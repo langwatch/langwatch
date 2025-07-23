@@ -1,0 +1,3518 @@
+export default {
+  openapi: "3.1.0",
+  info: {
+    title: "LangWatch API",
+    version: "1.0.0",
+    description: "LangWatch openapi spec",
+  },
+  servers: [
+    {
+      url: "https://app.langwatch.ai",
+    },
+  ],
+  security: [
+    {
+      api_key: [],
+    },
+  ],
+  paths: {
+    "/api/annotations": {
+      get: {
+        description: "Returns all annotations for project",
+        responses: {
+          "200": {
+            description: "Annotation response",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "array",
+                  items: {
+                    $ref: "#/components/schemas/Annotation",
+                  },
+                },
+              },
+            },
+          },
+          "400": {
+            description: "Unexpected error",
+            content: {
+              "application/json": {
+                schema: {
+                  $ref: "#/components/schemas/Error",
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+    "/api/annotations/trace/{id}": {
+      get: {
+        description: "Returns all annotations for single trace",
+        parameters: [
+          {
+            name: "id",
+            in: "path",
+            description: "ID of trace to fetch",
+            required: true,
+            schema: {
+              type: "string",
+            },
+          },
+        ],
+        responses: {
+          "200": {
+            description: "Annotation response",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "array",
+                  items: {
+                    $ref: "#/components/schemas/Annotation",
+                  },
+                },
+              },
+            },
+          },
+          "400": {
+            description: "Unexpected error",
+            content: {
+              "application/json": {
+                schema: {
+                  $ref: "#/components/schemas/Error",
+                },
+              },
+            },
+          },
+        },
+      },
+      post: {
+        description: "Create an annotation for a single trace",
+        parameters: [
+          {
+            name: "id",
+            in: "path",
+            description: "ID of the trace to annotate",
+            required: true,
+            schema: {
+              type: "string",
+            },
+          },
+        ],
+        requestBody: {
+          description: "Annotation data",
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                properties: {
+                  comment: {
+                    type: "string",
+                  },
+                  isThumbsUp: {
+                    type: "boolean",
+                  },
+                  email: {
+                    type: "string",
+                  },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          "200": {
+            description: "Annotation created",
+            content: {
+              "application/json": {
+                schema: {
+                  $ref: "#/components/schemas/Annotation",
+                },
+              },
+            },
+          },
+          "400": {
+            description: "Invalid input",
+            content: {
+              "application/json": {
+                schema: {
+                  $ref: "#/components/schemas/Error",
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+    "/api/annotations/{id}": {
+      get: {
+        description: "Returns a single annotation based on the ID supplied",
+        parameters: [
+          {
+            name: "id",
+            in: "path",
+            description: "ID of annotation to fetch",
+            required: true,
+            schema: {
+              type: "string",
+            },
+          },
+        ],
+        responses: {
+          "200": {
+            description: "Annotation response",
+            content: {
+              "application/json": {
+                schema: {
+                  $ref: "#/components/schemas/Annotation",
+                },
+              },
+            },
+          },
+          "400": {
+            description: "Unexpected error",
+            content: {
+              "application/json": {
+                schema: {
+                  $ref: "#/components/schemas/Error",
+                },
+              },
+            },
+          },
+        },
+      },
+      delete: {
+        description: "Deletes a single annotation based on the ID supplied",
+        parameters: [
+          {
+            name: "id",
+            in: "path",
+            description: "ID of annotation to delete",
+            required: true,
+            schema: {
+              type: "string",
+            },
+          },
+        ],
+        responses: {
+          "200": {
+            description: "Annotation response",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    status: {
+                      type: "string",
+                    },
+                    message: {
+                      type: "string",
+                    },
+                  },
+                },
+              },
+            },
+          },
+          "400": {
+            description: "Unexpected error",
+            content: {
+              "application/json": {
+                schema: {
+                  $ref: "#/components/schemas/Error",
+                },
+              },
+            },
+          },
+        },
+      },
+      patch: {
+        description: "Updates a single annotation based on the ID supplied",
+        parameters: [
+          {
+            name: "id",
+            in: "path",
+            description: "ID of annotation to delete",
+            required: true,
+            schema: {
+              type: "string",
+            },
+          },
+        ],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                properties: {
+                  comment: {
+                    type: "string",
+                  },
+                  isThumbsUp: {
+                    type: "boolean",
+                  },
+                  email: {
+                    type: "string",
+                  },
+                },
+              },
+            },
+          },
+        },
+        responses: {
+          "200": {
+            description: "Annotation response",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    status: {
+                      type: "string",
+                    },
+                    message: {
+                      type: "string",
+                    },
+                  },
+                },
+              },
+            },
+          },
+          "400": {
+            description: "Unexpected error",
+            content: {
+              "application/json": {
+                schema: {
+                  $ref: "#/components/schemas/Error",
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+    "/api/trace/{id}": {
+      get: {
+        description: "Returns single trace details based on the ID supplied",
+        parameters: [
+          {
+            name: "id",
+            in: "path",
+            description: "ID of trace to share",
+            required: true,
+            schema: {
+              type: "string",
+            },
+          },
+        ],
+        responses: {
+          "200": {
+            description: "Trace details with spans and evaluations",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    trace_id: {
+                      type: "string",
+                      example: "trace_BKZL_X0TKSD4oa1aBJTc_",
+                    },
+                    project_id: {
+                      type: "string",
+                      example: "KAXYxPR8MUgTcP8CF193y",
+                    },
+                    metadata: {
+                      type: "object",
+                      properties: {
+                        sdk_version: {
+                          type: "string",
+                          example: "0.1.11",
+                        },
+                        sdk_language: {
+                          type: "string",
+                          example: "python",
+                        },
+                      },
+                    },
+                    timestamps: {
+                      type: "object",
+                      properties: {
+                        started_at: {
+                          type: "integer",
+                          example: 1721382486868,
+                        },
+                        inserted_at: {
+                          type: "integer",
+                          example: 1721382492894,
+                        },
+                        updated_at: {
+                          type: "integer",
+                          example: 1721382492894,
+                        },
+                      },
+                    },
+                    input: {
+                      type: "object",
+                      properties: {
+                        value: {
+                          type: "string",
+                          example: "hi",
+                        },
+                      },
+                    },
+                    output: {
+                      type: "object",
+                      properties: {
+                        value: {
+                          type: "string",
+                          example: "Hey there! 👋😊",
+                        },
+                      },
+                    },
+                    metrics: {
+                      type: "object",
+                      properties: {
+                        first_token_ms: {
+                          type: "integer",
+                          example: 1449,
+                        },
+                        total_time_ms: {
+                          type: "integer",
+                          example: 1543,
+                        },
+                        prompt_tokens: {
+                          type: "integer",
+                          example: 20,
+                        },
+                        completion_tokens: {
+                          type: "integer",
+                          example: 7,
+                        },
+                        tokens_estimated: {
+                          type: "boolean",
+                          example: true,
+                        },
+                      },
+                    },
+                    error: {
+                      type: "object",
+                      nullable: true,
+                      properties: {
+                        stacktrace: {
+                          type: "array",
+                          items: {
+                            type: "string",
+                          },
+                        },
+                        message: {
+                          type: "string",
+                        },
+                        has_error: {
+                          type: "boolean",
+                        },
+                      },
+                      example: null,
+                    },
+                    indexing_md5s: {
+                      type: "array",
+                      items: {
+                        type: "string",
+                      },
+                      example: ["cccd21e0b70c706034dfd9f7772816a3"],
+                    },
+                    spans: {
+                      type: "array",
+                      items: {
+                        type: "object",
+                        properties: {
+                          trace_id: {
+                            type: "string",
+                            example: "trace_BKZL_X0TKSD4oa1aBJTc_",
+                          },
+                          span_id: {
+                            type: "string",
+                            example: "span_h1xUkcUJilhudDrLeQbR_",
+                          },
+                          timestamps: {
+                            type: "object",
+                            properties: {
+                              finished_at: {
+                                type: "integer",
+                                example: 1721382488392,
+                              },
+                              updated_at: {
+                                type: "integer",
+                                example: 1721382492027,
+                              },
+                              started_at: {
+                                type: "integer",
+                                example: 1721382486895,
+                              },
+                              first_token_at: {
+                                type: "integer",
+                                example: 1721382488317,
+                              },
+                              inserted_at: {
+                                type: "integer",
+                                example: 1721382492027,
+                              },
+                            },
+                          },
+                          type: {
+                            type: "string",
+                            example: "llm",
+                          },
+                          error: {
+                            type: "object",
+                            nullable: true,
+                            properties: {
+                              stacktrace: {
+                                type: "array",
+                                items: {
+                                  type: "string",
+                                },
+                              },
+                              message: {
+                                type: "string",
+                              },
+                              has_error: {
+                                type: "boolean",
+                              },
+                            },
+                            example: null,
+                          },
+                          params: {
+                            type: "object",
+                            properties: {
+                              stream: {
+                                type: "boolean",
+                                example: true,
+                              },
+                              temperature: {
+                                type: "number",
+                                example: 1,
+                              },
+                            },
+                          },
+                          project_id: {
+                            type: "string",
+                            example: "KAXYxPR8MUgTcP8CF193y",
+                          },
+                          parent_id: {
+                            type: "string",
+                            nullable: true,
+                            example: "span_ijZNjUMTz3ys0Z0YKwF_T",
+                          },
+                          name: {
+                            type: "string",
+                            nullable: true,
+                            example: null,
+                          },
+                          model: {
+                            type: "string",
+                            example: "openai/gpt-4o",
+                          },
+                          metrics: {
+                            type: "object",
+                            properties: {
+                              tokens_estimated: {
+                                type: "boolean",
+                                example: true,
+                              },
+                              completion_tokens: {
+                                type: "integer",
+                                example: 7,
+                              },
+                              prompt_tokens: {
+                                type: "integer",
+                                example: 20,
+                              },
+                            },
+                          },
+                          input: {
+                            type: "object",
+                            properties: {
+                              type: {
+                                type: "string",
+                                example: "chat_messages",
+                              },
+                              value: {
+                                type: "array",
+                                items: {
+                                  type: "object",
+                                  properties: {
+                                    role: {
+                                      type: "string",
+                                      example: "system",
+                                    },
+                                    content: {
+                                      type: "string",
+                                      example:
+                                        "You are a helpful assistant that only reply in short tweet-like responses, using lots of emojis.",
+                                    },
+                                  },
+                                },
+                                example: [
+                                  {
+                                    role: "system",
+                                    content:
+                                      "You are a helpful assistant that only reply in short tweet-like responses, using lots of emojis.",
+                                  },
+                                  {
+                                    role: "user",
+                                    content: "hi",
+                                  },
+                                ],
+                              },
+                            },
+                          },
+                          output: {
+                            type: "object",
+                            properties: {
+                              type: {
+                                type: "string",
+                                example: "chat_messages",
+                              },
+                              value: {
+                                type: "array",
+                                items: {
+                                  type: "object",
+                                  properties: {
+                                    role: {
+                                      type: "string",
+                                      example: "assistant",
+                                    },
+                                    content: {
+                                      type: "string",
+                                      example: "Hey there! 👋😊",
+                                    },
+                                  },
+                                },
+                                example: [
+                                  {
+                                    role: "assistant",
+                                    content: "Hey there! 👋😊",
+                                  },
+                                ],
+                              },
+                            },
+                          },
+                        },
+                      },
+                    },
+                    evaluations: {
+                      type: "array",
+                      items: {
+                        type: "object",
+                        properties: {
+                          evaluation_id: {
+                            type: "string",
+                            example: "check_VCagriZHNWICSOM09dXjM",
+                          },
+                          name: {
+                            type: "string",
+                            example: "Ragas Answer Relevancy",
+                          },
+                          type: {
+                            type: "string",
+                            example: "ragas/answer_relevancy",
+                          },
+                          trace_id: {
+                            type: "string",
+                            example: "trace_BKZL_X0TKSD4oa1aBJTc_",
+                          },
+                          project_id: {
+                            type: "string",
+                            example: "KAXYxPR8MUgTcP8CF193y",
+                          },
+                          status: {
+                            type: "string",
+                            example: "error",
+                          },
+                          timestamps: {
+                            type: "object",
+                            properties: {
+                              updated_at: {
+                                type: "integer",
+                                example: 1721383657788,
+                              },
+                              inserted_at: {
+                                type: "integer",
+                                example: 1721382493358,
+                              },
+                            },
+                          },
+                          error: {
+                            type: "object",
+                            properties: {
+                              stacktrace: {
+                                type: "array",
+                                items: {
+                                  type: "string",
+                                },
+                                example: ["TypeError: fetch failed"],
+                              },
+                              message: {
+                                type: "string",
+                                example: "fetch failed",
+                              },
+                              has_error: {
+                                type: "boolean",
+                                example: true,
+                              },
+                            },
+                          },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+          "400": {
+            description: "Unexpected error",
+            content: {
+              "application/json": {
+                schema: {
+                  $ref: "#/components/schemas/Error",
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+    "/api/trace/search": {
+      post: {
+        summary: "Search traces",
+        description: "Search for traces based on given criteria",
+        tags: ["Traces"],
+        requestBody: {
+          required: true,
+          content: {
+            "application/json": {
+              schema: {
+                $ref: "#/components/schemas/SearchRequest",
+              },
+            },
+          },
+        },
+        responses: {
+          "200": {
+            description: "Successful response",
+            content: {
+              "application/json": {
+                schema: {
+                  $ref: "#/components/schemas/SearchResponse",
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+    "/api/trace/{id}/share": {
+      post: {
+        description: "Returns a public path for a trace",
+        parameters: [
+          {
+            name: "id",
+            in: "path",
+            description: "ID of trace to share",
+            required: true,
+            schema: {
+              type: "string",
+            },
+          },
+        ],
+        responses: {
+          "200": {
+            description: "Public path created",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    path: {
+                      type: "string",
+                    },
+                  },
+                },
+              },
+            },
+          },
+          "400": {
+            description: "Unexpected error",
+            content: {
+              "application/json": {
+                schema: {
+                  $ref: "#/components/schemas/Error",
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+    "/api/trace/{id}/unshare": {
+      post: {
+        description: "Deletes a public path for a trace",
+        parameters: [
+          {
+            name: "id",
+            in: "path",
+            description: "ID of trace to unshare",
+            required: true,
+            schema: {
+              type: "string",
+            },
+          },
+        ],
+        responses: {
+          "200": {
+            description: "Public path deleted",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    message: {
+                      type: "string",
+                    },
+                  },
+                },
+              },
+            },
+          },
+          "400": {
+            description: "Unexpected error",
+            content: {
+              "application/json": {
+                schema: {
+                  $ref: "#/components/schemas/Error",
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+    "/api/dataset/{slug}/entries": {
+      post: {
+        responses: {},
+        operationId: "postApiDatasetBySlugEntries",
+        parameters: [
+          {
+            schema: {
+              type: "string",
+            },
+            in: "path",
+            name: "slug",
+            required: true,
+          },
+        ],
+        description: "Add entries to a dataset",
+        requestBody: {
+          content: {
+            "application/json": {
+              schema: {
+                $ref: "#/components/schemas/DatasetPostEntries",
+              },
+            },
+          },
+        },
+      },
+    },
+    "/api/prompts": {
+      get: {
+        responses: {
+          "200": {
+            content: {
+              "application/json": {
+                schema: {
+                  type: "array",
+                  items: {
+                    type: "object",
+                    properties: {
+                      id: {
+                        type: "string",
+                      },
+                      name: {
+                        type: "string",
+                      },
+                      updatedAt: {
+                        type: "string",
+                      },
+                      version: {
+                        type: "number",
+                      },
+                      versionId: {
+                        type: "string",
+                      },
+                      versionCreatedAt: {
+                        type: "string",
+                      },
+                      model: {
+                        type: "string",
+                      },
+                      prompt: {
+                        type: "string",
+                      },
+                      messages: {
+                        type: "array",
+                        items: {
+                          type: "object",
+                          properties: {
+                            role: {
+                              type: "string",
+                              enum: ["user", "assistant", "system"],
+                            },
+                            content: {
+                              type: "string",
+                            },
+                          },
+                          required: ["role", "content"],
+                          additionalProperties: true,
+                        },
+                      },
+                      response_format: {
+                        type: ["object", "null"],
+                        properties: {
+                          type: {
+                            type: "string",
+                            enum: ["json_schema"],
+                          },
+                          json_schema: {
+                            type: "object",
+                            properties: {
+                              name: {
+                                type: "string",
+                              },
+                              schema: {
+                                type: "object",
+                              },
+                            },
+                            required: ["name", "schema"],
+                          },
+                        },
+                        required: ["type", "json_schema"],
+                      },
+                    },
+                    required: [
+                      "id",
+                      "name",
+                      "updatedAt",
+                      "version",
+                      "versionId",
+                      "versionCreatedAt",
+                      "model",
+                      "prompt",
+                      "messages",
+                      "response_format",
+                    ],
+                  },
+                },
+              },
+            },
+            description: "Success",
+          },
+          "400": {
+            content: {
+              "application/json": {
+                schema: {
+                  _cached: null,
+                  type: "object",
+                  properties: {
+                    error: {
+                      type: "string",
+                      enum: ["Bad Request"],
+                    },
+                  },
+                  required: ["error"],
+                },
+              },
+            },
+            description: "Bad Request",
+          },
+          "401": {
+            content: {
+              "application/json": {
+                schema: {
+                  _cached: null,
+                  type: "object",
+                  properties: {
+                    error: {
+                      type: "string",
+                      enum: ["Unauthorized"],
+                    },
+                  },
+                  required: ["error"],
+                  error: "Unauthorized",
+                },
+              },
+            },
+            description: "Unauthorized",
+          },
+          "500": {
+            description: "Internal Server Error",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    error: {
+                      type: "string",
+                    },
+                  },
+                  required: ["error"],
+                },
+              },
+            },
+          },
+        },
+        operationId: "getApiPrompts",
+        parameters: [],
+        description: "Get all prompts for a project",
+      },
+      post: {
+        responses: {
+          "200": {
+            content: {
+              "application/json": {
+                schema: {
+                  _cached: null,
+                  type: "object",
+                  properties: {
+                    id: {
+                      type: "string",
+                    },
+                    name: {
+                      type: "string",
+                    },
+                    updatedAt: {
+                      type: "string",
+                    },
+                    version: {
+                      type: "number",
+                    },
+                    versionId: {
+                      type: "string",
+                    },
+                    versionCreatedAt: {
+                      type: "string",
+                    },
+                    model: {
+                      type: "string",
+                    },
+                    prompt: {
+                      type: "string",
+                    },
+                    messages: {
+                      type: "array",
+                      items: {
+                        type: "object",
+                        properties: {
+                          role: {
+                            type: "string",
+                            enum: ["user", "assistant", "system"],
+                          },
+                          content: {
+                            type: "string",
+                          },
+                        },
+                        required: ["role", "content"],
+                        additionalProperties: true,
+                      },
+                    },
+                    response_format: {
+                      type: ["object", "null"],
+                      properties: {
+                        type: {
+                          type: "string",
+                          enum: ["json_schema"],
+                        },
+                        json_schema: {
+                          type: "object",
+                          properties: {
+                            name: {
+                              type: "string",
+                            },
+                            schema: {
+                              type: "object",
+                            },
+                          },
+                          required: ["name", "schema"],
+                        },
+                      },
+                      required: ["type", "json_schema"],
+                    },
+                  },
+                  required: [
+                    "id",
+                    "name",
+                    "updatedAt",
+                    "version",
+                    "versionId",
+                    "versionCreatedAt",
+                    "model",
+                    "prompt",
+                    "messages",
+                    "response_format",
+                  ],
+                },
+              },
+            },
+            description: "Success",
+          },
+          "400": {
+            content: {
+              "application/json": {
+                schema: {
+                  _cached: null,
+                  type: "object",
+                  properties: {
+                    error: {
+                      type: "string",
+                      enum: ["Bad Request"],
+                    },
+                  },
+                  required: ["error"],
+                },
+              },
+            },
+            description: "Bad Request",
+          },
+          "401": {
+            content: {
+              "application/json": {
+                schema: {
+                  _cached: null,
+                  type: "object",
+                  properties: {
+                    error: {
+                      type: "string",
+                      enum: ["Unauthorized"],
+                    },
+                  },
+                  required: ["error"],
+                  error: "Unauthorized",
+                },
+              },
+            },
+            description: "Unauthorized",
+          },
+          "500": {
+            description: "Internal Server Error",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    error: {
+                      type: "string",
+                    },
+                  },
+                  required: ["error"],
+                },
+              },
+            },
+          },
+        },
+        operationId: "postApiPrompts",
+        parameters: [],
+        description: "Create a new prompt with default initial version",
+        requestBody: {
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                properties: {
+                  name: {
+                    type: "string",
+                    minLength: 1,
+                  },
+                },
+                required: ["name"],
+              },
+            },
+          },
+        },
+      },
+    },
+    "/api/prompts/{id}": {
+      get: {
+        responses: {
+          "200": {
+            content: {
+              "application/json": {
+                schema: {
+                  _cached: null,
+                  type: "object",
+                  properties: {
+                    id: {
+                      type: "string",
+                    },
+                    name: {
+                      type: "string",
+                    },
+                    updatedAt: {
+                      type: "string",
+                    },
+                    version: {
+                      type: "number",
+                    },
+                    versionId: {
+                      type: "string",
+                    },
+                    versionCreatedAt: {
+                      type: "string",
+                    },
+                    model: {
+                      type: "string",
+                    },
+                    prompt: {
+                      type: "string",
+                    },
+                    messages: {
+                      type: "array",
+                      items: {
+                        type: "object",
+                        properties: {
+                          role: {
+                            type: "string",
+                            enum: ["user", "assistant", "system"],
+                          },
+                          content: {
+                            type: "string",
+                          },
+                        },
+                        required: ["role", "content"],
+                        additionalProperties: true,
+                      },
+                    },
+                    response_format: {
+                      type: ["object", "null"],
+                      properties: {
+                        type: {
+                          type: "string",
+                          enum: ["json_schema"],
+                        },
+                        json_schema: {
+                          type: "object",
+                          properties: {
+                            name: {
+                              type: "string",
+                            },
+                            schema: {
+                              type: "object",
+                            },
+                          },
+                          required: ["name", "schema"],
+                        },
+                      },
+                      required: ["type", "json_schema"],
+                    },
+                  },
+                  required: [
+                    "id",
+                    "name",
+                    "updatedAt",
+                    "version",
+                    "versionId",
+                    "versionCreatedAt",
+                    "model",
+                    "prompt",
+                    "messages",
+                    "response_format",
+                  ],
+                },
+              },
+            },
+            description: "Success",
+          },
+          "400": {
+            content: {
+              "application/json": {
+                schema: {
+                  _cached: null,
+                  type: "object",
+                  properties: {
+                    error: {
+                      type: "string",
+                      enum: ["Bad Request"],
+                    },
+                  },
+                  required: ["error"],
+                },
+              },
+            },
+            description: "Bad Request",
+          },
+          "401": {
+            content: {
+              "application/json": {
+                schema: {
+                  _cached: null,
+                  type: "object",
+                  properties: {
+                    error: {
+                      type: "string",
+                      enum: ["Unauthorized"],
+                    },
+                  },
+                  required: ["error"],
+                  error: "Unauthorized",
+                },
+              },
+            },
+            description: "Unauthorized",
+          },
+          "404": {
+            description: "Prompt not found",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    error: {
+                      type: "string",
+                    },
+                  },
+                  required: ["error"],
+                },
+              },
+            },
+          },
+          "500": {
+            description: "Internal Server Error",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    error: {
+                      type: "string",
+                    },
+                  },
+                  required: ["error"],
+                },
+              },
+            },
+          },
+        },
+        operationId: "getApiPromptsById",
+        parameters: [
+          {
+            schema: {
+              type: "string",
+            },
+            in: "path",
+            name: "id",
+            required: true,
+          },
+        ],
+        description: "Get a specific prompt",
+      },
+      put: {
+        responses: {
+          "200": {
+            content: {
+              "application/json": {
+                schema: {
+                  _cached: null,
+                  type: "object",
+                  properties: {
+                    id: {
+                      type: "string",
+                    },
+                    name: {
+                      type: "string",
+                    },
+                    updatedAt: {
+                      type: "string",
+                    },
+                  },
+                  required: ["id", "name", "updatedAt"],
+                },
+              },
+            },
+            description: "Success",
+          },
+          "400": {
+            content: {
+              "application/json": {
+                schema: {
+                  _cached: null,
+                  type: "object",
+                  properties: {
+                    error: {
+                      type: "string",
+                      enum: ["Bad Request"],
+                    },
+                  },
+                  required: ["error"],
+                },
+              },
+            },
+            description: "Bad Request",
+          },
+          "401": {
+            content: {
+              "application/json": {
+                schema: {
+                  _cached: null,
+                  type: "object",
+                  properties: {
+                    error: {
+                      type: "string",
+                      enum: ["Unauthorized"],
+                    },
+                  },
+                  required: ["error"],
+                  error: "Unauthorized",
+                },
+              },
+            },
+            description: "Unauthorized",
+          },
+          "404": {
+            description: "Prompt not found",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    error: {
+                      type: "string",
+                    },
+                  },
+                  required: ["error"],
+                },
+              },
+            },
+          },
+          "500": {
+            description: "Internal Server Error",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    error: {
+                      type: "string",
+                    },
+                  },
+                  required: ["error"],
+                },
+              },
+            },
+          },
+        },
+        operationId: "putApiPromptsById",
+        parameters: [
+          {
+            schema: {
+              type: "string",
+            },
+            in: "path",
+            name: "id",
+            required: true,
+          },
+        ],
+        description: "Update a prompt",
+        requestBody: {
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                properties: {
+                  name: {
+                    type: "string",
+                    minLength: 1,
+                  },
+                },
+                required: ["name"],
+              },
+            },
+          },
+        },
+      },
+      delete: {
+        responses: {
+          "200": {
+            content: {
+              "application/json": {
+                schema: {
+                  _cached: null,
+                  type: "object",
+                  properties: {
+                    success: {
+                      type: "boolean",
+                    },
+                  },
+                  required: ["success"],
+                },
+              },
+            },
+            description: "Success",
+          },
+          "400": {
+            content: {
+              "application/json": {
+                schema: {
+                  _cached: null,
+                  type: "object",
+                  properties: {
+                    error: {
+                      type: "string",
+                      enum: ["Bad Request"],
+                    },
+                  },
+                  required: ["error"],
+                },
+              },
+            },
+            description: "Bad Request",
+          },
+          "401": {
+            content: {
+              "application/json": {
+                schema: {
+                  _cached: null,
+                  type: "object",
+                  properties: {
+                    error: {
+                      type: "string",
+                      enum: ["Unauthorized"],
+                    },
+                  },
+                  required: ["error"],
+                  error: "Unauthorized",
+                },
+              },
+            },
+            description: "Unauthorized",
+          },
+          "404": {
+            description: "Prompt not found",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    error: {
+                      type: "string",
+                    },
+                  },
+                  required: ["error"],
+                },
+              },
+            },
+          },
+          "500": {
+            description: "Internal Server Error",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    error: {
+                      type: "string",
+                    },
+                  },
+                  required: ["error"],
+                },
+              },
+            },
+          },
+        },
+        operationId: "deleteApiPromptsById",
+        parameters: [
+          {
+            schema: {
+              type: "string",
+            },
+            in: "path",
+            name: "id",
+            required: true,
+          },
+        ],
+        description: "Delete a prompt",
+      },
+    },
+    "/api/prompts/{id}/versions": {
+      get: {
+        responses: {
+          "200": {
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  items: {
+                    type: "object",
+                    properties: {
+                      id: {
+                        type: "string",
+                      },
+                      authorId: {
+                        type: ["string", "null"],
+                      },
+                      projectId: {
+                        type: "string",
+                        minLength: 1,
+                      },
+                      configId: {
+                        type: "string",
+                        minLength: 1,
+                      },
+                      schemaVersion: {
+                        type: "string",
+                        const: "1.0",
+                      },
+                      commitMessage: {
+                        type: ["string", "null"],
+                      },
+                      version: {
+                        type: "number",
+                      },
+                      createdAt: {
+                        type: "string",
+                      },
+                      configData: {
+                        type: "object",
+                        properties: {
+                          version: {
+                            type: "number",
+                            minimum: 1,
+                          },
+                          prompt: {
+                            type: "string",
+                          },
+                          messages: {
+                            type: "array",
+                            items: {
+                              type: "object",
+                              properties: {
+                                role: {
+                                  type: "string",
+                                  enum: ["user", "assistant", "system"],
+                                },
+                                content: {
+                                  type: "string",
+                                },
+                              },
+                              required: ["role", "content"],
+                              additionalProperties: true,
+                            },
+                            default: [],
+                          },
+                          inputs: {
+                            type: "array",
+                            items: {
+                              type: "object",
+                              properties: {
+                                identifier: {
+                                  type: "string",
+                                  minLength: 1,
+                                },
+                                type: {
+                                  type: "string",
+                                  enum: [
+                                    "str",
+                                    "float",
+                                    "bool",
+                                    "image",
+                                    "list[str]",
+                                    "list[float]",
+                                    "list[int]",
+                                    "list[bool]",
+                                    "dict",
+                                  ],
+                                },
+                              },
+                              required: ["identifier", "type"],
+                            },
+                            minItems: 1,
+                          },
+                          outputs: {
+                            type: "array",
+                            items: {
+                              type: "object",
+                              properties: {
+                                identifier: {
+                                  type: "string",
+                                  minLength: 1,
+                                },
+                                type: {
+                                  type: "string",
+                                  enum: ["str", "float", "bool", "json_schema"],
+                                },
+                                json_schema: {
+                                  type: "object",
+                                  properties: {
+                                    type: {
+                                      type: "string",
+                                      minLength: 1,
+                                    },
+                                  },
+                                  required: ["type"],
+                                  additionalProperties: true,
+                                },
+                              },
+                              required: ["identifier", "type"],
+                            },
+                            minItems: 1,
+                          },
+                          model: {
+                            type: "string",
+                            minLength: 1,
+                          },
+                          temperature: {
+                            type: "number",
+                          },
+                          max_tokens: {
+                            type: "number",
+                          },
+                          demonstrations: {
+                            type: "object",
+                            properties: {
+                              columns: {
+                                type: "array",
+                                items: {
+                                  type: "object",
+                                  properties: {
+                                    id: {
+                                      type: "string",
+                                      minLength: 1,
+                                    },
+                                    name: {
+                                      type: "string",
+                                      minLength: 1,
+                                    },
+                                    type: {
+                                      type: "string",
+                                      enum: [
+                                        "string",
+                                        "boolean",
+                                        "number",
+                                        "date",
+                                        "list",
+                                        "json",
+                                        "spans",
+                                        "rag_contexts",
+                                        "chat_messages",
+                                        "annotations",
+                                        "evaluations",
+                                      ],
+                                    },
+                                  },
+                                  required: ["id", "name", "type"],
+                                },
+                              },
+                              rows: {
+                                type: "array",
+                                items: {
+                                  allOf: [
+                                    {
+                                      type: "object",
+                                      properties: {
+                                        id: {
+                                          type: "string",
+                                          minLength: 1,
+                                        },
+                                      },
+                                      required: ["id"],
+                                    },
+                                    {
+                                      type: "object",
+                                      additionalProperties: {},
+                                    },
+                                  ],
+                                },
+                                default: [],
+                              },
+                            },
+                            required: ["columns", "rows"],
+                          },
+                        },
+                        required: [
+                          "prompt",
+                          "messages",
+                          "inputs",
+                          "outputs",
+                          "model",
+                          "demonstrations",
+                        ],
+                      },
+                    },
+                    required: [
+                      "id",
+                      "authorId",
+                      "projectId",
+                      "configId",
+                      "schemaVersion",
+                      "version",
+                      "createdAt",
+                      "configData",
+                    ],
+                  },
+                  properties: {
+                    id: {
+                      type: "string",
+                    },
+                    authorId: {
+                      type: ["string", "null"],
+                    },
+                    projectId: {
+                      type: "string",
+                      minLength: 1,
+                    },
+                    configId: {
+                      type: "string",
+                      minLength: 1,
+                    },
+                    schemaVersion: {
+                      type: "string",
+                      const: "1.0",
+                    },
+                    commitMessage: {
+                      type: ["string", "null"],
+                    },
+                    version: {
+                      type: "number",
+                    },
+                    createdAt: {
+                      type: "string",
+                    },
+                    configData: {
+                      type: "object",
+                      properties: {
+                        version: {
+                          type: "number",
+                          minimum: 1,
+                        },
+                        prompt: {
+                          type: "string",
+                        },
+                        messages: {
+                          type: "array",
+                          items: {
+                            type: "object",
+                            properties: {
+                              role: {
+                                type: "string",
+                                enum: ["user", "assistant", "system"],
+                              },
+                              content: {
+                                type: "string",
+                              },
+                            },
+                            required: ["role", "content"],
+                            additionalProperties: true,
+                          },
+                          default: [],
+                        },
+                        inputs: {
+                          type: "array",
+                          items: {
+                            type: "object",
+                            properties: {
+                              identifier: {
+                                type: "string",
+                                minLength: 1,
+                              },
+                              type: {
+                                type: "string",
+                                enum: [
+                                  "str",
+                                  "float",
+                                  "bool",
+                                  "image",
+                                  "list[str]",
+                                  "list[float]",
+                                  "list[int]",
+                                  "list[bool]",
+                                  "dict",
+                                ],
+                              },
+                            },
+                            required: ["identifier", "type"],
+                          },
+                          minItems: 1,
+                        },
+                        outputs: {
+                          type: "array",
+                          items: {
+                            type: "object",
+                            properties: {
+                              identifier: {
+                                type: "string",
+                                minLength: 1,
+                              },
+                              type: {
+                                type: "string",
+                                enum: ["str", "float", "bool", "json_schema"],
+                              },
+                              json_schema: {
+                                type: "object",
+                                properties: {
+                                  type: {
+                                    type: "string",
+                                    minLength: 1,
+                                  },
+                                },
+                                required: ["type"],
+                                additionalProperties: true,
+                              },
+                            },
+                            required: ["identifier", "type"],
+                          },
+                          minItems: 1,
+                        },
+                        model: {
+                          type: "string",
+                          minLength: 1,
+                        },
+                        temperature: {
+                          type: "number",
+                        },
+                        max_tokens: {
+                          type: "number",
+                        },
+                        demonstrations: {
+                          type: "object",
+                          properties: {
+                            columns: {
+                              type: "array",
+                              items: {
+                                type: "object",
+                                properties: {
+                                  id: {
+                                    type: "string",
+                                    minLength: 1,
+                                  },
+                                  name: {
+                                    type: "string",
+                                    minLength: 1,
+                                  },
+                                  type: {
+                                    type: "string",
+                                    enum: [
+                                      "string",
+                                      "boolean",
+                                      "number",
+                                      "date",
+                                      "list",
+                                      "json",
+                                      "spans",
+                                      "rag_contexts",
+                                      "chat_messages",
+                                      "annotations",
+                                      "evaluations",
+                                    ],
+                                  },
+                                },
+                                required: ["id", "name", "type"],
+                              },
+                            },
+                            rows: {
+                              type: "array",
+                              items: {
+                                allOf: [
+                                  {
+                                    type: "object",
+                                    properties: {
+                                      id: {
+                                        type: "string",
+                                        minLength: 1,
+                                      },
+                                    },
+                                    required: ["id"],
+                                  },
+                                  {
+                                    type: "object",
+                                    additionalProperties: {},
+                                  },
+                                ],
+                              },
+                              default: [],
+                            },
+                          },
+                          required: ["columns", "rows"],
+                        },
+                        prompting_technique: {
+                          type: "object",
+                          properties: {
+                            ref: {
+                              type: "string",
+                            },
+                          },
+                        },
+                      },
+                      required: [
+                        "prompt",
+                        "messages",
+                        "inputs",
+                        "outputs",
+                        "model",
+                        "demonstrations",
+                      ],
+                    },
+                  },
+                  required: [
+                    "id",
+                    "authorId",
+                    "projectId",
+                    "configId",
+                    "schemaVersion",
+                    "version",
+                    "createdAt",
+                    "configData",
+                  ],
+                },
+              },
+            },
+            description: "Success",
+          },
+          "400": {
+            content: {
+              "application/json": {
+                schema: {
+                  _cached: null,
+                  type: "object",
+                  properties: {
+                    error: {
+                      type: "string",
+                      enum: ["Bad Request"],
+                    },
+                  },
+                  required: ["error"],
+                },
+              },
+            },
+            description: "Bad Request",
+          },
+          "401": {
+            content: {
+              "application/json": {
+                schema: {
+                  _cached: null,
+                  type: "object",
+                  properties: {
+                    error: {
+                      type: "string",
+                      enum: ["Unauthorized"],
+                    },
+                  },
+                  required: ["error"],
+                  error: "Unauthorized",
+                },
+              },
+            },
+            description: "Unauthorized",
+          },
+          "404": {
+            description: "Prompt not found",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    error: {
+                      type: "string",
+                    },
+                  },
+                  required: ["error"],
+                },
+              },
+            },
+          },
+          "500": {
+            description: "Internal Server Error",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    error: {
+                      type: "string",
+                    },
+                  },
+                  required: ["error"],
+                },
+              },
+            },
+          },
+        },
+        operationId: "getApiPromptsByIdVersions",
+        parameters: [
+          {
+            schema: {
+              type: "string",
+            },
+            in: "path",
+            name: "id",
+            required: true,
+          },
+        ],
+        description: "Get all versions for a prompt",
+      },
+      post: {
+        responses: {
+          "200": {
+            content: {
+              "application/json": {
+                schema: {
+                  _cached: null,
+                  type: "object",
+                  properties: {
+                    id: {
+                      type: "string",
+                    },
+                    authorId: {
+                      type: ["string", "null"],
+                    },
+                    projectId: {
+                      type: "string",
+                      minLength: 1,
+                    },
+                    configId: {
+                      type: "string",
+                      minLength: 1,
+                    },
+                    schemaVersion: {
+                      type: "string",
+                      const: "1.0",
+                    },
+                    commitMessage: {
+                      type: ["string", "null"],
+                    },
+                    version: {
+                      type: "number",
+                    },
+                    createdAt: {
+                      type: "string",
+                    },
+                    configData: {
+                      type: "object",
+                      properties: {
+                        version: {
+                          type: "number",
+                          minimum: 1,
+                        },
+                        prompt: {
+                          type: "string",
+                        },
+                        messages: {
+                          type: "array",
+                          items: {
+                            type: "object",
+                            properties: {
+                              role: {
+                                type: "string",
+                                enum: ["user", "assistant", "system"],
+                              },
+                              content: {
+                                type: "string",
+                              },
+                            },
+                            required: ["role", "content"],
+                            additionalProperties: true,
+                          },
+                          default: [],
+                        },
+                        inputs: {
+                          type: "array",
+                          items: {
+                            type: "object",
+                            properties: {
+                              identifier: {
+                                type: "string",
+                                minLength: 1,
+                              },
+                              type: {
+                                type: "string",
+                                enum: [
+                                  "str",
+                                  "float",
+                                  "bool",
+                                  "image",
+                                  "list[str]",
+                                  "list[float]",
+                                  "list[int]",
+                                  "list[bool]",
+                                  "dict",
+                                ],
+                              },
+                            },
+                            required: ["identifier", "type"],
+                          },
+                          minItems: 1,
+                        },
+                        outputs: {
+                          type: "array",
+                          items: {
+                            type: "object",
+                            properties: {
+                              identifier: {
+                                type: "string",
+                                minLength: 1,
+                              },
+                              type: {
+                                type: "string",
+                                enum: ["str", "float", "bool", "json_schema"],
+                              },
+                              json_schema: {
+                                type: "object",
+                                properties: {
+                                  type: {
+                                    type: "string",
+                                    minLength: 1,
+                                  },
+                                },
+                                required: ["type"],
+                                additionalProperties: true,
+                              },
+                            },
+                            required: ["identifier", "type"],
+                          },
+                          minItems: 1,
+                        },
+                        model: {
+                          type: "string",
+                          minLength: 1,
+                        },
+                        temperature: {
+                          type: "number",
+                        },
+                        max_tokens: {
+                          type: "number",
+                        },
+                        demonstrations: {
+                          type: "object",
+                          properties: {
+                            columns: {
+                              type: "array",
+                              items: {
+                                type: "object",
+                                properties: {
+                                  id: {
+                                    type: "string",
+                                    minLength: 1,
+                                  },
+                                  name: {
+                                    type: "string",
+                                    minLength: 1,
+                                  },
+                                  type: {
+                                    type: "string",
+                                    enum: [
+                                      "string",
+                                      "boolean",
+                                      "number",
+                                      "date",
+                                      "list",
+                                      "json",
+                                      "spans",
+                                      "rag_contexts",
+                                      "chat_messages",
+                                      "annotations",
+                                      "evaluations",
+                                    ],
+                                  },
+                                },
+                                required: ["id", "name", "type"],
+                              },
+                            },
+                            rows: {
+                              type: "array",
+                              items: {
+                                allOf: [
+                                  {
+                                    type: "object",
+                                    properties: {
+                                      id: {
+                                        type: "string",
+                                        minLength: 1,
+                                      },
+                                    },
+                                    required: ["id"],
+                                  },
+                                  {
+                                    type: "object",
+                                    additionalProperties: {},
+                                  },
+                                ],
+                              },
+                              default: [],
+                            },
+                          },
+                          required: ["columns", "rows"],
+                        },
+                        prompting_technique: {
+                          type: "object",
+                          properties: {
+                            ref: {
+                              type: "string",
+                            },
+                          },
+                        },
+                      },
+                      required: [
+                        "prompt",
+                        "messages",
+                        "inputs",
+                        "outputs",
+                        "model",
+                        "demonstrations",
+                      ],
+                    },
+                  },
+                  required: [
+                    "id",
+                    "authorId",
+                    "projectId",
+                    "configId",
+                    "schemaVersion",
+                    "version",
+                    "createdAt",
+                    "configData",
+                  ],
+                },
+              },
+            },
+            description: "Success",
+          },
+          "400": {
+            content: {
+              "application/json": {
+                schema: {
+                  _cached: null,
+                  type: "object",
+                  properties: {
+                    error: {
+                      type: "string",
+                      enum: ["Bad Request"],
+                    },
+                  },
+                  required: ["error"],
+                },
+              },
+            },
+            description: "Bad Request",
+          },
+          "401": {
+            content: {
+              "application/json": {
+                schema: {
+                  _cached: null,
+                  type: "object",
+                  properties: {
+                    error: {
+                      type: "string",
+                      enum: ["Unauthorized"],
+                    },
+                  },
+                  required: ["error"],
+                  error: "Unauthorized",
+                },
+              },
+            },
+            description: "Unauthorized",
+          },
+          "404": {
+            description: "Prompt not found",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    error: {
+                      type: "string",
+                    },
+                  },
+                  required: ["error"],
+                },
+              },
+            },
+          },
+          "500": {
+            description: "Internal Server Error",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    error: {
+                      type: "string",
+                    },
+                  },
+                  required: ["error"],
+                },
+              },
+            },
+          },
+        },
+        operationId: "postApiPromptsByIdVersions",
+        parameters: [
+          {
+            schema: {
+              type: "string",
+            },
+            in: "path",
+            name: "id",
+            required: true,
+          },
+        ],
+        description: "Create a new version for a prompt",
+        requestBody: {
+          content: {
+            "application/json": {
+              schema: {
+                type: "object",
+                properties: {
+                  id: {
+                    type: "string",
+                  },
+                  authorId: {
+                    type: ["string", "null"],
+                  },
+                  projectId: {
+                    type: "string",
+                    minLength: 1,
+                  },
+                  configId: {
+                    type: "string",
+                    minLength: 1,
+                  },
+                  schemaVersion: {
+                    type: "string",
+                    const: "1.0",
+                  },
+                  commitMessage: {
+                    type: "string",
+                  },
+                  version: {
+                    type: "number",
+                  },
+                  createdAt: {
+                    type: "string",
+                  },
+                  configData: {
+                    type: "object",
+                    properties: {
+                      version: {
+                        type: "number",
+                        minimum: 1,
+                      },
+                      prompt: {
+                        type: "string",
+                      },
+                      messages: {
+                        type: "array",
+                        items: {
+                          type: "object",
+                          properties: {
+                            role: {
+                              type: "string",
+                              enum: ["user", "assistant", "system"],
+                            },
+                            content: {
+                              type: "string",
+                            },
+                          },
+                          required: ["role", "content"],
+                          additionalProperties: true,
+                        },
+                        default: [],
+                      },
+                      inputs: {
+                        type: "array",
+                        items: {
+                          type: "object",
+                          properties: {
+                            identifier: {
+                              type: "string",
+                              minLength: 1,
+                            },
+                            type: {
+                              type: "string",
+                              enum: [
+                                "str",
+                                "float",
+                                "bool",
+                                "image",
+                                "list[str]",
+                                "list[float]",
+                                "list[int]",
+                                "list[bool]",
+                                "dict",
+                              ],
+                            },
+                          },
+                          required: ["identifier", "type"],
+                        },
+                        minItems: 1,
+                      },
+                      outputs: {
+                        type: "array",
+                        items: {
+                          type: "object",
+                          properties: {
+                            identifier: {
+                              type: "string",
+                              minLength: 1,
+                            },
+                            type: {
+                              type: "string",
+                              enum: ["str", "float", "bool", "json_schema"],
+                            },
+                            json_schema: {
+                              type: "object",
+                              properties: {
+                                type: {
+                                  type: "string",
+                                  minLength: 1,
+                                },
+                              },
+                              required: ["type"],
+                              additionalProperties: true,
+                            },
+                          },
+                          required: ["identifier", "type"],
+                        },
+                        minItems: 1,
+                      },
+                      model: {
+                        type: "string",
+                        minLength: 1,
+                      },
+                      temperature: {
+                        type: "number",
+                      },
+                      max_tokens: {
+                        type: "number",
+                      },
+                      demonstrations: {
+                        type: "object",
+                        properties: {
+                          columns: {
+                            type: "array",
+                            items: {
+                              type: "object",
+                              properties: {
+                                id: {
+                                  type: "string",
+                                  minLength: 1,
+                                },
+                                name: {
+                                  type: "string",
+                                  minLength: 1,
+                                },
+                                type: {
+                                  type: "string",
+                                  enum: [
+                                    "string",
+                                    "boolean",
+                                    "number",
+                                    "date",
+                                    "list",
+                                    "json",
+                                    "spans",
+                                    "rag_contexts",
+                                    "chat_messages",
+                                    "annotations",
+                                    "evaluations",
+                                  ],
+                                },
+                              },
+                              required: ["id", "name", "type"],
+                            },
+                          },
+                          rows: {
+                            type: "array",
+                            items: {
+                              allOf: [
+                                {
+                                  type: "object",
+                                  properties: {
+                                    id: {
+                                      type: "string",
+                                      minLength: 1,
+                                    },
+                                  },
+                                  required: ["id"],
+                                },
+                                {
+                                  type: "object",
+                                  additionalProperties: {},
+                                },
+                              ],
+                            },
+                            default: [],
+                          },
+                        },
+                        required: ["columns"],
+                      },
+                      prompting_technique: {
+                        type: "object",
+                        properties: {
+                          ref: {
+                            type: "string",
+                          },
+                        },
+                      },
+                    },
+                    required: [
+                      "prompt",
+                      "inputs",
+                      "outputs",
+                      "model",
+                      "demonstrations",
+                    ],
+                  },
+                },
+                required: [
+                  "projectId",
+                  "configId",
+                  "schemaVersion",
+                  "commitMessage",
+                  "version",
+                  "configData",
+                ],
+              },
+            },
+          },
+        },
+      },
+    },
+    "/api/dataset/{slugOrId}": {
+      get: {
+        responses: {
+          "200": {
+            description: "Success",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    data: {
+                      type: "array",
+                      items: {
+                        type: "object",
+                        properties: {
+                          id: {
+                            type: "string",
+                          },
+                          datasetId: {
+                            type: "string",
+                          },
+                          projectId: {
+                            type: "string",
+                          },
+                          entry: {
+                            type: "object",
+                            additionalProperties: {},
+                          },
+                          createdAt: {
+                            type: "string",
+                          },
+                          updatedAt: {
+                            type: "string",
+                          },
+                        },
+                        required: [
+                          "id",
+                          "datasetId",
+                          "projectId",
+                          "entry",
+                          "createdAt",
+                          "updatedAt",
+                        ],
+                      },
+                    },
+                  },
+                  required: ["data"],
+                },
+              },
+            },
+          },
+          "400": {
+            description: "Bad Request",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    error: {
+                      type: "string",
+                    },
+                    status: {
+                      type: "string",
+                      default: "error",
+                    },
+                    message: {
+                      type: "string",
+                    },
+                  },
+                  required: ["status", "message"],
+                },
+              },
+            },
+          },
+          "401": {
+            description: "Unauthorized",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    error: {
+                      type: "string",
+                    },
+                    status: {
+                      type: "string",
+                      default: "error",
+                    },
+                    message: {
+                      type: "string",
+                    },
+                  },
+                  required: ["status", "message"],
+                },
+              },
+            },
+          },
+          "404": {
+            description: "Dataset not found",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    error: {
+                      type: "string",
+                    },
+                    status: {
+                      type: "string",
+                      default: "error",
+                    },
+                    message: {
+                      type: "string",
+                    },
+                  },
+                  required: ["status", "message"],
+                },
+              },
+            },
+          },
+          "422": {
+            description: "Unprocessable Entity",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    status: {
+                      type: "string",
+                      default: "error",
+                    },
+                    message: {
+                      type: "string",
+                    },
+                  },
+                  required: ["status", "message"],
+                },
+              },
+            },
+          },
+          "500": {
+            description: "Internal Server Error",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    error: {
+                      type: "string",
+                    },
+                    status: {
+                      type: "string",
+                      default: "error",
+                    },
+                    message: {
+                      type: "string",
+                    },
+                  },
+                  required: ["status", "message"],
+                },
+              },
+            },
+          },
+        },
+        operationId: "getApiDatasetBySlugOrId",
+        parameters: [
+          {
+            schema: {
+              type: "string",
+            },
+            in: "path",
+            name: "slugOrId",
+            required: true,
+          },
+        ],
+        description: "Get a dataset by its slug or id.",
+      },
+    },
+    "/api/scenario-events": {
+      post: {
+        responses: {
+          "201": {
+            description: "Event created successfully",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    success: {
+                      type: "boolean",
+                    },
+                    url: {
+                      type: ["string", "null"],
+                    },
+                  },
+                  required: ["success"],
+                },
+              },
+            },
+          },
+          "400": {
+            description: "Invalid event data",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    error: {
+                      type: "string",
+                    },
+                  },
+                  required: ["error"],
+                },
+              },
+            },
+          },
+          "401": {
+            description: "Unauthorized",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    error: {
+                      type: "string",
+                    },
+                  },
+                  required: ["error"],
+                },
+              },
+            },
+          },
+          "500": {
+            description: "Internal Server Error",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    error: {
+                      type: "string",
+                    },
+                  },
+                  required: ["error"],
+                },
+              },
+            },
+          },
+        },
+        operationId: "postApiScenario-events",
+        parameters: [],
+        description: "Create a new scenario event",
+        requestBody: {
+          content: {
+            "application/json": {
+              schema: {
+                oneOf: [
+                  {
+                    type: "object",
+                    properties: {
+                      type: {
+                        type: "string",
+                        const: "SCENARIO_RUN_STARTED",
+                      },
+                      timestamp: {
+                        type: "number",
+                      },
+                      rawEvent: {},
+                      batchRunId: {
+                        type: "string",
+                      },
+                      scenarioId: {
+                        type: "string",
+                      },
+                      scenarioRunId: {
+                        type: "string",
+                      },
+                      scenarioSetId: {
+                        type: "string",
+                        default: "default",
+                      },
+                      metadata: {
+                        type: "object",
+                        properties: {
+                          name: {
+                            type: "string",
+                          },
+                          description: {
+                            type: "string",
+                          },
+                        },
+                      },
+                    },
+                    required: [
+                      "type",
+                      "timestamp",
+                      "batchRunId",
+                      "scenarioId",
+                      "scenarioRunId",
+                      "metadata",
+                    ],
+                  },
+                  {
+                    type: "object",
+                    properties: {
+                      type: {
+                        type: "string",
+                        const: "SCENARIO_RUN_FINISHED",
+                      },
+                      timestamp: {
+                        type: "number",
+                      },
+                      rawEvent: {},
+                      batchRunId: {
+                        type: "string",
+                      },
+                      scenarioId: {
+                        type: "string",
+                      },
+                      scenarioRunId: {
+                        type: "string",
+                      },
+                      scenarioSetId: {
+                        type: "string",
+                        default: "default",
+                      },
+                      status: {
+                        type: "string",
+                        enum: [
+                          "SUCCESS",
+                          "ERROR",
+                          "CANCELLED",
+                          "IN_PROGRESS",
+                          "PENDING",
+                          "FAILED",
+                        ],
+                      },
+                      results: {
+                        type: ["object", "null"],
+                        properties: {
+                          verdict: {
+                            type: "string",
+                            enum: ["success", "failure", "inconclusive"],
+                          },
+                          reasoning: {
+                            type: "string",
+                          },
+                          metCriteria: {
+                            type: "array",
+                            items: {
+                              type: "string",
+                            },
+                          },
+                          unmetCriteria: {
+                            type: "array",
+                            items: {
+                              type: "string",
+                            },
+                          },
+                          error: {
+                            type: "string",
+                          },
+                        },
+                        required: ["verdict", "metCriteria", "unmetCriteria"],
+                      },
+                    },
+                    required: [
+                      "type",
+                      "timestamp",
+                      "batchRunId",
+                      "scenarioId",
+                      "scenarioRunId",
+                      "status",
+                    ],
+                  },
+                  {
+                    type: "object",
+                    properties: {
+                      type: {
+                        type: "string",
+                        const: "SCENARIO_MESSAGE_SNAPSHOT",
+                      },
+                      timestamp: {
+                        type: "number",
+                      },
+                      rawEvent: {},
+                      messages: {
+                        type: "array",
+                        items: {
+                          oneOf: [
+                            {
+                              type: "object",
+                              properties: {
+                                id: {
+                                  type: "string",
+                                },
+                                role: {
+                                  type: "string",
+                                  const: "developer",
+                                },
+                                content: {
+                                  type: "string",
+                                },
+                                name: {
+                                  type: "string",
+                                },
+                              },
+                              required: ["id", "role", "content"],
+                            },
+                            {
+                              type: "object",
+                              properties: {
+                                id: {
+                                  type: "string",
+                                },
+                                role: {
+                                  type: "string",
+                                  const: "system",
+                                },
+                                content: {
+                                  type: "string",
+                                },
+                                name: {
+                                  type: "string",
+                                },
+                              },
+                              required: ["id", "role", "content"],
+                            },
+                            {
+                              type: "object",
+                              properties: {
+                                id: {
+                                  type: "string",
+                                },
+                                role: {
+                                  type: "string",
+                                  const: "assistant",
+                                },
+                                content: {
+                                  type: "string",
+                                },
+                                name: {
+                                  type: "string",
+                                },
+                                toolCalls: {
+                                  type: "array",
+                                  items: {
+                                    type: "object",
+                                    properties: {
+                                      id: {
+                                        type: "string",
+                                      },
+                                      type: {
+                                        type: "string",
+                                        const: "function",
+                                      },
+                                      function: {
+                                        type: "object",
+                                        properties: {
+                                          name: {
+                                            type: "string",
+                                          },
+                                          arguments: {
+                                            type: "string",
+                                          },
+                                        },
+                                        required: ["name", "arguments"],
+                                      },
+                                    },
+                                    required: ["id", "type", "function"],
+                                  },
+                                },
+                              },
+                              required: ["id", "role"],
+                            },
+                            {
+                              type: "object",
+                              properties: {
+                                id: {
+                                  type: "string",
+                                },
+                                role: {
+                                  type: "string",
+                                  const: "user",
+                                },
+                                content: {
+                                  type: "string",
+                                },
+                                name: {
+                                  type: "string",
+                                },
+                              },
+                              required: ["id", "role", "content"],
+                            },
+                            {
+                              type: "object",
+                              properties: {
+                                id: {
+                                  type: "string",
+                                },
+                                content: {
+                                  type: "string",
+                                },
+                                role: {
+                                  type: "string",
+                                  const: "tool",
+                                },
+                                toolCallId: {
+                                  type: "string",
+                                },
+                              },
+                              required: ["id", "content", "role", "toolCallId"],
+                            },
+                          ],
+                        },
+                      },
+                      batchRunId: {
+                        type: "string",
+                      },
+                      scenarioId: {
+                        type: "string",
+                      },
+                      scenarioRunId: {
+                        type: "string",
+                      },
+                      scenarioSetId: {
+                        type: "string",
+                        default: "default",
+                      },
+                    },
+                    required: [
+                      "type",
+                      "timestamp",
+                      "messages",
+                      "batchRunId",
+                      "scenarioId",
+                      "scenarioRunId",
+                    ],
+                  },
+                ],
+              },
+            },
+          },
+        },
+      },
+      delete: {
+        responses: {
+          "200": {
+            description: "Events deleted successfully",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    success: {
+                      type: "boolean",
+                    },
+                    url: {
+                      type: ["string", "null"],
+                    },
+                  },
+                  required: ["success"],
+                },
+              },
+            },
+          },
+          "400": {
+            description: "Bad Request",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    error: {
+                      type: "string",
+                    },
+                  },
+                  required: ["error"],
+                },
+              },
+            },
+          },
+          "401": {
+            description: "Unauthorized",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    error: {
+                      type: "string",
+                    },
+                  },
+                  required: ["error"],
+                },
+              },
+            },
+          },
+          "500": {
+            description: "Internal Server Error",
+            content: {
+              "application/json": {
+                schema: {
+                  type: "object",
+                  properties: {
+                    error: {
+                      type: "string",
+                    },
+                  },
+                  required: ["error"],
+                },
+              },
+            },
+          },
+        },
+        operationId: "deleteApiScenario-events",
+        parameters: [],
+        description: "Delete all events",
+      },
+    },
+  },
+  components: {
+    schemas: {
+      Annotation: {
+        required: ["name"],
+        type: "object",
+        properties: {
+          id: {
+            description: "The ID of the annotation",
+            type: "string",
+          },
+          projectId: {
+            description: "The ID of the project",
+            type: "string",
+          },
+          traceId: {
+            description: "The ID of the trace",
+            type: "string",
+          },
+          comment: {
+            description: "The comment of the annotation",
+            type: "string",
+          },
+          isThumbsUp: {
+            description: "The thumbs up status of the annotation",
+            type: "boolean",
+          },
+          userId: {
+            description: "The ID of the user",
+            type: "string",
+          },
+          createdAt: {
+            description: "The created at of the annotation",
+            type: "string",
+          },
+          updatedAt: {
+            description: "The updated at of the annotation",
+            type: "string",
+          },
+          email: {
+            description: "The email of the user",
+            type: "string",
+          },
+        },
+      },
+      Error: {
+        required: ["error", "message"],
+        type: "object",
+        properties: {
+          error: {
+            type: "integer",
+            format: "int32",
+          },
+          message: {
+            type: "string",
+          },
+        },
+      },
+      SearchRequest: {
+        type: "object",
+        properties: {
+          query: {
+            type: "string",
+          },
+          startDate: {
+            type: "string",
+            format: "date-time",
+          },
+          endDate: {
+            type: "string",
+            format: "date-time",
+          },
+          pageSize: {
+            type: "integer",
+            example: 1000,
+          },
+          scrollId: {
+            type: "string",
+            example: "123",
+          },
+          filters: {
+            type: "object",
+            additionalProperties: {
+              type: "array",
+              items: {
+                type: "string",
+              },
+            },
+          },
+        },
+      },
+      SearchResponse: {
+        type: "object",
+        properties: {
+          traces: {
+            type: "array",
+            items: {
+              $ref: "#/components/schemas/Trace",
+            },
+          },
+          pagination: {
+            $ref: "#/components/schemas/Pagination",
+          },
+        },
+      },
+      Trace: {
+        type: "object",
+        properties: {
+          trace_id: {
+            type: "string",
+          },
+          project_id: {
+            type: "string",
+          },
+          timestamps: {
+            $ref: "#/components/schemas/Timestamps",
+          },
+          input: {
+            $ref: "#/components/schemas/Input",
+          },
+          output: {
+            $ref: "#/components/schemas/Output",
+          },
+          metadata: {
+            $ref: "#/components/schemas/Metadata",
+          },
+          metrics: {
+            $ref: "#/components/schemas/Metrics",
+          },
+          indexing_md5s: {
+            type: "array",
+            items: {
+              type: "string",
+            },
+          },
+          error: {
+            type: "string",
+            nullable: true,
+          },
+          evaluations: {
+            type: "array",
+            items: {
+              $ref: "#/components/schemas/Evaluation",
+            },
+          },
+          contexts: {
+            type: "array",
+            items: {},
+          },
+        },
+      },
+      Timestamps: {
+        type: "object",
+        properties: {
+          inserted_at: {
+            type: "integer",
+          },
+          started_at: {
+            type: "integer",
+          },
+          updated_at: {
+            type: "integer",
+          },
+        },
+      },
+      Input: {
+        type: "object",
+        properties: {
+          value: {
+            type: "string",
+          },
+          satisfaction_score: {
+            type: "number",
+          },
+        },
+      },
+      Output: {
+        type: "object",
+        properties: {
+          value: {
+            type: "string",
+          },
+        },
+      },
+      Metadata: {
+        type: "object",
+        properties: {
+          sdk_language: {
+            type: "string",
+          },
+          sdk_version: {
+            type: "string",
+          },
+        },
+      },
+      Metrics: {
+        type: "object",
+        properties: {
+          tokens_estimated: {
+            type: "boolean",
+          },
+          completion_tokens: {
+            type: "integer",
+          },
+          prompt_tokens: {
+            type: "integer",
+          },
+          total_cost: {
+            type: "number",
+          },
+          total_time_ms: {
+            type: "integer",
+          },
+          first_token_ms: {
+            type: "integer",
+            nullable: true,
+          },
+        },
+      },
+      Evaluation: {
+        type: "object",
+        properties: {
+          evaluation_id: {
+            type: "string",
+          },
+          score: {
+            type: "number",
+          },
+          timestamps: {
+            $ref: "#/components/schemas/EvaluationTimestamps",
+          },
+          evaluator_id: {
+            type: "string",
+          },
+          name: {
+            type: "string",
+          },
+          details: {
+            type: "string",
+          },
+          passed: {
+            type: "boolean",
+          },
+          label: {
+            type: "string",
+            nullable: true,
+          },
+          type: {
+            type: "string",
+          },
+          status: {
+            type: "string",
+          },
+        },
+      },
+      EvaluationTimestamps: {
+        type: "object",
+        properties: {
+          finished_at: {
+            type: "integer",
+          },
+          updated_at: {
+            type: "integer",
+          },
+        },
+      },
+      Pagination: {
+        type: "object",
+        properties: {
+          scrollId: {
+            type: "string",
+            example: "123",
+          },
+          totalHits: {
+            type: "integer",
+            example: 1254,
+          },
+        },
+      },
+      DatasetPostEntries: {
+        type: "object",
+        properties: {
+          entries: {
+            type: "array",
+            items: {
+              type: "object",
+              additionalProperties: {},
+            },
+            example: [
+              {
+                input: "hi",
+                output: "Hello, how can I help you today?",
+              },
+            ],
+          },
+        },
+        required: ["entries"],
+      },
+    },
+    securitySchemes: {
+      api_key: {
+        type: "apiKey",
+        in: "header",
+        name: "X-Auth-Token",
+      },
+    },
+  },
+} as const;

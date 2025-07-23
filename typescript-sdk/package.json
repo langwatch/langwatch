@@ -22,7 +22,8 @@
     "prebuild": "npm run prepare",
     "build": "tsup && esbuild src/index.ts --bundle --platform=node --outfile=dist/index.js",
     "prepublish": "npm run build",
-    "pull:openapispec": "curl https://raw.githubusercontent.com/langwatch/docs/refs/heads/main/api-reference/openapiLangWatch.json -o ./src/api-client/langwatch-openapi.json"
+    "pull:openapispec": "curl https://raw.githubusercontent.com/langwatch/docs/refs/heads/main/api-reference/openapiLangWatch.json -o ./src/api-client/langwatch-openapi.json",
+    "generate:openapi-types": "npm run pull:openapispec && npx openapi-typescript ./src/api-client/langwatch-openapi.json -o ./src/api-client/langwatch-openapi.ts"
   },
   "author": "",
   "license": "Apache-2.0",
@@ -55,6 +56,7 @@
     "javascript-stringify": "^2.1.0",
     "nanoid": "^5.0.9",
     "openai": "^4.47.3",
+    "openapi-fetch": "^0.14.0",
     "zod": "^3.22.4",
     "zod-validation-error": "^3.3.0"
   }
