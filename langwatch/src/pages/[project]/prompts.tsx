@@ -1,5 +1,4 @@
 import { Flex, Spacer, VStack } from "@chakra-ui/react";
-import { type LlmPromptConfig } from "@prisma/client";
 import { useState, useMemo, useRef, useEffect, useCallback } from "react";
 import { Plus } from "react-feather";
 
@@ -15,6 +14,7 @@ import {
   createDefaultColumns,
   PromptConfigTable,
 } from "~/prompt-configs/PromptConfigTable";
+import type { LlmConfigWithLatestVersion } from "~/server/prompt-config/repositories/llm-config.repository";
 import { api } from "~/utils/api";
 
 /**
@@ -44,9 +44,8 @@ import { api } from "~/utils/api";
 function usePromptConfigManagement(projectId: string | undefined) {
   const utils = api.useContext();
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
-  const [configToDelete, setConfigToDelete] = useState<LlmPromptConfig | null>(
-    null
-  );
+  const [configToDelete, setConfigToDelete] =
+    useState<LlmConfigWithLatestVersion | null>(null);
 
   // Fetch all prompt configs for the current project.
   const {
@@ -123,7 +122,7 @@ function usePromptConfigManagement(projectId: string | undefined) {
    * @param config The config to delete.
    */
   const handleDeleteConfig = useCallback(
-    (config: LlmPromptConfig) => {
+    (config: LlmConfigWithLatestVersion) => {
       setConfigToDelete(config);
       setIsDeleteDialogOpen(true);
     },
