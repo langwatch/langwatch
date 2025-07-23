@@ -122,10 +122,13 @@ function usePromptConfigManagement(projectId: string | undefined) {
    * Open the delete confirmation dialog for a given config.
    * @param config The config to delete.
    */
-  const handleDeleteConfig = useCallback((config: LlmPromptConfig) => {
-    setConfigToDelete(config);
-    setIsDeleteDialogOpen(true);
-  }, []);
+  const handleDeleteConfig = useCallback(
+    (config: LlmPromptConfig) => {
+      setConfigToDelete(config);
+      setIsDeleteDialogOpen(true);
+    },
+    [setConfigToDelete, setIsDeleteDialogOpen]
+  );
 
   /**
    * Confirm and perform deletion of the selected config.
