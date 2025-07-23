@@ -2,8 +2,6 @@ import { Flex, Spacer, VStack } from "@chakra-ui/react";
 import { useState, useMemo, useRef, useEffect, useCallback } from "react";
 import { Plus } from "react-feather";
 
-import type { LlmConfigWithLatestVersion } from "~/server/prompt-config/repositories/llm-config.repository";
-
 import { DeleteConfirmationDialog } from "~/components/annotations/DeleteConfirmationDialog";
 import { DashboardLayout } from "~/components/DashboardLayout";
 import { CENTER_CONTENT_BOX_ID } from "~/components/executable-panel/InputOutputExecutablePanel";
@@ -16,6 +14,7 @@ import {
   createDefaultColumns,
   PromptConfigTable,
 } from "~/prompt-configs/PromptConfigTable";
+import type { LlmConfigWithLatestVersion } from "~/server/prompt-config/repositories/llm-config.repository";
 import { api } from "~/utils/api";
 
 /**

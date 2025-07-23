@@ -1,12 +1,15 @@
 import { Button, HStack, Text, VStack } from "@chakra-ui/react";
+import { useDisclosure } from "@chakra-ui/react";
+import type { PrismLanguage } from "@react-email/components";
+import { ChevronDownIcon, CheckIcon } from "lucide-react";
+import React, { useEffect, useState, createContext, useContext } from "react";
+
+import type { Snippet, Target } from "../prompt-configs/types";
+
+import { RenderCode } from "./code/RenderCode";
 import { Dialog } from "./ui/dialog";
 import { Menu } from "./ui/menu";
-import { useDisclosure } from "@chakra-ui/react";
-import React, { useEffect, useState, createContext, useContext } from "react";
-import { ChevronDownIcon, CheckIcon } from "lucide-react";
-import { RenderCode } from "./code/RenderCode";
-import type { Snippet, Target } from "../prompt-configs/types";
-import type { PrismLanguage } from "@react-email/components";
+
 import { uppercaseFirstLetter } from "~/utils/stringCasing";
 
 // Add context for dialog state
@@ -21,7 +24,7 @@ interface GenerateApiSnippetProps {
   snippets: Snippet[];
   targets: Target[];
   title?: string;
-  description?: string;
+  description?: React.ReactNode;
   children?: React.ReactNode;
 }
 
@@ -91,7 +94,7 @@ export function GenerateApiSnippetDialog({
             </HStack>
             <Dialog.Description>
               <VStack alignItems="flex-start" gap={2}>
-                {description && description}
+                {description}
                 <HStack>
                   <Text
                     fontSize="sm"
@@ -182,7 +185,7 @@ const LanguageMenu = React.memo(function LanguageMenu({
           <Menu.Item
             key={target}
             value={target}
-            onClick={() => setSelectedTarget(target as Target)}
+            onClick={() => setSelectedTarget(target)}
           >
             {formatTarget(target)}
             {selectedTarget === target && <CheckIcon />}

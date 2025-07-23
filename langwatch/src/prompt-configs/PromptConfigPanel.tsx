@@ -9,11 +9,6 @@ import {
 } from "react";
 import { useDebouncedCallback } from "use-debounce";
 
-import { PanelHeader } from "./components/ui/PanelHeader";
-import { PromptConfigForm } from "./forms/prompt-config-form/PromptConfigForm";
-import { useInvokePrompt } from "./hooks/useInvokePrompt";
-import { usePromptConfigForm } from "./hooks/usePromptConfigForm";
-
 import {
   ExecutionInputPanel,
   type ExecuteData,
@@ -30,6 +25,11 @@ import {
   promptConfigFormValuesToOptimizationStudioNodeData,
 } from "~/prompt-configs/llmPromptConfigUtils";
 import { api } from "~/utils/api";
+
+import { PanelHeader } from "./components/ui/PanelHeader";
+import { PromptConfigForm } from "./forms/prompt-config-form/PromptConfigForm";
+import { useInvokePrompt } from "./hooks/useInvokePrompt";
+import { usePromptConfigForm } from "./hooks/usePromptConfigForm";
 
 /**
  * Panel for configuring and testing LLM prompts
@@ -58,10 +58,20 @@ export const PromptConfigPanel = forwardRef(function PromptConfigPanel(
 
   // ---- API calls and data fetching ----
   const {
+    reset,
     mutate: invokeLLM,
     isLoading: isExecuting,
     data: promptExecutionResult,
-  } = useInvokePrompt();
+  } = useInvokePrompt({
+    mutationKey: ["prompt-config", configId],
+  });
+
+  useEffect(() => {
+    const shouldReset = !isOpen || !isExpanded || !configId;
+    if (shouldReset) {
+      reset();
+    }
+  }, [isOpen, isExpanded, configId, reset]);
 
   // Fetch the LLM configuration
   const { data: llmConfig, isLoading: isLoadingConfig } =

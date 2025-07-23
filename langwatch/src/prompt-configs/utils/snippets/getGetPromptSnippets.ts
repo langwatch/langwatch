@@ -26,19 +26,44 @@ curl --request GET \\
     },
     {
       content: `
-import httpx
+import asyncio
+import langwatch.prompt
 
-url = "https://app.langwatch.ai/api/prompts/${promptId}"
+# Setup LangWatch (ensure LANGWATCH_API_KEY is set in environment)
+langwatch.setup(api_key="${apiKey}")
 
-headers = {"X-Auth-Token": "${apiKey}"}
+# Synchronous example
+prompt = langwatch.prompt.get_prompt("${promptId}")
 
-with httpx.Client() as client:
-    response = client.get(url, headers=headers)
+# Access prompt properties
+print(f"Prompt Name: {prompt.name}")
+print(f"Model: {prompt.model}")
+print(f"Version: {prompt.version_number}")
 
-print(response.text)
+# Format messages with variables (example)
+messages = prompt.format_messages(
+    user_name="John Doe",
+    input="Hello world"
+)
+print(f"Formatted messages: {messages}")
+
+# Asynchronous example
+async def get_prompt_async_example():
+    prompt = await langwatch.prompt.async_get_prompt("${promptId}")
+    
+    # Same functionality as sync version
+    print(f"Async - Prompt Name: {prompt.name}")
+    messages = prompt.format_messages(
+        user_name="Jane Doe",
+        input="Hello async world"
+    )
+    print(f"Async - Formatted messages: {messages}")
+
+# Run the async function
+asyncio.run(get_prompt_async_example())
 `,
       target: "python_python3",
-      title: "Get Prompts (Python httpx)",
+      title: "Get Prompts (Python SDK)",
       path: "/api/prompts/{id}",
       method: "GET",
     },
