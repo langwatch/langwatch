@@ -21,7 +21,8 @@
     "test": "vitest",
     "prebuild": "npm run prepare",
     "build": "tsup && esbuild src/index.ts --bundle --platform=node --outfile=dist/index.js",
-    "prepublish": "npm run build"
+    "prepublish": "npm run build",
+    "pull:openapispec": "curl https://raw.githubusercontent.com/langwatch/docs/refs/heads/main/api-reference/openapiLangWatch.json -o ./src/api-client/langwatch-openapi.json"
   },
   "author": "",
   "license": "Apache-2.0",
@@ -50,6 +51,7 @@
     "@opentelemetry/sdk-trace-base": "^2.0.1",
     "ai": "^4.0.14",
     "eventemitter3": "^5.0.1",
+    "fets": "^0.8.5",
     "javascript-stringify": "^2.1.0",
     "nanoid": "^5.0.9",
     "openai": "^4.47.3",
