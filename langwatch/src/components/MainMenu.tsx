@@ -184,39 +184,26 @@ export const MainMenu = React.memo(function MainMenu() {
               <Menu.Content>
                 <Menu.Item value="github">
                   <Link
-                    external
-                    target="_blank"
+                    isExternal
                     href="https://github.com/langwatch/langwatch"
                   >
                     <GitHub /> GitHub Support
                   </Link>
                 </Menu.Item>
                 <Menu.Item value="discord">
-                  <Link
-                    external
-                    target="_blank"
-                    href="https://discord.gg/kT4PhDS2gH"
-                  >
+                  <Link isExternal href="https://discord.gg/kT4PhDS2gH">
                     <DiscordOutlineIcon /> Discord
                   </Link>
                 </Menu.Item>
                 <MenuSeparator />
                 <Menu.Item value="documentation">
-                  <Link
-                    external
-                    target="_blank"
-                    href="https://docs.langwatch.ai"
-                  >
+                  <Link isExternal href="https://docs.langwatch.ai">
                     <BookOpen /> Documentation
                   </Link>
                 </Menu.Item>
 
                 <Menu.Item value="status">
-                  <Link
-                    external
-                    target="_blank"
-                    href="https://status.langwatch.ai/"
-                  >
+                  <Link isExternal href="https://status.langwatch.ai/">
                     <Activity /> Status Page
                   </Link>
                 </Menu.Item>
@@ -225,18 +212,15 @@ export const MainMenu = React.memo(function MainMenu() {
 
                 <Menu.Item value="feature-requests">
                   <Link
-                    external
-                    target="_blank"
+                    isExternal
                     href="https://github.com/orgs/langwatch/discussions/categories/ideas"
                   >
-                    {" "}
                     <Lightbulb /> Feature Request
                   </Link>
                 </Menu.Item>
                 <Menu.Item value="bug-reports">
                   <Link
-                    external
-                    target="_blank"
+                    isExternal
                     href="https://github.com/langwatch/langwatch/issues"
                   >
                     <Bug /> Report a Bug
