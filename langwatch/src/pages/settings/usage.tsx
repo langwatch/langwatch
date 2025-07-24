@@ -1,8 +1,10 @@
 import {
   Alert,
+  Button,
   Card,
   HStack,
   Heading,
+  Progress,
   Spacer,
   Table,
   Text,
@@ -40,6 +42,15 @@ export default function Usage() {
     {}
   );
 
+  const usage = api.limits.getUsage.useQuery(
+    { organizationId: organization?.id ?? "" },
+    {
+      enabled: !!organization,
+      refetchOnWindowFocus: false,
+      refetchOnMount: false,
+    }
+  );
+
   return (
     <SettingsLayout>
       <VStack
@@ -66,13 +77,41 @@ export default function Usage() {
               paddingX={4}
               align="start"
             >
+              <Heading size="md" as="h2">
+                Trace Usage
+              </Heading>
+              <Progress.Root
+                defaultValue={0}
+                max={usage.data?.activePlan.maxMessagesPerMonth}
+                value={usage.data?.currentMonthMessagesCount}
+                maxW="sm"
+                colorPalette="orange"
+                width="full"
+              >
+                <Progress.Label fontSize="xs"></Progress.Label>
+                <Progress.Track flex="1">
+                  <Progress.Range />
+                </Progress.Track>
+              </Progress.Root>
+              <Text>
+                You have used{" "}
+                <b>{usage.data?.currentMonthMessagesCount.toLocaleString()}</b>{" "}
+                out of{" "}
+                <b>
+                  {usage.data?.activePlan.maxMessagesPerMonth.toLocaleString()}
+                </b>{" "}
+                traces this month.
+              </Text>
+              <Button asChild marginBottom={2}>
+                <Link href="/settings/subscription">Change plan</Link>
+              </Button>
               {activePlan.data && (
                 <>
                   <Heading size="md" as="h2">
                     Active Plan
                   </Heading>
                   <Text paddingBottom={4}>
-                    You are on the {activePlan.data.name} plan
+                    You are on the <b>{activePlan.data.name}</b> plan
                     {activePlan.data.free && ", no payment is required"}
                   </Text>
                 </>
