@@ -2,14 +2,11 @@ import {
   Badge,
   Box,
   Center,
-  HStack,
+  MenuSeparator,
+  Portal,
   Spacer,
   Text,
   VStack,
-  Button,
-  Portal,
-  MenuItemGroupLabel,
-  MenuSeparator,
 } from "@chakra-ui/react";
 import type { Project } from "@prisma/client";
 import { useRouter } from "next/router";
@@ -20,33 +17,31 @@ import {
   CheckSquare,
   Edit,
   GitHub,
+  Globe,
   PlayCircle,
   Settings,
   Table,
   TrendingUp,
-  Globe,
 } from "react-feather";
 
-import { TextCursorInput, Bug, Lightbulb, Activity } from "lucide-react";
+import { Activity, Bug, Lightbulb } from "lucide-react";
 
 import { useOrganizationTeamProject } from "../hooks/useOrganizationTeamProject";
-import { dependencies } from "../injection/dependencies.client";
 import { OrganizationRoleGroup } from "../server/api/permission";
 import { api } from "../utils/api";
 import { projectRoutes } from "../utils/routes";
 import { trackEvent } from "../utils/tracking";
 
+import { LuListTree } from "react-icons/lu";
 import { ChatBalloonIcon } from "./icons/ChatBalloon";
 import { DiscordOutlineIcon } from "./icons/DiscordOutline";
 import { LogoIcon } from "./icons/LogoIcon";
 import { PuzzleIcon } from "./icons/PuzzleIcon";
-import { IconWrapper } from "./IconWrapper";
 import { useTableView } from "./messages/HeaderButtons";
 import { useColorRawValue } from "./ui/color-mode";
 import { Link } from "./ui/link";
-import { Tooltip } from "./ui/tooltip";
-import { LuListTree } from "react-icons/lu";
 import { Menu } from "./ui/menu";
+import { Tooltip } from "./ui/tooltip";
 
 export const MENU_WIDTH = "88px";
 
