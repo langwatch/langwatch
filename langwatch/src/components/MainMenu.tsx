@@ -6,6 +6,10 @@ import {
   Spacer,
   Text,
   VStack,
+  Button,
+  Portal,
+  MenuItemGroupLabel,
+  MenuSeparator,
 } from "@chakra-ui/react";
 import type { Project } from "@prisma/client";
 import { useRouter } from "next/router";
@@ -20,7 +24,10 @@ import {
   Settings,
   Table,
   TrendingUp,
+  Globe,
 } from "react-feather";
+
+import { TextCursorInput, Bug, Lightbulb, Activity } from "lucide-react";
 
 import { useOrganizationTeamProject } from "../hooks/useOrganizationTeamProject";
 import { dependencies } from "../injection/dependencies.client";
@@ -39,6 +46,7 @@ import { useColorRawValue } from "./ui/color-mode";
 import { Link } from "./ui/link";
 import { Tooltip } from "./ui/tooltip";
 import { LuListTree } from "react-icons/lu";
+import { Menu } from "./ui/menu";
 
 export const MENU_WIDTH = "88px";
 
@@ -162,6 +170,71 @@ export const MainMenu = React.memo(function MainMenu() {
 
           <Spacer />
 
+          <Menu.Root positioning={{ placement: "right-start" }}>
+            <Menu.Trigger asChild>
+              <VStack width="full" align="center" gap={0}>
+                <Globe size={20} />
+                <Text
+                  fontSize="12px"
+                  color="gray.600"
+                  textAlign="center"
+                  width="full"
+                >
+                  Support
+                </Text>
+              </VStack>
+            </Menu.Trigger>
+
+            <Portal>
+              <Menu.Content>
+                <Menu.Item value="github">
+                  <Link href="https://github.com/langwatch/langwatch">
+                    <GitHub /> GitHub Support
+                  </Link>
+                </Menu.Item>
+                <Menu.Item value="discord">
+                  <Link href="https://discord.gg/kT4PhDS2gH">
+                    <DiscordOutlineIcon /> Discord
+                  </Link>
+                </Menu.Item>
+                <MenuSeparator />
+                <Menu.Item value="documentation">
+                  <Link href="https://docs.langwatch.ai">
+                    <BookOpen /> Documentation
+                  </Link>
+                </Menu.Item>
+
+                <Menu.Item value="status">
+                  <Link href="https://status.langwatch.ai/">
+                    <Activity /> Status Page
+                  </Link>
+                </Menu.Item>
+
+                <MenuSeparator />
+
+                <Menu.Item value="feature-requests">
+                  <Link href="https://github.com/orgs/langwatch/discussions/categories/ideas">
+                    {" "}
+                    <Lightbulb /> Feature Request
+                  </Link>
+                </Menu.Item>
+                <Menu.Item value="bug-reports">
+                  <Link href="https://github.com/langwatch/langwatch/issues">
+                    <Bug /> Report a Bug
+                  </Link>
+                </Menu.Item>
+
+                {/* <Menu.Separator />
+              <Menu.ItemGroup>
+                <Menu.ItemGroupLabel>Align</Menu.ItemGroupLabel>
+                <Menu.Item value="left">Left</Menu.Item>
+                <Menu.Item value="middle">Middle</Menu.Item>
+                <Menu.Item value="right">Right</Menu.Item>
+              </Menu.ItemGroup> */}
+              </Menu.Content>
+            </Portal>
+          </Menu.Root>
+
           {(window as any)?.$crisp && project && (
             <SideMenuLink
               size="sm"
@@ -208,7 +281,8 @@ export const MainMenu = React.memo(function MainMenu() {
               project={project}
             />
           )}
-          <HStack width="full" gap={0} paddingX={2} paddingTop={2}>
+
+          {/* <HStack width="full" gap={0} paddingX={2} paddingTop={2}>
             <SideMenuLink
               size="sm"
               href="https://docs.langwatch.ai"
@@ -247,7 +321,7 @@ export const MainMenu = React.memo(function MainMenu() {
               isActive={false}
               project={project}
             />
-          </HStack>
+          </HStack> */}
         </VStack>
       </VStack>
     </Box>
