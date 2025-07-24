@@ -1,9 +1,9 @@
-import { Button, Heading, HStack } from "@chakra-ui/react";
+import { Button, Heading, HStack, type StackProps } from "@chakra-ui/react";
 import { X } from "lucide-react";
 import { Columns } from "lucide-react";
 
 // Component for the panel header
-interface PanelHeaderProps {
+interface PanelHeaderProps extends Omit<StackProps, "title"> {
   title: React.ReactNode;
   onClose?: () => void;
   showExpandButton?: boolean;
@@ -15,6 +15,7 @@ export function PanelHeader({
   onClose,
   showExpandButton = false,
   onExpand,
+  ...props
 }: PanelHeaderProps) {
   return (
     <HStack
@@ -22,7 +23,7 @@ export function PanelHeader({
       justify="space-between"
       gap={0}
       alignItems="flex-start"
-      marginBottom={8}
+      {...props}
     >
       <HStack gap={2}>
         <PanelTitle title={title} />

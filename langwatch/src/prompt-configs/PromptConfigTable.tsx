@@ -1,26 +1,30 @@
-import { Box, Button, HStack, IconButton, Table, Text } from "@chakra-ui/react";
-import { Edit, MoreVertical, Trash2 } from "react-feather";
-import type { LlmPromptConfig } from "@prisma/client";
-import { type ReactNode } from "react";
-import { Menu } from "~/components/ui/menu";
-import { GeneratePromptApiSnippetDialog } from "./components/GeneratePromptApiSnippetDialog";
-import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { Box, Button, HStack, Table, Text, VStack } from "@chakra-ui/react";
 import { UnplugIcon } from "lucide-react";
+import { type ReactNode } from "react";
+import { Edit, MoreVertical, Trash2 } from "react-feather";
+
+import type { LlmConfigWithLatestVersion } from "~/server/prompt-config/repositories/llm-config.repository";
+
+import { GeneratePromptApiSnippetDialog } from "./components/GeneratePromptApiSnippetDialog";
+
+import { MetadataTag } from "~/components/MetadataTag";
+import { Menu } from "~/components/ui/menu";
+import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 
 export type PromptConfigColumn = {
   key: string;
   header: string;
   width?: string;
   textAlign?: "left" | "center" | "right";
-  render: (config: LlmPromptConfig) => ReactNode;
+  render: (config: LlmConfigWithLatestVersion) => ReactNode;
 };
 
 export const createDefaultColumns = ({
   onDelete,
   onEdit,
 }: {
-  onDelete: (config: LlmPromptConfig) => Promise<void>;
-  onEdit: (config: LlmPromptConfig) => Promise<void>;
+  onDelete: (config: LlmConfigWithLatestVersion) => Promise<void>;
+  onEdit: (config: LlmConfigWithLatestVersion) => Promise<void>;
 }): PromptConfigColumn[] => [
   {
     key: "name",
@@ -32,6 +36,27 @@ export const createDefaultColumns = ({
     key: "lastUpdated",
     header: "Last Updated",
     render: (config) => <Text>{config.updatedAt.toLocaleString()}</Text>,
+  },
+  {
+    key: "metadata",
+    header: "Metadata",
+    render: (config) => (
+      <VStack alignItems="flex-start">
+        <MetadataTag label="prompt_id" value={config.id} copyable />
+        {config.latestVersion.id && (
+          <MetadataTag
+            label="version_id"
+            value={config.latestVersion.id}
+            copyable
+          />
+        )}
+        <MetadataTag
+          label="version"
+          value={`v${config.latestVersion.version}`}
+          copyable
+        />
+      </VStack>
+    ),
   },
   {
     key: "actions",
@@ -87,10 +112,10 @@ export const createDefaultColumns = ({
 ];
 
 export interface PromptConfigTableProps {
-  configs: LlmPromptConfig[];
+  configs: LlmConfigWithLatestVersion[];
   isLoading?: boolean;
   columns: PromptConfigColumn[];
-  onRowClick?: (config: LlmPromptConfig) => void;
+  onRowClick?: (config: LlmConfigWithLatestVersion) => void;
 }
 
 export function PromptConfigTable({
