@@ -1,14 +1,20 @@
 {
   "name": "langwatch",
-  "version": "0.2.0",
+  "version": "0.3.0-prerelease.1",
   "description": "",
   "main": "./dist/index.js",
   "module": "./dist/index.mjs",
   "types": "./dist/index.d.ts",
   "exports": {
     ".": {
+      "types": "./dist/index.d.ts",
       "import": "./dist/index.mjs",
       "require": "./dist/index.js"
+    },
+    "./observability": {
+      "types": "./dist/observability/index.d.ts",
+      "require": "./dist/observability/index.js",
+      "import": "./dist/observability/index.mjs"
     }
   },
   "repository": {
@@ -20,7 +26,7 @@
     "prepare": "./copy-types.sh",
     "test": "vitest",
     "prebuild": "npm run prepare",
-    "build": "tsup && esbuild src/index.ts --bundle --platform=node --outfile=dist/index.js",
+    "build": "tsup src/index.ts src/observability/index.ts --format cjs,esm --dts --clean",
     "prepublish": "npm run build"
   },
   "author": "",
