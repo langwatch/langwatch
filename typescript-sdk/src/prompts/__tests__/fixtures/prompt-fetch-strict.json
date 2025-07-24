@@ -1,0 +1,50 @@
+[
+    {
+        "scope": "https://app.langwatch.ai:443",
+        "method": "GET",
+        "path": "/api/prompts/prompt_XhPJ4fvAYC-xdEx1tF2gt",
+        "body": "",
+        "status": 200,
+        "response": [
+            "1f8b08000000000000ff",
+            "a5904f4b033110c5bf4ac8a597a6b6cb96cade4a51506915a9622bb2a4ddd936907f64664b65c97737aba5eac983b7e4cdef3dde4ccb55c50bee83339eca97fdc36d5e1fa6ab99385657c7115d673be27d6ea581441120892f34890708a89ce545767edffcc83a49e57afab4b917689e4d397f5cccef82aac3e2db3e0b2009aa29256736ccc662381159be1c4d8ae1a418e5837196af136d5c053a21ce8395ea62e749e44e1865551a9e2a157ce59a5e0026d91eb4af1bcd24a2429296066cb907d620841eb26e1da690b56d2794dd37c6410a6a7cf54799cbcf3280287780bc786d7970babb0dbe238149c3adb304f6ff6d62ff9cdde9bf9297a0354b2eb9710d252339afb631f2f8d6e701d03b8b50d62e189968db681d3f00ebacf7b0e8010000"
+        ],
+        "rawHeaders": [
+            "Date",
+            "Thu, 24 Jul 2025 17:21:19 GMT",
+            "Content-Type",
+            "application/json",
+            "Transfer-Encoding",
+            "chunked",
+            "Connection",
+            "keep-alive",
+            "Referrer-Policy",
+            "no-referrer",
+            "Strict-Transport-Security",
+            "max-age=31536000; includeSubDomains",
+            "Content-Security-Policy",
+            "default-src 'self';    script-src 'self' 'unsafe-eval' 'unsafe-inline' https://*.posthog.com https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://www.googletagmanager.com https://*.pendo.io https://client.crisp.chat https://static.hsappstatic.net https://*.google-analytics.com https://www.google.com https://*.reo.dev;    style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://*.pendo.io https://client.crisp.chat https://*.google.com https://*.reo.dev;    img-src 'self' blob: data: https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://image.crisp.chat https://www.googletagmanager.com https://*.pendo.io https://*.google-analytics.com https://www.google.com https://*.reo.dev;    font-src 'self' data: https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://client.crisp.chat https://www.google.com https://*.reo.dev;    object-src 'none';    base-uri 'self';    form-action 'self';    frame-ancestors 'none';    upgrade-insecure-requests;    worker-src 'self' blob:;    connect-src 'self' https://*.posthog.com https://*.pendo.io wss://*.pendo.io wss://client.relay.crisp.chat https://analytics.google.com https://stats.g.doubleclick.net https://*.google-analytics.com https://www.google.com https://*.reo.dev;    frame-src 'self' https://*.posthog.com https://*.pendo.io https://www.youtube.com https://get.langwatch.ai https://www.googletagmanager.com https://www.google.com https://*.reo.dev;",
+            "X-Content-Type-Options",
+            "nosniff",
+            "Vary",
+            "RSC, Next-Router-State-Tree, Next-Router-Prefetch, Next-Router-Segment-Prefetch",
+            "Report-To",
+            "{\"group\":\"cf-nel\",\"max_age\":604800,\"endpoints\":[{\"url\":\"https://a.nel.cloudflare.com/report/v4?s=oW5Wq71SlqzDdlqrf8iXlp59OQWEXNtLlpPaqDHfP4b4m9IlAKdtSrsUa2ff7I8OTYMypJQKIXU%2Fp4gx344FaxnSd6O0rPAzT%2B%2FyR%2Fndm94%3D\"}]}",
+            "Nel",
+            "{\"report_to\":\"cf-nel\",\"success_fraction\":0.0,\"max_age\":604800}",
+            "Cf-Cache-Status",
+            "DYNAMIC",
+            "Cache-Control",
+            "no-store, no-cache, must-revalidate",
+            "Content-Encoding",
+            "gzip",
+            "Server",
+            "cloudflare",
+            "CF-RAY",
+            "964517e1893f1821-EWR",
+            "alt-svc",
+            "h3=\":443\"; ma=86400"
+        ],
+        "responseIsBinary": false
+    }
+]

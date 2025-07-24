@@ -8,8 +8,8 @@ interface LangWatchApiClientOptions {
 }
 
 const configSchema = z.object({
-  apiKey: z.string().optional(),
-  endpoint: z.string().url().optional(),
+  apiKey: z.string().min(1, "API key is required"),
+  endpoint: z.string().url().optional().default("https://app.langwatch.ai"),
 });
 
 export function createClient(options?: LangWatchApiClientOptions) {

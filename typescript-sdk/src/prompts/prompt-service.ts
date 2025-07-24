@@ -143,25 +143,23 @@ export class PromptService {
     if (error) this.handleApiError(`delete prompt with ID "${id}"`, error);
   }
 
-  // /**
-  //  * Fetches all versions for a given prompt.
-  //  * @param id The prompt's unique identifier.
-  //  * @returns Array of Prompt instances representing each version.
-  //  * @throws {PromptsError} If the API call fails.
-  //  * @remarks
-  //  *   This method is currently disabled due to known issues with the endpoint.
-  //  */
-  // async getVersions(id: string): Promise<Prompt[]> {
-  //   const { data, error } = await this.client.GET(
-  //     "/api/prompts/{id}/versions",
-  //     {
-  //       params: { path: { id } },
-  //     }
-  //   );
-  //   if (error)
-  //     this.handleApiError(`fetch versions for prompt with ID "${id}"`, error);
-  //   return data.map((versionData) => new Prompt(versionData));
-  // }
+  /**
+   * TODO: This endpoint should be updated, as it doesn't correctly return versions.
+   * Fetches all versions for a given prompt.
+   * @param id The prompt's unique identifier.
+   * @throws {PromptsError} If the API call fails.
+   */
+  async getVersions(id: string): Promise<Prompt> {
+    const { data, error } = await this.client.GET(
+      "/api/prompts/{id}/versions",
+      {
+        params: { path: { id } },
+      }
+    );
+    if (error)
+      this.handleApiError(`fetch versions for prompt with ID "${id}"`, error);
+    return data;
+  }
 
   /**
    * Creates a new version for a given prompt.
