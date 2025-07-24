@@ -1,6 +1,8 @@
-import { AttributeValue, Span } from "@opentelemetry/api";
+import { Attributes, AttributeValue, Span } from "@opentelemetry/api";
 import semconv from "@opentelemetry/semantic-conventions/build/esm/experimental_attributes";
 import * as intSemconv from "./semconv";
+import { EvaluationRESTResult } from '../server/types/evaluations';
+import { recordEvaluation } from "../evaluation";
 
 /**
  * Supported types of spans for LangWatch observability. These types categorize the nature of the span for downstream analysis and visualization.
@@ -236,6 +238,15 @@ export interface LangWatchSpan extends Span {
   recordOutputString(output: string): this;
 
   /**
+   * Record the evaluation result for the span.
+   *
+   * @param result - The evaluation result
+   * @param attributes - Additional attributes to add to the evaluation span.
+   * @returns this
+   */
+  recordEvaluation(result: EvaluationRESTResult, attributes?: Attributes): this;
+
+  /**
    * Add a GenAI system message event to the span.
    *
    * This logs a system/instruction message sent to the model.
@@ -411,6 +422,10 @@ export function createLangWatchSpan(span: Span): LangWatchSpan {
           value: output,
         }),
       );
+    },
+
+    recordEvaluation(result: EvaluationRESTResult, attributes?: Attributes) {
+      recordEvaluation(result, attributes);
     },
 
     addGenAISystemMessageEvent(
