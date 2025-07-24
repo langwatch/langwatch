@@ -30,8 +30,7 @@ export default function SignIn({ session }: { session: Session | null }) {
   const error = query?.get("error");
 
   const publicEnv = usePublicEnv();
-  const isAuth0 = publicEnv.data?.NEXTAUTH_PROVIDER === "auth0";
-  const isAzureAD = publicEnv.data?.NEXTAUTH_PROVIDER === "azure-ad";
+  const isAuthProvider = publicEnv.data?.NEXTAUTH_PROVIDER;
   const callbackUrl = useSearchParams()?.get("callbackUrl") ?? undefined;
 
   useEffect(() => {
@@ -39,24 +38,15 @@ export default function SignIn({ session }: { session: Session | null }) {
       return;
     }
 
-    if (error !== "OAuthAccountNotLinked" && !session && isAuth0) {
+    if (error !== "OAuthAccountNotLinked" && !session && isAuthProvider) {
       setTimeout(
         () => {
-          void signIn("auth0", { callbackUrl });
+          void signIn(isAuthProvider, { callbackUrl });
         },
         error ? 2000 : 0
       );
     }
-
-    if (error !== "OAuthAccountNotLinked" && !session && isAzureAD) {
-      setTimeout(
-        () => {
-          void signIn("azure-ad", { callbackUrl });
-        },
-        error ? 2000 : 0
-      );
-    }
-  }, [publicEnv.data, session, callbackUrl, isAuth0, error, isAzureAD]);
+  }, [publicEnv.data, session, callbackUrl, isAuthProvider, error]);
 
   if (error) {
     return <SignInError error={error} />;
@@ -66,7 +56,7 @@ export default function SignIn({ session }: { session: Session | null }) {
     return null;
   }
 
-  return isAuth0 || isAzureAD ? (
+  return isAuthProvider ? (
     <Box padding="12px">Redirecting to Sign in...</Box>
   ) : (
     <SignInForm />
