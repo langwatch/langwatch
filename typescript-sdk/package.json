@@ -60,6 +60,7 @@
     "eventemitter3": "^5.0.1",
     "javascript-stringify": "^2.1.0",
     "openai": "^5.10.2",
+    "xksuid": "^0.0.4",
     "zod": "^4.0.8",
     "zod-validation-error": "^4.0.1"
   }
