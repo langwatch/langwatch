@@ -188,24 +188,40 @@ export const MainMenu = React.memo(function MainMenu() {
             <Portal>
               <Menu.Content>
                 <Menu.Item value="github">
-                  <Link href="https://github.com/langwatch/langwatch">
+                  <Link
+                    external
+                    target="_blank"
+                    href="https://github.com/langwatch/langwatch"
+                  >
                     <GitHub /> GitHub Support
                   </Link>
                 </Menu.Item>
                 <Menu.Item value="discord">
-                  <Link href="https://discord.gg/kT4PhDS2gH">
+                  <Link
+                    external
+                    target="_blank"
+                    href="https://discord.gg/kT4PhDS2gH"
+                  >
                     <DiscordOutlineIcon /> Discord
                   </Link>
                 </Menu.Item>
                 <MenuSeparator />
                 <Menu.Item value="documentation">
-                  <Link href="https://docs.langwatch.ai">
+                  <Link
+                    external
+                    target="_blank"
+                    href="https://docs.langwatch.ai"
+                  >
                     <BookOpen /> Documentation
                   </Link>
                 </Menu.Item>
 
                 <Menu.Item value="status">
-                  <Link href="https://status.langwatch.ai/">
+                  <Link
+                    external
+                    target="_blank"
+                    href="https://status.langwatch.ai/"
+                  >
                     <Activity /> Status Page
                   </Link>
                 </Menu.Item>
@@ -213,24 +229,24 @@ export const MainMenu = React.memo(function MainMenu() {
                 <MenuSeparator />
 
                 <Menu.Item value="feature-requests">
-                  <Link href="https://github.com/orgs/langwatch/discussions/categories/ideas">
+                  <Link
+                    external
+                    target="_blank"
+                    href="https://github.com/orgs/langwatch/discussions/categories/ideas"
+                  >
                     {" "}
                     <Lightbulb /> Feature Request
                   </Link>
                 </Menu.Item>
                 <Menu.Item value="bug-reports">
-                  <Link href="https://github.com/langwatch/langwatch/issues">
+                  <Link
+                    external
+                    target="_blank"
+                    href="https://github.com/langwatch/langwatch/issues"
+                  >
                     <Bug /> Report a Bug
                   </Link>
                 </Menu.Item>
-
-                {/* <Menu.Separator />
-              <Menu.ItemGroup>
-                <Menu.ItemGroupLabel>Align</Menu.ItemGroupLabel>
-                <Menu.Item value="left">Left</Menu.Item>
-                <Menu.Item value="middle">Middle</Menu.Item>
-                <Menu.Item value="right">Right</Menu.Item>
-              </Menu.ItemGroup> */}
               </Menu.Content>
             </Portal>
           </Menu.Root>
@@ -281,47 +297,6 @@ export const MainMenu = React.memo(function MainMenu() {
               project={project}
             />
           )}
-
-          {/* <HStack width="full" gap={0} paddingX={2} paddingTop={2}>
-            <SideMenuLink
-              size="sm"
-              href="https://docs.langwatch.ai"
-              icon={
-                <IconWrapper width="14px" height="14px" marginLeft="1px">
-                  <BookOpen />
-                </IconWrapper>
-              }
-              label="Documentation"
-              isActive={false}
-              project={project}
-            />
-
-            <SideMenuLink
-              size="sm"
-              href="https://github.com/langwatch/langwatch"
-              icon={
-                <IconWrapper width="14px" height="14px">
-                  <GitHub />
-                </IconWrapper>
-              }
-              label="GitHub"
-              isActive={false}
-              project={project}
-            />
-
-            <SideMenuLink
-              size="sm"
-              href="https://discord.gg/kT4PhDS2gH"
-              icon={
-                <IconWrapper width="14px" height="14px">
-                  <DiscordOutlineIcon />
-                </IconWrapper>
-              }
-              label="Community"
-              isActive={false}
-              project={project}
-            />
-          </HStack> */}
         </VStack>
       </VStack>
     </Box>
