@@ -208,10 +208,10 @@ export const authOptions = (
           clientSecret: env.GITHUB_CLIENT_SECRET ?? "",
           profile(profile) {
             return {
-              id: profile.sub,
-              name: profile.name,
+              id: profile.id.toString(),
+              name: profile.name ?? profile.login,
               email: profile.email,
-              image: profile.image,
+              image: profile.avatar_url,
             };
           },
         })
@@ -221,10 +221,10 @@ export const authOptions = (
           clientSecret: env.GITLAB_CLIENT_SECRET ?? "",
           profile(profile) {
             return {
-              id: profile.sub,
-              name: profile.name,
+              id: profile.sub?.toString(),
+              name: profile.name ?? profile.username,
               email: profile.email,
-              image: profile.image,
+              image: profile.avatar_url,
             };
           },
         })
@@ -237,7 +237,7 @@ export const authOptions = (
               id: profile.sub,
               name: profile.name,
               email: profile.email,
-              image: profile.image,
+              image: profile.picture,
             };
           },
         })
