@@ -10,6 +10,7 @@ export const ATTR_LANGWATCH_INPUT = "langwatch.input";
 export const ATTR_LANGWATCH_OUTPUT = "langwatch.output";
 export const ATTR_LANGWATCH_SPAN_TYPE = "langwatch.span.type";
 export const ATTR_LANGWATCH_RAG_CONTEXTS = "langwatch.contexts";
+export const ATTR_LANGWATCH_METRICS = "langwatch.metrics";
 export const ATTR_LANGWATCH_SDK_VERSION = "langwatch.sdk.version";
 export const ATTR_LANGWATCH_SDK_NAME = "langwatch.sdk.name";
 export const ATTR_LANGWATCH_SDK_LANGUAGE = "langwatch.sdk.language";

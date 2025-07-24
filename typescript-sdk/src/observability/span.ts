@@ -1,8 +1,11 @@
 import { Attributes, AttributeValue, Span } from "@opentelemetry/api";
 import semconv from "@opentelemetry/semantic-conventions/build/esm/experimental_attributes";
 import * as intSemconv from "./semconv";
-import { EvaluationRESTResult } from '../server/types/evaluations';
-import { recordEvaluation } from "../evaluation";
+import { EvaluationRESTResult } from "../server/types/evaluations";
+import {
+  EvaluationDetails,
+  recordEvaluation,
+} from "../evaluation/record-evaluation";
 
 /**
  * Supported types of spans for LangWatch observability. These types categorize the nature of the span for downstream analysis and visualization.
@@ -53,6 +56,22 @@ export interface LangWatchSpanRAGContext {
   document_id: string;
   chunk_id: string;
   content: string;
+}
+
+/**
+ * Metrics for a LangWatch span.
+ *
+ * @property promptTokens - The number of prompt tokens used.
+ * @property completionTokens - The number of completion tokens used.
+ * @property cost - The cost of the span.
+ */
+export interface LangWatchSpanMetrics {
+  /** The number of prompt tokens used */
+  promptTokens?: number;
+  /** The number of completion tokens used */
+  completionTokens?: number;
+  /** The cost of the span */
+  cost?: number;
 }
 
 /**
@@ -240,11 +259,11 @@ export interface LangWatchSpan extends Span {
   /**
    * Record the evaluation result for the span.
    *
-   * @param result - The evaluation result
+   * @param details - The evaluation details
    * @param attributes - Additional attributes to add to the evaluation span.
    * @returns this
    */
-  recordEvaluation(result: EvaluationRESTResult, attributes?: Attributes): this;
+  recordEvaluation(details: EvaluationDetails, attributes?: Attributes): this;
 
   /**
    * Add a GenAI system message event to the span.
@@ -369,6 +388,14 @@ export interface LangWatchSpan extends Span {
    * @returns this
    */
   setRAGContext(ragContext: LangWatchSpanRAGContext): this;
+
+  /**
+   * Set the metrics for the span.
+   *
+   * @param metrics - The metrics object
+   * @returns this
+   */
+  setMetrics(metrics: LangWatchSpanMetrics): this;
 }
 
 /**
@@ -424,8 +451,8 @@ export function createLangWatchSpan(span: Span): LangWatchSpan {
       );
     },
 
-    recordEvaluation(result: EvaluationRESTResult, attributes?: Attributes) {
-      recordEvaluation(result, attributes);
+    recordEvaluation(details: EvaluationDetails, attributes?: Attributes) {
+      recordEvaluation(details, attributes);
     },
 
     addGenAISystemMessageEvent(
@@ -535,6 +562,15 @@ export function createLangWatchSpan(span: Span): LangWatchSpan {
         JSON.stringify({
           type: "json",
           value: JSON.stringify([ragContext]),
+        }),
+      );
+    },
+    setMetrics(metrics: LangWatchSpanMetrics) {
+      span.setAttribute(
+        intSemconv.ATTR_LANGWATCH_METRICS,
+        JSON.stringify({
+          type: "json",
+          value: JSON.stringify(metrics),
         }),
       );
     },
