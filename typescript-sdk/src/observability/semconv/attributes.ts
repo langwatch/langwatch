@@ -14,6 +14,7 @@ export const ATTR_LANGWATCH_SDK_VERSION = "langwatch.sdk.version";
 export const ATTR_LANGWATCH_SDK_NAME = "langwatch.sdk.name";
 export const ATTR_LANGWATCH_SDK_LANGUAGE = "langwatch.sdk.language";
 export const ATTR_LANGWATCH_TIMESTAMPS = "langwatch.timestamps";
+export const ATTR_LANGWATCH_EVALUATION_CUSTOM = "langwatch.evaluation.custom";
 export const ATTR_LANGWATCH_PARAMS = "langwatch.params";
 export const ATTR_LANGWATCH_CUSTOMER_ID = "langwatch.customer.id";
 export const ATTR_LANGWATCH_THREAD_ID = "langwatch.thread.id";
