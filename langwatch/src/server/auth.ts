@@ -6,6 +6,9 @@ import {
   type NextAuthOptions,
 } from "next-auth";
 import Auth0Provider, { type Auth0Profile } from "next-auth/providers/auth0";
+import CognitoProvider, {
+  type CognitoProfile,
+} from "next-auth/providers/cognito";
 import CredentialsProvider from "next-auth/providers/credentials";
 import { compare } from "bcrypt";
 
@@ -15,6 +18,11 @@ import { dependencies } from "../injection/dependencies.server";
 import type { NextRequest } from "next/server";
 import { getNextAuthSessionToken } from "../utils/auth";
 import AzureADProvider from "next-auth/providers/azure-ad";
+import GitHubProvider from "next-auth/providers/github";
+import GitlabProvider from "next-auth/providers/gitlab";
+import GoogleProvider from "next-auth/providers/google";
+import OktaProvider from "next-auth/providers/okta";
+
 /**
  * Module augmentation for `next-auth` types. Allows us to add custom properties to the `session`
  * object and keep type safety.
@@ -173,6 +181,77 @@ export const authOptions = (
               name: profile.displayName,
               email: profile.mail ?? profile.userPrincipalName,
               image: null, // Microsoft Graph doesn't return image by default
+            };
+          },
+        })
+      : env.NEXTAUTH_PROVIDER === "cognito"
+      ? CognitoProvider({
+          clientId: env.COGNITO_CLIENT_ID ?? "",
+          clientSecret: env.COGNITO_CLIENT_SECRET ?? "",
+          issuer: env.COGNITO_ISSUER ?? "",
+          client: {
+            token_endpoint_auth_method: "none",
+          },
+
+          profile(profile: CognitoProfile) {
+            return {
+              id: profile.sub,
+              name: profile.name,
+              email: profile.email,
+              image: profile.picture,
+            };
+          },
+        })
+      : env.NEXTAUTH_PROVIDER === "github"
+      ? GitHubProvider({
+          clientId: env.GITHUB_CLIENT_ID ?? "",
+          clientSecret: env.GITHUB_CLIENT_SECRET ?? "",
+          profile(profile) {
+            return {
+              id: profile.id.toString(),
+              name: profile.name ?? profile.login,
+              email: profile.email,
+              image: profile.avatar_url,
+            };
+          },
+        })
+      : env.NEXTAUTH_PROVIDER === "gitlab"
+      ? GitlabProvider({
+          clientId: env.GITLAB_CLIENT_ID ?? "",
+          clientSecret: env.GITLAB_CLIENT_SECRET ?? "",
+          profile(profile) {
+            return {
+              id: profile.sub?.toString(),
+              name: profile.name ?? profile.username,
+              email: profile.email,
+              image: profile.avatar_url,
+            };
+          },
+        })
+      : env.NEXTAUTH_PROVIDER === "google"
+      ? GoogleProvider({
+          clientId: env.GOOGLE_CLIENT_ID ?? "",
+          clientSecret: env.GOOGLE_CLIENT_SECRET ?? "",
+          profile(profile) {
+            return {
+              id: profile.sub,
+              name: profile.name,
+              email: profile.email,
+              image: profile.picture,
+            };
+          },
+        })
+      : env.NEXTAUTH_PROVIDER === "okta"
+      ? OktaProvider({
+          clientId: env.OKTA_CLIENT_ID ?? "",
+          clientSecret: env.OKTA_CLIENT_SECRET ?? "",
+          issuer: env.OKTA_ISSUER ?? "",
+          profile(profile) {
+            return {
+              id: profile.sub,
+              name: profile.name,
+              email: profile.email,
+              image: profile.image,
             };
           },
         })

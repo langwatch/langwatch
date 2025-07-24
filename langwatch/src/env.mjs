@@ -15,7 +15,7 @@ export const env = createEnv({
     DATABASE_URL: optionalIfBuildTime(z.string().url()),
     NODE_ENV: z.enum(["development", "test", "production"]),
     BASE_HOST: optionalIfBuildTime(z.string().min(1)),
-    NEXTAUTH_PROVIDER: z.enum(["auth0", "email", "azure-ad"]),
+    NEXTAUTH_PROVIDER: z.string().optional(),
     NEXTAUTH_SECRET: optionalIfBuildTime(z.string().min(1)),
     NEXTAUTH_URL: optionalIfBuildTime(
       z.preprocess(
@@ -63,6 +63,29 @@ export const env = createEnv({
     AZURE_CLIENT_ID: z.string().optional(),
     AZURE_CLIENT_SECRET: z.string().optional(),
     AZURE_TENANT_ID: z.string().optional(),
+
+    // Cognito
+    COGNITO_CLIENT_ID: z.string().optional(),
+    COGNITO_ISSUER: z.string().optional(),
+    COGNITO_CLIENT_SECRET: z.string().optional(),
+
+    // Github
+    GITHUB_CLIENT_ID: z.string().optional(),
+    GITHUB_CLIENT_SECRET: z.string().optional(),
+
+    // Gitlab
+    GITLAB_CLIENT_ID: z.string().optional(),
+    GITLAB_CLIENT_SECRET: z.string().optional(),
+
+    // Google
+    GOOGLE_CLIENT_ID: z.string().optional(),
+    GOOGLE_CLIENT_SECRET: z.string().optional(),
+
+    // Okta
+    OKTA_CLIENT_ID: z.string().optional(),
+    OKTA_CLIENT_SECRET: z.string().optional(),
+    OKTA_ISSUER: z.string().optional(),
+
     POSTHOG_KEY: z.string().optional(),
     POSTHOG_HOST: z.string().optional(),
     DISABLE_USAGE_STATS: z.boolean().optional(),
@@ -140,12 +163,24 @@ export const env = createEnv({
     AZURE_CLIENT_ID: process.env.AZURE_CLIENT_ID,
     AZURE_CLIENT_SECRET: process.env.AZURE_CLIENT_SECRET,
     AZURE_TENANT_ID: process.env.AZURE_TENANT_ID,
+    COGNITO_CLIENT_ID: process.env.COGNITO_CLIENT_ID,
+    COGNITO_ISSUER: process.env.COGNITO_ISSUER,
+    COGNITO_CLIENT_SECRET: process.env.COGNITO_CLIENT_SECRET,
     POSTHOG_KEY: process.env.POSTHOG_KEY,
     POSTHOG_HOST: process.env.POSTHOG_HOST,
     DISABLE_USAGE_STATS:
       process.env.DISABLE_USAGE_STATS === "1" ||
       process.env.DISABLE_USAGE_STATS?.toLowerCase() === "true",
     LANGWATCH_NLP_LAMBDA_CONFIG: process.env.LANGWATCH_NLP_LAMBDA_CONFIG,
+    GITHUB_CLIENT_ID: process.env.GITHUB_CLIENT_ID,
+    GITHUB_CLIENT_SECRET: process.env.GITHUB_CLIENT_SECRET,
+    GITLAB_CLIENT_ID: process.env.GITLAB_CLIENT_ID,
+    GITLAB_CLIENT_SECRET: process.env.GITLAB_CLIENT_SECRET,
+    GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID,
+    GOOGLE_CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET,
+    OKTA_CLIENT_ID: process.env.OKTA_CLIENT_ID,
+    OKTA_CLIENT_SECRET: process.env.OKTA_CLIENT_SECRET,
+    OKTA_ISSUER: process.env.OKTA_ISSUER,
   },
   /**
    * Run `build` or `dev` with `SKIP_ENV_VALIDATION` to skip env validation.

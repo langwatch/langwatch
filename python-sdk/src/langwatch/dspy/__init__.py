@@ -28,6 +28,7 @@ from pydantic.fields import FieldInfo
 from coolname import generate_slug
 from retry import retry
 from dspy.evaluate.evaluate import Evaluate
+from dspy.utils.callback import with_callbacks
 
 
 class SerializableAndPydanticEncoder(json.JSONEncoder):
@@ -72,7 +73,16 @@ class SerializableAndPydanticEncoder(json.JSONEncoder):
         if isinstance(o, Completions):
             return {"__class__": classname} | o.__dict__
         if isinstance(o, BaseModel):
-            return o.model_dump(exclude_unset=True)
+            try:
+                return o.model_dump(exclude_unset=True)
+            except Exception as e:
+                if 'MockValSer' in str(e):
+                    return {
+                        key: getattr(o, key)
+                        for key in o.model_fields.keys()
+                        if hasattr(o, key) and getattr(o, key) is not None
+                    }
+                raise
         try:
             return super().default(o)
         except:
@@ -152,11 +162,12 @@ class LangWatchDSPy:
     def init(
         self,
         experiment: str,
-        optimizer: Optional[Teleprompter],
+        optimizer: Optional[Teleprompter] = None,
         run_id: Optional[str] = None,
         slug: Optional[str] = None,
         workflow_id: Optional[str] = None,
         workflow_version_id: Optional[str] = None,
+        evaluator: Optional[Evaluate] = None,
     ):
         if langwatch.get_api_key() is None:
             print("API key was not detected, calling langwatch.login()...")
@@ -184,6 +195,9 @@ class LangWatchDSPy:
             )
         response.raise_for_status()
 
+        if optimizer and evaluator:
+            raise ValueError("You can only provide an optimizer or an evaluator, not both.")
+
         self.experiment_slug = slug or experiment
         random.seed()  # MIPRO meses up the global seed, so we need to reset it to random to get a new run_id
         self.run_id = run_id or generate_slug(3)
@@ -193,9 +207,11 @@ class LangWatchDSPy:
         self.patch_llms()
         if optimizer is not None:
             self.patch_optimizer(optimizer)
+        elif evaluator is not None:
+            self.patch_evaluator(evaluator)
         else:
             print(
-                "No optimizer provided, assuming custom optimizer tracking, make sure to call `track_metric` and `log_step` manually: https://docs.langwatch.ai/dspy-visualization/custom-optimizer"
+                "No optimizer or evaluator provided, assuming custom optimizer tracking, make sure to call `track_metric` and `log_step` manually: https://docs.langwatch.ai/dspy-visualization/custom-optimizer"
             )
 
         result = response.json()
@@ -204,6 +220,10 @@ class LangWatchDSPy:
         print(
             f"[LangWatch] Open {langwatch.get_endpoint()}{self.experiment_path}?runIds={self.run_id} to track your DSPy training session live\n"
         )
+
+    def patch_evaluator(self, evaluator: Evaluate):
+        evaluator.__class__ = LangWatchTrackedEvaluate
+        print(f"\n[LangWatch] `dspy.evaluate.Evaluate` object detected and patched for live tracking.")
 
     def patch_optimizer(self, optimizer: Teleprompter):
         METRIC_TRACKING_CLASSMAP = {
@@ -379,14 +399,16 @@ langwatch_dspy = LangWatchDSPy()
 
 def init(
     experiment: str,
-    optimizer: Optional[Teleprompter],
+    optimizer: Optional[Teleprompter] = None,
     run_id: Optional[str] = None,
     slug: Optional[str] = None,
     workflow_id: Optional[str] = None,
     workflow_version_id: Optional[str] = None,
+    evaluator: Optional[Evaluate] = None,
 ):
     langwatch_dspy.init(
-        experiment, optimizer, run_id, slug, workflow_id, workflow_version_id
+        experiment, optimizer, run_id, slug, workflow_id, workflow_version_id,
+        evaluator=evaluator,
     )
 
 
@@ -671,6 +693,40 @@ class LangWatchTrackedMIPROv2(MIPROv2):
             yield
         finally:
             Evaluate.__call__ = original_evaluate_call
+
+
+class LangWatchTrackedEvaluate(Evaluate):
+    @with_callbacks
+    def __call__(self, program: dspy.Module, metric: Optional[Callable] = None, **kwargs):
+        lw_dspy = langwatch_dspy
+
+        metric_to_use = metric if metric is not None else self.metric
+        if not metric_to_use:
+            raise ValueError("Evaluation metric must be provided either during Evaluate initialization or during call.")
+
+        wrapped_metric = lw_dspy.track_metric(metric_to_use)
+
+        # Call the original evaluation logic with the wrapped metric.
+        # We need to make sure we pass the wrapped metric to the super call.
+        kwargs_for_super = kwargs.copy()
+        kwargs_for_super["metric"] = wrapped_metric
+        result = super().__call__(program, **kwargs_for_super)
+
+        score = result[0] if isinstance(result, tuple) else result
+
+        if lw_dspy.run_id:
+            lw_dspy.log_step(
+                optimizer=DSPyOptimizer(name="Evaluate", parameters={}),
+                index="0",
+                score=float(score),
+                label="score",
+                predictors=[
+                    DSPyPredictor(name=name, predictor=predictor)
+                    for name, predictor in program.named_predictors()
+                ],
+            )
+
+        return result
 
 
 # === Tracer ===#

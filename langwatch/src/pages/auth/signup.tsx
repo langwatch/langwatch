@@ -26,8 +26,7 @@ import { toaster } from "../../components/ui/toaster";
 
 export default function SignUp({ session }: { session: Session | null }) {
   const publicEnv = usePublicEnv();
-  const isAuth0 = publicEnv.data?.NEXTAUTH_PROVIDER === "auth0";
-  const isAzureAD = publicEnv.data?.NEXTAUTH_PROVIDER === "azure-ad";
+  const isAuthProvider = publicEnv.data?.NEXTAUTH_PROVIDER;
   const callbackUrl = useSearchParams()?.get("callbackUrl") ?? undefined;
 
   useEffect(() => {
@@ -35,20 +34,16 @@ export default function SignUp({ session }: { session: Session | null }) {
       return;
     }
 
-    if (!session && isAuth0) {
-      void signIn("auth0", { callbackUrl });
+    if (!session && isAuthProvider) {
+      void signIn(isAuthProvider, { callbackUrl });
     }
-
-    if (!session && isAzureAD) {
-      void signIn("azure-ad", { callbackUrl });
-    }
-  }, [publicEnv.data, session, callbackUrl, isAuth0, isAzureAD]);
+  }, [publicEnv.data, session, callbackUrl, isAuthProvider]);
 
   if (!publicEnv.data) {
     return null;
   }
 
-  return isAuth0 ? (
+  return isAuthProvider ? (
     <div style={{ padding: "12px" }}>Redirecting to Sign in...</div>
   ) : (
     <SignUpForm />

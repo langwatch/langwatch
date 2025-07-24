@@ -68,7 +68,7 @@ export default function ModelsPage() {
       >
         <HStack width="full" marginTop={6}>
           <Heading size="lg" as="h1">
-            Model Connections
+            Model Providers
           </Heading>
 
           <Spacer />
