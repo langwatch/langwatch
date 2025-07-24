@@ -96,7 +96,7 @@ export default function Usage() {
               <Text>
                 You have used{" "}
                 <b>{usage.data?.currentMonthMessagesCount.toLocaleString()}</b>{" "}
-                out of{" "}
+                traces out of{" "}
                 <b>
                   {usage.data?.activePlan.maxMessagesPerMonth.toLocaleString()}
                 </b>{" "}

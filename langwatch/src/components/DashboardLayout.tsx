@@ -11,6 +11,7 @@ import {
   Text,
   VStack,
   Progress,
+  Link,
   type StackProps,
 } from "@chakra-ui/react";
 import { type Organization, type Project, type Team } from "@prisma/client";
@@ -45,7 +46,6 @@ import { ProjectTechStackIcon } from "./TechStack";
 import { ChecklistIcon } from "./icons/Checklist";
 import { useColorRawValue } from "./ui/color-mode";
 import { InputGroup } from "./ui/input-group";
-import { Link } from "./ui/link";
 import { Menu } from "./ui/menu";
 import { Popover } from "./ui/popover";
 import { Tooltip } from "./ui/tooltip";
@@ -513,25 +513,27 @@ export const DashboardLayout = ({
               width="full"
             >
               <HStack>
-                <Link href="/settings/usage" width="150px" cursor="pointer">
-                  <Progress.Label fontSize="xs">
-                    <HStack gap={1}>
-                      Trace Usage
-                      <Tooltip
-                        content={`You have used ${usage.data?.currentMonthMessagesCount.toLocaleString()} out of ${usage.data?.activePlan.maxMessagesPerMonth.toLocaleString()} this month.`}
-                      >
-                        <Info size="12" />
-                      </Tooltip>
-                    </HStack>
-                  </Progress.Label>
-                  <Progress.Track
-                    flex="1"
-                    borderRadius="full"
-                    border="1px solid"
-                    borderColor="#eee"
+                <Link href="/settings/usage" width="150px">
+                  <Tooltip
+                    content={`You have used ${usage.data?.currentMonthMessagesCount.toLocaleString()} traces out of ${usage.data?.activePlan.maxMessagesPerMonth.toLocaleString()} this month.`}
                   >
-                    <Progress.Range />
-                  </Progress.Track>
+                    <HStack width="full" cursor="pointer">
+                      <Progress.Label fontSize="xs">
+                        <HStack gap={1} cursor="pointer">
+                          Usage
+                          <Info size="12" />
+                        </HStack>
+                      </Progress.Label>
+                      <Progress.Track
+                        flex="1"
+                        borderRadius="full"
+                        border="1px solid"
+                        borderColor="#eee"
+                      >
+                        <Progress.Range />
+                      </Progress.Track>
+                    </HStack>
+                  </Tooltip>
                 </Link>
               </HStack>
             </Progress.Root>
