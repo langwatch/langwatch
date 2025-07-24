@@ -10,6 +10,8 @@ import {
   Spacer,
   Text,
   VStack,
+  Progress,
+  Link,
   type StackProps,
 } from "@chakra-ui/react";
 import { type Organization, type Project, type Team } from "@prisma/client";
@@ -19,7 +21,14 @@ import Head from "next/head";
 import { useRouter } from "next/router";
 import numeral from "numeral";
 import React, { useMemo, useState } from "react";
-import { ChevronDown, ChevronRight, Lock, Plus, Search } from "react-feather";
+import {
+  ChevronDown,
+  ChevronRight,
+  Lock,
+  Plus,
+  Search,
+  Info,
+} from "react-feather";
 import { useOrganizationTeamProject } from "../hooks/useOrganizationTeamProject";
 import { usePublicEnv } from "../hooks/usePublicEnv";
 import { useRequiredSession } from "../hooks/useRequiredSession";
@@ -37,7 +46,6 @@ import { ProjectTechStackIcon } from "./TechStack";
 import { ChecklistIcon } from "./icons/Checklist";
 import { useColorRawValue } from "./ui/color-mode";
 import { InputGroup } from "./ui/input-group";
-import { Link } from "./ui/link";
 import { Menu } from "./ui/menu";
 import { Popover } from "./ui/popover";
 import { Tooltip } from "./ui/tooltip";
@@ -492,9 +500,45 @@ export const DashboardLayout = ({
               </InputGroup>
             </form>
           )}
-          <HStack gap={6} flex={1}>
+
+          <HStack gap={2} flex={1}>
             <Spacer />
-            <HStack gap={4}>
+
+            <Progress.Root
+              defaultValue={0}
+              max={usage.data?.activePlan.maxMessagesPerMonth}
+              value={usage.data?.currentMonthMessagesCount}
+              maxW="150px"
+              colorPalette="orange"
+              width="full"
+            >
+              <HStack>
+                <Link href="/settings/usage" width="150px">
+                  <Tooltip
+                    content={`You have used ${usage.data?.currentMonthMessagesCount.toLocaleString()} traces out of ${usage.data?.activePlan.maxMessagesPerMonth.toLocaleString()} this month.`}
+                  >
+                    <HStack width="full" cursor="pointer">
+                      <Progress.Label fontSize="xs">
+                        <HStack gap={1} cursor="pointer">
+                          Usage
+                          <Info size="12" />
+                        </HStack>
+                      </Progress.Label>
+                      <Progress.Track
+                        flex="1"
+                        borderRadius="full"
+                        border="1px solid"
+                        borderColor="#eee"
+                      >
+                        <Progress.Range />
+                      </Progress.Track>
+                    </HStack>
+                  </Tooltip>
+                </Link>
+              </HStack>
+            </Progress.Root>
+
+            <HStack>
               {integrationsLeft ? (
                 <Popover.Root positioning={{ placement: "bottom-end" }}>
                   <Popover.Trigger asChild>
@@ -524,7 +568,7 @@ export const DashboardLayout = ({
                   </Popover.Content>
                 </Popover.Root>
               ) : (
-                <Box width={["auto", "auto", "auto", "55px"]} />
+                <Spacer />
               )}
               <Menu.Root>
                 <Menu.Trigger asChild>
