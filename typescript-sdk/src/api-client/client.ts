@@ -1,9 +1,31 @@
-import createClient from "openapi-fetch";
+import openApiCreateClient from "openapi-fetch";
 import type { paths } from "./langwatch-openapi.ts";
-import { getEnv } from "../utils";
+import { z } from "zod";
 
-const env = getEnv();
+interface LangWatchApiClientOptions {
+  apiKey?: string;
+  endpoint?: string;
+}
 
-export const client = createClient<paths>({
-  baseUrl: env.LANGWATCH_ENDPOINT,
+const configSchema = z.object({
+  apiKey: z.string().optional(),
+  endpoint: z.string().url().optional(),
 });
+
+export function createClient(options?: LangWatchApiClientOptions) {
+  // This will error if the config is invalid
+  const config = configSchema.parse({
+    apiKey: options?.apiKey ?? process.env.LANGWATCH_API_KEY,
+    endpoint: options?.endpoint ?? process.env.LANGWATCH_ENDPOINT,
+  });
+
+  return openApiCreateClient<paths>({
+    baseUrl: config.endpoint,
+    headers: {
+      "X-Auth-Token": config.apiKey,
+      "Content-Type": "application/json",
+    },
+  });
+}
+
+export type LangwatchApiClient = ReturnType<typeof createClient>;

@@ -54,6 +54,7 @@
     "eventemitter3": "^5.0.1",
     "fets": "^0.8.5",
     "javascript-stringify": "^2.1.0",
+    "liquidjs": "^10.21.1",
     "nanoid": "^5.0.9",
     "openai": "^4.47.3",
     "openapi-fetch": "^0.14.0",
