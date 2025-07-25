@@ -23,8 +23,14 @@ const config: InternalConfig = {
 };
 
 export function setConfig(options: SetupOptions) {
-  config.apiKey = options.apiKey ?? config.apiKey;
-  config.endpoint = options.endpoint ?? config.endpoint;
+  config.apiKey = options.apiKey !== void 0
+    ? options.apiKey
+    : (process.env.LANGWATCH_API_KEY ?? config.apiKey);
+
+  config.endpoint = options.endpoint !== void 0
+    ? options.endpoint
+    : (process.env.LANGWATCH_ENDPOINT ?? config.endpoint);
+
   config.disableOpenTelemetryAutomaticSetup = options.disableOpenTelemetryAutomaticSetup ?? config.disableOpenTelemetryAutomaticSetup;
   config.disableAutomaticInputCapture = options.disableAutomaticInputCapture ?? config.disableAutomaticInputCapture;
   config.disableAutomaticOutputCapture = options.disableAutomaticOutputCapture ?? config.disableAutomaticOutputCapture;
