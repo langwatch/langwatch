@@ -81,6 +81,9 @@ importers:
       '@types/node':
         specifier: ^24.1.0
         version: 24.1.0
+      '@typescript/native-preview':
+        specifier: 7.0.0-dev.20250725.1
+        version: 7.0.0-dev.20250725.1
       dotenv:
         specifier: ^17.2.1
         version: 17.2.1
@@ -852,6 +855,53 @@ packages:
   '@typescript-eslint/visitor-keys@8.38.0':
     resolution: {integrity: sha512-pWrTcoFNWuwHlA9CvlfSsGWs14JxfN1TH25zM5L7o0pRLhsoZkDnTsXfQRJBEWJoV5DL0jf+Z+sxiud+K0mq1g==}
     engines: {node: ^18.18.0 || ^20.9.0 || >=21.1.0}
+
+  '@typescript/native-preview-darwin-arm64@7.0.0-dev.20250725.1':
+    resolution: {integrity: sha512-cVdP7WI0sH2XPpxHxfmeCQsHfLFFxAGhgwceCmbe/EiX1bgJKWY6vB6iLfGv8b+2a4S5ZqnUuz/MdY8pgRlpog==}
+    engines: {node: '>=20.6.0'}
+    cpu: [arm64]
+    os: [darwin]
+
+  '@typescript/native-preview-darwin-x64@7.0.0-dev.20250725.1':
+    resolution: {integrity: sha512-rneVW6EG0cG8sK2OcxqsikugcIQTReZxx3VL+Cr2SsaD7g2ROvrpDjb8GmzFYbLuCRQkKhk0eop47MXopwJFHg==}
+    engines: {node: '>=20.6.0'}
+    cpu: [x64]
+    os: [darwin]
+
+  '@typescript/native-preview-linux-arm64@7.0.0-dev.20250725.1':
+    resolution: {integrity: sha512-uzqO26nv/bsoCxpEJuYNE4SiZ/FrRq0og6RkMz6WXku6SCiy35l1zDJpGyIQpvV7ldBgLW2KENpVpZ+tSwRMyA==}
+    engines: {node: '>=20.6.0'}
+    cpu: [arm64]
+    os: [linux]
+
+  '@typescript/native-preview-linux-arm@7.0.0-dev.20250725.1':
+    resolution: {integrity: sha512-cksXd5g9jpez14B7ANWfe76TGcfTiOsXFnVL14dITwe1CCegAJo6eYH1eo9s2yuKOpZZXeUDyYHABD8tYGYyUQ==}
+    engines: {node: '>=20.6.0'}
+    cpu: [arm]
+    os: [linux]
+
+  '@typescript/native-preview-linux-x64@7.0.0-dev.20250725.1':
+    resolution: {integrity: sha512-fcPiVePGOBx1DP2hVXl/sX0VtJCfpB6VutH/uip1I52obKYVpZaPV8ljO018Ugquy/rfrp5fce7gAIiuDR1E7A==}
+    engines: {node: '>=20.6.0'}
+    cpu: [x64]
+    os: [linux]
+
+  '@typescript/native-preview-win32-arm64@7.0.0-dev.20250725.1':
+    resolution: {integrity: sha512-eJnjdADTkMiSdSEB6oPzDQfcyaEJnjX0VwECv0TIZ+mlW29Yb0MYNqhWa0gS2YmddJMfydz4Dxn5jX+yh8vTGQ==}
+    engines: {node: '>=20.6.0'}
+    cpu: [arm64]
+    os: [win32]
+
+  '@typescript/native-preview-win32-x64@7.0.0-dev.20250725.1':
+    resolution: {integrity: sha512-1WVouUtx6MY/Uw/baR2JHSFFlqhhw9zs35py/6EEbDuWEhhZNAf22y0DX9ugPOGy9m0XA5BcQhH/2DDxv0+2SA==}
+    engines: {node: '>=20.6.0'}
+    cpu: [x64]
+    os: [win32]
+
+  '@typescript/native-preview@7.0.0-dev.20250725.1':
+    resolution: {integrity: sha512-tIXt/RNuuIx7RQkxcmQ/PzSt9ifrY+saYD0i63kQsGELRxOCB3YMY7ZVqpI4WX4ulIpqjw1eVwlSfF+36lX18w==}
+    engines: {node: '>=20.6.0'}
+    hasBin: true
 
   '@typescript/vfs@1.6.1':
     resolution: {integrity: sha512-JwoxboBh7Oz1v38tPbkrZ62ZXNHAk9bJ7c9x0eI5zBfBnBYGhURdbnh7Z4smN/MV48Y5OCcZb58n972UtbazsA==}
@@ -3025,6 +3075,37 @@ snapshots:
     dependencies:
       '@typescript-eslint/types': 8.38.0
       eslint-visitor-keys: 4.2.1
+
+  '@typescript/native-preview-darwin-arm64@7.0.0-dev.20250725.1':
+    optional: true
+
+  '@typescript/native-preview-darwin-x64@7.0.0-dev.20250725.1':
+    optional: true
+
+  '@typescript/native-preview-linux-arm64@7.0.0-dev.20250725.1':
+    optional: true
+
+  '@typescript/native-preview-linux-arm@7.0.0-dev.20250725.1':
+    optional: true
+
+  '@typescript/native-preview-linux-x64@7.0.0-dev.20250725.1':
+    optional: true
+
+  '@typescript/native-preview-win32-arm64@7.0.0-dev.20250725.1':
+    optional: true
+
+  '@typescript/native-preview-win32-x64@7.0.0-dev.20250725.1':
+    optional: true
+
+  '@typescript/native-preview@7.0.0-dev.20250725.1':
+    optionalDependencies:
+      '@typescript/native-preview-darwin-arm64': 7.0.0-dev.20250725.1
+      '@typescript/native-preview-darwin-x64': 7.0.0-dev.20250725.1
+      '@typescript/native-preview-linux-arm': 7.0.0-dev.20250725.1
+      '@typescript/native-preview-linux-arm64': 7.0.0-dev.20250725.1
+      '@typescript/native-preview-linux-x64': 7.0.0-dev.20250725.1
+      '@typescript/native-preview-win32-arm64': 7.0.0-dev.20250725.1
+      '@typescript/native-preview-win32-x64': 7.0.0-dev.20250725.1
 
   '@typescript/vfs@1.6.1(typescript@5.8.3)':
     dependencies:
