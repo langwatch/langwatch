@@ -140,7 +140,7 @@ describe('runEvaluation', () => {
     };
     mockStartActiveSpan.mockImplementationOnce((name, fn) => fn(span));
     mockFetch.mockResolvedValueOnce({ ok: true, json: async () => ({ ...baseProcessed }) });
-    const { runEvaluation: runEval } = await import('../run-evaluation');
+    const { runEvaluation: runEval } = await import('../run-evaluation.js');
     await runEval(details as any);
     expect(span.setInput).toHaveBeenCalledWith(expect.objectContaining({ trace_id: 'trace' }));
   });
@@ -163,7 +163,7 @@ describe('runEvaluation', () => {
     };
     mockStartActiveSpan.mockImplementationOnce((name, fn) => fn(span));
     mockFetch.mockResolvedValueOnce({ ok: true, json: async () => ({ ...baseProcessed }) });
-    const { runEvaluation: runEval } = await import('../run-evaluation');
+    const { runEvaluation: runEval } = await import('../run-evaluation.js');
     await runEval(details as any);
     expect(span.setInput).not.toHaveBeenCalled();
   });
