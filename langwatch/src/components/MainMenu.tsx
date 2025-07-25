@@ -191,7 +191,7 @@ export const MainMenu = React.memo(function MainMenu() {
               }}
             >
               <MessageCircle size={16} />
-              <Text fontSize="12px" color="gray.600" textAlign="center">
+              <Text fontSize="xs" color="gray.600" textAlign="center">
                 Chat
               </Text>
             </HStack>
@@ -201,7 +201,7 @@ export const MainMenu = React.memo(function MainMenu() {
                 <HStack width="full" align="center" gap={0}>
                   <LifeBuoy size={16} />
                   <Text
-                    fontSize="12px"
+                    fontSize="xs"
                     color="gray.600"
                     textAlign="center"
                     width="full"
