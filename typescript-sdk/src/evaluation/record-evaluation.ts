@@ -1,6 +1,6 @@
 import { EvaluationRESTResult } from "../internal/generated/types/evaluations";
 import * as intSemconv from "../observability/semconv";
-import { Attributes } from "@opentelemetry/api";
+import { Attributes, SpanStatusCode } from "@opentelemetry/api";
 import { generate } from "xksuid";
 import { tracer } from "./tracer";
 
@@ -91,6 +91,7 @@ export function recordEvaluation(
       }
     } catch (error) {
       span.recordException(error as Error);
+      span.setStatus({ code: SpanStatusCode.ERROR, message: (error as Error)?.message });
     } finally {
       span.end();
     }

@@ -8,7 +8,7 @@ import { LangWatchApiError } from "../internal/api/errors";
 import { formatPromptTemplate, formatPromptMessages } from "./formatting";
 import { tracer } from "./tracer";
 import * as intSemconv from "../observability/semconv";
-import { Exception } from "@opentelemetry/api";
+import { Exception, SpanStatusCode } from "@opentelemetry/api";
 
 /**
  * Fetches a prompt definition from the LangWatch API by prompt ID, optionally formatting it with provided variables.
@@ -68,6 +68,7 @@ export async function getPrompt(
       return prompt;
     } catch (err) {
       span.recordException(err as Exception);
+      span.setStatus({ code: SpanStatusCode.ERROR, message: (err as Error)?.message });
 
       throw err;
     } finally {
