@@ -20,6 +20,15 @@
       "types": "./dist/observability/index.d.ts",
       "require": "./dist/observability/index.js",
       "import": "./dist/observability/index.mjs"
+    "./node": {
+      "types": "./dist/client-node.d.ts",
+      "import": "./dist/client-node.mjs",
+      "require": "./dist/client-node.js"
+    },
+    "./browser": {
+      "types": "./dist/client-browser.d.ts",
+      "import": "./dist/client-browser.mjs",
+      "require": "./dist/client-browser.js"
     }
   },
   "repository": {
@@ -45,7 +54,7 @@
     "@types/debug": "^4.1.12",
     "@types/eslint__js": "^9.14.0",
     "@types/node": "^24.1.0",
-    "dotenv": "^17.2.0",
+    "dotenv": "^17.2.1",
     "esbuild": "^0.25.8",
     "eslint": "^9.31.0",
     "ts-to-zod": "3.15.0",
@@ -57,7 +66,9 @@
   "dependencies": {
     "@langchain/core": "^0.3.66",
     "@opentelemetry/api": "^1.9.0",
+    "@opentelemetry/exporter-trace-otlp-http": "^0.203.0",
     "@opentelemetry/otlp-transformer": "^0.203.0",
+    "@opentelemetry/propagator-b3": "^2.0.1",
     "@opentelemetry/resources": "^2.0.1",
     "@opentelemetry/sdk-trace-base": "^2.0.1",
     "@opentelemetry/semantic-conventions": "^1.36.0",
@@ -66,7 +77,12 @@
     "javascript-stringify": "^2.1.0",
     "openai": "^5.10.2",
     "xksuid": "^0.0.4",
-    "zod": "^4.0.8",
+    "zod": "^4.0.10",
     "zod-validation-error": "^4.0.1"
+  },
+  "peerDependencies": {
+    "@opentelemetry/sdk-node": "^0.203.0",
+    "@opentelemetry/sdk-trace-web": "^2.0.1",
+    "@opentelemetry/context-zone": "^2.0.1"
   }
 }
