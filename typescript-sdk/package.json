@@ -20,6 +20,12 @@
       "types": "./dist/observability/index.d.ts",
       "require": "./dist/observability/index.js",
       "import": "./dist/observability/index.mjs"
+    },
+    "./prompt": {
+      "types": "./dist/prompt/index.d.ts",
+      "require": "./dist/prompt/index.js",
+      "import": "./dist/prompt/index.mjs"
+    },
     "./node": {
       "types": "./dist/client-node.d.ts",
       "import": "./dist/client-node.mjs",
