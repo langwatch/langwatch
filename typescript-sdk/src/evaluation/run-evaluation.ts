@@ -9,6 +9,7 @@ import {
 import { RAGChunk } from "../internal/generated/types/tracer";
 import { tracer } from "./tracer";
 import { EvaluationError, EvaluationResultModel } from "./types";
+import { SpanStatusCode } from "@opentelemetry/api";
 
 export interface BasicEvaluationData {
   input?: string;
@@ -123,6 +124,7 @@ export async function runEvaluation(
       }
     } catch (error) {
       span.recordException(error as Error);
+      span.setStatus({ code: SpanStatusCode.ERROR, message: (error as Error)?.message });
       throw error;
     } finally {
       span.end();
