@@ -1,4 +1,4 @@
-import { getApiKey, getEndpoint } from "../client";
+import { canAutomaticallyCaptureInput, getApiKey, getEndpoint } from "../client";
 import { Conversation } from "../internal/generated/types/evaluations";
 import {
   Evaluators,
@@ -60,7 +60,9 @@ export async function runEvaluation(
           as_guardrail: details.asGuardrail,
         };
 
-        span.setInput(request);
+        if (canAutomaticallyCaptureInput()) {
+          span.setInput(request);
+        }
 
         const url = new URL(
           "/api/evaluations/${evaluatorId}/evaluate",

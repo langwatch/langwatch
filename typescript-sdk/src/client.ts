@@ -38,10 +38,10 @@ export function getEndpoint(): string {
   return config.endpoint;
 }
 
-export function canCaptureInput(): boolean {
+export function canAutomaticallyCaptureInput(): boolean {
   return !config.disableAutomaticInputCapture;
 }
 
-export function canCaptureOutput(): boolean {
+export function canAutomaticallyCaptureOutput(): boolean {
   return !config.disableAutomaticOutputCapture;
 }
