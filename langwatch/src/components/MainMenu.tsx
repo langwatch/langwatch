@@ -179,53 +179,6 @@ export const MainMenu = React.memo(function MainMenu() {
             padding={2}
             paddingBottom={4}
           >
-            {/* {(window as any)?.$crisp && project && (
-              <SideMenuLink
-                size="sm"
-                href="#"
-                onClick={(e) => {
-                  e.preventDefault();
-                  (window as any)?.$crisp.push(["do", "chat:show"]);
-                  (window as any)?.$crisp.push(["do", "chat:toggle"]);
-                }}
-                icon={
-                  <Box
-                    position="relative"
-                    color="white"
-                    padding={2}
-                    marginX={-2}
-                    borderRadius="full"
-                    minWidth={0}
-                    minHeight={0}
-                    backgroundColor="blue.500"
-                    transition="all 0.2s ease-in-out"
-                    _groupHover={{
-                      transform: "scale(1.2)",
-                    }}
-                    _active={{
-                      color: "white",
-                    }}
-                  >
-                    <ChatBalloonIcon width={20} height={20} />
-                    <Box
-                      position="absolute"
-                      bottom="0px"
-                      right="0px"
-                      width="10px"
-                      height="10px"
-                      borderRadius="full"
-                      backgroundColor="green.500"
-                      border="1px solid"
-                      borderColor="white"
-                    />
-                  </Box>
-                }
-                label="Live Help"
-                isActive={false}
-                project={project}
-              />
-            )} */}
-
             <HStack
               width="full"
               align="center"
@@ -239,7 +192,7 @@ export const MainMenu = React.memo(function MainMenu() {
             >
               <MessageCircle size={16} />
               <Text fontSize="12px" color="gray.600" textAlign="center">
-                Contact
+                Chat
               </Text>
             </HStack>
 
