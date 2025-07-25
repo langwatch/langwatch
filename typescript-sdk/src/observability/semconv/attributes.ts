@@ -30,8 +30,12 @@ export const ATTR_LANGWATCH_GEN_AI_LOG_EVENT_IMPOSTER =
 export const ATTR_LANGWATCH_GEN_AI_LOG_EVENT_BODY =
   "langwatch.gen_ai.log_event.body";
 
-export const ATTR_LANGWATCH_LANGCHAIN_TAGS = "langwatch.langchain.tags";
-export const ATTR_LANGWATCH_LANGCHAIN_EVENT_NAME = "langwatch.langchain.event_name";
-export const ATTR_LANGWATCH_LANGCHAIN_RUN_ID = "langwatch.langchain.run_id";
-export const ATTR_LANGWATCH_LANGCHAIN_PARENT_RUN_ID =
-  "langwatch.langchain.parent_run_id";
+  export const ATTR_LANGWATCH_LANGCHAIN_TAGS = "langwatch.langchain.tags";
+  export const ATTR_LANGWATCH_LANGCHAIN_EVENT_NAME = "langwatch.langchain.event_name";
+  export const ATTR_LANGWATCH_LANGCHAIN_RUN_ID = "langwatch.langchain.run.id";
+  export const ATTR_LANGWATCH_LANGCHAIN_RUN_TAGS = "langwatch.langchain.run.tags";
+  export const ATTR_LANGWATCH_LANGCHAIN_RUN_TYPE = "langwatch.langchain.run.type";
+  export const ATTR_LANGWATCH_LANGCHAIN_RUN_METADATA = "langwatch.langchain.run.metadata";
+  export const ATTR_LANGWATCH_LANGCHAIN_RUN_EXTRA_PARAMS = "langwatch.langchain.run.extra_params";
+export const ATTR_LANGWATCH_LANGCHAIN_RUN_PARENT_ID =
+  "langwatch.langchain.run.parent.id";
