@@ -1,3 +1,4 @@
+import { LangWatchApiError } from "../internal/api/errors";
 import { canAutomaticallyCaptureInput, getApiKey, getEndpoint } from "../client";
 import { Conversation } from "../internal/generated/types/evaluations";
 import {
@@ -44,104 +45,87 @@ export type EvaluationDetails =
 export async function runEvaluation(
   details: EvaluationDetails,
 ): Promise<SingleEvaluationResult> {
-  return await new Promise((resolve, reject) => {
-    tracer.startActiveSpan("run_evaluation", async (span) => {
-      span.setType(details.asGuardrail ? "guardrail" : "evaluation");
+  return await tracer.startActiveSpan("run evaluation", async (span) => {
+    span.setType(details.asGuardrail ? "guardrail" : "evaluation");
 
-      try {
-        const evaluatorId =
-          "slug" in details ? details.slug : details.evaluator;
-        const request = {
-          trace_id: span.spanContext().traceId,
-          span_id: span.spanContext().spanId,
-          data: details.data,
-          name: details.name,
-          settings: details.settings,
-          as_guardrail: details.asGuardrail,
-        };
+    try {
+      const evaluatorId =
+        "slug" in details ? details.slug : details.evaluator;
+      const request = {
+        trace_id: span.spanContext().traceId,
+        span_id: span.spanContext().spanId,
+        data: details.data,
+        name: details.name,
+        settings: details.settings,
+        as_guardrail: details.asGuardrail,
+      };
 
-        if (canAutomaticallyCaptureInput()) {
-          span.setInput(request);
-        }
-
-        const url = new URL(
-          "/api/evaluations/${evaluatorId}/evaluate",
-          getEndpoint(),
-        );
-
-        const response = await fetch(url.toString(), {
-          method: "POST",
-          headers: {
-            "X-Auth-Token": getApiKey(),
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(request),
-        });
-        if (!response.ok) {
-          throw new EvaluationError(
-            "Unable to run evaluation",
-            response.status,
-            await safeBodyReadAttempt(response),
-          );
-        }
-
-        const result: EvaluationResultModel = await response.json();
-
-        span.setMetrics({
-          cost: result.cost?.amount,
-        });
-
-        span.setOutputEvaluation(details.asGuardrail ?? false, result);
-
-        if (result.status === "processed") {
-          resolve({
-            status: "processed",
-            passed: result.passed,
-            score: result.score,
-            details: result.details,
-            label: result.label,
-            cost: result.cost,
-          });
-        } else if (result.status === "skipped") {
-          resolve({
-            status: "skipped",
-            details: result.details,
-          });
-        } else if (result.status === "error") {
-          resolve({
-            status: "error",
-            error_type: (result as any).error_type || "Unknown",
-            details: result.details || "Unknown error",
-            traceback: (result as any).traceback || [],
-          });
-        } else {
-          resolve({
-            status: "error",
-            error_type: "UnknownStatus",
-            details: `Unknown evaluation status: ${result.status}`,
-            traceback: [],
-          });
-        }
-      } catch (error) {
-        reject(error);
-        span.recordException(error as Error);
-      } finally {
-        span.end();
+      if (canAutomaticallyCaptureInput()) {
+        span.setInput(request);
       }
-    });
-  });
-}
 
-async function safeBodyReadAttempt(
-  response: Response,
-): Promise<unknown | null> {
-  try {
-    if (response.headers.get("Content-Type")?.includes("application/json")) {
-      return await response.json();
+      const url = new URL(
+        "/api/evaluations/${evaluatorId}/evaluate",
+        getEndpoint(),
+      );
+
+      const response = await fetch(url.toString(), {
+        method: "POST",
+        headers: {
+          "X-Auth-Token": getApiKey(),
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(request),
+      });
+      if (!response.ok) {
+        const err = new LangWatchApiError("Unable to run evaluation", response);
+        await err.safeParseBody(response);
+
+        throw err;
+      }
+
+      const result: EvaluationResultModel = await response.json();
+
+      span.setMetrics({
+        cost: result.cost?.amount,
+      });
+
+      span.setOutputEvaluation(details.asGuardrail ?? false, result);
+
+      if (result.status === "processed") {
+        return {
+          status: "processed",
+          passed: result.passed,
+          score: result.score,
+          details: result.details,
+          label: result.label,
+          cost: result.cost,
+        } as SingleEvaluationResult;
+      } else if (result.status === "skipped") {
+        return {
+          status: "skipped",
+          details: result.details,
+        } as SingleEvaluationResult;
+      } else if (result.status === "error") {
+        return {
+          status: "error",
+          error_type: (result as any).error_type || "Unknown",
+          details: result.details || "Unknown error",
+          traceback: (result as any).traceback || [],
+        } as SingleEvaluationResult;
+      } else {
+        return {
+          status: "error",
+          error_type: "UnknownStatus",
+          details: `Unknown evaluation status: ${result.status}`,
+          traceback: [],
+        } as SingleEvaluationResult;
+      }
+    } catch (error) {
+      span.recordException(error as Error);
+      throw error;
+    } finally {
+      span.end();
     }
-
-    return await response.text();
-  } catch {
-    return null;
-  }
+  });
 }
