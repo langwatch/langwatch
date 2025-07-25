@@ -11,6 +11,11 @@
       "import": "./dist/index.mjs",
       "require": "./dist/index.js"
     },
+    "./evaluation": {
+      "types": "./dist/evaluation/index.d.ts",
+      "require": "./dist/evaluation/index.js",
+      "import": "./dist/evaluation/index.mjs"
+    },
     "./observability": {
       "types": "./dist/observability/index.d.ts",
       "require": "./dist/observability/index.js",
