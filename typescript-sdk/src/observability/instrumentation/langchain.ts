@@ -47,6 +47,10 @@ export class LangWatchCallbackHandler extends BaseCallbackHandler {
     return context.active();
   }
 
+  private getSpan(runId: string): LangWatchSpan | undefined {
+    return this.spans[runId];
+  }
+
   async handleLLMStart(
     llm: Serialized,
     prompts: string[],
@@ -70,12 +74,15 @@ export class LangWatchCallbackHandler extends BaseCallbackHandler {
       span.setInput(prompts);
     }
 
+    if (_tags) {
+      span.setAttribute(intSemconv.ATTR_LANGWATCH_LANGCHAIN_RUN_TAGS, _tags);
+    }
     if (extraParams) {
       span.setAttributes(
         Object.fromEntries(
           Object.entries(extraParams).map(([key, value]) => [
-            key,
-            JSON.stringify(autoconvertTypedValues(value)),
+            [`${intSemconv.ATTR_LANGWATCH_LANGCHAIN_RUN_EXTRA_PARAMS}.${key}`],
+            wrapNonScalarValues(value),
           ]),
         ),
       );
@@ -89,8 +96,8 @@ export class LangWatchCallbackHandler extends BaseCallbackHandler {
       span.setAttributes(
         Object.fromEntries(
           Object.entries(metadata).map(([key, value]) => [
-            key,
-            JSON.stringify(autoconvertTypedValues(value)),
+            [`${intSemconv.ATTR_LANGWATCH_LANGCHAIN_RUN_METADATA}.${key}`],
+            wrapNonScalarValues(value),
           ]),
         ),
       );
@@ -121,12 +128,15 @@ export class LangWatchCallbackHandler extends BaseCallbackHandler {
       span.setInput(messages.flatMap(convertFromLangChainMessages));
     }
 
+    if (_tags) {
+      span.setAttribute(intSemconv.ATTR_LANGWATCH_LANGCHAIN_RUN_TAGS, _tags);
+    }
     if (extraParams) {
       span.setAttributes(
         Object.fromEntries(
           Object.entries(extraParams).map(([key, value]) => [
-            key,
-            JSON.stringify(autoconvertTypedValues(value)),
+            [`${intSemconv.ATTR_LANGWATCH_LANGCHAIN_RUN_EXTRA_PARAMS}.${key}`],
+            wrapNonScalarValues(value),
           ]),
         ),
       );
@@ -139,8 +149,8 @@ export class LangWatchCallbackHandler extends BaseCallbackHandler {
       span.setAttributes(
         Object.fromEntries(
           Object.entries(metadata).map(([key, value]) => [
-            key,
-            JSON.stringify(autoconvertTypedValues(value)),
+            [`${intSemconv.ATTR_LANGWATCH_LANGCHAIN_RUN_METADATA}.${key}`],
+            wrapNonScalarValues(value),
           ]),
         ),
       );
@@ -154,7 +164,7 @@ export class LangWatchCallbackHandler extends BaseCallbackHandler {
     runId: string,
     _parentRunId?: string | undefined,
   ): Promise<void> {
-    const span = this.spans[runId];
+    const span = this.getSpan(runId);
     if (!span) return;
     const outputs: unknown[] = [];
     for (const generation of response.generations) {
@@ -188,7 +198,7 @@ export class LangWatchCallbackHandler extends BaseCallbackHandler {
     runId: string,
     _parentRunId?: string | undefined,
   ): Promise<void> {
-    const span = this.spans[runId];
+    const span = this.getSpan(runId);
     if (!span) return;
 
     addLangChainEvent(span, "handleLLMError", runId, _parentRunId);
@@ -221,6 +231,23 @@ export class LangWatchCallbackHandler extends BaseCallbackHandler {
       span.setInput(inputs);
     }
 
+    if (_tags) {
+      span.setAttribute(intSemconv.ATTR_LANGWATCH_LANGCHAIN_RUN_TAGS, _tags);
+    }
+    if (_metadata) {
+      span.setAttributes(
+        Object.fromEntries(
+          Object.entries(_metadata).map(([key, value]) => [
+            [`${intSemconv.ATTR_LANGWATCH_LANGCHAIN_RUN_METADATA}.${key}`],
+            wrapNonScalarValues(value),
+          ]),
+        ),
+      );
+    }
+    if (_runType) {
+      span.setAttribute(intSemconv.ATTR_LANGWATCH_LANGCHAIN_RUN_TYPE, _runType);
+    }
+
     this.spans[runId] = span;
   }
 
@@ -229,7 +256,7 @@ export class LangWatchCallbackHandler extends BaseCallbackHandler {
     runId: string,
     _parentRunId?: string | undefined,
   ): Promise<void> {
-    const span = this.spans[runId];
+    const span = this.getSpan(runId);
     if (!span) return;
 
     addLangChainEvent(span, "handleChainEnd", runId, _parentRunId);
@@ -245,7 +272,7 @@ export class LangWatchCallbackHandler extends BaseCallbackHandler {
     _tags?: string[] | undefined,
     _kwargs?: { inputs?: Record<string, unknown> | undefined } | undefined,
   ): Promise<void> {
-    const span = this.spans[runId];
+    const span = this.getSpan(runId);
     if (!span) return;
 
     addLangChainEvent(span, "handleChainError", runId, _parentRunId);
@@ -265,6 +292,8 @@ export class LangWatchCallbackHandler extends BaseCallbackHandler {
     _metadata?: Record<string, unknown> | undefined,
     name?: string,
   ): Promise<void> {
+    console.log('a');
+
     const parentContext = this.getParentContext(parentRunId);
     const span = this.tracer.startSpan(
       name ?? tool.id?.[tool.id.length - 1]?.toString() ?? "tool",
@@ -279,18 +308,18 @@ export class LangWatchCallbackHandler extends BaseCallbackHandler {
 
     span.setAttributes({
       [intSemconv.ATTR_LANGWATCH_LANGCHAIN_RUN_ID]: runId,
-      [intSemconv.ATTR_LANGWATCH_LANGCHAIN_PARENT_RUN_ID]: parentRunId,
+      [intSemconv.ATTR_LANGWATCH_LANGCHAIN_RUN_PARENT_ID]: parentRunId,
     });
 
     if (_tags) {
-      span.setAttribute(intSemconv.ATTR_LANGWATCH_LANGCHAIN_TAGS, _tags);
+      span.setAttribute(intSemconv.ATTR_LANGWATCH_LANGCHAIN_RUN_TAGS, _tags);
     }
     if (_metadata) {
       span.setAttributes(
         Object.fromEntries(
           Object.entries(_metadata).map(([key, value]) => [
-            key,
-            JSON.stringify(autoconvertTypedValues(value)),
+            [`${intSemconv.ATTR_LANGWATCH_LANGCHAIN_RUN_METADATA}.${key}`],
+            wrapNonScalarValues(value),
           ]),
         ),
       );
@@ -303,7 +332,7 @@ export class LangWatchCallbackHandler extends BaseCallbackHandler {
     runId: string,
     _parentRunId?: string | undefined,
   ): Promise<void> {
-    const span = this.spans[runId];
+    const span = this.getSpan(runId);
     if (!span) return;
     if (canAutomaticallyCaptureOutput()) {
       span.setOutputString(output);
@@ -321,7 +350,7 @@ export class LangWatchCallbackHandler extends BaseCallbackHandler {
     _parentRunId?: string | undefined,
     _tags?: string[] | undefined,
   ): Promise<void> {
-    const span = this.spans[runId];
+    const span = this.getSpan(runId);
     if (!span) return;
 
     addLangChainEvent(span, "handleToolError", runId, _parentRunId, _tags);
@@ -355,14 +384,14 @@ export class LangWatchCallbackHandler extends BaseCallbackHandler {
       span.setInputString(query);
     }
     if (_tags) {
-      span.setAttribute(intSemconv.ATTR_LANGWATCH_LANGCHAIN_TAGS, _tags);
+      span.setAttribute(intSemconv.ATTR_LANGWATCH_LANGCHAIN_RUN_TAGS, _tags);
     }
     if (_metadata) {
       span.setAttributes(
         Object.fromEntries(
           Object.entries(_metadata).map(([key, value]) => [
-            key,
-            JSON.stringify(autoconvertTypedValues(value)),
+            [`${intSemconv.ATTR_LANGWATCH_LANGCHAIN_RUN_METADATA}.${key}`],
+            wrapNonScalarValues(value),
           ]),
         ),
       );
@@ -370,7 +399,7 @@ export class LangWatchCallbackHandler extends BaseCallbackHandler {
 
     span.setAttributes({
       [intSemconv.ATTR_LANGWATCH_LANGCHAIN_RUN_ID]: runId,
-      [intSemconv.ATTR_LANGWATCH_LANGCHAIN_PARENT_RUN_ID]: parentRunId,
+      [intSemconv.ATTR_LANGWATCH_LANGCHAIN_RUN_PARENT_ID]: parentRunId,
     });
 
     this.spans[runId] = span;
@@ -382,7 +411,7 @@ export class LangWatchCallbackHandler extends BaseCallbackHandler {
     _parentRunId?: string | undefined,
     _tags?: string[] | undefined,
   ) {
-    const span = this.spans[runId];
+    const span = this.getSpan(runId);
     if (!span) return;
     if (canAutomaticallyCaptureOutput()) {
       span.setOutput(documents);
@@ -408,7 +437,7 @@ export class LangWatchCallbackHandler extends BaseCallbackHandler {
     _parentRunId?: string | undefined,
     _tags?: string[] | undefined,
   ) {
-    const span = this.spans[runId];
+    const span = this.getSpan(runId);
     if (!span) return;
 
     addLangChainEvent(span, "handleRetrieverError", runId, _parentRunId, _tags);
@@ -425,7 +454,7 @@ export class LangWatchCallbackHandler extends BaseCallbackHandler {
     _parentRunId?: string | undefined,
     _tags?: string[] | undefined,
   ): Promise<void> {
-    const span = this.spans[runId];
+    const span = this.getSpan(runId);
     if (!span) return;
 
     addLangChainEvent(span, "handleAgentAction", runId, _parentRunId, _tags);
@@ -438,7 +467,7 @@ export class LangWatchCallbackHandler extends BaseCallbackHandler {
     _parentRunId?: string | undefined,
     _tags?: string[] | undefined,
   ): Promise<void> {
-    const span = this.spans[runId];
+    const span = this.getSpan(runId);
     if (!span) return;
 
     addLangChainEvent(span, "handleAgentEnd", runId, _parentRunId, _tags);
@@ -537,28 +566,34 @@ const convertFromLangChainMessage = (
   };
 };
 
-function autoconvertTypedValues(value: unknown): {
-  type: string;
-  value: unknown;
-} {
-  if (typeof value === "string") {
-    return { type: "text", value };
+function wrapNonScalarValues(value: unknown): string | number | boolean | undefined {
+  if (value === void 0) {
+    return void 0;
+  }
+  if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
+    return value;
   }
 
   const chatMessages = z.array(chatMessageSchema).safeParse(value);
   if (Array.isArray(value) && chatMessages.success) {
-    return {
+    return JSON.stringify({
       type: "chat_messages",
       value: chatMessages.data,
-    };
+    });
   }
 
   try {
     JSON.stringify(value);
 
-    return { type: "json", value: value as object };
+    return JSON.stringify({
+      type: "json",
+      value: value as object,
+    });
   } catch (e) {
-    return { type: "raw", value: value as any };
+    return JSON.stringify({
+      type: "raw",
+      value: value as any,
+    });
   }
 }
 
@@ -573,8 +608,9 @@ function addLangChainEvent(
 ) {
   const attrs: Attributes = {
     [intSemconv.ATTR_LANGWATCH_LANGCHAIN_RUN_ID]: runId,
-    [intSemconv.ATTR_LANGWATCH_LANGCHAIN_PARENT_RUN_ID]: parentRunId,
+    [intSemconv.ATTR_LANGWATCH_LANGCHAIN_RUN_PARENT_ID]: parentRunId,
     [intSemconv.ATTR_LANGWATCH_LANGCHAIN_EVENT_NAME]: eventName,
+    ...attributes,
   };
 
   if (tags) {
@@ -582,7 +618,7 @@ function addLangChainEvent(
   }
   if (metadata) {
     Object.entries(metadata).forEach(([key, value]) => {
-      attrs[key] = JSON.stringify(autoconvertTypedValues(value));
+      attrs[key] = wrapNonScalarValues(value);
     });
   }
 
