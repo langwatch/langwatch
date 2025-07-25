@@ -1,5 +1,5 @@
 import { Attributes, AttributeValue, Span } from "@opentelemetry/api";
-import semconv from "@opentelemetry/semantic-conventions/build/esm/experimental_attributes";
+import semconv from "@opentelemetry/semantic-conventions/incubating";
 import * as intSemconv from "./semconv";
 import {
   RecordedEvaluationDetails,
