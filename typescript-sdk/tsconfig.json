@@ -21,12 +21,7 @@
     "tsBuildInfoFile": "./tsconfig.tsbuildinfo"
   },
   "include": [
-    ".eslintrc.cjs",
-    "next-env.d.ts",
     "**/*.ts",
-    "**/*.tsx",
-    "**/*.cjs",
-    "**/*.mjs"
   ],
   "exclude": ["node_modules", "./dist/**/*", "./example/**/*"]
 }

@@ -40,7 +40,7 @@
     "prepare": "./copy-types.sh",
     "test": "vitest",
     "prebuild": "npm run prepare",
-    "build": "tsup src/index.ts src/observability/index.ts --format cjs,esm --dts --clean",
+    "build": "tsup",
     "prepublish": "npm run build"
   },
   "author": "",
