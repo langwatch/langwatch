@@ -1,7 +1,7 @@
 {
   "compilerOptions": {
     "target": "es2017",
-    "module": "ESNext",
+    "module": "NodeNext",
     "declaration": true,
     "declarationMap": true,
     "outDir": "./dist",
@@ -12,7 +12,7 @@
     "checkJs": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
-    "moduleResolution": "node",
+    "moduleResolution": "nodenext",
     "isolatedModules": true,
     "jsx": "preserve",
     "incremental": true,
