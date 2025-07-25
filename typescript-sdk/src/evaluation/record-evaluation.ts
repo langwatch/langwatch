@@ -1,12 +1,10 @@
-import { EvaluationRESTResult } from "src/server/types/evaluations";
+import { EvaluationRESTResult } from "../internal/generated/types/evaluations";
 import * as intSemconv from "../observability/semconv";
-import { getTracer } from "../observability/trace";
 import { Attributes } from "@opentelemetry/api";
 import { generate } from "xksuid";
+import { tracer } from "./tracer";
 
-const tracer = getTracer("langwatch.evaluation");
-
-export interface EvaluationDetails {
+export interface RecordedEvaluationDetails {
   evaluationId?: string;
   name: string;
   type?: string;
@@ -25,7 +23,7 @@ export interface EvaluationDetails {
 }
 
 export function recordEvaluation(
-  details: EvaluationDetails,
+  details: RecordedEvaluationDetails,
   attributes?: Attributes,
 ) {
   let result: EvaluationRESTResult;
@@ -51,43 +49,52 @@ export function recordEvaluation(
       details: details.details,
     };
     if (details.cost) {
-      (result as any).cost = typeof details.cost === "number"
-        ? { currency: "USD", amount: details.cost }
-        : details.cost;
+      (result as any).cost =
+        typeof details.cost === "number"
+          ? { currency: "USD", amount: details.cost }
+          : details.cost;
     }
   }
 
-  tracer.startActiveSpan("evaluation", (span) => {
-    span.setType("evaluation");
-    span.addEvent(intSemconv.ATTR_LANGWATCH_EVALUATION_CUSTOM, {
-      json_encoded_event: JSON.stringify({
-        evaluation_id: details.evaluationId ?? `eval_${generate()}`,
-        name: details.name,
-        type: details.type,
-        is_guardrail: details.isGuardrail,
-        status: result.status,
-        passed: details.passed,
-        score: details.score,
-        label: details.label,
-        details: details.details,
-        cost: details.cost,
-        error: details.error,
-        timestamps: details.timestamps,
-      }),
-    });
-
-    span.recordOutput(result);
-
-    if (attributes) {
-      span.setAttributes(attributes);
-    }
-    if (details.cost) {
-      span.setMetrics({
-        cost: typeof details.cost === "number" ? details.cost : details.cost.amount,
+  tracer.startActiveSpan("record_evaluation", (span) => {
+    try {
+      span.setType(details.isGuardrail ? "guardrail" : "evaluation");
+      span.addEvent(intSemconv.ATTR_LANGWATCH_EVALUATION_CUSTOM, {
+        json_encoded_event: JSON.stringify({
+          evaluation_id: details.evaluationId ?? `eval_${generate()}`,
+          name: details.name,
+          type: details.type,
+          is_guardrail: details.isGuardrail,
+          status: result.status,
+          passed: details.passed,
+          score: details.score,
+          label: details.label,
+          details: details.details,
+          cost: details.cost,
+          error: details.error,
+          timestamps: details.timestamps,
+        }),
       });
+
+      span.setOutput(result);
+
+      if (attributes) {
+        span.setAttributes(attributes);
+      }
+      if (details.cost) {
+        span.setMetrics({
+          cost:
+            typeof details.cost === "number"
+              ? details.cost
+              : details.cost.amount,
+        });
+      }
+    } catch (error) {
+      span.recordException(error as Error);
+    } finally {
+      span.end();
     }
 
-    span.end();
     return;
   });
 }

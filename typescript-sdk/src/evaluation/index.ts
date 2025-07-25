@@ -1,2 +1,2 @@
-export * from "./evaluate";
+export * from "./run-evaluation";
 export * from "./record-evaluation";
