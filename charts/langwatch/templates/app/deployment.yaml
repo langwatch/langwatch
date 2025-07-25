@@ -6,11 +6,6 @@ metadata:
     app.kubernetes.io/name: {{ .Release.Name }}-app
     app.kubernetes.io/instance: {{ .Release.Name }}
     {{- include "langwatch.labels" . | nindent 4 }}
-  {{- if .Values.global.monitoring.enabled }}
-  annotations:
-    prometheus.io/scrape: "true"
-    prometheus.io/port: "{{ .Values.app.service.port }}"
-  {{- end }}
 spec:
   replicas: {{ .Values.app.replicaCount }}
   selector:
@@ -22,6 +17,11 @@ spec:
       labels:
         app.kubernetes.io/name: {{ .Release.Name }}-app
         app.kubernetes.io/instance: {{ .Release.Name }}
+      {{- if .Values.global.monitoring.enabled }}
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "{{ .Values.app.service.port }}"
+      {{- end }}
     spec:
       # Pod security context
       securityContext:

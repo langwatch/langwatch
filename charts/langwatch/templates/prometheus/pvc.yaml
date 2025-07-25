@@ -1,0 +1,20 @@
+{{- if and .Values.prometheus.enabled .Values.prometheus.storage.enabled }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ .Release.Name }}-prometheus
+  labels:
+    app.kubernetes.io/name: {{ .Release.Name }}-prometheus
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
+spec:
+  accessModes:
+    - ReadWriteOnce
+  {{- if .Values.prometheus.storage.storageClass }}
+  storageClassName: {{ .Values.prometheus.storage.storageClass }}
+  {{- end }}
+  resources:
+    requests:
+      storage: {{ .Values.prometheus.storage.size }}
+{{- end }} 
