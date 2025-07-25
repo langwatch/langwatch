@@ -65,7 +65,7 @@ export async function runEvaluation(
       }
 
       const url = new URL(
-        "/api/evaluations/${evaluatorId}/evaluate",
+        `/api/evaluations/${evaluatorId}/evaluate`,
         getEndpoint(),
       );
 
