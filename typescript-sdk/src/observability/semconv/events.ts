@@ -10,3 +10,5 @@ export const LOG_EVNT_GEN_AI_USER_MESSAGE = "gen.ai.user_message";
 export const LOG_EVNT_GEN_AI_ASSISTANT_MESSAGE = "gen.ai.assistant_message";
 export const LOG_EVNT_GEN_AI_TOOL_MESSAGE = "gen.ai.tool_message";
 export const LOG_EVNT_GEN_AI_CHOICE = "gen.ai.choice";
+
+export const EVNT_LANGWATCH_LANGCHAIN_CALLBACK = "langwatch.langchain.callback";

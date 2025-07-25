@@ -29,3 +29,9 @@ export const ATTR_LANGWATCH_GEN_AI_LOG_EVENT_IMPOSTER =
   "langwatch.gen_ai.log_event.imposter";
 export const ATTR_LANGWATCH_GEN_AI_LOG_EVENT_BODY =
   "langwatch.gen_ai.log_event.body";
+
+export const ATTR_LANGWATCH_LANGCHAIN_TAGS = "langwatch.langchain.tags";
+export const ATTR_LANGWATCH_LANGCHAIN_EVENT_NAME = "langwatch.langchain.event_name";
+export const ATTR_LANGWATCH_LANGCHAIN_RUN_ID = "langwatch.langchain.run_id";
+export const ATTR_LANGWATCH_LANGCHAIN_PARENT_RUN_ID =
+  "langwatch.langchain.parent_run_id";
