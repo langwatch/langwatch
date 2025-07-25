@@ -23,6 +23,7 @@ export const spanTypes = [
   "guardrail",
   "evaluation",
   "rag",
+  "prompt",
   "workflow",
   "component",
   "module",

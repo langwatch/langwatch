@@ -20,6 +20,11 @@ export const ATTR_LANGWATCH_PARAMS = "langwatch.params";
 export const ATTR_LANGWATCH_CUSTOMER_ID = "langwatch.customer.id";
 export const ATTR_LANGWATCH_THREAD_ID = "langwatch.thread.id";
 export const ATTR_LANGWATCH_STREAMING = "langwatch.gen_ai.streaming";
+export const ATTR_LANGWATCH_PROMPT_ID = "langwatch.prompt.id";
+export const ATTR_LANGWATCH_PROMPT_VERSION_ID = "langwatch.prompt.version.id";
+export const ATTR_LANGWATCH_PROMPT_VARIABLES = "langwatch.prompt.variables";
+export const ATTR_LANGWATCH_PROMPT_VERSION_NUMBER =
+  "langwatch.prompt.version.number";
 export const ATTR_LANGWATCH_GEN_AI_LOG_EVENT_IMPOSTER =
   "langwatch.gen_ai.log_event.imposter";
 export const ATTR_LANGWATCH_GEN_AI_LOG_EVENT_BODY =

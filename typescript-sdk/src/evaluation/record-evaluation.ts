@@ -56,7 +56,7 @@ export function recordEvaluation(
     }
   }
 
-  tracer.startActiveSpan("record_evaluation", (span) => {
+  tracer.startActiveSpan("record evaluation", (span) => {
     try {
       span.setType(details.isGuardrail ? "guardrail" : "evaluation");
       span.addEvent(intSemconv.ATTR_LANGWATCH_EVALUATION_CUSTOM, {
