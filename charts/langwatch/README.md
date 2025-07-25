@@ -11,6 +11,7 @@ When installing this chart, the following values must be provided:
 - `app.env.BASE_HOST`: The base URL of the application.
 - `app.env.NEXTAUTH_URL`: The URL of the authentication service.
 - `app.env.CRON_API_KEY`: API key for cronjob authentication (required if cronjobs are enabled).
+- `app.env.METRICS_API_KEY`: API key for metrics authentication (required if monitoring is enabled).
 
 ### Basic Installation (Without Monitoring)
 
@@ -48,8 +49,8 @@ helm install langwatch ./langwatch \
   --set app.env.BASE_HOST=$BASE_HOST \
   --set app.env.NEXTAUTH_URL=$NEXTAUTH_URL \
   --set app.env.CRON_API_KEY=$CRON_API_KEY \
+  --set app.env.METRICS_API_KEY=$METRICS_API_KEY \
   --set global.monitoring.enabled=true \
-  --set global.monitoring.metricsApiKey=$METRICS_API_KEY \
   --set prometheus.enabled=true
 ```
 

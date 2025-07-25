@@ -34,8 +34,8 @@ data:
           - source_labels: [__meta_kubernetes_pod_name]
             action: replace
             target_label: pod
-        {{- if .Values.global.monitoring.metricsApiKey }}
-        bearer_token: "{{ .Values.global.monitoring.metricsApiKey }}"
+        {{- if .Values.app.env.METRICS_API_KEY }}
+        bearer_token: "{{ .Values.app.env.METRICS_API_KEY }}"
         {{- end }}
 
       - job_name: 'langwatch-workers'
@@ -61,8 +61,8 @@ data:
           - source_labels: [__meta_kubernetes_pod_name]
             action: replace
             target_label: pod
-        {{- if .Values.global.monitoring.metricsApiKey }}
-        bearer_token: "{{ .Values.global.monitoring.metricsApiKey }}"
+        {{- if .Values.app.env.METRICS_API_KEY }}
+        bearer_token: "{{ .Values.app.env.METRICS_API_KEY }}"
         {{- end }}
 
       - job_name: 'kubernetes-cadvisor'

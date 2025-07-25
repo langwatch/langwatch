@@ -101,7 +101,7 @@ app:
     NEXTAUTH_SECRET: "" # Users must provide this values
     API_TOKEN_JWT_SECRET: "" # Users must provide this values
     CRON_API_KEY: "" # Users must provide this value for cronjob authentication
-    METRICS_API_KEY: "{{ .Values.global.monitoring.metricsApiKey }}" # Metrics authentication
+    METRICS_API_KEY: "" # Set via export METRICS_API_KEY before installation
     # SENDGRID_API_KEY: ""  # Optional
 
 langwatch_nlp:
