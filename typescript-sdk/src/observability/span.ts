@@ -1,11 +1,11 @@
 import { Attributes, AttributeValue, Span } from "@opentelemetry/api";
 import semconv from "@opentelemetry/semantic-conventions/build/esm/experimental_attributes";
 import * as intSemconv from "./semconv";
-import { EvaluationRESTResult } from "../server/types/evaluations";
 import {
-  EvaluationDetails,
+  RecordedEvaluationDetails,
   recordEvaluation,
 } from "../evaluation/record-evaluation";
+import { EvaluationResultModel } from "../evaluation/types";
 
 /**
  * Supported types of spans for LangWatch observability. These types categorize the nature of the span for downstream analysis and visualization.
@@ -213,49 +213,12 @@ export interface LangWatchSpanGenAIChoiceEventBody {
  * const span = createLangWatchSpan(otelSpan);
  * span
  *   .setType('llm')
- *   .recordInput({ prompt: 'Hello' })
- *   .recordOutput('Hi!')
+ *   .setInput({ prompt: 'Hello' })
+ *   .setOutput('Hi!')
  *   .addGenAIUserMessageEvent({ content: 'Hello' })
  *   .addGenAIAssistantMessageEvent({ content: 'Hi!' });
  */
 export interface LangWatchSpan extends Span {
-  /**
-   * Record the input to the span as a JSON-serializable value.
-   *
-   * The input is stringified and stored as a span attribute for later analysis.
-   *
-   * @param input - The input value (any type, will be JSON.stringified)
-   * @returns this
-   */
-  recordInput(input: unknown): this;
-  /**
-   * Record the input to the span as a plain string.
-   *
-   * Use this for raw text prompts or queries.
-   *
-   * @param input - The input string
-   * @returns this
-   */
-  recordInputString(input: string): this;
-  /**
-   * Record the output from the span as a JSON-serializable value.
-   *
-   * The output is stringified and stored as a span attribute for later analysis.
-   *
-   * @param output - The output value (any type, will be JSON.stringified)
-   * @returns this
-   */
-  recordOutput(output: unknown): this;
-  /**
-   * Record the output from the span as a plain string.
-   *
-   * Use this for raw text completions or responses.
-   *
-   * @param output - The output string
-   * @returns this
-   */
-  recordOutputString(output: string): this;
-
   /**
    * Record the evaluation result for the span.
    *
@@ -263,7 +226,10 @@ export interface LangWatchSpan extends Span {
    * @param attributes - Additional attributes to add to the evaluation span.
    * @returns this
    */
-  recordEvaluation(details: EvaluationDetails, attributes?: Attributes): this;
+  recordEvaluation(
+    details: RecordedEvaluationDetails,
+    attributes?: Attributes,
+  ): this;
 
   /**
    * Add a GenAI system message event to the span.
@@ -396,6 +362,52 @@ export interface LangWatchSpan extends Span {
    * @returns this
    */
   setMetrics(metrics: LangWatchSpanMetrics): this;
+
+  /**
+   * Record the input to the span as a JSON-serializable value.
+   *
+   * The input is stringified and stored as a span attribute for later analysis.
+   *
+   * @param input - The input value (any type, will be JSON.stringified)
+   * @returns this
+   */
+  setInput(input: unknown): this;
+  /**
+   * Record the input to the span as a plain string.
+   *
+   * Use this for raw text prompts or queries.
+   *
+   * @param input - The input string
+   * @returns this
+   */
+  setInputString(input: string): this;
+  /**
+   * Record the output from the span as a JSON-serializable value.
+   *
+   * The output is stringified and stored as a span attribute for later analysis.
+   *
+   * @param output - The output value (any type, will be JSON.stringified)
+   * @returns this
+   */
+  setOutput(output: unknown): this;
+  /**
+   * Record the output from the span as a plain string.
+   *
+   * Use this for raw text completions or responses.
+   *
+   * @param output - The output string
+   * @returns this
+   */
+  setOutputString(output: string): this;
+
+  /**
+   * Set the evaluation output for the span.
+   *
+   * @param guardrail - Whether the evaluation is a guardrail
+   * @param output - The evaluation result
+   * @returns this
+   */
+  setOutputEvaluation(guardrail: boolean, output: EvaluationResultModel): this;
 }
 
 /**
@@ -410,48 +422,14 @@ export interface LangWatchSpan extends Span {
  * import { createLangWatchSpan } from './span';
  * const otelSpan = tracer.startSpan('llm-call');
  * const span = createLangWatchSpan(otelSpan);
- * span.setType('llm').recordInput('Prompt').recordOutput('Completion');
+ * span.setType('llm').setInput('Prompt').setOutput('Completion');
  */
 export function createLangWatchSpan(span: Span): LangWatchSpan {
   const langwatchSpanMethods = {
-    recordInput(input: unknown) {
-      span.setAttribute(
-        intSemconv.ATTR_LANGWATCH_INPUT,
-        JSON.stringify({
-          type: "json",
-          value: JSON.stringify(input),
-        }),
-      );
-    },
-    recordInputString(input: string) {
-      span.setAttribute(
-        intSemconv.ATTR_LANGWATCH_INPUT,
-        JSON.stringify({
-          type: "text",
-          value: input,
-        }),
-      );
-    },
-    recordOutput(output: unknown) {
-      span.setAttribute(
-        intSemconv.ATTR_LANGWATCH_OUTPUT,
-        JSON.stringify({
-          type: "json",
-          value: JSON.stringify(output),
-        }),
-      );
-    },
-    recordOutputString(output: string) {
-      span.setAttribute(
-        intSemconv.ATTR_LANGWATCH_OUTPUT,
-        JSON.stringify({
-          type: "text",
-          value: output,
-        }),
-      );
-    },
-
-    recordEvaluation(details: EvaluationDetails, attributes?: Attributes) {
+    recordEvaluation(
+      details: RecordedEvaluationDetails,
+      attributes?: Attributes,
+    ) {
       recordEvaluation(details, attributes);
     },
 
@@ -552,7 +530,7 @@ export function createLangWatchSpan(span: Span): LangWatchSpan {
         intSemconv.ATTR_LANGWATCH_RAG_CONTEXTS,
         JSON.stringify({
           type: "json",
-          value: JSON.stringify(ragContexts),
+          value: ragContexts,
         }),
       );
     },
@@ -561,7 +539,7 @@ export function createLangWatchSpan(span: Span): LangWatchSpan {
         intSemconv.ATTR_LANGWATCH_RAG_CONTEXTS,
         JSON.stringify({
           type: "json",
-          value: JSON.stringify([ragContext]),
+          value: [ragContext],
         }),
       );
     },
@@ -570,7 +548,54 @@ export function createLangWatchSpan(span: Span): LangWatchSpan {
         intSemconv.ATTR_LANGWATCH_METRICS,
         JSON.stringify({
           type: "json",
-          value: JSON.stringify(metrics),
+          value: metrics,
+        }),
+      );
+    },
+
+    setInput(input: unknown) {
+      span.setAttribute(
+        intSemconv.ATTR_LANGWATCH_INPUT,
+        JSON.stringify({
+          type: "json",
+          value: input,
+        }),
+      );
+    },
+    setInputString(input: string) {
+      span.setAttribute(
+        intSemconv.ATTR_LANGWATCH_INPUT,
+        JSON.stringify({
+          type: "text",
+          value: input,
+        }),
+      );
+    },
+    setOutput(output: unknown) {
+      span.setAttribute(
+        intSemconv.ATTR_LANGWATCH_OUTPUT,
+        JSON.stringify({
+          type: "json",
+          value: output,
+        }),
+      );
+    },
+    setOutputString(output: string) {
+      span.setAttribute(
+        intSemconv.ATTR_LANGWATCH_OUTPUT,
+        JSON.stringify({
+          type: "text",
+          value: output,
+        }),
+      );
+    },
+
+    setOutputEvaluation(guardrail: boolean, output: EvaluationResultModel) {
+      span.setAttribute(
+        intSemconv.ATTR_LANGWATCH_OUTPUT,
+        JSON.stringify({
+          type: guardrail ? "guardrail_result" : "evaluation_result",
+          value: output,
         }),
       );
     },

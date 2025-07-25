@@ -108,7 +108,7 @@ export interface LangWatchTracer extends Tracer {
  * import { getTracer } from 'langwatch/observability';
  * const tracer = getTracer('my-service');
  * const span = tracer.startSpan('llm-call');
- * span.setType('llm').recordInput('Prompt').recordOutput('Completion');
+ * span.setType('llm').setInput('Prompt').setOutput('Completion');
  * span.end();
  *
  * tracer.startActiveSpan('llm-call', (span) => {
