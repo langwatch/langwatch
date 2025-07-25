@@ -4,6 +4,7 @@ const { mockStartActiveSpan } = vi.hoisted(() => ({
     setType: vi.fn(),
     setAttribute: vi.fn(),
     setAttributes: vi.fn(),
+    setStatus: vi.fn(),
     recordException: vi.fn(),
     end: vi.fn(),
   })),

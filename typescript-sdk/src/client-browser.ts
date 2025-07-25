@@ -6,7 +6,7 @@ import { B3Propagator } from '@opentelemetry/propagator-b3';
 
 let provider: WebTracerProvider | null = null;
 
-export async function setup(options: SetupOptions) {
+export async function setup(options: SetupOptions = {}) {
   if (provider) {
     await provider.shutdown();
   }
