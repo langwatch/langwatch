@@ -1,5 +1,10 @@
+import { getApiKey, getEndpoint } from "../client";
 import { Conversation } from "../internal/generated/types/evaluations";
-import { Evaluators, EvaluatorTypes, SingleEvaluationResult } from "../internal/generated/types/evaluators.generated";
+import {
+  Evaluators,
+  EvaluatorTypes,
+  SingleEvaluationResult,
+} from "../internal/generated/types/evaluators.generated";
 import { RAGChunk } from "../internal/generated/types/tracer";
 import { tracer } from "./tracer";
 import { EvaluationError, EvaluationResultModel } from "./types";
@@ -19,29 +24,33 @@ export interface EvaluationDetailsBase {
   contexts?: RAGChunk[] | string[];
   conversation?: Conversation;
   asGuardrail?: boolean;
-};
+}
 
 export interface SavedEvaluationDetails extends EvaluationDetailsBase {
   slug: string;
   settings?: Record<string, unknown>;
-};
+}
 
-export interface LangEvalsEvaluationDetails<T extends EvaluatorTypes> extends EvaluationDetailsBase {
+export interface LangEvalsEvaluationDetails<T extends EvaluatorTypes>
+  extends EvaluationDetailsBase {
   evaluator: T;
   settings?: Evaluators[T]["settings"];
-};
+}
 
 export type EvaluationDetails =
   | SavedEvaluationDetails
   | LangEvalsEvaluationDetails<EvaluatorTypes>;
 
-export async function runEvaluation(details: EvaluationDetails): Promise<SingleEvaluationResult> {
+export async function runEvaluation(
+  details: EvaluationDetails,
+): Promise<SingleEvaluationResult> {
   return await new Promise((resolve, reject) => {
     tracer.startActiveSpan("run_evaluation", async (span) => {
       span.setType(details.asGuardrail ? "guardrail" : "evaluation");
 
       try {
-        const evaluatorId = "slug" in details ? details.slug : details.evaluator;
+        const evaluatorId =
+          "slug" in details ? details.slug : details.evaluator;
         const request = {
           trace_id: span.spanContext().traceId,
           span_id: span.spanContext().spanId,
@@ -53,19 +62,25 @@ export async function runEvaluation(details: EvaluationDetails): Promise<SingleE
 
         span.setInput(request);
 
-        const response = await fetch(
-          `${process.env.LANGWATCH_ENDPOINT}/api/evaluations/${evaluatorId}/evaluate`,
-          {
-            method: "POST",
-            headers: {
-              "X-Auth-Token": process.env.LANGWATCH_API_KEY ?? "",
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify(request),
-          }
+        const url = new URL(
+          "/api/evaluations/${evaluatorId}/evaluate",
+          getEndpoint(),
         );
+
+        const response = await fetch(url.toString(), {
+          method: "POST",
+          headers: {
+            "X-Auth-Token": getApiKey(),
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(request),
+        });
         if (!response.ok) {
-          throw new EvaluationError("Unable to run evaluation", response.status, await safeBodyReadAttempt(response));
+          throw new EvaluationError(
+            "Unable to run evaluation",
+            response.status,
+            await safeBodyReadAttempt(response),
+          );
         }
 
         const result: EvaluationResultModel = await response.json();
@@ -105,7 +120,7 @@ export async function runEvaluation(details: EvaluationDetails): Promise<SingleE
             traceback: [],
           });
         }
-      } catch(error) {
+      } catch (error) {
         reject(error);
         span.recordException(error as Error);
       } finally {
@@ -115,7 +130,9 @@ export async function runEvaluation(details: EvaluationDetails): Promise<SingleE
   });
 }
 
-async function safeBodyReadAttempt(response: Response): Promise<unknown | null> {
+async function safeBodyReadAttempt(
+  response: Response,
+): Promise<unknown | null> {
   try {
     if (response.headers.get("Content-Type")?.includes("application/json")) {
       return await response.json();
