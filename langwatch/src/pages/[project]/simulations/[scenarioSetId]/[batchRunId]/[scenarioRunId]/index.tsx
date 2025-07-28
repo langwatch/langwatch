@@ -2,6 +2,7 @@ import { Box, Button, HStack, Text, VStack, Skeleton } from "@chakra-ui/react";
 import React, { useState } from "react";
 import { ArrowLeft, Clock, Check, X } from "react-feather";
 
+import { ScenarioRunStatus } from "~/app/api/scenario-events/[[...route]]/enums";
 import {
   CustomCopilotKitChat,
   SimulationConsole,
@@ -132,9 +133,11 @@ export default function IndividualScenarioRunPage() {
                         <VStack gap={4}>
                           <VStack align="space-between" gap={0}>
                             <HStack>
-                              {scenarioState?.status === "SUCCESS" ? (
+                              {scenarioState?.status ===
+                              ScenarioRunStatus.SUCCESS ? (
                                 <Check size={12} color="green" />
-                              ) : scenarioState?.status === "FAILED" ? (
+                              ) : scenarioState?.status ===
+                                ScenarioRunStatus.FAILED ? (
                                 <X size={12} color="red" />
                               ) : (
                                 <Clock size={12} color="orange" />
