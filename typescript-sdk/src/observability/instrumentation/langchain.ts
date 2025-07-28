@@ -19,7 +19,7 @@ import {
 } from "@langchain/core/messages";
 import type { ChatGeneration, LLMResult } from "@langchain/core/outputs";
 import type { ChainValues } from "@langchain/core/utils/types";
-import { getTracer } from "../trace";
+import { getLangWatchTracer } from "../trace";
 import type { LangWatchSpan } from "../span";
 import { context, trace, SpanStatusCode, Attributes } from "@opentelemetry/api";
 import { chatMessageSchema } from "../../internal/generated/types/tracer.generated";
@@ -32,7 +32,7 @@ import { z } from "zod";
 
 export class LangWatchCallbackHandler extends BaseCallbackHandler {
   name = "LangWatchCallbackHandler";
-  tracer = getTracer("langwatch.instrumentation.langchain");
+  tracer = getLangWatchTracer("langwatch.instrumentation.langchain");
   spans: Record<string, LangWatchSpan | undefined> = {};
 
   constructor() {
@@ -292,8 +292,6 @@ export class LangWatchCallbackHandler extends BaseCallbackHandler {
     _metadata?: Record<string, unknown> | undefined,
     name?: string,
   ): Promise<void> {
-    console.log('a');
-
     const parentContext = this.getParentContext(parentRunId);
     const span = this.tracer.startSpan(
       name ?? tool.id?.[tool.id.length - 1]?.toString() ?? "tool",
