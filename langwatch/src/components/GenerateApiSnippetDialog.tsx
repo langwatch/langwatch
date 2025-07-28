@@ -46,7 +46,8 @@ export function GenerateApiSnippetDialog({
   children,
 }: GenerateApiSnippetProps) {
   const { open, onOpen, onClose } = useDisclosure();
-  const [selectedTarget, setSelectedTarget] = useState<Target>("shell_curl");
+  const [selectedTarget, setSelectedTarget] =
+    useState<Target>("python_python3");
   const [selectedSnippet, setSelectedSnippet] = useState<Snippet | undefined>(
     snippets[0]
   );
