@@ -34,7 +34,7 @@ export default function SignUp({ session }: { session: Session | null }) {
       return;
     }
 
-    if (!session && isAuthProvider) {
+    if (!session && isAuthProvider && isAuthProvider !== "email") {
       void signIn(isAuthProvider, { callbackUrl });
     }
   }, [publicEnv.data, session, callbackUrl, isAuthProvider]);
@@ -43,7 +43,7 @@ export default function SignUp({ session }: { session: Session | null }) {
     return null;
   }
 
-  return isAuthProvider ? (
+  return isAuthProvider && isAuthProvider !== "email" ? (
     <div style={{ padding: "12px" }}>Redirecting to Sign in...</div>
   ) : (
     <SignUpForm />

@@ -38,7 +38,12 @@ export default function SignIn({ session }: { session: Session | null }) {
       return;
     }
 
-    if (error !== "OAuthAccountNotLinked" && !session && isAuthProvider) {
+    if (
+      error !== "OAuthAccountNotLinked" &&
+      !session &&
+      isAuthProvider &&
+      isAuthProvider !== "email"
+    ) {
       setTimeout(
         () => {
           void signIn(isAuthProvider, { callbackUrl });
@@ -56,7 +61,7 @@ export default function SignIn({ session }: { session: Session | null }) {
     return null;
   }
 
-  return isAuthProvider ? (
+  return isAuthProvider && isAuthProvider !== "email" ? (
     <Box padding="12px">Redirecting to Sign in...</Box>
   ) : (
     <SignInForm />
