@@ -216,6 +216,8 @@ export class ScenarioEventService {
       )
     );
 
-    return runs.filter(Boolean) as ScenarioRunData[];
+    return runs
+      .filter(Boolean)
+      .sort((a, b) => a!.timestamp - b!.timestamp) as ScenarioRunData[];
   }
 }

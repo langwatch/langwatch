@@ -18,6 +18,7 @@ export const ToolCallMessage = ({
       </HStack>
       <Box
         w="full"
+        maxW="80%"
         bg="gray.50"
         border="1px solid"
         borderColor="gray.200"

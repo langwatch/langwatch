@@ -1,7 +1,11 @@
 .copilotKitChat {
+  width: 100%;
   height: 100%;
   overflow-y: scroll;
 }
 .copilotKitMessageControls {
   display: none !important;
+}
+.copilotKitCodeBlock code {
+  white-space: pre-wrap !important;
 }
