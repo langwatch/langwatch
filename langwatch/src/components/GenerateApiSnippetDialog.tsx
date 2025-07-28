@@ -199,7 +199,7 @@ const LanguageMenu = React.memo(function LanguageMenu({
 function formatTarget(target: Target) {
   const [language, framework] = target.split("_");
   if (!language || !framework) return target;
-  return `${uppercaseFirstLetter(language)} (${framework})`;
+  return `${uppercaseFirstLetter(language)}`;
 }
 
 /**
