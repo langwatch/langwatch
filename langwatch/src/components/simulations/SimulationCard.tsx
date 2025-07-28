@@ -24,7 +24,7 @@ function SimulationCardHeader({
 }) {
   const colorPallete = {
     [ScenarioRunStatus.SUCCESS]: "green",
-    [ScenarioRunStatus.IN_PROGRESS]: "yellow",
+    [ScenarioRunStatus.IN_PROGRESS]: "gray",
     [ScenarioRunStatus.ERROR]: "red",
     [ScenarioRunStatus.CANCELLED]: "gray",
     [ScenarioRunStatus.PENDING]: "gray",
@@ -48,7 +48,7 @@ function SimulationCardHeader({
         </Text>
         {status && (
           <HStack align="center" gap={2}>
-            <Badge colorPalette={colorPallete} size="sm">
+            <Badge colorPalette={status === ScenarioRunStatus.IN_PROGRESS ? "blue" : colorPallete} size="sm">
               {status}
             </Badge>
           </HStack>
