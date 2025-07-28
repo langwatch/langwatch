@@ -1,3 +1,3 @@
-import { getTracer } from "../observability/trace";
+import { getLangWatchTracer } from "../observability/trace";
 
-export const tracer = getTracer("langwatch.prompt");
+export const tracer = getLangWatchTracer("langwatch.prompt");

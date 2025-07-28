@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { getTracer } from '../trace';
+import { getLangWatchTracer } from '../trace';
 import type { Tracer, Span, SpanOptions, Context } from '@opentelemetry/api';
 
 // Mock createLangWatchSpan to just tag the span for test visibility
@@ -31,13 +31,13 @@ describe('getTracer', () => {
   });
 
   it('returns a proxy with startSpan wrapping the span', () => {
-    const tracer = getTracer('test');
+    const tracer = getLangWatchTracer('test');
     const span = tracer.startSpan('my-span', { foo: 'bar' } as SpanOptions, {} as Context);
     expect(span).toMatchObject({ __isLangWatch: true, name: 'my-span', options: { foo: 'bar' } });
   });
 
   it('returns a proxy with startActiveSpan wrapping the span in the callback', () => {
-    const tracer = getTracer('test');
+    const tracer = getLangWatchTracer('test');
     const result = tracer.startActiveSpan('active-span', (span: any) => {
       expect(span).toMatchObject({ __isLangWatch: true, name: 'active-span' });
       return 'done';
@@ -46,7 +46,7 @@ describe('getTracer', () => {
   });
 
   it('supports startActiveSpan with options and context overloads', () => {
-    const tracer = getTracer('test');
+    const tracer = getLangWatchTracer('test');
     let called = 0;
     tracer.startActiveSpan('span1', { foo: 1 } as SpanOptions, (span: any) => {
       expect(span).toMatchObject({ __isLangWatch: true, name: 'span1', options: { foo: 1 } });
@@ -60,7 +60,7 @@ describe('getTracer', () => {
   });
 
   it('supports startActiveSpan with a callback that returns a Promise', async () => {
-    const tracer = getTracer('test');
+    const tracer = getLangWatchTracer('test');
     const result = await tracer.startActiveSpan('promise-span', async (span: any) => {
       expect(span).toMatchObject({ __isLangWatch: true, name: 'promise-span' });
       await new Promise((resolve) => setTimeout(resolve, 10));
@@ -70,7 +70,7 @@ describe('getTracer', () => {
   });
 
   it('supports startActiveSpan with a callback that returns a thenable (Promise-like)', async () => {
-    const tracer = getTracer('test');
+    const tracer = getLangWatchTracer('test');
     const thenable = {
       then: (resolve: (v: string) => void) => setTimeout(() => resolve('thenable-done'), 10),
     };
@@ -79,13 +79,13 @@ describe('getTracer', () => {
   });
 
   it('forwards unknown methods to the underlying tracer', () => {
-    const tracer = getTracer('test');
+    const tracer = getLangWatchTracer('test');
     // @ts-expect-error
     expect(tracer.someOtherMethod()).toBe('other');
   });
 
   it('throws if startActiveSpan is called without a function', () => {
-    const tracer = getTracer('test');
+    const tracer = getLangWatchTracer('test');
     // @ts-expect-error
     expect(() => tracer.startActiveSpan('no-fn')).toThrow(/function as the last argument/);
   });

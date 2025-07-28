@@ -164,7 +164,7 @@ export interface LangWatchTracer extends Tracer {
  *   span.end();
  * });
  */
-export function getTracer(name: string, version?: string): LangWatchTracer {
+export function getLangWatchTracer(name: string, version?: string): LangWatchTracer {
   const tracer = otelTrace.getTracer(name, version);
 
   // Create a proxy for the tracer that intercepts the calls to startActiveSpan and
