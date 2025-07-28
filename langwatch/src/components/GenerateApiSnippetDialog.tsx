@@ -46,7 +46,8 @@ export function GenerateApiSnippetDialog({
   children,
 }: GenerateApiSnippetProps) {
   const { open, onOpen, onClose } = useDisclosure();
-  const [selectedTarget, setSelectedTarget] = useState<Target>("shell_curl");
+  const [selectedTarget, setSelectedTarget] =
+    useState<Target>("python_python3");
   const [selectedSnippet, setSelectedSnippet] = useState<Snippet | undefined>(
     snippets[0]
   );
@@ -199,7 +200,7 @@ const LanguageMenu = React.memo(function LanguageMenu({
 function formatTarget(target: Target) {
   const [language, framework] = target.split("_");
   if (!language || !framework) return target;
-  return `${uppercaseFirstLetter(language)} (${framework})`;
+  return `${uppercaseFirstLetter(language)}`;
 }
 
 /**

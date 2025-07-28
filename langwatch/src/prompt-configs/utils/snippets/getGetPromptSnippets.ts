@@ -15,17 +15,6 @@ export function getGetPromptSnippets(params?: {
   return [
     {
       content: `
-curl --request GET \\
-  --url https://app.langwatch.ai/api/prompts/${promptId} \\
-  --header 'X-Auth-Token: ${apiKey}'
-`,
-      target: "shell_curl",
-      title: "Get Prompts (cURL)",
-      path: "/api/prompts/{id}",
-      method: "GET",
-    },
-    {
-      content: `
 import asyncio
 import langwatch.prompt
 
@@ -46,27 +35,24 @@ messages = prompt.format_messages(
     input="Hello world"
 )
 print(f"Formatted messages: {messages}")
-
-# Asynchronous example
-async def get_prompt_async_example():
-    prompt = await langwatch.prompt.async_get_prompt("${promptId}")
-    
-    # Same functionality as sync version
-    print(f"Async - Prompt Name: {prompt.name}")
-    messages = prompt.format_messages(
-        user_name="Jane Doe",
-        input="Hello async world"
-    )
-    print(f"Async - Formatted messages: {messages}")
-
-# Run the async function
-asyncio.run(get_prompt_async_example())
 `,
       target: "python_python3",
       title: "Get Prompts (Python SDK)",
       path: "/api/prompts/{id}",
       method: "GET",
     },
+    {
+      content: `
+curl --request GET \\
+  --url https://app.langwatch.ai/api/prompts/${promptId} \\
+  --header 'X-Auth-Token: ${apiKey}'
+`,
+      target: "shell_curl",
+      title: "Get Prompts (cURL)",
+      path: "/api/prompts/{id}",
+      method: "GET",
+    },
+
     {
       content: `
 const options = {method: 'GET', headers: {'X-Auth-Token': '${apiKey}'}};
