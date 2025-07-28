@@ -4,6 +4,7 @@ import {
   Span,
   SpanOptions,
   Context,
+  SpanStatusCode,
 } from "@opentelemetry/api";
 import { LangWatchSpan, createLangWatchSpan } from "./span";
 
@@ -36,6 +37,7 @@ export interface LangWatchTracer extends Tracer {
     options?: SpanOptions,
     context?: Context,
   ): LangWatchSpan;
+
   /**
    * Starts a new {@link LangWatchSpan} and calls the given function passing it the
    * created span as first argument.
@@ -96,6 +98,51 @@ export interface LangWatchTracer extends Tracer {
     context: Context,
     fn: F,
   ): ReturnType<F>;
+
+  /**
+   * Starts a new {@link LangWatchSpan}, runs the provided async function, and automatically handles
+   * error recording, status setting, and span ending. This is a safer and more ergonomic alternative
+   * to manually using try/catch/finally blocks with startActiveSpan.
+   *
+   * Overloads:
+   * - withActiveSpan(name, fn)
+   * - withActiveSpan(name, options, fn)
+   * - withActiveSpan(name, options, context, fn)
+   *
+   * @param name The name of the span
+   * @param options Optional SpanOptions for span creation
+   * @param context Optional Context to use to extract parent
+   * @param fn   The async function to execute within the span context. Receives the span as its first argument.
+   * @returns The return value of the provided function
+   *
+   * @example
+   *   await tracer.withActiveSpan('my-operation', async (span) => {
+   *     // ... your code ...
+   *   });
+   *
+   *   await tracer.withActiveSpan('my-operation', { attributes: { foo: 'bar' } }, async (span) => {
+   *     // ... your code ...
+   *   });
+   *
+   *   await tracer.withActiveSpan('my-operation', { attributes: { foo: 'bar' } }, myContext, async (span) => {
+   *     // ... your code ...
+   *   });
+   */
+  withActiveSpan<T>(
+    name: string,
+    fn: (span: LangWatchSpan) => Promise<T> | T
+  ): Promise<T>;
+  withActiveSpan<T>(
+    name: string,
+    options: SpanOptions,
+    fn: (span: LangWatchSpan) => Promise<T> | T
+  ): Promise<T>;
+  withActiveSpan<T>(
+    name: string,
+    options: SpanOptions,
+    context: Context,
+    fn: (span: LangWatchSpan) => Promise<T> | T
+  ): Promise<T>;
 }
 
 /**
@@ -173,6 +220,42 @@ export function getTracer(name: string, version?: string): LangWatchTracer {
           ): ReturnType<Tracer["startSpan"]> {
             const span = target.startSpan(...args);
             return createLangWatchSpan(span);
+          };
+        }
+
+        case "withActiveSpan": {
+          /**
+           * Implementation of withActiveSpan: supports all overloads like startActiveSpan.
+           * Uses the same argument detection logic as startActiveSpan for safety and robustness.
+           */
+          return async function withActiveSpan(...args: any[]): Promise<any> {
+            // Find the function argument (should be the last argument)
+            const fnIndex = args.findIndex((arg) => typeof arg === "function");
+            if (fnIndex === -1) {
+              throw new Error("withActiveSpan requires a function as the last argument");
+            }
+
+            const fn = args[fnIndex] as (span: LangWatchSpan) => Promise<any> | any;
+
+            // The preceding arguments are: name, options?, context?
+            const name = args[0];
+            const options = args.length > 2 ? args[1] : undefined;
+            const context = args.length > 3 ? args[2] : undefined;
+
+            const span = createLangWatchSpan(target.startSpan(name, options, context));
+
+            try {
+              return await fn(span);
+            } catch (err: any) {
+              span.setStatus({
+                code: SpanStatusCode.ERROR,
+                message: err && err.message ? err.message : String(err),
+              });
+              span.recordException(err);
+              throw err;
+            } finally {
+              span.end();
+            }
           };
         }
 
