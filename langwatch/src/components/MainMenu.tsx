@@ -216,7 +216,7 @@ export const MainMenu = React.memo(function MainMenu() {
                   <Menu.Item value="github">
                     <Link
                       isExternal
-                      href="https://github.com/langwatch/langwatch"
+                      href="https://github.com/orgs/langwatch/discussions/categories/support"
                     >
                       <GitHub /> GitHub Support
                     </Link>
