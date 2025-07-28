@@ -9,3 +9,4 @@ export * from "./SimulationChatWrapper";
 export * from "./SimulationChatFadeOverlay";
 export * from "./SimulationLayout";
 export * from "./set-run-history-sidebar";
+export * from "./PreviousRunsList";
