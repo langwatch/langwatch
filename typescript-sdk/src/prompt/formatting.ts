@@ -31,7 +31,7 @@ export interface PromptConfig {
  * Error thrown when required variables are missing from a prompt template during formatting.
  */
 export class MissingPromptVariableError extends Error {
-  private missingVars: string[];
+  public readonly missingVars: string[];
 
   /**
    * Constructs a new MissingPromptVariableError.
