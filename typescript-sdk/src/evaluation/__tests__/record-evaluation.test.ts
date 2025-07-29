@@ -41,22 +41,37 @@ describe('recordEvaluation', () => {
   });
 
   it('records processed evaluation', () => {
+    const span = {
+      setType: vi.fn(),
+      addEvent: vi.fn(),
+      setOutput: vi.fn(),
+      setAttributes: vi.fn(),
+      setMetrics: vi.fn(),
+      setOutputEvaluation: vi.fn(),
+      recordException: vi.fn(),
+      end: vi.fn(),
+    };
+
+    mockStartActiveSpan.mockImplementationOnce((name, fn) => fn(span));
     recordEvaluation({ ...baseDetails });
-    if (mockStartActiveSpan.mock.calls[0]) {
-      const span = mockStartActiveSpan.mock.calls[0][1]({
-        setType: vi.fn(),
-        addEvent: vi.fn(),
-        setOutput: vi.fn(),
-        setAttributes: vi.fn(),
-        setMetrics: vi.fn(),
-        recordException: vi.fn(),
-        end: vi.fn(),
-      });
-    }
+
     expect(mockStartActiveSpan).toHaveBeenCalledWith(
       'record evaluation',
       expect.any(Function)
     );
+    expect(span.setType).toHaveBeenCalledWith('evaluation');
+    expect(span.addEvent).toHaveBeenCalledWith('custom_event', expect.objectContaining({
+      json_encoded_event: expect.stringContaining('"name":"test"')
+    }));
+    expect(span.setOutput).toHaveBeenCalledWith(expect.objectContaining({
+      status: 'processed',
+      passed: true,
+      score: 1,
+      label: 'label',
+      details: 'ok',
+      cost: { currency: 'USD', amount: 0.1 },
+    }));
+    expect(span.end).toHaveBeenCalled();
   });
 
   it('records skipped evaluation', () => {
