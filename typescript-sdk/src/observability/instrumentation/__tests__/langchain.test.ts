@@ -35,12 +35,21 @@ const { mockSpan, mockTracer } = vi.hoisted(() => {
   const tracer = {
     startSpan: vi.fn(() => span),
     startActiveSpan: vi.fn(() => span),
+    withActiveSpan: vi.fn(async (...args: any[]) => {
+      // Find the function argument (should be the last argument)
+      const fnIndex = args.findIndex((arg) => typeof arg === "function");
+      if (fnIndex === -1) {
+        throw new Error("withActiveSpan requires a function as the last argument");
+      }
+      const userFn = args[fnIndex] as (span: any) => any;
+      return await userFn(span);
+    }) as any,
   };
   return { mockSpan: span, mockTracer: tracer };
 });
 
 vi.mock('../../trace', () => ({
-  getTracer: vi.fn(() => mockTracer),
+  getLangWatchTracer: vi.fn(() => mockTracer),
 }));
 
 vi.mock('@opentelemetry/api', async () => {
