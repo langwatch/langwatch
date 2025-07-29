@@ -1,14 +1,21 @@
-import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-http";
 import { setConfig, SetupOptions, getApiKey, getEndpoint } from "./client";
-import { BatchSpanProcessor, WebTracerProvider } from '@opentelemetry/sdk-trace-web';
+import { SpanProcessor, WebTracerProvider } from '@opentelemetry/sdk-trace-web';
 import { ZoneContextManager } from '@opentelemetry/context-zone';
-import { B3Propagator } from '@opentelemetry/propagator-b3';
+import { W3CTraceContextPropagator } from '@opentelemetry/core';
+import { version } from "../package.json";
+import { resourceFromAttributes } from "@opentelemetry/resources";
+import * as intSemconv from "./observability/semconv";
+import { FilterableBatchSpanProcessor } from "./observability/processors";
+import { createLangWatchExporter } from "./observability/exporters";
+import { addSpanProcessorToExistingTracerProvider, isOtelInitialized, mergeResourceIntoExistingTracerProvider } from "./client-shared";
 
+let managedSpanProcessors: SpanProcessor[] = [];
 let provider: WebTracerProvider | null = null;
+let setupCalled: boolean = false;
 
 export async function setup(options: SetupOptions = {}) {
-  if (provider) {
-    await provider.shutdown();
+  if (setupCalled) {
+    throw new Error("LangWatch setup has already been called in this process. Setup can only be called once, if you need to modify OpenTelemetry setup then use the OpenTelemetry API directly.");
   }
 
   setConfig(options);
@@ -16,18 +23,50 @@ export async function setup(options: SetupOptions = {}) {
   if (options.disableOpenTelemetryAutomaticSetup) return;
 
   const endpointURL = new URL("/api/otel/v1/traces", getEndpoint());
+  const langwatchSpanProcessor = new FilterableBatchSpanProcessor(
+    createLangWatchExporter(getApiKey(), endpointURL.toString()),
+    options.otelSpanProcessingExcludeRules ?? [],
+  );
 
-  provider = new WebTracerProvider({
-    spanProcessors: [new BatchSpanProcessor(new OTLPTraceExporter({
-      headers: {
-        "Authorization": `Bearer ${getApiKey()}`
-      },
-      url: endpointURL.toString(),
-    }))],
+  const langwatchResource = resourceFromAttributes({
+    [intSemconv.ATTR_LANGWATCH_SDK_LANGUAGE]: "typescript-browser",
+    [intSemconv.ATTR_LANGWATCH_SDK_VERSION]: version,
+    [intSemconv.ATTR_LANGWATCH_SDK_NAME]: "langwatch-observability-sdk",
   });
 
-  provider.register({
-    contextManager: new ZoneContextManager(),
-    propagator: new B3Propagator(),
+  if (isOtelInitialized()) {
+    mergeResourceIntoExistingTracerProvider(langwatchResource);
+    addSpanProcessorToExistingTracerProvider(langwatchSpanProcessor);
+    for (const spanProcessor of options.otelSpanProcessors ?? []) {
+      addSpanProcessorToExistingTracerProvider(spanProcessor);
+    }
+
+    managedSpanProcessors = [langwatchSpanProcessor];
+  } else {
+    provider = new WebTracerProvider({
+      resource: resourceFromAttributes({
+        [intSemconv.ATTR_LANGWATCH_SDK_LANGUAGE]: "typescript-browser",
+        [intSemconv.ATTR_LANGWATCH_SDK_VERSION]: version,
+        [intSemconv.ATTR_LANGWATCH_SDK_NAME]: "langwatch-observability-sdk",
+      }),
+      spanProcessors: [new FilterableBatchSpanProcessor(
+        createLangWatchExporter(getApiKey(), endpointURL.toString()),
+        options.otelSpanProcessingExcludeRules ?? [],
+      )],
+    });
+
+    provider.register({
+      contextManager: new ZoneContextManager(),
+      propagator: new W3CTraceContextPropagator(),
+    });
+  }
+
+  // This is not guaranteed to be called, but it's a good nice to have.
+  window.addEventListener("beforeunload", async () => {
+    if (provider) {
+      await provider.shutdown();
+    } else {
+      await Promise.all(managedSpanProcessors.map(p => p.shutdown()));
+    }
   });
 }

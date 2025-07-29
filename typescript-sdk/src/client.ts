@@ -1,7 +1,46 @@
+import { SpanProcessor } from "@opentelemetry/sdk-trace-base";
+import { SpanProcessingExcludeRule } from "./observability";
+
 export interface SetupOptions {
+  /**
+   * The API key to use for the LangWatch API.
+   */
   apiKey?: string;
+
+  /**
+   * The endpoint to use for the LangWatch API.
+   */
   endpoint?: string;
+
+  /**
+   * The span processors to use for the OpenTelemetry SDK.
+   *
+   * If provided, these will be added to the OpenTelemetry SDK after the LangWatch SDK has
+   * been initialized.
+   */
+  otelSpanProcessors?: SpanProcessor[];
+
+  /**
+   * The span processing exclude rules to use for the OpenTelemetry SDK.
+   *
+   * If provided, these will be added to the OpenTelemetry SDK after the LangWatch SDK has
+   * been initialized.
+   *
+   * If you are using the `otelSpanProcessors` option, then these will be ignored.
+   */
+  otelSpanProcessingExcludeRules?: SpanProcessingExcludeRule[];
+
+  /**
+   * Whether to disable the automatic setup of the OpenTelemetry SDK. If this is set, then
+   * the LangWatch SDK will not attempt to setup the OpenTelemetry SDK. You will need to
+   * setup the OpenTelemetry SDK yourself, and ensure that a SpanProcessor is added to the
+   * OpenTelemetry SDK that will send traces to the LangWatch API.
+   */
   disableOpenTelemetryAutomaticSetup?: boolean;
+
+  /**
+   * Whether to disable the automatic capture of input.
+   */
   disableAutomaticInputCapture?: boolean;
   disableAutomaticOutputCapture?: boolean;
 }
