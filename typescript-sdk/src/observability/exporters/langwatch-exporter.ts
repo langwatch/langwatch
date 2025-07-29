@@ -10,5 +10,5 @@ export function createLangWatchExporter(apiKey: string, endpointURL: string) {
       "X-LangWatch-SDK-Name": "langwatch-observability-sdk",
     },
     url: endpointURL,
-  })
+  });
 }
