@@ -19,6 +19,7 @@ import { Link } from "../../components/ui/link";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { api } from "../../utils/api";
 import { camelCaseToTitleCase } from "../../utils/stringCasing";
+import { usePublicEnv } from "~/hooks/usePublicEnv";
 
 export default function Usage() {
   const { organization } = useOrganizationTeamProject();
@@ -51,6 +52,9 @@ export default function Usage() {
     }
   );
 
+  const publicEnv = usePublicEnv();
+  const isSaaS = publicEnv.data?.IS_SAAS;
+
   return (
     <SettingsLayout>
       <VStack
@@ -77,34 +81,40 @@ export default function Usage() {
               paddingX={4}
               align="start"
             >
-              <Heading size="md" as="h2">
-                Trace Usage
-              </Heading>
-              <Progress.Root
-                defaultValue={0}
-                max={usage.data?.activePlan.maxMessagesPerMonth}
-                value={usage.data?.currentMonthMessagesCount}
-                maxW="sm"
-                colorPalette="orange"
-                width="full"
-              >
-                <Progress.Label fontSize="xs"></Progress.Label>
-                <Progress.Track flex="1">
-                  <Progress.Range />
-                </Progress.Track>
-              </Progress.Root>
-              <Text>
-                You have used{" "}
-                <b>{usage.data?.currentMonthMessagesCount.toLocaleString()}</b>{" "}
-                traces out of{" "}
-                <b>
-                  {usage.data?.activePlan.maxMessagesPerMonth.toLocaleString()}
-                </b>{" "}
-                traces this month.
-              </Text>
-              <Button asChild marginBottom={2}>
-                <Link href="/settings/subscription">Change plan</Link>
-              </Button>
+              {usage.data && isSaaS && (
+                <>
+                  <Heading size="md" as="h2">
+                    Trace Usage
+                  </Heading>
+                  <Progress.Root
+                    defaultValue={0}
+                    max={usage.data?.activePlan.maxMessagesPerMonth}
+                    value={usage.data?.currentMonthMessagesCount}
+                    maxW="sm"
+                    colorPalette="orange"
+                    width="full"
+                  >
+                    <Progress.Label fontSize="xs"></Progress.Label>
+                    <Progress.Track flex="1">
+                      <Progress.Range />
+                    </Progress.Track>
+                  </Progress.Root>
+                  <Text>
+                    You have used{" "}
+                    <b>
+                      {usage.data?.currentMonthMessagesCount.toLocaleString()}
+                    </b>{" "}
+                    traces out of{" "}
+                    <b>
+                      {usage.data?.activePlan.maxMessagesPerMonth.toLocaleString()}
+                    </b>{" "}
+                    traces this month.
+                  </Text>
+                  <Button asChild marginBottom={2}>
+                    <Link href="/settings/subscription">Change plan</Link>
+                  </Button>
+                </>
+              )}
               {activePlan.data && (
                 <>
                   <Heading size="md" as="h2">
