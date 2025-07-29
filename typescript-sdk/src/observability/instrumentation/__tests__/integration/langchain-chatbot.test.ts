@@ -1,0 +1,125 @@
+import { describe, expect, it } from "vitest";
+import { ChatOpenAI } from "@langchain/openai";
+import { LangWatchCallbackHandler } from "../../langchain";
+import { setup } from "src/client-node";
+import { DynamicTool } from "@langchain/core/tools";
+import { AgentExecutor, createToolCallingAgent, initializeAgentExecutorWithOptions } from "langchain/agents";
+import { getLangWatchTracer } from "../../../trace";
+import { ChatPromptTemplate } from "@langchain/core/prompts";
+import { beforeEach } from "node:test";
+
+beforeEach(async () => {
+  await setup();
+});
+
+describe("langchain chatbots", () => {
+  it("it should be able to do a simple question/response", async () => {
+    const tracer = getLangWatchTracer("langchain-chatbot.test");
+    await tracer.startActiveSpan("simple question/response", { root: true }, async (span) => {
+      try {
+        const llm = new ChatOpenAI({
+          model: "gpt-4o-mini",
+          temperature: 0,
+        });
+
+        const result = await llm.invoke([
+          { role: "user", content: "Hi im Bob" },
+        ], { callbacks: [new LangWatchCallbackHandler()] });
+        expect(result.content).toContain("Bob");
+      } finally {
+        span.end();
+      }
+    });
+  });
+
+  it("it should be able to handle tool calls", async () => {
+    const tools = [
+      new DynamicTool({
+        name: "get_current_time",
+        description: "Returns the current time in ISO-8601 format.",
+        func: async () => new Date().toISOString(),
+      }),
+
+      new DynamicTool({
+        name: "multiply",
+        description: 'Multiply two numbers, provide input like "a,b".',
+        func: async (input: string) => {
+          const [a, b] = input.split(",").map(Number);
+
+          if (a === void 0 || b === void 0) {
+            throw new Error("Invalid input");
+          }
+
+          return String(a * b);
+        },
+      }),
+    ];
+
+    const tracer = getLangWatchTracer("langchain-chatbot.test");
+    await tracer.startActiveSpan(
+      "langchain tool call",
+      { root: true },
+      async (span) => {
+        try {
+          const llm = new ChatOpenAI({
+            model: "gpt-4.1-mini",
+            temperature: 0,
+          });
+
+          const prompt = ChatPromptTemplate.fromMessages([
+            ["system", "You are a helpful assistant"],
+            ["placeholder", "{chat_history}"],
+            ["human", "{input}"],
+            ["placeholder", "{agent_scratchpad}"],
+          ]);
+
+          const agent = createToolCallingAgent({
+            llm,
+            tools,
+            prompt,
+          });
+          const agentExecutor = new AgentExecutor({
+            agent,
+            tools,
+          });
+
+          const tracingCallback = new LangWatchCallbackHandler();
+          const output = await agentExecutor.invoke({ input: "What time is it and what is 12 times 8?" }, { callbacks: [tracingCallback] });
+
+          console.log(output);
+        } finally {
+          span.end();
+        }
+      },
+    );
+  });
+
+  it("should understand context grouping", async () => {
+    const tracer = getLangWatchTracer("langchain-chatbot.test");
+    await tracer.startActiveSpan(
+      "context grouping",
+      { root: true },
+      async (span) => {
+        try {
+          const llm = new ChatOpenAI({
+            model: "gpt-4o-mini",
+            temperature: 0,
+          });
+
+          const tracingCallback = new LangWatchCallbackHandler();
+          const result1 = await llm.invoke([
+            { role: "user", content: "Hi im Alice" },
+          ], { callbacks: [tracingCallback] });
+          const result2 = await llm.invoke([
+            { role: "user", content: "Hi im Bob" },
+          ], { callbacks: [tracingCallback] });
+
+          expect(result1.content).toContain("Alice");
+          expect(result2.content).toContain("Bob");
+        } finally {
+          span.end();
+        }
+      },
+    );
+  });
+});
