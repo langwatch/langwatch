@@ -3,6 +3,8 @@ import {
   Box,
   Center,
   HStack,
+  MenuSeparator,
+  Portal,
   Spacer,
   Text,
   VStack,
@@ -16,29 +18,37 @@ import {
   CheckSquare,
   Edit,
   GitHub,
+  Globe,
   PlayCircle,
   Settings,
   Table,
   TrendingUp,
 } from "react-feather";
 
+import {
+  Activity,
+  Bug,
+  Lightbulb,
+  LifeBuoy,
+  MessageCircle,
+} from "lucide-react";
+
 import { useOrganizationTeamProject } from "../hooks/useOrganizationTeamProject";
-import { dependencies } from "../injection/dependencies.client";
 import { OrganizationRoleGroup } from "../server/api/permission";
 import { api } from "../utils/api";
 import { projectRoutes } from "../utils/routes";
 import { trackEvent } from "../utils/tracking";
 
+import { LuListTree } from "react-icons/lu";
 import { ChatBalloonIcon } from "./icons/ChatBalloon";
 import { DiscordOutlineIcon } from "./icons/DiscordOutline";
 import { LogoIcon } from "./icons/LogoIcon";
 import { PuzzleIcon } from "./icons/PuzzleIcon";
-import { IconWrapper } from "./IconWrapper";
 import { useTableView } from "./messages/HeaderButtons";
 import { useColorRawValue } from "./ui/color-mode";
 import { Link } from "./ui/link";
+import { Menu } from "./ui/menu";
 import { Tooltip } from "./ui/tooltip";
-import { LuListTree } from "react-icons/lu";
 
 export const MENU_WIDTH = "88px";
 
@@ -162,92 +172,95 @@ export const MainMenu = React.memo(function MainMenu() {
 
           <Spacer />
 
-          {(window as any)?.$crisp && project && (
-            <SideMenuLink
-              size="sm"
-              href="#"
+          <VStack
+            width="full"
+            align="center"
+            gap={2}
+            padding={2}
+            paddingBottom={4}
+          >
+            <HStack
+              width="full"
+              align="center"
+              gap={1}
+              cursor="pointer"
               onClick={(e) => {
                 e.preventDefault();
                 (window as any)?.$crisp.push(["do", "chat:show"]);
                 (window as any)?.$crisp.push(["do", "chat:toggle"]);
               }}
-              icon={
-                <Box
-                  position="relative"
-                  color="white"
-                  padding={2}
-                  marginX={-2}
-                  borderRadius="full"
-                  minWidth={0}
-                  minHeight={0}
-                  backgroundColor="blue.500"
-                  transition="all 0.2s ease-in-out"
-                  _groupHover={{
-                    transform: "scale(1.2)",
-                  }}
-                  _active={{
-                    color: "white",
-                  }}
-                >
-                  <ChatBalloonIcon width={20} height={20} />
-                  <Box
-                    position="absolute"
-                    bottom="0px"
-                    right="0px"
-                    width="10px"
-                    height="10px"
-                    borderRadius="full"
-                    backgroundColor="green.500"
-                    border="1px solid"
-                    borderColor="white"
-                  />
-                </Box>
-              }
-              label="Live Help"
-              isActive={false}
-              project={project}
-            />
-          )}
-          <HStack width="full" gap={0} paddingX={2} paddingTop={2}>
-            <SideMenuLink
-              size="sm"
-              href="https://docs.langwatch.ai"
-              icon={
-                <IconWrapper width="14px" height="14px" marginLeft="1px">
-                  <BookOpen />
-                </IconWrapper>
-              }
-              label="Documentation"
-              isActive={false}
-              project={project}
-            />
+            >
+              <MessageCircle size={16} />
+              <Text fontSize="xs" color="gray.600" textAlign="center">
+                Chat
+              </Text>
+            </HStack>
 
-            <SideMenuLink
-              size="sm"
-              href="https://github.com/langwatch/langwatch"
-              icon={
-                <IconWrapper width="14px" height="14px">
-                  <GitHub />
-                </IconWrapper>
-              }
-              label="GitHub"
-              isActive={false}
-              project={project}
-            />
+            <Menu.Root positioning={{ placement: "right-start" }}>
+              <Menu.Trigger asChild>
+                <HStack width="full" align="center" gap={0}>
+                  <LifeBuoy size={16} />
+                  <Text
+                    fontSize="xs"
+                    color="gray.600"
+                    textAlign="center"
+                    width="full"
+                  >
+                    Support
+                  </Text>
+                </HStack>
+              </Menu.Trigger>
 
-            <SideMenuLink
-              size="sm"
-              href="https://discord.gg/kT4PhDS2gH"
-              icon={
-                <IconWrapper width="14px" height="14px">
-                  <DiscordOutlineIcon />
-                </IconWrapper>
-              }
-              label="Community"
-              isActive={false}
-              project={project}
-            />
-          </HStack>
+              <Portal>
+                <Menu.Content>
+                  <Menu.Item value="github">
+                    <Link
+                      isExternal
+                      href="https://github.com/orgs/langwatch/discussions/categories/support"
+                    >
+                      <GitHub /> GitHub Support
+                    </Link>
+                  </Menu.Item>
+                  <Menu.Item value="discord">
+                    <Link isExternal href="https://discord.gg/kT4PhDS2gH">
+                      <DiscordOutlineIcon /> Discord
+                    </Link>
+                  </Menu.Item>
+                  <MenuSeparator />
+                  <Menu.Item value="documentation">
+                    <Link isExternal href="https://docs.langwatch.ai">
+                      <BookOpen /> Documentation
+                    </Link>
+                  </Menu.Item>
+
+                  <Menu.Item value="status">
+                    <Link isExternal href="https://status.langwatch.ai/">
+                      <Activity /> Status Page
+                    </Link>
+                  </Menu.Item>
+
+                  <MenuSeparator />
+
+                  <Menu.Item value="feature-requests">
+                    <Link
+                      isExternal
+                      href="https://github.com/orgs/langwatch/discussions/categories/ideas"
+                    >
+                      <Lightbulb /> Feature Request
+                    </Link>
+                  </Menu.Item>
+                  <Menu.Item value="bug-reports">
+                    <Link
+                      isExternal
+                      href="https://github.com/langwatch/langwatch/issues"
+                    >
+                      <Bug /> Report a Bug
+                    </Link>
+                  </Menu.Item>
+                </Menu.Content>
+              </Portal>
+            </Menu.Root>
+          </VStack>
         </VStack>
       </VStack>
     </Box>

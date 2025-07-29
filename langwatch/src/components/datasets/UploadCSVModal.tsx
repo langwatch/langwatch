@@ -14,7 +14,7 @@ import {
 } from "../../server/datasets/types";
 import {
   formatFileSize,
-  jsonToCSV,
+  jsonToCSV as papaparseJsonToCSV,
   useCSVReader,
   usePapaParse,
 } from "react-papaparse";
@@ -276,7 +276,6 @@ export function CSVReaderComponent({
           try {
             const contents = await file.text();
             let jsonContents;
-            console.log("contents", contents);
             try {
               jsonContents = JSON.parse(contents);
             } catch (error) {
@@ -346,6 +345,26 @@ export function CSVReaderComponent({
       }}
     </CSVReader>
   );
+}
+
+function jsonToCSV(jsonContents: object[]): string {
+  const stringifiedNestedValues = jsonContents.map((item) => {
+    return Object.fromEntries(
+      Object.entries(item).map(([key, value]) => {
+        if (value && typeof value === "object") {
+          return [key, JSON.stringify(value)];
+        }
+        return [key, value];
+      })
+    );
+  });
+  const columns = new Set(
+    stringifiedNestedValues.flatMap((item) => Object.keys(item))
+  );
+
+  return papaparseJsonToCSV(stringifiedNestedValues, {
+    columns: Array.from(columns),
+  });
 }
 
 function CSVReaderBox({

@@ -7,6 +7,7 @@ export const ToolResultMessage = ({ message }: { message: ResultMessage }) => {
     <VStack w="full" gap={2} mb={2} align="start">
       <Box
         w="full"
+        maxW="80%"
         bg="gray.50"
         border="1px solid"
         borderColor="gray.200"

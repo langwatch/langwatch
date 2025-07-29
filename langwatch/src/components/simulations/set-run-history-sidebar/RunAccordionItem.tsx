@@ -91,7 +91,7 @@ export const RunAccordionItem = ({
                     ? "red.400"
                     : "yellow.400"
                 }
-                boxSize={2}
+                boxSize={3}
               />
               <Text fontWeight="semibold" fontSize="sm">
                 {run.label}
