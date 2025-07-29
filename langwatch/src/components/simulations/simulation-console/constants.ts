@@ -1,3 +1,5 @@
+import type { Tokens } from "@chakra-ui/react";
+
 import {
   ScenarioRunStatus,
   Verdict,
@@ -7,7 +9,7 @@ import {
  * Static console styling colors
  * Single Responsibility: Provides consistent color values for console components (dark mode only)
  */
-export const CONSOLE_COLORS = {
+export const CONSOLE_COLORS: Record<string, Tokens["colors"]> = {
   consoleBg: "gray.800",
   consoleText: "white",
   headerColor: "white",
@@ -34,7 +36,7 @@ export const STATUS_DISPLAY_TEXT_MAP: Record<ScenarioRunStatus, string> = {
  * Mapping of verdict to display text
  * Single Responsibility: Provides consistent verdict text mapping
  */
-export const REASONING_VERDICT_COLOR_MAP: Record<Verdict, string> = {
+export const REASONING_VERDICT_COLOR_MAP: Record<Verdict, Tokens["colors"]> = {
   [Verdict.SUCCESS]: "green.300",
   [Verdict.FAILURE]: "red.400",
   [Verdict.INCONCLUSIVE]: "yellow.400",
