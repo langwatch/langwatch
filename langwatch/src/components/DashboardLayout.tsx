@@ -281,6 +281,7 @@ export const DashboardLayout = ({
     }
   );
   const publicEnv = usePublicEnv();
+  const isSaaS = publicEnv.data?.IS_SAAS;
 
   const [query, setQuery] = useState(router.query.query as string);
 
@@ -504,39 +505,41 @@ export const DashboardLayout = ({
           <HStack gap={2} flex={1}>
             <Spacer />
 
-            <Progress.Root
-              defaultValue={0}
-              max={usage.data?.activePlan.maxMessagesPerMonth}
-              value={usage.data?.currentMonthMessagesCount}
-              maxW="150px"
-              colorPalette="orange"
-              width="full"
-            >
-              <HStack>
-                <Link href="/settings/usage" width="150px">
-                  <Tooltip
-                    content={`You have used ${usage.data?.currentMonthMessagesCount.toLocaleString()} traces out of ${usage.data?.activePlan.maxMessagesPerMonth.toLocaleString()} this month.`}
-                  >
-                    <HStack width="full" cursor="pointer">
-                      <Progress.Label fontSize="xs">
-                        <HStack gap={1} cursor="pointer">
-                          Usage
-                          <Info size="12" />
-                        </HStack>
-                      </Progress.Label>
-                      <Progress.Track
-                        flex="1"
-                        borderRadius="full"
-                        border="1px solid"
-                        borderColor="#eee"
-                      >
-                        <Progress.Range />
-                      </Progress.Track>
-                    </HStack>
-                  </Tooltip>
-                </Link>
-              </HStack>
-            </Progress.Root>
+            {usage.data && isSaaS && (
+              <Progress.Root
+                defaultValue={0}
+                max={usage.data?.activePlan.maxMessagesPerMonth}
+                value={usage.data?.currentMonthMessagesCount}
+                maxW="150px"
+                colorPalette="orange"
+                width="full"
+              >
+                <HStack>
+                  <Link href="/settings/usage" width="150px">
+                    <Tooltip
+                      content={`You have used ${usage.data?.currentMonthMessagesCount.toLocaleString()} traces out of ${usage.data?.activePlan.maxMessagesPerMonth.toLocaleString()} this month.`}
+                    >
+                      <HStack width="full" cursor="pointer">
+                        <Progress.Label fontSize="xs">
+                          <HStack gap={1} cursor="pointer">
+                            Usage
+                            <Info size="12" />
+                          </HStack>
+                        </Progress.Label>
+                        <Progress.Track
+                          flex="1"
+                          borderRadius="full"
+                          border="1px solid"
+                          borderColor="#eee"
+                        >
+                          <Progress.Range />
+                        </Progress.Track>
+                      </HStack>
+                    </Tooltip>
+                  </Link>
+                </HStack>
+              </Progress.Root>
+            )}
 
             <HStack>
               {integrationsLeft ? (
