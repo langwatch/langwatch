@@ -1,6 +1,6 @@
 import { Box, Text, VStack } from "@chakra-ui/react";
 
-import { CONSOLE_COLORS } from "./constants";
+import { CONSOLE_COLORS, REASONING_VERDICT_COLOR_MAP } from "./constants";
 
 import type { ScenarioResults } from "~/app/api/scenario-events/[[...route]]/schemas";
 
@@ -64,7 +64,7 @@ export function CriteriaDetails({ results }: CriteriaDetailsProps) {
             Reasoning:
           </Text>
           <Text
-            color={CONSOLE_COLORS.consoleText}
+            color={REASONING_VERDICT_COLOR_MAP[results.verdict]}
             fontSize="sm"
             pl={2}
             whiteSpace="pre-wrap"

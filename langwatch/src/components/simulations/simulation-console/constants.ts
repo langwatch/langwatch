@@ -1,4 +1,7 @@
-import { ScenarioRunStatus } from "~/app/api/scenario-events/[[...route]]/enums";
+import {
+  ScenarioRunStatus,
+  Verdict,
+} from "~/app/api/scenario-events/[[...route]]/enums";
 
 /**
  * Static console styling colors
@@ -6,7 +9,7 @@ import { ScenarioRunStatus } from "~/app/api/scenario-events/[[...route]]/enums"
  */
 export const CONSOLE_COLORS = {
   consoleBg: "gray.800",
-  consoleText: "green.300",
+  consoleText: "white",
   headerColor: "white",
   successColor: "green.300",
   failureColor: "red.400",
@@ -25,4 +28,14 @@ export const STATUS_DISPLAY_TEXT_MAP: Record<ScenarioRunStatus, string> = {
   [ScenarioRunStatus.IN_PROGRESS]: "IN PROGRESS",
   [ScenarioRunStatus.PENDING]: "PENDING",
   [ScenarioRunStatus.FAILED]: "FAILED",
+};
+
+/**
+ * Mapping of verdict to display text
+ * Single Responsibility: Provides consistent verdict text mapping
+ */
+export const REASONING_VERDICT_COLOR_MAP: Record<Verdict, string> = {
+  [Verdict.SUCCESS]: "green.300",
+  [Verdict.FAILURE]: "red.400",
+  [Verdict.INCONCLUSIVE]: "yellow.400",
 };
