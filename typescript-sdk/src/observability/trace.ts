@@ -152,8 +152,8 @@ export interface LangWatchTracer extends Tracer {
  * which include ergonomic helpers for LLM/GenAI tracing.
  *
  * @example
- * import { getTracer } from 'langwatch/observability';
- * const tracer = getTracer('my-service');
+ * import { getLangWatchTracer } from 'langwatch';
+ * const tracer = getLangWatchTracer('my-service');
  * const span = tracer.startSpan('llm-call');
  * span.setType('llm').setInput('Prompt').setOutput('Completion');
  * span.end();
@@ -226,7 +226,7 @@ export function getLangWatchTracer(name: string, version?: string): LangWatchTra
         case "withActiveSpan": {
           /**
            * Implementation of withActiveSpan: supports all overloads like startActiveSpan.
-           * Uses the same argument detection logic as startActiveSpan for safety and robustness.
+           * Uses startActiveSpan to ensure context propagation for nested spans.
            */
           return async function withActiveSpan(...args: any[]): Promise<any> {
             // Find the function argument (should be the last argument)
@@ -234,28 +234,38 @@ export function getLangWatchTracer(name: string, version?: string): LangWatchTra
             if (fnIndex === -1) {
               throw new Error("withActiveSpan requires a function as the last argument");
             }
-
-            const fn = args[fnIndex] as (span: LangWatchSpan) => Promise<any> | any;
-
+            const userFn = args[fnIndex] as (span: LangWatchSpan) => Promise<any> | any;
             // The preceding arguments are: name, options?, context?
             const name = args[0];
             const options = args.length > 2 ? args[1] : undefined;
             const context = args.length > 3 ? args[2] : undefined;
 
-            const span = createLangWatchSpan(target.startSpan(name, options, context));
-
-            try {
-              return await fn(span);
-            } catch (err: any) {
-              span.setStatus({
-                code: SpanStatusCode.ERROR,
-                message: err && err.message ? err.message : String(err),
-              });
-              span.recordException(err);
-              throw err;
-            } finally {
-              span.end();
-            }
+            return await new Promise((resolve, reject) => {
+              // Use startActiveSpan to ensure context propagation
+              const cb = async (span: Span) => {
+                const wrappedSpan = createLangWatchSpan(span);
+                try {
+                  resolve(await userFn(wrappedSpan));
+                } catch (err: any) {
+                  wrappedSpan.setStatus({
+                    code: SpanStatusCode.ERROR,
+                    message: err && err.message ? err.message : String(err),
+                  });
+                  wrappedSpan.recordException(err);
+                  reject(err);
+                } finally {
+                  wrappedSpan.end();
+                }
+              };
+              // Call the correct overload of startActiveSpan
+              if (context !== undefined) {
+                target.startActiveSpan(name, options, context, cb);
+              } else if (options !== undefined) {
+                target.startActiveSpan(name, options, cb);
+              } else {
+                target.startActiveSpan(name, cb);
+              }
+            });
           };
         }
 
