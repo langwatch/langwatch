@@ -1,17 +1,20 @@
-import { describe, it, expect, beforeEach, afterAll } from "vitest";
-import * as client from "../client";
-
-const ORIGINAL_ENV = { ...process.env };
+import { describe, it, expect, beforeEach, afterAll, vi } from "vitest";
 
 describe("client config", () => {
-  beforeEach(() => {
-    // Reset config and env before each test
-    process.env = {
-      ...ORIGINAL_ENV,
-      LANGWATCH_API_KEY: void 0,
-      LANGWATCH_ENDPOINT: void 0,
-    };
+  let client: any;
 
+  beforeEach(async () => {
+    // Mock environment variables before importing the client module
+    vi.stubEnv('LANGWATCH_API_KEY', undefined);
+    vi.stubEnv('LANGWATCH_ENDPOINT', undefined);
+
+    // Reset modules to ensure fresh import after env stubbing
+    vi.resetModules();
+
+    // Dynamically import the client module
+    client = await import("../client.js");
+
+    // Reset config before each test
     client.setConfig({
       apiKey: "",
       endpoint: void 0,
@@ -20,8 +23,10 @@ describe("client config", () => {
       disableAutomaticOutputCapture: false,
     });
   });
+
   afterAll(() => {
-    process.env = { ...ORIGINAL_ENV };
+    // Restore original environment
+    vi.unstubAllEnvs();
   });
 
   it("should use default values if nothing is set", () => {
