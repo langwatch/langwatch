@@ -154,35 +154,27 @@ export default function IndividualScenarioRunPage() {
                       </HStack>
                     </Box>
                     {/* Conversation Area - Scrollable */}
-                    {!isScenarioStateLoading ? (
-                      <Box w="100%" p={4} overflow="auto" maxHeight="100%">
-                        <VStack>
-                          <CustomCopilotKitChat
-                            messages={scenarioState?.messages ?? []}
+                    <Box w="100%" p={4} overflow="auto" maxHeight="100%">
+                      <VStack>
+                        <CustomCopilotKitChat
+                          messages={scenarioState?.messages ?? []}
+                        />
+                        {/* Console Area */}
+                        <Box
+                          w="100%"
+                          borderTop="1px"
+                          borderColor="gray.100"
+                          flex="1"
+                        >
+                          <SimulationConsole
+                            results={results}
+                            scenarioName={scenarioState?.name ?? undefined}
+                            status={scenarioState?.status}
+                            durationInMs={scenarioState?.durationInMs}
                           />
-                          {/* Console Area */}
-                          <Box
-                            w="100%"
-                            borderTop="1px"
-                            borderColor="gray.100"
-                            flex="1"
-                          >
-                            <SimulationConsole
-                              results={results}
-                              scenarioName={scenarioState?.name ?? undefined}
-                              status={scenarioState?.status}
-                              durationInMs={scenarioState?.durationInMs}
-                            />
-                          </Box>
-                        </VStack>
-                      </Box>
-                    ) : (
-                      <Box w="100%" p={4} overflow="auto" maxHeight="100%">
-                        <VStack>
-                          <Skeleton height="100%" width="100%" />
-                        </VStack>
-                      </Box>
-                    )}
+                        </Box>
+                      </VStack>
+                    </Box>
                   </VStack>
 
                   {/* Previous Runs Sidebar - Scrollable */}

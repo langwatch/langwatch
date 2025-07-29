@@ -4,7 +4,7 @@ export * from "./SimulationZoomGrid";
 export * from "./CustomCopilotKitChat";
 export * from "./SimulationChatViewer";
 export * from "./SimulationResults";
-export * from "./SimulationConsole";
+export * from "./simulation-console/SimulationConsole";
 export * from "./SimulationChatWrapper";
 export * from "./SimulationChatFadeOverlay";
 export * from "./SimulationLayout";

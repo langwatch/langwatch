@@ -11,7 +11,6 @@ import React from "react";
 import { Check } from "react-feather";
 
 import "@copilotkit/react-ui/styles.css";
-import "../../../simulations.css";
 import { LuCircleOff } from "react-icons/lu";
 
 import { useSimulationRouter } from "~/hooks/simulations";
