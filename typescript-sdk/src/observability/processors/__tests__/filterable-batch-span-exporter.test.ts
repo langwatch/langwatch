@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { FilterableBatchSpanExporter, SpanProcessingExcludeRule } from '../filterable-batch-span-exporter';
+import { FilterableBatchSpanProcessor, SpanProcessingExcludeRule } from '../filterable-batch-span-processor';
 import type { ReadableSpan, SpanExporter } from '@opentelemetry/sdk-trace-base';
 
 function makeSpan({ name, instrumentationScopeName }: { name: string; instrumentationScopeName: string }): ReadableSpan {
@@ -9,7 +9,7 @@ function makeSpan({ name, instrumentationScopeName }: { name: string; instrument
   } as any;
 }
 
-describe('FilterableBatchSpanExporter', () => {
+describe('FilterableBatchSpanProcessor', () => {
   let exporter: SpanExporter;
   let onEndSpy: ReturnType<typeof vi.fn>;
 
@@ -17,7 +17,7 @@ describe('FilterableBatchSpanExporter', () => {
     onEndSpy = vi.fn();
     exporter = { export: vi.fn(), shutdown: vi.fn() } as any;
     // Patch BatchSpanProcessor's onEnd to spy on calls
-    (FilterableBatchSpanExporter.prototype as any).__proto__.onEnd = onEndSpy;
+    (FilterableBatchSpanProcessor.prototype as any).__proto__.onEnd = onEndSpy;
   });
 
   afterEach(() => {
@@ -28,7 +28,7 @@ describe('FilterableBatchSpanExporter', () => {
     const filters: SpanProcessingExcludeRule[] = [
       { fieldName: 'span_name', matchValue: 'foo', matchOperation: 'exact_match' },
     ];
-    const processor = new FilterableBatchSpanExporter(exporter, filters);
+    const processor = new FilterableBatchSpanProcessor(exporter, filters);
     const span = makeSpan({ name: 'bar', instrumentationScopeName: 'scope' });
     processor.onEnd(span);
     expect(onEndSpy).toHaveBeenCalledWith(span);
@@ -38,7 +38,7 @@ describe('FilterableBatchSpanExporter', () => {
     const filters: SpanProcessingExcludeRule[] = [
       { fieldName: 'span_name', matchValue: 'heartbeat', matchOperation: 'exact_match' },
     ];
-    const processor = new FilterableBatchSpanExporter(exporter, filters);
+    const processor = new FilterableBatchSpanProcessor(exporter, filters);
     const span = makeSpan({ name: 'heartbeat', instrumentationScopeName: 'scope' });
     processor.onEnd(span);
     expect(onEndSpy).not.toHaveBeenCalled();
@@ -48,7 +48,7 @@ describe('FilterableBatchSpanExporter', () => {
     const filters: SpanProcessingExcludeRule[] = [
       { fieldName: 'instrumentation_scope_name', matchValue: 'internal', matchOperation: 'starts_with' },
     ];
-    const processor = new FilterableBatchSpanExporter(exporter, filters);
+    const processor = new FilterableBatchSpanProcessor(exporter, filters);
     const span = makeSpan({ name: 'foo', instrumentationScopeName: 'internal-logger' });
     processor.onEnd(span);
     expect(onEndSpy).not.toHaveBeenCalled();
@@ -58,7 +58,7 @@ describe('FilterableBatchSpanExporter', () => {
     const filters: SpanProcessingExcludeRule[] = [
       { fieldName: 'span_name', matchValue: 'api', matchOperation: 'includes' },
     ];
-    const processor = new FilterableBatchSpanExporter(exporter, filters);
+    const processor = new FilterableBatchSpanProcessor(exporter, filters);
     const span = makeSpan({ name: 'call-api-endpoint', instrumentationScopeName: 'scope' });
     processor.onEnd(span);
     expect(onEndSpy).not.toHaveBeenCalled();
@@ -68,7 +68,7 @@ describe('FilterableBatchSpanExporter', () => {
     const filters: SpanProcessingExcludeRule[] = [
       { fieldName: 'span_name', matchValue: 'end', matchOperation: 'ends_with' },
     ];
-    const processor = new FilterableBatchSpanExporter(exporter, filters);
+    const processor = new FilterableBatchSpanProcessor(exporter, filters);
     const span = makeSpan({ name: 'process-end', instrumentationScopeName: 'scope' });
     processor.onEnd(span);
     expect(onEndSpy).not.toHaveBeenCalled();
@@ -79,7 +79,7 @@ describe('FilterableBatchSpanExporter', () => {
       { fieldName: 'span_name', matchValue: 'foo', matchOperation: 'exact_match' },
       { fieldName: 'instrumentation_scope_name', matchValue: 'bar', matchOperation: 'includes' },
     ];
-    const processor = new FilterableBatchSpanExporter(exporter, filters);
+    const processor = new FilterableBatchSpanProcessor(exporter, filters);
     const span = makeSpan({ name: 'baz', instrumentationScopeName: 'scope' });
     processor.onEnd(span);
     expect(onEndSpy).toHaveBeenCalledWith(span);
@@ -90,7 +90,7 @@ describe('FilterableBatchSpanExporter', () => {
       { fieldName: 'span_name', matchValue: 'baz', matchOperation: 'exact_match' },
       { fieldName: 'instrumentation_scope_name', matchValue: 'scope', matchOperation: 'exact_match' },
     ];
-    const processor = new FilterableBatchSpanExporter(exporter, filters);
+    const processor = new FilterableBatchSpanProcessor(exporter, filters);
     const span = makeSpan({ name: 'baz', instrumentationScopeName: 'scope' });
     processor.onEnd(span);
     expect(onEndSpy).not.toHaveBeenCalled();

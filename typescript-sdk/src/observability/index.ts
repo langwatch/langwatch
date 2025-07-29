@@ -1,6 +1,6 @@
 export * from "./span";
 export * from "./trace";
-export * from "./exporters";
+export * from "./processors";
 
 import * as instrumentation from "./instrumentation";
 
