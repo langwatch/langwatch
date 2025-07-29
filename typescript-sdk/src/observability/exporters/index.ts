@@ -1,1 +1,1 @@
-export * from "./filterable-batch-span-exporter";
+export * from "./langwatch-exporter";

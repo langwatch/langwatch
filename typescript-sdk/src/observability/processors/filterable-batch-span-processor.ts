@@ -39,7 +39,7 @@ export interface SpanProcessingExcludeRule {
  * This is useful for dropping noisy or irrelevant spans (e.g., health checks, heartbeats) from being exported to your tracing backend.
  *
  * @example
- * import { FilterableBatchSpanExporter } from './filterable-batch-span-exporter';
+ * import { FilterableBatchSpanProcessor } from './filterable-batch-span-exporter';
  * import { OTLPTraceExporter } from '@opentelemetry/exporter-trace-otlp-http';
  *
  * const exporter = new OTLPTraceExporter({ url: '...' });
@@ -47,13 +47,13 @@ export interface SpanProcessingExcludeRule {
  *   { fieldName: 'span_name', matchValue: 'heartbeat', matchOperation: 'exact_match' },
  *   { fieldName: 'instrumentation_scope_name', matchValue: 'internal', matchOperation: 'starts_with' },
  * ];
- * provider.addSpanProcessor(new FilterableBatchSpanExporter(exporter, filters));
+ * provider.addSpanProcessor(new FilterableBatchSpanProcessor(exporter, filters));
  */
-export class FilterableBatchSpanExporter extends BatchSpanProcessor {
+export class FilterableBatchSpanProcessor extends BatchSpanProcessor {
   private readonly _filters: SpanProcessingExcludeRule[];
 
   /**
-   * Create a new FilterableBatchSpanExporter.
+   * Create a new FilterableBatchSpanProcessor.
    *
    * @param exporter - The underlying SpanExporter to use for exporting spans.
    * @param filters - An array of rules for excluding spans from export.
