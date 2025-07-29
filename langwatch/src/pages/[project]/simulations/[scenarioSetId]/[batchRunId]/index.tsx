@@ -1,11 +1,13 @@
 import { Box } from "@chakra-ui/react";
+
 import { SimulationZoomGrid, SimulationLayout } from "~/components/simulations";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import "@copilotkit/react-ui/styles.css";
 import "../../simulations.css";
-import { api } from "~/utils/api";
-import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useSimulationRouter } from "~/hooks/simulations/useSimulationRouter";
+import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { api } from "~/utils/api";
+
 import { useEffect, useMemo } from "react";
 
 // Main layout for a single Simulation Set page
