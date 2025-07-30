@@ -4,6 +4,7 @@ import React from "react";
 import { ConsoleHeader } from "./ConsoleHeader";
 import { CONSOLE_COLORS } from "./constants";
 import { CriteriaDetails } from "./CriteriaDetails";
+import { ErrorDetails } from "./ErrorDetails";
 import { MetricsSummary } from "./MetricsSummary";
 import { StatusDisplay } from "./StatusDisplay";
 
@@ -63,7 +64,14 @@ export function SimulationConsole({
             </HStack>
           )}
 
-          {!isPending && <CriteriaDetails results={results} />}
+          {!isPending && !Boolean(results?.error) && (
+            <CriteriaDetails results={results} />
+          )}
+
+          {/* Error Details */}
+          {!isPending && results?.error && (
+            <ErrorDetails error={results.error} />
+          )}
         </VStack>
       </Code>
     </Box>
