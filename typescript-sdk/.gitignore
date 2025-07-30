@@ -5,5 +5,3 @@ dist
 src/internal/generated/types/*
 !src/internal/generated/types/.gitkeep
 coverage/
-
-# TODO(afr): fix this
