@@ -21,3 +21,41 @@
 .idea/
 *.tmproj
 .vscode/
+
+# Python virtual environments
+.venv/
+venv/
+env/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# Node.js
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Large binary files
+*.so
+*.dylib
+*.dll
+*.exe
+
+# Data files
+*.csv
+*.json
+*.xml
+*.sql
+*.db
+*.sqlite
+
+# Logs
+*.log
+logs/
+
+# Temporary files
+tmp/
+temp/
