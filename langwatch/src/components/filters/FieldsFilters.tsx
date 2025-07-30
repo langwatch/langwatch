@@ -12,6 +12,7 @@ import {
   VStack,
   useDisclosure,
 } from "@chakra-ui/react";
+import { useVirtualizer } from "@tanstack/react-virtual";
 import type { TRPCClientErrorLike } from "@trpc/client";
 import type { UseTRPCQueryResult } from "@trpc/react-query/shared";
 import type { inferRouterOutputs } from "@trpc/server";
@@ -20,22 +21,23 @@ import numeral from "numeral";
 import React, { useEffect, useMemo } from "react";
 import { ChevronDown, Search, X } from "react-feather";
 import { useDebounceValue } from "usehooks-ts";
-import { useDrawer } from "~/components/CurrentDrawer";
-import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+
 import { useFilterParams, type FilterParam } from "../../hooks/useFilterParams";
 import { TeamRoleGroup } from "../../server/api/permission";
 import type { AppRouter } from "../../server/api/root";
 import { availableFilters } from "../../server/filters/registry";
 import type { FilterDefinition, FilterField } from "../../server/filters/types";
 import { api } from "../../utils/api";
-import { Popover } from "../ui/popover";
+import { OverflownTextWithTooltip } from "../OverflownText";
 import { Checkbox } from "../ui/checkbox";
-import { Tooltip } from "../ui/tooltip";
 import { useColorRawValue } from "../ui/color-mode";
 import { InputGroup } from "../ui/input-group";
+import { Popover } from "../ui/popover";
 import { Slider } from "../ui/slider";
-import { useVirtualizer } from "@tanstack/react-virtual";
-import { OverflownTextWithTooltip } from "../OverflownText";
+import { Tooltip } from "../ui/tooltip";
+
+import { useDrawer } from "~/components/CurrentDrawer";
+import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 
 export function FieldsFilters() {
   const { nonEmptyFilters } = useFilterParams();
@@ -45,6 +47,7 @@ export function FieldsFilters() {
   const isEditMode = isDrawerOpen("editTriggerFilter");
 
   const filterKeys: FilterField[] = [
+    "metadata.prompt_ids",
     "spans.model",
     "metadata.labels",
     "evaluations.passed",

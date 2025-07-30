@@ -12,22 +12,20 @@ import { useRouter } from "next/router";
 import qs from "qs";
 import { useCallback, useEffect, useState } from "react";
 import { Maximize2, Minimize2 } from "react-feather";
+
+import { useAnnotationCommentStore } from "../../hooks/useAnnotationCommentStore";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { useTraceDetailsState } from "../../hooks/useTraceDetailsState";
 import { TeamRoleGroup } from "../../server/api/permission";
 import { api } from "../../utils/api";
+import { AddAnnotationQueueDrawer } from "../AddAnnotationQueueDrawer";
 import { useDrawer } from "../CurrentDrawer";
 import { Conversation } from "../messages/Conversation";
+import { Drawer } from "../ui/drawer";
 import { Link } from "../ui/link";
 import { Popover } from "../ui/popover";
 import { toaster } from "../ui/toaster";
-import { ShareButton } from "./ShareButton";
-import { SpanTree } from "./SpanTree";
-import { TraceSummary } from "./Summary";
 
-import { useAnnotationCommentStore } from "../../hooks/useAnnotationCommentStore";
-import { AddAnnotationQueueDrawer } from "../AddAnnotationQueueDrawer";
-import { Drawer } from "../ui/drawer";
 import { AddParticipants } from "./AddParticipants";
 import {
   Blocked,
@@ -36,6 +34,9 @@ import {
   Guardrails,
 } from "./Evaluations";
 import { Events } from "./Events";
+import { ShareButton } from "./ShareButton";
+import { SpanTree } from "./SpanTree";
+import { TraceSummary } from "./Summary";
 
 export function TraceDetails(props: {
   traceId: string;
