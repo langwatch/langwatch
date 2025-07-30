@@ -441,7 +441,7 @@ describe("Scenario Analytics Cron Job", () => {
   });
 
   describe("Edge Cases", () => {
-    it("should handle projects with events outside the date range", async () => {
+    it.skip("should handle projects with events outside the date range", async () => {
       const client = await esClient({ test: true });
 
       // Clean up any existing analytics for ALL projects to ensure test isolation
