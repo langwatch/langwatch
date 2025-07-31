@@ -29,6 +29,7 @@ import {
   getPayloadSizeHistogram,
   traceSpanCountHistogram,
 } from "../../server/metrics";
+import { withPagesRouterLogger } from "../../middleware/pages-router-logger";
 
 const logger = createLogger("langwatch:collector");
 
@@ -40,7 +41,7 @@ export const config = {
   },
 };
 
-export default async function handler(
+async function handleCollectorRequest(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
@@ -486,3 +487,6 @@ export default async function handler(
 
   return res.status(200).json({ message: "Trace received successfully." });
 }
+
+// Export the handler wrapped with logging middleware
+export default withPagesRouterLogger(handleCollectorRequest);

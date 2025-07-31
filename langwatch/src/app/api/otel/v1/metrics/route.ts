@@ -4,13 +4,14 @@ import * as Sentry from "@sentry/nextjs";
 import { NextResponse, type NextRequest } from "next/server";
 import { prisma } from "../../../../../server/db";
 import { createLogger } from "../../../../../utils/logger";
+import { withAppRouterLogger } from "../../../../../middleware/app-router-logger";
 
 const logger = createLogger("langwatch:otel:v1:metrics");
 
 const metricsRequestType = (root as any).opentelemetry.proto.collector.metrics
   .v1.ExportMetricsServiceRequest;
 
-export async function POST(req: NextRequest) {
+async function handleMetricsRequest(req: NextRequest) {
   const body = await req.arrayBuffer();
 
   const xAuthToken = req.headers.get("x-auth-token");
@@ -85,3 +86,6 @@ export async function POST(req: NextRequest) {
 
   return NextResponse.json({ message: "Not implemented" }, { status: 501 });
 }
+
+// Export the handler wrapped with logging middleware
+export const POST = withAppRouterLogger(handleMetricsRequest);
