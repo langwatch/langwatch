@@ -195,10 +195,10 @@ class LangWatchTrace:
         )
 
     @property
-    def trace_id(self) -> Optional[str]:
+    def trace_id(self) -> Optional[int]:
         if self._trace_id is None:
             return None
-        return self._trace_id.to_bytes(16, "big").hex()
+        return self._trace_id
 
     def _create_root_span(self):
         """Create the root span if parameters were provided."""
