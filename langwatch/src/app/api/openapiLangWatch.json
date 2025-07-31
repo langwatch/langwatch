@@ -2129,6 +2129,93 @@
                                 ]
                               },
                               "default": []
+                            },
+                            "id": {
+                              "type": "string"
+                            },
+                            "name": {
+                              "type": "string"
+                            },
+                            "inline": {
+                              "type": "object",
+                              "properties": {
+                                "records": {
+                                  "type": "object",
+                                  "additionalProperties": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string"
+                                    }
+                                  }
+                                },
+                                "columnTypes": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "object",
+                                    "properties": {
+                                      "name": {
+                                        "type": "string"
+                                      },
+                                      "type": {
+                                        "anyOf": [
+                                          {
+                                            "type": "string",
+                                            "const": "string"
+                                          },
+                                          {
+                                            "type": "string",
+                                            "const": "boolean"
+                                          },
+                                          {
+                                            "type": "string",
+                                            "const": "number"
+                                          },
+                                          {
+                                            "type": "string",
+                                            "const": "date"
+                                          },
+                                          {
+                                            "type": "string",
+                                            "const": "list"
+                                          },
+                                          {
+                                            "type": "string",
+                                            "const": "json"
+                                          },
+                                          {
+                                            "type": "string",
+                                            "const": "spans"
+                                          },
+                                          {
+                                            "type": "string",
+                                            "const": "rag_contexts"
+                                          },
+                                          {
+                                            "type": "string",
+                                            "const": "chat_messages"
+                                          },
+                                          {
+                                            "type": "string",
+                                            "const": "annotations"
+                                          },
+                                          {
+                                            "type": "string",
+                                            "const": "evaluations"
+                                          }
+                                        ]
+                                      }
+                                    },
+                                    "required": [
+                                      "name",
+                                      "type"
+                                    ]
+                                  }
+                                }
+                              },
+                              "required": [
+                                "records",
+                                "columnTypes"
+                              ]
                             }
                           },
                           "required": [
@@ -2150,8 +2237,7 @@
                         "messages",
                         "inputs",
                         "outputs",
-                        "model",
-                        "demonstrations"
+                        "model"
                       ]
                     }
                   },
@@ -2485,6 +2571,93 @@
                                 ]
                               },
                               "default": []
+                            },
+                            "id": {
+                              "type": "string"
+                            },
+                            "name": {
+                              "type": "string"
+                            },
+                            "inline": {
+                              "type": "object",
+                              "properties": {
+                                "records": {
+                                  "type": "object",
+                                  "additionalProperties": {
+                                    "type": "array",
+                                    "items": {
+                                      "type": "string"
+                                    }
+                                  }
+                                },
+                                "columnTypes": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "object",
+                                    "properties": {
+                                      "name": {
+                                        "type": "string"
+                                      },
+                                      "type": {
+                                        "anyOf": [
+                                          {
+                                            "type": "string",
+                                            "const": "string"
+                                          },
+                                          {
+                                            "type": "string",
+                                            "const": "boolean"
+                                          },
+                                          {
+                                            "type": "string",
+                                            "const": "number"
+                                          },
+                                          {
+                                            "type": "string",
+                                            "const": "date"
+                                          },
+                                          {
+                                            "type": "string",
+                                            "const": "list"
+                                          },
+                                          {
+                                            "type": "string",
+                                            "const": "json"
+                                          },
+                                          {
+                                            "type": "string",
+                                            "const": "spans"
+                                          },
+                                          {
+                                            "type": "string",
+                                            "const": "rag_contexts"
+                                          },
+                                          {
+                                            "type": "string",
+                                            "const": "chat_messages"
+                                          },
+                                          {
+                                            "type": "string",
+                                            "const": "annotations"
+                                          },
+                                          {
+                                            "type": "string",
+                                            "const": "evaluations"
+                                          }
+                                        ]
+                                      }
+                                    },
+                                    "required": [
+                                      "name",
+                                      "type"
+                                    ]
+                                  }
+                                }
+                              },
+                              "required": [
+                                "records",
+                                "columnTypes"
+                              ]
                             }
                           },
                           "required": [
@@ -2506,8 +2679,7 @@
                         "messages",
                         "inputs",
                         "outputs",
-                        "model",
-                        "demonstrations"
+                        "model"
                       ]
                     }
                   },
@@ -2834,6 +3006,93 @@
                               ]
                             },
                             "default": []
+                          },
+                          "id": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "inline": {
+                            "type": "object",
+                            "properties": {
+                              "records": {
+                                "type": "object",
+                                "additionalProperties": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string"
+                                  }
+                                }
+                              },
+                              "columnTypes": {
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "properties": {
+                                    "name": {
+                                      "type": "string"
+                                    },
+                                    "type": {
+                                      "anyOf": [
+                                        {
+                                          "type": "string",
+                                          "const": "string"
+                                        },
+                                        {
+                                          "type": "string",
+                                          "const": "boolean"
+                                        },
+                                        {
+                                          "type": "string",
+                                          "const": "number"
+                                        },
+                                        {
+                                          "type": "string",
+                                          "const": "date"
+                                        },
+                                        {
+                                          "type": "string",
+                                          "const": "list"
+                                        },
+                                        {
+                                          "type": "string",
+                                          "const": "json"
+                                        },
+                                        {
+                                          "type": "string",
+                                          "const": "spans"
+                                        },
+                                        {
+                                          "type": "string",
+                                          "const": "rag_contexts"
+                                        },
+                                        {
+                                          "type": "string",
+                                          "const": "chat_messages"
+                                        },
+                                        {
+                                          "type": "string",
+                                          "const": "annotations"
+                                        },
+                                        {
+                                          "type": "string",
+                                          "const": "evaluations"
+                                        }
+                                      ]
+                                    }
+                                  },
+                                  "required": [
+                                    "name",
+                                    "type"
+                                  ]
+                                }
+                              }
+                            },
+                            "required": [
+                              "records",
+                              "columnTypes"
+                            ]
                           }
                         },
                         "required": [
@@ -2853,8 +3112,7 @@
                       "prompt",
                       "inputs",
                       "outputs",
-                      "model",
-                      "demonstrations"
+                      "model"
                     ]
                   }
                 },

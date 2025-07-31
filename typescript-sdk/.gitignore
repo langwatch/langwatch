@@ -3,5 +3,7 @@ tsconfig.tsbuildinfo
 dist
 *.generated.ts
 src/internal/generated/types/*
+src/internal/generated/openapi/*
 !src/internal/generated/types/.gitkeep
+!src/internal/generated/openapi/.gitkeep
 coverage/
