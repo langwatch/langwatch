@@ -6,15 +6,15 @@ import { version } from "../package.json";
 import { resourceFromAttributes } from "@opentelemetry/resources";
 import * as intSemconv from "./observability/semconv";
 import { FilterableBatchSpanProcessor } from "./observability/processors";
-import { createLangWatchExporter } from "./observability/exporters";
+import { LangWatchExporter } from "./observability/exporters";
 import { addSpanProcessorToExistingTracerProvider, isOtelInitialized, mergeResourceIntoExistingTracerProvider } from "./client-shared";
 
 let managedSpanProcessors: SpanProcessor[] = [];
 let provider: WebTracerProvider | null = null;
-let setupCalled: boolean = false;
+let browserSetupCalled: boolean = false;
 
 export async function setup(options: SetupOptions = {}) {
-  if (setupCalled) {
+  if (browserSetupCalled) {
     throw new Error("LangWatch setup has already been called in this process. Setup can only be called once, if you need to modify OpenTelemetry setup then use the OpenTelemetry API directly.");
   }
 
@@ -24,7 +24,7 @@ export async function setup(options: SetupOptions = {}) {
 
   const endpointURL = new URL("/api/otel/v1/traces", getEndpoint());
   const langwatchSpanProcessor = new FilterableBatchSpanProcessor(
-    createLangWatchExporter(getApiKey(), endpointURL.toString()),
+    new LangWatchExporter(getApiKey(), endpointURL.toString()),
     options.otelSpanProcessingExcludeRules ?? [],
   );
 
@@ -49,10 +49,7 @@ export async function setup(options: SetupOptions = {}) {
         [intSemconv.ATTR_LANGWATCH_SDK_VERSION]: version,
         [intSemconv.ATTR_LANGWATCH_SDK_NAME]: "langwatch-observability-sdk",
       }),
-      spanProcessors: [new FilterableBatchSpanProcessor(
-        createLangWatchExporter(getApiKey(), endpointURL.toString()),
-        options.otelSpanProcessingExcludeRules ?? [],
-      )],
+      spanProcessors: [langwatchSpanProcessor, ...(options.otelSpanProcessors ?? [])],
     });
 
     provider.register({
