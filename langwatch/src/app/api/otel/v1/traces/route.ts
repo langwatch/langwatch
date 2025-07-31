@@ -13,13 +13,14 @@ import {
   scheduleTraceCollectionWithFallback,
 } from "../../../../../server/background/workers/collectorWorker";
 import { createLogger } from "../../../../../utils/logger";
+import { withAppRouterLogger } from "../../../../../middleware/app-router-logger";
 
 const logger = createLogger("langwatch:otel:v1:traces");
 
 const traceRequestType = (root as any).opentelemetry.proto.collector.trace.v1
   .ExportTraceServiceRequest;
 
-export async function POST(req: NextRequest) {
+async function handleTracesRequest(req: NextRequest) {
   const body = await req.arrayBuffer();
 
   const xAuthToken = req.headers.get("x-auth-token");
@@ -129,3 +130,6 @@ export async function POST(req: NextRequest) {
   await Promise.all(promises);
   return NextResponse.json({ message: "Trace received successfully." });
 }
+
+// Export the handler wrapped with logging middleware
+export const POST = withAppRouterLogger(handleTracesRequest);

@@ -7,13 +7,14 @@ import { prisma } from "../../../../../server/db";
 import { createLogger } from "../../../../../utils/logger";
 import { openTelemetryLogsRequestToTracesForCollection } from "~/server/tracer/otel.logs";
 import { fetchExistingMD5s, scheduleTraceCollectionWithFallback } from "~/server/background/workers/collectorWorker";
+import { withAppRouterLogger } from "../../../../../middleware/app-router-logger";
 
 const logger = createLogger("langwatch:otel:v1:logs");
 
 const logRequestType = (root as any).opentelemetry.proto.collector.logs.v1
   .ExportLogsServiceRequest;
 
-export async function POST(req: NextRequest) {
+async function handleLogsRequest(req: NextRequest) {
   const body = await req.arrayBuffer();
 
   const xAuthToken = req.headers.get("x-auth-token");
@@ -121,3 +122,6 @@ export async function POST(req: NextRequest) {
   await Promise.all(promises);
   return NextResponse.json({ message: "OK" }, { status: 200 });
 }
+
+// Export the handler wrapped with logging middleware
+export const POST = withAppRouterLogger(handleLogsRequest);
