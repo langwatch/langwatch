@@ -31,12 +31,12 @@ export interface SetupOptions {
   otelSpanProcessingExcludeRules?: SpanProcessingExcludeRule[];
 
   /**
-   * Whether to disable the automatic setup of the OpenTelemetry SDK. If this is set, then
+   * Whether to skip the automatic setup of the OpenTelemetry SDK. If this is set, then
    * the LangWatch SDK will not attempt to setup the OpenTelemetry SDK. You will need to
-   * setup the OpenTelemetry SDK yourself, and ensure that a SpanProcessor is added to the
+   * setup the OpenTelemetry yourself, and ensure that a SpanProcessor is added to the
    * OpenTelemetry SDK that will send traces to the LangWatch API.
    */
-  disableOpenTelemetryAutomaticSetup?: boolean;
+  skipOpenTelemetrySetup?: boolean;
 
   /**
    * Whether to disable the automatic capture of input.
@@ -48,7 +48,8 @@ export interface SetupOptions {
 interface InternalConfig {
   apiKey: string;
   endpoint: string;
-  disableOpenTelemetryAutomaticSetup: boolean;
+  setupCalled: boolean;
+  skipOpenTelemetrySetup: boolean;
   disableAutomaticInputCapture: boolean;
   disableAutomaticOutputCapture: boolean;
 }
@@ -56,12 +57,15 @@ interface InternalConfig {
 const config: InternalConfig = {
   apiKey: process.env.LANGWATCH_API_KEY ?? "",
   endpoint: process.env.LANGWATCH_ENDPOINT ?? "https://app.langwatch.ai",
-  disableOpenTelemetryAutomaticSetup: false,
+  setupCalled: false,
+  skipOpenTelemetrySetup: false,
   disableAutomaticInputCapture: false,
   disableAutomaticOutputCapture: false,
 };
 
 export function setConfig(options: SetupOptions) {
+  config.setupCalled = true;
+
   config.apiKey = options.apiKey !== void 0
     ? options.apiKey
     : (process.env.LANGWATCH_API_KEY ?? config.apiKey);
@@ -70,7 +74,7 @@ export function setConfig(options: SetupOptions) {
     ? options.endpoint
     : (process.env.LANGWATCH_ENDPOINT ?? config.endpoint);
 
-  config.disableOpenTelemetryAutomaticSetup = options.disableOpenTelemetryAutomaticSetup ?? config.disableOpenTelemetryAutomaticSetup;
+  config.skipOpenTelemetrySetup = options.skipOpenTelemetrySetup ?? config.skipOpenTelemetrySetup;
   config.disableAutomaticInputCapture = options.disableAutomaticInputCapture ?? config.disableAutomaticInputCapture;
   config.disableAutomaticOutputCapture = options.disableAutomaticOutputCapture ?? config.disableAutomaticOutputCapture;
 }
@@ -89,4 +93,8 @@ export function canAutomaticallyCaptureInput(): boolean {
 
 export function canAutomaticallyCaptureOutput(): boolean {
   return !config.disableAutomaticOutputCapture;
+}
+
+export function isSetupCalled(): boolean {
+  return config.setupCalled;
 }

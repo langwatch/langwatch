@@ -8,25 +8,25 @@ import { version } from "../package.json";
 import * as intSemconv from "./observability/semconv";
 import { addSpanProcessorToExistingTracerProvider, isOtelInitialized, mergeResourceIntoExistingTracerProvider } from "./client-shared";
 import { FilterableBatchSpanProcessor } from "./observability";
-import { createLangWatchExporter } from "./observability/exporters";
+import { LangWatchExporter } from "./observability/exporters";
 
 let managedSpanProcessors: SpanProcessor[] = [];
-let setupCalled: boolean = false;
+let nodeSetupCalled: boolean = false;
 let sdk: NodeSDK | null = null;
 
 export async function setup(options: SetupOptions = {}) {
-  if (setupCalled) {
+  if (nodeSetupCalled) {
     throw new Error("LangWatch setup has already been called in this process. Setup can only be called once, if you need to modify OpenTelemetry setup then use the OpenTelemetry API directly.");
   }
 
   setConfig(options);
-  setupCalled = true;
+  nodeSetupCalled = true;
 
   if (options.disableOpenTelemetryAutomaticSetup) return;
 
   const endpointURL = new URL("/api/otel/v1/traces", getEndpoint());
   const langwatchSpanProcessor = new FilterableBatchSpanProcessor(
-    createLangWatchExporter(getApiKey(), endpointURL.toString()),
+    new LangWatchExporter(getApiKey(), endpointURL.toString()),
     options.otelSpanProcessingExcludeRules ?? [],
   );
 
