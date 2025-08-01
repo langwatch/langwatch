@@ -1,4 +1,4 @@
-import { type PrismaClient } from "@prisma/client";
+import { type LlmPromptConfig, type PrismaClient } from "@prisma/client";
 
 import { type UpdateLlmConfigDTO } from "./dtos";
 import { LlmConfigRepository } from "./repositories";
@@ -18,12 +18,19 @@ export class PromptService {
    * Updates a prompt configuration with the provided data.
    * If a referenceId is provided, it will be formatted with the organization and project context.
    *
-   * @param id - The prompt configuration ID
-   * @param projectId - The project ID for authorization and context
-   * @param data - The update data containing name and optional referenceId
+   * @param params - The parameters object
+   * @param params.id - The prompt configuration ID
+   * @param params.projectId - The project ID for authorization and context
+   * @param params.data - The update data containing name and optional referenceId
    * @returns The updated prompt configuration
    */
-  async updatePrompt(id: string, projectId: string, data: UpdateLlmConfigDTO) {
+  async updatePrompt(params: {
+    id: string;
+    projectId: string;
+    data: UpdateLlmConfigDTO;
+  }): Promise<LlmPromptConfig> {
+    const { id, projectId, data } = params;
+
     const updateData = {
       ...data,
     };

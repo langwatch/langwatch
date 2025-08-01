@@ -1,4 +1,5 @@
 import type { MiddlewareHandler } from "hono";
+
 import { createLogger } from "~/utils/logger";
 
 const logger = createLogger("langwatch:api:errors");
@@ -36,6 +37,10 @@ export const errorMiddleware: MiddlewareHandler = async (c, next) => {
 
     if (isNotFoundError) {
       return c.json({ error: error.message }, 404);
+    }
+
+    if (error.status) {
+      return c.json({ error: error.message }, error.status);
     }
 
     // Otherwise treat as server error

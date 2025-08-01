@@ -1,8 +1,6 @@
 import type { Project } from "@prisma/client";
-import { TRPCError } from "@trpc/server";
-import { getHTTPStatusCodeFromError } from "@trpc/server/http";
 import { Hono } from "hono";
-import type { ContentfulStatusCode } from "hono/utils/http-status";
+import { HTTPException } from "hono/http-exception";
 import { describeRoute } from "hono-openapi";
 import { validator as zValidator, resolver } from "hono-openapi/zod";
 import { z } from "zod";
@@ -142,19 +140,12 @@ app.get(
 
       return c.json(response);
     } catch (error) {
-      if (error instanceof TRPCError) {
-        return c.json(
-          { error: error.message },
-          getHTTPStatusCodeFromError(error) as ContentfulStatusCode
-        );
-      }
-
       logger.error(
         { projectId: project.id, idOrReferenceId, error },
         "Error retrieving prompt"
       );
 
-      return c.json({ error: "internal server error" }, 500);
+      throw error;
     }
   }
 );
@@ -317,6 +308,7 @@ app.put(
     const project = c.get("project");
     const { id } = c.req.param();
     const data = c.req.valid("json");
+    const projectId = project.id;
 
     logger.info(
       {
@@ -328,19 +320,40 @@ app.put(
       "Updating prompt"
     );
 
-    const updatedConfig = await service.updatePrompt(id, project.id, data);
+    try {
+      const updatedConfig = await service.updatePrompt({
+        id,
+        projectId,
+        data,
+      });
 
-    logger.info(
-      {
-        projectId: project.id,
-        promptId: id,
-        name: updatedConfig.name,
-        referenceId: updatedConfig.referenceId,
-      },
-      "Successfully updated prompt"
-    );
+      logger.info(
+        {
+          projectId,
+          promptId: id,
+          name: updatedConfig.name,
+          referenceId: updatedConfig.referenceId,
+        },
+        "Successfully updated prompt"
+      );
 
-    return c.json(updatedConfig);
+      return c.json(updatedConfig);
+    } catch (error: any) {
+      logger.error({ projectId, promptId: id, error }, "Error updating prompt");
+
+      // Handle unique constraint violation for referenceId
+      if (
+        error.code === "P2002" &&
+        error.meta?.target?.includes("referenceId")
+      ) {
+        throw new HTTPException(409, {
+          message: "Reference ID already exists",
+        });
+      }
+
+      // Re-throw other errors to be handled by the error middleware
+      throw error;
+    }
   }
 );
 
