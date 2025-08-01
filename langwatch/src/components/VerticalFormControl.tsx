@@ -1,7 +1,18 @@
-import { Box, Field, VStack, type SystemStyleObject } from "@chakra-ui/react";
 import { type PropsWithChildren, type ReactNode } from "react";
 import type { FieldErrors } from "react-hook-form";
-import { HorizontalFormControl } from "./HorizontalFormControl";
+
+import {
+  HorizontalFormControl,
+  type HorizontalFormControlProps,
+} from "./HorizontalFormControl";
+
+export interface VerticalFormControlProps extends HorizontalFormControlProps {
+  helper?: string | ReactNode;
+  invalid?: boolean;
+  inputWidth?: string;
+  error?: FieldErrors<any>[0] | ReactNode;
+  size?: "sm" | "md";
+}
 
 export function VerticalFormControl({
   label,
@@ -12,15 +23,7 @@ export function VerticalFormControl({
   error,
   size = "md",
   ...props
-}: PropsWithChildren<{
-  label: string | ReactNode;
-  helper?: string | ReactNode;
-  invalid?: boolean;
-  inputWidth?: string;
-  error?: FieldErrors<any>[0] | ReactNode;
-  size?: "sm" | "md";
-}> &
-  SystemStyleObject) {
+}: PropsWithChildren<VerticalFormControlProps>) {
   return (
     <HorizontalFormControl
       label={label}

@@ -2,8 +2,6 @@ import { HStack, VStack } from "@chakra-ui/react";
 import {
   FormProvider,
   useFieldArray,
-  useFormContext,
-  type Control,
   type UseFormReturn,
 } from "react-hook-form";
 
@@ -15,19 +13,20 @@ import {
   OutputsFieldGroup,
 } from "../fields/PromptConfigVersionFieldGroup";
 import { PromptField } from "../fields/PromptField";
+import { PromptMessagesField } from "../fields/PromptMessagesField";
 import { PromptNameField } from "../fields/PromptNameField";
+import { ReferenceIdField } from "../fields/ReferenceIdField";
 
 import { PromptConfigInfoAndSavePartial } from "./components/PromptConfigInfoAndSavePartial";
 
+import { GenerateApiSnippetButton } from "~/components/GenerateApiSnippetButton";
 import { VerticalFormControl } from "~/components/VerticalFormControl";
+import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { GeneratePromptApiSnippetDialog } from "~/prompt-configs/components/GeneratePromptApiSnippetDialog";
 import { useGetPromptConfigByIdWithLatestVersionQuery } from "~/prompt-configs/hooks/useGetPromptConfigByIdWithLatestVersionQuery";
 import { usePromptConfig } from "~/prompt-configs/hooks/usePromptConfig";
 import type { PromptConfigFormValues } from "~/prompt-configs/hooks/usePromptConfigForm";
 import { usePromptConfigContext } from "~/prompt-configs/providers/PromptConfigProvider";
-import { PromptMessagesField } from "../fields/PromptMessagesField";
-import { GenerateApiSnippetButton } from "~/components/GenerateApiSnippetButton";
-import { GeneratePromptApiSnippetDialog } from "~/prompt-configs/components/GeneratePromptApiSnippetDialog";
-import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 
 interface PromptConfigFormProps {
   configId: string;
@@ -89,6 +88,7 @@ function InnerPromptConfigForm(props: PromptConfigFormProps) {
               </GeneratePromptApiSnippetDialog.Trigger>
             </GeneratePromptApiSnippetDialog>
           </HStack>
+          <ReferenceIdField />
           <ModelSelectField />
           <PromptField
             templateAdapter="default"
