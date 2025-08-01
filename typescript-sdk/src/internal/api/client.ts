@@ -5,7 +5,7 @@ import { getApiKey, getEndpoint } from "../../client";
 
 const configSchema = z.object({
   apiKey: z.string().min(1, "API key is required"),
-  endpoint: z.url(),
+  endpoint: z.string().url("Endpoint must be a valid URL"),
 });
 
 export function createLangWatchApiClient(apiKey?: string | undefined, endpoint?: string | undefined ) {
