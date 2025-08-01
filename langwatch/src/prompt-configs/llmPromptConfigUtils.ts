@@ -17,13 +17,13 @@ import type {
 } from "../optimization_studio/types/dsl";
 
 import type { PromptConfigFormValues } from "~/prompt-configs/hooks/usePromptConfigForm";
-import { kebabCase } from "~/utils/stringCasing";
 import {
   LlmConfigInputTypes,
   LlmConfigOutputTypes,
   type LlmConfigInputType,
   type LlmConfigOutputType,
 } from "~/types";
+import { kebabCase } from "~/utils/stringCasing";
 
 export function llmConfigToOptimizationStudioNodeData(
   config: LlmConfigWithLatestVersion

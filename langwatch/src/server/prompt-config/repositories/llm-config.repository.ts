@@ -166,7 +166,7 @@ export class LlmConfigRepository {
   async updateConfig(
     id: string,
     projectId: string,
-    data: Partial<LlmConfigDTO>
+    data: Partial<Pick<LlmConfigDTO, "name" | "referenceId">> // Allow updating name and referenceId
   ): Promise<LlmPromptConfig> {
     // Verify the config exists
     const existingConfig = await this.prisma.llmPromptConfig.findUnique({
@@ -177,7 +177,7 @@ export class LlmConfigRepository {
       throw new NotFoundError(`Prompt config not found. ID: ${id}`);
     }
 
-    // Update only the parent config metadata
+    // Update the config metadata - now supports both name and referenceId
     return this.prisma.llmPromptConfig.update({
       where: { id, projectId },
       data: {

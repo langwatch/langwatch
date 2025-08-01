@@ -47,7 +47,7 @@ export function PromptConfigProvider({
   } = useDisclosure();
 
   // Prompt config state
-  const { updatePromptNameIfChanged, createNewVersion } = usePromptConfig();
+  const { updatePromptConfig, createNewVersion } = usePromptConfig();
 
   // Closure to save the function that will do the saving
   const updateConfigClosureRef = useRef<
@@ -62,8 +62,7 @@ export function PromptConfigProvider({
         saveFormValues: SaveDialogFormValues
       ) => {
         try {
-          await updatePromptNameIfChanged(configId, updateConfigValues.name);
-
+          await updatePromptConfig(configId, updateConfigValues);
           const version = await createNewVersion(
             configId,
             promptConfigFormValuesVersionToLlmConfigVersionConfigData(
@@ -82,14 +81,15 @@ export function PromptConfigProvider({
           console.error(error);
           toaster.error({
             title: "Failed to save version",
-            description: "Please try again.",
+            description:
+              error instanceof Error ? error.message : "Please try again.",
           });
         }
       };
 
       openDialog();
     },
-    [openDialog, updatePromptNameIfChanged, createNewVersion, closeDialog]
+    [openDialog, updatePromptConfig, createNewVersion, closeDialog]
   );
 
   return (
