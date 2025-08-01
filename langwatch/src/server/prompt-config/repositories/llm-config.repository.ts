@@ -20,6 +20,7 @@ interface LlmConfigDTO {
   name: string;
   projectId: string;
   authorId?: string;
+  referenceId?: string;
 }
 
 /**
@@ -160,7 +161,12 @@ export class LlmConfigRepository {
     // Update only the parent config metadata
     return this.prisma.llmPromptConfig.update({
       where: { id, projectId },
-      data: { name: data.name },
+      data: {
+        // Only update if the field is explicitly provided (including null)
+        name: "name" in data ? data.name : existingConfig.name,
+        referenceId:
+          "referenceId" in data ? data.referenceId : existingConfig.referenceId,
+      },
     });
   }
 

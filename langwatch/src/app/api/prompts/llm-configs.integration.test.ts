@@ -1,4 +1,4 @@
-import type { LlmPromptConfig } from "@prisma/client";
+import type { LlmPromptConfig, Organization, Team } from "@prisma/client";
 import { nanoid } from "nanoid";
 import { describe, expect, it, beforeEach, afterEach } from "vitest";
 
@@ -21,13 +21,33 @@ describe("Prompts API", () => {
   });
   let testApiKey: string;
   let testProjectId: string;
+  let testOrganization: Organization;
+  let testTeam: Team;
 
   // Setup and teardown
   beforeEach(async () => {
-    // Create test project in the database
+    // Create organization first
+    testOrganization = await prisma.organization.create({
+      data: {
+        name: "Test Organization",
+        slug: `test-org-${nanoid()}`,
+      },
+    });
+
+    // Create team linked to the organization
+    testTeam = await prisma.team.create({
+      data: {
+        name: "Test Team",
+        slug: `test-team-${nanoid()}`,
+        organizationId: testOrganization.id,
+      },
+    });
+
+    // Create test project in the database with the proper team
     mockProject = await prisma.project.create({
       data: {
         ...mockProject,
+        teamId: testTeam.id,
       },
     });
 
@@ -49,6 +69,15 @@ describe("Prompts API", () => {
 
     await prisma.project.delete({
       where: { id: testProjectId },
+    });
+
+    // Clean up team and organization
+    await prisma.team.delete({
+      where: { id: testTeam.id },
+    });
+
+    await prisma.organization.delete({
+      where: { id: testOrganization.id },
     });
   });
 
@@ -252,6 +281,157 @@ describe("Prompts API", () => {
       expect(res.status).toBe(400); // Should be 400 Bad Request
       const body = await res.json();
       expect(body).toHaveProperty("error");
+    });
+  });
+
+  // PUT endpoints tests
+  describe("PUT endpoints", () => {
+    it.only("should update a prompt with a referenceId in correct format", async () => {
+      // Create a valid prompt first
+      const promptRes = await app.request(`/api/prompts`, {
+        method: "POST",
+        headers: {
+          "X-Auth-Token": testApiKey,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ name: "Test Prompt" }),
+      });
+
+      expect(promptRes.status).toBe(200);
+      const prompt = await promptRes.json();
+
+      // Get the project with organization info to construct expected referenceId
+      const project = await prisma.project.findUnique({
+        where: { id: testProjectId },
+        include: { team: { include: { organization: true } } },
+      });
+
+      const referenceId = "my-custom-ref";
+      const expectedReferenceId = `${project?.team.organization.id}/${testProjectId}/${referenceId}`;
+
+      // Update the prompt with a referenceId
+      const updateRes = await app.request(`/api/prompts/${prompt.id}`, {
+        method: "PUT",
+        headers: {
+          "X-Auth-Token": testApiKey,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          name: "Updated Test Prompt",
+          referenceId: referenceId,
+        }),
+      });
+
+      expect(updateRes.status).toBe(200);
+      const realPrompt = await prisma.llmPromptConfig.findUnique({
+        where: { id: prompt.id, projectId: testProjectId },
+      });
+
+      // Verify the referenceId is in the correct format
+      expect(realPrompt?.referenceId).toBe(expectedReferenceId);
+    });
+
+    it("should allow updating referenceId to null/empty", async () => {
+      // Create a prompt with a referenceId first
+      const promptRes = await app.request(`/api/prompts`, {
+        method: "POST",
+        headers: {
+          "X-Auth-Token": testApiKey,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ name: "Test Prompt" }),
+      });
+
+      const prompt = await promptRes.json();
+
+      // Set a referenceId first
+      await prisma.llmPromptConfig.update({
+        where: { id: prompt.id },
+        data: { referenceId: "some-ref-id" },
+      });
+
+      // Update to remove the referenceId
+      const updateRes = await app.request(`/api/prompts/${prompt.id}`, {
+        method: "PUT",
+        headers: {
+          "X-Auth-Token": testApiKey,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          name: "Updated Test Prompt",
+          referenceId: null,
+        }),
+      });
+
+      expect(updateRes.status).toBe(200);
+      const updatedPrompt = await updateRes.json();
+
+      expect(updatedPrompt.referenceId).toBeNull();
+
+      // Verify it was actually saved to the database
+      const dbPrompt = await prisma.llmPromptConfig.findUnique({
+        where: { id: prompt.id },
+      });
+
+      expect(dbPrompt?.referenceId).toBeNull();
+    });
+
+    it("should enforce unique referenceId constraint", async () => {
+      // Create first prompt with referenceId
+      const prompt1Res = await app.request(`/api/prompts`, {
+        method: "POST",
+        headers: {
+          "X-Auth-Token": testApiKey,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ name: "Test Prompt 1" }),
+      });
+
+      const prompt1 = await prompt1Res.json();
+
+      // Create second prompt
+      const prompt2Res = await app.request(`/api/prompts`, {
+        method: "POST",
+        headers: {
+          "X-Auth-Token": testApiKey,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ name: "Test Prompt 2" }),
+      });
+
+      const prompt2 = await prompt2Res.json();
+
+      // Set referenceId on first prompt
+      const updateRes1 = await app.request(`/api/prompts/${prompt1.id}`, {
+        method: "PUT",
+        headers: {
+          "X-Auth-Token": testApiKey,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          name: "Test Prompt 1",
+          referenceId: "duplicate-ref",
+        }),
+      });
+
+      expect(updateRes1.status).toBe(200);
+
+      // Try to set same referenceId on second prompt - should fail
+      const updateRes2 = await app.request(`/api/prompts/${prompt2.id}`, {
+        method: "PUT",
+        headers: {
+          "X-Auth-Token": testApiKey,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          name: "Test Prompt 2",
+          referenceId: "duplicate-ref",
+        }),
+      });
+
+      expect(updateRes2.status).toBe(400);
+      const errorBody = await updateRes2.json();
+      expect(errorBody).toHaveProperty("error");
     });
   });
 

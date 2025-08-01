@@ -31,6 +31,7 @@ export const llmPromptConfigFactory = Factory.define<
   updatedAt: new Date(),
   deletedAt: null,
   referenceId: null,
+  organizationId: null,
 }));
 
 type LlmPromptConfigVersionWithConfigData<T extends SchemaVersion> =

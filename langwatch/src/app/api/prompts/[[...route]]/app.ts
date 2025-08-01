@@ -303,7 +303,10 @@ app.put(
   }),
   zValidator(
     "json",
-    z.object({ name: z.string().min(1, "Name cannot be empty") })
+    z.object({
+      name: z.string().min(1, "Name cannot be empty"),
+      referenceId: z.string().optional(),
+    })
   ),
   async (c) => {
     const repository = c.get("llmConfigRepository");
@@ -312,14 +315,24 @@ app.put(
     const data = c.req.valid("json");
 
     logger.info(
-      { projectId: project.id, promptId: id, newName: data.name },
+      {
+        projectId: project.id,
+        promptId: id,
+        newName: data.name,
+        newReferenceId: data.referenceId,
+      },
       "Updating prompt"
     );
 
     const updatedConfig = await repository.updateConfig(id, project.id, data);
 
     logger.info(
-      { projectId: project.id, promptId: id, name: updatedConfig.name },
+      {
+        projectId: project.id,
+        promptId: id,
+        name: updatedConfig.name,
+        referenceId: updatedConfig.referenceId,
+      },
       "Successfully updated prompt"
     );
 
