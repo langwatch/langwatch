@@ -18,20 +18,17 @@ export const usePromptConfig = () => {
   const updateConfig = api.llmConfigs.updatePromptConfig.useMutation();
   const createVersion = api.llmConfigs.versions.create.useMutation();
 
-  const updatePromptNameIfChanged = async (configId: string, name: string) => {
-    const promptConfig =
-      await trpc.client.llmConfigs.getByIdWithLatestVersion.query({
-        projectId,
-        id: configId,
-      });
-    if (!promptConfig) return;
-    if (promptConfig.name === name) return;
-
+  const updatePromptConfig = async (
+    configId: string,
+    configData: { name: string; referenceId?: string }
+  ) => {
     const config = await updateConfig.mutateAsync({
       projectId,
       id: configId,
-      name,
+      name: configData.name,
+      referenceId: configData.referenceId,
     });
+
     await trpc.llmConfigs.getPromptConfigs.invalidate();
     await trpc.llmConfigs.getByIdWithLatestVersion.invalidate();
     return config;
@@ -58,7 +55,7 @@ export const usePromptConfig = () => {
   };
 
   return {
-    updatePromptNameIfChanged,
+    updatePromptConfig,
     createNewVersion,
     isLoading: updateConfig.isLoading || createVersion.isLoading,
   };

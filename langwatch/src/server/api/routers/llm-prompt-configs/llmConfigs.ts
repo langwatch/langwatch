@@ -58,7 +58,8 @@ export const llmConfigsRouter = createTRPCRouter({
       } catch (error) {
         throw new TRPCError({
           code: "NOT_FOUND",
-          message: "Prompt config not found.",
+          message: "Prompt config not found",
+          cause: error,
         });
       }
     }),
@@ -83,13 +84,14 @@ export const llmConfigsRouter = createTRPCRouter({
       } catch (error) {
         throw new TRPCError({
           code: "BAD_REQUEST",
-          message: "Failed to create config.",
+          message: "Failed to create config",
+          cause: error,
         });
       }
     }),
 
   /**
-   * Update an LLM prompt config's metadata (name only).
+   * Update an LLM prompt config's metadata (name and referenceId).
    */
   updatePromptConfig: protectedProcedure
     .input(
@@ -97,6 +99,7 @@ export const llmConfigsRouter = createTRPCRouter({
         z.object({
           id: z.string(),
           name: z.string(),
+          referenceId: z.string().optional(), // Add referenceId support
         })
       )
     )
@@ -108,14 +111,20 @@ export const llmConfigsRouter = createTRPCRouter({
         const updatedConfig = await repository.updateConfig(
           input.id,
           input.projectId,
-          { name: input.name }
+          {
+            name: input.name,
+            referenceId: input.referenceId,
+          }
         );
 
         return updatedConfig;
       } catch (error) {
         throw new TRPCError({
-          code: "NOT_FOUND",
-          message: "Prompt config not found.",
+          code: "BAD_REQUEST",
+          message: `Failed to update config: ${
+            error instanceof Error ? error.message : "Unknown error"
+          }`,
+          cause: error,
         });
       }
     }),
@@ -133,8 +142,9 @@ export const llmConfigsRouter = createTRPCRouter({
         return await repository.deleteConfig(input.id, input.projectId);
       } catch (error) {
         throw new TRPCError({
-          code: "NOT_FOUND",
-          message: "Prompt config not found.",
+          code: "BAD_REQUEST",
+          message: "Failed to delete config",
+          cause: error,
         });
       }
     }),
