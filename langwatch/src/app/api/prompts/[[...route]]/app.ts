@@ -7,13 +7,10 @@ import { describeRoute } from "hono-openapi";
 import { validator as zValidator, resolver } from "hono-openapi/zod";
 import { z } from "zod";
 
-import { type LlmConfigRepository } from "~/server/prompt-config/repositories/llm-config.repository";
+import { prisma } from "~/server/db";
+import { PromptService } from "~/server/prompt-config/prompt.service";
 
-import {
-  authMiddleware,
-  repositoryMiddleware,
-  errorMiddleware,
-} from "../../middleware";
+import { authMiddleware, errorMiddleware } from "../../middleware";
 import { loggerMiddleware } from "../../middleware/logger";
 import { baseResponses } from "../../shared/base-responses";
 
@@ -39,7 +36,7 @@ patchZodOpenapi();
 // Define types for our Hono context variables
 type Variables = {
   project: Project;
-  llmConfigRepository: LlmConfigRepository;
+  promptService: PromptService;
 };
 
 // Define the Hono app
@@ -50,7 +47,10 @@ export const app = new Hono<{
 // Middleware
 app.use(loggerMiddleware());
 app.use("/*", authMiddleware);
-app.use("/*", repositoryMiddleware);
+app.use("/*", (c, next) => {
+  c.set("promptService", new PromptService(prisma));
+  return next();
+});
 app.use("/*", errorMiddleware);
 
 // Get all prompts
@@ -69,12 +69,14 @@ app.get(
     },
   }),
   async (c) => {
-    const repository = c.get("llmConfigRepository");
+    const service = c.get("promptService");
     const project = c.get("project");
 
     logger.info({ projectId: project.id }, "Getting all prompts for project");
 
-    const configs = await repository.getAllWithLatestVersion(project.id);
+    const configs = await service.repository.getAllWithLatestVersion(
+      project.id
+    );
 
     logger.info(
       { projectId: project.id, count: configs.length },
@@ -102,7 +104,7 @@ app.get(
     },
   }),
   async (c) => {
-    const repository = c.get("llmConfigRepository");
+    const service = c.get("promptService");
     const project = c.get("project");
     const { idOrReferenceId } = c.req.param();
 
@@ -113,7 +115,7 @@ app.get(
 
     try {
       const config =
-        await repository.getConfigByIdOrReferenceIdWithLatestVersion(
+        await service.repository.getConfigByIdOrReferenceIdWithLatestVersion(
           idOrReferenceId,
           project.id
         );
@@ -173,7 +175,7 @@ app.post(
     z.object({ name: z.string().min(1, "Name cannot be empty") })
   ),
   async (c) => {
-    const repository = c.get("llmConfigRepository");
+    const service = c.get("promptService");
     const project = c.get("project");
     const data = c.req.valid("json");
     const { name } = data;
@@ -183,7 +185,7 @@ app.post(
       "Creating new prompt with initial version"
     );
 
-    const newConfig = await repository.createConfigWithInitialVersion({
+    const newConfig = await service.repository.createConfigWithInitialVersion({
       name,
       projectId: project.id,
     });
@@ -214,7 +216,7 @@ app.get(
     },
   }),
   async (c) => {
-    const repository = c.get("llmConfigRepository");
+    const service = c.get("promptService");
     const project = c.get("project");
     const { id } = c.req.param();
 
@@ -223,10 +225,12 @@ app.get(
       "Getting versions for prompt"
     );
 
-    const versions = await repository.versions.getVersionsForConfigById({
-      configId: id,
-      projectId: project.id,
-    });
+    const versions = await service.repository.versions.getVersionsForConfigById(
+      {
+        configId: id,
+        projectId: project.id,
+      }
+    );
 
     logger.info(
       { projectId: project.id, promptId: id, versionCount: versions.length },
@@ -255,7 +259,7 @@ app.post(
   }),
   zValidator("json", versionInputSchema),
   async (c) => {
-    const repository = c.get("llmConfigRepository");
+    const service = c.get("promptService");
     const project = c.get("project");
     const { id } = c.req.param();
     const data = c.req.valid("json");
@@ -265,7 +269,7 @@ app.post(
       "Creating new version for prompt"
     );
 
-    const version = await repository.versions.createVersion({
+    const version = await service.repository.versions.createVersion({
       ...data,
       configId: id,
       projectId: project.id,
@@ -309,7 +313,7 @@ app.put(
     })
   ),
   async (c) => {
-    const repository = c.get("llmConfigRepository");
+    const service = c.get("promptService");
     const project = c.get("project");
     const { id } = c.req.param();
     const data = c.req.valid("json");
@@ -324,7 +328,7 @@ app.put(
       "Updating prompt"
     );
 
-    const updatedConfig = await repository.updateConfig(id, project.id, data);
+    const updatedConfig = await service.updatePrompt(id, project.id, data);
 
     logger.info(
       {
@@ -357,13 +361,13 @@ app.delete(
     },
   }),
   async (c) => {
-    const repository = c.get("llmConfigRepository");
+    const service = c.get("promptService");
     const project = c.get("project");
     const { id } = c.req.param();
 
     logger.info({ projectId: project.id, promptId: id }, "Deleting prompt");
 
-    const result = await repository.deleteConfig(id, project.id);
+    const result = await service.repository.deleteConfig(id, project.id);
 
     logger.info(
       { projectId: project.id, promptId: id, success: result.success },
