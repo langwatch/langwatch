@@ -92,7 +92,7 @@
     "openai": "^5.10.2",
     "openapi-fetch": "^0.14.0",
     "xksuid": "^0.0.4",
-    "zod": "^3.25.76",
+    "zod": "^4.0.14",
     "zod-validation-error": "^3.0.3"
   },
   "peerDependencies": {
