@@ -1,14 +1,16 @@
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useEffect, useRef } from "react";
+import isEqual from "lodash-es/isEqual";
+import { useEffect } from "react";
 import { useForm, type DeepPartial } from "react-hook-form";
 import { z } from "zod";
 
 import { getLatestConfigVersionSchema } from "~/server/prompt-config/repositories/llm-config-version-schema";
+
 import { inputsAndOutputsToDemostrationColumns } from "../llmPromptConfigUtils";
-import isEqual from "lodash-es/isEqual";
 
 const promptConfigSchema = z.object({
   name: z.string().min(1, "Name is required"),
+  referenceId: z.string().optional(),
 });
 
 const latestConfigVersionSchema = getLatestConfigVersionSchema();
