@@ -61,6 +61,6 @@ export const handleError = async (
         message: error.message,
       }),
     },
-    506
+    500
   );
 };
