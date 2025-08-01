@@ -1,5 +1,8 @@
 import { type PrismaClient, type LlmPromptConfig } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
+import { nanoid } from "nanoid";
+
+import { createLogger } from "../../../utils/logger";
 
 import {
   LATEST_SCHEMA_VERSION,
@@ -7,8 +10,6 @@ import {
   type LatestConfigVersionSchema,
 } from "./llm-config-version-schema";
 import { LlmConfigVersionsRepository } from "./llm-config-versions.repository";
-import { createLogger } from "../../../utils/logger";
-import { nanoid } from "nanoid";
 
 const logger = createLogger("langwatch:prompt-config:llm-config.repository");
 

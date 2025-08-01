@@ -159,6 +159,9 @@ model Organization {
 
     promoCode String?
     features  OrganizationFeature[]
+
+    // New relation to prompts
+    llmPromptConfigs LlmPromptConfig[]
 }
 
 enum PIIRedactionLevel {
@@ -726,18 +729,25 @@ model AuditLog {
 }
 
 model LlmPromptConfig {
-    id        String    @id @default(nanoid())
-    name      String
-    projectId String
-    project   Project   @relation(fields: [projectId], references: [id])
-    createdAt DateTime  @default(now())
-    updatedAt DateTime  @default(now()) @updatedAt
-    deletedAt DateTime?
-
+    id          String    @id @default(nanoid())
+    name        String
+    projectId   String
+    project     Project   @relation(fields: [projectId], references: [id])
+    createdAt   DateTime  @default(now())
+    updatedAt   DateTime  @default(now()) @updatedAt
+    deletedAt   DateTime?
+    
+    // New fields for draft status and reference management
+    isDraft     Boolean   @default(true)
+    referenceId String?
+    
     // Relation to all versions - latest is determined by query
     versions LlmPromptConfigVersion[] @relation("Versions")
-
+    
+    @@unique([projectId, referenceId], name: "projectId_referenceId", map: "LlmPromptConfig_projectId_referenceId_key")
     @@index([projectId])
+    @@index([isDraft])
+    @@index([referenceId])
 }
 
 model LlmPromptConfigVersion {

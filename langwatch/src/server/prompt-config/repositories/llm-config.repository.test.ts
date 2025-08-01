@@ -1,5 +1,4 @@
 import { type PrismaClient } from "@prisma/client";
-import { LlmConfigRepository } from "./llm-config.repository";
 import {
   describe,
   it,
@@ -9,7 +8,10 @@ import {
   beforeAll,
   afterAll,
 } from "vitest";
+
 import { LATEST_SCHEMA_VERSION } from "./llm-config-version-schema";
+import { LlmConfigRepository } from "./llm-config.repository";
+
 import {
   llmPromptConfigFactory,
   llmPromptConfigVersionFactory,
@@ -18,7 +20,7 @@ import {
 describe("LlmConfigRepository", () => {
   let prisma: PrismaClient;
   let repository: LlmConfigRepository;
-  let realConsole = console.error;
+  const realConsole = console.error;
 
   beforeAll(() => {
     console.error = vi.fn();
