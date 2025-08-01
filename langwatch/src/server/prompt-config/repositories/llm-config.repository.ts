@@ -1,8 +1,8 @@
 import { type PrismaClient, type LlmPromptConfig } from "@prisma/client";
-import { TRPCError } from "@trpc/server";
 import { nanoid } from "nanoid";
 
 import { createLogger } from "../../../utils/logger";
+import { NotFoundError } from "../errors";
 
 import {
   LATEST_SCHEMA_VERSION,
@@ -67,10 +67,7 @@ export class LlmConfigRepository {
       .map((config) => {
         try {
           if (!config.versions?.[0]) {
-            throw new TRPCError({
-              code: "NOT_FOUND",
-              message: `Prompt config ${config.id} has no versions.`,
-            });
+            throw new Error(`Prompt config ${config.id} has no versions.`);
           }
 
           return {
@@ -109,18 +106,14 @@ export class LlmConfigRepository {
     });
 
     if (!config) {
-      throw new TRPCError({
-        code: "NOT_FOUND",
-        message: "Prompt config not found.",
-      });
+      throw new NotFoundError(
+        `Prompt config not found. ID: ${id}, Project ID: ${projectId}.`
+      );
     }
 
     // This should never happen, but if it does, we want to know about it
     if (!config.versions[0]) {
-      throw new TRPCError({
-        code: "NOT_FOUND",
-        message: "Prompt config has no versions.",
-      });
+      throw new NotFoundError(`Prompt config has no versions. ID: ${id}`);
     }
 
     try {
@@ -129,12 +122,11 @@ export class LlmConfigRepository {
         latestVersion: parseLlmConfigVersion(config.versions[0]),
       };
     } catch (error) {
-      throw new TRPCError({
-        code: "BAD_REQUEST",
-        message: `Failed to parse LLM config version: ${
+      throw new Error(
+        `Failed to parse LLM config version: ${
           error instanceof Error ? error.message : "Unknown error"
-        }`,
-      });
+        }`
+      );
     }
   }
 
@@ -152,10 +144,7 @@ export class LlmConfigRepository {
     });
 
     if (!existingConfig) {
-      throw new TRPCError({
-        code: "NOT_FOUND",
-        message: "Prompt config not found.",
-      });
+      throw new NotFoundError(`Prompt config not found. ID: ${id}`);
     }
 
     // Update only the parent config metadata

@@ -8,7 +8,7 @@ import { z } from "zod";
 import { prisma } from "~/server/db";
 import { PromptService } from "~/server/prompt-config/prompt.service";
 
-import { authMiddleware, errorMiddleware } from "../../middleware";
+import { authMiddleware, handleError } from "../../middleware";
 import { loggerMiddleware } from "../../middleware/logger";
 import { baseResponses } from "../../shared/base-responses";
 
@@ -45,11 +45,12 @@ export const app = new Hono<{
 // Middleware
 app.use(loggerMiddleware());
 app.use("/*", authMiddleware);
-app.use("/*", (c, next) => {
+app.use("/*", async (c, next) => {
   c.set("promptService", new PromptService(prisma));
-  return next();
+  await next();
 });
-app.use("/*", errorMiddleware);
+// https://hono.dev/docs/api/hono#error-handling
+app.onError(handleError);
 
 // Get all prompts
 app.get(

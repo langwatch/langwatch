@@ -1,5 +1,7 @@
 import { type MiddlewareHandler } from "hono";
+
 import { prisma } from "~/server/db";
+
 import { createLogger } from "~/utils/logger";
 
 const logger = createLogger("langwatch:api:auth");
@@ -24,8 +26,6 @@ export const authMiddleware: MiddlewareHandler = async (c, next) => {
 
     // Store project and repository for use in route handlers
     c.set("project", project);
-
-    return next();
   } catch (error) {
     // Log with structured context for debugging
     logger.error(
@@ -49,4 +49,6 @@ export const authMiddleware: MiddlewareHandler = async (c, next) => {
       500
     );
   }
+
+  await next();
 };
