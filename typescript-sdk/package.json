@@ -21,6 +21,11 @@
       "require": "./dist/observability/index.js",
       "import": "./dist/observability/index.mjs"
     },
+    "./observability/instrumentation/langchain": {
+      "types": "./dist/observability/instrumentation/langchain/index.d.ts",
+      "require": "./dist/observability/instrumentation/langchain/index.js",
+      "import": "./dist/observability/instrumentation/langchain/index.mjs"
+    },
     "./prompt": {
       "types": "./dist/prompt/index.d.ts",
       "require": "./dist/prompt/index.js",
