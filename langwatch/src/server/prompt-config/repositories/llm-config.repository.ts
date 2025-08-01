@@ -96,10 +96,8 @@ export class LlmConfigRepository {
   ): Promise<LlmConfigWithLatestVersion> {
     const config = await this.prisma.llmPromptConfig.findFirst({
       where: {
-        OR: [
-          { id, projectId },
-          { referenceId: id, projectId },
-        ],
+        OR: [{ id }, { referenceId: id }],
+        projectId,
       },
       include: {
         versions: {

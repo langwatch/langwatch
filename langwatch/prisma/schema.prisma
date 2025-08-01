@@ -733,7 +733,6 @@ model LlmPromptConfig {
     createdAt   DateTime  @default(now())
     updatedAt   DateTime  @default(now()) @updatedAt
     deletedAt   DateTime?
-    isDraft     Boolean   @default(true) // true = draft, false = published/finalized
     referenceId String?   // Unique identifier in format team/project/prompt, NULL = draft
 
     // Relation to all versions - latest is determined by query

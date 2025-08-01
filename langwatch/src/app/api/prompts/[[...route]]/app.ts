@@ -147,8 +147,8 @@ app.get(
         );
       }
 
-      logger.warn(
-        { projectId: project.id, promptId: id, error },
+      logger.error(
+        { projectId: project.id, idOrReferenceId, error },
         "Error retrieving prompt"
       );
 

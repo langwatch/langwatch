@@ -1,11 +1,14 @@
-import { describe, expect, it, beforeEach, afterEach } from "vitest";
-import { app } from "./[[...route]]/app";
-import { projectFactory } from "~/factories/project.factory";
-import { prisma } from "~/server/db";
-import { nanoid } from "nanoid";
-import { llmPromptConfigFactory } from "~/factories/llm-config.factory";
-import { LlmConfigRepository } from "~/server/prompt-config/repositories/llm-config.repository";
 import type { LlmPromptConfig } from "@prisma/client";
+import { nanoid } from "nanoid";
+import { describe, expect, it, beforeEach, afterEach } from "vitest";
+
+import { prisma } from "~/server/db";
+import { LlmConfigRepository } from "~/server/prompt-config/repositories/llm-config.repository";
+
+import { app } from "./[[...route]]/app";
+
+import { llmPromptConfigFactory } from "~/factories/llm-config.factory";
+import { projectFactory } from "~/factories/project.factory";
 
 describe("Prompts API", () => {
   // Test data setup
@@ -13,6 +16,7 @@ describe("Prompts API", () => {
     slug: nanoid(),
   });
   let mockConfig = llmPromptConfigFactory.build({
+    name: "Test Prompt",
     projectId: mockProject.id,
   });
   let testApiKey: string;
@@ -104,6 +108,47 @@ describe("Prompts API", () => {
         expect(body.length).toBe(1);
         expect(body[0].id).toBe(config.id);
         expect(body[0].projectId).toBe(testProjectId);
+      });
+
+      it("should get a single prompt by ID", async () => {
+        const res = await app.request(`/api/prompts/${config.id}`, {
+          headers: { "X-Auth-Token": testApiKey },
+        });
+
+        expect(res.status).toBe(200);
+        const body = await res.json();
+        expect(body.id).toBe(config.id);
+      });
+
+      it("should get a single prompt by reference ID", async () => {
+        // First, update the config to have a reference ID
+        const referenceId = `ref_${nanoid()}`;
+        await prisma.llmPromptConfig.update({
+          where: {
+            id: config.id,
+            projectId: testProjectId,
+          },
+          data: { referenceId },
+        });
+
+        const res = await app.request(`/api/prompts/${referenceId}`, {
+          headers: { "X-Auth-Token": testApiKey },
+        });
+
+        expect(res.status).toBe(200);
+        const body = await res.json();
+        expect(body.referenceId).toBe(referenceId);
+      });
+
+      it("should return 404 for non-existent prompt ID (should work with reference ID as well)", async () => {
+        const nonExistentId = `prompt_${nanoid()}`;
+        const res = await app.request(`/api/prompts/${nonExistentId}`, {
+          headers: { "X-Auth-Token": testApiKey },
+        });
+
+        expect(res.status).toBe(404);
+        const body = await res.json();
+        expect(body).toHaveProperty("error");
       });
 
       describe("Prompt Versions - Schema Version 1.0", () => {

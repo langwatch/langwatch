@@ -1,7 +1,3 @@
--- Add isDraft field to track draft status
--- isDraft: true = draft, false = published/finalized
-ALTER TABLE "LlmPromptConfig" ADD COLUMN "isDraft" BOOLEAN NOT NULL DEFAULT true;
-
 -- Add referenceId field for namespaced references
 -- referenceId: Unique identifier in format team/project/prompt
 -- NULL = draft, NOT NULL = finalized
