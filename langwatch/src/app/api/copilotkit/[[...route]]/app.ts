@@ -5,21 +5,24 @@
  * frontend. However, it's not currently doing anything, as we have disabled the input
  * feature of the frontend and we are setting the messages there directly.
  */
-import type { Project } from "@prisma/client";
-import { Hono } from "hono";
-import { describeRoute } from "hono-openapi";
-import { LlmConfigRepository } from "~/server/prompt-config/repositories/llm-config.repository";
-import { createLogger } from "~/utils/logger";
-import {
-  authMiddleware,
-  errorMiddleware,
-  loggerMiddleware,
-} from "../../middleware";
 import {
   CopilotRuntime,
   copilotRuntimeNodeHttpEndpoint,
   ExperimentalEmptyAdapter,
 } from "@copilotkit/runtime";
+import type { Project } from "@prisma/client";
+import { Hono } from "hono";
+import { describeRoute } from "hono-openapi";
+
+import { type LlmConfigRepository } from "~/server/prompt-config/repositories/llm-config.repository";
+
+import {
+  authMiddleware,
+  handleError,
+  loggerMiddleware,
+} from "../../middleware";
+
+import { createLogger } from "~/utils/logger";
 
 const logger = createLogger("langwatch:api:copilotkit");
 
@@ -37,7 +40,7 @@ export const app = new Hono<{
 // Middleware
 app.use(loggerMiddleware());
 app.use("/*", authMiddleware);
-app.use("/*", errorMiddleware);
+app.onError(handleError);
 
 // Get all prompts
 app.post(

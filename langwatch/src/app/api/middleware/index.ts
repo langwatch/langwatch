@@ -1,4 +1,3 @@
 export * from "./auth";
-export * from "./repository";
-export * from "./errors";
+export * from "./error-handler";
 export * from "./logger";

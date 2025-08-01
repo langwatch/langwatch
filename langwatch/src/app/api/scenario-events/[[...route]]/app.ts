@@ -2,15 +2,18 @@ import type { Project } from "@prisma/client";
 import { Hono } from "hono";
 import { describeRoute } from "hono-openapi";
 import { validator as zValidator, resolver } from "hono-openapi/zod";
+
 import {
   authMiddleware,
-  errorMiddleware,
+  handleError,
   loggerMiddleware,
 } from "../../middleware";
+import { baseResponses } from "../../shared/base-responses";
+
 import { ScenarioEventService } from "./scenario-event.service";
 import { scenarioEventSchema, responseSchemas } from "./schemas";
+
 import { createLogger } from "~/utils/logger";
-import { baseResponses } from "../../shared/base-responses";
 
 const logger = createLogger("langwatch:api:scenario-events");
 
@@ -26,8 +29,8 @@ export const app = new Hono<{
 
 // Middleware
 app.use(loggerMiddleware());
-app.use("/*", errorMiddleware);
 app.use("/*", authMiddleware);
+app.onError(handleError);
 
 // POST /api/scenario-events - Create a new scenario event
 app.post(

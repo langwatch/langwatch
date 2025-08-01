@@ -49,10 +49,11 @@ export const llmConfigsRouter = createTRPCRouter({
       const repository = new LlmConfigRepository(ctx.prisma);
 
       try {
-        const config = await repository.getConfigByIdWithLatestVersions(
-          input.id,
-          input.projectId
-        );
+        const config =
+          await repository.getConfigByIdOrReferenceIdWithLatestVersion({
+            id: input.id,
+            projectId: input.projectId,
+          });
         return config;
       } catch (error) {
         throw new TRPCError({
