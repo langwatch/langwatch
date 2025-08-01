@@ -1,6 +1,7 @@
 import { type LlmPromptConfig, type PrismaClient } from "@prisma/client";
 
 import { type UpdateLlmConfigDTO } from "./dtos";
+import { NotFoundError } from "./errors";
 import {
   LlmConfigRepository,
   type LlmConfigWithLatestVersion,
@@ -128,6 +129,14 @@ export class PromptService {
         },
       },
     });
+
+    if (!project) {
+      throw new NotFoundError("Project not found");
+    }
+
+    if (!project.team.organization) {
+      throw new NotFoundError("Organization not found");
+    }
 
     const organizationId = project?.team.organization.id;
 
