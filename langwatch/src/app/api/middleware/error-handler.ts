@@ -8,8 +8,14 @@ import { createLogger } from "~/utils/logger";
 const logger = createLogger("langwatch:api:errors");
 
 /**
- * Error handling middleware that catches errors and formats responses
+ * Error handling middleware that catches errors and formats responses.
+ * Should be used with the `onError` callback of the Hono app.
  * @see https://hono.dev/docs/api/hono#error-handling
+ *
+ * @example
+ * ```ts
+ * app.onError(handleError);
+ * ```
  */
 export const handleError = async (
   error: Error & {
