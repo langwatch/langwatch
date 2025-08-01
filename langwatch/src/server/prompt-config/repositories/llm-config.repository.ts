@@ -90,7 +90,7 @@ export class LlmConfigRepository {
   /**
    * Get a single LLM config by ID or reference ID
    */
-  async getConfigByIdOrReferenceIddWithLatestVersion(
+  async getConfigByIdOrReferenceIdWithLatestVersion(
     id: string,
     projectId: string
   ): Promise<LlmConfigWithLatestVersion> {

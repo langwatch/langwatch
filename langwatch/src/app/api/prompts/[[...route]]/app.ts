@@ -113,7 +113,7 @@ app.get(
 
     try {
       const config =
-        await repository.getConfigByIdOrReferenceIddWithLatestVersion(
+        await repository.getConfigByIdOrReferenceIdWithLatestVersion(
           idOrReferenceId,
           project.id
         );

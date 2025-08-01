@@ -50,7 +50,7 @@ export const llmConfigsRouter = createTRPCRouter({
 
       try {
         const config =
-          await repository.getConfigByIdOrReferenceIddWithLatestVersion(
+          await repository.getConfigByIdOrReferenceIdWithLatestVersion(
             input.id,
             input.projectId
           );
