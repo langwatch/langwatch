@@ -108,20 +108,18 @@ span.end();
 - **Fetch and format a prompt:**
   ```ts
   import { getPrompt } from "langwatch/prompt";
-  const prompt = await getPrompt("prompt-id", { user: "Alice" });
-  // prompt.messages and prompt.prompt are formatted with variables
+  const prompt = await getPrompt("prompt-id");
+  const compiledPrompt = await getPrompt("prompt-id", { user: "Alice" });
   ```
 - **Fetch a specific prompt version:**
   ```ts
   import { getPromptVersion } from "langwatch/prompt";
-  const version = await getPromptVersion("prompt-id", "version-id", { user: "Alice" });
+  const compiledPrompt = await getPromptVersion("prompt-id", "version-id", {
+    user: "Alice",
+  });
   ```
-- **Format prompt templates/messages:**
-  ```ts
-  import { formatPromptTemplate, formatPromptMessages } from "langwatch/prompt";
-  const formatted = formatPromptTemplate("Hello, {{user}}!", { user: "Alice" });
-  ```
-  > **Note:** The prompt APIs (`getPrompt`, `getPromptVersion`) automatically create spans and add useful tracing information. Manual instrumentation is only needed for custom attributes.
+
+  > **Note:** The prompt APIs (`getPrompt`, `getPromptVersion`) automatically create spans and add useful tracing information.
 
 ### 3. Evaluation
 
@@ -145,32 +143,17 @@ span.end();
   ```
   > **Note:** The evaluation APIs (`runEvaluation`, `recordEvaluation`) also create spans and add tracing/evaluation info automatically.
 
-### 4. Utilities
-
-- **Convert Vercel AI messages:**
-  ```ts
-  import { convertFromVercelAIMessages } from "langwatch/utils";
-  const lwMessages = convertFromVercelAIMessages(vercelMessages);
-  ```
-- **Error capture:**
-  ```ts
-  import { captureError } from "langwatch/utils";
-  const errObj = captureError(error);
-  ```
-
 ---
 
 ## API Reference
 
 ### Observability
-- `getTracer(name, version?)` → `LangWatchTracer`
-- `LangWatchSpan` methods: `.setType()`, `.setInput()`, `.setOutput()`, `.recordEvaluation()`, `.addGenAISystemMessageEvent()` (optional), `.setRAGContexts()`, `.setMetrics()`, etc.
+- `getLangWatchTracer(name, version?)` → `LangWatchTracer`
+- `LangWatchSpan` methods: `.setType()`, `.setInput()`, `.setOutput()`, `.recordEvaluation()`, `.addGenAISystemMessageEvent()`, `.addGenAIUserMessageEvent()`, `.addGenAIAssistantMessageEvent()`, `.addGenAIToolMessageEvent()`, `.setRAGContexts()`, `.setMetrics()`, etc.
 
 ### Prompt
 - `getPrompt(promptId, variables?)` → fetches and formats a prompt (creates a span automatically)
 - `getPromptVersion(promptId, versionId, variables?)`
-- `formatPromptTemplate(template, variables)`
-- `formatPromptMessages(messages, variables)`
 
 ### Evaluation
 - `runEvaluation(details)` → runs an evaluation and returns result (creates a span automatically)

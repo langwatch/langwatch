@@ -20,7 +20,7 @@ export async function setup(options: SetupOptions = {}) {
 
   setConfig(options);
 
-  if (options.disableOpenTelemetryAutomaticSetup) return;
+  if (options.skipOpenTelemetrySetup) return;
 
   const endpointURL = new URL("/api/otel/v1/traces", getEndpoint());
   const langwatchSpanProcessor = new FilterableBatchSpanProcessor(
@@ -29,6 +29,7 @@ export async function setup(options: SetupOptions = {}) {
   );
 
   const langwatchResource = resourceFromAttributes({
+    ...options.baseAttributes,
     [intSemconv.ATTR_LANGWATCH_SDK_LANGUAGE]: "typescript-browser",
     [intSemconv.ATTR_LANGWATCH_SDK_VERSION]: version,
     [intSemconv.ATTR_LANGWATCH_SDK_NAME]: "langwatch-observability-sdk",

@@ -23,6 +23,7 @@ export const ATTR_LANGWATCH_STREAMING = "langwatch.gen_ai.streaming";
 export const ATTR_LANGWATCH_PROMPT_ID = "langwatch.prompt.id";
 export const ATTR_LANGWATCH_PROMPT_VERSION_ID = "langwatch.prompt.version.id";
 export const ATTR_LANGWATCH_PROMPT_VARIABLES = "langwatch.prompt.variables";
+export const ATTR_LANGWATCH_PROMPT_SELECTED_ID = "langwatch.prompt.selected.id";
 export const ATTR_LANGWATCH_PROMPT_VERSION_NUMBER =
   "langwatch.prompt.version.number";
 export const ATTR_LANGWATCH_GEN_AI_LOG_EVENT_IMPOSTER =

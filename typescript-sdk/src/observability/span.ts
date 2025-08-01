@@ -6,6 +6,7 @@ import {
   recordEvaluation,
 } from "../evaluation/record-evaluation";
 import { EvaluationResultModel } from "../evaluation/types";
+import { Prompt } from "../prompt/prompt";
 
 /**
  * Supported types of spans for LangWatch observability. These types categorize the nature of the span for downstream analysis and visualization.
@@ -365,6 +366,15 @@ export interface LangWatchSpan extends Span {
   setMetrics(metrics: LangWatchSpanMetrics): this;
 
   /**
+   * Set the selected prompt for the span. This will attach this prompt to the trace. If
+   * this is set on multiple spans, the last one will be used.
+   *
+   * @param prompt - The prompt object
+   * @returns this
+   */
+  setSelectedPrompt(prompt: Prompt): this;
+
+  /**
    * Record the input to the span as a JSON-serializable value.
    *
    * The input is stringified and stored as a span attribute for later analysis.
@@ -552,6 +562,15 @@ export function createLangWatchSpan(span: Span): LangWatchSpan {
           value: metrics,
         }),
       );
+    },
+
+    setSelectedPrompt(prompt: Prompt) {
+      span.setAttributes({
+        [intSemconv.ATTR_LANGWATCH_PROMPT_SELECTED_ID]: prompt.id,
+        [intSemconv.ATTR_LANGWATCH_PROMPT_ID]: prompt.id,
+        [intSemconv.ATTR_LANGWATCH_PROMPT_VERSION_ID]: prompt.versionId,
+        [intSemconv.ATTR_LANGWATCH_PROMPT_VERSION_NUMBER]: prompt.version,
+      })
     },
 
     setInput(input: unknown) {

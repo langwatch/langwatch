@@ -1,5 +1,6 @@
 import { SpanProcessor } from "@opentelemetry/sdk-trace-base";
 import { SpanProcessingExcludeRule } from "./observability";
+import { Attributes } from "@opentelemetry/api";
 
 export interface SetupOptions {
   /**
@@ -42,7 +43,16 @@ export interface SetupOptions {
    * Whether to disable the automatic capture of input.
    */
   disableAutomaticInputCapture?: boolean;
+
+  /**
+   * Whether to disable the automatic capture of output.
+   */
   disableAutomaticOutputCapture?: boolean;
+
+  /**
+   * The base attributes to use for the OpenTelemetry SDK.
+   */
+  baseAttributes?: Attributes;
 }
 
 interface InternalConfig {
@@ -52,6 +62,8 @@ interface InternalConfig {
   skipOpenTelemetrySetup: boolean;
   disableAutomaticInputCapture: boolean;
   disableAutomaticOutputCapture: boolean;
+
+  baseAttributes: Attributes;
 }
 
 const config: InternalConfig = {
@@ -61,6 +73,7 @@ const config: InternalConfig = {
   skipOpenTelemetrySetup: false,
   disableAutomaticInputCapture: false,
   disableAutomaticOutputCapture: false,
+  baseAttributes: {},
 };
 
 export function setConfig(options: SetupOptions) {
@@ -77,6 +90,8 @@ export function setConfig(options: SetupOptions) {
   config.skipOpenTelemetrySetup = options.skipOpenTelemetrySetup ?? config.skipOpenTelemetrySetup;
   config.disableAutomaticInputCapture = options.disableAutomaticInputCapture ?? config.disableAutomaticInputCapture;
   config.disableAutomaticOutputCapture = options.disableAutomaticOutputCapture ?? config.disableAutomaticOutputCapture;
+
+  config.baseAttributes = options.baseAttributes ?? config.baseAttributes;
 }
 
 export function getApiKey(): string {
