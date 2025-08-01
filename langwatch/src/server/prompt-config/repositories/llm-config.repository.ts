@@ -94,10 +94,12 @@ export class LlmConfigRepository {
     id: string,
     projectId: string
   ): Promise<LlmConfigWithLatestVersion> {
-    const config = await this.prisma.llmPromptConfig.findUnique({
+    const config = await this.prisma.llmPromptConfig.findFirst({
       where: {
-        projectId,
-        OR: [{ id }, { referenceId: id }],
+        OR: [
+          { id, projectId },
+          { referenceId: id, projectId },
+        ],
       },
       include: {
         versions: {
