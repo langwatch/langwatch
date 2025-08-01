@@ -87,6 +87,10 @@ export function setConfig(options: SetupOptions) {
     ? options.endpoint
     : (process.env.LANGWATCH_ENDPOINT ?? config.endpoint);
 
+  if (config.apiKey === "") {
+    console.warn("[langwatch setup] No API key provided. Please set the LANGWATCH_API_KEY environment variable or pass it to the setup function. The SDK will perform no operations.");
+  }
+
   config.skipOpenTelemetrySetup = options.skipOpenTelemetrySetup ?? config.skipOpenTelemetrySetup;
   config.disableAutomaticInputCapture = options.disableAutomaticInputCapture ?? config.disableAutomaticInputCapture;
   config.disableAutomaticOutputCapture = options.disableAutomaticOutputCapture ?? config.disableAutomaticOutputCapture;
