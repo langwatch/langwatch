@@ -2,13 +2,17 @@ import { Alert, Box, HStack, Skeleton, VStack } from "@chakra-ui/react";
 import numeral from "numeral";
 import React, { type PropsWithChildren } from "react";
 import { HelpCircle } from "react-feather";
-import { getTotalTokensDisplay } from "~/utils/getTotalTokensDisplay";
+
 import { useTraceDetailsState } from "../../hooks/useTraceDetailsState";
 import type { Trace } from "../../server/tracer/types";
 import { formatMilliseconds } from "../../utils/formatMilliseconds";
 import { isNotFound } from "../../utils/trpcError";
 import { MetadataTag } from "../MetadataTag";
 import { Tooltip } from "../ui/tooltip";
+
+import { useDrawer } from "~/components/CurrentDrawer";
+import { useFilterParams } from "~/hooks/useFilterParams";
+import { getTotalTokensDisplay } from "~/utils/getTotalTokensDisplay";
 
 const SummaryItem = ({
   label,
@@ -69,6 +73,8 @@ export function TraceSummary(props: { traceId: string }) {
 
 const TraceSummaryValues = React.forwardRef<HTMLDivElement, { trace: Trace }>(
   function TraceSummaryValues({ trace }, ref) {
+    const { setFilterAsync } = useFilterParams();
+    const { closeDrawerAsync } = useDrawer();
     // Helper functions to improve readability
     const hasTraceCost = () => {
       return (
@@ -103,6 +109,16 @@ const TraceSummaryValues = React.forwardRef<HTMLDivElement, { trace: Trace }>(
     };
 
     const shouldShowCost = hasTraceCost() || hasSpanCosts();
+
+    const handleMetadataTagClick = async (key: string, value: string) => {
+      if (key === "prompt_ids") {
+        console.log("closing drawer");
+        await closeDrawerAsync();
+        setTimeout(() => {}, 0);
+        console.log("setting filter");
+        await setFilterAsync("metadata.prompt_ids", [value]);
+      }
+    };
 
     return (
       <>
@@ -189,6 +205,9 @@ const TraceSummaryValues = React.forwardRef<HTMLDivElement, { trace: Trace }>(
                   key={i}
                   label={key}
                   value={renderValue as string}
+                  onClick={() =>
+                    void handleMetadataTagClick(key, renderValue as string)
+                  }
                 />
               )
             );

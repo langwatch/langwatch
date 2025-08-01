@@ -1,9 +1,15 @@
-import { useOrganizationTeamProject } from "./useOrganizationTeamProject";
-import { usePeriodSelector } from "../components/PeriodSelector";
 import { useRouter } from "next/router";
+import qs from "qs";
+
+import { usePeriodSelector } from "../components/PeriodSelector";
 import { availableFilters } from "../server/filters/registry";
 import type { FilterField } from "../server/filters/types";
-import qs from "qs";
+
+import { useOrganizationTeamProject } from "./useOrganizationTeamProject";
+
+import { createLogger } from "~/utils/logger";
+
+const logger = createLogger("useFilterParams");
 
 export type FilterParam =
   | string[]
@@ -13,6 +19,8 @@ export type FilterParam =
 export const useFilterParams = () => {
   const { project } = useOrganizationTeamProject();
   const router = useRouter();
+
+  console.log("updating filter params");
 
   const {
     period: { startDate, endDate },
@@ -26,6 +34,8 @@ export const useFilterParams = () => {
     comma: true,
     allowEmptyArrays: true,
   });
+
+  console.log(queryParams);
 
   for (const [filterKey, filter] of Object.entries(availableFilters)) {
     const param = queryParams[filter.urlKey];
@@ -72,9 +82,9 @@ export const useFilterParams = () => {
     }
   }
 
-  const setFilter = (filter: FilterField, params: FilterParam) => {
+  const setFilterAsync = (filter: FilterField, params: FilterParam) => {
     const filterUrl = availableFilters[filter].urlKey;
-    void router.push(
+    return router.push(
       "?" +
         qs.stringify(
           {
@@ -170,7 +180,12 @@ export const useFilterParams = () => {
 
   return {
     filters,
-    setFilter,
+    setFilter: (filter: FilterField, params: FilterParam) => {
+      return void setFilterAsync(filter, params).catch((e) => {
+        logger.error("setFilter", e);
+      });
+    },
+    setFilterAsync,
     setFilters,
     clearFilters,
     getLatestFilters,

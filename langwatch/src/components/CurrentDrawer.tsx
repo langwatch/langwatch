@@ -1,16 +1,21 @@
 import { useRouter } from "next/router";
 import qs from "qs";
 import { ErrorBoundary } from "react-error-boundary";
+
 import { AddAnnotationQueueDrawer } from "./AddAnnotationQueueDrawer";
-import { AddOrEditAnnotationScoreDrawer } from "./AddOrEditAnnotationScoreDrawer";
 import { AddDatasetRecordDrawerV2 } from "./AddDatasetRecordDrawer";
+import { AddOrEditAnnotationScoreDrawer } from "./AddOrEditAnnotationScoreDrawer";
 import { AddOrEditDatasetDrawer } from "./AddOrEditDatasetDrawer";
 import { TriggerDrawer } from "./AddTriggerDrawer";
 import { BatchEvaluationDrawer } from "./BatchEvaluationDrawer";
 import { UploadCSVModal } from "./datasets/UploadCSVModal";
+import { EditTriggerFilterDrawer } from "./EditTriggerFilterDrawer";
 import { LLMModelCostDrawer } from "./settings/LLMModelCostDrawer";
 import { TraceDetailsDrawer } from "./TraceDetailsDrawer";
-import { EditTriggerFilterDrawer } from "./EditTriggerFilterDrawer";
+
+import { createLogger } from "~/utils/logger";
+
+const logger = createLogger("CurrentDrawer");
 
 type DrawerProps = {
   open: string;
@@ -73,7 +78,7 @@ export function CurrentDrawer() {
 export function useDrawer() {
   const router = useRouter();
 
-  const openDrawer = <T extends keyof typeof drawers>(
+  const openDrawerAsync = <T extends keyof typeof drawers>(
     drawer: T,
     props?: Parameters<(typeof drawers)[T]>[0],
     { replace }: { replace?: boolean } = {}
@@ -85,7 +90,7 @@ export function useDrawer() {
       )
     );
 
-    void router[replace ? "replace" : "push"](
+    return router[replace ? "replace" : "push"](
       "?" +
         qs.stringify(
           {
@@ -114,8 +119,8 @@ export function useDrawer() {
     );
   };
 
-  const closeDrawer = () => {
-    void router.push(
+  const closeDrawerAsync = (options: { shallow?: boolean } = {}) => {
+    return router.push(
       "?" +
         qs.stringify(
           Object.fromEntries(
@@ -131,7 +136,7 @@ export function useDrawer() {
           }
         ),
       undefined,
-      { shallow: true }
+      { shallow: options.shallow ?? true }
     );
   };
 
@@ -139,5 +144,19 @@ export function useDrawer() {
     return router.query["drawer.open"] === drawer;
   };
 
-  return { openDrawer, closeDrawer, drawerOpen };
+  return {
+    openDrawer: (...args: Parameters<typeof openDrawerAsync>) => {
+      return void openDrawerAsync(...args).catch((e) => {
+        logger.error("openDrawer", e);
+      });
+    },
+    openDrawerAsync,
+    closeDrawer: () => {
+      return void closeDrawerAsync().catch((e) => {
+        logger.error("closeDrawer", e);
+      });
+    },
+    closeDrawerAsync,
+    drawerOpen,
+  };
 }
