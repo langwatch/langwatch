@@ -1,5 +1,5 @@
 import { beforeAll, describe, expect, it } from "vitest";
-import { setup } from "src/client-node";
+import { setup } from "../../../client-node";
 import { getLangWatchTracer } from "../../trace";
 
 const tracerName = "basic-observability.test";
