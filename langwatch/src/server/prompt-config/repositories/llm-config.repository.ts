@@ -242,4 +242,40 @@ export class LlmConfigRepository {
       };
     });
   }
+
+  /**
+   * Get prompt by reference ID
+   * @param referenceId - The reference ID to search for
+   * @param projectId - Optional project ID for scoping
+   * @returns The config or null if not found
+   */
+  async getByReferenceId(
+    referenceId: string,
+    projectId?: string
+  ): Promise<LlmConfigWithLatestVersion | null> {
+    const whereClause = {
+      referenceId,
+      deletedAt: null,
+      ...(projectId && { projectId }),
+    };
+
+    const config = await this.prisma.llmPromptConfig.findFirst({
+      where: whereClause,
+      include: {
+        versions: {
+          orderBy: { createdAt: "desc" },
+          take: 1,
+        },
+      },
+    });
+
+    if (!config || !config.versions[0]) {
+      return null;
+    }
+
+    return {
+      ...config,
+      latestVersion: parseLlmConfigVersion(config.versions[0]),
+    };
+  }
 }
