@@ -2,7 +2,7 @@ import { PromptService } from "./service";
 import { CompiledPrompt, Prompt, TemplateVariables } from "./prompt";
 import * as intSemconv from "../observability/semconv";
 import { tracer } from "./tracer";
-import { canAutomaticallyCaptureInput, canAutomaticallyCaptureOutput } from "src/client";
+import { canAutomaticallyCaptureInput, canAutomaticallyCaptureOutput } from "../client";
 
 export async function getPromptVersion(id: string, versionId: string, variables: TemplateVariables): Promise<CompiledPrompt>;
 export async function getPromptVersion(id: string, versionId: string): Promise<Prompt>;

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { ChatOpenAI } from "@langchain/openai";
 import { LangWatchCallbackHandler } from "../../langchain";
-import { setup } from "src/client-node";
+import { setup } from "../../../../client-node";
 import { DynamicTool } from "@langchain/core/tools";
 import { AgentExecutor, createToolCallingAgent, initializeAgentExecutorWithOptions } from "langchain/agents";
 import { getLangWatchTracer } from "../../../trace";
