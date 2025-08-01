@@ -1,4 +1,5 @@
 import { z } from "zod";
+
 import { getLatestConfigVersionSchema } from "~/server/prompt-config/repositories/llm-config-version-schema";
 
 /**
@@ -21,6 +22,7 @@ export const llmPromptConfigSchema = z.object({
   id: z.string(),
   name: z.string(),
   updatedAt: z.date(),
+  referenceId: z.string().nullable(), // New field
 });
 
 /**
@@ -43,6 +45,7 @@ export const promptOutputSchema = llmPromptConfigSchema.merge(
         .passthrough()
     ),
     response_format: responseFormatSchema.nullable(),
+    // referenceId is inherited from llmPromptConfigSchema
   })
 );
 

@@ -88,14 +88,17 @@ export class LlmConfigRepository {
   }
 
   /**
-   * Get a single LLM config by ID
+   * Get a single LLM config by ID or reference ID
    */
-  async getConfigByIdWithLatestVersions(
+  async getConfigByIdOrReferenceIddWithLatestVersion(
     id: string,
     projectId: string
   ): Promise<LlmConfigWithLatestVersion> {
     const config = await this.prisma.llmPromptConfig.findUnique({
-      where: { id, projectId },
+      where: {
+        projectId,
+        OR: [{ id }, { referenceId: id }],
+      },
       include: {
         versions: {
           orderBy: { createdAt: "desc" },

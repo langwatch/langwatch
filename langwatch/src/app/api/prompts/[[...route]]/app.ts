@@ -1,13 +1,22 @@
 import type { Project } from "@prisma/client";
+import { TRPCError } from "@trpc/server";
+import { getHTTPStatusCodeFromError } from "@trpc/server/http";
 import { Hono } from "hono";
+import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { describeRoute } from "hono-openapi";
 import { validator as zValidator, resolver } from "hono-openapi/zod";
 import { z } from "zod";
+
 import { type LlmConfigRepository } from "~/server/prompt-config/repositories/llm-config.repository";
-import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
-import { createLogger } from "~/utils/logger";
+
+import {
+  authMiddleware,
+  repositoryMiddleware,
+  errorMiddleware,
+} from "../../middleware";
 import { loggerMiddleware } from "../../middleware/logger";
-import { badRequestSchema, successSchema } from "~/app/api/shared/schemas";
+import { baseResponses } from "../../shared/base-responses";
+
 import {
   llmPromptConfigSchema,
   promptOutputSchema,
@@ -15,18 +24,13 @@ import {
   versionOutputSchema,
 } from "./schemas";
 import {
-  authMiddleware,
-  repositoryMiddleware,
-  errorMiddleware,
-} from "../../middleware";
-import {
   buildStandardSuccessResponse,
   getOutputsToResponseFormat,
 } from "./utils";
-import { baseResponses } from "../../shared/base-responses";
-import { TRPCError } from "@trpc/server";
-import { getHTTPStatusCodeFromError } from "@trpc/server/http";
-import type { ContentfulStatusCode } from "hono/utils/http-status";
+
+import { badRequestSchema, successSchema } from "~/app/api/shared/schemas";
+import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
+import { createLogger } from "~/utils/logger";
 
 const logger = createLogger("langwatch:api:prompts");
 
@@ -83,9 +87,9 @@ app.get(
 
 // Get prompt by ID
 app.get(
-  "/:id",
+  "/:idOrReferenceId",
   describeRoute({
-    description: "Get a specific prompt",
+    description: "Get a specific prompt by ID or reference ID",
     responses: {
       ...baseResponses,
       200: buildStandardSuccessResponse(promptOutputSchema),
@@ -100,22 +104,24 @@ app.get(
   async (c) => {
     const repository = c.get("llmConfigRepository");
     const project = c.get("project");
-    const { id } = c.req.param();
+    const { idOrReferenceId } = c.req.param();
 
     logger.info(
-      { projectId: project.id, promptId: id },
+      { projectId: project.id, idOrReferenceId },
       "Getting prompt by ID"
     );
 
     try {
-      const config = await repository.getConfigByIdWithLatestVersions(
-        id,
-        project.id
-      );
-  
+      const config =
+        await repository.getConfigByIdOrReferenceIddWithLatestVersion(
+          idOrReferenceId,
+          project.id
+        );
+
       const response = {
-        id,
+        id: config.id,
         name: config.name,
+        referenceId: config.referenceId,
         version: config.latestVersion.version,
         versionId: config.latestVersion.id ?? "",
         versionCreatedAt: config.latestVersion.createdAt ?? new Date(),
@@ -135,7 +141,10 @@ app.get(
       return c.json(response);
     } catch (error) {
       if (error instanceof TRPCError) {
-        return c.json({ error: error.message }, getHTTPStatusCodeFromError(error) as ContentfulStatusCode);
+        return c.json(
+          { error: error.message },
+          getHTTPStatusCodeFromError(error) as ContentfulStatusCode
+        );
       }
 
       logger.warn(
