@@ -1,7 +1,4 @@
 export * from "./span";
 export * from "./trace";
 export * from "./processors";
-
-import * as instrumentation from "./instrumentation";
-
-export { instrumentation };
+export * as semconv from "./semconv";
