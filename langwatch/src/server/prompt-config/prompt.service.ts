@@ -1,7 +1,10 @@
 import { type LlmPromptConfig, type PrismaClient } from "@prisma/client";
 
 import { type UpdateLlmConfigDTO } from "./dtos";
-import { LlmConfigRepository } from "./repositories";
+import {
+  LlmConfigRepository,
+  type LlmConfigWithLatestVersion,
+} from "./repositories";
 
 /**
  * Service layer for managing LLM prompt configurations.
@@ -12,6 +15,60 @@ export class PromptService {
 
   constructor(private readonly prisma: PrismaClient) {
     this.repository = new LlmConfigRepository(prisma);
+  }
+
+  /**
+   * Gets a prompt by ID or reference ID.
+   * If a reference ID is provided, it will be formatted with the organization and project context.
+   *
+   * @param params - The parameters object
+   * @param params.idOrReferenceId - The ID or reference ID of the prompt
+   * @param params.projectId - The project ID for authorization and context
+   * @returns The prompt configuration
+   */
+  async getPromptByIdOrReferenceId(params: {
+    idOrReferenceId: string;
+    projectId: string;
+  }): Promise<LlmConfigWithLatestVersion> {
+    const { idOrReferenceId, projectId } = params;
+
+    const referenceId = await this.createReferenceId(
+      projectId,
+      idOrReferenceId
+    );
+
+    return this.repository.getConfigByIdOrReferenceIdWithLatestVersion({
+      id: idOrReferenceId,
+      referenceId,
+      projectId,
+    });
+  }
+
+  /**
+   * Creates a new prompt configuration with an initial version.
+   * If a reference ID is provided, it will be formatted with the organization and project context.
+   *
+   * @param params - The parameters object
+   * @param params.name - The name of the prompt
+   * @param params.projectId - The project ID for authorization and context
+   * @param params.referenceId - The reference ID of the prompt
+   * @returns The created prompt configuration
+   */
+  async createPrompt(params: {
+    name: string;
+    projectId: string;
+    referenceId?: string;
+  }): Promise<LlmConfigWithLatestVersion> {
+    const data = { ...params };
+
+    if (data.referenceId) {
+      data.referenceId = await this.createReferenceId(
+        data.projectId,
+        data.referenceId
+      );
+    }
+
+    return this.repository.createConfigWithInitialVersion(data);
   }
 
   /**

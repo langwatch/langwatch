@@ -88,13 +88,15 @@ export class LlmConfigRepository {
   /**
    * Get a single LLM config by ID or reference ID
    */
-  async getConfigByIdOrReferenceIdWithLatestVersion(
-    id: string,
-    projectId: string
-  ): Promise<LlmConfigWithLatestVersion> {
+  async getConfigByIdOrReferenceIdWithLatestVersion(params: {
+    id?: string;
+    referenceId?: string;
+    projectId: string;
+  }): Promise<LlmConfigWithLatestVersion> {
+    const { id, referenceId, projectId } = params;
     const config = await this.prisma.llmPromptConfig.findFirst({
       where: {
-        OR: [{ id }, { referenceId: id }],
+        OR: [{ id }, { referenceId }],
         projectId,
       },
       include: {
@@ -191,6 +193,7 @@ export class LlmConfigRepository {
           id: `prompt_${nanoid()}`,
           name: configData.name,
           projectId: configData.projectId,
+          referenceId: configData.referenceId,
         },
       });
 

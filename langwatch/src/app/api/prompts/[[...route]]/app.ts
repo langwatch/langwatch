@@ -113,11 +113,10 @@ app.get(
     );
 
     try {
-      const config =
-        await service.repository.getConfigByIdOrReferenceIdWithLatestVersion(
-          idOrReferenceId,
-          project.id
-        );
+      const config = await service.getPromptByIdOrReferenceId({
+        idOrReferenceId,
+        projectId: project.id,
+      });
 
       const response = {
         id: config.id,
@@ -164,7 +163,10 @@ app.post(
   }),
   zValidator(
     "json",
-    z.object({ name: z.string().min(1, "Name cannot be empty") })
+    z.object({
+      name: z.string().min(1, "Name cannot be empty"),
+      referenceId: z.string().optional(),
+    })
   ),
   async (c) => {
     const service = c.get("promptService");
@@ -177,9 +179,10 @@ app.post(
       "Creating new prompt with initial version"
     );
 
-    const newConfig = await service.repository.createConfigWithInitialVersion({
+    const newConfig = await service.createPrompt({
       name,
       projectId: project.id,
+      referenceId: data.referenceId,
     });
 
     logger.info(

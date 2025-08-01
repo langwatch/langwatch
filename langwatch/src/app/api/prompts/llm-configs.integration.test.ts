@@ -152,21 +152,33 @@ describe("Prompts API", () => {
       it("should get a single prompt by reference ID", async () => {
         // First, update the config to have a reference ID
         const referenceId = `ref_${nanoid()}`;
-        await prisma.llmPromptConfig.update({
-          where: {
-            id: config.id,
-            projectId: testProjectId,
+        // Create a new prompt with the reference ID
+        const createRes = await app.request(`/api/prompts`, {
+          method: "POST",
+          headers: {
+            "X-Auth-Token": testApiKey,
+            "Content-Type": "application/json",
           },
-          data: { referenceId },
+          body: JSON.stringify({ name: "Test Prompt", referenceId }),
         });
 
+        // Verify the prompt was created with the reference ID
+        expect(createRes.status).toBe(200);
+        const createBody = await createRes.json();
+        expect(createBody.referenceId).toBe(
+          `${testOrganization.id}/${testProjectId}/${referenceId}`
+        );
+
+        // Get the prompt by reference ID
         const res = await app.request(`/api/prompts/${referenceId}`, {
           headers: { "X-Auth-Token": testApiKey },
         });
 
         expect(res.status).toBe(200);
         const body = await res.json();
-        expect(body.referenceId).toBe(referenceId);
+        expect(body.referenceId).toBe(
+          `${testOrganization.id}/${testProjectId}/${referenceId}`
+        );
       });
 
       it("should return 404 for non-existent prompt ID (should work with reference ID as well)", async () => {
@@ -281,6 +293,29 @@ describe("Prompts API", () => {
       expect(res.status).toBe(400); // Should be 400 Bad Request
       const body = await res.json();
       expect(body).toHaveProperty("error");
+    });
+
+    it("should create a new prompt with a reference ID", async () => {
+      const res = await app.request(`/api/prompts`, {
+        method: "POST",
+        headers: {
+          "X-Auth-Token": testApiKey,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          name: "Test Prompt",
+          referenceId: "my-custom-ref",
+        }),
+      });
+
+      expect(res.status).toBe(200);
+      const body = await res.json();
+      expect(body).toHaveProperty("id");
+      expect(body).toHaveProperty("name", "Test Prompt");
+      expect(body).toHaveProperty(
+        "referenceId",
+        `${testOrganization.id}/${testProjectId}/my-custom-ref`
+      );
     });
   });
 
