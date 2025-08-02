@@ -5,6 +5,7 @@ import { FileManager } from "../utils/fileManager";
 import { PromptService, PromptsError } from "../../prompt/service";
 import { PromptConverter } from "../../prompt/converter";
 import { ensureProjectInitialized } from "../utils/init";
+import { checkApiKey } from "../utils/apiKey";
 
 interface AddOptions {
   version?: string;
@@ -17,6 +18,9 @@ export const addCommand = async (name: string, options: AddOptions): Promise<voi
       console.error(chalk.red("Error: Prompt name cannot be empty"));
       process.exit(1);
     }
+
+    // Check API key before doing anything else
+    checkApiKey();
 
     const promptService = PromptService.getInstance();
     const version = options.version || "latest";

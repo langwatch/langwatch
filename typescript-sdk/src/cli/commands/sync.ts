@@ -7,12 +7,16 @@ import { PromptService, PromptsError } from "../../prompt/service";
 import type { SyncResult } from "../types";
 import { FileManager } from "../utils/fileManager";
 import { ensureProjectInitialized } from "../utils/init";
+import { checkApiKey } from "../utils/apiKey";
 
 export const syncCommand = async (): Promise<void> => {
   const startTime = Date.now();
 
   try {
-        // Get prompt service
+    // Check API key before doing anything else
+    checkApiKey();
+
+    // Get prompt service
     const promptService = PromptService.getInstance();
 
     // Ensure project is initialized (prompts.json, lock file, directories)
