@@ -64,57 +64,57 @@ function InnerPromptConfigForm(props: PromptConfigFormProps) {
   if (!savedConfig) return null;
 
   return (
-    <FormProvider {...methods}>
-      <form style={{ width: "100%" }}>
-        <VStack width="full" gap={6}>
-          <VerticalFormControl label="Current Version" size="sm">
-            <PromptConfigInfoAndSavePartial
-              isSaving={isLoading}
-              config={savedConfig}
-              saveEnabled={saveEnabled}
-              onSaveClick={() =>
-                triggerSaveVersion(configId, methods.getValues())
-              }
-            />
-          </VerticalFormControl>
-          <HStack width="full" alignItems="end">
-            <PromptNameField />
-            <GeneratePromptApiSnippetDialog
-              configId={configId}
-              apiKey={project?.apiKey}
-            >
-              <GeneratePromptApiSnippetDialog.Trigger>
-                <GenerateApiSnippetButton />
-              </GeneratePromptApiSnippetDialog.Trigger>
-            </GeneratePromptApiSnippetDialog>
-          </HStack>
-          <ReferenceIdField />
-          <ModelSelectField />
-          <PromptField
-            templateAdapter="default"
-            messageFields={messageFields}
-            availableFields={availableFields}
-            otherNodesFields={{}}
-            isTemplateSupported={true}
+    <form style={{ width: "100%" }}>
+      <VStack width="full" gap={6}>
+        <VerticalFormControl label="Current Version" size="sm">
+          <PromptConfigInfoAndSavePartial
+            isSaving={isLoading}
+            config={savedConfig}
+            saveEnabled={saveEnabled}
+            onSaveClick={() =>
+              triggerSaveVersion(configId, methods.getValues())
+            }
           />
-          <PromptMessagesField
-            messageFields={messageFields}
-            availableFields={availableFields}
-            otherNodesFields={{}}
-          />
-          <InputsFieldGroup />
-          <OutputsFieldGroup />
-          <DemonstrationsField />
-        </VStack>
-      </form>
-    </FormProvider>
+        </VerticalFormControl>
+        <HStack width="full" alignItems="end">
+          <PromptNameField />
+          <GeneratePromptApiSnippetDialog
+            configId={configId}
+            apiKey={project?.apiKey}
+          >
+            <GeneratePromptApiSnippetDialog.Trigger>
+              <GenerateApiSnippetButton />
+            </GeneratePromptApiSnippetDialog.Trigger>
+          </GeneratePromptApiSnippetDialog>
+        </HStack>
+        <ReferenceIdField />
+        <ModelSelectField />
+        <PromptField
+          templateAdapter="default"
+          messageFields={messageFields}
+          availableFields={availableFields}
+          otherNodesFields={{}}
+          isTemplateSupported={true}
+        />
+        <PromptMessagesField
+          messageFields={messageFields}
+          availableFields={availableFields}
+          otherNodesFields={{}}
+        />
+        <InputsFieldGroup />
+        <OutputsFieldGroup />
+        <DemonstrationsField />
+      </VStack>
+    </form>
   );
 }
 
 export function PromptConfigForm(props: PromptConfigFormProps) {
   return (
-    <PromptConfigProvider>
-      <InnerPromptConfigForm {...props} />
-    </PromptConfigProvider>
+    <FormProvider {...props.methods}>
+      <PromptConfigProvider>
+        <InnerPromptConfigForm {...props} />
+      </PromptConfigProvider>
+    </FormProvider>
   );
 }

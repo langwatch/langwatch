@@ -105,6 +105,29 @@ export class PromptService {
   }
 
   /**
+   * Checks if a reference ID is unique for a project.
+   * @param params - The parameters object
+   * @param params.referenceId - The reference ID to check
+   * @param params.projectId - The project ID to check
+   * @param params.excludeId - The ID of the config to exclude from the check
+   * @returns True if the reference ID is unique, false otherwise
+   */
+  async checkReferenceIdUniqueness(params: {
+    referenceId: string;
+    projectId: string;
+    excludeId?: string;
+  }): Promise<boolean> {
+    // Check if referenceId exists (excluding current config if editing)
+    const existingConfig = await this.repository.getByReferenceId(
+      params.referenceId,
+      params.projectId
+    );
+
+    // Return true if unique (no existing config or it's the same config being edited)
+    return !existingConfig || existingConfig.id === params.excludeId;
+  }
+
+  /**
    * Creates a fully qualified reference ID by combining organization, project, and user-provided reference.
    * Format: {organizationId}/{projectId}/{referenceId}
    *

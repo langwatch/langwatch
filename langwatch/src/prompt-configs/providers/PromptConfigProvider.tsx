@@ -1,5 +1,6 @@
 import { useDisclosure } from "@chakra-ui/react";
 import { createContext, useCallback, useContext, useRef } from "react";
+import { useFormContext } from "react-hook-form";
 
 import {
   SaveVersionDialog,
@@ -15,7 +16,7 @@ interface PromptConfigContextType {
   triggerSaveVersion: (
     configId: string,
     updateConfigValues: PromptConfigFormValues
-  ) => void;
+  ) => Promise<void>;
 }
 
 const PromptConfigContext = createContext<PromptConfigContextType>({
@@ -54,8 +55,16 @@ export function PromptConfigProvider({
     ((saveFormValues: SaveDialogFormValues) => Promise<void>) | null
   >(null);
 
+  const methods = useFormContext<PromptConfigFormValues>();
+
   const triggerSaveVersion = useCallback(
-    (configId: string, updateConfigValues: PromptConfigFormValues) => {
+    async (configId: string, updateConfigValues: PromptConfigFormValues) => {
+      const isValid = await methods.trigger();
+
+      if (!isValid) {
+        return;
+      }
+
       // Save a ref to the function that will do the saving
       // with the saveFormValues enclosed in the closure
       updateConfigClosureRef.current = async (
