@@ -1,4 +1,5 @@
 import { HStack, VStack } from "@chakra-ui/react";
+import { useCallback } from "react";
 import {
   FormProvider,
   useFieldArray,
@@ -20,6 +21,7 @@ import { ReferenceIdField } from "../fields/ReferenceIdField";
 import { PromptConfigInfoAndSavePartial } from "./components/PromptConfigInfoAndSavePartial";
 
 import { GenerateApiSnippetButton } from "~/components/GenerateApiSnippetButton";
+import { toaster } from "~/components/ui/toaster";
 import { VerticalFormControl } from "~/components/VerticalFormControl";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { GeneratePromptApiSnippetDialog } from "~/prompt-configs/components/GeneratePromptApiSnippetDialog";
@@ -27,6 +29,9 @@ import { useGetPromptConfigByIdWithLatestVersionQuery } from "~/prompt-configs/h
 import { usePromptConfig } from "~/prompt-configs/hooks/usePromptConfig";
 import type { PromptConfigFormValues } from "~/prompt-configs/hooks/usePromptConfigForm";
 import { usePromptConfigContext } from "~/prompt-configs/providers/PromptConfigProvider";
+import { createLogger } from "~/utils/logger";
+
+const logger = createLogger("PromptConfigForm");
 
 interface PromptConfigFormProps {
   configId: string;
@@ -61,6 +66,16 @@ function InnerPromptConfigForm(props: PromptConfigFormProps) {
     methods.watch("version.configData.inputs") ?? []
   ).map((input) => input.identifier);
 
+  const handleSaveClick = useCallback(() => {
+    void triggerSaveVersion(configId, methods.getValues()).catch((error) => {
+      logger.error(error);
+      toaster.error({
+        title: "Failed to save version",
+        description: error.message,
+      });
+    });
+  }, [configId, methods, triggerSaveVersion]);
+
   if (!savedConfig) return null;
 
   return (
@@ -71,9 +86,7 @@ function InnerPromptConfigForm(props: PromptConfigFormProps) {
             isSaving={isLoading}
             config={savedConfig}
             saveEnabled={saveEnabled}
-            onSaveClick={() =>
-              triggerSaveVersion(configId, methods.getValues())
-            }
+            onSaveClick={handleSaveClick}
           />
         </VerticalFormControl>
         <HStack width="full" alignItems="end">

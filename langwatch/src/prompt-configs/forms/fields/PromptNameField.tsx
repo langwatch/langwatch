@@ -19,7 +19,6 @@ export function PromptNameField({ label }: PromptNameFieldProps) {
     <VerticalFormControl
       label={label ?? "Prompt Name"}
       invalid={!!errors.name}
-      helper={errors.name?.message?.toString()}
       error={errors.name}
       size="sm"
     >

@@ -59,9 +59,11 @@ export function PromptConfigProvider({
 
   const triggerSaveVersion = useCallback(
     async (configId: string, updateConfigValues: PromptConfigFormValues) => {
+      // Trigger the form validation
       const isValid = await methods.trigger();
 
       if (!isValid) {
+        // If the form is not valid, don't save
         return;
       }
 
@@ -98,7 +100,7 @@ export function PromptConfigProvider({
 
       openDialog();
     },
-    [openDialog, updatePromptConfig, createNewVersion, closeDialog]
+    [openDialog, updatePromptConfig, createNewVersion, closeDialog, methods]
   );
 
   return (

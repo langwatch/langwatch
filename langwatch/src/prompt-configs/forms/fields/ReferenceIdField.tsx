@@ -1,7 +1,6 @@
 import { Input, Text } from "@chakra-ui/react";
 import { useState, type ReactNode } from "react";
 import { useFormContext, useFormState } from "react-hook-form";
-import { useDebounceCallback } from "usehooks-ts";
 
 import type { PromptConfigFormValues } from "../../hooks/usePromptConfigForm";
 
@@ -35,26 +34,6 @@ export function ReferenceIdField({ label }: ReferenceIdFieldProps) {
   // Show warning when user has changed an existing reference ID
   const showWarning = isReferenceIdDirty && hasOriginalId;
 
-  /**
-   * Handle the change event for the reference ID field.
-   * @param e - The change event.
-   */
-  const handleChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value;
-    const isValid = await checkReferenceIdUniqueness({
-      referenceId: value,
-      excludeId: originalReferenceId,
-    });
-    setIsValid(isValid);
-  };
-
-  /**
-   * Handle the change event for the reference ID field with debounce.
-   * Debounce is used to prevent excessive API calls on every keystroke.
-   * @param e - The change event.
-   */
-  const handleChangeDebounced = useDebounceCallback(handleChange, 500);
-
   return (
     <VerticalFormControl
       label={label ?? "Reference ID"}
@@ -66,21 +45,7 @@ export function ReferenceIdField({ label }: ReferenceIdFieldProps) {
       <Input
         size="sm"
         placeholder="team/project/prompt"
-        {...register("referenceId", {
-          validate: async (value) => {
-            const isValid = await checkReferenceIdUniqueness({
-              referenceId: value ?? "",
-              excludeId: originalReferenceId,
-            });
-
-            console.log("isValid", isValid);
-            return isValid;
-          },
-        })}
-        // onChange={(e) => {
-        //   void register("referenceId").onChange(e).catch(logger.error);
-        //   void handleChangeDebounced(e)?.catch(logger.error);
-        // }}
+        {...register("referenceId")}
       />
       {showWarning && (
         <Text color="red.500" fontSize="12px" fontWeight="medium" mt={2}>
@@ -91,11 +56,11 @@ export function ReferenceIdField({ label }: ReferenceIdFieldProps) {
           documentation.
         </Text>
       )}
-      {!isValid && (
+      {/* {!isValid && (
         <Text color="red.500" fontSize="12px" fontWeight="medium" mt={2}>
           ⚠ Reference id must be unique.
         </Text>
-      )}
+      )} */}
     </VerticalFormControl>
   );
 }
