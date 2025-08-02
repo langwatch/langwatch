@@ -1,6 +1,8 @@
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 
+import { PromptService } from "~/server/prompt-config/prompt.service";
+
 import { LlmConfigRepository } from "../../../prompt-config/repositories/llm-config.repository";
 import { TeamRoleGroup } from "../../permission";
 import { checkUserPermissionForProject } from "../../permission";
@@ -189,5 +191,27 @@ export const llmConfigsRouter = createTRPCRouter({
           cause: error,
         });
       }
+    }),
+
+  /**
+   * Check if a reference ID is unique for a project.
+   */
+  checkReferenceIdUniqueness: protectedProcedure
+    .input(
+      z.object({
+        referenceId: z.string(),
+        projectId: z.string(),
+        excludeId: z.string().optional(), // Exclude current config when editing
+      })
+    )
+    .use(checkUserPermissionForProject(TeamRoleGroup.PROMPTS_VIEW))
+    .query(async ({ ctx, input }) => {
+      const service = new PromptService(ctx.prisma);
+
+      return await service.checkReferenceIdUniqueness({
+        referenceId: input.referenceId,
+        projectId: input.projectId,
+        excludeId: input.excludeId,
+      });
     }),
 });

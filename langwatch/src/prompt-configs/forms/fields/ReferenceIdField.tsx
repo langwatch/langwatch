@@ -1,10 +1,15 @@
 import { Input, Text } from "@chakra-ui/react";
-import { type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { useFormContext, useFormState } from "react-hook-form";
+import { useDebounceCallback } from "usehooks-ts";
 
 import type { PromptConfigFormValues } from "../../hooks/usePromptConfigForm";
 
 import { VerticalFormControl } from "~/components/VerticalFormControl";
+import { usePromptReferenceIdCheck } from "~/hooks/prompts/usePromptReferenceIdCheck";
+import { createLogger } from "~/utils/logger";
+
+const logger = createLogger("ReferenceIdField");
 
 interface ReferenceIdFieldProps {
   // Optional label to override the default "Reference ID" label
@@ -18,6 +23,8 @@ interface ReferenceIdFieldProps {
 export function ReferenceIdField({ label }: ReferenceIdFieldProps) {
   const { register, control } = useFormContext<PromptConfigFormValues>();
   const { errors, dirtyFields, defaultValues } = useFormState({ control });
+  const [isValid, setIsValid] = useState(true);
+  const { checkReferenceIdUniqueness } = usePromptReferenceIdCheck();
 
   // Check if reference ID field is dirty (changed from original)
   const isReferenceIdDirty = dirtyFields.referenceId;
@@ -28,17 +35,30 @@ export function ReferenceIdField({ label }: ReferenceIdFieldProps) {
   // Show warning when user has changed an existing reference ID
   const showWarning = isReferenceIdDirty && hasOriginalId;
 
-  console.log({
-    isReferenceIdDirty,
-    originalReferenceId,
-    hasOriginalId,
-    showWarning,
-  });
+  /**
+   * Handle the change event for the reference ID field.
+   * @param e - The change event.
+   */
+  const handleChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    const isValid = await checkReferenceIdUniqueness({
+      referenceId: value,
+      excludeId: originalReferenceId,
+    });
+    setIsValid(isValid);
+  };
+
+  /**
+   * Handle the change event for the reference ID field with debounce.
+   * Debounce is used to prevent excessive API calls on every keystroke.
+   * @param e - The change event.
+   */
+  const handleChangeDebounced = useDebounceCallback(handleChange, 500);
 
   return (
     <VerticalFormControl
       label={label ?? "Reference ID"}
-      invalid={!!errors.referenceId}
+      invalid={!!errors.referenceId || !isValid}
       tooltip="Optional unique identifier for easy reference (e.g., team/project/prompt). Once set, avoid changing to prevent breaking existing integrations."
       error={errors.referenceId}
       size="sm"
@@ -46,14 +66,34 @@ export function ReferenceIdField({ label }: ReferenceIdFieldProps) {
       <Input
         size="sm"
         placeholder="team/project/prompt"
-        {...register("referenceId")}
+        {...register("referenceId", {
+          validate: async (value) => {
+            const isValid = await checkReferenceIdUniqueness({
+              referenceId: value ?? "",
+              excludeId: originalReferenceId,
+            });
+
+            console.log("isValid", isValid);
+            return isValid;
+          },
+        })}
+        // onChange={(e) => {
+        //   void register("referenceId").onChange(e).catch(logger.error);
+        //   void handleChangeDebounced(e)?.catch(logger.error);
+        // }}
       />
       {showWarning && (
         <Text color="red.500" fontSize="12px" fontWeight="medium" mt={2}>
-          ⚠️ Warning: Changing this reference ID will break any existing
-          integrations, API calls, or workflows that use "{originalReferenceId}
-          ". Make sure to update all references in your codebase and
+          ⚠ Warning: Changing this reference ID will break any existing
+          integrations, API calls, or workflows that use &quot;
+          {originalReferenceId}
+          &quot;. Make sure to update all references in your codebase and
           documentation.
+        </Text>
+      )}
+      {!isValid && (
+        <Text color="red.500" fontSize="12px" fontWeight="medium" mt={2}>
+          ⚠ Reference id must be unique.
         </Text>
       )}
     </VerticalFormControl>

@@ -8,6 +8,8 @@ import { getLatestConfigVersionSchema } from "~/server/prompt-config/repositorie
 
 import { inputsAndOutputsToDemostrationColumns } from "../llmPromptConfigUtils";
 
+import { usePromptReferenceIdCheck } from "~/hooks/prompts/usePromptReferenceIdCheck";
+
 const promptConfigSchema = z.object({
   name: z.string().min(1, "Name is required"),
   referenceId: z.string().optional(),
@@ -55,13 +57,35 @@ export const usePromptConfigForm = ({
   onChange,
   initialConfigValues,
 }: UsePromptConfigFormProps) => {
+  const { checkReferenceIdUniqueness } = usePromptReferenceIdCheck();
+
   const methods = useForm<PromptConfigFormValues>({
     /**
      * Don't pass undefined as defaultValue
      * @see https://react-hook-form.com/docs/useform#defaultValues
      */
     defaultValues: initialConfigValues ?? {},
-    resolver: zodResolver(formSchema),
+    resolver: (data, ...args) => {
+      return zodResolver(
+        promptConfigSchema.extend({
+          referenceId: z
+            .string()
+            .optional()
+            .refine(
+              async (value) => {
+                console.log("refine isVali value", value);
+                if (!value || value.trim() === "") return true;
+                return await checkReferenceIdUniqueness({
+                  referenceId: value,
+                  excludeId: initialConfigValues?.referenceId,
+                });
+              },
+              { message: "Reference ID must be unique" }
+            ),
+          version: formSchema.shape.version,
+        })
+      )(data, ...args);
+    },
   });
 
   const formData = methods.watch();
