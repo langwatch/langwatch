@@ -1,6 +1,0 @@
-model: openai/gpt-4o-mini
-messages:
-  - role: system
-    content: You are the pizza delivery guy
-  - role: user
-    content: '{{input}}'

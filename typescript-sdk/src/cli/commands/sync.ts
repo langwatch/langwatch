@@ -16,13 +16,15 @@ export const syncCommand = async (): Promise<void> => {
     // Ensure directories exist
     FileManager.ensureDirectories();
 
-    // Load prompts config
+        // Load prompts config and lock
     const config = FileManager.loadPromptsConfig();
+    const lock = FileManager.loadPromptsLock();
 
     const result: SyncResult = {
       fetched: [],
       pushed: [],
       unchanged: [],
+      cleaned: [],
       errors: [],
     };
 
@@ -52,9 +54,12 @@ export const syncCommand = async (): Promise<void> => {
             // Convert to MaterializedPrompt format using the converter
             const materializedPrompt = PromptConverter.fromApiToMaterialized(prompt);
 
-            const savedPath = FileManager.saveMaterializedPrompt(name, materializedPrompt);
+                        const savedPath = FileManager.saveMaterializedPrompt(name, materializedPrompt);
             const relativePath = path.relative(process.cwd(), savedPath);
             result.fetched.push(name); // Store the name, not path
+
+            // Update lock file entry
+            FileManager.updateLockEntry(lock, name, materializedPrompt, savedPath);
 
             fetchSpinner.text = `Fetched ${chalk.cyan(`${name}@${versionSpec}`)} ${chalk.gray(`(version ${prompt.version})`)} → ${chalk.gray(relativePath)}`;
           } else {
@@ -116,8 +121,30 @@ export const syncCommand = async (): Promise<void> => {
         }
       }
 
-      pushSpinner.stop();
+            pushSpinner.stop();
     }
+
+    // Cleanup orphaned materialized files
+    const currentDependencies = new Set(Object.keys(config.prompts).filter(name => {
+      const dependency = config.prompts[name];
+      // Only include remote dependencies (not local file: dependencies)
+      if (typeof dependency === "object" && dependency.file) {
+        return false;
+      }
+      if (typeof dependency === "string" && dependency.startsWith("file:")) {
+        return false;
+      }
+      return true;
+    }));
+
+    const cleanedFiles = FileManager.cleanupOrphanedMaterializedFiles(currentDependencies);
+    if (cleanedFiles.length > 0) {
+      result.cleaned = cleanedFiles;
+      FileManager.removeFromLock(lock, cleanedFiles);
+    }
+
+    // Save the updated lock file
+    FileManager.savePromptsLock(lock);
 
     // Print individual results if there were actions
     if (result.fetched.length > 0) {
@@ -138,6 +165,13 @@ export const syncCommand = async (): Promise<void> => {
       }
     }
 
+    // Print cleaned up files
+    if (result.cleaned.length > 0) {
+      for (const name of result.cleaned) {
+        console.log(chalk.yellow(`✓ Cleaned ${chalk.cyan(name)} (no longer in dependencies)`));
+      }
+    }
+
     // Print errors
     if (result.errors.length > 0) {
       for (const { name, error } of result.errors) {
@@ -145,9 +179,9 @@ export const syncCommand = async (): Promise<void> => {
       }
     }
 
-    // Print summary
+        // Print summary
     const duration = ((Date.now() - startTime) / 1000).toFixed(1);
-    const totalActions = result.fetched.length + result.pushed.length;
+    const totalActions = result.fetched.length + result.pushed.length + result.cleaned.length;
 
     if (totalActions === 0 && result.errors.length === 0) {
       console.log(chalk.gray(`Synced in ${duration}s`));
@@ -155,6 +189,7 @@ export const syncCommand = async (): Promise<void> => {
       const summary = [];
       if (result.fetched.length > 0) summary.push(`${result.fetched.length} fetched`);
       if (result.pushed.length > 0) summary.push(`${result.pushed.length} pushed`);
+      if (result.cleaned.length > 0) summary.push(`${result.cleaned.length} cleaned`);
       if (result.errors.length > 0) summary.push(`${result.errors.length} errors`);
 
       console.log(chalk.gray(`Synced ${summary.join(', ')} in ${duration}s`));
