@@ -10,6 +10,7 @@ export default defineConfig([
       "src/evaluation/index.ts",
       "src/client-node.ts",
       "src/client-browser.ts",
+      "src/cli/index.ts",
     ],
     splitting: true,
     clean: true,

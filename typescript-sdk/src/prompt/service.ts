@@ -4,6 +4,7 @@ import {
 } from "../internal/api/client";
 import type { paths } from "../internal/generated/openapi/api-client";
 import { Prompt } from "./prompt";
+import { PromptConverter } from "./converter";
 
 // Extract types directly from OpenAPI schema for strong type safety.
 type CreatePromptBody = NonNullable<
@@ -103,15 +104,35 @@ export class PromptService {
   /**
    * Fetches a single prompt by its ID.
    * @param id The prompt's unique identifier.
-   * @returns The Prompt instance.
+   * @returns The Prompt instance or null if not found.
    * @throws {PromptsError} If the API call fails.
    */
-  async get(id: string): Promise<Prompt> {
+  async get(id: string): Promise<Prompt | null> {
     const { data, error } = await this.client.GET("/api/prompts/{id}", {
       params: { path: { id } },
     });
-    if (error) this.handleApiError(`fetch prompt with ID "${id}"`, error);
+    if (error) {
+      if (error.toString().includes("404")) {
+        return null;
+      }
+      this.handleApiError(`fetch prompt with ID "${id}"`, error);
+    }
     return new Prompt(data);
+  }
+
+  /**
+   * Validates if a prompt exists.
+   * @param id The prompt's unique identifier.
+   * @returns True if prompt exists, false otherwise.
+   * @throws {PromptsError} If the API call fails (not 404).
+   */
+  async exists(id: string): Promise<boolean> {
+    try {
+      const prompt = await this.get(id);
+      return prompt !== null;
+    } catch (error) {
+      throw error; // Re-throw non-404 errors
+    }
   }
 
   /**
@@ -144,7 +165,11 @@ export class PromptService {
     });
     if (error) this.handleApiError(`update prompt with ID "${id}"`, error);
     // TODO: This is a workaround to get the updated prompt. It would be better to return the updated prompt directly.
-    return await this.get(id);
+    const updatedPrompt = await this.get(id);
+    if (!updatedPrompt) {
+      throw new PromptsError("Prompt not found after update", "update prompt", null);
+    }
+    return updatedPrompt;
   }
 
   /**
@@ -216,6 +241,63 @@ export class PromptService {
     if (error)
       this.handleApiError(`create version for prompt with ID "${id}"`, error);
     // TODO: This is a workaround to get the updated prompt. It would be better to return the updated prompt directly.
-    return await this.get(id);
+    const updatedPrompt = await this.get(id);
+    if (!updatedPrompt) {
+      throw new PromptsError("Prompt not found after version creation", "create version", null);
+    }
+    return updatedPrompt;
+  }
+
+  /**
+   * Upserts a prompt with local configuration - creates if doesn't exist, updates version if exists.
+   * @param name The prompt's name/identifier.
+   * @param config Local prompt configuration.
+   * @returns Object with created flag and the prompt instance.
+   * @throws {PromptsError} If the API call fails.
+   */
+    async upsert(name: string, config: {
+    model: string;
+    modelParameters?: {
+      temperature?: number;
+      max_tokens?: number;
+    };
+    messages: Array<{
+      role: "system" | "user" | "assistant";
+      content: string;
+    }>;
+  }): Promise<{ created: boolean; prompt: Prompt }> {
+    let prompt = await this.get(name);
+    let created = false;
+
+    if (!prompt) {
+      prompt = await this.create({ name });
+      created = true;
+    }
+
+    // Create a new version with the updated config using the converter
+    const versionData = {
+      configData: {
+        version: 1,
+        model: config.model,
+        prompt: PromptConverter.extractSystemPrompt(config.messages),
+        messages: PromptConverter.filterNonSystemMessages(config.messages),
+        temperature: config.modelParameters?.temperature,
+        max_tokens: config.modelParameters?.max_tokens,
+        inputs: [{ identifier: "input", type: "text" as const }],
+        outputs: [{ identifier: "output", type: "text" as const }],
+      },
+      commitMessage: `Updated via CLI sync`,
+      projectId: "placeholder", // Will be overridden by the API
+      configId: prompt.id,
+      schemaVersion: "1.0" as const,
+      version: 1, // Will be auto-incremented by the API
+    } as any; // Type assertion to bypass strict typing for now
+
+    const updatedPrompt = await this.createVersion(prompt.id, versionData);
+
+    return {
+      created,
+      prompt: updatedPrompt,
+    };
   }
 }

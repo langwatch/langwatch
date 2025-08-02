@@ -1,0 +1,62 @@
+#!/usr/bin/env node
+
+// Load environment variables BEFORE any other imports
+import { config } from "dotenv";
+config();
+
+import { Command } from "commander";
+import { parsePromptSpec } from "./types";
+
+// Import commands with proper async handling
+const addCommand = async (name: string, options: { version?: string }): Promise<void> => {
+  const { addCommand: addCommandImpl } = await import("./commands/add.js");
+  return addCommandImpl(name, options);
+};
+
+const syncCommand = async (): Promise<void> => {
+  const { syncCommand: syncCommandImpl } = await import("./commands/sync.js");
+  return syncCommandImpl();
+};
+
+const program = new Command();
+
+program
+  .name("langwatch")
+  .description("LangWatch CLI - The npm of prompts")
+  .configureHelp({
+    showGlobalOptions: true,
+  })
+  .showHelpAfterError()
+  .showSuggestionAfterError();
+
+// Add prompt command group
+const promptCmd = program
+  .command("prompt")
+  .description("Manage prompt dependencies");
+
+promptCmd
+  .command("add <spec>")
+  .description("Add a prompt dependency (e.g., 'agent/foo', 'agent/bar@5', 'shared/prompt@latest')")
+  .action(async (spec: string) => {
+    try {
+      const { name, version } = parsePromptSpec(spec);
+      await addCommand(name, { version });
+    } catch (error) {
+      console.error(`Error: ${error instanceof Error ? error.message : "Unknown error"}`);
+      process.exit(1);
+    }
+  });
+
+promptCmd
+  .command("sync")
+  .description("Sync prompts - fetch remote and push local")
+  .action(async () => {
+    try {
+      await syncCommand();
+    } catch (error) {
+      console.error(`Error: ${error instanceof Error ? error.message : "Unknown error"}`);
+      process.exit(1);
+    }
+  });
+
+program.parse(process.argv);
