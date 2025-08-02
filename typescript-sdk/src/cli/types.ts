@@ -47,7 +47,19 @@ export type SyncResult = {
   fetched: string[];
   pushed: string[];
   unchanged: string[];
+  cleaned: string[];
   errors: Array<{ name: string; error: string }>;
+};
+
+export type PromptsLockEntry = {
+  version: number;
+  versionId: string;
+  materialized: string;
+};
+
+export type PromptsLock = {
+  lockfileVersion: number;
+  prompts: Record<string, PromptsLockEntry>;
 };
 
 // Parse npm-style version specifications like "foo@latest" or "bar@5"

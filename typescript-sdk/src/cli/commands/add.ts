@@ -36,17 +36,21 @@ export const addCommand = async (name: string, options: AddOptions): Promise<voi
       // Ensure directories exist
       FileManager.ensureDirectories();
 
-      // Convert to MaterializedPrompt format and save
+            // Convert to MaterializedPrompt format and save
       const materializedPrompt = PromptConverter.fromApiToMaterialized(prompt);
       const savedPath = FileManager.saveMaterializedPrompt(name, materializedPrompt);
       const relativePath = path.relative(process.cwd(), savedPath);
 
-      // Load existing config and add the new dependency
+      // Load existing config and lock, add the new dependency
       const config = FileManager.loadPromptsConfig();
-      config.prompts[name] = version;
+      const lock = FileManager.loadPromptsLock();
 
-      // Save the updated config
+      config.prompts[name] = version;
+      FileManager.updateLockEntry(lock, name, materializedPrompt, savedPath);
+
+      // Save the updated config and lock
       FileManager.savePromptsConfig(config);
+      FileManager.savePromptsLock(lock);
 
       spinner.succeed();
 

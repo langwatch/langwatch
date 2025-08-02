@@ -3,17 +3,22 @@ import * as path from "path";
 import * as yaml from "js-yaml";
 import chalk from "chalk";
 import { z } from "zod";
-import type { PromptsConfig, LocalPromptConfig, MaterializedPrompt } from "../types";
+import type { PromptsConfig, LocalPromptConfig, MaterializedPrompt, PromptsLock, PromptsLockEntry } from "../types";
 import { localPromptConfigSchema } from "../types";
 import { PromptConverter } from "../../prompt/converter";
 
 export class FileManager {
   private static readonly PROMPTS_CONFIG_FILE = "prompts.json";
+  private static readonly PROMPTS_LOCK_FILE = "prompts-lock.json";
   private static readonly PROMPTS_DIR = "prompts";
   private static readonly MATERIALIZED_DIR = ".materialized";
 
   static getPromptsConfigPath(): string {
     return path.join(process.cwd(), this.PROMPTS_CONFIG_FILE);
+  }
+
+  static getPromptsLockPath(): string {
+    return path.join(process.cwd(), this.PROMPTS_LOCK_FILE);
   }
 
   static getPromptsDir(): string {
@@ -55,6 +60,29 @@ export class FileManager {
   static savePromptsConfig(config: PromptsConfig): void {
     const configPath = this.getPromptsConfigPath();
     fs.writeFileSync(configPath, JSON.stringify(config, null, 2) + "\n");
+  }
+
+  static loadPromptsLock(): PromptsLock {
+    const lockPath = this.getPromptsLockPath();
+
+    if (!fs.existsSync(lockPath)) {
+      return {
+        lockfileVersion: 1,
+        prompts: {}
+      };
+    }
+
+    try {
+      const content = fs.readFileSync(lockPath, "utf-8");
+      return JSON.parse(content) as PromptsLock;
+    } catch (error) {
+      throw new Error(`Failed to parse prompts-lock.json: ${error instanceof Error ? error.message : "Unknown error"}`);
+    }
+  }
+
+  static savePromptsLock(lock: PromptsLock): void {
+    const lockPath = this.getPromptsLockPath();
+    fs.writeFileSync(lockPath, JSON.stringify(lock, null, 2) + "\n");
   }
 
   static loadLocalPrompt(filePath: string): LocalPromptConfig {
@@ -156,5 +184,65 @@ export class FileManager {
     const promptsDir = this.getPromptsDir();
     const relativePath = path.relative(promptsDir, filePath);
     return relativePath.replace(/\.prompt\.yaml$/, "");
+  }
+
+  static cleanupOrphanedMaterializedFiles(currentDependencies: Set<string>): string[] {
+    const materializedDir = this.getMaterializedDir();
+
+    if (!fs.existsSync(materializedDir)) {
+      return [];
+    }
+
+    const cleaned: string[] = [];
+
+    const cleanupDir = (dir: string, relativePath = ""): void => {
+      const entries = fs.readdirSync(dir, { withFileTypes: true });
+
+      for (const entry of entries) {
+        const fullPath = path.join(dir, entry.name);
+        const relativeFilePath = path.join(relativePath, entry.name);
+
+        if (entry.isDirectory()) {
+          cleanupDir(fullPath, relativeFilePath);
+
+          // Remove empty directories
+          try {
+            const dirEntries = fs.readdirSync(fullPath);
+            if (dirEntries.length === 0) {
+              fs.rmdirSync(fullPath);
+            }
+          } catch {
+            // Directory not empty or other error, ignore
+          }
+        } else if (entry.isFile() && entry.name.endsWith(".prompt.yaml")) {
+          // Extract prompt name from materialized file path
+          const promptName = relativeFilePath.replace(/\.prompt\.yaml$/, "");
+
+          if (!currentDependencies.has(promptName)) {
+            fs.unlinkSync(fullPath);
+            cleaned.push(promptName);
+          }
+        }
+      }
+    };
+
+    cleanupDir(materializedDir);
+    return cleaned;
+  }
+
+  static updateLockEntry(lock: PromptsLock, name: string, prompt: MaterializedPrompt, materializedPath: string): void {
+    const relativePath = path.relative(process.cwd(), materializedPath);
+
+    lock.prompts[name] = {
+      version: prompt.version,
+      versionId: prompt.versionId,
+      materialized: relativePath,
+    };
+  }
+
+  static removeFromLock(lock: PromptsLock, names: string[]): void {
+    for (const name of names) {
+      delete lock.prompts[name];
+    }
   }
 }
