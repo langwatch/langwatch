@@ -80,7 +80,7 @@ function InnerPromptConfigForm(props: PromptConfigFormProps) {
 
   return (
     <form style={{ width: "100%" }}>
-      <VStack width="full" gap={6}>
+      <VStack width="full" gap={6} mb={6}>
         <VerticalFormControl label="Current Version" size="sm">
           <PromptConfigInfoAndSavePartial
             isSaving={isLoading}
