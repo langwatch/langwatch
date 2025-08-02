@@ -74,35 +74,19 @@ export const syncCommand = async (): Promise<void> => {
       fetchSpinner.stop();
     }
 
-    // Process local prompts (push to API)
-    // 1. First process files referenced in prompts.json with "file:" prefix
+        // Process local prompts (push to API) - only those explicitly declared in prompts.json
     const localFileRefs = Object.entries(config.prompts).filter(([, dependency]) => {
       return typeof dependency === "string" && dependency.startsWith("file:");
     });
 
-    // 2. Also get files discovered by FileManager
-    const discoveredLocalFiles = FileManager.getLocalPromptFiles();
+    if (localFileRefs.length > 0) {
+      const pushSpinner = ora(`Pushing ${localFileRefs.length} local prompts...`).start();
 
-    const allLocalWork = [...localFileRefs, ...discoveredLocalFiles.map(f => [FileManager.promptNameFromPath(f), f])];
-
-    if (allLocalWork.length > 0) {
-      const pushSpinner = ora(`Pushing ${allLocalWork.length} local prompts...`).start();
-
-      for (const [promptName, filePathOrDep] of allLocalWork) {
+      for (const [promptName, dependency] of localFileRefs) {
         try {
-          // Handle both file: references and discovered files
-          let filePath: string;
-          if (typeof filePathOrDep === "string" && filePathOrDep.startsWith("file:")) {
-            filePath = filePathOrDep.slice(5); // Remove "file:" prefix
-          } else {
-            filePath = filePathOrDep as string;
-            // Skip if this prompt is defined in prompts.json as a remote dependency
-            if (config.prompts[promptName] && typeof config.prompts[promptName] === "string" && !config.prompts[promptName].startsWith("file:")) {
-              continue;
-            }
-          }
+          const filePath = (dependency as string).slice(5); // Remove "file:" prefix
 
-                    // Load local prompt config
+          // Load local prompt config
           const localConfig = FileManager.loadLocalPrompt(filePath);
 
           // Convert local config to API format and push using PromptService.upsert
@@ -121,7 +105,28 @@ export const syncCommand = async (): Promise<void> => {
         }
       }
 
-            pushSpinner.stop();
+      pushSpinner.stop();
+    }
+
+    // Check for orphan local prompt files and show helpful warnings
+    const discoveredLocalFiles = FileManager.getLocalPromptFiles();
+    const orphanFiles = discoveredLocalFiles.filter(filePath => {
+      const promptName = FileManager.promptNameFromPath(filePath);
+      return !config.prompts[promptName]; // Not declared in prompts.json
+    });
+
+    if (orphanFiles.length > 0) {
+      console.log(chalk.yellow(`\n⚠ Found ${orphanFiles.length} orphan prompt file${orphanFiles.length > 1 ? 's' : ''}:`));
+
+      for (const filePath of orphanFiles) {
+        const promptName = FileManager.promptNameFromPath(filePath);
+        const relativePath = path.relative(process.cwd(), filePath);
+
+        console.log(chalk.yellow(`  ${relativePath}`));
+        console.log(chalk.gray(`    Add to prompts.json: "${promptName}": "file:${relativePath}"`));
+      }
+
+      console.log(chalk.gray(`\nTip: Add these to prompts.json to include them in sync operations.`));
     }
 
     // Cleanup orphaned materialized files
