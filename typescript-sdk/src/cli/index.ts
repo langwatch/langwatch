@@ -18,6 +18,11 @@ const removeCommand = async (name: string): Promise<void> => {
   return removeCommandImpl(name);
 };
 
+const initCommand = async (): Promise<void> => {
+  const { initCommand: initCommandImpl } = await import("./commands/init.js");
+  return initCommandImpl();
+};
+
 const syncCommand = async (): Promise<void> => {
   const { syncCommand: syncCommandImpl } = await import("./commands/sync.js");
   return syncCommandImpl();
@@ -38,6 +43,18 @@ program
 const promptCmd = program
   .command("prompt")
   .description("Manage prompt dependencies");
+
+promptCmd
+  .command("init")
+  .description("Initialize a new prompts project")
+  .action(async () => {
+    try {
+      await initCommand();
+    } catch (error) {
+      console.error(`Error: ${error instanceof Error ? error.message : "Unknown error"}`);
+      process.exit(1);
+    }
+  });
 
 promptCmd
   .command("add <spec>")
