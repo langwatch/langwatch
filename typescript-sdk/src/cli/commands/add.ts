@@ -4,6 +4,7 @@ import ora from "ora";
 import { FileManager } from "../utils/fileManager";
 import { PromptService, PromptsError } from "../../prompt/service";
 import { PromptConverter } from "../../prompt/converter";
+import { ensureProjectInitialized } from "../utils/init";
 
 interface AddOptions {
   version?: string;
@@ -20,7 +21,7 @@ export const addCommand = async (name: string, options: AddOptions): Promise<voi
     const promptService = PromptService.getInstance();
     const version = options.version || "latest";
 
-    // Fetch and materialize the prompt (like sync does for individual prompts)
+        // Fetch and materialize the prompt (like sync does for individual prompts)
     const spinner = ora(`Adding ${chalk.cyan(`${name}@${version}`)}...`).start();
 
     try {
@@ -33,10 +34,16 @@ export const addCommand = async (name: string, options: AddOptions): Promise<voi
         process.exit(1);
       }
 
-      // Ensure directories exist
-      FileManager.ensureDirectories();
+      // Stop spinner before any user input prompts
+      spinner.stop();
 
-            // Convert to MaterializedPrompt format and save
+      // Ensure project is initialized (prompts.json, lock file, directories)
+      await ensureProjectInitialized();
+
+      // Restart spinner for the actual work
+      spinner.start(`Adding ${chalk.cyan(`${name}@${version}`)}...`);
+
+      // Convert to MaterializedPrompt format and save
       const materializedPrompt = PromptConverter.fromApiToMaterialized(prompt);
       const savedPath = FileManager.saveMaterializedPrompt(name, materializedPrompt);
       const relativePath = path.relative(process.cwd(), savedPath);
@@ -54,8 +61,9 @@ export const addCommand = async (name: string, options: AddOptions): Promise<voi
 
       spinner.succeed();
 
-      // Show what was done
-      console.log(chalk.green(`✓ Pulled ${chalk.cyan(`${name}@${version}`)} ${chalk.gray(`(version ${prompt.version})`)} → ${chalk.gray(relativePath)}`));
+      // Show what was done (add ./ prefix for consistency)
+      const displayPath = relativePath.startsWith('./') ? relativePath : `./${relativePath}`;
+      console.log(chalk.green(`✓ Pulled ${chalk.cyan(`${name}@${version}`)} ${chalk.gray(`(version ${prompt.version})`)} → ${chalk.gray(displayPath)}`));
 
     } catch (error) {
       spinner.fail();

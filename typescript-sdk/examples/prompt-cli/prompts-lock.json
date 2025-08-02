@@ -1,4 +1,10 @@
 {
   "lockfileVersion": 1,
-  "prompts": {}
+  "prompts": {
+    "prompt_4RXLJtB9Cj-OA1BaLpxWc": {
+      "version": 3,
+      "versionId": "prompt_version_CuyQm0aYeUB7SjaWmRnA9",
+      "materialized": "prompts/.materialized/prompt_4RXLJtB9Cj-OA1BaLpxWc.prompt.yaml"
+    }
+  }
 }

@@ -62,6 +62,19 @@ export class FileManager {
     fs.writeFileSync(configPath, JSON.stringify(config, null, 2) + "\n");
   }
 
+  static initializePromptsConfig(): { created: boolean; path: string } {
+    const configPath = this.getPromptsConfigPath();
+    const existed = fs.existsSync(configPath);
+
+    if (!existed) {
+      const emptyConfig: PromptsConfig = { prompts: {} };
+      this.savePromptsConfig(emptyConfig);
+      return { created: true, path: configPath };
+    }
+
+    return { created: false, path: configPath };
+  }
+
   static loadPromptsLock(): PromptsLock {
     const lockPath = this.getPromptsLockPath();
 
@@ -83,6 +96,22 @@ export class FileManager {
   static savePromptsLock(lock: PromptsLock): void {
     const lockPath = this.getPromptsLockPath();
     fs.writeFileSync(lockPath, JSON.stringify(lock, null, 2) + "\n");
+  }
+
+  static initializePromptsLock(): { created: boolean; path: string } {
+    const lockPath = this.getPromptsLockPath();
+    const existed = fs.existsSync(lockPath);
+
+    if (!existed) {
+      const emptyLock: PromptsLock = {
+        lockfileVersion: 1,
+        prompts: {}
+      };
+      this.savePromptsLock(emptyLock);
+      return { created: true, path: lockPath };
+    }
+
+    return { created: false, path: lockPath };
   }
 
   static loadLocalPrompt(filePath: string): LocalPromptConfig {
@@ -244,5 +273,31 @@ export class FileManager {
     for (const name of names) {
       delete lock.prompts[name];
     }
+  }
+
+  static addToGitignore(entry: string): { added: boolean; existed: boolean } {
+    const gitignorePath = path.join(process.cwd(), ".gitignore");
+
+    // Check if .gitignore exists
+    if (!fs.existsSync(gitignorePath)) {
+      // Create new .gitignore with the entry
+      fs.writeFileSync(gitignorePath, `${entry}\n`);
+      return { added: true, existed: false };
+    }
+
+    // Read existing .gitignore
+    const content = fs.readFileSync(gitignorePath, "utf-8");
+    const lines = content.split("\n").map(line => line.trim());
+
+    // Check if entry already exists
+    if (lines.includes(entry)) {
+      return { added: false, existed: true };
+    }
+
+    // Add entry to .gitignore
+    const newContent = content.endsWith("\n") ? `${content}${entry}\n` : `${content}\n${entry}\n`;
+    fs.writeFileSync(gitignorePath, newContent);
+
+    return { added: true, existed: false };
   }
 }

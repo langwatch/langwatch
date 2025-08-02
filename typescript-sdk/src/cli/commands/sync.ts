@@ -1,22 +1,24 @@
+import * as fs from "fs";
 import * as path from "path";
 import chalk from "chalk";
 import ora from "ora";
-import { FileManager } from "../utils/fileManager";
-import { PromptService, PromptsError } from "../../prompt/service";
 import { PromptConverter } from "../../prompt/converter";
+import { PromptService, PromptsError } from "../../prompt/service";
 import type { SyncResult } from "../types";
+import { FileManager } from "../utils/fileManager";
+import { ensureProjectInitialized } from "../utils/init";
 
 export const syncCommand = async (): Promise<void> => {
   const startTime = Date.now();
 
   try {
-    // Get prompt service
+        // Get prompt service
     const promptService = PromptService.getInstance();
 
-    // Ensure directories exist
-    FileManager.ensureDirectories();
+    // Ensure project is initialized (prompts.json, lock file, directories)
+    await ensureProjectInitialized(false); // Don't prompt for .gitignore in sync
 
-        // Load prompts config and lock
+    // Load prompts config and lock
     const config = FileManager.loadPromptsConfig();
     const lock = FileManager.loadPromptsLock();
 
@@ -40,28 +42,42 @@ export const syncCommand = async (): Promise<void> => {
       return true;
     });
 
-    if (remoteDeps.length > 0) {
-      const fetchSpinner = ora(`Fetching ${remoteDeps.length} remote prompts...`).start();
+        if (remoteDeps.length > 0) {
+      const fetchSpinner = ora(`Checking ${remoteDeps.length} remote prompts...`).start();
 
       for (const [name, dependency] of remoteDeps) {
         try {
           const versionSpec = typeof dependency === "string" ? dependency : dependency.version || "latest";
 
-          // Fetch the prompt from the API
+          // Check if we already have this prompt with the same version
+          const lockEntry = lock.prompts[name];
+
+          // Fetch the prompt from the API to check current version
           const prompt = await promptService.get(name);
 
-                    if (prompt) {
-            // Convert to MaterializedPrompt format using the converter
-            const materializedPrompt = PromptConverter.fromApiToMaterialized(prompt);
+          if (prompt) {
+            // Check if we need to update (new version or not materialized)
+            const needsUpdate = !lockEntry ||
+                               lockEntry.version !== prompt.version ||
+                               !lockEntry.materialized ||
+                               !fs.existsSync(path.resolve(lockEntry.materialized));
 
-                        const savedPath = FileManager.saveMaterializedPrompt(name, materializedPrompt);
-            const relativePath = path.relative(process.cwd(), savedPath);
-            result.fetched.push(name); // Store the name, not path
+            if (needsUpdate) {
+              // Convert to MaterializedPrompt format using the converter
+              const materializedPrompt = PromptConverter.fromApiToMaterialized(prompt);
 
-            // Update lock file entry
-            FileManager.updateLockEntry(lock, name, materializedPrompt, savedPath);
+              const savedPath = FileManager.saveMaterializedPrompt(name, materializedPrompt);
+              const relativePath = path.relative(process.cwd(), savedPath);
+              result.fetched.push(name); // Store the name, not path
 
-            fetchSpinner.text = `Fetched ${chalk.cyan(`${name}@${versionSpec}`)} ${chalk.gray(`(version ${prompt.version})`)} → ${chalk.gray(relativePath)}`;
+              // Update lock file entry
+              FileManager.updateLockEntry(lock, name, materializedPrompt, savedPath);
+
+              fetchSpinner.text = `Fetched ${chalk.cyan(`${name}@${versionSpec}`)} ${chalk.gray(`(version ${prompt.version})`)} → ${chalk.gray(relativePath)}`;
+            } else {
+              // No change needed, track as unchanged
+              result.unchanged.push(name);
+            }
           } else {
             result.errors.push({ name, error: "Prompt not found" });
           }
@@ -151,15 +167,19 @@ export const syncCommand = async (): Promise<void> => {
     // Save the updated lock file
     FileManager.savePromptsLock(lock);
 
-    // Print individual results if there were actions
+        // Print individual results if there were actions
     if (result.fetched.length > 0) {
       for (const name of result.fetched) {
-        const parts = name.split("/");
-        const fileName = `${parts[parts.length - 1]}.prompt.yaml`;
-        const materializedPath = parts.length > 1
-          ? `./prompts/.materialized/${parts.slice(0, -1).join("/")}/${fileName}`
-          : `./prompts/.materialized/${fileName}`;
-        console.log(chalk.green(`✓ Pulled ${chalk.cyan(name)} → ${chalk.gray(materializedPath)}`));
+        // Get the actual saved path from lock file for display consistency
+        const lockEntry = lock.prompts[name];
+        const displayPath = lockEntry?.materialized ? `./${lockEntry.materialized}` : `./prompts/.materialized/${name}.prompt.yaml`;
+
+        // Get version info for display (like add command)
+        const dependency = config.prompts[name];
+        const versionSpec = typeof dependency === "string" ? dependency : dependency?.version || "latest";
+        const actualVersion = lockEntry?.version || "unknown";
+
+        console.log(chalk.green(`✓ Pulled ${chalk.cyan(`${name}@${versionSpec}`)} ${chalk.gray(`(version ${actualVersion})`)} → ${chalk.gray(displayPath)}`));
       }
     }
 
@@ -184,7 +204,7 @@ export const syncCommand = async (): Promise<void> => {
       }
     }
 
-        // Print summary
+            // Print summary
     const duration = ((Date.now() - startTime) / 1000).toFixed(1);
     const totalActions = result.fetched.length + result.pushed.length + result.cleaned.length;
 
