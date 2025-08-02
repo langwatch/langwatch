@@ -7,11 +7,27 @@ import {
   type SystemStyleObject,
 } from "@chakra-ui/react";
 import { type PropsWithChildren, type ReactNode } from "react";
+import { Info } from "react-feather";
 import type { FieldErrors } from "react-hook-form";
+
+import { Tooltip } from "~/components/ui/tooltip";
+
+export interface HorizontalFormControlProps extends SystemStyleObject {
+  label: string | ReactNode;
+  helper?: string | ReactNode;
+  tooltip?: ReactNode;
+  invalid?: boolean;
+  inputWidth?: string;
+  direction?: "horizontal" | "vertical";
+  size?: "sm" | "md";
+  error?: FieldErrors<any>[0] | ReactNode;
+  align?: "start" | "end";
+}
 
 export function HorizontalFormControl({
   label,
   helper,
+  tooltip,
   invalid,
   children,
   minWidth,
@@ -21,18 +37,7 @@ export function HorizontalFormControl({
   size = "md",
   error,
   ...props
-}: PropsWithChildren<{
-  label: string | ReactNode;
-  helper: string | ReactNode;
-  invalid?: boolean;
-  inputWidth?: string;
-  direction?: "horizontal" | "vertical";
-  size?: "sm" | "md";
-  error?: FieldErrors<any>[0] | ReactNode;
-}> &
-  SystemStyleObject & {
-    align?: "start" | "end";
-  }) {
+}: PropsWithChildren<HorizontalFormControlProps>) {
   return (
     <Field.Root
       borderBottomWidth="1px"
@@ -71,7 +76,14 @@ export function HorizontalFormControl({
               width: "full",
             })}
           >
-            {label}
+            <HStack gap={2}>
+              {label}
+              {tooltip && (
+                <Tooltip content={tooltip} positioning={{ placement: "top" }}>
+                  <Info size={14} />
+                </Tooltip>
+              )}
+            </HStack>
           </Field.Label>
           <Field.HelperText margin={0} fontSize="13px">
             {helper}

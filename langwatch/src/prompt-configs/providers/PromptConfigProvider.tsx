@@ -1,5 +1,6 @@
 import { useDisclosure } from "@chakra-ui/react";
 import { createContext, useCallback, useContext, useRef } from "react";
+import { useFormContext } from "react-hook-form";
 
 import {
   SaveVersionDialog,
@@ -15,7 +16,7 @@ interface PromptConfigContextType {
   triggerSaveVersion: (
     configId: string,
     updateConfigValues: PromptConfigFormValues
-  ) => void;
+  ) => Promise<void>;
 }
 
 const PromptConfigContext = createContext<PromptConfigContextType>({
@@ -47,23 +48,32 @@ export function PromptConfigProvider({
   } = useDisclosure();
 
   // Prompt config state
-  const { updatePromptNameIfChanged, createNewVersion } = usePromptConfig();
+  const { updatePromptConfig, createNewVersion } = usePromptConfig();
 
   // Closure to save the function that will do the saving
   const updateConfigClosureRef = useRef<
     ((saveFormValues: SaveDialogFormValues) => Promise<void>) | null
   >(null);
 
+  const methods = useFormContext<PromptConfigFormValues>();
+
   const triggerSaveVersion = useCallback(
-    (configId: string, updateConfigValues: PromptConfigFormValues) => {
+    async (configId: string, updateConfigValues: PromptConfigFormValues) => {
+      // Trigger the form validation
+      const isValid = await methods.trigger();
+
+      if (!isValid) {
+        // If the form is not valid, don't save
+        return;
+      }
+
       // Save a ref to the function that will do the saving
       // with the saveFormValues enclosed in the closure
       updateConfigClosureRef.current = async (
         saveFormValues: SaveDialogFormValues
       ) => {
         try {
-          await updatePromptNameIfChanged(configId, updateConfigValues.name);
-
+          await updatePromptConfig(configId, updateConfigValues);
           const version = await createNewVersion(
             configId,
             promptConfigFormValuesVersionToLlmConfigVersionConfigData(
@@ -82,14 +92,15 @@ export function PromptConfigProvider({
           console.error(error);
           toaster.error({
             title: "Failed to save version",
-            description: "Please try again.",
+            description:
+              error instanceof Error ? error.message : "Please try again.",
           });
         }
       };
 
       openDialog();
     },
-    [openDialog, updatePromptNameIfChanged, createNewVersion, closeDialog]
+    [openDialog, updatePromptConfig, createNewVersion, closeDialog, methods]
   );
 
   return (
