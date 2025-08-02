@@ -13,6 +13,11 @@ const addCommand = async (name: string, options: { version?: string }): Promise<
   return addCommandImpl(name, options);
 };
 
+const removeCommand = async (name: string): Promise<void> => {
+  const { removeCommand: removeCommandImpl } = await import("./commands/remove.js");
+  return removeCommandImpl(name);
+};
+
 const syncCommand = async (): Promise<void> => {
   const { syncCommand: syncCommandImpl } = await import("./commands/sync.js");
   return syncCommandImpl();
@@ -41,6 +46,18 @@ promptCmd
     try {
       const { name, version } = parsePromptSpec(spec);
       await addCommand(name, { version });
+    } catch (error) {
+      console.error(`Error: ${error instanceof Error ? error.message : "Unknown error"}`);
+      process.exit(1);
+    }
+  });
+
+promptCmd
+  .command("remove <name>")
+  .description("Remove a prompt dependency")
+  .action(async (name: string) => {
+    try {
+      await removeCommand(name);
     } catch (error) {
       console.error(`Error: ${error instanceof Error ? error.message : "Unknown error"}`);
       process.exit(1);
