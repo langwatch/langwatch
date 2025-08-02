@@ -68,19 +68,19 @@ export const usePromptConfigForm = ({
     resolver: (data, ...args) => {
       return zodResolver(
         promptConfigSchema.extend({
+          // We redefine this here so we can use the hooks for a server side validation
           referenceId: z
             .string()
             .optional()
             .refine(
               async (value) => {
-                console.log("refine isVali value", value);
                 if (!value || value.trim() === "") return true;
                 return await checkReferenceIdUniqueness({
                   referenceId: value,
                   excludeId: initialConfigValues?.referenceId,
                 });
               },
-              { message: "Reference ID must be unique" }
+              { message: "⚠ Reference id must be unique." }
             ),
           version: formSchema.shape.version,
         })
