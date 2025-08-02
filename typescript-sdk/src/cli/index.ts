@@ -23,6 +23,11 @@ const initCommand = async (): Promise<void> => {
   return initCommandImpl();
 };
 
+const loginCommand = async (): Promise<void> => {
+  const { loginCommand: loginCommandImpl } = await import("./commands/login.js");
+  return loginCommandImpl();
+};
+
 const syncCommand = async (): Promise<void> => {
   const { syncCommand: syncCommandImpl } = await import("./commands/sync.js");
   return syncCommandImpl();
@@ -38,6 +43,19 @@ program
   })
   .showHelpAfterError()
   .showSuggestionAfterError();
+
+// Top-level commands
+program
+  .command("login")
+  .description("Login to LangWatch and save API key")
+  .action(async () => {
+    try {
+      await loginCommand();
+    } catch (error) {
+      console.error(`Error: ${error instanceof Error ? error.message : "Unknown error"}`);
+      process.exit(1);
+    }
+  });
 
 // Add prompt command group
 const promptCmd = program

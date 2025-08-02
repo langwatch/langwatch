@@ -9,7 +9,9 @@ export const checkApiKey = (): void => {
 
   if (!apiKey || apiKey.trim() === "") {
     console.error(chalk.red("Error: LANGWATCH_API_KEY not found."));
-    console.error(chalk.gray("Please add it to your environment variables or .env file:"));
+    console.error(chalk.gray("You can get your API key by running:"));
+    console.error(chalk.cyan("  langwatch login"));
+    console.error(chalk.gray("Or manually add it to your .env file:"));
     console.error(chalk.cyan("  echo 'LANGWATCH_API_KEY=your_api_key_here' >> .env"));
     process.exit(1);
   }
