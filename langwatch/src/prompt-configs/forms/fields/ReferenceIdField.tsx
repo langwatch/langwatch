@@ -1,14 +1,10 @@
 import { Input, Text } from "@chakra-ui/react";
-import { useState, type ReactNode } from "react";
+import { type ReactNode } from "react";
 import { useFormContext, useFormState } from "react-hook-form";
 
 import type { PromptConfigFormValues } from "../../hooks/usePromptConfigForm";
 
 import { VerticalFormControl } from "~/components/VerticalFormControl";
-import { usePromptReferenceIdCheck } from "~/hooks/prompts/usePromptReferenceIdCheck";
-import { createLogger } from "~/utils/logger";
-
-const logger = createLogger("ReferenceIdField");
 
 interface ReferenceIdFieldProps {
   // Optional label to override the default "Reference ID" label
@@ -22,8 +18,6 @@ interface ReferenceIdFieldProps {
 export function ReferenceIdField({ label }: ReferenceIdFieldProps) {
   const { register, control } = useFormContext<PromptConfigFormValues>();
   const { errors, dirtyFields, defaultValues } = useFormState({ control });
-  const [isValid, setIsValid] = useState(true);
-  const { checkReferenceIdUniqueness } = usePromptReferenceIdCheck();
 
   // Check if reference ID field is dirty (changed from original)
   const isReferenceIdDirty = dirtyFields.referenceId;
@@ -37,7 +31,7 @@ export function ReferenceIdField({ label }: ReferenceIdFieldProps) {
   return (
     <VerticalFormControl
       label={label ?? "Reference ID"}
-      invalid={!!errors.referenceId || !isValid}
+      invalid={!!errors.referenceId}
       tooltip="Optional unique identifier for easy reference (e.g., team/project/prompt). Once set, avoid changing to prevent breaking existing integrations."
       error={errors.referenceId}
       size="sm"
@@ -56,11 +50,6 @@ export function ReferenceIdField({ label }: ReferenceIdFieldProps) {
           documentation.
         </Text>
       )}
-      {/* {!isValid && (
-        <Text color="red.500" fontSize="12px" fontWeight="medium" mt={2}>
-          ⚠ Reference id must be unique.
-        </Text>
-      )} */}
     </VerticalFormControl>
   );
 }

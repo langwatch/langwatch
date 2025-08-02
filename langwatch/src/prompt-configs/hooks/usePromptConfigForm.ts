@@ -2,43 +2,15 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import isEqual from "lodash-es/isEqual";
 import { useEffect } from "react";
 import { useForm, type DeepPartial } from "react-hook-form";
-import { z } from "zod";
-
-import { getLatestConfigVersionSchema } from "~/server/prompt-config/repositories/llm-config-version-schema";
+import { type z } from "zod";
 
 import { inputsAndOutputsToDemostrationColumns } from "../llmPromptConfigUtils";
 
 import { usePromptReferenceIdCheck } from "~/hooks/prompts/usePromptReferenceIdCheck";
-
-const promptConfigSchema = z.object({
-  name: z.string().min(1, "Name is required"),
-  referenceId: z.string().optional(),
-});
-
-const latestConfigVersionSchema = getLatestConfigVersionSchema();
-
-const formSchema = promptConfigSchema.extend({
-  version: z.object({
-    configData: z.object({
-      prompt: latestConfigVersionSchema.shape.configData.shape.prompt,
-      messages: latestConfigVersionSchema.shape.configData.shape.messages,
-      inputs: latestConfigVersionSchema.shape.configData.shape.inputs,
-      outputs: latestConfigVersionSchema.shape.configData.shape.outputs,
-      llm: z.object({
-        model: latestConfigVersionSchema.shape.configData.shape.model,
-        temperature:
-          latestConfigVersionSchema.shape.configData.shape.temperature,
-        max_tokens: latestConfigVersionSchema.shape.configData.shape.max_tokens,
-        // Additional params attached to the LLM config
-        litellm_params: z.record(z.string()).optional(),
-      }),
-      demonstrations:
-        latestConfigVersionSchema.shape.configData.shape.demonstrations,
-      prompting_technique:
-        latestConfigVersionSchema.shape.configData.shape.prompting_technique,
-    }),
-  }),
-});
+import {
+  createPromptConfigSchemaWithValidators,
+  type formSchema,
+} from "~/prompt-configs/schemas";
 
 export type PromptConfigFormValues = z.infer<typeof formSchema>;
 
@@ -55,7 +27,7 @@ let disableFormSyncTimeout: NodeJS.Timeout | null = null;
 export const usePromptConfigForm = ({
   configId,
   onChange,
-  initialConfigValues,
+  initialConfigValues = {},
 }: UsePromptConfigFormProps) => {
   const { checkReferenceIdUniqueness } = usePromptReferenceIdCheck();
 
@@ -64,25 +36,12 @@ export const usePromptConfigForm = ({
      * Don't pass undefined as defaultValue
      * @see https://react-hook-form.com/docs/useform#defaultValues
      */
-    defaultValues: initialConfigValues ?? {},
+    defaultValues: initialConfigValues,
     resolver: (data, ...args) => {
       return zodResolver(
-        promptConfigSchema.extend({
-          // We redefine this here so we can use the hooks for a server side validation
-          referenceId: z
-            .string()
-            .optional()
-            .refine(
-              async (value) => {
-                if (!value || value.trim() === "") return true;
-                return await checkReferenceIdUniqueness({
-                  referenceId: value,
-                  excludeId: initialConfigValues?.referenceId,
-                });
-              },
-              { message: "⚠ Reference id must be unique." }
-            ),
-          version: formSchema.shape.version,
+        createPromptConfigSchemaWithValidators({
+          initialConfigValues,
+          checkReferenceIdUniqueness,
         })
       )(data, ...args);
     },
@@ -129,7 +88,7 @@ export const usePromptConfigForm = ({
     setTimeout(() => {
       disableOnChange = false;
     }, 1);
-  }, [initialConfigValues]);
+  }, [initialConfigValues, methods]);
 
   // Provides reverse sync of form values to the parent component
   useEffect(() => {
