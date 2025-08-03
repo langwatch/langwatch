@@ -53,7 +53,6 @@ function PanelTitle({ title }: PanelTitleProps) {
     <Heading
       lineClamp={2}
       fontWeight={500}
-      cursor="pointer"
       overflow="hidden"
       textOverflow="ellipsis"
     >

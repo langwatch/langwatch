@@ -1,4 +1,4 @@
-import { Text, Spinner, VStack, HStack } from "@chakra-ui/react";
+import { Text, Spinner, VStack, HStack, Badge } from "@chakra-ui/react";
 import {
   type Dispatch,
   type SetStateAction,
@@ -171,20 +171,23 @@ export const PromptConfigPanel = forwardRef(function PromptConfigPanel(
       <InputOutputExecutablePanel.CenterContent>
         <VStack width="full" gap={4} height="full" background="white">
           <PanelHeader
-            title={<Text>Prompt Configuration</Text>}
+            title={
+              <HStack>
+                <Text>Prompt Configuration</Text>
+                {llmConfig?.latestVersion && llmConfig.handle && (
+                  <Badge
+                    colorPalette="green"
+                    border="1px solid"
+                    borderColor="green.200"
+                  >
+                    v{llmConfig?.latestVersion.version}
+                  </Badge>
+                )}
+              </HStack>
+            }
             onClose={handleClose}
             onExpand={handleExpand}
           />
-          {llmConfig && (
-            <HStack width="full" gap={2} flexWrap="wrap">
-              <MetadataTag label="prompt_id" value={llmConfig.id} copyable />
-              <MetadataTag
-                label="version_id"
-                value={llmConfig.latestVersion.id ?? ""}
-                copyable
-              />
-            </HStack>
-          )}
           {isLoadingConfig ? (
             <Spinner size="md" />
           ) : (

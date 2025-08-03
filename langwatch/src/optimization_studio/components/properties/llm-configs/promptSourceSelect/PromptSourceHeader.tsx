@@ -177,14 +177,16 @@ export function PromptSourceHeader({
             {...register("name")}
           />
         </InputGroup>
-        <GeneratePromptApiSnippetDialog
-          configId={configId}
-          apiKey={project?.apiKey}
-        >
-          <GeneratePromptApiSnippetDialog.Trigger>
-            <GenerateApiSnippetButton />
-          </GeneratePromptApiSnippetDialog.Trigger>
-        </GeneratePromptApiSnippetDialog>
+        {savedConfig && (
+          <GeneratePromptApiSnippetDialog
+            configId={configId}
+            apiKey={project?.apiKey}
+          >
+            <GeneratePromptApiSnippetDialog.Trigger>
+              <GenerateApiSnippetButton config={savedConfig} />
+            </GeneratePromptApiSnippetDialog.Trigger>
+          </GeneratePromptApiSnippetDialog>
+        )}
         <HStack flex={1} width="50%">
           <PromptSource configId={configId} onSelect={onPromptSourceSelect} />
         </HStack>

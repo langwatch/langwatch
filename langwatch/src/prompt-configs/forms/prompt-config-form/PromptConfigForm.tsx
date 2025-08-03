@@ -81,26 +81,13 @@ function InnerPromptConfigForm(props: PromptConfigFormProps) {
   return (
     <form style={{ width: "100%" }}>
       <VStack width="full" gap={6} mb={6}>
-        <VerticalFormControl label="Current Version" size="sm">
-          <PromptConfigInfoAndSavePartial
-            isSaving={isLoading}
-            config={savedConfig}
-            saveEnabled={saveEnabled}
-            onSaveClick={handleSaveClick}
-          />
-        </VerticalFormControl>
-        <HStack width="full" alignItems="end">
-          <PromptNameField />
-          <GeneratePromptApiSnippetDialog
-            configId={configId}
-            apiKey={project?.apiKey}
-          >
-            <GeneratePromptApiSnippetDialog.Trigger>
-              <GenerateApiSnippetButton />
-            </GeneratePromptApiSnippetDialog.Trigger>
-          </GeneratePromptApiSnippetDialog>
-        </HStack>
-        <HandleField />
+        <PromptConfigInfoAndSavePartial
+          isSaving={isLoading}
+          config={savedConfig}
+          showSave={false}
+          saveEnabled={saveEnabled}
+          onSaveClick={handleSaveClick}
+        />
         <ModelSelectField />
         <PromptField
           templateAdapter="default"

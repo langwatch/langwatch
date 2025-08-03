@@ -18,6 +18,8 @@ import { Menu } from "~/components/ui/menu";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { toaster } from "../components/ui/toaster";
 import { formatTimeAgo } from "../utils/formatTimeAgo";
+import { CopyButton } from "../components/CopyButton";
+import { GenerateApiSnippetButton } from "../components/GenerateApiSnippetButton";
 
 export interface PromptConfigTableProps {
   configs: LlmConfigWithLatestVersion[];
@@ -67,14 +69,12 @@ export function PromptsList({
           <Card.Root
             key={config.id}
             cursor="pointer"
-            onClick={() => onEdit(config)}
+            onClick={() => void onEdit(config)}
             transition="all 0.2s"
-            _hover={
-              {
-                transform: "translateY(-2px)",
-                shadow: "md",
-              }
-            }
+            _hover={{
+              transform: "translateY(-2px)",
+              shadow: "md",
+            }}
             borderWidth="1px"
             borderColor="gray.200"
             _dark={{
@@ -97,45 +97,10 @@ export function PromptsList({
                       ) : (
                         <Text>{config.handle}</Text>
                       )}
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        cursor="pointer"
-                        onClick={(event) => {
-                          if (!config.handle) return;
-                          event.stopPropagation();
-
-                          if (!navigator.clipboard) {
-                            toaster.create({
-                              title: `Your browser does not support clipboard access, please copy the prompt ID manually`,
-                              type: "error",
-                              duration: 2000,
-                              meta: {
-                                closable: true,
-                              },
-                              placement: "top-end",
-                            });
-                            return;
-                          }
-
-                          void (async () => {
-                            await navigator.clipboard.writeText(
-                              config.handle ?? ""
-                            );
-                            toaster.create({
-                              title: `Prompt ID copied to your clipboard`,
-                              type: "success",
-                              duration: 2000,
-                              meta: {
-                                closable: true,
-                              },
-                              placement: "top-end",
-                            });
-                          })();
-                        }}
-                      >
-                        <CopyIcon width={14} height={14} />
-                      </Button>
+                      <CopyButton
+                        value={config.handle ?? ""}
+                        label="Prompt ID"
+                      />
                       <Badge
                         colorPalette="green"
                         border="1px solid"
@@ -249,14 +214,7 @@ export function PromptsList({
 
                 <HStack gap={2}>
                   <GeneratePromptApiSnippetDialog.Trigger>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <UnplugIcon size={14} />
-                      API
-                    </Button>
+                    <GenerateApiSnippetButton config={config} />
                   </GeneratePromptApiSnippetDialog.Trigger>
                 </HStack>
               </HStack>
