@@ -97,10 +97,6 @@ export class PromptService {
       ...data,
     };
 
-    if (data.handle && !data.scope) {
-      throw new Error("Scope is required when handle is provided");
-    }
-
     // Format handle with organization/project context if provided
     if (data.handle) {
       let newScope = data.scope;
