@@ -21,12 +21,11 @@ export const usePromptConfig = () => {
 
   const updatePromptConfig = async (
     configId: string,
-    configData: { name: string; handle?: string; scope?: PromptScope }
+    configData: { handle?: string; scope?: PromptScope }
   ) => {
     const config = await updateConfig.mutateAsync({
       projectId,
       id: configId,
-      name: configData.name,
       handle: configData.handle,
       scope: configData.scope,
     });

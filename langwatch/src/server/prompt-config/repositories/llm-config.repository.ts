@@ -21,7 +21,7 @@ const logger = createLogger("langwatch:prompt-config:llm-config.repository");
  * Interface for LLM Config data transfer objects
  */
 interface LlmConfigDTO {
-  name: string;
+  name?: string;
   projectId: string;
   organizationId: string;
   authorId?: string;
@@ -272,7 +272,7 @@ export class LlmConfigRepository {
       const newConfig = await tx.llmPromptConfig.create({
         data: {
           id: `prompt_${nanoid()}`,
-          name: configData.name,
+          name: configData.name ?? "",
           projectId: configData.projectId,
           handle: configData.handle,
         },

@@ -44,6 +44,7 @@ import { PromptMessagesField } from "../../../../prompt-configs/forms/fields/Pro
 import { useShallow } from "zustand/react/shallow";
 import { useWizardContext } from "../../../../components/evaluations/wizard/hooks/useWizardContext";
 import type { PromptTextAreaOnAddMention } from "~/prompt-configs/components/ui/PromptTextArea";
+import type { LlmConfigWithLatestVersion } from "../../../../server/prompt-config/repositories/llm-config.repository";
 
 /**
  * Properties panel for the Signature node in the optimization studio.
@@ -170,7 +171,7 @@ function SignaturePropertiesPanelInner({
   };
 
   const handleTriggerSaveVersion = (
-    configId: string,
+    config: LlmConfigWithLatestVersion,
     saveFormValues: PromptConfigFormValues
   ) => {
     void (async () => {
@@ -178,7 +179,7 @@ function SignaturePropertiesPanelInner({
       const isValid = await formProps.methods.trigger();
       if (!isValid) return;
 
-      triggerSaveVersion(configId, saveFormValues);
+      await triggerSaveVersion(config, saveFormValues);
     })();
   };
 
@@ -203,8 +204,8 @@ function SignaturePropertiesPanelInner({
       .filter((edge) => edge.target === node.id)
       .map((edge) => edge.source + "." + edge.sourceHandle);
 
-    let dependentNodes: string[] = [];
-    let toVisit = [node.id];
+    const dependentNodes: string[] = [];
+    const toVisit = [node.id];
     while (toVisit.length > 0) {
       const currentNode = toVisit.shift();
       if (!currentNode) continue;

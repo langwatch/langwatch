@@ -34,7 +34,7 @@ export class PromptService {
     idOrHandle: string;
     projectId: string;
     organizationId: string;
-  }): Promise<LlmConfigWithLatestVersion> {
+  }): Promise<LlmConfigWithLatestVersion | null> {
     const { idOrHandle, projectId, organizationId } = params;
 
     return this.repository.getConfigByIdOrHandleWithLatestVersion({

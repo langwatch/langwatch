@@ -3,7 +3,10 @@ import { z } from "zod";
 
 import type { EvaluatorTypes } from "~/server/evaluations/evaluators.generated";
 
-import { datasetColumnTypeSchema, type DatasetColumns } from "../../server/datasets/types";
+import {
+  datasetColumnTypeSchema,
+  type DatasetColumns,
+} from "../../server/datasets/types";
 import type { LlmConfigInputType, LlmConfigOutputType } from "~/types";
 import type { ChatMessage } from "../../server/tracer/types";
 
@@ -147,7 +150,6 @@ type MessagesParameter = StronglyTypedFieldBase & {
 
 export type LlmPromptConfigComponent = Signature & {
   configId: string;
-  name: string;
   inputs: (Omit<Field, "type"> & { type: LlmConfigInputType })[];
   outputs: (Omit<Field, "type"> & { type: LlmConfigOutputType })[];
   parameters: (
@@ -176,10 +178,14 @@ export type PromptingTechnique = BaseComponent;
 export const nodeDatasetSchema = z.object({
   id: z.string().optional(),
   name: z.string().optional(),
-  inline: z.object({
-    records: z.record(z.array(z.string())),
-    columnTypes: z.array(z.object({ name: z.string(), type: datasetColumnTypeSchema })),
-  }).optional(),
+  inline: z
+    .object({
+      records: z.record(z.array(z.string())),
+      columnTypes: z.array(
+        z.object({ name: z.string(), type: datasetColumnTypeSchema })
+      ),
+    })
+    .optional(),
 });
 
 export type NodeDataset = z.infer<typeof nodeDatasetSchema>;

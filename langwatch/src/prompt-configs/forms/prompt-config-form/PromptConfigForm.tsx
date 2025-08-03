@@ -1,4 +1,4 @@
-import { HStack, VStack } from "@chakra-ui/react";
+import { HStack, Spacer, VStack } from "@chakra-ui/react";
 import { useCallback } from "react";
 import {
   FormProvider,
@@ -15,21 +15,17 @@ import {
 } from "../fields/PromptConfigVersionFieldGroup";
 import { PromptField } from "../fields/PromptField";
 import { PromptMessagesField } from "../fields/PromptMessagesField";
-import { PromptNameField } from "../fields/PromptNameField";
-import { HandleField } from "../fields/HandleField";
 
-import { PromptConfigInfoAndSavePartial } from "./components/PromptConfigInfoAndSavePartial";
+import { PromptHandleInfo } from "./components/PromptHandleInfo";
 
-import { GenerateApiSnippetButton } from "~/components/GenerateApiSnippetButton";
 import { toaster } from "~/components/ui/toaster";
-import { VerticalFormControl } from "~/components/VerticalFormControl";
-import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import { GeneratePromptApiSnippetDialog } from "~/prompt-configs/components/GeneratePromptApiSnippetDialog";
 import { useGetPromptConfigByIdWithLatestVersionQuery } from "~/prompt-configs/hooks/useGetPromptConfigByIdWithLatestVersionQuery";
 import { usePromptConfig } from "~/prompt-configs/hooks/usePromptConfig";
 import type { PromptConfigFormValues } from "~/prompt-configs/hooks/usePromptConfigForm";
 import { usePromptConfigContext } from "~/prompt-configs/providers/PromptConfigProvider";
 import { createLogger } from "~/utils/logger";
+import { VersionHistoryButton } from "./components/VersionHistoryButton";
+import { VersionSaveButton } from "./components/VersionSaveButton";
 
 const logger = createLogger("PromptConfigForm");
 
@@ -43,7 +39,6 @@ interface PromptConfigFormProps {
  * Handles rendering the form fields and save dialog
  */
 function InnerPromptConfigForm(props: PromptConfigFormProps) {
-  const { project } = useOrganizationTeamProject();
   const { methods, configId } = props;
   const { isLoading } = usePromptConfig();
   const { triggerSaveVersion } = usePromptConfigContext();
@@ -67,27 +62,29 @@ function InnerPromptConfigForm(props: PromptConfigFormProps) {
   ).map((input) => input.identifier);
 
   const handleSaveClick = useCallback(() => {
-    void triggerSaveVersion(configId, methods.getValues()).catch((error) => {
+    if (!savedConfig) return;
+    void triggerSaveVersion(savedConfig, methods.getValues()).catch((error) => {
       logger.error(error);
       toaster.error({
         title: "Failed to save version",
         description: error.message,
       });
     });
-  }, [configId, methods, triggerSaveVersion]);
+  }, [savedConfig, methods, triggerSaveVersion]);
+
+  const hasDemonstrations =
+    Object.values(
+      savedConfig?.latestVersion.configData.demonstrations?.inline?.records ?? {
+        dummy: [],
+      }
+    )[0]?.length ?? 0 > 0;
 
   if (!savedConfig) return null;
 
   return (
-    <form style={{ width: "100%" }}>
-      <VStack width="full" gap={6} mb={6}>
-        <PromptConfigInfoAndSavePartial
-          isSaving={isLoading}
-          config={savedConfig}
-          showSave={false}
-          saveEnabled={saveEnabled}
-          onSaveClick={handleSaveClick}
-        />
+    <form style={{ width: "100%", height: "100%" }}>
+      <VStack width="full" height="full" gap={6} mb={6}>
+        <PromptHandleInfo config={savedConfig} />
         <ModelSelectField />
         <PromptField
           templateAdapter="default"
@@ -103,7 +100,24 @@ function InnerPromptConfigForm(props: PromptConfigFormProps) {
         />
         <InputsFieldGroup />
         <OutputsFieldGroup />
-        <DemonstrationsField />
+        {hasDemonstrations && <DemonstrationsField />}
+        <HStack
+          gap={2}
+          width="full"
+          position="absolute"
+          bottom={0}
+          background="white"
+          padding={3}
+          boxShadow="0 0px 6px rgba(0, 0, 0, 0.1)"
+        >
+          <VersionHistoryButton configId={configId} label="History" />
+          <Spacer />
+          <VersionSaveButton
+            disabled={!saveEnabled}
+            onClick={handleSaveClick}
+            isSaving={isLoading}
+          />
+        </HStack>
       </VStack>
     </form>
   );

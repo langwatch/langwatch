@@ -155,4 +155,7 @@ export const Select = {
   ItemGroup: SelectItemGroup,
   Label: SelectLabel,
   ItemText: SelectItemText,
+  Indicator: ChakraSelect.Indicator,
+  HiddenSelect: ChakraSelect.HiddenSelect,
+  Control: ChakraSelect.Control,
 };

@@ -1,5 +1,11 @@
 import { useDisclosure } from "@chakra-ui/react";
-import { createContext, useCallback, useContext, useRef } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useRef,
+  useState,
+} from "react";
 import { useFormContext } from "react-hook-form";
 
 import {
@@ -11,10 +17,15 @@ import type { PromptConfigFormValues } from "../hooks/usePromptConfigForm";
 
 import { toaster } from "~/components/ui/toaster";
 import { promptConfigFormValuesVersionToLlmConfigVersionConfigData } from "~/prompt-configs/llmPromptConfigUtils";
+import type { LlmConfigWithLatestVersion } from "../../server/prompt-config/repositories";
+import {
+  ChangeHandleDialog,
+  type ChangeHandleDialogFormValues,
+} from "../forms/ChangeHandleDialog";
 
 interface PromptConfigContextType {
   triggerSaveVersion: (
-    configId: string,
+    config: LlmConfigWithLatestVersion,
     updateConfigValues: PromptConfigFormValues
   ) => Promise<void>;
 }
@@ -46,6 +57,8 @@ export function PromptConfigProvider({
     onOpen: openDialog,
     onClose: closeDialog,
   } = useDisclosure();
+  const [currentConfig, setCurrentConfig] =
+    useState<LlmConfigWithLatestVersion | null>(null);
 
   // Prompt config state
   const { updatePromptConfig, createNewVersion } = usePromptConfig();
@@ -58,7 +71,11 @@ export function PromptConfigProvider({
   const methods = useFormContext<PromptConfigFormValues>();
 
   const triggerSaveVersion = useCallback(
-    async (configId: string, updateConfigValues: PromptConfigFormValues) => {
+    async (
+      config: LlmConfigWithLatestVersion,
+      updateConfigValues: PromptConfigFormValues
+    ) => {
+      setCurrentConfig(config);
       // Trigger the form validation
       const isValid = await methods.trigger();
 
@@ -70,12 +87,17 @@ export function PromptConfigProvider({
       // Save a ref to the function that will do the saving
       // with the saveFormValues enclosed in the closure
       updateConfigClosureRef.current = async (
-        saveFormValues: SaveDialogFormValues
+        saveFormValues: SaveDialogFormValues | ChangeHandleDialogFormValues
       ) => {
         try {
-          await updatePromptConfig(configId, updateConfigValues);
+          if ("handle" in saveFormValues) {
+            await updatePromptConfig(config.id, {
+              handle: saveFormValues.handle,
+              scope: saveFormValues.scope,
+            });
+          }
           const version = await createNewVersion(
-            configId,
+            config.id,
             promptConfigFormValuesVersionToLlmConfigVersionConfigData(
               updateConfigValues.version
             ),
@@ -106,15 +128,30 @@ export function PromptConfigProvider({
   return (
     <PromptConfigContext.Provider value={{ triggerSaveVersion }}>
       {children}
-      <SaveVersionDialog
-        isOpen={isOpen}
-        onClose={closeDialog}
-        onSubmit={async (saveFormValues) => {
-          if (!updateConfigClosureRef.current)
-            throw new Error("No closure found");
-          await updateConfigClosureRef.current(saveFormValues);
-        }}
-      />
+      {currentConfig &&
+      (!currentConfig.handle || currentConfig.handle === currentConfig.id) ? (
+        <ChangeHandleDialog
+          config={currentConfig}
+          isOpen={isOpen}
+          onClose={closeDialog}
+          onSubmit={async (changeHandleFormValues) => {
+            if (!updateConfigClosureRef.current)
+              throw new Error("No closure found");
+            await updateConfigClosureRef.current(changeHandleFormValues);
+          }}
+          firstTimeSave={true}
+        />
+      ) : (
+        <SaveVersionDialog
+          isOpen={isOpen}
+          onClose={closeDialog}
+          onSubmit={async (saveFormValues) => {
+            if (!updateConfigClosureRef.current)
+              throw new Error("No closure found");
+            await updateConfigClosureRef.current(saveFormValues);
+          }}
+        />
+      )}
     </PromptConfigContext.Provider>
   );
 }

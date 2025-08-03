@@ -13,7 +13,7 @@ export function VersionSaveButton({
 }) {
   return (
     <Tooltip
-      content="Save prompt version"
+      content={disabled ? "No changes detected" : ""}
       positioning={{ placement: "top" }}
       openDelay={0}
       showArrow

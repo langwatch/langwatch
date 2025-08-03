@@ -136,7 +136,7 @@ export class LlmConfigVersionsRepository {
    * Create a new version for an existing config
    */
   async createVersion(
-    versionData: LlmConfigVersionDTO
+    versionData: Omit<LlmConfigVersionDTO, "author">
   ): Promise<LlmPromptConfigVersion & { schemaVersion: SchemaVersion }> {
     // Omit the version field from the validator since auto-incremented by the database
     const validator = getVersionValidator(versionData.schemaVersion).omit({
@@ -152,6 +152,10 @@ export class LlmConfigVersionsRepository {
       const count = await tx.llmPromptConfigVersion.count({
         where: { configId, projectId },
       });
+
+      if ("author" in versionData) {
+        delete versionData.author;
+      }
 
       // Create the new version
       const newVersion = await tx.llmPromptConfigVersion.create({

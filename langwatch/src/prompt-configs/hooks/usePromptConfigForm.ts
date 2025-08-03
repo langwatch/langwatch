@@ -8,8 +8,7 @@ import { inputsAndOutputsToDemostrationColumns } from "../llmPromptConfigUtils";
 
 import { usePromptHandleCheck } from "~/hooks/prompts/usePromptHandleCheck";
 import {
-  createPromptConfigSchemaWithValidators,
-  type formSchema,
+  formSchema,
 } from "~/prompt-configs/schemas";
 
 export type PromptConfigFormValues = z.infer<typeof formSchema>;
@@ -29,8 +28,6 @@ export const usePromptConfigForm = ({
   onChange,
   initialConfigValues = {},
 }: UsePromptConfigFormProps) => {
-  const { checkHandleUniqueness } = usePromptHandleCheck();
-
   const methods = useForm<PromptConfigFormValues>({
     /**
      * Don't pass undefined as defaultValue
@@ -38,12 +35,7 @@ export const usePromptConfigForm = ({
      */
     defaultValues: initialConfigValues,
     resolver: (data, ...args) => {
-      return zodResolver(
-        createPromptConfigSchemaWithValidators({
-          configId,
-          checkHandleUniqueness,
-        })
-      )(data, ...args);
+      return zodResolver(formSchema)(data, ...args);
     },
   });
 

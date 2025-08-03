@@ -22,7 +22,7 @@ const projectIdSchema = z.object({
 
 const configDataSchema = z
   .object({
-    name: z.string(),
+    name: z.string().optional(),
   })
   .merge(projectIdSchema);
 
@@ -103,7 +103,6 @@ export const llmConfigsRouter = createTRPCRouter({
       projectIdSchema.merge(
         z.object({
           id: z.string(),
-          name: z.string(),
           handle: z.string().optional(),
           scope: z.nativeEnum(PromptScope).optional(),
         })
@@ -117,7 +116,6 @@ export const llmConfigsRouter = createTRPCRouter({
         input.id,
         input.projectId,
         {
-          name: input.name,
           handle: input.handle,
           scope: input.scope,
         }

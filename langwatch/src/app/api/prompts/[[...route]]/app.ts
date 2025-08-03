@@ -125,6 +125,12 @@ app.get(
         organizationId: organization.id,
       });
 
+      if (!config) {
+        throw new HTTPException(404, {
+          message: "Prompt not found",
+        });
+      }
+
       const response = {
         id: config.id,
         name: config.name,

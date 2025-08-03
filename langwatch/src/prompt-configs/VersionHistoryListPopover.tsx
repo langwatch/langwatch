@@ -161,11 +161,22 @@ function VersionHistoryList({
 /**
  * Trigger button for the version history popover
  */
-function VersionHistoryTrigger({ onClick }: { onClick?: () => void }) {
+function VersionHistoryTrigger({
+  onClick,
+  label,
+}: {
+  onClick?: () => void;
+  label?: string;
+}) {
   return (
     <Popover.Trigger asChild onClick={onClick}>
-      <Button variant="ghost" color="gray.500" size="xs" padding={0} minWidth={0}>
+      <Button
+        variant="ghost"
+        color="gray.500"
+        minWidth={0}
+      >
         <HistoryIcon size={16} />
+        {label && <Text>{label}</Text>}
       </Button>
     </Popover.Trigger>
   );
@@ -210,16 +221,18 @@ function VersionHistoryPopover({
   onRestore,
   versions,
   isLoading,
+  label,
 }: {
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
   onRestore: (versionId: string) => void;
   versions: PromptVersion[];
   isLoading: boolean;
+  label?: string;
 }) {
   return (
     <Popover.Root open={isOpen} onOpenChange={({ open }) => onOpenChange(open)}>
-      <VersionHistoryTrigger />
+      <VersionHistoryTrigger label={label} />
       {isOpen && (
         <VersionHistoryContent
           onRestore={onRestore}
@@ -237,9 +250,11 @@ function VersionHistoryPopover({
 export function VersionHistoryListPopover({
   configId,
   onRestore,
+  label,
 }: {
   configId: string;
   onRestore?: (versionId: string) => void;
+  label?: string;
 }) {
   const { open, setOpen, onClose } = useDisclosure();
   const { project } = useOrganizationTeamProject();
@@ -297,9 +312,11 @@ export function VersionHistoryListPopover({
           void refetch();
         }
       }}
+      // eslint-disable-next-line @typescript-eslint/no-misused-promises
       onRestore={handleRestore}
       versions={versions ?? []}
       isLoading={isLoading}
+      label={label}
     />
   );
 }
