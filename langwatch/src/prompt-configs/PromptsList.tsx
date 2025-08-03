@@ -20,6 +20,10 @@ import { toaster } from "../components/ui/toaster";
 import { formatTimeAgo } from "../utils/formatTimeAgo";
 import { CopyButton } from "../components/CopyButton";
 import { GenerateApiSnippetButton } from "../components/GenerateApiSnippetButton";
+import { LLMModelDisplay } from "../components/llmPromptConfigs/LLMModelDisplay";
+import { titleCase } from "../utils/stringCasing";
+import { Tooltip } from "../components/ui/tooltip";
+import { LuBuilding } from "react-icons/lu";
 
 export interface PromptConfigTableProps {
   configs: LlmConfigWithLatestVersion[];
@@ -85,29 +89,56 @@ export function PromptsList({
               <HStack justify="space-between" align="flex-start">
                 <Box flex="1">
                   {config.handle ? (
-                    <HStack fontFamily="mono" fontWeight="bold" gap={1}>
+                    <HStack width="full" gap={1}>
                       {/* For legacy prompts, show the name */}
                       {config.handle === config.id && config.name ? (
                         <>
-                          <Text>{config.name}</Text>
-                          <Text fontWeight="normal" color="gray.500">
+                          <Text fontFamily="mono" fontWeight="bold">
+                            {config.name}
+                          </Text>
+                          <Text
+                            fontWeight="normal"
+                            color="gray.500"
+                            fontFamily="mono"
+                          >
                             ({config.handle})
                           </Text>
                         </>
                       ) : (
-                        <Text>{config.handle}</Text>
+                        <Text fontFamily="mono" fontWeight="bold">
+                          {config.handle}
+                        </Text>
                       )}
                       <CopyButton
                         value={config.handle ?? ""}
                         label="Prompt ID"
                       />
-                      <Badge
-                        colorPalette="green"
-                        border="1px solid"
-                        borderColor="green.200"
-                      >
-                        v{config.latestVersion.version}
-                      </Badge>
+                      <HStack gap={3}>
+                        <Badge
+                          colorPalette="green"
+                          border="1px solid"
+                          borderColor="green.200"
+                        >
+                          v{config.latestVersion.version}
+                        </Badge>
+                        {config.scope === "ORGANIZATION" && (
+                          <Tooltip content="This prompt is available to all projects in the organization">
+                            <Badge colorPalette="purple" variant="outline">
+                              <HStack>
+                                <LuBuilding />
+                                Organization
+                              </HStack>
+                            </Badge>
+                          </Tooltip>
+                        )}
+                        {config.latestVersion.configData.model && (
+                          <HStack gap={2} align="center">
+                            <LLMModelDisplay
+                              model={config.latestVersion.configData.model}
+                            />
+                          </HStack>
+                        )}
+                      </HStack>
                     </HStack>
                   ) : (
                     <Badge size="lg">Draft</Badge>
