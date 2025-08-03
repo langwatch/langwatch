@@ -245,7 +245,8 @@ export function llmConfigToPromptConfigFormValues(
 ): PromptConfigFormValues {
   return {
     name: llmConfig.name ?? "",
-    referenceId: llmConfig.referenceId ?? "",
+    handle: llmConfig.handle ?? "",
+    scope: llmConfig.scope,
     version: {
       configData: {
         ...llmConfig.latestVersion.configData,

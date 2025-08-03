@@ -5,6 +5,7 @@ import {
 
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
+import type { PromptScope } from "@prisma/client";
 
 /**
  * Custom hook to abstract the logic of prompt config and version operations
@@ -20,13 +21,14 @@ export const usePromptConfig = () => {
 
   const updatePromptConfig = async (
     configId: string,
-    configData: { name: string; referenceId?: string }
+    configData: { name: string; handle?: string; scope?: PromptScope }
   ) => {
     const config = await updateConfig.mutateAsync({
       projectId,
       id: configId,
       name: configData.name,
-      referenceId: configData.referenceId,
+      handle: configData.handle,
+      scope: configData.scope,
     });
 
     await trpc.llmConfigs.getPromptConfigs.invalidate();

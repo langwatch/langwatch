@@ -9,6 +9,8 @@ import { checkUserPermissionForProject } from "../../permission";
 import { createTRPCRouter, protectedProcedure } from "../../trpc";
 
 import { llmConfigVersionsRouter } from "./llmPromptConfigVersions";
+import { prisma } from "../../../db";
+import { PromptScope } from "@prisma/client";
 
 const idSchema = z.object({
   id: z.string(),
@@ -38,29 +40,11 @@ export const llmConfigsRouter = createTRPCRouter({
     .use(checkUserPermissionForProject(TeamRoleGroup.PROMPTS_VIEW))
     .query(async ({ ctx, input }) => {
       const repository = new LlmConfigRepository(ctx.prisma);
-      const project = await ctx.prisma.project.findUnique({
-        where: {
-          id: input.projectId,
-        },
-        include: {
-          team: {
-            include: {
-              organization: true,
-            },
-          },
-        },
-      });
-
-      if (!project) {
-        throw new TRPCError({
-          code: "NOT_FOUND",
-          message: "Project not found.",
-        });
-      }
+      const organizationId = await getOrganizationIdForProject(input.projectId);
 
       return await repository.getAllWithLatestVersion({
         projectId: input.projectId,
-        organizationId: project?.team.organization.id,
+        organizationId,
       });
     }),
 
@@ -72,31 +56,13 @@ export const llmConfigsRouter = createTRPCRouter({
     .use(checkUserPermissionForProject(TeamRoleGroup.PROMPTS_VIEW))
     .query(async ({ ctx, input }) => {
       const repository = new LlmConfigRepository(ctx.prisma);
-      const project = await ctx.prisma.project.findUnique({
-        where: {
-          id: input.projectId,
-        },
-        include: {
-          team: {
-            include: {
-              organization: true,
-            },
-          },
-        },
-      });
-
-      if (!project) {
-        throw new TRPCError({
-          code: "NOT_FOUND",
-          message: "Project not found.",
-        });
-      }
+      const organizationId = await getOrganizationIdForProject(input.projectId);
 
       try {
         const config = await repository.getConfigByIdOrHandleWithLatestVersion({
           idOrHandle: input.id,
           projectId: input.projectId,
-          organizationId: project?.team.organization.id,
+          organizationId,
         });
         return config;
       } catch (error) {
@@ -116,12 +82,15 @@ export const llmConfigsRouter = createTRPCRouter({
     .use(checkUserPermissionForProject(TeamRoleGroup.PROMPTS_MANAGE))
     .mutation(async ({ ctx, input }) => {
       const repository = new LlmConfigRepository(ctx.prisma);
+      const organizationId = await getOrganizationIdForProject(input.projectId);
       const authorId = ctx.session?.user?.id;
 
       try {
         const newConfig = await repository.createConfigWithInitialVersion({
           ...input,
           authorId,
+          organizationId,
+          scope: "PROJECT",
         });
 
         return newConfig;
@@ -135,7 +104,7 @@ export const llmConfigsRouter = createTRPCRouter({
     }),
 
   /**
-   * Update an LLM prompt config's metadata (name and referenceId).
+   * Update an LLM prompt config's metadata (name, handle and scope).
    */
   updatePromptConfig: protectedProcedure
     .input(
@@ -143,7 +112,8 @@ export const llmConfigsRouter = createTRPCRouter({
         z.object({
           id: z.string(),
           name: z.string(),
-          referenceId: z.string().optional(), // Add referenceId support
+          handle: z.string().optional(),
+          scope: z.nativeEnum(PromptScope).optional(),
         })
       )
     )
@@ -157,7 +127,8 @@ export const llmConfigsRouter = createTRPCRouter({
           input.projectId,
           {
             name: input.name,
-            referenceId: input.referenceId,
+            handle: input.handle,
+            scope: input.scope,
           }
         );
 
@@ -194,12 +165,13 @@ export const llmConfigsRouter = createTRPCRouter({
     }),
 
   /**
-   * Check if a reference ID is unique for a project.
+   * Check if a handle is unique for a project.
    */
-  checkReferenceIdUniqueness: protectedProcedure
+  checkHandleUniqueness: protectedProcedure
     .input(
       z.object({
-        referenceId: z.string(),
+        handle: z.string(),
+        scope: z.nativeEnum(PromptScope),
         projectId: z.string(),
         excludeId: z.string().optional(), // Exclude current config when editing
       })
@@ -208,10 +180,38 @@ export const llmConfigsRouter = createTRPCRouter({
     .query(async ({ ctx, input }) => {
       const service = new PromptService(ctx.prisma);
 
-      return await service.checkReferenceIdUniqueness({
-        referenceId: input.referenceId,
+      const organizationId = await getOrganizationIdForProject(input.projectId);
+
+      return await service.checkHandleUniqueness({
+        handle: input.handle,
+        scope: input.scope,
         projectId: input.projectId,
+        organizationId,
         excludeId: input.excludeId,
       });
     }),
 });
+
+async function getOrganizationIdForProject(projectId: string): Promise<string> {
+  const project = await prisma.project.findUnique({
+    where: {
+      id: projectId,
+    },
+    include: {
+      team: {
+        include: {
+          organization: true,
+        },
+      },
+    },
+  });
+
+  if (!project) {
+    throw new TRPCError({
+      code: "NOT_FOUND",
+      message: "Organization not found",
+    });
+  }
+
+  return project.team.organization.id;
+}

@@ -1,24 +1,27 @@
+import { type PromptScope } from "@prisma/client";
 import { useOrganizationTeamProject } from "../useOrganizationTeamProject";
 
 import { api } from "~/utils/api";
 
-export const usePromptReferenceIdCheck = () => {
+export const usePromptHandleCheck = () => {
   const { project } = useOrganizationTeamProject();
   const trpc = api.useContext();
 
-  const checkReferenceIdUniqueness = async (params: {
-    referenceId: string;
+  const checkHandleUniqueness = async (params: {
+    handle: string;
+    scope: PromptScope;
     excludeId?: string;
   }) => {
-    const isValid = await trpc.llmConfigs.checkReferenceIdUniqueness.fetch({
+    const isValid = await trpc.llmConfigs.checkHandleUniqueness.fetch({
       ...params,
       projectId: project?.id ?? "",
+      scope: params.scope,
     });
 
     return isValid;
   };
 
   return {
-    checkReferenceIdUniqueness,
+    checkHandleUniqueness,
   };
 };

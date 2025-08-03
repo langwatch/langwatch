@@ -16,7 +16,7 @@ import {
 import { PromptField } from "../fields/PromptField";
 import { PromptMessagesField } from "../fields/PromptMessagesField";
 import { PromptNameField } from "../fields/PromptNameField";
-import { ReferenceIdField } from "../fields/ReferenceIdField";
+import { HandleField } from "../fields/HandleField";
 
 import { PromptConfigInfoAndSavePartial } from "./components/PromptConfigInfoAndSavePartial";
 
@@ -100,7 +100,7 @@ function InnerPromptConfigForm(props: PromptConfigFormProps) {
             </GeneratePromptApiSnippetDialog.Trigger>
           </GeneratePromptApiSnippetDialog>
         </HStack>
-        <ReferenceIdField />
+        <HandleField />
         <ModelSelectField />
         <PromptField
           templateAdapter="default"

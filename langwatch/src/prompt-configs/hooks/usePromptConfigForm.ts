@@ -6,7 +6,7 @@ import { type z } from "zod";
 
 import { inputsAndOutputsToDemostrationColumns } from "../llmPromptConfigUtils";
 
-import { usePromptReferenceIdCheck } from "~/hooks/prompts/usePromptReferenceIdCheck";
+import { usePromptHandleCheck } from "~/hooks/prompts/usePromptHandleCheck";
 import {
   createPromptConfigSchemaWithValidators,
   type formSchema,
@@ -29,7 +29,7 @@ export const usePromptConfigForm = ({
   onChange,
   initialConfigValues = {},
 }: UsePromptConfigFormProps) => {
-  const { checkReferenceIdUniqueness } = usePromptReferenceIdCheck();
+  const { checkHandleUniqueness } = usePromptHandleCheck();
 
   const methods = useForm<PromptConfigFormValues>({
     /**
@@ -40,8 +40,8 @@ export const usePromptConfigForm = ({
     resolver: (data, ...args) => {
       return zodResolver(
         createPromptConfigSchemaWithValidators({
-          initialConfigValues,
-          checkReferenceIdUniqueness,
+          configId,
+          checkHandleUniqueness,
         })
       )(data, ...args);
     },

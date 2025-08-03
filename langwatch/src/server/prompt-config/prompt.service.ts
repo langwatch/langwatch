@@ -61,18 +61,7 @@ export class PromptService {
     handle?: string;
     scope: PromptScope;
   }): Promise<LlmConfigWithLatestVersion> {
-    const data = { ...params };
-
-    if (data.handle) {
-      data.handle = this.repository.createHandle({
-        handle: data.handle,
-        scope: data.scope,
-        projectId: data.projectId,
-        organizationId: data.organizationId,
-      });
-    }
-
-    return this.repository.createConfigWithInitialVersion(data);
+    return this.repository.createConfigWithInitialVersion(params);
   }
 
   /**
@@ -88,81 +77,53 @@ export class PromptService {
   async updatePrompt(params: {
     id: string;
     projectId: string;
-    organizationId: string;
     data: UpdateLlmConfigDTO;
   }): Promise<LlmPromptConfig> {
-    const { id, projectId, organizationId, data } = params;
+    const { id, projectId, data } = params;
 
-    const updateData = {
-      ...data,
-    };
-
-    // Format handle with organization/project context if provided
-    if (data.handle) {
-      let newScope = data.scope;
-      // Keep current scope if not provided
-      if (!newScope) {
-        const config =
-          await this.repository.getConfigByIdOrHandleWithLatestVersion({
-            idOrHandle: id,
-            projectId,
-            organizationId,
-          });
-        newScope = config.scope;
-      }
-
-      updateData.handle = this.repository.createHandle({
-        handle: data.handle,
-        scope: newScope,
-        projectId,
-        organizationId,
-      });
-    }
-
-    return this.repository.updateConfig(id, projectId, updateData);
+    return this.repository.updateConfig(id, projectId, data);
   }
 
-// TODO: fix after rebase
-/**
- * Checks if a reference ID is unique for a project.
- * @param params - The parameters object
- * @param params.referenceId - The reference ID to check
- * @param params.projectId - The project ID to check
- * @param params.excludeId - The ID of the config to exclude from the check
- * @returns True if the reference ID is unique, false otherwise
- */
-async checkReferenceIdUniqueness(params: {
-  referenceId: string;
-  projectId: string;
-  excludeId?: string;
-}): Promise<boolean> {
-  // Check if referenceId exists (excluding current config if editing)
-  const existingConfig = await this.repository.getByReferenceId(
-    params.referenceId,
-    params.projectId
-  );
+  /**
+   * Checks if a handle is unique for a project.
+   * @param params - The parameters object
+   * @param params.handle - The handle to check
+   * @param params.projectId - The project ID to check
+   * @param params.organizationId - The organization ID to check
+   * @param params.excludeId - The ID of the config to exclude from the check
+   * @returns True if the handle is unique, false otherwise
+   */
+  async checkHandleUniqueness(params: {
+    handle: string;
+    projectId: string;
+    organizationId: string;
+    scope: PromptScope;
+    excludeId?: string;
+  }): Promise<boolean> {
+    // Check if handle exists (excluding current config if editing)
+    const existingConfig = await this.prisma.llmPromptConfig.findUnique({
+      where: {
+        scope: params.scope,
+        handle: this.repository.createHandle({
+          handle: params.handle,
+          scope: params.scope,
+          projectId: params.projectId,
+          organizationId: params.organizationId,
+        }),
+        // Double check just to make sure the prompt belongs to the project or organization the user is from
+        OR: [
+          {
+            projectId: params.projectId,
+          },
+          {
+            organizationId: params.organizationId,
+            scope: "ORGANIZATION",
+          },
+        ],
+      },
+    });
 
-  // Return true if unique (no existing config or it's the same config being edited)
-  return !existingConfig || existingConfig.id === params.excludeId;
-}
-
-/**
- * Creates a fully qualified reference ID by combining organization, project, and user-provided reference.
- * Format: {organizationId}/{projectId}/{referenceId}
- *
- * This ensures reference IDs are unique across the entire system and provides clear ownership context.
- *
- * @param projectId - The project ID to fetch organization context
- * @param referenceId - The user-provided reference identifier
- * @returns Formatted reference ID string
- * @throws Will throw if project is not found or missing organization context
- */
-private async createReferenceId(
-  projectId: string,
-  referenceId: string
-): Promise<string> {
-  // TODO: implement after rebase
-  // const repository = new LlmConfigRepository(this.prisma);
-  // const config = await repository.createHandle(referenceId, projectId);
-  // return config.id;
+    // Return true if unique (no existing config or it's the same config being edited)
+    return !existingConfig || existingConfig.id === params.excludeId;
+  }
 }

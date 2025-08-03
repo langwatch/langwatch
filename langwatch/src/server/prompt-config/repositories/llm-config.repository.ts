@@ -23,6 +23,7 @@ const logger = createLogger("langwatch:prompt-config:llm-config.repository");
 interface LlmConfigDTO {
   name: string;
   projectId: string;
+  organizationId: string;
   authorId?: string;
   handle?: string;
   scope?: PromptScope;
@@ -108,7 +109,10 @@ export class LlmConfigRepository {
     const config = await this.prisma.llmPromptConfig.findFirst({
       where: {
         OR: [
-          { id: idOrHandle },
+          {
+            id: idOrHandle,
+            OR: [{ projectId }, { organizationId, scope: "ORGANIZATION" }],
+          },
           {
             handle: this.createHandle({
               handle: idOrHandle,
@@ -166,7 +170,7 @@ export class LlmConfigRepository {
   async updateConfig(
     id: string,
     projectId: string,
-    data: Partial<Pick<LlmConfigDTO, "name" | "referenceId">> // Allow updating name and referenceId
+    data: Partial<Pick<LlmConfigDTO, "name" | "handle" | "scope">>
   ): Promise<LlmPromptConfig> {
     // Verify the config exists
     const existingConfig = await this.prisma.llmPromptConfig.findUnique({
@@ -177,7 +181,21 @@ export class LlmConfigRepository {
       throw new NotFoundError(`Prompt config not found. ID: ${id}`);
     }
 
-    // Update the config metadata - now supports both name and referenceId
+    // Format handle with organization/project context if provided
+    if (data.handle) {
+      if (!existingConfig.organizationId) {
+        // TODO: perhaps organizationId should be NOT NULL across the whole table
+        throw new Error("Organization ID is required to update handle");
+      }
+
+      data.handle = this.createHandle({
+        handle: data.handle,
+        scope: data.scope ?? existingConfig.scope,
+        projectId,
+        organizationId: existingConfig.organizationId,
+      });
+    }
+
     return this.prisma.llmPromptConfig.update({
       where: { id, projectId },
       data: {
@@ -212,8 +230,17 @@ export class LlmConfigRepository {
    * and because all configs should have an initial version.
    */
   async createConfigWithInitialVersion(
-    configData: LlmConfigDTO
+    configData: LlmConfigDTO & { scope: PromptScope }
   ): Promise<LlmConfigWithLatestVersion> {
+    if (configData.handle) {
+      configData.handle = this.createHandle({
+        handle: configData.handle,
+        scope: configData.scope,
+        projectId: configData.projectId,
+        organizationId: configData.organizationId,
+      });
+    }
+
     return await this.prisma.$transaction(async (tx) => {
       // Create the config within the transaction
       const newConfig = await tx.llmPromptConfig.create({
@@ -270,42 +297,6 @@ export class LlmConfigRepository {
         latestVersion: parseLlmConfigVersion(newVersion),
       };
     });
-  }
-
-  /**
-   * Get prompt by handle
-   * @param handle - The handle to search for
-   * @param projectId - Optional project ID for scoping
-   * @returns The config or null if not found
-   */
-  async getByHandle(
-    handle: string,
-    projectId?: string
-  ): Promise<LlmConfigWithLatestVersion | null> {
-    const whereClause = {
-      handle,
-      deletedAt: null,
-      ...(projectId && { projectId }),
-    };
-
-    const config = await this.prisma.llmPromptConfig.findFirst({
-      where: whereClause,
-      include: {
-        versions: {
-          orderBy: { createdAt: "desc" },
-          take: 1,
-        },
-      },
-    });
-
-    if (!config || !config.versions[0]) {
-      return null;
-    }
-
-    return {
-      ...config,
-      latestVersion: parseLlmConfigVersion(config.versions[0]),
-    };
   }
 
   /**

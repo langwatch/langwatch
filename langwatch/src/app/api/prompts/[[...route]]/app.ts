@@ -322,7 +322,6 @@ app.put(
   async (c) => {
     const service = c.get("promptService");
     const project = c.get("project");
-    const organization = c.get("organization");
     const { id } = c.req.param();
     const data = c.req.valid("json");
     const projectId = project.id;
@@ -341,7 +340,6 @@ app.put(
       const updatedConfig = await service.updatePrompt({
         id,
         projectId,
-        organizationId: organization.id,
         data,
       });
 
