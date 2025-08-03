@@ -36,7 +36,30 @@ export const llmConfigsRouter = createTRPCRouter({
     .use(checkUserPermissionForProject(TeamRoleGroup.PROMPTS_VIEW))
     .query(async ({ ctx, input }) => {
       const repository = new LlmConfigRepository(ctx.prisma);
-      return await repository.getAllWithLatestVersion(input.projectId);
+      const project = await ctx.prisma.project.findUnique({
+        where: {
+          id: input.projectId,
+        },
+        include: {
+          team: {
+            include: {
+              organization: true,
+            },
+          },
+        },
+      });
+
+      if (!project) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Project not found.",
+        });
+      }
+
+      return await repository.getAllWithLatestVersion({
+        projectId: input.projectId,
+        organizationId: project?.team.organization.id,
+      });
     }),
 
   /**
@@ -47,13 +70,32 @@ export const llmConfigsRouter = createTRPCRouter({
     .use(checkUserPermissionForProject(TeamRoleGroup.PROMPTS_VIEW))
     .query(async ({ ctx, input }) => {
       const repository = new LlmConfigRepository(ctx.prisma);
+      const project = await ctx.prisma.project.findUnique({
+        where: {
+          id: input.projectId,
+        },
+        include: {
+          team: {
+            include: {
+              organization: true,
+            },
+          },
+        },
+      });
+
+      if (!project) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Project not found.",
+        });
+      }
 
       try {
-        const config =
-          await repository.getConfigByIdOrHandleWithLatestVersion({
-            id: input.id,
-            projectId: input.projectId,
-          });
+        const config = await repository.getConfigByIdOrHandleWithLatestVersion({
+          idOrHandle: input.id,
+          projectId: input.projectId,
+          organizationId: project?.team.organization.id,
+        });
         return config;
       } catch (error) {
         throw new TRPCError({

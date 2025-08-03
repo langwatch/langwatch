@@ -725,16 +725,22 @@ model AuditLog {
     @@index([ipAddress])
 }
 
+enum PromptScope {
+    ORGANIZATION
+    PROJECT
+}
+
 model LlmPromptConfig {
-    id             String    @id @default(nanoid())
+    id             String      @id @default(nanoid())
     handle         String? // Globally unique identifier in format team/project/prompt
     name           String
     projectId      String
-    project        Project   @relation(fields: [projectId], references: [id])
-    createdAt      DateTime  @default(now())
-    updatedAt      DateTime  @default(now()) @updatedAt
+    project        Project     @relation(fields: [projectId], references: [id])
+    createdAt      DateTime    @default(now())
+    updatedAt      DateTime    @default(now()) @updatedAt
     deletedAt      DateTime?
     organizationId String? // Multi-tenancy. If null, it means the prompt isn't shared across the organization.
+    scope          PromptScope @default(PROJECT)
 
     // Relation to all versions - latest is determined by query
     versions LlmPromptConfigVersion[] @relation("Versions")

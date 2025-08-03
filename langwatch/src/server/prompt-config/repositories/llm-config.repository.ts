@@ -1,4 +1,8 @@
-import { type PrismaClient, type LlmPromptConfig } from "@prisma/client";
+import {
+  type PrismaClient,
+  type LlmPromptConfig,
+  type PromptScope,
+} from "@prisma/client";
 import { nanoid } from "nanoid";
 
 import { createLogger } from "../../../utils/logger";
@@ -21,6 +25,7 @@ interface LlmConfigDTO {
   projectId: string;
   authorId?: string;
   handle?: string;
+  scope?: PromptScope;
 }
 
 /**
@@ -47,11 +52,17 @@ export class LlmConfigRepository {
   /**
    * Get all LLM configs for a project
    */
-  async getAllWithLatestVersion(
-    projectId: string
-  ): Promise<LlmConfigWithLatestVersion[]> {
+  async getAllWithLatestVersion({
+    projectId,
+    organizationId,
+  }: {
+    projectId: string;
+    organizationId: string;
+  }): Promise<LlmConfigWithLatestVersion[]> {
     const configs = await this.prisma.llmPromptConfig.findMany({
-      where: { projectId },
+      where: {
+        OR: [{ projectId }, { organizationId, scope: "ORGANIZATION" }],
+      },
       orderBy: { updatedAt: "desc" },
       include: {
         versions: {
@@ -89,15 +100,30 @@ export class LlmConfigRepository {
    * Get a single LLM config by ID or handle
    */
   async getConfigByIdOrHandleWithLatestVersion(params: {
-    id?: string;
-    handle?: string;
+    idOrHandle: string;
     projectId: string;
+    organizationId: string;
   }): Promise<LlmConfigWithLatestVersion> {
-    const { id, handle, projectId } = params;
+    const { idOrHandle, projectId, organizationId } = params;
     const config = await this.prisma.llmPromptConfig.findFirst({
       where: {
-        OR: [{ id }, { handle }],
-        projectId,
+        OR: [
+          { id: idOrHandle },
+          {
+            handle: this.createHandle({
+              handle: idOrHandle,
+              scope: "PROJECT",
+              projectId,
+            }),
+          },
+          {
+            handle: this.createHandle({
+              handle: idOrHandle,
+              scope: "ORGANIZATION",
+              organizationId,
+            }),
+          },
+        ],
       },
       include: {
         versions: {
@@ -109,13 +135,15 @@ export class LlmConfigRepository {
 
     if (!config) {
       throw new NotFoundError(
-        `Prompt config not found. ID: ${id}, Project ID: ${projectId}.`
+        `Prompt config not found. ID: ${idOrHandle}, Project ID: ${projectId}, Organization ID: ${organizationId}.`
       );
     }
 
     // This should never happen, but if it does, we want to know about it
     if (!config.versions[0]) {
-      throw new NotFoundError(`Prompt config has no versions. ID: ${id}`);
+      throw new NotFoundError(
+        `Prompt config has no versions. ID: ${idOrHandle}`
+      );
     }
 
     try {
@@ -156,6 +184,7 @@ export class LlmConfigRepository {
         // Only update if the field is explicitly provided (including null)
         name: "name" in data ? data.name : existingConfig.name,
         handle: "handle" in data ? data.handle : existingConfig.handle,
+        scope: "scope" in data ? data.scope : existingConfig.scope,
       },
     });
   }
@@ -277,5 +306,39 @@ export class LlmConfigRepository {
       ...config,
       latestVersion: parseLlmConfigVersion(config.versions[0]),
     };
+  }
+
+  /**
+   * Creates a fully qualified handle by combining organization, project, and user-provided handle.
+   * Format: {projectId}/{handle} or {organizationId}/{handle}
+   *
+   * This ensures handles are unique across the entire system and provides clear ownership context.
+   *
+   * @param handle - The user-provided handle
+   * @param scope - The scope of the handle (PROJECT or ORGANIZATION)
+   * @param projectId - The project ID to fetch organization context
+   * @param organizationId - The organization ID to fetch project context
+   * @returns Formatted handle string
+   */
+  createHandle(
+    args:
+      | {
+          handle: string;
+          scope: "PROJECT";
+          projectId: string;
+        }
+      | {
+          handle: string;
+          scope: "ORGANIZATION";
+          organizationId: string;
+        }
+  ): string {
+    const { handle, scope } = args;
+
+    if (scope === "ORGANIZATION") {
+      return `${args.organizationId}/${handle}`;
+    }
+
+    return `${args.projectId}/${handle}`;
   }
 }

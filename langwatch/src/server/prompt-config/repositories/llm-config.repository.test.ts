@@ -44,6 +44,7 @@ describe("LlmConfigRepository", () => {
     it("should return valid configs with latest versions", async () => {
       // Arrange
       const projectId = "test-project";
+      const organizationId = "test-organization";
       const mockConfigs = [
         llmPromptConfigFactory.build({
           versions: [
@@ -58,7 +59,10 @@ describe("LlmConfigRepository", () => {
       prisma.llmPromptConfig.findMany = vi.fn().mockResolvedValue(mockConfigs);
 
       // Act
-      const result = await repository.getAllWithLatestVersion(projectId);
+      const result = await repository.getAllWithLatestVersion({
+        projectId,
+        organizationId,
+      });
 
       // Assert
       expect(result).toHaveLength(1);
@@ -69,6 +73,7 @@ describe("LlmConfigRepository", () => {
     it("should filter out configs with invalid versions", async () => {
       // Arrange
       const projectId = "test-project";
+      const organizationId = "test-organization";
       const mockConfigs = [
         llmPromptConfigFactory.build({
           versions: [
@@ -90,7 +95,10 @@ describe("LlmConfigRepository", () => {
       prisma.llmPromptConfig.findMany = vi.fn().mockResolvedValue(mockConfigs);
 
       // Act
-      const result = await repository.getAllWithLatestVersion(projectId);
+      const result = await repository.getAllWithLatestVersion({
+        projectId,
+        organizationId,
+      });
 
       // Assert
       expect(result).toHaveLength(1);
@@ -100,6 +108,7 @@ describe("LlmConfigRepository", () => {
     it("should filter out configs with no versions", async () => {
       // Arrange
       const projectId = "test-project";
+      const organizationId = "test-organization";
       const mockConfigs = [
         llmPromptConfigFactory.build({
           versions: [
@@ -120,7 +129,10 @@ describe("LlmConfigRepository", () => {
       prisma.llmPromptConfig.findMany = vi.fn().mockResolvedValue(mockConfigs);
 
       // Act
-      const result = await repository.getAllWithLatestVersion(projectId);
+      const result = await repository.getAllWithLatestVersion({
+        projectId,
+        organizationId,
+      });
 
       // Assert
       expect(result).toHaveLength(1);

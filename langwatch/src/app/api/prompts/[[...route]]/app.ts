@@ -1,4 +1,4 @@
-import type { Project } from "@prisma/client";
+import { PromptScope, type Organization, type Project } from "@prisma/client";
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { describeRoute } from "hono-openapi";
@@ -8,7 +8,11 @@ import { z } from "zod";
 import { prisma } from "~/server/db";
 import { PromptService } from "~/server/prompt-config/prompt.service";
 
-import { authMiddleware, handleError } from "../../middleware";
+import {
+  authMiddleware,
+  handleError,
+  organizationMiddleware,
+} from "../../middleware";
 import { loggerMiddleware } from "../../middleware/logger";
 import { baseResponses } from "../../shared/base-responses";
 
@@ -34,6 +38,7 @@ patchZodOpenapi();
 // Define types for our Hono context variables
 type Variables = {
   project: Project;
+  organization: Organization;
   promptService: PromptService;
 };
 
@@ -45,6 +50,7 @@ export const app = new Hono<{
 // Middleware
 app.use(loggerMiddleware());
 app.use("/*", authMiddleware);
+app.use("/*", organizationMiddleware);
 app.use("/*", async (c, next) => {
   c.set("promptService", new PromptService(prisma));
   await next();
@@ -70,12 +76,14 @@ app.get(
   async (c) => {
     const service = c.get("promptService");
     const project = c.get("project");
+    const organization = c.get("organization");
 
     logger.info({ projectId: project.id }, "Getting all prompts for project");
 
-    const configs = await service.repository.getAllWithLatestVersion(
-      project.id
-    );
+    const configs = await service.repository.getAllWithLatestVersion({
+      projectId: project.id,
+      organizationId: organization.id,
+    });
 
     logger.info(
       { projectId: project.id, count: configs.length },
@@ -105,6 +113,7 @@ app.get(
   async (c) => {
     const service = c.get("promptService");
     const project = c.get("project");
+    const organization = c.get("organization");
     const { id } = c.req.param();
 
     logger.info({ projectId: project.id, id }, "Getting prompt by ID");
@@ -113,6 +122,7 @@ app.get(
       const config = await service.getPromptByIdOrHandle({
         idOrHandle: id,
         projectId: project.id,
+        organizationId: organization.id,
       });
 
       const response = {
@@ -163,11 +173,13 @@ app.post(
     z.object({
       name: z.string().min(1, "Name cannot be empty"),
       handle: z.string().optional(),
+      scope: z.nativeEnum(PromptScope).default(PromptScope.PROJECT),
     })
   ),
   async (c) => {
     const service = c.get("promptService");
     const project = c.get("project");
+    const organization = c.get("organization");
     const data = c.req.valid("json");
     const { name } = data;
 
@@ -180,6 +192,8 @@ app.post(
       name,
       projectId: project.id,
       handle: data.handle,
+      organizationId: organization.id,
+      scope: data.scope,
     });
 
     logger.info(
@@ -302,11 +316,13 @@ app.put(
     z.object({
       name: z.string().min(1, "Name cannot be empty"),
       handle: z.string().optional(),
+      scope: z.nativeEnum(PromptScope).optional(),
     })
   ),
   async (c) => {
     const service = c.get("promptService");
     const project = c.get("project");
+    const organization = c.get("organization");
     const { id } = c.req.param();
     const data = c.req.valid("json");
     const projectId = project.id;
@@ -325,6 +341,7 @@ app.put(
       const updatedConfig = await service.updatePrompt({
         id,
         projectId,
+        organizationId: organization.id,
         data,
       });
 

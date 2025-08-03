@@ -1,4 +1,5 @@
 import {
+  PromptScope,
   type LlmPromptConfig,
   type LlmPromptConfigVersion,
 } from "@prisma/client";
@@ -32,6 +33,7 @@ export const llmPromptConfigFactory = Factory.define<
   deletedAt: null,
   handle: null,
   organizationId: null,
+  scope: PromptScope.PROJECT,
 }));
 
 type LlmPromptConfigVersionWithConfigData<T extends SchemaVersion> =

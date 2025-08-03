@@ -1,7 +1,10 @@
-import { type LlmPromptConfig, type PrismaClient } from "@prisma/client";
+import {
+  type PromptScope,
+  type LlmPromptConfig,
+  type PrismaClient,
+} from "@prisma/client";
 
 import { type UpdateLlmConfigDTO } from "./dtos";
-import { NotFoundError } from "./errors";
 import {
   LlmConfigRepository,
   type LlmConfigWithLatestVersion,
@@ -30,18 +33,14 @@ export class PromptService {
   async getPromptByIdOrHandle(params: {
     idOrHandle: string;
     projectId: string;
+    organizationId: string;
   }): Promise<LlmConfigWithLatestVersion> {
-    const { idOrHandle, projectId } = params;
-
-    const handle = await this.createHandle(
-      projectId,
-      idOrHandle
-    );
+    const { idOrHandle, projectId, organizationId } = params;
 
     return this.repository.getConfigByIdOrHandleWithLatestVersion({
-      id: idOrHandle,
-      handle: handle,
+      idOrHandle,
       projectId,
+      organizationId,
     });
   }
 
@@ -58,15 +57,19 @@ export class PromptService {
   async createPrompt(params: {
     name: string;
     projectId: string;
+    organizationId: string;
     handle?: string;
+    scope: PromptScope;
   }): Promise<LlmConfigWithLatestVersion> {
     const data = { ...params };
 
     if (data.handle) {
-      data.handle = await this.createHandle(
-        data.projectId,
-        data.handle
-      );
+      data.handle = this.repository.createHandle({
+        handle: data.handle,
+        scope: data.scope,
+        projectId: data.projectId,
+        organizationId: data.organizationId,
+      });
     }
 
     return this.repository.createConfigWithInitialVersion(data);
@@ -85,61 +88,41 @@ export class PromptService {
   async updatePrompt(params: {
     id: string;
     projectId: string;
+    organizationId: string;
     data: UpdateLlmConfigDTO;
   }): Promise<LlmPromptConfig> {
-    const { id, projectId, data } = params;
+    const { id, projectId, organizationId, data } = params;
 
     const updateData = {
       ...data,
     };
 
+    if (data.handle && !data.scope) {
+      throw new Error("Scope is required when handle is provided");
+    }
+
     // Format handle with organization/project context if provided
     if (data.handle) {
-      updateData.handle = await this.createHandle(
+      let newScope = data.scope;
+      // Keep current scope if not provided
+      if (!newScope) {
+        const config =
+          await this.repository.getConfigByIdOrHandleWithLatestVersion({
+            idOrHandle: id,
+            projectId,
+            organizationId,
+          });
+        newScope = config.scope;
+      }
+
+      updateData.handle = this.repository.createHandle({
+        handle: data.handle,
+        scope: newScope,
         projectId,
-        data.handle
-      );
+        organizationId,
+      });
     }
 
     return this.repository.updateConfig(id, projectId, updateData);
-  }
-
-  /**
-   * Creates a fully qualified handle by combining organization, project, and user-provided handle.
-   * Format: {organizationId}/{projectId}/{handle}
-   *
-   * This ensures handles are unique across the entire system and provides clear ownership context.
-   *
-   * @param projectId - The project ID to fetch organization context
-   * @param handle - The user-provided handle
-   * @returns Formatted handle string
-   * @throws Will throw if project is not found or missing organization context
-   */
-  private async createHandle(
-    projectId: string,
-    handle: string
-  ): Promise<string> {
-    const project = await this.prisma.project.findUnique({
-      where: { id: projectId },
-      include: {
-        team: {
-          include: {
-            organization: true,
-          },
-        },
-      },
-    });
-
-    if (!project) {
-      throw new NotFoundError("Project not found");
-    }
-
-    if (!project.team.organization) {
-      throw new NotFoundError("Organization not found");
-    }
-
-    const organizationId = project?.team.organization.id;
-
-    return `${organizationId}/${projectId}/${handle}`;
   }
 }
