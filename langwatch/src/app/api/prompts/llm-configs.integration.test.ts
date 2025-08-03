@@ -149,39 +149,39 @@ describe("Prompts API", () => {
         expect(body.id).toBe(config.id);
       });
 
-      it("should get a single prompt by reference ID", async () => {
-        // First, update the config to have a reference ID
-        const referenceId = `ref_${nanoid()}`;
-        // Create a new prompt with the reference ID
+      it("should get a single prompt by handle", async () => {
+        // First, update the config to have a handle
+        const handle = `ref_${nanoid()}`;
+        // Create a new prompt with the handle
         const createRes = await app.request(`/api/prompts`, {
           method: "POST",
           headers: {
             "X-Auth-Token": testApiKey,
             "Content-Type": "application/json",
           },
-          body: JSON.stringify({ name: "Test Prompt", referenceId }),
+          body: JSON.stringify({ name: "Test Prompt", handle }),
         });
 
-        // Verify the prompt was created with the reference ID
+        // Verify the prompt was created with the handle
         expect(createRes.status).toBe(200);
         const createBody = await createRes.json();
-        expect(createBody.referenceId).toBe(
-          `${testOrganization.id}/${testProjectId}/${referenceId}`
+        expect(createBody.handle).toBe(
+          `${testOrganization.id}/${testProjectId}/${handle}`
         );
 
-        // Get the prompt by reference ID
-        const res = await app.request(`/api/prompts/${referenceId}`, {
+        // Get the prompt by handle
+        const res = await app.request(`/api/prompts/${handle}`, {
           headers: { "X-Auth-Token": testApiKey },
         });
 
         expect(res.status).toBe(200);
         const body = await res.json();
-        expect(body.referenceId).toBe(
-          `${testOrganization.id}/${testProjectId}/${referenceId}`
+        expect(body.handle).toBe(
+          `${testOrganization.id}/${testProjectId}/${handle}`
         );
       });
 
-      it("should return 404 for non-existent prompt ID (should work with reference ID as well)", async () => {
+      it("should return 404 for non-existent prompt ID (should work with handle as well)", async () => {
         const nonExistentId = `prompt_${nanoid()}`;
         const res = await app.request(`/api/prompts/${nonExistentId}`, {
           headers: { "X-Auth-Token": testApiKey },
@@ -295,7 +295,7 @@ describe("Prompts API", () => {
       expect(body).toHaveProperty("error");
     });
 
-    it("should create a new prompt with a reference ID", async () => {
+    it("should create a new prompt with a handle", async () => {
       const res = await app.request(`/api/prompts`, {
         method: "POST",
         headers: {
@@ -304,7 +304,7 @@ describe("Prompts API", () => {
         },
         body: JSON.stringify({
           name: "Test Prompt",
-          referenceId: "my-custom-ref",
+          handle: "my-custom-ref",
         }),
       });
 
@@ -313,7 +313,7 @@ describe("Prompts API", () => {
       expect(body).toHaveProperty("id");
       expect(body).toHaveProperty("name", "Test Prompt");
       expect(body).toHaveProperty(
-        "referenceId",
+        "handle",
         `${testOrganization.id}/${testProjectId}/my-custom-ref`
       );
     });
@@ -321,7 +321,7 @@ describe("Prompts API", () => {
 
   // PUT endpoints tests
   describe("PUT endpoints", () => {
-    it("should update a prompt with a referenceId in correct format", async () => {
+    it("should update a prompt with a handle in correct format", async () => {
       // Create a valid prompt first
       const promptRes = await app.request(`/api/prompts`, {
         method: "POST",
@@ -335,16 +335,16 @@ describe("Prompts API", () => {
       expect(promptRes.status).toBe(200);
       const prompt = await promptRes.json();
 
-      // Get the project with organization info to construct expected referenceId
+      // Get the project with organization info to construct expected handle
       const project = await prisma.project.findUnique({
         where: { id: testProjectId },
         include: { team: { include: { organization: true } } },
       });
 
-      const referenceId = "my-custom-ref";
-      const expectedReferenceId = `${project?.team.organization.id}/${testProjectId}/${referenceId}`;
+      const handle = "my-custom-ref";
+      const expectedHandle = `${project?.team.organization.id}/${testProjectId}/${handle}`;
 
-      // Update the prompt with a referenceId
+      // Update the prompt with a handle
       const updateRes = await app.request(`/api/prompts/${prompt.id}`, {
         method: "PUT",
         headers: {
@@ -353,7 +353,7 @@ describe("Prompts API", () => {
         },
         body: JSON.stringify({
           name: "Updated Test Prompt",
-          referenceId: referenceId,
+          handle: handle,
         }),
       });
 
@@ -362,12 +362,12 @@ describe("Prompts API", () => {
         where: { id: prompt.id, projectId: testProjectId },
       });
 
-      // Verify the referenceId is in the correct format
-      expect(realPrompt?.referenceId).toBe(expectedReferenceId);
+      // Verify the handle is in the correct format
+      expect(realPrompt?.handle).toBe(expectedHandle);
     });
 
-    it("should enforce unique referenceId constraint", async () => {
-      // Create first prompt with referenceId
+    it("should enforce unique handle constraint", async () => {
+      // Create first prompt with handle
       const prompt1Res = await app.request(`/api/prompts`, {
         method: "POST",
         headers: {
@@ -391,7 +391,7 @@ describe("Prompts API", () => {
 
       const prompt2 = await prompt2Res.json();
 
-      // Set referenceId on first prompt
+      // Set handle on first prompt
       const updateRes1 = await app.request(`/api/prompts/${prompt1.id}`, {
         method: "PUT",
         headers: {
@@ -400,13 +400,13 @@ describe("Prompts API", () => {
         },
         body: JSON.stringify({
           name: "Test Prompt 1",
-          referenceId: "duplicate-ref",
+          handle: "duplicate-ref",
         }),
       });
 
       expect(updateRes1.status).toBe(200);
 
-      // Try to set same referenceId on second prompt - should fail
+      // Try to set same handle on second prompt - should fail
       const updateRes2 = await app.request(`/api/prompts/${prompt2.id}`, {
         method: "PUT",
         headers: {
@@ -415,7 +415,7 @@ describe("Prompts API", () => {
         },
         body: JSON.stringify({
           name: "Test Prompt 2",
-          referenceId: "duplicate-ref",
+          handle: "duplicate-ref",
         }),
       });
 

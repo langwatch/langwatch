@@ -22,7 +22,7 @@ export const llmPromptConfigSchema = z.object({
   id: z.string(),
   name: z.string(),
   updatedAt: z.date(),
-  referenceId: z.string().nullable(), // New field
+  handle: z.string().nullable(),
 });
 
 /**
@@ -45,7 +45,6 @@ export const promptOutputSchema = llmPromptConfigSchema.merge(
         .passthrough()
     ),
     response_format: responseFormatSchema.nullable(),
-    // referenceId is inherited from llmPromptConfigSchema
   })
 );
 

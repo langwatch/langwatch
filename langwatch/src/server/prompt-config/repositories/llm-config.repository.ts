@@ -20,7 +20,7 @@ interface LlmConfigDTO {
   name: string;
   projectId: string;
   authorId?: string;
-  referenceId?: string;
+  handle?: string;
 }
 
 /**
@@ -86,17 +86,17 @@ export class LlmConfigRepository {
   }
 
   /**
-   * Get a single LLM config by ID or reference ID
+   * Get a single LLM config by ID or handle
    */
-  async getConfigByIdOrReferenceIdWithLatestVersion(params: {
+  async getConfigByIdOrHandleWithLatestVersion(params: {
     id?: string;
-    referenceId?: string;
+    handle?: string;
     projectId: string;
   }): Promise<LlmConfigWithLatestVersion> {
-    const { id, referenceId, projectId } = params;
+    const { id, handle, projectId } = params;
     const config = await this.prisma.llmPromptConfig.findFirst({
       where: {
-        OR: [{ id }, { referenceId }],
+        OR: [{ id }, { handle }],
         projectId,
       },
       include: {
@@ -155,8 +155,7 @@ export class LlmConfigRepository {
       data: {
         // Only update if the field is explicitly provided (including null)
         name: "name" in data ? data.name : existingConfig.name,
-        referenceId:
-          "referenceId" in data ? data.referenceId : existingConfig.referenceId,
+        handle: "handle" in data ? data.handle : existingConfig.handle,
       },
     });
   }
@@ -193,7 +192,7 @@ export class LlmConfigRepository {
           id: `prompt_${nanoid()}`,
           name: configData.name,
           projectId: configData.projectId,
-          referenceId: configData.referenceId,
+          handle: configData.handle,
         },
       });
 
@@ -245,17 +244,17 @@ export class LlmConfigRepository {
   }
 
   /**
-   * Get prompt by reference ID
-   * @param referenceId - The reference ID to search for
+   * Get prompt by handle
+   * @param handle - The handle to search for
    * @param projectId - Optional project ID for scoping
    * @returns The config or null if not found
    */
-  async getByReferenceId(
-    referenceId: string,
+  async getByHandle(
+    handle: string,
     projectId?: string
   ): Promise<LlmConfigWithLatestVersion | null> {
     const whereClause = {
-      referenceId,
+      handle,
       deletedAt: null,
       ...(projectId && { projectId }),
     };

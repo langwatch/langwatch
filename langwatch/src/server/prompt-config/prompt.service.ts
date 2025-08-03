@@ -9,7 +9,7 @@ import {
 
 /**
  * Service layer for managing LLM prompt configurations.
- * Handles business logic for prompt operations including reference ID formatting.
+ * Handles business logic for prompt operations including handle formatting.
  */
 export class PromptService {
   readonly repository: LlmConfigRepository;
@@ -19,53 +19,53 @@ export class PromptService {
   }
 
   /**
-   * Gets a prompt by ID or reference ID.
-   * If a reference ID is provided, it will be formatted with the organization and project context.
+   * Gets a prompt by ID or handle.
+   * If a handle is provided, it will be formatted with the organization and project context.
    *
    * @param params - The parameters object
-   * @param params.idOrReferenceId - The ID or reference ID of the prompt
+   * @param params.idOrHandle - The ID or handle of the prompt
    * @param params.projectId - The project ID for authorization and context
    * @returns The prompt configuration
    */
-  async getPromptByIdOrReferenceId(params: {
-    idOrReferenceId: string;
+  async getPromptByIdOrHandle(params: {
+    idOrHandle: string;
     projectId: string;
   }): Promise<LlmConfigWithLatestVersion> {
-    const { idOrReferenceId, projectId } = params;
+    const { idOrHandle, projectId } = params;
 
-    const referenceId = await this.createReferenceId(
+    const handle = await this.createHandle(
       projectId,
-      idOrReferenceId
+      idOrHandle
     );
 
-    return this.repository.getConfigByIdOrReferenceIdWithLatestVersion({
-      id: idOrReferenceId,
-      referenceId,
+    return this.repository.getConfigByIdOrHandleWithLatestVersion({
+      id: idOrHandle,
+      handle: handle,
       projectId,
     });
   }
 
   /**
    * Creates a new prompt configuration with an initial version.
-   * If a reference ID is provided, it will be formatted with the organization and project context.
+   * If a handle is provided, it will be formatted with the organization and project context.
    *
    * @param params - The parameters object
    * @param params.name - The name of the prompt
    * @param params.projectId - The project ID for authorization and context
-   * @param params.referenceId - The reference ID of the prompt
+   * @param params.handle - The handle of the prompt
    * @returns The created prompt configuration
    */
   async createPrompt(params: {
     name: string;
     projectId: string;
-    referenceId?: string;
+    handle?: string;
   }): Promise<LlmConfigWithLatestVersion> {
     const data = { ...params };
 
-    if (data.referenceId) {
-      data.referenceId = await this.createReferenceId(
+    if (data.handle) {
+      data.handle = await this.createHandle(
         data.projectId,
-        data.referenceId
+        data.handle
       );
     }
 
@@ -74,12 +74,12 @@ export class PromptService {
 
   /**
    * Updates a prompt configuration with the provided data.
-   * If a referenceId is provided, it will be formatted with the organization and project context.
+   * If a handle is provided, it will be formatted with the organization and project context.
    *
    * @param params - The parameters object
    * @param params.id - The prompt configuration ID
    * @param params.projectId - The project ID for authorization and context
-   * @param params.data - The update data containing name and optional referenceId
+   * @param params.data - The update data containing name and optional handle
    * @returns The updated prompt configuration
    */
   async updatePrompt(params: {
@@ -93,11 +93,11 @@ export class PromptService {
       ...data,
     };
 
-    // Format referenceId with organization/project context if provided
-    if (data.referenceId) {
-      updateData.referenceId = await this.createReferenceId(
+    // Format handle with organization/project context if provided
+    if (data.handle) {
+      updateData.handle = await this.createHandle(
         projectId,
-        data.referenceId
+        data.handle
       );
     }
 
@@ -105,19 +105,19 @@ export class PromptService {
   }
 
   /**
-   * Creates a fully qualified reference ID by combining organization, project, and user-provided reference.
-   * Format: {organizationId}/{projectId}/{referenceId}
+   * Creates a fully qualified handle by combining organization, project, and user-provided handle.
+   * Format: {organizationId}/{projectId}/{handle}
    *
-   * This ensures reference IDs are unique across the entire system and provides clear ownership context.
+   * This ensures handles are unique across the entire system and provides clear ownership context.
    *
    * @param projectId - The project ID to fetch organization context
-   * @param referenceId - The user-provided reference identifier
-   * @returns Formatted reference ID string
+   * @param handle - The user-provided handle
+   * @returns Formatted handle string
    * @throws Will throw if project is not found or missing organization context
    */
-  private async createReferenceId(
+  private async createHandle(
     projectId: string,
-    referenceId: string
+    handle: string
   ): Promise<string> {
     const project = await this.prisma.project.findUnique({
       where: { id: projectId },
@@ -140,6 +140,6 @@ export class PromptService {
 
     const organizationId = project?.team.organization.id;
 
-    return `${organizationId}/${projectId}/${referenceId}`;
+    return `${organizationId}/${projectId}/${handle}`;
   }
 }

@@ -30,7 +30,7 @@ export const llmPromptConfigFactory = Factory.define<
   createdAt: new Date(),
   updatedAt: new Date(),
   deletedAt: null,
-  referenceId: null,
+  handle: null,
   organizationId: null,
 }));
 

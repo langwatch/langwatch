@@ -88,9 +88,9 @@ app.get(
 
 // Get prompt by ID
 app.get(
-  "/:idOrReferenceId",
+  "/:id",
   describeRoute({
-    description: "Get a specific prompt by ID or reference ID",
+    description: "Get a specific prompt by ID",
     responses: {
       ...baseResponses,
       200: buildStandardSuccessResponse(promptOutputSchema),
@@ -105,23 +105,20 @@ app.get(
   async (c) => {
     const service = c.get("promptService");
     const project = c.get("project");
-    const { idOrReferenceId } = c.req.param();
+    const { id } = c.req.param();
 
-    logger.info(
-      { projectId: project.id, idOrReferenceId },
-      "Getting prompt by ID"
-    );
+    logger.info({ projectId: project.id, id }, "Getting prompt by ID");
 
     try {
-      const config = await service.getPromptByIdOrReferenceId({
-        idOrReferenceId,
+      const config = await service.getPromptByIdOrHandle({
+        idOrHandle: id,
         projectId: project.id,
       });
 
       const response = {
         id: config.id,
         name: config.name,
-        referenceId: config.referenceId,
+        handle: config.handle,
         version: config.latestVersion.version,
         versionId: config.latestVersion.id ?? "",
         versionCreatedAt: config.latestVersion.createdAt ?? new Date(),
@@ -141,7 +138,7 @@ app.get(
       return c.json(response);
     } catch (error) {
       logger.error(
-        { projectId: project.id, idOrReferenceId, error },
+        { projectId: project.id, id, error },
         "Error retrieving prompt"
       );
 
@@ -165,7 +162,7 @@ app.post(
     "json",
     z.object({
       name: z.string().min(1, "Name cannot be empty"),
-      referenceId: z.string().optional(),
+      handle: z.string().optional(),
     })
   ),
   async (c) => {
@@ -182,7 +179,7 @@ app.post(
     const newConfig = await service.createPrompt({
       name,
       projectId: project.id,
-      referenceId: data.referenceId,
+      handle: data.handle,
     });
 
     logger.info(
@@ -304,7 +301,7 @@ app.put(
     "json",
     z.object({
       name: z.string().min(1, "Name cannot be empty"),
-      referenceId: z.string().optional(),
+      handle: z.string().optional(),
     })
   ),
   async (c) => {
@@ -319,7 +316,7 @@ app.put(
         projectId: project.id,
         promptId: id,
         newName: data.name,
-        newReferenceId: data.referenceId,
+        newHandle: data.handle,
       },
       "Updating prompt"
     );
@@ -336,7 +333,7 @@ app.put(
           projectId,
           promptId: id,
           name: updatedConfig.name,
-          referenceId: updatedConfig.referenceId,
+          handle: updatedConfig.handle,
         },
         "Successfully updated prompt"
       );
@@ -345,13 +342,10 @@ app.put(
     } catch (error: any) {
       logger.error({ projectId, promptId: id, error }, "Error updating prompt");
 
-      // Handle unique constraint violation for referenceId
-      if (
-        error.code === "P2002" &&
-        error.meta?.target?.includes("referenceId")
-      ) {
+      // Handle unique constraint violation for handle
+      if (error.code === "P2002" && error.meta?.target?.includes("handle")) {
         throw new HTTPException(409, {
-          message: "Reference ID already exists",
+          message: "Prompt handle already exists",
         });
       }
 
