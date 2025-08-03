@@ -30,6 +30,9 @@ import {
 import { badRequestSchema, successSchema } from "~/app/api/shared/schemas";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
 import { createLogger } from "~/utils/logger";
+import { getHTTPStatusCodeFromError } from "@trpc/server/http";
+import { TRPCError } from "@trpc/server";
+import type { ContentfulStatusCode } from "hono/utils/http-status";
 
 const logger = createLogger("langwatch:api:prompts");
 
@@ -90,7 +93,13 @@ app.get(
       "Retrieved prompts for project"
     );
 
-    return c.json(configs);
+    const transformedConfigs = configs.map((config) =>
+      transformConfigToPromptOutput(config, config.id)
+    );
+
+    return c.json(
+      transformedConfigs satisfies z.infer<typeof promptOutputSchema>[]
+    );
   }
 );
 
@@ -214,11 +223,14 @@ app.post(
       "Creating new version for prompt"
     );
 
-    const version = await service.repository.versions.createVersion({
-      ...data,
-      configId: id,
-      projectId: project.id,
-    }, organization.id);
+    const version = await service.repository.versions.createVersion(
+      {
+        ...data,
+        configId: id,
+        projectId: project.id,
+      },
+      organization.id
+    );
 
     logger.info(
       {
@@ -258,48 +270,21 @@ app.get(
 
     logger.info({ projectId: project.id, id }, "Getting prompt by ID");
 
-    try {
-      const config = await service.getPromptByIdOrHandle({
-        idOrHandle: id,
-        projectId: project.id,
-        organizationId: organization.id,
+    const config = await service.getPromptByIdOrHandle({
+      idOrHandle: id,
+      projectId: project.id,
+      organizationId: organization.id,
+    });
+
+    if (!config) {
+      throw new HTTPException(404, {
+        message: "Prompt not found",
       });
-
-      if (!config) {
-        throw new HTTPException(404, {
-          message: "Prompt not found",
-        });
-      }
-
-      const response = {
-        id: config.id,
-        name: config.name,
-        handle: config.handle,
-        version: config.latestVersion.version,
-        versionId: config.latestVersion.id ?? "",
-        versionCreatedAt: config.latestVersion.createdAt ?? new Date(),
-        model: config.latestVersion.configData.model,
-        prompt: config.latestVersion.configData.prompt,
-        updatedAt: config.updatedAt,
-        messages: [
-          {
-            role: "system",
-            content: config.latestVersion.configData.prompt,
-          },
-          ...config.latestVersion.configData.messages,
-        ],
-        response_format: getOutputsToResponseFormat(config),
-      } satisfies z.infer<typeof promptOutputSchema>;
-
-      return c.json(response);
-    } catch (error) {
-      logger.error(
-        { projectId: project.id, id, error },
-        "Error retrieving prompt"
-      );
-
-      throw error;
     }
+
+    const response = transformConfigToPromptOutput(config, id);
+
+    return c.json(response);
   }
 );
 
@@ -418,3 +403,29 @@ app.delete(
     return c.json(result satisfies z.infer<typeof successSchema>);
   }
 );
+
+// Helper function to transform config to promptOutputSchema format
+const transformConfigToPromptOutput = (
+  config: any,
+  id: string
+): z.infer<typeof promptOutputSchema> => {
+  return {
+    id,
+    name: config.name,
+    handle: config.handle,
+    version: config.latestVersion.version,
+    versionId: config.latestVersion.id ?? "",
+    versionCreatedAt: config.latestVersion.createdAt ?? new Date(),
+    model: config.latestVersion.configData.model,
+    prompt: config.latestVersion.configData.prompt,
+    updatedAt: config.updatedAt,
+    messages: [
+      {
+        role: "system",
+        content: config.latestVersion.configData.prompt,
+      },
+      ...config.latestVersion.configData.messages,
+    ],
+    response_format: getOutputsToResponseFormat(config),
+  };
+};
