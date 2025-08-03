@@ -31,13 +31,13 @@ export function HandleField({ label }: HandleFieldProps) {
     <VerticalFormControl
       label={label ?? "Handle"}
       invalid={!!errors.handle}
-      helper="Optional unique identifier for easy reference (e.g., team/project/prompt). Once set, avoid changing to prevent breaking existing integrations."
+      helper="Optional unique identifier for easy reference (e.g., team/sample-prompt). Once set, avoid changing to prevent breaking existing integrations."
       error={errors.handle}
       size="sm"
     >
       <Input
         size="sm"
-        placeholder="team/project/prompt"
+        placeholder="namespace/prompt-name"
         {...register("handle")}
       />
       {showWarning && (

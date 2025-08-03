@@ -732,7 +732,7 @@ enum PromptScope {
 
 model LlmPromptConfig {
     id             String      @id @default(nanoid())
-    handle         String? // Globally unique identifier in format team/project/prompt
+    handle         String? // Globally unique identifier in format team/sample-prompt
     name           String
     projectId      String
     project        Project     @relation(fields: [projectId], references: [id])
