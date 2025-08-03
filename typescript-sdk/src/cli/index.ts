@@ -28,6 +28,11 @@ const loginCommand = async (): Promise<void> => {
   return loginCommandImpl();
 };
 
+const listCommand = async (): Promise<void> => {
+  const { listCommand: listCommandImpl } = await import("./commands/list.js");
+  return listCommandImpl();
+};
+
 const syncCommand = async (): Promise<void> => {
   const { syncCommand: syncCommandImpl } = await import("./commands/sync.js");
   return syncCommandImpl();
@@ -93,6 +98,18 @@ promptCmd
   .action(async (name: string) => {
     try {
       await removeCommand(name);
+    } catch (error) {
+      console.error(`Error: ${error instanceof Error ? error.message : "Unknown error"}`);
+      process.exit(1);
+    }
+  });
+
+promptCmd
+  .command("list")
+  .description("List all available prompts on the server")
+  .action(async () => {
+    try {
+      await listCommand();
     } catch (error) {
       console.error(`Error: ${error instanceof Error ? error.message : "Unknown error"}`);
       process.exit(1);
