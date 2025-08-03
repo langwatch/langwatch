@@ -48,7 +48,7 @@ interface HeaderProps extends ChakraStackProps {}
 
 function Header({ children, ...props }: PropsWithChildren<HeaderProps>) {
   return (
-    <HStack width="full" align="top" gap={6} paddingBottom={6} {...props}>
+    <HStack width="full" align="center" gap={6} paddingBottom={6} {...props}>
       {children}
     </HStack>
   );

@@ -48,6 +48,9 @@ export const outputsSchema = z.object({
 const configSchemaV1_0 = z.object({
   id: z.string().optional(),
   authorId: z.string().nullable().optional(),
+  author: z.object({
+    name: z.string(),
+  }).optional(),
   projectId: z.string().min(1, "Project ID cannot be empty"),
   configId: z.string().min(1, "Config ID cannot be empty"),
   schemaVersion: z.literal(SchemaVersion.V1_0),

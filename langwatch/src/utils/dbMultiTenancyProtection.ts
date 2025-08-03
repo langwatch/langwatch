@@ -48,10 +48,13 @@ const _guardProjectId = ({ params }: { params: Prisma.MiddlewareParams }) => {
   } else if (
     !params.args?.where?.projectId &&
     !params.args?.where?.projectId_slug &&
-    !params.args?.where?.projectId?.in
+    !params.args?.where?.projectId?.in &&
+    !params.args?.where?.OR?.every((o: any) => o.projectId || o.organizationId)
   ) {
     throw new Error(
-      `The ${action} action on the ${model} model requires a 'projectId' or 'projectId.in' in the where clause`
+      params.args?.where?.OR
+        ? `The ${action} action on the ${model} model requires that all the OR clauses check for either the projectId or organizationId`
+        : `The ${action} action on the ${model} model requires a 'projectId' or 'projectId.in' in the where clause`
     );
   }
 };

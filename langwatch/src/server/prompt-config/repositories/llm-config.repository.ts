@@ -33,7 +33,7 @@ interface LlmConfigDTO {
  * Interface for LLM Config with its latest version
  */
 export interface LlmConfigWithLatestVersion extends LlmPromptConfig {
-  latestVersion: LatestConfigVersionSchema;
+  latestVersion: LatestConfigVersionSchema & { author?: { name: string } };
 }
 
 /**
@@ -68,6 +68,13 @@ export class LlmConfigRepository {
       include: {
         versions: {
           orderBy: { createdAt: "desc" },
+          include: {
+            author: {
+              select: {
+                name: true,
+              },
+            },
+          },
           take: 1,
         },
       },
@@ -78,6 +85,12 @@ export class LlmConfigRepository {
     return configs
       .map((config) => {
         try {
+          config.handle = this.removeHandlePrefixes(
+            config.handle,
+            projectId,
+            organizationId
+          );
+
           if (!config.versions?.[0]) {
             throw new Error(`Prompt config ${config.id} has no versions.`);
           }
@@ -98,34 +111,43 @@ export class LlmConfigRepository {
   }
 
   /**
-   * Get a single LLM config by ID or handle
+   * Get a single LLM config by ID or handle, either at project or organization level
    */
   async getConfigByIdOrHandleWithLatestVersion(params: {
     idOrHandle: string;
     projectId: string;
     organizationId: string;
-  }): Promise<LlmConfigWithLatestVersion> {
+  }): Promise<LlmConfigWithLatestVersion | null> {
     const { idOrHandle, projectId, organizationId } = params;
     const config = await this.prisma.llmPromptConfig.findFirst({
       where: {
         OR: [
           {
-            id: idOrHandle,
-            OR: [{ projectId }, { organizationId, scope: "ORGANIZATION" }],
+            projectId,
+            OR: [
+              { id: idOrHandle },
+              {
+                handle: this.createHandle({
+                  handle: idOrHandle,
+                  scope: "PROJECT",
+                  projectId,
+                }),
+              },
+            ],
           },
           {
-            handle: this.createHandle({
-              handle: idOrHandle,
-              scope: "PROJECT",
-              projectId,
-            }),
-          },
-          {
-            handle: this.createHandle({
-              handle: idOrHandle,
-              scope: "ORGANIZATION",
-              organizationId,
-            }),
+            organizationId,
+            scope: "ORGANIZATION",
+            OR: [
+              { id: idOrHandle },
+              {
+                handle: this.createHandle({
+                  handle: idOrHandle,
+                  scope: "ORGANIZATION",
+                  organizationId,
+                }),
+              },
+            ],
           },
         ],
       },
@@ -138,9 +160,7 @@ export class LlmConfigRepository {
     });
 
     if (!config) {
-      throw new NotFoundError(
-        `Prompt config not found. ID: ${idOrHandle}, Project ID: ${projectId}, Organization ID: ${organizationId}.`
-      );
+      return null;
     }
 
     // This should never happen, but if it does, we want to know about it
@@ -149,6 +169,12 @@ export class LlmConfigRepository {
         `Prompt config has no versions. ID: ${idOrHandle}`
       );
     }
+
+    config.handle = this.removeHandlePrefixes(
+      config.handle,
+      projectId,
+      organizationId
+    );
 
     try {
       return {
@@ -292,6 +318,12 @@ export class LlmConfigRepository {
         data: { updatedAt: new Date() },
       });
 
+      updatedConfig.handle = this.removeHandlePrefixes(
+        updatedConfig.handle,
+        configData.projectId,
+        configData.organizationId
+      );
+
       return {
         ...updatedConfig,
         latestVersion: parseLlmConfigVersion(newVersion),
@@ -331,5 +363,25 @@ export class LlmConfigRepository {
     }
 
     return `${args.projectId}/${handle}`;
+  }
+
+  removeHandlePrefixes(
+    handle: string | null,
+    projectId: string,
+    organizationId: string
+  ): string | null {
+    if (!handle) {
+      return null;
+    }
+
+    if (handle.startsWith(`${projectId}/`)) {
+      return handle.slice(projectId.length + 1);
+    }
+
+    if (handle.startsWith(`${organizationId}/`)) {
+      return handle.slice(organizationId.length + 1);
+    }
+
+    return handle;
   }
 }

@@ -58,20 +58,20 @@ export const llmConfigsRouter = createTRPCRouter({
       const repository = new LlmConfigRepository(ctx.prisma);
       const organizationId = await getOrganizationIdForProject(input.projectId);
 
-      try {
-        const config = await repository.getConfigByIdOrHandleWithLatestVersion({
-          idOrHandle: input.id,
-          projectId: input.projectId,
-          organizationId,
-        });
-        return config;
-      } catch (error) {
+      const config = await repository.getConfigByIdOrHandleWithLatestVersion({
+        idOrHandle: input.id,
+        projectId: input.projectId,
+        organizationId,
+      });
+
+      if (!config) {
         throw new TRPCError({
           code: "NOT_FOUND",
           message: "Prompt config not found",
-          cause: error,
         });
       }
+
+      return config;
     }),
 
   /**
@@ -85,22 +85,14 @@ export const llmConfigsRouter = createTRPCRouter({
       const organizationId = await getOrganizationIdForProject(input.projectId);
       const authorId = ctx.session?.user?.id;
 
-      try {
-        const newConfig = await repository.createConfigWithInitialVersion({
-          ...input,
-          authorId,
-          organizationId,
-          scope: "PROJECT",
-        });
+      const newConfig = await repository.createConfigWithInitialVersion({
+        ...input,
+        authorId,
+        organizationId,
+        scope: "PROJECT",
+      });
 
-        return newConfig;
-      } catch (error) {
-        throw new TRPCError({
-          code: "BAD_REQUEST",
-          message: "Failed to create config",
-          cause: error,
-        });
-      }
+      return newConfig;
     }),
 
   /**
@@ -121,27 +113,17 @@ export const llmConfigsRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       const repository = new LlmConfigRepository(ctx.prisma);
 
-      try {
-        const updatedConfig = await repository.updateConfig(
-          input.id,
-          input.projectId,
-          {
-            name: input.name,
-            handle: input.handle,
-            scope: input.scope,
-          }
-        );
+      const updatedConfig = await repository.updateConfig(
+        input.id,
+        input.projectId,
+        {
+          name: input.name,
+          handle: input.handle,
+          scope: input.scope,
+        }
+      );
 
-        return updatedConfig;
-      } catch (error) {
-        throw new TRPCError({
-          code: "BAD_REQUEST",
-          message: `Failed to update config: ${
-            error instanceof Error ? error.message : "Unknown error"
-          }`,
-          cause: error,
-        });
-      }
+      return updatedConfig;
     }),
 
   /**
@@ -153,15 +135,7 @@ export const llmConfigsRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       const repository = new LlmConfigRepository(ctx.prisma);
 
-      try {
-        return await repository.deleteConfig(input.id, input.projectId);
-      } catch (error) {
-        throw new TRPCError({
-          code: "BAD_REQUEST",
-          message: "Failed to delete config",
-          cause: error,
-        });
-      }
+      return await repository.deleteConfig(input.id, input.projectId);
     }),
 
   /**
