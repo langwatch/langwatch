@@ -179,7 +179,11 @@ function SignaturePropertiesPanelInner({
       const isValid = await formProps.methods.trigger();
       if (!isValid) return;
 
-      await triggerSaveVersion(config, saveFormValues);
+      await triggerSaveVersion({
+        config,
+        updateConfigValues: saveFormValues,
+        editingHandleOrScope: false,
+      });
     })();
   };
 

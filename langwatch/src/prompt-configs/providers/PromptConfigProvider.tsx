@@ -24,10 +24,15 @@ import {
 } from "../forms/ChangeHandleDialog";
 
 interface PromptConfigContextType {
-  triggerSaveVersion: (
-    config: LlmConfigWithLatestVersion,
-    updateConfigValues: PromptConfigFormValues
-  ) => Promise<void>;
+  triggerSaveVersion: ({
+    config,
+    updateConfigValues,
+    editingHandleOrScope,
+  }: {
+    config: LlmConfigWithLatestVersion;
+    updateConfigValues: PromptConfigFormValues;
+    editingHandleOrScope: boolean;
+  }) => Promise<void>;
 }
 
 const PromptConfigContext = createContext<PromptConfigContextType>({
@@ -59,6 +64,7 @@ export function PromptConfigProvider({
   } = useDisclosure();
   const [currentConfig, setCurrentConfig] =
     useState<LlmConfigWithLatestVersion | null>(null);
+  const [editingHandleOrScope, setEditingHandleOrScope] = useState(false);
 
   // Prompt config state
   const { updatePromptConfig, createNewVersion } = usePromptConfig();
@@ -71,11 +77,17 @@ export function PromptConfigProvider({
   const methods = useFormContext<PromptConfigFormValues>();
 
   const triggerSaveVersion = useCallback(
-    async (
-      config: LlmConfigWithLatestVersion,
-      updateConfigValues: PromptConfigFormValues
-    ) => {
+    async ({
+      config,
+      updateConfigValues,
+      editingHandleOrScope,
+    }: {
+      config: LlmConfigWithLatestVersion;
+      updateConfigValues: PromptConfigFormValues;
+      editingHandleOrScope: boolean;
+    }) => {
       setCurrentConfig(config);
+      setEditingHandleOrScope(editingHandleOrScope);
       // Trigger the form validation
       const isValid = await methods.trigger();
 
@@ -125,11 +137,15 @@ export function PromptConfigProvider({
     [openDialog, updatePromptConfig, createNewVersion, closeDialog, methods]
   );
 
+  const firstTimeSave = !!(
+    currentConfig &&
+    (!currentConfig.handle || currentConfig.handle === currentConfig.id)
+  );
+
   return (
     <PromptConfigContext.Provider value={{ triggerSaveVersion }}>
       {children}
-      {currentConfig &&
-      (!currentConfig.handle || currentConfig.handle === currentConfig.id) ? (
+      {currentConfig && (firstTimeSave || editingHandleOrScope) ? (
         <ChangeHandleDialog
           config={currentConfig}
           isOpen={isOpen}
@@ -139,7 +155,7 @@ export function PromptConfigProvider({
               throw new Error("No closure found");
             await updateConfigClosureRef.current(changeHandleFormValues);
           }}
-          firstTimeSave={true}
+          firstTimeSave={firstTimeSave}
         />
       ) : (
         <SaveVersionDialog

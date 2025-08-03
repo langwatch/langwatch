@@ -1,11 +1,11 @@
-import { Text, Spinner, VStack, HStack, Badge } from "@chakra-ui/react";
+import { Badge, Button, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
 import {
-  type Dispatch,
-  type SetStateAction,
+  forwardRef,
   useEffect,
   useMemo,
-  forwardRef,
+  type Dispatch,
   type ForwardedRef,
+  type SetStateAction,
 } from "react";
 import { useDebouncedCallback } from "use-debounce";
 
@@ -14,6 +14,7 @@ import { PromptConfigForm } from "./forms/prompt-config-form/PromptConfigForm";
 import { useInvokePrompt } from "./hooks/useInvokePrompt";
 import { usePromptConfigForm } from "./hooks/usePromptConfigForm";
 
+import { LuBuilding } from "react-icons/lu";
 import {
   ExecutionInputPanel,
   type ExecuteData,
@@ -23,13 +24,13 @@ import {
   InputOutputExecutablePanel,
   PANEL_ANIMATION_DURATION,
 } from "~/components/executable-panel/InputOutputExecutablePanel";
-import { MetadataTag } from "~/components/MetadataTag";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import {
   llmConfigToPromptConfigFormValues,
   promptConfigFormValuesToOptimizationStudioNodeData,
 } from "~/prompt-configs/llmPromptConfigUtils";
 import { api } from "~/utils/api";
+import { Tooltip } from "../components/ui/tooltip";
 
 /**
  * Panel for configuring and testing LLM prompts
@@ -173,7 +174,7 @@ export const PromptConfigPanel = forwardRef(function PromptConfigPanel(
           <PanelHeader
             title={
               <HStack>
-                <Text>Prompt Configuration</Text>
+                <Text whiteSpace="nowrap">Prompt Configuration</Text>
                 {llmConfig?.latestVersion && llmConfig.handle && (
                   <Badge
                     colorPalette="green"
@@ -182,6 +183,32 @@ export const PromptConfigPanel = forwardRef(function PromptConfigPanel(
                   >
                     v{llmConfig?.latestVersion.version}
                   </Badge>
+                )}
+                {llmConfig?.scope === "ORGANIZATION" && (
+                  <Tooltip content="This prompt is available to all projects in the organization">
+                    <Button
+                      onClick={() => {
+                        // Hack to call the edit handle dialog, as triggering from here and dealing with all the provider context shaneningans is too complicated
+                        const button =
+                          document.querySelector<HTMLButtonElement>(
+                            "#js-edit-prompt-handle"
+                          );
+                        if (button) {
+                          button.click();
+                        }
+                      }}
+                      variant="plain"
+                      asChild
+                      size="xs"
+                    >
+                      <Badge colorPalette="purple" variant="outline">
+                        <HStack>
+                          <LuBuilding />
+                          Organization
+                        </HStack>
+                      </Badge>
+                    </Button>
+                  </Tooltip>
                 )}
               </HStack>
             }

@@ -63,7 +63,11 @@ function InnerPromptConfigForm(props: PromptConfigFormProps) {
 
   const handleSaveClick = useCallback(() => {
     if (!savedConfig) return;
-    void triggerSaveVersion(savedConfig, methods.getValues()).catch((error) => {
+    void triggerSaveVersion({
+      config: savedConfig,
+      updateConfigValues: methods.getValues(),
+      editingHandleOrScope: false,
+    }).catch((error) => {
       logger.error(error);
       toaster.error({
         title: "Failed to save version",
@@ -84,7 +88,7 @@ function InnerPromptConfigForm(props: PromptConfigFormProps) {
   return (
     <form style={{ width: "100%", height: "100%" }}>
       <VStack width="full" height="full" gap={6} mb={6}>
-        <PromptHandleInfo config={savedConfig} />
+        <PromptHandleInfo config={savedConfig} methods={methods} />
         <ModelSelectField />
         <PromptField
           templateAdapter="default"

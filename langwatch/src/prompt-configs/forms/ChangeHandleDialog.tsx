@@ -12,7 +12,7 @@ import {
 } from "@chakra-ui/react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { PromptScope } from "@prisma/client";
-import { useCallback } from "react";
+import { useCallback, useEffect } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { z } from "zod";
 
@@ -121,6 +121,13 @@ export function ChangeHandleDialog({
     ),
   });
 
+  useEffect(() => {
+    reset({
+      handle: firstTimeSave ? "" : config.handle ?? "",
+      scope: config.scope ?? "PROJECT",
+    });
+  }, [config, firstTimeSave, reset]);
+
   const submitCallback = useCallback(
     async (data: z.infer<typeof changeHandleFormSchema>) => {
       await onSubmit({
@@ -192,11 +199,27 @@ export function ChangeHandleDialog({
           <Dialog.CloseTrigger />
           <Dialog.Body>
             <VStack width="full" gap={4}>
+              {!firstTimeSave && (
+                <Text
+                  color="red.500"
+                  fontSize="12px"
+                  fontWeight="medium"
+                  mb={2}
+                >
+                  ⚠ Warning: Changing the prompt identifier or scope may break
+                  any existing integrations, API calls, or workflows that use
+                  &quot;
+                  {config.handle}
+                  &quot;. Make sure to update all references in your codebase
+                  and documentation.
+                </Text>
+              )}
               <Field.Root invalid={!!errors.handle}>
                 <Field.Label>Prompt Identifier</Field.Label>
                 <Input
                   placeholder="prompt-name"
                   autoFocus
+                  data-1p-ignore
                   {...handleHandler}
                   onChange={(e) => {
                     e.target.value = e.target.value

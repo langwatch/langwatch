@@ -6,10 +6,7 @@ import { type z } from "zod";
 
 import { inputsAndOutputsToDemostrationColumns } from "../llmPromptConfigUtils";
 
-import { usePromptHandleCheck } from "~/hooks/prompts/usePromptHandleCheck";
-import {
-  formSchema,
-} from "~/prompt-configs/schemas";
+import { formSchema } from "~/prompt-configs/schemas";
 
 export type PromptConfigFormValues = z.infer<typeof formSchema>;
 
