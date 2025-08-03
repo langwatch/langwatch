@@ -1,5 +1,9 @@
+import {
+  type Project,
+  PIIRedactionLevel,
+  ProjectSensitiveDataVisibilityLevel,
+} from "@prisma/client";
 import { Factory } from "fishery";
-import { type Project, PIIRedactionLevel, ProjectSensitiveDataVisibilityLevel } from "@prisma/client";
 import { nanoid } from "nanoid";
 
 export const projectFactory = Factory.define<Project>(({ sequence }) => ({
