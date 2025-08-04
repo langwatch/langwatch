@@ -1,0 +1,27 @@
+{
+  "name": "langchain-sdk-example",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "start": "tsc && dotenv -- node dist/index.js",
+    "build": "tsc",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "LangWatch",
+  "type": "module",
+  "license": "MIT",
+  "dependencies": {
+    "@langchain/openai": "^0.6.3",
+    "@langchain/core": "^0.3.66",
+    "langchain": "^0.3.30",
+    "@opentelemetry/context-async-hooks": "^2.0.1",
+    "@opentelemetry/sdk-node": "^0.203.0",
+    "cli-markdown": "^3.5.1",
+    "dotenv-cli": "^10.0.0",
+    "langwatch": "file:../../"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.2"
+  }
+}
