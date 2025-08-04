@@ -285,7 +285,9 @@ export class LlmConfigRepository {
           id: `prompt_${nanoid()}`,
           name: configData.name ?? "",
           projectId: configData.projectId,
+          organizationId: configData.organizationId,
           handle: configData.handle,
+          scope: configData.scope,
         },
       });
 

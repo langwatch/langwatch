@@ -739,7 +739,7 @@ model LlmPromptConfig {
     createdAt      DateTime    @default(now())
     updatedAt      DateTime    @default(now()) @updatedAt
     deletedAt      DateTime?
-    organizationId String? // Multi-tenancy. If null, it means the prompt isn't shared across the organization.
+    organizationId String
     scope          PromptScope @default(PROJECT)
 
     // Relation to all versions - latest is determined by query
