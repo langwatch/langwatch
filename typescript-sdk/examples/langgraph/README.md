@@ -1,17 +1,17 @@
-# LangChain Example
+# LangGraph Example
 
-This directory contains examples of AI apps built with the LangWatch SDK and LangChain.
+This directory contains examples of AI apps built with the LangWatch SDK and LangGraph.
 
 ## Example
 
 ### Basic Chatbot (`src/index.ts`)
 
-A simple chatbot that handles basic conversation flow using LangChain:
+A simple chatbot that handles basic conversation flow using LangGraph:
 
 - **Features:**
   - Basic conversation loop
   - User input handling
-  - AI response generation using LangChain
+  - AI response generation using LangGraph
   - Conversation history management
   - Error handling
   - Exit commands (`quit`, `exit`)
@@ -37,6 +37,6 @@ A simple chatbot that handles basic conversation flow using LangChain:
    - Run `npm run start` to check for type errors
    - Ensure all dependencies are installed
 
-4. **LangChain import errors**
-   - Make sure all LangChain dependencies are installed
-   - Check that the LangChain version is compatible
+4. **LangGraph import errors**
+   - Make sure all LangGraph dependencies are installed
+   - Check that the LangGraph version is compatible
