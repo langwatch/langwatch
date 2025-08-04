@@ -68,21 +68,21 @@ export class Prompt implements PromptResponse {
    * @param variables - Object containing variable values for template compilation
    * @returns CompiledPrompt instance with compiled content
    */
-  compile(variables: TemplateVariables = {}): CompiledPrompt {
+  private _compile(variables: TemplateVariables, strict: boolean): CompiledPrompt {
     try {
-      // Compile main prompt with lenient mode
+      // Compile main prompt
       const compiledPrompt = this.prompt
         ? liquid.parseAndRenderSync(this.prompt, variables, {
-            strictVariables: false,
+            strictVariables: strict,
           })
         : "";
 
-      // Compile messages leniently
+      // Compile messages
       const compiledMessages = (this.messages || []).map((message) => ({
         ...message,
         content: message.content
           ? liquid.parseAndRenderSync(message.content, variables, {
-              strictVariables: false,
+              strictVariables: strict,
             })
           : message.content,
       }));
@@ -105,6 +105,10 @@ export class Prompt implements PromptResponse {
         error
       );
     }
+  }
+
+  compile(variables: TemplateVariables = {}): CompiledPrompt {
+    return this._compile(variables, false);
   }
 
   /**
@@ -113,44 +117,8 @@ export class Prompt implements PromptResponse {
    * @returns CompiledPrompt instance with compiled content
    */
   compileStrict(variables: TemplateVariables): CompiledPrompt {
-    try {
-      // Compile main prompt with strict mode
-      const compiledPrompt = this.prompt
-        ? liquid.parseAndRenderSync(this.prompt, variables, {
-            strictVariables: true,
-          })
-        : "";
-
-      // Compile messages strictly
-      const compiledMessages = (this.messages || []).map((message) => ({
-        ...message,
-        content: message.content
-          ? liquid.parseAndRenderSync(message.content, variables, {
-              strictVariables: true,
-            })
-          : message.content,
-      }));
-
-      // Create new prompt data with compiled content
-      const compiledData: PromptResponse = {
-        ...this,
-        prompt: compiledPrompt,
-        messages: compiledMessages,
-      };
-
-      return new CompiledPrompt(compiledData, this);
-    } catch (error) {
-      const templateStr = this.prompt || JSON.stringify(this.messages);
-      throw new PromptCompilationError(
-        `Failed to compile prompt template: ${
-          error instanceof Error ? error.message : "Unknown error"
-        }`,
-        templateStr,
-        error
-      );
-    }
+    return this._compile(variables, true);
   }
-}
 
 /**
  * Represents a compiled prompt that extends Prompt with reference to the original template
