@@ -3,40 +3,50 @@ import ora from "ora";
 import { PromptService, PromptsError } from "../../prompt/service";
 import { checkApiKey } from "../utils/apiKey";
 
+// Helper to strip ANSI codes for length calculation
+const stripAnsi = (str: string): string => {
+  return str.replace(/\u001b\[[0-9;]*m/g, '');
+};
+
 // Simple table formatting helper
-const formatTable = (data: Array<Record<string, string>>, headers: string[]): void => {
+const formatTable = (
+  data: Array<Record<string, string>>,
+  headers: string[],
+): void => {
   if (data.length === 0) {
     console.log(chalk.gray("No prompts found"));
     return;
   }
 
-  // Calculate column widths
+  // Calculate column widths (strip ANSI codes for accurate length calculation)
   const colWidths: Record<string, number> = {};
-  headers.forEach(header => {
+  headers.forEach((header) => {
     colWidths[header] = Math.max(
       header.length,
-      ...data.map(row => (row[header] || "").length)
+      ...data.map((row) => stripAnsi(row[header] || "").length),
     );
   });
 
   // Print header
   const headerRow = headers
-    .map(header => chalk.bold(header.padEnd(colWidths[header]!)))
+    .map((header) => chalk.bold(header.padEnd(colWidths[header]!)))
     .join("  ");
   console.log(headerRow);
 
   // Print separator
   const separator = headers
-    .map(header => "─".repeat(colWidths[header]!))
+    .map((header) => "─".repeat(colWidths[header]!))
     .join("  ");
   console.log(chalk.gray(separator));
 
   // Print data rows
-  data.forEach(row => {
+  data.forEach((row) => {
     const dataRow = headers
-      .map(header => {
+      .map((header) => {
         const value = row[header] || "";
-        const paddedValue = value.padEnd(colWidths[header]!);
+        const strippedLength = stripAnsi(value).length;
+        const paddingNeeded = colWidths[header]! - strippedLength;
+        const paddedValue = value + " ".repeat(Math.max(0, paddingNeeded));
 
         // Color coding
         if (header === "Name") {
@@ -88,7 +98,9 @@ export const listCommand = async (): Promise<void> => {
       // Fetch all prompts
       const prompts = await promptService.getAll();
 
-      spinner.succeed(`Found ${prompts.length} prompt${prompts.length !== 1 ? 's' : ''}`);
+      spinner.succeed(
+        `Found ${prompts.length} prompt${prompts.length !== 1 ? "s" : ""}`,
+      );
 
       if (prompts.length === 0) {
         console.log();
@@ -101,34 +113,53 @@ export const listCommand = async (): Promise<void> => {
       console.log();
 
       // Format prompts for table display
-      const tableData = prompts.map(prompt => ({
-        "Name": prompt.name || prompt.id,
-        "Version": prompt.version ? `v${prompt.version}` : "N/A",
-        "Model": prompt.model || "N/A",
-        "Updated": formatRelativeTime(prompt.updatedAt),
-      }));
+      const tableData = prompts
+        .filter((prompt) => prompt.version)
+        .map((prompt) => ({
+          Name:
+            prompt.handle || `${prompt.name} ` + chalk.gray(`(${prompt.id})`),
+          Version: prompt.version ? `${prompt.version}` : "N/A",
+          Model: prompt.model || "N/A",
+          Updated: formatRelativeTime(prompt.updatedAt),
+        }));
 
       // Display table
       formatTable(tableData, ["Name", "Version", "Model", "Updated"]);
 
       console.log();
-      console.log(chalk.gray(`Use ${chalk.cyan("langwatch prompt add <name>")} to add a prompt to your project`));
-
+      console.log(
+        chalk.gray(
+          `Use ${chalk.cyan(
+            "langwatch prompt add <name>",
+          )} to add a prompt to your project`,
+        ),
+      );
     } catch (error) {
       spinner.fail();
       if (error instanceof PromptsError) {
         console.error(chalk.red(`Error: ${error.message}`));
       } else {
-        console.error(chalk.red(`Error fetching prompts: ${error instanceof Error ? error.message : "Unknown error"}`));
+        console.error(
+          chalk.red(
+            `Error fetching prompts: ${
+              error instanceof Error ? error.message : "Unknown error"
+            }`,
+          ),
+        );
       }
       process.exit(1);
     }
-
   } catch (error) {
     if (error instanceof PromptsError) {
       console.error(chalk.red(`Error: ${error.message}`));
     } else {
-      console.error(chalk.red(`Unexpected error: ${error instanceof Error ? error.message : "Unknown error"}`));
+      console.error(
+        chalk.red(
+          `Unexpected error: ${
+            error instanceof Error ? error.message : "Unknown error"
+          }`,
+        ),
+      );
     }
     process.exit(1);
   }

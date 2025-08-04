@@ -920,10 +920,25 @@
                           "type",
                           "json_schema"
                         ]
+                      },
+                      "handle": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      },
+                      "scope": {
+                        "type": "string",
+                        "enum": [
+                          "ORGANIZATION",
+                          "PROJECT"
+                        ]
                       }
                     },
                     "required": [
                       "id",
+                      "handle",
+                      "scope",
                       "name",
                       "updatedAt",
                       "version",
@@ -1097,10 +1112,25 @@
                         "type",
                         "json_schema"
                       ]
+                    },
+                    "handle": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "scope": {
+                      "type": "string",
+                      "enum": [
+                        "ORGANIZATION",
+                        "PROJECT"
+                      ]
                     }
                   },
                   "required": [
                     "id",
+                    "handle",
+                    "scope",
                     "name",
                     "updatedAt",
                     "version",
@@ -1192,6 +1222,17 @@
                   "name": {
                     "type": "string",
                     "minLength": 1
+                  },
+                  "handle": {
+                    "type": "string"
+                  },
+                  "scope": {
+                    "type": "string",
+                    "enum": [
+                      "ORGANIZATION",
+                      "PROJECT"
+                    ],
+                    "default": "PROJECT"
                   }
                 },
                 "required": [
@@ -1293,10 +1334,25 @@
                         "type",
                         "json_schema"
                       ]
+                    },
+                    "handle": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "scope": {
+                      "type": "string",
+                      "enum": [
+                        "ORGANIZATION",
+                        "PROJECT"
+                      ]
                     }
                   },
                   "required": [
                     "id",
+                    "handle",
+                    "scope",
                     "name",
                     "updatedAt",
                     "version",
@@ -1424,10 +1480,25 @@
                     },
                     "updatedAt": {
                       "type": "string"
+                    },
+                    "handle": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "scope": {
+                      "type": "string",
+                      "enum": [
+                        "ORGANIZATION",
+                        "PROJECT"
+                      ]
                     }
                   },
                   "required": [
                     "id",
+                    "handle",
+                    "scope",
                     "name",
                     "updatedAt"
                   ]
@@ -1539,6 +1610,16 @@
                   "name": {
                     "type": "string",
                     "minLength": 1
+                  },
+                  "handle": {
+                    "type": "string"
+                  },
+                  "scope": {
+                    "type": "string",
+                    "enum": [
+                      "ORGANIZATION",
+                      "PROJECT"
+                    ]
                   }
                 },
                 "required": [
@@ -2239,6 +2320,30 @@
                         "outputs",
                         "model"
                       ]
+                    },
+                    "author": {
+                      "type": "object",
+                      "properties": {
+                        "name": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "name"
+                      ]
+                    },
+                    "handle": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "scope": {
+                      "type": "string",
+                      "enum": [
+                        "ORGANIZATION",
+                        "PROJECT"
+                      ]
                     }
                   },
                   "required": [
@@ -2249,7 +2354,9 @@
                     "schemaVersion",
                     "version",
                     "createdAt",
-                    "configData"
+                    "configData",
+                    "handle",
+                    "scope"
                   ]
                 }
               }
@@ -2681,6 +2788,30 @@
                         "outputs",
                         "model"
                       ]
+                    },
+                    "author": {
+                      "type": "object",
+                      "properties": {
+                        "name": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "name"
+                      ]
+                    },
+                    "handle": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "scope": {
+                      "type": "string",
+                      "enum": [
+                        "ORGANIZATION",
+                        "PROJECT"
+                      ]
                     }
                   },
                   "required": [
@@ -2691,7 +2822,9 @@
                     "schemaVersion",
                     "version",
                     "createdAt",
-                    "configData"
+                    "configData",
+                    "handle",
+                    "scope"
                   ]
                 }
               }

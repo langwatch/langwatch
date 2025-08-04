@@ -30,9 +30,6 @@ import {
 import { badRequestSchema, successSchema } from "~/app/api/shared/schemas";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
 import { createLogger } from "~/utils/logger";
-import { getHTTPStatusCodeFromError } from "@trpc/server/http";
-import { TRPCError } from "@trpc/server";
-import type { ContentfulStatusCode } from "hono/utils/http-status";
 
 const logger = createLogger("langwatch:api:prompts");
 
@@ -194,6 +191,27 @@ app.get(
   }
 );
 
+// Hack: only here because hono does not generate openapi spec correctly for /:id{.+} paths
+app.get(
+  "/:id/versions",
+  describeRoute({
+    description: "Get all versions for a prompt",
+    responses: {
+      ...baseResponses,
+      200: buildStandardSuccessResponse(versionOutputSchema),
+      404: {
+        description: "Prompt not found",
+        content: {
+          "application/json": { schema: resolver(badRequestSchema) },
+        },
+      },
+    },
+  }),
+  async () => {
+    throw new Error("This should not have been called");
+  }
+);
+
 // Create version
 app.post(
   "/:id{.+?}/versions",
@@ -246,11 +264,32 @@ app.post(
   }
 );
 
+// Hack: only here because hono does not generate openapi spec correctly for /:id{.+} paths
+app.post(
+  "/:id/versions",
+  describeRoute({
+    description: "Create a new version for a prompt",
+    responses: {
+      ...baseResponses,
+      200: buildStandardSuccessResponse(versionOutputSchema),
+      404: {
+        description: "Prompt not found",
+        content: {
+          "application/json": { schema: resolver(badRequestSchema) },
+        },
+      },
+    },
+  }),
+  async () => {
+    throw new Error("This should not have been called");
+  }
+);
+
 // Get prompt by ID
 app.get(
   "/:id{.+}",
   describeRoute({
-    description: "Get a specific prompt by ID",
+    description: "Get a specific prompt",
     responses: {
       ...baseResponses,
       200: buildStandardSuccessResponse(promptOutputSchema),
@@ -268,7 +307,7 @@ app.get(
     const organization = c.get("organization");
     const { id } = c.req.param();
 
-    logger.info({ projectId: project.id, id }, "Getting prompt by ID");
+    logger.info({ projectId: project.id, id }, "Getting prompt");
 
     const config = await service.getPromptByIdOrHandle({
       idOrHandle: id,
@@ -285,6 +324,27 @@ app.get(
     const response = transformConfigToPromptOutput(config, id);
 
     return c.json(response);
+  }
+);
+
+// Hack: only here because hono does not generate openapi spec correctly for /:id{.+} paths
+app.get(
+  "/:id",
+  describeRoute({
+    description: "Get a specific prompt",
+    responses: {
+      ...baseResponses,
+      200: buildStandardSuccessResponse(promptOutputSchema),
+      404: {
+        description: "Prompt not found",
+        content: {
+          "application/json": { schema: resolver(badRequestSchema) },
+        },
+      },
+    },
+  }),
+  async () => {
+    throw new Error("This should not have been called");
   }
 );
 
@@ -365,6 +425,35 @@ app.put(
   }
 );
 
+// Hack: only here because hono does not generate openapi spec correctly for /:id{.+} paths
+app.put(
+  "/:id",
+  describeRoute({
+    description: "Update a prompt",
+    responses: {
+      ...baseResponses,
+      200: buildStandardSuccessResponse(llmPromptConfigSchema),
+      404: {
+        description: "Prompt not found",
+        content: {
+          "application/json": { schema: resolver(badRequestSchema) },
+        },
+      },
+    },
+  }),
+  zValidator(
+    "json",
+    z.object({
+      name: z.string().min(1, "Name cannot be empty"),
+      handle: z.string().optional(),
+      scope: z.nativeEnum(PromptScope).optional(),
+    })
+  ),
+  async () => {
+    throw new Error("This should not have been called");
+  }
+);
+
 // Delete prompt
 app.delete(
   "/:id{.+}",
@@ -404,6 +493,27 @@ app.delete(
   }
 );
 
+// Hack: only here because hono does not generate openapi spec correctly for /:id{.+} paths
+app.delete(
+  "/:id",
+  describeRoute({
+    description: "Delete a prompt",
+    responses: {
+      ...baseResponses,
+      200: buildStandardSuccessResponse(successSchema),
+      404: {
+        description: "Prompt not found",
+        content: {
+          "application/json": { schema: resolver(badRequestSchema) },
+        },
+      },
+    },
+  }),
+  async () => {
+    throw new Error("This should not have been called");
+  }
+);
+
 // Helper function to transform config to promptOutputSchema format
 const transformConfigToPromptOutput = (
   config: any,
@@ -413,6 +523,7 @@ const transformConfigToPromptOutput = (
     id,
     name: config.name,
     handle: config.handle,
+    scope: config.scope,
     version: config.latestVersion.version,
     versionId: config.latestVersion.id ?? "",
     versionCreatedAt: config.latestVersion.createdAt ?? new Date(),

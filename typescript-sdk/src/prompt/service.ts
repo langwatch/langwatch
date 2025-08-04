@@ -167,7 +167,11 @@ export class PromptService {
     // TODO: This is a workaround to get the updated prompt. It would be better to return the updated prompt directly.
     const updatedPrompt = await this.get(id);
     if (!updatedPrompt) {
-      throw new PromptsError("Prompt not found after update", "update prompt", null);
+      throw new PromptsError(
+        "Prompt not found after update",
+        "update prompt",
+        null,
+      );
     }
     return updatedPrompt;
   }
@@ -189,9 +193,7 @@ export class PromptService {
    * @param id The prompt's unique identifier.
    * @throws {PromptsError} If the API call fails.
    */
-  async getVersions(
-    id: string,
-  ): Promise<Record<string, Prompt>> {
+  async getVersions(id: string): Promise<Record<string, Prompt>> {
     const { data, error } = await this.client.GET(
       "/api/prompts/{id}/versions",
       {
@@ -209,6 +211,8 @@ export class PromptService {
     for (const version of dataTypeCorrected) {
       prompts[version.id] = new Prompt({
         id: version.configId,
+        handle: version.handle,
+        scope: version.scope,
         messages: version.configData.messages,
         model: version.configData.model,
         prompt: version.configData.prompt,
@@ -243,7 +247,11 @@ export class PromptService {
     // TODO: This is a workaround to get the updated prompt. It would be better to return the updated prompt directly.
     const updatedPrompt = await this.get(id);
     if (!updatedPrompt) {
-      throw new PromptsError("Prompt not found after version creation", "create version", null);
+      throw new PromptsError(
+        "Prompt not found after version creation",
+        "create version",
+        null,
+      );
     }
     return updatedPrompt;
   }
@@ -255,17 +263,20 @@ export class PromptService {
    * @returns Object with created flag and the prompt instance.
    * @throws {PromptsError} If the API call fails.
    */
-    async upsert(name: string, config: {
-    model: string;
-    modelParameters?: {
-      temperature?: number;
-      max_tokens?: number;
-    };
-    messages: Array<{
-      role: "system" | "user" | "assistant";
-      content: string;
-    }>;
-  }): Promise<{ created: boolean; prompt: Prompt }> {
+  async upsert(
+    name: string,
+    config: {
+      model: string;
+      modelParameters?: {
+        temperature?: number;
+        max_tokens?: number;
+      };
+      messages: Array<{
+        role: "system" | "user" | "assistant";
+        content: string;
+      }>;
+    },
+  ): Promise<{ created: boolean; prompt: Prompt }> {
     let prompt = await this.get(name);
     let created = false;
 
