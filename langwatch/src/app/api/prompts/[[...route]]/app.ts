@@ -1,13 +1,21 @@
-import type { Project } from "@prisma/client";
+import { PromptScope, type Organization, type Project } from "@prisma/client";
 import { Hono } from "hono";
+import { HTTPException } from "hono/http-exception";
 import { describeRoute } from "hono-openapi";
 import { validator as zValidator, resolver } from "hono-openapi/zod";
 import { z } from "zod";
-import { type LlmConfigRepository } from "~/server/prompt-config/repositories/llm-config.repository";
-import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
-import { createLogger } from "~/utils/logger";
+
+import { prisma } from "~/server/db";
+import { PromptService } from "~/server/prompt-config/prompt.service";
+
+import {
+  authMiddleware,
+  handleError,
+  organizationMiddleware,
+} from "../../middleware";
 import { loggerMiddleware } from "../../middleware/logger";
-import { badRequestSchema, successSchema } from "~/app/api/shared/schemas";
+import { baseResponses } from "../../shared/base-responses";
+
 import {
   llmPromptConfigSchema,
   promptOutputSchema,
@@ -15,18 +23,13 @@ import {
   versionOutputSchema,
 } from "./schemas";
 import {
-  authMiddleware,
-  repositoryMiddleware,
-  errorMiddleware,
-} from "../../middleware";
-import {
   buildStandardSuccessResponse,
   getOutputsToResponseFormat,
 } from "./utils";
-import { baseResponses } from "../../shared/base-responses";
-import { TRPCError } from "@trpc/server";
-import { getHTTPStatusCodeFromError } from "@trpc/server/http";
-import type { ContentfulStatusCode } from "hono/utils/http-status";
+
+import { badRequestSchema, successSchema } from "~/app/api/shared/schemas";
+import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
+import { createLogger } from "~/utils/logger";
 
 const logger = createLogger("langwatch:api:prompts");
 
@@ -35,7 +38,8 @@ patchZodOpenapi();
 // Define types for our Hono context variables
 type Variables = {
   project: Project;
-  llmConfigRepository: LlmConfigRepository;
+  organization: Organization;
+  promptService: PromptService;
 };
 
 // Define the Hono app
@@ -46,8 +50,13 @@ export const app = new Hono<{
 // Middleware
 app.use(loggerMiddleware());
 app.use("/*", authMiddleware);
-app.use("/*", repositoryMiddleware);
-app.use("/*", errorMiddleware);
+app.use("/*", organizationMiddleware);
+app.use("/*", async (c, next) => {
+  c.set("promptService", new PromptService(prisma));
+  await next();
+});
+// https://hono.dev/docs/api/hono#error-handling
+app.onError(handleError);
 
 // Get all prompts
 app.get(
@@ -65,12 +74,16 @@ app.get(
     },
   }),
   async (c) => {
-    const repository = c.get("llmConfigRepository");
+    const service = c.get("promptService");
     const project = c.get("project");
+    const organization = c.get("organization");
 
     logger.info({ projectId: project.id }, "Getting all prompts for project");
 
-    const configs = await repository.getAllWithLatestVersion(project.id);
+    const configs = await service.repository.getAllWithLatestVersion({
+      projectId: project.id,
+      organizationId: organization.id,
+    });
 
     logger.info(
       { projectId: project.id, count: configs.length },
@@ -85,7 +98,7 @@ app.get(
 app.get(
   "/:id",
   describeRoute({
-    description: "Get a specific prompt",
+    description: "Get a specific prompt by ID",
     responses: {
       ...baseResponses,
       200: buildStandardSuccessResponse(promptOutputSchema),
@@ -98,24 +111,24 @@ app.get(
     },
   }),
   async (c) => {
-    const repository = c.get("llmConfigRepository");
+    const service = c.get("promptService");
     const project = c.get("project");
+    const organization = c.get("organization");
     const { id } = c.req.param();
 
-    logger.info(
-      { projectId: project.id, promptId: id },
-      "Getting prompt by ID"
-    );
+    logger.info({ projectId: project.id, id }, "Getting prompt by ID");
 
     try {
-      const config = await repository.getConfigByIdWithLatestVersions(
-        id,
-        project.id
-      );
-  
+      const config = await service.getPromptByIdOrHandle({
+        idOrHandle: id,
+        projectId: project.id,
+        organizationId: organization.id,
+      });
+
       const response = {
-        id,
+        id: config.id,
         name: config.name,
+        handle: config.handle,
         version: config.latestVersion.version,
         versionId: config.latestVersion.id ?? "",
         versionCreatedAt: config.latestVersion.createdAt ?? new Date(),
@@ -134,16 +147,12 @@ app.get(
 
       return c.json(response);
     } catch (error) {
-      if (error instanceof TRPCError) {
-        return c.json({ error: error.message }, getHTTPStatusCodeFromError(error) as ContentfulStatusCode);
-      }
-
-      logger.warn(
-        { projectId: project.id, promptId: id, error },
+      logger.error(
+        { projectId: project.id, id, error },
         "Error retrieving prompt"
       );
 
-      return c.json({ error: "internal server error" }, 500);
+      throw error;
     }
   }
 );
@@ -161,11 +170,16 @@ app.post(
   }),
   zValidator(
     "json",
-    z.object({ name: z.string().min(1, "Name cannot be empty") })
+    z.object({
+      name: z.string().min(1, "Name cannot be empty"),
+      handle: z.string().optional(),
+      scope: z.nativeEnum(PromptScope).default(PromptScope.PROJECT),
+    })
   ),
   async (c) => {
-    const repository = c.get("llmConfigRepository");
+    const service = c.get("promptService");
     const project = c.get("project");
+    const organization = c.get("organization");
     const data = c.req.valid("json");
     const { name } = data;
 
@@ -174,9 +188,12 @@ app.post(
       "Creating new prompt with initial version"
     );
 
-    const newConfig = await repository.createConfigWithInitialVersion({
+    const newConfig = await service.createPrompt({
       name,
       projectId: project.id,
+      handle: data.handle,
+      organizationId: organization.id,
+      scope: data.scope,
     });
 
     logger.info(
@@ -205,7 +222,7 @@ app.get(
     },
   }),
   async (c) => {
-    const repository = c.get("llmConfigRepository");
+    const service = c.get("promptService");
     const project = c.get("project");
     const { id } = c.req.param();
 
@@ -214,10 +231,12 @@ app.get(
       "Getting versions for prompt"
     );
 
-    const versions = await repository.versions.getVersionsForConfigById({
-      configId: id,
-      projectId: project.id,
-    });
+    const versions = await service.repository.versions.getVersionsForConfigById(
+      {
+        configId: id,
+        projectId: project.id,
+      }
+    );
 
     logger.info(
       { projectId: project.id, promptId: id, versionCount: versions.length },
@@ -246,7 +265,7 @@ app.post(
   }),
   zValidator("json", versionInputSchema),
   async (c) => {
-    const repository = c.get("llmConfigRepository");
+    const service = c.get("promptService");
     const project = c.get("project");
     const { id } = c.req.param();
     const data = c.req.valid("json");
@@ -256,7 +275,7 @@ app.post(
       "Creating new version for prompt"
     );
 
-    const version = await repository.versions.createVersion({
+    const version = await service.repository.versions.createVersion({
       ...data,
       configId: id,
       projectId: project.id,
@@ -294,27 +313,62 @@ app.put(
   }),
   zValidator(
     "json",
-    z.object({ name: z.string().min(1, "Name cannot be empty") })
+    z.object({
+      name: z.string().min(1, "Name cannot be empty"),
+      handle: z.string().optional(),
+      scope: z.nativeEnum(PromptScope).optional(),
+    })
   ),
   async (c) => {
-    const repository = c.get("llmConfigRepository");
+    const service = c.get("promptService");
     const project = c.get("project");
+    const organization = c.get("organization");
     const { id } = c.req.param();
     const data = c.req.valid("json");
+    const projectId = project.id;
 
     logger.info(
-      { projectId: project.id, promptId: id, newName: data.name },
+      {
+        projectId: project.id,
+        promptId: id,
+        newName: data.name,
+        newHandle: data.handle,
+      },
       "Updating prompt"
     );
 
-    const updatedConfig = await repository.updateConfig(id, project.id, data);
+    try {
+      const updatedConfig = await service.updatePrompt({
+        id,
+        projectId,
+        organizationId: organization.id,
+        data,
+      });
 
-    logger.info(
-      { projectId: project.id, promptId: id, name: updatedConfig.name },
-      "Successfully updated prompt"
-    );
+      logger.info(
+        {
+          projectId,
+          promptId: id,
+          name: updatedConfig.name,
+          handle: updatedConfig.handle,
+        },
+        "Successfully updated prompt"
+      );
 
-    return c.json(updatedConfig);
+      return c.json(updatedConfig);
+    } catch (error: any) {
+      logger.error({ projectId, promptId: id, error }, "Error updating prompt");
+
+      // Handle unique constraint violation for handle
+      if (error.code === "P2002" && error.meta?.target?.includes("handle")) {
+        throw new HTTPException(409, {
+          message: "Prompt handle already exists",
+        });
+      }
+
+      // Re-throw other errors to be handled by the error middleware
+      throw error;
+    }
   }
 );
 
@@ -335,13 +389,13 @@ app.delete(
     },
   }),
   async (c) => {
-    const repository = c.get("llmConfigRepository");
+    const service = c.get("promptService");
     const project = c.get("project");
     const { id } = c.req.param();
 
     logger.info({ projectId: project.id, promptId: id }, "Deleting prompt");
 
-    const result = await repository.deleteConfig(id, project.id);
+    const result = await service.repository.deleteConfig(id, project.id);
 
     logger.info(
       { projectId: project.id, promptId: id, success: result.success },

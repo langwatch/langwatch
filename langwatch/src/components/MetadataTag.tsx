@@ -32,10 +32,12 @@ export const MetadataTag = ({
   label,
   value,
   copyable,
+  onClick,
 }: {
   label: string;
   value: string;
   copyable?: boolean;
+  onClick?: () => void;
 }) => {
   const { project } = useOrganizationTeamProject();
   const { isCopied, copyToClipboard } = useCopyToClipboard();
@@ -64,7 +66,13 @@ export const MetadataTag = ({
   };
 
   return (
-    <HStack gap={0} fontSize="smaller" margin={0}>
+    <HStack
+      gap={0}
+      fontSize="smaller"
+      margin={0}
+      onClick={onClick}
+      cursor={onClick ? "pointer" : "default"}
+    >
       <Text
         borderWidth={1}
         borderColor="gray.200"

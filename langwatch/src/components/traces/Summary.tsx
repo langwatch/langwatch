@@ -2,13 +2,15 @@ import { Alert, Box, HStack, Skeleton, VStack } from "@chakra-ui/react";
 import numeral from "numeral";
 import React, { type PropsWithChildren } from "react";
 import { HelpCircle } from "react-feather";
-import { getTotalTokensDisplay } from "~/utils/getTotalTokensDisplay";
+
 import { useTraceDetailsState } from "../../hooks/useTraceDetailsState";
 import type { Trace } from "../../server/tracer/types";
 import { formatMilliseconds } from "../../utils/formatMilliseconds";
 import { isNotFound } from "../../utils/trpcError";
 import { MetadataTag } from "../MetadataTag";
 import { Tooltip } from "../ui/tooltip";
+
+import { getTotalTokensDisplay } from "~/utils/getTotalTokensDisplay";
 
 const SummaryItem = ({
   label,
@@ -104,6 +106,28 @@ const TraceSummaryValues = React.forwardRef<HTMLDivElement, { trace: Trace }>(
 
     const shouldShowCost = hasTraceCost() || hasSpanCosts();
 
+    /**
+     * Handle metadata tag click.
+     * Note: This is a quick hack to open the current page in a new tab with the prompt_id filter applied
+     * since the double update of the query params has race conditions and we can't use the current hooks.
+     *
+     * TODO: Create a more robust/seemless way to open the current page in a new tab with the prompt_id filter applied,
+     * probably that will work for all of the metadata tags.
+     *
+     * @param key - The key of the metadata tag.
+     * @param value - The value of the metadata tag.
+     */
+    const handleMetadataTagClick = async (key: string, value: string) => {
+      if (key === "prompt_ids") {
+        // Open current page in new tab with prompt_id filter applied
+        const baseUrl = window.location.origin + window.location.pathname;
+        const newUrl = new URL(baseUrl);
+        newUrl.searchParams.set("prompt_id", value);
+        // Open in new tab
+        window.open(newUrl.toString(), "_blank");
+      }
+    };
+
     return (
       <>
         <HStack
@@ -189,6 +213,9 @@ const TraceSummaryValues = React.forwardRef<HTMLDivElement, { trace: Trace }>(
                   key={i}
                   label={key}
                   value={renderValue as string}
+                  onClick={() =>
+                    void handleMetadataTagClick(key, renderValue as string)
+                  }
                 />
               )
             );

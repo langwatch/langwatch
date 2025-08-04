@@ -1,5 +1,5 @@
-import { ScenarioEventRepository } from "./scenario-event.repository";
 import { ScenarioRunStatus } from "./enums";
+import { ScenarioEventRepository } from "./scenario-event.repository";
 import type { ScenarioEvent, ScenarioRunData } from "./types";
 
 /**
@@ -85,12 +85,12 @@ export class ScenarioEventService {
       scenarioId: latestMessageEvent.scenarioId,
       batchRunId: latestMessageEvent.batchRunId,
       scenarioRunId: latestMessageEvent.scenarioRunId,
-      status: latestRunFinishedEvent?.status || ScenarioRunStatus.IN_PROGRESS,
-      results: latestRunFinishedEvent?.results || null,
-      messages: latestMessageEvent.messages || [],
-      timestamp: latestMessageEvent.timestamp || 0,
-      name: runStartedEvent?.metadata?.name || null,
-      description: runStartedEvent?.metadata?.description || null,
+      status: latestRunFinishedEvent?.status ?? ScenarioRunStatus.IN_PROGRESS,
+      results: latestRunFinishedEvent?.results ?? null,
+      messages: latestMessageEvent.messages ?? [],
+      timestamp: latestMessageEvent.timestamp ?? 0,
+      name: runStartedEvent?.metadata?.name ?? null,
+      description: runStartedEvent?.metadata?.description ?? null,
       durationInMs:
         runStartedEvent?.timestamp && latestRunFinishedEvent?.timestamp
           ? latestRunFinishedEvent.timestamp - runStartedEvent.timestamp

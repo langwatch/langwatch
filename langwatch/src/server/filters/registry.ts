@@ -2,11 +2,13 @@ import type {
   QueryDslBoolQuery,
   QueryDslQueryContainer,
 } from "@elastic/elasticsearch/lib/api/types";
+
 import {
   AVAILABLE_EVALUATORS,
   type EvaluatorTypes,
 } from "../../server/evaluations/evaluators.generated";
 import { reservedTraceMetadataSchema } from "../tracer/types.generated";
+
 import type { FilterDefinition, FilterField } from "./types";
 
 export const availableFilters: { [K in FilterField]: FilterDefinition } = {
@@ -477,9 +479,7 @@ export const availableFilters: { [K in FilterField]: FilterDefinition } = {
         return (
           result.unique_values?.buckets?.map((bucket: any) => ({
             field: bucket.key ? "true" : "false",
-            label: bucket.key
-              ? "Traces with error"
-              : "Traces without error",
+            label: bucket.key ? "Traces with error" : "Traces without error",
             count: bucket.doc_count,
           })) ?? []
         );
@@ -1426,6 +1426,49 @@ export const availableFilters: { [K in FilterField]: FilterDefinition } = {
               _result.unique_values?.buckets?.no_annotations?.doc_count ?? 0,
           },
         ];
+      },
+    },
+  },
+  "metadata.prompt_ids": {
+    name: "Prompt ID",
+    urlKey: "prompt_id",
+    query: (values: string[]) => ({
+      terms: { "metadata.prompt_ids": values },
+    }),
+    listMatch: {
+      aggregation: (query: string | undefined) => ({
+        unique_values: {
+          filter: query
+            ? {
+                prefix: {
+                  "metadata.prompt_ids": {
+                    value: query,
+                    case_insensitive: true,
+                  },
+                },
+              }
+            : {
+                match_all: {},
+              },
+          aggs: {
+            child: {
+              terms: {
+                field: "metadata.prompt_ids",
+                size: 10_000,
+                order: { _key: "asc" },
+              },
+            },
+          },
+        },
+      }),
+      extract: (result: Record<string, any>) => {
+        return (
+          result.unique_values?.child?.buckets?.map((bucket: any) => ({
+            field: bucket.key,
+            label: bucket.key,
+            count: bucket.doc_count,
+          })) ?? []
+        );
       },
     },
   },

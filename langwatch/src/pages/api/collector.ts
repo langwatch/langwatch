@@ -29,6 +29,7 @@ import {
   getPayloadSizeHistogram,
   traceSpanCountHistogram,
 } from "../../server/metrics";
+import { withPagesRouterLogger } from "../../middleware/pages-router-logger";
 
 const logger = createLogger("langwatch:collector");
 
@@ -40,7 +41,7 @@ export const config = {
   },
 };
 
-export default async function handler(
+async function handleCollectorRequest(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
@@ -56,6 +57,10 @@ export default async function handler(
     (authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : null);
 
   if (!authToken) {
+    logger.error(
+      "collector request is not authenticated, no auth token provided"
+    );
+
     return res.status(401).json({
       message:
         "Authentication token is required. Use X-Auth-Token header or Authorization: Bearer token.",
@@ -66,6 +71,8 @@ export default async function handler(
     req.headers["content-type"] !== "application/json" ||
     typeof req.body !== "object"
   ) {
+    logger.error("collector request body is not json");
+
     return res.status(400).json({ message: "Invalid body, expecting json" });
   }
 
@@ -77,8 +84,12 @@ export default async function handler(
   });
 
   if (!project) {
+    logger.error("collector request is not authenticated, invalid auth token");
+
     return res.status(401).json({ message: "Invalid auth token." });
   }
+
+  logger.info({ projectId: project.id }, "collector request being processed");
 
   try {
     const currentMonthMessagesCount = await getCurrentMonthMessagesCount(
@@ -98,16 +109,31 @@ export default async function handler(
             activePlan.name ?? "free"
           );
         } catch (error) {
-          logger.error({ error, projectId: project.id }, "Error sending plan limit notification");
+          logger.error(
+            { error, projectId: project.id },
+            "Error sending plan limit notification"
+          );
         }
       }
-      logger.info({ projectId: project.id, currentMonthMessagesCount }, "[429] Reached plan limit");
+      logger.info(
+        {
+          projectId: project.id,
+          currentMonthMessagesCount,
+          activePlanName: activePlan.name,
+          maxMessagesPerMonth: activePlan.maxMessagesPerMonth,
+        },
+        "Project has reached plan limit"
+      );
+
       return res.status(429).json({
         message: `ERR_PLAN_LIMIT: You have reached the monthly limit of ${activePlan.maxMessagesPerMonth} messages, please go to LangWatch dashboard to verify your plan.`,
       });
     }
   } catch (error) {
-    logger.error({ error, projectId: project.id }, "Error getting current month messages count");
+    logger.error(
+      { error, projectId: project.id },
+      "Error getting current month messages count"
+    );
     Sentry.captureException(
       new Error("Error getting current month messages count"),
       {
@@ -155,6 +181,11 @@ export default async function handler(
       (evaluation.score === undefined || evaluation.score === null) &&
       (evaluation.label === undefined || evaluation.label === null)
     ) {
+      logger.error(
+        { projectId: project.id, evaluationId: evaluation.id },
+        "evaluation has no passed, score or label"
+      );
+
       return res.status(400).json({
         error:
           "Either `passed`, `score` or `label` field must be defined for evaluations",
@@ -171,6 +202,11 @@ export default async function handler(
       (evaluation.timestamps?.finished_at &&
         evaluation.timestamps.finished_at.toString().length !== 13)
     ) {
+      logger.error(
+        { projectId: project.id, evaluationId: evaluation.id },
+        "evaluation timestamps not in milliseconds"
+      );
+
       return res.status(400).json({
         error:
           "Evaluation timestamps should be in milliseconds not in seconds, please multiply it by 1000",
@@ -182,18 +218,32 @@ export default async function handler(
   try {
     params = collectorRESTParamsValidatorSchema.parse(req.body);
   } catch (error) {
-    logger.error({ error, body: req.body, projectId: project.id }, 'invalid trace received');
     Sentry.captureException(new Error("ZodError on parsing body"), {
       extra: { projectId: project.id, body: req.body, zodError: error },
     });
 
     const validationError = fromZodError(error as ZodError);
+
+    logger.error(
+      { error, body: req.body, validationError },
+      "invalid trace received"
+    );
+
     return res.status(400).json({ error: validationError.message });
   }
 
   const { trace_id: nullableTraceId, expected_output: expectedOutput } = params;
 
   if (req.body.spans && !Array.isArray(req.body.spans)) {
+    logger.error(
+      {
+        projectId: project.id,
+        spans: req.body.spans,
+        traceId: nullableTraceId,
+      },
+      "invalid spans field, expecting array"
+    );
+
     return res
       .status(400)
       .json({ message: "Invalid 'spans' field, expecting array" });
@@ -202,7 +252,14 @@ export default async function handler(
   traceSpanCountHistogram.observe(req.body.spans?.length ?? 0);
 
   if (req.body.spans?.length > 200) {
-    logger.info({ projectId: project.id, spansCount: req.body.spans?.length }, "[429] Too many spans");
+    logger.info(
+      {
+        projectId: project.id,
+        spansCount: req.body.spans?.length,
+        traceId: nullableTraceId,
+      },
+      "[429] Too many spans"
+    );
     return res.status(429).json({
       message: "Too many spans, maximum of 200 per trace",
     });
@@ -233,6 +290,12 @@ export default async function handler(
         zodError: error,
       },
     });
+
+    logger.error(
+      { projectId: project.id, metadata: params.metadata, zodError: error },
+      "invalid metadata received"
+    );
+
     return res.status(400).json({ error: validationError.message });
   }
 
@@ -301,6 +364,16 @@ export default async function handler(
 
   const traceId = nullableTraceId ?? spans[0]?.trace_id;
   if (!traceId) {
+    logger.error(
+      {
+        projectId: project.id,
+        traceId: nullableTraceId,
+        spanCount: spans.length,
+        spanIds: spans.map((span) => span.span_id),
+      },
+      "trace id not defined"
+    );
+
     return res.status(400).json({ message: "Trace ID not defined" });
   }
 
@@ -314,6 +387,11 @@ export default async function handler(
     new Set(spans.filter((span) => span.trace_id).map((span) => span.trace_id))
   );
   if (traceIds[0] && (traceIds.length > 1 || traceIds[0] != traceId)) {
+    logger.error(
+      { projectId: project.id, traceId, traceIds },
+      "trace ids are not the same"
+    );
+
     return res
       .status(400)
       .json({ message: "All spans must have the same trace id" });
@@ -323,12 +401,17 @@ export default async function handler(
     try {
       spanValidatorSchema.parse(span);
     } catch (error) {
-      logger.error({ error, span, projectId: project.id }, 'invalid span received');
       Sentry.captureException(new Error("ZodError on parsing spans"), {
         extra: { projectId: project.id, span, zodError: error },
       });
 
       const validationError = fromZodError(error as ZodError);
+
+      logger.error(
+        { error, span, projectId: project.id, index, validationError },
+        "invalid span received"
+      );
+
       return res
         .status(400)
         .json({ error: validationError.message + ` at "spans[${index}]"` });
@@ -342,7 +425,10 @@ export default async function handler(
       (span.timestamps.first_token_at &&
         span.timestamps.first_token_at.toString().length !== 13)
     ) {
-      logger.error({ traceId, projectId: project.id }, 'timestamps not in milliseconds for span');
+      logger.error(
+        { traceId, projectId: project.id },
+        "timestamps not in milliseconds for span"
+      );
       return res.status(400).json({
         error:
           "Timestamps should be in milliseconds not in seconds, please multiply it by 1000",
@@ -356,10 +442,20 @@ export default async function handler(
     .digest("hex");
   const existingTrace = await fetchExistingMD5s(traceId, project.id);
   if (existingTrace?.indexing_md5s?.includes(paramsMD5)) {
+    logger.info(
+      { traceId, projectId: project.id, paramsMD5 },
+      "trace already indexed"
+    );
+
     return res.status(200).json({ message: "No changes" });
   }
 
   if (existingTrace?.version && existingTrace.version > 256) {
+    logger.error(
+      { traceId, projectId: project.id, version: existingTrace.version },
+      "over 256 updates were sent for this trace already, no more updates will be accepted"
+    );
+
     return res.status(400).json({
       message:
         "Over 256 updates were sent for this trace already, no more updates will be accepted",
@@ -391,3 +487,6 @@ export default async function handler(
 
   return res.status(200).json({ message: "Trace received successfully." });
 }
+
+// Export the handler wrapped with logging middleware
+export default withPagesRouterLogger(handleCollectorRequest);

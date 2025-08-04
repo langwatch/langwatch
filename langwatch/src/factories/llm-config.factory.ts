@@ -1,16 +1,19 @@
-import { Factory } from "fishery";
 import {
+  PromptScope,
   type LlmPromptConfig,
   type LlmPromptConfigVersion,
 } from "@prisma/client";
+import { Factory } from "fishery";
 import { nanoid } from "nanoid";
+import type { z } from "zod";
+
 import {
   LATEST_SCHEMA_VERSION,
   type SchemaVersion,
   parseLlmConfigVersion,
   type schemaValidators,
 } from "~/server/prompt-config/repositories/llm-config-version-schema";
-import type { z } from "zod";
+
 import type { NodeDataset } from "../optimization_studio/types/dsl";
 
 /**
@@ -28,6 +31,9 @@ export const llmPromptConfigFactory = Factory.define<
   createdAt: new Date(),
   updatedAt: new Date(),
   deletedAt: null,
+  handle: null,
+  organizationId: null,
+  scope: PromptScope.PROJECT,
 }));
 
 type LlmPromptConfigVersionWithConfigData<T extends SchemaVersion> =

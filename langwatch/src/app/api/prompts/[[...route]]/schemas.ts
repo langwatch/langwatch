@@ -1,4 +1,5 @@
 import { z } from "zod";
+
 import { getLatestConfigVersionSchema } from "~/server/prompt-config/repositories/llm-config-version-schema";
 
 /**
@@ -21,6 +22,7 @@ export const llmPromptConfigSchema = z.object({
   id: z.string(),
   name: z.string(),
   updatedAt: z.date(),
+  handle: z.string().nullable(),
 });
 
 /**

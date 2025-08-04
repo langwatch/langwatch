@@ -1,4 +1,5 @@
 import type { Context, Next } from "hono";
+
 import { createLogger } from "../../../utils/logger";
 
 const logger = createLogger("langwatch:api:hono");
@@ -6,7 +7,7 @@ const logger = createLogger("langwatch:api:hono");
 export const loggerMiddleware = () => {
   return async (c: Context, next: Next): Promise<any> => {
     const start = Date.now();
-    let error: unknown = null;
+    let error: any = c.error;
 
     try {
       await next();
@@ -30,7 +31,7 @@ export const loggerMiddleware = () => {
         organizationId: c.get("organization")?.id ?? null,
       };
 
-      if (error) {
+      if (error || c.error) {
         logData.error = error instanceof Error ? error : JSON.stringify(error);
         logger.error(logData, "error handling request");
       } else {
