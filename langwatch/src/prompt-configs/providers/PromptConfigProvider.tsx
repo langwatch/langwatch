@@ -108,20 +108,37 @@ export function PromptConfigProvider({
               scope: saveFormValues.scope,
             });
           }
-          const version = await createNewVersion(
-            config.id,
-            promptConfigFormValuesVersionToLlmConfigVersionConfigData(
-              updateConfigValues.version
-            ),
-            saveFormValues.commitMessage
-          );
+
+          if (saveFormValues.saveNewVersion) {
+            const version = await createNewVersion(
+              config.id,
+              promptConfigFormValuesVersionToLlmConfigVersionConfigData(
+                updateConfigValues.version
+              ),
+              saveFormValues.commitMessage
+            );
+            toaster.success({
+              title: "Version saved",
+              description: `Version ${version.version} has been saved successfully.`,
+            });
+          } else {
+            if (
+              "handle" in saveFormValues &&
+              config.handle !== saveFormValues.handle
+            ) {
+              toaster.success({
+                title: "Prompt config updated",
+                description: `Prompt identifier has been updated successfully.`,
+              });
+            } else {
+              toaster.success({
+                title: "Prompt config updated",
+                description: `Prompt scope has been updated successfully.`,
+              });
+            }
+          }
 
           closeDialog();
-
-          toaster.success({
-            title: "Version saved",
-            description: `Version ${version.version} has been saved successfully.`,
-          });
         } catch (error) {
           console.error(error);
           toaster.error({

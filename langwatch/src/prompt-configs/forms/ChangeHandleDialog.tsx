@@ -83,6 +83,7 @@ export type ChangeHandleDialogFormValues = {
   handle: string;
   scope: PromptScope;
   commitMessage: string;
+  saveNewVersion: boolean;
 };
 
 export interface ChangeHandleDialogProps {
@@ -133,9 +134,8 @@ export function ChangeHandleDialog({
       await onSubmit({
         handle: data.handle,
         scope: data.scope,
-        commitMessage: firstTimeSave
-          ? `Created prompt ${data.handle}`
-          : `Renamed prompt to ${data.handle}`,
+        commitMessage: `Created prompt ${data.handle}`,
+        saveNewVersion: firstTimeSave,
       });
       reset();
     },
