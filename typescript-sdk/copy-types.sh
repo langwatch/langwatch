@@ -1,3 +1,5 @@
+#!/bin/bash
+
 set -e
 
 cp ../langwatch/src/server/tracer/types.ts src/internal/generated/types/tracer.ts
