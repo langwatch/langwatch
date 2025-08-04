@@ -47,21 +47,21 @@ npm install langwatch
 Here's the fastest way to get LangWatch working in your app:
 
 ```ts
-import { setup } from "langwatch/node";
-import { getTracer } from "langwatch/observability";
+import { setupLangWatch } from "langwatch/node";
+import { getLangWatchTracer } from "langwatch";
 
 // 1. Initialize LangWatch (Node.js example)
-await setup({ apiKey: "YOUR_API_KEY" }); // By default, this will read the LANGWATCH_API_KEY environment variable
+await setupLangWatch({ apiKey: "YOUR_API_KEY" }); // By default, this will read the LANGWATCH_API_KEY environment variable
 
 // 2. Create a tracer and span
-const tracer = getTracer("my-app");
+const tracer = getLangWatchTracer("my-app");
 const span = tracer.startSpan("my-operation");
 span.setInput("User prompt");
 span.setOutput("Model response");
 span.end();
 ```
 
-> **Tip:** For use in the browser, use `import { setup } from "langwatch/browser"` instead.
+> **Tip:** For use in the browser, use `import { setupLangWatch } from "langwatch/browser"` instead.
 
 ---
 
@@ -71,7 +71,7 @@ span.end();
 
 - **Get a tracer:**
   ```ts
-  const tracer = getTracer("my-app");
+  const tracer = getLangWatchTracer("my-app");
   ```
 - **Start a span and record input/output:**
   ```ts
@@ -82,6 +82,16 @@ span.end();
   span.end();
   ```
   > **Note:** `setInput` and `setOutput` are the primary methods to record input/output. Use `setInputString`/`setOutputString` for plain text, or pass any serializable value.
+
+- **Use withActiveSpan for automatic error handling:**
+  ```ts
+  await tracer.withActiveSpan("my-operation", async (span) => {
+    span.setType("llm");
+    span.setInput("User prompt");
+    // ... your code ...
+    span.setOutput("Model response");
+  });
+  ```
 
 - **Record an evaluation directly on a span:**
   ```ts
@@ -94,13 +104,17 @@ span.end();
   span.addGenAISystemMessageEvent({ content: "You are a helpful assistant." });
   span.addGenAIUserMessageEvent({ content: "Hello!" });
   span.addGenAIAssistantMessageEvent({ content: "Hi! How can I help you?" });
+  span.addGenAIToolMessageEvent({ content: "Tool result", id: "tool-1" });
+  span.addGenAIChoiceEvent({ finish_reason: "stop", index: 0, message: { content: "Response" } });
   ```
   > **Advanced:** The `addGenAI...` methods are optional and mainly for advanced/manual instrumentation. Most users do not need these unless you want fine-grained message event logs.
 
-- **RAG context, metrics, and evaluation:**
+- **RAG context, metrics, and model information:**
   ```ts
   span.setRAGContexts([{ document_id: "doc1", chunk_id: "c1", content: "..." }]);
   span.setMetrics({ promptTokens: 10, completionTokens: 20, cost: 0.002 });
+  span.setRequestModel("gpt-4");
+  span.setResponseModel("gpt-4");
   ```
 
 ### 2. Prompt Management
@@ -143,38 +157,102 @@ span.end();
   ```
   > **Note:** The evaluation APIs (`runEvaluation`, `recordEvaluation`) also create spans and add tracing/evaluation info automatically.
 
+### 4. LangChain Integration
+
+- **Use with LangChain:**
+  ```ts
+  import { LangWatchCallbackHandler } from "langwatch/observability/instrumentation/langchain";
+
+  const chatModel = new ChatOpenAI({
+    callbacks: [new LangWatchCallbackHandler()],
+  });
+  ```
+
 ---
 
 ## API Reference
 
+### Setup
+- `setupLangWatch(options?)` → Initialize LangWatch (from `langwatch/node` or `langwatch/browser`)
+
 ### Observability
 - `getLangWatchTracer(name, version?)` → `LangWatchTracer`
-- `LangWatchSpan` methods: `.setType()`, `.setInput()`, `.setOutput()`, `.recordEvaluation()`, `.addGenAISystemMessageEvent()`, `.addGenAIUserMessageEvent()`, `.addGenAIAssistantMessageEvent()`, `.addGenAIToolMessageEvent()`, `.setRAGContexts()`, `.setMetrics()`, etc.
+- `LangWatchTracer` methods: `.startSpan()`, `.startActiveSpan()`, `.withActiveSpan()`
+- `LangWatchSpan` methods:
+  - `.setType()`, `.setInput()`, `.setOutput()`, `.setInputString()`, `.setOutputString()`
+  - `.recordEvaluation()`, `.setRequestModel()`, `.setResponseModel()`
+  - `.setRAGContexts()`, `.setRAGContext()`, `.setMetrics()`, `.setSelectedPrompt()`
+  - `.addGenAISystemMessageEvent()`, `.addGenAIUserMessageEvent()`, `.addGenAIAssistantMessageEvent()`, `.addGenAIToolMessageEvent()`, `.addGenAIChoiceEvent()`
 
 ### Prompt
 - `getPrompt(promptId, variables?)` → fetches and formats a prompt (creates a span automatically)
-- `getPromptVersion(promptId, versionId, variables?)`
+- `getPromptVersion(promptId, versionId, variables?)` → fetches specific prompt version
 
 ### Evaluation
 - `runEvaluation(details)` → runs an evaluation and returns result (creates a span automatically)
 - `recordEvaluation(details, attributes?)` → records a custom evaluation span (creates a span automatically)
 
-### Utilities
-- `convertFromVercelAIMessages(messages)`
-- `captureError(error)`
-- `autoconvertTypedValues(value)`
+### LangChain Integration
+- `LangWatchCallbackHandler` → LangChain callback handler for automatic instrumentation
+
+### Exporters & Processors
+- `LangWatchExporter` → Custom OpenTelemetry exporter
+- `FilterableBatchSpanProcessor` → Span processor with filtering capabilities
 
 ---
 
 ## Types
-- `PromptDefinition`, `PromptMessage`, `PromptConfig`, `EvaluationDetails`, `SingleEvaluationResult`, `LangWatchSpan`, etc.
+
+### Core Types
+- `LangWatchSpan` → Extended OpenTelemetry span with LangWatch methods
+- `LangWatchTracer` → Extended OpenTelemetry tracer with LangWatch methods
+- `SpanType` → Union of supported span types (`"llm"`, `"chain"`, `"tool"`, `"agent"`, etc.)
+
+### Evaluation Types
+- `EvaluationDetails` → Configuration for running evaluations
+- `SingleEvaluationResult` → Result from evaluation runs
+- `RecordedEvaluationDetails` → Configuration for recording custom evaluations
+
+### Prompt Types
+- `Prompt` → Prompt object with compilation capabilities
+- `CompiledPrompt` → Compiled prompt with variables interpolated
+- `TemplateVariables` → Variables for prompt compilation
+
+### RAG & Metrics Types
+- `LangWatchSpanRAGContext` → RAG context structure
+- `LangWatchSpanMetrics` → Metrics structure (tokens, cost)
+- `LangWatchSpanGenAI*EventBody` → GenAI message event structures
 
 ---
 
 ## Advanced
-- Custom OpenTelemetry exporters: see `src/observability/exporters`
-- Instrumentation helpers: see `src/observability/instrumentation`
-- Full TypeScript types for all APIs
+
+### Custom OpenTelemetry Integration
+```ts
+import { FilterableBatchSpanProcessor, LangWatchExporter } from "langwatch";
+
+const processor = new FilterableBatchSpanProcessor(
+  new LangWatchExporter(apiKey, endpoint),
+  excludeRules
+);
+```
+
+### Span Processing Rules
+```ts
+const excludeRules: SpanProcessingExcludeRule[] = [
+  { attribute: "http.url", value: "/health" },
+  { attribute: "span.type", value: "health" }
+];
+```
+
+### Manual Instrumentation
+```ts
+import { semconv } from "langwatch/observability";
+
+span.setAttributes({
+  [semconv.ATTR_LANGWATCH_THREAD_ID]: threadId,
+});
+```
 
 ---
 
