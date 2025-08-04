@@ -1,14 +1,24 @@
 import {
-  type PromptScope,
   type LlmPromptConfig,
   type PrismaClient,
+  type PromptScope,
 } from "@prisma/client";
 
+import { type z } from "zod";
 import { type UpdateLlmConfigDTO } from "./dtos";
 import {
   LlmConfigRepository,
   type LlmConfigWithLatestVersion,
 } from "./repositories";
+import {
+  type getLatestConfigVersionSchema,
+  SchemaVersion,
+} from "./repositories/llm-config-version-schema";
+
+// Extract the configData type from the schema
+type ConfigData = z.infer<
+  ReturnType<typeof getLatestConfigVersionSchema>
+>["configData"];
 
 /**
  * Service layer for managing LLM prompt configurations.
@@ -125,5 +135,187 @@ export class PromptService {
 
     // Return true if unique (no existing config or it's the same config being edited)
     return !existingConfig || existingConfig.id === params.excludeId;
+  }
+
+  /**
+   * Sync/upsert a prompt from local content with conflict resolution
+   */
+  async syncPrompt(params: {
+    idOrHandle: string;
+    localConfigData: ConfigData;
+    localVersion?: number;
+    projectId: string;
+    organizationId: string;
+    authorId?: string;
+    commitMessage?: string;
+  }): Promise<{
+    action: "created" | "updated" | "conflict" | "up_to_date";
+    prompt?: LlmConfigWithLatestVersion;
+    conflictInfo?: {
+      localVersion: number;
+      remoteVersion: number;
+      differences: string[];
+      remoteConfigData: ConfigData;
+    };
+  }> {
+    const {
+      idOrHandle,
+      localConfigData,
+      localVersion,
+      projectId,
+      organizationId,
+      authorId,
+      commitMessage,
+    } = params;
+
+    // Check if prompt exists on server
+    const existingPrompt = await this.getPromptByIdOrHandle({
+      idOrHandle,
+      projectId,
+      organizationId,
+    });
+
+    // Case 1: Prompt doesn't exist on server - create new
+    if (!existingPrompt) {
+      const newPrompt = await this.repository.createConfigWithInitialVersion({
+        name: idOrHandle,
+        handle: idOrHandle,
+        projectId,
+        organizationId,
+        scope: "PROJECT" as PromptScope,
+      });
+
+      // Create a new version with the local content
+      const newVersion = await this.repository.versions.createVersion(
+        {
+          configId: newPrompt.id,
+          projectId,
+          authorId,
+          commitMessage: commitMessage ?? "Synced from local file",
+          configData: localConfigData,
+          schemaVersion: SchemaVersion.V1_0,
+        },
+        organizationId
+      );
+
+      return {
+        action: "created",
+        prompt: {
+          ...newPrompt,
+          latestVersion: {
+            ...newVersion,
+            commitMessage: newVersion.commitMessage ?? "Synced from local file",
+            version: newVersion.version,
+            configData: localConfigData,
+          },
+        },
+      };
+    }
+
+    // Check modify permissions
+    const permission = await this.repository.checkModifyPermission({
+      idOrHandle,
+      projectId,
+      organizationId,
+    });
+
+    if (!permission.hasPermission) {
+      throw new Error(
+        permission.reason ?? "No permission to modify this prompt"
+      );
+    }
+
+    const remoteVersion = existingPrompt.latestVersion.version;
+    const remoteConfigData = existingPrompt.latestVersion.configData;
+
+    // Case 2: Same version - check content
+    if (localVersion === remoteVersion) {
+      const comparison = this.repository.compareConfigContent(
+        localConfigData,
+        remoteConfigData
+      );
+
+      if (comparison.isEqual) {
+        // Content is the same - up to date
+        return { action: "up_to_date", prompt: existingPrompt };
+      } else {
+        // Content differs - create new version
+        const newVersion = await this.repository.versions.createVersion(
+          {
+            configId: existingPrompt.id,
+            projectId,
+            authorId,
+            commitMessage: commitMessage ?? "Updated from local file",
+            configData: localConfigData,
+            schemaVersion: SchemaVersion.V1_0,
+          },
+          organizationId
+        );
+
+        return {
+          action: "updated",
+          prompt: {
+            ...existingPrompt,
+            latestVersion: {
+              ...newVersion,
+              configData: localConfigData,
+            } as any,
+          },
+        };
+      }
+    }
+
+    // Case 3: Different versions
+    if (localVersion && localVersion < remoteVersion) {
+      // Local is behind - check if local content differs from the version it's based on
+      const localBaseVersion = await this.repository.getConfigVersionByNumber({
+        idOrHandle,
+        versionNumber: localVersion,
+        projectId,
+        organizationId,
+      });
+
+      if (localBaseVersion) {
+        const baseComparison = this.repository.compareConfigContent(
+          localConfigData,
+          localBaseVersion.configData as Record<string, unknown>
+        );
+
+        if (baseComparison.isEqual) {
+          // Local hasn't changed since base version - can safely update
+          return { action: "up_to_date", prompt: existingPrompt };
+        }
+      }
+
+      // Local has changes and is behind - conflict
+      return {
+        action: "conflict",
+        conflictInfo: {
+          localVersion,
+          remoteVersion,
+          differences:
+            this.repository.compareConfigContent(
+              localConfigData,
+              remoteConfigData
+            ).differences ?? [],
+          remoteConfigData,
+        },
+      };
+    }
+
+    // Case 4: Local version is newer or unknown - assume conflict
+    return {
+      action: "conflict",
+      conflictInfo: {
+        localVersion: localVersion ?? 0,
+        remoteVersion,
+        differences:
+          this.repository.compareConfigContent(
+            localConfigData,
+            remoteConfigData
+          ).differences ?? [],
+        remoteConfigData,
+      },
+    };
   }
 }

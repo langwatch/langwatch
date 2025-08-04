@@ -56,17 +56,19 @@ describe("Prompt", () => {
 
     const prompt = await promptService.get("prompt_123");
 
-    expect(prompt.id).toBe("prompt_123");
-    expect(prompt.name).toBe("Test Prompt");
+    expect(prompt).toBeDefined();
+
+    expect(prompt?.id).toBe("prompt_123");
+    expect(prompt?.name).toBe("Test Prompt");
 
     // Test template compilation
-    const compiled = prompt.compile({
+    const compiled = prompt?.compile({
       user_name: "Alice",
       topic: "weather",
     });
 
-    expect(compiled.prompt).toContain("Alice");
-    expect(JSON.stringify(compiled.messages)).toContain("weather");
+    expect(compiled?.prompt).toContain("Alice");
+    expect(JSON.stringify(compiled?.messages)).toContain("weather");
   });
 
   it("should handle missing template variables gracefully", async () => {
@@ -94,10 +96,10 @@ describe("Prompt", () => {
     const prompt = await promptService.get("prompt_123");
 
     // Lenient compilation should not throw and should replace missing variables with empty strings
-    const compiled = prompt.compile({ user_name: "Alice", topic: "weather" });
+    const compiled = prompt?.compile({ user_name: "Alice", topic: "weather" });
     expect(compiled).toBeInstanceOf(Prompt);
-    expect(compiled.prompt).toBe("Hello Alice, how is the weather today?");
-    expect(compiled.messages[0]?.content).toBe("Tell me about weather");
+    expect(compiled?.prompt).toBe("Hello Alice, how is the weather today?");
+    expect(compiled?.messages[0]?.content).toBe("Tell me about weather");
   });
 
   it("should throw on strict compilation with missing variables", async () => {
@@ -125,7 +127,7 @@ describe("Prompt", () => {
     const prompt = await promptService.get("prompt_123");
 
     expect(() => {
-      prompt.compileStrict({ });
+      prompt?.compileStrict({});
     }).toThrow(PromptCompilationError);
   });
 

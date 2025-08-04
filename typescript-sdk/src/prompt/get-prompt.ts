@@ -15,6 +15,10 @@ export async function getPrompt(id: string, variables?: TemplateVariables): Prom
     const service = PromptService.getInstance();
     const prompt = await service.get(id);
 
+    if (!prompt) {
+      throw new Error(`Prompt with ID "${id}" not found`);
+    }
+
     if (canAutomaticallyCaptureOutput()) {
       span.setOutput(prompt);
     }

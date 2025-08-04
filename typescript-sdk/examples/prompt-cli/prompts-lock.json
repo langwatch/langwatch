@@ -1,0 +1,15 @@
+{
+  "lockfileVersion": 1,
+  "prompts": {
+    "shared/ts-guidelines": {
+      "version": 2,
+      "versionId": "prompt_version_3D9Jx7eqvGiScFdWaHUs6",
+      "materialized": "prompts/.materialized/shared/ts-guidelines.prompt.yaml"
+    },
+    "test2209": {
+      "version": 3,
+      "versionId": "prompt_version_scRQwSRMIyJvoSxTqP2nR",
+      "materialized": "prompts/test2209.prompt.yaml"
+    }
+  }
+}

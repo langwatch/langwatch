@@ -22,9 +22,12 @@ import {
   versionInputSchema,
   versionOutputSchema,
 } from "./schemas";
+
+import { getLatestConfigVersionSchema } from "~/server/prompt-config/repositories/llm-config-version-schema";
 import {
   buildStandardSuccessResponse,
   getOutputsToResponseFormat,
+  patchHonoOpenApiSpecFix,
 } from "./utils";
 
 import { badRequestSchema, successSchema } from "~/app/api/shared/schemas";
@@ -58,6 +61,8 @@ app.use("/*", async (c, next) => {
 // https://hono.dev/docs/api/hono#error-handling
 app.onError(handleError);
 
+patchHonoOpenApiSpecFix(app);
+
 // Get all prompts
 app.get(
   "/",
@@ -90,7 +95,13 @@ app.get(
       "Retrieved prompts for project"
     );
 
-    return c.json(configs);
+    const transformedConfigs = configs.map((config) =>
+      transformConfigToPromptOutput(config, config.id)
+    );
+
+    return c.json(
+      transformedConfigs satisfies z.infer<typeof promptOutputSchema>[]
+    );
   }
 );
 
@@ -214,11 +225,14 @@ app.post(
       "Creating new version for prompt"
     );
 
-    const version = await service.repository.versions.createVersion({
-      ...data,
-      configId: id,
-      projectId: project.id,
-    }, organization.id);
+    const version = await service.repository.versions.createVersion(
+      {
+        ...data,
+        configId: id,
+        projectId: project.id,
+      },
+      organization.id
+    );
 
     logger.info(
       {
@@ -238,7 +252,7 @@ app.post(
 app.get(
   "/:id{.+}",
   describeRoute({
-    description: "Get a specific prompt by ID",
+    description: "Get a specific prompt",
     responses: {
       ...baseResponses,
       200: buildStandardSuccessResponse(promptOutputSchema),
@@ -256,50 +270,23 @@ app.get(
     const organization = c.get("organization");
     const { id } = c.req.param();
 
-    logger.info({ projectId: project.id, id }, "Getting prompt by ID");
+    logger.info({ projectId: project.id, id }, "Getting prompt");
 
-    try {
-      const config = await service.getPromptByIdOrHandle({
-        idOrHandle: id,
-        projectId: project.id,
-        organizationId: organization.id,
+    const config = await service.getPromptByIdOrHandle({
+      idOrHandle: id,
+      projectId: project.id,
+      organizationId: organization.id,
+    });
+
+    if (!config) {
+      throw new HTTPException(404, {
+        message: "Prompt not found",
       });
-
-      if (!config) {
-        throw new HTTPException(404, {
-          message: "Prompt not found",
-        });
-      }
-
-      const response = {
-        id: config.id,
-        name: config.name,
-        handle: config.handle,
-        version: config.latestVersion.version,
-        versionId: config.latestVersion.id ?? "",
-        versionCreatedAt: config.latestVersion.createdAt ?? new Date(),
-        model: config.latestVersion.configData.model,
-        prompt: config.latestVersion.configData.prompt,
-        updatedAt: config.updatedAt,
-        messages: [
-          {
-            role: "system",
-            content: config.latestVersion.configData.prompt,
-          },
-          ...config.latestVersion.configData.messages,
-        ],
-        response_format: getOutputsToResponseFormat(config),
-      } satisfies z.infer<typeof promptOutputSchema>;
-
-      return c.json(response);
-    } catch (error) {
-      logger.error(
-        { projectId: project.id, id, error },
-        "Error retrieving prompt"
-      );
-
-      throw error;
     }
+
+    const response = transformConfigToPromptOutput(config, id);
+
+    return c.json(response);
   }
 );
 
@@ -418,3 +405,136 @@ app.delete(
     return c.json(result satisfies z.infer<typeof successSchema>);
   }
 );
+
+// Sync endpoint for upsert operations
+app.post(
+  "/:id{.+?}/sync",
+  describeRoute({
+    description: "Sync/upsert a prompt with local content",
+    responses: {
+      ...baseResponses,
+      200: {
+        description: "Sync result",
+        content: {
+          "application/json": {
+            schema: resolver(
+              z.object({
+                action: z.enum([
+                  "created",
+                  "updated",
+                  "conflict",
+                  "up_to_date",
+                ]),
+                prompt: promptOutputSchema.optional(),
+                conflictInfo: z
+                  .object({
+                    localVersion: z.number(),
+                    remoteVersion: z.number(),
+                    differences: z.array(z.string()),
+                    remoteConfigData:
+                      getLatestConfigVersionSchema().shape.configData,
+                  })
+                  .optional(),
+              })
+            ),
+          },
+        },
+      },
+    },
+  }),
+  zValidator(
+    "json",
+    z.object({
+      configData: getLatestConfigVersionSchema().shape.configData,
+      localVersion: z.number().optional(),
+      commitMessage: z.string().optional(),
+    })
+  ),
+  async (c) => {
+    const service = c.get("promptService");
+    const project = c.get("project");
+    const organization = c.get("organization");
+    const { id } = c.req.param();
+    const data = c.req.valid("json");
+
+    logger.info(
+      { projectId: project.id, promptId: id },
+      "Syncing prompt with local content"
+    );
+
+    try {
+      const syncResult = await service.syncPrompt({
+        idOrHandle: id,
+        localConfigData: data.configData,
+        localVersion: data.localVersion,
+        projectId: project.id,
+        organizationId: organization.id,
+        commitMessage: data.commitMessage,
+      });
+
+      const response: any = {
+        action: syncResult.action,
+      };
+
+      if (syncResult.prompt) {
+        response.prompt = transformConfigToPromptOutput(syncResult.prompt, id);
+      }
+
+      if (syncResult.conflictInfo) {
+        response.conflictInfo = syncResult.conflictInfo;
+      }
+
+      logger.info(
+        {
+          projectId: project.id,
+          promptId: id,
+          action: syncResult.action,
+        },
+        "Successfully synced prompt"
+      );
+
+      return c.json(response);
+    } catch (error: any) {
+      logger.error(
+        { projectId: project.id, promptId: id, error },
+        "Error syncing prompt"
+      );
+
+      if (error.message.includes("No permission")) {
+        throw new HTTPException(403, {
+          message: error.message,
+        });
+      }
+
+      // Re-throw other errors to be handled by the error middleware
+      throw error;
+    }
+  }
+);
+
+// Helper function to transform config to promptOutputSchema format
+const transformConfigToPromptOutput = (
+  config: any,
+  id: string
+): z.infer<typeof promptOutputSchema> => {
+  return {
+    id,
+    name: config.name,
+    handle: config.handle,
+    scope: config.scope,
+    version: config.latestVersion.version,
+    versionId: config.latestVersion.id ?? "",
+    versionCreatedAt: config.latestVersion.createdAt ?? new Date(),
+    model: config.latestVersion.configData.model,
+    prompt: config.latestVersion.configData.prompt,
+    updatedAt: config.updatedAt,
+    messages: [
+      {
+        role: "system",
+        content: config.latestVersion.configData.prompt,
+      },
+      ...config.latestVersion.configData.messages,
+    ],
+    response_format: getOutputsToResponseFormat(config),
+  };
+};

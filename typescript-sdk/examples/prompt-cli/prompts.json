@@ -1,0 +1,6 @@
+{
+  "prompts": {
+    "shared/ts-guidelines": "latest",
+    "test2209": "file:prompts/test2209.prompt.yaml"
+  }
+}

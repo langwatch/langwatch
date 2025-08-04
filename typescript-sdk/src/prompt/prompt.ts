@@ -19,7 +19,7 @@ export class PromptCompilationError extends Error {
   constructor(
     message: string,
     public readonly template: string,
-    public readonly originalError?: any
+    public readonly originalError?: any,
   ) {
     super(message);
     this.name = "PromptCompilationError";
@@ -33,6 +33,8 @@ const liquid = new Liquid({
 
 export class Prompt implements PromptResponse {
   public readonly id!: string;
+  public readonly handle!: string | null;
+  public readonly scope!: "ORGANIZATION" | "PROJECT";
   public readonly name!: string;
   public readonly updatedAt!: string;
   public readonly version!: number;
@@ -45,6 +47,8 @@ export class Prompt implements PromptResponse {
 
   constructor(promptData: PromptResponse) {
     this.id = promptData.id;
+    this.handle = promptData.handle;
+    this.scope = promptData.scope;
     this.name = promptData.name;
     this.updatedAt = promptData.updatedAt;
     this.version = promptData.version;
@@ -68,13 +72,16 @@ export class Prompt implements PromptResponse {
    * @param variables - Object containing variable values for template compilation
    * @returns CompiledPrompt instance with compiled content
    */
-  private _compile(variables: TemplateVariables, strict: boolean): CompiledPrompt {
+  private _compile(
+    variables: TemplateVariables,
+    strict: boolean,
+  ): CompiledPrompt {
     try {
       // Compile main prompt
       const compiledPrompt = this.prompt
         ? liquid.parseAndRenderSync(this.prompt, variables, {
-          strictVariables: strict,
-        })
+            strictVariables: strict,
+          })
         : "";
 
       // Compile messages
@@ -82,8 +89,8 @@ export class Prompt implements PromptResponse {
         ...message,
         content: message.content
           ? liquid.parseAndRenderSync(message.content, variables, {
-            strictVariables: strict,
-          })
+              strictVariables: strict,
+            })
           : message.content,
       }));
 
@@ -98,10 +105,11 @@ export class Prompt implements PromptResponse {
     } catch (error) {
       const templateStr = this.prompt || JSON.stringify(this.messages);
       throw new PromptCompilationError(
-        `Failed to compile prompt template: ${error instanceof Error ? error.message : "Unknown error"
+        `Failed to compile prompt template: ${
+          error instanceof Error ? error.message : "Unknown error"
         }`,
         templateStr,
-        error
+        error,
       );
     }
   }
@@ -126,7 +134,7 @@ export class Prompt implements PromptResponse {
 export class CompiledPrompt extends Prompt {
   constructor(
     compiledData: PromptResponse,
-    public readonly original: Prompt
+    public readonly original: Prompt,
   ) {
     super(compiledData);
   }

@@ -1,0 +1,8 @@
+model: openai/gpt-4o-mini
+modelParameters:
+  temperature: 0.7
+messages:
+  - role: system
+    content: You are a helpful assistant 3
+  - role: user
+    content: "{{input}}"

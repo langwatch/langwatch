@@ -10,6 +10,9 @@
     "README.md",
     "LICENSE"
   ],
+  "bin": {
+    "langwatch": "./dist/cli/index.js"
+  },
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
@@ -69,10 +72,10 @@
   "devDependencies": {
     "@eslint/js": "^9.32.0",
     "@types/debug": "^4.1.12",
+    "@types/js-yaml": "^4.0.9",
     "@types/node": "^24.1.0",
     "@typescript/native-preview": "7.0.0-dev.20250804.1",
     "@vitest/coverage-v8": "3.2.4",
-    "dotenv": "^17.2.1",
     "esbuild": "^0.25.8",
     "eslint": "^9.32.0",
     "fets": "^0.8.5",
@@ -90,8 +93,16 @@
     "@opentelemetry/resources": "^2.0.1",
     "@opentelemetry/sdk-trace-base": "^2.0.1",
     "@opentelemetry/semantic-conventions": "^1.36.0",
+    "@types/prompts": "^2.4.9",
+    "chalk": "^4.1.2",
+    "commander": "^12.0.0",
+    "dotenv": "^16.6.1",
+    "js-yaml": "^4.1.0",
     "liquidjs": "^10.21.1",
+    "open": "^10.2.0",
     "openapi-fetch": "^0.14.0",
+    "ora": "^5.4.1",
+    "prompts": "^2.4.2",
     "xksuid": "^0.0.4",
     "zod": "^4.0.14"
   },
