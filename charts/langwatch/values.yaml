@@ -19,6 +19,32 @@ global:
     enabled: false
     prometheusAnnotations: true
 
+# Prometheus monitoring configuration
+prometheus:
+  enabled: false
+  image:
+    repository: quay.io/prometheus/prometheus
+    tag: "v3.0.1"
+    pullPolicy: IfNotPresent
+  service:
+    type: ClusterIP
+    port: 9090
+    annotations: {}
+  resources:
+    requests:
+      cpu: 200m
+      memory: 512Mi
+    limits:
+      cpu: 500m
+      memory: 2Gi
+  storage:
+    enabled: true
+    size: 6Gi
+    storageClass: ""
+  retention: 60d
+  rbac:
+    enabled: true
+
 # Image configurations
 images:
   app:
@@ -45,7 +71,6 @@ images:
     repository: langwatch/opensearch-lite
     tag: latest
     pullPolicy: IfNotPresent
-
 
 # Service configurations
 app:
@@ -75,6 +100,7 @@ app:
     NEXTAUTH_SECRET: "" # Users must provide this values
     API_TOKEN_JWT_SECRET: "" # Users must provide this values
     CRON_API_KEY: "" # Users must provide this value for cronjob authentication
+    METRICS_API_KEY: "" # Set this for metrics authentication (will be stored in Kubernetes Secret)
     # SENDGRID_API_KEY: ""  # Optional
 
 langwatch_nlp:
@@ -203,17 +229,17 @@ cronjobs:
   jobs:
     topicClustering:
       enabled: true
-      schedule: "0 0 * * *"  # At midnight every day
+      schedule: "0 0 * * *" # At midnight every day
       endpoint: "/api/cron/schedule_topic_clustering"
 
     alertTriggers:
       enabled: true
-      schedule: "*/3 * * * *"  # Every 3 minutes
+      schedule: "*/3 * * * *" # Every 3 minutes
       endpoint: "/api/cron/triggers"
 
     tracesRetentionCleanup:
       enabled: true
-      schedule: "0 1 * * *"  # At 1 AM every day
+      schedule: "0 1 * * *" # At 1 AM every day
       endpoint: "/api/cron/traces_retention_period_cleanup"
 
 # Ingress configuration
