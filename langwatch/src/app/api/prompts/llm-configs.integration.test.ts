@@ -2,13 +2,12 @@ import type { LlmPromptConfig, Organization, Team } from "@prisma/client";
 import { nanoid } from "nanoid";
 import { describe, expect, it, beforeEach, afterEach } from "vitest";
 
+import { llmPromptConfigFactory } from "~/factories/llm-config.factory";
+import { projectFactory } from "~/factories/project.factory";
 import { prisma } from "~/server/db";
 import { LlmConfigRepository } from "~/server/prompt-config/repositories/llm-config.repository";
 
 import { app } from "./[[...route]]/app";
-
-import { llmPromptConfigFactory } from "~/factories/llm-config.factory";
-import { projectFactory } from "~/factories/project.factory";
 
 describe("Prompts API", () => {
   // Test data setup
@@ -151,36 +150,75 @@ describe("Prompts API", () => {
         expect(body.id).toBe(config.id);
       });
 
-      it("should get a single prompt by handle", async () => {
+      describe("when the prompt is scoped to project (default)", () => {
         // First, update the config to have a handle
         const handle = `ref_${nanoid()}`;
-        // Create a new prompt with the handle
-        const createRes = await app.request(`/api/prompts`, {
-          method: "POST",
-          headers: {
-            "X-Auth-Token": testApiKey,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ name: "Test Prompt", handle }),
+
+        beforeEach(async () => {
+          // Create a new prompt with the handle
+          const createRes = await app.request(`/api/prompts`, {
+            method: "POST",
+            headers: {
+              "X-Auth-Token": testApiKey,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ name: "Test Prompt", handle }),
+          });
+
+          // Verify the prompt was created with the handle
+          expect(createRes.status).toBe(200);
+          const createBody = await createRes.json();
+          expect(createBody.handle).toBe(`${testProjectId}/${handle}`);
         });
 
-        // Verify the prompt was created with the handle
-        expect(createRes.status).toBe(200);
-        const createBody = await createRes.json();
-        expect(createBody.handle).toBe(
-          `${testOrganization.id}/${testProjectId}/${handle}`
-        );
+        it("should get a single prompt by handle", async () => {
+          // Get the prompt by handle
+          const res = await app.request(`/api/prompts/${handle}`, {
+            headers: { "X-Auth-Token": testApiKey },
+          });
 
-        // Get the prompt by handle
-        const res = await app.request(`/api/prompts/${handle}`, {
-          headers: { "X-Auth-Token": testApiKey },
+          expect(res.status).toBe(200);
+          const body = await res.json();
+          expect(body.handle).toBe(`${testProjectId}/${handle}`);
+        });
+      });
+
+      describe("when the prompt is scoped to organization", () => {
+        // Create a new prompt with organization scope and handle
+        const handle = `org_ref_${nanoid()}`;
+
+        beforeEach(async () => {
+          const createRes = await app.request(`/api/prompts`, {
+            method: "POST",
+            headers: {
+              "X-Auth-Token": testApiKey,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              name: "Test Org Prompt",
+              handle,
+              scope: "ORGANIZATION",
+            }),
+          });
+
+          // Verify the prompt was created with the organization-scoped handle
+          expect(createRes.status).toBe(200);
+          const createBody = await createRes.json();
+          expect(createBody.handle).toBe(`${testOrganization.id}/${handle}`);
+          expect(createBody.scope).toBe("ORGANIZATION");
         });
 
-        expect(res.status).toBe(200);
-        const body = await res.json();
-        expect(body.handle).toBe(
-          `${testOrganization.id}/${testProjectId}/${handle}`
-        );
+        it("should get a single prompt by handle", async () => {
+          // Get the prompt by handle
+          const res = await app.request(`/api/prompts/${handle}`, {
+            headers: { "X-Auth-Token": testApiKey },
+          });
+
+          expect(res.status).toBe(200);
+          const body = await res.json();
+          expect(body.handle).toBe(`${testOrganization.id}/${handle}`);
+          expect(body.scope).toBe("ORGANIZATION");
+        });
       });
 
       it("should return 404 for non-existent prompt ID (should work with handle as well)", async () => {
@@ -297,131 +335,233 @@ describe("Prompts API", () => {
       expect(body).toHaveProperty("error");
     });
 
-    it("should create a new prompt with a handle", async () => {
-      const res = await app.request(`/api/prompts`, {
-        method: "POST",
-        headers: {
-          "X-Auth-Token": testApiKey,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          name: "Test Prompt",
-          handle: "my-custom-ref",
-        }),
-      });
+    describe("when scoping by project (default)", () => {
+      it("should create a new prompt with a handle scoped to project", async () => {
+        const res = await app.request(`/api/prompts`, {
+          method: "POST",
+          headers: {
+            "X-Auth-Token": testApiKey,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            name: "Test Prompt",
+            handle: "my-custom-ref",
+          }),
+        });
 
-      expect(res.status).toBe(200);
-      const body = await res.json();
-      expect(body).toHaveProperty("id");
-      expect(body).toHaveProperty("name", "Test Prompt");
-      expect(body).toHaveProperty(
-        "handle",
-        `${testOrganization.id}/${testProjectId}/my-custom-ref`
-      );
+        expect(res.status).toBe(200);
+        const body = await res.json();
+        expect(body).toHaveProperty("id");
+        expect(body).toHaveProperty("name", "Test Prompt");
+        expect(body).toHaveProperty("handle", `${testProjectId}/my-custom-ref`);
+      });
+    });
+
+    describe("when scoping by organization", () => {
+      it("should create a new prompt with a handle scoped to project", async () => {
+        const res = await app.request(`/api/prompts`, {
+          method: "POST",
+          headers: {
+            "X-Auth-Token": testApiKey,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            name: "Test Prompt",
+            handle: "my-custom-ref",
+            scope: "ORGANIZATION",
+          }),
+        });
+
+        expect(res.status).toBe(200);
+        const body = await res.json();
+        expect(body).toHaveProperty("id");
+        expect(body).toHaveProperty("name", "Test Prompt");
+        expect(body).toHaveProperty(
+          "handle",
+          `${testOrganization.id}/my-custom-ref`
+        );
+      });
     });
   });
 
   // PUT endpoints tests
   describe("PUT endpoints", () => {
-    it("should update a prompt with a handle in correct format", async () => {
-      // Create a valid prompt first
-      const promptRes = await app.request(`/api/prompts`, {
-        method: "POST",
-        headers: {
-          "X-Auth-Token": testApiKey,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ name: "Test Prompt" }),
-      });
-
-      expect(promptRes.status).toBe(200);
-      const prompt = await promptRes.json();
-
-      // Get the project with organization info to construct expected handle
-      const project = await prisma.project.findUnique({
-        where: { id: testProjectId },
-        include: { team: { include: { organization: true } } },
-      });
-
-      const handle = "my-custom-ref";
-      const expectedHandle = `${project?.team.organization.id}/${testProjectId}/${handle}`;
-
-      // Update the prompt with a handle
-      const updateRes = await app.request(`/api/prompts/${prompt.id}`, {
-        method: "PUT",
-        headers: {
-          "X-Auth-Token": testApiKey,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          name: "Updated Test Prompt",
-          handle: handle,
-        }),
-      });
-
-      expect(updateRes.status).toBe(200);
-      const realPrompt = await prisma.llmPromptConfig.findUnique({
-        where: { id: prompt.id, projectId: testProjectId },
-      });
-
-      // Verify the handle is in the correct format
-      expect(realPrompt?.handle).toBe(expectedHandle);
-    });
-
-    it("should enforce unique handle constraint", async () => {
-      // Create first prompt with handle
+    it("should allow duplicate handles across different scopes", async () => {
+      // Create first prompt with organization scope
       const prompt1Res = await app.request(`/api/prompts`, {
         method: "POST",
         headers: {
           "X-Auth-Token": testApiKey,
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ name: "Test Prompt 1" }),
+        body: JSON.stringify({
+          name: "Test Prompt 1",
+          handle: "shared-ref",
+          scope: "ORGANIZATION",
+        }),
       });
 
+      expect(prompt1Res.status).toBe(200);
       const prompt1 = await prompt1Res.json();
+      expect(prompt1.handle).toBe(`${testOrganization.id}/shared-ref`);
+      expect(prompt1.scope).toBe("ORGANIZATION");
 
-      // Create second prompt
+      // Create second prompt with project scope using same handle - should succeed
       const prompt2Res = await app.request(`/api/prompts`, {
         method: "POST",
         headers: {
           "X-Auth-Token": testApiKey,
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ name: "Test Prompt 2" }),
-      });
-
-      const prompt2 = await prompt2Res.json();
-
-      // Set handle on first prompt
-      const updateRes1 = await app.request(`/api/prompts/${prompt1.id}`, {
-        method: "PUT",
-        headers: {
-          "X-Auth-Token": testApiKey,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          name: "Test Prompt 1",
-          handle: "duplicate-ref",
-        }),
-      });
-
-      expect(updateRes1.status).toBe(200);
-
-      // Try to set same handle on second prompt - should fail
-      const updateRes2 = await app.request(`/api/prompts/${prompt2.id}`, {
-        method: "PUT",
-        headers: {
-          "X-Auth-Token": testApiKey,
-          "Content-Type": "application/json",
-        },
         body: JSON.stringify({
           name: "Test Prompt 2",
-          handle: "duplicate-ref",
+          handle: "shared-ref",
+          scope: "PROJECT",
         }),
       });
 
-      expect(updateRes2.status).toBe(409);
+      expect(prompt2Res.status).toBe(200);
+      const prompt2 = await prompt2Res.json();
+      expect(prompt2.handle).toBe(`${testProjectId}/shared-ref`);
+      expect(prompt2.scope).toBe("PROJECT");
+    });
+
+    describe("with project scope (default)", () => {
+      it("should update a prompt with a handle in correct format", async () => {
+        // Create a valid prompt first
+        const promptRes = await app.request(`/api/prompts`, {
+          method: "POST",
+          headers: {
+            "X-Auth-Token": testApiKey,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ name: "Test Prompt" }),
+        });
+
+        expect(promptRes.status).toBe(200);
+        const prompt = await promptRes.json();
+
+        // Get the project with organization info to construct expected handle
+        const project = await prisma.project.findUnique({
+          where: { id: testProjectId },
+          include: { team: { include: { organization: true } } },
+        });
+
+        const handle = "my-custom-ref";
+        const expectedHandle = `${testProjectId}/${handle}`;
+
+        // Update the prompt with a handle
+        const updateRes = await app.request(`/api/prompts/${prompt.id}`, {
+          method: "PUT",
+          headers: {
+            "X-Auth-Token": testApiKey,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            name: "Updated Test Prompt",
+            handle: handle,
+          }),
+        });
+
+        expect(updateRes.status).toBe(200);
+        const realPrompt = await prisma.llmPromptConfig.findUnique({
+          where: { id: prompt.id, projectId: testProjectId },
+        });
+
+        // Verify the handle is in the correct format
+        expect(realPrompt?.handle).toBe(expectedHandle);
+      });
+
+      it("should enforce unique handle constraint", async () => {
+        // Create first prompt with handle
+        const prompt1Res = await app.request(`/api/prompts`, {
+          method: "POST",
+          headers: {
+            "X-Auth-Token": testApiKey,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ name: "Test Prompt 1" }),
+        });
+
+        const prompt1 = await prompt1Res.json();
+
+        // Create second prompt
+        const prompt2Res = await app.request(`/api/prompts`, {
+          method: "POST",
+          headers: {
+            "X-Auth-Token": testApiKey,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ name: "Test Prompt 2" }),
+        });
+
+        const prompt2 = await prompt2Res.json();
+
+        // Set handle on first prompt
+        const updateRes1 = await app.request(`/api/prompts/${prompt1.id}`, {
+          method: "PUT",
+          headers: {
+            "X-Auth-Token": testApiKey,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            name: "Test Prompt 1",
+            handle: "duplicate-ref",
+          }),
+        });
+
+        expect(updateRes1.status).toBe(200);
+
+        // Try to set same handle on second prompt - should fail
+        const updateRes2 = await app.request(`/api/prompts/${prompt2.id}`, {
+          method: "PUT",
+          headers: {
+            "X-Auth-Token": testApiKey,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            name: "Test Prompt 2",
+            handle: "duplicate-ref",
+          }),
+        });
+
+        expect(updateRes2.status).toBe(409);
+      });
+    });
+    describe("when scoped to organization", () => {
+      it("should prevent duplicate handles within the same organization", async () => {
+        // Create first prompt with organization scope
+        const prompt1Res = await app.request(`/api/prompts`, {
+          method: "POST",
+          headers: {
+            "X-Auth-Token": testApiKey,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            name: "Test Prompt 1",
+            handle: "org-duplicate-ref",
+            scope: "ORGANIZATION",
+          }),
+        });
+
+        expect(prompt1Res.status).toBe(200);
+
+        // Try to create second prompt with same handle and organization scope - should fail
+        const prompt2Res = await app.request(`/api/prompts`, {
+          method: "POST",
+          headers: {
+            "X-Auth-Token": testApiKey,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            name: "Test Prompt 2",
+            handle: "org-duplicate-ref",
+            scope: "ORGANIZATION",
+          }),
+        });
+
+        expect(prompt2Res.status).toBe(409);
+      });
     });
   });
 

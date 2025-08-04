@@ -5,8 +5,12 @@ import { describeRoute } from "hono-openapi";
 import { validator as zValidator, resolver } from "hono-openapi/zod";
 import { z } from "zod";
 
+import { badRequestSchema, successSchema } from "~/app/api/shared/schemas";
 import { prisma } from "~/server/db";
 import { PromptService } from "~/server/prompt-config/prompt.service";
+import { getLatestConfigVersionSchema } from "~/server/prompt-config/repositories/llm-config-version-schema";
+import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
+import { createLogger } from "~/utils/logger";
 
 import {
   authMiddleware,
@@ -22,17 +26,11 @@ import {
   versionInputSchema,
   versionOutputSchema,
 } from "./schemas";
-
-import { getLatestConfigVersionSchema } from "~/server/prompt-config/repositories/llm-config-version-schema";
 import {
   buildStandardSuccessResponse,
   getOutputsToResponseFormat,
   patchHonoOpenApiSpecFix,
 } from "./utils";
-
-import { badRequestSchema, successSchema } from "~/app/api/shared/schemas";
-import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
-import { createLogger } from "~/utils/logger";
 
 const logger = createLogger("langwatch:api:prompts");
 
@@ -136,20 +134,34 @@ app.post(
       "Creating new prompt with initial version"
     );
 
-    const newConfig = await service.createPrompt({
-      name,
-      projectId: project.id,
-      handle: data.handle,
-      organizationId: organization.id,
-      scope: data.scope,
-    });
+    try {
+      const newConfig = await service.createPrompt({
+        name,
+        projectId: project.id,
+        handle: data.handle,
+        organizationId: organization.id,
+        scope: data.scope,
+      });
 
-    logger.info(
-      { projectId: project.id, promptId: newConfig.id, promptName: name },
-      "Successfully created new prompt"
-    );
+      logger.info(
+        { projectId: project.id, promptId: newConfig.id, promptName: name },
+        "Successfully created prompt with initial version"
+      );
 
-    return c.json(newConfig);
+      return c.json(newConfig);
+    } catch (error: any) {
+      logger.error({ projectId: project.id, error }, "Error creating prompt");
+
+      // Handle unique constraint violation for handle
+      if (error.code === "P2002" && error.meta?.target?.includes("handle")) {
+        throw new HTTPException(409, {
+          message: `Prompt handle already exists for ${data.scope as string}`,
+        });
+      }
+
+      // Re-throw other errors to be handled by the error middleware
+      throw error;
+    }
   }
 );
 
@@ -357,7 +369,7 @@ app.put(
       // Handle unique constraint violation for handle
       if (error.code === "P2002" && error.meta?.target?.includes("handle")) {
         throw new HTTPException(409, {
-          message: "Prompt handle already exists",
+          message: `Prompt handle already exists for scope`,
         });
       }
 
