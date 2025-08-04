@@ -2,11 +2,12 @@ import * as fs from "fs";
 import * as path from "path";
 import chalk from "chalk";
 import ora from "ora";
-import open from "open";
 import prompts from "prompts";
 import { getEndpoint } from "../../client";
 
-const updateEnvFile = (apiKey: string): { created: boolean; updated: boolean; path: string } => {
+const updateEnvFile = (
+  apiKey: string,
+): { created: boolean; updated: boolean; path: string } => {
   const envPath = path.join(process.cwd(), ".env");
 
   // Check if .env exists
@@ -22,7 +23,7 @@ const updateEnvFile = (apiKey: string): { created: boolean; updated: boolean; pa
 
   // Check if LANGWATCH_API_KEY already exists and update it
   let found = false;
-  const updatedLines = lines.map(line => {
+  const updatedLines = lines.map((line) => {
     if (line.startsWith("LANGWATCH_API_KEY=")) {
       found = true;
       return `LANGWATCH_API_KEY=${apiKey}`;
@@ -46,7 +47,11 @@ const updateEnvFile = (apiKey: string): { created: boolean; updated: boolean; pa
 export const loginCommand = async (): Promise<void> => {
   try {
     console.log(chalk.blue("🔐 LangWatch Login"));
-    console.log(chalk.gray("This will open your browser to get an API key from LangWatch."));
+    console.log(
+      chalk.gray(
+        "This will open your browser to get an API key from LangWatch.",
+      ),
+    );
     console.log();
 
     // Get the authorization URL
@@ -59,6 +64,7 @@ export const loginCommand = async (): Promise<void> => {
     const spinner = ora("Opening browser...").start();
 
     try {
+      const open = (await import("open")).default;
       await open(authUrl);
       spinner.succeed("Browser opened");
     } catch (error) {
@@ -74,18 +80,18 @@ export const loginCommand = async (): Promise<void> => {
 
     // Wait for user input using prompts library
     const response = await prompts({
-      type: 'password',
-      name: 'apiKey',
-      message: 'Paste your API key here:',
+      type: "password",
+      name: "apiKey",
+      message: "Paste your API key here:",
       validate: (value: string) => {
-        if (!value || value.trim() === '') {
-          return 'API key is required';
+        if (!value || value.trim() === "") {
+          return "API key is required";
         }
         if (value.length < 10) {
-          return 'API key seems too short. Please check and try again.';
+          return "API key seems too short. Please check and try again.";
         }
         return true;
-      }
+      },
     });
 
     if (!response.apiKey) {
@@ -113,9 +119,14 @@ export const loginCommand = async (): Promise<void> => {
     console.log(chalk.green("🎉 You're all set! You can now use:"));
     console.log(chalk.cyan("  langwatch prompt add <name>"));
     console.log(chalk.cyan("  langwatch prompt sync"));
-
   } catch (error) {
-    console.error(chalk.red(`Error during login: ${error instanceof Error ? error.message : "Unknown error"}`));
+    console.error(
+      chalk.red(
+        `Error during login: ${
+          error instanceof Error ? error.message : "Unknown error"
+        }`,
+      ),
+    );
     process.exit(1);
   }
 };

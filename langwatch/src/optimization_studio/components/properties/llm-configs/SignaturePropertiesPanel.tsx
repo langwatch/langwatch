@@ -200,6 +200,7 @@ function SignaturePropertiesPanelInner({
 
   const availableFields = useMemo(() => {
     return node.data.inputs.map((input) => input.identifier);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [JSON.stringify(node.data.inputs)]);
 
   // Find all nodes that depends on this node based on the edges
@@ -235,6 +236,7 @@ function SignaturePropertiesPanelInner({
             ) ?? [],
         ])
     );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [edges, nodes, node.id, JSON.stringify(node.data.outputs)]);
 
   const updateNodeInternals = useUpdateNodeInternals();

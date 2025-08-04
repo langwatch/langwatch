@@ -8,7 +8,7 @@ import { Command } from "commander";
 import { parsePromptSpec } from "./types";
 
 // Import commands with proper async handling
-const addCommand = async (name: string, options: { version?: string }): Promise<void> => {
+const addCommand = async (name: string, options: { version?: string; localFile?: string }): Promise<void> => {
   const { addCommand: addCommandImpl } = await import("./commands/add.js");
   return addCommandImpl(name, options);
 };
@@ -36,6 +36,11 @@ const listCommand = async (): Promise<void> => {
 const syncCommand = async (): Promise<void> => {
   const { syncCommand: syncCommandImpl } = await import("./commands/sync.js");
   return syncCommandImpl();
+};
+
+const createCommand = async (name: string, options: Record<string, unknown>): Promise<void> => {
+  const { createCommand: createCommandImpl } = await import("./commands/create.js");
+  return createCommandImpl(name, options);
 };
 
 const program = new Command();
@@ -80,12 +85,28 @@ promptCmd
   });
 
 promptCmd
-  .command("add <spec>")
-  .description("Add a prompt dependency (e.g., 'agent/foo', 'agent/bar@5', 'shared/prompt@latest')")
-  .action(async (spec: string) => {
+  .command("create <name>")
+  .description("Create a new prompt YAML file with default content")
+  .action(async (name: string) => {
     try {
-      const { name, version } = parsePromptSpec(spec);
-      await addCommand(name, { version });
+      await createCommand(name, {});
+    } catch (error) {
+      console.error(`Error: ${error instanceof Error ? error.message : "Unknown error"}`);
+      process.exit(1);
+    }
+  });
+
+promptCmd
+  .command("add <spec> [localFile]")
+  .description("Add a prompt dependency (e.g., 'agent/foo', 'agent/bar@5') or local file")
+  .action(async (spec: string, localFile?: string) => {
+    try {
+      if (localFile) {
+        await addCommand(spec, { localFile });
+      } else {
+        const { name, version } = parsePromptSpec(spec);
+        await addCommand(name, { version });
+      }
     } catch (error) {
       console.error(`Error: ${error instanceof Error ? error.message : "Unknown error"}`);
       process.exit(1);

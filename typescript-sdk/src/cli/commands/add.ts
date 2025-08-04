@@ -1,3 +1,4 @@
+import * as fs from "fs";
 import * as path from "path";
 import chalk from "chalk";
 import ora from "ora";
@@ -9,7 +10,50 @@ import { checkApiKey } from "../utils/apiKey";
 
 interface AddOptions {
   version?: string;
+  localFile?: string;
 }
+
+const addLocalFile = async (name: string, localFilePath: string): Promise<void> => {
+  // Validate that the file exists and has the right extension
+  if (!fs.existsSync(localFilePath)) {
+    console.error(chalk.red(`Error: Local file not found: ${localFilePath}`));
+    process.exit(1);
+  }
+
+  if (!localFilePath.endsWith('.prompt.yaml')) {
+    console.error(chalk.red(`Error: Local file must have .prompt.yaml extension`));
+    process.exit(1);
+  }
+
+  // Load and validate the YAML file
+  try {
+    const config = FileManager.loadLocalPrompt(localFilePath);
+
+    // Ensure project is initialized
+    await ensureProjectInitialized();
+
+    // Add to prompts.json as a file: dependency
+    const promptsConfig = FileManager.loadPromptsConfig();
+    promptsConfig.prompts[name] = `file:${localFilePath}`;
+    FileManager.savePromptsConfig(promptsConfig);
+
+    // Update lock file
+    const lock = FileManager.loadPromptsLock();
+    lock.prompts[name] = {
+      version: 0, // Local files start at version 0
+      versionId: "local",
+      materialized: localFilePath, // Store the original file path
+    };
+    FileManager.savePromptsLock(lock);
+
+    console.log(chalk.green(`✓ Added local prompt: ${chalk.cyan(name)} → ${chalk.gray(localFilePath)}`));
+
+  } catch (error) {
+    console.error(chalk.red("Error loading local prompt file:"));
+    console.error(chalk.red(error instanceof Error ? error.message : String(error)));
+    process.exit(1);
+  }
+};
 
 export const addCommand = async (name: string, options: AddOptions): Promise<void> => {
   try {
@@ -17,6 +61,12 @@ export const addCommand = async (name: string, options: AddOptions): Promise<voi
     if (!name || name.trim() === "") {
       console.error(chalk.red("Error: Prompt name cannot be empty"));
       process.exit(1);
+    }
+
+    // Handle local file addition
+    if (options.localFile) {
+      await addLocalFile(name, options.localFile);
+      return;
     }
 
     // Check API key before doing anything else

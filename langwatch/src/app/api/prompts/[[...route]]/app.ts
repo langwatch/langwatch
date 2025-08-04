@@ -22,9 +22,12 @@ import {
   versionInputSchema,
   versionOutputSchema,
 } from "./schemas";
+
+import { getLatestConfigVersionSchema } from "~/server/prompt-config/repositories/llm-config-version-schema";
 import {
   buildStandardSuccessResponse,
   getOutputsToResponseFormat,
+  patchHonoOpenApiSpecFix,
 } from "./utils";
 
 import { badRequestSchema, successSchema } from "~/app/api/shared/schemas";
@@ -57,6 +60,8 @@ app.use("/*", async (c, next) => {
 });
 // https://hono.dev/docs/api/hono#error-handling
 app.onError(handleError);
+
+patchHonoOpenApiSpecFix(app);
 
 // Get all prompts
 app.get(
@@ -191,27 +196,6 @@ app.get(
   }
 );
 
-// Hack: only here because hono does not generate openapi spec correctly for /:id{.+} paths
-app.get(
-  "/:id/versions",
-  describeRoute({
-    description: "Get all versions for a prompt",
-    responses: {
-      ...baseResponses,
-      200: buildStandardSuccessResponse(versionOutputSchema),
-      404: {
-        description: "Prompt not found",
-        content: {
-          "application/json": { schema: resolver(badRequestSchema) },
-        },
-      },
-    },
-  }),
-  async () => {
-    throw new Error("This should not have been called");
-  }
-);
-
 // Create version
 app.post(
   "/:id{.+?}/versions",
@@ -264,27 +248,6 @@ app.post(
   }
 );
 
-// Hack: only here because hono does not generate openapi spec correctly for /:id{.+} paths
-app.post(
-  "/:id/versions",
-  describeRoute({
-    description: "Create a new version for a prompt",
-    responses: {
-      ...baseResponses,
-      200: buildStandardSuccessResponse(versionOutputSchema),
-      404: {
-        description: "Prompt not found",
-        content: {
-          "application/json": { schema: resolver(badRequestSchema) },
-        },
-      },
-    },
-  }),
-  async () => {
-    throw new Error("This should not have been called");
-  }
-);
-
 // Get prompt by ID
 app.get(
   "/:id{.+}",
@@ -324,27 +287,6 @@ app.get(
     const response = transformConfigToPromptOutput(config, id);
 
     return c.json(response);
-  }
-);
-
-// Hack: only here because hono does not generate openapi spec correctly for /:id{.+} paths
-app.get(
-  "/:id",
-  describeRoute({
-    description: "Get a specific prompt",
-    responses: {
-      ...baseResponses,
-      200: buildStandardSuccessResponse(promptOutputSchema),
-      404: {
-        description: "Prompt not found",
-        content: {
-          "application/json": { schema: resolver(badRequestSchema) },
-        },
-      },
-    },
-  }),
-  async () => {
-    throw new Error("This should not have been called");
   }
 );
 
@@ -425,35 +367,6 @@ app.put(
   }
 );
 
-// Hack: only here because hono does not generate openapi spec correctly for /:id{.+} paths
-app.put(
-  "/:id",
-  describeRoute({
-    description: "Update a prompt",
-    responses: {
-      ...baseResponses,
-      200: buildStandardSuccessResponse(llmPromptConfigSchema),
-      404: {
-        description: "Prompt not found",
-        content: {
-          "application/json": { schema: resolver(badRequestSchema) },
-        },
-      },
-    },
-  }),
-  zValidator(
-    "json",
-    z.object({
-      name: z.string().min(1, "Name cannot be empty"),
-      handle: z.string().optional(),
-      scope: z.nativeEnum(PromptScope).optional(),
-    })
-  ),
-  async () => {
-    throw new Error("This should not have been called");
-  }
-);
-
 // Delete prompt
 app.delete(
   "/:id{.+}",
@@ -493,24 +406,109 @@ app.delete(
   }
 );
 
-// Hack: only here because hono does not generate openapi spec correctly for /:id{.+} paths
-app.delete(
-  "/:id",
+// Sync endpoint for upsert operations
+app.post(
+  "/:id{.+?}/sync",
   describeRoute({
-    description: "Delete a prompt",
+    description: "Sync/upsert a prompt with local content",
     responses: {
       ...baseResponses,
-      200: buildStandardSuccessResponse(successSchema),
-      404: {
-        description: "Prompt not found",
+      200: {
+        description: "Sync result",
         content: {
-          "application/json": { schema: resolver(badRequestSchema) },
+          "application/json": {
+            schema: resolver(
+              z.object({
+                action: z.enum([
+                  "created",
+                  "updated",
+                  "conflict",
+                  "up_to_date",
+                ]),
+                prompt: promptOutputSchema.optional(),
+                conflictInfo: z
+                  .object({
+                    localVersion: z.number(),
+                    remoteVersion: z.number(),
+                    differences: z.array(z.string()),
+                    remoteConfigData:
+                      getLatestConfigVersionSchema().shape.configData,
+                  })
+                  .optional(),
+              })
+            ),
+          },
         },
       },
     },
   }),
-  async () => {
-    throw new Error("This should not have been called");
+  zValidator(
+    "json",
+    z.object({
+      configData: getLatestConfigVersionSchema().shape.configData,
+      localVersion: z.number().optional(),
+      commitMessage: z.string().optional(),
+    })
+  ),
+  async (c) => {
+    const service = c.get("promptService");
+    const project = c.get("project");
+    const organization = c.get("organization");
+    const { id } = c.req.param();
+    const data = c.req.valid("json");
+
+    logger.info(
+      { projectId: project.id, promptId: id },
+      "Syncing prompt with local content"
+    );
+
+    try {
+      const syncResult = await service.syncPrompt({
+        idOrHandle: id,
+        localConfigData: data.configData,
+        localVersion: data.localVersion,
+        projectId: project.id,
+        organizationId: organization.id,
+        commitMessage: data.commitMessage,
+      });
+
+      const response: any = {
+        action: syncResult.action,
+      };
+
+      if (syncResult.prompt) {
+        response.prompt = transformConfigToPromptOutput(syncResult.prompt, id);
+      }
+
+      if (syncResult.conflictInfo) {
+        response.conflictInfo = syncResult.conflictInfo;
+      }
+
+      logger.info(
+        {
+          projectId: project.id,
+          promptId: id,
+          action: syncResult.action,
+        },
+        "Successfully synced prompt"
+      );
+
+      return c.json(response);
+    } catch (error: any) {
+      logger.error(
+        { projectId: project.id, promptId: id, error },
+        "Error syncing prompt"
+      );
+
+      if (error.message.includes("No permission")) {
+        throw new HTTPException(403, {
+          message: error.message,
+        });
+      }
+
+      // Re-throw other errors to be handled by the error middleware
+      throw error;
+    }
   }
 );
 

@@ -1,6 +1,7 @@
 import {
   type PrismaClient,
   type LlmPromptConfig,
+  type LlmPromptConfigVersion,
   type PromptScope,
 } from "@prisma/client";
 import { nanoid } from "nanoid";
@@ -12,6 +13,8 @@ import {
   LATEST_SCHEMA_VERSION,
   parseLlmConfigVersion,
   type LatestConfigVersionSchema,
+  getSchemaValidator,
+  SchemaVersion,
 } from "./llm-config-version-schema";
 import { LlmConfigVersionsRepository } from "./llm-config-versions.repository";
 
@@ -33,7 +36,9 @@ interface LlmConfigDTO {
  * Interface for LLM Config with its latest version
  */
 export interface LlmConfigWithLatestVersion extends LlmPromptConfig {
-  latestVersion: LatestConfigVersionSchema & { author?: { name: string } };
+  latestVersion: LatestConfigVersionSchema & {
+    author?: { name: string } | null;
+  };
 }
 
 /**
@@ -107,7 +112,7 @@ export class LlmConfigRepository {
           return null;
         }
       })
-      .filter((config) => config !== null) as LlmConfigWithLatestVersion[];
+      .filter((config) => config !== null);
   }
 
   /**
@@ -396,5 +401,180 @@ export class LlmConfigRepository {
     }
 
     return handle;
+  }
+
+  /**
+   * Get a specific version by version number for a config
+   */
+  async getConfigVersionByNumber(params: {
+    idOrHandle: string;
+    versionNumber: number;
+    projectId: string;
+    organizationId: string;
+  }): Promise<LlmPromptConfigVersion | null> {
+    const { idOrHandle, versionNumber, projectId, organizationId } = params;
+
+    const config = await this.getConfigByIdOrHandleWithLatestVersion({
+      idOrHandle,
+      projectId,
+      organizationId,
+    });
+
+    if (!config) {
+      return null;
+    }
+
+    return this.prisma.llmPromptConfigVersion.findFirst({
+      where: {
+        configId: config.id,
+        projectId,
+        version: versionNumber,
+      },
+    });
+  }
+
+  /**
+   * Check if user has permission to modify a prompt
+   */
+  async checkModifyPermission(params: {
+    idOrHandle: string;
+    projectId: string;
+    organizationId: string;
+  }): Promise<{ hasPermission: boolean; reason?: string }> {
+    const { idOrHandle, projectId, organizationId } = params;
+
+    const config = await this.getConfigByIdOrHandleWithLatestVersion({
+      idOrHandle,
+      projectId,
+      organizationId,
+    });
+
+    if (!config) {
+      return { hasPermission: true }; // Can create new
+    }
+
+    // If it's an organization-level prompt but not created by this project
+    if (config.scope === "ORGANIZATION" && config.projectId !== projectId) {
+      return {
+        hasPermission: false,
+        reason:
+          "Only the project that created this organization-level prompt can modify it",
+      };
+    }
+
+    return { hasPermission: true };
+  }
+
+  /**
+   * Compare two config data objects for content equality
+   * Uses Zod schema normalization to ensure strict structural comparison
+   */
+  compareConfigContent(
+    config1: unknown,
+    config2: unknown
+  ): { isEqual: boolean; differences?: string[] } {
+    try {
+      // Get the configData schema for normalization
+      const schemaValidator = getSchemaValidator(SchemaVersion.V1_0);
+      const configDataSchema = schemaValidator.shape.configData;
+
+      // Normalize both configs using Zod parsing - this ensures:
+      // 1. Consistent field ordering
+      // 2. Type coercion and validation
+      // 3. Removal of extra fields not in schema
+      // 4. Default value application
+      const parseResult1 = configDataSchema.safeParse(config1);
+      const parseResult2 = configDataSchema.safeParse(config2);
+
+      // If either config fails validation, they can't be equal
+      if (!parseResult1.success || !parseResult2.success) {
+        const differences: string[] = [];
+        if (!parseResult1.success) {
+          differences.push(
+            "config1 validation failed: " + parseResult1.error.message
+          );
+        }
+        if (!parseResult2.success) {
+          differences.push(
+            "config2 validation failed: " + parseResult2.error.message
+          );
+        }
+        return { isEqual: false, differences };
+      }
+
+      const normalized1 = parseResult1.data;
+      const normalized2 = parseResult2.data;
+
+      // Compare normalized configs using deterministic JSON serialization
+      const json1 = JSON.stringify(
+        normalized1,
+        Object.keys(normalized1).sort(),
+        2
+      );
+      const json2 = JSON.stringify(
+        normalized2,
+        Object.keys(normalized2).sort(),
+        2
+      );
+
+      const isEqual = json1 === json2;
+
+      if (!isEqual) {
+        // Enhanced difference detection using normalized configs
+        const differences: string[] = [];
+
+        // TODO: move this to a more git diff kinda of approach
+        if (normalized1.model !== normalized2.model) {
+          differences.push(
+            `model: ${normalized1.model} → ${normalized2.model}`
+          );
+        }
+        if (normalized1.prompt !== normalized2.prompt) {
+          differences.push("prompt content differs");
+        }
+        if (
+          JSON.stringify(normalized1.messages) !==
+          JSON.stringify(normalized2.messages)
+        ) {
+          differences.push("messages differ");
+        }
+        if (
+          JSON.stringify(normalized1.inputs) !==
+          JSON.stringify(normalized2.inputs)
+        ) {
+          differences.push("inputs differ");
+        }
+        if (
+          JSON.stringify(normalized1.outputs) !==
+          JSON.stringify(normalized2.outputs)
+        ) {
+          differences.push("outputs differ");
+        }
+        if (normalized1.temperature !== normalized2.temperature) {
+          differences.push(
+            `temperature: ${normalized1.temperature} → ${normalized2.temperature}`
+          );
+        }
+        if (normalized1.max_tokens !== normalized2.max_tokens) {
+          differences.push(
+            `max_tokens: ${normalized1.max_tokens} → ${normalized2.max_tokens}`
+          );
+        }
+
+        return { isEqual: false, differences };
+      }
+
+      return { isEqual: true };
+    } catch (error) {
+      logger.error({ error }, "Error comparing config content");
+      // If comparison fails, assume they're different
+      return {
+        isEqual: false,
+        differences: [
+          "Unable to compare configs: " +
+            (error instanceof Error ? error.message : "Unknown error"),
+        ],
+      };
+    }
   }
 }

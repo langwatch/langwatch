@@ -2322,7 +2322,10 @@
                       ]
                     },
                     "author": {
-                      "type": "object",
+                      "type": [
+                        "object",
+                        "null"
+                      ],
                       "properties": {
                         "name": {
                           "type": "string"
@@ -2790,7 +2793,10 @@
                       ]
                     },
                     "author": {
-                      "type": "object",
+                      "type": [
+                        "object",
+                        "null"
+                      ],
                       "properties": {
                         "name": {
                           "type": "string"
@@ -3246,6 +3252,20 @@
                       "inputs",
                       "outputs",
                       "model"
+                    ]
+                  },
+                  "author": {
+                    "type": [
+                      "object",
+                      "null"
+                    ],
+                    "properties": {
+                      "name": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "name"
                     ]
                   }
                 },
@@ -3958,6 +3978,705 @@
         "operationId": "deleteApiScenario-events",
         "parameters": [],
         "description": "Delete all events"
+      }
+    },
+    "/api/prompts/{id}/sync": {
+      "post": {
+        "responses": {
+          "200": {
+            "description": "Sync result",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "action": {
+                      "type": "string",
+                      "enum": [
+                        "created",
+                        "updated",
+                        "conflict",
+                        "up_to_date"
+                      ]
+                    },
+                    "prompt": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "handle": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "scope": {
+                          "type": "string",
+                          "enum": [
+                            "ORGANIZATION",
+                            "PROJECT"
+                          ]
+                        },
+                        "name": {
+                          "type": "string"
+                        },
+                        "updatedAt": {
+                          "type": "string"
+                        },
+                        "version": {
+                          "type": "number"
+                        },
+                        "versionId": {
+                          "type": "string"
+                        },
+                        "versionCreatedAt": {
+                          "type": "string"
+                        },
+                        "model": {
+                          "type": "string"
+                        },
+                        "prompt": {
+                          "type": "string"
+                        },
+                        "messages": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "role": {
+                                "type": "string",
+                                "enum": [
+                                  "user",
+                                  "assistant",
+                                  "system"
+                                ]
+                              },
+                              "content": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "role",
+                              "content"
+                            ],
+                            "additionalProperties": true
+                          }
+                        },
+                        "response_format": {
+                          "type": [
+                            "object",
+                            "null"
+                          ],
+                          "properties": {
+                            "type": {
+                              "type": "string",
+                              "enum": [
+                                "json_schema"
+                              ]
+                            },
+                            "json_schema": {
+                              "type": "object",
+                              "properties": {
+                                "name": {
+                                  "type": "string"
+                                },
+                                "schema": {
+                                  "type": "object"
+                                }
+                              },
+                              "required": [
+                                "name",
+                                "schema"
+                              ]
+                            }
+                          },
+                          "required": [
+                            "type",
+                            "json_schema"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "handle",
+                        "scope",
+                        "name",
+                        "updatedAt",
+                        "version",
+                        "versionId",
+                        "versionCreatedAt",
+                        "model",
+                        "prompt",
+                        "messages",
+                        "response_format"
+                      ]
+                    },
+                    "conflictInfo": {
+                      "type": "object",
+                      "properties": {
+                        "localVersion": {
+                          "type": "number"
+                        },
+                        "remoteVersion": {
+                          "type": "number"
+                        },
+                        "differences": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "remoteConfigData": {
+                          "type": "object",
+                          "properties": {
+                            "version": {
+                              "type": "number",
+                              "minimum": 1
+                            },
+                            "prompt": {
+                              "type": "string"
+                            },
+                            "messages": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "role": {
+                                    "type": "string",
+                                    "enum": [
+                                      "user",
+                                      "assistant",
+                                      "system"
+                                    ]
+                                  },
+                                  "content": {
+                                    "type": "string"
+                                  }
+                                },
+                                "required": [
+                                  "role",
+                                  "content"
+                                ],
+                                "additionalProperties": true
+                              },
+                              "default": []
+                            },
+                            "inputs": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "identifier": {
+                                    "type": "string",
+                                    "minLength": 1
+                                  },
+                                  "type": {
+                                    "type": "string",
+                                    "enum": [
+                                      "str",
+                                      "float",
+                                      "bool",
+                                      "image",
+                                      "list[str]",
+                                      "list[float]",
+                                      "list[int]",
+                                      "list[bool]",
+                                      "dict"
+                                    ]
+                                  }
+                                },
+                                "required": [
+                                  "identifier",
+                                  "type"
+                                ]
+                              },
+                              "minItems": 1
+                            },
+                            "outputs": {
+                              "type": "array",
+                              "items": {
+                                "type": "object",
+                                "properties": {
+                                  "identifier": {
+                                    "type": "string",
+                                    "minLength": 1
+                                  },
+                                  "type": {
+                                    "type": "string",
+                                    "enum": [
+                                      "str",
+                                      "float",
+                                      "bool",
+                                      "json_schema"
+                                    ]
+                                  },
+                                  "json_schema": {
+                                    "type": "object",
+                                    "properties": {
+                                      "type": {
+                                        "type": "string",
+                                        "minLength": 1
+                                      }
+                                    },
+                                    "required": [
+                                      "type"
+                                    ],
+                                    "additionalProperties": true
+                                  }
+                                },
+                                "required": [
+                                  "identifier",
+                                  "type"
+                                ]
+                              },
+                              "minItems": 1
+                            },
+                            "model": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "temperature": {
+                              "type": "number"
+                            },
+                            "max_tokens": {
+                              "type": "number"
+                            },
+                            "demonstrations": {
+                              "type": "object",
+                              "properties": {
+                                "id": {
+                                  "type": "string"
+                                },
+                                "name": {
+                                  "type": "string"
+                                },
+                                "inline": {
+                                  "type": "object",
+                                  "properties": {
+                                    "records": {
+                                      "type": "object",
+                                      "additionalProperties": {
+                                        "type": "array",
+                                        "items": {
+                                          "type": "string"
+                                        }
+                                      }
+                                    },
+                                    "columnTypes": {
+                                      "type": "array",
+                                      "items": {
+                                        "type": "object",
+                                        "properties": {
+                                          "name": {
+                                            "type": "string"
+                                          },
+                                          "type": {
+                                            "anyOf": [
+                                              {
+                                                "type": "string",
+                                                "const": "string"
+                                              },
+                                              {
+                                                "type": "string",
+                                                "const": "boolean"
+                                              },
+                                              {
+                                                "type": "string",
+                                                "const": "number"
+                                              },
+                                              {
+                                                "type": "string",
+                                                "const": "date"
+                                              },
+                                              {
+                                                "type": "string",
+                                                "const": "list"
+                                              },
+                                              {
+                                                "type": "string",
+                                                "const": "json"
+                                              },
+                                              {
+                                                "type": "string",
+                                                "const": "spans"
+                                              },
+                                              {
+                                                "type": "string",
+                                                "const": "rag_contexts"
+                                              },
+                                              {
+                                                "type": "string",
+                                                "const": "chat_messages"
+                                              },
+                                              {
+                                                "type": "string",
+                                                "const": "annotations"
+                                              },
+                                              {
+                                                "type": "string",
+                                                "const": "evaluations"
+                                              }
+                                            ]
+                                          }
+                                        },
+                                        "required": [
+                                          "name",
+                                          "type"
+                                        ]
+                                      }
+                                    }
+                                  },
+                                  "required": [
+                                    "records",
+                                    "columnTypes"
+                                  ]
+                                }
+                              }
+                            },
+                            "prompting_technique": {
+                              "type": "object",
+                              "properties": {
+                                "ref": {
+                                  "type": "string"
+                                }
+                              }
+                            }
+                          },
+                          "required": [
+                            "prompt",
+                            "messages",
+                            "inputs",
+                            "outputs",
+                            "model"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "localVersion",
+                        "remoteVersion",
+                        "differences",
+                        "remoteConfigData"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "action"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "operationId": "postApiPromptsByIdSync",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "id",
+            "required": true
+          }
+        ],
+        "description": "Sync/upsert a prompt with local content",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "configData": {
+                    "type": "object",
+                    "properties": {
+                      "version": {
+                        "type": "number",
+                        "minimum": 1
+                      },
+                      "prompt": {
+                        "type": "string"
+                      },
+                      "messages": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "role": {
+                              "type": "string",
+                              "enum": [
+                                "user",
+                                "assistant",
+                                "system"
+                              ]
+                            },
+                            "content": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "role",
+                            "content"
+                          ],
+                          "additionalProperties": true
+                        },
+                        "default": []
+                      },
+                      "inputs": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "identifier": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "type": {
+                              "type": "string",
+                              "enum": [
+                                "str",
+                                "float",
+                                "bool",
+                                "image",
+                                "list[str]",
+                                "list[float]",
+                                "list[int]",
+                                "list[bool]",
+                                "dict"
+                              ]
+                            }
+                          },
+                          "required": [
+                            "identifier",
+                            "type"
+                          ]
+                        },
+                        "minItems": 1
+                      },
+                      "outputs": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "identifier": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "type": {
+                              "type": "string",
+                              "enum": [
+                                "str",
+                                "float",
+                                "bool",
+                                "json_schema"
+                              ]
+                            },
+                            "json_schema": {
+                              "type": "object",
+                              "properties": {
+                                "type": {
+                                  "type": "string",
+                                  "minLength": 1
+                                }
+                              },
+                              "required": [
+                                "type"
+                              ],
+                              "additionalProperties": true
+                            }
+                          },
+                          "required": [
+                            "identifier",
+                            "type"
+                          ]
+                        },
+                        "minItems": 1
+                      },
+                      "model": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "temperature": {
+                        "type": "number"
+                      },
+                      "max_tokens": {
+                        "type": "number"
+                      },
+                      "demonstrations": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "inline": {
+                            "type": "object",
+                            "properties": {
+                              "records": {
+                                "type": "object",
+                                "additionalProperties": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string"
+                                  }
+                                }
+                              },
+                              "columnTypes": {
+                                "type": "array",
+                                "items": {
+                                  "type": "object",
+                                  "properties": {
+                                    "name": {
+                                      "type": "string"
+                                    },
+                                    "type": {
+                                      "anyOf": [
+                                        {
+                                          "type": "string",
+                                          "const": "string"
+                                        },
+                                        {
+                                          "type": "string",
+                                          "const": "boolean"
+                                        },
+                                        {
+                                          "type": "string",
+                                          "const": "number"
+                                        },
+                                        {
+                                          "type": "string",
+                                          "const": "date"
+                                        },
+                                        {
+                                          "type": "string",
+                                          "const": "list"
+                                        },
+                                        {
+                                          "type": "string",
+                                          "const": "json"
+                                        },
+                                        {
+                                          "type": "string",
+                                          "const": "spans"
+                                        },
+                                        {
+                                          "type": "string",
+                                          "const": "rag_contexts"
+                                        },
+                                        {
+                                          "type": "string",
+                                          "const": "chat_messages"
+                                        },
+                                        {
+                                          "type": "string",
+                                          "const": "annotations"
+                                        },
+                                        {
+                                          "type": "string",
+                                          "const": "evaluations"
+                                        }
+                                      ]
+                                    }
+                                  },
+                                  "required": [
+                                    "name",
+                                    "type"
+                                  ]
+                                }
+                              }
+                            },
+                            "required": [
+                              "records",
+                              "columnTypes"
+                            ]
+                          }
+                        }
+                      },
+                      "prompting_technique": {
+                        "type": "object",
+                        "properties": {
+                          "ref": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    },
+                    "required": [
+                      "prompt",
+                      "inputs",
+                      "outputs",
+                      "model"
+                    ]
+                  },
+                  "localVersion": {
+                    "type": "number"
+                  },
+                  "commitMessage": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "configData"
+                ]
+              }
+            }
+          }
+        }
       }
     }
   },

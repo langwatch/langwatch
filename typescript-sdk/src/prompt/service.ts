@@ -3,7 +3,7 @@ import {
   type LangwatchApiClient,
 } from "../internal/api/client";
 import type { paths } from "../internal/generated/openapi/api-client";
-import { Prompt } from "./prompt";
+import { Prompt, type PromptResponse } from "./prompt";
 import { PromptConverter } from "./converter";
 
 // Extract types directly from OpenAPI schema for strong type safety.
@@ -15,6 +15,9 @@ type UpdatePromptBody = NonNullable<
 >["content"]["application/json"];
 type CreateVersionBody = NonNullable<
   paths["/api/prompts/{id}/versions"]["post"]["requestBody"]
+>["content"]["application/json"];
+type SyncBody = NonNullable<
+  paths["/api/prompts/{id}/sync"]["post"]["requestBody"]
 >["content"]["application/json"];
 
 /**
@@ -30,6 +33,23 @@ export class PromptsError extends Error {
     super(message);
     this.name = "PromptsError";
   }
+}
+
+export type SyncAction = "created" | "updated" | "conflict" | "up_to_date";
+
+export type ConfigData = NonNullable<
+  paths["/api/prompts/{id}/sync"]["post"]["requestBody"]
+>["content"]["application/json"]["configData"];
+
+export interface SyncResult {
+  action: SyncAction;
+  prompt?: PromptResponse;
+  conflictInfo?: {
+    localVersion: number;
+    remoteVersion: number;
+    differences: string[];
+    remoteConfigData: ConfigData;
+  };
 }
 
 interface PromptServiceOptions {
@@ -294,8 +314,8 @@ export class PromptService {
         messages: PromptConverter.filterNonSystemMessages(config.messages),
         temperature: config.modelParameters?.temperature,
         max_tokens: config.modelParameters?.max_tokens,
-        inputs: [{ identifier: "input", type: "text" as const }],
-        outputs: [{ identifier: "output", type: "text" as const }],
+        inputs: [{ identifier: "input", type: "str" as const }],
+        outputs: [{ identifier: "output", type: "str" as const }],
       },
       commitMessage: `Updated via CLI sync`,
       projectId: "placeholder", // Will be overridden by the API
@@ -310,5 +330,42 @@ export class PromptService {
       created,
       prompt: updatedPrompt,
     };
+  }
+
+  /**
+   * Sync a prompt with local content, handling conflicts and version management
+   */
+  async sync(params: {
+    name: string;
+    configData: ConfigData;
+    localVersion?: number;
+    commitMessage?: string;
+  }): Promise<SyncResult> {
+    try {
+      const response = await this.client.POST("/api/prompts/{id}/sync", {
+        params: { path: { id: params.name } },
+        body: {
+          configData: params.configData,
+          localVersion: params.localVersion,
+          commitMessage: params.commitMessage,
+        },
+      });
+
+      if (response.error) {
+        const errorMessage =
+          response.error?.error ?? JSON.stringify(response.error);
+        throw new Error(`Failed to sync prompt: ${errorMessage}`);
+      }
+
+      return {
+        action: response.data.action as SyncAction,
+        prompt: response.data.prompt as PromptResponse,
+        conflictInfo: response.data.conflictInfo,
+      };
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Unknown error occurred";
+      throw new PromptsError(message, "sync", error);
+    }
   }
 }

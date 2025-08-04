@@ -52,6 +52,7 @@ const configSchemaV1_0 = z.object({
     .object({
       name: z.string(),
     })
+    .nullable()
     .optional(),
   projectId: z.string().min(1, "Project ID cannot be empty"),
   configId: z.string().min(1, "Config ID cannot be empty"),
