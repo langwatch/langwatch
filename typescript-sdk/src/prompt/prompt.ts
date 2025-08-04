@@ -44,7 +44,16 @@ export class Prompt implements PromptResponse {
   public readonly response_format!: PromptResponse["response_format"];
 
   constructor(promptData: PromptResponse) {
-    Object.assign(this, promptData);
+    this.id = promptData.id;
+    this.name = promptData.name;
+    this.updatedAt = promptData.updatedAt;
+    this.version = promptData.version;
+    this.versionId = promptData.versionId;
+    this.versionCreatedAt = promptData.versionCreatedAt;
+    this.model = promptData.model;
+    this.prompt = promptData.prompt;
+    this.messages = promptData.messages;
+    this.response_format = promptData.response_format;
   }
 
   /**
