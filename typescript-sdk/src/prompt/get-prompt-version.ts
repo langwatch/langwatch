@@ -8,7 +8,7 @@ export async function getPromptVersion(id: string, versionId: string, variables:
 export async function getPromptVersion(id: string, versionId: string): Promise<Prompt>;
 
 export async function getPromptVersion(id: string, versionId: string, variables?: TemplateVariables): Promise<Prompt | CompiledPrompt> {
-  return tracer.withActiveSpan("retrieve prompt", async (span) => {
+  return tracer.withActiveSpan("retrieve prompt version", async (span) => {
     span.setType("prompt");
     span.setAttribute(intSemconv.ATTR_LANGWATCH_PROMPT_ID, id);
 
