@@ -16,11 +16,15 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - uses: pnpm/action-setup@v2
+        with:
+          version: 10.12.1
+
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: pnpm
+          cache: "pnpm"
           cache-dependency-path: "typescript-sdk/pnpm-lock.yaml"
 
       - name: Install dependencies
@@ -37,16 +41,24 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - uses: pnpm/action-setup@v2
+        with:
+          version: 10.12.1
+
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: pnpm
+          cache: "pnpm"
           cache-dependency-path: "typescript-sdk/pnpm-lock.yaml"
 
       - name: Install dependencies
         working-directory: typescript-sdk
         run: pnpm install --frozen-lockfile
+
+      - name: Install TypeScript Native Preview
+        working-directory: typescript-sdk
+        run: pnpm install -D @typescript/native-preview
 
       - name: Run typecheck
         working-directory: typescript-sdk
@@ -58,11 +70,15 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - uses: pnpm/action-setup@v2
+        with:
+          version: 10.12.1
+
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: pnpm
+          cache: "pnpm"
           cache-dependency-path: "typescript-sdk/pnpm-lock.yaml"
 
       - name: Install dependencies
@@ -71,4 +87,4 @@ jobs:
 
       - name: Build
         working-directory: typescript-sdk
-        run: pnpm build
+        run: pnpm run build
