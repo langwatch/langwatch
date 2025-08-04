@@ -5,7 +5,6 @@ import { describeRoute } from "hono-openapi";
 import { validator as zValidator, resolver } from "hono-openapi/zod";
 import { z } from "zod";
 
-import { badRequestSchema, successSchema } from "~/app/api/shared/schemas";
 import { prisma } from "~/server/db";
 import { PromptService } from "~/server/prompt-config/prompt.service";
 import { getLatestConfigVersionSchema } from "~/server/prompt-config/repositories/llm-config-version-schema";
@@ -31,6 +30,7 @@ import {
   getOutputsToResponseFormat,
   patchHonoOpenApiSpecFix,
 } from "./utils";
+import { badRequestSchema, successSchema } from "~/app/api/shared/schemas";
 
 const logger = createLogger("langwatch:api:prompts");
 

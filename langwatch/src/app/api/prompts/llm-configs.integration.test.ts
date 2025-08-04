@@ -2,12 +2,13 @@ import type { LlmPromptConfig, Organization, Team } from "@prisma/client";
 import { nanoid } from "nanoid";
 import { describe, expect, it, beforeEach, afterEach } from "vitest";
 
-import { llmPromptConfigFactory } from "~/factories/llm-config.factory";
-import { projectFactory } from "~/factories/project.factory";
 import { prisma } from "~/server/db";
 import { LlmConfigRepository } from "~/server/prompt-config/repositories/llm-config.repository";
 
 import { app } from "./[[...route]]/app";
+
+import { llmPromptConfigFactory } from "~/factories/llm-config.factory";
+import { projectFactory } from "~/factories/project.factory";
 
 describe("Prompts API", () => {
   // Test data setup
@@ -168,7 +169,7 @@ describe("Prompts API", () => {
           // Verify the prompt was created with the handle
           expect(createRes.status).toBe(200);
           const createBody = await createRes.json();
-          expect(createBody.handle).toBe(`${testProjectId}/${handle}`);
+          expect(createBody.handle).toBe(handle);
         });
 
         it("should get a single prompt by handle", async () => {
@@ -179,7 +180,7 @@ describe("Prompts API", () => {
 
           expect(res.status).toBe(200);
           const body = await res.json();
-          expect(body.handle).toBe(`${testProjectId}/${handle}`);
+          expect(body.handle).toBe(handle);
         });
       });
 
@@ -204,7 +205,7 @@ describe("Prompts API", () => {
           // Verify the prompt was created with the organization-scoped handle
           expect(createRes.status).toBe(200);
           const createBody = await createRes.json();
-          expect(createBody.handle).toBe(`${testOrganization.id}/${handle}`);
+          expect(createBody.handle).toBe(handle);
           expect(createBody.scope).toBe("ORGANIZATION");
         });
 
@@ -216,7 +217,7 @@ describe("Prompts API", () => {
 
           expect(res.status).toBe(200);
           const body = await res.json();
-          expect(body.handle).toBe(`${testOrganization.id}/${handle}`);
+          expect(body.handle).toBe(handle);
           expect(body.scope).toBe("ORGANIZATION");
         });
       });
@@ -353,7 +354,7 @@ describe("Prompts API", () => {
         const body = await res.json();
         expect(body).toHaveProperty("id");
         expect(body).toHaveProperty("name", "Test Prompt");
-        expect(body).toHaveProperty("handle", `${testProjectId}/my-custom-ref`);
+        expect(body).toHaveProperty("handle", "my-custom-ref");
       });
     });
 
@@ -376,10 +377,7 @@ describe("Prompts API", () => {
         const body = await res.json();
         expect(body).toHaveProperty("id");
         expect(body).toHaveProperty("name", "Test Prompt");
-        expect(body).toHaveProperty(
-          "handle",
-          `${testOrganization.id}/my-custom-ref`
-        );
+        expect(body).toHaveProperty("handle", "my-custom-ref");
       });
     });
   });
@@ -403,7 +401,7 @@ describe("Prompts API", () => {
 
       expect(prompt1Res.status).toBe(200);
       const prompt1 = await prompt1Res.json();
-      expect(prompt1.handle).toBe(`${testOrganization.id}/shared-ref`);
+      expect(prompt1.handle).toBe("shared-ref");
       expect(prompt1.scope).toBe("ORGANIZATION");
 
       // Create second prompt with project scope using same handle - should succeed
@@ -422,7 +420,7 @@ describe("Prompts API", () => {
 
       expect(prompt2Res.status).toBe(200);
       const prompt2 = await prompt2Res.json();
-      expect(prompt2.handle).toBe(`${testProjectId}/shared-ref`);
+      expect(prompt2.handle).toBe("shared-ref");
       expect(prompt2.scope).toBe("PROJECT");
     });
 
