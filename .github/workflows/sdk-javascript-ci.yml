@@ -33,6 +33,9 @@ jobs:
 
       - name: Run tests
         working-directory: typescript-sdk
+        env:
+          OPENAI_API_KEY: ${{ secrets.TYPESCRIPT_SDK_OPENAI_API_KEY }}
+          LANGWATCH_API_KEY: ${{ secrets.TYPESCRIPT_SDK_LANGWATCH_API_KEY }}
         run: pnpm test
 
   typecheck:

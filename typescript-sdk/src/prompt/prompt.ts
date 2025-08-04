@@ -73,8 +73,8 @@ export class Prompt implements PromptResponse {
       // Compile main prompt
       const compiledPrompt = this.prompt
         ? liquid.parseAndRenderSync(this.prompt, variables, {
-            strictVariables: strict,
-          })
+          strictVariables: strict,
+        })
         : "";
 
       // Compile messages
@@ -82,8 +82,8 @@ export class Prompt implements PromptResponse {
         ...message,
         content: message.content
           ? liquid.parseAndRenderSync(message.content, variables, {
-              strictVariables: strict,
-            })
+            strictVariables: strict,
+          })
           : message.content,
       }));
 
@@ -98,8 +98,7 @@ export class Prompt implements PromptResponse {
     } catch (error) {
       const templateStr = this.prompt || JSON.stringify(this.messages);
       throw new PromptCompilationError(
-        `Failed to compile prompt template: ${
-          error instanceof Error ? error.message : "Unknown error"
+        `Failed to compile prompt template: ${error instanceof Error ? error.message : "Unknown error"
         }`,
         templateStr,
         error
@@ -119,6 +118,7 @@ export class Prompt implements PromptResponse {
   compileStrict(variables: TemplateVariables): CompiledPrompt {
     return this._compile(variables, true);
   }
+}
 
 /**
  * Represents a compiled prompt that extends Prompt with reference to the original template
