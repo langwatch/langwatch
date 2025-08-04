@@ -20,7 +20,9 @@ spec:
         app.kubernetes.io/name: {{ .Release.Name }}-prometheus
         app.kubernetes.io/instance: {{ .Release.Name }}
     spec:
+      {{- if .Values.prometheus.rbac.enabled }}
       serviceAccountName: {{ .Release.Name }}-prometheus
+      {{- end }}
       securityContext:
         runAsNonRoot: true
         runAsUser: 65534

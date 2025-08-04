@@ -18,7 +18,6 @@ global:
   monitoring:
     enabled: false
     prometheusAnnotations: true
-    metricsApiKey: "" # Set this for metrics authentication
 
 # Prometheus monitoring configuration
 prometheus:
@@ -101,7 +100,7 @@ app:
     NEXTAUTH_SECRET: "" # Users must provide this values
     API_TOKEN_JWT_SECRET: "" # Users must provide this values
     CRON_API_KEY: "" # Users must provide this value for cronjob authentication
-    METRICS_API_KEY: "" # Set via export METRICS_API_KEY before installation
+    METRICS_API_KEY: "" # Set this for metrics authentication (will be stored in Kubernetes Secret)
     # SENDGRID_API_KEY: ""  # Optional
 
 langwatch_nlp:

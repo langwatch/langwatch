@@ -94,8 +94,8 @@ helm install langwatch ./langwatch \
   --set app.env.BASE_HOST="http://localhost:5560" \
   --set app.env.NEXTAUTH_URL="http://localhost:5560" \
   --set app.env.CRON_API_KEY=$CRON_API_KEY \
+  --set app.env.METRICS_API_KEY=$METRICS_API_KEY \
   --set global.monitoring.enabled=true \
-  --set global.monitoring.metricsApiKey=$METRICS_API_KEY \
   --set prometheus.enabled=true
 ```
 
