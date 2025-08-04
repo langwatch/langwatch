@@ -5,7 +5,7 @@ import { checkApiKey } from "../utils/apiKey";
 
 // Helper to strip ANSI codes for length calculation
 const stripAnsi = (str: string): string => {
-  return str.replace(/\u001b\[[0-9;]*m/g, '');
+  return str.replace(/\u001b\[[0-9;]*m/g, "");
 };
 
 // Simple table formatting helper
@@ -96,10 +96,17 @@ export const listCommand = async (): Promise<void> => {
 
     try {
       // Fetch all prompts
-      const prompts = await promptService.getAll();
+      const allPrompts = await promptService.getAll();
+      const prompts = allPrompts.filter((prompt) => prompt.version);
+      const draftPrompts = allPrompts.filter((prompt) => !prompt.version);
 
       spinner.succeed(
-        `Found ${prompts.length} prompt${prompts.length !== 1 ? "s" : ""}`,
+        `Found ${prompts.length} published prompt${prompts.length !== 1 ? "s" : ""} ` +
+          chalk.gray(
+            `(+${draftPrompts.length} draft${
+              draftPrompts.length !== 1 ? "s" : ""
+            })`,
+          ),
       );
 
       if (prompts.length === 0) {
@@ -113,15 +120,12 @@ export const listCommand = async (): Promise<void> => {
       console.log();
 
       // Format prompts for table display
-      const tableData = prompts
-        .filter((prompt) => prompt.version)
-        .map((prompt) => ({
-          Name:
-            prompt.handle || `${prompt.name} ` + chalk.gray(`(${prompt.id})`),
-          Version: prompt.version ? `${prompt.version}` : "N/A",
-          Model: prompt.model || "N/A",
-          Updated: formatRelativeTime(prompt.updatedAt),
-        }));
+      const tableData = prompts.map((prompt) => ({
+        Name: prompt.handle || `${prompt.name} ` + chalk.gray(`(${prompt.id})`),
+        Version: prompt.version ? `${prompt.version}` : "N/A",
+        Model: prompt.model || "N/A",
+        Updated: formatRelativeTime(prompt.updatedAt),
+      }));
 
       // Display table
       formatTable(tableData, ["Name", "Version", "Model", "Updated"]);
