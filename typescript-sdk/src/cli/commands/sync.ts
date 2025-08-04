@@ -139,7 +139,11 @@ export const syncCommand = async (): Promise<void> => {
                 materializedPrompt,
               );
               const relativePath = path.relative(process.cwd(), savedPath);
-              result.fetched.push(name); // Store the name, not path
+              result.fetched.push({
+                name,
+                version: prompt.version,
+                versionSpec,
+              });
 
               // Update lock file entry
               FileManager.updateLockEntry(
@@ -302,19 +306,32 @@ export const syncCommand = async (): Promise<void> => {
           if (syncResult.action === "conflict") {
             if (conflictResolution === "remote") {
               actionText = "Pulled"; // User chose to use remote version
-              result.fetched.push(promptName); // Track as fetched, not pushed
+              result.fetched.push({
+                name: promptName,
+                version: syncResult.conflictInfo?.remoteVersion || 0,
+                versionSpec: "latest", // Default for conflict resolution
+              });
             } else {
               actionText = "Pushed"; // User chose to use local version (or forced push)
-              result.pushed.push(promptName);
+              result.pushed.push({
+                name: promptName,
+                version: (syncResult.conflictInfo?.remoteVersion || 0) + 1, // New version after push
+              });
             }
+          } else if (syncResult.action === "up_to_date") {
+            // For up-to-date prompts, add to unchanged instead of pushed
+            actionText = "Up-to-date";
+            result.unchanged.push(promptName);
           } else {
             actionText =
               {
                 created: "Created",
                 updated: "Updated",
-                up_to_date: "Up-to-date",
               }[syncResult.action] || "Pushed";
-            result.pushed.push(promptName);
+            result.pushed.push({
+              name: promptName,
+              version: syncResult.prompt?.version || 0,
+            });
           }
 
           pushSpinner.text = `${actionText} ${chalk.cyan(
@@ -403,25 +420,17 @@ export const syncCommand = async (): Promise<void> => {
 
     // Print individual results if there were actions
     if (result.fetched.length > 0) {
-      for (const name of result.fetched) {
+      for (const { name, version, versionSpec } of result.fetched) {
         // Get the actual saved path from lock file for display consistency
         const lockEntry = lock.prompts[name];
         const displayPath = lockEntry?.materialized
           ? `./${lockEntry.materialized}`
           : `./prompts/.materialized/${name}.prompt.yaml`;
 
-        // Get version info for display (like add command)
-        const dependency = config.prompts[name];
-        const versionSpec =
-          typeof dependency === "string"
-            ? dependency
-            : dependency?.version || "latest";
-        const actualVersion = lockEntry?.version || "unknown";
-
         console.log(
           chalk.green(
             `✓ Pulled ${chalk.cyan(`${name}@${versionSpec}`)} ${chalk.gray(
-              `(version ${actualVersion})`,
+              `(version ${version})`,
             )} → ${chalk.gray(displayPath)}`,
           ),
         );
@@ -429,11 +438,11 @@ export const syncCommand = async (): Promise<void> => {
     }
 
     if (result.pushed.length > 0) {
-      for (const name of result.pushed) {
+      for (const { name, version } of result.pushed) {
         const localPath = `./prompts/${name}.prompt.yaml`;
         console.log(
           chalk.green(
-            `✓ Pushed ${chalk.cyan(name)} from ${chalk.gray(localPath)}`,
+            `✓ Pushed ${chalk.cyan(name)} ${chalk.gray(`(version ${version})`)} from ${chalk.gray(localPath)}`,
           ),
         );
       }
@@ -463,7 +472,7 @@ export const syncCommand = async (): Promise<void> => {
       result.fetched.length + result.pushed.length + result.cleaned.length;
 
     if (totalActions === 0 && result.errors.length === 0) {
-      console.log(chalk.gray(`Synced in ${duration}s`));
+      console.log(chalk.gray(`Synced in ${duration}s, no changes`));
     } else {
       const summary = [];
       if (result.fetched.length > 0)

@@ -53,8 +53,8 @@ export type MaterializedPrompt = {
 };
 
 export type SyncResult = {
-  fetched: string[];
-  pushed: string[];
+  fetched: Array<{ name: string; version: number; versionSpec: string }>;
+  pushed: Array<{ name: string; version: number }>;
   unchanged: string[];
   cleaned: string[];
   errors: Array<{ name: string; error: string }>;
