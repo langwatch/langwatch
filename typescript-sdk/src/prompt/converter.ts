@@ -1,5 +1,5 @@
-import type { Prompt } from "../../prompt/prompt";
-import type { LocalPromptConfig, MaterializedPrompt } from "../types";
+import type { Prompt } from "./prompt";
+import type { LocalPromptConfig, MaterializedPrompt } from "../cli/types";
 
 /**
  * Converter utility for transforming between YAML prompt format and API service format.
