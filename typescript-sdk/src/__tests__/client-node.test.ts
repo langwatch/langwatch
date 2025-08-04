@@ -69,8 +69,8 @@ describe('client-node setup', () => {
     expect(typeof sdkInstance.shutdown).toBe('function');
   });
 
-  it('does not set up NodeSDK if disableOpenTelemetryAutomaticSetup is true', async () => {
-    await clientNode.setup({ apiKey: 'abc', endpoint: 'https://foo', disableOpenTelemetryAutomaticSetup: true });
+  it('does not set up NodeSDK if skipOpenTelemetrySetup is true', async () => {
+    await clientNode.setup({ apiKey: 'abc', endpoint: 'https://foo', skipOpenTelemetrySetup: true });
     expect(NodeSDK).not.toHaveBeenCalled();
   });
 });

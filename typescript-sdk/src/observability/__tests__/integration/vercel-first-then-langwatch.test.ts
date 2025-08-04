@@ -15,7 +15,7 @@ describe("Vercel AI setup first, then LangWatch", () => {
     await setup({
       apiKey: "test-key",
       endpoint: "http://localhost:9999",
-      disableOpenTelemetryAutomaticSetup: false,
+      skipOpenTelemetrySetup: false,
     });
 
     // Test that LangWatch still works

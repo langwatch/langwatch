@@ -12,6 +12,7 @@ const { mockSpan, mockTracer } = vi.hoisted(() => {
     addEvent: vi.fn(function (this: any, ...args) { calls.addEvent.push(args); return this; }),
     recordException: vi.fn((...args) => { calls.recordException.push(args); }),
     setStatus: vi.fn(function (this: any, ...args) { calls.setStatus.push(args); return this; }),
+    setSelectedPrompt: vi.fn(function (this: any, ...args) { calls.setSelectedPrompt.push(args); return this; }),
     end: vi.fn(() => { calls.end++; }),
     setRAGContexts: vi.fn(function (this: any, ...args) { return this; }),
     setRAGContext: vi.fn(function (this: any, ...args) { return this; }),
@@ -48,7 +49,7 @@ const { mockSpan, mockTracer } = vi.hoisted(() => {
   return { mockSpan: span, mockTracer: tracer };
 });
 
-vi.mock('../../trace', () => ({
+vi.mock('../../../trace', () => ({
   getLangWatchTracer: vi.fn(() => mockTracer),
 }));
 
@@ -68,14 +69,14 @@ vi.mock('@opentelemetry/api', async () => {
   };
 });
 
-vi.mock('../../client', () => ({
+vi.mock('../../../client', () => ({
   canAutomaticallyCaptureInput: () => true,
   canAutomaticallyCaptureOutput: () => true,
 }));
 
 // --- Imports (must be after mocks for Vitest hoisting) ---
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { LangWatchCallbackHandler, convertFromLangChainMessages } from '../langchain';
+import { LangWatchCallbackHandler, convertFromLangChainMessages } from '..';
 
 // --- Tests ---
 describe('LangWatchCallbackHandler', () => {

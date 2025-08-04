@@ -19,15 +19,15 @@ import {
 } from "@langchain/core/messages";
 import type { ChatGeneration, LLMResult } from "@langchain/core/outputs";
 import type { ChainValues } from "@langchain/core/utils/types";
-import { getLangWatchTracer } from "../trace";
-import type { LangWatchSpan } from "../span";
+import { getLangWatchTracer } from "../../trace";
+import type { LangWatchSpan } from "../../span";
 import { context, trace, SpanStatusCode, Attributes } from "@opentelemetry/api";
-import { chatMessageSchema } from "../../internal/generated/types/tracer.generated";
+import { chatMessageSchema } from "../../../internal/generated/types/tracer.generated";
 import {
   canAutomaticallyCaptureInput,
   canAutomaticallyCaptureOutput,
-} from "../../client";
-import * as intSemconv from "../semconv";
+} from "../../../client";
+import * as intSemconv from "../../semconv";
 import { z } from "zod";
 
 export class LangWatchCallbackHandler extends BaseCallbackHandler {

@@ -17,11 +17,10 @@
     "jsx": "preserve",
     "incremental": true,
     "noUncheckedIndexedAccess": true,
-    "baseUrl": ".",
     "tsBuildInfoFile": "./tsconfig.tsbuildinfo"
   },
   "include": [
     "**/*.ts",
   ],
-  "exclude": ["node_modules", "./dist/**/*", "./example/**/*"]
+  "exclude": ["node_modules", "./dist/**/*", "./example/**/*", "./examples/**/*"]
 }

@@ -24,23 +24,23 @@ describe('client-browser integration', () => {
     await expect(setupBrowser({
       apiKey: 'integration-key',
       endpoint: 'http://localhost:9999',
-      disableOpenTelemetryAutomaticSetup: false,
+      skipOpenTelemetrySetup: false,
     })).resolves.not.toThrow();
 
     // Second setup should also complete without error (triggers shutdown of previous)
     await expect(setupBrowser({
       apiKey: 'integration-key2',
       endpoint: 'http://localhost:9999',
-      disableOpenTelemetryAutomaticSetup: false,
+      skipOpenTelemetrySetup: false,
     })).resolves.not.toThrow();
   });
 
-  it('should not set up WebTracerProvider if disableOpenTelemetryAutomaticSetup is true', async () => {
+  it('should not set up WebTracerProvider if skipOpenTelemetrySetup is true', async () => {
     // Should complete without error and without setting up WebTracerProvider
     await expect(setupBrowser({
       apiKey: 'integration-key',
       endpoint: 'http://localhost:9999',
-      disableOpenTelemetryAutomaticSetup: true,
+      skipOpenTelemetrySetup: true,
     })).resolves.not.toThrow();
   });
 });

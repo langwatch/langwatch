@@ -3,8 +3,8 @@ import { registerOTel } from '@vercel/otel';
 import { setup } from "../../../client-node";
 import { getLangWatchTracer } from "../../trace";
 
-describe("LangWatch with disableOpenTelemetryAutomaticSetup=true", () => {
-  it("should work when LangWatch is set up with disableOpenTelemetryAutomaticSetup=true", async () => {
+describe("LangWatch with skipOpenTelemetrySetup=true", () => {
+  it("should work when LangWatch is set up with skipOpenTelemetrySetup=true", async () => {
     // Setup Vercel AI first
     registerOTel({ serviceName: 'vercel-first' });
 
@@ -12,7 +12,7 @@ describe("LangWatch with disableOpenTelemetryAutomaticSetup=true", () => {
     await setup({
       apiKey: "test-key",
       endpoint: "http://localhost:9999",
-      disableOpenTelemetryAutomaticSetup: true,
+      skipOpenTelemetrySetup: true,
     });
 
     // Test that LangWatch still works

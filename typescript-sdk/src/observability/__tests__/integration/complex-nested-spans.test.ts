@@ -9,7 +9,7 @@ describe("Complex nested spans with Vercel AI", () => {
     await setup({
       apiKey: "test-key",
       endpoint: "http://localhost:9999",
-      disableOpenTelemetryAutomaticSetup: false,
+      skipOpenTelemetrySetup: false,
     });
 
     const tracer = getLangWatchTracer("complex-otel-test");

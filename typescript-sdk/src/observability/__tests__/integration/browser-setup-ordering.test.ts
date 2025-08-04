@@ -15,14 +15,14 @@ describe("Browser SDK setup ordering", () => {
     await setupBrowser({
       apiKey: "test-key-1",
       endpoint: "http://localhost:9999",
-      disableOpenTelemetryAutomaticSetup: false,
+      skipOpenTelemetrySetup: false,
     });
 
     // Second setup should work (browser doesn't have the same restriction as node)
     await setupBrowser({
       apiKey: "test-key-2",
       endpoint: "http://localhost:9999",
-      disableOpenTelemetryAutomaticSetup: false,
+      skipOpenTelemetrySetup: false,
     });
 
     // Test that LangWatch still works
@@ -32,12 +32,12 @@ describe("Browser SDK setup ordering", () => {
     });
   });
 
-  it("should work when LangWatch is set up with disableOpenTelemetryAutomaticSetup=true", async () => {
+  it("should work when LangWatch is set up with skipOpenTelemetrySetup=true", async () => {
     // Setup LangWatch with automatic setup disabled
     await setupBrowser({
       apiKey: "test-key",
       endpoint: "http://localhost:9999",
-      disableOpenTelemetryAutomaticSetup: true,
+      skipOpenTelemetrySetup: true,
     });
 
     // Test that LangWatch still works
@@ -51,7 +51,7 @@ describe("Browser SDK setup ordering", () => {
     await setupBrowser({
       apiKey: "test-key",
       endpoint: "http://localhost:9999",
-      disableOpenTelemetryAutomaticSetup: false,
+      skipOpenTelemetrySetup: false,
     });
 
     // Check that window event listeners were added

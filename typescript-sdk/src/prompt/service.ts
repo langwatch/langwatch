@@ -49,7 +49,7 @@ export class PromptService {
   private client: LangwatchApiClient;
   private static instance: PromptService | null = null;
 
-  private constructor(opts?: PromptServiceOptions) {
+  constructor(opts?: PromptServiceOptions) {
     this.client = opts?.client ?? createLangWatchApiClient();
   }
 

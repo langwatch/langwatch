@@ -9,7 +9,7 @@ describe("Different Vercel AI configurations", () => {
     await setup({
       apiKey: "test-key",
       endpoint: "http://localhost:9999",
-      disableOpenTelemetryAutomaticSetup: false,
+      skipOpenTelemetrySetup: false,
     });
 
     const tracer = getLangWatchTracer("config-test");

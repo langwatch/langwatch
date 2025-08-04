@@ -2,7 +2,6 @@ import { describe, it, expect } from "vitest";
 import { registerOTel } from '@vercel/otel';
 import { setup } from "../../../client-node";
 import { getLangWatchTracer } from "../../trace";
-import { isOtelInitialized } from "../../../client-shared";
 
 describe("LangWatch setup first, then Vercel AI", () => {
   it("should work when LangWatch is set up first, then Vercel AI", async () => {
@@ -10,7 +9,7 @@ describe("LangWatch setup first, then Vercel AI", () => {
     await setup({
       apiKey: "test-key",
       endpoint: "http://localhost:9999",
-      disableOpenTelemetryAutomaticSetup: false,
+      skipOpenTelemetrySetup: false,
     });
 
     // Then setup Vercel AI

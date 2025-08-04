@@ -8,7 +8,7 @@ import {
 } from "../internal/generated/types/evaluators.generated";
 import { RAGChunk } from "../internal/generated/types/tracer";
 import { tracer } from "./tracer";
-import { EvaluationError, EvaluationResultModel } from "./types";
+import { EvaluationResultModel } from "./types";
 import { SpanStatusCode } from "@opentelemetry/api";
 
 export interface BasicEvaluationData {

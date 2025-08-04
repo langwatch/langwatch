@@ -15,7 +15,7 @@ describe("SDK compatibility with Vercel AI OpenTelemetry", () => {
     await setup({
       apiKey: "test-key",
       endpoint: "http://localhost:9999",
-      disableOpenTelemetryAutomaticSetup: false,
+      skipOpenTelemetrySetup: false,
     });
 
     // Test that LangWatch still works

@@ -8,14 +8,14 @@ describe("Multiple setup attempts and error handling", () => {
     await setup({
       apiKey: "test-key-1",
       endpoint: "http://localhost:9999",
-      disableOpenTelemetryAutomaticSetup: false,
+      skipOpenTelemetrySetup: false,
     });
 
     // Second setup should throw an error
     await expect(setup({
       apiKey: "test-key-2",
       endpoint: "http://localhost:9999",
-      disableOpenTelemetryAutomaticSetup: false,
+      skipOpenTelemetrySetup: false,
     })).rejects.toThrow("LangWatch setup has already been called");
 
     // Test that LangWatch still works
