@@ -17,6 +17,9 @@ importers:
       '@langchain/langgraph':
         specifier: ^0.4.2
         version: 0.4.2(@langchain/core@0.3.66(@opentelemetry/api@1.9.0)(@opentelemetry/exporter-trace-otlp-proto@0.203.0(@opentelemetry/api@1.9.0))(@opentelemetry/sdk-trace-base@2.0.1(@opentelemetry/api@1.9.0))(openai@5.11.0(zod@4.0.14)))(react@19.1.0)(zod-to-json-schema@3.24.6(zod@4.0.14))
+      '@langchain/openai':
+        specifier: ^0.6.3
+        version: 0.6.3(@langchain/core@0.3.66(@opentelemetry/api@1.9.0)(@opentelemetry/exporter-trace-otlp-proto@0.203.0(@opentelemetry/api@1.9.0))(@opentelemetry/sdk-trace-base@2.0.1(@opentelemetry/api@1.9.0))(openai@5.11.0(zod@4.0.14)))
       '@opentelemetry/api':
         specifier: ^1.9.0
         version: 1.9.0
@@ -30,9 +33,6 @@ importers:
         specifier: ^2.0.1
         version: 2.0.1(@opentelemetry/api@1.9.0)
       '@opentelemetry/exporter-trace-otlp-http':
-        specifier: ^0.203.0
-        version: 0.203.0(@opentelemetry/api@1.9.0)
-      '@opentelemetry/otlp-transformer':
         specifier: ^0.203.0
         version: 0.203.0(@opentelemetry/api@1.9.0)
       '@opentelemetry/resources':
@@ -53,9 +53,6 @@ importers:
       '@vercel/otel':
         specifier: ^1.13.0
         version: 1.13.0(@opentelemetry/api-logs@0.203.0)(@opentelemetry/api@1.9.0)(@opentelemetry/instrumentation@0.203.0(@opentelemetry/api@1.9.0))(@opentelemetry/resources@2.0.1(@opentelemetry/api@1.9.0))(@opentelemetry/sdk-logs@0.203.0(@opentelemetry/api@1.9.0))(@opentelemetry/sdk-metrics@2.0.1(@opentelemetry/api@1.9.0))(@opentelemetry/sdk-trace-base@2.0.1(@opentelemetry/api@1.9.0))
-      ai:
-        specifier: ^5.0.0
-        version: 5.0.0(zod@4.0.14)
       langchain:
         specifier: ^0.3.30
         version: 0.3.30(@langchain/core@0.3.66(@opentelemetry/api@1.9.0)(@opentelemetry/exporter-trace-otlp-proto@0.203.0(@opentelemetry/api@1.9.0))(@opentelemetry/sdk-trace-base@2.0.1(@opentelemetry/api@1.9.0))(openai@5.11.0(zod@4.0.14)))(@opentelemetry/api@1.9.0)(@opentelemetry/exporter-trace-otlp-proto@0.203.0(@opentelemetry/api@1.9.0))(@opentelemetry/sdk-trace-base@2.0.1(@opentelemetry/api@1.9.0))(openai@5.11.0(zod@4.0.14))
@@ -71,16 +68,10 @@ importers:
       zod:
         specifier: ^4.0.14
         version: 4.0.14
-      zod-validation-error:
-        specifier: ^4.0.1
-        version: 4.0.1(zod@4.0.14)
     devDependencies:
       '@eslint/js':
         specifier: ^9.32.0
         version: 9.32.0
-      '@langchain/openai':
-        specifier: ^0.6.3
-        version: 0.6.3(@langchain/core@0.3.66(@opentelemetry/api@1.9.0)(@opentelemetry/exporter-trace-otlp-proto@0.203.0(@opentelemetry/api@1.9.0))(@opentelemetry/sdk-trace-base@2.0.1(@opentelemetry/api@1.9.0))(openai@5.11.0(zod@4.0.14)))
       '@types/debug':
         specifier: ^4.1.12
         version: 4.1.12
@@ -88,8 +79,8 @@ importers:
         specifier: ^24.1.0
         version: 24.1.0
       '@typescript/native-preview':
-        specifier: 7.0.0-dev.20250725.1
-        version: 7.0.0-dev.20250725.1
+        specifier: 7.0.0-dev.20250804.1
+        version: 7.0.0-dev.20250804.1
       '@vitest/coverage-v8':
         specifier: 3.2.4
         version: 3.2.4(vitest@3.2.4(@types/debug@4.1.12)(@types/node@24.1.0)(yaml@2.8.0))
@@ -125,12 +116,6 @@ importers:
         version: 3.2.4(@types/debug@4.1.12)(@types/node@24.1.0)(yaml@2.8.0)
 
 packages:
-
-  '@ai-sdk/gateway@1.0.0':
-    resolution: {integrity: sha512-VEm87DyRx1yIPywbTy8ntoyh4jEDv1rJ88m+2I7zOm08jJI5BhFtAWh0OF6YzZu1Vu4NxhOWO4ssGdsqydDQ3A==}
-    engines: {node: '>=18'}
-    peerDependencies:
-      zod: ^3.25.76 || ^4
 
   '@ai-sdk/openai@2.0.0':
     resolution: {integrity: sha512-G0WY5K81JwGpuX9HEmP2VTdt3N9m43qPnGT4fWkXcpu6Y2B05nnjs8k1r/csCJd8+TkYC6esjBABQYHxdMOejQ==}
@@ -916,50 +901,50 @@ packages:
     resolution: {integrity: sha512-pWrTcoFNWuwHlA9CvlfSsGWs14JxfN1TH25zM5L7o0pRLhsoZkDnTsXfQRJBEWJoV5DL0jf+Z+sxiud+K0mq1g==}
     engines: {node: ^18.18.0 || ^20.9.0 || >=21.1.0}
 
-  '@typescript/native-preview-darwin-arm64@7.0.0-dev.20250725.1':
-    resolution: {integrity: sha512-cVdP7WI0sH2XPpxHxfmeCQsHfLFFxAGhgwceCmbe/EiX1bgJKWY6vB6iLfGv8b+2a4S5ZqnUuz/MdY8pgRlpog==}
+  '@typescript/native-preview-darwin-arm64@7.0.0-dev.20250804.1':
+    resolution: {integrity: sha512-Bn7ptzfXtXUmriod5fadXo5+j8VfeJmePm54IcbtqwxhyDkcvyHPhOhp2l7IMtpVOwuXTua/hid6HCHe0LXTaQ==}
     engines: {node: '>=20.6.0'}
     cpu: [arm64]
     os: [darwin]
 
-  '@typescript/native-preview-darwin-x64@7.0.0-dev.20250725.1':
-    resolution: {integrity: sha512-rneVW6EG0cG8sK2OcxqsikugcIQTReZxx3VL+Cr2SsaD7g2ROvrpDjb8GmzFYbLuCRQkKhk0eop47MXopwJFHg==}
+  '@typescript/native-preview-darwin-x64@7.0.0-dev.20250804.1':
+    resolution: {integrity: sha512-WN4sCqnEfrvr7n+YfZR/Wme5FZ88ASY5p2Zcvbm1bMO1FCn2h7iPnInoMfynsoYmfcWQhZqEaSkmK6HGeJKuWQ==}
     engines: {node: '>=20.6.0'}
     cpu: [x64]
     os: [darwin]
 
-  '@typescript/native-preview-linux-arm64@7.0.0-dev.20250725.1':
-    resolution: {integrity: sha512-uzqO26nv/bsoCxpEJuYNE4SiZ/FrRq0og6RkMz6WXku6SCiy35l1zDJpGyIQpvV7ldBgLW2KENpVpZ+tSwRMyA==}
+  '@typescript/native-preview-linux-arm64@7.0.0-dev.20250804.1':
+    resolution: {integrity: sha512-N5NHuiT9gBDl3+sW0OGJPeSZYAwYZGfMf2ES4ZDj1Pd4TDR2b6S47FckQVrGWzVDImoqZZsJan5gs3cofTE8nA==}
     engines: {node: '>=20.6.0'}
     cpu: [arm64]
     os: [linux]
 
-  '@typescript/native-preview-linux-arm@7.0.0-dev.20250725.1':
-    resolution: {integrity: sha512-cksXd5g9jpez14B7ANWfe76TGcfTiOsXFnVL14dITwe1CCegAJo6eYH1eo9s2yuKOpZZXeUDyYHABD8tYGYyUQ==}
+  '@typescript/native-preview-linux-arm@7.0.0-dev.20250804.1':
+    resolution: {integrity: sha512-emtoOuf+K8TK9JnQn8RsNs/mNiPQ/u5xR+N1S7IQFgiEBrngPzCKSwDrtPbY9xGh9mVg7aGa58+Y/hAtXudFwQ==}
     engines: {node: '>=20.6.0'}
     cpu: [arm]
     os: [linux]
 
-  '@typescript/native-preview-linux-x64@7.0.0-dev.20250725.1':
-    resolution: {integrity: sha512-fcPiVePGOBx1DP2hVXl/sX0VtJCfpB6VutH/uip1I52obKYVpZaPV8ljO018Ugquy/rfrp5fce7gAIiuDR1E7A==}
+  '@typescript/native-preview-linux-x64@7.0.0-dev.20250804.1':
+    resolution: {integrity: sha512-yT9JKfbuSh3hNybNqUHIsuoOvVsLka7JfRfNh2Hes1eJGVH04I4E5tKAlzI9Iy7OEWCovHZFblQRjp/3CJYxyA==}
     engines: {node: '>=20.6.0'}
     cpu: [x64]
     os: [linux]
 
-  '@typescript/native-preview-win32-arm64@7.0.0-dev.20250725.1':
-    resolution: {integrity: sha512-eJnjdADTkMiSdSEB6oPzDQfcyaEJnjX0VwECv0TIZ+mlW29Yb0MYNqhWa0gS2YmddJMfydz4Dxn5jX+yh8vTGQ==}
+  '@typescript/native-preview-win32-arm64@7.0.0-dev.20250804.1':
+    resolution: {integrity: sha512-da5LkGm/l1zzpaTc2FwQh1F3H1pYSAUpqHzskcPL//SDTfrQnkbN9dPn+CI8cHDRv8lCAQFXII+xFFLWPMNXyQ==}
     engines: {node: '>=20.6.0'}
     cpu: [arm64]
     os: [win32]
 
-  '@typescript/native-preview-win32-x64@7.0.0-dev.20250725.1':
-    resolution: {integrity: sha512-1WVouUtx6MY/Uw/baR2JHSFFlqhhw9zs35py/6EEbDuWEhhZNAf22y0DX9ugPOGy9m0XA5BcQhH/2DDxv0+2SA==}
+  '@typescript/native-preview-win32-x64@7.0.0-dev.20250804.1':
+    resolution: {integrity: sha512-zC+Wzi8Lr+RGF69PHHnesyoImBTwkzdPD9aoHTrynrP8Fcv+oRAUQmQcI0JFB0cEzFxMQ1sUMdBrAikdveaz1g==}
     engines: {node: '>=20.6.0'}
     cpu: [x64]
     os: [win32]
 
-  '@typescript/native-preview@7.0.0-dev.20250725.1':
-    resolution: {integrity: sha512-tIXt/RNuuIx7RQkxcmQ/PzSt9ifrY+saYD0i63kQsGELRxOCB3YMY7ZVqpI4WX4ulIpqjw1eVwlSfF+36lX18w==}
+  '@typescript/native-preview@7.0.0-dev.20250804.1':
+    resolution: {integrity: sha512-EVYSeheDmdLrvwWRW4RXl47rUMEst6JkO7hgvwYEF8TBQ4zrBWcMlCulhgI5MsvCrNf7hkVn6628bCkp/5Ik2A==}
     engines: {node: '>=20.6.0'}
     hasBin: true
 
@@ -1056,12 +1041,6 @@ packages:
     resolution: {integrity: sha512-NZyJarBfL7nWwIq+FDL6Zp/yHEhePMNnnJ0y3qfieCrmNvYct8uvtiV41UvlSe6apAfk0fY1FbWx+NwfmpvtTg==}
     engines: {node: '>=0.4.0'}
     hasBin: true
-
-  ai@5.0.0:
-    resolution: {integrity: sha512-F4jOhOSeiZD8lXpF4l1hRqyM1jbqoLKGVZNxAP467wmQCsWUtElMa3Ki5PrDMq6qvUNC3deUKfERDAsfj7IDlg==}
-    engines: {node: '>=18'}
-    peerDependencies:
-      zod: ^3.25.76 || ^4
 
   ajv@6.12.6:
     resolution: {integrity: sha512-j3fVLgvTo527anyYyJOGTYJbG+vnnQYvE0m5mmkc1TK+nxAppkCLMIL0aZ4dblVCNoGShhm+kzE4ZUykBoMg4g==}
@@ -2535,12 +2514,6 @@ packages:
     peerDependencies:
       zod: ^3.24.1
 
-  zod-validation-error@4.0.1:
-    resolution: {integrity: sha512-F3rdaCOHs5ViJ5YTz5zzRtfkQdMdIeKudJAoxy7yB/2ZMEHw73lmCAcQw11r7++20MyGl4WV59EVh7A9rNAyog==}
-    engines: {node: '>=18.0.0'}
-    peerDependencies:
-      zod: ^3.25.0 || ^4.0.0
-
   zod@3.25.76:
     resolution: {integrity: sha512-gzUt/qt81nXsFGKIFcC3YnfEAx5NkunCfnDlvuBSSFS02bcXu4Lmea0AFIUwbLWxWPx3d9p8S5QoaujKcNQxcQ==}
 
@@ -2551,12 +2524,6 @@ packages:
     resolution: {integrity: sha512-XE96n56IQpJM7NAoXswY3XRLcWFW83xe0BiAOeMD7K5k5xecOeul3Qcpx6GqEeeHNkW5DWL5zOyTbEfB4eti8w==}
 
 snapshots:
-
-  '@ai-sdk/gateway@1.0.0(zod@4.0.14)':
-    dependencies:
-      '@ai-sdk/provider': 2.0.0
-      '@ai-sdk/provider-utils': 3.0.0(zod@4.0.14)
-      zod: 4.0.14
 
   '@ai-sdk/openai@2.0.0(zod@4.0.14)':
     dependencies:
@@ -3364,36 +3331,36 @@ snapshots:
       '@typescript-eslint/types': 8.38.0
       eslint-visitor-keys: 4.2.1
 
-  '@typescript/native-preview-darwin-arm64@7.0.0-dev.20250725.1':
+  '@typescript/native-preview-darwin-arm64@7.0.0-dev.20250804.1':
     optional: true
 
-  '@typescript/native-preview-darwin-x64@7.0.0-dev.20250725.1':
+  '@typescript/native-preview-darwin-x64@7.0.0-dev.20250804.1':
     optional: true
 
-  '@typescript/native-preview-linux-arm64@7.0.0-dev.20250725.1':
+  '@typescript/native-preview-linux-arm64@7.0.0-dev.20250804.1':
     optional: true
 
-  '@typescript/native-preview-linux-arm@7.0.0-dev.20250725.1':
+  '@typescript/native-preview-linux-arm@7.0.0-dev.20250804.1':
     optional: true
 
-  '@typescript/native-preview-linux-x64@7.0.0-dev.20250725.1':
+  '@typescript/native-preview-linux-x64@7.0.0-dev.20250804.1':
     optional: true
 
-  '@typescript/native-preview-win32-arm64@7.0.0-dev.20250725.1':
+  '@typescript/native-preview-win32-arm64@7.0.0-dev.20250804.1':
     optional: true
 
-  '@typescript/native-preview-win32-x64@7.0.0-dev.20250725.1':
+  '@typescript/native-preview-win32-x64@7.0.0-dev.20250804.1':
     optional: true
 
-  '@typescript/native-preview@7.0.0-dev.20250725.1':
+  '@typescript/native-preview@7.0.0-dev.20250804.1':
     optionalDependencies:
-      '@typescript/native-preview-darwin-arm64': 7.0.0-dev.20250725.1
-      '@typescript/native-preview-darwin-x64': 7.0.0-dev.20250725.1
-      '@typescript/native-preview-linux-arm': 7.0.0-dev.20250725.1
-      '@typescript/native-preview-linux-arm64': 7.0.0-dev.20250725.1
-      '@typescript/native-preview-linux-x64': 7.0.0-dev.20250725.1
-      '@typescript/native-preview-win32-arm64': 7.0.0-dev.20250725.1
-      '@typescript/native-preview-win32-x64': 7.0.0-dev.20250725.1
+      '@typescript/native-preview-darwin-arm64': 7.0.0-dev.20250804.1
+      '@typescript/native-preview-darwin-x64': 7.0.0-dev.20250804.1
+      '@typescript/native-preview-linux-arm': 7.0.0-dev.20250804.1
+      '@typescript/native-preview-linux-arm64': 7.0.0-dev.20250804.1
+      '@typescript/native-preview-linux-x64': 7.0.0-dev.20250804.1
+      '@typescript/native-preview-win32-arm64': 7.0.0-dev.20250804.1
+      '@typescript/native-preview-win32-x64': 7.0.0-dev.20250804.1
 
   '@typescript/vfs@1.6.1(typescript@5.9.2)':
     dependencies:
@@ -3516,14 +3483,6 @@ snapshots:
       acorn: 8.15.0
 
   acorn@8.15.0: {}
-
-  ai@5.0.0(zod@4.0.14):
-    dependencies:
-      '@ai-sdk/gateway': 1.0.0(zod@4.0.14)
-      '@ai-sdk/provider': 2.0.0
-      '@ai-sdk/provider-utils': 3.0.0(zod@4.0.14)
-      '@opentelemetry/api': 1.9.0
-      zod: 4.0.14
 
   ajv@6.12.6:
     dependencies:
@@ -4980,10 +4939,6 @@ snapshots:
       zod: 3.25.76
 
   zod-to-json-schema@3.24.6(zod@4.0.14):
-    dependencies:
-      zod: 4.0.14
-
-  zod-validation-error@4.0.1(zod@4.0.14):
     dependencies:
       zod: 4.0.14
 
