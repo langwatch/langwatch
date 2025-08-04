@@ -143,9 +143,8 @@ export class LlmConfigVersionsRepository {
    * Create a new version for an existing config
    */
   async createVersion(
-    versionData: Omit<LlmConfigVersionDTO, "author"> & {
-      organizationId: string;
-    }
+    versionData: Omit<LlmConfigVersionDTO, "author">,
+    organizationId: string
   ): Promise<LlmPromptConfigVersion & { schemaVersion: SchemaVersion }> {
     // Verify the config exists
     const promptRepository = new LlmConfigRepository(this.prisma);
@@ -153,7 +152,7 @@ export class LlmConfigVersionsRepository {
       await promptRepository.getConfigByIdOrHandleWithLatestVersion({
         idOrHandle: versionData.configId,
         projectId: versionData.projectId,
-        organizationId: versionData.organizationId,
+        organizationId,
       });
 
     if (!config) {
@@ -233,8 +232,7 @@ export class LlmConfigVersionsRepository {
       commitMessage: `Restore from version ${version.version}`,
       schemaVersion: version.schemaVersion as SchemaVersion,
       configData: version.configData as LlmConfigVersionDTO["configData"],
-      organizationId
-    });
+    }, organizationId);
 
     return newVersion;
   }

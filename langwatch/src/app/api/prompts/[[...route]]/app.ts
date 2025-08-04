@@ -218,8 +218,7 @@ app.post(
       ...data,
       configId: id,
       projectId: project.id,
-      organizationId: organization.id,
-    });
+    }, organization.id);
 
     logger.info(
       {
