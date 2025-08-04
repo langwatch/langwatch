@@ -8,15 +8,16 @@ import { recordEvaluation } from '../../evaluation/record-evaluation';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const makeMockSpan = () => {
-  const calls: any = { addEvent: [], setAttribute: [], end: 0, setAttributes: [], recordException: [] };
+  const calls: any = { addEvent: [], setAttribute: [], end: 0, setAttributes: [], recordException: [], setStatus: [], updateName: [] };
   return {
     addEvent: vi.fn((...args) => { calls.addEvent.push(args); }),
     setAttribute: vi.fn((...args) => { calls.setAttribute.push(args); }),
     setAttributes: vi.fn((...args) => { calls.setAttributes.push(args); }),
     end: vi.fn(() => { calls.end++; }),
     recordException: vi.fn((...args) => { calls.recordException.push(args); }),
+    setStatus: vi.fn((...args) => { calls.setStatus.push(args); }),
+    updateName: vi.fn((...args) => { calls.updateName.push(args); }),
     calls,
-    someOriginalMethod: vi.fn(() => 'original'),
   };
 };
 
@@ -147,7 +148,67 @@ describe('createLangWatchSpan', () => {
     expect(recordEvaluation).toHaveBeenCalledWith(details, attributes);
   });
 
-  it('forwards unknown methods to the original span', () => {
-    expect((lwSpan as any).someOriginalMethod()).toBe('original');
+  it('supports fluent API chaining', () => {
+    // Test that methods can be chained and each returns the LangWatchSpan instance
+    const result = lwSpan
+      .setType('llm')
+      .setRequestModel('gpt-4')
+      .setInputString('Hello')
+      .addGenAIUserMessageEvent({ content: 'Hello' })
+      .addGenAIAssistantMessageEvent({ content: 'Hi!' })
+      .setOutputString('Hi!')
+      .recordEvaluation({ name: 'test', status: 'processed' });
+
+    // Verify that the result is the same LangWatchSpan instance
+    expect(result).toBe(lwSpan);
+
+    // Verify that all the expected methods were called
+    expect(span.setAttribute).toHaveBeenCalledWith(intSemconv.ATTR_LANGWATCH_SPAN_TYPE, 'llm');
+    expect(span.setAttribute).toHaveBeenCalledWith(semconv.ATTR_GEN_AI_REQUEST_MODEL, 'gpt-4');
+    expect(span.setAttribute).toHaveBeenCalledWith(intSemconv.ATTR_LANGWATCH_INPUT, JSON.stringify({ type: 'text', value: 'Hello' }));
+    expect(span.setAttribute).toHaveBeenCalledWith(intSemconv.ATTR_LANGWATCH_OUTPUT, JSON.stringify({ type: 'text', value: 'Hi!' }));
+    expect(span.addEvent).toHaveBeenCalledWith(intSemconv.LOG_EVNT_GEN_AI_USER_MESSAGE, expect.any(Object));
+    expect(span.addEvent).toHaveBeenCalledWith(intSemconv.LOG_EVNT_GEN_AI_ASSISTANT_MESSAGE, expect.any(Object));
+    expect(recordEvaluation).toHaveBeenCalledWith({ name: 'test', status: 'processed' }, undefined);
+  });
+
+  it('maintains fluent API when mixing LangWatch and original span methods', () => {
+    // Test that we can chain LangWatch methods with original span methods
+    const result = lwSpan
+      .setType('llm')
+      .setAttribute('custom.attr', 'value') // Original span method
+      .setInputString('Hello')
+      .setAttributes({ 'another.attr': 'value' }) // Original span method
+      .setOutputString('Hi!');
+
+    // Verify that the result is the same LangWatchSpan instance
+    expect(result).toBe(lwSpan);
+
+    // Verify that both LangWatch and original span methods were called
+    expect(span.setAttribute).toHaveBeenCalledWith(intSemconv.ATTR_LANGWATCH_SPAN_TYPE, 'llm');
+    expect(span.setAttribute).toHaveBeenCalledWith('custom.attr', 'value');
+    expect(span.setAttributes).toHaveBeenCalledWith({ 'another.attr': 'value' });
+    expect(span.setAttribute).toHaveBeenCalledWith(intSemconv.ATTR_LANGWATCH_INPUT, JSON.stringify({ type: 'text', value: 'Hello' }));
+    expect(span.setAttribute).toHaveBeenCalledWith(intSemconv.ATTR_LANGWATCH_OUTPUT, JSON.stringify({ type: 'text', value: 'Hi!' }));
+  });
+
+  it('forwards original span methods correctly', () => {
+    // Test that original span methods work and return the LangWatchSpan for chaining
+    const result = lwSpan
+      .setAttribute('test', 'value')
+      .setAttributes({ 'test2': 'value2' })
+      .addEvent('test-event', { 'event-attr': 'value' })
+      .setStatus({ code: 0 })
+      .updateName('new-name');
+
+    // Verify that the result is the same LangWatchSpan instance
+    expect(result).toBe(lwSpan);
+
+    // Verify that all the original span methods were called
+    expect(span.setAttribute).toHaveBeenCalledWith('test', 'value');
+    expect(span.setAttributes).toHaveBeenCalledWith({ 'test2': 'value2' });
+    expect(span.addEvent).toHaveBeenCalledWith('test-event', { 'event-attr': 'value' });
+    expect(span.setStatus).toHaveBeenCalledWith({ code: 0 });
+    expect(span.updateName).toHaveBeenCalledWith('new-name');
   });
 });

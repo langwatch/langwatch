@@ -1,4 +1,12 @@
-import { Attributes, AttributeValue, Span } from "@opentelemetry/api";
+import {
+  Attributes,
+  AttributeValue,
+  Span,
+  SpanContext,
+  SpanStatus,
+  Link,
+  Exception
+} from "@opentelemetry/api";
 import semconv from "@opentelemetry/semantic-conventions/incubating";
 import * as intSemconv from "./semconv";
 import {
@@ -422,12 +430,292 @@ export interface LangWatchSpan extends Span {
 }
 
 /**
- * Wraps an OpenTelemetry Span with LangWatch-specific helpers for LLM, RAG, and GenAI tracing.
+ * LangWatchSpan class that wraps an OpenTelemetry Span with LangWatch-specific helpers.
  *
- * This function returns a Proxy that adds ergonomic methods for recording LLM/GenAI data to the span.
+ * This class provides a clean, type-safe wrapper around OpenTelemetry spans with
+ * additional methods for LLM, RAG, and GenAI tracing. All methods support fluent API chaining.
+ *
+ * @example
+ * import { createLangWatchSpan } from './span';
+ * const otelSpan = tracer.startSpan('llm-call');
+ * const span = createLangWatchSpan(otelSpan);
+ * span.setType('llm').setInput('Prompt').setOutput('Completion');
+ */
+class LangWatchSpanImpl implements LangWatchSpan {
+  constructor(private span: Span) {}
+
+  // OpenTelemetry Span methods with fluent API support
+  setAttribute(key: string, value: AttributeValue): this {
+    this.span.setAttribute(key, value);
+    return this;
+  }
+
+  setAttributes(attributes: Attributes): this {
+    this.span.setAttributes(attributes);
+    return this;
+  }
+
+  addEvent(name: string, attributes?: Attributes): this {
+    this.span.addEvent(name, attributes);
+    return this;
+  }
+
+  recordException(exception: Exception): this {
+    this.span.recordException(exception);
+    return this;
+  }
+
+  setStatus(status: SpanStatus): this {
+    this.span.setStatus(status);
+    return this;
+  }
+
+  updateName(name: string): this {
+    this.span.updateName(name);
+    return this;
+  }
+
+  // Pass through other Span methods without chaining
+  end(endTime?: number): void {
+    this.span.end(endTime);
+  }
+
+  isRecording(): boolean {
+    return this.span.isRecording();
+  }
+
+  spanContext(): SpanContext {
+    return this.span.spanContext();
+  }
+
+  addLink(link: Link): this {
+    this.span.addLink(link);
+    return this;
+  }
+
+  addLinks(links: Link[]): this {
+    this.span.addLinks(links);
+    return this;
+  }
+
+  // LangWatch-specific methods
+  recordEvaluation(
+    details: RecordedEvaluationDetails,
+    attributes?: Attributes,
+  ): this {
+    recordEvaluation(details, attributes);
+    return this;
+  }
+
+  addGenAISystemMessageEvent(
+    body: LangWatchSpanGenAISystemMessageEventBody,
+    system?: intSemconv.VAL_GEN_AI_SYSTEMS | (string & {}),
+    attributes?: Record<string, AttributeValue>,
+  ): this {
+    if (body.role === void 0) {
+      body.role = "system";
+    }
+
+    this.span.addEvent(intSemconv.LOG_EVNT_GEN_AI_SYSTEM_MESSAGE, {
+      ...attributes,
+      [semconv.ATTR_GEN_AI_SYSTEM]: system,
+      [intSemconv.ATTR_LANGWATCH_GEN_AI_LOG_EVENT_BODY]: JSON.stringify(body),
+      [intSemconv.ATTR_LANGWATCH_GEN_AI_LOG_EVENT_IMPOSTER]: true,
+    });
+    return this;
+  }
+
+  addGenAIUserMessageEvent(
+    body: LangWatchSpanGenAIUserMessageEventBody,
+    system?: intSemconv.VAL_GEN_AI_SYSTEMS | (string & {}),
+    attributes?: Record<string, AttributeValue>,
+  ): this {
+    if (body.role === void 0) {
+      body.role = "user";
+    }
+
+    this.span.addEvent(intSemconv.LOG_EVNT_GEN_AI_USER_MESSAGE, {
+      ...attributes,
+      [semconv.ATTR_GEN_AI_SYSTEM]: system,
+      [intSemconv.ATTR_LANGWATCH_GEN_AI_LOG_EVENT_BODY]: JSON.stringify(body),
+      [intSemconv.ATTR_LANGWATCH_GEN_AI_LOG_EVENT_IMPOSTER]: true,
+    });
+    return this;
+  }
+
+  addGenAIAssistantMessageEvent(
+    body: LangWatchSpanGenAIAssistantMessageEventBody,
+    system?: intSemconv.VAL_GEN_AI_SYSTEMS | (string & {}),
+    attributes?: Record<string, AttributeValue>,
+  ): this {
+    if (body.role === void 0) {
+      body.role = "assistant";
+    }
+
+    this.span.addEvent(intSemconv.LOG_EVNT_GEN_AI_ASSISTANT_MESSAGE, {
+      ...attributes,
+      [semconv.ATTR_GEN_AI_SYSTEM]: system,
+      [intSemconv.ATTR_LANGWATCH_GEN_AI_LOG_EVENT_BODY]: JSON.stringify(body),
+      [intSemconv.ATTR_LANGWATCH_GEN_AI_LOG_EVENT_IMPOSTER]: true,
+    });
+    return this;
+  }
+
+  addGenAIToolMessageEvent(
+    body: LangWatchSpanGenAIToolMessageEventBody,
+    system?: intSemconv.VAL_GEN_AI_SYSTEMS | (string & {}),
+    attributes?: Record<string, AttributeValue>,
+  ): this {
+    if (body.role === void 0) {
+      body.role = "tool";
+    }
+
+    this.span.addEvent(intSemconv.LOG_EVNT_GEN_AI_TOOL_MESSAGE, {
+      ...attributes,
+      [semconv.ATTR_GEN_AI_SYSTEM]: system,
+      [intSemconv.ATTR_LANGWATCH_GEN_AI_LOG_EVENT_BODY]: JSON.stringify(body),
+      [intSemconv.ATTR_LANGWATCH_GEN_AI_LOG_EVENT_IMPOSTER]: true,
+    });
+    return this;
+  }
+
+  addGenAIChoiceEvent(
+    body: LangWatchSpanGenAIChoiceEventBody,
+    system?: intSemconv.VAL_GEN_AI_SYSTEMS | (string & {}),
+    attributes?: Record<string, AttributeValue>,
+  ): this {
+    if (body.message && body.message.role === void 0) {
+      body.message.role = "assistant";
+    }
+
+    this.span.addEvent(intSemconv.LOG_EVNT_GEN_AI_CHOICE, {
+      ...attributes,
+      [semconv.ATTR_GEN_AI_SYSTEM]: system,
+      [intSemconv.ATTR_LANGWATCH_GEN_AI_LOG_EVENT_BODY]: JSON.stringify(body),
+      [intSemconv.ATTR_LANGWATCH_GEN_AI_LOG_EVENT_IMPOSTER]: true,
+    });
+    return this;
+  }
+
+  setType(type: SpanType): this {
+    this.span.setAttribute(intSemconv.ATTR_LANGWATCH_SPAN_TYPE, type);
+    return this;
+  }
+
+  setRequestModel(model: string): this {
+    this.span.setAttribute(semconv.ATTR_GEN_AI_REQUEST_MODEL, model);
+    return this;
+  }
+
+  setResponseModel(model: string): this {
+    this.span.setAttribute(semconv.ATTR_GEN_AI_RESPONSE_MODEL, model);
+    return this;
+  }
+
+  setRAGContexts(ragContexts: LangWatchSpanRAGContext[]): this {
+    this.span.setAttribute(
+      intSemconv.ATTR_LANGWATCH_RAG_CONTEXTS,
+      JSON.stringify({
+        type: "json",
+        value: ragContexts,
+      }),
+    );
+    return this;
+  }
+
+  setRAGContext(ragContext: LangWatchSpanRAGContext): this {
+    this.span.setAttribute(
+      intSemconv.ATTR_LANGWATCH_RAG_CONTEXTS,
+      JSON.stringify({
+        type: "json",
+        value: [ragContext],
+      }),
+    );
+    return this;
+  }
+
+  setMetrics(metrics: LangWatchSpanMetrics): this {
+    this.span.setAttribute(
+      intSemconv.ATTR_LANGWATCH_METRICS,
+      JSON.stringify({
+        type: "json",
+        value: metrics,
+      }),
+    );
+    return this;
+  }
+
+  setSelectedPrompt(prompt: Prompt): this {
+    this.span.setAttributes({
+      [intSemconv.ATTR_LANGWATCH_PROMPT_SELECTED_ID]: prompt.id,
+      [intSemconv.ATTR_LANGWATCH_PROMPT_ID]: prompt.id,
+      [intSemconv.ATTR_LANGWATCH_PROMPT_VERSION_ID]: prompt.versionId,
+      [intSemconv.ATTR_LANGWATCH_PROMPT_VERSION_NUMBER]: prompt.version,
+    });
+    return this;
+  }
+
+  setInput(input: unknown): this {
+    this.span.setAttribute(
+      intSemconv.ATTR_LANGWATCH_INPUT,
+      JSON.stringify({
+        type: "json",
+        value: input,
+      }),
+    );
+    return this;
+  }
+
+  setInputString(input: string): this {
+    this.span.setAttribute(
+      intSemconv.ATTR_LANGWATCH_INPUT,
+      JSON.stringify({
+        type: "text",
+        value: input,
+      }),
+    );
+    return this;
+  }
+
+  setOutput(output: unknown): this {
+    this.span.setAttribute(
+      intSemconv.ATTR_LANGWATCH_OUTPUT,
+      JSON.stringify({
+        type: "json",
+        value: output,
+      }),
+    );
+    return this;
+  }
+
+  setOutputString(output: string): this {
+    this.span.setAttribute(
+      intSemconv.ATTR_LANGWATCH_OUTPUT,
+      JSON.stringify({
+        type: "text",
+        value: output,
+      }),
+    );
+    return this;
+  }
+
+  setOutputEvaluation(guardrail: boolean, output: EvaluationResultModel): this {
+    this.span.setAttribute(
+      intSemconv.ATTR_LANGWATCH_OUTPUT,
+      JSON.stringify({
+        type: guardrail ? "guardrail_result" : "evaluation_result",
+        value: output,
+      }),
+    );
+    return this;
+  }
+}
+
+/**
+ * Creates a LangWatchSpan wrapper around an OpenTelemetry Span.
  *
  * @param span - The OpenTelemetry Span to wrap
- * @returns A LangWatchSpan proxy with additional methods for LLM/GenAI observability
+ * @returns A LangWatchSpan with additional methods for LLM/GenAI observability
  *
  * @example
  * import { createLangWatchSpan } from './span';
@@ -436,201 +724,5 @@ export interface LangWatchSpan extends Span {
  * span.setType('llm').setInput('Prompt').setOutput('Completion');
  */
 export function createLangWatchSpan(span: Span): LangWatchSpan {
-  const langwatchSpanMethods = {
-    recordEvaluation(
-      details: RecordedEvaluationDetails,
-      attributes?: Attributes,
-    ) {
-      recordEvaluation(details, attributes);
-    },
-
-    addGenAISystemMessageEvent(
-      body: LangWatchSpanGenAISystemMessageEventBody,
-      system?: intSemconv.VAL_GEN_AI_SYSTEMS | (string & {}),
-      attributes?: Record<string, AttributeValue>,
-    ) {
-      if (body.role === void 0) {
-        body.role = "system";
-      }
-
-      span.addEvent(intSemconv.LOG_EVNT_GEN_AI_SYSTEM_MESSAGE, {
-        ...attributes,
-        [semconv.ATTR_GEN_AI_SYSTEM]: system,
-        [intSemconv.ATTR_LANGWATCH_GEN_AI_LOG_EVENT_BODY]: JSON.stringify(body),
-        [intSemconv.ATTR_LANGWATCH_GEN_AI_LOG_EVENT_IMPOSTER]: true,
-      });
-    },
-    addGenAIUserMessageEvent(
-      body: LangWatchSpanGenAIUserMessageEventBody,
-      system?: intSemconv.VAL_GEN_AI_SYSTEMS | (string & {}),
-      attributes?: Record<string, AttributeValue>,
-    ) {
-      if (body.role === void 0) {
-        body.role = "user";
-      }
-
-      span.addEvent(intSemconv.LOG_EVNT_GEN_AI_USER_MESSAGE, {
-        ...attributes,
-        [semconv.ATTR_GEN_AI_SYSTEM]: system,
-        [intSemconv.ATTR_LANGWATCH_GEN_AI_LOG_EVENT_BODY]: JSON.stringify(body),
-        [intSemconv.ATTR_LANGWATCH_GEN_AI_LOG_EVENT_IMPOSTER]: true,
-      });
-    },
-    addGenAIAssistantMessageEvent(
-      body: LangWatchSpanGenAIAssistantMessageEventBody,
-      system?: intSemconv.VAL_GEN_AI_SYSTEMS | (string & {}),
-      attributes?: Record<string, AttributeValue>,
-    ) {
-      if (body.role === void 0) {
-        body.role = "assistant";
-      }
-
-      span.addEvent(intSemconv.LOG_EVNT_GEN_AI_ASSISTANT_MESSAGE, {
-        ...attributes,
-        [semconv.ATTR_GEN_AI_SYSTEM]: system,
-        [intSemconv.ATTR_LANGWATCH_GEN_AI_LOG_EVENT_BODY]: JSON.stringify(body),
-        [intSemconv.ATTR_LANGWATCH_GEN_AI_LOG_EVENT_IMPOSTER]: true,
-      });
-    },
-    addGenAIToolMessageEvent(
-      body: LangWatchSpanGenAIToolMessageEventBody,
-      system?: intSemconv.VAL_GEN_AI_SYSTEMS | (string & {}),
-      attributes?: Record<string, AttributeValue>,
-    ) {
-      if (body.role === void 0) {
-        body.role = "tool";
-      }
-
-      span.addEvent(intSemconv.LOG_EVNT_GEN_AI_TOOL_MESSAGE, {
-        ...attributes,
-        [semconv.ATTR_GEN_AI_SYSTEM]: system,
-        [intSemconv.ATTR_LANGWATCH_GEN_AI_LOG_EVENT_BODY]: JSON.stringify(body),
-        [intSemconv.ATTR_LANGWATCH_GEN_AI_LOG_EVENT_IMPOSTER]: true,
-      });
-    },
-    addGenAIChoiceEvent(
-      body: LangWatchSpanGenAIChoiceEventBody,
-      system?: intSemconv.VAL_GEN_AI_SYSTEMS | (string & {}),
-      attributes?: Record<string, AttributeValue>,
-    ) {
-      if (body.message && body.message.role === void 0) {
-        body.message.role = "assistant";
-      }
-
-      span.addEvent(intSemconv.LOG_EVNT_GEN_AI_CHOICE, {
-        ...attributes,
-        [semconv.ATTR_GEN_AI_SYSTEM]: system,
-        [intSemconv.ATTR_LANGWATCH_GEN_AI_LOG_EVENT_BODY]: JSON.stringify(body),
-        [intSemconv.ATTR_LANGWATCH_GEN_AI_LOG_EVENT_IMPOSTER]: true,
-      });
-    },
-
-    setType(type: SpanType) {
-      span.setAttribute(intSemconv.ATTR_LANGWATCH_SPAN_TYPE, type);
-    },
-
-    setRequestModel(model: string) {
-      span.setAttribute(semconv.ATTR_GEN_AI_REQUEST_MODEL, model);
-    },
-    setResponseModel(model: string) {
-      span.setAttribute(semconv.ATTR_GEN_AI_RESPONSE_MODEL, model);
-    },
-
-    setRAGContexts(ragContexts: LangWatchSpanRAGContext[]) {
-      span.setAttribute(
-        intSemconv.ATTR_LANGWATCH_RAG_CONTEXTS,
-        JSON.stringify({
-          type: "json",
-          value: ragContexts,
-        }),
-      );
-    },
-    setRAGContext(ragContext: LangWatchSpanRAGContext) {
-      span.setAttribute(
-        intSemconv.ATTR_LANGWATCH_RAG_CONTEXTS,
-        JSON.stringify({
-          type: "json",
-          value: [ragContext],
-        }),
-      );
-    },
-    setMetrics(metrics: LangWatchSpanMetrics) {
-      span.setAttribute(
-        intSemconv.ATTR_LANGWATCH_METRICS,
-        JSON.stringify({
-          type: "json",
-          value: metrics,
-        }),
-      );
-    },
-
-    setSelectedPrompt(prompt: Prompt) {
-      span.setAttributes({
-        [intSemconv.ATTR_LANGWATCH_PROMPT_SELECTED_ID]: prompt.id,
-        [intSemconv.ATTR_LANGWATCH_PROMPT_ID]: prompt.id,
-        [intSemconv.ATTR_LANGWATCH_PROMPT_VERSION_ID]: prompt.versionId,
-        [intSemconv.ATTR_LANGWATCH_PROMPT_VERSION_NUMBER]: prompt.version,
-      })
-    },
-
-    setInput(input: unknown) {
-      span.setAttribute(
-        intSemconv.ATTR_LANGWATCH_INPUT,
-        JSON.stringify({
-          type: "json",
-          value: input,
-        }),
-      );
-    },
-    setInputString(input: string) {
-      span.setAttribute(
-        intSemconv.ATTR_LANGWATCH_INPUT,
-        JSON.stringify({
-          type: "text",
-          value: input,
-        }),
-      );
-    },
-    setOutput(output: unknown) {
-      span.setAttribute(
-        intSemconv.ATTR_LANGWATCH_OUTPUT,
-        JSON.stringify({
-          type: "json",
-          value: output,
-        }),
-      );
-    },
-    setOutputString(output: string) {
-      span.setAttribute(
-        intSemconv.ATTR_LANGWATCH_OUTPUT,
-        JSON.stringify({
-          type: "text",
-          value: output,
-        }),
-      );
-    },
-
-    setOutputEvaluation(guardrail: boolean, output: EvaluationResultModel) {
-      span.setAttribute(
-        intSemconv.ATTR_LANGWATCH_OUTPUT,
-        JSON.stringify({
-          type: guardrail ? "guardrail_result" : "evaluation_result",
-          value: output,
-        }),
-      );
-    },
-  };
-
-  const handler: ProxyHandler<any> = {
-    get(target, prop, _receiver) {
-      if (prop in langwatchSpanMethods) {
-        return langwatchSpanMethods[prop as keyof typeof langwatchSpanMethods];
-      }
-
-      const value = target[prop as keyof Span];
-      return typeof value === "function" ? value.bind(target) : value;
-    },
-  };
-
-  return new Proxy(span, handler) as LangWatchSpan;
+  return new LangWatchSpanImpl(span);
 }
