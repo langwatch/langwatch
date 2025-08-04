@@ -7,6 +7,7 @@ import { LlmConfigRepository } from "../../../prompt-config/repositories/llm-con
 import { TeamRoleGroup } from "../../permission";
 import { checkUserPermissionForProject } from "../../permission";
 import { createTRPCRouter, protectedProcedure } from "../../trpc";
+import { getOrganizationIdForProject } from "./llmConfigs";
 
 const idSchema = z.object({
   id: z.string(),
@@ -38,10 +39,15 @@ export const llmConfigVersionsRouter = createTRPCRouter({
     .use(checkUserPermissionForProject(TeamRoleGroup.PROMPTS_VIEW))
     .query(async ({ ctx, input }) => {
       const repository = new LlmConfigRepository(ctx.prisma);
+      const organizationId = await getOrganizationIdForProject(input.projectId);
 
       try {
         const versions =
-          await repository.versions.getVersionsForConfigById(input);
+          await repository.versions.getVersionsForConfigByIdOrHandle({
+            idOrHandle: input.configId,
+            projectId: input.projectId,
+            organizationId,
+          });
         return versions;
       } catch (error) {
         throw new TRPCError({
@@ -88,11 +94,13 @@ export const llmConfigVersionsRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       const repository = new LlmConfigRepository(ctx.prisma);
       const authorId = ctx.session?.user?.id;
+      const organizationId = await getOrganizationIdForProject(input.projectId);
 
       try {
         const version = await repository.versions.createVersion({
           ...input,
           authorId,
+          organizationId,
         });
 
         return version;
@@ -139,11 +147,13 @@ export const llmConfigVersionsRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       const { id, projectId } = input;
       const repository = new LlmConfigRepository(ctx.prisma);
+      const organizationId = await getOrganizationIdForProject(projectId);
 
       try {
         const newVersion = await repository.versions.restoreVersion(
           id,
           projectId,
+          organizationId,
           ctx.session?.user?.id || null
         );
 

@@ -12,6 +12,7 @@ import {
   type SchemaVersion,
   getVersionValidator,
 } from "./llm-config-version-schema";
+import { LlmConfigRepository } from "./llm-config.repository";
 
 /**
  * Interface for LLM Config Version data transfer objects
@@ -31,17 +32,23 @@ export class LlmConfigVersionsRepository {
   /**
    * Get all versions for a specific config
    */
-  async getVersionsForConfigById({
-    configId,
+  async getVersionsForConfigByIdOrHandle({
+    idOrHandle,
     projectId,
+    organizationId,
   }: {
-    configId: string;
+    idOrHandle: string;
     projectId: string;
+    organizationId: string;
   }): Promise<(LlmPromptConfigVersion & { author: User | null })[]> {
     // Verify the config exists
-    const config = await this.prisma.llmPromptConfig.findUnique({
-      where: { id: configId, projectId },
-    });
+    const promptRepository = new LlmConfigRepository(this.prisma);
+    const config =
+      await promptRepository.getConfigByIdOrHandleWithLatestVersion({
+        idOrHandle,
+        projectId,
+        organizationId,
+      });
 
     if (!config) {
       throw new TRPCError({
@@ -52,7 +59,7 @@ export class LlmConfigVersionsRepository {
 
     // Get all versions
     return this.prisma.llmPromptConfigVersion.findMany({
-      where: { configId, projectId },
+      where: { configId: config.id, projectId },
       orderBy: { createdAt: "desc" },
       include: {
         author: true,
@@ -136,8 +143,26 @@ export class LlmConfigVersionsRepository {
    * Create a new version for an existing config
    */
   async createVersion(
-    versionData: Omit<LlmConfigVersionDTO, "author">
+    versionData: Omit<LlmConfigVersionDTO, "author"> & {
+      organizationId: string;
+    }
   ): Promise<LlmPromptConfigVersion & { schemaVersion: SchemaVersion }> {
+    // Verify the config exists
+    const promptRepository = new LlmConfigRepository(this.prisma);
+    const config =
+      await promptRepository.getConfigByIdOrHandleWithLatestVersion({
+        idOrHandle: versionData.configId,
+        projectId: versionData.projectId,
+        organizationId: versionData.organizationId,
+      });
+
+    if (!config) {
+      throw new TRPCError({
+        code: "NOT_FOUND",
+        message: "Prompt config not found.",
+      });
+    }
+
     // Omit the version field from the validator since auto-incremented by the database
     const validator = getVersionValidator(versionData.schemaVersion).omit({
       version: true,
@@ -147,7 +172,8 @@ export class LlmConfigVersionsRepository {
     validator.parse(versionData);
 
     // Use a transaction to ensure both operations succeed or fail together
-    const { configId, projectId } = versionData;
+    const configId = config.id;
+    const { projectId } = versionData;
     const version = await this.prisma.$transaction(async (tx) => {
       const count = await tx.llmPromptConfigVersion.count({
         where: { configId, projectId },
@@ -188,6 +214,7 @@ export class LlmConfigVersionsRepository {
   async restoreVersion(
     id: string,
     projectId: string,
+    organizationId: string,
     authorId: string | null
   ): Promise<LlmPromptConfigVersion> {
     // Find the version to restore
@@ -206,7 +233,8 @@ export class LlmConfigVersionsRepository {
       commitMessage: `Restore from version ${version.version}`,
       schemaVersion: version.schemaVersion as SchemaVersion,
       configData: version.configData as LlmConfigVersionDTO["configData"],
-    } as LlmConfigVersionDTO);
+      organizationId
+    });
 
     return newVersion;
   }

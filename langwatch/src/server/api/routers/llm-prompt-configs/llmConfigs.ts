@@ -132,8 +132,13 @@ export const llmConfigsRouter = createTRPCRouter({
     .use(checkUserPermissionForProject(TeamRoleGroup.PROMPTS_MANAGE))
     .mutation(async ({ ctx, input }) => {
       const repository = new LlmConfigRepository(ctx.prisma);
+      const organizationId = await getOrganizationIdForProject(input.projectId);
 
-      return await repository.deleteConfig(input.id, input.projectId);
+      return await repository.deleteConfig(
+        input.id,
+        input.projectId,
+        organizationId
+      );
     }),
 
   /**
@@ -164,7 +169,9 @@ export const llmConfigsRouter = createTRPCRouter({
     }),
 });
 
-async function getOrganizationIdForProject(projectId: string): Promise<string> {
+export async function getOrganizationIdForProject(
+  projectId: string
+): Promise<string> {
   const project = await prisma.project.findUnique({
     where: {
       id: projectId,

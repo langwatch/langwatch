@@ -94,9 +94,150 @@ app.get(
   }
 );
 
+// Create prompt with initial version
+// TODO: Consider allowing for the initial version to be customized via params
+app.post(
+  "/",
+  describeRoute({
+    description: "Create a new prompt with default initial version",
+    responses: {
+      ...baseResponses,
+      200: buildStandardSuccessResponse(promptOutputSchema),
+    },
+  }),
+  zValidator(
+    "json",
+    z.object({
+      name: z.string().min(1, "Name cannot be empty"),
+      handle: z.string().optional(),
+      scope: z.nativeEnum(PromptScope).default(PromptScope.PROJECT),
+    })
+  ),
+  async (c) => {
+    const service = c.get("promptService");
+    const project = c.get("project");
+    const organization = c.get("organization");
+    const data = c.req.valid("json");
+    const { name } = data;
+
+    logger.info(
+      { projectId: project.id, promptName: name },
+      "Creating new prompt with initial version"
+    );
+
+    const newConfig = await service.createPrompt({
+      name,
+      projectId: project.id,
+      handle: data.handle,
+      organizationId: organization.id,
+      scope: data.scope,
+    });
+
+    logger.info(
+      { projectId: project.id, promptId: newConfig.id, promptName: name },
+      "Successfully created new prompt"
+    );
+
+    return c.json(newConfig);
+  }
+);
+
+// Get versions
+app.get(
+  "/:id{.+?}/versions",
+  describeRoute({
+    description: "Get all versions for a prompt",
+    responses: {
+      ...baseResponses,
+      200: buildStandardSuccessResponse(versionOutputSchema),
+      404: {
+        description: "Prompt not found",
+        content: {
+          "application/json": { schema: resolver(badRequestSchema) },
+        },
+      },
+    },
+  }),
+  async (c) => {
+    const service = c.get("promptService");
+    const project = c.get("project");
+    const organization = c.get("organization");
+    const { id } = c.req.param();
+
+    logger.info(
+      { projectId: project.id, promptId: id },
+      "Getting versions for prompt"
+    );
+
+    const versions =
+      await service.repository.versions.getVersionsForConfigByIdOrHandle({
+        idOrHandle: id,
+        projectId: project.id,
+        organizationId: organization.id,
+      });
+
+    logger.info(
+      { projectId: project.id, promptId: id, versionCount: versions.length },
+      "Successfully retrieved prompt versions"
+    );
+
+    return c.json(versions);
+  }
+);
+
+// Create version
+app.post(
+  "/:id{.+?}/versions",
+  describeRoute({
+    description: "Create a new version for a prompt",
+    responses: {
+      ...baseResponses,
+      200: buildStandardSuccessResponse(versionOutputSchema),
+      404: {
+        description: "Prompt not found",
+        content: {
+          "application/json": { schema: resolver(badRequestSchema) },
+        },
+      },
+    },
+  }),
+  zValidator("json", versionInputSchema),
+  async (c) => {
+    const service = c.get("promptService");
+    const project = c.get("project");
+    const organization = c.get("organization");
+    const { id } = c.req.param();
+    const data = c.req.valid("json");
+
+    logger.info(
+      { projectId: project.id, promptId: id, model: data.configData?.model },
+      "Creating new version for prompt"
+    );
+
+    const version = await service.repository.versions.createVersion({
+      ...data,
+      configId: id,
+      projectId: project.id,
+      organizationId: organization.id,
+    });
+
+    logger.info(
+      {
+        projectId: project.id,
+        promptId: id,
+        versionId: version.id,
+        version: version.version,
+      },
+      "Successfully created new prompt version"
+    );
+
+    return c.json(version);
+  }
+);
+
 // Get prompt by ID
 app.get(
-  "/:id",
+  "/:id{.+}",
   describeRoute({
     description: "Get a specific prompt by ID",
     responses: {
@@ -163,147 +304,9 @@ app.get(
   }
 );
 
-// Create prompt with initial version
-// TODO: Consider allowing for the initial version to be customized via params
-app.post(
-  "/",
-  describeRoute({
-    description: "Create a new prompt with default initial version",
-    responses: {
-      ...baseResponses,
-      200: buildStandardSuccessResponse(promptOutputSchema),
-    },
-  }),
-  zValidator(
-    "json",
-    z.object({
-      name: z.string().min(1, "Name cannot be empty"),
-      handle: z.string().optional(),
-      scope: z.nativeEnum(PromptScope).default(PromptScope.PROJECT),
-    })
-  ),
-  async (c) => {
-    const service = c.get("promptService");
-    const project = c.get("project");
-    const organization = c.get("organization");
-    const data = c.req.valid("json");
-    const { name } = data;
-
-    logger.info(
-      { projectId: project.id, promptName: name },
-      "Creating new prompt with initial version"
-    );
-
-    const newConfig = await service.createPrompt({
-      name,
-      projectId: project.id,
-      handle: data.handle,
-      organizationId: organization.id,
-      scope: data.scope,
-    });
-
-    logger.info(
-      { projectId: project.id, promptId: newConfig.id, promptName: name },
-      "Successfully created new prompt"
-    );
-
-    return c.json(newConfig);
-  }
-);
-
-// Get versions
-app.get(
-  "/:id/versions",
-  describeRoute({
-    description: "Get all versions for a prompt",
-    responses: {
-      ...baseResponses,
-      200: buildStandardSuccessResponse(versionOutputSchema),
-      404: {
-        description: "Prompt not found",
-        content: {
-          "application/json": { schema: resolver(badRequestSchema) },
-        },
-      },
-    },
-  }),
-  async (c) => {
-    const service = c.get("promptService");
-    const project = c.get("project");
-    const { id } = c.req.param();
-
-    logger.info(
-      { projectId: project.id, promptId: id },
-      "Getting versions for prompt"
-    );
-
-    const versions = await service.repository.versions.getVersionsForConfigById(
-      {
-        configId: id,
-        projectId: project.id,
-      }
-    );
-
-    logger.info(
-      { projectId: project.id, promptId: id, versionCount: versions.length },
-      "Successfully retrieved prompt versions"
-    );
-
-    return c.json(versions);
-  }
-);
-
-// Create version
-app.post(
-  "/:id/versions",
-  describeRoute({
-    description: "Create a new version for a prompt",
-    responses: {
-      ...baseResponses,
-      200: buildStandardSuccessResponse(versionOutputSchema),
-      404: {
-        description: "Prompt not found",
-        content: {
-          "application/json": { schema: resolver(badRequestSchema) },
-        },
-      },
-    },
-  }),
-  zValidator("json", versionInputSchema),
-  async (c) => {
-    const service = c.get("promptService");
-    const project = c.get("project");
-    const { id } = c.req.param();
-    const data = c.req.valid("json");
-
-    logger.info(
-      { projectId: project.id, promptId: id, model: data.configData?.model },
-      "Creating new version for prompt"
-    );
-
-    const version = await service.repository.versions.createVersion({
-      ...data,
-      configId: id,
-      projectId: project.id,
-    });
-
-    logger.info(
-      {
-        projectId: project.id,
-        promptId: id,
-        versionId: version.id,
-        version: version.version,
-      },
-      "Successfully created new prompt version"
-    );
-
-    return c.json(version);
-  }
-);
-
 // Update prompt
 app.put(
-  "/:id",
+  "/:id{.+}",
   describeRoute({
     description: "Update a prompt",
     responses: {
@@ -338,6 +341,7 @@ app.put(
         promptId: id,
         newName: data.name,
         newHandle: data.handle,
+        newScope: data.scope,
       },
       "Updating prompt"
     );
@@ -355,6 +359,7 @@ app.put(
           promptId: id,
           name: updatedConfig.name,
           handle: updatedConfig.handle,
+          scope: updatedConfig.scope,
         },
         "Successfully updated prompt"
       );
@@ -378,7 +383,7 @@ app.put(
 
 // Delete prompt
 app.delete(
-  "/:id",
+  "/:id{.+}",
   describeRoute({
     description: "Delete a prompt",
     responses: {
@@ -395,11 +400,16 @@ app.delete(
   async (c) => {
     const service = c.get("promptService");
     const project = c.get("project");
+    const organization = c.get("organization");
     const { id } = c.req.param();
 
     logger.info({ projectId: project.id, promptId: id }, "Deleting prompt");
 
-    const result = await service.repository.deleteConfig(id, project.id);
+    const result = await service.repository.deleteConfig(
+      id,
+      project.id,
+      organization.id
+    );
 
     logger.info(
       { projectId: project.id, promptId: id, success: result.success },

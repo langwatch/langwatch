@@ -237,11 +237,22 @@ export class LlmConfigRepository {
    * Delete an LLM config and all its versions
    */
   async deleteConfig(
-    id: string,
-    projectId: string
+    idOrHandle: string,
+    projectId: string,
+    organizationId: string
   ): Promise<{ success: boolean }> {
+    const config = await this.getConfigByIdOrHandleWithLatestVersion({
+      idOrHandle,
+      projectId,
+      organizationId,
+    });
+
+    if (!config) {
+      throw new NotFoundError(`Prompt config not found. ID: ${idOrHandle}`);
+    }
+
     await this.prisma.llmPromptConfig.delete({
-      where: { id, projectId },
+      where: { id: config.id, projectId },
     });
 
     return { success: true };
