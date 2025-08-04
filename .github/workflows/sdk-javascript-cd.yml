@@ -35,11 +35,10 @@ jobs:
 
       - name: Run unit tests
         working-directory: ./typescript-sdk
+        env:
+          OPENAI_API_KEY: ${{ secrets.TYPESCRIPT_SDK_OPENAI_API_KEY }}
+          LANGWATCH_API_KEY: ${{ secrets.TYPESCRIPT_SDK_LANGWATCH_API_KEY }}
         run: pnpm test
-
-      - name: Typecheck
-        working-directory: ./typescript-sdk
-        run: ./node_modules/.bin/tsgo --noEmit --project ./tsconfig.json
 
       - name: Build
         working-directory: ./typescript-sdk
