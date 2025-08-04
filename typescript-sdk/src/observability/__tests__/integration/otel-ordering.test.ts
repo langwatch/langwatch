@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { registerOTel } from '@vercel/otel'
 import { getLangWatchTracer } from "../../trace";
-import { setup } from "../../../client-node";
+import { setupLangWatch } from "../../../client-node";
 import { isOtelInitialized } from "../../../client-shared";
 
 describe("SDK compatibility with Vercel AI OpenTelemetry", () => {
@@ -12,7 +12,7 @@ describe("SDK compatibility with Vercel AI OpenTelemetry", () => {
     expect(isOtelInitialized()).toBe(true);
 
     // Then setup LangWatch
-    await setup({
+    await setupLangWatch({
       apiKey: "test-key",
       endpoint: "http://localhost:9999",
       skipOpenTelemetrySetup: false,

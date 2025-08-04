@@ -1,18 +1,18 @@
 import { describe, it, expect } from "vitest";
-import { setup } from "../../../client-node";
+import { setupLangWatch } from "../../../client-node";
 import { getLangWatchTracer } from "../../trace";
 
 describe("Multiple setup attempts and error handling", () => {
   it("should throw error when multiple LangWatch setups are called", async () => {
     // First setup
-    await setup({
+    await setupLangWatch({
       apiKey: "test-key-1",
       endpoint: "http://localhost:9999",
       skipOpenTelemetrySetup: false,
     });
 
     // Second setup should throw an error
-    await expect(setup({
+    await expect(setupLangWatch({
       apiKey: "test-key-2",
       endpoint: "http://localhost:9999",
       skipOpenTelemetrySetup: false,

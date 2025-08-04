@@ -1,11 +1,11 @@
-import { setup } from "langwatch/node";
+import { setupLangWatch } from "langwatch/node";
 import { getLangWatchTracer } from "langwatch";
 import { semconv } from "langwatch/observability";
 import * as readline from "readline";
 import cliMarkdown from "cli-markdown";
 import { mastra } from "./mastra/index.js";
 
-await setup();
+await setupLangWatch();
 
 const tracer = getLangWatchTracer("mastra-weather-agent-example");
 

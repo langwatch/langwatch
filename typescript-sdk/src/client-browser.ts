@@ -13,7 +13,7 @@ let managedSpanProcessors: SpanProcessor[] = [];
 let provider: WebTracerProvider | null = null;
 let browserSetupCalled: boolean = false;
 
-export async function setup(options: SetupOptions = {}) {
+export async function setupLangWatch(options: SetupOptions = {}) {
   if (browserSetupCalled) {
     throw new Error("LangWatch setup has already been called in this process. Setup can only be called once, if you need to modify OpenTelemetry setup then use the OpenTelemetry API directly.");
   }

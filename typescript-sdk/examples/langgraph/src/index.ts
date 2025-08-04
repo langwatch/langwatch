@@ -1,4 +1,4 @@
-import { setup } from "langwatch/node";
+import { setupLangWatch } from "langwatch/node";
 import { LangWatchCallbackHandler } from "langwatch/observability/instrumentation/langchain";
 import { getLangWatchTracer } from "langwatch";
 import { semconv } from "langwatch/observability";
@@ -7,7 +7,7 @@ import { HumanMessage, SystemMessage } from "@langchain/core/messages";
 import * as readline from "readline";
 import cliMarkdown from "cli-markdown";
 
-await setup();
+await setupLangWatch();
 
 const tracer = getLangWatchTracer("langgraph-sdk-example");
 

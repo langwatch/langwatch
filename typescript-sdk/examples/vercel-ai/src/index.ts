@@ -1,4 +1,4 @@
-import { setup } from "langwatch/node";
+import { setupLangWatch } from "langwatch/node";
 import { getLangWatchTracer } from "langwatch";
 import { semconv } from "langwatch/observability";
 import { openai } from "@ai-sdk/openai";
@@ -6,7 +6,7 @@ import { generateText } from "ai";
 import * as readline from "readline";
 import cliMarkdown from "cli-markdown";
 
-await setup();
+await setupLangWatch();
 
 const tracer = getLangWatchTracer("vercel-ai-sdk-example");
 

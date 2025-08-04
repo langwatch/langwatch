@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { ChatOpenAI } from "@langchain/openai";
 import { LangWatchCallbackHandler } from "../../../langchain";
-import { setup } from "../../../../../client-node";
+import { setupLangWatch } from "../../../../../client-node";
 import { DynamicTool } from "@langchain/core/tools";
 import { AgentExecutor, createToolCallingAgent, initializeAgentExecutorWithOptions } from "langchain/agents";
 import { getLangWatchTracer } from "../../../../trace";
@@ -9,7 +9,7 @@ import { ChatPromptTemplate } from "@langchain/core/prompts";
 import { beforeEach } from "node:test";
 
 beforeEach(async () => {
-  await setup();
+  await setupLangWatch();
 });
 
 describe("langchain chatbots", () => {

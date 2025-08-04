@@ -51,7 +51,7 @@ describe('client-node setup', () => {
   });
 
   it('calls setConfig and sets up NodeSDK with correct options', async () => {
-    await clientNode.setup({ apiKey: 'abc', endpoint: 'https://foo', disableOpenTelemetryAutomaticSetup: false });
+    await clientNode.setupLangWatch({ apiKey: 'abc', endpoint: 'https://foo', disableOpenTelemetryAutomaticSetup: false });
     expect(NodeSDK).toHaveBeenCalledTimes(1);
     const opts = NodeSDK.mock.instances[0].opts;
     expect(opts.spanProcessors[0].exporter.headers.Authorization).toBe('Bearer abc');
@@ -60,7 +60,7 @@ describe('client-node setup', () => {
 
   it('calls shutdown on existing sdk if setup is called again', async () => {
     // First setup
-    await clientNode.setup({ apiKey: 'abc', endpoint: 'https://foo', disableOpenTelemetryAutomaticSetup: false });
+    await clientNode.setupLangWatch({ apiKey: 'abc', endpoint: 'https://foo', disableOpenTelemetryAutomaticSetup: false });
     const sdkInstance = NodeSDK.mock.instances[0];
 
     // The current implementation prevents multiple setup calls, so we test the shutdown behavior differently
@@ -70,7 +70,7 @@ describe('client-node setup', () => {
   });
 
   it('does not set up NodeSDK if skipOpenTelemetrySetup is true', async () => {
-    await clientNode.setup({ apiKey: 'abc', endpoint: 'https://foo', skipOpenTelemetrySetup: true });
+    await clientNode.setupLangWatch({ apiKey: 'abc', endpoint: 'https://foo', skipOpenTelemetrySetup: true });
     expect(NodeSDK).not.toHaveBeenCalled();
   });
 });

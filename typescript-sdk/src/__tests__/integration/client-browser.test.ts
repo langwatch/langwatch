@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { setup as setupBrowser } from '../../client-browser';
+import { setupLangWatch as setupBrowser } from '../../client-browser';
 
 // Mock window object for Node.js test environment
 const mockWindow = {

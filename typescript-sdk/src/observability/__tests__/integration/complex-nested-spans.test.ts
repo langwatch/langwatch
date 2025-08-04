@@ -1,12 +1,12 @@
 import { describe, it, expect } from "vitest";
 import { registerOTel } from '@vercel/otel';
-import { setup } from "../../../client-node";
+import { setupLangWatch } from "../../../client-node";
 import { getLangWatchTracer } from "../../trace";
 
 describe("Complex nested spans with Vercel AI", () => {
   it("should work with complex nested spans when Vercel AI is set up first", async () => {
     registerOTel({ serviceName: 'complex-test' });
-    await setup({
+    await setupLangWatch({
       apiKey: "test-key",
       endpoint: "http://localhost:9999",
       skipOpenTelemetrySetup: false,

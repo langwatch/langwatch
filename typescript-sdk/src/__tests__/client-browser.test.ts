@@ -66,7 +66,7 @@ describe('client-browser setup', () => {
   });
 
   it('calls setConfig and sets up WebTracerProvider with correct options', async () => {
-    await clientBrowser.setup({ apiKey: 'abc', endpoint: 'https://foo', skipOpenTelemetrySetup: false });
+    await clientBrowser.setupLangWatch({ apiKey: 'abc', endpoint: 'https://foo', skipOpenTelemetrySetup: false });
     expect(WebTracerProvider).toHaveBeenCalledTimes(1);
     const opts = WebTracerProvider.mock.instances[0].opts;
     expect(opts.spanProcessors[0].exporter.headers.Authorization).toBe('Bearer abc');
@@ -75,7 +75,7 @@ describe('client-browser setup', () => {
   });
 
   it('calls shutdown on existing provider if setup is called again', async () => {
-    await clientBrowser.setup({ apiKey: 'abc', endpoint: 'https://foo', skipOpenTelemetrySetup: false });
+    await clientBrowser.setupLangWatch({ apiKey: 'abc', endpoint: 'https://foo', skipOpenTelemetrySetup: false });
     const providerInstance = WebTracerProvider.mock.instances[0];
 
     // The current implementation prevents multiple setup calls, so we test the shutdown behavior differently
@@ -85,7 +85,7 @@ describe('client-browser setup', () => {
   });
 
   it('does not set up WebTracerProvider if skipOpenTelemetrySetup is true', async () => {
-    await clientBrowser.setup({ apiKey: 'abc', endpoint: 'https://foo', skipOpenTelemetrySetup: true });
+    await clientBrowser.setupLangWatch({ apiKey: 'abc', endpoint: 'https://foo', skipOpenTelemetrySetup: true });
     expect(WebTracerProvider).not.toHaveBeenCalled();
     expect(mockWindow.addEventListener).not.toHaveBeenCalled();
   });

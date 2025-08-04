@@ -17,7 +17,7 @@ describe('client-node integration', () => {
 
   it('should start and shut down the NodeSDK without error', async () => {
     // First setup should complete without error
-    await expect(clientNode.setup({
+    await expect(clientNode.setupLangWatch({
       apiKey: 'integration-key',
       endpoint: 'http://localhost:9999',
       disableOpenTelemetryAutomaticSetup: false,
@@ -28,7 +28,7 @@ describe('client-node integration', () => {
     clientNode = await import('../../client-node.js');
 
     // Second setup should also complete without error (triggers shutdown of previous)
-    await expect(clientNode.setup({
+    await expect(clientNode.setupLangWatch({
       apiKey: 'integration-key2',
       endpoint: 'http://localhost:9999',
       disableOpenTelemetryAutomaticSetup: false,
@@ -37,7 +37,7 @@ describe('client-node integration', () => {
 
   it('should not start NodeSDK if disableOpenTelemetryAutomaticSetup is true', async () => {
     // Should complete without error and without setting up NodeSDK
-    await expect(clientNode.setup({
+    await expect(clientNode.setupLangWatch({
       apiKey: 'integration-key',
       endpoint: 'http://localhost:9999',
       disableOpenTelemetryAutomaticSetup: true,

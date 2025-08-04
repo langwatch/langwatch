@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { registerOTel } from '@vercel/otel';
-import { setup } from "../../../client-node";
+import { setupLangWatch } from "../../../client-node";
 import { getLangWatchTracer } from "../../trace";
 
 describe("LangWatch with skipOpenTelemetrySetup=true", () => {
@@ -9,7 +9,7 @@ describe("LangWatch with skipOpenTelemetrySetup=true", () => {
     registerOTel({ serviceName: 'vercel-first' });
 
     // Then setup LangWatch with automatic setup disabled
-    await setup({
+    await setupLangWatch({
       apiKey: "test-key",
       endpoint: "http://localhost:9999",
       skipOpenTelemetrySetup: true,

@@ -1,12 +1,12 @@
 import { beforeAll, describe, expect, it } from "vitest";
-import { setup } from "../../../client-node";
+import { setupLangWatch } from "../../../client-node";
 import { getLangWatchTracer } from "../../trace";
 
 const tracerName = "basic-observability.test";
 
 describe("basic observability tests around tracing", () => {
   beforeAll(async () => {
-    await setup();
+    await setupLangWatch();
   });
 
   it("traces should be sent", async () => {
