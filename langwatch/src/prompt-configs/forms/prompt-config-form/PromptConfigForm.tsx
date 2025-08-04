@@ -1,9 +1,8 @@
-import { HStack, VStack } from "@chakra-ui/react";
+import { HStack, Spacer, VStack } from "@chakra-ui/react";
+import { useCallback } from "react";
 import {
   FormProvider,
   useFieldArray,
-  useFormContext,
-  type Control,
   type UseFormReturn,
 } from "react-hook-form";
 
@@ -15,19 +14,20 @@ import {
   OutputsFieldGroup,
 } from "../fields/PromptConfigVersionFieldGroup";
 import { PromptField } from "../fields/PromptField";
-import { PromptNameField } from "../fields/PromptNameField";
+import { PromptMessagesField } from "../fields/PromptMessagesField";
 
-import { PromptConfigInfoAndSavePartial } from "./components/PromptConfigInfoAndSavePartial";
+import { PromptHandleInfo } from "./components/PromptHandleInfo";
 
-import { VerticalFormControl } from "~/components/VerticalFormControl";
+import { toaster } from "~/components/ui/toaster";
 import { useGetPromptConfigByIdWithLatestVersionQuery } from "~/prompt-configs/hooks/useGetPromptConfigByIdWithLatestVersionQuery";
 import { usePromptConfig } from "~/prompt-configs/hooks/usePromptConfig";
 import type { PromptConfigFormValues } from "~/prompt-configs/hooks/usePromptConfigForm";
 import { usePromptConfigContext } from "~/prompt-configs/providers/PromptConfigProvider";
-import { PromptMessagesField } from "../fields/PromptMessagesField";
-import { GenerateApiSnippetButton } from "~/components/GenerateApiSnippetButton";
-import { GeneratePromptApiSnippetDialog } from "~/prompt-configs/components/GeneratePromptApiSnippetDialog";
-import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { createLogger } from "~/utils/logger";
+import { VersionHistoryButton } from "./components/VersionHistoryButton";
+import { VersionSaveButton } from "./components/VersionSaveButton";
+
+const logger = createLogger("PromptConfigForm");
 
 interface PromptConfigFormProps {
   configId: string;
@@ -39,7 +39,6 @@ interface PromptConfigFormProps {
  * Handles rendering the form fields and save dialog
  */
 function InnerPromptConfigForm(props: PromptConfigFormProps) {
-  const { project } = useOrganizationTeamProject();
   const { methods, configId } = props;
   const { isLoading } = usePromptConfig();
   const { triggerSaveVersion } = usePromptConfigContext();
@@ -62,59 +61,78 @@ function InnerPromptConfigForm(props: PromptConfigFormProps) {
     methods.watch("version.configData.inputs") ?? []
   ).map((input) => input.identifier);
 
+  const handleSaveClick = useCallback(() => {
+    if (!savedConfig) return;
+    void triggerSaveVersion({
+      config: savedConfig,
+      updateConfigValues: methods.getValues(),
+      editingHandleOrScope: false,
+    }).catch((error) => {
+      logger.error(error);
+      toaster.error({
+        title: "Failed to save version",
+        description: error.message,
+      });
+    });
+  }, [savedConfig, methods, triggerSaveVersion]);
+
+  const hasDemonstrations =
+    Object.values(
+      savedConfig?.latestVersion.configData.demonstrations?.inline?.records ?? {
+        dummy: [],
+      }
+    )[0]?.length ?? 0 > 0;
+
   if (!savedConfig) return null;
 
   return (
-    <FormProvider {...methods}>
-      <form style={{ width: "100%" }}>
-        <VStack width="full" gap={6}>
-          <VerticalFormControl label="Current Version" size="sm">
-            <PromptConfigInfoAndSavePartial
-              isSaving={isLoading}
-              config={savedConfig}
-              saveEnabled={saveEnabled}
-              onSaveClick={() =>
-                triggerSaveVersion(configId, methods.getValues())
-              }
-            />
-          </VerticalFormControl>
-          <HStack width="full" alignItems="end">
-            <PromptNameField />
-            <GeneratePromptApiSnippetDialog
-              configId={configId}
-              apiKey={project?.apiKey}
-            >
-              <GeneratePromptApiSnippetDialog.Trigger>
-                <GenerateApiSnippetButton />
-              </GeneratePromptApiSnippetDialog.Trigger>
-            </GeneratePromptApiSnippetDialog>
-          </HStack>
-          <ModelSelectField />
-          <PromptField
-            templateAdapter="default"
-            messageFields={messageFields}
-            availableFields={availableFields}
-            otherNodesFields={{}}
-            isTemplateSupported={true}
+    <form style={{ width: "100%", height: "100%" }}>
+      <VStack width="full" height="full" gap={6} mb={6}>
+        <PromptHandleInfo config={savedConfig} methods={methods} />
+        <ModelSelectField />
+        <PromptField
+          templateAdapter="default"
+          messageFields={messageFields}
+          availableFields={availableFields}
+          otherNodesFields={{}}
+          isTemplateSupported={true}
+        />
+        <PromptMessagesField
+          messageFields={messageFields}
+          availableFields={availableFields}
+          otherNodesFields={{}}
+        />
+        <InputsFieldGroup />
+        <OutputsFieldGroup />
+        {hasDemonstrations && <DemonstrationsField />}
+        <HStack
+          gap={2}
+          width="full"
+          position="absolute"
+          bottom={0}
+          background="white"
+          padding={3}
+          boxShadow="0 0px 6px rgba(0, 0, 0, 0.1)"
+        >
+          <VersionHistoryButton configId={configId} label="History" />
+          <Spacer />
+          <VersionSaveButton
+            disabled={!saveEnabled}
+            onClick={handleSaveClick}
+            isSaving={isLoading}
           />
-          <PromptMessagesField
-            messageFields={messageFields}
-            availableFields={availableFields}
-            otherNodesFields={{}}
-          />
-          <InputsFieldGroup />
-          <OutputsFieldGroup />
-          <DemonstrationsField />
-        </VStack>
-      </form>
-    </FormProvider>
+        </HStack>
+      </VStack>
+    </form>
   );
 }
 
 export function PromptConfigForm(props: PromptConfigFormProps) {
   return (
-    <PromptConfigProvider>
-      <InnerPromptConfigForm {...props} />
-    </PromptConfigProvider>
+    <FormProvider {...props.methods}>
+      <PromptConfigProvider>
+        <InnerPromptConfigForm {...props} />
+      </PromptConfigProvider>
+    </FormProvider>
   );
 }

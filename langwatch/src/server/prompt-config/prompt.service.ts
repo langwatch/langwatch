@@ -34,7 +34,7 @@ export class PromptService {
     idOrHandle: string;
     projectId: string;
     organizationId: string;
-  }): Promise<LlmConfigWithLatestVersion> {
+  }): Promise<LlmConfigWithLatestVersion | null> {
     const { idOrHandle, projectId, organizationId } = params;
 
     return this.repository.getConfigByIdOrHandleWithLatestVersion({
@@ -61,18 +61,7 @@ export class PromptService {
     handle?: string;
     scope: PromptScope;
   }): Promise<LlmConfigWithLatestVersion> {
-    const data = { ...params };
-
-    if (data.handle) {
-      data.handle = this.repository.createHandle({
-        handle: data.handle,
-        scope: data.scope,
-        projectId: data.projectId,
-        organizationId: data.organizationId,
-      });
-    }
-
-    return this.repository.createConfigWithInitialVersion(data);
+    return this.repository.createConfigWithInitialVersion(params);
   }
 
   /**
@@ -88,37 +77,53 @@ export class PromptService {
   async updatePrompt(params: {
     id: string;
     projectId: string;
-    organizationId: string;
     data: UpdateLlmConfigDTO;
   }): Promise<LlmPromptConfig> {
-    const { id, projectId, organizationId, data } = params;
+    const { id, projectId, data } = params;
 
-    const updateData = {
-      ...data,
-    };
+    return this.repository.updateConfig(id, projectId, data);
+  }
 
-    // Format handle with organization/project context if provided
-    if (data.handle) {
-      let newScope = data.scope;
-      // Keep current scope if not provided
-      if (!newScope) {
-        const config =
-          await this.repository.getConfigByIdOrHandleWithLatestVersion({
-            idOrHandle: id,
-            projectId,
-            organizationId,
-          });
-        newScope = config.scope;
-      }
+  /**
+   * Checks if a handle is unique for a project.
+   * @param params - The parameters object
+   * @param params.handle - The handle to check
+   * @param params.projectId - The project ID to check
+   * @param params.organizationId - The organization ID to check
+   * @param params.excludeId - The ID of the config to exclude from the check
+   * @returns True if the handle is unique, false otherwise
+   */
+  async checkHandleUniqueness(params: {
+    handle: string;
+    projectId: string;
+    organizationId: string;
+    scope: PromptScope;
+    excludeId?: string;
+  }): Promise<boolean> {
+    // Check if handle exists (excluding current config if editing)
+    const existingConfig = await this.prisma.llmPromptConfig.findUnique({
+      where: {
+        scope: params.scope,
+        handle: this.repository.createHandle({
+          handle: params.handle,
+          scope: params.scope,
+          projectId: params.projectId,
+          organizationId: params.organizationId,
+        }),
+        // Double check just to make sure the prompt belongs to the project or organization the user is from
+        OR: [
+          {
+            projectId: params.projectId,
+          },
+          {
+            organizationId: params.organizationId,
+            scope: "ORGANIZATION",
+          },
+        ],
+      },
+    });
 
-      updateData.handle = this.repository.createHandle({
-        handle: data.handle,
-        scope: newScope,
-        projectId,
-        organizationId,
-      });
-    }
-
-    return this.repository.updateConfig(id, projectId, updateData);
+    // Return true if unique (no existing config or it's the same config being edited)
+    return !existingConfig || existingConfig.id === params.excludeId;
   }
 }

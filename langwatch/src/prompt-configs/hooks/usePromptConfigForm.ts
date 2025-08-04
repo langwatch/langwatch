@@ -1,40 +1,12 @@
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useEffect, useRef } from "react";
-import { useForm, type DeepPartial } from "react-hook-form";
-import { z } from "zod";
-
-import { getLatestConfigVersionSchema } from "~/server/prompt-config/repositories/llm-config-version-schema";
-import { inputsAndOutputsToDemostrationColumns } from "../llmPromptConfigUtils";
 import isEqual from "lodash-es/isEqual";
+import { useEffect } from "react";
+import { useForm, type DeepPartial } from "react-hook-form";
+import { type z } from "zod";
 
-const promptConfigSchema = z.object({
-  name: z.string().min(1, "Name is required"),
-});
+import { inputsAndOutputsToDemostrationColumns } from "../llmPromptConfigUtils";
 
-const latestConfigVersionSchema = getLatestConfigVersionSchema();
-
-const formSchema = promptConfigSchema.extend({
-  version: z.object({
-    configData: z.object({
-      prompt: latestConfigVersionSchema.shape.configData.shape.prompt,
-      messages: latestConfigVersionSchema.shape.configData.shape.messages,
-      inputs: latestConfigVersionSchema.shape.configData.shape.inputs,
-      outputs: latestConfigVersionSchema.shape.configData.shape.outputs,
-      llm: z.object({
-        model: latestConfigVersionSchema.shape.configData.shape.model,
-        temperature:
-          latestConfigVersionSchema.shape.configData.shape.temperature,
-        max_tokens: latestConfigVersionSchema.shape.configData.shape.max_tokens,
-        // Additional params attached to the LLM config
-        litellm_params: z.record(z.string()).optional(),
-      }),
-      demonstrations:
-        latestConfigVersionSchema.shape.configData.shape.demonstrations,
-      prompting_technique:
-        latestConfigVersionSchema.shape.configData.shape.prompting_technique,
-    }),
-  }),
-});
+import { formSchema } from "~/prompt-configs/schemas";
 
 export type PromptConfigFormValues = z.infer<typeof formSchema>;
 
@@ -51,15 +23,17 @@ let disableFormSyncTimeout: NodeJS.Timeout | null = null;
 export const usePromptConfigForm = ({
   configId,
   onChange,
-  initialConfigValues,
+  initialConfigValues = {},
 }: UsePromptConfigFormProps) => {
   const methods = useForm<PromptConfigFormValues>({
     /**
      * Don't pass undefined as defaultValue
      * @see https://react-hook-form.com/docs/useform#defaultValues
      */
-    defaultValues: initialConfigValues ?? {},
-    resolver: zodResolver(formSchema),
+    defaultValues: initialConfigValues,
+    resolver: (data, ...args) => {
+      return zodResolver(formSchema)(data, ...args);
+    },
   });
 
   const formData = methods.watch();
@@ -103,7 +77,7 @@ export const usePromptConfigForm = ({
     setTimeout(() => {
       disableOnChange = false;
     }, 1);
-  }, [initialConfigValues]);
+  }, [initialConfigValues, methods]);
 
   // Provides reverse sync of form values to the parent component
   useEffect(() => {

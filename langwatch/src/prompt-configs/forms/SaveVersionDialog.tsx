@@ -12,6 +12,7 @@ const saveVersionFormSchema = z.object({
 
 export type SaveDialogFormValues = {
   commitMessage: string;
+  saveNewVersion: boolean;
 };
 
 export interface SaveVersionDialogProps {
@@ -30,7 +31,7 @@ export function SaveVersionDialog({
     handleSubmit,
     formState: { errors, isSubmitting, isDirty },
     reset,
-  } = useForm<SaveDialogFormValues>({
+  } = useForm<z.infer<typeof saveVersionFormSchema>>({
     defaultValues: {
       commitMessage: "",
     },
@@ -38,8 +39,11 @@ export function SaveVersionDialog({
   });
 
   const submitCallback = useCallback(
-    async (data: SaveDialogFormValues) => {
-      await onSubmit(data);
+    async (data: z.infer<typeof saveVersionFormSchema>) => {
+      await onSubmit({
+        commitMessage: data.commitMessage,
+        saveNewVersion: true,
+      });
       reset();
     },
     [onSubmit, reset]

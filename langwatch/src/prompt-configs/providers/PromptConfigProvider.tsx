@@ -1,5 +1,12 @@
 import { useDisclosure } from "@chakra-ui/react";
-import { createContext, useCallback, useContext, useRef } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useRef,
+  useState,
+} from "react";
+import { useFormContext } from "react-hook-form";
 
 import {
   SaveVersionDialog,
@@ -10,12 +17,22 @@ import type { PromptConfigFormValues } from "../hooks/usePromptConfigForm";
 
 import { toaster } from "~/components/ui/toaster";
 import { promptConfigFormValuesVersionToLlmConfigVersionConfigData } from "~/prompt-configs/llmPromptConfigUtils";
+import type { LlmConfigWithLatestVersion } from "../../server/prompt-config/repositories";
+import {
+  ChangeHandleDialog,
+  type ChangeHandleDialogFormValues,
+} from "../forms/ChangeHandleDialog";
 
 interface PromptConfigContextType {
-  triggerSaveVersion: (
-    configId: string,
-    updateConfigValues: PromptConfigFormValues
-  ) => void;
+  triggerSaveVersion: ({
+    config,
+    updateConfigValues,
+    editingHandleOrScope,
+  }: {
+    config: LlmConfigWithLatestVersion;
+    updateConfigValues: PromptConfigFormValues;
+    editingHandleOrScope: boolean;
+  }) => Promise<void>;
 }
 
 const PromptConfigContext = createContext<PromptConfigContextType>({
@@ -45,65 +62,129 @@ export function PromptConfigProvider({
     onOpen: openDialog,
     onClose: closeDialog,
   } = useDisclosure();
+  const [currentConfig, setCurrentConfig] =
+    useState<LlmConfigWithLatestVersion | null>(null);
+  const [editingHandleOrScope, setEditingHandleOrScope] = useState(false);
 
   // Prompt config state
-  const { updatePromptNameIfChanged, createNewVersion } = usePromptConfig();
+  const { updatePromptConfig, createNewVersion } = usePromptConfig();
 
   // Closure to save the function that will do the saving
   const updateConfigClosureRef = useRef<
     ((saveFormValues: SaveDialogFormValues) => Promise<void>) | null
   >(null);
 
+  const methods = useFormContext<PromptConfigFormValues>();
+
   const triggerSaveVersion = useCallback(
-    (configId: string, updateConfigValues: PromptConfigFormValues) => {
+    async ({
+      config,
+      updateConfigValues,
+      editingHandleOrScope,
+    }: {
+      config: LlmConfigWithLatestVersion;
+      updateConfigValues: PromptConfigFormValues;
+      editingHandleOrScope: boolean;
+    }) => {
+      setCurrentConfig(config);
+      setEditingHandleOrScope(editingHandleOrScope);
+      // Trigger the form validation
+      const isValid = await methods.trigger();
+
+      if (!isValid) {
+        // If the form is not valid, don't save
+        return;
+      }
+
       // Save a ref to the function that will do the saving
       // with the saveFormValues enclosed in the closure
       updateConfigClosureRef.current = async (
-        saveFormValues: SaveDialogFormValues
+        saveFormValues: SaveDialogFormValues | ChangeHandleDialogFormValues
       ) => {
         try {
-          await updatePromptNameIfChanged(configId, updateConfigValues.name);
+          if ("handle" in saveFormValues) {
+            await updatePromptConfig(config.id, {
+              handle: saveFormValues.handle,
+              scope: saveFormValues.scope,
+            });
+          }
 
-          const version = await createNewVersion(
-            configId,
-            promptConfigFormValuesVersionToLlmConfigVersionConfigData(
-              updateConfigValues.version
-            ),
-            saveFormValues.commitMessage
-          );
+          if (saveFormValues.saveNewVersion) {
+            const version = await createNewVersion(
+              config.id,
+              promptConfigFormValuesVersionToLlmConfigVersionConfigData(
+                updateConfigValues.version
+              ),
+              saveFormValues.commitMessage
+            );
+            toaster.success({
+              title: "Version saved",
+              description: `Version ${version.version} has been saved successfully.`,
+            });
+          } else {
+            if (
+              "handle" in saveFormValues &&
+              config.handle !== saveFormValues.handle
+            ) {
+              toaster.success({
+                title: "Prompt config updated",
+                description: `Prompt identifier has been updated successfully.`,
+              });
+            } else {
+              toaster.success({
+                title: "Prompt config updated",
+                description: `Prompt scope has been updated successfully.`,
+              });
+            }
+          }
 
           closeDialog();
-
-          toaster.success({
-            title: "Version saved",
-            description: `Version ${version.version} has been saved successfully.`,
-          });
         } catch (error) {
           console.error(error);
           toaster.error({
             title: "Failed to save version",
-            description: "Please try again.",
+            description:
+              error instanceof Error ? error.message : "Please try again.",
           });
         }
       };
 
       openDialog();
     },
-    [openDialog, updatePromptNameIfChanged, createNewVersion, closeDialog]
+    [openDialog, updatePromptConfig, createNewVersion, closeDialog, methods]
+  );
+
+  const firstTimeSave = !!(
+    currentConfig &&
+    (!currentConfig.handle || currentConfig.handle === currentConfig.id)
   );
 
   return (
     <PromptConfigContext.Provider value={{ triggerSaveVersion }}>
       {children}
-      <SaveVersionDialog
-        isOpen={isOpen}
-        onClose={closeDialog}
-        onSubmit={async (saveFormValues) => {
-          if (!updateConfigClosureRef.current)
-            throw new Error("No closure found");
-          await updateConfigClosureRef.current(saveFormValues);
-        }}
-      />
+      {currentConfig && (firstTimeSave || editingHandleOrScope) ? (
+        <ChangeHandleDialog
+          config={currentConfig}
+          isOpen={isOpen}
+          onClose={closeDialog}
+          onSubmit={async (changeHandleFormValues) => {
+            if (!updateConfigClosureRef.current)
+              throw new Error("No closure found");
+            await updateConfigClosureRef.current(changeHandleFormValues);
+          }}
+          firstTimeSave={firstTimeSave}
+        />
+      ) : (
+        <SaveVersionDialog
+          isOpen={isOpen}
+          onClose={closeDialog}
+          onSubmit={async (saveFormValues) => {
+            if (!updateConfigClosureRef.current)
+              throw new Error("No closure found");
+            await updateConfigClosureRef.current(saveFormValues);
+          }}
+        />
+      )}
     </PromptConfigContext.Provider>
   );
 }

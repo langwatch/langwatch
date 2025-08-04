@@ -140,7 +140,7 @@ export default function Datasets() {
         marginTop={8}
       >
         <PageLayout.Header>
-          <PageLayout.Heading>Datasets and Evaluations</PageLayout.Heading>
+          <PageLayout.Heading>Datasets</PageLayout.Heading>
           <Spacer />
           <PageLayout.HeaderButton
             onClick={() => {

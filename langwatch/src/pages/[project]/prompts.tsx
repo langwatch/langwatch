@@ -1,4 +1,4 @@
-import { Flex, Spacer, VStack } from "@chakra-ui/react";
+import { Flex, Spacer, VStack, Tabs, Badge } from "@chakra-ui/react";
 import { useState, useMemo, useRef, useEffect, useCallback } from "react";
 import { Plus } from "react-feather";
 
@@ -10,10 +10,7 @@ import { toaster } from "~/components/ui/toaster";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { usePromptIdQueryParam } from "~/hooks/usePromptIdQueryParam";
 import { PromptConfigPanel } from "~/prompt-configs/PromptConfigPanel";
-import {
-  createDefaultColumns,
-  PromptConfigTable,
-} from "~/prompt-configs/PromptConfigTable";
+import { PromptsList } from "~/prompt-configs/PromptsList";
 import type { LlmConfigWithLatestVersion } from "~/server/prompt-config/repositories/llm-config.repository";
 import { api } from "~/utils/api";
 
@@ -238,21 +235,13 @@ export default function PromptConfigsPage() {
   };
 
   /**
-   * Memoized table columns for prompt config table.
-   * Handles edit and delete actions for each row.
+   * Handler for editing a prompt config.
+   * Opens the config in the side panel.
    */
-  const defaultColumns = useMemo(() => {
-    return createDefaultColumns({
-      onDelete: (config) => {
-        handleDeleteConfig(config);
-        return Promise.resolve();
-      },
-      onEdit: (config) => {
-        setSelectedPromptId(config.id);
-        return Promise.resolve();
-      },
-    });
-  }, [setSelectedPromptId, handleDeleteConfig]);
+  const handleEditConfig = async (config: LlmConfigWithLatestVersion) => {
+    setSelectedPromptId(config.id);
+    setIsPaneExpanded(true);
+  };
 
   /**
    * NB: The styling and markup of this page is a bit hacky
@@ -272,6 +261,15 @@ export default function PromptConfigsPage() {
     panelRef.current?.querySelector(
       `#${CENTER_CONTENT_BOX_ID}`
     ) as HTMLDivElement | null;
+
+  const publishedPrompts = useMemo(
+    () => promptConfigs?.filter((config) => config.handle),
+    [promptConfigs]
+  );
+  const draftPrompts = useMemo(
+    () => promptConfigs?.filter((config) => !config.handle),
+    [promptConfigs]
+  );
 
   return (
     <DashboardLayout position="relative">
@@ -294,7 +292,7 @@ export default function PromptConfigsPage() {
         >
           <Flex flexDirection="column" height="100%">
             <PageLayout.Container
-              maxW={"calc(100vw - 200px)"}
+              maxW={"calc(min(1440px, 100vw - 200px))"}
               padding={6}
               marginTop={8}
             >
@@ -307,18 +305,37 @@ export default function PromptConfigsPage() {
                   <Plus height={16} /> Create New
                 </PageLayout.HeaderButton>
               </PageLayout.Header>
-              <PageLayout.Content>
-                <PromptConfigTable
-                  configs={promptConfigs ?? []}
-                  isLoading={isLoading}
-                  onRowClick={(config) => {
-                    setSelectedPromptId(config.id);
-                    // Always expand the panel when a row is clicked
-                    setIsPaneExpanded(true);
-                  }}
-                  columns={defaultColumns}
-                />
-              </PageLayout.Content>
+              <Tabs.Root defaultValue="published" variant="enclosed">
+                <Tabs.List width="full">
+                  <Tabs.Trigger value="published">
+                    Published{" "}
+                    {publishedPrompts?.length && (
+                      <Badge>{publishedPrompts?.length ?? 0}</Badge>
+                    )}
+                  </Tabs.Trigger>
+                  <Tabs.Trigger value="draft">Draft</Tabs.Trigger>
+                </Tabs.List>
+                <Tabs.Content value="published">
+                  <PromptsList
+                    configs={publishedPrompts ?? []}
+                    isLoading={isLoading}
+                    onDelete={async (config) => {
+                      void handleDeleteConfig(config);
+                    }}
+                    onEdit={handleEditConfig}
+                  />
+                </Tabs.Content>
+                <Tabs.Content value="draft">
+                  <PromptsList
+                    configs={draftPrompts ?? []}
+                    isLoading={isLoading}
+                    onDelete={async (config) => {
+                      void handleDeleteConfig(config);
+                    }}
+                    onEdit={handleEditConfig}
+                  />
+                </Tabs.Content>
+              </Tabs.Root>
 
               <DeleteConfirmationDialog
                 title="Are you really sure?"

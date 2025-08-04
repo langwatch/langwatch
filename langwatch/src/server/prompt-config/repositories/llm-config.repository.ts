@@ -21,8 +21,9 @@ const logger = createLogger("langwatch:prompt-config:llm-config.repository");
  * Interface for LLM Config data transfer objects
  */
 interface LlmConfigDTO {
-  name: string;
+  name?: string;
   projectId: string;
+  organizationId: string;
   authorId?: string;
   handle?: string;
   scope?: PromptScope;
@@ -32,7 +33,7 @@ interface LlmConfigDTO {
  * Interface for LLM Config with its latest version
  */
 export interface LlmConfigWithLatestVersion extends LlmPromptConfig {
-  latestVersion: LatestConfigVersionSchema;
+  latestVersion: LatestConfigVersionSchema & { author?: { name: string } };
 }
 
 /**
@@ -67,6 +68,13 @@ export class LlmConfigRepository {
       include: {
         versions: {
           orderBy: { createdAt: "desc" },
+          include: {
+            author: {
+              select: {
+                name: true,
+              },
+            },
+          },
           take: 1,
         },
       },
@@ -77,6 +85,12 @@ export class LlmConfigRepository {
     return configs
       .map((config) => {
         try {
+          config.handle = this.removeHandlePrefixes(
+            config.handle,
+            projectId,
+            organizationId
+          );
+
           if (!config.versions?.[0]) {
             throw new Error(`Prompt config ${config.id} has no versions.`);
           }
@@ -97,31 +111,43 @@ export class LlmConfigRepository {
   }
 
   /**
-   * Get a single LLM config by ID or handle
+   * Get a single LLM config by ID or handle, either at project or organization level
    */
   async getConfigByIdOrHandleWithLatestVersion(params: {
     idOrHandle: string;
     projectId: string;
     organizationId: string;
-  }): Promise<LlmConfigWithLatestVersion> {
+  }): Promise<LlmConfigWithLatestVersion | null> {
     const { idOrHandle, projectId, organizationId } = params;
     const config = await this.prisma.llmPromptConfig.findFirst({
       where: {
         OR: [
-          { id: idOrHandle },
           {
-            handle: this.createHandle({
-              handle: idOrHandle,
-              scope: "PROJECT",
-              projectId,
-            }),
+            projectId,
+            OR: [
+              { id: idOrHandle },
+              {
+                handle: this.createHandle({
+                  handle: idOrHandle,
+                  scope: "PROJECT",
+                  projectId,
+                }),
+              },
+            ],
           },
           {
-            handle: this.createHandle({
-              handle: idOrHandle,
-              scope: "ORGANIZATION",
-              organizationId,
-            }),
+            organizationId,
+            scope: "ORGANIZATION",
+            OR: [
+              { id: idOrHandle },
+              {
+                handle: this.createHandle({
+                  handle: idOrHandle,
+                  scope: "ORGANIZATION",
+                  organizationId,
+                }),
+              },
+            ],
           },
         ],
       },
@@ -134,9 +160,7 @@ export class LlmConfigRepository {
     });
 
     if (!config) {
-      throw new NotFoundError(
-        `Prompt config not found. ID: ${idOrHandle}, Project ID: ${projectId}, Organization ID: ${organizationId}.`
-      );
+      return null;
     }
 
     // This should never happen, but if it does, we want to know about it
@@ -145,6 +169,12 @@ export class LlmConfigRepository {
         `Prompt config has no versions. ID: ${idOrHandle}`
       );
     }
+
+    config.handle = this.removeHandlePrefixes(
+      config.handle,
+      projectId,
+      organizationId
+    );
 
     try {
       return {
@@ -166,7 +196,7 @@ export class LlmConfigRepository {
   async updateConfig(
     id: string,
     projectId: string,
-    data: Partial<LlmConfigDTO>
+    data: Partial<Pick<LlmConfigDTO, "name" | "handle" | "scope">>
   ): Promise<LlmPromptConfig> {
     // Verify the config exists
     const existingConfig = await this.prisma.llmPromptConfig.findUnique({
@@ -177,7 +207,21 @@ export class LlmConfigRepository {
       throw new NotFoundError(`Prompt config not found. ID: ${id}`);
     }
 
-    // Update only the parent config metadata
+    // Format handle with organization/project context if provided
+    if (data.handle) {
+      if (!existingConfig.organizationId) {
+        // TODO: perhaps organizationId should be NOT NULL across the whole table
+        throw new Error("Organization ID is required to update handle");
+      }
+
+      data.handle = this.createHandle({
+        handle: data.handle,
+        scope: data.scope ?? existingConfig.scope,
+        projectId,
+        organizationId: existingConfig.organizationId,
+      });
+    }
+
     return this.prisma.llmPromptConfig.update({
       where: { id, projectId },
       data: {
@@ -193,11 +237,22 @@ export class LlmConfigRepository {
    * Delete an LLM config and all its versions
    */
   async deleteConfig(
-    id: string,
-    projectId: string
+    idOrHandle: string,
+    projectId: string,
+    organizationId: string
   ): Promise<{ success: boolean }> {
+    const config = await this.getConfigByIdOrHandleWithLatestVersion({
+      idOrHandle,
+      projectId,
+      organizationId,
+    });
+
+    if (!config) {
+      throw new NotFoundError(`Prompt config not found. ID: ${idOrHandle}`);
+    }
+
     await this.prisma.llmPromptConfig.delete({
-      where: { id, projectId },
+      where: { id: config.id, projectId },
     });
 
     return { success: true };
@@ -212,14 +267,23 @@ export class LlmConfigRepository {
    * and because all configs should have an initial version.
    */
   async createConfigWithInitialVersion(
-    configData: LlmConfigDTO
+    configData: LlmConfigDTO & { scope: PromptScope }
   ): Promise<LlmConfigWithLatestVersion> {
+    if (configData.handle) {
+      configData.handle = this.createHandle({
+        handle: configData.handle,
+        scope: configData.scope,
+        projectId: configData.projectId,
+        organizationId: configData.organizationId,
+      });
+    }
+
     return await this.prisma.$transaction(async (tx) => {
       // Create the config within the transaction
       const newConfig = await tx.llmPromptConfig.create({
         data: {
           id: `prompt_${nanoid()}`,
-          name: configData.name,
+          name: configData.name ?? "",
           projectId: configData.projectId,
           handle: configData.handle,
         },
@@ -265,47 +329,17 @@ export class LlmConfigRepository {
         data: { updatedAt: new Date() },
       });
 
+      updatedConfig.handle = this.removeHandlePrefixes(
+        updatedConfig.handle,
+        configData.projectId,
+        configData.organizationId
+      );
+
       return {
         ...updatedConfig,
         latestVersion: parseLlmConfigVersion(newVersion),
       };
     });
-  }
-
-  /**
-   * Get prompt by handle
-   * @param handle - The handle to search for
-   * @param projectId - Optional project ID for scoping
-   * @returns The config or null if not found
-   */
-  async getByHandle(
-    handle: string,
-    projectId?: string
-  ): Promise<LlmConfigWithLatestVersion | null> {
-    const whereClause = {
-      handle,
-      deletedAt: null,
-      ...(projectId && { projectId }),
-    };
-
-    const config = await this.prisma.llmPromptConfig.findFirst({
-      where: whereClause,
-      include: {
-        versions: {
-          orderBy: { createdAt: "desc" },
-          take: 1,
-        },
-      },
-    });
-
-    if (!config || !config.versions[0]) {
-      return null;
-    }
-
-    return {
-      ...config,
-      latestVersion: parseLlmConfigVersion(config.versions[0]),
-    };
   }
 
   /**
@@ -340,5 +374,25 @@ export class LlmConfigRepository {
     }
 
     return `${args.projectId}/${handle}`;
+  }
+
+  removeHandlePrefixes(
+    handle: string | null,
+    projectId: string,
+    organizationId: string
+  ): string | null {
+    if (!handle) {
+      return null;
+    }
+
+    if (handle.startsWith(`${projectId}/`)) {
+      return handle.slice(projectId.length + 1);
+    }
+
+    if (handle.startsWith(`${organizationId}/`)) {
+      return handle.slice(organizationId.length + 1);
+    }
+
+    return handle;
   }
 }

@@ -116,6 +116,8 @@ describe("Prompts API", () => {
         config = await repository.createConfigWithInitialVersion({
           name: mockConfig.name,
           projectId: testProjectId,
+          organizationId: testOrganization.id,
+          scope: "PROJECT",
         });
       });
 

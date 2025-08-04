@@ -17,13 +17,13 @@ import type {
 } from "../optimization_studio/types/dsl";
 
 import type { PromptConfigFormValues } from "~/prompt-configs/hooks/usePromptConfigForm";
-import { kebabCase } from "~/utils/stringCasing";
 import {
   LlmConfigInputTypes,
   LlmConfigOutputTypes,
   type LlmConfigInputType,
   type LlmConfigOutputType,
 } from "~/types";
+import { kebabCase } from "~/utils/stringCasing";
 
 export function llmConfigToOptimizationStudioNodeData(
   config: LlmConfigWithLatestVersion
@@ -75,7 +75,6 @@ export function promptConfigFormValuesToOptimizationStudioNodeData(
 ): Node<LlmPromptConfigComponent>["data"] {
   return {
     configId,
-    name: formValues.name,
     inputs: formValues.version?.configData?.inputs,
     outputs: formValues.version?.configData?.outputs,
     parameters: [
@@ -119,7 +118,6 @@ export function safeOptimizationStudioNodeDataToPromptConfigFormInitialValues(
   const outputs = safeOutputs(nodeData.outputs);
 
   return {
-    name: nodeData.name ?? "",
     version: {
       configData: {
         inputs,
@@ -244,7 +242,6 @@ export function llmConfigToPromptConfigFormValues(
   llmConfig: LlmConfigWithLatestVersion
 ): PromptConfigFormValues {
   return {
-    name: llmConfig.name ?? "",
     version: {
       configData: {
         ...llmConfig.latestVersion.configData,

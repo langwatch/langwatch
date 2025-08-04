@@ -1,12 +1,10 @@
-import { HStack, Input, Text } from "@chakra-ui/react";
+import { HStack, Text } from "@chakra-ui/react";
 import type { Node } from "@xyflow/react";
 import { useMemo } from "react";
 import { useFormContext } from "react-hook-form";
 
 import { parseLlmConfigVersion } from "~/server/prompt-config/repositories/llm-config-version-schema";
 import type { LlmConfigWithLatestVersion } from "~/server/prompt-config/repositories/llm-config.repository";
-
-import { InputGroup } from "../../../../../components/ui/input-group";
 
 import { PromptSource } from "./PromptSource";
 
@@ -27,6 +25,7 @@ import { api } from "~/utils/api";
 import { createLogger } from "~/utils/logger";
 import { GeneratePromptApiSnippetDialog } from "~/prompt-configs/components/GeneratePromptApiSnippetDialog";
 import { GenerateApiSnippetButton } from "~/components/GenerateApiSnippetButton";
+import { CopyButton } from "../../../../../components/CopyButton";
 
 const logger = createLogger(
   "langwatch:optimization_studio:prompt_source_header"
@@ -41,7 +40,7 @@ export function PromptSourceHeader({
   node: Node<LlmPromptConfigComponent>;
   onPromptSourceSelect: (config: { id: string; name: string }) => void;
   triggerSaveVersion: (
-    configId: string,
+    config: LlmConfigWithLatestVersion,
     formValues: PromptConfigFormValues
   ) => void;
   values: PromptConfigFormValues;
@@ -54,7 +53,7 @@ export function PromptSourceHeader({
   const formProps = useFormContext<PromptConfigFormValues>();
 
   // Fetch the saved configuration to compare with current node data
-  const { data: savedConfig, isLoading: isLoadingSavedConfig } =
+  const { data: savedConfig } =
     useGetPromptConfigByIdWithLatestVersionQuery(configId);
 
   const { mutateAsync: createConfig } =
@@ -77,7 +76,6 @@ export function PromptSourceHeader({
       try {
         const newConfig = await createConfig({
           projectId,
-          name: node.data.name,
         });
 
         // Update the node data with the new config ID
@@ -90,7 +88,7 @@ export function PromptSourceHeader({
         });
 
         // Trigger the save version mutation for the new config
-        triggerSaveVersion(newConfig.id, values);
+        triggerSaveVersion(newConfig, values);
       } catch (error) {
         console.error(error);
         toaster.error({
@@ -99,7 +97,7 @@ export function PromptSourceHeader({
         });
       }
     } else {
-      triggerSaveVersion(configId, values);
+      triggerSaveVersion(savedConfig, values);
     }
   };
 
@@ -145,46 +143,36 @@ export function PromptSourceHeader({
     })();
   };
 
-  const { register, formState } = useFormContext<PromptConfigFormValues>();
-  const { errors } = formState;
-
   return (
     <VerticalFormControl
       label="Versioned Prompt"
       width="full"
       size="sm"
-      invalid={!!errors.name}
-      error={
-        errors.name ??
-        (!savedConfig && !isLoadingSavedConfig && (
-          <Text fontSize="sm" color="red.500">
-            This node&apos;s source prompt was deleted. Please save a new prompt
-            version to continue using this configuration.
-          </Text>
-        ))
-      }
       paddingBottom={4}
     >
       <HStack justifyContent="space-between">
-        <InputGroup
-          startElement={<Text fontSize="12px">Name:</Text>}
-          startOffset="-24px"
-          width="100%"
-        >
-          <Input
-            size="sm"
-            placeholder="Enter a name for this prompt"
-            {...register("name")}
-          />
-        </InputGroup>
-        <GeneratePromptApiSnippetDialog
-          configId={configId}
-          apiKey={project?.apiKey}
-        >
-          <GeneratePromptApiSnippetDialog.Trigger>
-            <GenerateApiSnippetButton />
-          </GeneratePromptApiSnippetDialog.Trigger>
-        </GeneratePromptApiSnippetDialog>
+        <HStack paddingX={1} gap={1}>
+          {savedConfig?.handle ? (
+            <Text fontSize="sm" fontWeight="500" fontFamily="mono">
+              {savedConfig.handle}
+            </Text>
+          ) : (
+            <Text color="gray.500">Draft</Text>
+          )}
+          {savedConfig?.handle && (
+            <CopyButton value={savedConfig.handle} label="Prompt ID" />
+          )}
+        </HStack>
+        {savedConfig && (
+          <GeneratePromptApiSnippetDialog
+            configId={configId}
+            apiKey={project?.apiKey}
+          >
+            <GeneratePromptApiSnippetDialog.Trigger>
+              <GenerateApiSnippetButton config={savedConfig} />
+            </GeneratePromptApiSnippetDialog.Trigger>
+          </GeneratePromptApiSnippetDialog>
+        )}
         <HStack flex={1} width="50%">
           <PromptSource configId={configId} onSelect={onPromptSourceSelect} />
         </HStack>

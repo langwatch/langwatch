@@ -1,14 +1,20 @@
-import { Text, Spinner, VStack, HStack } from "@chakra-ui/react";
+import { Badge, Button, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
 import {
-  type Dispatch,
-  type SetStateAction,
+  forwardRef,
   useEffect,
   useMemo,
-  forwardRef,
+  type Dispatch,
   type ForwardedRef,
+  type SetStateAction,
 } from "react";
 import { useDebouncedCallback } from "use-debounce";
 
+import { PanelHeader } from "./components/ui/PanelHeader";
+import { PromptConfigForm } from "./forms/prompt-config-form/PromptConfigForm";
+import { useInvokePrompt } from "./hooks/useInvokePrompt";
+import { usePromptConfigForm } from "./hooks/usePromptConfigForm";
+
+import { LuBuilding } from "react-icons/lu";
 import {
   ExecutionInputPanel,
   type ExecuteData,
@@ -18,18 +24,13 @@ import {
   InputOutputExecutablePanel,
   PANEL_ANIMATION_DURATION,
 } from "~/components/executable-panel/InputOutputExecutablePanel";
-import { MetadataTag } from "~/components/MetadataTag";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import {
   llmConfigToPromptConfigFormValues,
   promptConfigFormValuesToOptimizationStudioNodeData,
 } from "~/prompt-configs/llmPromptConfigUtils";
 import { api } from "~/utils/api";
-
-import { PanelHeader } from "./components/ui/PanelHeader";
-import { PromptConfigForm } from "./forms/prompt-config-form/PromptConfigForm";
-import { useInvokePrompt } from "./hooks/useInvokePrompt";
-import { usePromptConfigForm } from "./hooks/usePromptConfigForm";
+import { Tooltip } from "../components/ui/tooltip";
 
 /**
  * Panel for configuring and testing LLM prompts
@@ -171,20 +172,49 @@ export const PromptConfigPanel = forwardRef(function PromptConfigPanel(
       <InputOutputExecutablePanel.CenterContent>
         <VStack width="full" gap={4} height="full" background="white">
           <PanelHeader
-            title={<Text>Prompt Configuration</Text>}
+            title={
+              <HStack>
+                <Text whiteSpace="nowrap">Prompt Configuration</Text>
+                {llmConfig?.latestVersion && llmConfig.handle && (
+                  <Badge
+                    colorPalette="green"
+                    border="1px solid"
+                    borderColor="green.200"
+                  >
+                    v{llmConfig?.latestVersion.version}
+                  </Badge>
+                )}
+                {llmConfig?.scope === "ORGANIZATION" && (
+                  <Tooltip content="This prompt is available to all projects in the organization">
+                    <Button
+                      onClick={() => {
+                        // Hack to call the edit handle dialog, as triggering from here and dealing with all the provider context shaneningans is too complicated
+                        const button =
+                          document.querySelector<HTMLButtonElement>(
+                            "#js-edit-prompt-handle"
+                          );
+                        if (button) {
+                          button.click();
+                        }
+                      }}
+                      variant="plain"
+                      asChild
+                      size="xs"
+                    >
+                      <Badge colorPalette="purple" variant="outline">
+                        <HStack>
+                          <LuBuilding />
+                          Organization
+                        </HStack>
+                      </Badge>
+                    </Button>
+                  </Tooltip>
+                )}
+              </HStack>
+            }
             onClose={handleClose}
             onExpand={handleExpand}
           />
-          {llmConfig && (
-            <HStack width="full" gap={2} flexWrap="wrap">
-              <MetadataTag label="prompt_id" value={llmConfig.id} copyable />
-              <MetadataTag
-                label="version_id"
-                value={llmConfig.latestVersion.id ?? ""}
-                copyable
-              />
-            </HStack>
-          )}
           {isLoadingConfig ? (
             <Spinner size="md" />
           ) : (

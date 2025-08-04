@@ -6,9 +6,11 @@ import { Tooltip } from "../../../../components/ui/tooltip";
 export function VersionHistoryButton({
   configId,
   onRestore,
+  label,
 }: {
   configId: string;
   onRestore?: (versionId: string) => void;
+  label?: string;
 }) {
   return (
     <Tooltip
@@ -17,9 +19,11 @@ export function VersionHistoryButton({
       openDelay={0}
       showArrow
     >
-      <Button variant="outline" asChild>
-        <VersionHistoryListPopover configId={configId} onRestore={onRestore} />
-      </Button>
+      <VersionHistoryListPopover
+        configId={configId}
+        onRestore={onRestore}
+        label={label}
+      />
     </Tooltip>
   );
 }
