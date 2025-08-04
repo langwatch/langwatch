@@ -11,6 +11,8 @@ export default defineConfig([
       "src/client-node.ts",
       "src/client-browser.ts",
     ],
+    splitting: true,
+    clean: true,
     format: ["cjs", "esm"],
     dts: true,
     sourcemap: true,
