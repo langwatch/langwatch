@@ -105,6 +105,9 @@ importers:
       '@typescript/native-preview':
         specifier: 7.0.0-dev.20250804.1
         version: 7.0.0-dev.20250804.1
+      '@vercel/otel':
+        specifier: ^1.13.0
+        version: 1.13.0(@opentelemetry/api-logs@0.203.0)(@opentelemetry/api@1.9.0)(@opentelemetry/instrumentation@0.203.0(@opentelemetry/api@1.9.0))(@opentelemetry/resources@2.0.1(@opentelemetry/api@1.9.0))(@opentelemetry/sdk-logs@0.203.0(@opentelemetry/api@1.9.0))(@opentelemetry/sdk-metrics@2.0.1(@opentelemetry/api@1.9.0))(@opentelemetry/sdk-trace-base@2.0.1(@opentelemetry/api@1.9.0))
       '@vitest/coverage-v8':
         specifier: 3.2.4
         version: 3.2.4(vitest@3.2.4(@types/debug@4.1.12)(@types/node@24.1.0)(yaml@2.8.0))
@@ -979,6 +982,18 @@ packages:
     resolution: {integrity: sha512-JwoxboBh7Oz1v38tPbkrZ62ZXNHAk9bJ7c9x0eI5zBfBnBYGhURdbnh7Z4smN/MV48Y5OCcZb58n972UtbazsA==}
     peerDependencies:
       typescript: '*'
+
+  '@vercel/otel@1.13.0':
+    resolution: {integrity: sha512-esRkt470Y2jRK1B1g7S1vkt4Csu44gp83Zpu8rIyPoqy2BKgk4z7ik1uSMswzi45UogLHFl6yR5TauDurBQi4Q==}
+    engines: {node: '>=18'}
+    peerDependencies:
+      '@opentelemetry/api': '>=1.7.0 <2.0.0'
+      '@opentelemetry/api-logs': '>=0.46.0 <0.200.0'
+      '@opentelemetry/instrumentation': '>=0.46.0 <0.200.0'
+      '@opentelemetry/resources': '>=1.19.0 <2.0.0'
+      '@opentelemetry/sdk-logs': '>=0.46.0 <0.200.0'
+      '@opentelemetry/sdk-metrics': '>=1.19.0 <2.0.0'
+      '@opentelemetry/sdk-trace-base': '>=1.19.0 <2.0.0'
 
   '@vitest/coverage-v8@3.2.4':
     resolution: {integrity: sha512-EyF9SXU6kS5Ku/U82E259WSnvg6c8KTjppUncuNdm5QHpe17mwREHnjDzozC8x9MZ0xfBUFSaLkRv4TMA75ALQ==}
@@ -3447,6 +3462,16 @@ snapshots:
       typescript: 5.9.2
     transitivePeerDependencies:
       - supports-color
+
+  '@vercel/otel@1.13.0(@opentelemetry/api-logs@0.203.0)(@opentelemetry/api@1.9.0)(@opentelemetry/instrumentation@0.203.0(@opentelemetry/api@1.9.0))(@opentelemetry/resources@2.0.1(@opentelemetry/api@1.9.0))(@opentelemetry/sdk-logs@0.203.0(@opentelemetry/api@1.9.0))(@opentelemetry/sdk-metrics@2.0.1(@opentelemetry/api@1.9.0))(@opentelemetry/sdk-trace-base@2.0.1(@opentelemetry/api@1.9.0))':
+    dependencies:
+      '@opentelemetry/api': 1.9.0
+      '@opentelemetry/api-logs': 0.203.0
+      '@opentelemetry/instrumentation': 0.203.0(@opentelemetry/api@1.9.0)
+      '@opentelemetry/resources': 2.0.1(@opentelemetry/api@1.9.0)
+      '@opentelemetry/sdk-logs': 0.203.0(@opentelemetry/api@1.9.0)
+      '@opentelemetry/sdk-metrics': 2.0.1(@opentelemetry/api@1.9.0)
+      '@opentelemetry/sdk-trace-base': 2.0.1(@opentelemetry/api@1.9.0)
 
   '@vitest/coverage-v8@3.2.4(vitest@3.2.4(@types/debug@4.1.12)(@types/node@24.1.0)(yaml@2.8.0))':
     dependencies:
