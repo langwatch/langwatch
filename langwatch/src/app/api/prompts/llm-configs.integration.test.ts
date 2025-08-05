@@ -2,13 +2,12 @@ import type { LlmPromptConfig, Organization, Team } from "@prisma/client";
 import { nanoid } from "nanoid";
 import { describe, expect, it, beforeEach, afterEach } from "vitest";
 
+import { llmPromptConfigFactory } from "~/factories/llm-config.factory";
+import { projectFactory } from "~/factories/project.factory";
 import { prisma } from "~/server/db";
 import { LlmConfigRepository } from "~/server/prompt-config/repositories/llm-config.repository";
 
 import { app } from "./[[...route]]/app";
-
-import { llmPromptConfigFactory } from "~/factories/llm-config.factory";
-import { projectFactory } from "~/factories/project.factory";
 
 describe("Prompts API", () => {
   // Test data setup

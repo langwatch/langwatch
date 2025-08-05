@@ -2,8 +2,9 @@
 import type { LlmPromptConfigVersion } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
-import type { LlmConfigVersionDTO } from "./llm-config-versions.repository";
+
 import { LlmConfigInputTypes, LlmConfigOutputTypes } from "../../../types";
+import type { LlmConfigVersionDTO } from "./llm-config-versions.repository";
 import { createLogger } from "../../../utils/logger";
 import { nodeDatasetSchema } from "../../../optimization_studio/types/dsl";
 
