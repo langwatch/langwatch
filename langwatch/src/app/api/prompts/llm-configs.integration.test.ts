@@ -1,27 +1,26 @@
-import type { LlmPromptConfig, Organization, Team } from "@prisma/client";
+import type {
+  LlmPromptConfig,
+  Organization,
+  Project,
+  Team,
+} from "@prisma/client";
 import { nanoid } from "nanoid";
 import { describe, expect, it, beforeEach, afterEach } from "vitest";
 
-import { llmPromptConfigFactory } from "~/factories/llm-config.factory";
-import { projectFactory } from "~/factories/project.factory";
 import { prisma } from "~/server/db";
 import { LlmConfigRepository } from "~/server/prompt-config/repositories/llm-config.repository";
 
 import { app } from "./[[...route]]/app";
+import { llmPromptConfigFactory } from "~/factories/llm-config.factory";
+import { projectFactory } from "~/factories/project.factory";
 
 describe("Prompts API", () => {
-  // Test data setup
-  let mockProject = projectFactory.build({
-    slug: nanoid(),
-  });
-  let mockConfig = llmPromptConfigFactory.build({
-    name: "Test Prompt",
-    projectId: mockProject.id,
-  });
+  let mockConfig: LlmPromptConfig;
   let testApiKey: string;
   let testProjectId: string;
   let testOrganization: Organization;
   let testTeam: Team;
+  let testProject: Project;
 
   // Setup and teardown
   beforeEach(async () => {
@@ -42,17 +41,21 @@ describe("Prompts API", () => {
       },
     });
 
+    // Test data setup
+    testProject = projectFactory.build({
+      slug: nanoid(),
+    });
     // Create test project in the database with the proper team
-    mockProject = await prisma.project.create({
+    testProject = await prisma.project.create({
       data: {
-        ...mockProject,
+        ...testProject,
         teamId: testTeam.id,
       },
     });
 
     // Update variables after project creation to ensure they have the correct values
-    testApiKey = mockProject.apiKey;
-    testProjectId = mockProject.id;
+    testApiKey = testProject.apiKey;
+    testProjectId = testProject.id;
 
     // Update the mock config with the correct project ID
     mockConfig = llmPromptConfigFactory.build({
@@ -358,7 +361,7 @@ describe("Prompts API", () => {
     });
 
     describe("when scoping by organization", () => {
-      it("should create a new prompt with a handle scoped to project", async () => {
+      it("should create a new prompt with a handle scoped to organization", async () => {
         const res = await app.request(`/api/prompts`, {
           method: "POST",
           headers: {
@@ -436,14 +439,8 @@ describe("Prompts API", () => {
         });
 
         expect(promptRes.status).toBe(200);
+
         const prompt = await promptRes.json();
-
-        // Get the project with organization info to construct expected handle
-        const project = await prisma.project.findUnique({
-          where: { id: testProjectId },
-          include: { team: { include: { organization: true } } },
-        });
-
         const handle = "my-custom-ref";
         const expectedHandle = `${testProjectId}/${handle}`;
 
