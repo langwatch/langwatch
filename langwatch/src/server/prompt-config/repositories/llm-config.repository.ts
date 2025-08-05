@@ -28,7 +28,7 @@ const logger = createLogger("langwatch:prompt-config:llm-config.repository");
  */
 export type CreateLlmConfigParams = Omit<
   LlmPromptConfig,
-  "id" | "createdAt" | "updatedAt"
+  "id" | "createdAt" | "updatedAt" | "deletedAt"
 > & {
   // Optional authorId to set on the config and version.
   // This is optional because it's not required for the config to be created,

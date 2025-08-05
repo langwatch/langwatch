@@ -1,7 +1,6 @@
 import {
   type LlmPromptConfig,
   type LlmPromptConfigVersion,
-  type Prisma,
   type PrismaClient,
   type User,
 } from "@prisma/client";
@@ -13,7 +12,6 @@ import {
   type SchemaVersion,
   getVersionValidator,
 } from "./llm-config-version-schema";
-import { LATEST_SCHEMA_VERSION } from "./llm-config-version-schema";
 import { LlmConfigRepository } from "./llm-config.repository";
 
 /**

@@ -9,6 +9,7 @@ import { type UpdateLlmConfigDTO } from "./dtos";
 import {
   LlmConfigRepository,
   type LlmConfigWithLatestVersion,
+  type CreateLlmConfigVersionParams,
 } from "./repositories";
 import {
   type getLatestConfigVersionSchema,
@@ -64,14 +65,23 @@ export class PromptService {
    * @param params.handle - The handle of the prompt
    * @returns The created prompt configuration
    */
-  async createPrompt(params: {
-    name: string;
-    projectId: string;
-    organizationId: string;
-    handle?: string;
-    scope: PromptScope;
-  }): Promise<LlmConfigWithLatestVersion> {
-    return this.repository.createConfigWithInitialVersion(params);
+  async createPrompt(
+    params: {
+      name: string;
+      projectId: string;
+      organizationId: string;
+      handle?: string;
+      scope: PromptScope;
+    },
+    versionData?: CreateLlmConfigVersionParams
+  ): Promise<LlmConfigWithLatestVersion> {
+    return this.repository.createConfigWithInitialVersion({
+      configData: {
+        ...params,
+        handle: params.handle ?? null,
+      },
+      versionData,
+    });
   }
 
   /**
