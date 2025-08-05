@@ -19,7 +19,12 @@ export const getFirstInputAsText = (spans: Span[]): string => {
       span.input.value &&
       span.type !== "evaluation" &&
       span.type !== "guardrail" &&
-      (span.input.type !== "json" || !isEmptyJson(span.input.value))
+      (span.input.type !== "json" || !isEmptyJson(span.input.value)) &&
+      // Agent inputs captured by openinference from agno are not really human redable, skip it
+      !(
+        span.params?.scope?.name == "openinference.instrumentation.agno" &&
+        span.type == "agent"
+      )
   );
 
   let input = topmostInputs[0]?.input;
