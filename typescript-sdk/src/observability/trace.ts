@@ -1,12 +1,12 @@
 import {
   trace as otelTrace,
-  Tracer,
-  Span,
-  SpanOptions,
-  Context,
+  type Tracer,
+  type Span,
+  type SpanOptions,
+  type Context,
   SpanStatusCode,
 } from "@opentelemetry/api";
-import { LangWatchSpan, createLangWatchSpan } from "./span";
+import { type LangWatchSpan, createLangWatchSpan } from "./span";
 
 /**
  * LangWatch OpenTelemetry Tracing Extensions
@@ -128,21 +128,21 @@ export interface LangWatchTracer extends Tracer {
    *     // ... your code ...
    *   });
    */
-  withActiveSpan<F extends (span: LangWatchSpan) => unknown>(
+  withActiveSpan<T>(
     name: string,
-    fn: F,
-  ): ReturnType<F>;
-  withActiveSpan<F extends (span: LangWatchSpan) => unknown>(
+    fn: (span: LangWatchSpan) => Promise<T> | T,
+  ): ReturnType<typeof fn>;
+  withActiveSpan<T>(
     name: string,
     options: SpanOptions,
-    fn: F,
-  ): ReturnType<F>;
-  withActiveSpan<F extends (span: LangWatchSpan) => unknown>(
+    fn: (span: LangWatchSpan) => Promise<T> | T,
+  ): ReturnType<typeof fn>;
+  withActiveSpan<T>(
     name: string,
     options: SpanOptions,
     context: Context,
-    fn: F,
-  ): ReturnType<F>;
+    fn: (span: LangWatchSpan) => Promise<T> | T,
+  ): ReturnType<typeof fn>;
 }
 
 /**
@@ -227,9 +227,11 @@ export function getLangWatchTracer(
         }
 
         case "withActiveSpan": {
-          // Because this is an overload, we don't know where the
-          // function is, so we need to find it.
-          return function (...args: any[]) {
+          /**
+           * Implementation of withActiveSpan: supports all overloads like startActiveSpan.
+           * Uses startActiveSpan to ensure context propagation for nested spans.
+           */
+          return async function withActiveSpan(...args: any[]): Promise<any> {
             // Find the function argument (should be the last argument)
             const fnIndex = args.findIndex((arg) => typeof arg === "function");
             if (fnIndex === -1) {
@@ -237,45 +239,40 @@ export function getLangWatchTracer(
                 "withActiveSpan requires a function as the last argument",
               );
             }
+            const userFn = args[fnIndex] as (
+              span: LangWatchSpan,
+            ) => Promise<any> | any;
+            // The preceding arguments are: name, options?, context?
+            const name = args[0];
+            const options = args.length > 2 ? args[1] : undefined;
+            const context = args.length > 3 ? args[2] : undefined;
 
-            const userFn = args[fnIndex];
-
-            // Replace with wrapped function that handles async/error/span ending
-            args[fnIndex] = (span: Span) => {
-              const wrappedSpan = createLangWatchSpan(span);
-
-              const handleError = (err: any) => {
-                wrappedSpan.setStatus({
-                  code: SpanStatusCode.ERROR,
-                  message: err?.message || String(err),
-                });
-                wrappedSpan.recordException(err);
-                wrappedSpan.end();
-                throw err;
-              };
-
-              try {
-                const result = userFn(wrappedSpan);
-
-                // Handle promise case
-                if (
-                  typeof result === "object" &&
-                  typeof result.then === "function"
-                ) {
-                  return Promise.resolve(result)
-                    .catch(handleError)
-                    .finally(() => wrappedSpan.end());
+            return await new Promise((resolve, reject) => {
+              // Use startActiveSpan to ensure context propagation
+              const cb = async (span: Span) => {
+                const wrappedSpan = createLangWatchSpan(span);
+                try {
+                  resolve(await userFn(wrappedSpan));
+                } catch (err: any) {
+                  wrappedSpan.setStatus({
+                    code: SpanStatusCode.ERROR,
+                    message: err?.message ? err.message : String(err),
+                  });
+                  wrappedSpan.recordException(err);
+                  reject(err);
+                } finally {
+                  wrappedSpan.end();
                 }
-
-                // Sync case - end span immediately
-                wrappedSpan.end();
-                return result;
-              } catch (err) {
-                handleError(err);
+              };
+              // Call the correct overload of startActiveSpan
+              if (context !== undefined) {
+                target.startActiveSpan(name, options, context, cb);
+              } else if (options !== undefined) {
+                target.startActiveSpan(name, options, cb);
+              } else {
+                target.startActiveSpan(name, cb);
               }
-            };
-
-            return (target.startActiveSpan as any)(...args);
+            });
           };
         }
 
