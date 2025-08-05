@@ -2,7 +2,7 @@ import {
   type PrismaClient,
   type LlmPromptConfig,
   type LlmPromptConfigVersion,
-  type PromptScope,
+  type Prisma,
 } from "@prisma/client";
 import { nanoid } from "nanoid";
 
@@ -14,22 +14,27 @@ import {
   type LatestConfigVersionSchema,
   getSchemaValidator,
   SchemaVersion,
+  LATEST_SCHEMA_VERSION,
 } from "./llm-config-version-schema";
-import { LlmConfigVersionsRepository } from "./llm-config-versions.repository";
+import {
+  LlmConfigVersionsRepository,
+  type CreateLlmConfigVersionParams,
+} from "./llm-config-versions.repository";
 
 const logger = createLogger("langwatch:prompt-config:llm-config.repository");
 
 /**
  * Interface for LLM Config data transfer objects
  */
-interface LlmConfigDTO {
-  name?: string;
-  projectId: string;
-  organizationId: string;
+export type CreateLlmConfigParams = Omit<
+  LlmPromptConfig,
+  "id" | "createdAt" | "updatedAt"
+> & {
+  // Optional authorId to set on the config and version.
+  // This is optional because it's not required for the config to be created,
+  // and wouldn't be available via the API.
   authorId?: string;
-  handle?: string;
-  scope?: PromptScope;
-}
+};
 
 /**
  * Interface for LLM Config with its latest version
@@ -245,7 +250,7 @@ export class LlmConfigRepository {
   async updateConfig(
     id: string,
     projectId: string,
-    data: Partial<Pick<LlmConfigDTO, "name" | "handle" | "scope">>
+    data: Partial<CreateLlmConfigParams>
   ): Promise<LlmPromptConfig> {
     // Verify the config exists
     const existingConfig = await this.prisma.llmPromptConfig.findUnique({
@@ -315,9 +320,27 @@ export class LlmConfigRepository {
    * transaction, which is important for maintaining data integrity,
    * and because all configs should have an initial version.
    */
-  async createConfigWithInitialVersion(
-    configData: LlmConfigDTO & { scope: PromptScope }
-  ): Promise<LlmConfigWithLatestVersion> {
+  async createConfigWithInitialVersion(params: {
+    configData: CreateLlmConfigParams;
+    /**
+     * If no version data is provided, we'll create a default version.
+     * If version data is provided, we'll use it to create the initial version.
+     *
+     * The version data should not include the configId, or projectId.
+     * These will be set automatically from the newly created config.
+     */
+    versionData?: Omit<CreateLlmConfigVersionParams, "configId" | "projectId">;
+  }): Promise<LlmConfigWithLatestVersion> {
+    const { configData, versionData } = params;
+
+    // Sanity check on the authorId
+    if (
+      versionData?.authorId &&
+      configData?.authorId !== versionData.authorId
+    ) {
+      throw new Error("Author ID mismatch between config and version data");
+    }
+
     if (configData.handle) {
       configData.handle = this.createHandle({
         handle: configData.handle,
@@ -340,15 +363,26 @@ export class LlmConfigRepository {
         },
       });
 
-      // Create the initial version within the same transaction
-      const defaultVersion = await this.versions.buildDefault({
-        llmConfig: newConfig,
-        authorId: configData.authorId,
-        tx,
-      });
+      const newVersionData =
+        // Use the provided version data if provided
+        versionData ?? {
+          version: 0,
+          schemaVersion: LATEST_SCHEMA_VERSION,
+          configData: await this.buildDefaultVersionBaseData({
+            projectId: newConfig.projectId,
+            tx,
+          }),
+        };
 
       const newVersion = await tx.llmPromptConfigVersion.create({
-        data: defaultVersion,
+        data: {
+          ...newVersionData,
+          configData: newVersionData.configData as Prisma.InputJsonValue,
+          id: this.versions.generateVersionId(),
+          configId: newConfig.id,
+          projectId: newConfig.projectId,
+          authorId: configData.authorId ?? null,
+        },
       });
 
       // Update the config's updatedAt timestamp
@@ -601,5 +635,40 @@ export class LlmConfigRepository {
 
   private generateConfigId() {
     return `prompt_${nanoid()}`;
+  }
+
+  /**
+   * Build a default version base for a config
+   */
+  private async buildDefaultVersionBaseData(params: {
+    projectId: string;
+    tx?: Prisma.TransactionClient;
+  }): Promise<CreateLlmConfigVersionParams["configData"]> {
+    const { projectId } = params;
+    const client = params.tx ?? this.prisma;
+
+    // Get the default model for the project
+    const defaultModel = await client.project.findUnique({
+      where: { id: projectId },
+    });
+
+    return {
+      model: defaultModel?.defaultModel ?? "openai/gpt-4o-mini",
+      prompt: "You are a helpful assistant",
+      messages: [
+        {
+          role: "user",
+          content: "{{input}}",
+        },
+      ],
+      inputs: [{ identifier: "input", type: "str" }],
+      outputs: [{ identifier: "output", type: "str" }],
+      demonstrations: {
+        inline: {
+          records: {},
+          columnTypes: [],
+        },
+      },
+    };
   }
 }

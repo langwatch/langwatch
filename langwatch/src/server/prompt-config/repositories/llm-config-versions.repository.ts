@@ -21,6 +21,11 @@ import { LlmConfigRepository } from "./llm-config.repository";
  */
 export type LlmConfigVersionDTO = Omit<LatestConfigVersionSchema, "version">;
 
+export type CreateLlmConfigVersionParams = Omit<
+  LlmPromptConfigVersion,
+  "id" | "author" | "config" | "createdAt"
+>;
+
 /**
  * Repository for managing LLM Configuration Versions
  * Follows Single Responsibility Principle by focusing only on LLM config versions data access
@@ -241,56 +246,7 @@ export class LlmConfigVersionsRepository {
     return newVersion;
   }
 
-  async buildDefault(params: {
-    llmConfig: Pick<
-      LlmPromptConfig,
-      "id" | "projectId" | "organizationId" | "scope"
-    >;
-    tx?: Prisma.TransactionClient;
-    authorId?: string;
-  }): Promise<
-    Omit<LlmPromptConfigVersion, "createdAt"> & {
-      configData: LlmConfigVersionDTO["configData"];
-    }
-  > {
-    const { tx, llmConfig, authorId } = params;
-    const client = tx ?? this.prisma;
-
-    // Get the default model for the project
-    const defaultModel = await client.project.findUnique({
-      where: { id: llmConfig.projectId },
-    });
-
-    return {
-      id: this.generateVersionId(),
-      configId: llmConfig.id,
-      projectId: llmConfig.projectId,
-      authorId: authorId ?? null,
-      version: 0,
-      configData: {
-        model: defaultModel?.defaultModel ?? "openai/gpt-4o-mini",
-        prompt: "You are a helpful assistant",
-        messages: [
-          {
-            role: "user",
-            content: "{{input}}",
-          },
-        ],
-        inputs: [{ identifier: "input", type: "str" }],
-        outputs: [{ identifier: "output", type: "str" }],
-        demonstrations: {
-          inline: {
-            records: {},
-            columnTypes: [],
-          },
-        },
-      },
-      schemaVersion: LATEST_SCHEMA_VERSION,
-      commitMessage: "Initial version",
-    };
-  }
-
-  private generateVersionId() {
+  generateVersionId() {
     return `prompt_version_${nanoid()}`;
   }
 }
