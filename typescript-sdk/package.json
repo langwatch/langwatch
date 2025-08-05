@@ -75,6 +75,7 @@
     "@types/js-yaml": "^4.0.9",
     "@types/node": "^24.1.0",
     "@typescript/native-preview": "7.0.0-dev.20250804.1",
+    "@vercel/otel": "^1.13.0",
     "@vitest/coverage-v8": "3.2.4",
     "esbuild": "^0.25.8",
     "eslint": "^9.32.0",
@@ -107,15 +108,14 @@
     "zod": "^4.0.14"
   },
   "peerDependencies": {
-    "@ai-sdk/openai": "^2.0.0",
-    "@langchain/core": "^0.3.66",
-    "@langchain/openai": "^0.6.3",
-    "@langchain/langgraph": "^0.4.2",
-    "@opentelemetry/context-async-hooks": "^2.0.1",
-    "@opentelemetry/context-zone": "^2.0.1",
-    "@opentelemetry/sdk-node": "^0.203.0",
-    "@opentelemetry/sdk-trace-web": "^2.0.1",
-    "@vercel/otel": "^1.13.0",
-    "langchain": "^0.3.30"
+    "@ai-sdk/openai": ">=2.0.0",
+    "@langchain/core": ">=0.3.0",
+    "@langchain/openai": ">=0.6.0",
+    "@langchain/langgraph": ">=0.4.0",
+    "@opentelemetry/context-async-hooks": ">=1.19.0",
+    "@opentelemetry/context-zone": ">=1.19.0",
+    "@opentelemetry/sdk-node": ">=0.200.0",
+    "@opentelemetry/sdk-trace-web": ">=1.19.0",
+    "langchain": ">=0.3.0"
   }
 }
