@@ -1,4 +1,3 @@
-// Logger interface that's compatible with common logging libraries
 export interface Logger {
   debug(message: string, ...args: unknown[]): void;
   info(message: string, ...args: unknown[]): void;
@@ -6,7 +5,6 @@ export interface Logger {
   error(message: string, ...args: unknown[]): void;
 }
 
-// No-op logger for when no logger is provided
 export class NoOpLogger implements Logger {
   debug(): void {}
   info(): void {}
@@ -14,7 +12,6 @@ export class NoOpLogger implements Logger {
   error(): void {}
 }
 
-// Console logger that wraps Node.js console
 export class ConsoleLogger implements Logger {
   debug(message: string, ...args: unknown[]): void {
     console.debug(message, ...args);
@@ -30,5 +27,29 @@ export class ConsoleLogger implements Logger {
 
   error(message: string, ...args: unknown[]): void {
     console.error(message, ...args);
+  }
+}
+
+export class PrefixedLogger implements Logger {
+  constructor(private logger: Logger, private prefix: string) {}
+
+  private formatMessage(message: string): string {
+    return `[${this.prefix}] ${message}`;
+  }
+
+  debug(message: string, ...args: unknown[]): void {
+    this.logger.debug(this.formatMessage(message), ...args);
+  }
+
+  info(message: string, ...args: unknown[]): void {
+    this.logger.info(this.formatMessage(message), ...args);
+  }
+
+  warn(message: string, ...args: unknown[]): void {
+    this.logger.warn(this.formatMessage(message), ...args);
+  }
+
+  error(message: string, ...args: unknown[]): void {
+    this.logger.error(this.formatMessage(message), ...args);
   }
 }
