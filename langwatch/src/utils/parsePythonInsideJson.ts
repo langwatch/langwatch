@@ -2,7 +2,7 @@ import * as ohm from "ohm-js";
 
 const grammar = ohm.grammar(`
   PyRepr {
-    Expression = ObjectExpr | Array | String | UUID | Number | Boolean | null
+    Expression = null | Boolean | ObjectExpr | Array | String | UUID | Number | AngleBracket
 
     ObjectExpr = ClassExpr | DictExpr
 
@@ -26,11 +26,13 @@ const grammar = ohm.grammar(`
 
     null = "None"
 
+    AngleBracket = "<" (~">" any)* ">"
+
     UUID = letter alnum alnum+
         | digit+ letter+ alnum+
         | alnum+ "-" alnum+
 
-    identifier = letter (alnum | "_")*
+    identifier = ~("None" | "True" | "False") letter (alnum | "_")*
   }
 `);
 
@@ -66,6 +68,7 @@ const semantics = grammar.createSemantics().addOperation("toJSON", {
   },
   Boolean: (b) => b.sourceString === "True",
   null: (_) => null,
+  AngleBracket: (_1, content, _2) => `<${content.sourceString}>`,
   UUID: (uuid, b, c) => uuid.sourceString + b.sourceString + c.sourceString,
   identifier: (first, rest) => first.sourceString + rest.sourceString,
 

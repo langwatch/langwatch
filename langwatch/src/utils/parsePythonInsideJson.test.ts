@@ -84,4 +84,41 @@ describe("parsePythonInsideJson", () => {
       },
     });
   });
+
+  it("should parse objects with < and >", () => {
+    const obj = {
+      a: "RunResponse(content=None, content_type='str', thinking=None, reasoning_content=None, messages=None, metrics=None, model='gpt-4.1-mini', model_provider='OpenAI', run_id='2eb5f203-cf27-4629-9e16-f0053f5a339b', agent_id='343e176a-2781-4617-b25f-8227041d3b64', agent_name=None, session_id='test_session', team_session_id=None, workflow_id=None, tools=None, formatted_tool_calls=None, images=None, videos=None, audio=None, response_audio=None, citations=None, extra_data=None, created_at=1754399668, events=None, status=<RunStatus.running: 'RUNNING'>)",
+    };
+    expect(parsePythonInsideJson(obj)).toEqual({
+      a: {
+        RunResponse: {
+          content: null,
+          content_type: "str",
+          thinking: null,
+          reasoning_content: null,
+          messages: null,
+          metrics: null,
+          model: "gpt-4.1-mini",
+          model_provider: "OpenAI",
+          run_id: "2eb5f203-cf27-4629-9e16-f0053f5a339b",
+          agent_id: "343e176a-2781-4617-b25f-8227041d3b64",
+          agent_name: null,
+          session_id: "test_session",
+          team_session_id: null,
+          workflow_id: null,
+          tools: null,
+          formatted_tool_calls: null,
+          images: null,
+          videos: null,
+          audio: null,
+          response_audio: null,
+          citations: null,
+          extra_data: null,
+          created_at: 1754399668,
+          events: null,
+          status: "<RunStatus.running: 'RUNNING'>",
+        },
+      },
+    });
+  });
 });
