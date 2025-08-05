@@ -13,7 +13,9 @@ import {
 } from "./repositories";
 import {
   type getLatestConfigVersionSchema,
+  LATEST_SCHEMA_VERSION,
   SchemaVersion,
+  getVersionValidator,
 } from "./repositories/llm-config-version-schema";
 
 // Extract the configData type from the schema
@@ -65,22 +67,44 @@ export class PromptService {
    * @param params.handle - The handle of the prompt
    * @returns The created prompt configuration
    */
-  async createPrompt(
-    params: {
-      name: string;
-      projectId: string;
-      organizationId: string;
-      handle?: string;
-      scope: PromptScope;
-    },
-    versionData?: CreateLlmConfigVersionParams
-  ): Promise<LlmConfigWithLatestVersion> {
+  async createPrompt(params: {
+    projectId: string;
+    organizationId: string;
+    handle: string;
+    scope?: PromptScope;
+    authorId?: string;
+    configData?: CreateLlmConfigVersionParams["configData"];
+    schemaVersion?: SchemaVersion;
+  }): Promise<LlmConfigWithLatestVersion> {
+    if (params.configData) {
+      const schemaVersion = params.schemaVersion ?? LATEST_SCHEMA_VERSION;
+      try {
+        getVersionValidator(schemaVersion).parse(params.configData);
+      } catch (error) {
+        throw new Error(
+          `configData does not match schema version: ${schemaVersion}`,
+          { cause: error }
+        );
+      }
+    }
+
     return this.repository.createConfigWithInitialVersion({
       configData: {
-        ...params,
+        name: params.handle,
         handle: params.handle ?? null,
+        projectId: params.projectId,
+        organizationId: params.organizationId,
+        scope: params.scope ?? "PROJECT",
+        authorId: params.authorId,
       },
-      versionData,
+      versionData: params.configData
+        ? {
+            configData: params.configData,
+            commitMessage: "Initial version",
+            authorId: params.authorId ?? null,
+            version: 0,
+          }
+        : undefined,
     });
   }
 

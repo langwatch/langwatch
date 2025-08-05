@@ -329,7 +329,10 @@ export class LlmConfigRepository {
      * The version data should not include the configId, or projectId.
      * These will be set automatically from the newly created config.
      */
-    versionData?: Omit<CreateLlmConfigVersionParams, "configId" | "projectId">;
+    versionData?: Omit<
+      CreateLlmConfigVersionParams,
+      "configId" | "projectId" | "schemaVersion"
+    >;
   }): Promise<LlmConfigWithLatestVersion> {
     const { configData, versionData } = params;
 
@@ -382,6 +385,7 @@ export class LlmConfigRepository {
           configId: newConfig.id,
           projectId: newConfig.projectId,
           authorId: configData.authorId ?? null,
+          schemaVersion: LATEST_SCHEMA_VERSION,
         },
       });
 
