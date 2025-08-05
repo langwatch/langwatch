@@ -276,7 +276,7 @@ export class LlmConfigRepository {
       });
     }
 
-    return this.prisma.llmPromptConfig.update({
+    const updatedConfig = await this.prisma.llmPromptConfig.update({
       where: { id, projectId },
       data: {
         // Only update if the field is explicitly provided (including null)
@@ -285,6 +285,15 @@ export class LlmConfigRepository {
         scope: "scope" in data ? data.scope : existingConfig.scope,
       },
     });
+
+    // Remove handle prefixes
+    updatedConfig.handle = this.removeHandlePrefixes(
+      updatedConfig.handle,
+      projectId,
+      existingConfig.organizationId
+    );
+
+    return updatedConfig;
   }
 
   /**
@@ -363,26 +372,33 @@ export class LlmConfigRepository {
         },
       });
 
-      const newVersionData =
-        // Use the provided version data if provided
-        versionData ?? {
+      let newVersionData: Partial<CreateLlmConfigVersionParams> | undefined =
+        versionData;
+
+      if (!newVersionData) {
+        const configData = await this.buildDefaultVersionConfigData({
+          projectId: newConfig.projectId,
+          tx,
+        });
+
+        newVersionData = {
+          configData,
           version: 0,
           schemaVersion: LATEST_SCHEMA_VERSION,
-          configData: await this.buildDefaultVersionBaseData({
-            projectId: newConfig.projectId,
-            tx,
-          }),
+          commitMessage: "Initial version",
         };
+      }
 
       const newVersion = await tx.llmPromptConfigVersion.create({
         data: {
           ...newVersionData,
+          version: 0,
           configData: newVersionData.configData as Prisma.InputJsonValue,
           id: this.versions.generateVersionId(),
           configId: newConfig.id,
           projectId: newConfig.projectId,
           authorId: configData.authorId ?? null,
-          schemaVersion: LATEST_SCHEMA_VERSION,
+          schemaVersion: newVersionData.schemaVersion ?? LATEST_SCHEMA_VERSION,
         },
       });
 
@@ -641,7 +657,7 @@ export class LlmConfigRepository {
   /**
    * Build a default version base for a config
    */
-  private async buildDefaultVersionBaseData(params: {
+  private async buildDefaultVersionConfigData(params: {
     projectId: string;
     tx?: Prisma.TransactionClient;
   }): Promise<CreateLlmConfigVersionParams["configData"]> {

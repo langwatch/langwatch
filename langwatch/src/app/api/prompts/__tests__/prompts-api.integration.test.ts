@@ -8,10 +8,13 @@ import { nanoid } from "nanoid";
 import { describe, expect, it, beforeEach, afterEach } from "vitest";
 
 import { prisma } from "~/server/db";
-import { LlmConfigRepository } from "~/server/prompt-config/repositories/llm-config.repository";
 
-import { app } from "./[[...route]]/app";
-import { llmPromptConfigFactory } from "~/factories/llm-config.factory";
+import { app } from "../[[...route]]/app";
+
+import {
+  llmPromptConfigFactory,
+  llmPromptConfigVersionFactory,
+} from "~/factories/llm-config.factory";
 import { projectFactory } from "~/factories/project.factory";
 
 describe("Prompts API", () => {
@@ -114,12 +117,15 @@ describe("Prompts API", () => {
     describe("when there are prompts", () => {
       let config: LlmPromptConfig;
       beforeEach(async () => {
-        const repository = new LlmConfigRepository(prisma);
-        config = await repository.createConfigWithInitialVersion({
-          name: mockConfig.name,
-          projectId: testProjectId,
-          organizationId: testOrganization.id,
-          scope: "PROJECT",
+        config = await prisma.llmPromptConfig.create({
+          data: mockConfig,
+        });
+
+        await prisma.llmPromptConfigVersion.create({
+          data: llmPromptConfigVersionFactory.build({
+            configId: config.id,
+            projectId: testProjectId,
+          }),
         });
       });
 
@@ -474,25 +480,28 @@ describe("Prompts API", () => {
             "X-Auth-Token": testApiKey,
             "Content-Type": "application/json",
           },
-          body: JSON.stringify({ name: "Test Prompt 1" }),
+          body: JSON.stringify({
+            name: "Test Prompt 1",
+          }),
         });
 
         const prompt1 = await prompt1Res.json();
 
         // Create second prompt
-        const prompt2Res = await app.request(`/api/prompts`, {
+        await app.request(`/api/prompts`, {
           method: "POST",
           headers: {
             "X-Auth-Token": testApiKey,
             "Content-Type": "application/json",
           },
-          body: JSON.stringify({ name: "Test Prompt 2" }),
+          body: JSON.stringify({
+            name: "Test Prompt 2",
+            handle: "duplicate-ref",
+          }),
         });
 
-        const prompt2 = await prompt2Res.json();
-
         // Set handle on first prompt
-        const updateRes1 = await app.request(`/api/prompts/${prompt1.id}`, {
+        const updateRes = await app.request(`/api/prompts/${prompt1.id}`, {
           method: "PUT",
           headers: {
             "X-Auth-Token": testApiKey,
@@ -504,22 +513,8 @@ describe("Prompts API", () => {
           }),
         });
 
-        expect(updateRes1.status).toBe(200);
-
-        // Try to set same handle on second prompt - should fail
-        const updateRes2 = await app.request(`/api/prompts/${prompt2.id}`, {
-          method: "PUT",
-          headers: {
-            "X-Auth-Token": testApiKey,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            name: "Test Prompt 2",
-            handle: "duplicate-ref",
-          }),
-        });
-
-        expect(updateRes2.status).toBe(409);
+        // Should fail because the handle is already taken
+        expect(updateRes.status).toBe(409);
       });
     });
     describe("when scoped to organization", () => {

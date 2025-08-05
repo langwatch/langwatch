@@ -40,7 +40,7 @@ type Variables = {
 // Define the Hono app
 export const app = new Hono<{
   Variables: Variables;
-}>().basePath("/api/prompts");
+}>().basePath("/");
 
 // Middleware
 app.use("/*", organizationMiddleware);

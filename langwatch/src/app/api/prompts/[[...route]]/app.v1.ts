@@ -3,6 +3,7 @@ import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { describeRoute } from "hono-openapi";
 import { validator as zValidator, resolver } from "hono-openapi/zod";
+import { Prompt } from "next/font/google";
 import { z } from "zod";
 
 import { prisma } from "~/server/db";
@@ -43,7 +44,7 @@ type Variables = {
 // Define the Hono app
 export const app = new Hono<{
   Variables: Variables;
-}>().basePath("/api/prompts");
+}>().basePath("/");
 
 // Middleware
 app.use("/*", organizationMiddleware);
@@ -125,20 +126,32 @@ app.post(
       "Creating new prompt with initial version"
     );
 
-    const newConfig = await service.createPrompt({
-      name,
-      projectId: project.id,
-      handle: data.handle ?? "",
-      organizationId: organization.id,
-      scope: data.scope,
-    });
+    try {
+      const newConfig = await service.createPrompt({
+        name,
+        projectId: project.id,
+        handle: data.handle ?? "",
+        organizationId: organization.id,
+        scope: data.scope,
+      });
 
-    logger.info(
-      { projectId: project.id, promptId: newConfig.id, promptName: name },
-      "Successfully created new prompt"
-    );
+      logger.info(
+        { projectId: project.id, promptId: newConfig.id, promptName: name },
+        "Successfully created new prompt"
+      );
 
-    return c.json(newConfig);
+      return c.json(newConfig);
+    } catch (error: any) {
+      if (error.code === "P2002" && error.meta?.target?.includes("handle")) {
+        throw new HTTPException(409, {
+          message: `Prompt handle already exists for scope: ${
+            data.scope ?? PromptScope.PROJECT
+          }`,
+        });
+      }
+
+      throw error;
+    }
   }
 );
 

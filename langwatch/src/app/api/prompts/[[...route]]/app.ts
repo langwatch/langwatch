@@ -4,6 +4,7 @@ import { authMiddleware, handleError } from "../../middleware";
 import { loggerMiddleware } from "../../middleware/logger";
 
 import { app as appV1 } from "./app.v1";
+import { app as appV2 } from "./app.v2";
 import { patchHonoOpenApiSpecFix } from "./utils";
 
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
@@ -22,3 +23,4 @@ app.onError(handleError);
 patchHonoOpenApiSpecFix(app);
 
 app.route("/", appV1);
+app.route("/v2", appV2);
