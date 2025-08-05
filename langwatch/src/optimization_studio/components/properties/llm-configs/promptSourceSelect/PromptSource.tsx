@@ -41,12 +41,14 @@ const usePrompSourceController = ({
 
   const promptConfigsWithName = useMemo(
     () =>
-      (promptConfigs ?? []).map((p) => ({
-        id: p.id,
-        name: `${p.name} - ${p.latestVersion.commitMessage}`,
-        latestVersion: p.latestVersion,
-        updatedAt: p.updatedAt,
-      })),
+      (promptConfigs ?? [])
+        .filter((p) => p.handle)
+        .map((p) => ({
+          id: p.id,
+          name: (p.handle == p.id ? p.name : p.handle) ?? "",
+          latestVersion: p.latestVersion,
+          updatedAt: p.updatedAt,
+        })),
     [promptConfigs]
   );
 

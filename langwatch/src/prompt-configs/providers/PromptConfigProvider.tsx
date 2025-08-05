@@ -6,7 +6,7 @@ import {
   useRef,
   useState,
 } from "react";
-import { useFormContext } from "react-hook-form";
+import { type UseFormReturn } from "react-hook-form";
 
 import {
   SaveVersionDialog,
@@ -26,10 +26,12 @@ import {
 interface PromptConfigContextType {
   triggerSaveVersion: ({
     config,
+    form,
     updateConfigValues,
     editingHandleOrScope,
   }: {
     config: LlmConfigWithLatestVersion;
+    form: UseFormReturn<PromptConfigFormValues>;
     updateConfigValues: PromptConfigFormValues;
     editingHandleOrScope: boolean;
   }) => Promise<void>;
@@ -74,22 +76,22 @@ export function PromptConfigProvider({
     ((saveFormValues: SaveDialogFormValues) => Promise<void>) | null
   >(null);
 
-  const methods = useFormContext<PromptConfigFormValues>();
-
   const triggerSaveVersion = useCallback(
     async ({
       config,
+      form,
       updateConfigValues,
       editingHandleOrScope,
     }: {
       config: LlmConfigWithLatestVersion;
+      form: UseFormReturn<PromptConfigFormValues>;
       updateConfigValues: PromptConfigFormValues;
       editingHandleOrScope: boolean;
     }) => {
       setCurrentConfig(config);
       setEditingHandleOrScope(editingHandleOrScope);
       // Trigger the form validation
-      const isValid = await methods.trigger();
+      const isValid = await form.trigger();
 
       if (!isValid) {
         // If the form is not valid, don't save
@@ -151,7 +153,7 @@ export function PromptConfigProvider({
 
       openDialog();
     },
-    [openDialog, updatePromptConfig, createNewVersion, closeDialog, methods]
+    [openDialog, updatePromptConfig, createNewVersion, closeDialog]
   );
 
   const firstTimeSave = !!(

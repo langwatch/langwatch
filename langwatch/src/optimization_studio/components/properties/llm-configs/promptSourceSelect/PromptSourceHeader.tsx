@@ -1,4 +1,4 @@
-import { HStack, Text } from "@chakra-ui/react";
+import { HStack, Spacer, Text } from "@chakra-ui/react";
 import type { Node } from "@xyflow/react";
 import { useMemo } from "react";
 import { useFormContext } from "react-hook-form";
@@ -150,7 +150,14 @@ export function PromptSourceHeader({
       size="sm"
       paddingBottom={4}
     >
-      <HStack justifyContent="space-between">
+      <HStack
+        justifyContent="space-between"
+        border="1px solid"
+        borderColor="gray.200"
+        borderRadius="md"
+        padding={2}
+        background="gray.50"
+      >
         <HStack paddingX={1} gap={1}>
           {savedConfig?.handle ? (
             <Text fontSize="sm" fontWeight="500" fontFamily="mono">
@@ -159,10 +166,8 @@ export function PromptSourceHeader({
           ) : (
             <Text color="gray.500">Draft</Text>
           )}
-          {savedConfig?.handle && (
-            <CopyButton value={savedConfig.handle} label="Prompt ID" />
-          )}
         </HStack>
+        <Spacer />
         {savedConfig && (
           <GeneratePromptApiSnippetDialog
             configId={configId}
@@ -173,9 +178,7 @@ export function PromptSourceHeader({
             </GeneratePromptApiSnippetDialog.Trigger>
           </GeneratePromptApiSnippetDialog>
         )}
-        <HStack flex={1} width="50%">
-          <PromptSource configId={configId} onSelect={onPromptSourceSelect} />
-        </HStack>
+        <PromptSource configId={configId} onSelect={onPromptSourceSelect} />
         {node.data.configId && (
           <VersionHistoryButton
             configId={node.data.configId}
@@ -185,6 +188,7 @@ export function PromptSourceHeader({
         <VersionSaveButton
           disabled={savedConfig && !hasDrifted}
           onClick={() => void handleSaveVersion()}
+          hideLabel={true}
         />
       </HStack>
     </VerticalFormControl>

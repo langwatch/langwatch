@@ -65,6 +65,7 @@ function InnerPromptConfigForm(props: PromptConfigFormProps) {
     if (!savedConfig) return;
     void triggerSaveVersion({
       config: savedConfig,
+      form: methods,
       updateConfigValues: methods.getValues(),
       editingHandleOrScope: false,
     }).catch((error) => {

@@ -93,6 +93,14 @@ function SignaturePropertiesPanelInner({
 
   const { isInsideWizard } = useWizardContext();
 
+  const { data: llmConfig } = api.llmConfigs.getByIdWithLatestVersion.useQuery(
+    {
+      id: configId,
+      projectId: project?.id ?? "",
+    },
+    { enabled: !!project?.id && !!configId }
+  );
+
   /**
    * Converts form values to node data and updates the workflow store.
    * This ensures the node's data stays in sync with the form state.
@@ -102,16 +110,21 @@ function SignaturePropertiesPanelInner({
   const syncNodeDataWithFormValues = useMemo(
     () =>
       debounce((formValues: PromptConfigFormValues) => {
+        if (!llmConfig) {
+          return;
+        }
+
         const newNodeData = promptConfigFormValuesToOptimizationStudioNodeData(
-          configId,
+          llmConfig,
           formValues
         );
+
         setNode({
           id: node.id,
           data: newNodeData,
         });
       }, 200),
-    [configId, node.id, setNode]
+    [llmConfig, node.id, setNode]
   );
 
   // Initialize form with values from node data
@@ -181,6 +194,7 @@ function SignaturePropertiesPanelInner({
 
       await triggerSaveVersion({
         config,
+        form: formProps.methods,
         updateConfigValues: saveFormValues,
         editingHandleOrScope: false,
       });

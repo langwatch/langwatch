@@ -124,6 +124,10 @@ export const PromptConfigPanel = forwardRef(function PromptConfigPanel(
 
   // Handle prompt execution with current form data and inputs
   const handleExecute = (inputData: ExecuteData) => {
+    if (!llmConfig) {
+      return;
+    }
+
     const formData = formProps.methods.getValues();
     // Update inputs with values from the input panel
     formData.version.configData.inputs = inputFields?.map((input) => ({
@@ -134,7 +138,7 @@ export const PromptConfigPanel = forwardRef(function PromptConfigPanel(
     invokeLLM({
       projectId,
       data: promptConfigFormValuesToOptimizationStudioNodeData(
-        configId,
+        llmConfig,
         formData
       ),
     });

@@ -32,7 +32,7 @@ export const llmPromptConfigFactory = Factory.define<
   updatedAt: new Date(),
   deletedAt: null,
   handle: null,
-  organizationId: null,
+  organizationId: "", // This should be overridden with an actual organization ID when used
   scope: PromptScope.PROJECT,
 }));
 

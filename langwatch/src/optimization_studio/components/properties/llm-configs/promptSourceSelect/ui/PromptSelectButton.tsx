@@ -1,5 +1,5 @@
-import { Button, HStack, Text } from "@chakra-ui/react";
-import { Book, ChevronDown } from "react-feather";
+import { Button } from "@chakra-ui/react";
+import { LuFolder } from "react-icons/lu";
 import { Tooltip } from "../../../../../../components/ui/tooltip";
 
 // Prompt Selection Button Component
@@ -23,8 +23,9 @@ export function PromptSelectionButton({
         onClick={onClick}
         justifyContent="space-between"
         variant="outline"
+        background="white"
       >
-        <Book size={16} />
+        <LuFolder size={16} />
       </Button>
     </Tooltip>
   );

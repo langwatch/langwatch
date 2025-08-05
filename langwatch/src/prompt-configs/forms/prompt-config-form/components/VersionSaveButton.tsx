@@ -6,10 +6,12 @@ export function VersionSaveButton({
   disabled,
   onClick,
   isSaving,
+  hideLabel = false,
 }: {
   disabled?: boolean;
   onClick: () => void;
   isSaving?: boolean;
+  hideLabel?: boolean;
 }) {
   return (
     <Tooltip
@@ -30,7 +32,7 @@ export function VersionSaveButton({
         }}
       >
         {isSaving ? <Spinner /> : <Save />}
-        <Text display={{ base: "none", "2xl": "block" }}>Save Version</Text>
+        {!hideLabel && <Text>Save Version</Text>}
       </Button>
     </Tooltip>
   );

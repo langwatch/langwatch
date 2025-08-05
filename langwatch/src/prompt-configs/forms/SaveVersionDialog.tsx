@@ -90,7 +90,7 @@ export function SaveVersionDialog({
           </form>
         </Dialog.Body>
         <Dialog.Footer>
-          <Button variant="outline" mr={3} onClick={onClose}>
+          <Button variant="outline" onClick={onClose}>
             Cancel
           </Button>
           <Button

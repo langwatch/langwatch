@@ -70,11 +70,12 @@ export function llmConfigToOptimizationStudioNodeData(
 }
 
 export function promptConfigFormValuesToOptimizationStudioNodeData(
-  configId: string,
+  llmConfig: LlmConfigWithLatestVersion,
   formValues: PromptConfigFormValues
 ): Node<LlmPromptConfigComponent>["data"] {
   return {
-    configId,
+    configId: llmConfig.id,
+    name: llmConfig.handle?.replace("/", " ") || llmConfig.name || "Anonymous",
     inputs: formValues.version?.configData?.inputs,
     outputs: formValues.version?.configData?.outputs,
     parameters: [

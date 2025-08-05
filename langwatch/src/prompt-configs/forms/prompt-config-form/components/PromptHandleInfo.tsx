@@ -24,6 +24,7 @@ export function PromptHandleInfo({ methods, config }: ConfigHeaderProps) {
   const handleEditClick = useCallback(() => {
     void triggerSaveVersion({
       config,
+      form: methods,
       updateConfigValues: methods.getValues(),
       editingHandleOrScope: true,
     });
