@@ -1,6 +1,5 @@
 import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-http";
-import { version } from "../../../package.json";
-import { getApiKey, getEndpoint } from "../../client";
+import { LANGWATCH_SDK_LANGUAGE, LANGWATCH_SDK_NAME, LANGWATCH_SDK_VERSION, TRACES_PATH } from "../setup/utils";
 
 export interface LangWatchExporterOptions {
   endpoint?: string;
@@ -45,8 +44,8 @@ export class LangWatchExporter extends OTLPTraceExporter {
    * @param opts.debug - Deprecated: This option is deprecated and will be removed in a future version
    */
   constructor(opts?: LangWatchExporterOptions) {
-    const setApiKey = opts?.apiKey ?? getApiKey();
-    const setEndpoint = opts?.endpoint ?? getEndpoint();
+    const apiKey = opts?.apiKey ?? process.env.LANGWATCH_API_KEY ?? "";
+    const endpoint = opts?.endpoint ?? process.env.LANGWATCH_ENDPOINT ?? "https://app.langwatch.ai";
 
     if (opts && opts.includeAllSpans !== void 0) {
       console.warn("[LangWatchExporter] The behavior of `includeAllSpans` is deprecated and will be removed in a future version");
@@ -55,14 +54,17 @@ export class LangWatchExporter extends OTLPTraceExporter {
       console.warn("[LangWatchExporter] The behavior of `debug` is deprecated and will be removed in a future version");
     }
 
+    const url = new URL(TRACES_PATH, endpoint);
+    const otelEndpoint = url.toString();
+
     super({
       headers: {
-        "Authorization": `Bearer ${setApiKey}`,
-        "X-LangWatch-SDK-Version": version,
-        "X-LangWatch-SDK-Language": `typescript-${typeof process !== "undefined" ? "node" : "browser"}`,
-        "X-LangWatch-SDK-Name": "langwatch-observability-sdk",
+        "x-langwatch-sdk-name": LANGWATCH_SDK_NAME,
+        "x-langwatch-sdk-language": LANGWATCH_SDK_LANGUAGE,
+        "x-langwatch-sdk-version": LANGWATCH_SDK_VERSION,
+        ...(apiKey ? { authorization: `Bearer ${apiKey}` } : {}),
       },
-      url: setEndpoint,
+      url: otelEndpoint.toString(),
     });
   }
 }
