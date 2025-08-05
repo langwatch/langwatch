@@ -3,8 +3,8 @@ import {
   type PrismaClient,
   type PromptScope,
 } from "@prisma/client";
-
 import { type z } from "zod";
+
 import { type UpdateLlmConfigDTO } from "./dtos";
 import {
   LlmConfigRepository,

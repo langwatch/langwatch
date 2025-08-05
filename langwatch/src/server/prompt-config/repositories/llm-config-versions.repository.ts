@@ -1,6 +1,7 @@
 import {
   type LlmPromptConfig,
   type LlmPromptConfigVersion,
+  type Prisma,
   type PrismaClient,
   type User,
 } from "@prisma/client";
@@ -12,6 +13,7 @@ import {
   type SchemaVersion,
   getVersionValidator,
 } from "./llm-config-version-schema";
+import { LATEST_SCHEMA_VERSION } from "./llm-config-version-schema";
 import { LlmConfigRepository } from "./llm-config.repository";
 
 /**
@@ -237,5 +239,48 @@ export class LlmConfigVersionsRepository {
     );
 
     return newVersion;
+  }
+
+  async buildDefault(params: {
+    llmConfig: Pick<
+      LlmPromptConfig,
+      "id" | "projectId" | "organizationId" | "scope"
+    >;
+    tx?: Prisma.TransactionClient;
+    authorId?: string;
+  }) {
+    const { tx, llmConfig, authorId } = params;
+    const client = tx ?? this.prisma;
+
+    // Get the default model for the project
+    const defaultModel = await client.project.findUnique({
+      where: { id: llmConfig.projectId },
+    });
+
+    return {
+      configId: llmConfig.id,
+      projectId: llmConfig.projectId,
+      organizationId: llmConfig.organizationId,
+      authorId: authorId ?? null,
+      version: 0,
+      configData: {
+        model: defaultModel?.defaultModel ?? "openai/gpt-4o-mini",
+        prompt: "You are a helpful assistant",
+        messages: [
+          {
+            role: "user",
+            content: "{{input}}",
+          },
+        ],
+        inputs: [{ identifier: "input", type: "str" }],
+        outputs: [{ identifier: "output", type: "str" }],
+        demonstrations: {
+          columns: [],
+          rows: [],
+        },
+      },
+      schemaVersion: LATEST_SCHEMA_VERSION,
+      commitMessage: "Initial version",
+    };
   }
 }

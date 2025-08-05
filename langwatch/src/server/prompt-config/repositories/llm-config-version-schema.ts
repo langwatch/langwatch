@@ -3,10 +3,10 @@ import type { LlmPromptConfigVersion } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 
+import { nodeDatasetSchema } from "../../../optimization_studio/types/dsl";
 import { LlmConfigInputTypes, LlmConfigOutputTypes } from "../../../types";
 import type { LlmConfigVersionDTO } from "./llm-config-versions.repository";
 import { createLogger } from "../../../utils/logger";
-import { nodeDatasetSchema } from "../../../optimization_studio/types/dsl";
 
 const logger = createLogger(
   "langwatch:prompt-config:llm-config-version-schema"

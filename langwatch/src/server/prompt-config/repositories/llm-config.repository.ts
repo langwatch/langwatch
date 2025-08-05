@@ -10,7 +10,6 @@ import { createLogger } from "../../../utils/logger";
 import { NotFoundError } from "../errors";
 
 import {
-  LATEST_SCHEMA_VERSION,
   parseLlmConfigVersion,
   type LatestConfigVersionSchema,
   getSchemaValidator,
@@ -341,38 +340,15 @@ export class LlmConfigRepository {
         },
       });
 
-      // Get the default model for the project
-      const defaultModel = await tx.project.findUnique({
-        where: { id: configData.projectId },
+      // Create the initial version within the same transaction
+      const defaultVersion = await this.versions.buildDefault({
+        llmConfig: newConfig,
+        authorId: configData.authorId,
+        tx,
       });
 
-      // Create the initial version within the same transaction
       const newVersion = await tx.llmPromptConfigVersion.create({
-        data: {
-          id: `prompt_version_${nanoid()}`,
-          configId: newConfig.id,
-          projectId: configData.projectId,
-          authorId: configData.authorId,
-          version: 0,
-          configData: {
-            model: defaultModel?.defaultModel ?? "openai/gpt-4o-mini",
-            prompt: "You are a helpful assistant",
-            messages: [
-              {
-                role: "user",
-                content: "{{input}}",
-              },
-            ],
-            inputs: [{ identifier: "input", type: "str" }],
-            outputs: [{ identifier: "output", type: "str" }],
-            demonstrations: {
-              columns: [],
-              rows: [],
-            },
-          },
-          schemaVersion: LATEST_SCHEMA_VERSION,
-          commitMessage: "Initial version",
-        },
+        data: defaultVersion,
       });
 
       // Update the config's updatedAt timestamp
