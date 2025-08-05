@@ -1,6 +1,6 @@
 {
   "name": "langwatch",
-  "version": "0.3.2",
+  "version": "0.4.0-prerelease.1",
   "description": "",
   "main": "dist/index.js",
   "module": "dist/index.mjs",
@@ -19,11 +19,6 @@
       "import": "./dist/index.mjs",
       "require": "./dist/index.js"
     },
-    "./evaluation": {
-      "types": "./dist/evaluation/index.d.ts",
-      "require": "./dist/evaluation/index.js",
-      "import": "./dist/evaluation/index.mjs"
-    },
     "./observability": {
       "types": "./dist/observability/index.d.ts",
       "require": "./dist/observability/index.js",
@@ -33,21 +28,6 @@
       "types": "./dist/observability/instrumentation/langchain/index.d.ts",
       "require": "./dist/observability/instrumentation/langchain/index.js",
       "import": "./dist/observability/instrumentation/langchain/index.mjs"
-    },
-    "./prompt": {
-      "types": "./dist/prompt/index.d.ts",
-      "require": "./dist/prompt/index.js",
-      "import": "./dist/prompt/index.mjs"
-    },
-    "./node": {
-      "types": "./dist/client-node.d.ts",
-      "import": "./dist/client-node.mjs",
-      "require": "./dist/client-node.js"
-    },
-    "./browser": {
-      "types": "./dist/client-browser.d.ts",
-      "import": "./dist/client-browser.mjs",
-      "require": "./dist/client-browser.js"
     }
   },
   "repository": {
@@ -73,7 +53,7 @@
     "@eslint/js": "^9.32.0",
     "@types/debug": "^4.1.12",
     "@types/js-yaml": "^4.0.9",
-    "@types/node": "^24.1.0",
+    "@types/node": "^24.2.0",
     "@typescript/native-preview": "7.0.0-dev.20250804.1",
     "@vercel/otel": "^1.13.0",
     "@vitest/coverage-v8": "3.2.4",
@@ -84,7 +64,7 @@
     "ts-to-zod": "3.15.0",
     "tsup": "^8.5.0",
     "typescript": "^5.9.2",
-    "typescript-eslint": "^8.38.0",
+    "typescript-eslint": "^8.39.0",
     "vitest": "^3.2.4"
   },
   "dependencies": {
