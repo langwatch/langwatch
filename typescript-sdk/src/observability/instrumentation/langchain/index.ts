@@ -19,7 +19,7 @@ import {
 } from "@langchain/core/messages";
 import type { ChatGeneration, LLMResult } from "@langchain/core/outputs";
 import type { ChainValues } from "@langchain/core/utils/types";
-import { getLangWatchTracer } from "../../trace";
+import { getLangWatchTracer } from "../../tracer";
 import type { LangWatchSpan } from "../../span";
 import { context, trace, SpanStatusCode, Attributes } from "@opentelemetry/api";
 import { chatMessageSchema } from "../../../internal/generated/types/tracer.generated";

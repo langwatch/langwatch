@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { getLangWatchTracer } from '../trace';
+import { getLangWatchTracer } from '../tracer';
 import type { Tracer, Span, SpanOptions, Context } from '@opentelemetry/api';
 
 // Mock createLangWatchSpan to just tag the span for test visibility

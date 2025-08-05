@@ -4,7 +4,7 @@ import { LangWatchCallbackHandler } from "../../../langchain";
 import { setupLangWatch } from "../../../../../client-node";
 import { DynamicTool } from "@langchain/core/tools";
 import { AgentExecutor, createToolCallingAgent, initializeAgentExecutorWithOptions } from "langchain/agents";
-import { getLangWatchTracer } from "../../../../trace";
+import { getLangWatchTracer } from "../../../../tracer";
 import { ChatPromptTemplate } from "@langchain/core/prompts";
 import { beforeEach } from "node:test";
 
