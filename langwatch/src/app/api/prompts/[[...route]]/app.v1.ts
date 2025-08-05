@@ -271,6 +271,15 @@ app.get(
   "/:id{.+}",
   describeRoute({
     description: "Get a specific prompt",
+    parameters: [
+      {
+        name: "version",
+        in: "query",
+        description: "Specific version number to retrieve",
+        required: false,
+        schema: { type: "integer", minimum: 0 },
+      },
+    ],
     responses: {
       ...baseResponses,
       200: buildStandardSuccessResponse(promptOutputSchema),
@@ -287,13 +296,17 @@ app.get(
     const project = c.get("project");
     const organization = c.get("organization");
     const { id } = c.req.param();
+    const version = c.req.query("version")
+      ? parseInt(c.req.query("version")!)
+      : undefined;
 
-    logger.info({ projectId: project.id, id }, "Getting prompt");
+    logger.info({ projectId: project.id, id, version }, "Getting prompt");
 
     const config = await service.getPromptByIdOrHandle({
       idOrHandle: id,
       projectId: project.id,
       organizationId: organization.id,
+      version,
     });
 
     if (!config) {

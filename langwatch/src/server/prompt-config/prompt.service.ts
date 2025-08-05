@@ -53,6 +53,7 @@ export class PromptService {
     idOrHandle: string;
     projectId: string;
     organizationId: string;
+    version?: number;
   }): Promise<LlmConfigWithLatestVersion | null> {
     const { idOrHandle, projectId, organizationId } = params;
 

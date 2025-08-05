@@ -1,12 +1,12 @@
 import {
   trace as otelTrace,
-  Tracer,
-  Span,
-  SpanOptions,
-  Context,
+  type Tracer,
+  type Span,
+  type SpanOptions,
+  type Context,
   SpanStatusCode,
 } from "@opentelemetry/api";
-import { LangWatchSpan, createLangWatchSpan } from "./span";
+import { type LangWatchSpan, createLangWatchSpan } from "./span";
 
 /**
  * LangWatch OpenTelemetry Tracing Extensions
@@ -130,19 +130,19 @@ export interface LangWatchTracer extends Tracer {
    */
   withActiveSpan<T>(
     name: string,
-    fn: (span: LangWatchSpan) => Promise<T> | T
-  ): Promise<T>;
+    fn: (span: LangWatchSpan) => Promise<T> | T,
+  ): ReturnType<typeof fn>;
   withActiveSpan<T>(
     name: string,
     options: SpanOptions,
-    fn: (span: LangWatchSpan) => Promise<T> | T
-  ): Promise<T>;
+    fn: (span: LangWatchSpan) => Promise<T> | T,
+  ): ReturnType<typeof fn>;
   withActiveSpan<T>(
     name: string,
     options: SpanOptions,
     context: Context,
-    fn: (span: LangWatchSpan) => Promise<T> | T
-  ): Promise<T>;
+    fn: (span: LangWatchSpan) => Promise<T> | T,
+  ): ReturnType<typeof fn>;
 }
 
 /**
@@ -164,7 +164,10 @@ export interface LangWatchTracer extends Tracer {
  *   span.end();
  * });
  */
-export function getLangWatchTracer(name: string, version?: string): LangWatchTracer {
+export function getLangWatchTracer(
+  name: string,
+  version?: string,
+): LangWatchTracer {
   const tracer = otelTrace.getTracer(name, version);
 
   // Create a proxy for the tracer that intercepts the calls to startActiveSpan and
@@ -232,9 +235,13 @@ export function getLangWatchTracer(name: string, version?: string): LangWatchTra
             // Find the function argument (should be the last argument)
             const fnIndex = args.findIndex((arg) => typeof arg === "function");
             if (fnIndex === -1) {
-              throw new Error("withActiveSpan requires a function as the last argument");
+              throw new Error(
+                "withActiveSpan requires a function as the last argument",
+              );
             }
-            const userFn = args[fnIndex] as (span: LangWatchSpan) => Promise<any> | any;
+            const userFn = args[fnIndex] as (
+              span: LangWatchSpan,
+            ) => Promise<any> | any;
             // The preceding arguments are: name, options?, context?
             const name = args[0];
             const options = args.length > 2 ? args[1] : undefined;
@@ -249,7 +256,7 @@ export function getLangWatchTracer(name: string, version?: string): LangWatchTra
                 } catch (err: any) {
                   wrappedSpan.setStatus({
                     code: SpanStatusCode.ERROR,
-                    message: err && err.message ? err.message : String(err),
+                    message: err?.message ? err.message : String(err),
                   });
                   wrappedSpan.recordException(err);
                   reject(err);

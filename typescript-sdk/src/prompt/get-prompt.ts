@@ -1,13 +1,26 @@
 import { PromptService } from "./service";
-import { CompiledPrompt, Prompt, TemplateVariables } from "./prompt";
+import {
+  type CompiledPrompt,
+  type Prompt,
+  type TemplateVariables,
+} from "./prompt";
 import * as intSemconv from "../observability/semconv";
 import { tracer } from "./tracer";
-import { canAutomaticallyCaptureInput, canAutomaticallyCaptureOutput } from "../client";
+import {
+  canAutomaticallyCaptureInput,
+  canAutomaticallyCaptureOutput,
+} from "../client";
 
-export async function getPrompt(id: string, variables: TemplateVariables): Promise<CompiledPrompt>;
+export async function getPrompt(
+  id: string,
+  variables: TemplateVariables,
+): Promise<CompiledPrompt>;
 export async function getPrompt(id: string): Promise<Prompt>;
 
-export async function getPrompt(id: string, variables?: TemplateVariables): Promise<Prompt | CompiledPrompt> {
+export async function getPrompt(
+  id: string,
+  variables?: TemplateVariables,
+): Promise<Prompt | CompiledPrompt> {
   return tracer.withActiveSpan("retrieve prompt", async (span) => {
     span.setType("prompt");
     span.setAttribute(intSemconv.ATTR_LANGWATCH_PROMPT_ID, id);
