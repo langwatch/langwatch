@@ -1,12 +1,12 @@
 import {
   trace as otelTrace,
-  type Tracer,
-  type Span,
-  type SpanOptions,
-  type Context,
+  Tracer,
+  Span,
+  SpanOptions,
+  Context,
   SpanStatusCode,
 } from "@opentelemetry/api";
-import { type LangWatchSpan, createLangWatchSpan } from "./span";
+import { LangWatchSpan, createLangWatchSpan } from "./span";
 
 /**
  * LangWatch OpenTelemetry Tracing Extensions
@@ -128,21 +128,21 @@ export interface LangWatchTracer extends Tracer {
    *     // ... your code ...
    *   });
    */
-  withActiveSpan<T>(
+  withActiveSpan<F extends (span: LangWatchSpan) => unknown>(
     name: string,
-    fn: (span: LangWatchSpan) => Promise<T> | T,
-  ): ReturnType<typeof fn>;
-  withActiveSpan<T>(
+    fn: F,
+  ): ReturnType<F>;
+  withActiveSpan<F extends (span: LangWatchSpan) => unknown>(
     name: string,
     options: SpanOptions,
-    fn: (span: LangWatchSpan) => Promise<T> | T,
-  ): ReturnType<typeof fn>;
-  withActiveSpan<T>(
+    fn: F,
+  ): ReturnType<F>;
+  withActiveSpan<F extends (span: LangWatchSpan) => unknown>(
     name: string,
     options: SpanOptions,
     context: Context,
-    fn: (span: LangWatchSpan) => Promise<T> | T,
-  ): ReturnType<typeof fn>;
+    fn: F,
+  ): ReturnType<F>;
 }
 
 /**
@@ -256,7 +256,7 @@ export function getLangWatchTracer(
                 } catch (err: any) {
                   wrappedSpan.setStatus({
                     code: SpanStatusCode.ERROR,
-                    message: err?.message ? err.message : String(err),
+                    message: err && err.message ? err.message : String(err),
                   });
                   wrappedSpan.recordException(err);
                   reject(err);

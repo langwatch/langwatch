@@ -1,13 +1,39 @@
 import { PromptService } from "./service";
-import { CompiledPrompt, Prompt, TemplateVariables } from "./prompt";
+import {
+  type CompiledPrompt,
+  type Prompt,
+  type TemplateVariables,
+} from "./prompt";
 import * as intSemconv from "../observability/semconv";
-import { tracer } from "./tracer";
-import { canAutomaticallyCaptureInput, canAutomaticallyCaptureOutput } from "../client";
+import { tracer } from "./tracing/tracer";
+import {
+  canAutomaticallyCaptureInput,
+  canAutomaticallyCaptureOutput,
+} from "../client";
 
-export async function getPromptVersion(id: string, versionId: string, variables: TemplateVariables): Promise<CompiledPrompt>;
-export async function getPromptVersion(id: string, versionId: string): Promise<Prompt>;
-
-export async function getPromptVersion(id: string, versionId: string, variables?: TemplateVariables): Promise<Prompt | CompiledPrompt> {
+/**
+ * Retrieves a specific version of a prompt by ID and optionally compiles it with variables.
+ * @param id - The ID of the prompt to retrieve.
+ * @param versionId - The ID of the version to retrieve.
+ * @param variables - Optional variables to compile the prompt with.
+ * @returns The prompt or compiled prompt.
+ * @deprecated Use the PromptFacade instead: langwatch.prompts.get(id, versionId, variables)
+ * @throws {Error} If the prompt version is not found.
+ */
+export async function getPromptVersion(
+  id: string,
+  versionId: string,
+  variables: TemplateVariables,
+): Promise<CompiledPrompt>;
+export async function getPromptVersion(
+  id: string,
+  versionId: string,
+): Promise<Prompt>;
+export async function getPromptVersion(
+  id: string,
+  versionId: string,
+  variables?: TemplateVariables,
+): Promise<Prompt | CompiledPrompt> {
   return tracer.withActiveSpan("retrieve prompt version", async (span) => {
     span.setType("prompt");
     span.setAttribute(intSemconv.ATTR_LANGWATCH_PROMPT_ID, id);

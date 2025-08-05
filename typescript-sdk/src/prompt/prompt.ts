@@ -1,5 +1,7 @@
 import { Liquid } from "liquidjs";
 import type { paths } from "../internal/generated/openapi/api-client";
+import { PromptTracingDecorator } from "./prompt-tracing.decorator";
+import { traceCompile } from "./tracing/trace-compile";
 
 // Extract the prompt response type from OpenAPI schema
 export type PromptResponse = NonNullable<
@@ -58,6 +60,10 @@ export class Prompt implements PromptResponse {
     this.prompt = promptData.prompt;
     this.messages = promptData.messages;
     this.response_format = promptData.response_format;
+
+    // Traced methods
+    this.compile = traceCompile(this.compile.bind(this));
+    this.compileStrict = traceCompile(this.compileStrict.bind(this));
   }
 
   /**
@@ -128,10 +134,10 @@ export class Prompt implements PromptResponse {
   }
 }
 
-/**
+export /**
  * Represents a compiled prompt that extends Prompt with reference to the original template
  */
-export class CompiledPrompt extends Prompt {
+class CompiledPrompt extends Prompt {
   constructor(
     compiledData: PromptResponse,
     public readonly original: Prompt,
