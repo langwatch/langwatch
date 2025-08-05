@@ -1,6 +1,8 @@
-import { type PromptService } from "./service";
+import { PromptService } from "./service";
 import { type Prompt } from "./prompt";
 import type { CreatePromptBodyV2, UpdatePromptBody } from "./types";
+import { PromptServiceTracingDecorator } from "./prompt-service-tracing.decorator";
+import { PromptTracingDecorator } from "./prompt-tracing.decorator";
 
 /**
  * Facade for prompt operations in the LangWatch SDK.
@@ -9,8 +11,8 @@ import type { CreatePromptBodyV2, UpdatePromptBody } from "./types";
 export class PromptFacade {
   private service: PromptService;
 
-  constructor(service: PromptService) {
-    this.service = service;
+  constructor(service?: PromptService) {
+    this.service = service ?? PromptService.getInstance();
   }
 
   /**
@@ -19,8 +21,9 @@ export class PromptFacade {
    * @returns The created Prompt instance.
    * @throws {PromptsError} If the API call fails.
    */
-  async create(data: CreatePromptBodyV2): Promise<Prompt> {
-    return this.service.create(data);
+  async create(data: CreatePromptBodyV2): Promise<PromptTracingDecorator> {
+    const prompt = await this.service.create(data);
+    return new PromptTracingDecorator(prompt);
   }
 
   /**
@@ -33,11 +36,10 @@ export class PromptFacade {
   async get(
     handleOrId: string,
     options?: { version?: string },
-  ): Promise<Prompt | null> {
-    if (options?.version) {
-      return this.service.getVersion(handleOrId, options.version);
-    }
-    return this.service.get(handleOrId);
+  ): Promise<PromptTracingDecorator | null> {
+    const service = new PromptServiceTracingDecorator(this.service);
+    const prompt = await service.get(handleOrId, options);
+    return prompt ? new PromptTracingDecorator(prompt) : null;
   }
 
   /**
@@ -47,8 +49,12 @@ export class PromptFacade {
    * @returns The updated Prompt instance.
    * @throws {PromptsError} If the API call fails.
    */
-  async update(handleOrId: string, newData: UpdatePromptBody): Promise<Prompt> {
-    return this.service.update(handleOrId, newData);
+  async update(
+    handleOrId: string,
+    newData: UpdatePromptBody,
+  ): Promise<PromptTracingDecorator> {
+    const prompt = await this.service.update(handleOrId, newData);
+    return new PromptTracingDecorator(prompt);
   }
 
   /**

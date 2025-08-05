@@ -118,14 +118,18 @@ export class PromptService {
    * @returns The Prompt instance or null if not found.
    * @throws {PromptsError} If the API call fails.
    */
-  async get(id: string): Promise<Prompt | null> {
+  async get(
+    id: string,
+    options?: { version?: string },
+  ): Promise<Prompt | null> {
     const { data, error } = await this.client.GET("/api/prompts/{id}", {
       params: { path: { id } },
+      query: {
+        version: options?.version,
+      },
     });
+
     if (error) {
-      if (error.toString().includes("404")) {
-        return null;
-      }
       this.handleApiError(`fetch prompt with ID "${id}"`, error);
     }
     return new Prompt(data);

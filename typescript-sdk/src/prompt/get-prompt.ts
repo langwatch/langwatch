@@ -5,25 +5,18 @@ import {
   type TemplateVariables,
 } from "./prompt";
 import * as intSemconv from "../observability/semconv";
-import { tracer } from "./tracing";
+import { tracer } from "./tracer";
 import {
   canAutomaticallyCaptureInput,
   canAutomaticallyCaptureOutput,
 } from "../client";
 
-/**
- * Retrieves a prompt by ID and optionally compiles it with variables.
- * @param id - The ID of the prompt to retrieve.
- * @param variables - Optional variables to compile the prompt with.
- * @deprecated Use the PromptFacade instead: langwatch.prompts.get(id, variables)
- * @returns The prompt or compiled prompt.
- * @throws {Error} If the prompt is not found.
- */
 export async function getPrompt(
   id: string,
   variables: TemplateVariables,
 ): Promise<CompiledPrompt>;
 export async function getPrompt(id: string): Promise<Prompt>;
+
 export async function getPrompt(
   id: string,
   variables?: TemplateVariables,
