@@ -933,6 +933,12 @@
                           "ORGANIZATION",
                           "PROJECT"
                         ]
+                      },
+                      "projectId": {
+                        "type": "string"
+                      },
+                      "organizationId": {
+                        "type": "string"
                       }
                     },
                     "required": [
@@ -941,6 +947,8 @@
                       "scope",
                       "name",
                       "updatedAt",
+                      "projectId",
+                      "organizationId",
                       "version",
                       "versionId",
                       "versionCreatedAt",
@@ -1125,6 +1133,12 @@
                         "ORGANIZATION",
                         "PROJECT"
                       ]
+                    },
+                    "projectId": {
+                      "type": "string"
+                    },
+                    "organizationId": {
+                      "type": "string"
                     }
                   },
                   "required": [
@@ -1133,6 +1147,8 @@
                     "scope",
                     "name",
                     "updatedAt",
+                    "projectId",
+                    "organizationId",
                     "version",
                     "versionId",
                     "versionCreatedAt",
@@ -4672,6 +4688,320 @@
                 },
                 "required": [
                   "configData"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/prompts/v2": {
+      "post": {
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "handle": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "scope": {
+                      "type": "string",
+                      "enum": [
+                        "ORGANIZATION",
+                        "PROJECT"
+                      ]
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "updatedAt": {
+                      "type": "string"
+                    },
+                    "projectId": {
+                      "type": "string"
+                    },
+                    "organizationId": {
+                      "type": "string"
+                    },
+                    "version": {
+                      "type": "number"
+                    },
+                    "versionId": {
+                      "type": "string"
+                    },
+                    "versionCreatedAt": {
+                      "type": "string"
+                    },
+                    "model": {
+                      "type": "string"
+                    },
+                    "prompt": {
+                      "type": "string"
+                    },
+                    "messages": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "role": {
+                            "type": "string",
+                            "enum": [
+                              "user",
+                              "assistant",
+                              "system"
+                            ]
+                          },
+                          "content": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "role",
+                          "content"
+                        ],
+                        "additionalProperties": true
+                      }
+                    },
+                    "response_format": {
+                      "type": [
+                        "object",
+                        "null"
+                      ],
+                      "properties": {
+                        "type": {
+                          "type": "string",
+                          "enum": [
+                            "json_schema"
+                          ]
+                        },
+                        "json_schema": {
+                          "type": "object",
+                          "properties": {
+                            "name": {
+                              "type": "string"
+                            },
+                            "schema": {
+                              "type": "object"
+                            }
+                          },
+                          "required": [
+                            "name",
+                            "schema"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "json_schema"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "handle",
+                    "scope",
+                    "name",
+                    "updatedAt",
+                    "projectId",
+                    "organizationId",
+                    "version",
+                    "versionId",
+                    "versionCreatedAt",
+                    "model",
+                    "prompt",
+                    "messages",
+                    "response_format"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "operationId": "postApiPromptsV2",
+        "parameters": [],
+        "description": "Create a new prompt with default initial version",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "handle": {
+                    "type": "string",
+                    "pattern": "^[a-z0-9_-]+(?:\\/[a-z0-9_-]+)?$"
+                  },
+                  "scope": {
+                    "type": "string",
+                    "enum": [
+                      "ORGANIZATION",
+                      "PROJECT"
+                    ],
+                    "default": "PROJECT"
+                  },
+                  "authorId": {
+                    "type": "string"
+                  },
+                  "prompt": {
+                    "type": "string"
+                  },
+                  "messages": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "role": {
+                          "type": "string",
+                          "enum": [
+                            "user",
+                            "assistant",
+                            "system"
+                          ]
+                        },
+                        "content": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "role",
+                        "content"
+                      ]
+                    }
+                  },
+                  "inputs": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "identifier": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "type": {
+                          "type": "string",
+                          "enum": [
+                            "str",
+                            "float",
+                            "bool",
+                            "image",
+                            "list[str]",
+                            "list[float]",
+                            "list[int]",
+                            "list[bool]",
+                            "dict"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "identifier",
+                        "type"
+                      ]
+                    }
+                  },
+                  "outputs": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "identifier": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "type": {
+                          "type": "string",
+                          "enum": [
+                            "str",
+                            "float",
+                            "bool",
+                            "json_schema"
+                          ]
+                        },
+                        "json_schema": {
+                          "type": "object",
+                          "properties": {
+                            "type": {
+                              "type": "string",
+                              "minLength": 1
+                            }
+                          },
+                          "required": [
+                            "type"
+                          ],
+                          "additionalProperties": true
+                        }
+                      },
+                      "required": [
+                        "identifier",
+                        "type"
+                      ]
+                    }
+                  }
+                },
+                "required": [
+                  "handle"
                 ]
               }
             }
