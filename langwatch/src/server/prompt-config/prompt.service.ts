@@ -1,5 +1,6 @@
 import {
   type LlmPromptConfig,
+  type Prisma,
   type PrismaClient,
   type PromptScope,
 } from "@prisma/client";
@@ -7,15 +8,17 @@ import { type z } from "zod";
 
 import { type UpdateLlmConfigDTO } from "./dtos";
 import {
+  type CreateLlmConfigVersionParams,
   LlmConfigRepository,
   type LlmConfigWithLatestVersion,
-  type CreateLlmConfigVersionParams,
 } from "./repositories";
 import {
   type getLatestConfigVersionSchema,
-  LATEST_SCHEMA_VERSION,
   SchemaVersion,
-  getVersionValidator,
+  type inputsSchema,
+  type outputsSchema,
+  type promptingTechniqueSchema,
+  LATEST_SCHEMA_VERSION,
 } from "./repositories/llm-config-version-schema";
 
 // Extract the configData type from the schema
@@ -59,34 +62,47 @@ export class PromptService {
 
   /**
    * Creates a new prompt configuration with an initial version.
-   * If a handle is provided, it will be formatted with the organization and project context.
+   * Will create a default version if no version data is provided.
    *
    * @param params - The parameters object
-   * @param params.name - The name of the prompt
    * @param params.projectId - The project ID for authorization and context
-   * @param params.handle - The handle of the prompt
-   * @returns The created prompt configuration
+   * @param params.organizationId - The organization ID for authorization and context
+   * @param params.handle - The handle of the prompt (also used as name)
+   * @param params.scope - The scope of the prompt (defaults to "PROJECT")
+   * @param params.authorId - Optional author ID for the initial version
+   * @param params.configData - Optional initial configuration data
+   * @param params.schemaVersion - Optional schema version (defaults to latest)
+   * @returns The created prompt configuration with its initial version
    */
   async createPrompt(params: {
+    // Config data
     projectId: string;
     organizationId: string;
     handle: string;
     scope?: PromptScope;
+    // Version data
     authorId?: string;
-    configData?: CreateLlmConfigVersionParams["configData"];
-    schemaVersion?: SchemaVersion;
+    prompt?: string;
+    messages?: CreateLlmConfigVersionParams;
+    inputs?: z.infer<typeof inputsSchema>[];
+    outputs?: z.infer<typeof outputsSchema>[];
+    model?: string;
+    temperature?: number;
+    max_tokens?: number;
+    prompting_technique?: z.infer<typeof promptingTechniqueSchema>;
   }): Promise<LlmConfigWithLatestVersion> {
-    if (params.configData) {
-      const schemaVersion = params.schemaVersion ?? LATEST_SCHEMA_VERSION;
-      try {
-        getVersionValidator(schemaVersion).parse(params.configData);
-      } catch (error) {
-        throw new Error(
-          `configData does not match schema version: ${schemaVersion}`,
-          { cause: error }
-        );
-      }
-    }
+    // If any of the version data is provided,
+    // we should create a version from that data
+    const shouldCreateVersion = Boolean(
+      params.prompt ??
+        params.messages ??
+        params.inputs ??
+        params.outputs ??
+        params.model ??
+        params.temperature ??
+        params.max_tokens ??
+        params.prompting_technique
+    );
 
     return this.repository.createConfigWithInitialVersion({
       configData: {
@@ -97,9 +113,19 @@ export class PromptService {
         scope: params.scope ?? "PROJECT",
         authorId: params.authorId,
       },
-      versionData: params.configData
+      versionData: shouldCreateVersion
         ? {
-            configData: params.configData,
+            configData: {
+              prompt: params.prompt,
+              messages: params.messages,
+              inputs: params.inputs,
+              outputs: params.outputs,
+              model: params.model,
+              temperature: params.temperature,
+              max_tokens: params.max_tokens,
+              prompting_technique: params.prompting_technique,
+            } as Prisma.JsonValue,
+            schemaVersion: LATEST_SCHEMA_VERSION,
             commitMessage: "Initial version",
             authorId: params.authorId ?? null,
             version: 0,
