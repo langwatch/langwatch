@@ -9,12 +9,12 @@ import {
 } from "@opentelemetry/api";
 import semconv from "@opentelemetry/semantic-conventions/incubating";
 import * as intSemconv from "./semconv";
-import {
-  RecordedEvaluationDetails,
-  recordEvaluation,
-} from "../evaluation/record-evaluation";
-import { EvaluationResultModel } from "../evaluation/types";
-import { Prompt } from "../prompt/prompt";
+// import {
+//   RecordedEvaluationDetails,
+//   recordEvaluation,
+// } from "../evaluation/record-evaluation";
+// import { EvaluationResultModel } from "../evaluation/types";
+// import { Prompt } from "../prompt/prompt";
 
 /**
  * Supported types of spans for LangWatch observability. These types categorize the nature of the span for downstream analysis and visualization.
@@ -229,17 +229,17 @@ export interface LangWatchSpanGenAIChoiceEventBody {
  *   .addGenAIAssistantMessageEvent({ content: 'Hi!' });
  */
 export interface LangWatchSpan extends Span {
-  /**
-   * Record the evaluation result for the span.
-   *
-   * @param details - The evaluation details
-   * @param attributes - Additional attributes to add to the evaluation span.
-   * @returns this
-   */
-  recordEvaluation(
-    details: RecordedEvaluationDetails,
-    attributes?: Attributes,
-  ): this;
+  // /**
+  //  * Record the evaluation result for the span.
+  //  *
+  //  * @param details - The evaluation details
+  //  * @param attributes - Additional attributes to add to the evaluation span.
+  //  * @returns this
+  //  */
+  // recordEvaluation(
+  //   details: RecordedEvaluationDetails,
+  //   attributes?: Attributes,
+  // ): this;
 
   /**
    * Add a GenAI system message event to the span.
@@ -373,14 +373,14 @@ export interface LangWatchSpan extends Span {
    */
   setMetrics(metrics: LangWatchSpanMetrics): this;
 
-  /**
-   * Set the selected prompt for the span. This will attach this prompt to the trace. If
-   * this is set on multiple spans, the last one will be used.
-   *
-   * @param prompt - The prompt object
-   * @returns this
-   */
-  setSelectedPrompt(prompt: Prompt): this;
+  // /**
+  //  * Set the selected prompt for the span. This will attach this prompt to the trace. If
+  //  * this is set on multiple spans, the last one will be used.
+  //  *
+  //  * @param prompt - The prompt object
+  //  * @returns this
+  //  */
+  // setSelectedPrompt(prompt: Prompt): this;
 
   /**
    * Record the input to the span as a JSON-serializable value.
@@ -419,14 +419,14 @@ export interface LangWatchSpan extends Span {
    */
   setOutputString(output: string): this;
 
-  /**
-   * Set the evaluation output for the span.
-   *
-   * @param guardrail - Whether the evaluation is a guardrail
-   * @param output - The evaluation result
-   * @returns this
-   */
-  setOutputEvaluation(guardrail: boolean, output: EvaluationResultModel): this;
+  // /**
+  //  * Set the evaluation output for the span.
+  //  *
+  //  * @param guardrail - Whether the evaluation is a guardrail
+  //  * @param output - The evaluation result
+  //  * @returns this
+  //  */
+  // setOutputEvaluation(guardrail: boolean, output: EvaluationResultModel): this;
 }
 
 /**
@@ -498,14 +498,14 @@ class LangWatchSpanImpl implements LangWatchSpan {
     return this;
   }
 
-  // LangWatch-specific methods
-  recordEvaluation(
-    details: RecordedEvaluationDetails,
-    attributes?: Attributes,
-  ): this {
-    recordEvaluation(details, attributes);
-    return this;
-  }
+  // // LangWatch-specific methods
+  // recordEvaluation(
+  //   details: RecordedEvaluationDetails,
+  //   attributes?: Attributes,
+  // ): this {
+  //   recordEvaluation(details, attributes);
+  //   return this;
+  // }
 
   addGenAISystemMessageEvent(
     body: LangWatchSpanGenAISystemMessageEventBody,
@@ -645,15 +645,15 @@ class LangWatchSpanImpl implements LangWatchSpan {
     return this;
   }
 
-  setSelectedPrompt(prompt: Prompt): this {
-    this.span.setAttributes({
-      [intSemconv.ATTR_LANGWATCH_PROMPT_SELECTED_ID]: prompt.id,
-      [intSemconv.ATTR_LANGWATCH_PROMPT_ID]: prompt.id,
-      [intSemconv.ATTR_LANGWATCH_PROMPT_VERSION_ID]: prompt.versionId,
-      [intSemconv.ATTR_LANGWATCH_PROMPT_VERSION_NUMBER]: prompt.version,
-    });
-    return this;
-  }
+  // setSelectedPrompt(prompt: Prompt): this {
+  //   this.span.setAttributes({
+  //     [intSemconv.ATTR_LANGWATCH_PROMPT_SELECTED_ID]: prompt.id,
+  //     [intSemconv.ATTR_LANGWATCH_PROMPT_ID]: prompt.id,
+  //     [intSemconv.ATTR_LANGWATCH_PROMPT_VERSION_ID]: prompt.versionId,
+  //     [intSemconv.ATTR_LANGWATCH_PROMPT_VERSION_NUMBER]: prompt.version,
+  //   });
+  //   return this;
+  // }
 
   setInput(input: unknown): this {
     this.span.setAttribute(
@@ -699,16 +699,16 @@ class LangWatchSpanImpl implements LangWatchSpan {
     return this;
   }
 
-  setOutputEvaluation(guardrail: boolean, output: EvaluationResultModel): this {
-    this.span.setAttribute(
-      intSemconv.ATTR_LANGWATCH_OUTPUT,
-      JSON.stringify({
-        type: guardrail ? "guardrail_result" : "evaluation_result",
-        value: output,
-      }),
-    );
-    return this;
-  }
+  // setOutputEvaluation(guardrail: boolean, output: EvaluationResultModel): this {
+  //   this.span.setAttribute(
+  //     intSemconv.ATTR_LANGWATCH_OUTPUT,
+  //     JSON.stringify({
+  //       type: guardrail ? "guardrail_result" : "evaluation_result",
+  //       value: output,
+  //     }),
+  //   );
+  //   return this;
+  // }
 }
 
 /**
