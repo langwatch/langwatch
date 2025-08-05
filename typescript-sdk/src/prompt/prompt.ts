@@ -1,7 +1,6 @@
 import { Liquid } from "liquidjs";
 import type { paths } from "../internal/generated/openapi/api-client";
-import { PromptTracingDecorator } from "./prompt-tracing.decorator";
-import { traceCompile } from "./tracing/trace-compile";
+import { traceCompile } from "./tracing";
 
 // Extract the prompt response type from OpenAPI schema
 export type PromptResponse = NonNullable<
