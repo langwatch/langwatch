@@ -10,6 +10,8 @@ import type {
   UpdatePromptBody,
   CreateVersionBody,
 } from "./types";
+import { PromptServiceTracingDecorator } from "./prompt-service-tracing.decorator";
+import { traceGetPrompt } from "./tracing/trace-get-prompt";
 
 /**
  * Custom error class for Prompts API operations.
@@ -63,6 +65,8 @@ export class PromptService {
 
   constructor(opts?: PromptServiceOptions) {
     this.client = opts?.client ?? createLangWatchApiClient();
+
+    this.get = traceGetPrompt(this.get.bind(this));
   }
 
   /**
@@ -273,13 +277,13 @@ export class PromptService {
 
   /**
    * Upserts a prompt with local configuration - creates if doesn't exist, updates version if exists.
-   * @param name The prompt's name/identifier.
+   * @param handle The prompt's handle/identifier.
    * @param config Local prompt configuration.
    * @returns Object with created flag and the prompt instance.
    * @throws {PromptsError} If the API call fails.
    */
   async upsert(
-    name: string,
+    handle: string,
     config: {
       model: string;
       modelParameters?: {
@@ -292,11 +296,11 @@ export class PromptService {
       }>;
     },
   ): Promise<{ created: boolean; prompt: Prompt }> {
-    let prompt = await this.get(name);
+    let prompt = await this.get(handle);
     let created = false;
 
     if (!prompt) {
-      prompt = await this.create({ name });
+      prompt = await this.create({ handle });
       created = true;
     }
 
