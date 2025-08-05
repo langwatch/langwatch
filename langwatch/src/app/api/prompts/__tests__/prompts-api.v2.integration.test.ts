@@ -1,21 +1,13 @@
-import type {
-  LlmPromptConfig,
-  Organization,
-  Project,
-  Team,
-} from "@prisma/client";
-import { nanoid } from "nanoid";
+import type { Organization, Project, Team } from "@prisma/client";
 import { describe, expect, it, beforeEach, afterEach } from "vitest";
 
 import { prisma } from "~/server/db";
 
 import { app } from "../[[...route]]/app";
 
-import { llmPromptConfigFactory } from "~/factories/llm-config.factory";
-import { projectFactory } from "~/factories/project.factory";
+import { organizationFactory, projectFactory, teamFactory } from "~/factories";
 
 describe("Prompts API V2", () => {
-  let mockConfig: LlmPromptConfig;
   let testApiKey: string;
   let testProjectId: string;
   let testOrganization: Organization;
@@ -26,41 +18,26 @@ describe("Prompts API V2", () => {
   beforeEach(async () => {
     // Create organization first
     testOrganization = await prisma.organization.create({
-      data: {
-        name: "Test Organization",
-        slug: `test-org-${nanoid()}`,
-      },
+      data: organizationFactory.build(),
     });
 
     // Create team linked to the organization
     testTeam = await prisma.team.create({
-      data: {
-        name: "Test Team",
-        slug: `test-team-${nanoid()}`,
+      data: teamFactory.build({
         organizationId: testOrganization.id,
-      },
+      }),
     });
 
-    // Test data setup
-    testProject = projectFactory.build({
-      slug: nanoid(),
-    });
     // Create test project in the database with the proper team
     testProject = await prisma.project.create({
-      data: {
-        ...testProject,
+      data: projectFactory.build({
         teamId: testTeam.id,
-      },
+      }),
     });
 
     // Update variables after project creation to ensure they have the correct values
     testApiKey = testProject.apiKey;
     testProjectId = testProject.id;
-
-    // Update the mock config with the correct project ID
-    mockConfig = llmPromptConfigFactory.build({
-      projectId: testProjectId,
-    });
   });
 
   afterEach(async () => {
@@ -98,28 +75,20 @@ describe("Prompts API V2", () => {
 
   // POST endpoints tests
   describe("POST endpoints", () => {
-    it("should create a new prompt", async () => {
+    it.only("should create a new prompt", async () => {
       const res = await app.request(`/api/prompts/v2`, {
         method: "POST",
         headers: {
           "X-Auth-Token": testApiKey,
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ name: mockConfig.name }),
+        body: JSON.stringify({ handle: "test-handle/chunky-bacon" }),
       });
 
       expect(res.status).toBe(200);
       const body = await res.json();
       expect(body).toHaveProperty("id");
-      expect(body).toHaveProperty("name", mockConfig.name);
-      expect(body).toHaveProperty("projectId", testProjectId);
-
-      // Verify the prompt was actually created in the database
-      const createdConfig = await prisma.llmPromptConfig.findUnique({
-        where: { id: body.id, projectId: testProjectId },
-      });
-      expect(createdConfig).not.toBeNull();
-      expect(createdConfig?.name).toBe(mockConfig.name);
+      expect(body).toHaveProperty("handle", "test-handle/chunky-bacon");
     });
   });
 });

@@ -73,6 +73,7 @@ app.post(
     })
   ),
   async (c) => {
+    console.log("HIIIIII");
     const service = c.get("promptService");
     const project = c.get("project");
     const organization = c.get("organization");
