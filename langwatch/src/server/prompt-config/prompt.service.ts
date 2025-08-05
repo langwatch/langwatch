@@ -8,18 +8,21 @@ import { type z } from "zod";
 
 import { type UpdateLlmConfigDTO } from "./dtos";
 import {
-  type CreateLlmConfigVersionParams,
   LlmConfigRepository,
   type LlmConfigWithLatestVersion,
 } from "./repositories";
 import {
   type getLatestConfigVersionSchema,
   SchemaVersion,
-  type inputsSchema,
-  type outputsSchema,
-  type promptingTechniqueSchema,
   LATEST_SCHEMA_VERSION,
 } from "./repositories/llm-config-version-schema";
+
+import {
+  type inputsSchema,
+  type messageSchema,
+  type outputsSchema,
+  type promptingTechniqueSchema,
+} from "~/prompt-configs/schemas/field-schemas";
 
 // Extract the configData type from the schema
 type ConfigData = z.infer<
@@ -65,6 +68,7 @@ export class PromptService {
    * Will create a default version if no version data is provided.
    *
    * @param params - The parameters object
+   * @param params.name - The name of the prompt (do not use this, use handle instead)
    * @param params.projectId - The project ID for authorization and context
    * @param params.organizationId - The organization ID for authorization and context
    * @param params.handle - The handle of the prompt (also used as name)
@@ -80,10 +84,11 @@ export class PromptService {
     organizationId: string;
     handle: string;
     scope?: PromptScope;
+    name?: string;
     // Version data
     authorId?: string;
     prompt?: string;
-    messages?: CreateLlmConfigVersionParams;
+    messages?: z.infer<typeof messageSchema>[];
     inputs?: z.infer<typeof inputsSchema>[];
     outputs?: z.infer<typeof outputsSchema>[];
     model?: string;
@@ -106,7 +111,7 @@ export class PromptService {
 
     return this.repository.createConfigWithInitialVersion({
       configData: {
-        name: params.handle,
+        name: params.name ?? params.handle,
         handle: params.handle ?? null,
         projectId: params.projectId,
         organizationId: params.organizationId,

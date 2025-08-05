@@ -1,3 +1,4 @@
+import type { Project } from "@prisma/client";
 import { type MiddlewareHandler } from "hono";
 
 import { prisma } from "~/server/db";
@@ -5,6 +6,13 @@ import { prisma } from "~/server/db";
 import { createLogger } from "~/utils/logger";
 
 const logger = createLogger("langwatch:api:auth");
+
+/**
+ * Variables set by the auth middleware
+ */
+export type AuthMiddlewareVariables = {
+  project: Project;
+};
 
 export const authMiddleware: MiddlewareHandler = async (c, next) => {
   const apiKey =

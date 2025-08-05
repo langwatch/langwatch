@@ -4,10 +4,16 @@ import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 
 import { nodeDatasetSchema } from "../../../optimization_studio/types/dsl";
-import { LlmConfigInputTypes, LlmConfigOutputTypes } from "../../../types";
 import { createLogger } from "../../../utils/logger";
 
 import type { LlmConfigVersionDTO } from "./llm-config-versions.repository";
+
+import {
+  inputsSchema,
+  messageSchema,
+  outputsSchema,
+  promptingTechniqueSchema,
+} from "~/prompt-configs/schemas/field-schemas";
 
 const logger = createLogger(
   "langwatch:prompt-config:llm-config-version-schema"
@@ -23,35 +29,6 @@ export enum SchemaVersion {
 }
 
 export const LATEST_SCHEMA_VERSION = SchemaVersion.V1_0 as const;
-
-export const messageSchema = z.object({
-  role: z.enum(["user", "assistant", "system"]),
-  content: z.string(),
-});
-
-/**
- * Base schema for input and output parameters
- */
-export const inputsSchema = z.object({
-  identifier: z.string().min(1, "Identifier cannot be empty"),
-  type: z.enum(LlmConfigInputTypes),
-});
-
-export const outputsSchema = z.object({
-  identifier: z.string().min(1, "Identifier cannot be empty"),
-  type: z.enum(LlmConfigOutputTypes),
-  json_schema: z
-    .object({
-      type: z.string().min(1, "Type cannot be empty"),
-    })
-    .passthrough()
-    .optional(),
-});
-
-export const promptingTechniqueSchema = z.object({
-  type: z.enum(["few_shot", "in_context", "chain_of_thought"]),
-  demonstrations: nodeDatasetSchema.optional(),
-});
 
 /**
  * Schema v1.0 - Base configuration schema

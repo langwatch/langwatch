@@ -1,6 +1,14 @@
+import type { Organization } from "@prisma/client";
 import { type MiddlewareHandler } from "hono";
 
 import { prisma } from "~/server/db";
+
+/**
+ * Variables set by the organization middleware
+ */
+export type OrganizationMiddlewareVariables = {
+  organization: Organization;
+};
 
 export const organizationMiddleware: MiddlewareHandler = async (c, next) => {
   const project = c.get("project");
