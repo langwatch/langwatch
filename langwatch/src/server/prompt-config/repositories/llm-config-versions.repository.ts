@@ -248,7 +248,11 @@ export class LlmConfigVersionsRepository {
     >;
     tx?: Prisma.TransactionClient;
     authorId?: string;
-  }) {
+  }): Promise<
+    Omit<LlmPromptConfigVersion, "createdAt"> & {
+      configData: LlmConfigVersionDTO["configData"];
+    }
+  > {
     const { tx, llmConfig, authorId } = params;
     const client = tx ?? this.prisma;
 
@@ -258,9 +262,9 @@ export class LlmConfigVersionsRepository {
     });
 
     return {
+      id: this.generateVersionId(),
       configId: llmConfig.id,
       projectId: llmConfig.projectId,
-      organizationId: llmConfig.organizationId,
       authorId: authorId ?? null,
       version: 0,
       configData: {
@@ -275,12 +279,18 @@ export class LlmConfigVersionsRepository {
         inputs: [{ identifier: "input", type: "str" }],
         outputs: [{ identifier: "output", type: "str" }],
         demonstrations: {
-          columns: [],
-          rows: [],
+          inline: {
+            records: {},
+            columnTypes: [],
+          },
         },
       },
       schemaVersion: LATEST_SCHEMA_VERSION,
       commitMessage: "Initial version",
     };
+  }
+
+  private generateVersionId() {
+    return `prompt_version_${nanoid()}`;
   }
 }

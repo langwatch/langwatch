@@ -331,7 +331,7 @@ export class LlmConfigRepository {
       // Create the config within the transaction
       const newConfig = await tx.llmPromptConfig.create({
         data: {
-          id: `prompt_${nanoid()}`,
+          id: this.generateConfigId(),
           name: configData.name ?? "",
           projectId: configData.projectId,
           organizationId: configData.organizationId,
@@ -597,5 +597,9 @@ export class LlmConfigRepository {
         ],
       };
     }
+  }
+
+  private generateConfigId() {
+    return `prompt_${nanoid()}`;
   }
 }
