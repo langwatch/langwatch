@@ -1,6 +1,6 @@
-import { PromptService } from "./service";
-import type { Prompt } from "./prompt";
-import type { CreatePromptBody, UpdatePromptBody } from "./types";
+import { type PromptService } from "./service";
+import { type Prompt } from "./prompt";
+import type { CreatePromptBody, UpdatePromptBody } from "../types";
 
 /**
  * Facade for prompt operations in the LangWatch SDK.
@@ -9,16 +9,8 @@ import type { CreatePromptBody, UpdatePromptBody } from "./types";
 export class PromptFacade {
   private service: PromptService;
 
-  constructor(service?: PromptService) {
-    this.service = service ?? PromptService.getInstance();
-  }
-
-  /**
-   * Gets the singleton instance of PromptFacade.
-   * Creates the instance lazily on first access.
-   */
-  static getInstance(): PromptFacade {
-    return new PromptFacade();
+  constructor(service: PromptService) {
+    this.service = service;
   }
 
   /**
@@ -42,7 +34,10 @@ export class PromptFacade {
     handleOrId: string,
     options?: { version?: string },
   ): Promise<Prompt | null> {
-    return this.service.get(handleOrId, options);
+    if (options?.version) {
+      return this.service.getVersion(handleOrId, options.version);
+    }
+    return this.service.get(handleOrId);
   }
 
   /**
@@ -61,7 +56,7 @@ export class PromptFacade {
    * @param handleOrId The prompt's handle or unique identifier.
    * @throws {PromptsError} If the API call fails.
    */
-  async delete(handleOrId: string): Promise<{ success: boolean }> {
+  async delete(handleOrId: string): Promise<void> {
     return this.service.delete(handleOrId);
   }
 }
