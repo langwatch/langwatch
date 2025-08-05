@@ -232,7 +232,10 @@ span.end();
 import { FilterableBatchSpanProcessor, LangWatchExporter } from "langwatch";
 
 const processor = new FilterableBatchSpanProcessor(
-  new LangWatchExporter(apiKey, endpoint),
+  new LangWatchExporter({
+    apiKey: "your-api-key",
+    endpoint: "https://custom.langwatch.com",
+  }),
   excludeRules
 );
 ```
@@ -241,7 +244,7 @@ const processor = new FilterableBatchSpanProcessor(
 ```ts
 const excludeRules: SpanProcessingExcludeRule[] = [
   { attribute: "http.url", value: "/health" },
-  { attribute: "span.type", value: "health" }
+  { attribute: "span.type", value: "health" },
 ];
 ```
 

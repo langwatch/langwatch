@@ -2,6 +2,13 @@ import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-http";
 import { version } from "../../../package.json";
 import { getApiKey, getEndpoint } from "../../client";
 
+export interface LangWatchExporterOptions {
+  endpoint?: string;
+  apiKey?: string;
+  includeAllSpans?: boolean;
+  debug?: boolean;
+}
+
 /**
  * LangWatchExporter extends the OpenTelemetry OTLP HTTP trace exporter
  * to send trace data to LangWatch with proper authentication and metadata headers.
@@ -18,27 +25,35 @@ import { getApiKey, getEndpoint } from "../../client";
  * // Using environment variables/fallback configuration
  * const exporter = new LangWatchExporter();
  *
- * // Using custom API key and endpoint
- *
- * // With environment variables/fallback configuration
- * const exporter = new LangWatchExporter();
- *
- * // With custom API key and endpoint
- * const exporter = new LangWatchExporter('api-key', 'https://custom.langwatch.com');
+ * // Using custom options
+ * const exporter = new LangWatchExporter({
+ *   apiKey: 'your-api-key',
+ *   endpoint: 'https://custom.langwatch.com'
+ * });
  * ```
  */
 export class LangWatchExporter extends OTLPTraceExporter {
     /**
    * Creates a new LangWatchExporter instance.
    *
-   * @param apiKey - Optional API key for LangWatch authentication. If not provided,
-   *                 will use environment variables or fallback configuration.
-   * @param endpointURL - Optional custom endpoint URL for LangWatch ingestion.
-   *                     If not provided, will use environment variables or fallback configuration.
+   * @param opts - Optional configuration options for the exporter
+   * @param opts.apiKey - Optional API key for LangWatch authentication. If not provided,
+   *                     will use environment variables or fallback configuration.
+   * @param opts.endpoint - Optional custom endpoint URL for LangWatch ingestion.
+   *                       If not provided, will use environment variables or fallback configuration.
+   * @param opts.includeAllSpans - Deprecated: This option is deprecated and will be removed in a future version
+   * @param opts.debug - Deprecated: This option is deprecated and will be removed in a future version
    */
-  constructor(apiKey?: string, endpointURL?: string) {
-    const setApiKey = apiKey ?? getApiKey();
-    const setEndpoint = endpointURL ?? getEndpoint();
+  constructor(opts?: LangWatchExporterOptions) {
+    const setApiKey = opts?.apiKey ?? getApiKey();
+    const setEndpoint = opts?.endpoint ?? getEndpoint();
+
+    if (opts && opts.includeAllSpans !== void 0) {
+      console.warn("[LangWatchExporter] The behavior of `includeAllSpans` is deprecated and will be removed in a future version");
+    }
+    if (opts && opts.debug !== void 0) {
+      console.warn("[LangWatchExporter] The behavior of `debug` is deprecated and will be removed in a future version");
+    }
 
     super({
       headers: {

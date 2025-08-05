@@ -24,7 +24,10 @@ export async function setupLangWatch(options: SetupOptions = {}) {
 
   const endpointURL = new URL("/api/otel/v1/traces", getEndpoint());
   const langwatchSpanProcessor = new FilterableBatchSpanProcessor(
-    new LangWatchExporter(getApiKey(), endpointURL.toString()),
+    new LangWatchExporter({
+      apiKey: getApiKey(),
+      endpoint: endpointURL.toString(),
+    }),
     options.otelSpanProcessingExcludeRules ?? [],
   );
 
