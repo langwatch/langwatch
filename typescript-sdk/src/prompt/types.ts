@@ -4,6 +4,9 @@ import type { paths } from "../internal/generated/openapi/api-client";
 export type CreatePromptBody = NonNullable<
   paths["/api/prompts"]["post"]["requestBody"]
 >["content"]["application/json"];
+export type CreatePromptBodyV2 = NonNullable<
+  paths["/api/prompts/v2"]["post"]["requestBody"]
+>["content"]["application/json"];
 export type UpdatePromptBody = NonNullable<
   paths["/api/prompts/{id}"]["put"]["requestBody"]
 >["content"]["application/json"];

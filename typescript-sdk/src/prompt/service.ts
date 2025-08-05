@@ -6,7 +6,7 @@ import type { paths } from "../internal/generated/openapi/api-client";
 import { Prompt, type PromptResponse } from "./prompt";
 import { PromptConverter } from "./converter";
 import type {
-  CreatePromptBody,
+  CreatePromptBodyV2,
   UpdatePromptBody,
   CreateVersionBody,
 } from "./types";
@@ -152,8 +152,8 @@ export class PromptService {
    * @returns The created Prompt instance.
    * @throws {PromptsError} If the API call fails.
    */
-  async create(params: CreatePromptBody): Promise<Prompt> {
-    const { data, error } = await this.client.POST("/api/prompts", {
+  async create(params: CreatePromptBodyV2): Promise<Prompt> {
+    const { data, error } = await this.client.POST("/api/prompts/v2", {
       body: params,
     });
     if (error) this.handleApiError("create prompt", error);
