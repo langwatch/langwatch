@@ -4,3 +4,5 @@ export {
   type SpanProcessingExcludeRule,
 } from "./observability/processors";
 export { LangWatchExporter } from "./observability/exporters";
+
+export { LangWatch } from "./client-sdk";
