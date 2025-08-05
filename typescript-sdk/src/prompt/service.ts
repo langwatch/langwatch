@@ -5,20 +5,11 @@ import {
 import type { paths } from "../internal/generated/openapi/api-client";
 import { Prompt, type PromptResponse } from "./prompt";
 import { PromptConverter } from "./converter";
-
-// Extract types directly from OpenAPI schema for strong type safety.
-type CreatePromptBody = NonNullable<
-  paths["/api/prompts"]["post"]["requestBody"]
->["content"]["application/json"];
-type UpdatePromptBody = NonNullable<
-  paths["/api/prompts/{id}"]["put"]["requestBody"]
->["content"]["application/json"];
-type CreateVersionBody = NonNullable<
-  paths["/api/prompts/{id}/versions"]["post"]["requestBody"]
->["content"]["application/json"];
-type SyncBody = NonNullable<
-  paths["/api/prompts/{id}/sync"]["post"]["requestBody"]
->["content"]["application/json"];
+import type {
+  CreatePromptBody,
+  UpdatePromptBody,
+  CreateVersionBody,
+} from "./types";
 
 /**
  * Custom error class for Prompts API operations.
@@ -359,7 +350,7 @@ export class PromptService {
 
       return {
         action: response.data.action as SyncAction,
-        prompt: response.data.prompt as PromptResponse,
+        prompt: response.data.prompt,
         conflictInfo: response.data.conflictInfo,
       };
     } catch (error) {
