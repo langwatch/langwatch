@@ -10,7 +10,6 @@ import type {
   UpdatePromptBody,
   CreateVersionBody,
 } from "./types";
-import { PromptServiceTracingDecorator } from "./prompt-service-tracing.decorator";
 import { traceGetPrompt } from "./tracing/trace-get-prompt";
 
 /**
