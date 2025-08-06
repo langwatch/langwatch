@@ -122,20 +122,6 @@ export const ATTR_LANGWATCH_PROMPT_VERSION_NUMBER =
   "langwatch.prompt.version.number";
 
 /**
- * LangWatch gen AI log event imposter attribute key
- * Used to identify imposter events in log records
- */
-export const ATTR_LANGWATCH_GEN_AI_LOG_EVENT_IMPOSTER =
-  "langwatch.gen_ai.log_event.imposter";
-
-/**
- * LangWatch gen AI log event body attribute key
- * Used to store the body content of log events
- */
-export const ATTR_LANGWATCH_GEN_AI_LOG_EVENT_BODY =
-  "langwatch.gen_ai.log_event.body";
-
-/**
  * LangWatch LangChain tags attribute key
  * Used to store tags associated with LangChain operations
  */
