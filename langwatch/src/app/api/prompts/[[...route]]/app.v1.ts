@@ -116,8 +116,8 @@ app.post(
     "json",
     z.object({
       name: nameSchema,
-      handle: handleSchema,
-      scope: scopeSchema,
+      handle: handleSchema.optional(),
+      scope: scopeSchema.optional(),
     })
   ),
   async (c) => {
