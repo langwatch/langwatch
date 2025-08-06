@@ -24,6 +24,11 @@
       "require": "./dist/observability/index.js",
       "import": "./dist/observability/index.mjs"
     },
+    "./observability/setup/node": {
+      "types": "./dist/observability/setup/node/index.d.ts",
+      "require": "./dist/observability/setup/node/index.js",
+      "import": "./dist/observability/setup/node/index.mjs"
+    },
     "./observability/instrumentation/langchain": {
       "types": "./dist/observability/instrumentation/langchain/index.d.ts",
       "require": "./dist/observability/instrumentation/langchain/index.js",
@@ -37,7 +42,9 @@
   },
   "scripts": {
     "prepare": "./copy-types.sh && pnpm run generate:openapi-types",
-    "test": "vitest",
+    "test": "pnpm test:core",
+    "test:core": "vitest run",
+    "test:e2e": "vitest run --include='**/*.e2e.test.ts'",
     "prebuild": "pnpm run prepare",
     "build": "tsgo --noEmit &&  tsup",
     "prepublish": "pnpm run build",
