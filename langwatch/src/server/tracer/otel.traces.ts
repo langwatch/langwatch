@@ -234,7 +234,7 @@ const addOpenTelemetrySpanAsSpan = (
   }
 
   // Special handling for strands-agents Python SDK
-  if (isStrandsAgentsPythonResource(trace.customMetadata)) {
+  if (isStrandsAgentsPythonResource(otelScope, otelSpan)) {
     const io = extractStrandsAgentsInputOutput(otelSpan);
     if (io) {
       input = io.input;
