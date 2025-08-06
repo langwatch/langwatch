@@ -33,7 +33,7 @@ export function isStrandsAgentsInstrumentation(
   if (attrStrVal(span?.attributes, "gen_ai.agent.name") === "Strands Agents") return true;
   if (attrStrVal(span?.attributes, "service.name") === "strands-agents") return true; 
   if (scope?.name === "opentelemetry.instrumentation.strands") return true;
-  if (span?.name?.includes("Agents")) return true;
+  if (span?.name?.includes(" Strands Agents")) return true;
 
   return false;
 }
