@@ -1,22 +1,20 @@
-import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-http";
+import { OTLPLogExporter } from "@opentelemetry/exporter-logs-otlp-http";
 import {
   LANGWATCH_SDK_LANGUAGE,
   LANGWATCH_SDK_NAME,
   LANGWATCH_SDK_RUNTIME,
   LANGWATCH_SDK_VERSION,
-  TRACES_PATH,
+  LOGS_PATH,
 } from "../setup/constants";
 
-export interface LangWatchExporterOptions {
+export interface LangWatchLogsExporterOptions {
   endpoint?: string;
   apiKey?: string;
-  includeAllSpans?: boolean;
-  debug?: boolean;
 }
 
 /**
- * LangWatchExporter extends the OpenTelemetry OTLP HTTP trace exporter
- * to send trace data to LangWatch with proper authentication and metadata headers.
+ * LangWatchLogsExporter extends the OpenTelemetry OTLP HTTP logs exporter
+ * to send logs to LangWatch with proper authentication and metadata headers.
  *
  * This exporter automatically configures:
  * - Authorization headers using the provided API key or environment variables/fallback
@@ -25,49 +23,36 @@ export interface LangWatchExporterOptions {
  *
  * @example
  * ```typescript
- * import { LangWatchExporter } from '@langwatch/observability';
+ * import { LangWatchLogsExporter } from '@langwatch/observability';
  *
  * // Using environment variables/fallback configuration
- * const exporter = new LangWatchExporter();
+ * const exporter = new LangWatchLogsExporter();
  *
  * // Using custom options
- * const exporter = new LangWatchExporter({
+ * const exporter = new LangWatchLogsExporter({
  *   apiKey: 'your-api-key',
  *   endpoint: 'https://custom.langwatch.com'
  * });
  * ```
  */
-export class LangWatchExporter extends OTLPTraceExporter {
+export class LangWatchLogsExporter extends OTLPLogExporter {
   /**
-   * Creates a new LangWatchExporter instance.
+   * Creates a new LangWatchLogsExporter instance.
    *
-   * @param opts - Optional configuration options for the exporter
+   * @param opts - Optional configuration options for the exporter.
    * @param opts.apiKey - Optional API key for LangWatch authentication. If not provided,
    *                     will use environment variables or fallback configuration.
    * @param opts.endpoint - Optional custom endpoint URL for LangWatch ingestion.
    *                       If not provided, will use environment variables or fallback configuration.
-   * @param opts.includeAllSpans - Deprecated: This option is deprecated and will be removed in a future version
-   * @param opts.debug - Deprecated: This option is deprecated and will be removed in a future version
    */
-  constructor(opts?: LangWatchExporterOptions) {
+  constructor(opts?: LangWatchLogsExporterOptions) {
     const apiKey = opts?.apiKey ?? process.env.LANGWATCH_API_KEY ?? "";
     const endpoint =
       opts?.endpoint ??
       process.env.LANGWATCH_ENDPOINT ??
       "https://app.langwatch.ai";
 
-    if (opts && opts.includeAllSpans !== void 0) {
-      console.warn(
-        "[LangWatchExporter] The behavior of `includeAllSpans` is deprecated and will be removed in a future version",
-      );
-    }
-    if (opts && opts.debug !== void 0) {
-      console.warn(
-        "[LangWatchExporter] The behavior of `debug` is deprecated and will be removed in a future version",
-      );
-    }
-
-    const url = new URL(TRACES_PATH, endpoint);
+    const url = new URL(LOGS_PATH, endpoint);
     const otelEndpoint = url.toString();
 
     super({
