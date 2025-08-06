@@ -287,6 +287,13 @@ class LangWatchSpanInternal implements LangWatchSpan {
     return this;
   }
 
+  // /**
+  //  * Set the evaluation output for the span.
+  //  *
+  //  * @param guardrail - Whether the evaluation is a guardrail
+  //  * @param output - The evaluation result
+  //  * @returns this
+  //  */
   // setOutputEvaluation(guardrail: boolean, output: EvaluationResultModel): this {
   //   this.span.setAttribute(
   //     intSemconv.ATTR_LANGWATCH_OUTPUT,
@@ -294,9 +301,15 @@ class LangWatchSpanInternal implements LangWatchSpan {
   //       type: guardrail ? "guardrail_result" : "evaluation_result",
   //       value: output,
   //     }),
+  //   return setEvaluationOutput(
+  //     this.span,
+  //     "langwatch.evaluation.output",
+  //     { guardrail, output }
   //   );
   //   return this;
   // }
+
+
 }
 
 /**
