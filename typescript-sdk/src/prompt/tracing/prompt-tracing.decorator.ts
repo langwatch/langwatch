@@ -1,4 +1,3 @@
-// typescript-sdk/src/prompt/tracing/prompt-tracing-proxy.ts
 import { tracer } from "./tracer";
 import * as intSemconv from "../../observability/semconv";
 import {
@@ -14,33 +13,36 @@ import { Prompt } from "../prompt";
 export class PromptTracingDecorator {
   constructor(private readonly target: Prompt) {}
 
-  get compile() {
-    return this.traceCompile("compile");
+  compile(...variables: Parameters<Prompt["compile"]>) {
+    return this.wrapCompileFn("compile", this.target.compile)(...variables);
   }
 
-  get compileStrict() {
-    return this.traceCompile("compileStrict");
+  compileStrict(...variables: Parameters<Prompt["compileStrict"]>) {
+    return this.wrapCompileFn(
+      "compileStrict",
+      this.target.compileStrict,
+    )(...variables);
   }
 
-  private traceCompile(spanName: string) {
-    return (...args: Parameters<Prompt["compile"]>) => {
-      const [variables] = args;
+  private wrapCompileFn<T extends (...args: any[]) => any>(
+    spanName: string,
+    fn: (...args: Parameters<T>) => ReturnType<T>,
+  ) {
+    return (...variables: Parameters<T>) => {
       return tracer.withActiveSpan(spanName, (span) => {
         span.setType("prompt");
 
         try {
-          const compiledPrompt = this.target.compile.apply(this.target, args);
+          const result = fn.apply(this.target, variables);
 
           if (canAutomaticallyCaptureOutput()) {
-            span.setOutput(compiledPrompt);
+            span.setOutput(result);
           }
 
           span.setAttributes({
-            [intSemconv.ATTR_LANGWATCH_PROMPT_ID]: compiledPrompt.id,
-            [intSemconv.ATTR_LANGWATCH_PROMPT_VERSION_ID]:
-              compiledPrompt.versionId,
-            [intSemconv.ATTR_LANGWATCH_PROMPT_VERSION_NUMBER]:
-              compiledPrompt.version,
+            [intSemconv.ATTR_LANGWATCH_PROMPT_ID]: result.id,
+            [intSemconv.ATTR_LANGWATCH_PROMPT_VERSION_ID]: result.versionId,
+            [intSemconv.ATTR_LANGWATCH_PROMPT_VERSION_NUMBER]: result.version,
           });
 
           if (variables && canAutomaticallyCaptureInput()) {
@@ -53,7 +55,7 @@ export class PromptTracingDecorator {
             );
           }
 
-          return compiledPrompt;
+          return result;
         } catch (error) {
           span.recordException(error as Error);
           throw error;
