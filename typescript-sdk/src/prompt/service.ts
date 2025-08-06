@@ -14,8 +14,7 @@ import { tracer } from "../evaluation/tracer";
 import { canAutomaticallyCaptureInput } from "../client";
 import { canAutomaticallyCaptureOutput } from "../client";
 import { SpanType } from "../observability";
-import { PromptServiceTracingDecorator } from "./tracing/prompt-service-tracing-decorator";
-import { createTracingProxy } from "./tracing/create-tracing-proxy";
+import { PromptServiceTracingDecorator, createTracingProxy } from "./tracing";
 
 /**
  * Custom error class for Prompts API operations.

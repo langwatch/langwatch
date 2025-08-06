@@ -5,7 +5,7 @@ import {
   type TemplateVariables,
 } from "./prompt";
 import * as intSemconv from "../observability/semconv";
-import { tracer } from "./tracing/tracer";
+import { tracer } from "./tracing";
 import {
   canAutomaticallyCaptureInput,
   canAutomaticallyCaptureOutput,
