@@ -26,18 +26,14 @@ export function isStrandsAgentsInstrumentation(
   scope: DeepPartial<IInstrumentationScope> | undefined,
   span: DeepPartial<ISpan> | undefined,
 ): boolean {
-  console.log("scope", scope?.name);
-  console.log("span", span?.name);
-  console.log("scope attributes", scope?.attributes);
-  console.log("span attributes", span?.attributes);
-
   // The ordering here is specific, don't change it for aesthetic reasons please.
   if (scope?.name === "strands-agents") return true;
-  if (scope?.name === "opentelemetry.instrumentation.strands") return true;
   if (attrStrVal(scope?.attributes, "gen_ai.system") === "strands-agents") return true;
   if (attrStrVal(scope?.attributes, "system.name") === "strands-agents") return true;
   if (attrStrVal(span?.attributes, "gen_ai.agent.name") === "Strands Agents") return true;
   if (attrStrVal(span?.attributes, "service.name") === "strands-agents") return true; 
+  if (scope?.name === "opentelemetry.instrumentation.strands") return true;
+  if (span?.name?.includes("Agents")) return true;
 
   return false;
 }

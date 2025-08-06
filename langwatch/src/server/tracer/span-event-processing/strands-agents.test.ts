@@ -29,6 +29,16 @@ describe("isStrandsAgentsInstrumentation", () => {
       isStrandsAgentsInstrumentation({}, { attributes: [{ key: "service.name", value: { stringValue: "strands-agents" } }] })
     ).toBe(true);
   });
+  it("returns true for span.name.includes('Agents')", () => {
+    expect(
+      isStrandsAgentsInstrumentation({}, { name: "invoke_agent Strands Agents" })
+    ).toBe(true);
+  });
+  it("returns true for scope.name === 'opentelemetry.instrumentation.strands'", () => {
+    expect(
+      isStrandsAgentsInstrumentation({ name: "opentelemetry.instrumentation.strands" }, {})
+    ).toBe(true);
+  });
   it("returns false for wrong service name", () => {
     expect(
       isStrandsAgentsInstrumentation({}, { attributes: [{ key: "service.name", value: { stringValue: "other-service" } }] })
