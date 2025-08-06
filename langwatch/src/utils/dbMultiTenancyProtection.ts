@@ -14,6 +14,10 @@ const EXEMPT_MODELS = [
   "Subscription",
   "OrganizationFeature",
   "AuditLog",
+  /**
+   * Because prompts can be accessed at either the project or org level
+   */
+  "LlmPromptConfig",
 ];
 
 const _guardProjectId = ({ params }: { params: Prisma.MiddlewareParams }) => {

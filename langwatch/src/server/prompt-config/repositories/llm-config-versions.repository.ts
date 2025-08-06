@@ -5,8 +5,8 @@ import {
   type User,
 } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
-
 import { nanoid } from "nanoid";
+
 import {
   type LatestConfigVersionSchema,
   type SchemaVersion,
@@ -43,12 +43,11 @@ export class LlmConfigVersionsRepository {
   }): Promise<(LlmPromptConfigVersion & { author: User | null })[]> {
     // Verify the config exists
     const promptRepository = new LlmConfigRepository(this.prisma);
-    const config =
-      await promptRepository.getConfigByIdOrHandleWithLatestVersion({
-        idOrHandle,
-        projectId,
-        organizationId,
-      });
+    const config = await promptRepository.getPromptByIdOrHandle({
+      idOrHandle,
+      projectId,
+      organizationId,
+    });
 
     if (!config) {
       throw new TRPCError({
@@ -225,14 +224,17 @@ export class LlmConfigVersionsRepository {
       throw new Error(`Version ${id} not found.`);
     }
 
-    const newVersion = await this.createVersion({
-      authorId,
-      projectId: version.projectId,
-      configId: version.configId,
-      commitMessage: `Restore from version ${version.version}`,
-      schemaVersion: version.schemaVersion as SchemaVersion,
-      configData: version.configData as LlmConfigVersionDTO["configData"],
-    }, organizationId);
+    const newVersion = await this.createVersion(
+      {
+        authorId,
+        projectId: version.projectId,
+        configId: version.configId,
+        commitMessage: `Restore from version ${version.version}`,
+        schemaVersion: version.schemaVersion as SchemaVersion,
+        configData: version.configData as LlmConfigVersionDTO["configData"],
+      },
+      organizationId
+    );
 
     return newVersion;
   }

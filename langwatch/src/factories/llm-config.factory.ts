@@ -27,12 +27,12 @@ export const llmPromptConfigFactory = Factory.define<
 >(({ sequence }) => ({
   id: nanoid(),
   name: `Test LLM Prompt Config ${sequence}`,
-  projectId: nanoid(), // This should be overridden with an actual project ID when used
+  projectId: nanoid(),
+  organizationId: nanoid(),
   createdAt: new Date(),
   updatedAt: new Date(),
   deletedAt: null,
   handle: null,
-  organizationId: "", // This should be overridden with an actual organization ID when used
   scope: PromptScope.PROJECT,
 }));
 

@@ -25,6 +25,8 @@ export const llmPromptConfigSchema = z.object({
   scope: z.nativeEnum(PromptScope),
   name: z.string(),
   updatedAt: z.date(),
+  projectId: z.string(),
+  organizationId: z.string(),
 });
 
 /**

@@ -116,6 +116,51 @@ export class LlmConfigRepository {
   }
 
   /**
+   * Get prompt by id or handle
+   */
+  async getPromptByIdOrHandle(params: {
+    idOrHandle: string;
+    projectId: string;
+    organizationId: string;
+  }): Promise<LlmPromptConfig | null> {
+    const { idOrHandle, projectId, organizationId } = params;
+
+    return await this.prisma.llmPromptConfig.findFirst({
+      where: {
+        OR: [
+          {
+            projectId,
+            OR: [
+              { id: idOrHandle },
+              {
+                handle: this.createHandle({
+                  handle: idOrHandle,
+                  scope: "PROJECT",
+                  projectId,
+                }),
+              },
+            ],
+          },
+          {
+            organizationId,
+            scope: "ORGANIZATION",
+            OR: [
+              { id: idOrHandle },
+              {
+                handle: this.createHandle({
+                  handle: idOrHandle,
+                  scope: "ORGANIZATION",
+                  organizationId,
+                }),
+              },
+            ],
+          },
+        ],
+      },
+    });
+  }
+
+  /**
    * Get a single LLM config by ID or handle, either at project or organization level
    */
   async getConfigByIdOrHandleWithLatestVersion(params: {
