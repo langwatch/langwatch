@@ -10,7 +10,12 @@ import type {
   UpdatePromptBody,
   CreateVersionBody,
 } from "./types";
-import { traceGetPrompt } from "./tracing/trace-get-prompt";
+import { tracer } from "../evaluation/tracer";
+import { canAutomaticallyCaptureInput } from "../client";
+import { canAutomaticallyCaptureOutput } from "../client";
+import { SpanType } from "../observability";
+import { PromptServiceTracingDecorator } from "./tracing/prompt-service-tracing-decorator";
+import { createTracingProxy } from "./tracing/create-tracing-proxy";
 
 /**
  * Custom error class for Prompts API operations.
@@ -50,6 +55,7 @@ interface PromptServiceOptions {
 
 /**
  * Service for managing prompt resources via the Langwatch API.
+ * Constructor creates a proxy that wraps the service and traces all methods.
  *
  * Responsibilities:
  * - CRUD operations for prompts
@@ -64,8 +70,13 @@ export class PromptService {
 
   constructor(opts?: PromptServiceOptions) {
     this.client = opts?.client ?? createLangWatchApiClient();
-
-    this.get = traceGetPrompt(this.get.bind(this));
+    /**
+     * Wraps the service in a tracing proxy via the decorator.
+     */
+    return createTracingProxy(
+      this as PromptService,
+      PromptServiceTracingDecorator,
+    );
   }
 
   /**
@@ -366,4 +377,51 @@ export class PromptService {
       throw new PromptsError(message, "sync", error);
     }
   }
+}
+// Generic tracing utility
+function traceMethod<T extends (...args: any[]) => any>(
+  fn: T,
+  metadata: {
+    spanName: string;
+    spanType: SpanType;
+    extractAttributes?: (
+      params: Parameters<T>,
+      result?: Awaited<ReturnType<T>>,
+    ) => Record<string, any>;
+    captureInput?: (params: Parameters<T>) => any;
+    captureOutput?: (result: Awaited<ReturnType<T>>) => any;
+  },
+): T {
+  return ((...params: Parameters<T>) => {
+    return tracer.withActiveSpan(metadata.spanName, async (span) => {
+      span.setType(metadata.spanType);
+
+      if (metadata.extractAttributes) {
+        const attrs = metadata.extractAttributes(params);
+        span.setAttributes(attrs);
+      }
+
+      if (metadata.captureInput && canAutomaticallyCaptureInput()) {
+        span.setInput(metadata.captureInput(params));
+      }
+
+      try {
+        const result = await fn(...params);
+
+        if (metadata.extractAttributes) {
+          const attrs = metadata.extractAttributes(params, result);
+          span.setAttributes(attrs);
+        }
+
+        if (metadata.captureOutput && canAutomaticallyCaptureOutput()) {
+          span.setOutput(metadata.captureOutput(result));
+        }
+
+        return result;
+      } catch (error) {
+        span.recordException(error as Error);
+        throw error;
+      }
+    });
+  }) as T;
 }
