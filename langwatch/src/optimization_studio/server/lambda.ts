@@ -40,7 +40,9 @@ const parseLambdaConfig = (): LangWatchLambdaConfig => {
   try {
     return JSON.parse(configStr) as LangWatchLambdaConfig;
   } catch (error) {
-    throw new Error("Failed to parse LANGWATCH_NLP_LAMBDA_CONFIG: " + String(error));
+    throw new Error(
+      "Failed to parse LANGWATCH_NLP_LAMBDA_CONFIG: " + String(error)
+    );
   }
 };
 
@@ -112,7 +114,10 @@ const createLogGroupWithRetention = async (
   } catch (error: any) {
     if (error.name === "ResourceAlreadyExistsException") {
       // Log group already exists, just set retention
-      logger.info({ functionName }, "Log group already exists, setting retention policy");
+      logger.info(
+        { functionName },
+        "Log group already exists, setting retention policy"
+      );
 
       const retentionCommand = new PutRetentionPolicyCommand({
         logGroupName,
@@ -239,7 +244,9 @@ const updateProjectLambdaImage = async (
   return response;
 };
 
-export const getProjectLambdaArn = async (projectId: string): Promise<string> => {
+export const getProjectLambdaArn = async (
+  projectId: string
+): Promise<string> => {
   const config = parseLambdaConfig();
   const lambda = createLambdaClient();
   const functionName = `langwatch_nlp-${projectId}`;
@@ -250,7 +257,24 @@ export const getProjectLambdaArn = async (projectId: string): Promise<string> =>
   if (!lambdaConfig) {
     // Create the Lambda function (includes log group creation with retention)
     logger.info({ projectId }, `Creating Lambda function for project`);
-    lambdaConfig = await createProjectLambda(lambda, functionName, config);
+    try {
+      lambdaConfig = await createProjectLambda(lambda, functionName, config);
+    } catch (error) {
+      if (
+        error instanceof Error &&
+        error.message.includes("Function already exists")
+      ) {
+        logger.info(
+          { projectId },
+          "Lambda function already exists, skipping creation"
+        );
+        lambdaConfig = await checkLambdaExists(lambda, functionName);
+        if (!lambdaConfig) {
+          throw new Error("Error retrieving Lambda function");
+        }
+      }
+      throw error;
+    }
   } else {
     // Get complete function details to check image URI
     const getFunctionCommand = new GetFunctionCommand({

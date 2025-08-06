@@ -97,10 +97,7 @@ export const schemaValidators = {
 };
 
 export function getSchemaValidator(version: SchemaVersion | string) {
-  const validator =
-    schemaValidators[
-      version === "1.0.0" ? SchemaVersion.V1_0 : (version as SchemaVersion)
-    ];
+  const validator = schemaValidators[version as SchemaVersion];
   if (!validator) {
     throw new TRPCError({
       code: "BAD_REQUEST",
