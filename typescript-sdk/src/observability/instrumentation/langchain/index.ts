@@ -20,13 +20,13 @@ import {
 import type { ChatGeneration, LLMResult } from "@langchain/core/outputs";
 import type { ChainValues } from "@langchain/core/utils/types";
 import { getLangWatchTracer } from "../../tracer";
-import type { LangWatchSpan } from "../../span";
+import type { LangWatchSpan } from "../../types";
 import { context, trace, SpanStatusCode, Attributes } from "@opentelemetry/api";
 import { chatMessageSchema } from "../../../internal/generated/types/tracer.generated";
 import {
-  canAutomaticallyCaptureInput,
-  canAutomaticallyCaptureOutput,
-} from "../../../client";
+  getObservabilityConfigSuppressInputCapture,
+  getObservabilityConfigSuppressOutputCapture,
+} from "../../setup/config";
 import * as intSemconv from "../../semconv";
 import { z } from "zod";
 
@@ -70,7 +70,7 @@ export class LangWatchCallbackHandler extends BaseCallbackHandler {
 
     span.setType("llm");
 
-    if (canAutomaticallyCaptureInput()) {
+    if (!getObservabilityConfigSuppressInputCapture()) {
       span.setInput(prompts);
     }
 
@@ -124,7 +124,7 @@ export class LangWatchCallbackHandler extends BaseCallbackHandler {
 
     span.setType("llm");
 
-    if (canAutomaticallyCaptureInput()) {
+    if (!getObservabilityConfigSuppressInputCapture()) {
       span.setInput(messages.flatMap(convertFromLangChainMessages));
     }
 
@@ -184,7 +184,7 @@ export class LangWatchCallbackHandler extends BaseCallbackHandler {
     }
     const output = outputs.length === 1 ? outputs[0] : outputs;
 
-    if (canAutomaticallyCaptureOutput()) {
+    if (!getObservabilityConfigSuppressOutputCapture()) {
       span.setOutput(output);
     }
 
@@ -227,7 +227,7 @@ export class LangWatchCallbackHandler extends BaseCallbackHandler {
     );
     span.setType("chain");
 
-    if (canAutomaticallyCaptureInput()) {
+    if (!getObservabilityConfigSuppressInputCapture()) {
       span.setInput(inputs);
     }
 
@@ -300,7 +300,7 @@ export class LangWatchCallbackHandler extends BaseCallbackHandler {
     );
     span.setType("tool");
 
-    if (canAutomaticallyCaptureInput()) {
+    if (!getObservabilityConfigSuppressInputCapture()) {
       span.setInputString(input);
     }
 
@@ -332,7 +332,7 @@ export class LangWatchCallbackHandler extends BaseCallbackHandler {
   ): Promise<void> {
     const span = this.getSpan(runId);
     if (!span) return;
-    if (canAutomaticallyCaptureOutput()) {
+    if (!getObservabilityConfigSuppressOutputCapture()) {
       span.setOutputString(output);
     }
 
@@ -378,7 +378,7 @@ export class LangWatchCallbackHandler extends BaseCallbackHandler {
     );
     span.setType("rag");
 
-    if (canAutomaticallyCaptureInput()) {
+    if (!getObservabilityConfigSuppressInputCapture()) {
       span.setInputString(query);
     }
     if (_tags) {
@@ -411,7 +411,7 @@ export class LangWatchCallbackHandler extends BaseCallbackHandler {
   ) {
     const span = this.getSpan(runId);
     if (!span) return;
-    if (canAutomaticallyCaptureOutput()) {
+    if (!getObservabilityConfigSuppressOutputCapture()) {
       span.setOutput(documents);
     }
 
@@ -421,7 +421,7 @@ export class LangWatchCallbackHandler extends BaseCallbackHandler {
       documents.map((document) => ({
         document_id: document.metadata.id,
         chunk_id: document.metadata.chunk_id,
-        content: canAutomaticallyCaptureInput() ? document.pageContent : "",
+        content: !getObservabilityConfigSuppressInputCapture() ? document.pageContent : "",
       })),
     );
 
@@ -470,7 +470,7 @@ export class LangWatchCallbackHandler extends BaseCallbackHandler {
 
     addLangChainEvent(span, "handleAgentEnd", runId, _parentRunId, _tags);
 
-    if (canAutomaticallyCaptureOutput()) {
+    if (!getObservabilityConfigSuppressOutputCapture()) {
       span.setOutput(action.returnValues);
     }
 
