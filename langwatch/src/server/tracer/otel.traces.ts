@@ -33,6 +33,7 @@ import {
 import { openTelemetryToLangWatchMetadataMapping } from "./metadata";
 import { createLogger } from "~/utils/logger";
 import { z } from "zod";
+import { isStrandsAgentsPythonResource, extractStrandsAgentsInputOutput } from "./span-event-processing/strands-agents";
 
 const logger = createLogger("langwatch.tracer.opentelemetry");
 
@@ -231,6 +232,16 @@ const addOpenTelemetrySpanAsSpan = (
         break;
     }
   }
+
+  // Special handling for strands-agents Python SDK
+  if (isStrandsAgentsPythonResource(trace.customMetadata)) {
+    const io = extractStrandsAgentsInputOutput(otelSpan);
+    if (io) {
+      input = io.input;
+      output = io.output;
+    }
+  }
+
   if (started_at && attributesMap.ai?.response?.msToFirstChunk) {
     first_token_at =
       started_at +
@@ -1018,7 +1029,7 @@ export function otelAttributesToNestedAttributes(
     if (anyValuePair.kvlistValue)
       return otelAttributesToNestedAttributes(anyValuePair.kvlistValue.values);
 
-    if (anyValuePair.arrayValue && anyValuePair.arrayValue.values)
+    if (anyValuePair.arrayValue?.values)
       return anyValuePair.arrayValue.values.map(resolveOtelAnyValue);
 
     return void 0;

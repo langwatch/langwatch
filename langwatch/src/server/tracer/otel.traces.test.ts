@@ -1568,6 +1568,88 @@ describe("opentelemetry traces receiver", () => {
     });
   });
 
+  it("receives a strands-agents Python SDK trace", async () => {
+    const strandsAgentsTrace: DeepPartial<IExportTraceServiceRequest> = {
+      resourceSpans: [
+        {
+          resource: {
+            attributes: [
+              { key: "service.name", value: { stringValue: "strands-agents" } },
+              { key: "telemetry.sdk.language", value: { stringValue: "python" } },
+            ],
+          },
+          scopeSpans: [
+            {
+              scope: { name: "opentelemetry.instrumentation.strands" },
+              spans: [
+                {
+                  traceId: "abcdabcdabcdabcdabcdabcdabcdabcd",
+                  spanId: "1234123412341234",
+                  name: "Model invoke",
+                  kind: "SPAN_KIND_INTERNAL" as unknown as ESpanKind,
+                  startTimeUnixNano: "1723006472661658000",
+                  endTimeUnixNano: "1723006473946042000",
+                  attributes: [
+                    { key: "gen_ai.request.model", value: { stringValue: "openai/gpt-4.1-nano" } },
+                  ],
+                  events: [
+                    {
+                      name: "gen_ai.tool.message",
+                      attributes: [
+                        { key: "role", value: { stringValue: "user" } },
+                        { key: "content", value: { stringValue: '[{"text": "yo"}]' } },
+                        { key: "id", value: { stringValue: "msg-1" } },
+                      ],
+                    },
+                    {
+                      name: "gen_ai.choice",
+                      attributes: [
+                        { key: "message", value: { stringValue: '[{"text": "Hello!"}]' } },
+                        { key: "id", value: { stringValue: "choice-1" } },
+                        { key: "finish_reason", value: { stringValue: "stop" } },
+                      ],
+                    },
+                  ],
+                  status: {},
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    };
+
+    const traces = openTelemetryTraceRequestToTracesForCollection(strandsAgentsTrace);
+    expect(traces).toHaveLength(1);
+    const trace = traces[0];
+    expect(trace).toBeDefined();
+    expect(trace!.spans).toHaveLength(1);
+    const span = trace!.spans[0];
+    expect(span).toBeDefined();
+    expect((span as any).model).toBe("openai/gpt-4.1-nano");
+    expect(span!.input).toEqual({
+      type: "chat_messages",
+      value: [
+        {
+          role: "user",
+          content: [{ text: "yo" }],
+          id: "msg-1",
+        },
+      ],
+    });
+    expect(span!.output).toEqual({
+      type: "chat_messages",
+      value: [
+        {
+          role: "choice",
+          content: [{ text: "Hello!" }],
+          id: "choice-1",
+          finish_reason: "stop",
+        },
+      ],
+    });
+  });
+
   it("receives a Spring AI trace", async () => {
     const traces = openTelemetryTraceRequestToTracesForCollection(springAITrace);
 
