@@ -11,6 +11,8 @@ import { prisma } from "~/server/db";
 
 import { app } from "../[[...route]]/app";
 
+import { createHandle } from "./helpers";
+
 import {
   llmPromptConfigFactory,
   llmPromptConfigVersionFactory,
@@ -161,7 +163,7 @@ describe("Prompts API", () => {
 
       describe("when the prompt is scoped to project (default)", () => {
         // First, update the config to have a handle
-        const handle = `ref_${nanoid()}`;
+        const handle = createHandle("ref");
 
         beforeEach(async () => {
           // Create a new prompt with the handle
@@ -194,7 +196,7 @@ describe("Prompts API", () => {
 
       describe("when the prompt is scoped to organization", () => {
         // Create a new prompt with organization scope and handle
-        const handle = `org_ref_${nanoid()}`;
+        const handle = createHandle("org_ref");
 
         beforeEach(async () => {
           const createRes = await app.request(`/api/prompts`, {
