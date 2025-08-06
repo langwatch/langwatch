@@ -1,4 +1,4 @@
-import type { ISpan } from "@opentelemetry/otlp-transformer";
+import type { IInstrumentationScope, IKeyValue, ISpan } from "@opentelemetry/otlp-transformer";
 import type { DeepPartial } from "~/utils/types";
 
 /**
@@ -15,19 +15,27 @@ function safeJsonParse(jsonString: string, fallback: any = null): any {
   }
 }
 
-/**
- * Detects if the resource attributes indicate a strands-agents Python SDK span
- */
-export function isStrandsAgentsPythonResource(
-  resource: Record<string, any> | undefined | null
-): boolean {
-  if (!resource) return false;
-  if (typeof resource !== "object") return false;
+const attrStrVal = (attributes: DeepPartial<IKeyValue[]> | undefined, key: string) => {
+  return attributes?.find((a) => a?.key === key)?.value?.stringValue;
+};
 
-  return (
-    resource["service.name"] === "strands-agents" &&
-    resource["telemetry.sdk.language"] === "python"
-  );
+/**
+ * Detects if the given scope or span is a strands-agents Python SDK span
+ */
+export function isStrandsAgentsInstrumentation(
+  scope: DeepPartial<IInstrumentationScope> | undefined,
+  span: DeepPartial<ISpan> | undefined,
+): boolean {
+  // The ordering here is specific, don't change it for aesthetic reasons please.
+  if (scope?.name === "strands-agents") return true;
+  if (attrStrVal(scope?.attributes, "gen_ai.system") === "strands-agents") return true;
+  if (attrStrVal(scope?.attributes, "system.name") === "strands-agents") return true;
+  if (attrStrVal(span?.attributes, "gen_ai.agent.name") === "Strands Agents") return true;
+  if (attrStrVal(span?.attributes, "service.name") === "strands-agents") return true; 
+  if (scope?.name === "opentelemetry.instrumentation.strands") return true;
+  if (span?.name?.includes(" Strands Agents")) return true;
+
+  return false;
 }
 
 /**

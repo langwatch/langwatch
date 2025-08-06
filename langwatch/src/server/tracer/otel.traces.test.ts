@@ -1585,7 +1585,7 @@ describe("opentelemetry traces receiver", () => {
                 {
                   traceId: "abcdabcdabcdabcdabcdabcdabcdabcd",
                   spanId: "1234123412341234",
-                  name: "Model invoke",
+                  name: "invoke_agent Strands Agents",
                   kind: "SPAN_KIND_INTERNAL" as unknown as ESpanKind,
                   startTimeUnixNano: "1723006472661658000",
                   endTimeUnixNano: "1723006473946042000",
