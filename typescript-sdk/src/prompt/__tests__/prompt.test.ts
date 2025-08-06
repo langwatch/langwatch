@@ -1,133 +1,204 @@
-import { describe, it, expect, beforeAll, afterEach, vi } from "vitest";
-import { PromptService } from "../service";
-import { Prompt, PromptCompilationError } from "../prompt";
-import type { LangwatchApiClient } from "../../internal/api/client";
+import { describe, it, expect, beforeEach, afterEach, afterAll } from "vitest";
+import {
+  InMemorySpanExporter,
+  SimpleSpanProcessor,
+  NodeTracerProvider,
+  ReadableSpan,
+} from "@opentelemetry/sdk-trace-node";
 
-// Mock the client with proper Vitest mock methods
-const mockClient = {
-  GET: vi.fn(),
-  POST: vi.fn(),
-  PUT: vi.fn(),
-  DELETE: vi.fn(),
-} as unknown as LangwatchApiClient & {
-  GET: ReturnType<typeof vi.fn>;
-  POST: ReturnType<typeof vi.fn>;
-  PUT: ReturnType<typeof vi.fn>;
-  DELETE: ReturnType<typeof vi.fn>;
-};
+// Set up tracing BEFORE importing the modules that use tracers
+let spanExporter: InMemorySpanExporter;
+let tracerProvider: NodeTracerProvider;
 
-// Mock the createLangWatchApiClient function
-vi.mock("../../internal/api/client", () => ({
-  createLangWatchApiClient: vi.fn(() => mockClient),
-}));
+spanExporter = new InMemorySpanExporter();
+tracerProvider = new NodeTracerProvider({
+  spanProcessors: [new SimpleSpanProcessor(spanExporter)],
+});
+tracerProvider.register();
+
+import { ATTR_LANGWATCH_SPAN_TYPE } from "../../observability/semconv";
+import { Prompt, PromptCompilationError, CompiledPrompt } from "../prompt";
 
 describe("Prompt", () => {
-  let promptService: PromptService;
-
-  beforeAll(async () => {
-    promptService = new PromptService({ client: mockClient });
+  beforeEach(() => {
+    // Clear any previous spans
+    spanExporter.reset();
   });
 
   afterEach(() => {
-    vi.clearAllMocks();
+    // Clean up spans after each test
+    spanExporter.reset();
   });
 
-  it("should fetch and compile a prompt", async () => {
-    // Mock the API response
-    const mockPromptData = {
-      id: "prompt_123",
-      name: "Test Prompt",
-      prompt: "Hello {{user_name}}, how is the {{topic}} today?",
-      messages: [
-        {
-          role: "user",
-          content: "Tell me about {{topic}}",
-        },
-      ],
-      model: "gpt-4",
-      version: 1,
-      updatedAt: "2024-01-01T00:00:00Z",
-    };
-
-    mockClient.GET.mockResolvedValueOnce({
-      data: mockPromptData,
-      error: null,
-    });
-
-    const prompt = await promptService.get("prompt_123");
-
-    expect(prompt).toBeDefined();
-
-    expect(prompt?.id).toBe("prompt_123");
-    expect(prompt?.name).toBe("Test Prompt");
-
-    // Test template compilation
-    const compiled = prompt?.compile({
-      user_name: "Alice",
-      topic: "weather",
-    });
-
-    expect(compiled?.prompt).toContain("Alice");
-    expect(JSON.stringify(compiled?.messages)).toContain("weather");
+  // Clean up the tracer provider after all tests
+  afterAll(() => {
+    tracerProvider.shutdown();
   });
 
-  it("should handle missing template variables gracefully", async () => {
-    // Mock the API response
-    const mockPromptData = {
-      id: "prompt_123",
-      name: "Test Prompt",
-      prompt: "Hello {{user_name}}, how is the {{topic}} today?",
-      messages: [
-        {
-          role: "user",
-          content: "Tell me about {{topic}}",
-        },
-      ],
-      model: "gpt-4",
-      version: 1,
-      updatedAt: "2024-01-01T00:00:00Z",
-    };
+  const mockPromptData = {
+    id: "prompt_123",
+    handle: null,
+    scope: "PROJECT" as const,
+    name: "Test Prompt",
+    updatedAt: "2024-01-01T00:00:00Z",
+    version: 1,
+    versionId: "version_123",
+    versionCreatedAt: "2024-01-01T00:00:00Z",
+    model: "gpt-4",
+    prompt: "Hello {{user_name}}, how is the {{topic}} today?",
+    messages: [
+      {
+        role: "user" as const,
+        content: "Tell me about {{topic}}",
+      },
+    ],
+    response_format: null,
+  };
 
-    mockClient.GET.mockResolvedValueOnce({
-      data: mockPromptData,
-      error: null,
+  describe("#compile", () => {
+    const prompt = new Prompt(mockPromptData);
+    let result: CompiledPrompt;
+    let spans: ReadableSpan[];
+    let compileSpan: ReadableSpan | undefined;
+
+    beforeEach(async () => {
+      // Clear any previous spans
+      spanExporter.reset();
+
+      // Test template compilation
+      result = prompt.compile({
+        user_name: "Alice",
+        topic: "weather",
+      });
+      spans = spanExporter.getFinishedSpans();
+      compileSpan = spans.find((span) => span.name === "compile");
     });
 
-    const prompt = await promptService.get("prompt_123");
+    it("should compile a prompt", () => {
+      expect(result.prompt).toBe("Hello Alice, how is the weather today?");
+    });
 
-    // Lenient compilation should not throw and should replace missing variables with empty strings
-    const compiled = prompt?.compile({ user_name: "Alice", topic: "weather" });
-    expect(compiled).toBeInstanceOf(Prompt);
-    expect(compiled?.prompt).toBe("Hello Alice, how is the weather today?");
-    expect(compiled?.messages[0]?.content).toBe("Tell me about weather");
+    it("should compile the messages", () => {
+      expect(result.messages[0]?.content).toBe("Tell me about weather");
+    });
+
+    describe("tracing", () => {
+      it("should create a span with correct name", () => {
+        expect(compileSpan).toBeDefined();
+      });
+
+      it("should set span type to 'prompt'", () => {
+        expect(compileSpan?.attributes[ATTR_LANGWATCH_SPAN_TYPE]).toBe(
+          "prompt",
+        );
+      });
+
+      it("should set prompt metadata attributes", () => {
+        expect(compileSpan?.attributes["langwatch.prompt.id"]).toBe(
+          "prompt_123",
+        );
+        expect(compileSpan?.attributes["langwatch.prompt.version.id"]).toBe(
+          "version_123",
+        );
+        expect(compileSpan?.attributes["langwatch.prompt.version.number"]).toBe(
+          1,
+        );
+      });
+
+      it("should set output data", () => {
+        // Check that output was set (it should be JSON stringified)
+        expect(compileSpan?.attributes["langwatch.output"]).toBeDefined();
+
+        const outputAttr = compileSpan?.attributes[
+          "langwatch.output"
+        ] as string;
+        const output = JSON.parse(outputAttr);
+
+        expect(output.value.prompt).toBe(
+          "Hello Alice, how is the weather today?",
+        );
+        expect(output.value.messages[0].content).toBe("Tell me about weather");
+      });
+
+      it("should set input variables", () => {
+        // Check that input variables were captured
+        expect(
+          compileSpan?.attributes["langwatch.prompt.variables"],
+        ).toBeDefined();
+
+        const variablesAttr = compileSpan?.attributes[
+          "langwatch.prompt.variables"
+        ] as string;
+        const variables = JSON.parse(variablesAttr);
+
+        expect(variables.value).toEqual([
+          {
+            user_name: "Alice",
+            topic: "weather",
+          },
+        ]);
+      });
+    });
   });
 
-  it("should throw on strict compilation with missing variables", async () => {
-    // Mock the API response
-    const mockPromptData = {
-      id: "prompt_123",
-      name: "Test Prompt",
-      prompt: "Hello {{user_name}}, how is the {{topic}} today?",
-      messages: [
-        {
-          role: "user",
-          content: "Tell me about {{topic}}",
-        },
-      ],
-      model: "gpt-4",
-      version: 1,
-      updatedAt: "2024-01-01T00:00:00Z",
-    };
+  describe("#compileStrict", () => {
+    const prompt = new Prompt(mockPromptData);
+    let result: CompiledPrompt;
+    let spans: ReadableSpan[];
+    let compileSpan: ReadableSpan | undefined;
 
-    mockClient.GET.mockResolvedValueOnce({
-      data: mockPromptData,
-      error: null,
+    beforeEach(async () => {
+      // Clear any previous spans
+      spanExporter.reset();
+
+      // Test template compilation
+      result = prompt.compile({
+        user_name: "Alice",
+        topic: "weather",
+      });
+      spans = spanExporter.getFinishedSpans();
+      compileSpan = spans.find((span) => span.name === "compile");
     });
 
-    const prompt = await promptService.get("prompt_123");
+    it("should compile a prompt", () => {
+      expect(result.prompt).toBe("Hello Alice, how is the weather today?");
+    });
 
-    expect(() => {
-      prompt?.compileStrict({});
-    }).toThrow(PromptCompilationError);
+    it("should compile the messages", () => {
+      expect(result.messages[0]?.content).toBe("Tell me about weather");
+    });
+
+    it("should throw on strict compilation with missing variables", () => {
+      expect(() => {
+        prompt.compileStrict({});
+      }).toThrow(PromptCompilationError);
+    });
+
+    describe("tracing", () => {
+      it("should still create a span even when throwing", () => {
+        expect(() => {
+          prompt.compileStrict({});
+        }).toThrow(PromptCompilationError);
+
+        expect(compileSpan).toBeDefined();
+        expect(compileSpan?.attributes[ATTR_LANGWATCH_SPAN_TYPE]).toBe(
+          "prompt",
+        );
+      });
+
+      it("should mark span as error when throwing", () => {
+        expect(() => {
+          prompt.compileStrict({});
+        }).toThrow(PromptCompilationError);
+
+        const spans = spanExporter.getFinishedSpans();
+        const compileStrictSpan = spans.find(
+          (span) => span.name === "compileStrict",
+        );
+
+        // Check that the span was marked as an error
+        expect(compileStrictSpan?.status?.code).toBe(2); // ERROR status code
+      });
+    });
   });
 });
