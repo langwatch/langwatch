@@ -26,4 +26,6 @@ export const organizationFactory = Factory.define<
   useCustomS3: false,
   sentPlanLimitAlert: null,
   promoCode: null,
+  stripeCustomerId: null,
+  currency: "USD",
 }));

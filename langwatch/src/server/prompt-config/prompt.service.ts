@@ -6,8 +6,8 @@ import {
 } from "@prisma/client";
 import { type z } from "zod";
 
-import { type UpdateLlmConfigDTO } from "./dtos";
 import {
+  type CreateLlmConfigParams,
   LlmConfigRepository,
   type LlmConfigWithLatestVersion,
 } from "./repositories";
@@ -152,11 +152,14 @@ export class PromptService {
   async updatePrompt(params: {
     id: string;
     projectId: string;
-    data: UpdateLlmConfigDTO;
+    data: Partial<Pick<CreateLlmConfigParams, "handle" | "scope">>;
   }): Promise<LlmPromptConfig> {
     const { id, projectId, data } = params;
 
-    return this.repository.updateConfig(id, projectId, data);
+    return this.repository.updateConfig(id, projectId, {
+      handle: data.handle,
+      scope: data.scope,
+    });
   }
 
   /**

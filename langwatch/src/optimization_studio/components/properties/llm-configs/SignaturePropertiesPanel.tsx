@@ -3,9 +3,13 @@ import { useUpdateNodeInternals, type Node } from "@xyflow/react";
 import debounce from "lodash-es/debounce";
 import { useEffect, useMemo, useRef } from "react";
 import { FormProvider, useFieldArray } from "react-hook-form";
+import { useShallow } from "zustand/react/shallow";
 
 import type { LatestConfigVersionSchema } from "~/server/prompt-config/repositories/llm-config-version-schema";
 
+import { useWizardContext } from "../../../../components/evaluations/wizard/hooks/useWizardContext";
+import { PromptMessagesField } from "../../../../prompt-configs/forms/fields/PromptMessagesField";
+import type { LlmConfigWithLatestVersion } from "../../../../server/prompt-config/repositories/llm-config.repository";
 import { useWorkflowStore } from "../../../hooks/useWorkflowStore";
 import type {
   LLMConfig,
@@ -20,6 +24,7 @@ import { WrappedOptimizationStudioLLMConfigField } from "./WrappedOptimizationSt
 import { toaster } from "~/components/ui/toaster";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useSmartSetNode } from "~/optimization_studio/hooks/useSmartSetNode";
+import type { PromptTextAreaOnAddMention } from "~/prompt-configs/components/ui/PromptTextArea";
 import { DemonstrationsField } from "~/prompt-configs/forms/fields/DemonstrationsField";
 import {
   InputsFieldGroup,
@@ -40,11 +45,7 @@ import {
 import { PromptConfigProvider } from "~/prompt-configs/providers/PromptConfigProvider";
 import { usePromptConfigContext } from "~/prompt-configs/providers/PromptConfigProvider";
 import { api } from "~/utils/api";
-import { PromptMessagesField } from "../../../../prompt-configs/forms/fields/PromptMessagesField";
-import { useShallow } from "zustand/react/shallow";
-import { useWizardContext } from "../../../../components/evaluations/wizard/hooks/useWizardContext";
-import type { PromptTextAreaOnAddMention } from "~/prompt-configs/components/ui/PromptTextArea";
-import type { LlmConfigWithLatestVersion } from "../../../../server/prompt-config/repositories/llm-config.repository";
+import { snakeCase } from "~/utils/stringCasing";
 
 /**
  * Properties panel for the Signature node in the optimization studio.
@@ -400,11 +401,20 @@ export function SignaturePropertiesPanel({
     if (!nodeHasConfigId) {
       void (async () => {
         try {
+          // Create a temporary name for the config
+          const tempName =
+            (node.data as LlmPromptConfigComponent).name ??
+            createNewOptimizationStudioPromptName(workflowName, nodes);
+
+          // Convert the name to the handle standard
+          const handle = snakeCase(tempName);
+
+          // Reset the node name
+          node.data.name = handle;
+
           // Create a new config
           const newConfig = await createMutation.mutateAsync({
-            name:
-              (node.data as LlmPromptConfigComponent).name ??
-              createNewOptimizationStudioPromptName(workflowName, nodes),
+            handle,
             projectId: project?.id ?? "",
           });
 
@@ -425,6 +435,7 @@ export function SignaturePropertiesPanel({
           const { llm, ...rest } =
             nodeConfigData ??
             ({} as PromptConfigFormValues["version"]["configData"]);
+
           const newVersion = await createNewVersion(
             newConfig.id,
             {

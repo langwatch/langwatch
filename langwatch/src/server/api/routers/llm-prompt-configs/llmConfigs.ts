@@ -1,16 +1,18 @@
+import { PromptScope } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 
-import { PromptService } from "~/server/prompt-config/prompt.service";
+import { PromptService } from "~/server/prompt-config";
 
+import { prisma } from "../../../db";
 import { LlmConfigRepository } from "../../../prompt-config/repositories/llm-config.repository";
 import { TeamRoleGroup } from "../../permission";
 import { checkUserPermissionForProject } from "../../permission";
 import { createTRPCRouter, protectedProcedure } from "../../trpc";
 
 import { llmConfigVersionsRouter } from "./llmPromptConfigVersions";
-import { prisma } from "../../../db";
-import { PromptScope } from "@prisma/client";
+
+import { handleSchema } from "~/prompt-configs/schemas";
 
 const idSchema = z.object({
   id: z.string(),
@@ -22,7 +24,7 @@ const projectIdSchema = z.object({
 
 const configDataSchema = z
   .object({
-    name: z.string().optional(),
+    handle: handleSchema,
   })
   .merge(projectIdSchema);
 
@@ -81,18 +83,16 @@ export const llmConfigsRouter = createTRPCRouter({
     .input(configDataSchema)
     .use(checkUserPermissionForProject(TeamRoleGroup.PROMPTS_MANAGE))
     .mutation(async ({ ctx, input }) => {
-      const repository = new LlmConfigRepository(ctx.prisma);
+      const service = new PromptService(ctx.prisma);
       const organizationId = await getOrganizationIdForProject(input.projectId);
       const authorId = ctx.session?.user?.id;
 
-      const newConfig = await repository.createConfigWithInitialVersion({
+      return await service.createPrompt({
         ...input,
         authorId,
         organizationId,
-        scope: "PROJECT",
+        scope: PromptScope.PROJECT,
       });
-
-      return newConfig;
     }),
 
   /**
@@ -110,16 +110,15 @@ export const llmConfigsRouter = createTRPCRouter({
     )
     .use(checkUserPermissionForProject(TeamRoleGroup.PROMPTS_MANAGE))
     .mutation(async ({ ctx, input }) => {
-      const repository = new LlmConfigRepository(ctx.prisma);
-
-      const updatedConfig = await repository.updateConfig(
-        input.id,
-        input.projectId,
-        {
+      const service = new PromptService(ctx.prisma);
+      const updatedConfig = await service.updatePrompt({
+        id: input.id,
+        projectId: input.projectId,
+        data: {
           handle: input.handle,
           scope: input.scope,
-        }
-      );
+        },
+      });
 
       return updatedConfig;
     }),
@@ -156,7 +155,6 @@ export const llmConfigsRouter = createTRPCRouter({
     .use(checkUserPermissionForProject(TeamRoleGroup.PROMPTS_VIEW))
     .query(async ({ ctx, input }) => {
       const service = new PromptService(ctx.prisma);
-
       const organizationId = await getOrganizationIdForProject(input.projectId);
 
       return await service.checkHandleUniqueness({
