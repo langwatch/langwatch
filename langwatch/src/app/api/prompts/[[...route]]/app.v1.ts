@@ -1,18 +1,21 @@
-import { PromptScope, type Organization } from "@prisma/client";
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { describeRoute } from "hono-openapi";
 import { validator as zValidator, resolver } from "hono-openapi/zod";
 import { z } from "zod";
 
-import { prisma } from "~/server/db";
-import { PromptService } from "~/server/prompt-config/prompt.service";
+import { type PromptService } from "~/server/prompt-config/prompt.service";
 import { getLatestConfigVersionSchema } from "~/server/prompt-config/repositories/llm-config-version-schema";
 
 import {
   organizationMiddleware,
   type AuthMiddlewareVariables,
+  type OrganizationMiddlewareVariables,
 } from "../../middleware";
+import {
+  promptServiceMiddleware,
+  type PromptServiceMiddlewareVariables,
+} from "../../middleware/prompt-service";
 import { baseResponses } from "../../shared/base-responses";
 
 import {
@@ -25,8 +28,16 @@ import {
   buildStandardSuccessResponse,
   getOutputsToResponseFormat,
 } from "./utils";
+import { handlePossibleConflictError } from "./utils";
 
 import { badRequestSchema, successSchema } from "~/app/api/shared/schemas";
+import {
+  handleSchema,
+  nameSchema,
+  scopeSchema,
+  commitMessageSchema,
+  versionSchema,
+} from "~/prompt-configs/schemas/field-schemas";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
 import { createLogger } from "~/utils/logger";
 
@@ -35,10 +46,9 @@ const logger = createLogger("langwatch:api:prompts");
 patchZodOpenapi();
 
 // Define types for our Hono context variables
-type Variables = {
-  organization: Organization;
-  promptService: PromptService;
-} & AuthMiddlewareVariables;
+type Variables = PromptServiceMiddlewareVariables &
+  AuthMiddlewareVariables &
+  OrganizationMiddlewareVariables;
 
 // Define the Hono app
 export const app = new Hono<{
@@ -47,10 +57,7 @@ export const app = new Hono<{
 
 // Middleware
 app.use("/*", organizationMiddleware);
-app.use("/*", async (c, next) => {
-  c.set("promptService", new PromptService(prisma));
-  await next();
-});
+app.use("/*", promptServiceMiddleware);
 
 // Get all prompts
 app.get(
@@ -108,9 +115,9 @@ app.post(
   zValidator(
     "json",
     z.object({
-      name: z.string().min(1, "Name cannot be empty"),
-      handle: z.string().optional(),
-      scope: z.nativeEnum(PromptScope).default(PromptScope.PROJECT),
+      name: nameSchema,
+      handle: handleSchema,
+      scope: scopeSchema,
     })
   ),
   async (c) => {
@@ -141,14 +148,7 @@ app.post(
 
       return c.json(newConfig);
     } catch (error: any) {
-      if (error.code === "P2002" && error.meta?.target?.includes("handle")) {
-        throw new HTTPException(409, {
-          message: `Prompt handle already exists for scope: ${
-            data.scope ?? PromptScope.PROJECT
-          }`,
-        });
-      }
-
+      handlePossibleConflictError(error, data.scope);
       throw error;
     }
   }
@@ -310,9 +310,9 @@ app.put(
   zValidator(
     "json",
     z.object({
-      name: z.string().min(1, "Name cannot be empty"),
-      handle: z.string().optional(),
-      scope: z.nativeEnum(PromptScope).optional(),
+      name: nameSchema,
+      handle: handleSchema.optional(),
+      scope: scopeSchema.optional(),
     })
   ),
   async (c) => {
@@ -354,13 +354,7 @@ app.put(
       return c.json(updatedConfig);
     } catch (error: any) {
       logger.error({ projectId, promptId: id, error }, "Error updating prompt");
-
-      // Handle unique constraint violation for handle
-      if (error.code === "P2002" && error.meta?.target?.includes("handle")) {
-        throw new HTTPException(409, {
-          message: `Prompt handle already exists for scope`,
-        });
-      }
+      handlePossibleConflictError(error, data.scope);
 
       // Re-throw other errors to be handled by the error middleware
       throw error;
@@ -447,8 +441,8 @@ app.post(
     "json",
     z.object({
       configData: getLatestConfigVersionSchema().shape.configData,
-      localVersion: z.number().optional(),
-      commitMessage: z.string().optional(),
+      localVersion: versionSchema.optional(),
+      commitMessage: commitMessageSchema.optional(),
     })
   ),
   async (c) => {

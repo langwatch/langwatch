@@ -1,21 +1,24 @@
 import { Hono } from "hono";
-import { HTTPException } from "hono/http-exception";
 import { describeRoute } from "hono-openapi";
 import { validator as zValidator } from "hono-openapi/zod";
 import { z } from "zod";
-
-import { prisma } from "~/server/db";
-import { PromptService } from "~/server/prompt-config/prompt.service";
 
 import {
   organizationMiddleware,
   type AuthMiddlewareVariables,
   type OrganizationMiddlewareVariables,
 } from "../../middleware";
+import {
+  promptServiceMiddleware,
+  type PromptServiceMiddlewareVariables,
+} from "../../middleware/prompt-service";
 import { baseResponses } from "../../shared/base-responses";
 
 import { promptOutputSchema } from "./schemas";
-import { buildStandardSuccessResponse } from "./utils";
+import {
+  buildStandardSuccessResponse,
+  handlePossibleConflictError,
+} from "./utils";
 
 import {
   handleSchema,
@@ -32,9 +35,8 @@ const logger = createLogger("langwatch:api:prompts");
 patchZodOpenapi();
 
 // Define types for our Hono context variables
-type Variables = {
-  promptService: PromptService;
-} & AuthMiddlewareVariables &
+type Variables = PromptServiceMiddlewareVariables &
+  AuthMiddlewareVariables &
   OrganizationMiddlewareVariables;
 
 // Define the Hono app
@@ -44,10 +46,7 @@ export const app = new Hono<{
 
 // Middleware
 app.use("/*", organizationMiddleware);
-app.use("/*", async (c, next) => {
-  c.set("promptService", new PromptService(prisma));
-  await next();
-});
+app.use("/*", promptServiceMiddleware);
 
 // Create prompt with initial version
 app.post(
@@ -109,14 +108,7 @@ app.post(
       return c.json(newConfig);
     } catch (error: any) {
       logger.error({ projectId: project.id, error }, "Error creating prompt");
-
-      // Handle unique constraint violation for handle
-      if (error.code === "P2002" && error.meta?.target?.includes("handle")) {
-        throw new HTTPException(409, {
-          message: `Prompt handle already exists for ${data.scope as string}`,
-          cause: error,
-        });
-      }
+      handlePossibleConflictError(error, data.scope);
 
       // Re-throw other errors to be handled by the error middleware
       throw error;

@@ -3,8 +3,6 @@ import { z } from "zod";
 
 import { getLatestConfigVersionSchema } from "~/server/prompt-config/repositories/llm-config-version-schema";
 
-import { scopeSchema } from "~/prompt-configs/schemas/field-schemas";
-
 /**
  * Schema for response format specification
  * Used to define structured output formats for LLM responses

@@ -76,3 +76,13 @@ export const nameSchema = z
 export const scopeSchema = z
   .nativeEnum(PromptScope)
   .default(PromptScope.PROJECT);
+
+/**
+ * Schema for commit message
+ */
+export const commitMessageSchema = z.string();
+
+/**
+ * Schema for prompt configuration version
+ */
+export const versionSchema = z.number();
