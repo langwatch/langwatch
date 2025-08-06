@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { setupObservability, createAndStartNodeSdk } from "../setup";
+import { setupObservability, createAndStartNodeSdk } from "../setup.js";
 import { resourceFromAttributes } from "@opentelemetry/resources";
 import { resetObservabilitySdkConfig } from "../../../config.js";
 import { shouldCaptureInput, shouldCaptureOutput } from "../../../config.js";
@@ -58,9 +58,9 @@ describe("setupObservability", () => {
     expect(handle.shutdown()).resolves.toBeUndefined();
   });
 
-  it("returns shutdown noop if already setup", () => {
-    const { isConcreteProvider } = require("../../utils.ts");
-    (isConcreteProvider as any).mockReturnValue(true);
+  it("returns shutdown noop if already setup", async () => {
+    const { isConcreteProvider } = await import("../../utils.js");
+    vi.mocked(isConcreteProvider).mockReturnValue(true);
     const handle = setupObservability(defaultOptions);
     expect(typeof handle.shutdown).toBe("function");
     expect(handle.shutdown()).resolves.toBeUndefined();
@@ -717,9 +717,9 @@ describe("UNSAFE_forceOpenTelemetryReinitialization", () => {
     resetObservabilitySdkConfig();
   });
 
-  it("warns when forcing reinitialization with existing provider", () => {
-    const { isConcreteProvider } = require("../../utils.ts");
-    (isConcreteProvider as any).mockReturnValue(true);
+  it("warns when forcing reinitialization with existing provider", async () => {
+    const { isConcreteProvider } = await import("../../utils.js");
+    vi.mocked(isConcreteProvider).mockReturnValue(true);
 
     const logger = new MockLogger({});
     const options = {
@@ -736,9 +736,9 @@ describe("UNSAFE_forceOpenTelemetryReinitialization", () => {
     );
   });
 
-  it("does not warn when forcing reinitialization without existing provider", () => {
-    const { isConcreteProvider } = require("../../utils.ts");
-    (isConcreteProvider as any).mockReturnValue(false);
+  it("does not warn when forcing reinitialization without existing provider", async () => {
+    const { isConcreteProvider } = await import("../../utils.js");
+    vi.mocked(isConcreteProvider).mockReturnValue(false);
 
     const logger = new MockLogger({});
     const options = {
@@ -790,10 +790,10 @@ describe("error handling in setup", () => {
     );
   });
 
-  it("throws error when throwOnSetupError is true", () => {
+  it("throws error when throwOnSetupError is true", async () => {
     // Mock the createMergedResource to throw an error
-    const { createMergedResource } = require("../../utils.ts");
-    (createMergedResource as any).mockImplementation(() => {
+    const { createMergedResource } = await import("../../utils.js");
+    vi.mocked(createMergedResource).mockImplementation(() => {
       throw new Error("Test error message");
     });
 
@@ -805,11 +805,11 @@ describe("error handling in setup", () => {
     expect(() => setupObservability(options)).toThrow("Test error message");
   });
 
-  it("returns noop shutdown when setup fails and throwOnSetupError is false", () => {
+  it("returns noop shutdown when setup fails and throwOnSetupError is false", async () => {
     const logger = new MockLogger({});
     // Mock the createMergedResource to throw an error
-    const { createMergedResource } = require("../../utils.ts");
-    (createMergedResource as any).mockImplementation(() => {
+    const { createMergedResource } = await import("../../utils.js");
+    vi.mocked(createMergedResource).mockImplementation(() => {
       throw new Error("Test error message");
     });
 

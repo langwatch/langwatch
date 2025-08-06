@@ -30,22 +30,7 @@ import {
 // import { Prompt } from "../prompt/prompt";
 
 class LangWatchSpanInternal implements LangWatchSpan {
-  constructor(private span: Span) {}
-  addGenAISystemMessageEvent(body: LangWatchSpanGenAISystemMessageEventBody, system?: intSemconv.VAL_GEN_AI_SYSTEMS | (string & {}), attributes?: Record<string, AttributeValue>): this {
-    throw new Error("Method not implemented.");
-  }
-  addGenAIUserMessageEvent(body: LangWatchSpanGenAIUserMessageEventBody, system?: intSemconv.VAL_GEN_AI_SYSTEMS | (string & {}), attributes?: Record<string, AttributeValue>): this {
-    throw new Error("Method not implemented.");
-  }
-  addGenAIAssistantMessageEvent(body: LangWatchSpanGenAIAssistantMessageEventBody, system?: intSemconv.VAL_GEN_AI_SYSTEMS | (string & {}), attributes?: Record<string, AttributeValue>): this {
-    throw new Error("Method not implemented.");
-  }
-  addGenAIToolMessageEvent(body: LangWatchSpanGenAIToolMessageEventBody, system?: intSemconv.VAL_GEN_AI_SYSTEMS | (string & {}), attributes?: Record<string, AttributeValue>): this {
-    throw new Error("Method not implemented.");
-  }
-  addGenAIChoiceEvent(body: LangWatchSpanGenAIChoiceEventBody, system?: intSemconv.VAL_GEN_AI_SYSTEMS | (string & {}), attributes?: Record<string, AttributeValue>): this {
-    throw new Error("Method not implemented.");
-  }
+  constructor(private span: Span) { }
 
   // OpenTelemetry Span methods with fluent API support
   setAttributes(attributes: SemconvAttributes): this {

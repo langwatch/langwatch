@@ -138,7 +138,7 @@ export interface LangWatchSpanMetrics {
  * @property role - The role of the message, typically 'system' or 'instruction'.
  *
  * @example
- * span.addGenAISystemMessageEvent({ content: 'You are a helpful assistant.' });
+ * logger.emitGenAISystemMessageEvent({ content: 'You are a helpful assistant.' });
  */
 export interface LangWatchSpanGenAISystemMessageEventBody {
   /** Content of the system message */
@@ -156,7 +156,7 @@ export interface LangWatchSpanGenAISystemMessageEventBody {
  * @property role - The role of the message, typically 'user' or 'customer'.
  *
  * @example
- * span.addGenAIUserMessageEvent({ content: 'What is the weather today?' });
+ * logger.emitGenAIUserMessageEvent({ content: 'What is the weather today?' });
  */
 export interface LangWatchSpanGenAIUserMessageEventBody {
   /** Content of the user message */
@@ -175,7 +175,7 @@ export interface LangWatchSpanGenAIUserMessageEventBody {
  * @property tool_calls - Array of tool call objects, if the assistant invoked tools/functions.
  *
  * @example
- * span.addGenAIAssistantMessageEvent({ content: 'The weather is sunny.', role: 'assistant' });
+ * logger.emitGenAIAssistantMessageEvent({ content: 'The weather is sunny.', role: 'assistant' });
  */
 export interface LangWatchSpanGenAIAssistantMessageEventBody {
   /** Content of the assistant message */
@@ -207,7 +207,7 @@ export interface LangWatchSpanGenAIAssistantMessageEventBody {
  * @property role - The role, typically 'tool' or 'function'.
  *
  * @example
- * span.addGenAIToolMessageEvent({ content: 'Result from tool', id: 'tool-1', role: 'tool' });
+ * logger.emitGenAIToolMessageEvent({ content: 'Result from tool', id: 'tool-1', role: 'tool' });
  */
 export interface LangWatchSpanGenAIToolMessageEventBody {
   /** Content of the tool message */
@@ -228,7 +228,7 @@ export interface LangWatchSpanGenAIToolMessageEventBody {
  * @property message - The message content and tool calls for this choice.
  *
  * @example
- * span.addGenAIChoiceEvent({ finish_reason: 'stop', index: 0, message: { content: 'Hello!' } });
+ * logger.emitGenAIChoiceEvent({ finish_reason: 'stop', index: 0, message: { content: 'Hello!' } });
  */
 export interface LangWatchSpanGenAIChoiceEventBody {
   /** Reason the generation finished */
