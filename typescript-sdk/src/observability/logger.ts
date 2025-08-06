@@ -1,6 +1,8 @@
-import { Logger, LoggerProvider, logs, NoopLoggerProvider } from "@opentelemetry/api-logs";
-import { LangWatchLogger, LangWatchLogRecord } from "./types";
-import { shouldCaptureInput, shouldCaptureOutput } from "./config";
+import { Logger, LoggerProvider, NoopLoggerProvider } from "@opentelemetry/api-logs";
+import { EmitOptions, LangWatchLogger, LangWatchLogRecord, LangWatchSpanGenAIAssistantMessageEventBody, LangWatchSpanGenAIChoiceEventBody, LangWatchSpanGenAISystemMessageEventBody, LangWatchSpanGenAIToolMessageEventBody, LangWatchSpanGenAIUserMessageEventBody, SemconvAttributes } from "./types";
+import { shouldCaptureOutput } from "./config";
+import * as intSemconv from "./semconv";
+import { context } from "@opentelemetry/api";
 
 // Default to NoOp logger provider to avoid global state issues
 let currentLoggerProvider: LoggerProvider = new NoopLoggerProvider();
@@ -99,11 +101,123 @@ export function createLangWatchLogger(logger: Logger): LangWatchLogger {
 export class LangWatchLoggerInternal implements LangWatchLogger {
   constructor(private logger: Logger) { }
 
-  emit(logRecord: LangWatchLogRecord): void {
+  emit(logRecord: LangWatchLogRecord, options?: EmitOptions): void {
+    // Handle output capture configuration
     if (!shouldCaptureOutput()) {
       logRecord.body = void 0;
     }
 
+    // Set context if not provided and not explicitly excluded
+    if (!logRecord.context && !options?.excludeContext) {
+      logRecord.context = context.active();
+    }
+
+    // Emit the log record through the underlying OpenTelemetry logger
     this.logger.emit(logRecord);
+  }
+
+  emitGenAISystemMessageEvent(
+    body: LangWatchSpanGenAISystemMessageEventBody,
+    system?: intSemconv.VAL_GEN_AI_SYSTEMS | (string & {}),
+    attributes?: SemconvAttributes,
+  ): void {
+    if (body.role === void 0) {
+      body.role = "system";
+    }
+
+    this.emit({
+      eventName: intSemconv.LOG_EVNT_GEN_AI_SYSTEM_MESSAGE,
+      context: context.active(),
+      attributes: {
+        ...attributes,
+        "gen_ai.system": system,
+      },
+      body: { ...body },
+      observedTimestamp: new Date().getTime(),
+    });
+  }
+
+  emitGenAIUserMessageEvent(
+    body: LangWatchSpanGenAIUserMessageEventBody,
+    system?: intSemconv.VAL_GEN_AI_SYSTEMS | (string & {}),
+    attributes?: SemconvAttributes,
+  ) {
+    if (body.role === void 0) {
+      body.role = "user";
+    }
+
+    this.emit({
+      eventName: intSemconv.LOG_EVNT_GEN_AI_USER_MESSAGE,
+      context: context.active(),
+      attributes: {
+        ...attributes,
+        "gen_ai.system": system,
+      },
+      body: { ...body },
+      observedTimestamp: new Date().getTime(),
+    });
+  }
+
+  emitGenAIAssistantMessageEvent(
+    body: LangWatchSpanGenAIAssistantMessageEventBody,
+    system?: intSemconv.VAL_GEN_AI_SYSTEMS | (string & {}),
+    attributes?: SemconvAttributes,
+  ) {
+    if (body.role === void 0) {
+      body.role = "assistant";
+    }
+
+    this.emit({
+      eventName: intSemconv.LOG_EVNT_GEN_AI_ASSISTANT_MESSAGE,
+      context: context.active(),
+      attributes: {
+        ...attributes,
+        "gen_ai.system": system,
+      },
+      body: { ...body },
+      observedTimestamp: new Date().getTime(),
+    });
+  }
+
+  emitGenAIToolMessageEvent(
+    body: LangWatchSpanGenAIToolMessageEventBody,
+    system?: intSemconv.VAL_GEN_AI_SYSTEMS | (string & {}),
+    attributes?: SemconvAttributes,
+  ) {
+    if (body.role === void 0) {
+      body.role = "tool";
+    }
+
+    this.emit({
+      eventName: intSemconv.LOG_EVNT_GEN_AI_TOOL_MESSAGE,
+      context: context.active(),
+      attributes: {
+        ...attributes,
+        "gen_ai.system": system,
+      },
+      body: { ...body },
+      observedTimestamp: new Date().getTime(),
+    });
+  }
+
+  emitGenAIChoiceEvent(
+    body: LangWatchSpanGenAIChoiceEventBody,
+    system?: intSemconv.VAL_GEN_AI_SYSTEMS | (string & {}),
+    attributes?: SemconvAttributes,
+  ) {
+    if (body.message && body.message.role === void 0) {
+      body.message.role = "assistant";
+    }
+
+    this.emit({
+      eventName: intSemconv.LOG_EVNT_GEN_AI_CHOICE,
+      context: context.active(),
+      attributes: {
+        ...attributes,
+        "gen_ai.system": system,
+      },
+      body: { ...body },
+      observedTimestamp: new Date().getTime(),
+    });
   }
 }

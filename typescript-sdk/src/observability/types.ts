@@ -540,82 +540,6 @@ export interface LangWatchSpan extends Span {
   // ): this;
 
   /**
-   * Add a GenAI system message event to the span.
-   *
-   * This logs a system/instruction message sent to the model.
-   *
-   * @param body - The event body (content and role)
-   * @param system - The GenAI system (optional, e.g., 'openai', 'anthropic')
-   * @param attributes - Additional OpenTelemetry attributes (optional)
-   * @returns this
-   */
-  addGenAISystemMessageEvent(
-    body: LangWatchSpanGenAISystemMessageEventBody,
-    system?: intSemconv.VAL_GEN_AI_SYSTEMS | (string & {}),
-    attributes?: Record<string, AttributeValue>,
-  ): this;
-  /**
-   * Add a GenAI user message event to the span.
-   *
-   * This logs a user/customer message sent to the model.
-   *
-   * @param body - The event body (content and role)
-   * @param system - The GenAI system (optional)
-   * @param attributes - Additional OpenTelemetry attributes (optional)
-   * @returns this
-   */
-  addGenAIUserMessageEvent(
-    body: LangWatchSpanGenAIUserMessageEventBody,
-    system?: intSemconv.VAL_GEN_AI_SYSTEMS | (string & {}),
-    attributes?: Record<string, AttributeValue>,
-  ): this;
-  /**
-   * Add a GenAI assistant message event to the span.
-   *
-   * This logs an assistant/bot response, including tool calls if present.
-   *
-   * @param body - The event body (content, role, tool_calls)
-   * @param system - The GenAI system (optional)
-   * @param attributes - Additional OpenTelemetry attributes (optional)
-   * @returns this
-   */
-  addGenAIAssistantMessageEvent(
-    body: LangWatchSpanGenAIAssistantMessageEventBody,
-    system?: intSemconv.VAL_GEN_AI_SYSTEMS | (string & {}),
-    attributes?: Record<string, AttributeValue>,
-  ): this;
-  /**
-   * Add a GenAI tool message event to the span.
-   *
-   * This logs a message from a tool/function invoked by the assistant.
-   *
-   * @param body - The event body (content, id, role)
-   * @param system - The GenAI system (optional)
-   * @param attributes - Additional OpenTelemetry attributes (optional)
-   * @returns this
-   */
-  addGenAIToolMessageEvent(
-    body: LangWatchSpanGenAIToolMessageEventBody,
-    system?: intSemconv.VAL_GEN_AI_SYSTEMS | (string & {}),
-    attributes?: Record<string, AttributeValue>,
-  ): this;
-  /**
-   * Add a GenAI choice event to the span.
-   *
-   * This logs a model output choice, including finish reason and message content.
-   *
-   * @param body - The event body (finish_reason, index, message)
-   * @param system - The GenAI system (optional)
-   * @param attributes - Additional OpenTelemetry attributes (optional)
-   * @returns this
-   */
-  addGenAIChoiceEvent(
-    body: LangWatchSpanGenAIChoiceEventBody,
-    system?: intSemconv.VAL_GEN_AI_SYSTEMS | (string & {}),
-    attributes?: Record<string, AttributeValue>,
-  ): this;
-
-  /**
    * Set multiple attributes for the span.
    *
    * @param attributes - The attributes object
@@ -757,6 +681,22 @@ export interface LangWatchLogRecord extends LogRecord {
 }
 
 /**
+ * Options for emitting a log record.
+ */
+export interface EmitOptions {
+  /**
+   * Whether to not include the OTel context on the log record.
+   *
+   * With standard OpenTelemetry, the context is not included on the log record by
+   * default, so this is useful if you want to emit a lot without having to manually
+   * set the context on each log record.
+   *
+   * @default false
+   */
+  excludeContext?: boolean;
+}
+
+/**
  * Extension of OpenTelemetry's Logger with LangWatch and GenAI-specific methods.
  */
 export interface LangWatchLogger extends Logger {
@@ -764,6 +704,83 @@ export interface LangWatchLogger extends Logger {
    * Emit a log record with LangWatch and GenAI-specific attributes.
    *
    * @param logRecord - The log record to emit
+   * @param options - Optional options for emitting the log record
    */
-  emit(logRecord: LangWatchLogRecord): void;
+  emit(logRecord: LangWatchLogRecord, options?: EmitOptions): void;
+
+  /**
+   * Emit a GenAI system message event to the logger.
+   *
+   * This logs a system/instruction message sent to the model.
+   *
+   * @param body - The event body (content and role)
+   * @param system - The GenAI system (optional, e.g., 'openai', 'anthropic')
+   * @param attributes - Additional OpenTelemetry attributes (optional)
+   * @returns this
+   */
+  emitGenAISystemMessageEvent(
+    body: LangWatchSpanGenAISystemMessageEventBody,
+    system?: intSemconv.VAL_GEN_AI_SYSTEMS | (string & {}),
+    attributes?: SemconvAttributes,
+  ): void;
+  /**
+   * Emit a GenAI user message event to the logger.
+   *
+   * This logs a user/customer message sent to the model.
+   *
+   * @param body - The event body (content and role)
+   * @param system - The GenAI system (optional)
+   * @param attributes - Additional OpenTelemetry attributes (optional)
+   * @returns this
+   */
+  emitGenAIUserMessageEvent(
+    body: LangWatchSpanGenAIUserMessageEventBody,
+    system?: intSemconv.VAL_GEN_AI_SYSTEMS | (string & {}),
+    attributes?: SemconvAttributes,
+  ): void;
+  /**
+   * Emit a GenAI assistant message event to the logger.
+   *
+   * This logs an assistant/bot response, including tool calls if present.
+   *
+   * @param body - The event body (content, role, tool_calls)
+   * @param system - The GenAI system (optional)
+   * @param attributes - Additional OpenTelemetry attributes (optional)
+   * @returns this
+   */
+  emitGenAIAssistantMessageEvent(
+    body: LangWatchSpanGenAIAssistantMessageEventBody,
+    system?: intSemconv.VAL_GEN_AI_SYSTEMS | (string & {}),
+    attributes?: SemconvAttributes,
+  ): void;
+  /**
+   * Emit a GenAI tool message event to the logger.
+   *
+   * This logs a message from a tool/function invoked by the assistant.
+   *
+   * @param body - The event body (content, id, role)
+   * @param system - The GenAI system (optional)
+   * @param attributes - Additional OpenTelemetry attributes (optional)
+   * @returns this
+   */
+  emitGenAIToolMessageEvent(
+    body: LangWatchSpanGenAIToolMessageEventBody,
+    system?: intSemconv.VAL_GEN_AI_SYSTEMS | (string & {}),
+    attributes?: SemconvAttributes,
+  ): void;
+  /**
+   * Emit a GenAI choice event to the logger.
+   *
+   * This logs a model output choice, including finish reason and message content.
+   *
+   * @param body - The event body (finish_reason, index, message)
+   * @param system - The GenAI system (optional)
+   * @param attributes - Additional OpenTelemetry attributes (optional)
+   * @returns this
+   */
+  emitGenAIChoiceEvent(
+    body: LangWatchSpanGenAIChoiceEventBody,
+    system?: intSemconv.VAL_GEN_AI_SYSTEMS | (string & {}),
+    attributes?: SemconvAttributes,
+  ): void;
 }

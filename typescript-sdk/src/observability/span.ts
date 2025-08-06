@@ -31,6 +31,21 @@ import {
 
 class LangWatchSpanInternal implements LangWatchSpan {
   constructor(private span: Span) {}
+  addGenAISystemMessageEvent(body: LangWatchSpanGenAISystemMessageEventBody, system?: intSemconv.VAL_GEN_AI_SYSTEMS | (string & {}), attributes?: Record<string, AttributeValue>): this {
+    throw new Error("Method not implemented.");
+  }
+  addGenAIUserMessageEvent(body: LangWatchSpanGenAIUserMessageEventBody, system?: intSemconv.VAL_GEN_AI_SYSTEMS | (string & {}), attributes?: Record<string, AttributeValue>): this {
+    throw new Error("Method not implemented.");
+  }
+  addGenAIAssistantMessageEvent(body: LangWatchSpanGenAIAssistantMessageEventBody, system?: intSemconv.VAL_GEN_AI_SYSTEMS | (string & {}), attributes?: Record<string, AttributeValue>): this {
+    throw new Error("Method not implemented.");
+  }
+  addGenAIToolMessageEvent(body: LangWatchSpanGenAIToolMessageEventBody, system?: intSemconv.VAL_GEN_AI_SYSTEMS | (string & {}), attributes?: Record<string, AttributeValue>): this {
+    throw new Error("Method not implemented.");
+  }
+  addGenAIChoiceEvent(body: LangWatchSpanGenAIChoiceEventBody, system?: intSemconv.VAL_GEN_AI_SYSTEMS | (string & {}), attributes?: Record<string, AttributeValue>): this {
+    throw new Error("Method not implemented.");
+  }
 
   // OpenTelemetry Span methods with fluent API support
   setAttributes(attributes: SemconvAttributes): this {
@@ -94,96 +109,6 @@ class LangWatchSpanInternal implements LangWatchSpan {
   //   recordEvaluation(details, attributes);
   //   return this;
   // }
-
-  addGenAISystemMessageEvent(
-    body: LangWatchSpanGenAISystemMessageEventBody,
-    system?: intSemconv.VAL_GEN_AI_SYSTEMS | (string & {}),
-    attributes?: Record<string, AttributeValue>,
-  ): this {
-    if (body.role === void 0) {
-      body.role = "system";
-    }
-
-    this.span.addEvent(intSemconv.LOG_EVNT_GEN_AI_SYSTEM_MESSAGE, {
-      ...attributes,
-      [semconv.ATTR_GEN_AI_SYSTEM]: system,
-      [intSemconv.ATTR_LANGWATCH_GEN_AI_LOG_EVENT_BODY]: JSON.stringify(body),
-      [intSemconv.ATTR_LANGWATCH_GEN_AI_LOG_EVENT_IMPOSTER]: true,
-    });
-    return this;
-  }
-
-  addGenAIUserMessageEvent(
-    body: LangWatchSpanGenAIUserMessageEventBody,
-    system?: intSemconv.VAL_GEN_AI_SYSTEMS | (string & {}),
-    attributes?: Record<string, AttributeValue>,
-  ): this {
-    if (body.role === void 0) {
-      body.role = "user";
-    }
-
-    this.span.addEvent(intSemconv.LOG_EVNT_GEN_AI_USER_MESSAGE, {
-      ...attributes,
-      [semconv.ATTR_GEN_AI_SYSTEM]: system,
-      [intSemconv.ATTR_LANGWATCH_GEN_AI_LOG_EVENT_BODY]: JSON.stringify(body),
-      [intSemconv.ATTR_LANGWATCH_GEN_AI_LOG_EVENT_IMPOSTER]: true,
-    });
-    return this;
-  }
-
-  addGenAIAssistantMessageEvent(
-    body: LangWatchSpanGenAIAssistantMessageEventBody,
-    system?: intSemconv.VAL_GEN_AI_SYSTEMS | (string & {}),
-    attributes?: Record<string, AttributeValue>,
-  ): this {
-    if (body.role === void 0) {
-      body.role = "assistant";
-    }
-
-    this.span.addEvent(intSemconv.LOG_EVNT_GEN_AI_ASSISTANT_MESSAGE, {
-      ...attributes,
-      [semconv.ATTR_GEN_AI_SYSTEM]: system,
-      [intSemconv.ATTR_LANGWATCH_GEN_AI_LOG_EVENT_BODY]: JSON.stringify(body),
-      [intSemconv.ATTR_LANGWATCH_GEN_AI_LOG_EVENT_IMPOSTER]: true,
-    });
-    return this;
-  }
-
-  addGenAIToolMessageEvent(
-    body: LangWatchSpanGenAIToolMessageEventBody,
-    system?: intSemconv.VAL_GEN_AI_SYSTEMS | (string & {}),
-    attributes?: Record<string, AttributeValue>,
-  ): this {
-    if (body.role === void 0) {
-      body.role = "tool";
-    }
-
-    this.span.addEvent(intSemconv.LOG_EVNT_GEN_AI_TOOL_MESSAGE, {
-      ...attributes,
-      [semconv.ATTR_GEN_AI_SYSTEM]: system,
-      [intSemconv.ATTR_LANGWATCH_GEN_AI_LOG_EVENT_BODY]: JSON.stringify(body),
-      [intSemconv.ATTR_LANGWATCH_GEN_AI_LOG_EVENT_IMPOSTER]: true,
-    });
-    return this;
-  }
-
-  addGenAIChoiceEvent(
-    body: LangWatchSpanGenAIChoiceEventBody,
-    system?: intSemconv.VAL_GEN_AI_SYSTEMS | (string & {}),
-    attributes?: Record<string, AttributeValue>,
-  ): this {
-    if (body.message && body.message.role === void 0) {
-      body.message.role = "assistant";
-    }
-
-    this.span.addEvent(intSemconv.LOG_EVNT_GEN_AI_CHOICE, {
-      ...attributes,
-      [semconv.ATTR_GEN_AI_SYSTEM]: system,
-      [intSemconv.ATTR_LANGWATCH_GEN_AI_LOG_EVENT_BODY]: JSON.stringify(body),
-      [intSemconv.ATTR_LANGWATCH_GEN_AI_LOG_EVENT_IMPOSTER]: true,
-    });
-    return this;
-  }
 
   setType(type: SpanType): this {
     this.span.setAttribute(intSemconv.ATTR_LANGWATCH_SPAN_TYPE, type);
