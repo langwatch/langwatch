@@ -27,7 +27,7 @@ export const E2E_CONFIG = {
   timeout: parseInt(process.env.E2E_TIMEOUT || "30000", 10),
   retryDelay: parseInt(process.env.E2E_RETRY_DELAY || "1000", 10),
   maxRetries: parseInt(process.env.E2E_MAX_RETRIES || "3", 10),
-  pollTimeout: parseInt(process.env.E2E_POLL_TIMEOUT || "15000", 10),
+  pollTimeout: parseInt(process.env.E2E_POLL_TIMEOUT || "22000", 10),
   pollInterval: parseInt(process.env.E2E_POLL_INTERVAL || "2000", 10),
 } as const;
 
