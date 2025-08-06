@@ -230,7 +230,7 @@ export default function PromptConfigsPage() {
       setSelectedPromptId(result.id);
     } catch (error) {
       toaster.create({
-        title: "Error creating prompt config",
+        title: `Error creating prompt config`,
         description: error instanceof Error ? error.message : "Unknown error",
         type: "error",
       });
@@ -268,8 +268,7 @@ export default function PromptConfigsPage() {
   const { publishedPrompts, draftPrompts } = useMemo(() => {
     return (promptConfigs ?? []).reduce(
       (acc, config) => {
-        // If handle and handle doesn't start with "drafts/", it's a published prompt
-        if (config.handle && !config.handle.startsWith("drafts/")) {
+        if (config.handle && config.latestVersion.version > 0) {
           acc.publishedPrompts.push(config);
         } else {
           acc.draftPrompts.push(config);
@@ -321,11 +320,16 @@ export default function PromptConfigsPage() {
                 <Tabs.List width="full">
                   <Tabs.Trigger value="published">
                     Published{" "}
-                    {publishedPrompts?.length && (
+                    {Boolean(publishedPrompts?.length) && (
                       <Badge>{publishedPrompts?.length ?? 0}</Badge>
                     )}
                   </Tabs.Trigger>
-                  <Tabs.Trigger value="draft">Draft</Tabs.Trigger>
+                  <Tabs.Trigger value="draft">
+                    Draft
+                    {Boolean(draftPrompts?.length) && (
+                      <Badge>{draftPrompts?.length ?? 0}</Badge>
+                    )}
+                  </Tabs.Trigger>
                 </Tabs.List>
                 <Tabs.Content value="published">
                   <PromptsList

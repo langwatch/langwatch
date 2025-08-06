@@ -98,6 +98,7 @@ export class PromptService {
   }): Promise<LlmConfigWithLatestVersion> {
     // If any of the version data is provided,
     // we should create a version from that data
+    // and it's not consideered a draft
     const shouldCreateVersion = Boolean(
       params.prompt ??
         params.messages ??
@@ -133,7 +134,7 @@ export class PromptService {
             schemaVersion: LATEST_SCHEMA_VERSION,
             commitMessage: "Initial version",
             authorId: params.authorId ?? null,
-            version: 0,
+            version: 1,
           }
         : undefined,
     });

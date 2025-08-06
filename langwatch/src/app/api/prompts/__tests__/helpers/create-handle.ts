@@ -5,6 +5,6 @@ import { nanoid } from "nanoid";
  * @param prefix - The prefix to use for the handle
  * @returns The handle
  */
-export const createHandle = (prefix?: string): Lowercase<string> => {
-  return `${prefix ?? ""}_${nanoid()}`.toLowerCase() as Lowercase<string>;
+export const createHandle = (prefix: string): Lowercase<string> => {
+  return `${prefix}_${nanoid()}`.toLowerCase() as Lowercase<string>;
 };

@@ -372,9 +372,11 @@ export class LlmConfigRepository {
         },
       });
 
+      // Set the version data to the provided version data, or undefined if no version data is provided.
       let newVersionData: Partial<CreateLlmConfigVersionParams> | undefined =
         versionData;
 
+      // If no version data is provided, we'll create a default (draft) version.
       if (!newVersionData) {
         const configData = await this.buildDefaultVersionConfigData({
           projectId: newConfig.projectId,
