@@ -130,12 +130,4 @@ describe("Prompt", () => {
       prompt?.compileStrict({});
     }).toThrow(PromptCompilationError);
   });
-
-  it.todo("should create a prompt");
-  it.todo("should update a prompt");
-  it.todo("should delete a prompt");
-  it.todo("should create a prompt version");
-  it.todo("should get a prompt version");
-  it.todo("should list prompt versions");
-  it.todo("should delete a prompt version");
 });
