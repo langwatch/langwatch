@@ -33,6 +33,7 @@ import {
 import { openTelemetryToLangWatchMetadataMapping } from "./metadata";
 import { createLogger } from "~/utils/logger";
 import { z } from "zod";
+import { isStrandsAgentsPythonResource, extractStrandsAgentsInputOutput } from "./span-event-processing/strands-agents";
 
 const logger = createLogger("langwatch.tracer.opentelemetry");
 
@@ -231,6 +232,34 @@ const addOpenTelemetrySpanAsSpan = (
         break;
     }
   }
+
+  // Special handling for strands-agents Python SDK
+  if (isStrandsAgentsPythonResource(trace.customMetadata)) {
+    const io = extractStrandsAgentsInputOutput(otelSpan);
+    if (io) {
+      input = io.input;
+      output = io.output;
+    }
+    // Compose the span and push, then return early
+    const span: BaseSpan = {
+      span_id: otelSpan.spanId as string,
+      trace_id: otelSpan.traceId as string,
+      ...(otelSpan.parentSpanId
+        ? { parent_id: otelSpan.parentSpanId as string }
+        : {}),
+      name: otelSpan.name,
+      type,
+      input,
+      output,
+      timestamps: {
+        ...(started_at ? { started_at } : {}),
+        ...(finished_at ? { finished_at } : {}),
+      } as Span["timestamps"],
+      params,
+    };
+    trace.spans.push(span);
+  }
+
   if (started_at && attributesMap.ai?.response?.msToFirstChunk) {
     first_token_at =
       started_at +
