@@ -14,6 +14,9 @@ export class PromptTracingDecorator {
   constructor(private readonly target: Prompt) {}
 
   compile(...variables: Parameters<Prompt["compile"]>) {
+    console.log("compile", variables);
+    const innerresults = this.target.compile(...variables);
+    console.log("innerresults", innerresults);
     return this.wrapCompileFn("compile", this.target.compile)(...variables);
   }
 
@@ -32,34 +35,29 @@ export class PromptTracingDecorator {
       return tracer.withActiveSpan(spanName, (span) => {
         span.setType("prompt");
 
-        try {
-          const result = fn.apply(this.target, variables);
+        const result = fn.apply(this.target, variables);
 
-          if (canAutomaticallyCaptureOutput()) {
-            span.setOutput(result);
-          }
-
-          span.setAttributes({
-            [intSemconv.ATTR_LANGWATCH_PROMPT_ID]: result.id,
-            [intSemconv.ATTR_LANGWATCH_PROMPT_VERSION_ID]: result.versionId,
-            [intSemconv.ATTR_LANGWATCH_PROMPT_VERSION_NUMBER]: result.version,
-          });
-
-          if (variables && canAutomaticallyCaptureInput()) {
-            span.setAttribute(
-              intSemconv.ATTR_LANGWATCH_PROMPT_VARIABLES,
-              JSON.stringify({
-                type: "json",
-                value: variables,
-              }),
-            );
-          }
-
-          return result;
-        } catch (error) {
-          span.recordException(error as Error);
-          throw error;
+        if (canAutomaticallyCaptureOutput()) {
+          span.setOutput(result);
         }
+
+        span.setAttributes({
+          [intSemconv.ATTR_LANGWATCH_PROMPT_ID]: result.id,
+          [intSemconv.ATTR_LANGWATCH_PROMPT_VERSION_ID]: result.versionId,
+          [intSemconv.ATTR_LANGWATCH_PROMPT_VERSION_NUMBER]: result.version,
+        });
+
+        if (variables && canAutomaticallyCaptureInput()) {
+          span.setAttribute(
+            intSemconv.ATTR_LANGWATCH_PROMPT_VARIABLES,
+            JSON.stringify({
+              type: "json",
+              value: variables,
+            }),
+          );
+        }
+
+        return result;
       });
     };
   }
