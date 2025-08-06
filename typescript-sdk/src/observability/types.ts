@@ -615,6 +615,23 @@ export interface LangWatchSpan extends Span {
   ): this;
 
   /**
+   * Set multiple attributes for the span.
+   *
+   * @param attributes - The attributes object
+   * @returns this
+   */
+  setAttributes(attributes: SemconvAttributes): this;
+
+  /**
+   * Set a single attribute for the span.
+   *
+   * @param key - The attribute key
+   * @param value - The attribute value
+   * @returns this
+   */
+  setAttribute(key: keyof SemconvAttributes, value: AttributeValue): this;
+
+  /**
    * Set the type of the span (e.g., 'llm', 'rag', 'tool', etc).
    *
    * This is used for downstream filtering and analytics.
