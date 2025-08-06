@@ -2,6 +2,20 @@ import type { ISpan } from "@opentelemetry/otlp-transformer";
 import type { DeepPartial } from "~/utils/types";
 
 /**
+ * Safely parses a JSON string, returning a fallback value if the string is not valid JSON.
+ * @param jsonString - The JSON string to parse.
+ * @param fallback - The value to return if the string is not valid JSON.
+ * @returns The parsed JSON value, or the fallback value if the string is not valid JSON.
+ */
+function safeJsonParse(jsonString: string, fallback: any = null): any {
+  try {
+    return JSON.parse(jsonString);
+  } catch {
+    return fallback;
+  }
+}
+
+/**
  * Detects if the resource attributes indicate a strands-agents Python SDK span
  */
 export function isStrandsAgentsPythonResource(
@@ -33,7 +47,7 @@ export function extractStrandsAgentsInputOutput(otelSpan: DeepPartial<ISpan>): {
       case event.name === "gen_ai.tool.message": {
         inputMessages.push({
           role: event.attributes.find(a => a?.key === "role")?.value?.stringValue ?? "unknown",
-          content: JSON.parse(event.attributes.find(a => a?.key === "content")?.value?.stringValue ?? ""),
+          content: safeJsonParse(event.attributes.find(a => a?.key === "content")?.value?.stringValue ?? ""),
           id: event.attributes.find(a => a?.key === "id")?.value?.stringValue,
         });
         break;
@@ -42,7 +56,7 @@ export function extractStrandsAgentsInputOutput(otelSpan: DeepPartial<ISpan>): {
       case event.name === "gen_ai.choice": {
         outputChoices.push({
           role: "choice",
-          content: JSON.parse(event.attributes.find(a => a?.key === "message")?.value?.stringValue ?? ""),
+          content: safeJsonParse(event.attributes.find(a => a?.key === "message")?.value?.stringValue ?? ""),
           id: event.attributes.find(a => a?.key === "id")?.value?.stringValue ?? void 0,
           finish_reason: event.attributes.find(a => a?.key === "finish_reason")?.value?.stringValue ?? void 0,
         });
@@ -50,9 +64,13 @@ export function extractStrandsAgentsInputOutput(otelSpan: DeepPartial<ISpan>): {
       }
       
       case /gen_ai\..+\.message/.test(event.name): {
+        const nameParts = event.name.split(".");
+        if (nameParts.length < 3) break;
+        if (nameParts.length === 0) break;
+
         inputMessages.push({
-          role: event.name.split(".")[1],
-          content: JSON.parse(event.attributes.find(a => a?.key === "content")?.value?.stringValue ?? "{}"),
+          role: nameParts[1],
+          content: safeJsonParse(event.attributes.find(a => a?.key === "content")?.value?.stringValue ?? "{}"),
           id: event.attributes.find(a => a?.key === "id")?.value?.stringValue ?? void 0,
         });
         break;
