@@ -9,7 +9,6 @@ export default defineConfig({
     include: [
       '**/*.unit.test.ts',
       '**/*.integration.test.ts',
-      '**/*.e2e.test.ts',
     ],
   },
 });

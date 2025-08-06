@@ -83,15 +83,8 @@ describe("Tracer Integration Tests", () => {
           .setType("llm")
           .setInput(TEST_COMPLEX_INPUT)
           .setRequestModel("gpt-4")
-          .addGenAIUserMessageEvent({
-            role: "user",
-            content: "Generate a haiku about TypeScript"
-          })
+          .addEvent("hehe")
           .setOutput(TEST_COMPLEX_OUTPUT)
-          .addGenAIAssistantMessageEvent({
-            role: "assistant",
-            content: "Types flow like code,\nCompiler catches all bugs,\nJavaScript evolved."
-          })
           .setMetrics({
             promptTokens: 15,
             completionTokens: 25,
@@ -136,19 +129,15 @@ describe("Tracer Integration Tests", () => {
       expect(metricsData.value.cost).toBeCloseTo(0.0012);
 
       // Verify events were recorded
-      expect(span.events).toHaveLength(2);
+      expect(span.events).toHaveLength(1);
       const eventNames = span.events.map(e => e.name);
-      expect(eventNames).toContain(semconv.LOG_EVNT_GEN_AI_USER_MESSAGE);
-      expect(eventNames).toContain(semconv.LOG_EVNT_GEN_AI_ASSISTANT_MESSAGE);
+      expect(eventNames).toContain("hehe");
 
       // Verify event data format
-      const userEvent = span.events.find(e => e.name === semconv.LOG_EVNT_GEN_AI_USER_MESSAGE);
+      const userEvent = span.events.find(e => e.name === "hehe");
       if (!userEvent?.attributes) {
         throw new Error("Expected user event with attributes");
       }
-      const userEventBody = JSON.parse(userEvent.attributes[semconv.ATTR_LANGWATCH_GEN_AI_LOG_EVENT_BODY] as string);
-      expect(userEventBody.role).toBe("user");
-      expect(userEventBody.content).toBe("Generate a haiku about TypeScript");
     });
 
     it("should handle nested spans with proper parent-child relationships", async () => {
@@ -216,12 +205,9 @@ describe("Tracer Integration Tests", () => {
       await expect(
         tracer.withActiveSpan("failing-operation", async (span) => {
           span
+            .addEvent("halp")
             .setType("llm")
-            .setInput("This will fail")
-            .addGenAIUserMessageEvent({
-              role: "user",
-              content: "Cause an error"
-            });
+            .setInput("This will fail");
 
           throw new Error("Integration test error");
         })
@@ -247,7 +233,7 @@ describe("Tracer Integration Tests", () => {
 
       // Verify events were recorded before error
       expect(span.events.length).toBeGreaterThan(0);
-      const hasUserMessage = span.events.some(e => e.name === semconv.LOG_EVNT_GEN_AI_USER_MESSAGE);
+      const hasUserMessage = span.events.some(e => e.name === "halp");
       expect(hasUserMessage).toBe(true);
 
       // Verify exception was recorded
@@ -267,10 +253,6 @@ describe("Tracer Integration Tests", () => {
         .setType("agent")
         .setInput({ task: "Manual span operation" })
         .setAttribute("custom.attribute", "test-value")
-        .addGenAISystemMessageEvent({
-          role: "system",
-          content: "You are a helpful assistant"
-        })
         .setRAGContext({
           document_id: "doc-123",
           chunk_id: "chunk-456",

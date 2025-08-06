@@ -18,12 +18,14 @@ import {
   expectSpanAttribute,
 } from "./e2e-utils";
 import * as semconv from "../../semconv";
+import { getLangWatchLogger } from "../../logger";
 
 describe("Content Parsing E2E", () => {
   const setup = setupE2ETest();
 
   it("should parse and extract chat messages correctly", async () => {
     const tracer = createTestTracer("chat-messages");
+    const logger = getLangWatchLogger("chat-messages");
     const testIds = generateTestIds();
     let traceId: string;
 
@@ -58,8 +60,8 @@ describe("Content Parsing E2E", () => {
       span.setInput(chatInput);
 
       // Add message events
-      span.addGenAISystemMessageEvent({ content: chatInput.messages[0]?.content || "" });
-      span.addGenAIUserMessageEvent({ role: "user", content: chatInput.messages[1]?.content || "" });
+      logger.emitGenAISystemMessageEvent({ content: chatInput.messages[0]?.content || "" });
+      logger.emitGenAIUserMessageEvent({ content: chatInput.messages[1]?.content || "" });
 
       await delay(50);
 
@@ -69,8 +71,7 @@ describe("Content Parsing E2E", () => {
         completionTokens: chatOutput.usage.completion_tokens,
       });
 
-      span.addGenAIAssistantMessageEvent({
-        role: "assistant",
+      logger.emitGenAIAssistantMessageEvent({
         content: chatOutput.choices[0]?.message.content || ""
       });
 

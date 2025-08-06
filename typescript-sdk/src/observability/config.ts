@@ -24,10 +24,6 @@ export interface ObservabilityConfig {
 let observabilitySdkConfig: ObservabilityConfig | null = null;
 
 export function initializeObservabilitySdkConfig(config: ObservabilityConfig) {
-  if (observabilitySdkConfig) {
-    observabilitySdkConfig.logger.error("[LangWatch Observability SDK] Config already initialized; skipping");
-    return;
-  }
   observabilitySdkConfig = config;
 }
 

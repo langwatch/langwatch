@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { Logger } from '../../../../logger';
+import { Logger } from '../../../../logger/index.js';
 import {
   initializeObservabilitySdkConfig,
   resetObservabilitySdkConfig,
@@ -31,18 +31,15 @@ describe('Data Capture Config', () => {
   });
 
   describe('initialization', () => {
-    it('initializes config only once', () => {
+    it('initializes config is allowed any number of times', () => {
       const logger = new MockLogger();
       initializeObservabilitySdkConfig({ logger });
       expect(getObservabilitySdkLogger()).toBe(logger);
 
-      // Second call should log error and not overwrite
+      // Second call should overwrite
       const logger2 = new MockLogger();
       initializeObservabilitySdkConfig({ logger: logger2 });
-      expect(getObservabilitySdkLogger()).toBe(logger);
-      expect(logger.error).toHaveBeenCalledWith(
-        expect.stringContaining('already initialized')
-      );
+      expect(getObservabilitySdkLogger()).toBe(logger2);
     });
 
     it('returns defaults when config not set', () => {

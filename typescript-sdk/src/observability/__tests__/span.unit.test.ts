@@ -361,246 +361,7 @@ describe("span.ts", () => {
     });
   });
 
-  describe("GenAI message event methods", () => {
-    describe("addGenAISystemMessageEvent", () => {
-      it("should add system message event with default role", () => {
-        const { mockSpan, langwatchSpan } = testScenarios.createSpanTest();
-        const messageBody = testData.systemMessage();
-        // @ts-expect-error - we want to test the default role
-        delete messageBody.role; // Test default role
 
-        const result = langwatchSpan.addGenAISystemMessageEvent(messageBody);
-
-        expect(result).toBe(langwatchSpan);
-        expect(mockSpan.addEvent).toHaveBeenCalledWith(
-          intSemconv.LOG_EVNT_GEN_AI_SYSTEM_MESSAGE,
-          {
-            [intSemconv.ATTR_LANGWATCH_GEN_AI_LOG_EVENT_BODY]: JSON.stringify({
-              ...messageBody,
-              role: "system",
-            }),
-            [intSemconv.ATTR_LANGWATCH_GEN_AI_LOG_EVENT_IMPOSTER]: true,
-          }
-        );
-      });
-
-      it("should add system message event with custom attributes", () => {
-        const { mockSpan, langwatchSpan } = testScenarios.createSpanTest();
-        const messageBody = testData.systemMessage();
-        const system = "openai";
-        const attributes = { "custom.attr": "value" };
-
-        langwatchSpan.addGenAISystemMessageEvent(messageBody, system, attributes);
-
-        expect(mockSpan.addEvent).toHaveBeenCalledWith(
-          intSemconv.LOG_EVNT_GEN_AI_SYSTEM_MESSAGE,
-          {
-            ...attributes,
-            [semconv.ATTR_GEN_AI_SYSTEM]: system,
-            [intSemconv.ATTR_LANGWATCH_GEN_AI_LOG_EVENT_BODY]: JSON.stringify(messageBody),
-            [intSemconv.ATTR_LANGWATCH_GEN_AI_LOG_EVENT_IMPOSTER]: true,
-          }
-        );
-      });
-
-      it("should preserve existing role", () => {
-        const { mockSpan, langwatchSpan } = testScenarios.createSpanTest();
-        const messageBody = { content: "Test", role: "instruction" as const };
-
-        langwatchSpan.addGenAISystemMessageEvent(messageBody);
-
-        expect(mockSpan.addEvent).toHaveBeenCalledWith(
-          intSemconv.LOG_EVNT_GEN_AI_SYSTEM_MESSAGE,
-          expect.objectContaining({
-            [intSemconv.ATTR_LANGWATCH_GEN_AI_LOG_EVENT_BODY]: JSON.stringify(messageBody),
-          })
-        );
-      });
-    });
-
-    describe("addGenAIUserMessageEvent", () => {
-      it("should add user message event with default role", () => {
-        const { mockSpan, langwatchSpan } = testScenarios.createSpanTest();
-        const messageBody = testData.userMessage();
-        // @ts-expect-error - we want to test the default role
-        delete messageBody.role;
-
-        const result = langwatchSpan.addGenAIUserMessageEvent(messageBody);
-
-        expect(result).toBe(langwatchSpan);
-        expect(mockSpan.addEvent).toHaveBeenCalledWith(
-          intSemconv.LOG_EVNT_GEN_AI_USER_MESSAGE,
-          {
-            [intSemconv.ATTR_LANGWATCH_GEN_AI_LOG_EVENT_BODY]: JSON.stringify({
-              ...messageBody,
-              role: "user",
-            }),
-            [intSemconv.ATTR_LANGWATCH_GEN_AI_LOG_EVENT_IMPOSTER]: true,
-          }
-        );
-      });
-
-      it("should handle customer role", () => {
-        const { mockSpan, langwatchSpan } = testScenarios.createSpanTest();
-        const messageBody = { content: "Customer question", role: "customer" as const };
-
-        langwatchSpan.addGenAIUserMessageEvent(messageBody);
-
-        expect(mockSpan.addEvent).toHaveBeenCalledWith(
-          intSemconv.LOG_EVNT_GEN_AI_USER_MESSAGE,
-          expect.objectContaining({
-            [intSemconv.ATTR_LANGWATCH_GEN_AI_LOG_EVENT_BODY]: JSON.stringify(messageBody),
-          })
-        );
-      });
-    });
-
-    describe("addGenAIAssistantMessageEvent", () => {
-      it("should add assistant message event with default role", () => {
-        const { mockSpan, langwatchSpan } = testScenarios.createSpanTest();
-        const messageBody = testData.assistantMessage();
-        // @ts-expect-error - we want to test the default role
-        delete messageBody.role;
-
-        const result = langwatchSpan.addGenAIAssistantMessageEvent(messageBody);
-
-        expect(result).toBe(langwatchSpan);
-        expect(mockSpan.addEvent).toHaveBeenCalledWith(
-          intSemconv.LOG_EVNT_GEN_AI_ASSISTANT_MESSAGE,
-          {
-            [intSemconv.ATTR_LANGWATCH_GEN_AI_LOG_EVENT_BODY]: JSON.stringify({
-              ...messageBody,
-              role: "assistant",
-            }),
-            [intSemconv.ATTR_LANGWATCH_GEN_AI_LOG_EVENT_IMPOSTER]: true,
-          }
-        );
-      });
-
-      it("should handle assistant message with tool calls", () => {
-        const { mockSpan, langwatchSpan } = testScenarios.createSpanTest();
-        const messageBody = testData.assistantMessageWithToolCalls();
-
-        langwatchSpan.addGenAIAssistantMessageEvent(messageBody);
-
-        expect(mockSpan.addEvent).toHaveBeenCalledWith(
-          intSemconv.LOG_EVNT_GEN_AI_ASSISTANT_MESSAGE,
-          expect.objectContaining({
-            [intSemconv.ATTR_LANGWATCH_GEN_AI_LOG_EVENT_BODY]: JSON.stringify(messageBody),
-          })
-        );
-      });
-
-      it("should handle bot role", () => {
-        const { mockSpan, langwatchSpan } = testScenarios.createSpanTest();
-        const messageBody = { content: "Bot response", role: "bot" as const };
-
-        langwatchSpan.addGenAIAssistantMessageEvent(messageBody);
-
-        expect(mockSpan.addEvent).toHaveBeenCalledWith(
-          intSemconv.LOG_EVNT_GEN_AI_ASSISTANT_MESSAGE,
-          expect.objectContaining({
-            [intSemconv.ATTR_LANGWATCH_GEN_AI_LOG_EVENT_BODY]: JSON.stringify(messageBody),
-          })
-        );
-      });
-    });
-
-    describe("addGenAIToolMessageEvent", () => {
-      it("should add tool message event with default role", () => {
-        const { mockSpan, langwatchSpan } = testScenarios.createSpanTest();
-        const messageBody = testData.toolMessage();
-        // @ts-expect-error - we want to test the default role
-        delete messageBody.role;
-
-        const result = langwatchSpan.addGenAIToolMessageEvent(messageBody);
-
-        expect(result).toBe(langwatchSpan);
-        expect(mockSpan.addEvent).toHaveBeenCalledWith(
-          intSemconv.LOG_EVNT_GEN_AI_TOOL_MESSAGE,
-          {
-            [intSemconv.ATTR_LANGWATCH_GEN_AI_LOG_EVENT_BODY]: JSON.stringify({
-              ...messageBody,
-              role: "tool",
-            }),
-            [intSemconv.ATTR_LANGWATCH_GEN_AI_LOG_EVENT_IMPOSTER]: true,
-          }
-        );
-      });
-
-      it("should handle function role", () => {
-        const { mockSpan, langwatchSpan } = testScenarios.createSpanTest();
-        const messageBody = { content: "Function result", id: "call_456", role: "function" as const };
-
-        langwatchSpan.addGenAIToolMessageEvent(messageBody);
-
-        expect(mockSpan.addEvent).toHaveBeenCalledWith(
-          intSemconv.LOG_EVNT_GEN_AI_TOOL_MESSAGE,
-          expect.objectContaining({
-            [intSemconv.ATTR_LANGWATCH_GEN_AI_LOG_EVENT_BODY]: JSON.stringify(messageBody),
-          })
-        );
-      });
-    });
-
-    describe("addGenAIChoiceEvent", () => {
-      it("should add choice event", () => {
-        const { mockSpan, langwatchSpan } = testScenarios.createSpanTest();
-        const eventBody = testData.choiceEvent();
-
-        const result = langwatchSpan.addGenAIChoiceEvent(eventBody);
-
-        expect(result).toBe(langwatchSpan);
-        expect(mockSpan.addEvent).toHaveBeenCalledWith(
-          intSemconv.LOG_EVNT_GEN_AI_CHOICE,
-          {
-            [intSemconv.ATTR_LANGWATCH_GEN_AI_LOG_EVENT_BODY]: JSON.stringify(eventBody),
-            [intSemconv.ATTR_LANGWATCH_GEN_AI_LOG_EVENT_IMPOSTER]: true,
-          }
-        );
-      });
-
-      it("should set default role for choice message", () => {
-        const { mockSpan, langwatchSpan } = testScenarios.createSpanTest();
-        const eventBody = testData.choiceEvent();
-        if (eventBody.message) {
-          // @ts-expect-error - we want to test the default role
-          delete eventBody.message.role;
-        }
-
-        langwatchSpan.addGenAIChoiceEvent(eventBody);
-
-        const expectedBody = { ...eventBody };
-        if (expectedBody.message) {
-          expectedBody.message.role = "assistant";
-        }
-
-        expect(mockSpan.addEvent).toHaveBeenCalledWith(
-          intSemconv.LOG_EVNT_GEN_AI_CHOICE,
-          expect.objectContaining({
-            [intSemconv.ATTR_LANGWATCH_GEN_AI_LOG_EVENT_BODY]: JSON.stringify(expectedBody),
-          })
-        );
-      });
-
-      it("should handle choice without message", () => {
-        const { mockSpan, langwatchSpan } = testScenarios.createSpanTest();
-        const eventBody = {
-          finish_reason: "length" as const,
-          index: 0,
-        };
-
-        langwatchSpan.addGenAIChoiceEvent(eventBody);
-
-        expect(mockSpan.addEvent).toHaveBeenCalledWith(
-          intSemconv.LOG_EVNT_GEN_AI_CHOICE,
-          expect.objectContaining({
-            [intSemconv.ATTR_LANGWATCH_GEN_AI_LOG_EVENT_BODY]: JSON.stringify(eventBody),
-          })
-        );
-      });
-    });
-  });
 
   describe("method chaining", () => {
     it("should support fluent API chaining", () => {
@@ -610,17 +371,16 @@ describe("span.ts", () => {
         .setRequestModel("gpt-4")
         .setResponseModel("gpt-4-turbo")
         .setInput("Hello")
+        .addEvent("hehe")
         .setOutput("Hi there!")
         .setMetrics({ promptTokens: 10, completionTokens: 5 })
-        .setRAGContext(testData.ragContext())
-        .addGenAIUserMessageEvent(testData.userMessage())
-        .addGenAIAssistantMessageEvent(testData.assistantMessage());
+        .setRAGContext(testData.ragContext());
 
       expect(result).toBe(langwatchSpan);
 
       // Verify all methods were called
       expect(mockSpan.setAttribute).toHaveBeenCalledTimes(7); // type, request/response models, input, output, metrics, rag
-      expect(mockSpan.addEvent).toHaveBeenCalledTimes(2); // user and assistant messages
+      expect(mockSpan.addEvent).toHaveBeenCalledTimes(1); // hehe
     });
   });
 
@@ -631,13 +391,6 @@ describe("span.ts", () => {
       expect(() => langwatchSpan.setInput(undefined)).not.toThrow();
       expect(() => langwatchSpan.setOutput(null)).not.toThrow();
       expect(() => langwatchSpan.setOutput(undefined)).not.toThrow();
-    });
-
-    it("should handle empty message events", () => {
-      const { mockSpan, langwatchSpan } = testScenarios.createSpanTest();
-      expect(() => langwatchSpan.addGenAISystemMessageEvent({})).not.toThrow();
-      expect(() => langwatchSpan.addGenAIUserMessageEvent({})).not.toThrow();
-      expect(() => langwatchSpan.addGenAIAssistantMessageEvent({})).not.toThrow();
     });
 
     it("should handle empty metrics", () => {
@@ -683,16 +436,14 @@ describe("span.ts", () => {
       // Set some attributes and events
       langwatchSpan
         .setType("llm")
-        .setInput("test input")
-        .addGenAIUserMessageEvent(testData.userMessage());
+        .setInput("test input");
 
       // Still recording with data
       testScenarios.validateSpanLifecycle(mockSpan, {
         shouldBeRecording: true,
         shouldHaveAttributes: {
           [intSemconv.ATTR_LANGWATCH_SPAN_TYPE]: "llm"
-        },
-        shouldHaveEvents: [intSemconv.LOG_EVNT_GEN_AI_USER_MESSAGE]
+        }
       });
 
       // End the span

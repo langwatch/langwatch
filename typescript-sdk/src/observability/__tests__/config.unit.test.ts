@@ -19,7 +19,7 @@ describe('config.ts', () => {
     console.error = originalConsoleError;
   });
 
-  it('initializeObservabilitySdkConfig sets config only once', async () => {
+  it('initializeObservabilitySdkConfig sets config any number of times', async () => {
     const config = await import('../config.js');
     config.resetObservabilitySdkConfig(); // Ensure clean state
 
@@ -27,13 +27,10 @@ describe('config.ts', () => {
     config.initializeObservabilitySdkConfig({ logger });
     expect(config.getObservabilitySdkLogger()).toBe(logger);
 
-    // Second call should log error and not overwrite
+    // Second call should overwrite
     const logger2 = new MockLogger();
     config.initializeObservabilitySdkConfig({ logger: logger2 });
-    expect(config.getObservabilitySdkLogger()).toBe(logger);
-    expect(logger.error).toHaveBeenCalledWith(
-      expect.stringContaining('already initialized')
-    );
+    expect(config.getObservabilitySdkLogger()).toBe(logger2);
   });
 
   it('getObservabilitySdkLogger works after config is set', async () => {

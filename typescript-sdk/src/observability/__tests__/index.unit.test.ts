@@ -253,7 +253,7 @@ describe("index.ts", () => {
       // Should have LangWatch methods
       expect(typeof langwatchSpan.setType).toBe("function");
       expect(typeof langwatchSpan.setRAGContext).toBe("function");
-      expect(typeof langwatchSpan.addGenAIUserMessageEvent).toBe("function");
+      expect(typeof langwatchSpan.addEvent).toBe("function");
 
       // Should preserve OpenTelemetry methods
       expect(typeof langwatchSpan.setAttribute).toBe("function");
@@ -315,20 +315,14 @@ describe("index.ts", () => {
           chunk_id: "chunk-1",
           content: "context data"
         })
-        .addGenAIUserMessageEvent({
-          content: "Process this data",
-          role: "user"
-        })
+        .addEvent("content-is-parsed")
         .setMetrics({
           promptTokens: 50,
           completionTokens: 25,
           cost: 0.001
         })
         .setOutput({ result: "processed" })
-        .addGenAIAssistantMessageEvent({
-          content: "Data processed successfully",
-          role: "assistant"
-        });
+        .addEvent("content-is-processed");
 
       // End span
       span.end();
@@ -344,8 +338,8 @@ describe("index.ts", () => {
       expect(createdSpan?.getAttributeValue(indexModule.attributes.ATTR_LANGWATCH_OUTPUT)).toBeDefined();
 
       // Verify events were added
-      expect(createdSpan?.hasEvent(intSemconv.LOG_EVNT_GEN_AI_USER_MESSAGE)).toBe(true);
-      expect(createdSpan?.hasEvent(intSemconv.LOG_EVNT_GEN_AI_ASSISTANT_MESSAGE)).toBe(true);
+      expect(createdSpan?.hasEvent("content-is-parsed")).toBe(true);
+      expect(createdSpan?.hasEvent("content-is-processed")).toBe(true);
     });
 
     it("should support withActiveSpan workflow", async () => {
@@ -356,10 +350,7 @@ describe("index.ts", () => {
         span
           .setType("llm")
           .setInput("Generate response")
-          .addGenAIUserMessageEvent({
-            content: "Hello",
-            role: "user"
-          });
+          .addEvent("content-is-parsed")
 
         // Simulate async work
         await new Promise(resolve => setTimeout(resolve, 1));
@@ -367,10 +358,7 @@ describe("index.ts", () => {
         // Complete span
         span
           .setOutput("Hello! How can I help?")
-          .addGenAIAssistantMessageEvent({
-            content: "Hello! How can I help?",
-            role: "assistant"
-          });
+          .addEvent("content-is-parsed")
 
         return "workflow-complete";
       });
@@ -427,10 +415,7 @@ describe("index.ts", () => {
           span
             .setType("llm")
             .setInput("This will fail")
-            .addGenAIUserMessageEvent({
-              content: "Cause an error",
-              role: "user"
-            });
+            .addEvent("content-is-parsed")
 
           throw new Error("Integration test error");
         })
@@ -444,13 +429,7 @@ describe("index.ts", () => {
 
       try {
         await tracer.withActiveSpan("integrity-span", async (span) => {
-          span.setType("llm").setInput("Valid input");
-
-          // This should be recorded before error
-          span.addGenAIUserMessageEvent({
-            content: "Valid message",
-            role: "user"
-          });
+          span.setType("llm").setInput("Valid input").addEvent("content-is-parsed")
 
           throw new Error("Test error");
         });
@@ -463,7 +442,7 @@ describe("index.ts", () => {
       expect(span).toBeDefined();
       expect(span?.ended).toBe(true);
       expect(span?.getAttributeValue(indexModule.attributes.ATTR_LANGWATCH_SPAN_TYPE)).toBe("llm");
-      expect(span?.hasEvent(intSemconv.LOG_EVNT_GEN_AI_USER_MESSAGE)).toBe(true);
+      expect(span?.hasEvent("content-is-parsed")).toBe(true);
     });
   });
 

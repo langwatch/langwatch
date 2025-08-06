@@ -45,18 +45,14 @@ const TEST_GEN_AI_ATTRIBUTES = {
 } as const;
 
 describe("Logger Integration Tests", () => {
-  let logRecordExporter: InMemoryLogRecordExporter;
-  let logRecordProcessor: SimpleLogRecordProcessor;
+  const logRecordExporter = new InMemoryLogRecordExporter();
+  const logRecordProcessor = new SimpleLogRecordProcessor(logRecordExporter);
   let observabilityHandle: ReturnType<typeof setupObservability>;
 
   beforeEach(() => {
     // Reset OpenTelemetry global state
     vi.resetModules();
     resetObservabilitySdkConfig();
-
-    // Create in-memory exporter to capture actual log record data
-    logRecordExporter = new InMemoryLogRecordExporter();
-    logRecordProcessor = new SimpleLogRecordProcessor(logRecordExporter);
 
     // Setup observability with real OpenTelemetry SDK
     observabilityHandle = setupObservability({
@@ -72,14 +68,14 @@ describe("Logger Integration Tests", () => {
   });
 
   afterEach(async () => {
-    await observabilityHandle.shutdown();
+    await logRecordProcessor.forceFlush();
     logRecordExporter.reset();
     resetObservabilitySdkConfig();
   });
 
   describe("log record creation and data flow", () => {
     it("should create log records with proper LangWatch attributes through real OpenTelemetry", async () => {
-      const logger = getLangWatchLogger("integration-test-logger");
+      const logger = getLangWatchLogger("integration-test-logger-1");
 
       // Create log record with LangWatch enhancements
       const logRecord: LangWatchLogRecord = {
@@ -117,7 +113,7 @@ describe("Logger Integration Tests", () => {
     });
 
     it("should handle different severity levels correctly", async () => {
-      const logger = getLangWatchLogger("severity-test-logger");
+      const logger = getLangWatchLogger("severity-test-logger-2");
 
       const logRecords: LangWatchLogRecord[] = [
         {
@@ -168,7 +164,7 @@ describe("Logger Integration Tests", () => {
     });
 
     it("should handle log records without attributes", async () => {
-      const logger = getLangWatchLogger("no-attributes-test-logger");
+      const logger = getLangWatchLogger("no-attributes-test-logger-3");
 
       const logRecord: LangWatchLogRecord = {
         severityText: "INFO",
@@ -197,7 +193,7 @@ describe("Logger Integration Tests", () => {
 
   describe("data capture integration", () => {
     it("should preserve log record body when output capture is enabled by default", async () => {
-      const logger = getLangWatchLogger("data-capture-test-logger");
+      const logger = getLangWatchLogger("data-capture-test-logger-4");
 
       const logRecord: LangWatchLogRecord = {
         severityText: "INFO",
@@ -237,7 +233,7 @@ describe("Logger Integration Tests", () => {
         },
       });
 
-      const logger = getLangWatchLogger("data-capture-all-test-logger");
+      const logger = getLangWatchLogger("data-capture-all-test-logger-5");
 
       const logRecord: LangWatchLogRecord = {
         severityText: "INFO",
@@ -277,7 +273,7 @@ describe("Logger Integration Tests", () => {
         },
       });
 
-      const logger = getLangWatchLogger("data-capture-output-test-logger");
+      const logger = getLangWatchLogger("data-capture-output-test-logger-6");
 
       const logRecord: LangWatchLogRecord = {
         severityText: "INFO",
@@ -317,7 +313,7 @@ describe("Logger Integration Tests", () => {
         },
       });
 
-      const logger = getLangWatchLogger("data-capture-input-test-logger");
+      const logger = getLangWatchLogger("data-capture-input-test-logger-7");
 
       const logRecord: LangWatchLogRecord = {
         severityText: "INFO",
@@ -357,7 +353,7 @@ describe("Logger Integration Tests", () => {
         },
       });
 
-      const logger = getLangWatchLogger("data-capture-none-test-logger");
+      const logger = getLangWatchLogger("data-capture-none-test-logger-8");
 
       const logRecord: LangWatchLogRecord = {
         severityText: "INFO",
@@ -382,9 +378,6 @@ describe("Logger Integration Tests", () => {
     });
 
     it("should preserve other log record properties when output capture is disabled", async () => {
-      // Setup with 'input' data capture
-      await observabilityHandle.shutdown();
-
       observabilityHandle = setupObservability({
         serviceName: "logger-integration-test",
         logRecordProcessors: [logRecordProcessor],
@@ -397,7 +390,7 @@ describe("Logger Integration Tests", () => {
         },
       });
 
-      const logger = getLangWatchLogger("data-capture-properties-test-logger");
+      const logger = getLangWatchLogger("data-capture-properties-test-logger-9");
 
       const timestamp = new Date();
       const logRecord: LangWatchLogRecord = {
@@ -428,8 +421,7 @@ describe("Logger Integration Tests", () => {
     });
 
     it("should handle log records without body when output capture is disabled", async () => {
-      // Setup with 'input' data capture
-      await observabilityHandle.shutdown();
+
 
       observabilityHandle = setupObservability({
         serviceName: "logger-integration-test",
@@ -443,7 +435,7 @@ describe("Logger Integration Tests", () => {
         },
       });
 
-      const logger = getLangWatchLogger("data-capture-no-body-test-logger");
+      const logger = getLangWatchLogger("data-capture-no-body-test-logger-10");
 
       const logRecord: LangWatchLogRecord = {
         severityText: "INFO",
@@ -471,9 +463,9 @@ describe("Logger Integration Tests", () => {
   describe("logger naming and versioning", () => {
     it("should handle different logger names correctly", async () => {
       const loggers = [
-        getLangWatchLogger("app-logger"),
-        getLangWatchLogger("database-logger"),
-        getLangWatchLogger("api-logger"),
+        getLangWatchLogger("app-logger-11"),
+        getLangWatchLogger("database-logger-12"),
+        getLangWatchLogger("api-logger-13"),
       ];
 
       // Emit from each logger
@@ -500,9 +492,9 @@ describe("Logger Integration Tests", () => {
 
     it("should handle different versions correctly", async () => {
       const loggers = [
-        getLangWatchLogger("version-test-logger", "1.0.0"),
-        getLangWatchLogger("version-test-logger", "2.0.0"),
-        getLangWatchLogger("version-test-logger", "latest"),
+        getLangWatchLogger("version-test-logger-14", "1.0.0"),
+        getLangWatchLogger("version-test-logger-15", "2.0.0"),
+        getLangWatchLogger("version-test-logger-16", "latest"),
       ];
 
       // Emit from each logger
@@ -530,7 +522,7 @@ describe("Logger Integration Tests", () => {
 
   describe("GenAI-specific logging", () => {
     it("should handle GenAI-specific attributes correctly", async () => {
-      const logger = getLangWatchLogger("genai-test-logger");
+      const logger = getLangWatchLogger("genai-test-logger-17");
 
       const logRecord: LangWatchLogRecord = {
         severityText: "INFO",
@@ -566,7 +558,7 @@ describe("Logger Integration Tests", () => {
     });
 
     it("should handle GenAI error scenarios", async () => {
-      const logger = getLangWatchLogger("genai-error-test-logger");
+      const logger = getLangWatchLogger("genai-error-test-logger-18");
 
       const errorLogRecord: LangWatchLogRecord = {
         severityText: "ERROR",
@@ -604,7 +596,7 @@ describe("Logger Integration Tests", () => {
 
   describe("performance and concurrency", () => {
     it("should handle concurrent log record creation efficiently", async () => {
-      const logger = getLangWatchLogger("concurrent-test-logger");
+      const logger = getLangWatchLogger("concurrent-test-logger-19");
 
       const concurrentOperations = Array.from({ length: 10 }, (_, i) => {
         const logRecord: LangWatchLogRecord = {
@@ -637,7 +629,7 @@ describe("Logger Integration Tests", () => {
     });
 
     it("should handle rapid log record creation/deletion cycles", async () => {
-      const logger = getLangWatchLogger("rapid-cycle-test-logger");
+      const logger = getLangWatchLogger("rapid-cycle-test-logger-20");
       const cycles = 50;
 
       const rapidOperations = Array.from({ length: cycles }, (_, i) => {
@@ -671,7 +663,7 @@ describe("Logger Integration Tests", () => {
     });
 
     it("should handle large data volumes efficiently", async () => {
-      const logger = getLangWatchLogger("large-data-test-logger");
+      const logger = getLangWatchLogger("large-data-test-logger-21");
 
       // Create moderately large log data
       const largeData = {
@@ -711,7 +703,7 @@ describe("Logger Integration Tests", () => {
 
   describe("attribute and metadata validation", () => {
     it("should validate and sanitize attribute values", async () => {
-      const logger = getLangWatchLogger("attribute-validation-test-logger");
+      const logger = getLangWatchLogger("attribute-validation-test-logger-22");
 
       const validationLogRecord: LangWatchLogRecord = {
         severityText: "INFO",
@@ -749,7 +741,7 @@ describe("Logger Integration Tests", () => {
     });
 
     it("should handle complex attribute type coercion", async () => {
-      const logger = getLangWatchLogger("attribute-coercion-test-logger");
+      const logger = getLangWatchLogger("attribute-coercion-test-logger-23");
 
       const coercionLogRecord: LangWatchLogRecord = {
         severityText: "INFO",
@@ -786,7 +778,7 @@ describe("Logger Integration Tests", () => {
 
   describe("error boundary and recovery", () => {
     it("should handle log record operation failures gracefully", async () => {
-      const logger = getLangWatchLogger("log-failure-test-logger");
+      const logger = getLangWatchLogger("log-failure-test-logger-24");
 
       // Test log record that encounters issues during creation
       const failureLogRecord: LangWatchLogRecord = {
@@ -817,7 +809,7 @@ describe("Logger Integration Tests", () => {
     });
 
     it("should handle provider shutdown during log operations", async () => {
-      const logger = getLangWatchLogger("shutdown-test-logger");
+      const logger = getLangWatchLogger("shutdown-test-logger-25");
 
       // Emit log record
       const shutdownLogRecord: LangWatchLogRecord = {
@@ -850,8 +842,8 @@ describe("Logger Integration Tests", () => {
   describe("current logger provider integration", () => {
     it("should use the currently configured logger provider", () => {
       // Get loggers using current provider
-      const logger1 = getLangWatchLogger("current-test-1");
-      const logger2 = getLangWatchLogger("current-test-2");
+      const logger1 = getLangWatchLogger("current-test-26");
+      const logger2 = getLangWatchLogger("current-test-27");
 
       // Both should work with the same current provider
       logger1.emit({
@@ -882,7 +874,7 @@ describe("Logger Integration Tests", () => {
 
       const logger = getLangWatchLoggerFromProvider(
         customProvider,
-        "custom-provider-test-logger",
+        "custom-provider-test-logger-28",
         "1.0.0"
       );
 
