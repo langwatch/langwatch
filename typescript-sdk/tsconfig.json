@@ -12,6 +12,7 @@
     "checkJs": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
+    "allowImportingTsExtensions": true,
     "moduleResolution": "nodenext",
     "isolatedModules": true,
     "jsx": "preserve",

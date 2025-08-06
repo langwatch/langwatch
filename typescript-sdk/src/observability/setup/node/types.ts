@@ -1,5 +1,5 @@
 import { Logger } from "../../../logger";
-import { Attributes, AttributeValue, TracerProvider } from "@opentelemetry/api";
+import { AttributeValue } from "@opentelemetry/api";
 import { Instrumentation } from "@opentelemetry/instrumentation";
 import { SpanProcessor } from "@opentelemetry/sdk-trace-base";
 import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-http";
@@ -10,47 +10,7 @@ import { ViewOptions } from "@opentelemetry/sdk-metrics";
 import { Resource, ResourceDetector } from "@opentelemetry/resources";
 import { Sampler, SpanLimits } from "@opentelemetry/sdk-trace-base";
 import { IdGenerator } from "@opentelemetry/sdk-trace-base";
-import { LangWatchTracer } from "../../tracer";
-import * as langwatchAttributes from "../../semconv/attributes";
-import * as semconvAttributes from "@opentelemetry/semantic-conventions/incubating";
-
-/**
- * Union type representing all possible attribute keys that can be used in spans.
- *
- * This includes:
- * - Standard OpenTelemetry semantic convention attributes
- * - LangWatch-specific attributes
- * - Custom string attributes
- *
- * @example
- * ```typescript
- * const attributes: SemconvAttributes = {
- *   "http.method": "GET",
- *   "http.url": "https://api.example.com",
- *   "langwatch.span.type": "llm",
- *   "custom.attribute": "value"
- * };
- * ```
- */
-export type AttributeKey = keyof typeof semconvAttributes | keyof typeof langwatchAttributes | (string & {});
-
-/**
- * Record type representing span attributes with semantic convention keys.
- *
- * This type ensures type safety when setting attributes on spans while
- * allowing both standard OpenTelemetry semantic conventions and custom attributes.
- *
- * @example
- * ```typescript
- * const spanAttributes: SemconvAttributes = {
- *   "service.name": "my-service",
- *   "service.version": "1.0.0",
- *   "langwatch.span.type": "llm",
- *   "custom.user.id": "user123"
- * };
- * ```
- */
-export type SemconvAttributes = Record<AttributeKey, AttributeValue>;
+import { SemconvAttributes } from "../../types";
 
 /**
  * Configuration options for setting up LangWatch observability.
@@ -121,14 +81,14 @@ export interface SetupObservabilityOptions {
   attributes?: SemconvAttributes;
 
   /**
-   * Enable debug logging for troubleshooting.
+   * Whether to throw an error if there was an issue setting up OpenTelemetry.
    *
-   * When enabled, detailed logs about trace processing and configuration
-   * will be output to the console.
+   * When enabled, LangWatch will throw an error if OpenTelemetry fails to initialize.
+   * If disabled, LangWatch will log the error and continue.
    *
    * @default false
    */
-  debug?: boolean;
+  throwOnSetupError?: boolean;
 
   /**
    * Custom logger instance for LangWatch internal logging.
@@ -149,12 +109,35 @@ export interface SetupObservabilityOptions {
   logger?: Logger;
 
   /**
-   * Custom OpenTelemetry TracerProvider instance.
+   * Log level for LangWatch internal logging.
    *
-   * If provided, LangWatch will use this provider instead of creating
-   * its own. Useful for advanced OpenTelemetry configurations.
+   * This will only affect the logs produced by the LangWatch Observability SDK
+   * itself. It will log the level provided, and any logs at a higher level.
+   *
+   * @default "warn"
    */
-  tracerProvider?: TracerProvider;
+  logLevel?: "debug" | "info" | "warn" | "error";
+
+  /**
+   * When this is enabled, LangWatch will log spans to the console.
+   *
+   * This is useful for debugging and troubleshooting, and should only be enabled
+   * when running in a development environment on a local machine.
+   *
+   * @default false
+   */
+  consoleTracing?: boolean;
+
+  /**
+   * When this is enabled, LangWatch will not set up OpenTelemetry.
+   *
+   * This is useful when you're using the Observability SDK in an environment
+   * where OpenTelemetry is already set up, or you don't have control over the
+   * OpenTelemetry tracing provider.
+   *
+   * @default false
+   */
+  skipOpenTelemetrySetup?: boolean;
 
   /**
    * OpenTelemetry instrumentations to register with the tracer.
@@ -203,18 +186,6 @@ export interface SetupObservabilityOptions {
    * ```
    */
   traceExporter?: OTLPTraceExporter;
-
-  /**
-   * Whether to override the global OpenTelemetry tracer provider.
-   *
-   * When true, LangWatch will set its tracer provider as the global
-   * default. This affects other libraries that use OpenTelemetry.
-   *
-   * @default true
-   */
-  overrideGlobal?: boolean;
-
-  // Advanced OTEL passthrough
 
   /**
    * Whether to automatically detect and configure resources.
@@ -373,10 +344,7 @@ export interface SetupObservabilityOptions {
  *
  * @example
  * ```typescript
- * const { tracer, shutdown } = await setupObservability(options);
- *
- * // Use the tracer for creating spans
- * const span = tracer.startSpan("my-operation");
+ * const { shutdown } = await setupObservability(options);
  *
  * // Shutdown when the application is terminating
  * process.on('SIGTERM', async () => {
@@ -386,32 +354,6 @@ export interface SetupObservabilityOptions {
  * ```
  */
 export interface ObservabilityHandle {
-  /**
-   * Configured LangWatch tracer instance.
-   *
-   * This tracer is pre-configured with the LangWatch endpoint and
-   * can be used to create spans, add attributes, and record events.
-   *
-   * @example
-   * ```typescript
-   * const span = tracer.startSpan("database-query");
-   * span.setAttribute("db.system", "postgresql");
-   * span.setAttribute("db.statement", "SELECT * FROM users");
-   *
-   * try {
-   *   const result = await queryDatabase();
-   *   span.setStatus({ code: SpanStatusCode.OK });
-   *   return result;
-   * } catch (error) {
-   *   span.setStatus({ code: SpanStatusCode.ERROR, message: error.message });
-   *   throw error;
-   * } finally {
-   *   span.end();
-   * }
-   * ```
-   */
-  tracer: LangWatchTracer;
-
   /**
    * Gracefully shuts down the observability system.
    *
