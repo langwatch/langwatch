@@ -172,6 +172,16 @@ export interface SetupObservabilityOptions {
   consoleTracing?: boolean;
 
   /**
+   * When this is enabled, LangWatch will log OpenTelemetry logs to the console.
+   *
+   * This is useful for debugging and troubleshooting, and should only be enabled
+   * when running in a development environment on a local machine.
+   *
+   * @default false
+   */
+  consoleLogging?: boolean;
+
+  /**
    * When this is enabled, LangWatch will not set up OpenTelemetry.
    *
    * This is useful when you're using the Observability SDK in an environment
@@ -390,14 +400,14 @@ export interface SetupObservabilityOptions {
 }
 
 /**
- * Handle returned from observability setup containing the tracer and shutdown function.
+ * Handle returned from observability setup containing the shutdown function.
  *
- * This interface provides access to the configured LangWatch tracer and a method
- * to properly shut down the observability system when the application terminates.
+ * This interface provides a method to properly shut down the observability system
+ * when the application terminates.
  *
  * @example
  * ```typescript
- * const { shutdown } = await setupObservability(options);
+ * const { shutdown } = setupObservability(options);
  *
  * // Shutdown when the application is terminating
  * process.on('SIGTERM', async () => {
