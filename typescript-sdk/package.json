@@ -24,6 +24,11 @@
       "require": "./dist/observability/index.js",
       "import": "./dist/observability/index.mjs"
     },
+    "./observability/setup/node": {
+      "types": "./dist/observability/setup/node/index.d.ts",
+      "require": "./dist/observability/setup/node/index.js",
+      "import": "./dist/observability/setup/node/index.mjs"
+    },
     "./observability/instrumentation/langchain": {
       "types": "./dist/observability/instrumentation/langchain/index.d.ts",
       "require": "./dist/observability/instrumentation/langchain/index.js",
@@ -37,7 +42,9 @@
   },
   "scripts": {
     "prepare": "./copy-types.sh && pnpm run generate:openapi-types",
-    "test": "vitest",
+    "test": "pnpm test:core",
+    "test:core": "vitest run",
+    "test:e2e": "vitest run --include='**/*.e2e.test.ts'",
     "prebuild": "pnpm run prepare",
     "build": "tsgo --noEmit &&  tsup",
     "prepublish": "pnpm run build",
@@ -69,9 +76,14 @@
   },
   "dependencies": {
     "@opentelemetry/api": "^1.9.0",
+    "@opentelemetry/api-logs": "^0.203.0",
     "@opentelemetry/core": "^2.0.1",
+    "@opentelemetry/exporter-logs-otlp-http": "^0.203.0",
     "@opentelemetry/exporter-trace-otlp-http": "^0.203.0",
+    "@opentelemetry/instrumentation": "^0.203.0",
     "@opentelemetry/resources": "^2.0.1",
+    "@opentelemetry/sdk-logs": "^0.203.0",
+    "@opentelemetry/sdk-metrics": "^2.0.1",
     "@opentelemetry/sdk-trace-base": "^2.0.1",
     "@opentelemetry/semantic-conventions": "^1.36.0",
     "@types/prompts": "^2.4.9",
@@ -90,8 +102,8 @@
   "peerDependencies": {
     "@ai-sdk/openai": ">=2.0.0",
     "@langchain/core": ">=0.3.0",
-    "@langchain/openai": ">=0.6.0",
     "@langchain/langgraph": ">=0.4.0",
+    "@langchain/openai": ">=0.6.0",
     "@opentelemetry/context-async-hooks": ">=1.19.0",
     "@opentelemetry/context-zone": ">=1.19.0",
     "@opentelemetry/sdk-node": ">=0.200.0",

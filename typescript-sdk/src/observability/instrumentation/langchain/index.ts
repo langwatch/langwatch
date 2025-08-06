@@ -19,14 +19,11 @@ import {
 } from "@langchain/core/messages";
 import type { ChatGeneration, LLMResult } from "@langchain/core/outputs";
 import type { ChainValues } from "@langchain/core/utils/types";
-import { getLangWatchTracer } from "../../trace";
-import type { LangWatchSpan } from "../../span";
+import { getLangWatchTracer } from "../../tracer";
+import type { LangWatchSpan } from "../../types";
 import { context, trace, SpanStatusCode, Attributes } from "@opentelemetry/api";
 import { chatMessageSchema } from "../../../internal/generated/types/tracer.generated";
-import {
-  canAutomaticallyCaptureInput,
-  canAutomaticallyCaptureOutput,
-} from "../../../client";
+import { shouldCaptureInput, shouldCaptureOutput } from "../../config";
 import * as intSemconv from "../../semconv";
 import { z } from "zod";
 
@@ -70,7 +67,7 @@ export class LangWatchCallbackHandler extends BaseCallbackHandler {
 
     span.setType("llm");
 
-    if (canAutomaticallyCaptureInput()) {
+    if (shouldCaptureInput()) {
       span.setInput(prompts);
     }
 
@@ -124,7 +121,7 @@ export class LangWatchCallbackHandler extends BaseCallbackHandler {
 
     span.setType("llm");
 
-    if (canAutomaticallyCaptureInput()) {
+    if (shouldCaptureInput()) {
       span.setInput(messages.flatMap(convertFromLangChainMessages));
     }
 
@@ -184,7 +181,7 @@ export class LangWatchCallbackHandler extends BaseCallbackHandler {
     }
     const output = outputs.length === 1 ? outputs[0] : outputs;
 
-    if (canAutomaticallyCaptureOutput()) {
+    if (shouldCaptureOutput()) {
       span.setOutput(output);
     }
 
@@ -227,7 +224,7 @@ export class LangWatchCallbackHandler extends BaseCallbackHandler {
     );
     span.setType("chain");
 
-    if (canAutomaticallyCaptureInput()) {
+    if (shouldCaptureInput()) {
       span.setInput(inputs);
     }
 
@@ -300,7 +297,7 @@ export class LangWatchCallbackHandler extends BaseCallbackHandler {
     );
     span.setType("tool");
 
-    if (canAutomaticallyCaptureInput()) {
+    if (shouldCaptureInput()) {
       span.setInputString(input);
     }
 
@@ -332,7 +329,7 @@ export class LangWatchCallbackHandler extends BaseCallbackHandler {
   ): Promise<void> {
     const span = this.getSpan(runId);
     if (!span) return;
-    if (canAutomaticallyCaptureOutput()) {
+    if (shouldCaptureOutput()) {
       span.setOutputString(output);
     }
 
@@ -378,7 +375,7 @@ export class LangWatchCallbackHandler extends BaseCallbackHandler {
     );
     span.setType("rag");
 
-    if (canAutomaticallyCaptureInput()) {
+    if (shouldCaptureInput()) {
       span.setInputString(query);
     }
     if (_tags) {
@@ -411,7 +408,7 @@ export class LangWatchCallbackHandler extends BaseCallbackHandler {
   ) {
     const span = this.getSpan(runId);
     if (!span) return;
-    if (canAutomaticallyCaptureOutput()) {
+    if (shouldCaptureOutput()) {
       span.setOutput(documents);
     }
 
@@ -421,7 +418,7 @@ export class LangWatchCallbackHandler extends BaseCallbackHandler {
       documents.map((document) => ({
         document_id: document.metadata.id,
         chunk_id: document.metadata.chunk_id,
-        content: canAutomaticallyCaptureInput() ? document.pageContent : "",
+        content: shouldCaptureInput() ? document.pageContent : "",
       })),
     );
 
@@ -470,7 +467,7 @@ export class LangWatchCallbackHandler extends BaseCallbackHandler {
 
     addLangChainEvent(span, "handleAgentEnd", runId, _parentRunId, _tags);
 
-    if (canAutomaticallyCaptureOutput()) {
+    if (shouldCaptureOutput()) {
       span.setOutput(action.returnValues);
     }
 
@@ -545,13 +542,17 @@ const convertFromLangChainMessage = (
   const content =
     typeof message.content === "string"
       ? message.content
-      : message.content.map((content: any) =>
+      : message.content == null
+      ? ""
+      : Array.isArray(message.content)
+      ? message.content.map((content: any) =>
           content.type === "text"
             ? { type: "text", text: content.text }
             : content.type == "image_url"
             ? { type: "image_url", image_url: content.image_url }
             : { type: "text", text: JSON.stringify(content) },
-        );
+        )
+      : JSON.stringify(message.content);
   const functionCall = message.additional_kwargs as any;
   return {
     role,
@@ -588,9 +589,10 @@ function wrapNonScalarValues(value: unknown): string | number | boolean | undefi
       value: value as object,
     });
   } catch (e) {
+    // Handle circular references and other serialization errors
     return JSON.stringify({
       type: "raw",
-      value: value as any,
+      value: "[Circular Reference or Non-Serializable Object]",
     });
   }
 }

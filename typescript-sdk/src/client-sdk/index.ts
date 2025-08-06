@@ -3,8 +3,8 @@ import { PromptsFacade } from "./services/prompts";
 import { type InternalConfig } from "./types";
 import { createLangWatchApiClient } from "../internal/api/client";
 import { trace, Tracer } from "@opentelemetry/api";
-import { EvaluationsFacade } from "./services/evaluations";
-import { Logger, NoOpLogger } from "./logger";
+import { Logger, NoOpLogger } from "../logger";
+import { TracesFacade } from "./services/traces/facade";
 
 const DEFAULT_ENDPOINT = "https://api.langwatch.com";
 
@@ -17,7 +17,7 @@ export interface LangWatchConstructorOptions {
     prompts?: {
       defaultCacheTtlMs?: number;
     };
-    evaluations?: {};
+    traces?: {},
   };
 }
 
@@ -25,8 +25,8 @@ export class LangWatch {
   readonly #config: InternalConfig;
   readonly #tracer: Tracer = trace.getTracer("langwatch");
 
-  readonly evaluations: EvaluationsFacade;
   readonly prompts: PromptsFacade;
+  readonly traces: TracesFacade;
 
   constructor(options: LangWatchConstructorOptions = {}) {
     const apiKey = options.apiKey ?? process.env.LANGWATCH_API_KEY ?? "";
@@ -38,8 +38,8 @@ export class LangWatch {
       options: options.options,
     });
 
-    this.evaluations = new EvaluationsFacade(this.#config);
     this.prompts = new PromptsFacade(this.#config);
+    this.traces = new TracesFacade(this.#config);
   }
 
   #createInternalConfig({
@@ -58,9 +58,9 @@ export class LangWatch {
         ...PromptsFacade.defaultOptions,
         ...options?.prompts,
       },
-      evaluations: {
-        ...EvaluationsFacade.defaultOptions,
-        ...options?.evaluations,
+      traces: {
+        ...TracesFacade.defaultOptions,
+        ...options?.traces,
       },
       langwatchApiClient: createLangWatchApiClient(apiKey, endpoint),
     };

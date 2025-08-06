@@ -10,7 +10,7 @@ export interface InternalConfig {
   prompts: {
     defaultCacheTtlMs: number;
   };
-  evaluations: {},
+  traces: {},
 }
 
 export interface BaseRequestOptions {
