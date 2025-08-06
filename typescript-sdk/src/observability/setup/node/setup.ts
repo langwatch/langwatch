@@ -20,7 +20,11 @@ export function setupObservability(
     level: options.logLevel,
     prefix: "LangWatch Observability",
   });
-  setObservabilityConfig({ logger });
+  setObservabilityConfig({
+    logger,
+    suppressInputCapture: options.suppressInputCapture,
+    suppressOutputCapture: options.suppressOutputCapture,
+  });
 
   if (options.skipOpenTelemetrySetup) {
     logger.debug("Skipping OpenTelemetry setup");
@@ -33,7 +37,8 @@ export function setupObservability(
   const alreadySetup = isConcreteProvider(globalProvider);
 
   // If a global provider is already set, do not allow patching or re-initialization.
-  if (alreadySetup) {
+  // Unless forceReinit is explicitly set to true (primarily for testing)
+  if (alreadySetup && !options.UNSAFE_forceOpenTelemetryReinitialization) {
     logger.error(
       `OpenTelemetry is already set up in this process.\n` +
         `Spans will NOT be sent to LangWatch unless you add the LangWatch span processor or exporter to your existing OpenTelemetry setup.\n` +
@@ -52,6 +57,13 @@ export function setupObservability(
         );
       },
     };
+  }
+
+  if (alreadySetup && options.UNSAFE_forceOpenTelemetryReinitialization) {
+    logger.warn(
+      "OpenTelemetry is already set up, but UNSAFE_forceOpenTelemetryReinitialization=true. " +
+      "Proceeding with reinitialization. This may cause conflicts."
+    );
   }
 
   logger.info("No existing TracerProvider; initializing NodeSDK");
@@ -128,6 +140,9 @@ export function createAndStartNodeSdk(
     logger.debug("Added BatchSpanProcessor to SDK");
   }
 
+  // When custom span processors are provided, don't set traceExporter to avoid conflicts
+  const useCustomProcessors = options.spanProcessors?.length || options.consoleTracing;
+
   const sdk = new NodeSDK({
     resource,
     serviceName: options.serviceName,
@@ -142,7 +157,8 @@ export function createAndStartNodeSdk(
     spanProcessors: processors,
     spanLimits: options.spanLimits,
     idGenerator: options.idGenerator,
-    traceExporter: exporter,
+    // Only set traceExporter when not using custom span processors
+    ...(useCustomProcessors ? {} : { traceExporter: exporter }),
     instrumentations: options.instrumentations,
   });
 

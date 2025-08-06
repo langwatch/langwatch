@@ -9,6 +9,12 @@ import * as langwatchAttributes from "./semconv/attributes";
 import * as semconvAttributes from "@opentelemetry/semantic-conventions/incubating";
 import * as intSemconv from "./semconv";
 
+// Utility type to pull out all values of keys on an object, and only allow types which
+// are strings, while preserving the auto-completion of the keys.
+type OnlyStringValues<T> = {
+  [K in keyof T]: T[K] extends string ? T[K] : never;
+}[keyof T];
+
 /**
  * Union type representing all possible attribute keys that can be used in spans.
  *
@@ -28,8 +34,8 @@ import * as intSemconv from "./semconv";
  * ```
  */
 export type AttributeKey =
-  | keyof typeof semconvAttributes
-  | keyof typeof langwatchAttributes
+  | OnlyStringValues<typeof semconvAttributes>
+  | OnlyStringValues<typeof langwatchAttributes>
   | (string & {});
 
 /**
@@ -49,6 +55,10 @@ export type AttributeKey =
  * ```
  */
 export type SemconvAttributes = Partial<Record<AttributeKey, AttributeValue>>;
+
+export interface LangWatchSpanOptions extends SpanOptions {
+  attributes?: SemconvAttributes;
+}
 
 /**
  * Supported types of spans for LangWatch observability. These types categorize the nature of the span for downstream analysis and visualization.
@@ -316,7 +326,7 @@ export interface LangWatchTracer extends Tracer {
    */
   startSpan(
     name: string,
-    options?: SpanOptions,
+    options?: LangWatchSpanOptions,
     context?: Context,
   ): LangWatchSpan;
 
@@ -367,7 +377,7 @@ export interface LangWatchTracer extends Tracer {
    */
   startActiveSpan<F extends (span: LangWatchSpan) => unknown>(
     name: string,
-    options: SpanOptions,
+    options: LangWatchSpanOptions,
     fn: F,
   ): ReturnType<F>;
 
@@ -382,7 +392,7 @@ export interface LangWatchTracer extends Tracer {
    */
   startActiveSpan<F extends (span: LangWatchSpan) => unknown>(
     name: string,
-    options: SpanOptions,
+    options: LangWatchSpanOptions,
     context: Context,
     fn: F,
   ): ReturnType<F>;
@@ -478,7 +488,7 @@ export interface LangWatchTracer extends Tracer {
    */
   withActiveSpan<F extends (span: LangWatchSpan) => unknown>(
     name: string,
-    options: SpanOptions,
+    options: LangWatchSpanOptions,
     fn: F,
   ): ReturnType<F>;
 
@@ -493,7 +503,7 @@ export interface LangWatchTracer extends Tracer {
    */
   withActiveSpan<F extends (span: LangWatchSpan) => unknown>(
     name: string,
-    options: SpanOptions,
+    options: LangWatchSpanOptions,
     context: Context,
     fn: F,
   ): ReturnType<F>;

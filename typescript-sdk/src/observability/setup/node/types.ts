@@ -81,6 +81,20 @@ export interface SetupObservabilityOptions {
   attributes?: SemconvAttributes;
 
   /**
+   * Whether to suppress automatic capture of input data on spans.
+   *
+   * @default false
+   */
+  suppressInputCapture?: boolean;
+
+  /**
+   * Whether to suppress automatic capture of output data on spans.
+   *
+   * @default false
+   */
+  suppressOutputCapture?: boolean;
+
+  /**
    * Whether to throw an error if there was an issue setting up OpenTelemetry.
    *
    * When enabled, LangWatch will throw an error if OpenTelemetry fails to initialize.
@@ -334,6 +348,15 @@ export interface SetupObservabilityOptions {
    * ```
    */
   idGenerator?: IdGenerator;
+
+  /**
+   * Force reinitialization even if OpenTelemetry is already set up.
+   * This is useful for testing scenarios but should be used with caution
+   * in production as it can cause conflicts.
+   *
+   * @default false
+   */
+  UNSAFE_forceOpenTelemetryReinitialization?: boolean;
 }
 
 /**

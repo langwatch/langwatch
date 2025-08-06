@@ -9,6 +9,7 @@ const MockLogger = vi.fn().mockImplementation(() => ({
 }));
 import { OTLPTraceExporter } from '@opentelemetry/exporter-trace-otlp-http';
 import { trace } from '@opentelemetry/api';
+import { setObservabilityConfigInstance } from '../../config.js';
 
 
 // Helper to create a mock logger
@@ -97,5 +98,82 @@ describe('createAndStartNodeSdk', () => {
     const options = { ...defaultOptions, spanProcessors: [fakeProcessor] };
     const sdk = createAndStartNodeSdk(options, logger, resourceFromAttributes({}));
     expect(sdk).toBeDefined();
+  });
+});
+
+describe('setupObservability - suppress options', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    // Reset any existing config
+    setObservabilityConfigInstance(null);
+  });
+  afterEach(() => {
+    trace.disable();
+    // Reset config after each test
+    setObservabilityConfigInstance(null);
+  });
+
+    it('sets suppressInputCapture in observability config', async () => {
+    const options = { ...defaultOptions, suppressInputCapture: true };
+    setupObservability(options);
+
+    const { getObservabilityConfigSuppressInputCapture } = await import('../../config.js');
+    expect(getObservabilityConfigSuppressInputCapture()).toBe(true);
+  });
+
+  it('sets suppressOutputCapture in observability config', async () => {
+    const options = { ...defaultOptions, suppressOutputCapture: true };
+    setupObservability(options);
+
+    const { getObservabilityConfigSuppressOutputCapture } = await import('../../config.js');
+    expect(getObservabilityConfigSuppressOutputCapture()).toBe(true);
+  });
+
+  it('sets both suppress options in observability config', async () => {
+    const options = {
+      ...defaultOptions,
+      suppressInputCapture: true,
+      suppressOutputCapture: true
+    };
+    setupObservability(options);
+
+    const {
+      getObservabilityConfigSuppressInputCapture,
+      getObservabilityConfigSuppressOutputCapture
+    } = await import('../../config.js');
+    expect(getObservabilityConfigSuppressInputCapture()).toBe(true);
+    expect(getObservabilityConfigSuppressOutputCapture()).toBe(true);
+  });
+
+  it('defaults suppress options to undefined when not specified', async () => {
+    const options = { ...defaultOptions };
+    setupObservability(options);
+
+    const {
+      getObservabilityConfigSuppressInputCapture,
+      getObservabilityConfigSuppressOutputCapture
+    } = await import('../../config.js');
+    // These should be false due to default behavior in the config functions
+    expect(getObservabilityConfigSuppressInputCapture()).toBe(false);
+    expect(getObservabilityConfigSuppressOutputCapture()).toBe(false);
+  });
+
+  it('sets suppress options even when skipOpenTelemetrySetup is true', async () => {
+    const options = {
+      ...defaultOptions,
+      suppressInputCapture: true,
+      suppressOutputCapture: true,
+      skipOpenTelemetrySetup: true
+    };
+    const handle = setupObservability(options);
+
+    const {
+      getObservabilityConfigSuppressInputCapture,
+      getObservabilityConfigSuppressOutputCapture
+    } = await import('../../config.js');
+    expect(getObservabilityConfigSuppressInputCapture()).toBe(true);
+    expect(getObservabilityConfigSuppressOutputCapture()).toBe(true);
+
+    await handle.shutdown();
   });
 });

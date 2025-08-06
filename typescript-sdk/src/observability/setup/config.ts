@@ -1,4 +1,4 @@
-import { Logger, NoOpLogger } from "../../logger";
+import { Logger, NoOpLogger } from "../../logger/index.js";
 import { ObservabilityConfig } from "./types";
 
 let observabilityConfig: ObservabilityConfig | null = null;
@@ -27,4 +27,12 @@ export function getObservabilityConfig(): ObservabilityConfig {
 
 export function getObservabilityLogger(): Logger {
   return getObservabilityConfig().logger;
+}
+
+export function getObservabilityConfigSuppressInputCapture(): boolean {
+  return getObservabilityConfig().suppressInputCapture ?? false;
+}
+
+export function getObservabilityConfigSuppressOutputCapture(): boolean {
+  return getObservabilityConfig().suppressOutputCapture ?? false;
 }
