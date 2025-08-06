@@ -1,9 +1,9 @@
 import { describe, it, expect } from "vitest";
-import { extractStrandsAgentsInputOutput, isStrandsAgentsPythonResource as isStrandsAgentsInstrumentation } from "./strands-agents";
+import { extractStrandsAgentsInputOutput, isStrandsAgentsInstrumentation } from "./strands-agents";
 import type { DeepPartial } from "~/utils/types";
 import type { ISpan, IEvent } from "@opentelemetry/otlp-transformer";
 
-describe("isStrandsAgentsPythonResource", () => {
+describe("isStrandsAgentsInstrumentation", () => {
   it("returns true for scope.name === 'strands-agents'", () => {
     expect(
       isStrandsAgentsInstrumentation({ name: "strands-agents" }, {})

@@ -33,7 +33,7 @@ import {
 import { openTelemetryToLangWatchMetadataMapping } from "./metadata";
 import { createLogger } from "~/utils/logger";
 import { z } from "zod";
-import { isStrandsAgentsPythonResource, extractStrandsAgentsInputOutput } from "./span-event-processing/strands-agents";
+import { isStrandsAgentsInstrumentation, extractStrandsAgentsInputOutput } from "./span-event-processing/strands-agents";
 
 const logger = createLogger("langwatch.tracer.opentelemetry");
 
@@ -234,7 +234,7 @@ const addOpenTelemetrySpanAsSpan = (
   }
 
   // Special handling for strands-agents Python SDK
-  if (isStrandsAgentsPythonResource(otelScope, otelSpan)) {
+  if (isStrandsAgentsInstrumentation(otelScope, otelSpan)) {
     const io = extractStrandsAgentsInputOutput(otelSpan);
     if (io) {
       input = io.input;
