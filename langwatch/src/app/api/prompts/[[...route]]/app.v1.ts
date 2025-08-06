@@ -33,7 +33,6 @@ import { handlePossibleConflictError } from "./utils";
 import { badRequestSchema, successSchema } from "~/app/api/shared/schemas";
 import {
   handleSchema,
-  nameSchema,
   scopeSchema,
   commitMessageSchema,
   versionSchema,
@@ -327,10 +326,15 @@ app.put(
   }),
   zValidator(
     "json",
-    z.object({
-      name: nameSchema,
+    z.strictObject({
       handle: handleSchema.optional(),
       scope: scopeSchema.optional(),
+      // Version data
+      authorId: z.string().optional(),
+      prompt: z.string().optional(),
+      messages: z.array(messageSchema).optional(),
+      inputs: z.array(inputsSchema).optional(),
+      outputs: z.array(outputsSchema).optional(),
     })
   ),
   async (c) => {
@@ -340,11 +344,16 @@ app.put(
     const data = c.req.valid("json");
     const projectId = project.id;
 
+    if (Object.keys(data).length === 0) {
+      throw new HTTPException(400, {
+        message: "At least one field is required",
+      });
+    }
+
     logger.info(
       {
         projectId: project.id,
         promptId: id,
-        newName: data.name,
         newHandle: data.handle,
         newScope: data.scope,
       },
@@ -362,7 +371,6 @@ app.put(
         {
           projectId,
           promptId: id,
-          name: updatedConfig.name,
           handle: updatedConfig.handle,
           scope: updatedConfig.scope,
         },

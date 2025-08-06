@@ -355,7 +355,6 @@ describe("Prompts API", () => {
         expect(res.status).toBe(200);
         const body = await res.json();
         expect(body).toHaveProperty("id");
-        expect(body).toHaveProperty("name", "Test Prompt");
         expect(body).toHaveProperty("handle", "my-custom-ref");
       });
     });
@@ -378,7 +377,6 @@ describe("Prompts API", () => {
         expect(res.status).toBe(200);
         const body = await res.json();
         expect(body).toHaveProperty("id");
-        expect(body).toHaveProperty("name", "Test Prompt");
         expect(body).toHaveProperty("handle", "my-custom-ref");
       });
     });
@@ -427,7 +425,7 @@ describe("Prompts API", () => {
     });
 
     describe("with project scope (default)", () => {
-      it("should update a prompt with a handle in correct format", async () => {
+      it("should updte a prompt with a handle in correct format", async () => {
         // Create a valid prompt first
         const promptRes = await app.request(`/api/prompts`, {
           method: "POST",
@@ -435,14 +433,12 @@ describe("Prompts API", () => {
             "X-Auth-Token": testApiKey,
             "Content-Type": "application/json",
           },
-          body: JSON.stringify({ name: "Test Prompt" }),
+          body: JSON.stringify({ handle: "my-custom-ref" }),
         });
 
         expect(promptRes.status).toBe(200);
 
         const prompt = await promptRes.json();
-        const handle = "my-custom-ref";
-        const expectedHandle = `${testProjectId}/${handle}`;
 
         // Update the prompt with a handle
         const updateRes = await app.request(`/api/prompts/${prompt.id}`, {
@@ -452,18 +448,21 @@ describe("Prompts API", () => {
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            name: "Updated Test Prompt",
-            handle: handle,
+            handle: "my-custom-ref-updated",
           }),
         });
 
-        expect(updateRes.status).toBe(200);
+        const updateBody = await updateRes.json();
+        expect(updateBody.handle).toBe("my-custom-ref-updated");
+
         const realPrompt = await prisma.llmPromptConfig.findUnique({
           where: { id: prompt.id, projectId: testProjectId },
         });
 
         // Verify the handle is in the correct format
-        expect(realPrompt?.handle).toBe(expectedHandle);
+        expect(realPrompt?.handle).toBe(
+          `${testProjectId}/my-custom-ref-updated`
+        );
       });
 
       it("should enforce unique handle constraint", async () => {
@@ -475,10 +474,11 @@ describe("Prompts API", () => {
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            name: "Test Prompt 1",
+            handle: "first-ref",
           }),
         });
 
+        expect(prompt1Res.status).toBe(200);
         const prompt1 = await prompt1Res.json();
 
         // Create second prompt
@@ -489,8 +489,7 @@ describe("Prompts API", () => {
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            name: "Test Prompt 2",
-            handle: "duplicate-ref",
+            handle: "second-ref",
           }),
         });
 
@@ -502,8 +501,7 @@ describe("Prompts API", () => {
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            name: "Test Prompt 1",
-            handle: "duplicate-ref",
+            handle: "second-ref",
           }),
         });
 
@@ -605,35 +603,25 @@ describe("Prompts API", () => {
       expect(body).toHaveProperty("error");
     });
 
-    it("should validate input when updating a prompt", async () => {
-      // Create a valid prompt first
-      const promptRes = await app.request(`/api/prompts`, {
-        method: "POST",
-        headers: {
-          "X-Auth-Token": testApiKey,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ name: "Test Prompt" }),
-      });
-
-      const prompt = await promptRes.json();
-
-      const invalidData = {
-        name: "", // Empty name should be rejected
-      };
-
-      const res = await app.request(`/api/prompts/${prompt.id}`, {
+    it("should strictly validate input when updating a prompt", async () => {
+      // Update the prompt with invalid data
+      const res = await app.request(`/api/prompts/${mockConfig.id}`, {
         method: "PUT",
-        headers: {
-          "X-Auth-Token": testApiKey,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(invalidData),
+        headers: { "X-Auth-Token": testApiKey },
+        body: JSON.stringify({ bogus: "bogus" }),
       });
 
       expect(res.status).toBe(400);
       const body = await res.json();
       expect(body).toHaveProperty("error");
+    });
+
+    it("should return 400 if no fields are provided", async () => {
+      const res = await app.request(`/api/prompts/${mockConfig.id}`, {
+        method: "PUT",
+        headers: { "X-Auth-Token": testApiKey },
+      });
+      expect(res.status).toBe(400);
     });
   });
 });
