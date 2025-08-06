@@ -4,10 +4,17 @@
  * both the target and the decorator remain unchanged.
  * Additonal decorator methods are ignored.
  *
+ * If using in a constructor with `this` you must cast the target.
+ *
  * @param target - The target to wrap.
  * @param DecoratorClass - The decorator class to use.
  * @returns A proxy that wraps the target and
  * adds tracing to the methods of the decorator.
+ *
+ * @example
+ * ```ts
+ * const proxy = createTracingProxy(target as Prompt, PromptTracingDecorator);
+ * ```
  */
 export function createTracingProxy<T extends object, D extends Partial<T>>(
   target: T,
