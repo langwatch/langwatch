@@ -6,12 +6,12 @@ import { SetupObservabilityOptions } from '../../types';
 import { resourceFromAttributes } from '@opentelemetry/resources';
 import { trace } from '@opentelemetry/api';
 import { getConcreteProvider } from '../../../utils';
-import { setObservabilityConfigInstance } from '../../../config.js';
+import { resetObservabilitySdkConfig } from '../../../../config.js';
 
 afterEach(() => {
   trace.disable();
   // Reset observability config after each test
-  setObservabilityConfigInstance(null);
+  resetObservabilitySdkConfig();
 });
 
 // Integration tests for setupObservability configuration options in Node.js
@@ -363,69 +363,112 @@ describe('setupObservability Integration - Configuration Options', () => {
     expect(provider).toBeUndefined();
   });
 
-  it('should set suppressInputCapture in observability config', async () => {
-    const logger = createMockLogger();
-    const options: SetupObservabilityOptions = {
-      apiKey: 'test-api-key',
-      suppressInputCapture: true,
-      logger,
-    };
-    const handle = setupObservability(options);
+  describe('data capture configuration', () => {
+    it('should set "none" mode in observability config', async () => {
+      const logger = createMockLogger();
+      const options: SetupObservabilityOptions = {
+        apiKey: 'test-api-key',
+        dataCapture: "none",
+        logger,
+      };
+      const handle = setupObservability(options);
 
-    // Import config module to check the setting
-    const { getObservabilityConfigSuppressInputCapture } = await import('../../../config.js');
-    expect(getObservabilityConfigSuppressInputCapture()).toBe(true);
+      // Import config module to check the setting
+      const { shouldCaptureInput, shouldCaptureOutput } = await import('../../../../config.js');
+      expect(shouldCaptureInput()).toBe(false);
+      expect(shouldCaptureOutput()).toBe(false);
 
-    await handle.shutdown();
-  });
+      await handle.shutdown();
+    });
 
-  it('should set suppressOutputCapture in observability config', async () => {
-    const logger = createMockLogger();
-    const options: SetupObservabilityOptions = {
-      apiKey: 'test-api-key',
-      suppressOutputCapture: true,
-      logger,
-    };
-    const handle = setupObservability(options);
+    it('should set "input" mode in observability config', async () => {
+      const logger = createMockLogger();
+      const options: SetupObservabilityOptions = {
+        apiKey: 'test-api-key',
+        dataCapture: "input",
+        logger,
+      };
+      const handle = setupObservability(options);
 
-        // Import config module to check the setting
-    const { getObservabilityConfigSuppressOutputCapture } = await import('../../../config.js');
-    expect(getObservabilityConfigSuppressOutputCapture()).toBe(true);
+      // Import config module to check the setting
+      const { shouldCaptureInput, shouldCaptureOutput } = await import('../../../../config.js');
+      expect(shouldCaptureInput()).toBe(true);
+      expect(shouldCaptureOutput()).toBe(false);
 
-    await handle.shutdown();
-  });
+      await handle.shutdown();
+    });
 
-  it('should set both suppress options in observability config', async () => {
-    const logger = createMockLogger();
-    const options: SetupObservabilityOptions = {
-      apiKey: 'test-api-key',
-      suppressInputCapture: true,
-      suppressOutputCapture: true,
-      logger,
-    };
-    const handle = setupObservability(options);
+    it('should set "output" mode in observability config', async () => {
+      const logger = createMockLogger();
+      const options: SetupObservabilityOptions = {
+        apiKey: 'test-api-key',
+        dataCapture: "output",
+        logger,
+      };
+      const handle = setupObservability(options);
 
-    // Import config module to check both settings
-    const { getObservabilityConfigSuppressInputCapture, getObservabilityConfigSuppressOutputCapture } = await import('../../../config.js');
-    expect(getObservabilityConfigSuppressInputCapture()).toBe(true);
-    expect(getObservabilityConfigSuppressOutputCapture()).toBe(true);
+      // Import config module to check the setting
+      const { shouldCaptureInput, shouldCaptureOutput } = await import('../../../../config.js');
+      expect(shouldCaptureInput()).toBe(false);
+      expect(shouldCaptureOutput()).toBe(true);
 
-    await handle.shutdown();
-  });
+      await handle.shutdown();
+    });
 
-  it('should default suppress options to false when not specified', async () => {
-    const logger = createMockLogger();
-    const options: SetupObservabilityOptions = {
-      apiKey: 'test-api-key',
-      logger,
-    };
-    const handle = setupObservability(options);
+    it('should set "all" mode in observability config', async () => {
+      const logger = createMockLogger();
+      const options: SetupObservabilityOptions = {
+        apiKey: 'test-api-key',
+        dataCapture: "all",
+        logger,
+      };
+      const handle = setupObservability(options);
 
-    // Import config module to check default values
-    const { getObservabilityConfigSuppressInputCapture, getObservabilityConfigSuppressOutputCapture } = await import('../../../config.js');
-    expect(getObservabilityConfigSuppressInputCapture()).toBe(false);
-    expect(getObservabilityConfigSuppressOutputCapture()).toBe(false);
+      // Import config module to check the setting
+      const { shouldCaptureInput, shouldCaptureOutput } = await import('../../../../config.js');
+      expect(shouldCaptureInput()).toBe(true);
+      expect(shouldCaptureOutput()).toBe(true);
 
-    await handle.shutdown();
+      await handle.shutdown();
+    });
+
+    it('should default to "all" mode when not specified', async () => {
+      const logger = createMockLogger();
+      const options: SetupObservabilityOptions = {
+        apiKey: 'test-api-key',
+        logger,
+      };
+      const handle = setupObservability(options);
+
+      // Import config module to check default values
+      const { shouldCaptureInput, shouldCaptureOutput } = await import('../../../../config.js');
+      expect(shouldCaptureInput()).toBe(true);
+      expect(shouldCaptureOutput()).toBe(true);
+
+      await handle.shutdown();
+    });
+
+    it('should work with predicate functions', async () => {
+      const logger = createMockLogger();
+      const options: SetupObservabilityOptions = {
+        apiKey: 'test-api-key',
+        dataCapture: (ctx) => ctx.spanType === "llm" ? "all" : "none",
+        logger,
+      };
+      const handle = setupObservability(options);
+
+      // Import config module to check predicate behavior
+      const { shouldCaptureInput, shouldCaptureOutput } = await import('../../../../config.js');
+
+      // LLM spans should capture both
+      expect(shouldCaptureInput({ spanType: "llm" })).toBe(true);
+      expect(shouldCaptureOutput({ spanType: "llm" })).toBe(true);
+
+      // Other spans should capture nothing
+      expect(shouldCaptureInput({ spanType: "tool" })).toBe(false);
+      expect(shouldCaptureOutput({ spanType: "tool" })).toBe(false);
+
+      await handle.shutdown();
+    });
   });
 });

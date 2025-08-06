@@ -11,7 +11,7 @@ import {
 import { Resource } from "@opentelemetry/resources";
 import { LangWatchExporter } from "../../exporters";
 import { ConsoleLogger, Logger } from "../../../logger";
-import { setObservabilityConfig } from "../config";
+import { initializeObservabilitySdkConfig } from "../../config";
 
 export function setupObservability(
   options: SetupObservabilityOptions = {},
@@ -20,10 +20,9 @@ export function setupObservability(
     level: options.logLevel,
     prefix: "LangWatch Observability",
   });
-  setObservabilityConfig({
+  initializeObservabilitySdkConfig({
     logger,
-    suppressInputCapture: options.suppressInputCapture,
-    suppressOutputCapture: options.suppressOutputCapture,
+    dataCapture: options.dataCapture,
   });
 
   if (options.skipOpenTelemetrySetup) {

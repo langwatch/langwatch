@@ -11,6 +11,7 @@ import { Resource, ResourceDetector } from "@opentelemetry/resources";
 import { Sampler, SpanLimits } from "@opentelemetry/sdk-trace-base";
 import { IdGenerator } from "@opentelemetry/sdk-trace-base";
 import { SemconvAttributes } from "../../types";
+import { DataCaptureOptions } from "../../features/data-capture/types";
 
 /**
  * Configuration options for setting up LangWatch observability.
@@ -81,18 +82,46 @@ export interface SetupObservabilityOptions {
   attributes?: SemconvAttributes;
 
   /**
-   * Whether to suppress automatic capture of input data on spans.
+   * Configuration for automatic data capture.
    *
-   * @default false
-   */
-  suppressInputCapture?: boolean;
-
-  /**
-   * Whether to suppress automatic capture of output data on spans.
+   * This provides control over input/output data capture by LangWatch instrumentations.
+   * You can use a simple string mode, a configuration object, or a predicate function
+   * for dynamic control based on the operation context.
    *
-   * @default false
+   * @example
+   * ```typescript
+   * // Simple mode - capture everything
+   * dataCapture: "all"
+   *
+   * // Simple mode - capture only input data
+   * dataCapture: "input"
+   *
+   * // Simple mode - capture only output data
+   * dataCapture: "output"
+   *
+   * // Simple mode - capture nothing
+   * dataCapture: "none"
+   *
+   * // Configuration object
+   * dataCapture: {
+   *   mode: "all"
+   * }
+   *
+   * // Dynamic predicate function
+   * dataCapture: (context) => {
+   *   // Don't capture sensitive data in production
+   *   if (context.environment === "production" &&
+   *       context.operationName.includes("password")) {
+   *     return "none";
+   *   }
+   *   // Capture everything else
+   *   return "all";
+   * }
+   * ```
+   *
+   * @default "all"
    */
-  suppressOutputCapture?: boolean;
+  dataCapture?: DataCaptureOptions;
 
   /**
    * Whether to throw an error if there was an issue setting up OpenTelemetry.
