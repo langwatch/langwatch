@@ -14,9 +14,6 @@ export class PromptTracingDecorator {
   constructor(private readonly target: Prompt) {}
 
   compile(...variables: Parameters<Prompt["compile"]>) {
-    console.log("compile", variables);
-    const innerresults = this.target.compile(...variables);
-    console.log("innerresults", innerresults);
     return this.wrapCompileFn("compile", this.target.compile)(...variables);
   }
 
