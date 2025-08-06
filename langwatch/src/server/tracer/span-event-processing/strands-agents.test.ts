@@ -28,6 +28,37 @@ describe("isStrandsAgentsPythonResource", () => {
       })
     ).toBe(false);
   });
+  it("returns false for null resource", () => {
+    expect(isStrandsAgentsPythonResource(null as any)).toBe(false);
+  });
+  
+  it("returns false for undefined resource", () => {
+    expect(isStrandsAgentsPythonResource(undefined as any)).toBe(false);
+  });
+  
+  it("returns false when service.name is missing", () => {
+    expect(
+      isStrandsAgentsPythonResource({
+        "telemetry.sdk.language": "python",
+      })
+    ).toBe(false);
+  });
+  
+  it("returns false when telemetry.sdk.language is missing", () => {
+    expect(
+      isStrandsAgentsPythonResource({
+        "service.name": "strands-agents",
+      })
+    ).toBe(false);
+  });
+  it("returns false when service.name is not a string", () => {
+    expect(
+      isStrandsAgentsPythonResource({
+        "service.name": 42,
+        "telemetry.sdk.language": "python",
+      })
+    ).toBe(false);
+  });
 });
 
 describe("extractStrandsAgentsInputOutput", () => {

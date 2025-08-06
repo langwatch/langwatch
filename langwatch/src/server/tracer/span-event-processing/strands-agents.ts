@@ -19,8 +19,11 @@ function safeJsonParse(jsonString: string, fallback: any = null): any {
  * Detects if the resource attributes indicate a strands-agents Python SDK span
  */
 export function isStrandsAgentsPythonResource(
-  resource: Record<string, any>
+  resource: Record<string, any> | undefined | null
 ): boolean {
+  if (!resource) return false;
+  if (typeof resource !== "object") return false;
+
   return (
     resource["service.name"] === "strands-agents" &&
     resource["telemetry.sdk.language"] === "python"
