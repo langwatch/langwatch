@@ -351,8 +351,9 @@ export interface SetupObservabilityOptions {
 
   /**
    * Force reinitialization even if OpenTelemetry is already set up.
-   * This is useful for testing scenarios but should be used with caution
-   * in production as it can cause conflicts.
+   *
+   * This is useful for testing and debugging, but pls pls do not use this in production,
+   * unless you are very sure you know what you are doing. 🙏🙏🙏
    *
    * @default false
    */
