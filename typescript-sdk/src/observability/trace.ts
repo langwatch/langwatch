@@ -265,6 +265,7 @@ export function getLangWatchTracer(
                 }
 
                 // Sync case - end span immediately
+                wrappedSpan.end();
                 return result;
               } catch (err) {
                 handleError(err);
