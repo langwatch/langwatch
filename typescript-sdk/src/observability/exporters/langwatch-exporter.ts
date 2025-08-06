@@ -1,5 +1,11 @@
 import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-http";
-import { LANGWATCH_SDK_LANGUAGE, LANGWATCH_SDK_NAME, LANGWATCH_SDK_VERSION, TRACES_PATH } from "../setup/utils";
+import {
+  LANGWATCH_SDK_LANGUAGE,
+  LANGWATCH_SDK_NAME,
+  LANGWATCH_SDK_RUNTIME,
+  LANGWATCH_SDK_VERSION,
+  TRACES_PATH,
+} from "../setup/constants";
 
 export interface LangWatchExporterOptions {
   endpoint?: string;
@@ -32,7 +38,7 @@ export interface LangWatchExporterOptions {
  * ```
  */
 export class LangWatchExporter extends OTLPTraceExporter {
-    /**
+  /**
    * Creates a new LangWatchExporter instance.
    *
    * @param opts - Optional configuration options for the exporter
@@ -45,13 +51,20 @@ export class LangWatchExporter extends OTLPTraceExporter {
    */
   constructor(opts?: LangWatchExporterOptions) {
     const apiKey = opts?.apiKey ?? process.env.LANGWATCH_API_KEY ?? "";
-    const endpoint = opts?.endpoint ?? process.env.LANGWATCH_ENDPOINT ?? "https://app.langwatch.ai";
+    const endpoint =
+      opts?.endpoint ??
+      process.env.LANGWATCH_ENDPOINT ??
+      "https://app.langwatch.ai";
 
     if (opts && opts.includeAllSpans !== void 0) {
-      console.warn("[LangWatchExporter] The behavior of `includeAllSpans` is deprecated and will be removed in a future version");
+      console.warn(
+        "[LangWatchExporter] The behavior of `includeAllSpans` is deprecated and will be removed in a future version",
+      );
     }
     if (opts && opts.debug !== void 0) {
-      console.warn("[LangWatchExporter] The behavior of `debug` is deprecated and will be removed in a future version");
+      console.warn(
+        "[LangWatchExporter] The behavior of `debug` is deprecated and will be removed in a future version",
+      );
     }
 
     const url = new URL(TRACES_PATH, endpoint);
@@ -62,6 +75,7 @@ export class LangWatchExporter extends OTLPTraceExporter {
         "x-langwatch-sdk-name": LANGWATCH_SDK_NAME,
         "x-langwatch-sdk-language": LANGWATCH_SDK_LANGUAGE,
         "x-langwatch-sdk-version": LANGWATCH_SDK_VERSION,
+        "x-langwatch-sdk-runtime": LANGWATCH_SDK_RUNTIME,
         ...(apiKey ? { authorization: `Bearer ${apiKey}` } : {}),
       },
       url: otelEndpoint.toString(),
