@@ -37,6 +37,9 @@ import {
   scopeSchema,
   commitMessageSchema,
   versionSchema,
+  outputsSchema,
+  messageSchema,
+  inputsSchema,
 } from "~/prompt-configs/schemas/field-schemas";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
 import { createLogger } from "~/utils/logger";
@@ -102,7 +105,6 @@ app.get(
 );
 
 // Create prompt with initial version
-// TODO: Consider allowing for the initial version to be customized via params
 app.post(
   "/",
   describeRoute({
@@ -115,9 +117,14 @@ app.post(
   zValidator(
     "json",
     z.object({
-      name: nameSchema,
-      handle: handleSchema.optional(),
-      scope: scopeSchema.optional(),
+      handle: handleSchema,
+      scope: scopeSchema,
+      // Version data
+      authorId: z.string().optional(),
+      prompt: z.string().optional(),
+      messages: z.array(messageSchema).optional(),
+      inputs: z.array(inputsSchema).optional(),
+      outputs: z.array(outputsSchema).optional(),
     })
   ),
   async (c) => {
@@ -125,30 +132,41 @@ app.post(
     const project = c.get("project");
     const organization = c.get("organization");
     const data = c.req.valid("json");
-    const { name } = data;
 
     logger.info(
-      { projectId: project.id, promptName: name },
+      {
+        handle: data.handle,
+        scope: data.scope,
+        projectId: project.id,
+        organizationId: organization.id,
+      },
       "Creating new prompt with initial version"
     );
 
     try {
       const newConfig = await service.createPrompt({
-        name,
         projectId: project.id,
-        handle: data.handle ?? "",
+        handle: data.handle,
         organizationId: organization.id,
         scope: data.scope,
+        authorId: data.authorId,
+        prompt: data.prompt,
+        messages: data.messages,
+        inputs: data.inputs,
+        outputs: data.outputs,
       });
 
       logger.info(
-        { projectId: project.id, promptId: newConfig.id, promptName: name },
-        "Successfully created new prompt"
+        { promptId: newConfig.id },
+        "Successfully created prompt with initial version"
       );
 
       return c.json(newConfig);
     } catch (error: any) {
+      logger.error({ projectId: project.id, error }, "Error creating prompt");
       handlePossibleConflictError(error, data.scope);
+
+      // Re-throw other errors to be handled by the error middleware
       throw error;
     }
   }

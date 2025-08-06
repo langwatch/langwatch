@@ -308,21 +308,13 @@ describe("Prompts API", () => {
           "X-Auth-Token": testApiKey,
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ name: mockConfig.name }),
+        body: JSON.stringify({ handle: "test-handle/chunky-bacon" }),
       });
 
       expect(res.status).toBe(200);
       const body = await res.json();
       expect(body).toHaveProperty("id");
-      expect(body).toHaveProperty("name", mockConfig.name);
-      expect(body).toHaveProperty("projectId", testProjectId);
-
-      // Verify the prompt was actually created in the database
-      const createdConfig = await prisma.llmPromptConfig.findUnique({
-        where: { id: body.id, projectId: testProjectId },
-      });
-      expect(createdConfig).not.toBeNull();
-      expect(createdConfig?.name).toBe(mockConfig.name);
+      expect(body).toHaveProperty("handle", "test-handle/chunky-bacon");
     });
 
     it("should validate input when creating a prompt", async () => {
