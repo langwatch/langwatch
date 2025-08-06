@@ -132,7 +132,7 @@ export class LangWatchLoggerInternal implements LangWatchLogger {
         ...attributes,
         "gen_ai.system": system,
       },
-      body: { ...body },
+      body: shouldCaptureOutput() ? { ...body } : void 0,
       observedTimestamp: new Date().getTime(),
     });
   }
@@ -153,7 +153,7 @@ export class LangWatchLoggerInternal implements LangWatchLogger {
         ...attributes,
         "gen_ai.system": system,
       },
-      body: { ...body },
+      body: shouldCaptureOutput() ? { ...body } : void 0,
       observedTimestamp: new Date().getTime(),
     });
   }
@@ -174,7 +174,7 @@ export class LangWatchLoggerInternal implements LangWatchLogger {
         ...attributes,
         "gen_ai.system": system,
       },
-      body: { ...body },
+      body: shouldCaptureOutput() ? { ...body } : void 0,
       observedTimestamp: new Date().getTime(),
     });
   }
@@ -195,7 +195,7 @@ export class LangWatchLoggerInternal implements LangWatchLogger {
         ...attributes,
         "gen_ai.system": system,
       },
-      body: { ...body },
+      body: shouldCaptureOutput() ? { ...body } : void 0,
       observedTimestamp: new Date().getTime(),
     });
   }
@@ -216,7 +216,7 @@ export class LangWatchLoggerInternal implements LangWatchLogger {
         ...attributes,
         "gen_ai.system": system,
       },
-      body: { ...body },
+      body: shouldCaptureOutput() ? { ...body } : void 0,
       observedTimestamp: new Date().getTime(),
     });
   }
