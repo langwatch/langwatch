@@ -2,6 +2,8 @@ import { Flex, Spacer, VStack, Tabs, Badge } from "@chakra-ui/react";
 import { useState, useMemo, useRef, useEffect, useCallback } from "react";
 import { Plus } from "react-feather";
 
+import type { LlmConfigWithLatestVersion } from "~/server/prompt-config/repositories/llm-config.repository";
+
 import { DeleteConfirmationDialog } from "~/components/annotations/DeleteConfirmationDialog";
 import { DashboardLayout } from "~/components/DashboardLayout";
 import { CENTER_CONTENT_BOX_ID } from "~/components/executable-panel/InputOutputExecutablePanel";
@@ -11,7 +13,7 @@ import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { usePromptIdQueryParam } from "~/hooks/usePromptIdQueryParam";
 import { PromptConfigPanel } from "~/prompt-configs/PromptConfigPanel";
 import { PromptsList } from "~/prompt-configs/PromptsList";
-import type { LlmConfigWithLatestVersion } from "~/server/prompt-config/repositories/llm-config.repository";
+import { createDraftHandle } from "~/prompt-configs/utils/create-handle";
 import { api } from "~/utils/api";
 
 /**
@@ -103,9 +105,9 @@ function usePromptConfigManagement(projectId: string | undefined) {
    * @returns The created prompt config.
    */
   const createConfig = useCallback(
-    async (name: string, projectId: string) => {
+    async (handle: string, projectId: string) => {
       const result = await createConfigWithInitialVersionMutation.mutateAsync({
-        name,
+        handle,
         projectId,
       });
       void refetchPromptConfigs();
@@ -222,8 +224,9 @@ export default function PromptConfigsPage() {
         return;
       }
 
-      // Create a new prompt config with default name.
-      const result = await createConfig("New Prompt Config", project.id);
+      // Create a new prompt config with default handle.
+      const handle = createDraftHandle();
+      const result = await createConfig(handle, project.id);
       setSelectedPromptId(result.id);
     } catch (error) {
       toaster.create({
@@ -262,14 +265,23 @@ export default function PromptConfigsPage() {
       `#${CENTER_CONTENT_BOX_ID}`
     ) as HTMLDivElement | null;
 
-  const publishedPrompts = useMemo(
-    () => promptConfigs?.filter((config) => config.handle),
-    [promptConfigs]
-  );
-  const draftPrompts = useMemo(
-    () => promptConfigs?.filter((config) => !config.handle),
-    [promptConfigs]
-  );
+  const { publishedPrompts, draftPrompts } = useMemo(() => {
+    return (promptConfigs ?? []).reduce(
+      (acc, config) => {
+        // If handle and handle doesn't start with "drafts/", it's a published prompt
+        if (config.handle && !config.handle.startsWith("drafts/")) {
+          acc.publishedPrompts.push(config);
+        } else {
+          acc.draftPrompts.push(config);
+        }
+        return acc;
+      },
+      {
+        publishedPrompts: [] as LlmConfigWithLatestVersion[],
+        draftPrompts: [] as LlmConfigWithLatestVersion[],
+      }
+    );
+  }, [promptConfigs]);
 
   return (
     <DashboardLayout position="relative">

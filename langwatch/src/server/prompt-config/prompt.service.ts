@@ -246,11 +246,13 @@ export class PromptService {
     // Case 1: Prompt doesn't exist on server - create new
     if (!existingPrompt) {
       const newPrompt = await this.repository.createConfigWithInitialVersion({
-        name: idOrHandle,
-        handle: idOrHandle,
-        projectId,
-        organizationId,
-        scope: "PROJECT" as PromptScope,
+        configData: {
+          name: idOrHandle,
+          handle: idOrHandle,
+          projectId,
+          organizationId,
+          scope: "PROJECT" as PromptScope,
+        },
       });
 
       // Create a new version with the local content
