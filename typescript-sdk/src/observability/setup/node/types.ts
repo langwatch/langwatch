@@ -1,7 +1,7 @@
 import { Logger } from "../../../logger";
 import { AttributeValue } from "@opentelemetry/api";
 import { Instrumentation } from "@opentelemetry/instrumentation";
-import { SpanProcessor } from "@opentelemetry/sdk-trace-base";
+import { SpanExporter, SpanProcessor } from "@opentelemetry/sdk-trace-base";
 import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-http";
 import { ContextManager, TextMapPropagator } from "@opentelemetry/api";
 import { LogRecordProcessor } from "@opentelemetry/sdk-logs";
@@ -185,7 +185,7 @@ export interface SetupObservabilityOptions {
    * })
    * ```
    */
-  traceExporter?: OTLPTraceExporter;
+  traceExporter?: SpanExporter;
 
   /**
    * Whether to automatically detect and configure resources.
