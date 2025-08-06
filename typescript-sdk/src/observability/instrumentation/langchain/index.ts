@@ -545,13 +545,17 @@ const convertFromLangChainMessage = (
   const content =
     typeof message.content === "string"
       ? message.content
-      : message.content.map((content: any) =>
+      : message.content == null
+      ? ""
+      : Array.isArray(message.content)
+      ? message.content.map((content: any) =>
           content.type === "text"
             ? { type: "text", text: content.text }
             : content.type == "image_url"
             ? { type: "image_url", image_url: content.image_url }
             : { type: "text", text: JSON.stringify(content) },
-        );
+        )
+      : JSON.stringify(message.content);
   const functionCall = message.additional_kwargs as any;
   return {
     role,
@@ -588,9 +592,10 @@ function wrapNonScalarValues(value: unknown): string | number | boolean | undefi
       value: value as object,
     });
   } catch (e) {
+    // Handle circular references and other serialization errors
     return JSON.stringify({
       type: "raw",
-      value: value as any,
+      value: "[Circular Reference or Non-Serializable Object]",
     });
   }
 }
