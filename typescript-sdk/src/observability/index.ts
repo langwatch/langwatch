@@ -1,5 +1,6 @@
 export { getLangWatchTracer, getLangWatchTracerFromProvider } from "./tracer";
 export { createLangWatchSpan } from "./span";
+export { getLangWatchLogger, getLangWatchLoggerFromProvider, createLangWatchLogger } from "./logger";
 export { FilterableBatchSpanProcessor, type SpanProcessingExcludeRule } from "./processors";
 export { LangWatchExporter, type LangWatchExporterOptions } from "./exporters";
 export {

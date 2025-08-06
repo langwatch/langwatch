@@ -8,6 +8,7 @@ import {
 import * as langwatchAttributes from "./semconv/attributes";
 import * as semconvAttributes from "@opentelemetry/semantic-conventions/incubating";
 import * as intSemconv from "./semconv";
+import { Logger, LogRecord } from "@opentelemetry/api-logs";
 
 // Utility type to pull out all values of keys on an object, and only allow types which
 // are strings, while preserving the auto-completion of the keys.
@@ -741,4 +742,28 @@ export interface LangWatchSpan extends Span {
   //  * @returns this
   //  */
   // setOutputEvaluation(guardrail: boolean, output: EvaluationResultModel): this;
+}
+
+/**
+ * Extension of OpenTelemetry's LogRecord with LangWatch and GenAI-specific attributes.
+ */
+export interface LangWatchLogRecord extends LogRecord {
+  /**
+   * Additional attributes to add to the log record.
+   *
+   * @default {}
+   */
+  attributes?: SemconvAttributes;
+}
+
+/**
+ * Extension of OpenTelemetry's Logger with LangWatch and GenAI-specific methods.
+ */
+export interface LangWatchLogger extends Logger {
+  /**
+   * Emit a log record with LangWatch and GenAI-specific attributes.
+   *
+   * @param logRecord - The log record to emit
+   */
+  emit(logRecord: LangWatchLogRecord): void;
 }
