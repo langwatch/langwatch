@@ -73,7 +73,6 @@ app.post(
     })
   ),
   async (c) => {
-    console.log("HIIIIII");
     const service = c.get("promptService");
     const project = c.get("project");
     const organization = c.get("organization");
@@ -115,6 +114,7 @@ app.post(
       if (error.code === "P2002" && error.meta?.target?.includes("handle")) {
         throw new HTTPException(409, {
           message: `Prompt handle already exists for ${data.scope as string}`,
+          cause: error,
         });
       }
 

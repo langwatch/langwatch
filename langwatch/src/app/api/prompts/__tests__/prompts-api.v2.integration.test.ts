@@ -63,7 +63,7 @@ describe("Prompts API V2", () => {
   // Authentication tests
   describe("Authentication", () => {
     it("should return 401 with invalid API key", async () => {
-      const res = await app.request(`/api/prompts`, {
+      const res = await app.request(`/api/prompts/v2`, {
         headers: { "X-Auth-Token": "invalid-key" },
       });
 
@@ -75,7 +75,7 @@ describe("Prompts API V2", () => {
 
   // POST endpoints tests
   describe("POST endpoints", () => {
-    it.only("should create a new prompt", async () => {
+    it("should create a new prompt", async () => {
       const res = await app.request(`/api/prompts/v2`, {
         method: "POST",
         headers: {

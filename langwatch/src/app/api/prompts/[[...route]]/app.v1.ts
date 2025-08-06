@@ -3,7 +3,6 @@ import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { describeRoute } from "hono-openapi";
 import { validator as zValidator, resolver } from "hono-openapi/zod";
-import { Prompt } from "next/font/google";
 import { z } from "zod";
 
 import { prisma } from "~/server/db";
@@ -516,7 +515,12 @@ app.post(
 
 // Helper function to transform config to promptOutputSchema format
 const transformConfigToPromptOutput = (
-  config: any,
+  config: Awaited<
+    ReturnType<
+      typeof PromptService.prototype.repository.getAllWithLatestVersion
+    >
+  >[0],
+
   id: string
 ): z.infer<typeof promptOutputSchema> => {
   return {
@@ -532,13 +536,33 @@ const transformConfigToPromptOutput = (
     updatedAt: config.updatedAt,
     projectId: config.projectId,
     organizationId: config.organizationId,
-    messages: [
-      {
-        role: "system",
-        content: config.latestVersion.configData.prompt,
-      },
-      ...config.latestVersion.configData.messages,
-    ],
+    messages: buildMessages(config),
     response_format: getOutputsToResponseFormat(config),
   };
 };
+
+/**
+ * Build messages array from config data.
+ *
+ * While there shouldn't be a case where both a prompt and a system message are provided,
+ * this should have been addressed on ingestion, and this isn't the place to handle it.
+ */
+function buildMessages(
+  config: Awaited<
+    ReturnType<
+      typeof PromptService.prototype.repository.getAllWithLatestVersion
+    >
+  >[0]
+): z.infer<typeof promptOutputSchema>["messages"] {
+  const { prompt } = config.latestVersion.configData;
+  const messages = [...config.latestVersion.configData.messages];
+
+  if (prompt) {
+    messages.unshift({
+      role: "system",
+      content: prompt,
+    });
+  }
+
+  return messages;
+}
