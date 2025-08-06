@@ -6,5 +6,10 @@ export default defineConfig({
     hookTimeout: 30_000,
     setupFiles: ["dotenv/config"],
     environment: "node",
+    include: [
+      '**/*.unit.test.ts',
+      '**/*.integration.test.ts',
+      '**/*.e2e.test.ts',
+    ],
   },
 });
