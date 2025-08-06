@@ -23,10 +23,7 @@ import { getLangWatchTracer } from "../../tracer";
 import type { LangWatchSpan } from "../../types";
 import { context, trace, SpanStatusCode, Attributes } from "@opentelemetry/api";
 import { chatMessageSchema } from "../../../internal/generated/types/tracer.generated";
-import {
-  getObservabilityConfigSuppressInputCapture,
-  getObservabilityConfigSuppressOutputCapture,
-} from "../../setup/config";
+import { shouldCaptureInput, shouldCaptureOutput } from "../../config";
 import * as intSemconv from "../../semconv";
 import { z } from "zod";
 
@@ -70,7 +67,7 @@ export class LangWatchCallbackHandler extends BaseCallbackHandler {
 
     span.setType("llm");
 
-    if (!getObservabilityConfigSuppressInputCapture()) {
+    if (shouldCaptureInput()) {
       span.setInput(prompts);
     }
 
@@ -124,7 +121,7 @@ export class LangWatchCallbackHandler extends BaseCallbackHandler {
 
     span.setType("llm");
 
-    if (!getObservabilityConfigSuppressInputCapture()) {
+    if (shouldCaptureInput()) {
       span.setInput(messages.flatMap(convertFromLangChainMessages));
     }
 
@@ -184,7 +181,7 @@ export class LangWatchCallbackHandler extends BaseCallbackHandler {
     }
     const output = outputs.length === 1 ? outputs[0] : outputs;
 
-    if (!getObservabilityConfigSuppressOutputCapture()) {
+    if (shouldCaptureOutput()) {
       span.setOutput(output);
     }
 
@@ -227,7 +224,7 @@ export class LangWatchCallbackHandler extends BaseCallbackHandler {
     );
     span.setType("chain");
 
-    if (!getObservabilityConfigSuppressInputCapture()) {
+    if (shouldCaptureInput()) {
       span.setInput(inputs);
     }
 
@@ -300,7 +297,7 @@ export class LangWatchCallbackHandler extends BaseCallbackHandler {
     );
     span.setType("tool");
 
-    if (!getObservabilityConfigSuppressInputCapture()) {
+    if (shouldCaptureInput()) {
       span.setInputString(input);
     }
 
@@ -332,7 +329,7 @@ export class LangWatchCallbackHandler extends BaseCallbackHandler {
   ): Promise<void> {
     const span = this.getSpan(runId);
     if (!span) return;
-    if (!getObservabilityConfigSuppressOutputCapture()) {
+    if (shouldCaptureOutput()) {
       span.setOutputString(output);
     }
 
@@ -378,7 +375,7 @@ export class LangWatchCallbackHandler extends BaseCallbackHandler {
     );
     span.setType("rag");
 
-    if (!getObservabilityConfigSuppressInputCapture()) {
+    if (shouldCaptureInput()) {
       span.setInputString(query);
     }
     if (_tags) {
@@ -411,7 +408,7 @@ export class LangWatchCallbackHandler extends BaseCallbackHandler {
   ) {
     const span = this.getSpan(runId);
     if (!span) return;
-    if (!getObservabilityConfigSuppressOutputCapture()) {
+    if (shouldCaptureOutput()) {
       span.setOutput(documents);
     }
 
@@ -421,7 +418,7 @@ export class LangWatchCallbackHandler extends BaseCallbackHandler {
       documents.map((document) => ({
         document_id: document.metadata.id,
         chunk_id: document.metadata.chunk_id,
-        content: !getObservabilityConfigSuppressInputCapture() ? document.pageContent : "",
+        content: shouldCaptureInput() ? document.pageContent : "",
       })),
     );
 
@@ -470,7 +467,7 @@ export class LangWatchCallbackHandler extends BaseCallbackHandler {
 
     addLangChainEvent(span, "handleAgentEnd", runId, _parentRunId, _tags);
 
-    if (!getObservabilityConfigSuppressOutputCapture()) {
+    if (shouldCaptureOutput()) {
       span.setOutput(action.returnValues);
     }
 
