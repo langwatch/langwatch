@@ -63,7 +63,7 @@ describe("setupObservability", () => {
     vi.mocked(isConcreteProvider).mockReturnValue(true);
     const handle = setupObservability(defaultOptions);
     expect(typeof handle.shutdown).toBe("function");
-    expect(handle.shutdown()).resolves.toBeUndefined();
+    await expect(handle.shutdown()).resolves.toBeUndefined();
   });
 
   it("calls createAndStartNodeSdk and returns shutdown", () => {
@@ -242,7 +242,7 @@ describe("data capture configuration", () => {
     it("falls back to 'all' when no context provided to predicate", () => {
       setupObservability({
         ...defaultOptions,
-        dataCapture: () => "input", // Would normally return input only
+        dataCapture: () => "input", // Predicate would return "input" with context; without context falls back to "all"
       });
 
       // Without context, should fall back to default
@@ -822,7 +822,7 @@ describe("error handling in setup", () => {
     const handle = setupObservability(options);
 
     expect(typeof handle.shutdown).toBe("function");
-    expect(handle.shutdown()).resolves.toBeUndefined();
+    await expect(handle.shutdown()).resolves.toBeUndefined();
 
     expect(logger.error).toHaveBeenCalledWith(
       "Failed to initialize NodeSDK: Test error message",

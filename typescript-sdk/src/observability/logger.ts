@@ -1,54 +1,70 @@
-import { Logger, LoggerProvider, NoopLoggerProvider } from "@opentelemetry/api-logs";
-import { EmitOptions, LangWatchLogger, LangWatchLogRecord, LangWatchSpanGenAIAssistantMessageEventBody, LangWatchSpanGenAIChoiceEventBody, LangWatchSpanGenAISystemMessageEventBody, LangWatchSpanGenAIToolMessageEventBody, LangWatchSpanGenAIUserMessageEventBody, SemconvAttributes } from "./types";
+import {
+  AnyValue,
+  Logger,
+  LoggerProvider,
+  NoopLoggerProvider,
+} from "@opentelemetry/api-logs";
+import {
+  EmitOptions,
+  LangWatchLogger,
+  LangWatchLogRecord,
+  LangWatchSpanGenAIAssistantMessageEventBody,
+  LangWatchSpanGenAIChoiceEventBody,
+  LangWatchSpanGenAISystemMessageEventBody,
+  LangWatchSpanGenAIToolMessageEventBody,
+  LangWatchSpanGenAIUserMessageEventBody,
+  SemConvLogRecordAttributes,
+} from "./types";
 import { shouldCaptureOutput } from "./config";
 import * as intSemconv from "./semconv";
 import { context } from "@opentelemetry/api";
 
-// Default to NoOp logger provider to avoid global state issues
 let currentLoggerProvider: LoggerProvider = new NoopLoggerProvider();
+let isProviderSet = false;
 
 /**
- * Set the logger provider for LangWatch logging.
+ * @module observability/logger
+ * @description
+ * Provides LangWatch logger integration with OpenTelemetry, including logger provider management and logger creation utilities.
  *
- * This should be called during observability setup to provide
- * the LangWatch logger provider. If not called, a NoOp logger
- * will be used.
+ * @remarks
+ * This module allows you to set a global logger provider, retrieve LangWatch loggers, and wrap OpenTelemetry loggers with LangWatch-specific functionality.
  *
- * @param loggerProvider - The OpenTelemetry logger provider to use
+ * @see {@link setLangWatchLoggerProvider}
+ * @see {@link getLangWatchLogger}
+ * @see {@link getLangWatchLoggerFromProvider}
+ * @see {@link createLangWatchLogger}
  */
-export function setLangWatchLoggerProvider(loggerProvider: LoggerProvider): void {
+export function setLangWatchLoggerProvider(
+  loggerProvider: LoggerProvider,
+): void {
+  if (isProviderSet) {
+    console.warn(
+      "LangWatch logger provider has already been set. Ignoring subsequent call.",
+    );
+    return;
+  }
   currentLoggerProvider = loggerProvider;
+  isProviderSet = true;
 }
 
 /**
- * Get a LangWatch logger with the given name and version.
+ * Retrieves a LangWatch logger with the specified name and optional version.
  *
- * This function uses the logger provider set during observability setup.
- * If no provider was set, a NoOp logger will be returned.
+ * @param name - The name of the logger (typically your service or module name).
+ * @param version - (Optional) The version of the logger.
+ * @returns A {@link LangWatchLogger} instance.
  *
- * @param name - The name of the logger
- * @param version - The version of the logger
- * @returns A LangWatch logger
+ * @remarks
+ * Uses the logger provider set during observability setup. If no provider is set, returns a NoOp logger.
  *
  * @example
- * ```typescript
- * // Setup observability (this will set the logger provider internally)
- * setupObservability({
- *   apiKey: "your-api-key",
- *   serviceName: "my-service"
- * });
- *
- * // Now you can use the logger anywhere in your app
+ * ```ts
  * const logger = getLangWatchLogger("my-service");
- * logger.info("Hello from LangWatch!");
- *
- * // With version
- * const logger = getLangWatchLogger("my-service", "1.0.0");
- *
- * // If no setup was done, this will use a NoOp logger (no-op)
- * const logger = getLangWatchLogger("my-service");
- * logger.info("This won't be sent anywhere");
+ * logger.info("Service started");
  * ```
+ *
+ * @see {@link setLangWatchLoggerProvider}
  */
 export function getLangWatchLogger(
   name: string,
@@ -58,21 +74,20 @@ export function getLangWatchLogger(
 }
 
 /**
- * Get a LangWatch logger from a specific OpenTelemetry logger provider.
+ * Retrieves a LangWatch logger from a specific OpenTelemetry logger provider.
  *
- * This function is useful when you want to use a specific logger provider
- * instead of the one set during setup.
+ * @param loggerProvider - The OpenTelemetry logger provider to use.
+ * @param name - The name of the logger.
+ * @param version - (Optional) The version of the logger.
+ * @returns A {@link LangWatchLogger} instance.
  *
- * @param loggerProvider - The OpenTelemetry logger provider to use
- * @param name - The name of the logger
- * @param version - The version of the logger
- * @returns A LangWatch logger
+ * @remarks
+ * Use this function if you want to use a custom logger provider instead of the global one.
  *
  * @example
- * ```typescript
- * // With your own provider
- * const customProvider = new LoggerProvider({...});
- * const logger = getLangWatchLoggerFromProvider(customProvider, "my-service");
+ * ```ts
+ * const customProvider = new LoggerProvider();
+ * const logger = getLangWatchLoggerFromProvider(customProvider, "custom-service");
  * ```
  */
 export function getLangWatchLoggerFromProvider(
@@ -84,22 +99,32 @@ export function getLangWatchLoggerFromProvider(
 }
 
 /**
- * Create a LangWatch logger from an OpenTelemetry logger.
+ * Wraps an OpenTelemetry logger as a LangWatch logger.
  *
- * @param logger - The OpenTelemetry logger to wrap
- * @returns A LangWatch logger
+ * @param logger - The OpenTelemetry logger to wrap.
+ * @returns A {@link LangWatchLogger} instance.
+ *
+ * @example
+ * ```ts
+ * import { Logger } from "@opentelemetry/api-logs";
+ * const otelLogger = new Logger();
+ * const lwLogger = createLangWatchLogger(otelLogger);
+ * lwLogger.info("Wrapped logger");
+ * ```
  */
 export function createLangWatchLogger(logger: Logger): LangWatchLogger {
   return new LangWatchLoggerInternal(logger);
 }
 
 /**
- * Internal implementation of LangWatchLogger.
+ * Internal implementation of {@link LangWatchLogger}.
  *
- * This class wraps an OpenTelemetry logger and adds LangWatch-specific functionality.
+ * @remarks
+ * This class wraps an OpenTelemetry logger and adds LangWatch-specific functionality for structured logging and event emission.
+ * Not intended for direct use; use {@link getLangWatchLogger} or {@link createLangWatchLogger} instead.
  */
 export class LangWatchLoggerInternal implements LangWatchLogger {
-  constructor(private logger: Logger) { }
+  constructor(private logger: Logger) {}
 
   emit(logRecord: LangWatchLogRecord, options?: EmitOptions): void {
     // Handle output capture configuration
@@ -119,104 +144,108 @@ export class LangWatchLoggerInternal implements LangWatchLogger {
   emitGenAISystemMessageEvent(
     body: LangWatchSpanGenAISystemMessageEventBody,
     system?: intSemconv.VAL_GEN_AI_SYSTEMS | (string & {}),
-    attributes?: SemconvAttributes,
+    attributes?: SemConvLogRecordAttributes,
   ): void {
     if (body.role === void 0) {
       body.role = "system";
     }
 
-    this.emit({
-      eventName: intSemconv.LOG_EVNT_GEN_AI_SYSTEM_MESSAGE,
-      context: context.active(),
-      attributes: {
+    this.emitGenAIEvent(
+      intSemconv.LOG_EVNT_GEN_AI_SYSTEM_MESSAGE,
+      { ...body },
+      {
         ...attributes,
         "gen_ai.system": system,
       },
-      body: shouldCaptureOutput() ? { ...body } : void 0,
-      observedTimestamp: new Date().getTime(),
-    });
+    );
   }
 
   emitGenAIUserMessageEvent(
     body: LangWatchSpanGenAIUserMessageEventBody,
     system?: intSemconv.VAL_GEN_AI_SYSTEMS | (string & {}),
-    attributes?: SemconvAttributes,
+    attributes?: SemConvLogRecordAttributes,
   ) {
     if (body.role === void 0) {
       body.role = "user";
     }
 
-    this.emit({
-      eventName: intSemconv.LOG_EVNT_GEN_AI_USER_MESSAGE,
-      context: context.active(),
-      attributes: {
+    this.emitGenAIEvent(
+      intSemconv.LOG_EVNT_GEN_AI_USER_MESSAGE,
+      { ...body },
+      {
         ...attributes,
         "gen_ai.system": system,
       },
-      body: shouldCaptureOutput() ? { ...body } : void 0,
-      observedTimestamp: new Date().getTime(),
-    });
+    );
   }
 
   emitGenAIAssistantMessageEvent(
     body: LangWatchSpanGenAIAssistantMessageEventBody,
     system?: intSemconv.VAL_GEN_AI_SYSTEMS | (string & {}),
-    attributes?: SemconvAttributes,
+    attributes?: SemConvLogRecordAttributes,
   ) {
     if (body.role === void 0) {
       body.role = "assistant";
     }
 
-    this.emit({
-      eventName: intSemconv.LOG_EVNT_GEN_AI_ASSISTANT_MESSAGE,
-      context: context.active(),
-      attributes: {
+    this.emitGenAIEvent(
+      intSemconv.LOG_EVNT_GEN_AI_ASSISTANT_MESSAGE,
+      { ...body },
+      {
         ...attributes,
         "gen_ai.system": system,
       },
-      body: shouldCaptureOutput() ? { ...body } : void 0,
-      observedTimestamp: new Date().getTime(),
-    });
+    );
   }
 
   emitGenAIToolMessageEvent(
     body: LangWatchSpanGenAIToolMessageEventBody,
     system?: intSemconv.VAL_GEN_AI_SYSTEMS | (string & {}),
-    attributes?: SemconvAttributes,
+    attributes?: SemConvLogRecordAttributes,
   ) {
     if (body.role === void 0) {
       body.role = "tool";
     }
 
-    this.emit({
-      eventName: intSemconv.LOG_EVNT_GEN_AI_TOOL_MESSAGE,
-      context: context.active(),
-      attributes: {
+    this.emitGenAIEvent(
+      intSemconv.LOG_EVNT_GEN_AI_TOOL_MESSAGE,
+      { ...body },
+      {
         ...attributes,
         "gen_ai.system": system,
       },
-      body: shouldCaptureOutput() ? { ...body } : void 0,
-      observedTimestamp: new Date().getTime(),
-    });
+    );
   }
 
   emitGenAIChoiceEvent(
     body: LangWatchSpanGenAIChoiceEventBody,
     system?: intSemconv.VAL_GEN_AI_SYSTEMS | (string & {}),
-    attributes?: SemconvAttributes,
+    attributes?: SemConvLogRecordAttributes,
   ) {
     if (body.message && body.message.role === void 0) {
       body.message.role = "assistant";
     }
 
-    this.emit({
-      eventName: intSemconv.LOG_EVNT_GEN_AI_CHOICE,
-      context: context.active(),
-      attributes: {
+    this.emitGenAIEvent(
+      intSemconv.LOG_EVNT_GEN_AI_CHOICE,
+      { ...body },
+      {
         ...attributes,
         "gen_ai.system": system,
       },
-      body: shouldCaptureOutput() ? { ...body } : void 0,
+    );
+  }
+
+  private emitGenAIEvent(
+    eventName: string,
+    body: AnyValue,
+    attributes?: SemConvLogRecordAttributes,
+  ): void {
+    this.emit({
+      eventName,
+      context: context.active(),
+      attributes: { ...attributes },
+      body: shouldCaptureOutput() ? body : void 0,
       observedTimestamp: new Date().getTime(),
     });
   }

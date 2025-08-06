@@ -44,8 +44,8 @@ export function getConcreteProvider(provider: unknown): unknown | undefined {
   if (!provider || typeof provider !== "object") return undefined;
 
   // Check provider itself
-  const ctorName = (provider as any).constructor?.name;
-  if (["NodeTracerProvider", "BasicTracerProvider"].includes(ctorName)) {
+  const constructorName = (provider as any).constructor?.name;
+  if (["NodeTracerProvider", "BasicTracerProvider"].includes(constructorName)) {
     return provider;
   }
   if (typeof (provider as any).addSpanProcessor === "function") {
@@ -61,8 +61,8 @@ export function getConcreteProvider(provider: unknown): unknown | undefined {
   }
 
   if (delegate && typeof delegate === "object") {
-    const delegateCtorName = delegate.constructor?.name;
-    if (["NodeTracerProvider", "BasicTracerProvider"].includes(delegateCtorName)) {
+    const delegateConstructorName = delegate.constructor?.name;
+    if (["NodeTracerProvider", "BasicTracerProvider"].includes(delegateConstructorName)) {
       return delegate;
     }
     if (typeof delegate.addSpanProcessor === "function") {
@@ -70,7 +70,7 @@ export function getConcreteProvider(provider: unknown): unknown | undefined {
     }
   }
 
-  return undefined;
+  return void 0;
 }
 
 /**

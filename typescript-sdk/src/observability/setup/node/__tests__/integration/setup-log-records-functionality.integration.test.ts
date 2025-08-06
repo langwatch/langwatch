@@ -1,16 +1,33 @@
 import { describe, it, expect, vi } from 'vitest';
 import { setupObservability } from '../../setup';
 import { logs } from '@opentelemetry/api-logs';
+import { LogRecordProcessor, SdkLogRecord } from "@opentelemetry/sdk-logs";
+import { getLangWatchLogger } from '../../../../logger';
 
 // Integration tests for log records functionality in setupObservability
 function createMockLogger() {
   return { error: vi.fn(), debug: vi.fn(), info: vi.fn(), warn: vi.fn() };
 }
 
+// Mock LogRecordProcessor to capture emitted log records
+class MockLogRecordProcessor implements LogRecordProcessor {
+  public records: SdkLogRecord[] = [];
+  onEmit(record: SdkLogRecord): void {
+    this.records.push(record);
+  }
+  forceFlush(): Promise<void> {
+    return Promise.resolve();
+  }
+  shutdown(): Promise<void> {
+    return Promise.resolve();
+  }
+}
+
 describe('setupObservability Integration - Log Records Functionality', () => {
-  it('should create log records with correct attributes', () => {
+  it('should create log records with correct attributes', async () => {
     const logger = createMockLogger();
-    setupObservability({ apiKey: 'test-key', logger });
+    const mockProcessor = new MockLogRecordProcessor();
+    setupObservability({ apiKey: 'test-key', logger, logRecordProcessors: [mockProcessor] });
 
     const loggerProvider = logs.getLoggerProvider();
     const logRecordLogger = loggerProvider.getLogger('test-logger');
@@ -27,13 +44,27 @@ describe('setupObservability Integration - Log Records Functionality', () => {
       },
     });
 
-    // No assertion possible on log record here, but no error means success
-    expect(logRecordLogger).toBeDefined();
+    await mockProcessor.forceFlush();
+    expect(mockProcessor.records.length).toBe(1);
+    const record = mockProcessor.records[0];
+    if (!record) {
+      throw new Error('No record found');
+    }
+    if (!record.attributes) {
+      throw new Error('No attributes found');
+    }
+    expect(record.severityText).toBe('INFO');
+    expect(record.severityNumber).toBe(9);
+    expect(record.body).toBe('Test log message');
+    expect(record.attributes["log.source"]).toBe('test-integration');
+    expect(record.attributes["log.category"]).toBe('test');
+    expect(record.attributes["user.id"]).toBe('12345');
   });
 
-  it('should handle different log severity levels', () => {
+  it('should handle different log severity levels', async () => {
     const logger = createMockLogger();
-    setupObservability({ apiKey: 'test-key', logger });
+    const mockProcessor = new MockLogRecordProcessor();
+    setupObservability({ apiKey: 'test-key', logger, logRecordProcessors: [mockProcessor] });
 
     const loggerProvider = logs.getLoggerProvider();
     const logRecordLogger = loggerProvider.getLogger('severity-test');
@@ -60,16 +91,31 @@ describe('setupObservability Integration - Log Records Functionality', () => {
       });
     }
 
-    // Verify logger was created successfully
-    expect(logRecordLogger).toBeDefined();
+    await mockProcessor.forceFlush();
+    expect(mockProcessor.records.length).toBe(severityLevels.length);
+    for (let i = 0; i < severityLevels.length; i++) {
+      const record = mockProcessor.records[i];
+      if (!record) {
+        throw new Error('No record found');
+      }
+      if (!record.attributes) {
+        throw new Error('No attributes found');
+      }
+      expect(record).toBeDefined();
+      expect(record.severityText).toBe(severityLevels[i]?.text);
+      expect(record.severityNumber).toBe(severityLevels[i]?.number);
+      expect(record.body).toBe(`Test ${severityLevels[i]?.text} message`);
+      expect(record.attributes["log.level"]).toBe(severityLevels[i]?.text);
+      expect(record.attributes["test.severity"]).toBe(severityLevels[i]?.number);
+    }
   });
 
-  it('should handle log records with complex attributes', () => {
+  it('should handle log records with complex attributes', async () => {
     const logger = createMockLogger();
-    setupObservability({ apiKey: 'test-key', logger });
+    const mockProcessor = new MockLogRecordProcessor();
+    setupObservability({ apiKey: 'test-key', logger, logRecordProcessors: [mockProcessor] });
 
-    const loggerProvider = logs.getLoggerProvider();
-    const logRecordLogger = loggerProvider.getLogger('complex-attributes');
+    const logRecordLogger = getLangWatchLogger('complex-attributes');
 
     // Create a log record with complex attributes
     logRecordLogger.emit({
@@ -82,20 +128,38 @@ describe('setupObservability Integration - Log Records Functionality', () => {
         'boolean.attr': true,
         'array.attr': ['item1', 'item2', 'item3'],
         'object.attr': { key1: 'value1', key2: 'value2' },
-        'null.attr': null,
+        'null.attr': undefined,
         'undefined.attr': undefined,
       },
     });
 
-    expect(logRecordLogger).toBeDefined();
+    await mockProcessor.forceFlush();
+    expect(mockProcessor.records.length).toBe(1);
+    const record = mockProcessor.records[0];
+    if (!record) {
+      throw new Error('No record found');
+    }
+    expect(record.severityText).toBe('INFO');
+    expect(record.severityNumber).toBe(9);
+    expect(record.body).toBe('Complex attribute test');
+
+    if (!record.attributes) {
+      throw new Error('No attributes found');
+    }
+    expect(record.attributes["string.attr"]).toBe('string value');
+    expect(record.attributes["number.attr"]).toBe(42);
+    expect(record.attributes["boolean.attr"]).toBe(true);
+    expect(record.attributes["array.attr"]).toEqual(['item1', 'item2', 'item3']);
+    expect(record.attributes["object.attr"]).toEqual({ key1: 'value1', key2: 'value2' });
+    expect(record.attributes["null.attr"]).toBeNull();
+    expect(record.attributes["undefined.attr"]).toBeUndefined();
   });
 
   it('should handle log records with timestamps', () => {
     const logger = createMockLogger();
     setupObservability({ apiKey: 'test-key', logger });
 
-    const loggerProvider = logs.getLoggerProvider();
-    const logRecordLogger = loggerProvider.getLogger('timestamp-test');
+    const logRecordLogger = getLangWatchLogger('timestamp-test');
 
     const now = Date.now();
     const timestamp = new Date(now);
@@ -221,12 +285,12 @@ describe('setupObservability Integration - Log Records Functionality', () => {
     expect(logRecordLogger).toBeDefined();
   });
 
-    it('should handle log records with custom log record processors', () => {
+    it('should handle log records with custom log record processors', async () => {
     const logger = createMockLogger();
     const customProcessor = {
       onEmit: vi.fn(),
       shutdown: vi.fn(),
-      forceFlush: vi.fn(),
+      forceFlush: vi.fn().mockResolvedValue(undefined),
     };
 
     setupObservability({
@@ -235,10 +299,9 @@ describe('setupObservability Integration - Log Records Functionality', () => {
       logRecordProcessors: [customProcessor]
     });
 
-    const loggerProvider = logs.getLoggerProvider();
-    const logRecordLogger = loggerProvider.getLogger('custom-processor-test');
+    const logRecordLogger = getLangWatchLogger('custom-processor-test');
 
-    logRecordLogger.emit({
+    const logRecord = {
       severityText: 'INFO',
       severityNumber: 9,
       body: 'Custom processor test message',
@@ -246,20 +309,28 @@ describe('setupObservability Integration - Log Records Functionality', () => {
         'custom.processor': true,
         'test.feature': 'custom-processors',
       },
-    });
+    };
 
-    expect(logRecordLogger).toBeDefined();
-    // The custom processor should have been added to the setup
-    // Note: The actual onEmit call might not happen immediately due to batching
-    expect(customProcessor).toBeDefined();
+    logRecordLogger.emit(logRecord);
+    await customProcessor.forceFlush();
+    await vi.waitFor(() => {
+      expect(customProcessor.onEmit).toHaveBeenCalledWith(expect.objectContaining({
+        severityText: 'INFO',
+        severityNumber: 9,
+        body: 'Custom processor test message',
+        attributes: expect.objectContaining({
+          'custom.processor': true,
+          'test.feature': 'custom-processors',
+        })
+      }));
+    });
   });
 
   it('should handle log records with error conditions', () => {
     const logger = createMockLogger();
     setupObservability({ apiKey: 'test-key', logger });
 
-    const loggerProvider = logs.getLoggerProvider();
-    const logRecordLogger = loggerProvider.getLogger('error-test');
+    const logRecordLogger = getLangWatchLogger("error-test")
 
     // Test error log records
     logRecordLogger.emit({

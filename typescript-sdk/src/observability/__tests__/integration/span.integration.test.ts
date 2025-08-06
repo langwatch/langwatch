@@ -8,7 +8,7 @@ import { getLangWatchTracer } from "../../tracer";
 import { createLangWatchSpan } from "../../span";
 import { NoOpLogger } from "../../../logger";
 import * as semconv from "../../semconv";
-import { trace } from "@opentelemetry/api";
+import { SpanStatusCode, trace } from "@opentelemetry/api";
 
 /**
  * Integration tests for LangWatch spans with real OpenTelemetry setup.
@@ -619,15 +619,15 @@ describe("Span Integration Tests", () => {
         .setAttribute("test.phase", "initial");
 
       // Test multiple status updates (should be allowed)
-      langwatchSpan.setStatus({ code: 1 }); // OK
+      langwatchSpan.setStatus({ code: SpanStatusCode.OK }); // OK
       langwatchSpan.setAttribute("test.phase", "ok-status");
 
       // Update to error status
-      langwatchSpan.setStatus({ code: 2, message: "Test error" }); // ERROR
+      langwatchSpan.setStatus({ code: SpanStatusCode.ERROR, message: "Test error" }); // ERROR
       langwatchSpan.setAttribute("test.phase", "error-status");
 
       // Back to OK (should be allowed)
-      langwatchSpan.setStatus({ code: 1 });
+      langwatchSpan.setStatus({ code: SpanStatusCode.OK });
       langwatchSpan.setAttribute("test.phase", "final");
 
       langwatchSpan.setOutput("Status transitions completed");
@@ -650,7 +650,7 @@ describe("Span Integration Tests", () => {
       }
 
       // Should have final OK status
-      expect(exportedSpan.status.code).toBe(1); // OK
+      expect(exportedSpan.status.code).toBe(SpanStatusCode.OK); // OK
       expect(exportedSpan.attributes["test.phase"]).toBe("final");
 
       // Attributes set after end() should not be present

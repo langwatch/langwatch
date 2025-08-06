@@ -10,7 +10,7 @@ import { ViewOptions } from "@opentelemetry/sdk-metrics";
 import { Resource, ResourceDetector } from "@opentelemetry/resources";
 import { Sampler, SpanLimits } from "@opentelemetry/sdk-trace-base";
 import { IdGenerator } from "@opentelemetry/sdk-trace-base";
-import { SemconvAttributes } from "../../types";
+import { SemConvAttributes } from "../../types";
 import { DataCaptureOptions } from "../../features/data-capture/types";
 
 /**
@@ -79,7 +79,7 @@ export interface SetupObservabilityOptions {
    * }
    * ```
    */
-  attributes?: SemconvAttributes;
+  attributes?: SemConvAttributes;
 
   /**
    * Configuration for automatic data capture.

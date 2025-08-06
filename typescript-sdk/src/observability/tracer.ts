@@ -132,28 +132,29 @@ export function getLangWatchTracerFromProvider(
       switch (prop) {
         case "startActiveSpan":
           return (...args: any[]) => {
-            const { name, options, context, fn } = normalizeSpanArgs(args);
+            const spanArgs = normalizeSpanArgs(args);
+
             const wrappedFn = (span: Span, ...cbArgs: any[]) =>
-              fn(createLangWatchSpan(span), ...cbArgs);
+              spanArgs.fn(createLangWatchSpan(span), ...cbArgs);
 
-            if (context !== void 0)
-              return target.startActiveSpan(name, options, context, wrappedFn);
+            if (spanArgs.context !== void 0)
+              return target.startActiveSpan(spanArgs.name, spanArgs.options, spanArgs.context, wrappedFn);
 
-            if (options !== void 0)
-              return target.startActiveSpan(name, options, wrappedFn);
+            if (spanArgs.options !== void 0)
+              return target.startActiveSpan(spanArgs.name, spanArgs.options, wrappedFn);
 
-            return target.startActiveSpan(name, wrappedFn);
+            return target.startActiveSpan(spanArgs.name, wrappedFn);
           };
 
         case "withActiveSpan":
           return (...args: any[]) => {
-            const { name, options, context, fn } = normalizeSpanArgs(args);
+            const spanArgs = normalizeSpanArgs(args);
 
             const cb = (span: Span) => {
               const wrappedSpan = createLangWatchSpan(span);
 
               try {
-                const result = fn(wrappedSpan);
+                const result = spanArgs.fn(wrappedSpan);
 
                 // If result is a promise, handle it async
                 if (result && typeof result.then === "function") {
@@ -195,22 +196,23 @@ export function getLangWatchTracerFromProvider(
             };
 
             // Call target.startActiveSpan to avoid double-wrapping
-            if (context !== void 0)
-              return target.startActiveSpan(name, options, context, cb);
-            if (options !== void 0)
-              return target.startActiveSpan(name, options, cb);
+            if (spanArgs.context !== void 0)
+              return target.startActiveSpan(spanArgs.name, spanArgs.options, spanArgs.context, cb);
+            if (spanArgs.options !== void 0)
+              return target.startActiveSpan(spanArgs.name, spanArgs.options, cb);
 
-            return target.startActiveSpan(name, cb);
+            return target.startActiveSpan(spanArgs.name, cb);
           };
 
         case "startSpan":
           return (name: string, options?: SpanOptions, context?: Context) =>
             createLangWatchSpan(target.startSpan(name, options, context));
 
-        default:
+        default: {
           const value = (target as any)[prop];
 
           return typeof value === "function" ? value.bind(target) : value;
+        }
       }
     },
   };
@@ -219,11 +221,25 @@ export function getLangWatchTracerFromProvider(
   return proxyInstance;
 }
 
+/**
+ * Normalizes the variable arguments passed to span methods.
+ * Handles the following overloaded signatures:
+ * - (name, fn)
+ * - (name, options, fn)
+ * - (name, options, context, fn)
+ *
+ * @param args - The arguments array from the span method
+ * @returns An object with normalized name, options, context, and fn properties
+ * @throws Error if no callback function is found in the arguments
+ */
 function normalizeSpanArgs(args: any[]) {
   const [name, arg2, arg3, arg4] = args;
+
   if (typeof arg4 === "function")
     return { name, options: arg2, context: arg3, fn: arg4 };
+
   if (typeof arg3 === "function") return { name, options: arg2, fn: arg3 };
   if (typeof arg2 === "function") return { name, fn: arg2 };
+
   throw new Error("Expected a span callback as the last argument");
 }

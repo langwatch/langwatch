@@ -598,20 +598,22 @@ describe("Logger Integration Tests", () => {
     it("should handle concurrent log record creation efficiently", async () => {
       const logger = getLangWatchLogger("concurrent-test-logger-19");
 
-      const concurrentOperations = Array.from({ length: 10 }, (_, i) => {
-        const logRecord: LangWatchLogRecord = {
-          severityText: "INFO",
-          severityNumber: 9,
-          body: `Concurrent log message ${i}`,
-          attributes: {
-            "operation.index": i,
-            "concurrent.test": true,
-          },
-        };
+      const concurrentOperations = await Promise.all(
+        Array.from({ length: 10 }, async (_, i) => {
+          const logRecord: LangWatchLogRecord = {
+            severityText: "INFO",
+            severityNumber: 9,
+            body: `Concurrent log message ${i}`,
+            attributes: {
+              "operation.index": i,
+              "concurrent.test": true,
+            },
+          };
 
-        logger.emit(logRecord);
-        return i;
-      });
+          logger.emit(logRecord);
+          return i;
+        })
+      );
 
       expect(concurrentOperations).toEqual([0, 1, 2, 3, 4, 5, 6, 7, 8, 9]);
 

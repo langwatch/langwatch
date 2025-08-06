@@ -8,7 +8,7 @@ import {
 import * as langwatchAttributes from "./semconv/attributes";
 import * as semconvAttributes from "@opentelemetry/semantic-conventions/incubating";
 import * as intSemconv from "./semconv";
-import { Logger, LogRecord } from "@opentelemetry/api-logs";
+import { AnyValue, Logger, LogRecord } from "@opentelemetry/api-logs";
 
 // Utility type to pull out all values of keys on an object, and only allow types which
 // are strings, while preserving the auto-completion of the keys.
@@ -34,7 +34,7 @@ type OnlyStringValues<T> = {
  * };
  * ```
  */
-export type AttributeKey =
+export type SemConvAttributeKey =
   | OnlyStringValues<typeof semconvAttributes>
   | OnlyStringValues<typeof langwatchAttributes>
   | (string & {});
@@ -47,7 +47,7 @@ export type AttributeKey =
  *
  * @example
  * ```typescript
- * const spanAttributes: SemconvAttributes = {
+ * const spanAttributes: SemConvAttributes = {
  *   "service.name": "my-service",
  *   "service.version": "1.0.0",
  *   "langwatch.span.type": "llm",
@@ -55,10 +55,41 @@ export type AttributeKey =
  * };
  * ```
  */
-export type SemconvAttributes = Partial<Record<AttributeKey, AttributeValue>>;
+export type SemConvAttributes = Partial<Record<SemConvAttributeKey, AttributeValue>>;
 
+/**
+ * Record type representing log record attributes with semantic convention keys.
+ *
+ * This type ensures type safety when setting attributes on log records while
+ * allowing both standard OpenTelemetry semantic conventions and custom attributes.
+ *
+ * @example
+ * ```typescript
+ * const logRecordAttributes: SemConvLogRecordAttributes = {
+ *   "log.level": "INFO",
+ *   "log.source": "my-service",
+ *   "log.category": "test",
+ *   "user.id": "12345",
+ *   "string.attr": "string value",
+ *   "number.attr": 42,
+ *   "boolean.attr": true,
+ *   "array.attr": ["item1", "item2", "item3"],
+ *   "object.attr": { key1: "value1", key2: "value2" },
+ *   "null.attr": null,
+ *   "undefined.attr": undefined
+ * };
+ * ```
+ */
+export type SemConvLogRecordAttributes = Partial<Record<SemConvAttributeKey, AnyValue>>;
+
+/**
+ * Options for creating a LangWatch span.
+ *
+ * @param attributes - Additional attributes to add to the span.
+ */
 export interface LangWatchSpanOptions extends SpanOptions {
-  attributes?: SemconvAttributes;
+  /** Additional attributes to add to the span. */
+  attributes?: SemConvAttributes;
 }
 
 /**
@@ -545,7 +576,7 @@ export interface LangWatchSpan extends Span {
    * @param attributes - The attributes object
    * @returns this
    */
-  setAttributes(attributes: SemconvAttributes): this;
+  setAttributes(attributes: SemConvAttributes): this;
 
   /**
    * Set a single attribute for the span.
@@ -554,7 +585,7 @@ export interface LangWatchSpan extends Span {
    * @param value - The attribute value
    * @returns this
    */
-  setAttribute(key: keyof SemconvAttributes, value: AttributeValue): this;
+  setAttribute(key: keyof SemConvAttributes, value: AttributeValue): this;
 
   /**
    * Set the type of the span (e.g., 'llm', 'rag', 'tool', etc).
@@ -677,7 +708,7 @@ export interface LangWatchLogRecord extends LogRecord {
    *
    * @default {}
    */
-  attributes?: SemconvAttributes;
+  attributes?: SemConvLogRecordAttributes;
 }
 
 /**
@@ -721,7 +752,7 @@ export interface LangWatchLogger extends Logger {
   emitGenAISystemMessageEvent(
     body: LangWatchSpanGenAISystemMessageEventBody,
     system?: intSemconv.VAL_GEN_AI_SYSTEMS | (string & {}),
-    attributes?: SemconvAttributes,
+    attributes?: SemConvAttributes,
   ): void;
   /**
    * Emit a GenAI user message event to the logger.
@@ -736,7 +767,7 @@ export interface LangWatchLogger extends Logger {
   emitGenAIUserMessageEvent(
     body: LangWatchSpanGenAIUserMessageEventBody,
     system?: intSemconv.VAL_GEN_AI_SYSTEMS | (string & {}),
-    attributes?: SemconvAttributes,
+    attributes?: SemConvAttributes,
   ): void;
   /**
    * Emit a GenAI assistant message event to the logger.
@@ -751,7 +782,7 @@ export interface LangWatchLogger extends Logger {
   emitGenAIAssistantMessageEvent(
     body: LangWatchSpanGenAIAssistantMessageEventBody,
     system?: intSemconv.VAL_GEN_AI_SYSTEMS | (string & {}),
-    attributes?: SemconvAttributes,
+    attributes?: SemConvAttributes,
   ): void;
   /**
    * Emit a GenAI tool message event to the logger.
@@ -766,7 +797,7 @@ export interface LangWatchLogger extends Logger {
   emitGenAIToolMessageEvent(
     body: LangWatchSpanGenAIToolMessageEventBody,
     system?: intSemconv.VAL_GEN_AI_SYSTEMS | (string & {}),
-    attributes?: SemconvAttributes,
+    attributes?: SemConvAttributes,
   ): void;
   /**
    * Emit a GenAI choice event to the logger.
@@ -781,6 +812,6 @@ export interface LangWatchLogger extends Logger {
   emitGenAIChoiceEvent(
     body: LangWatchSpanGenAIChoiceEventBody,
     system?: intSemconv.VAL_GEN_AI_SYSTEMS | (string & {}),
-    attributes?: SemconvAttributes,
+    attributes?: SemConvAttributes,
   ): void;
 }

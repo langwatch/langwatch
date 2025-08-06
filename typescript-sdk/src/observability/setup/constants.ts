@@ -1,10 +1,17 @@
 import { version } from "../../../package.json";
 
 export type JsRuntime = "node" | "deno" | "bun" | "web" | "unknown";
+let _runtime: JsRuntime | undefined;
+export const LANGWATCH_SDK_RUNTIME = (): JsRuntime => {
+  if (!_runtime) {
+    _runtime = detectRuntime();
+  }
+  return _runtime;
+};
+
 
 export const LANGWATCH_SDK_NAME = "langwatch-observability-sdk";
 export const LANGWATCH_SDK_LANGUAGE = "typescript";
-export const LANGWATCH_SDK_RUNTIME = detectRuntime();
 export const LANGWATCH_SDK_VERSION = version;
 
 export const DEFAULT_ENDPOINT = "https://app.langwatch.ai/";

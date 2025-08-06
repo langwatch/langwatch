@@ -46,7 +46,7 @@ describe('config.ts', () => {
     const config = await import('../config.js');
     config.resetObservabilitySdkConfig(); // Ensure clean state
 
-    const result = config.getObservabilitySdkConfig();
+    const result = config.getObservabilitySdkConfig({ throwOnUninitialized: true });
     expect(result.logger).toBeInstanceOf((await import('../../logger/index.js')).NoOpLogger);
     expect(console.error).toHaveBeenCalledWith(
       expect.stringContaining('Please call setupObservability')

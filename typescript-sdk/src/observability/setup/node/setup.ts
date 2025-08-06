@@ -68,7 +68,11 @@ export function setupObservability(
     );
   }
 
-  logger.info("No existing TracerProvider; initializing NodeSDK");
+  if (!alreadySetup) {
+    logger.info("No existing TracerProvider; initializing NodeSDK");
+  } else {
+    logger.info("Reinitializing NodeSDK (forced)");
+  }
 
   try {
     const sdk = createAndStartNodeSdk(options, logger, createMergedResource(

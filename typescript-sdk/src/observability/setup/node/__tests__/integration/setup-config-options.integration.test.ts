@@ -305,7 +305,7 @@ describe('setupObservability Integration - Configuration Options', () => {
     process.env.LANGWATCH_ENDPOINT = 'https://env-endpoint';
     process.env.LANGWATCH_SERVICE_NAME = 'env-service';
     const logger = createMockLogger();
-    // Re-import setupObservability to pick up env vars if needed
+    // setupObservability should pick up env vars when not provided in options
     const options: SetupObservabilityOptions = { logger };
     const handle = setupObservability(options);
     // Accept any logger method being called, not just info

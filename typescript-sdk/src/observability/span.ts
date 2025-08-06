@@ -18,7 +18,7 @@ import {
   LangWatchSpanGenAIUserMessageEventBody,
   LangWatchSpanMetrics,
   LangWatchSpanRAGContext,
-  SemconvAttributes,
+  SemConvAttributes,
   SpanType,
 } from "./types";
 
@@ -33,12 +33,12 @@ class LangWatchSpanInternal implements LangWatchSpan {
   constructor(private span: Span) { }
 
   // OpenTelemetry Span methods with fluent API support
-  setAttributes(attributes: SemconvAttributes): this {
+  setAttributes(attributes: SemConvAttributes): this {
     this.span.setAttributes(attributes);
     return this;
   }
 
-  setAttribute(key: keyof SemconvAttributes, value: AttributeValue): this {
+  setAttribute(key: keyof SemConvAttributes, value: AttributeValue): this {
     this.span.setAttribute(key, value);
     return this;
   }
