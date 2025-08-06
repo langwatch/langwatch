@@ -90,7 +90,7 @@ app.post(
     try {
       const newConfig = await service.createPrompt({
         projectId: project.id,
-        handle: data.handle ?? "",
+        handle: data.handle,
         organizationId: organization.id,
         scope: data.scope,
         authorId: data.authorId,

@@ -100,14 +100,14 @@ export class PromptService {
     // we should create a version from that data
     // and it's not consideered a draft
     const shouldCreateVersion = Boolean(
-      params.prompt ??
-        params.messages ??
-        params.inputs ??
-        params.outputs ??
-        params.model ??
-        params.temperature ??
-        params.max_tokens ??
-        params.prompting_technique
+      params.prompt !== undefined ||
+        params.messages !== undefined ||
+        params.inputs !== undefined ||
+        params.outputs !== undefined ||
+        params.model !== undefined ||
+        params.temperature !== undefined ||
+        params.max_tokens !== undefined ||
+        params.prompting_technique !== undefined
     );
 
     return this.repository.createConfigWithInitialVersion({
