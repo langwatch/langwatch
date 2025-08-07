@@ -1,4 +1,4 @@
-import type { paths } from "../internal/generated/openapi/api-client";
+import type { paths } from "@/internal/generated/openapi/api-client";
 
 // Extract types directly from OpenAPI schema for strong type safety.
 export type CreatePromptBody = NonNullable<

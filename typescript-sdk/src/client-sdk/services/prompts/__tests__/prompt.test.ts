@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { promptResponseFactory } from "../../../__tests__/factories/prompt.factory";
+import { promptResponseFactory } from "../../../../../__tests__/factories/prompt.factory";
 import { CompiledPrompt, Prompt, PromptCompilationError } from "../prompt";
 
 describe("Prompt", () => {

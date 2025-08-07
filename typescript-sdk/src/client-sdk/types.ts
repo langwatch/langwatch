@@ -1,6 +1,7 @@
 import { type LangwatchApiClient } from '../internal/api/client';
 import { type CacheStore } from './cache';
 import { type Logger } from '../logger';
+import { DataCaptureOptions } from '@/observability-sdk';
 
 export interface InternalConfig {
   langwatchApiClient: LangwatchApiClient;
@@ -11,6 +12,10 @@ export interface InternalConfig {
     defaultCacheTtlMs: number;
   };
   traces: {},
+
+  observability: {
+    dataCapture: DataCaptureOptions;
+  };
 }
 
 export interface BaseRequestOptions {

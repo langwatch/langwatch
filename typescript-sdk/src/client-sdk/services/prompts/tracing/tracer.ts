@@ -2,6 +2,6 @@
  * WARNING: ts-to-zod needs this file to be in this directory.
  */
 
-import { getLangWatchTracer } from "../../observability/trace";
+import { getLangWatchTracer } from "@/observability-sdk/tracer";
 
 export const tracer = getLangWatchTracer("langwatch.prompt");
