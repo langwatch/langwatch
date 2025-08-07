@@ -1606,7 +1606,7 @@ describe("opentelemetry traces receiver", () => {
                       attributes: [
                         { key: "message", value: { stringValue: '[{"text": "Hello!"}]' } },
                         { key: "id", value: { stringValue: "choice-1" } },
-                        { key: "finish_reason", value: { stringValue: "stop" } },
+                        { key: "finish_reason", value: { stringValue: "end_turn" } },
                       ],
                     },
                   ],
@@ -1641,10 +1641,11 @@ describe("opentelemetry traces receiver", () => {
       type: "chat_messages",
       value: [
         {
-          role: "choice",
+          role: "assistant",
           content: [{ text: "Hello!" }],
           id: "choice-1",
-          finish_reason: "stop",
+          finish_reason: "end_turn",
+          tool_result: void 0,
         },
       ],
     });

@@ -150,7 +150,7 @@ describe("extractStrandsAgentsInputOutput", () => {
           attributes: [
             { key: "message", value: { stringValue: '{"bar":99}' } },
             { key: "id", value: { stringValue: "choice-1" } },
-            { key: "finish_reason", value: { stringValue: "stop" } },
+            { key: "finish_reason", value: { stringValue: "end_turn" } },
           ],
         },
       ] as unknown as IEvent[],
@@ -176,10 +176,11 @@ describe("extractStrandsAgentsInputOutput", () => {
         type: "chat_messages",
         value: [
           {
-            role: "choice",
+            role: "assistant",
             content: { bar: 99 },
             id: "choice-1",
-            finish_reason: "stop",
+            finish_reason: "end_turn",
+            tool_result: void 0,
           },
         ],
       },
@@ -188,5 +189,143 @@ describe("extractStrandsAgentsInputOutput", () => {
 
   it("returns null if no events", () => {
     expect(extractStrandsAgentsInputOutput({})).toBeNull();
+  });
+
+  it("parses content/message as JSON or string for input and output", () => {
+    const span: DeepPartial<ISpan> = {
+      events: [
+        // content is a valid JSON string (should parse to object)
+        {
+          name: "gen_ai.user.message",
+          attributes: [
+            { key: "role", value: { stringValue: "user" } },
+            { key: "content", value: { stringValue: '{"foo":123}' } },
+            { key: "id", value: { stringValue: "msg-1" } },
+          ],
+        },
+        // content is a plain string (should remain string)
+        {
+          name: "gen_ai.tool.message",
+          attributes: [
+            { key: "role", value: { stringValue: "tool" } },
+            { key: "content", value: { stringValue: "plain string" } },
+            { key: "id", value: { stringValue: "tool-1" } },
+          ],
+        },
+        // message is a valid JSON string (should parse to object)
+        {
+          name: "gen_ai.choice",
+          attributes: [
+            { key: "message", value: { stringValue: '{"bar":456}' } },
+            { key: "id", value: { stringValue: "choice-1" } },
+            { key: "finish_reason", value: { stringValue: "end_turn" } },
+          ],
+        },
+        // message is a plain string (should remain string)
+        {
+          name: "gen_ai.choice",
+          attributes: [
+            { key: "message", value: { stringValue: "just a string" } },
+            { key: "id", value: { stringValue: "choice-2" } },
+            { key: "finish_reason", value: { stringValue: "end_turn" } },
+          ],
+        },
+      ] as unknown as IEvent[],
+    };
+    const result = extractStrandsAgentsInputOutput(span);
+    expect(result).toEqual({
+      input: {
+        type: "chat_messages",
+        value: [
+          {
+            role: "user",
+            content: { foo: 123 },
+            id: "msg-1",
+          },
+          {
+            role: "tool",
+            content: "plain string",
+            id: "tool-1",
+          },
+        ],
+      },
+      output: {
+        type: "chat_messages",
+        value: [
+          {
+            role: "assistant",
+            content: { bar: 456 },
+            id: "choice-1",
+            finish_reason: "end_turn",
+            tool_result: void 0,
+          },
+          {
+            role: "assistant",
+            content: "just a string",
+            id: "choice-2",
+            finish_reason: "end_turn",
+            tool_result: void 0,
+          },
+        ],
+      },
+    });
+  });
+
+  it("assigns 'assistant' role to choice when role is missing and finish_reason is 'end_turn'", () => {
+    const span: DeepPartial<ISpan> = {
+      events: [
+        {
+          name: "gen_ai.choice",
+          attributes: [
+            { key: "message", value: { stringValue: '"response"' } },
+            { key: "id", value: { stringValue: "choice-1" } },
+            { key: "finish_reason", value: { stringValue: "end_turn" } },
+            // No 'role' attribute
+          ],
+        },
+        {
+          name: "gen_ai.choice",
+          attributes: [
+            { key: "message", value: { stringValue: '"response2"' } },
+            { key: "id", value: { stringValue: "choice-2" } },
+            { key: "finish_reason", value: { stringValue: "not_end_turn" } },
+            // No 'role' attribute
+          ],
+        },
+        {
+          name: "gen_ai.choice",
+          attributes: [
+            { key: "message", value: { stringValue: '"response3"' } },
+            { key: "id", value: { stringValue: "choice-3" } },
+            { key: "finish_reason", value: { stringValue: "end_turn" } },
+            { key: "role", value: { stringValue: "customrole" } },
+          ],
+        },
+      ] as unknown as IEvent[],
+    };
+    const result = extractStrandsAgentsInputOutput(span);
+    expect(result?.output?.value).toEqual([
+      {
+        role: "assistant",
+        content: "response",
+        id: "choice-1",
+        finish_reason: "end_turn",
+        tool_result: void 0,
+      },
+      {
+        role: void 0,
+        content: "response2",
+        id: "choice-2",
+        finish_reason: "not_end_turn",
+        tool_result: void 0,
+      },
+      {
+        role: "customrole",
+        content: "response3",
+        id: "choice-3",
+        finish_reason: "end_turn",
+        tool_result: void 0,
+      },
+    ]);
   });
 });
