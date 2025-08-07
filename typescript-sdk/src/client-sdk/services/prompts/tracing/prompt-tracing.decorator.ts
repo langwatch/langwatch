@@ -1,14 +1,13 @@
 import { tracer } from "./tracer";
-import * as intSemconv from "@/observability-sdk/semconv";
 import { Prompt } from "../prompt";
-import { InternalConfig } from "@/client-sdk/types";
+import { shouldCaptureInput } from "@/observability-sdk";
 
 /**
  * Class that decorates the target prompt,
  * adding tracing to specific methods.
  */
 export class PromptTracingDecorator {
-  constructor(private readonly target: Prompt, private readonly config: InternalConfig) {}
+  constructor(private readonly target: Prompt) {}
 
   compile(...variables: Parameters<Prompt["compile"]>) {
     return this.wrapCompileFn("compile", this.target.compile)(...variables);
@@ -31,19 +30,19 @@ export class PromptTracingDecorator {
 
         const result = fn.apply(this.target, variables);
 
-        if (this.config.observability?.dataCapture.mode === "output") {
-          span.setOutput(result);
+        if (shouldCaptureInput()) {
+          span.setInput(result);
         }
 
         span.setAttributes({
-          [intSemconv.ATTR_LANGWATCH_PROMPT_ID]: result.id,
-          [intSemconv.ATTR_LANGWATCH_PROMPT_VERSION_ID]: result.versionId,
-          [intSemconv.ATTR_LANGWATCH_PROMPT_VERSION_NUMBER]: result.version,
+          'langwatch.prompt.id': result.id,
+          'langwatch.prompt.version.id': result.versionId,
+          'langwatch.prompt.version.number': result.version,
         });
 
-        if (variables && this.config.observability?.dataCapture?.input) {
+        if (variables && shouldCaptureInput()) {
           span.setAttribute(
-            intSemconv.ATTR_LANGWATCH_PROMPT_VARIABLES,
+            'langwatch.prompt.variables',
             JSON.stringify({
               type: "json",
               value: variables,
