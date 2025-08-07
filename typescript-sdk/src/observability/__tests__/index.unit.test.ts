@@ -5,7 +5,6 @@ import { getLangWatchTracer, getLangWatchTracerFromProvider } from "../tracer";
 import { FilterableBatchSpanProcessor } from "../processors";
 import { LangWatchExporter } from "../exporters";
 import * as indexModule from "../index";
-import * as intSemconv from "../semconv";
 
 describe("index.ts", () => {
   let testEnv: ReturnType<typeof setupTestEnvironment>;
@@ -150,10 +149,10 @@ describe("index.ts", () => {
       expect(indexModule.FilterableBatchSpanProcessor.name).toBe("FilterableBatchSpanProcessor");
     });
 
-    it("should export LangWatchExporter class", () => {
+    it("should export LangWatchTraceExporter class", () => {
       expect(indexModule.LangWatchExporter).toBeDefined();
       expect(typeof indexModule.LangWatchExporter).toBe("function");
-      expect(indexModule.LangWatchExporter.name).toBe("LangWatchExporter");
+      expect(indexModule.LangWatchExporter.name).toBe("LangWatchTraceExporter");
     });
 
     it("should provide attributes object with expected structure", () => {

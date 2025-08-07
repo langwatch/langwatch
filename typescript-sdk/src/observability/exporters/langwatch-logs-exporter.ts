@@ -60,7 +60,7 @@ export class LangWatchLogsExporter extends OTLPLogExporter {
         "x-langwatch-sdk-name": LANGWATCH_SDK_NAME,
         "x-langwatch-sdk-language": LANGWATCH_SDK_LANGUAGE,
         "x-langwatch-sdk-version": LANGWATCH_SDK_VERSION,
-        "x-langwatch-sdk-runtime": LANGWATCH_SDK_RUNTIME,
+        "x-langwatch-sdk-runtime": LANGWATCH_SDK_RUNTIME(),
         ...(apiKey ? { authorization: `Bearer ${apiKey}` } : {}),
       },
       url: otelEndpoint.toString(),

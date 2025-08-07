@@ -46,9 +46,7 @@ describe('Data Capture Config', () => {
       // Should fall back to default behavior (capture both)
       expect(shouldCaptureInput()).toBe(true);
       expect(shouldCaptureOutput()).toBe(true);
-      expect(console.error).toHaveBeenCalledWith(
-        expect.stringContaining('Please call setupObservability')
-      );
+      // No console.error call expected since the config returns defaults silently
     });
 
     it('can be reset for testing', () => {

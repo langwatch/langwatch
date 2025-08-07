@@ -42,15 +42,21 @@ describe('config.ts', () => {
     expect(config.getObservabilitySdkLogger()).toBe(logger);
   });
 
-  it('getObservabilitySdkConfig returns default when not initialized', async () => {
+  it('getObservabilitySdkConfig throws error when not initialized and throwOnUninitialized is true', async () => {
     const config = await import('../config.js');
     config.resetObservabilitySdkConfig(); // Ensure clean state
 
-    const result = config.getObservabilitySdkConfig({ throwOnUninitialized: true });
+    expect(() => {
+      config.getObservabilitySdkConfig({ throwOnUninitialized: true });
+    }).toThrow('Please call setupObservability() before using the Observability SDK');
+  });
+
+  it('getObservabilitySdkConfig returns default when not initialized and throwOnUninitialized is false', async () => {
+    const config = await import('../config.js');
+    config.resetObservabilitySdkConfig(); // Ensure clean state
+
+    const result = config.getObservabilitySdkConfig({ throwOnUninitialized: false });
     expect(result.logger).toBeInstanceOf((await import('../../logger/index.js')).NoOpLogger);
-    expect(console.error).toHaveBeenCalledWith(
-      expect.stringContaining('Please call setupObservability')
-    );
   });
 
   it('getObservabilitySdkConfig returns actual config when initialized', async () => {

@@ -462,7 +462,7 @@ describe("tracer.ts", () => {
         const options = { kind: SpanKind.PRODUCER };
         const callback = vi.fn(() => "result");
 
-        const result = await langwatchTracer.withActiveSpan("with-options", options, callback);
+        const result = langwatchTracer.withActiveSpan("with-options", options, callback);
 
         expect(callback).toHaveBeenCalled();
         expect(result).toBe("result");
@@ -474,7 +474,7 @@ describe("tracer.ts", () => {
         const context = {} as any;
         const callback = vi.fn(() => "result");
 
-        const result = await langwatchTracer.withActiveSpan("with-context", options, context, callback);
+        const result = langwatchTracer.withActiveSpan("with-context", options, context, callback);
 
         expect(callback).toHaveBeenCalled();
         expect(result).toBe("result");
