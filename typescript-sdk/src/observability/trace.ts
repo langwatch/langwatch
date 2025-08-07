@@ -258,7 +258,10 @@ export function getLangWatchTracer(
                 const result = userFn(wrappedSpan);
 
                 // Handle promise case
-                if (result && typeof result.then === "function") {
+                if (
+                  result &&
+                  ["then", "catch", "finally"].includes(typeof result)
+                ) {
                   return result
                     .catch(handleError)
                     .finally(() => wrappedSpan.end());

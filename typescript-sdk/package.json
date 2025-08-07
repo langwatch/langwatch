@@ -90,7 +90,8 @@
         "tsup": "^8.5.0",
         "typescript": "^5.9.2",
         "typescript-eslint": "^8.38.0",
-        "vitest": "^3.2.4"
+        "vitest": "^3.2.4",
+        "vitest-mock-extended": "^3.1.0"
     },
     "dependencies": {
         "@opentelemetry/api": "^1.9.0",
