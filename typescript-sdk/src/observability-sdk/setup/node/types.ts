@@ -1,8 +1,6 @@
 import { Logger } from "../../../logger";
-import { AttributeValue } from "@opentelemetry/api";
 import { Instrumentation } from "@opentelemetry/instrumentation";
 import { SpanExporter, SpanProcessor } from "@opentelemetry/sdk-trace-base";
-import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-http";
 import { ContextManager, TextMapPropagator } from "@opentelemetry/api";
 import { LogRecordProcessor } from "@opentelemetry/sdk-logs";
 import { IMetricReader } from "@opentelemetry/sdk-metrics";

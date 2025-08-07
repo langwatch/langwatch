@@ -1,11 +1,11 @@
 import { OTLPLogExporter } from "@opentelemetry/exporter-logs-otlp-http";
 import {
   LANGWATCH_SDK_LANGUAGE,
-  LANGWATCH_SDK_NAME,
+  LANGWATCH_SDK_NAME_OBSERVABILITY,
   LANGWATCH_SDK_RUNTIME,
   LANGWATCH_SDK_VERSION,
   LOGS_PATH,
-} from "../setup/constants";
+} from "../../internal/constants";
 
 export interface LangWatchLogsExporterOptions {
   endpoint?: string;
@@ -57,7 +57,7 @@ export class LangWatchLogsExporter extends OTLPLogExporter {
 
     super({
       headers: {
-        "x-langwatch-sdk-name": LANGWATCH_SDK_NAME,
+        "x-langwatch-sdk-name": LANGWATCH_SDK_NAME_OBSERVABILITY,
         "x-langwatch-sdk-language": LANGWATCH_SDK_LANGUAGE,
         "x-langwatch-sdk-version": LANGWATCH_SDK_VERSION,
         "x-langwatch-sdk-runtime": LANGWATCH_SDK_RUNTIME(),

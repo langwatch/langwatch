@@ -11,23 +11,12 @@ import semconv from "@opentelemetry/semantic-conventions/incubating";
 import * as intSemconv from "./semconv";
 import {
   LangWatchSpan,
-  LangWatchSpanGenAIAssistantMessageEventBody,
-  LangWatchSpanGenAIChoiceEventBody,
-  LangWatchSpanGenAISystemMessageEventBody,
-  LangWatchSpanGenAIToolMessageEventBody,
-  LangWatchSpanGenAIUserMessageEventBody,
   LangWatchSpanMetrics,
   LangWatchSpanRAGContext,
   SemConvAttributes,
   SpanType,
 } from "./types";
-
-// import {
-//   RecordedEvaluationDetails,
-//   recordEvaluation,
-// } from "../evaluation/record-evaluation";
-// import { EvaluationResultModel } from "../evaluation/types";
-// import { Prompt } from "../prompt/prompt";
+import { Prompt } from "@/client-sdk/services/prompts";
 
 class LangWatchSpanInternal implements LangWatchSpan {
   constructor(private span: Span) { }
@@ -143,15 +132,15 @@ class LangWatchSpanInternal implements LangWatchSpan {
     return this;
   }
 
-  // setSelectedPrompt(prompt: Prompt): this {
-  //   this.span.setAttributes({
-  //     [intSemconv.ATTR_LANGWATCH_PROMPT_SELECTED_ID]: prompt.id,
-  //     [intSemconv.ATTR_LANGWATCH_PROMPT_ID]: prompt.id,
-  //     [intSemconv.ATTR_LANGWATCH_PROMPT_VERSION_ID]: prompt.versionId,
-  //     [intSemconv.ATTR_LANGWATCH_PROMPT_VERSION_NUMBER]: prompt.version,
-  //   });
-  //   return this;
-  // }
+  setSelectedPrompt(prompt: Prompt): this {
+    this.span.setAttributes({
+      [intSemconv.ATTR_LANGWATCH_PROMPT_SELECTED_ID]: prompt.id,
+      [intSemconv.ATTR_LANGWATCH_PROMPT_ID]: prompt.id,
+      [intSemconv.ATTR_LANGWATCH_PROMPT_VERSION_ID]: prompt.versionId,
+      [intSemconv.ATTR_LANGWATCH_PROMPT_VERSION_NUMBER]: prompt.version,
+    });
+    return this;
+  }
 
   setInput(input: unknown): this {
     this.span.setAttribute(
