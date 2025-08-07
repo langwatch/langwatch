@@ -6,9 +6,9 @@ import type { paths } from "../internal/generated/openapi/api-client";
 import { Prompt, type PromptResponse } from "./prompt";
 import { PromptConverter } from "./converter";
 import type {
-  CreatePromptBodyV2,
   UpdatePromptBody,
   CreateVersionBody,
+  CreatePromptBody,
 } from "./types";
 import { tracer } from "../evaluation/tracer";
 import { canAutomaticallyCaptureInput } from "../client";
@@ -169,8 +169,8 @@ export class PromptService {
    * @returns The created Prompt instance.
    * @throws {PromptsError} If the API call fails.
    */
-  async create(params: CreatePromptBodyV2): Promise<Prompt> {
-    const { data, error } = await this.client.POST("/api/prompts/v2", {
+  async create(params: CreatePromptBody): Promise<Prompt> {
+    const { data, error } = await this.client.POST("/api/prompts", {
       body: params,
     });
     if (error) this.handleApiError("create prompt", error);
@@ -209,11 +209,13 @@ export class PromptService {
    * @param id The prompt's unique identifier.
    * @throws {PromptsError} If the API call fails.
    */
-  async delete(id: string): Promise<void> {
-    const { error } = await this.client.DELETE("/api/prompts/{id}", {
+  async delete(id: string): Promise<{ success: boolean }> {
+    const { data, error } = await this.client.DELETE("/api/prompts/{id}", {
       params: { path: { id } },
     });
     if (error) this.handleApiError(`delete prompt with ID "${id}"`, error);
+
+    return data;
   }
 
   /**

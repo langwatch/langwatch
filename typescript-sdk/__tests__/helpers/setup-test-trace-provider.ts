@@ -14,9 +14,5 @@ export function setupTestTraceProvider() {
   const findFinishedSpanByName = (name: string) =>
     spanExporter.getFinishedSpans().find((span) => span.name === name);
 
-  return {
-    spanExporter,
-    tracerProvider,
-    findFinishedSpanByName,
-  };
+  return { spanExporter, tracerProvider, findFinishedSpanByName };
 }
