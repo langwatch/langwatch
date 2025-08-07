@@ -1,36 +1,48 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { setupObservability } from '../../setup';
 import { logs } from '@opentelemetry/api-logs';
-import { LogRecordProcessor, SdkLogRecord } from "@opentelemetry/sdk-logs";
+import { LogRecordProcessor, SdkLogRecord, InMemoryLogRecordExporter, SimpleLogRecordProcessor } from "@opentelemetry/sdk-logs";
 import { getLangWatchLogger } from '../../../../logger';
+import { resetObservabilitySdkConfig } from '../../../../config';
 
 // Integration tests for log records functionality in setupObservability
 function createMockLogger() {
   return { error: vi.fn(), debug: vi.fn(), info: vi.fn(), warn: vi.fn() };
 }
 
-// Mock LogRecordProcessor to capture emitted log records
-class MockLogRecordProcessor implements LogRecordProcessor {
-  public records: SdkLogRecord[] = [];
-  onEmit(record: SdkLogRecord): void {
-    this.records.push(record);
-  }
-  forceFlush(): Promise<void> {
-    return Promise.resolve();
-  }
-  shutdown(): Promise<void> {
-    return Promise.resolve();
-  }
-}
+
 
 describe('setupObservability Integration - Log Records Functionality', () => {
-  it('should create log records with correct attributes', async () => {
-    const logger = createMockLogger();
-    const mockProcessor = new MockLogRecordProcessor();
-    setupObservability({ apiKey: 'test-key', logger, logRecordProcessors: [mockProcessor] });
+  const logRecordExporter = new InMemoryLogRecordExporter();
+  const logRecordProcessor = new SimpleLogRecordProcessor(logRecordExporter);
+  let observabilityHandle: ReturnType<typeof setupObservability>;
 
-    const loggerProvider = logs.getLoggerProvider();
-    const logRecordLogger = loggerProvider.getLogger('test-logger');
+  beforeEach(() => {
+    // Reset OpenTelemetry global state
+    vi.resetModules();
+    resetObservabilitySdkConfig();
+
+    // Setup observability with real OpenTelemetry SDK
+    observabilityHandle = setupObservability({
+      serviceName: "log-records-functionality-test",
+      logRecordProcessors: [logRecordProcessor],
+      logger: createMockLogger(),
+      throwOnSetupError: true,
+      attributes: {
+        "test.suite": "log-records-functionality",
+        "test.environment": "vitest"
+      },
+    });
+  });
+
+  afterEach(async () => {
+    await logRecordProcessor.forceFlush();
+    logRecordExporter.reset();
+    resetObservabilitySdkConfig();
+  });
+
+  it('should create log records with correct attributes', async () => {
+    const logRecordLogger = getLangWatchLogger('test-logger');
 
     // Create a log record with attributes
     logRecordLogger.emit({
@@ -44,9 +56,11 @@ describe('setupObservability Integration - Log Records Functionality', () => {
       },
     });
 
-    await mockProcessor.forceFlush();
-    expect(mockProcessor.records.length).toBe(1);
-    const record = mockProcessor.records[0];
+    await logRecordProcessor.forceFlush();
+    const exportedLogRecords = logRecordExporter.getFinishedLogRecords();
+    expect(exportedLogRecords).toHaveLength(1);
+
+    const record = exportedLogRecords[0];
     if (!record) {
       throw new Error('No record found');
     }
@@ -62,12 +76,7 @@ describe('setupObservability Integration - Log Records Functionality', () => {
   });
 
   it('should handle different log severity levels', async () => {
-    const logger = createMockLogger();
-    const mockProcessor = new MockLogRecordProcessor();
-    setupObservability({ apiKey: 'test-key', logger, logRecordProcessors: [mockProcessor] });
-
-    const loggerProvider = logs.getLoggerProvider();
-    const logRecordLogger = loggerProvider.getLogger('severity-test');
+    const logRecordLogger = getLangWatchLogger('severity-test');
 
     // Test different severity levels
     const severityLevels = [
@@ -91,10 +100,12 @@ describe('setupObservability Integration - Log Records Functionality', () => {
       });
     }
 
-    await mockProcessor.forceFlush();
-    expect(mockProcessor.records.length).toBe(severityLevels.length);
+    await logRecordProcessor.forceFlush();
+    const exportedLogRecords = logRecordExporter.getFinishedLogRecords();
+    expect(exportedLogRecords).toHaveLength(severityLevels.length);
+
     for (let i = 0; i < severityLevels.length; i++) {
-      const record = mockProcessor.records[i];
+      const record = exportedLogRecords[i];
       if (!record) {
         throw new Error('No record found');
       }
@@ -111,10 +122,6 @@ describe('setupObservability Integration - Log Records Functionality', () => {
   });
 
   it('should handle log records with complex attributes', async () => {
-    const logger = createMockLogger();
-    const mockProcessor = new MockLogRecordProcessor();
-    setupObservability({ apiKey: 'test-key', logger, logRecordProcessors: [mockProcessor] });
-
     const logRecordLogger = getLangWatchLogger('complex-attributes');
 
     // Create a log record with complex attributes
@@ -133,9 +140,11 @@ describe('setupObservability Integration - Log Records Functionality', () => {
       },
     });
 
-    await mockProcessor.forceFlush();
-    expect(mockProcessor.records.length).toBe(1);
-    const record = mockProcessor.records[0];
+    await logRecordProcessor.forceFlush();
+    const exportedLogRecords = logRecordExporter.getFinishedLogRecords();
+    expect(exportedLogRecords).toHaveLength(1);
+
+    const record = exportedLogRecords[0];
     if (!record) {
       throw new Error('No record found');
     }
@@ -151,7 +160,7 @@ describe('setupObservability Integration - Log Records Functionality', () => {
     expect(record.attributes["boolean.attr"]).toBe(true);
     expect(record.attributes["array.attr"]).toEqual(['item1', 'item2', 'item3']);
     expect(record.attributes["object.attr"]).toEqual({ key1: 'value1', key2: 'value2' });
-    expect(record.attributes["null.attr"]).toBeNull();
+    expect(record.attributes["null.attr"]).toBeUndefined();
     expect(record.attributes["undefined.attr"]).toBeUndefined();
   });
 
@@ -182,8 +191,7 @@ describe('setupObservability Integration - Log Records Functionality', () => {
     const logger = createMockLogger();
     setupObservability({ apiKey: 'test-key', logger });
 
-    const loggerProvider = logs.getLoggerProvider();
-    const logRecordLogger = loggerProvider.getLogger('trace-context-test');
+    const logRecordLogger = getLangWatchLogger('trace-context-test');
 
     // Create a log record that could be associated with a trace
     logRecordLogger.emit({
@@ -204,8 +212,7 @@ describe('setupObservability Integration - Log Records Functionality', () => {
     const logger = createMockLogger();
     setupObservability({ apiKey: 'test-key', logger });
 
-    const loggerProvider = logs.getLoggerProvider();
-    const logRecordLogger = loggerProvider.getLogger('multiple-logs');
+    const logRecordLogger = getLangWatchLogger('multiple-logs');
 
     // Emit multiple log records
     for (let i = 0; i < 5; i++) {
@@ -227,12 +234,10 @@ describe('setupObservability Integration - Log Records Functionality', () => {
     const logger = createMockLogger();
     setupObservability({ apiKey: 'test-key', logger });
 
-    const loggerProvider = logs.getLoggerProvider();
-
     // Create multiple loggers
-    const logger1 = loggerProvider.getLogger('logger-1');
-    const logger2 = loggerProvider.getLogger('logger-2');
-    const logger3 = loggerProvider.getLogger('logger-3');
+    const logger1 = getLangWatchLogger('logger-1');
+    const logger2 = getLangWatchLogger('logger-2');
+    const logger3 = getLangWatchLogger('logger-3');
 
     // Emit logs from different loggers
     logger1.emit({
@@ -269,8 +274,7 @@ describe('setupObservability Integration - Log Records Functionality', () => {
       consoleLogging: true
     });
 
-    const loggerProvider = logs.getLoggerProvider();
-    const logRecordLogger = loggerProvider.getLogger('console-logging-test');
+    const logRecordLogger = getLangWatchLogger('console-logging-test');
 
     logRecordLogger.emit({
       severityText: 'INFO',
@@ -286,19 +290,6 @@ describe('setupObservability Integration - Log Records Functionality', () => {
   });
 
     it('should handle log records with custom log record processors', async () => {
-    const logger = createMockLogger();
-    const customProcessor = {
-      onEmit: vi.fn(),
-      shutdown: vi.fn(),
-      forceFlush: vi.fn().mockResolvedValue(undefined),
-    };
-
-    setupObservability({
-      apiKey: 'test-key',
-      logger,
-      logRecordProcessors: [customProcessor]
-    });
-
     const logRecordLogger = getLangWatchLogger('custom-processor-test');
 
     const logRecord = {
@@ -312,18 +303,20 @@ describe('setupObservability Integration - Log Records Functionality', () => {
     };
 
     logRecordLogger.emit(logRecord);
-    await customProcessor.forceFlush();
-    await vi.waitFor(() => {
-      expect(customProcessor.onEmit).toHaveBeenCalledWith(expect.objectContaining({
-        severityText: 'INFO',
-        severityNumber: 9,
-        body: 'Custom processor test message',
-        attributes: expect.objectContaining({
-          'custom.processor': true,
-          'test.feature': 'custom-processors',
-        })
-      }));
-    });
+
+    await logRecordProcessor.forceFlush();
+    const exportedLogRecords = logRecordExporter.getFinishedLogRecords();
+    expect(exportedLogRecords).toHaveLength(1);
+
+    const record = exportedLogRecords[0];
+    if (!record) {
+      throw new Error('No record found');
+    }
+    expect(record.severityText).toBe('INFO');
+    expect(record.severityNumber).toBe(9);
+    expect(record.body).toBe('Custom processor test message');
+    expect(record.attributes?.['custom.processor']).toBe(true);
+    expect(record.attributes?.['test.feature']).toBe('custom-processors');
   });
 
   it('should handle log records with error conditions', () => {
@@ -351,8 +344,7 @@ describe('setupObservability Integration - Log Records Functionality', () => {
     const logger = createMockLogger();
     setupObservability({ apiKey: 'test-key', logger });
 
-    const loggerProvider = logs.getLoggerProvider();
-    const logRecordLogger = loggerProvider.getLogger('performance-test');
+    const logRecordLogger = getLangWatchLogger('performance-test');
 
     const startTime = Date.now();
 
@@ -375,8 +367,7 @@ describe('setupObservability Integration - Log Records Functionality', () => {
     const logger = createMockLogger();
     setupObservability({ apiKey: 'test-key', logger });
 
-    const loggerProvider = logs.getLoggerProvider();
-    const logRecordLogger = loggerProvider.getLogger('business-context-test');
+    const logRecordLogger = getLangWatchLogger('business-context-test');
 
     logRecordLogger.emit({
       severityText: 'INFO',
@@ -398,8 +389,7 @@ describe('setupObservability Integration - Log Records Functionality', () => {
     const logger = createMockLogger();
     setupObservability({ apiKey: 'test-key', logger });
 
-    const loggerProvider = logs.getLoggerProvider();
-    const logRecordLogger = loggerProvider.getLogger('security-test');
+    const logRecordLogger = getLangWatchLogger('security-test');
 
     logRecordLogger.emit({
       severityText: 'WARN',
@@ -420,8 +410,7 @@ describe('setupObservability Integration - Log Records Functionality', () => {
     const logger = createMockLogger();
     setupObservability({ apiKey: 'test-key', logger });
 
-    const loggerProvider = logs.getLoggerProvider();
-    const logRecordLogger = loggerProvider.getLogger('metrics-test');
+    const logRecordLogger = getLangWatchLogger('metrics-test');
 
     logRecordLogger.emit({
       severityText: 'INFO',
@@ -443,8 +432,7 @@ describe('setupObservability Integration - Log Records Functionality', () => {
     const logger = createMockLogger();
     setupObservability({ apiKey: 'test-key', logger });
 
-    const loggerProvider = logs.getLoggerProvider();
-    const logRecordLogger = loggerProvider.getLogger('structured-data-test');
+    const logRecordLogger = getLangWatchLogger('structured-data-test');
 
     const structuredData = {
       user: {
@@ -499,8 +487,7 @@ describe('setupObservability Integration - Log Records Functionality', () => {
       logRecordProcessors: [processor1, processor2]
     });
 
-    const loggerProvider = logs.getLoggerProvider();
-    const logRecordLogger = loggerProvider.getLogger('multiple-processors-test');
+    const logRecordLogger = getLangWatchLogger('multiple-processors-test');
 
     logRecordLogger.emit({
       severityText: 'INFO',
@@ -525,8 +512,7 @@ describe('setupObservability Integration - Log Records Functionality', () => {
       consoleLogging: true
     });
 
-    const loggerProvider = logs.getLoggerProvider();
-    const logRecordLogger = loggerProvider.getLogger('console-levels-test');
+    const logRecordLogger = getLangWatchLogger('console-levels-test');
 
     // Test different levels with console logging enabled
     const levels = [
@@ -563,8 +549,7 @@ describe('setupObservability Integration - Log Records Functionality', () => {
       }
     });
 
-    const loggerProvider = logs.getLoggerProvider();
-    const logRecordLogger = loggerProvider.getLogger('resource-attributes-test');
+    const logRecordLogger = getLangWatchLogger('resource-attributes-test');
 
     logRecordLogger.emit({
       severityText: 'INFO',

@@ -60,7 +60,7 @@ describe("LangWatchExporter", () => {
         "x-langwatch-sdk-name": LANGWATCH_SDK_NAME,
         "x-langwatch-sdk-language": LANGWATCH_SDK_LANGUAGE,
         "x-langwatch-sdk-version": LANGWATCH_SDK_VERSION,
-        "x-langwatch-sdk-runtime": LANGWATCH_SDK_RUNTIME,
+        "x-langwatch-sdk-runtime": LANGWATCH_SDK_RUNTIME(),
         authorization: `Bearer ${apiKey}`,
       });
     });
@@ -148,7 +148,7 @@ describe("LangWatchExporter", () => {
         "x-langwatch-sdk-name": LANGWATCH_SDK_NAME,
         "x-langwatch-sdk-language": LANGWATCH_SDK_LANGUAGE,
         "x-langwatch-sdk-version": LANGWATCH_SDK_VERSION,
-        "x-langwatch-sdk-runtime": LANGWATCH_SDK_RUNTIME,
+        "x-langwatch-sdk-runtime": LANGWATCH_SDK_RUNTIME(),
       });
     });
 
@@ -259,7 +259,7 @@ describe("LangWatchExporter", () => {
             "x-langwatch-sdk-name": LANGWATCH_SDK_NAME,
             "x-langwatch-sdk-language": LANGWATCH_SDK_LANGUAGE,
             "x-langwatch-sdk-version": LANGWATCH_SDK_VERSION,
-            "x-langwatch-sdk-runtime": LANGWATCH_SDK_RUNTIME,
+            "x-langwatch-sdk-runtime": LANGWATCH_SDK_RUNTIME(),
           }),
           url: expect.stringContaining("/api/otel/v1/traces"),
         })

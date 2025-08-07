@@ -19,16 +19,23 @@ import { shouldCaptureOutput } from "./config";
 import * as intSemconv from "./semconv";
 import { context } from "@opentelemetry/api";
 
+/**
+ * The LangWatch-specific global logger provider. It may not be the same as the current
+ * OpenTelemetry global logger provider, but it's the last one the `setupObservability`
+ * knows about.
+ * @internal
+ */
 let currentLoggerProvider: LoggerProvider = new NoopLoggerProvider();
-let isProviderSet = false;
 
 /**
  * @module observability/logger
  * @description
- * Provides LangWatch logger integration with OpenTelemetry, including logger provider management and logger creation utilities.
+ * Provides LangWatch logger integration with OpenTelemetry, including logger provider
+ * management and logger creation utilities.
  *
  * @remarks
- * This module allows you to set a global logger provider, retrieve LangWatch loggers, and wrap OpenTelemetry loggers with LangWatch-specific functionality.
+ * This module allows you to set a global logger provider, retrieve LangWatch loggers,
+ * and wrap OpenTelemetry loggers with LangWatch-specific functionality.
  *
  * @see {@link setLangWatchLoggerProvider}
  * @see {@link getLangWatchLogger}
@@ -38,14 +45,7 @@ let isProviderSet = false;
 export function setLangWatchLoggerProvider(
   loggerProvider: LoggerProvider,
 ): void {
-  if (isProviderSet) {
-    console.warn(
-      "LangWatch logger provider has already been set. Ignoring subsequent call.",
-    );
-    return;
-  }
   currentLoggerProvider = loggerProvider;
-  isProviderSet = true;
 }
 
 /**
@@ -56,7 +56,8 @@ export function setLangWatchLoggerProvider(
  * @returns A {@link LangWatchLogger} instance.
  *
  * @remarks
- * Uses the logger provider set during observability setup. If no provider is set, returns a NoOp logger.
+ * Uses the logger provider set during observability setup. If no provider is set, returns
+ * a NoOp logger.
  *
  * @example
  * ```ts
@@ -120,8 +121,10 @@ export function createLangWatchLogger(logger: Logger): LangWatchLogger {
  * Internal implementation of {@link LangWatchLogger}.
  *
  * @remarks
- * This class wraps an OpenTelemetry logger and adds LangWatch-specific functionality for structured logging and event emission.
- * Not intended for direct use; use {@link getLangWatchLogger} or {@link createLangWatchLogger} instead.
+ * This class wraps an OpenTelemetry logger and adds LangWatch-specific functionality for
+ * structured logging and event emission.
+ * Not intended for direct use; use {@link getLangWatchLogger} or
+ * {@link createLangWatchLogger} instead.
  */
 export class LangWatchLoggerInternal implements LangWatchLogger {
   constructor(private logger: Logger) {}
