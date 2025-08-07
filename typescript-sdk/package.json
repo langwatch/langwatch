@@ -24,7 +24,7 @@
       "require": "./dist/observability/index.js",
       "import": "./dist/observability/index.mjs"
     },
-    "./observability/setup/node": {
+    "./observability/node": {
       "types": "./dist/observability/setup/node/index.d.ts",
       "require": "./dist/observability/setup/node/index.js",
       "import": "./dist/observability/setup/node/index.mjs"
@@ -42,9 +42,7 @@
   },
   "scripts": {
     "prepare": "./copy-types.sh && pnpm run generate:openapi-types",
-    "test": "pnpm test:core",
-    "test:core": "vitest run",
-    "test:e2e": "vitest run --include='**/*.e2e.test.ts'",
+    "test": "vitest",
     "prebuild": "pnpm run prepare",
     "build": "tsgo --noEmit &&  tsup",
     "prepublish": "pnpm run build",
@@ -58,9 +56,11 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.32.0",
+    "@opentelemetry/sdk-node": ">=0.203.0",
+    "@opentelemetry/sdk-trace-web": ">=2.0.1",
     "@types/debug": "^4.1.12",
     "@types/js-yaml": "^4.0.9",
-    "@types/node": "^24.2.0",
+    "@types/node": "^24.1.0",
     "@typescript/native-preview": "7.0.0-dev.20250804.1",
     "@vercel/otel": "^1.13.0",
     "@vitest/coverage-v8": "3.2.4",
@@ -70,20 +70,15 @@
     "nock": "^14.0.8",
     "ts-to-zod": "3.15.0",
     "tsup": "^8.5.0",
+    "typescript-eslint": "^8.38.0",
     "typescript": "^5.9.2",
-    "typescript-eslint": "^8.39.0",
     "vitest": "^3.2.4"
   },
   "dependencies": {
-    "@opentelemetry/api-logs": "0.203.0",
     "@opentelemetry/api": "^1.9.0",
     "@opentelemetry/core": "^2.0.1",
-    "@opentelemetry/exporter-logs-otlp-http": "0.203.0",
-    "@opentelemetry/exporter-trace-otlp-http": "0.203.0",
-    "@opentelemetry/instrumentation": "0.203.0",
+    "@opentelemetry/exporter-trace-otlp-http": "^0.203.0",
     "@opentelemetry/resources": "^2.0.1",
-    "@opentelemetry/sdk-logs": "0.203.0",
-    "@opentelemetry/sdk-metrics": "^2.0.1",
     "@opentelemetry/sdk-trace-base": "^2.0.1",
     "@opentelemetry/semantic-conventions": "^1.36.0",
     "@types/prompts": "^2.4.9",
@@ -102,12 +97,12 @@
   "peerDependencies": {
     "@ai-sdk/openai": ">=2.0.0",
     "@langchain/core": ">=0.3.0",
-    "@langchain/langgraph": ">=0.4.0",
     "@langchain/openai": ">=0.6.0",
-    "@opentelemetry/context-async-hooks": ">=2.0.1",
-    "@opentelemetry/context-zone": ">=2.0.1",
-    "@opentelemetry/sdk-node": ">=0.203.0",
-    "@opentelemetry/sdk-trace-web": ">=2.0.1",
+    "@langchain/langgraph": ">=0.4.0",
+    "@opentelemetry/context-async-hooks": ">=1.19.0",
+    "@opentelemetry/context-zone": ">=1.19.0",
+    "@opentelemetry/sdk-node": ">=0.200.0",
+    "@opentelemetry/sdk-trace-web": ">=1.19.0",
     "langchain": ">=0.3.0"
   }
 }
