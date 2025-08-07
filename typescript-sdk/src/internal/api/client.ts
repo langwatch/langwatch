@@ -11,7 +11,10 @@ const configSchema = z.object({
   endpoint: z.string().url("Endpoint must be a valid URL"),
 });
 
-export function createLangWatchApiClient(apiKey?: string | undefined, endpoint?: string | undefined ): LangwatchApiClient {
+export function createLangWatchApiClient(
+  apiKey?: string | undefined,
+  endpoint?: string | undefined,
+): LangwatchApiClient {
   // This will error if the config is invalid
   const config = configSchema.parse({
     apiKey: apiKey ?? getApiKey(),
@@ -26,5 +29,3 @@ export function createLangWatchApiClient(apiKey?: string | undefined, endpoint?:
     },
   });
 }
-
-

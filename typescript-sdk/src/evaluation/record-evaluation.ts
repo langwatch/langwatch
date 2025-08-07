@@ -1,7 +1,7 @@
 import { EvaluationRESTResult } from "../internal/generated/types/evaluations";
 import * as intSemconv from "../observability/semconv";
 import { Attributes, SpanStatusCode } from "@opentelemetry/api";
-import { generate } from "xksuid";
+import KSUID from "ksuid";
 import { tracer } from "./tracer";
 
 export interface RecordedEvaluationDetails {
@@ -61,7 +61,8 @@ export function recordEvaluation(
       span.setType(details.isGuardrail ? "guardrail" : "evaluation");
       span.addEvent(intSemconv.ATTR_LANGWATCH_EVALUATION_CUSTOM, {
         json_encoded_event: JSON.stringify({
-          evaluation_id: details.evaluationId ?? `eval_${generate()}`,
+          evaluation_id:
+            details.evaluationId ?? `eval_${KSUID.randomSync().string}`,
           name: details.name,
           type: details.type,
           is_guardrail: details.isGuardrail,
@@ -91,7 +92,10 @@ export function recordEvaluation(
       }
     } catch (error) {
       span.recordException(error as Error);
-      span.setStatus({ code: SpanStatusCode.ERROR, message: (error as Error)?.message });
+      span.setStatus({
+        code: SpanStatusCode.ERROR,
+        message: (error as Error)?.message,
+      });
     } finally {
       span.end();
     }

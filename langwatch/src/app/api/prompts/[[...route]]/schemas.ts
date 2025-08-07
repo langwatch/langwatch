@@ -33,24 +33,22 @@ export const llmPromptConfigSchema = z.object({
  * Schema for prompt output responses
  * Extends the base config schema with version-specific information and prompt content
  */
-export const promptOutputSchema = llmPromptConfigSchema.merge(
-  z.object({
-    version: z.number(),
-    versionId: z.string(),
-    versionCreatedAt: z.date(),
-    model: z.string(),
-    prompt: z.string(),
-    messages: z.array(
-      z
-        .object({
-          role: z.enum(["user", "assistant", "system"]),
-          content: z.string(),
-        })
-        .passthrough()
-    ),
-    response_format: responseFormatSchema.nullable(),
-  })
-);
+export const promptOutputSchema = llmPromptConfigSchema.extend({
+  version: z.number(),
+  versionId: z.string(),
+  versionCreatedAt: z.date(),
+  model: z.string(),
+  prompt: z.string(),
+  messages: z.array(
+    z
+      .object({
+        role: z.enum(["user", "assistant", "system"]),
+        content: z.string(),
+      })
+      .passthrough()
+  ),
+  response_format: responseFormatSchema.nullable(),
+});
 
 /**
  * Schema for creating new prompt versions
