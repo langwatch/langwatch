@@ -2,10 +2,9 @@ import { describe, expect, it, beforeAll, beforeEach } from "vitest";
 import { getLangwatchSDK } from "../../helpers/get-sdk.js";
 import { setupTestTraceProvider } from "../../helpers/setup-test-trace-provider.js";
 import { ReadableSpan } from "@opentelemetry/sdk-trace-node";
+import { ATTR_LANGWATCH_SPAN_TYPE } from "../../../src/observability/semconv";
 
 const { spanExporter, findFinishedSpanByName } = setupTestTraceProvider();
-
-import { ATTR_LANGWATCH_SPAN_TYPE } from "../../../src/observability/semconv";
 
 describe("Prompt tracing", () => {
   let langwatch: typeof import("../../../dist/index.js");

@@ -36,32 +36,3 @@ export const promptResponseFactory = Factory.define<PromptResponse>(
     },
   }),
 );
-
-/**
- * Convenience factory for creating minimal prompts
- */
-export const minimalPromptResponseFactory = promptResponseFactory.params({
-  prompt: "Simple prompt",
-  messages: [],
-  response_format: undefined,
-});
-
-/**
- * Factory for creating prompts with just text response format
- */
-export const textPromptResponseFactory = promptResponseFactory.params({
-  response_format: {
-    type: "json_schema" as const,
-    json_schema: {
-      name: "response",
-      schema: {},
-    },
-  },
-});
-
-/**
- * Factory for creating project-scoped prompts
- */
-export const projectPromptResponseFactory = promptResponseFactory.params({
-  scope: "PROJECT" as const,
-});
