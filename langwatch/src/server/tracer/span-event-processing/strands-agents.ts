@@ -74,7 +74,7 @@ export function extractStrandsAgentsInputOutput(otelSpan: DeepPartial<ISpan>): {
 
         outputChoices.push({
           // Use the role, but fallback to "assistant" if we're at the end of a turn.
-          role: role ?? finishReason === "end_turn" ? "assistant" : void 0,
+          role: role !== void 0 ? role : (finishReason === "end_turn" ? "assistant" : void 0),
           content: jsonOrString(event.attributes.find(a => a?.key === "message")?.value?.stringValue),
           id: event.attributes.find(a => a?.key === "id")?.value?.stringValue,
           finish_reason: event.attributes.find(a => a?.key === "finish_reason")?.value?.stringValue,
