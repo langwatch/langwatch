@@ -27,7 +27,7 @@ function makeMockTracer() {
   } as unknown as Tracer;
 }
 
-describe.skip("getTracer", () => {
+describe("getTracer", () => {
   const origGetTracer = vi.hoisted(() => vi.fn());
   let otelTrace: { getTracer: typeof origGetTracer };
 
@@ -131,7 +131,7 @@ describe.skip("getTracer", () => {
   });
 });
 
-describe.skip("getTracer (withActiveSpan)", () => {
+describe("getTracer (withActiveSpan)", () => {
   let tracer: ReturnType<typeof getLangWatchTracer>;
   beforeEach(() => {
     tracer = getLangWatchTracer("test");
@@ -222,7 +222,7 @@ describe.skip("getTracer (withActiveSpan)", () => {
 
   it("throws if withActiveSpan is called without a function", async () => {
     // @ts-expect-error
-    await expect(tracer.withActiveSpan("no-fn")).rejects.toThrow(
+    return await expect(tracer.withActiveSpan("no-fn")).rejects.toThrow(
       /function as the last argument/,
     );
   });
