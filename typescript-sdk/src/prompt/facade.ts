@@ -61,7 +61,7 @@ export class PromptFacade {
    * @param handleOrId The prompt's handle or unique identifier.
    * @throws {PromptsError} If the API call fails.
    */
-  async delete(handleOrId: string): Promise<void> {
+  async delete(handleOrId: string): Promise<{ success: boolean }> {
     return this.service.delete(handleOrId);
   }
 }

@@ -16,7 +16,7 @@ export const promptResponseFactory = Factory.define<PromptResponse>(
     versionId: `prompt_version_${sequence}`,
     versionCreatedAt: new Date().toISOString(),
     model: "gpt-4o-mini",
-    prompt: "Hello {{name}}, how can I help you today?",
+    prompt: "Hello {{name}}, how is the {{topic}} today?",
     messages: [
       {
         role: "system" as const,
@@ -24,7 +24,7 @@ export const promptResponseFactory = Factory.define<PromptResponse>(
       },
       {
         role: "user" as const,
-        content: "Hello {{name}}, how can I help you today?",
+        content: "Tell me about {{topic}}",
       },
     ],
     response_format: {

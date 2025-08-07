@@ -1,5 +1,5 @@
 import { describe, expect, it, beforeAll } from "vitest";
-import { getLangwatchSDK } from "../../helpers/get-sdk.js";
+import { getLangwatchSDK } from "../../helpers/get-sdk";
 
 describe("Prompt management", () => {
   let langwatch: typeof import("../../../dist/index.js");
