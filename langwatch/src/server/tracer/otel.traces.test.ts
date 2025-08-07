@@ -1641,10 +1641,11 @@ describe("opentelemetry traces receiver", () => {
       type: "chat_messages",
       value: [
         {
-          role: "choice",
           content: [{ text: "Hello!" }],
           id: "choice-1",
           finish_reason: "stop",
+          role: void 0,
+          tool_result: void 0,
         },
       ],
     });
