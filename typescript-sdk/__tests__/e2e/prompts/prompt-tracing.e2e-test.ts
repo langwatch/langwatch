@@ -1,21 +1,9 @@
 import { describe, expect, it, beforeAll, beforeEach } from "vitest";
 import { getLangwatchSDK } from "../../helpers/get-sdk.js";
-import {
-  InMemorySpanExporter,
-  SimpleSpanProcessor,
-  NodeTracerProvider,
-  ReadableSpan,
-} from "@opentelemetry/sdk-trace-node";
+import { setupTestTraceProvider } from "../../helpers/setup-test-trace-provider.js";
+import { ReadableSpan } from "@opentelemetry/sdk-trace-node";
 
-// Set up tracing BEFORE importing the modules that use tracers
-let spanExporter: InMemorySpanExporter;
-let tracerProvider: NodeTracerProvider;
-
-spanExporter = new InMemorySpanExporter();
-tracerProvider = new NodeTracerProvider({
-  spanProcessors: [new SimpleSpanProcessor(spanExporter)],
-});
-tracerProvider.register();
+const { spanExporter, findFinishedSpanByName } = setupTestTraceProvider();
 
 import { ATTR_LANGWATCH_SPAN_TYPE } from "../../../src/observability/semconv";
 
@@ -26,22 +14,17 @@ describe("Prompt tracing", () => {
     langwatch = await getLangwatchSDK();
   });
 
+  beforeEach(() => {
+    spanExporter.reset();
+  });
+
   describe("get tracing", () => {
-    let spans: ReadableSpan[];
     let getSpan: ReadableSpan | undefined;
 
     beforeEach(async () => {
-      // Clear any previous spans
-      spanExporter.reset();
-
       // Test template compilation
-      const prompt = await langwatch.prompts.get("prompt_123");
-      prompt.compile({
-        name: "Alice",
-        topic: "weather",
-      });
-      spans = spanExporter.getFinishedSpans();
-      getSpan = spans.find((span) => span.name === "retrieve prompt");
+      await langwatch.prompts.get("prompt_123");
+      getSpan = findFinishedSpanByName("retrieve prompt");
     });
 
     it("should create a span with correct name", () => {
@@ -77,21 +60,16 @@ describe("Prompt tracing", () => {
   });
 
   describe("compilation", () => {
-    let spans: ReadableSpan[];
     let compileSpan: ReadableSpan | undefined;
 
     beforeEach(async () => {
-      // Clear any previous spans
-      spanExporter.reset();
-
       // Test template compilation
       const prompt = await langwatch.prompts.get("prompt_123");
       prompt.compile({
         name: "Alice",
         topic: "weather",
       });
-      spans = spanExporter.getFinishedSpans();
-      compileSpan = spans.find((span) => span.name === "compile");
+      compileSpan = findFinishedSpanByName("compile");
     });
 
     it("should create a span with correct name", () => {
