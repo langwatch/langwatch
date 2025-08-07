@@ -259,10 +259,10 @@ export function getLangWatchTracer(
 
                 // Handle promise case
                 if (
-                  result &&
-                  ["then", "catch", "finally"].includes(typeof result)
+                  typeof result === "object" &&
+                  typeof result.then === "function"
                 ) {
-                  return result
+                  return Promise.resolve(result)
                     .catch(handleError)
                     .finally(() => wrappedSpan.end());
                 }
