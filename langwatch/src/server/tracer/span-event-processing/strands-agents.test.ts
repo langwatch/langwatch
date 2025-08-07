@@ -270,4 +270,62 @@ describe("extractStrandsAgentsInputOutput", () => {
       },
     });
   });
+
+  it("assigns 'assistant' role to choice when role is missing and finish_reason is 'end_turn'", () => {
+    const span: DeepPartial<ISpan> = {
+      events: [
+        {
+          name: "gen_ai.choice",
+          attributes: [
+            { key: "message", value: { stringValue: '"response"' } },
+            { key: "id", value: { stringValue: "choice-1" } },
+            { key: "finish_reason", value: { stringValue: "end_turn" } },
+            // No 'role' attribute
+          ],
+        },
+        {
+          name: "gen_ai.choice",
+          attributes: [
+            { key: "message", value: { stringValue: '"response2"' } },
+            { key: "id", value: { stringValue: "choice-2" } },
+            { key: "finish_reason", value: { stringValue: "not_end_turn" } },
+            // No 'role' attribute
+          ],
+        },
+        {
+          name: "gen_ai.choice",
+          attributes: [
+            { key: "message", value: { stringValue: '"response3"' } },
+            { key: "id", value: { stringValue: "choice-3" } },
+            { key: "finish_reason", value: { stringValue: "end_turn" } },
+            { key: "role", value: { stringValue: "customrole" } },
+          ],
+        },
+      ] as unknown as IEvent[],
+    };
+    const result = extractStrandsAgentsInputOutput(span);
+    expect(result?.output?.value).toEqual([
+      {
+        role: "assistant",
+        content: "response",
+        id: "choice-1",
+        finish_reason: "end_turn",
+        tool_result: void 0,
+      },
+      {
+        role: void 0,
+        content: "response2",
+        id: "choice-2",
+        finish_reason: "not_end_turn",
+        tool_result: void 0,
+      },
+      {
+        role: "customrole",
+        content: "response3",
+        id: "choice-3",
+        finish_reason: "end_turn",
+        tool_result: void 0,
+      },
+    ]);
+  });
 });
