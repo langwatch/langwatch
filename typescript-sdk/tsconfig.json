@@ -17,7 +17,14 @@
         "jsx": "preserve",
         "incremental": true,
         "noUncheckedIndexedAccess": true,
-        "tsBuildInfoFile": "./tsconfig.tsbuildinfo"
+        "tsBuildInfoFile": "./tsconfig.tsbuildinfo",
+        "paths": {
+            "@/*": ["./src/*"],
+            "@/cli/*": ["./src/cli/*"],
+            "@/client-sdk/*": ["./src/client-sdk/*"],
+            "@/observability-sdk/*": ["./src/observability-sdk/*"],
+            "@/internal/*": ["./src/internal/*"]
+        }
     },
     "include": ["**/*.ts", "vitest.config.mts"],
     "exclude": [
