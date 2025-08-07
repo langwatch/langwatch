@@ -1,5 +1,5 @@
 import { Liquid } from "liquidjs";
-import type { paths } from "../internal/generated/openapi/api-client";
+import type { paths } from "@/internal/generated/openapi/api-client";
 import { PromptTracingDecorator } from "./tracing/prompt-tracing.decorator";
 import { createTracingProxy } from "./tracing";
 

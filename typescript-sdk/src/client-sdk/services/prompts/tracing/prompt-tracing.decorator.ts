@@ -1,17 +1,14 @@
 import { tracer } from "./tracer";
-import * as intSemconv from "../../observability/semconv";
-import {
-  canAutomaticallyCaptureInput,
-  canAutomaticallyCaptureOutput,
-} from "../../client";
+import * as intSemconv from "@/observability-sdk/semconv";
 import { Prompt } from "../prompt";
+import { InternalConfig } from "@/client-sdk/types";
 
 /**
  * Class that decorates the target prompt,
  * adding tracing to specific methods.
  */
 export class PromptTracingDecorator {
-  constructor(private readonly target: Prompt) {}
+  constructor(private readonly target: Prompt, private readonly config: InternalConfig) {}
 
   compile(...variables: Parameters<Prompt["compile"]>) {
     return this.wrapCompileFn("compile", this.target.compile)(...variables);
@@ -34,7 +31,7 @@ export class PromptTracingDecorator {
 
         const result = fn.apply(this.target, variables);
 
-        if (canAutomaticallyCaptureOutput()) {
+        if (this.config.observability?.dataCapture.mode === "output") {
           span.setOutput(result);
         }
 
@@ -44,7 +41,7 @@ export class PromptTracingDecorator {
           [intSemconv.ATTR_LANGWATCH_PROMPT_VERSION_NUMBER]: result.version,
         });
 
-        if (variables && canAutomaticallyCaptureInput()) {
+        if (variables && this.config.observability?.dataCapture?.input) {
           span.setAttribute(
             intSemconv.ATTR_LANGWATCH_PROMPT_VARIABLES,
             JSON.stringify({

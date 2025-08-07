@@ -1,10 +1,10 @@
 import { type CacheStore, InMemoryCacheStore } from "./cache";
-import { PromptsFacade } from "./services/prompts";
+import { PromptFacade } from "./services/prompts";
 import { type InternalConfig } from "./types";
 import { createLangWatchApiClient } from "../internal/api/client";
-import { trace, Tracer } from "@opentelemetry/api";
 import { Logger, NoOpLogger } from "../logger";
 import { TracesFacade } from "./services/traces/facade";
+import { DataCaptureOptions, getLangWatchTracer, LangWatchTracer } from "@/observability-sdk";
 
 const DEFAULT_ENDPOINT = "https://api.langwatch.com";
 
@@ -18,14 +18,18 @@ export interface LangWatchConstructorOptions {
       defaultCacheTtlMs?: number;
     };
     traces?: {},
+
+    observability?: {
+      dataCapture?: DataCaptureOptions;
+    },
   };
 }
 
 export class LangWatch {
   readonly #config: InternalConfig;
-  readonly #tracer: Tracer = trace.getTracer("langwatch");
+  readonly #tracer: LangWatchTracer = getLangWatchTracer("langwatch");
 
-  readonly prompts: PromptsFacade;
+  readonly prompts: PromptFacade;
   readonly traces: TracesFacade;
 
   constructor(options: LangWatchConstructorOptions = {}) {
@@ -38,7 +42,7 @@ export class LangWatch {
       options: options.options,
     });
 
-    this.prompts = new PromptsFacade(this.#config);
+    this.prompts = new PromptFacade(this.#config);
     this.traces = new TracesFacade(this.#config);
   }
 
@@ -55,12 +59,15 @@ export class LangWatch {
       logger: options?.logger ?? new NoOpLogger(),
       cacheStore: options?.cacheStore ?? new InMemoryCacheStore(),
       prompts: {
-        ...PromptsFacade.defaultOptions,
+        ...PromptFacade.defaultOptions,
         ...options?.prompts,
       },
       traces: {
         ...TracesFacade.defaultOptions,
         ...options?.traces,
+      },
+      observability: {
+        dataCapture: options?.observability?.dataCapture ?? "all",
       },
       langwatchApiClient: createLangWatchApiClient(apiKey, endpoint),
     };

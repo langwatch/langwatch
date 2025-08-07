@@ -1,20 +1,9 @@
-import {
-  createLangWatchApiClient,
-  type LangwatchApiClient,
-} from "../internal/api/client";
-import type { paths } from "../internal/generated/openapi/api-client";
+import type { paths } from "@/internal/generated/openapi/api-client";
 import { Prompt, type PromptResponse } from "./prompt";
-import { PromptConverter } from "./converter";
-import type {
-  UpdatePromptBody,
-  CreateVersionBody,
-  CreatePromptBody,
-} from "./types";
-import { tracer } from "../evaluation/tracer";
-import { canAutomaticallyCaptureInput } from "../client";
-import { canAutomaticallyCaptureOutput } from "../client";
-import { SpanType } from "../observability";
+import { PromptConverter } from "@/cli/utils/promptConverter";
 import { PromptServiceTracingDecorator, createTracingProxy } from "./tracing";
+import { InternalConfig } from "@/client-sdk/types";
+import { CreatePromptBody, CreateVersionBody, UpdatePromptBody } from "./types";
 
 /**
  * Custom error class for Prompts API operations.
@@ -48,10 +37,6 @@ export interface SyncResult {
   };
 }
 
-interface PromptServiceOptions {
-  client?: LangwatchApiClient;
-}
-
 /**
  * Service for managing prompt resources via the Langwatch API.
  * Constructor creates a proxy that wraps the service and traces all methods.
@@ -63,37 +48,19 @@ interface PromptServiceOptions {
  *
  * All methods return Prompt instances, which encapsulate prompt data and template logic.
  */
-export class PromptService {
-  private client: LangwatchApiClient;
-  private static instance: PromptService | null = null;
+export class PromptsService {
+  private config: InternalConfig;
 
-  constructor(opts?: PromptServiceOptions) {
-    this.client = opts?.client ?? createLangWatchApiClient();
+  constructor(config: InternalConfig) {
+    this.config = config;
+
     /**
      * Wraps the service in a tracing proxy via the decorator.
      */
     return createTracingProxy(
-      this as PromptService,
+      this as PromptsService,
       PromptServiceTracingDecorator,
     );
-  }
-
-  /**
-   * Gets the singleton instance of PromptService.
-   * Creates the instance lazily on first access.
-   */
-  public static getInstance(): PromptService {
-    if (!PromptService.instance) {
-      PromptService.instance = new PromptService();
-    }
-    return PromptService.instance;
-  }
-
-  /**
-   * Resets the singleton instance. Primarily used for testing.
-   */
-  public static resetInstance(): void {
-    PromptService.instance = null;
   }
 
   /**
@@ -120,7 +87,7 @@ export class PromptService {
    * @throws {PromptsError} If the API call fails.
    */
   async getAll(): Promise<Prompt[]> {
-    const { data, error } = await this.client.GET("/api/prompts");
+    const { data, error } = await this.config.langwatchApiClient.GET("/api/prompts");
     if (error) this.handleApiError("fetch all prompts", error);
     return data.map((promptData) => new Prompt(promptData));
   }
@@ -135,7 +102,7 @@ export class PromptService {
     id: string,
     options?: { version?: string },
   ): Promise<Prompt | null> {
-    const { data, error } = await this.client.GET("/api/prompts/{id}", {
+    const { data, error } = await this.config.langwatchApiClient.GET("/api/prompts/{id}", {
       params: { path: { id } },
       query: {
         version: options?.version,
@@ -170,7 +137,7 @@ export class PromptService {
    * @throws {PromptsError} If the API call fails.
    */
   async create(params: CreatePromptBody): Promise<Prompt> {
-    const { data, error } = await this.client.POST("/api/prompts", {
+    const { data, error } = await this.config.langwatchApiClient.POST("/api/prompts", {
       body: params,
     });
     if (error) this.handleApiError("create prompt", error);
@@ -187,7 +154,7 @@ export class PromptService {
    *   The API does not return the updated prompt directly, so this method fetches it after updating.
    */
   async update(id: string, params: UpdatePromptBody): Promise<Prompt> {
-    const { error } = await this.client.PUT("/api/prompts/{id}", {
+    const { error } = await this.config.langwatchApiClient.PUT("/api/prompts/{id}", {
       params: { path: { id } },
       body: params,
     });
@@ -210,7 +177,7 @@ export class PromptService {
    * @throws {PromptsError} If the API call fails.
    */
   async delete(id: string): Promise<{ success: boolean }> {
-    const { data, error } = await this.client.DELETE("/api/prompts/{id}", {
+    const { data, error } = await this.config.langwatchApiClient.DELETE("/api/prompts/{id}", {
       params: { path: { id } },
     });
     if (error) this.handleApiError(`delete prompt with ID "${id}"`, error);
@@ -224,7 +191,7 @@ export class PromptService {
    * @throws {PromptsError} If the API call fails.
    */
   async getVersions(id: string): Promise<Record<string, Prompt>> {
-    const { data, error } = await this.client.GET(
+    const { data, error } = await this.config.langwatchApiClient.GET(
       "/api/prompts/{id}/versions",
       {
         params: { path: { id } },
@@ -268,7 +235,7 @@ export class PromptService {
    *   The API does not return the updated prompt directly, so this method fetches it after creation.
    */
   async createVersion(id: string, params: CreateVersionBody): Promise<Prompt> {
-    const { error } = await this.client.POST("/api/prompts/{id}/versions", {
+    const { error } = await this.config.langwatchApiClient.POST("/api/prompts/{id}/versions", {
       params: { path: { id } },
       body: params,
     });
@@ -352,7 +319,7 @@ export class PromptService {
     commitMessage?: string;
   }): Promise<SyncResult> {
     try {
-      const response = await this.client.POST("/api/prompts/{id}/sync", {
+      const response = await this.config.langwatchApiClient.POST("/api/prompts/{id}/sync", {
         params: { path: { id: params.name } },
         body: {
           configData: params.configData,
@@ -378,51 +345,4 @@ export class PromptService {
       throw new PromptsError(message, "sync", error);
     }
   }
-}
-// Generic tracing utility
-function traceMethod<T extends (...args: any[]) => any>(
-  fn: T,
-  metadata: {
-    spanName: string;
-    spanType: SpanType;
-    extractAttributes?: (
-      params: Parameters<T>,
-      result?: Awaited<ReturnType<T>>,
-    ) => Record<string, any>;
-    captureInput?: (params: Parameters<T>) => any;
-    captureOutput?: (result: Awaited<ReturnType<T>>) => any;
-  },
-): T {
-  return ((...params: Parameters<T>) => {
-    return tracer.withActiveSpan(metadata.spanName, async (span) => {
-      span.setType(metadata.spanType);
-
-      if (metadata.extractAttributes) {
-        const attrs = metadata.extractAttributes(params);
-        span.setAttributes(attrs);
-      }
-
-      if (metadata.captureInput && canAutomaticallyCaptureInput()) {
-        span.setInput(metadata.captureInput(params));
-      }
-
-      try {
-        const result = await fn(...params);
-
-        if (metadata.extractAttributes) {
-          const attrs = metadata.extractAttributes(params, result);
-          span.setAttributes(attrs);
-        }
-
-        if (metadata.captureOutput && canAutomaticallyCaptureOutput()) {
-          span.setOutput(metadata.captureOutput(result));
-        }
-
-        return result;
-      } catch (error) {
-        span.recordException(error as Error);
-        throw error;
-      }
-    });
-  }) as T;
 }
