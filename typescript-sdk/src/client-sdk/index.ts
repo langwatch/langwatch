@@ -18,10 +18,6 @@ export interface LangWatchConstructorOptions {
       defaultCacheTtlMs?: number;
     };
     traces?: {},
-
-    observability?: {
-      dataCapture?: DataCaptureOptions;
-    },
   };
 }
 
@@ -65,9 +61,6 @@ export class LangWatch {
       traces: {
         ...TracesFacade.defaultOptions,
         ...options?.traces,
-      },
-      observability: {
-        dataCapture: options?.observability?.dataCapture ?? "all",
       },
       langwatchApiClient: createLangWatchApiClient(apiKey, endpoint),
     };
