@@ -1,6 +1,6 @@
 import { PromptService } from "./service";
 import type { Prompt } from "./prompt";
-import type { CreatePromptBodyV2, UpdatePromptBody } from "./types";
+import type { CreatePromptBody, UpdatePromptBody } from "./types";
 
 /**
  * Facade for prompt operations in the LangWatch SDK.
@@ -14,12 +14,20 @@ export class PromptFacade {
   }
 
   /**
+   * Gets the singleton instance of PromptFacade.
+   * Creates the instance lazily on first access.
+   */
+  static getInstance(): PromptFacade {
+    return new PromptFacade();
+  }
+
+  /**
    * Creates a new prompt.
    * @param data The prompt creation payload.
    * @returns The created Prompt instance.
    * @throws {PromptsError} If the API call fails.
    */
-  async create(data: CreatePromptBodyV2): Promise<Prompt> {
+  async create(data: CreatePromptBody): Promise<Prompt> {
     return this.service.create(data);
   }
 
