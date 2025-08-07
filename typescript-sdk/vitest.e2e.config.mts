@@ -1,4 +1,5 @@
 import { defineConfig } from "vitest/config";
+import { resolve } from "path";
 
 export default defineConfig({
     test: {
@@ -9,5 +10,14 @@ export default defineConfig({
             "__tests__/e2e/**/*.e2e-test.ts",
             "src/__tests___e2e/**/*.e2e.test.ts",
         ],
+    },
+    resolve: {
+        alias: {
+            "@": resolve(__dirname, "./src"),
+            "@/cli": resolve(__dirname, "./src/cli"),
+            "@/client-sdk": resolve(__dirname, "./src/client-sdk"),
+            "@/observability-sdk": resolve(__dirname, "./src/observability-sdk"),
+            "@/internal": resolve(__dirname, "./src/internal"),
+        },
     },
 });

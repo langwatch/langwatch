@@ -41,12 +41,14 @@
     "directory": "typescript-sdk"
   },
   "scripts": {
-    "prepare": "./copy-types.sh && pnpm run generate:openapi-types",
+    "prepare": "pnpm run generate:server-types && pnpm run generate:openapi-types",
     "test": "vitest",
+    "test:e2e": "vitest run -c ./vitest.e2e.config.mts",
     "prebuild": "pnpm run prepare",
-    "build": "tsgo --noEmit &&  tsup",
+    "build": "tsgo --noEmit && tsup",
     "prepublish": "pnpm run build",
-    "generate:openapi-types": "npx openapi-typescript ../langwatch/src/app/api/openapiLangWatch.json -o ./src/internal/generated/openapi/api-client.ts"
+    "generate:openapi-types": "npx openapi-typescript ../langwatch/src/app/api/openapiLangWatch.json -o ./src/internal/generated/openapi/api-client.ts",
+    "generate:server-types": "./copy-types.sh"
   },
   "author": "LangWatch",
   "license": "MIT",

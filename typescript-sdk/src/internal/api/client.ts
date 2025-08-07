@@ -1,33 +1,25 @@
 import openApiCreateClient from "openapi-fetch";
 import type { paths } from "../generated/openapi/api-client";
-import { z } from "zod";
 import { version } from "../../../package.json";
+import { LANGWATCH_SDK_LANGUAGE, LANGWATCH_SDK_NAME_OBSERVABILITY, LANGWATCH_SDK_RUNTIME, LANGWATCH_SDK_VERSION } from "../constants";
 
-// Define the client type explicitly to avoid naming issues
 export type LangwatchApiClient = ReturnType<typeof openApiCreateClient<paths>>;
-
-const configSchema = z.object({
-  apiKey: z.string().min(1, "API key is required"),
-  endpoint: z.url("Endpoint must be a valid URL"),
-});
 
 export function createLangWatchApiClient(
   apiKey?: string | undefined,
   endpoint?: string | undefined,
 ): LangwatchApiClient {
-  // This will error if the config is invalid
-  const config = configSchema.parse({
-    apiKey: apiKey,
-    endpoint: endpoint,
-  });
-
   return openApiCreateClient<paths>({
-    baseUrl: config.endpoint,
+    baseUrl: endpoint,
     headers: {
-      "Authorization": `Bearer ${config.apiKey}`,
-      "X-Auth-Token": config.apiKey,
-      "Content-Type": "application/json",
-      "User-Agent": `langwatch-sdk-node/${version}`,
+      "authorization": `Bearer ${apiKey}`,
+      "x-auth-token": apiKey,
+      "content-type": "application/json",
+      "user-agent": `langwatch-sdk-node/${version}`,
+      "x-langwatch-sdk-name": LANGWATCH_SDK_NAME_OBSERVABILITY,
+      "x-langwatch-sdk-language": LANGWATCH_SDK_LANGUAGE,
+      "x-langwatch-sdk-version": LANGWATCH_SDK_VERSION,
+      "x-langwatch-sdk-platform": LANGWATCH_SDK_RUNTIME(),
     },
   });
 }
