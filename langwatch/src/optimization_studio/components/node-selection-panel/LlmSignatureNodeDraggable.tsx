@@ -14,6 +14,12 @@ import {
 } from "~/prompt-configs/llmPromptConfigUtils";
 import type { NodeWithOptionalPosition } from "~/types";
 import { api } from "~/utils/api";
+import { createLogger } from "~/utils/logger";
+import { snakeCase } from "~/utils/stringCasing";
+
+const logger = createLogger(
+  "langwatch:optimization_studio:node-selection-panel:LlmSignatureNodeDraggable"
+);
 
 export function LlmSignatureNodeDraggable() {
   const { project } = useOrganizationTeamProject();
@@ -41,17 +47,23 @@ export function LlmSignatureNodeDraggable() {
           workflowName,
           nodes
         );
+
+        /**
+         * Convert the name to the handle standard
+         */
+        const handle = snakeCase(promptName);
+
         // Do this right away so that it appears snappy
         setNode({
           id: item.node.id,
           data: {
-            name: promptName,
+            name: handle,
           },
         });
 
         try {
           const config = await createConfigWithInitialVersion.mutateAsync({
-            name: promptName,
+            handle,
             projectId: project.id,
           });
 
@@ -60,7 +72,12 @@ export function LlmSignatureNodeDraggable() {
             data: llmConfigToOptimizationStudioNodeData(config),
           });
         } catch (error) {
-          console.error("Error creating new prompt", error);
+          logger.error("Error creating new prompt", {
+            error,
+            workflowName,
+            handle,
+          });
+
           toaster.error({
             title: "Error",
             description: "Error creating new prompt",

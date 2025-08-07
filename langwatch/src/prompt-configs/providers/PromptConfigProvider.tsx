@@ -8,6 +8,11 @@ import {
 } from "react";
 import { type UseFormReturn } from "react-hook-form";
 
+import type { LlmConfigWithLatestVersion } from "../../server/prompt-config/repositories";
+import {
+  ChangeHandleDialog,
+  type ChangeHandleDialogFormValues,
+} from "../forms/ChangeHandleDialog";
 import {
   SaveVersionDialog,
   type SaveDialogFormValues,
@@ -17,11 +22,6 @@ import type { PromptConfigFormValues } from "../hooks/usePromptConfigForm";
 
 import { toaster } from "~/components/ui/toaster";
 import { promptConfigFormValuesVersionToLlmConfigVersionConfigData } from "~/prompt-configs/llmPromptConfigUtils";
-import type { LlmConfigWithLatestVersion } from "../../server/prompt-config/repositories";
-import {
-  ChangeHandleDialog,
-  type ChangeHandleDialogFormValues,
-} from "../forms/ChangeHandleDialog";
 
 interface PromptConfigContextType {
   triggerSaveVersion: ({
@@ -158,7 +158,9 @@ export function PromptConfigProvider({
 
   const firstTimeSave = !!(
     currentConfig &&
-    (!currentConfig.handle || currentConfig.handle === currentConfig.id)
+    (!currentConfig.handle ||
+      // currentConfig.handle === currentConfig.id || // possibly not needed
+      currentConfig.latestVersion.version === 0)
   );
 
   return (

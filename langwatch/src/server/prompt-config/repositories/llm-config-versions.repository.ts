@@ -19,6 +19,11 @@ import { LlmConfigRepository } from "./llm-config.repository";
  */
 export type LlmConfigVersionDTO = Omit<LatestConfigVersionSchema, "version">;
 
+export type CreateLlmConfigVersionParams = Omit<
+  LlmPromptConfigVersion,
+  "id" | "author" | "config" | "createdAt"
+>;
+
 /**
  * Repository for managing LLM Configuration Versions
  * Follows Single Responsibility Principle by focusing only on LLM config versions data access
@@ -237,5 +242,9 @@ export class LlmConfigVersionsRepository {
     );
 
     return newVersion;
+  }
+
+  generateVersionId() {
+    return `prompt_version_${nanoid()}`;
   }
 }

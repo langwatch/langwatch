@@ -53,7 +53,7 @@ export const llmPromptConfigVersionFactory = Factory.define<
     ? parseLlmConfigVersion(params?.configData as any)
     : {
         prompt: "You are a helpful assistant",
-        model: "gpt-4o-mini",
+        model: "openai/gpt-4o-mini",
         inputs: [{ identifier: "input", type: "str" }],
         outputs: [{ identifier: "output", type: "str" }],
         demonstrations: {

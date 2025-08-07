@@ -1,5 +1,6 @@
 import { HStack, Spacer, Text } from "@chakra-ui/react";
 import type { Node } from "@xyflow/react";
+import { nanoid } from "nanoid";
 import { useMemo } from "react";
 import { useFormContext } from "react-hook-form";
 
@@ -8,11 +9,13 @@ import type { LlmConfigWithLatestVersion } from "~/server/prompt-config/reposito
 
 import { PromptSource } from "./PromptSource";
 
+import { GenerateApiSnippetButton } from "~/components/GenerateApiSnippetButton";
 import { toaster } from "~/components/ui/toaster";
 import { VerticalFormControl } from "~/components/VerticalFormControl";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useSmartSetNode } from "~/optimization_studio/hooks/useSmartSetNode";
 import type { LlmPromptConfigComponent } from "~/optimization_studio/types/dsl";
+import { GeneratePromptApiSnippetDialog } from "~/prompt-configs/components/GeneratePromptApiSnippetDialog";
 import { VersionHistoryButton } from "~/prompt-configs/forms/prompt-config-form/components/VersionHistoryButton";
 import { VersionSaveButton } from "~/prompt-configs/forms/prompt-config-form/components/VersionSaveButton";
 import { useGetPromptConfigByIdWithLatestVersionQuery } from "~/prompt-configs/hooks/useGetPromptConfigByIdWithLatestVersionQuery";
@@ -23,9 +26,7 @@ import {
 } from "~/prompt-configs/llmPromptConfigUtils";
 import { api } from "~/utils/api";
 import { createLogger } from "~/utils/logger";
-import { GeneratePromptApiSnippetDialog } from "~/prompt-configs/components/GeneratePromptApiSnippetDialog";
-import { GenerateApiSnippetButton } from "~/components/GenerateApiSnippetButton";
-import { CopyButton } from "../../../../../components/CopyButton";
+import { snakeCase } from "~/utils/stringCasing";
 
 const logger = createLogger(
   "langwatch:optimization_studio:prompt_source_header"
@@ -73,9 +74,15 @@ export function PromptSourceHeader({
   const handleSaveVersion = async () => {
     // If no saved config, we will need to create a new one
     if (!savedConfig) {
+      // Handles are now required, so this is a fallback for having to "pre-create" a config
+      const handle = snakeCase(node.data.name ?? `prompt-${nanoid(5)}`);
+      // Reset the node name
+      node.data.name = handle;
+
       try {
         const newConfig = await createConfig({
           projectId,
+          handle,
         });
 
         // Update the node data with the new config ID

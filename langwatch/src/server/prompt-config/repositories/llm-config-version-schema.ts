@@ -3,10 +3,17 @@ import type { LlmPromptConfigVersion } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 
-import { LlmConfigInputTypes, LlmConfigOutputTypes } from "../../../types";
-import type { LlmConfigVersionDTO } from "./llm-config-versions.repository";
-import { createLogger } from "../../../utils/logger";
 import { nodeDatasetSchema } from "../../../optimization_studio/types/dsl";
+import { createLogger } from "../../../utils/logger";
+
+import type { LlmConfigVersionDTO } from "./llm-config-versions.repository";
+
+import {
+  inputsSchema,
+  messageSchema,
+  outputsSchema,
+  promptingTechniqueSchema,
+} from "~/prompt-configs/schemas/field-schemas";
 
 const logger = createLogger(
   "langwatch:prompt-config:llm-config-version-schema"
@@ -22,25 +29,6 @@ export enum SchemaVersion {
 }
 
 export const LATEST_SCHEMA_VERSION = SchemaVersion.V1_0 as const;
-
-/**
- * Base schema for input and output parameters
- */
-const inputsSchema = z.object({
-  identifier: z.string().min(1, "Identifier cannot be empty"),
-  type: z.enum(LlmConfigInputTypes),
-});
-
-export const outputsSchema = z.object({
-  identifier: z.string().min(1, "Identifier cannot be empty"),
-  type: z.enum(LlmConfigOutputTypes),
-  json_schema: z
-    .object({
-      type: z.string().min(1, "Type cannot be empty"),
-    })
-    .passthrough()
-    .optional(),
-});
 
 /**
  * Schema v1.0 - Base configuration schema
@@ -64,27 +52,14 @@ const configSchemaV1_0 = z.object({
   configData: z.object({
     version: z.number().min(1, "Version must be greater than 0").optional(),
     prompt: z.string(),
-    messages: z
-      .array(
-        z
-          .object({
-            role: z.enum(["user", "assistant", "system"]),
-            content: z.string(),
-          })
-          .passthrough()
-      )
-      .default([]),
+    messages: z.array(messageSchema).default([]),
     inputs: z.array(inputsSchema).min(1, "At least one input is required"),
     outputs: z.array(outputsSchema).min(1, "At least one output is required"),
     model: z.string().min(1, "Model identifier cannot be empty"),
     temperature: z.number().optional(),
     max_tokens: z.number().optional(),
     demonstrations: nodeDatasetSchema.optional(),
-    prompting_technique: z
-      .object({
-        ref: z.string().optional(),
-      })
-      .optional(),
+    prompting_technique: promptingTechniqueSchema.optional(),
   }),
 });
 

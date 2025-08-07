@@ -1,19 +1,28 @@
 import {
   type LlmPromptConfig,
+  type Prisma,
   type PrismaClient,
   type PromptScope,
 } from "@prisma/client";
-
 import { type z } from "zod";
-import { type UpdateLlmConfigDTO } from "./dtos";
+
 import {
+  type CreateLlmConfigParams,
   LlmConfigRepository,
   type LlmConfigWithLatestVersion,
 } from "./repositories";
 import {
   type getLatestConfigVersionSchema,
   SchemaVersion,
+  LATEST_SCHEMA_VERSION,
 } from "./repositories/llm-config-version-schema";
+
+import {
+  type inputsSchema,
+  type messageSchema,
+  type outputsSchema,
+  type promptingTechniqueSchema,
+} from "~/prompt-configs/schemas/field-schemas";
 
 // Extract the configData type from the schema
 type ConfigData = z.infer<
@@ -56,22 +65,79 @@ export class PromptService {
 
   /**
    * Creates a new prompt configuration with an initial version.
-   * If a handle is provided, it will be formatted with the organization and project context.
+   * Will create a default version if no version data is provided.
    *
    * @param params - The parameters object
-   * @param params.name - The name of the prompt
+   * @param params.name - The name of the prompt (do not use this, use handle instead)
    * @param params.projectId - The project ID for authorization and context
-   * @param params.handle - The handle of the prompt
-   * @returns The created prompt configuration
+   * @param params.organizationId - The organization ID for authorization and context
+   * @param params.handle - The handle of the prompt (also used as name)
+   * @param params.scope - The scope of the prompt (defaults to "PROJECT")
+   * @param params.authorId - Optional author ID for the initial version
+   * @param params.configData - Optional initial configuration data
+   * @param params.schemaVersion - Optional schema version (defaults to latest)
+   * @returns The created prompt configuration with its initial version
    */
   async createPrompt(params: {
-    name: string;
+    // Config data
     projectId: string;
     organizationId: string;
-    handle?: string;
-    scope: PromptScope;
+    handle: string;
+    scope?: PromptScope;
+    name?: string;
+    // Version data
+    authorId?: string;
+    prompt?: string;
+    messages?: z.infer<typeof messageSchema>[];
+    inputs?: z.infer<typeof inputsSchema>[];
+    outputs?: z.infer<typeof outputsSchema>[];
+    model?: string;
+    temperature?: number;
+    max_tokens?: number;
+    prompting_technique?: z.infer<typeof promptingTechniqueSchema>;
   }): Promise<LlmConfigWithLatestVersion> {
-    return this.repository.createConfigWithInitialVersion(params);
+    // If any of the version data is provided,
+    // we should create a version from that data
+    // and it's not consideered a draft
+    const shouldCreateVersion = Boolean(
+      params.prompt !== undefined ||
+        params.messages !== undefined ||
+        params.inputs !== undefined ||
+        params.outputs !== undefined ||
+        params.model !== undefined ||
+        params.temperature !== undefined ||
+        params.max_tokens !== undefined ||
+        params.prompting_technique !== undefined
+    );
+
+    return this.repository.createConfigWithInitialVersion({
+      configData: {
+        name: params.name ?? params.handle,
+        handle: params.handle ?? null,
+        projectId: params.projectId,
+        organizationId: params.organizationId,
+        scope: params.scope ?? "PROJECT",
+        authorId: params.authorId,
+      },
+      versionData: shouldCreateVersion
+        ? {
+            configData: {
+              prompt: params.prompt,
+              messages: params.messages,
+              inputs: params.inputs,
+              outputs: params.outputs,
+              model: params.model,
+              temperature: params.temperature,
+              max_tokens: params.max_tokens,
+              prompting_technique: params.prompting_technique,
+            } as Prisma.JsonValue,
+            schemaVersion: LATEST_SCHEMA_VERSION,
+            commitMessage: "Initial version",
+            authorId: params.authorId ?? null,
+            version: 1,
+          }
+        : undefined,
+    });
   }
 
   /**
@@ -87,11 +153,14 @@ export class PromptService {
   async updatePrompt(params: {
     id: string;
     projectId: string;
-    data: UpdateLlmConfigDTO;
+    data: Partial<Pick<CreateLlmConfigParams, "handle" | "scope">>;
   }): Promise<LlmPromptConfig> {
     const { id, projectId, data } = params;
 
-    return this.repository.updateConfig(id, projectId, data);
+    return this.repository.updateConfig(id, projectId, {
+      handle: data.handle,
+      scope: data.scope,
+    });
   }
 
   /**
@@ -178,11 +247,13 @@ export class PromptService {
     // Case 1: Prompt doesn't exist on server - create new
     if (!existingPrompt) {
       const newPrompt = await this.repository.createConfigWithInitialVersion({
-        name: idOrHandle,
-        handle: idOrHandle,
-        projectId,
-        organizationId,
-        scope: "PROJECT" as PromptScope,
+        configData: {
+          name: idOrHandle,
+          handle: idOrHandle,
+          projectId,
+          organizationId,
+          scope: "PROJECT" as PromptScope,
+        },
       });
 
       // Create a new version with the local content

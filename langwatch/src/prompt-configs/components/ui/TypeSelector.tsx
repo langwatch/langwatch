@@ -6,16 +6,17 @@ import {
   useDisclosure,
   Text,
 } from "@chakra-ui/react";
+import Ajv from "ajv";
 import { useCallback, useEffect, useState } from "react";
 import { ChevronDown } from "react-feather";
 import { LuBraces } from "react-icons/lu";
-import { TypeLabel } from "~/optimization_studio/components/nodes/Nodes";
-import type { LlmConfigInputType, LlmConfigOutputType } from "~/types";
+import { fromZodError } from "zod-validation-error";
+
 import { Dialog } from "~/components/ui/dialog";
 import { CodeEditor } from "~/optimization_studio/components/code/CodeEditorModal";
-import Ajv from "ajv";
-import { outputsSchema } from "~/server/prompt-config/repositories/llm-config-version-schema";
-import { fromZodError } from "zod-validation-error";
+import { TypeLabel } from "~/optimization_studio/components/nodes/Nodes";
+import { outputsSchema } from "~/prompt-configs/schemas";
+import type { LlmConfigInputType, LlmConfigOutputType } from "~/types";
 
 /**
  * Type selector with dropdown for field types
