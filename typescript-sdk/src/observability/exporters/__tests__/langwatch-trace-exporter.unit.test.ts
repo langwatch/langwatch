@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { LangWatchExporter, LangWatchExporterOptions } from "../langwatch-exporter";
+import { LangWatchTraceExporter, LangWatchTraceExporterOptions } from "../langwatch-trace-exporter";
 import {
   LANGWATCH_SDK_NAME,
   LANGWATCH_SDK_LANGUAGE,
@@ -43,9 +43,9 @@ describe("LangWatchExporter", () => {
 
   describe("constructor", () => {
     it("should create exporter with default values when no options provided", () => {
-      const exporter = new LangWatchExporter();
+      const exporter = new LangWatchTraceExporter();
 
-      expect(exporter).toBeInstanceOf(LangWatchExporter);
+      expect(exporter).toBeInstanceOf(LangWatchTraceExporter);
       // Access the config through the mock
       expect((exporter as any).config).toBeDefined();
       expect((exporter as any).url).toBe("https://app.langwatch.ai/api/otel/v1/traces");
@@ -53,7 +53,7 @@ describe("LangWatchExporter", () => {
 
     it("should use provided API key in options", () => {
       const apiKey = "test-api-key";
-      const exporter = new LangWatchExporter({ apiKey });
+      const exporter = new LangWatchTraceExporter({ apiKey });
 
       const headers = (exporter as any).headers;
       expect(headers).toMatchObject({
@@ -67,7 +67,7 @@ describe("LangWatchExporter", () => {
 
     it("should use provided endpoint in options", () => {
       const endpoint = "https://custom.langwatch.com";
-      const exporter = new LangWatchExporter({ endpoint });
+      const exporter = new LangWatchTraceExporter({ endpoint });
 
       expect((exporter as any).url).toBe(`${endpoint}/api/otel/v1/traces`);
     });
@@ -75,7 +75,7 @@ describe("LangWatchExporter", () => {
     it("should use both custom API key and endpoint", () => {
       const apiKey = "custom-key";
       const endpoint = "https://custom.langwatch.com";
-      const exporter = new LangWatchExporter({ apiKey, endpoint });
+      const exporter = new LangWatchTraceExporter({ apiKey, endpoint });
 
       expect((exporter as any).url).toBe(`${endpoint}/api/otel/v1/traces`);
       const headers = (exporter as any).headers;
@@ -88,7 +88,7 @@ describe("LangWatchExporter", () => {
       const apiKey = "env-api-key";
       process.env.LANGWATCH_API_KEY = apiKey;
 
-      const exporter = new LangWatchExporter();
+      const exporter = new LangWatchTraceExporter();
 
       const headers = (exporter as any).headers;
       expect(headers.authorization).toBe(`Bearer ${apiKey}`);
@@ -98,7 +98,7 @@ describe("LangWatchExporter", () => {
       const endpoint = "https://env.langwatch.ai";
       process.env.LANGWATCH_ENDPOINT = endpoint;
 
-      const exporter = new LangWatchExporter();
+      const exporter = new LangWatchTraceExporter();
 
       expect((exporter as any).url).toBe(`${endpoint}/api/otel/v1/traces`);
     });
@@ -110,7 +110,7 @@ describe("LangWatchExporter", () => {
       const optionsKey = "options-key";
       const optionsEndpoint = "https://options.langwatch.com";
 
-      const exporter = new LangWatchExporter({
+      const exporter = new LangWatchTraceExporter({
         apiKey: optionsKey,
         endpoint: optionsEndpoint,
       });
@@ -123,7 +123,7 @@ describe("LangWatchExporter", () => {
     it("should use default endpoint when no endpoint provided", () => {
       delete process.env.LANGWATCH_ENDPOINT;
 
-      const exporter = new LangWatchExporter();
+      const exporter = new LangWatchTraceExporter();
 
       expect((exporter as any).url).toBe("https://app.langwatch.ai/api/otel/v1/traces");
     });
@@ -131,7 +131,7 @@ describe("LangWatchExporter", () => {
     it("should handle missing API key gracefully", () => {
       delete process.env.LANGWATCH_API_KEY;
 
-      const exporter = new LangWatchExporter();
+      const exporter = new LangWatchTraceExporter();
 
       const headers = (exporter as any).headers;
       expect(headers.authorization).toBeUndefined();
@@ -141,7 +141,7 @@ describe("LangWatchExporter", () => {
 
   describe("header configuration", () => {
     it("should include all required SDK headers", () => {
-      const exporter = new LangWatchExporter();
+      const exporter = new LangWatchTraceExporter();
 
       const headers = (exporter as any).headers;
       expect(headers).toMatchObject({
@@ -154,7 +154,7 @@ describe("LangWatchExporter", () => {
 
     it("should include authorization header when API key is provided", () => {
       const apiKey = "test-key";
-      const exporter = new LangWatchExporter({ apiKey });
+      const exporter = new LangWatchTraceExporter({ apiKey });
 
       const headers = (exporter as any).headers;
       expect(headers.authorization).toBe(`Bearer ${apiKey}`);
@@ -162,7 +162,7 @@ describe("LangWatchExporter", () => {
 
     it("should not include authorization header when no API key is provided", () => {
       delete process.env.LANGWATCH_API_KEY;
-      const exporter = new LangWatchExporter();
+      const exporter = new LangWatchTraceExporter();
 
       const headers = (exporter as any).headers;
       expect(headers).not.toHaveProperty("authorization");
@@ -171,7 +171,7 @@ describe("LangWatchExporter", () => {
 
   describe("deprecated options", () => {
     it("should warn when includeAllSpans option is provided", () => {
-      new LangWatchExporter({ includeAllSpans: true });
+      new LangWatchTraceExporter({ includeAllSpans: true });
 
       expect(consoleSpy).toHaveBeenCalledWith(
         "[LangWatchExporter] The behavior of `includeAllSpans` is deprecated and will be removed in a future version"
@@ -179,7 +179,7 @@ describe("LangWatchExporter", () => {
     });
 
     it("should warn when debug option is provided", () => {
-      new LangWatchExporter({ debug: true });
+      new LangWatchTraceExporter({ debug: true });
 
       expect(consoleSpy).toHaveBeenCalledWith(
         "[LangWatchExporter] The behavior of `debug` is deprecated and will be removed in a future version"
@@ -187,7 +187,7 @@ describe("LangWatchExporter", () => {
     });
 
     it("should warn for both deprecated options when both are provided", () => {
-      new LangWatchExporter({ includeAllSpans: false, debug: false });
+      new LangWatchTraceExporter({ includeAllSpans: false, debug: false });
 
       expect(consoleSpy).toHaveBeenCalledWith(
         "[LangWatchExporter] The behavior of `includeAllSpans` is deprecated and will be removed in a future version"
@@ -198,14 +198,14 @@ describe("LangWatchExporter", () => {
     });
 
     it("should not warn when deprecated options are undefined", () => {
-      new LangWatchExporter({ apiKey: "test" });
+      new LangWatchTraceExporter({ apiKey: "test" });
 
       expect(consoleSpy).not.toHaveBeenCalled();
     });
 
     it("should warn even when deprecated options are explicitly set to undefined", () => {
       // This tests the `!== void 0` check in the code
-      new LangWatchExporter({ includeAllSpans: undefined });
+      new LangWatchTraceExporter({ includeAllSpans: undefined });
 
       expect(consoleSpy).not.toHaveBeenCalled();
     });
@@ -213,21 +213,21 @@ describe("LangWatchExporter", () => {
 
   describe("URL construction", () => {
     it("should construct URL correctly with default endpoint", () => {
-      const exporter = new LangWatchExporter();
+      const exporter = new LangWatchTraceExporter();
 
       expect((exporter as any).url).toBe("https://app.langwatch.ai/api/otel/v1/traces");
     });
 
     it("should construct URL correctly with custom endpoint", () => {
       const endpoint = "https://custom.example.com";
-      const exporter = new LangWatchExporter({ endpoint });
+      const exporter = new LangWatchTraceExporter({ endpoint });
 
       expect((exporter as any).url).toBe(`${endpoint}/api/otel/v1/traces`);
     });
 
     it("should handle endpoint with trailing slash", () => {
       const endpoint = "https://custom.example.com/";
-      const exporter = new LangWatchExporter({ endpoint });
+      const exporter = new LangWatchTraceExporter({ endpoint });
 
       expect((exporter as any).url).toBe(`${endpoint}api/otel/v1/traces`);
     });
@@ -236,13 +236,13 @@ describe("LangWatchExporter", () => {
       const endpoint = "custom.example.com";
 
       expect(() => {
-        new LangWatchExporter({ endpoint });
+        new LangWatchTraceExporter({ endpoint });
       }).toThrow("Invalid URL");
     });
 
     it("should use TRACES_PATH constant for URL construction", () => {
       const endpoint = "https://test.com";
-      const exporter = new LangWatchExporter({ endpoint });
+      const exporter = new LangWatchTraceExporter({ endpoint });
 
       expect((exporter as any).url).toBe(`${endpoint}${TRACES_PATH}`);
     });
@@ -250,7 +250,7 @@ describe("LangWatchExporter", () => {
 
   describe("inheritance from OTLPTraceExporter", () => {
     it("should extend OTLPTraceExporter", () => {
-      const exporter = new LangWatchExporter();
+      const exporter = new LangWatchTraceExporter();
 
       // Since we're mocking OTLPTraceExporter, we check that the constructor was called
       expect(vi.mocked(OTLPTraceExporter)).toHaveBeenCalledWith(
@@ -269,7 +269,7 @@ describe("LangWatchExporter", () => {
 
   describe("edge cases", () => {
     it("should handle empty string API key", () => {
-      const exporter = new LangWatchExporter({ apiKey: "" });
+      const exporter = new LangWatchTraceExporter({ apiKey: "" });
 
       const headers = (exporter as any).headers;
       expect(headers).not.toHaveProperty("authorization");
@@ -277,12 +277,12 @@ describe("LangWatchExporter", () => {
 
     it("should handle empty string endpoint", () => {
       expect(() => {
-        new LangWatchExporter({ endpoint: "" });
+        new LangWatchTraceExporter({ endpoint: "" });
       }).toThrow(); // URL constructor should throw for empty string
     });
 
     it("should handle null values in options", () => {
-      const exporter = new LangWatchExporter({
+      const exporter = new LangWatchTraceExporter({
         apiKey: null as any,
         endpoint: null as any,
       });
@@ -293,7 +293,7 @@ describe("LangWatchExporter", () => {
 
     it("should handle complex endpoint URLs", () => {
       const endpoint = "https://subdomain.example.com:8080/path";
-      const exporter = new LangWatchExporter({ endpoint });
+      const exporter = new LangWatchTraceExporter({ endpoint });
 
       // URL constructor behavior: new URL("/api/otel/v1/traces", "https://subdomain.example.com:8080/path")
       // results in "https://subdomain.example.com:8080/api/otel/v1/traces" (path gets replaced, not appended)
@@ -303,7 +303,7 @@ describe("LangWatchExporter", () => {
 
   describe("type safety", () => {
     it("should accept valid LangWatchExporterOptions", () => {
-      const options: LangWatchExporterOptions = {
+      const options: LangWatchTraceExporterOptions = {
         apiKey: "test-key",
         endpoint: "https://test.com",
         includeAllSpans: true,
@@ -311,23 +311,23 @@ describe("LangWatchExporter", () => {
       };
 
       expect(() => {
-        new LangWatchExporter(options);
+        new LangWatchTraceExporter(options);
       }).not.toThrow();
     });
 
     it("should work without any options", () => {
       expect(() => {
-        new LangWatchExporter();
+        new LangWatchTraceExporter();
       }).not.toThrow();
     });
 
     it("should work with partial options", () => {
       expect(() => {
-        new LangWatchExporter({ apiKey: "test" });
+        new LangWatchTraceExporter({ apiKey: "test" });
       }).not.toThrow();
 
       expect(() => {
-        new LangWatchExporter({ endpoint: "https://test.com" });
+        new LangWatchTraceExporter({ endpoint: "https://test.com" });
       }).not.toThrow();
     });
   });
