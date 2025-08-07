@@ -2,16 +2,19 @@ import type { IInstrumentationScope, IKeyValue, ISpan } from "@opentelemetry/otl
 import type { DeepPartial } from "~/utils/types";
 
 /**
- * Safely parses a JSON string, returning a fallback value if the string is not valid JSON.
- * @param jsonString - The JSON string to parse.
- * @param fallback - The value to return if the string is not valid JSON.
- * @returns The parsed JSON value, or the fallback value if the string is not valid JSON.
+ * Returns the JSON value if the string is valid JSON, otherwise returns the string.
+ * @param str - The string to parse.
+ * @param undefinedIfEmpty - If true, returns undefined if the string is empty.
+ * @returns The parsed JSON value, or the string if it is not valid JSON.
  */
-function safeJsonParse(jsonString: string, fallback: any = null): any {
+function jsonOrString(str: string | null | undefined, undefinedIfEmpty = false): any {
+  if (str === void 0 || str === null) return str;
+
   try {
-    return JSON.parse(jsonString);
+    return JSON.parse(str);
   } catch {
-    return fallback;
+    if (undefinedIfEmpty && str === "") return void 0;
+    return str;
   }
 }
 
@@ -58,19 +61,24 @@ export function extractStrandsAgentsInputOutput(otelSpan: DeepPartial<ISpan>): {
     switch (true) {
       case event.name === "gen_ai.tool.message": {
         inputMessages.push({
-          role: event.attributes.find(a => a?.key === "role")?.value?.stringValue ?? "unknown",
-          content: safeJsonParse(event.attributes.find(a => a?.key === "content")?.value?.stringValue ?? ""),
+          role: event.attributes.find(a => a?.key === "role")?.value?.stringValue,
+          content: jsonOrString(event.attributes.find(a => a?.key === "content")?.value?.stringValue),
           id: event.attributes.find(a => a?.key === "id")?.value?.stringValue,
         });
         break;
       }
 
       case event.name === "gen_ai.choice": {
+        const finishReason = event.attributes.find(a => a?.key === "finish_reason")?.value?.stringValue;
+        const role = event.attributes.find(a => a?.key === "role")?.value?.stringValue;
+
         outputChoices.push({
-          role: "choice",
-          content: safeJsonParse(event.attributes.find(a => a?.key === "message")?.value?.stringValue ?? ""),
-          id: event.attributes.find(a => a?.key === "id")?.value?.stringValue ?? void 0,
-          finish_reason: event.attributes.find(a => a?.key === "finish_reason")?.value?.stringValue ?? void 0,
+          // Use the role, but fallback to "assistant" if we're at the end of a turn.
+          role: role ?? finishReason === "end_turn" ? "assistant" : void 0,
+          content: jsonOrString(event.attributes.find(a => a?.key === "message")?.value?.stringValue),
+          id: event.attributes.find(a => a?.key === "id")?.value?.stringValue,
+          finish_reason: event.attributes.find(a => a?.key === "finish_reason")?.value?.stringValue,
+          tool_result: jsonOrString(event.attributes.find(a => a?.key === "tool_result")?.value?.stringValue, ),
         });
         break;
       }
@@ -82,8 +90,8 @@ export function extractStrandsAgentsInputOutput(otelSpan: DeepPartial<ISpan>): {
 
         inputMessages.push({
           role: nameParts[1],
-          content: safeJsonParse(event.attributes.find(a => a?.key === "content")?.value?.stringValue ?? "{}"),
-          id: event.attributes.find(a => a?.key === "id")?.value?.stringValue ?? void 0,
+          content: jsonOrString(event.attributes.find(a => a?.key === "content")?.value?.stringValue),
+          id: event.attributes.find(a => a?.key === "id")?.value?.stringValue,
         });
         break;
       }
