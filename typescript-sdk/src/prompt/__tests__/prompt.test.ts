@@ -10,7 +10,7 @@ describe("Prompt", () => {
     beforeEach(async () => {
       // Test template compilation
       result = prompt.compile({
-        user_name: "Alice",
+        name: "Alice",
         topic: "weather",
       });
     });
@@ -20,7 +20,7 @@ describe("Prompt", () => {
     });
 
     it("should compile the messages", () => {
-      expect(result.messages[0]?.content).toBe("Tell me about weather");
+      expect(result.messages[1]?.content).toBe("Tell me about weather");
     });
   });
 
@@ -30,8 +30,8 @@ describe("Prompt", () => {
 
     beforeEach(async () => {
       // Test template compilation
-      result = prompt.compile({
-        user_name: "Alice",
+      result = prompt.compileStrict({
+        name: "Alice",
         topic: "weather",
       });
     });
@@ -41,7 +41,7 @@ describe("Prompt", () => {
     });
 
     it("should compile the messages", () => {
-      expect(result.messages[0]?.content).toBe("Tell me about weather");
+      expect(result.messages[1]?.content).toBe("Tell me about weather");
     });
 
     it("should throw on strict compilation with missing variables", () => {
