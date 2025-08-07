@@ -1,121 +1,127 @@
 {
-  "name": "langwatch",
-  "version": "0.3.2",
-  "description": "",
-  "main": "dist/index.js",
-  "module": "dist/index.mjs",
-  "types": "dist/index.d.ts",
-  "files": [
-    "dist",
-    "README.md",
-    "LICENSE"
-  ],
-  "bin": {
-    "langwatch": "./dist/cli/index.js"
-  },
-  "exports": {
-    ".": {
-      "types": "./dist/index.d.ts",
-      "import": "./dist/index.mjs",
-      "require": "./dist/index.js"
+    "name": "langwatch",
+    "version": "0.3.2",
+    "description": "",
+    "main": "dist/index.js",
+    "module": "dist/index.mjs",
+    "types": "dist/index.d.ts",
+    "files": [
+        "dist",
+        "README.md",
+        "LICENSE"
+    ],
+    "bin": {
+        "langwatch": "./dist/cli/index.js"
     },
-    "./evaluation": {
-      "types": "./dist/evaluation/index.d.ts",
-      "require": "./dist/evaluation/index.js",
-      "import": "./dist/evaluation/index.mjs"
+    "exports": {
+        ".": {
+            "types": "./dist/index.d.ts",
+            "import": "./dist/index.mjs",
+            "require": "./dist/index.js"
+        },
+        "./evaluation": {
+            "types": "./dist/evaluation/index.d.ts",
+            "require": "./dist/evaluation/index.js",
+            "import": "./dist/evaluation/index.mjs"
+        },
+        "./observability": {
+            "types": "./dist/observability/index.d.ts",
+            "require": "./dist/observability/index.js",
+            "import": "./dist/observability/index.mjs"
+        },
+        "./observability/instrumentation/langchain": {
+            "types": "./dist/observability/instrumentation/langchain/index.d.ts",
+            "require": "./dist/observability/instrumentation/langchain/index.js",
+            "import": "./dist/observability/instrumentation/langchain/index.mjs"
+        },
+        "./prompt": {
+            "types": "./dist/prompt/index.d.ts",
+            "require": "./dist/prompt/index.js",
+            "import": "./dist/prompt/index.mjs"
+        },
+        "./node": {
+            "types": "./dist/client-node.d.ts",
+            "import": "./dist/client-node.mjs",
+            "require": "./dist/client-node.js"
+        },
+        "./browser": {
+            "types": "./dist/client-browser.d.ts",
+            "import": "./dist/client-browser.mjs",
+            "require": "./dist/client-browser.js"
+        }
     },
-    "./observability": {
-      "types": "./dist/observability/index.d.ts",
-      "require": "./dist/observability/index.js",
-      "import": "./dist/observability/index.mjs"
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/langwatch/langwatch.git",
+        "directory": "typescript-sdk"
     },
-    "./observability/instrumentation/langchain": {
-      "types": "./dist/observability/instrumentation/langchain/index.d.ts",
-      "require": "./dist/observability/instrumentation/langchain/index.js",
-      "import": "./dist/observability/instrumentation/langchain/index.mjs"
+    "scripts": {
+        "prepare": "./copy-types.sh && pnpm run generate:openapi-types",
+        "test": "vitest",
+        "test:e2e": "vitest run -c ./vitest.e2e.config.mts",
+        "prebuild": "pnpm run prepare",
+        "build": "tsgo --noEmit &&  tsup",
+        "prepublish": "pnpm run build",
+        "generate:openapi-types": "npx openapi-typescript ../langwatch/src/app/api/openapiLangWatch.json -o ./src/internal/generated/openapi/api-client.ts"
     },
-    "./prompt": {
-      "types": "./dist/prompt/index.d.ts",
-      "require": "./dist/prompt/index.js",
-      "import": "./dist/prompt/index.mjs"
+    "author": "LangWatch",
+    "license": "MIT",
+    "engines": {
+        "node": ">=20",
+        "pnpm": ">=8"
     },
-    "./node": {
-      "types": "./dist/client-node.d.ts",
-      "import": "./dist/client-node.mjs",
-      "require": "./dist/client-node.js"
+    "devDependencies": {
+        "@eslint/js": "^9.32.0",
+        "@opentelemetry/sdk-trace-node": "^2.0.1",
+        "@types/debug": "^4.1.12",
+        "@types/js-yaml": "^4.0.9",
+        "@types/node": "^24.1.0",
+        "@typescript/native-preview": "7.0.0-dev.20250804.1",
+        "@vercel/otel": "^1.13.0",
+        "@vitest/coverage-v8": "3.2.4",
+        "esbuild": "^0.25.8",
+        "eslint": "^9.32.0",
+        "fets": "^0.8.5",
+        "fishery": "^2.3.1",
+        "msw": "^2.10.4",
+        "nock": "^14.0.8",
+        "openapi-msw": "^1.2.0",
+        "ts-to-zod": "3.15.0",
+        "tsup": "^8.5.0",
+        "typescript": "^5.9.2",
+        "typescript-eslint": "^8.38.0",
+        "vitest": "^3.2.4",
+        "vitest-mock-extended": "^3.1.0"
     },
-    "./browser": {
-      "types": "./dist/client-browser.d.ts",
-      "import": "./dist/client-browser.mjs",
-      "require": "./dist/client-browser.js"
+    "dependencies": {
+        "@opentelemetry/api": "^1.9.0",
+        "@opentelemetry/core": "^2.0.1",
+        "@opentelemetry/exporter-trace-otlp-http": "^0.203.0",
+        "@opentelemetry/resources": "^2.0.1",
+        "@opentelemetry/sdk-trace-base": "^2.0.1",
+        "@opentelemetry/semantic-conventions": "^1.36.0",
+        "@types/prompts": "^2.4.9",
+        "chalk": "^4.1.2",
+        "commander": "^12.0.0",
+        "dotenv": "^16.6.1",
+        "js-yaml": "^4.1.0",
+        "ksuid": "^3.0.0",
+        "liquidjs": "^10.21.1",
+        "open": "^10.2.0",
+        "openapi-fetch": "^0.14.0",
+        "ora": "^5.4.1",
+        "prompts": "^2.4.2",
+        "zod": "^4.0.14"
+    },
+    "peerDependencies": {
+        "@ai-sdk/openai": ">=2.0.0",
+        "@langchain/core": ">=0.3.0",
+        "@langchain/langgraph": ">=0.4.0",
+        "@langchain/openai": ">=0.6.0",
+        "@opentelemetry/context-async-hooks": ">=1.19.0",
+        "@opentelemetry/context-zone": ">=1.19.0",
+        "@opentelemetry/sdk-node": ">=0.200.0",
+        "@opentelemetry/sdk-trace-web": ">=1.19.0",
+        "langchain": ">=0.3.0"
     }
-  },
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/langwatch/langwatch.git",
-    "directory": "typescript-sdk"
-  },
-  "scripts": {
-    "prepare": "./copy-types.sh && pnpm run generate:openapi-types",
-    "test": "vitest",
-    "prebuild": "pnpm run prepare",
-    "build": "tsgo --noEmit &&  tsup",
-    "prepublish": "pnpm run build",
-    "generate:openapi-types": "npx openapi-typescript ../langwatch/src/app/api/openapiLangWatch.json -o ./src/internal/generated/openapi/api-client.ts"
-  },
-  "author": "LangWatch",
-  "license": "MIT",
-  "engines": {
-    "node": ">=20",
-    "pnpm": ">=8"
-  },
-  "devDependencies": {
-    "@eslint/js": "^9.32.0",
-    "@types/debug": "^4.1.12",
-    "@types/js-yaml": "^4.0.9",
-    "@types/node": "^24.1.0",
-    "@typescript/native-preview": "7.0.0-dev.20250804.1",
-    "@vercel/otel": "^1.13.0",
-    "@vitest/coverage-v8": "3.2.4",
-    "esbuild": "^0.25.8",
-    "eslint": "^9.32.0",
-    "fets": "^0.8.5",
-    "nock": "^14.0.8",
-    "ts-to-zod": "3.15.0",
-    "tsup": "^8.5.0",
-    "typescript": "^5.9.2",
-    "typescript-eslint": "^8.38.0",
-    "vitest": "^3.2.4"
-  },
-  "dependencies": {
-    "@opentelemetry/api": "^1.9.0",
-    "@opentelemetry/core": "^2.0.1",
-    "@opentelemetry/exporter-trace-otlp-http": "^0.203.0",
-    "@opentelemetry/resources": "^2.0.1",
-    "@opentelemetry/sdk-trace-base": "^2.0.1",
-    "@opentelemetry/semantic-conventions": "^1.36.0",
-    "@types/prompts": "^2.4.9",
-    "chalk": "^4.1.2",
-    "commander": "^12.0.0",
-    "dotenv": "^16.6.1",
-    "js-yaml": "^4.1.0",
-    "liquidjs": "^10.21.1",
-    "open": "^10.2.0",
-    "openapi-fetch": "^0.14.0",
-    "ora": "^5.4.1",
-    "prompts": "^2.4.2",
-    "xksuid": "^0.0.4",
-    "zod": "^4.0.14"
-  },
-  "peerDependencies": {
-    "@ai-sdk/openai": ">=2.0.0",
-    "@langchain/core": ">=0.3.0",
-    "@langchain/openai": ">=0.6.0",
-    "@langchain/langgraph": ">=0.4.0",
-    "@opentelemetry/context-async-hooks": ">=1.19.0",
-    "@opentelemetry/context-zone": ">=1.19.0",
-    "@opentelemetry/sdk-node": ">=0.200.0",
-    "@opentelemetry/sdk-trace-web": ">=1.19.0",
-    "langchain": ">=0.3.0"
-  }
 }

@@ -171,6 +171,7 @@ export class LlmConfigRepository {
     idOrHandle: string;
     projectId: string;
     organizationId: string;
+    version?: number;
   }): Promise<LlmConfigWithLatestVersion | null> {
     const { idOrHandle, projectId, organizationId } = params;
     const config = await this.prisma.llmPromptConfig.findFirst({
@@ -208,6 +209,7 @@ export class LlmConfigRepository {
       include: {
         versions: {
           orderBy: { createdAt: "desc" },
+          where: "version" in params ? { version: params.version } : undefined,
           take: 1,
         },
       },

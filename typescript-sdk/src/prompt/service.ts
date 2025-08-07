@@ -5,20 +5,16 @@ import {
 import type { paths } from "../internal/generated/openapi/api-client";
 import { Prompt, type PromptResponse } from "./prompt";
 import { PromptConverter } from "./converter";
-
-// Extract types directly from OpenAPI schema for strong type safety.
-type CreatePromptBody = NonNullable<
-  paths["/api/prompts"]["post"]["requestBody"]
->["content"]["application/json"];
-type UpdatePromptBody = NonNullable<
-  paths["/api/prompts/{id}"]["put"]["requestBody"]
->["content"]["application/json"];
-type CreateVersionBody = NonNullable<
-  paths["/api/prompts/{id}/versions"]["post"]["requestBody"]
->["content"]["application/json"];
-type SyncBody = NonNullable<
-  paths["/api/prompts/{id}/sync"]["post"]["requestBody"]
->["content"]["application/json"];
+import type {
+  UpdatePromptBody,
+  CreateVersionBody,
+  CreatePromptBody,
+} from "./types";
+import { tracer } from "../evaluation/tracer";
+import { canAutomaticallyCaptureInput } from "../client";
+import { canAutomaticallyCaptureOutput } from "../client";
+import { SpanType } from "../observability";
+import { PromptServiceTracingDecorator, createTracingProxy } from "./tracing";
 
 /**
  * Custom error class for Prompts API operations.
@@ -58,6 +54,7 @@ interface PromptServiceOptions {
 
 /**
  * Service for managing prompt resources via the Langwatch API.
+ * Constructor creates a proxy that wraps the service and traces all methods.
  *
  * Responsibilities:
  * - CRUD operations for prompts
@@ -72,6 +69,13 @@ export class PromptService {
 
   constructor(opts?: PromptServiceOptions) {
     this.client = opts?.client ?? createLangWatchApiClient();
+    /**
+     * Wraps the service in a tracing proxy via the decorator.
+     */
+    return createTracingProxy(
+      this as PromptService,
+      PromptServiceTracingDecorator,
+    );
   }
 
   /**
@@ -127,14 +131,18 @@ export class PromptService {
    * @returns The Prompt instance or null if not found.
    * @throws {PromptsError} If the API call fails.
    */
-  async get(id: string): Promise<Prompt | null> {
+  async get(
+    id: string,
+    options?: { version?: string },
+  ): Promise<Prompt | null> {
     const { data, error } = await this.client.GET("/api/prompts/{id}", {
       params: { path: { id } },
+      query: {
+        version: options?.version,
+      },
     });
+
     if (error) {
-      if (error.toString().includes("404")) {
-        return null;
-      }
       this.handleApiError(`fetch prompt with ID "${id}"`, error);
     }
     return new Prompt(data);
@@ -201,11 +209,13 @@ export class PromptService {
    * @param id The prompt's unique identifier.
    * @throws {PromptsError} If the API call fails.
    */
-  async delete(id: string): Promise<void> {
-    const { error } = await this.client.DELETE("/api/prompts/{id}", {
+  async delete(id: string): Promise<{ success: boolean }> {
+    const { data, error } = await this.client.DELETE("/api/prompts/{id}", {
       params: { path: { id } },
     });
     if (error) this.handleApiError(`delete prompt with ID "${id}"`, error);
+
+    return data;
   }
 
   /**
@@ -278,13 +288,13 @@ export class PromptService {
 
   /**
    * Upserts a prompt with local configuration - creates if doesn't exist, updates version if exists.
-   * @param name The prompt's name/identifier.
+   * @param handle The prompt's handle/identifier.
    * @param config Local prompt configuration.
    * @returns Object with created flag and the prompt instance.
    * @throws {PromptsError} If the API call fails.
    */
   async upsert(
-    name: string,
+    handle: string,
     config: {
       model: string;
       modelParameters?: {
@@ -297,11 +307,11 @@ export class PromptService {
       }>;
     },
   ): Promise<{ created: boolean; prompt: Prompt }> {
-    let prompt = await this.get(name);
+    let prompt = await this.get(handle);
     let created = false;
 
     if (!prompt) {
-      prompt = await this.create({ name });
+      prompt = await this.create({ handle });
       created = true;
     }
 
@@ -359,7 +369,7 @@ export class PromptService {
 
       return {
         action: response.data.action as SyncAction,
-        prompt: response.data.prompt as PromptResponse,
+        prompt: response.data.prompt,
         conflictInfo: response.data.conflictInfo,
       };
     } catch (error) {
@@ -368,4 +378,51 @@ export class PromptService {
       throw new PromptsError(message, "sync", error);
     }
   }
+}
+// Generic tracing utility
+function traceMethod<T extends (...args: any[]) => any>(
+  fn: T,
+  metadata: {
+    spanName: string;
+    spanType: SpanType;
+    extractAttributes?: (
+      params: Parameters<T>,
+      result?: Awaited<ReturnType<T>>,
+    ) => Record<string, any>;
+    captureInput?: (params: Parameters<T>) => any;
+    captureOutput?: (result: Awaited<ReturnType<T>>) => any;
+  },
+): T {
+  return ((...params: Parameters<T>) => {
+    return tracer.withActiveSpan(metadata.spanName, async (span) => {
+      span.setType(metadata.spanType);
+
+      if (metadata.extractAttributes) {
+        const attrs = metadata.extractAttributes(params);
+        span.setAttributes(attrs);
+      }
+
+      if (metadata.captureInput && canAutomaticallyCaptureInput()) {
+        span.setInput(metadata.captureInput(params));
+      }
+
+      try {
+        const result = await fn(...params);
+
+        if (metadata.extractAttributes) {
+          const attrs = metadata.extractAttributes(params, result);
+          span.setAttributes(attrs);
+        }
+
+        if (metadata.captureOutput && canAutomaticallyCaptureOutput()) {
+          span.setOutput(metadata.captureOutput(result));
+        }
+
+        return result;
+      } catch (error) {
+        span.recordException(error as Error);
+        throw error;
+      }
+    });
+  }) as T;
 }

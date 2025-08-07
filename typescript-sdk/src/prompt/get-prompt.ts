@@ -1,13 +1,33 @@
 import { PromptService } from "./service";
-import { CompiledPrompt, Prompt, TemplateVariables } from "./prompt";
+import {
+  type CompiledPrompt,
+  type Prompt,
+  type TemplateVariables,
+} from "./prompt";
 import * as intSemconv from "../observability/semconv";
-import { tracer } from "./tracer";
-import { canAutomaticallyCaptureInput, canAutomaticallyCaptureOutput } from "../client";
+import { tracer } from "./tracing";
+import {
+  canAutomaticallyCaptureInput,
+  canAutomaticallyCaptureOutput,
+} from "../client";
 
-export async function getPrompt(id: string, variables: TemplateVariables): Promise<CompiledPrompt>;
+/**
+ * Retrieves a prompt by ID and optionally compiles it with variables.
+ * @param id - The ID of the prompt to retrieve.
+ * @param variables - Optional variables to compile the prompt with.
+ * @deprecated Use the PromptFacade instead: langwatch.prompts.get(id, variables)
+ * @returns The prompt or compiled prompt.
+ * @throws {Error} If the prompt is not found.
+ */
+export async function getPrompt(
+  id: string,
+  variables: TemplateVariables,
+): Promise<CompiledPrompt>;
 export async function getPrompt(id: string): Promise<Prompt>;
-
-export async function getPrompt(id: string, variables?: TemplateVariables): Promise<Prompt | CompiledPrompt> {
+export async function getPrompt(
+  id: string,
+  variables?: TemplateVariables,
+): Promise<Prompt | CompiledPrompt> {
   return tracer.withActiveSpan("retrieve prompt", async (span) => {
     span.setType("prompt");
     span.setAttribute(intSemconv.ATTR_LANGWATCH_PROMPT_ID, id);
