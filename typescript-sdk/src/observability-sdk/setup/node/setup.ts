@@ -153,9 +153,9 @@ export function createAndStartNodeSdk(
   const langwatch = getLangWatchConfig(options);
 
   if (langwatch.disabled) {
-    logger.info("LangWatch integration disabled, using user-provided SpanProcessors and LogRecordProcessors");
+    logger.warn("LangWatch integration disabled, using user-provided SpanProcessors and LogRecordProcessors");
   } else {
-    logger.warn(`Using LangWatch ${langwatch.processorType} processors for tracing and logging`);
+    logger.info(`Using LangWatch ${langwatch.processorType} processors for tracing and logging`);
   }
 
   const spanProcessors: SpanProcessor[] = [];
@@ -184,11 +184,11 @@ export function createAndStartNodeSdk(
     if (langwatch.processorType === 'batch') {
       spanProcessors.push(new BatchSpanProcessor(traceExporter));
       logProcessors.push(new BatchLogRecordProcessor(logExporter));
-      logger.debug(`Added LangWatch ${langwatch.processorType}SpanProcessor and LogRecordProcessor to SDK`);
+      logger.debug(`Added LangWatch ${langwatch.processorType} SpanProcessor and LogRecordProcessor to SDK`);
     } else {
       spanProcessors.push(new SimpleSpanProcessor(traceExporter));
       logProcessors.push(new SimpleLogRecordProcessor(logExporter));
-      logger.debug(`Added LangWatch ${langwatch.processorType}SpanProcessor and LogRecordProcessor to SDK`);
+      logger.debug(`Added LangWatch ${langwatch.processorType} SpanProcessor and LogRecordProcessor to SDK`);
     }
   }
 
