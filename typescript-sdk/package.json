@@ -20,19 +20,19 @@
       "require": "./dist/index.js"
     },
     "./observability": {
-      "types": "./dist/observability/index.d.ts",
-      "require": "./dist/observability/index.js",
-      "import": "./dist/observability/index.mjs"
+      "types": "./dist/observability-sdk/index.d.ts",
+      "require": "./dist/observability-sdk/index.js",
+      "import": "./dist/observability-sdk/index.mjs"
     },
     "./observability/node": {
-      "types": "./dist/observability/setup/node/index.d.ts",
-      "require": "./dist/observability/setup/node/index.js",
-      "import": "./dist/observability/setup/node/index.mjs"
+      "types": "./dist/observability-sdk/setup/node/index.d.ts",
+      "require": "./dist/observability-sdk/setup/node/index.js",
+      "import": "./dist/observability-sdk/setup/node/index.mjs"
     },
     "./observability/instrumentation/langchain": {
-      "types": "./dist/observability/instrumentation/langchain/index.d.ts",
-      "require": "./dist/observability/instrumentation/langchain/index.js",
-      "import": "./dist/observability/instrumentation/langchain/index.mjs"
+      "types": "./dist/observability-sdk/instrumentation/langchain/index.d.ts",
+      "require": "./dist/observability-sdk/instrumentation/langchain/index.js",
+      "import": "./dist/observability-sdk/instrumentation/langchain/index.mjs"
     }
   },
   "repository": {
@@ -42,10 +42,12 @@
   },
   "scripts": {
     "prepare": "pnpm run generate:server-types && pnpm run generate:openapi-types",
+    "lint": "eslint .",
     "test": "vitest",
     "test:e2e": "vitest run -c ./vitest.e2e.config.mts",
     "prebuild": "pnpm run prepare",
     "build": "tsgo --noEmit && tsup",
+    "typecheck": "tsgo --noEmit",
     "prepublish": "pnpm run build",
     "generate:openapi-types": "npx openapi-typescript ../langwatch/src/app/api/openapiLangWatch.json -o ./src/internal/generated/openapi/api-client.ts",
     "generate:server-types": "./copy-types.sh"
