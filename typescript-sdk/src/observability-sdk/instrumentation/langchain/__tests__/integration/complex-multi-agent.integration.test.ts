@@ -140,7 +140,7 @@ describe("LangChain Multi-Agent Integration Tests", () => {
     expect(llmSpans.length).toBeGreaterThan(0);
 
     llmSpans.forEach((span) => {
-      expect(span.name).toContain("ChatOpenAI");
+      expect(span.name).toContain("openai gpt-4o-mini");
       expect(span.attributes["langwatch.span.type"]).toBe("llm");
       expect(span.attributes["gen_ai.request.model"]).toBeDefined();
     });

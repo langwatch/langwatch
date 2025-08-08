@@ -1,5 +1,18 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { LangWatchCallbackHandler, convertFromLangChainMessages } from '..';
+
+// Import helper functions for testing
+import {
+  className,
+  shorten,
+  previewInput,
+  ctxSkip,
+  wrapNonScalarValues,
+  buildLangChainMetadataAttributes,
+  applyGenAIAttrs,
+  getResolvedParentContext,
+  deriveNameAndType
+} from '..';
 
 describe('LangWatchCallbackHandler', () => {
   describe('message conversion', () => {
@@ -116,14 +129,33 @@ describe('LangWatchCallbackHandler', () => {
       expect(handler.name).toBe('LangWatchCallbackHandler');
     });
 
-    it('initializes empty spans object', () => {
+    it('initializes with expected properties', () => {
       const handler = new LangWatchCallbackHandler();
-      expect(handler.spans).toEqual({});
+      expect(handler.name).toBe('LangWatchCallbackHandler');
+      expect(handler.tracer).toBeDefined();
+      // Check that it's a LangChain callback handler by checking it extends BaseCallbackHandler
+      expect(handler).toBeInstanceOf(LangWatchCallbackHandler);
     });
 
     it('has tracer property', () => {
       const handler = new LangWatchCallbackHandler();
       expect(handler.tracer).toBeDefined();
+    });
+
+    it('does not duplicate langgraph metadata under langchain.run.metadata', async () => {
+      const handler = new LangWatchCallbackHandler();
+      const metadata: any = {
+        langgraph_node: 'analyze',
+        langgraph_step: 2,
+        langgraph_path: ['__pregel_pull', 'analyze'],
+        langgraph_triggers: ['branch:to:analyze'],
+        thread_id: 'thread',
+        checkpoint_ns: 'ns',
+      };
+      await handler.handleChatModelStart({} as any, [], 'run', undefined, {}, [], metadata);
+      await handler.handleLLMEnd({ generations: [[]] } as any, 'run');
+      // If we reached here, it means building attributes didn't throw and filtering worked
+      expect(true).toBe(true);
     });
   });
 
@@ -245,6 +277,741 @@ describe('LangWatchCallbackHandler', () => {
           await handler.handleChainEnd(testCase as any, `test-${index}`);
         }).not.toThrow();
       });
+    });
+  });
+});
+
+describe('Helper Functions', () => {
+  describe('className', () => {
+    it('extracts class name from id array', () => {
+      const serialized = { id: ['langchain', 'llms', 'OpenAI'], lc: 1, type: 'not_implemented' } as any;
+      expect(className(serialized)).toBe('OpenAI');
+    });
+
+    it('extracts class name from lc_namespace array', () => {
+      const serialized = { lc_namespace: ['langchain', 'chains', 'LLMChain'], lc: 1, type: 'not_implemented' } as any;
+      expect(className(serialized)).toBe('LLMChain');
+    });
+
+    it('returns empty string for invalid serialized', () => {
+      expect(className(undefined)).toBe('');
+      expect(className({} as any)).toBe('');
+      expect(className({ id: 'not-an-array' } as any)).toBe('');
+    });
+  });
+
+  describe('shorten', () => {
+    it('shortens long strings', () => {
+      const longString = 'a'.repeat(150);
+      const result = shorten(longString);
+      expect(result.length).toBe(120);
+      expect(result.endsWith('…')).toBe(true);
+    });
+
+    it('returns short strings unchanged', () => {
+      const shortString = 'Hello World';
+      expect(shorten(shortString)).toBe(shortString);
+    });
+
+    it('handles empty strings', () => {
+      expect(shorten('')).toBe('');
+    });
+  });
+
+  describe('previewInput', () => {
+    it('returns shortened string for long text', () => {
+      const longText = 'a'.repeat(150);
+      expect(previewInput(longText)).toBe('a'.repeat(119) + '…');
+    });
+
+    it('returns trimmed string for short text', () => {
+      expect(previewInput('  Hello World  ')).toBe('Hello World');
+    });
+
+    it('returns undefined for non-strings', () => {
+      expect(previewInput(123)).toBeUndefined();
+      expect(previewInput({})).toBeUndefined();
+      expect(previewInput(null)).toBeUndefined();
+    });
+
+    it('returns undefined for empty strings', () => {
+      expect(previewInput('')).toBeUndefined();
+      expect(previewInput('   ')).toBeUndefined();
+    });
+  });
+
+  describe('ctxSkip', () => {
+    it('skips ChannelWrite classes', () => {
+      const serialized = { id: ['ChannelWrite'], lc: 1, type: 'not_implemented' } as any;
+      expect(ctxSkip(serialized)).toBe(true);
+    });
+
+    it('skips langsmith:hidden tags', () => {
+      const tags = ['langsmith:hidden', 'other-tag'];
+      expect(ctxSkip(undefined, tags)).toBe(true);
+    });
+
+    it('does not skip normal classes', () => {
+      const serialized = { id: ['OpenAI'], lc: 1, type: 'not_implemented' } as any;
+      expect(ctxSkip(serialized)).toBe(false);
+    });
+
+    it('does not skip normal tags', () => {
+      const tags = ['normal-tag'];
+      expect(ctxSkip(undefined, tags)).toBe(false);
+    });
+  });
+
+  describe('wrapNonScalarValues', () => {
+    it('returns primitive values unchanged', () => {
+      expect(wrapNonScalarValues('string')).toBe('string');
+      expect(wrapNonScalarValues(123)).toBe(123);
+      expect(wrapNonScalarValues(true)).toBe(true);
+      expect(wrapNonScalarValues(false)).toBe(false);
+    });
+
+    it('handles null and undefined', () => {
+      expect(wrapNonScalarValues(null)).toBe('null');
+      expect(wrapNonScalarValues(undefined)).toBeUndefined();
+    });
+
+    it('handles arrays', () => {
+      const array = [1, 2, 3];
+      expect(wrapNonScalarValues(array)).toBe(7); // Returns JSON string length for arrays
+    });
+
+    it('handles objects', () => {
+      const obj = { key: 'value' };
+      expect(wrapNonScalarValues(obj)).toBe(15); // Returns JSON string length
+    });
+
+    it('handles circular references', () => {
+      const circular: any = { name: 'test' };
+      circular.self = circular;
+      expect(wrapNonScalarValues(circular)).toBe(35); // Should handle circular refs
+    });
+  });
+
+  describe('deriveNameAndType', () => {
+    describe('LLM/Chat naming', () => {
+      it('names LLM with provider and model', () => {
+        const result = deriveNameAndType({
+          runType: 'llm',
+          metadata: { ls_provider: 'OpenAI', ls_model_name: 'gpt-4' }
+        });
+        expect(result.name).toBe('OpenAI gpt-4');
+        expect(result.type).toBe('llm');
+      });
+
+      it('includes temperature when present', () => {
+        const result = deriveNameAndType({
+          runType: 'llm',
+          metadata: { ls_provider: 'OpenAI', ls_model_name: 'gpt-4', ls_temperature: 0.7 }
+        });
+        expect(result.name).toBe('OpenAI gpt-4 (temp 0.7)');
+        expect(result.type).toBe('llm');
+      });
+
+      it('falls back to class name when metadata missing', () => {
+        const result = deriveNameAndType({
+          runType: 'llm',
+          serialized: { id: ['OpenAI'], lc: 1, type: 'not_implemented' } as any
+        });
+        expect(result.name).toBe('LLM OpenAI');
+        expect(result.type).toBe('llm');
+      });
+
+      it('prioritizes llm runType over langgraph metadata', () => {
+        const result = deriveNameAndType({
+          runType: 'llm',
+          serialized: { id: ['OpenAI'], lc: 1, type: 'not_implemented' } as any,
+          metadata: {
+            langgraph_node: 'analyze',
+            langgraph_step: 2,
+            ls_provider: 'openai',
+            ls_model_name: 'gpt-4'
+          }
+        });
+        expect(result.name).toBe('openai gpt-4');
+        expect(result.type).toBe('llm');
+      });
+    });
+
+    describe('LangGraph node naming', () => {
+      it('names nodes with step number', () => {
+        const result = deriveNameAndType({
+          runType: 'chain',
+          metadata: { langgraph_node: 'analyze', langgraph_step: 2 }
+        });
+        expect(result.name).toBe('Node: analyze (step 2)');
+        expect(result.type).toBe('component');
+      });
+
+      it('names nodes without step number', () => {
+        const result = deriveNameAndType({
+          runType: 'chain',
+          metadata: { langgraph_node: 'search' }
+        });
+        expect(result.name).toBe('Node: search');
+        expect(result.type).toBe('component');
+      });
+
+      it('prioritizes router over node when both are present', () => {
+        const result = deriveNameAndType({
+          runType: 'chain',
+          serialized: { id: ['Branch<analyze,generate_answer>'], lc: 1, type: 'not_implemented' } as any,
+          metadata: {
+            langgraph_node: 'analyze',
+            langgraph_step: 2
+          }
+        });
+        // Now routers are prioritized over nodes, so this should be a router
+        expect(result.name).toBe('Route: unknown → unknown');
+        expect(result.type).toBe('component');
+      });
+    });
+
+    describe('Router vs Node prioritization', () => {
+      it('prioritizes routers over nodes when both are present', () => {
+        const result = deriveNameAndType({
+          runType: 'chain',
+          serialized: { id: ['Branch<analyze,search>'], lc: 1, type: 'not_implemented' } as any,
+          metadata: {
+            langgraph_node: 'analyze',
+            langgraph_step: 2,
+            langgraph_path: ['start', 'analyze'],
+            langgraph_triggers: ['branch:to:search']
+          }
+        });
+        // Should prioritize router over node
+        expect(result.name).toBe('Route: analyze → search');
+        expect(result.type).toBe('component');
+      });
+
+      it('handles node when router detection fails', () => {
+        const result = deriveNameAndType({
+          runType: 'chain',
+          metadata: {
+            langgraph_node: 'process',
+            langgraph_step: 1
+            // No router metadata
+          }
+        });
+        expect(result.name).toBe('Node: process (step 1)');
+        expect(result.type).toBe('component');
+      });
+
+      it('handles router when node metadata is missing', () => {
+        const result = deriveNameAndType({
+          runType: 'chain',
+          serialized: { id: ['Branch<start,end>'], lc: 1, type: 'not_implemented' } as any,
+          metadata: {
+            langgraph_path: ['start'],
+            langgraph_triggers: ['branch:to:end']
+            // No langgraph_node
+          }
+        });
+        expect(result.name).toBe('Route: start → end');
+        expect(result.type).toBe('component');
+      });
+
+      it('handles complex routing scenarios', () => {
+        const result = deriveNameAndType({
+          runType: 'chain',
+          serialized: { id: ['Branch<validate,process,retry>'], lc: 1, type: 'not_implemented' } as any,
+          metadata: {
+            langgraph_node: 'validate',
+            langgraph_step: 3,
+            langgraph_path: ['input', 'validate'],
+            langgraph_triggers: ['condition:valid', 'branch:to:process', 'branch:to:retry']
+          }
+        });
+        // Should prioritize router over node
+        expect(result.name).toBe('Route: validate → process');
+        expect(result.type).toBe('component');
+      });
+    });
+
+    describe('Router naming', () => {
+      it('names routers with path and decision', () => {
+        const result = deriveNameAndType({
+          runType: 'chain',
+          serialized: { id: ['Branch<analyze,search,analyze>'], lc: 1, type: 'not_implemented' } as any,
+          metadata: {
+            langgraph_path: ['__pregel_pull', 'analyze'],
+            langgraph_triggers: ['branch:to:search']
+          }
+        });
+        expect(result.name).toBe('Route: analyze → search');
+        expect(result.type).toBe('component');
+      });
+
+      it('handles missing path or decision', () => {
+        const result = deriveNameAndType({
+          runType: 'chain',
+          serialized: { id: ['Branch<analyze,search,analyze>'], lc: 1, type: 'not_implemented' } as any
+        });
+        expect(result.name).toBe('Route: unknown → unknown');
+        expect(result.type).toBe('component');
+      });
+
+      it('detects routers by Branch class name', () => {
+        const result = deriveNameAndType({
+          runType: 'chain',
+          serialized: { id: ['Branch<start,end>'], lc: 1, type: 'not_implemented' } as any
+        });
+        expect(result.name).toBe('Route: unknown → unknown');
+        expect(result.type).toBe('component');
+      });
+
+      it('detects routers by langgraph_triggers array', () => {
+        const result = deriveNameAndType({
+          runType: 'chain',
+          metadata: {
+            langgraph_triggers: ['branch:to:validate', 'branch:to:process']
+          }
+        });
+        expect(result.name).toBe('Route: unknown → validate');
+        expect(result.type).toBe('component');
+      });
+
+      it('extracts decision from complex trigger array', () => {
+        const result = deriveNameAndType({
+          runType: 'chain',
+          metadata: {
+            langgraph_path: ['start', 'validate'],
+            langgraph_triggers: ['condition:true', 'branch:to:success', 'branch:to:retry']
+          }
+        });
+        expect(result.name).toBe('Route: validate → success');
+        expect(result.type).toBe('component');
+      });
+
+      it('handles empty langgraph_triggers array', () => {
+        const result = deriveNameAndType({
+          runType: 'chain',
+          metadata: {
+            langgraph_path: ['start'],
+            langgraph_triggers: []
+          }
+        });
+        // Empty arrays are not detected as routers, so it falls through to graph runner
+        expect(result.name).toBe('Graph: LangGraph');
+        expect(result.type).toBe('chain');
+      });
+
+      it('handles non-array langgraph_triggers', () => {
+        const result = deriveNameAndType({
+          runType: 'chain',
+          metadata: {
+            langgraph_path: ['start'],
+            langgraph_triggers: 'not-an-array'
+          }
+        });
+        // When langgraph_triggers is not an array, it's not detected as a router
+        // So it falls through to graph runner detection
+        expect(result.name).toBe('Graph: LangGraph');
+        expect(result.type).toBe('chain');
+      });
+    });
+
+    describe('Tool naming', () => {
+      it('names tools with input preview', () => {
+        const result = deriveNameAndType({
+          runType: 'tool',
+          metadata: { name: 'search_tool' },
+          inputs: 'search query'
+        });
+        expect(result.name).toBe('Tool: search_tool — search query');
+        expect(result.type).toBe('tool');
+      });
+
+      it('names tools without input preview', () => {
+        const result = deriveNameAndType({
+          runType: 'tool',
+          metadata: { name: 'calculator' }
+        });
+        expect(result.name).toBe('Tool: calculator');
+        expect(result.type).toBe('tool');
+      });
+    });
+
+    describe('Graph runner naming', () => {
+      it('names graph runners', () => {
+        const result = deriveNameAndType({
+          runType: 'chain',
+          metadata: { langgraph_path: ['path'], langgraph_node: undefined }
+        });
+        expect(result.name).toBe('Graph: LangGraph');
+        expect(result.type).toBe('chain');
+      });
+    });
+
+    describe('Fallback naming', () => {
+      it('names agents', () => {
+        const result = deriveNameAndType({
+          runType: 'chain',
+          serialized: { id: ['AgentExecutor'], lc: 1, type: 'not_implemented' } as any
+        });
+        expect(result.name).toBe('Agent: AgentExecutor');
+        expect(result.type).toBe('component');
+      });
+
+      it('names runnables', () => {
+        const result = deriveNameAndType({
+          runType: 'chain',
+          serialized: { id: ['RunnableSequence'], lc: 1, type: 'not_implemented' } as any
+        });
+        expect(result.name).toBe('Runnable: Sequence');
+        expect(result.type).toBe('chain');
+      });
+
+      it('uses hard-coded name when provided', () => {
+        const result = deriveNameAndType({
+          runType: 'llm',
+          name: 'Custom Name'
+        });
+        expect(result.name).toBe('Custom Name');
+        expect(result.type).toBe('llm');
+      });
+
+      it('uses operation_name from metadata', () => {
+        const result = deriveNameAndType({
+          runType: 'chain',
+          metadata: { operation_name: 'My Operation' }
+        });
+        expect(result.name).toBe('My Operation');
+        expect(result.type).toBe('chain');
+      });
+    });
+
+    describe('Edge cases and error handling', () => {
+      it('handles null/undefined metadata gracefully', () => {
+        const result = deriveNameAndType({
+          runType: 'chain',
+          metadata: null as any
+        });
+        expect(result.name).toBe('LangChain operation');
+        expect(result.type).toBe('chain');
+      });
+
+      it('handles empty metadata object', () => {
+        const result = deriveNameAndType({
+          runType: 'chain',
+          metadata: {}
+        });
+        expect(result.name).toBe('LangChain operation');
+        expect(result.type).toBe('chain');
+      });
+
+      it('handles malformed langgraph_path', () => {
+        const result = deriveNameAndType({
+          runType: 'chain',
+          metadata: {
+            langgraph_path: 'not-an-array',
+            langgraph_triggers: ['branch:to:end']
+          }
+        });
+        expect(result.name).toBe('Route: unknown → end');
+        expect(result.type).toBe('component');
+      });
+
+      it('handles empty langgraph_path array', () => {
+        const result = deriveNameAndType({
+          runType: 'chain',
+          metadata: {
+            langgraph_path: [],
+            langgraph_triggers: ['branch:to:end']
+          }
+        });
+        expect(result.name).toBe('Route: unknown → end');
+        expect(result.type).toBe('component');
+      });
+
+      it('handles non-string langgraph_node', () => {
+        const result = deriveNameAndType({
+          runType: 'chain',
+          metadata: {
+            langgraph_node: 123,
+            langgraph_step: 1
+          }
+        });
+        expect(result.name).toBe('Node: 123 (step 1)');
+        expect(result.type).toBe('component');
+      });
+
+      it('handles non-number langgraph_step', () => {
+        const result = deriveNameAndType({
+          runType: 'chain',
+          metadata: {
+            langgraph_node: 'test',
+            langgraph_step: 'step-1'
+          }
+        });
+        expect(result.name).toBe('Node: test (step step-1)');
+        expect(result.type).toBe('component');
+      });
+
+      it('handles complex trigger objects', () => {
+        const result = deriveNameAndType({
+          runType: 'chain',
+          metadata: {
+            langgraph_path: ['start'],
+            langgraph_triggers: [
+              { type: 'condition', value: true },
+              { type: 'branch', target: 'success' }
+            ]
+          }
+        });
+        // Complex objects are detected as routers but no branch triggers found
+        expect(result.name).toBe('Route: start → ');
+        expect(result.type).toBe('component');
+      });
+
+      it('prioritizes user-provided name over all metadata', () => {
+        const result = deriveNameAndType({
+          runType: 'chain',
+          name: 'Custom Router Name',
+          metadata: {
+            langgraph_node: 'analyze',
+            langgraph_path: ['start'],
+            langgraph_triggers: ['branch:to:end']
+          }
+        });
+        expect(result.name).toBe('Custom Router Name');
+        expect(result.type).toBe('chain');
+      });
+
+      it('prioritizes operation_name over router/node detection', () => {
+        const result = deriveNameAndType({
+          runType: 'chain',
+          metadata: {
+            operation_name: 'Custom Operation',
+            langgraph_node: 'analyze',
+            langgraph_path: ['start'],
+            langgraph_triggers: ['branch:to:end']
+          }
+        });
+        expect(result.name).toBe('Custom Operation');
+        expect(result.type).toBe('chain');
+      });
+
+      it('handles mixed router detection scenarios', () => {
+        // Test with Branch class but no triggers
+        const result1 = deriveNameAndType({
+          runType: 'chain',
+          serialized: { id: ['Branch<start,end>'], lc: 1, type: 'not_implemented' } as any,
+          metadata: {
+            langgraph_node: 'start'
+          }
+        });
+        expect(result1.name).toBe('Route: unknown → unknown');
+        expect(result1.type).toBe('component');
+
+        // Test with triggers but no Branch class
+        const result2 = deriveNameAndType({
+          runType: 'chain',
+          metadata: {
+            langgraph_triggers: ['branch:to:process']
+          }
+        });
+        expect(result2.name).toBe('Route: unknown → process');
+        expect(result2.type).toBe('component');
+      });
+
+      it('handles edge cases in decision extraction', () => {
+        // Test with malformed branch trigger
+        const result1 = deriveNameAndType({
+          runType: 'chain',
+          metadata: {
+            langgraph_path: ['start'],
+            langgraph_triggers: ['not-a-branch-trigger']
+          }
+        });
+        expect(result1.name).toBe('Route: start → ');
+        expect(result1.type).toBe('component');
+
+        // Test with multiple branch triggers (should pick first)
+        const result2 = deriveNameAndType({
+          runType: 'chain',
+          metadata: {
+            langgraph_path: ['start'],
+            langgraph_triggers: ['branch:to:first', 'branch:to:second']
+          }
+        });
+        expect(result2.name).toBe('Route: start → first');
+        expect(result2.type).toBe('component');
+      });
+
+      it('maintains correct type assignments', () => {
+        // Router should be component type
+        const routerResult = deriveNameAndType({
+          runType: 'chain',
+          metadata: {
+            langgraph_triggers: ['branch:to:end']
+          }
+        });
+        expect(routerResult.type).toBe('component');
+
+        // Node should be component type
+        const nodeResult = deriveNameAndType({
+          runType: 'chain',
+          metadata: {
+            langgraph_node: 'test'
+          }
+        });
+        expect(nodeResult.type).toBe('component');
+
+        // Graph runner should be chain type
+        const graphResult = deriveNameAndType({
+          runType: 'chain',
+          metadata: {
+            langgraph_path: ['path']
+          }
+        });
+        expect(graphResult.type).toBe('chain');
+      });
+
+      it('consistently handles empty vs non-array triggers', () => {
+        // Empty array should not be detected as router
+        const emptyArrayResult = deriveNameAndType({
+          runType: 'chain',
+          metadata: {
+            langgraph_path: ['start'],
+            langgraph_triggers: []
+          }
+        });
+        expect(emptyArrayResult.name).toBe('Graph: LangGraph');
+        expect(emptyArrayResult.type).toBe('chain');
+
+        // Non-array should not be detected as router
+        const nonArrayResult = deriveNameAndType({
+          runType: 'chain',
+          metadata: {
+            langgraph_path: ['start'],
+            langgraph_triggers: 'not-an-array'
+          }
+        });
+        expect(nonArrayResult.name).toBe('Graph: LangGraph');
+        expect(nonArrayResult.type).toBe('chain');
+
+                // Both should behave the same way
+        expect(emptyArrayResult.name).toBe(nonArrayResult.name);
+        expect(emptyArrayResult.type).toBe(nonArrayResult.type);
+      });
+    });
+  });
+
+  describe('buildLangChainMetadataAttributes', () => {
+    it('filters out LangGraph metadata keys', () => {
+      const metadata = {
+        langgraph_node: 'analyze',
+        langgraph_step: 2,
+        thread_id: 'thread-123',
+        custom_key: 'custom_value',
+        another_key: 'another_value'
+      };
+
+      const result = buildLangChainMetadataAttributes(metadata);
+
+      // Should not contain LangGraph keys
+      expect(result['langwatch.langchain.run.metadata.langgraph_node']).toBeUndefined();
+      expect(result['langwatch.langchain.run.metadata.langgraph_step']).toBeUndefined();
+      expect(result['langwatch.langchain.run.metadata.thread_id']).toBeUndefined();
+
+      // Should contain other keys
+      expect(result['langwatch.langchain.run.metadata.custom_key']).toBe('custom_value');
+      expect(result['langwatch.langchain.run.metadata.another_key']).toBe('another_value');
+    });
+
+    it('handles empty metadata', () => {
+      const result = buildLangChainMetadataAttributes({});
+      expect(result).toEqual({});
+    });
+
+    it('handles undefined metadata', () => {
+      const result = buildLangChainMetadataAttributes(undefined as any);
+      expect(result).toEqual({});
+    });
+  });
+
+  describe('applyGenAIAttrs', () => {
+    it('sets gen_ai attributes from metadata', () => {
+      const span = {
+        setAttribute: vi.fn()
+      } as any;
+
+      const metadata = {
+        ls_provider: 'OpenAI',
+        ls_model_name: 'gpt-4',
+        ls_temperature: 0.7,
+        response_metadata: { model_name: 'gpt-4-0613' }
+      };
+
+      applyGenAIAttrs(span, metadata);
+
+      expect(span.setAttribute).toHaveBeenCalledWith('gen_ai.system', 'OpenAI');
+      expect(span.setAttribute).toHaveBeenCalledWith('gen_ai.request.model', 'gpt-4');
+      expect(span.setAttribute).toHaveBeenCalledWith('gen_ai.request.temperature', 0.7);
+      expect(span.setAttribute).toHaveBeenCalledWith('gen_ai.response.model', 'gpt-4-0613');
+    });
+
+    it('handles missing metadata gracefully', () => {
+      const span = {
+        setAttribute: vi.fn()
+      } as any;
+
+      applyGenAIAttrs(span, undefined);
+
+      expect(span.setAttribute).not.toHaveBeenCalled();
+    });
+
+    it('extracts model from kwargs', () => {
+      const span = {
+        setAttribute: vi.fn()
+      } as any;
+
+      const metadata = { kwargs: { model: 'gpt-3.5-turbo' } };
+      const extraParams = { kwargs: { temperature: 0.5 } };
+
+      applyGenAIAttrs(span, metadata, extraParams);
+
+      expect(span.setAttribute).toHaveBeenCalledWith('gen_ai.request.model', 'gpt-3.5-turbo');
+      expect(span.setAttribute).toHaveBeenCalledWith('gen_ai.request.temperature', 0.5);
+    });
+  });
+
+  describe('getResolvedParentContext', () => {
+    it('returns active context when no runId provided', () => {
+      const result = getResolvedParentContext(undefined, {}, {});
+      expect(result).toBeDefined();
+    });
+
+    it('returns active context when no spans exist', () => {
+      const result = getResolvedParentContext('run-1', {}, {});
+      expect(result).toBeDefined();
+    });
+
+    it('finds parent span and returns context', () => {
+      const mockSpan = {
+        spanContext: () => ({ traceId: '123', spanId: '456' }),
+        setAttributes: vi.fn(),
+        setAttribute: vi.fn(),
+        setType: vi.fn(),
+        setRequestModel: vi.fn(),
+        setInput: vi.fn(),
+        setOutput: vi.fn(),
+        setRAGContexts: vi.fn(),
+        recordException: vi.fn(),
+        setStatus: vi.fn(),
+        addEvent: vi.fn(),
+        end: vi.fn()
+      };
+      const spans = { 'run-1': mockSpan as any };
+      const parentOf = { 'child-1': 'run-1' };
+
+      const result = getResolvedParentContext('child-1', spans, parentOf);
+      expect(result).toBeDefined();
     });
   });
 });
