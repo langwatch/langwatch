@@ -39,7 +39,10 @@ async function main() {
     let finish = false;
 
     await tracer.withActiveSpan("iteration", {
-      attributes: { "langwatch.thread_id": threadId },
+      attributes: {
+        "langwatch.thread_id": threadId,
+        "langwatch.tags": ["langchain.sdk.example"],
+      },
     }, async () => {
       try {
         // Get user input
@@ -68,7 +71,7 @@ async function main() {
         // Generate AI response
         console.log("🤖 Thinking...");
 
-        const result = await chatModel.invoke(conversationHistory, { callbacks: [] });
+        const result = await chatModel.invoke(conversationHistory, { callbacks: [langWatchCallback] });
         const aiResponse = result.content as string;
 
         // Add AI response to conversation history
