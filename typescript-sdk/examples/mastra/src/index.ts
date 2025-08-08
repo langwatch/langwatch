@@ -4,7 +4,11 @@ import * as readline from "readline";
 import cliMarkdown from "cli-markdown";
 import { mastra } from "./mastra/index.js";
 
-setupObservability();
+setupObservability({
+  attributes: {
+    "langwatch.tags": ["mastra.sdk.example"],
+  },
+});
 
 const tracer = getLangWatchTracer("mastra-weather-agent-example");
 
@@ -34,6 +38,7 @@ async function main() {
     await tracer.withActiveSpan("iteration", {
       attributes: {
         "langwatch.thread_id": threadId,
+        "langwatch.tags": ["mastra.sdk.example"],
       },
     }, async (span) => {
       try {
