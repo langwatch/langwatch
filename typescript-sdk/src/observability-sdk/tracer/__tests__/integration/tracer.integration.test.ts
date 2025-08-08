@@ -1,10 +1,10 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { InMemorySpanExporter, SimpleSpanProcessor, BasicTracerProvider } from "@opentelemetry/sdk-trace-base";
+import { InMemorySpanExporter, SimpleSpanProcessor } from "@opentelemetry/sdk-trace-base";
 import { SpanStatusCode, trace } from "@opentelemetry/api";
-import { getLangWatchTracer } from "../../tracer";
-import { NoOpLogger } from "../../../logger";
-import * as semconv from "../../semconv";
-import { setupObservability } from "../../setup/node";
+import { getLangWatchTracer } from "../..";
+import { NoOpLogger } from "../../../../logger";
+import * as semconv from "../../../semconv";
+import { setupObservability } from "../../../setup/node";
 
 /**
  * Integration tests for LangWatch tracer with real OpenTelemetry setup.

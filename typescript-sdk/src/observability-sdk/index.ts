@@ -1,7 +1,7 @@
-export { getLangWatchTracer, getLangWatchTracerFromProvider } from "./tracer";
-export { createLangWatchSpan } from "./span";
-export { getLangWatchLogger, getLangWatchLoggerFromProvider, createLangWatchLogger } from "./logger";
-export { FilterableBatchSpanProcessor, type SpanProcessingExcludeRule } from "./processors";
+export {
+  FilterableBatchSpanProcessor,
+  type SpanProcessingExcludeRule,
+} from "./processors";
 export {
   LangWatchExporter,
   type LangWatchExporterOptions,
@@ -10,6 +10,7 @@ export {
   LangWatchLogsExporter,
   type LangWatchLogsExporterOptions,
 } from "./exporters";
+
 export {
   type DataCaptureConfig,
   type DataCaptureMode,
@@ -21,12 +22,33 @@ export {
 } from "./features/data-capture";
 
 export {
+  createLangWatchSpan,
+  type LangWatchSpan,
+  type SpanType,
+  spanTypes,
+} from "./span";
+
+export {
+  getLangWatchLogger,
+  getLangWatchLoggerFromProvider,
+  type LangWatchLogger,
+} from "./logger";
+export {
+  getLangWatchTracer,
+  getLangWatchTracerFromProvider,
+  type LangWatchTracer,
+} from "./tracer";
+
+export {
   getDataCaptureMode,
   shouldCaptureInput,
   shouldCaptureOutput,
 } from "./config.js";
 
-export { type Logger, type LogLevel, ConsoleLogger, NoOpLogger } from "../logger";
+export {
+  type SemConvAttributes,
+  type SemConvLogRecordAttributes,
+  type SemConvAttributeKey,
+} from "./semconv";
 
-export * from "./types";
 export * as attributes from "./semconv/attributes";
