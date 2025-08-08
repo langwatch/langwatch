@@ -1,13 +1,12 @@
-import { setupLangWatch } from "langwatch/node";
+import { setupObservability } from "langwatch/observability/node";
 import { LangWatchCallbackHandler } from "langwatch/observability/instrumentation/langchain";
 import { getLangWatchTracer } from "langwatch";
-import { semconv } from "langwatch/observability";
 import { ChatOpenAI } from "@langchain/openai";
 import { HumanMessage, SystemMessage } from "@langchain/core/messages";
 import * as readline from "readline";
 import cliMarkdown from "cli-markdown";
 
-await setupLangWatch();
+setupObservability();
 
 const tracer = getLangWatchTracer("langchain-sdk-example");
 
@@ -40,10 +39,8 @@ async function main() {
     let finish = false;
 
     await tracer.withActiveSpan("iteration", {
-      attributes: {
-        [semconv.ATTR_LANGWATCH_THREAD_ID]: threadId,
-      },
-    }, async (span) => {
+      attributes: { "langwatch.thread_id": threadId },
+    }, async () => {
       try {
         // Get user input
         const userInput = await new Promise<string>((resolve) => {
