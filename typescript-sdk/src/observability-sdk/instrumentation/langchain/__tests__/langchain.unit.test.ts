@@ -36,8 +36,8 @@ describe('LangWatchCallbackHandler', () => {
       const result = convertFromLangChainMessages(messages as any);
 
       expect(result).toHaveLength(1);
-      expect(result[0].role).toBe('user'); // Should default to user
-      expect(result[0].content).toBe('Unknown');
+      expect(result[0]?.role).toBe('user'); // Should default to user
+      expect(result[0]?.content).toBe('Unknown');
     });
 
     it('handles complex message content (arrays)', () => {
@@ -55,8 +55,8 @@ describe('LangWatchCallbackHandler', () => {
       const result = convertFromLangChainMessages(messages as any);
 
       expect(result).toHaveLength(1);
-      expect(result[0].role).toBe('user');
-      expect(result[0].content).toEqual([
+      expect(result[0]?.role).toBe('user');
+      expect(result[0]?.content).toEqual([
         { type: 'text', text: 'Hello' },
         { type: 'image_url', image_url: { url: 'https://example.com/image.jpg' } }
       ]);
@@ -75,8 +75,8 @@ describe('LangWatchCallbackHandler', () => {
       const result = convertFromLangChainMessages(messages as any);
 
       expect(result).toHaveLength(1);
-      expect(result[0].role).toBe('assistant');
-      expect(result[0].function_call).toEqual({ name: 'test_function', arguments: '{"arg": "value"}' });
+      expect(result[0]?.role).toBe('assistant');
+      expect(result[0]?.function_call).toEqual({ name: 'test_function', arguments: '{"arg": "value"}' });
     });
 
     it('handles malformed content gracefully', () => {
@@ -101,8 +101,8 @@ describe('LangWatchCallbackHandler', () => {
       // Should not throw and return valid results
       const result = convertFromLangChainMessages(messages as any);
       expect(result).toHaveLength(2);
-      expect(result[0].role).toBe('user');
-      expect(result[1].role).toBe('assistant');
+      expect(result[0]?.role).toBe('user');
+      expect(result[1]?.role).toBe('assistant');
     });
   });
 
