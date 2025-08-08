@@ -1,7 +1,7 @@
-import { PromptsService, SyncResult } from "./service";
+import { PromptsService, type SyncResult } from "./service";
 import type { Prompt } from "./prompt";
 import type { CreatePromptBody, UpdatePromptBody } from "./types";
-import { InternalConfig } from "@/client-sdk/types";
+import { type InternalConfig } from "@/client-sdk/types";
 
 /**
  * Facade for prompt operations in the LangWatch SDK.

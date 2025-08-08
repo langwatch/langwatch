@@ -9,8 +9,8 @@
 
 import {
   BatchSpanProcessor,
-  ReadableSpan,
-  SpanExporter,
+  type ReadableSpan,
+  type SpanExporter,
 } from '@opentelemetry/sdk-trace-base';
 
 /**

@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { Logger } from '../../../../logger/index.js';
+import { type Logger } from '../../../../logger/index.js';
 import {
   initializeObservabilitySdkConfig,
   resetObservabilitySdkConfig,
@@ -7,7 +7,7 @@ import {
   shouldCaptureInput,
   shouldCaptureOutput,
 } from '../../../config.js';
-import { DataCaptureContext } from '../types.js';
+import { type DataCaptureContext } from '../types.js';
 
 class MockLogger implements Logger {
   debug = vi.fn();

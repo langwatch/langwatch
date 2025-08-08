@@ -1,4 +1,4 @@
-import { Prompt, TemplateVariables, CompiledPrompt } from "../prompt";
+import { type Prompt, type TemplateVariables, type CompiledPrompt } from "../prompt";
 import { shouldCaptureInput } from "@/observability-sdk";
 import type { LangWatchSpan } from "@/observability-sdk";
 

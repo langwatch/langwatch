@@ -78,8 +78,8 @@ const warnIfMisconfigured = (options: SetupObservabilityOptions, langwatch: Retu
   // because those are handled as early exits in setupObservability()
   if (langwatch.disabled) {
     const hasAlternativeExport =
-      options.spanProcessors?.length ||
-      options.debug?.consoleTracing ||
+      options.spanProcessors?.length ??
+      options.debug?.consoleTracing ??
       options.traceExporter;
 
     if (!hasAlternativeExport) {

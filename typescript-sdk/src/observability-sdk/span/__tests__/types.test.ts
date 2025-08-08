@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
   spanTypes,
-  SpanType,
-  LangWatchSpanRAGContext,
-  LangWatchSpanMetrics,
-  LangWatchSpanOptions,
-  JsonSerializable,
+  type SpanType,
+  type LangWatchSpanRAGContext,
+  type LangWatchSpanMetrics,
+  type LangWatchSpanOptions,
+  type JsonSerializable,
 } from "../types";
 
 describe("spanTypes", () => {

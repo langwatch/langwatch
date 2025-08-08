@@ -1,6 +1,6 @@
 import { createTracingProxy } from "@/client-sdk/tracing/create-tracing-proxy";
-import { InternalConfig } from "@/client-sdk/types";
-import { GetTraceParams, TracesError, GetTraceResponse } from "./types";
+import { type InternalConfig } from "@/client-sdk/types";
+import { type GetTraceParams, TracesError, type GetTraceResponse } from "./types";
 import { tracer } from "./tracing";
 
 /**

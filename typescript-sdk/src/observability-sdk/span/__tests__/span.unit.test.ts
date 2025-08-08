@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { SpanStatusCode } from "@opentelemetry/api";
-import { SpanType } from "../../span/types";
+import { type SpanType } from "../../span/types";
 import {
   setupTestEnvironment,
   testData,

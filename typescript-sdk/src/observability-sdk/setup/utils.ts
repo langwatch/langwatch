@@ -1,9 +1,9 @@
 import {
   defaultResource,
-  Resource,
+  type Resource,
   resourceFromAttributes,
 } from "@opentelemetry/resources";
-import { Attributes } from "@opentelemetry/api";
+import { type Attributes } from "@opentelemetry/api";
 import * as semconv from "@opentelemetry/semantic-conventions/incubating";
 import {
   LANGWATCH_SDK_LANGUAGE,

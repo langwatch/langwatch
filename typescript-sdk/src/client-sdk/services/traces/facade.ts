@@ -1,7 +1,7 @@
 import { trace, Tracer } from "@opentelemetry/api";
 import { type InternalConfig } from "../../types";
 import { TracesService } from "./service";
-import { GetTraceParams, GetTraceResponse } from "./types";
+import { type GetTraceParams, type GetTraceResponse } from "./types";
 
 export class TracesFacade {
   readonly #config: InternalConfig;

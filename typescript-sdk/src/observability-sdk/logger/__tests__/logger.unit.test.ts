@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { getLangWatchLogger, getLangWatchLoggerFromProvider, setLangWatchLoggerProvider, createLangWatchLogger } from "..";
 import { logs, NoopLoggerProvider } from "@opentelemetry/api-logs";
-import { LangWatchLogger, LangWatchLogRecord } from "../types";
+import { type LangWatchLogger, type LangWatchLogRecord } from "../types";
 import { resetObservabilitySdkConfig, initializeObservabilitySdkConfig } from "../../config";
 
 vi.mock("@opentelemetry/api-logs", () => ({
@@ -138,7 +138,7 @@ describe("LangWatch Logger", () => {
 
   describe("LangWatchLogger emit functionality", () => {
     it("should emit log records with LangWatch attributes", () => {
-      const logger = getLangWatchLogger("test-logger") as LangWatchLogger;
+      const logger = getLangWatchLogger("test-logger");
 
       const logRecord: LangWatchLogRecord = {
         severityText: "INFO",
@@ -158,7 +158,7 @@ describe("LangWatch Logger", () => {
     });
 
     it("should emit log records without attributes", () => {
-      const logger = getLangWatchLogger("test-logger") as LangWatchLogger;
+      const logger = getLangWatchLogger("test-logger");
 
       const logRecord: LangWatchLogRecord = {
         severityText: "ERROR",
@@ -170,7 +170,7 @@ describe("LangWatch Logger", () => {
     });
 
     it("should emit log records with complex attributes", () => {
-      const logger = getLangWatchLogger("test-logger") as LangWatchLogger;
+      const logger = getLangWatchLogger("test-logger");
 
       const logRecord: LangWatchLogRecord = {
         severityText: "WARN",

@@ -1,16 +1,16 @@
 import {
-  AnyValue,
-  Logger,
+  type AnyValue,
+  type Logger,
 } from "@opentelemetry/api-logs";
 import {
-  EmitOptions,
-  LangWatchLogger,
-  LangWatchLogRecord,
-  LangWatchSpanGenAIAssistantMessageEventBody,
-  LangWatchSpanGenAIChoiceEventBody,
-  LangWatchSpanGenAISystemMessageEventBody,
-  LangWatchSpanGenAIToolMessageEventBody,
-  LangWatchSpanGenAIUserMessageEventBody,
+  type EmitOptions,
+  type LangWatchLogger,
+  type LangWatchLogRecord,
+  type LangWatchSpanGenAIAssistantMessageEventBody,
+  type LangWatchSpanGenAIChoiceEventBody,
+  type LangWatchSpanGenAISystemMessageEventBody,
+  type LangWatchSpanGenAIToolMessageEventBody,
+  type LangWatchSpanGenAIUserMessageEventBody,
 } from "./types";
 import { shouldCaptureOutput } from "../config";
 import * as intSemconv from "../semconv";

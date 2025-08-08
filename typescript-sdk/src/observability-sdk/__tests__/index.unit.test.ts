@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { setupTestEnvironment, testScenarios, MockTracerProvider } from "./test-utils";
-import { createLangWatchSpan, LangWatchSpan } from "../span";
+import { createLangWatchSpan, type LangWatchSpan } from "../span";
 import { getLangWatchTracer, getLangWatchTracerFromProvider } from "../tracer";
 import { FilterableBatchSpanProcessor } from "../processors";
 import { LangWatchExporter } from "../exporters";

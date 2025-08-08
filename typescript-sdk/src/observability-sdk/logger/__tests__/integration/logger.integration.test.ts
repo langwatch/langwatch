@@ -3,7 +3,7 @@ import { InMemoryLogRecordExporter, SimpleLogRecordProcessor } from "@openteleme
 import { getLangWatchLogger, getLangWatchLoggerFromProvider } from "../..";
 import { NoOpLogger } from "../../../../logger";
 import { setupObservability } from "../../../setup/node";
-import { LangWatchLogRecord } from "../../types";
+import { type LangWatchLogRecord } from "../../types";
 import { resetObservabilitySdkConfig } from "../../../config";
 
 /**
@@ -159,7 +159,7 @@ describe("Logger Integration Tests", () => {
 
       // Verify attributes
       exportedLogRecords.forEach((record, index) => {
-        expect(record.attributes?.["level"]).toBe(["debug", "info", "warn", "error"][index]);
+        expect(record.attributes?.level).toBe(["debug", "info", "warn", "error"][index]);
       });
     });
 

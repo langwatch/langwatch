@@ -1,8 +1,8 @@
-import { Logger, NoOpLogger } from "../logger/index.js";
+import { type Logger, NoOpLogger } from "../logger/index.js";
 import {
-  DataCaptureMode,
-  DataCaptureContext,
-  DataCaptureOptions,
+  type DataCaptureMode,
+  type DataCaptureContext,
+  type DataCaptureOptions,
 } from "./features/data-capture/types.js";
 
 /**
@@ -172,8 +172,8 @@ export function getDataCaptureMode(
   // Handle different config formats
   if (typeof config.dataCapture === "string") {
     const validModes: DataCaptureMode[] = ["none", "input", "output", "all"];
-    if (validModes.includes(config.dataCapture as DataCaptureMode)) {
-      return config.dataCapture as DataCaptureMode;
+    if (validModes.includes(config.dataCapture)) {
+      return config.dataCapture;
     }
 
 

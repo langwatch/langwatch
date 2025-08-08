@@ -1,4 +1,4 @@
-import { LangWatchTracer } from "@/observability-sdk";
+import { type LangWatchTracer } from "@/observability-sdk";
 import { SpanKind } from "@opentelemetry/api";
 
 // Type for decorator methods that receive span as first parameter
@@ -7,13 +7,11 @@ type DecoratorMethodWithSpan<T extends (...args: any[]) => any> =
 
 // Type for decorator class that maps original methods to span-aware versions
 // Only requires methods that are actually implemented in the decorator
-type DecoratorClass<T> = {
-  new (target: T): Partial<{
+type DecoratorClass<T> = new (target: T) => Partial<{
     [K in keyof T]: T[K] extends (...args: any[]) => any
       ? DecoratorMethodWithSpan<T[K]>
       : T[K];
   }>;
-};
 
 /**
  * Creates a proxy that always creates spans for public methods.
@@ -80,5 +78,5 @@ export function createTracingProxy<
 
       return typeof value === "function" ? value.bind(target) : value;
     },
-  }) as T;
+  });
 }

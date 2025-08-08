@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { LangWatchLogsExporter, LangWatchLogsExporterOptions } from "../langwatch-logs-exporter";
+import { LangWatchLogsExporter, type LangWatchLogsExporterOptions } from "../langwatch-logs-exporter";
 import {
   LANGWATCH_SDK_NAME_OBSERVABILITY as LANGWATCH_SDK_NAME,
   LANGWATCH_SDK_LANGUAGE,

@@ -29,7 +29,7 @@ import type {
 import type { ChainValues } from "@langchain/core/utils/types";
 import { getLangWatchTracer } from "../../tracer";
 import type { LangWatchSpan } from "../../span";
-import { context, trace, SpanStatusCode, Attributes } from "@opentelemetry/api";
+import { context, trace, SpanStatusCode, type Attributes } from "@opentelemetry/api";
 import { chatMessageSchema } from "../../../internal/generated/types/tracer.generated";
 import { shouldCaptureInput, shouldCaptureOutput } from "../../config";
 import { z } from "zod";
@@ -59,10 +59,10 @@ export class LangWatchCallbackHandler extends BaseCallbackHandler {
     llm: Serialized,
     prompts: string[],
     runId: string,
-    parentRunId?: string | undefined,
-    extraParams?: Record<string, unknown> | undefined,
-    _tags?: string[] | undefined,
-    metadata?: Record<string, unknown> | undefined,
+    parentRunId?: string  ,
+    extraParams?: Record<string, unknown>  ,
+    _tags?: string[]  ,
+    metadata?: Record<string, unknown>  ,
     name?: string,
   ): Promise<void> {
     const parentContext = this.getParentContext(parentRunId);
@@ -116,10 +116,10 @@ export class LangWatchCallbackHandler extends BaseCallbackHandler {
     llm: Serialized,
     messages: BaseMessage[][],
     runId: string,
-    parentRunId?: string | undefined,
-    extraParams?: Record<string, unknown> | undefined,
-    _tags?: string[] | undefined,
-    metadata?: Record<string, unknown> | undefined,
+    parentRunId?: string  ,
+    extraParams?: Record<string, unknown>  ,
+    _tags?: string[]  ,
+    metadata?: Record<string, unknown>  ,
     name?: string,
   ): Promise<void> {
     const parentContext = this.getParentContext(parentRunId);
@@ -172,7 +172,7 @@ export class LangWatchCallbackHandler extends BaseCallbackHandler {
   async handleLLMEnd(
     response: LLMResult,
     runId: string,
-    _parentRunId?: string | undefined,
+    _parentRunId?: string  ,
   ): Promise<void> {
     const span = this.getSpan(runId);
     if (!span) return;
@@ -184,7 +184,7 @@ export class LangWatchCallbackHandler extends BaseCallbackHandler {
             (generation_ as ChatGeneration).message,
           ]);
         } else if ("text" in generation_ && generation_.text) {
-          return (generation_ as Generation).text;
+          return (generation_).text;
         } else {
           return generation_;
         }
@@ -201,7 +201,7 @@ export class LangWatchCallbackHandler extends BaseCallbackHandler {
   async handleLLMError(
     err: Error,
     runId: string,
-    _parentRunId?: string | undefined,
+    _parentRunId?: string  ,
   ): Promise<void> {
     const span = this.getSpan(runId);
     if (!span) return;
@@ -218,9 +218,9 @@ export class LangWatchCallbackHandler extends BaseCallbackHandler {
     chain: Serialized,
     inputs: ChainValues,
     runId: string,
-    parentRunId?: string | undefined,
-    _tags?: string[] | undefined,
-    _metadata?: Record<string, unknown> | undefined,
+    parentRunId?: string  ,
+    _tags?: string[]  ,
+    _metadata?: Record<string, unknown>  ,
     _runType?: string,
     name?: string,
   ): Promise<void> {
@@ -259,7 +259,7 @@ export class LangWatchCallbackHandler extends BaseCallbackHandler {
   async handleChainEnd(
     output: ChainValues,
     runId: string,
-    _parentRunId?: string | undefined,
+    _parentRunId?: string  ,
   ): Promise<void> {
     const span = this.getSpan(runId);
     if (!span) return;
@@ -273,9 +273,9 @@ export class LangWatchCallbackHandler extends BaseCallbackHandler {
   async handleChainError(
     err: Error,
     runId: string,
-    _parentRunId?: string | undefined,
-    _tags?: string[] | undefined,
-    _kwargs?: { inputs?: Record<string, unknown> | undefined } | undefined,
+    _parentRunId?: string  ,
+    _tags?: string[]  ,
+    _kwargs?: { inputs?: Record<string, unknown> | undefined }  ,
   ): Promise<void> {
     const span = this.getSpan(runId);
     if (!span) return;
@@ -292,9 +292,9 @@ export class LangWatchCallbackHandler extends BaseCallbackHandler {
     tool: Serialized,
     input: string,
     runId: string,
-    parentRunId?: string | undefined,
-    _tags?: string[] | undefined,
-    _metadata?: Record<string, unknown> | undefined,
+    parentRunId?: string  ,
+    _tags?: string[]  ,
+    _metadata?: Record<string, unknown>  ,
     name?: string,
   ): Promise<void> {
     const parentContext = this.getParentContext(parentRunId);
@@ -333,7 +333,7 @@ export class LangWatchCallbackHandler extends BaseCallbackHandler {
   async handleToolEnd(
     output: string,
     runId: string,
-    _parentRunId?: string | undefined,
+    _parentRunId?: string  ,
   ): Promise<void> {
     const span = this.getSpan(runId);
     if (!span) return;
@@ -350,8 +350,8 @@ export class LangWatchCallbackHandler extends BaseCallbackHandler {
   async handleToolError(
     err: Error,
     runId: string,
-    _parentRunId?: string | undefined,
-    _tags?: string[] | undefined,
+    _parentRunId?: string  ,
+    _tags?: string[]  ,
   ): Promise<void> {
     const span = this.getSpan(runId);
     if (!span) return;
@@ -368,10 +368,10 @@ export class LangWatchCallbackHandler extends BaseCallbackHandler {
     retriever: Serialized,
     query: string,
     runId: string,
-    parentRunId?: string | undefined,
-    _tags?: string[] | undefined,
-    _metadata?: Record<string, unknown> | undefined,
-    name?: string | undefined,
+    parentRunId?: string  ,
+    _tags?: string[]  ,
+    _metadata?: Record<string, unknown>  ,
+    name?: string  ,
   ) {
     const parentContext = this.getParentContext(parentRunId);
     const span = this.tracer.startSpan(
@@ -411,8 +411,8 @@ export class LangWatchCallbackHandler extends BaseCallbackHandler {
   async handleRetrieverEnd(
     documents: DocumentInterface<Record<string, any>>[],
     runId: string,
-    _parentRunId?: string | undefined,
-    _tags?: string[] | undefined,
+    _parentRunId?: string  ,
+    _tags?: string[]  ,
   ) {
     const span = this.getSpan(runId);
     if (!span) return;
@@ -437,8 +437,8 @@ export class LangWatchCallbackHandler extends BaseCallbackHandler {
   async handleRetrieverError(
     err: Error,
     runId: string,
-    _parentRunId?: string | undefined,
-    _tags?: string[] | undefined,
+    _parentRunId?: string  ,
+    _tags?: string[]  ,
   ) {
     const span = this.getSpan(runId);
     if (!span) return;
@@ -454,8 +454,8 @@ export class LangWatchCallbackHandler extends BaseCallbackHandler {
   async handleAgentAction(
     _action: AgentAction,
     runId: string,
-    _parentRunId?: string | undefined,
-    _tags?: string[] | undefined,
+    _parentRunId?: string  ,
+    _tags?: string[]  ,
   ): Promise<void> {
     const span = this.getSpan(runId);
     if (!span) return;
@@ -467,8 +467,8 @@ export class LangWatchCallbackHandler extends BaseCallbackHandler {
   async handleAgentEnd(
     action: AgentFinish,
     runId: string,
-    _parentRunId?: string | undefined,
-    _tags?: string[] | undefined,
+    _parentRunId?: string  ,
+    _tags?: string[]  ,
   ): Promise<void> {
     const span = this.getSpan(runId);
     if (!span) return;
@@ -619,8 +619,8 @@ function addLangChainEvent(
   eventName: string,
   runId: string,
   parentRunId: string | undefined,
-  tags?: string[] | undefined,
-  metadata?: Record<string, unknown> | undefined,
+  tags?: string[]  ,
+  metadata?: Record<string, unknown>  ,
   attributes?: Attributes,
 ) {
   const attrs: Attributes = {

@@ -1,13 +1,13 @@
 import {
   trace,
-  Span,
-  SpanOptions,
-  Context,
+  type Span,
+  type SpanOptions,
+  type Context,
   SpanStatusCode,
-  TracerProvider,
+  type TracerProvider,
 } from "@opentelemetry/api";
 import { createLangWatchSpan } from "../span";
-import { LangWatchTracer } from "./types";
+import { type LangWatchTracer } from "./types";
 
 /**
  * Get a LangWatch tracer from a specific OpenTelemetry tracer provider.

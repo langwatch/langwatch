@@ -65,8 +65,7 @@ export function detectRuntime(globals?: any): JsRuntime {
       return "node";
     }
     if (
-      typeof g.window !== "undefined" &&
-      typeof g.window.document !== "undefined" &&
+      typeof g.window?.document !== "undefined" &&
       g === g.window
     ) {
       return "web";

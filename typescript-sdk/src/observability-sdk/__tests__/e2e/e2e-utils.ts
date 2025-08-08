@@ -8,8 +8,8 @@ import { getLangWatchTracer } from "../../tracer";
 import { LangWatch } from "../../../client-sdk";
 import { LangWatchExporter } from "../../exporters";
 import { SimpleSpanProcessor } from "@opentelemetry/sdk-trace-base";
-import { Span as OtelSpan, trace } from "@opentelemetry/api";
-import { GetTraceResponse } from "../../../client-sdk/services/traces/types";
+import { type Span as OtelSpan, trace } from "@opentelemetry/api";
+import { type GetTraceResponse } from "../../../client-sdk/services/traces/types";
 
 type Trace = GetTraceResponse;
 type Span = NonNullable<Trace["spans"]>[number];

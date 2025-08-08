@@ -1,12 +1,12 @@
 import { describe, expect, it } from "vitest";
 import {
   INPUT_OUTPUT_TYPES,
-  InputOutputType,
+  type InputOutputType,
   isValidInputOutputType,
   processSpanInputOutput,
-  SpanInputOutputMethod,
+  type SpanInputOutputMethod,
 } from "../input-output";
-import { SpanInputOutput, ChatMessage } from "../../../internal/generated/types/tracer";
+import { type SpanInputOutput, type ChatMessage } from "../../../internal/generated/types/tracer";
 
 describe("INPUT_OUTPUT_TYPES", () => {
   it("should include all expected types", () => {

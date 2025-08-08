@@ -3,8 +3,8 @@ import { Prompt, type PromptResponse } from "./prompt";
 import { PromptConverter } from "@/cli/utils/promptConverter";
 import { PromptServiceTracingDecorator, tracer } from "./tracing";
 import { createTracingProxy } from "@/client-sdk/tracing/create-tracing-proxy";
-import { InternalConfig } from "@/client-sdk/types";
-import { CreatePromptBody, CreateVersionBody, UpdatePromptBody } from "./types";
+import { type InternalConfig } from "@/client-sdk/types";
+import { type CreatePromptBody, type CreateVersionBody, type UpdatePromptBody } from "./types";
 
 /**
  * Custom error class for Prompts API operations.

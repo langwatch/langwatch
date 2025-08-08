@@ -1,5 +1,5 @@
-import { PromptsService } from "../service";
-import { Prompt } from "../prompt";
+import { type PromptsService } from "../service";
+import { type Prompt } from "../prompt";
 import type { LangWatchSpan } from "@/observability-sdk";
 import { shouldCaptureInput } from "@/observability-sdk";
 import type { CreatePromptBody, UpdatePromptBody } from "../types";

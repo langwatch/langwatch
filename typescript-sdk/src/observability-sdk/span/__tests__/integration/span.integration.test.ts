@@ -560,7 +560,7 @@ describe("Span Integration Tests", () => {
       }
 
       expect(span.attributes[semconv.ATTR_LANGWATCH_SPAN_TYPE]).toBe("llm");
-      expect(span.attributes["step"]).toBe(4); // Last value wins
+      expect(span.attributes.step).toBe(4); // Last value wins
       expect(span.events).toHaveLength(1);
 
       const inputData = JSON.parse(
