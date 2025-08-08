@@ -14,19 +14,15 @@ T = TypeVar("T", bound="PutApiPromptsByIdBody")
 class PutApiPromptsByIdBody:
     """
     Attributes:
-        name (str):
         handle (Union[Unset, str]):
         scope (Union[Unset, PutApiPromptsByIdBodyScope]):
     """
 
-    name: str
     handle: Union[Unset, str] = UNSET
     scope: Union[Unset, PutApiPromptsByIdBodyScope] = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
-        name = self.name
-
         handle = self.handle
 
         scope: Union[Unset, str] = UNSET
@@ -35,11 +31,7 @@ class PutApiPromptsByIdBody:
 
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
-        field_dict.update(
-            {
-                "name": name,
-            }
-        )
+        field_dict.update({})
         if handle is not UNSET:
             field_dict["handle"] = handle
         if scope is not UNSET:
@@ -50,8 +42,6 @@ class PutApiPromptsByIdBody:
     @classmethod
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
         d = dict(src_dict)
-        name = d.pop("name")
-
         handle = d.pop("handle", UNSET)
 
         _scope = d.pop("scope", UNSET)
@@ -62,7 +52,6 @@ class PutApiPromptsByIdBody:
             scope = PutApiPromptsByIdBodyScope(_scope)
 
         put_api_prompts_by_id_body = cls(
-            name=name,
             handle=handle,
             scope=scope,
         )

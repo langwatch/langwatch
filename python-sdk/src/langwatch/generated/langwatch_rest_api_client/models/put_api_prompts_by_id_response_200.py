@@ -14,14 +14,12 @@ class PutApiPromptsByIdResponse200:
     """
     Attributes:
         id (str):
-        name (str):
         updated_at (str):
         handle (Union[None, str]):
         scope (PutApiPromptsByIdResponse200Scope):
     """
 
     id: str
-    name: str
     updated_at: str
     handle: Union[None, str]
     scope: PutApiPromptsByIdResponse200Scope
@@ -29,8 +27,6 @@ class PutApiPromptsByIdResponse200:
 
     def to_dict(self) -> dict[str, Any]:
         id = self.id
-
-        name = self.name
 
         updated_at = self.updated_at
 
@@ -44,7 +40,6 @@ class PutApiPromptsByIdResponse200:
         field_dict.update(
             {
                 "id": id,
-                "name": name,
                 "updatedAt": updated_at,
                 "handle": handle,
                 "scope": scope,
@@ -57,8 +52,6 @@ class PutApiPromptsByIdResponse200:
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
         d = dict(src_dict)
         id = d.pop("id")
-
-        name = d.pop("name")
 
         updated_at = d.pop("updatedAt")
 
@@ -73,7 +66,6 @@ class PutApiPromptsByIdResponse200:
 
         put_api_prompts_by_id_response_200 = cls(
             id=id,
-            name=name,
             updated_at=updated_at,
             handle=handle,
             scope=scope,

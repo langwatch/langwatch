@@ -218,7 +218,7 @@ class PromptService:
             client=self._client,
             # Name shouldn't be required here, but it is.
             body=PutApiPromptsByIdBody(
-                name="", handle=handle, scope=PutApiPromptsByIdBodyScope[scope]
+                handle=handle, scope=PutApiPromptsByIdBodyScope[scope]
             ),
         )
         unwrap_response(
