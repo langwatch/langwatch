@@ -3,8 +3,9 @@ import * as path from "path";
 import chalk from "chalk";
 import ora from "ora";
 import * as yaml from "js-yaml";
-import { PromptConverter } from "../../prompt/converter";
-import { ConfigData, PromptService, PromptsError } from "../../prompt/service";
+import { PromptConverter } from "@/cli/utils/promptConverter";
+import { ConfigData, PromptsError, type SyncAction } from "@/client-sdk/services/prompts";
+import { createLangWatchClient } from "../utils/langwatch";
 import type { SyncResult } from "../types";
 import { FileManager } from "../utils/fileManager";
 import { ensureProjectInitialized } from "../utils/init";
@@ -71,8 +72,8 @@ export const syncCommand = async (): Promise<void> => {
     // Check API key before doing anything else
     checkApiKey();
 
-    // Get prompt service
-    const promptService = PromptService.getInstance();
+    // Get LangWatch client
+    const langwatch = createLangWatchClient();
 
     // Ensure project is initialized (prompts.json, lock file, directories)
     await ensureProjectInitialized(false); // Don't prompt for .gitignore in sync
@@ -119,7 +120,7 @@ export const syncCommand = async (): Promise<void> => {
           const lockEntry = lock.prompts[name];
 
           // Fetch the prompt from the API to check current version
-          const prompt = await promptService.get(name);
+          const prompt = await langwatch.prompts.get(name);
 
           if (prompt) {
             // Check if we need to update (new version or not materialized)
@@ -217,7 +218,7 @@ export const syncCommand = async (): Promise<void> => {
           };
 
           // Use new sync API with conflict detection
-          const syncResult = await promptService.sync({
+          const syncResult = await langwatch.prompts.sync({
             name: promptName,
             configData,
             localVersion: currentVersion,
@@ -323,11 +324,13 @@ export const syncCommand = async (): Promise<void> => {
             actionText = "Up-to-date";
             result.unchanged.push(promptName);
           } else {
-            actionText =
-              {
-                created: "Created",
-                updated: "Updated",
-              }[syncResult.action] || "Pushed";
+            const actionMap: Record<SyncAction, string> = {
+              created: "Created",
+              updated: "Updated",
+              conflict: "Conflict resolved",
+              up_to_date: "Up to date",
+            };
+            actionText = actionMap[syncResult.action as SyncAction] || "Pushed";
             result.pushed.push({
               name: promptName,
               version: syncResult.prompt?.version || 0,

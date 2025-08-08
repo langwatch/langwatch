@@ -3,8 +3,9 @@ import * as path from "path";
 import chalk from "chalk";
 import ora from "ora";
 import { FileManager } from "../utils/fileManager";
-import { PromptService, PromptsError } from "../../prompt/service";
-import { PromptConverter } from "../../prompt/converter";
+import { PromptsError } from "@/client-sdk/services/prompts";
+import { createLangWatchClient } from "../utils/langwatch";
+import { PromptConverter } from "../utils/promptConverter";
 import { ensureProjectInitialized } from "../utils/init";
 import { checkApiKey } from "../utils/apiKey";
 
@@ -72,7 +73,7 @@ export const addCommand = async (name: string, options: AddOptions): Promise<voi
     // Check API key before doing anything else
     checkApiKey();
 
-    const promptService = PromptService.getInstance();
+    const langwatch = createLangWatchClient();
     const version = options.version || "latest";
 
         // Fetch and materialize the prompt (like sync does for individual prompts)
@@ -80,7 +81,7 @@ export const addCommand = async (name: string, options: AddOptions): Promise<voi
 
     try {
       // Fetch the prompt from the API
-      const prompt = await promptService.get(name);
+      const prompt = await langwatch.prompts.get(name);
 
       if (!prompt) {
         spinner.fail();

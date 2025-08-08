@@ -3,7 +3,7 @@ import * as path from "path";
 import chalk from "chalk";
 import ora from "ora";
 import { FileManager } from "../utils/fileManager";
-import { PromptService, PromptsError } from "../../prompt/service";
+import { PromptsError } from "@/client-sdk/services/prompts";
 
 export const removeCommand = async (name: string): Promise<void> => {
   try {
