@@ -670,26 +670,17 @@ export const organizationRouter = createTRPCRouter({
       }
 
       await prisma.$transaction(async (prisma) => {
-        // Check if user is already a member of the organization
-        const existingOrgMembership = await prisma.organizationUser.findUnique({
-          where: {
-            userId_organizationId: {
-              userId: session.user.id,
-              organizationId: invite.organizationId,
-            },
-          },
-        });
-
-        // Only create organization membership if it doesn't exist
-        if (!existingOrgMembership) {
-          await prisma.organizationUser.create({
-            data: {
+        // Create org membership; skip if it already exists
+        await prisma.organizationUser.createMany({
+          data: [
+            {
               userId: session.user.id,
               organizationId: invite.organizationId,
               role: invite.role,
             },
-          });
-        }
+          ],
+          skipDuplicates: true,
+        });
 
         const organizationToTeamRoleMap: {
           [K in OrganizationUserRole]: TeamUserRole;
@@ -699,28 +690,26 @@ export const organizationRouter = createTRPCRouter({
           [OrganizationUserRole.EXTERNAL]: TeamUserRole.VIEWER,
         };
 
-        const teamIds = invite.teamIds.split(",");
-        for (const teamId of teamIds) {
-          // Check if user is already a member of the team
-          const existingTeamMembership = await prisma.teamUser.findUnique({
-            where: {
-              userId_teamId: {
-                userId: session.user.id,
-                teamId: teamId,
-              },
-            },
-          });
+        const dedupedTeamIds = Array.from(
+          new Set(
+            invite.teamIds
+              .split(",")
+              .map((s) => s.trim())
+              .filter(Boolean)
+          )
+        );
 
-          // Only create team membership if it doesn't exist
-          if (!existingTeamMembership) {
-            await prisma.teamUser.create({
-              data: {
-                userId: session.user.id,
-                teamId: teamId,
-                role: organizationToTeamRoleMap[invite.role],
-              },
-            });
-          }
+        if (dedupedTeamIds.length > 0) {
+          const teamMembershipData = dedupedTeamIds.map((teamId) => ({
+            userId: session.user.id,
+            teamId,
+            role: organizationToTeamRoleMap[invite.role],
+          }));
+
+          await prisma.teamUser.createMany({
+            data: teamMembershipData,
+            skipDuplicates: true, // safe under concurrency and preserves existing roles
+          });
         }
 
         await prisma.organizationInvite.update({
