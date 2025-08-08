@@ -4,9 +4,13 @@ from typing import TYPE_CHECKING, Any, Literal, TypeVar, Union, cast
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
 
+from ..models.get_api_prompts_by_id_versions_response_200_scope import GetApiPromptsByIdVersionsResponse200Scope
 from ..types import UNSET, Unset
 
 if TYPE_CHECKING:
+    from ..models.get_api_prompts_by_id_versions_response_200_author_type_0 import (
+        GetApiPromptsByIdVersionsResponse200AuthorType0,
+    )
     from ..models.get_api_prompts_by_id_versions_response_200_config_data import (
         GetApiPromptsByIdVersionsResponse200ConfigData,
     )
@@ -27,7 +31,10 @@ class GetApiPromptsByIdVersionsResponse200:
         version (float):
         created_at (str):
         config_data (GetApiPromptsByIdVersionsResponse200ConfigData):
+        handle (Union[None, str]):
+        scope (GetApiPromptsByIdVersionsResponse200Scope):
         commit_message (Union[None, Unset, str]):
+        author (Union['GetApiPromptsByIdVersionsResponse200AuthorType0', None, Unset]):
     """
 
     id: str
@@ -38,10 +45,17 @@ class GetApiPromptsByIdVersionsResponse200:
     version: float
     created_at: str
     config_data: "GetApiPromptsByIdVersionsResponse200ConfigData"
+    handle: Union[None, str]
+    scope: GetApiPromptsByIdVersionsResponse200Scope
     commit_message: Union[None, Unset, str] = UNSET
+    author: Union["GetApiPromptsByIdVersionsResponse200AuthorType0", None, Unset] = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
+        from ..models.get_api_prompts_by_id_versions_response_200_author_type_0 import (
+            GetApiPromptsByIdVersionsResponse200AuthorType0,
+        )
+
         id = self.id
 
         author_id: Union[None, str]
@@ -59,11 +73,24 @@ class GetApiPromptsByIdVersionsResponse200:
 
         config_data = self.config_data.to_dict()
 
+        handle: Union[None, str]
+        handle = self.handle
+
+        scope = self.scope.value
+
         commit_message: Union[None, Unset, str]
         if isinstance(self.commit_message, Unset):
             commit_message = UNSET
         else:
             commit_message = self.commit_message
+
+        author: Union[None, Unset, dict[str, Any]]
+        if isinstance(self.author, Unset):
+            author = UNSET
+        elif isinstance(self.author, GetApiPromptsByIdVersionsResponse200AuthorType0):
+            author = self.author.to_dict()
+        else:
+            author = self.author
 
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
@@ -77,15 +104,22 @@ class GetApiPromptsByIdVersionsResponse200:
                 "version": version,
                 "createdAt": created_at,
                 "configData": config_data,
+                "handle": handle,
+                "scope": scope,
             }
         )
         if commit_message is not UNSET:
             field_dict["commitMessage"] = commit_message
+        if author is not UNSET:
+            field_dict["author"] = author
 
         return field_dict
 
     @classmethod
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
+        from ..models.get_api_prompts_by_id_versions_response_200_author_type_0 import (
+            GetApiPromptsByIdVersionsResponse200AuthorType0,
+        )
         from ..models.get_api_prompts_by_id_versions_response_200_config_data import (
             GetApiPromptsByIdVersionsResponse200ConfigData,
         )
@@ -114,6 +148,15 @@ class GetApiPromptsByIdVersionsResponse200:
 
         config_data = GetApiPromptsByIdVersionsResponse200ConfigData.from_dict(d.pop("configData"))
 
+        def _parse_handle(data: object) -> Union[None, str]:
+            if data is None:
+                return data
+            return cast(Union[None, str], data)
+
+        handle = _parse_handle(d.pop("handle"))
+
+        scope = GetApiPromptsByIdVersionsResponse200Scope(d.pop("scope"))
+
         def _parse_commit_message(data: object) -> Union[None, Unset, str]:
             if data is None:
                 return data
@@ -122,6 +165,23 @@ class GetApiPromptsByIdVersionsResponse200:
             return cast(Union[None, Unset, str], data)
 
         commit_message = _parse_commit_message(d.pop("commitMessage", UNSET))
+
+        def _parse_author(data: object) -> Union["GetApiPromptsByIdVersionsResponse200AuthorType0", None, Unset]:
+            if data is None:
+                return data
+            if isinstance(data, Unset):
+                return data
+            try:
+                if not isinstance(data, dict):
+                    raise TypeError()
+                author_type_0 = GetApiPromptsByIdVersionsResponse200AuthorType0.from_dict(data)
+
+                return author_type_0
+            except:  # noqa: E722
+                pass
+            return cast(Union["GetApiPromptsByIdVersionsResponse200AuthorType0", None, Unset], data)
+
+        author = _parse_author(d.pop("author", UNSET))
 
         get_api_prompts_by_id_versions_response_200 = cls(
             id=id,
@@ -132,7 +192,10 @@ class GetApiPromptsByIdVersionsResponse200:
             version=version,
             created_at=created_at,
             config_data=config_data,
+            handle=handle,
+            scope=scope,
             commit_message=commit_message,
+            author=author,
         )
 
         get_api_prompts_by_id_versions_response_200.additional_properties = d

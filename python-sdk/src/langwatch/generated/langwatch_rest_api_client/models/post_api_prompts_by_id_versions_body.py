@@ -7,6 +7,7 @@ from attrs import field as _attrs_field
 from ..types import UNSET, Unset
 
 if TYPE_CHECKING:
+    from ..models.post_api_prompts_by_id_versions_body_author_type_0 import PostApiPromptsByIdVersionsBodyAuthorType0
     from ..models.post_api_prompts_by_id_versions_body_config_data import PostApiPromptsByIdVersionsBodyConfigData
 
 
@@ -26,6 +27,7 @@ class PostApiPromptsByIdVersionsBody:
         id (Union[Unset, str]):
         author_id (Union[None, Unset, str]):
         created_at (Union[Unset, str]):
+        author (Union['PostApiPromptsByIdVersionsBodyAuthorType0', None, Unset]):
     """
 
     project_id: str
@@ -37,9 +39,14 @@ class PostApiPromptsByIdVersionsBody:
     id: Union[Unset, str] = UNSET
     author_id: Union[None, Unset, str] = UNSET
     created_at: Union[Unset, str] = UNSET
+    author: Union["PostApiPromptsByIdVersionsBodyAuthorType0", None, Unset] = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
+        from ..models.post_api_prompts_by_id_versions_body_author_type_0 import (
+            PostApiPromptsByIdVersionsBodyAuthorType0,
+        )
+
         project_id = self.project_id
 
         config_id = self.config_id
@@ -62,6 +69,14 @@ class PostApiPromptsByIdVersionsBody:
 
         created_at = self.created_at
 
+        author: Union[None, Unset, dict[str, Any]]
+        if isinstance(self.author, Unset):
+            author = UNSET
+        elif isinstance(self.author, PostApiPromptsByIdVersionsBodyAuthorType0):
+            author = self.author.to_dict()
+        else:
+            author = self.author
+
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
         field_dict.update(
@@ -80,11 +95,16 @@ class PostApiPromptsByIdVersionsBody:
             field_dict["authorId"] = author_id
         if created_at is not UNSET:
             field_dict["createdAt"] = created_at
+        if author is not UNSET:
+            field_dict["author"] = author
 
         return field_dict
 
     @classmethod
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
+        from ..models.post_api_prompts_by_id_versions_body_author_type_0 import (
+            PostApiPromptsByIdVersionsBodyAuthorType0,
+        )
         from ..models.post_api_prompts_by_id_versions_body_config_data import PostApiPromptsByIdVersionsBodyConfigData
 
         d = dict(src_dict)
@@ -115,6 +135,23 @@ class PostApiPromptsByIdVersionsBody:
 
         created_at = d.pop("createdAt", UNSET)
 
+        def _parse_author(data: object) -> Union["PostApiPromptsByIdVersionsBodyAuthorType0", None, Unset]:
+            if data is None:
+                return data
+            if isinstance(data, Unset):
+                return data
+            try:
+                if not isinstance(data, dict):
+                    raise TypeError()
+                author_type_0 = PostApiPromptsByIdVersionsBodyAuthorType0.from_dict(data)
+
+                return author_type_0
+            except:  # noqa: E722
+                pass
+            return cast(Union["PostApiPromptsByIdVersionsBodyAuthorType0", None, Unset], data)
+
+        author = _parse_author(d.pop("author", UNSET))
+
         post_api_prompts_by_id_versions_body = cls(
             project_id=project_id,
             config_id=config_id,
@@ -125,6 +162,7 @@ class PostApiPromptsByIdVersionsBody:
             id=id,
             author_id=author_id,
             created_at=created_at,
+            author=author,
         )
 
         post_api_prompts_by_id_versions_body.additional_properties = d

@@ -1,12 +1,17 @@
 from collections.abc import Mapping
-from typing import TYPE_CHECKING, Any, TypeVar
+from typing import TYPE_CHECKING, Any, TypeVar, Union
 
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
 
+from ..types import UNSET, Unset
+
 if TYPE_CHECKING:
     from ..models.get_api_prompts_by_id_versions_response_200_config_data_demonstrations_columns_item import (
         GetApiPromptsByIdVersionsResponse200ConfigDataDemonstrationsColumnsItem,
+    )
+    from ..models.get_api_prompts_by_id_versions_response_200_config_data_demonstrations_inline import (
+        GetApiPromptsByIdVersionsResponse200ConfigDataDemonstrationsInline,
     )
     from ..models.get_api_prompts_by_id_versions_response_200_config_data_demonstrations_rows_item import (
         GetApiPromptsByIdVersionsResponse200ConfigDataDemonstrationsRowsItem,
@@ -22,10 +27,16 @@ class GetApiPromptsByIdVersionsResponse200ConfigDataDemonstrations:
     Attributes:
         columns (list['GetApiPromptsByIdVersionsResponse200ConfigDataDemonstrationsColumnsItem']):
         rows (list['GetApiPromptsByIdVersionsResponse200ConfigDataDemonstrationsRowsItem']):
+        id (Union[Unset, str]):
+        name (Union[Unset, str]):
+        inline (Union[Unset, GetApiPromptsByIdVersionsResponse200ConfigDataDemonstrationsInline]):
     """
 
     columns: list["GetApiPromptsByIdVersionsResponse200ConfigDataDemonstrationsColumnsItem"]
     rows: list["GetApiPromptsByIdVersionsResponse200ConfigDataDemonstrationsRowsItem"]
+    id: Union[Unset, str] = UNSET
+    name: Union[Unset, str] = UNSET
+    inline: Union[Unset, "GetApiPromptsByIdVersionsResponse200ConfigDataDemonstrationsInline"] = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -39,6 +50,14 @@ class GetApiPromptsByIdVersionsResponse200ConfigDataDemonstrations:
             rows_item = rows_item_data.to_dict()
             rows.append(rows_item)
 
+        id = self.id
+
+        name = self.name
+
+        inline: Union[Unset, dict[str, Any]] = UNSET
+        if not isinstance(self.inline, Unset):
+            inline = self.inline.to_dict()
+
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
         field_dict.update(
@@ -47,6 +66,12 @@ class GetApiPromptsByIdVersionsResponse200ConfigDataDemonstrations:
                 "rows": rows,
             }
         )
+        if id is not UNSET:
+            field_dict["id"] = id
+        if name is not UNSET:
+            field_dict["name"] = name
+        if inline is not UNSET:
+            field_dict["inline"] = inline
 
         return field_dict
 
@@ -54,6 +79,9 @@ class GetApiPromptsByIdVersionsResponse200ConfigDataDemonstrations:
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
         from ..models.get_api_prompts_by_id_versions_response_200_config_data_demonstrations_columns_item import (
             GetApiPromptsByIdVersionsResponse200ConfigDataDemonstrationsColumnsItem,
+        )
+        from ..models.get_api_prompts_by_id_versions_response_200_config_data_demonstrations_inline import (
+            GetApiPromptsByIdVersionsResponse200ConfigDataDemonstrationsInline,
         )
         from ..models.get_api_prompts_by_id_versions_response_200_config_data_demonstrations_rows_item import (
             GetApiPromptsByIdVersionsResponse200ConfigDataDemonstrationsRowsItem,
@@ -76,9 +104,23 @@ class GetApiPromptsByIdVersionsResponse200ConfigDataDemonstrations:
 
             rows.append(rows_item)
 
+        id = d.pop("id", UNSET)
+
+        name = d.pop("name", UNSET)
+
+        _inline = d.pop("inline", UNSET)
+        inline: Union[Unset, GetApiPromptsByIdVersionsResponse200ConfigDataDemonstrationsInline]
+        if isinstance(_inline, Unset):
+            inline = UNSET
+        else:
+            inline = GetApiPromptsByIdVersionsResponse200ConfigDataDemonstrationsInline.from_dict(_inline)
+
         get_api_prompts_by_id_versions_response_200_config_data_demonstrations = cls(
             columns=columns,
             rows=rows,
+            id=id,
+            name=name,
+            inline=inline,
         )
 
         get_api_prompts_by_id_versions_response_200_config_data_demonstrations.additional_properties = d

@@ -18,6 +18,7 @@ if TYPE_CHECKING:
     import langwatch.dataset as dataset
     import langwatch.dspy as dspy
     import langwatch.langchain as langchain
+    import langchain.prompts as prompts
 
 
 @module_property
@@ -54,6 +55,13 @@ def __getattr__(name: str):
             # Cache it in the module globals for subsequent access
             globals()[name] = module
             return module
+    elif name == "prompts":
+        # Special-case: expose a PromptService instance at langwatch.prompts
+        from .prompts.service import PromptService
+
+        svc = PromptService.from_global()
+        globals()[name] = svc  # Cache for subsequent access
+        return svc
 
     raise AttributeError(f"module '{__name__}' has no attribute '{name}'")
 
@@ -140,4 +148,5 @@ __all__ = [
     "evaluations",
     "langchain",
     "dspy",
+    "prompts",
 ]

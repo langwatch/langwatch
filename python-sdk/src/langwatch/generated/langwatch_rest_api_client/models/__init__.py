@@ -11,6 +11,10 @@ from .delete_api_prompts_by_id_response_401 import DeleteApiPromptsByIdResponse4
 from .delete_api_prompts_by_id_response_401_error import DeleteApiPromptsByIdResponse401Error
 from .delete_api_prompts_by_id_response_404 import DeleteApiPromptsByIdResponse404
 from .delete_api_prompts_by_id_response_500 import DeleteApiPromptsByIdResponse500
+from .delete_api_scenario_events_response_200 import DeleteApiScenarioEventsResponse200
+from .delete_api_scenario_events_response_400 import DeleteApiScenarioEventsResponse400
+from .delete_api_scenario_events_response_401 import DeleteApiScenarioEventsResponse401
+from .delete_api_scenario_events_response_500 import DeleteApiScenarioEventsResponse500
 from .error import Error
 from .evaluation import Evaluation
 from .evaluation_timestamps import EvaluationTimestamps
@@ -35,6 +39,7 @@ from .get_api_prompts_by_id_response_200_response_format_type_0_json_schema_sche
 from .get_api_prompts_by_id_response_200_response_format_type_0_type import (
     GetApiPromptsByIdResponse200ResponseFormatType0Type,
 )
+from .get_api_prompts_by_id_response_200_scope import GetApiPromptsByIdResponse200Scope
 from .get_api_prompts_by_id_response_400 import GetApiPromptsByIdResponse400
 from .get_api_prompts_by_id_response_400_error import GetApiPromptsByIdResponse400Error
 from .get_api_prompts_by_id_response_401 import GetApiPromptsByIdResponse401
@@ -42,6 +47,7 @@ from .get_api_prompts_by_id_response_401_error import GetApiPromptsByIdResponse4
 from .get_api_prompts_by_id_response_404 import GetApiPromptsByIdResponse404
 from .get_api_prompts_by_id_response_500 import GetApiPromptsByIdResponse500
 from .get_api_prompts_by_id_versions_response_200 import GetApiPromptsByIdVersionsResponse200
+from .get_api_prompts_by_id_versions_response_200_author_type_0 import GetApiPromptsByIdVersionsResponse200AuthorType0
 from .get_api_prompts_by_id_versions_response_200_config_data import GetApiPromptsByIdVersionsResponse200ConfigData
 from .get_api_prompts_by_id_versions_response_200_config_data_demonstrations import (
     GetApiPromptsByIdVersionsResponse200ConfigDataDemonstrations,
@@ -51,6 +57,15 @@ from .get_api_prompts_by_id_versions_response_200_config_data_demonstrations_col
 )
 from .get_api_prompts_by_id_versions_response_200_config_data_demonstrations_columns_item_type import (
     GetApiPromptsByIdVersionsResponse200ConfigDataDemonstrationsColumnsItemType,
+)
+from .get_api_prompts_by_id_versions_response_200_config_data_demonstrations_inline import (
+    GetApiPromptsByIdVersionsResponse200ConfigDataDemonstrationsInline,
+)
+from .get_api_prompts_by_id_versions_response_200_config_data_demonstrations_inline_column_types_item import (
+    GetApiPromptsByIdVersionsResponse200ConfigDataDemonstrationsInlineColumnTypesItem,
+)
+from .get_api_prompts_by_id_versions_response_200_config_data_demonstrations_inline_records import (
+    GetApiPromptsByIdVersionsResponse200ConfigDataDemonstrationsInlineRecords,
 )
 from .get_api_prompts_by_id_versions_response_200_config_data_demonstrations_rows_item import (
     GetApiPromptsByIdVersionsResponse200ConfigDataDemonstrationsRowsItem,
@@ -76,6 +91,10 @@ from .get_api_prompts_by_id_versions_response_200_config_data_outputs_item_json_
 from .get_api_prompts_by_id_versions_response_200_config_data_outputs_item_type import (
     GetApiPromptsByIdVersionsResponse200ConfigDataOutputsItemType,
 )
+from .get_api_prompts_by_id_versions_response_200_config_data_prompting_technique import (
+    GetApiPromptsByIdVersionsResponse200ConfigDataPromptingTechnique,
+)
+from .get_api_prompts_by_id_versions_response_200_scope import GetApiPromptsByIdVersionsResponse200Scope
 from .get_api_prompts_by_id_versions_response_400 import GetApiPromptsByIdVersionsResponse400
 from .get_api_prompts_by_id_versions_response_400_error import GetApiPromptsByIdVersionsResponse400Error
 from .get_api_prompts_by_id_versions_response_401 import GetApiPromptsByIdVersionsResponse401
@@ -95,6 +114,7 @@ from .get_api_prompts_response_200_item_response_format_type_0_json_schema_schem
 from .get_api_prompts_response_200_item_response_format_type_0_type import (
     GetApiPromptsResponse200ItemResponseFormatType0Type,
 )
+from .get_api_prompts_response_200_item_scope import GetApiPromptsResponse200ItemScope
 from .get_api_prompts_response_400 import GetApiPromptsResponse400
 from .get_api_prompts_response_400_error import GetApiPromptsResponse400Error
 from .get_api_prompts_response_401 import GetApiPromptsResponse401
@@ -128,7 +148,113 @@ from .patch_api_annotations_id_body import PatchApiAnnotationsIdBody
 from .patch_api_annotations_id_response_200 import PatchApiAnnotationsIdResponse200
 from .post_api_annotations_trace_id_body import PostApiAnnotationsTraceIdBody
 from .post_api_prompts_body import PostApiPromptsBody
+from .post_api_prompts_body_inputs_item import PostApiPromptsBodyInputsItem
+from .post_api_prompts_body_inputs_item_type import PostApiPromptsBodyInputsItemType
+from .post_api_prompts_body_messages_item import PostApiPromptsBodyMessagesItem
+from .post_api_prompts_body_messages_item_role import PostApiPromptsBodyMessagesItemRole
+from .post_api_prompts_body_outputs_item import PostApiPromptsBodyOutputsItem
+from .post_api_prompts_body_outputs_item_json_schema import PostApiPromptsBodyOutputsItemJsonSchema
+from .post_api_prompts_body_outputs_item_type import PostApiPromptsBodyOutputsItemType
+from .post_api_prompts_body_scope import PostApiPromptsBodyScope
+from .post_api_prompts_by_id_sync_body import PostApiPromptsByIdSyncBody
+from .post_api_prompts_by_id_sync_body_config_data import PostApiPromptsByIdSyncBodyConfigData
+from .post_api_prompts_by_id_sync_body_config_data_demonstrations import (
+    PostApiPromptsByIdSyncBodyConfigDataDemonstrations,
+)
+from .post_api_prompts_by_id_sync_body_config_data_demonstrations_inline import (
+    PostApiPromptsByIdSyncBodyConfigDataDemonstrationsInline,
+)
+from .post_api_prompts_by_id_sync_body_config_data_demonstrations_inline_column_types_item import (
+    PostApiPromptsByIdSyncBodyConfigDataDemonstrationsInlineColumnTypesItem,
+)
+from .post_api_prompts_by_id_sync_body_config_data_demonstrations_inline_records import (
+    PostApiPromptsByIdSyncBodyConfigDataDemonstrationsInlineRecords,
+)
+from .post_api_prompts_by_id_sync_body_config_data_inputs_item import PostApiPromptsByIdSyncBodyConfigDataInputsItem
+from .post_api_prompts_by_id_sync_body_config_data_inputs_item_type import (
+    PostApiPromptsByIdSyncBodyConfigDataInputsItemType,
+)
+from .post_api_prompts_by_id_sync_body_config_data_messages_item import PostApiPromptsByIdSyncBodyConfigDataMessagesItem
+from .post_api_prompts_by_id_sync_body_config_data_messages_item_role import (
+    PostApiPromptsByIdSyncBodyConfigDataMessagesItemRole,
+)
+from .post_api_prompts_by_id_sync_body_config_data_outputs_item import PostApiPromptsByIdSyncBodyConfigDataOutputsItem
+from .post_api_prompts_by_id_sync_body_config_data_outputs_item_json_schema import (
+    PostApiPromptsByIdSyncBodyConfigDataOutputsItemJsonSchema,
+)
+from .post_api_prompts_by_id_sync_body_config_data_outputs_item_type import (
+    PostApiPromptsByIdSyncBodyConfigDataOutputsItemType,
+)
+from .post_api_prompts_by_id_sync_body_config_data_prompting_technique import (
+    PostApiPromptsByIdSyncBodyConfigDataPromptingTechnique,
+)
+from .post_api_prompts_by_id_sync_response_200 import PostApiPromptsByIdSyncResponse200
+from .post_api_prompts_by_id_sync_response_200_action import PostApiPromptsByIdSyncResponse200Action
+from .post_api_prompts_by_id_sync_response_200_conflict_info import PostApiPromptsByIdSyncResponse200ConflictInfo
+from .post_api_prompts_by_id_sync_response_200_conflict_info_remote_config_data import (
+    PostApiPromptsByIdSyncResponse200ConflictInfoRemoteConfigData,
+)
+from .post_api_prompts_by_id_sync_response_200_conflict_info_remote_config_data_demonstrations import (
+    PostApiPromptsByIdSyncResponse200ConflictInfoRemoteConfigDataDemonstrations,
+)
+from .post_api_prompts_by_id_sync_response_200_conflict_info_remote_config_data_demonstrations_inline import (
+    PostApiPromptsByIdSyncResponse200ConflictInfoRemoteConfigDataDemonstrationsInline,
+)
+from .post_api_prompts_by_id_sync_response_200_conflict_info_remote_config_data_demonstrations_inline_column_types_item import (
+    PostApiPromptsByIdSyncResponse200ConflictInfoRemoteConfigDataDemonstrationsInlineColumnTypesItem,
+)
+from .post_api_prompts_by_id_sync_response_200_conflict_info_remote_config_data_demonstrations_inline_records import (
+    PostApiPromptsByIdSyncResponse200ConflictInfoRemoteConfigDataDemonstrationsInlineRecords,
+)
+from .post_api_prompts_by_id_sync_response_200_conflict_info_remote_config_data_inputs_item import (
+    PostApiPromptsByIdSyncResponse200ConflictInfoRemoteConfigDataInputsItem,
+)
+from .post_api_prompts_by_id_sync_response_200_conflict_info_remote_config_data_inputs_item_type import (
+    PostApiPromptsByIdSyncResponse200ConflictInfoRemoteConfigDataInputsItemType,
+)
+from .post_api_prompts_by_id_sync_response_200_conflict_info_remote_config_data_messages_item import (
+    PostApiPromptsByIdSyncResponse200ConflictInfoRemoteConfigDataMessagesItem,
+)
+from .post_api_prompts_by_id_sync_response_200_conflict_info_remote_config_data_messages_item_role import (
+    PostApiPromptsByIdSyncResponse200ConflictInfoRemoteConfigDataMessagesItemRole,
+)
+from .post_api_prompts_by_id_sync_response_200_conflict_info_remote_config_data_outputs_item import (
+    PostApiPromptsByIdSyncResponse200ConflictInfoRemoteConfigDataOutputsItem,
+)
+from .post_api_prompts_by_id_sync_response_200_conflict_info_remote_config_data_outputs_item_json_schema import (
+    PostApiPromptsByIdSyncResponse200ConflictInfoRemoteConfigDataOutputsItemJsonSchema,
+)
+from .post_api_prompts_by_id_sync_response_200_conflict_info_remote_config_data_outputs_item_type import (
+    PostApiPromptsByIdSyncResponse200ConflictInfoRemoteConfigDataOutputsItemType,
+)
+from .post_api_prompts_by_id_sync_response_200_conflict_info_remote_config_data_prompting_technique import (
+    PostApiPromptsByIdSyncResponse200ConflictInfoRemoteConfigDataPromptingTechnique,
+)
+from .post_api_prompts_by_id_sync_response_200_prompt import PostApiPromptsByIdSyncResponse200Prompt
+from .post_api_prompts_by_id_sync_response_200_prompt_messages_item import (
+    PostApiPromptsByIdSyncResponse200PromptMessagesItem,
+)
+from .post_api_prompts_by_id_sync_response_200_prompt_messages_item_role import (
+    PostApiPromptsByIdSyncResponse200PromptMessagesItemRole,
+)
+from .post_api_prompts_by_id_sync_response_200_prompt_response_format_type_0 import (
+    PostApiPromptsByIdSyncResponse200PromptResponseFormatType0,
+)
+from .post_api_prompts_by_id_sync_response_200_prompt_response_format_type_0_json_schema import (
+    PostApiPromptsByIdSyncResponse200PromptResponseFormatType0JsonSchema,
+)
+from .post_api_prompts_by_id_sync_response_200_prompt_response_format_type_0_json_schema_schema import (
+    PostApiPromptsByIdSyncResponse200PromptResponseFormatType0JsonSchemaSchema,
+)
+from .post_api_prompts_by_id_sync_response_200_prompt_response_format_type_0_type import (
+    PostApiPromptsByIdSyncResponse200PromptResponseFormatType0Type,
+)
+from .post_api_prompts_by_id_sync_response_200_prompt_scope import PostApiPromptsByIdSyncResponse200PromptScope
+from .post_api_prompts_by_id_sync_response_400 import PostApiPromptsByIdSyncResponse400
+from .post_api_prompts_by_id_sync_response_401 import PostApiPromptsByIdSyncResponse401
+from .post_api_prompts_by_id_sync_response_500 import PostApiPromptsByIdSyncResponse500
 from .post_api_prompts_by_id_versions_body import PostApiPromptsByIdVersionsBody
+from .post_api_prompts_by_id_versions_body_author_type_0 import PostApiPromptsByIdVersionsBodyAuthorType0
 from .post_api_prompts_by_id_versions_body_config_data import PostApiPromptsByIdVersionsBodyConfigData
 from .post_api_prompts_by_id_versions_body_config_data_demonstrations import (
     PostApiPromptsByIdVersionsBodyConfigDataDemonstrations,
@@ -138,6 +264,15 @@ from .post_api_prompts_by_id_versions_body_config_data_demonstrations_columns_it
 )
 from .post_api_prompts_by_id_versions_body_config_data_demonstrations_columns_item_type import (
     PostApiPromptsByIdVersionsBodyConfigDataDemonstrationsColumnsItemType,
+)
+from .post_api_prompts_by_id_versions_body_config_data_demonstrations_inline import (
+    PostApiPromptsByIdVersionsBodyConfigDataDemonstrationsInline,
+)
+from .post_api_prompts_by_id_versions_body_config_data_demonstrations_inline_column_types_item import (
+    PostApiPromptsByIdVersionsBodyConfigDataDemonstrationsInlineColumnTypesItem,
+)
+from .post_api_prompts_by_id_versions_body_config_data_demonstrations_inline_records import (
+    PostApiPromptsByIdVersionsBodyConfigDataDemonstrationsInlineRecords,
 )
 from .post_api_prompts_by_id_versions_body_config_data_demonstrations_rows_item import (
     PostApiPromptsByIdVersionsBodyConfigDataDemonstrationsRowsItem,
@@ -163,7 +298,11 @@ from .post_api_prompts_by_id_versions_body_config_data_outputs_item_json_schema 
 from .post_api_prompts_by_id_versions_body_config_data_outputs_item_type import (
     PostApiPromptsByIdVersionsBodyConfigDataOutputsItemType,
 )
+from .post_api_prompts_by_id_versions_body_config_data_prompting_technique import (
+    PostApiPromptsByIdVersionsBodyConfigDataPromptingTechnique,
+)
 from .post_api_prompts_by_id_versions_response_200 import PostApiPromptsByIdVersionsResponse200
+from .post_api_prompts_by_id_versions_response_200_author_type_0 import PostApiPromptsByIdVersionsResponse200AuthorType0
 from .post_api_prompts_by_id_versions_response_200_config_data import PostApiPromptsByIdVersionsResponse200ConfigData
 from .post_api_prompts_by_id_versions_response_200_config_data_demonstrations import (
     PostApiPromptsByIdVersionsResponse200ConfigDataDemonstrations,
@@ -173,6 +312,15 @@ from .post_api_prompts_by_id_versions_response_200_config_data_demonstrations_co
 )
 from .post_api_prompts_by_id_versions_response_200_config_data_demonstrations_columns_item_type import (
     PostApiPromptsByIdVersionsResponse200ConfigDataDemonstrationsColumnsItemType,
+)
+from .post_api_prompts_by_id_versions_response_200_config_data_demonstrations_inline import (
+    PostApiPromptsByIdVersionsResponse200ConfigDataDemonstrationsInline,
+)
+from .post_api_prompts_by_id_versions_response_200_config_data_demonstrations_inline_column_types_item import (
+    PostApiPromptsByIdVersionsResponse200ConfigDataDemonstrationsInlineColumnTypesItem,
+)
+from .post_api_prompts_by_id_versions_response_200_config_data_demonstrations_inline_records import (
+    PostApiPromptsByIdVersionsResponse200ConfigDataDemonstrationsInlineRecords,
 )
 from .post_api_prompts_by_id_versions_response_200_config_data_demonstrations_rows_item import (
     PostApiPromptsByIdVersionsResponse200ConfigDataDemonstrationsRowsItem,
@@ -198,6 +346,10 @@ from .post_api_prompts_by_id_versions_response_200_config_data_outputs_item_json
 from .post_api_prompts_by_id_versions_response_200_config_data_outputs_item_type import (
     PostApiPromptsByIdVersionsResponse200ConfigDataOutputsItemType,
 )
+from .post_api_prompts_by_id_versions_response_200_config_data_prompting_technique import (
+    PostApiPromptsByIdVersionsResponse200ConfigDataPromptingTechnique,
+)
+from .post_api_prompts_by_id_versions_response_200_scope import PostApiPromptsByIdVersionsResponse200Scope
 from .post_api_prompts_by_id_versions_response_400 import PostApiPromptsByIdVersionsResponse400
 from .post_api_prompts_by_id_versions_response_400_error import PostApiPromptsByIdVersionsResponse400Error
 from .post_api_prompts_by_id_versions_response_401 import PostApiPromptsByIdVersionsResponse401
@@ -215,15 +367,42 @@ from .post_api_prompts_response_200_response_format_type_0_json_schema_schema im
     PostApiPromptsResponse200ResponseFormatType0JsonSchemaSchema,
 )
 from .post_api_prompts_response_200_response_format_type_0_type import PostApiPromptsResponse200ResponseFormatType0Type
+from .post_api_prompts_response_200_scope import PostApiPromptsResponse200Scope
 from .post_api_prompts_response_400 import PostApiPromptsResponse400
 from .post_api_prompts_response_400_error import PostApiPromptsResponse400Error
 from .post_api_prompts_response_401 import PostApiPromptsResponse401
 from .post_api_prompts_response_401_error import PostApiPromptsResponse401Error
 from .post_api_prompts_response_500 import PostApiPromptsResponse500
+from .post_api_scenario_events_body_type_0 import PostApiScenarioEventsBodyType0
+from .post_api_scenario_events_body_type_0_metadata import PostApiScenarioEventsBodyType0Metadata
+from .post_api_scenario_events_body_type_1 import PostApiScenarioEventsBodyType1
+from .post_api_scenario_events_body_type_1_results_type_0 import PostApiScenarioEventsBodyType1ResultsType0
+from .post_api_scenario_events_body_type_1_results_type_0_verdict import (
+    PostApiScenarioEventsBodyType1ResultsType0Verdict,
+)
+from .post_api_scenario_events_body_type_1_status import PostApiScenarioEventsBodyType1Status
+from .post_api_scenario_events_body_type_2 import PostApiScenarioEventsBodyType2
+from .post_api_scenario_events_body_type_2_messages_item_type_0 import PostApiScenarioEventsBodyType2MessagesItemType0
+from .post_api_scenario_events_body_type_2_messages_item_type_1 import PostApiScenarioEventsBodyType2MessagesItemType1
+from .post_api_scenario_events_body_type_2_messages_item_type_2 import PostApiScenarioEventsBodyType2MessagesItemType2
+from .post_api_scenario_events_body_type_2_messages_item_type_2_tool_calls_item import (
+    PostApiScenarioEventsBodyType2MessagesItemType2ToolCallsItem,
+)
+from .post_api_scenario_events_body_type_2_messages_item_type_2_tool_calls_item_function import (
+    PostApiScenarioEventsBodyType2MessagesItemType2ToolCallsItemFunction,
+)
+from .post_api_scenario_events_body_type_2_messages_item_type_3 import PostApiScenarioEventsBodyType2MessagesItemType3
+from .post_api_scenario_events_body_type_2_messages_item_type_4 import PostApiScenarioEventsBodyType2MessagesItemType4
+from .post_api_scenario_events_response_201 import PostApiScenarioEventsResponse201
+from .post_api_scenario_events_response_400 import PostApiScenarioEventsResponse400
+from .post_api_scenario_events_response_401 import PostApiScenarioEventsResponse401
+from .post_api_scenario_events_response_500 import PostApiScenarioEventsResponse500
 from .post_api_trace_id_share_response_200 import PostApiTraceIdShareResponse200
 from .post_api_trace_id_unshare_response_200 import PostApiTraceIdUnshareResponse200
 from .put_api_prompts_by_id_body import PutApiPromptsByIdBody
+from .put_api_prompts_by_id_body_scope import PutApiPromptsByIdBodyScope
 from .put_api_prompts_by_id_response_200 import PutApiPromptsByIdResponse200
+from .put_api_prompts_by_id_response_200_scope import PutApiPromptsByIdResponse200Scope
 from .put_api_prompts_by_id_response_400 import PutApiPromptsByIdResponse400
 from .put_api_prompts_by_id_response_400_error import PutApiPromptsByIdResponse400Error
 from .put_api_prompts_by_id_response_401 import PutApiPromptsByIdResponse401
@@ -248,6 +427,10 @@ __all__ = (
     "DeleteApiPromptsByIdResponse401Error",
     "DeleteApiPromptsByIdResponse404",
     "DeleteApiPromptsByIdResponse500",
+    "DeleteApiScenarioEventsResponse200",
+    "DeleteApiScenarioEventsResponse400",
+    "DeleteApiScenarioEventsResponse401",
+    "DeleteApiScenarioEventsResponse500",
     "Error",
     "Evaluation",
     "EvaluationTimestamps",
@@ -266,6 +449,7 @@ __all__ = (
     "GetApiPromptsByIdResponse200ResponseFormatType0JsonSchema",
     "GetApiPromptsByIdResponse200ResponseFormatType0JsonSchemaSchema",
     "GetApiPromptsByIdResponse200ResponseFormatType0Type",
+    "GetApiPromptsByIdResponse200Scope",
     "GetApiPromptsByIdResponse400",
     "GetApiPromptsByIdResponse400Error",
     "GetApiPromptsByIdResponse401",
@@ -273,10 +457,14 @@ __all__ = (
     "GetApiPromptsByIdResponse404",
     "GetApiPromptsByIdResponse500",
     "GetApiPromptsByIdVersionsResponse200",
+    "GetApiPromptsByIdVersionsResponse200AuthorType0",
     "GetApiPromptsByIdVersionsResponse200ConfigData",
     "GetApiPromptsByIdVersionsResponse200ConfigDataDemonstrations",
     "GetApiPromptsByIdVersionsResponse200ConfigDataDemonstrationsColumnsItem",
     "GetApiPromptsByIdVersionsResponse200ConfigDataDemonstrationsColumnsItemType",
+    "GetApiPromptsByIdVersionsResponse200ConfigDataDemonstrationsInline",
+    "GetApiPromptsByIdVersionsResponse200ConfigDataDemonstrationsInlineColumnTypesItem",
+    "GetApiPromptsByIdVersionsResponse200ConfigDataDemonstrationsInlineRecords",
     "GetApiPromptsByIdVersionsResponse200ConfigDataDemonstrationsRowsItem",
     "GetApiPromptsByIdVersionsResponse200ConfigDataInputsItem",
     "GetApiPromptsByIdVersionsResponse200ConfigDataInputsItemType",
@@ -285,6 +473,8 @@ __all__ = (
     "GetApiPromptsByIdVersionsResponse200ConfigDataOutputsItem",
     "GetApiPromptsByIdVersionsResponse200ConfigDataOutputsItemJsonSchema",
     "GetApiPromptsByIdVersionsResponse200ConfigDataOutputsItemType",
+    "GetApiPromptsByIdVersionsResponse200ConfigDataPromptingTechnique",
+    "GetApiPromptsByIdVersionsResponse200Scope",
     "GetApiPromptsByIdVersionsResponse400",
     "GetApiPromptsByIdVersionsResponse400Error",
     "GetApiPromptsByIdVersionsResponse401",
@@ -298,6 +488,7 @@ __all__ = (
     "GetApiPromptsResponse200ItemResponseFormatType0JsonSchema",
     "GetApiPromptsResponse200ItemResponseFormatType0JsonSchemaSchema",
     "GetApiPromptsResponse200ItemResponseFormatType0Type",
+    "GetApiPromptsResponse200ItemScope",
     "GetApiPromptsResponse400",
     "GetApiPromptsResponse400Error",
     "GetApiPromptsResponse401",
@@ -331,11 +522,64 @@ __all__ = (
     "PatchApiAnnotationsIdResponse200",
     "PostApiAnnotationsTraceIdBody",
     "PostApiPromptsBody",
+    "PostApiPromptsBodyInputsItem",
+    "PostApiPromptsBodyInputsItemType",
+    "PostApiPromptsBodyMessagesItem",
+    "PostApiPromptsBodyMessagesItemRole",
+    "PostApiPromptsBodyOutputsItem",
+    "PostApiPromptsBodyOutputsItemJsonSchema",
+    "PostApiPromptsBodyOutputsItemType",
+    "PostApiPromptsBodyScope",
+    "PostApiPromptsByIdSyncBody",
+    "PostApiPromptsByIdSyncBodyConfigData",
+    "PostApiPromptsByIdSyncBodyConfigDataDemonstrations",
+    "PostApiPromptsByIdSyncBodyConfigDataDemonstrationsInline",
+    "PostApiPromptsByIdSyncBodyConfigDataDemonstrationsInlineColumnTypesItem",
+    "PostApiPromptsByIdSyncBodyConfigDataDemonstrationsInlineRecords",
+    "PostApiPromptsByIdSyncBodyConfigDataInputsItem",
+    "PostApiPromptsByIdSyncBodyConfigDataInputsItemType",
+    "PostApiPromptsByIdSyncBodyConfigDataMessagesItem",
+    "PostApiPromptsByIdSyncBodyConfigDataMessagesItemRole",
+    "PostApiPromptsByIdSyncBodyConfigDataOutputsItem",
+    "PostApiPromptsByIdSyncBodyConfigDataOutputsItemJsonSchema",
+    "PostApiPromptsByIdSyncBodyConfigDataOutputsItemType",
+    "PostApiPromptsByIdSyncBodyConfigDataPromptingTechnique",
+    "PostApiPromptsByIdSyncResponse200",
+    "PostApiPromptsByIdSyncResponse200Action",
+    "PostApiPromptsByIdSyncResponse200ConflictInfo",
+    "PostApiPromptsByIdSyncResponse200ConflictInfoRemoteConfigData",
+    "PostApiPromptsByIdSyncResponse200ConflictInfoRemoteConfigDataDemonstrations",
+    "PostApiPromptsByIdSyncResponse200ConflictInfoRemoteConfigDataDemonstrationsInline",
+    "PostApiPromptsByIdSyncResponse200ConflictInfoRemoteConfigDataDemonstrationsInlineColumnTypesItem",
+    "PostApiPromptsByIdSyncResponse200ConflictInfoRemoteConfigDataDemonstrationsInlineRecords",
+    "PostApiPromptsByIdSyncResponse200ConflictInfoRemoteConfigDataInputsItem",
+    "PostApiPromptsByIdSyncResponse200ConflictInfoRemoteConfigDataInputsItemType",
+    "PostApiPromptsByIdSyncResponse200ConflictInfoRemoteConfigDataMessagesItem",
+    "PostApiPromptsByIdSyncResponse200ConflictInfoRemoteConfigDataMessagesItemRole",
+    "PostApiPromptsByIdSyncResponse200ConflictInfoRemoteConfigDataOutputsItem",
+    "PostApiPromptsByIdSyncResponse200ConflictInfoRemoteConfigDataOutputsItemJsonSchema",
+    "PostApiPromptsByIdSyncResponse200ConflictInfoRemoteConfigDataOutputsItemType",
+    "PostApiPromptsByIdSyncResponse200ConflictInfoRemoteConfigDataPromptingTechnique",
+    "PostApiPromptsByIdSyncResponse200Prompt",
+    "PostApiPromptsByIdSyncResponse200PromptMessagesItem",
+    "PostApiPromptsByIdSyncResponse200PromptMessagesItemRole",
+    "PostApiPromptsByIdSyncResponse200PromptResponseFormatType0",
+    "PostApiPromptsByIdSyncResponse200PromptResponseFormatType0JsonSchema",
+    "PostApiPromptsByIdSyncResponse200PromptResponseFormatType0JsonSchemaSchema",
+    "PostApiPromptsByIdSyncResponse200PromptResponseFormatType0Type",
+    "PostApiPromptsByIdSyncResponse200PromptScope",
+    "PostApiPromptsByIdSyncResponse400",
+    "PostApiPromptsByIdSyncResponse401",
+    "PostApiPromptsByIdSyncResponse500",
     "PostApiPromptsByIdVersionsBody",
+    "PostApiPromptsByIdVersionsBodyAuthorType0",
     "PostApiPromptsByIdVersionsBodyConfigData",
     "PostApiPromptsByIdVersionsBodyConfigDataDemonstrations",
     "PostApiPromptsByIdVersionsBodyConfigDataDemonstrationsColumnsItem",
     "PostApiPromptsByIdVersionsBodyConfigDataDemonstrationsColumnsItemType",
+    "PostApiPromptsByIdVersionsBodyConfigDataDemonstrationsInline",
+    "PostApiPromptsByIdVersionsBodyConfigDataDemonstrationsInlineColumnTypesItem",
+    "PostApiPromptsByIdVersionsBodyConfigDataDemonstrationsInlineRecords",
     "PostApiPromptsByIdVersionsBodyConfigDataDemonstrationsRowsItem",
     "PostApiPromptsByIdVersionsBodyConfigDataInputsItem",
     "PostApiPromptsByIdVersionsBodyConfigDataInputsItemType",
@@ -344,11 +588,16 @@ __all__ = (
     "PostApiPromptsByIdVersionsBodyConfigDataOutputsItem",
     "PostApiPromptsByIdVersionsBodyConfigDataOutputsItemJsonSchema",
     "PostApiPromptsByIdVersionsBodyConfigDataOutputsItemType",
+    "PostApiPromptsByIdVersionsBodyConfigDataPromptingTechnique",
     "PostApiPromptsByIdVersionsResponse200",
+    "PostApiPromptsByIdVersionsResponse200AuthorType0",
     "PostApiPromptsByIdVersionsResponse200ConfigData",
     "PostApiPromptsByIdVersionsResponse200ConfigDataDemonstrations",
     "PostApiPromptsByIdVersionsResponse200ConfigDataDemonstrationsColumnsItem",
     "PostApiPromptsByIdVersionsResponse200ConfigDataDemonstrationsColumnsItemType",
+    "PostApiPromptsByIdVersionsResponse200ConfigDataDemonstrationsInline",
+    "PostApiPromptsByIdVersionsResponse200ConfigDataDemonstrationsInlineColumnTypesItem",
+    "PostApiPromptsByIdVersionsResponse200ConfigDataDemonstrationsInlineRecords",
     "PostApiPromptsByIdVersionsResponse200ConfigDataDemonstrationsRowsItem",
     "PostApiPromptsByIdVersionsResponse200ConfigDataInputsItem",
     "PostApiPromptsByIdVersionsResponse200ConfigDataInputsItemType",
@@ -357,6 +606,8 @@ __all__ = (
     "PostApiPromptsByIdVersionsResponse200ConfigDataOutputsItem",
     "PostApiPromptsByIdVersionsResponse200ConfigDataOutputsItemJsonSchema",
     "PostApiPromptsByIdVersionsResponse200ConfigDataOutputsItemType",
+    "PostApiPromptsByIdVersionsResponse200ConfigDataPromptingTechnique",
+    "PostApiPromptsByIdVersionsResponse200Scope",
     "PostApiPromptsByIdVersionsResponse400",
     "PostApiPromptsByIdVersionsResponse400Error",
     "PostApiPromptsByIdVersionsResponse401",
@@ -370,15 +621,36 @@ __all__ = (
     "PostApiPromptsResponse200ResponseFormatType0JsonSchema",
     "PostApiPromptsResponse200ResponseFormatType0JsonSchemaSchema",
     "PostApiPromptsResponse200ResponseFormatType0Type",
+    "PostApiPromptsResponse200Scope",
     "PostApiPromptsResponse400",
     "PostApiPromptsResponse400Error",
     "PostApiPromptsResponse401",
     "PostApiPromptsResponse401Error",
     "PostApiPromptsResponse500",
+    "PostApiScenarioEventsBodyType0",
+    "PostApiScenarioEventsBodyType0Metadata",
+    "PostApiScenarioEventsBodyType1",
+    "PostApiScenarioEventsBodyType1ResultsType0",
+    "PostApiScenarioEventsBodyType1ResultsType0Verdict",
+    "PostApiScenarioEventsBodyType1Status",
+    "PostApiScenarioEventsBodyType2",
+    "PostApiScenarioEventsBodyType2MessagesItemType0",
+    "PostApiScenarioEventsBodyType2MessagesItemType1",
+    "PostApiScenarioEventsBodyType2MessagesItemType2",
+    "PostApiScenarioEventsBodyType2MessagesItemType2ToolCallsItem",
+    "PostApiScenarioEventsBodyType2MessagesItemType2ToolCallsItemFunction",
+    "PostApiScenarioEventsBodyType2MessagesItemType3",
+    "PostApiScenarioEventsBodyType2MessagesItemType4",
+    "PostApiScenarioEventsResponse201",
+    "PostApiScenarioEventsResponse400",
+    "PostApiScenarioEventsResponse401",
+    "PostApiScenarioEventsResponse500",
     "PostApiTraceIdShareResponse200",
     "PostApiTraceIdUnshareResponse200",
     "PutApiPromptsByIdBody",
+    "PutApiPromptsByIdBodyScope",
     "PutApiPromptsByIdResponse200",
+    "PutApiPromptsByIdResponse200Scope",
     "PutApiPromptsByIdResponse400",
     "PutApiPromptsByIdResponse400Error",
     "PutApiPromptsByIdResponse401",

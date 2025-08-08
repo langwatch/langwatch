@@ -4,6 +4,8 @@ from typing import TYPE_CHECKING, Any, TypeVar, Union, cast
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
 
+from ..models.get_api_prompts_response_200_item_scope import GetApiPromptsResponse200ItemScope
+
 if TYPE_CHECKING:
     from ..models.get_api_prompts_response_200_item_messages_item import GetApiPromptsResponse200ItemMessagesItem
     from ..models.get_api_prompts_response_200_item_response_format_type_0 import (
@@ -28,6 +30,10 @@ class GetApiPromptsResponse200Item:
         prompt (str):
         messages (list['GetApiPromptsResponse200ItemMessagesItem']):
         response_format (Union['GetApiPromptsResponse200ItemResponseFormatType0', None]):
+        handle (Union[None, str]):
+        scope (GetApiPromptsResponse200ItemScope):
+        project_id (str):
+        organization_id (str):
     """
 
     id: str
@@ -40,6 +46,10 @@ class GetApiPromptsResponse200Item:
     prompt: str
     messages: list["GetApiPromptsResponse200ItemMessagesItem"]
     response_format: Union["GetApiPromptsResponse200ItemResponseFormatType0", None]
+    handle: Union[None, str]
+    scope: GetApiPromptsResponse200ItemScope
+    project_id: str
+    organization_id: str
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -74,6 +84,15 @@ class GetApiPromptsResponse200Item:
         else:
             response_format = self.response_format
 
+        handle: Union[None, str]
+        handle = self.handle
+
+        scope = self.scope.value
+
+        project_id = self.project_id
+
+        organization_id = self.organization_id
+
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
         field_dict.update(
@@ -88,6 +107,10 @@ class GetApiPromptsResponse200Item:
                 "prompt": prompt,
                 "messages": messages,
                 "response_format": response_format,
+                "handle": handle,
+                "scope": scope,
+                "projectId": project_id,
+                "organizationId": organization_id,
             }
         )
 
@@ -139,6 +162,19 @@ class GetApiPromptsResponse200Item:
 
         response_format = _parse_response_format(d.pop("response_format"))
 
+        def _parse_handle(data: object) -> Union[None, str]:
+            if data is None:
+                return data
+            return cast(Union[None, str], data)
+
+        handle = _parse_handle(d.pop("handle"))
+
+        scope = GetApiPromptsResponse200ItemScope(d.pop("scope"))
+
+        project_id = d.pop("projectId")
+
+        organization_id = d.pop("organizationId")
+
         get_api_prompts_response_200_item = cls(
             id=id,
             name=name,
@@ -150,6 +186,10 @@ class GetApiPromptsResponse200Item:
             prompt=prompt,
             messages=messages,
             response_format=response_format,
+            handle=handle,
+            scope=scope,
+            project_id=project_id,
+            organization_id=organization_id,
         )
 
         get_api_prompts_response_200_item.additional_properties = d

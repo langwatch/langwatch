@@ -87,7 +87,7 @@ class PromptService:
             )
         return cls(instance.rest_api_client)
 
-    @trace_prompt("get", lambda _self, prompt_id, **_: {"inputs.prompt_id": prompt_id})
+    # @trace_prompt("get", lambda _self, prompt_id, **_: {"inputs.prompt_id": prompt_id})
     def get(self, prompt_id: str) -> Prompt:
         """
         Retrieve a prompt by its ID.
@@ -111,13 +111,13 @@ class PromptService:
         )
         return Prompt(ok)
 
-    @trace_prompt("create", lambda _self, name, **_: {"inputs.name": name})
-    def create(self, name: str) -> Prompt:
+    # @trace_prompt("create", lambda _self, name, **_: {"inputs.name": name})
+    def create(self, handle: str) -> Prompt:
         """
-        Create a new prompt with the specified name.
+        Create a new prompt with the specified handle.
 
         Args:
-            name: Name for the new prompt
+            handle: Name for the new prompt
 
         Returns:
             Prompt object containing the created prompt data
@@ -127,23 +127,24 @@ class PromptService:
             RuntimeError: For authentication (401) or server errors (5xx)
         """
         resp = post_api_prompts.sync_detailed(
-            client=self._client, body=PostApiPromptsBody(name=name)
+            client=self._client, body=PostApiPromptsBody(handle=handle)
         )
+        print(resp)
         ok = unwrap_response(
             resp,
             ok_type=PostApiPromptsResponse200,
-            subject=f'name="{name}"',
+            subject=f'handle="{handle}"',
             op="create",
         )
         return Prompt(ok)
 
-    @trace_prompt(
-        "update",
-        lambda _self, prompt_id, name, **_: {
-            "inputs.prompt_id": prompt_id,
-            "inputs.name": name,
-        },
-    )
+    # @trace_prompt(
+    #     "update",
+    #     lambda _self, prompt_id, name, **_: {
+    #         "inputs.prompt_id": prompt_id,
+    #         "inputs.name": name,
+    #     },
+    # )
     def update(self, prompt_id: str, name: str) -> Prompt:
         """
         Update an existing prompt's name.
@@ -173,9 +174,9 @@ class PromptService:
         )
         return self.get(prompt_id)
 
-    @trace_prompt(
-        "delete", lambda _self, prompt_id, **_: {"inputs.prompt_id": prompt_id}
-    )
+    # @trace_prompt(
+    #     "delete", lambda _self, prompt_id, **_: {"inputs.prompt_id": prompt_id}
+    # )
     def delete(self, prompt_id: str) -> Dict[str, bool]:
         """
         Delete a prompt by its ID.

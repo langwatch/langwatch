@@ -13,6 +13,7 @@ import {
   messageSchema,
   outputsSchema,
   promptingTechniqueSchema,
+  responseFormatSchema,
 } from "~/prompt-configs/schemas/field-schemas";
 
 const logger = createLogger(
@@ -35,7 +36,7 @@ export const LATEST_SCHEMA_VERSION = SchemaVersion.V1_0 as const;
  * Validates the configData JSON field in LlmPromptConfigVersion
  */
 const configSchemaV1_0 = z.object({
-  id: z.string().optional(),
+  id: z.string(),
   authorId: z.string().nullable().optional(),
   author: z
     .object({
@@ -47,10 +48,9 @@ const configSchemaV1_0 = z.object({
   configId: z.string().min(1, "Config ID cannot be empty"),
   schemaVersion: z.literal(SchemaVersion.V1_0),
   commitMessage: z.string(),
-  version: z.number(),
-  createdAt: z.date().optional(),
+  version: z.number().min(0, "Version must be greater than 0"),
+  createdAt: z.date(),
   configData: z.object({
-    version: z.number().min(1, "Version must be greater than 0").optional(),
     prompt: z.string(),
     messages: z.array(messageSchema).default([]),
     inputs: z.array(inputsSchema).min(1, "At least one input is required"),
@@ -60,6 +60,7 @@ const configSchemaV1_0 = z.object({
     max_tokens: z.number().optional(),
     demonstrations: nodeDatasetSchema.optional(),
     prompting_technique: promptingTechniqueSchema.optional(),
+    response_format: responseFormatSchema.optional(),
   }),
 });
 
