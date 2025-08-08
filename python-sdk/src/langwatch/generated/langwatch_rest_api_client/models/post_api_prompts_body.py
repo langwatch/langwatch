@@ -21,7 +21,6 @@ class PostApiPromptsBody:
     """
     Attributes:
         handle (str):
-        name (Union[Unset, str]):
         scope (Union[Unset, PostApiPromptsBodyScope]):  Default: PostApiPromptsBodyScope.PROJECT.
         author_id (Union[Unset, str]):
         prompt (Union[Unset, str]):
@@ -31,7 +30,6 @@ class PostApiPromptsBody:
     """
 
     handle: str
-    name: Union[Unset, str] = UNSET
     scope: Union[Unset, PostApiPromptsBodyScope] = PostApiPromptsBodyScope.PROJECT
     author_id: Union[Unset, str] = UNSET
     prompt: Union[Unset, str] = UNSET
@@ -42,8 +40,6 @@ class PostApiPromptsBody:
 
     def to_dict(self) -> dict[str, Any]:
         handle = self.handle
-
-        name = self.name
 
         scope: Union[Unset, str] = UNSET
         if not isinstance(self.scope, Unset):
@@ -81,8 +77,6 @@ class PostApiPromptsBody:
                 "handle": handle,
             }
         )
-        if name is not UNSET:
-            field_dict["name"] = name
         if scope is not UNSET:
             field_dict["scope"] = scope
         if author_id is not UNSET:
@@ -106,8 +100,6 @@ class PostApiPromptsBody:
 
         d = dict(src_dict)
         handle = d.pop("handle")
-
-        name = d.pop("name", UNSET)
 
         _scope = d.pop("scope", UNSET)
         scope: Union[Unset, PostApiPromptsBodyScope]
@@ -143,7 +135,6 @@ class PostApiPromptsBody:
 
         post_api_prompts_body = cls(
             handle=handle,
-            name=name,
             scope=scope,
             author_id=author_id,
             prompt=prompt,
