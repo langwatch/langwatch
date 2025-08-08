@@ -1,12 +1,12 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { LangWatchLogsExporter, LangWatchLogsExporterOptions } from "../langwatch-logs-exporter";
 import {
-  LANGWATCH_SDK_NAME,
+  LANGWATCH_SDK_NAME_OBSERVABILITY as LANGWATCH_SDK_NAME,
   LANGWATCH_SDK_LANGUAGE,
   LANGWATCH_SDK_VERSION,
   LANGWATCH_SDK_RUNTIME,
   LOGS_PATH,
-} from "../../setup/constants";
+} from "../../../internal/constants";
 import { OTLPLogExporter } from "@opentelemetry/exporter-logs-otlp-http";
 
 // Mock the OTLP exporter
