@@ -8,7 +8,7 @@ export default defineConfig({
         setupFiles: ["dotenv/config", "./__tests__/e2e/setup/msw-setup.ts"],
         include: [
             "__tests__/e2e/**/*.e2e-test.ts",
-            "src/__tests___e2e/**/*.e2e.test.ts",
+            "src/__tests__/e2e/**/*.e2e.test.ts",
         ],
     },
     resolve: {

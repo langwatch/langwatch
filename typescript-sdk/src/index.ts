@@ -1,6 +1,7 @@
 export {
   getLangWatchTracer,
   getLangWatchLogger,
+  attributes,
 } from "./observability-sdk";
 
 export {

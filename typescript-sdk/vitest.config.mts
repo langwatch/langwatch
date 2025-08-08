@@ -11,6 +11,9 @@ export default defineConfig({
             "src/**/*.test.ts",
             "!src/**/*.e2e.test.ts",
         ],
+        exclude: [
+            "examples/**",
+        ],
     },
     resolve: {
         alias: {

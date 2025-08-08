@@ -1,11 +1,16 @@
 import { describe, expect, it, beforeAll } from "vitest";
 import { getLangwatchSDK } from "../../helpers/get-sdk";
+import type { LangWatch } from "../../../dist/index.js";
 
 describe("Prompt management", () => {
-  let langwatch: typeof import("../../../dist/index.js");
+  let langwatch: LangWatch;
 
   beforeAll(async () => {
-    langwatch = await getLangwatchSDK();
+    const { LangWatch } = await getLangwatchSDK();
+    langwatch = new LangWatch({
+      apiKey: process.env.LANGWATCH_API_KEY || "test-key",
+      endpoint: process.env.LANGWATCH_ENDPOINT || "http://localhost:3000",
+    });
   });
 
   it("get prompt", async () => {

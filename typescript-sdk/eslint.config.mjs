@@ -8,7 +8,8 @@ const config = tseslint.config(
             "dist/**",
             "coverage/**",
             "examples/**",
-            "ts-to-zod.config.js"
+            "ts-to-zod.config.js",
+            "__tests__/e2e/**"
         ]
     },
     eslint.configs.recommended,

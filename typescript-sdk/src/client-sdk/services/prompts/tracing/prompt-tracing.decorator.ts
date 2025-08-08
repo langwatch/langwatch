@@ -1,5 +1,5 @@
 import { type Prompt, type TemplateVariables, type CompiledPrompt } from "../prompt";
-import { shouldCaptureInput } from "@/observability-sdk";
+import { shouldCaptureInput, shouldCaptureOutput } from "@/observability-sdk";
 import type { LangWatchSpan } from "@/observability-sdk";
 
 /**
@@ -10,13 +10,23 @@ export class PromptTracingDecorator {
   constructor(private readonly target: Prompt) {}
 
   compile(span: LangWatchSpan, variables: TemplateVariables = {}): CompiledPrompt {
-    const result = this.target.compile(variables);
-
     span.setType("prompt");
 
-    if (shouldCaptureInput()) {
-      span.setInput(result);
+    if (shouldCaptureInput({ spanType: "prompt" })) {
+      span.setInput(this.target.raw);
+
+      if (variables) {
+        span.setAttribute(
+          'langwatch.prompt.variables',
+          JSON.stringify({
+            type: "json",
+            value: variables,
+          }),
+        );
+      }
     }
+
+    const result = this.target.compile(variables);
 
     span.setAttributes({
       'langwatch.prompt.id': result.id,
@@ -24,14 +34,8 @@ export class PromptTracingDecorator {
       'langwatch.prompt.version.number': result.version,
     });
 
-    if (variables && shouldCaptureInput()) {
-      span.setAttribute(
-        'langwatch.prompt.variables',
-        JSON.stringify({
-          type: "json",
-          value: variables,
-        }),
-      );
+    if (shouldCaptureOutput({ spanType: "prompt" })) {
+      span.setOutput(result.raw);
     }
 
     return result;
@@ -42,8 +46,18 @@ export class PromptTracingDecorator {
 
     span.setType("prompt");
 
-    if (shouldCaptureInput()) {
-      span.setInput(result);
+    if (shouldCaptureInput({ spanType: "prompt" })) {
+      span.setInput(this.target.raw);
+
+      if (variables) {
+        span.setAttribute(
+          'langwatch.prompt.variables',
+          JSON.stringify({
+            type: "json",
+            value: variables,
+          }),
+        );
+      }
     }
 
     span.setAttributes({
@@ -52,14 +66,8 @@ export class PromptTracingDecorator {
       'langwatch.prompt.version.number': result.version,
     });
 
-    if (variables && shouldCaptureInput()) {
-      span.setAttribute(
-        'langwatch.prompt.variables',
-        JSON.stringify({
-          type: "json",
-          value: variables,
-        }),
-      );
+    if (shouldCaptureOutput({ spanType: "prompt" })) {
+      span.setOutput(result.raw);
     }
 
     return result;
