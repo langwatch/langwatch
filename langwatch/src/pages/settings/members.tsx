@@ -322,7 +322,7 @@ function MembersList({
     );
   };
 
-  const sortedMembers = organization.members.sort((a, b) =>
+  const sortedMembers = [...organization.members].sort((a, b) =>
     b.user.id.localeCompare(a.user.id)
   );
 

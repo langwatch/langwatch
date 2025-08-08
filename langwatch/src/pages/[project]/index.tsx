@@ -72,10 +72,14 @@ function Index() {
    * @returns True if the URL is safe to redirect to
    */
   function isValidReturnToUrl(url: string): boolean {
-    return (
-      url.startsWith("/") ||
-      (typeof window !== "undefined" && url.startsWith(window.location.origin))
-    );
+    if (url.startsWith("/")) return true; // relative path
+    if (typeof window === "undefined") return false;
+    try {
+      const target = new URL(url, window.location.origin);
+      return target.origin === window.location.origin;
+    } catch {
+      return false;
+    }
   }
 
   useEffect(() => {
