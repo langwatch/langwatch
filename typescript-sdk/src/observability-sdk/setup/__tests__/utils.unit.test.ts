@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import * as utils from '../utils';
 import { resourceFromAttributes } from '@opentelemetry/resources';
-import { DEFAULT_SERVICE_NAME } from '../constants';
+import { DEFAULT_SERVICE_NAME } from '../../../internal/constants.js';
 
 describe('utils.ts', () => {
   describe('isConcreteProvider', () => {

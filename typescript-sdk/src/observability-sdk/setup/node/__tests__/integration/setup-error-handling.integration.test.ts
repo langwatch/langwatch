@@ -18,8 +18,8 @@ describe('setupObservability Integration - Error Handling', () => {
     const logger = createMockLogger();
     // Pass an invalid resource to force NodeSDK to throw
     const handle = setupObservability({
-      apiKey: 'test-key',
-      logger,
+      langwatch: { apiKey: 'test-key' },
+      debug: { logger },
       resource: 123 as any, // Intentionally invalid
     });
 
@@ -34,9 +34,9 @@ describe('setupObservability Integration - Error Handling', () => {
     const logger = createMockLogger();
     // Pass an invalid resource to force NodeSDK to throw
     const call = () => setupObservability({
-      apiKey: 'test-key',
-      logger,
-      throwOnSetupError: true,
+      langwatch: { apiKey: 'test-key' },
+      debug: { logger },
+      advanced: { throwOnSetupError: true },
       resource: 123 as any, // Intentionally invalid
     });
     expect(call).toThrow();

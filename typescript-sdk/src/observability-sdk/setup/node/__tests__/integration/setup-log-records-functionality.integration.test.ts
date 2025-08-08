@@ -1,9 +1,8 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { setupObservability } from '../../setup';
-import { logs } from '@opentelemetry/api-logs';
-import { LogRecordProcessor, SdkLogRecord, InMemoryLogRecordExporter, SimpleLogRecordProcessor } from "@opentelemetry/sdk-logs";
+import { InMemoryLogRecordExporter, SimpleLogRecordProcessor } from "@opentelemetry/sdk-logs";
 import { getLangWatchLogger } from '../../../../logger';
-import { resetObservabilitySdkConfig } from '../../../../config';
+import { resetObservabilitySdkConfig } from '../../../../config.js';
 
 // Integration tests for log records functionality in setupObservability
 function createMockLogger() {
@@ -26,8 +25,8 @@ describe('setupObservability Integration - Log Records Functionality', () => {
     observabilityHandle = setupObservability({
       serviceName: "log-records-functionality-test",
       logRecordProcessors: [logRecordProcessor],
-      logger: createMockLogger(),
-      throwOnSetupError: true,
+      debug: { logger: createMockLogger() },
+      advanced: { throwOnSetupError: true },
       attributes: {
         "test.suite": "log-records-functionality",
         "test.environment": "vitest"
@@ -166,7 +165,7 @@ describe('setupObservability Integration - Log Records Functionality', () => {
 
   it('should handle log records with timestamps', () => {
     const logger = createMockLogger();
-    setupObservability({ apiKey: 'test-key', logger });
+    setupObservability({ langwatch: { apiKey: 'test-key' }, debug: { logger } });
 
     const logRecordLogger = getLangWatchLogger('timestamp-test');
 
@@ -189,7 +188,7 @@ describe('setupObservability Integration - Log Records Functionality', () => {
 
   it('should handle log records with trace context', () => {
     const logger = createMockLogger();
-    setupObservability({ apiKey: 'test-key', logger });
+    setupObservability({ langwatch: { apiKey: 'test-key' }, debug: { logger } });
 
     const logRecordLogger = getLangWatchLogger('trace-context-test');
 
@@ -210,7 +209,7 @@ describe('setupObservability Integration - Log Records Functionality', () => {
 
   it('should handle multiple log records from same logger', () => {
     const logger = createMockLogger();
-    setupObservability({ apiKey: 'test-key', logger });
+    setupObservability({ langwatch: { apiKey: 'test-key' }, debug: { logger } });
 
     const logRecordLogger = getLangWatchLogger('multiple-logs');
 
@@ -232,7 +231,7 @@ describe('setupObservability Integration - Log Records Functionality', () => {
 
   it('should handle log records with different loggers', () => {
     const logger = createMockLogger();
-    setupObservability({ apiKey: 'test-key', logger });
+    setupObservability({ langwatch: { apiKey: 'test-key' }, debug: { logger } });
 
     // Create multiple loggers
     const logger1 = getLangWatchLogger('logger-1');
@@ -269,9 +268,8 @@ describe('setupObservability Integration - Log Records Functionality', () => {
   it('should handle log records with console logging enabled', () => {
     const logger = createMockLogger();
     setupObservability({
-      apiKey: 'test-key',
-      logger,
-      consoleLogging: true
+      langwatch: { apiKey: 'test-key' },
+      debug: { logger, consoleLogging: true },
     });
 
     const logRecordLogger = getLangWatchLogger('console-logging-test');
@@ -321,7 +319,7 @@ describe('setupObservability Integration - Log Records Functionality', () => {
 
   it('should handle log records with error conditions', () => {
     const logger = createMockLogger();
-    setupObservability({ apiKey: 'test-key', logger });
+    setupObservability({ langwatch: { apiKey: 'test-key' }, debug: { logger } });
 
     const logRecordLogger = getLangWatchLogger("error-test")
 
@@ -342,7 +340,7 @@ describe('setupObservability Integration - Log Records Functionality', () => {
 
   it('should handle log records with performance metrics', () => {
     const logger = createMockLogger();
-    setupObservability({ apiKey: 'test-key', logger });
+    setupObservability({ langwatch: { apiKey: 'test-key' }, debug: { logger } });
 
     const logRecordLogger = getLangWatchLogger('performance-test');
 
@@ -365,7 +363,7 @@ describe('setupObservability Integration - Log Records Functionality', () => {
 
   it('should handle log records with business context', () => {
     const logger = createMockLogger();
-    setupObservability({ apiKey: 'test-key', logger });
+    setupObservability({ langwatch: { apiKey: 'test-key' }, debug: { logger } });
 
     const logRecordLogger = getLangWatchLogger('business-context-test');
 
@@ -387,7 +385,7 @@ describe('setupObservability Integration - Log Records Functionality', () => {
 
   it('should handle log records with security context', () => {
     const logger = createMockLogger();
-    setupObservability({ apiKey: 'test-key', logger });
+    setupObservability({ langwatch: { apiKey: 'test-key' }, debug: { logger } });
 
     const logRecordLogger = getLangWatchLogger('security-test');
 
@@ -408,7 +406,7 @@ describe('setupObservability Integration - Log Records Functionality', () => {
 
   it('should handle log records with application metrics', () => {
     const logger = createMockLogger();
-    setupObservability({ apiKey: 'test-key', logger });
+    setupObservability({ langwatch: { apiKey: 'test-key' }, debug: { logger } });
 
     const logRecordLogger = getLangWatchLogger('metrics-test');
 
@@ -430,7 +428,7 @@ describe('setupObservability Integration - Log Records Functionality', () => {
 
   it('should handle log records with structured data', () => {
     const logger = createMockLogger();
-    setupObservability({ apiKey: 'test-key', logger });
+    setupObservability({ langwatch: { apiKey: 'test-key' }, debug: { logger } });
 
     const logRecordLogger = getLangWatchLogger('structured-data-test');
 
@@ -482,8 +480,8 @@ describe('setupObservability Integration - Log Records Functionality', () => {
     };
 
     setupObservability({
-      apiKey: 'test-key',
-      logger,
+      langwatch: { apiKey: 'test-key' },
+      debug: { logger },
       logRecordProcessors: [processor1, processor2]
     });
 
@@ -507,9 +505,8 @@ describe('setupObservability Integration - Log Records Functionality', () => {
   it('should handle log records with different log levels and console logging', () => {
     const logger = createMockLogger();
     setupObservability({
-      apiKey: 'test-key',
-      logger,
-      consoleLogging: true
+      langwatch: { apiKey: 'test-key' },
+      debug: { logger, consoleTracing: true },
     });
 
     const logRecordLogger = getLangWatchLogger('console-levels-test');
@@ -540,8 +537,8 @@ describe('setupObservability Integration - Log Records Functionality', () => {
   it('should handle log records with resource attributes', () => {
     const logger = createMockLogger();
     setupObservability({
-      apiKey: 'test-key',
-      logger,
+      langwatch: { apiKey: 'test-key' },
+      debug: { logger },
       attributes: {
         'service.name': 'test-service',
         'service.version': '1.0.0',

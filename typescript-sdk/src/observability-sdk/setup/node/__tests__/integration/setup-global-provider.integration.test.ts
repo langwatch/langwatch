@@ -22,7 +22,7 @@ describe('setupObservability Integration - Existing Global Provider', () => {
     const globalProvider = createTestProvider();
     trace.setGlobalTracerProvider(globalProvider as any);
     const logger = createMockLogger();
-    const handle = setupObservability({ apiKey: 'test-key', logger });
+    const handle = setupObservability({ langwatch: { apiKey: 'test-key' }, debug: { logger } });
     expect(logger.error).toHaveBeenCalledWith(expect.stringContaining('OpenTelemetry is already set up in this process'));
     expect(typeof handle.shutdown).toBe('function');
     await expect(handle.shutdown()).resolves.toBeUndefined();

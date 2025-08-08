@@ -21,7 +21,7 @@ vi.mock("../../utils", () => ({
   createMergedResource: vi.fn(() => resourceFromAttributes({})),
 }));
 vi.mock("../../../exporters", () => ({
-  LangWatchExporter: vi.fn().mockImplementation(() => ({ shutdown: vi.fn() })),
+  LangWatchTraceExporter: vi.fn().mockImplementation(() => ({ shutdown: vi.fn() })),
   LangWatchLogsExporter: vi
     .fn()
     .mockImplementation(() => ({ shutdown: vi.fn() })),
@@ -50,10 +50,13 @@ describe("setupObservability", () => {
   });
 
   it("returns shutdown noop if skipOpenTelemetrySetup is true", () => {
+    const logger = new MockLogger({});
     const handle = setupObservability({
-      ...defaultOptions,
-      skipOpenTelemetrySetup: true,
+      langwatch: { apiKey: "test" },
+      advanced: { skipOpenTelemetrySetup: true },
+      debug: { logger }
     });
+    expect(logger.debug).toHaveBeenCalledWith("Skipping OpenTelemetry setup");
     expect(typeof handle.shutdown).toBe("function");
     expect(handle.shutdown()).resolves.toBeUndefined();
   });
@@ -82,10 +85,146 @@ describe("setupObservability", () => {
     const handle = setupObservability({
       ...defaultOptions,
       resource: badResource,
-      throwOnSetupError: false,
+      advanced: { throwOnSetupError: false },
     });
     expect(typeof handle.shutdown).toBe("function");
     expect(handle.shutdown()).resolves.toBeUndefined();
+  });
+
+  it("returns no-op handle when advanced.disabled is true", () => {
+    const logger = new MockLogger({});
+    const handle = setupObservability({
+      langwatch: { apiKey: "test" },
+      advanced: { disabled: true },
+      debug: { logger }
+    });
+
+    expect(logger.debug).toHaveBeenCalledWith("Observability disabled via advanced.disabled");
+    expect(typeof handle.shutdown).toBe("function");
+    expect(handle.shutdown()).resolves.toBeUndefined();
+  });
+});
+
+describe("langwatch configuration", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    resetObservabilitySdkConfig();
+  });
+
+  afterEach(() => {
+    trace.disable();
+    resetObservabilitySdkConfig();
+  });
+
+  it("uses simple processor by default", () => {
+    const logger = new MockLogger({});
+    const sdk = createAndStartNodeSdk({
+      langwatch: { apiKey: "test" },
+      debug: { logger }
+    }, logger, resourceFromAttributes({}));
+
+    expect(logger.debug).toHaveBeenCalledWith(
+      "Using LangWatch simple processors for tracing and logging"
+    );
+    expect(sdk).toBeDefined();
+  });
+
+  it("uses batch processor when specified", () => {
+    const logger = new MockLogger({});
+    const sdk = createAndStartNodeSdk({
+      langwatch: {
+        apiKey: "test",
+        processorType: "batch"
+      },
+      debug: { logger }
+    }, logger, resourceFromAttributes({}));
+
+    expect(logger.debug).toHaveBeenCalledWith(
+      "Added LangWatch batchSpanProcessor and LogRecordProcessor to SDK"
+    );
+    expect(sdk).toBeDefined();
+  });
+
+  it("completely disables langwatch when set to 'disabled'", () => {
+    const logger = new MockLogger({});
+    const fakeProcessor = {
+      onStart: vi.fn(),
+      onEnd: vi.fn(),
+      shutdown: vi.fn(),
+      forceFlush: vi.fn(),
+    };
+
+    const sdk = createAndStartNodeSdk({
+      langwatch: 'disabled',
+      spanProcessors: [fakeProcessor],
+      debug: { logger }
+    }, logger, resourceFromAttributes({}));
+
+    expect(logger.debug).toHaveBeenCalledWith(
+      "LangWatch integration disabled, using user-provided SpanProcessors and LogRecordProcessors"
+    );
+    expect(sdk).toBeDefined();
+  });
+
+  it("warns about misconfiguration when langwatch disabled without alternatives", () => {
+    const logger = new MockLogger({});
+    const sdk = createAndStartNodeSdk({
+      langwatch: 'disabled',
+      debug: { logger }
+    }, logger, resourceFromAttributes({}));
+
+    expect(logger.error).toHaveBeenCalledWith(
+      expect.stringContaining("LangWatch integration is disabled but no custom span processors, trace exporters, or console tracing is configured.")
+    );
+    expect(sdk).toBeDefined();
+  });
+
+  it("throws on misconfiguration when throwOnSetupError is true", () => {
+    const logger = new MockLogger({});
+
+    expect(() => createAndStartNodeSdk({
+      langwatch: 'disabled',
+      advanced: { throwOnSetupError: true },
+      debug: { logger }
+    }, logger, resourceFromAttributes({}))).toThrow();
+  });
+
+  it("does not warn when langwatch disabled but alternatives provided", () => {
+    const logger = new MockLogger({});
+    const fakeProcessor = {
+      onStart: vi.fn(),
+      onEnd: vi.fn(),
+      shutdown: vi.fn(),
+      forceFlush: vi.fn(),
+    };
+
+    const sdk = createAndStartNodeSdk({
+      langwatch: 'disabled',
+      spanProcessors: [fakeProcessor],
+      debug: { logger }
+    }, logger, resourceFromAttributes({}));
+
+    expect(logger.error).not.toHaveBeenCalledWith(
+      expect.stringContaining("LangWatch integration is disabled but no custom span processors")
+    );
+    expect(sdk).toBeDefined();
+  });
+
+  it("does not warn when langwatch disabled but console tracing enabled", () => {
+    const logger = new MockLogger({});
+
+    const sdk = createAndStartNodeSdk({
+      langwatch: 'disabled',
+      debug: {
+        consoleTracing: true,
+        logger
+      }
+    }, logger, resourceFromAttributes({}));
+
+    expect(logger.error).not.toHaveBeenCalledWith(
+      expect.stringContaining("LangWatch integration is disabled but no custom span processors")
+    );
+    expect(sdk).toBeDefined();
   });
 });
 
@@ -328,7 +467,10 @@ describe("createAndStartNodeSdk", () => {
 
   it("adds console span processor if consoleTracing is true", () => {
     const logger = new MockLogger({});
-    const options = { ...defaultOptions, consoleTracing: true };
+    const options = {
+      ...defaultOptions,
+      debug: { consoleTracing: true }
+    };
     const sdk = createAndStartNodeSdk(
       options,
       logger,
@@ -368,7 +510,10 @@ describe("console logging configuration", () => {
 
   it("enables console logging when consoleLogging is true", () => {
     const logger = new MockLogger({});
-    const options = { ...defaultOptions, consoleLogging: true };
+    const options = {
+      ...defaultOptions,
+      debug: { consoleLogging: true }
+    };
 
     const sdk = createAndStartNodeSdk(
       options,
@@ -402,8 +547,10 @@ describe("console logging configuration", () => {
     const logger = new MockLogger({});
     const options = {
       ...defaultOptions,
-      consoleTracing: true,
-      consoleLogging: true,
+      debug: {
+        consoleTracing: true,
+        consoleLogging: true,
+      }
     };
 
     const sdk = createAndStartNodeSdk(
@@ -453,10 +600,7 @@ describe("log record processors configuration", () => {
 
     expect(sdk).toBeDefined();
     expect(logger.debug).toHaveBeenCalledWith(
-      "User LogRecordProcessor added to SDK",
-    );
-    expect(logger.debug).toHaveBeenCalledWith(
-      "Added 1 user LogRecordProcessors to SDK",
+      "Added user-provided 1 LogRecordProcessors to SDK",
     );
   });
 
@@ -485,10 +629,7 @@ describe("log record processors configuration", () => {
 
     expect(sdk).toBeDefined();
     expect(logger.debug).toHaveBeenCalledWith(
-      "User LogRecordProcessor added to SDK",
-    );
-    expect(logger.debug).toHaveBeenCalledWith(
-      "Added 2 user LogRecordProcessors to SDK",
+      "Added user-provided 2 LogRecordProcessors to SDK",
     );
   });
 
@@ -504,7 +645,7 @@ describe("log record processors configuration", () => {
 
     expect(sdk).toBeDefined();
     expect(logger.debug).toHaveBeenCalledWith(
-      "Added BatchLogRecordProcessor to SDK",
+      "Added LangWatch simpleSpanProcessor and LogRecordProcessor to SDK",
     );
   });
 
@@ -518,7 +659,7 @@ describe("log record processors configuration", () => {
     const options = {
       ...defaultOptions,
       logRecordProcessors: [fakeLogProcessor],
-      consoleLogging: true,
+      debug: { consoleLogging: true, logger },
     };
 
     const sdk = createAndStartNodeSdk(
@@ -529,10 +670,7 @@ describe("log record processors configuration", () => {
 
     expect(sdk).toBeDefined();
     expect(logger.debug).toHaveBeenCalledWith(
-      "User LogRecordProcessor added to SDK",
-    );
-    expect(logger.debug).toHaveBeenCalledWith(
-      "Added 1 user LogRecordProcessors to SDK",
+      "Added user-provided 1 LogRecordProcessors to SDK",
     );
     expect(logger.debug).toHaveBeenCalledWith(
       "Console recording of logs enabled; adding console log record processor",
@@ -569,10 +707,7 @@ describe("span processors configuration", () => {
 
     expect(sdk).toBeDefined();
     expect(logger.debug).toHaveBeenCalledWith(
-      "User SpanProcessor added to SDK",
-    );
-    expect(logger.debug).toHaveBeenCalledWith(
-      "Added 1 user SpanProcessors to SDK",
+      "Added user-provided 1 SpanProcessors to SDK",
     );
   });
 
@@ -588,7 +723,7 @@ describe("span processors configuration", () => {
 
     expect(sdk).toBeDefined();
     expect(logger.debug).toHaveBeenCalledWith(
-      "Added BatchSpanProcessor to SDK",
+      "Added LangWatch simpleSpanProcessor and LogRecordProcessor to SDK",
     );
   });
 
@@ -603,7 +738,7 @@ describe("span processors configuration", () => {
     const options = {
       ...defaultOptions,
       spanProcessors: [fakeProcessor],
-      consoleTracing: true,
+      debug: { consoleTracing: true, logger },
     };
 
     const sdk = createAndStartNodeSdk(
@@ -614,10 +749,7 @@ describe("span processors configuration", () => {
 
     expect(sdk).toBeDefined();
     expect(logger.debug).toHaveBeenCalledWith(
-      "User SpanProcessor added to SDK",
-    );
-    expect(logger.debug).toHaveBeenCalledWith(
-      "Added 1 user SpanProcessors to SDK",
+      "Added user-provided 1 SpanProcessors to SDK",
     );
     expect(logger.debug).toHaveBeenCalledWith(
       "Console tracing enabled; adding console span exporter",
@@ -674,8 +806,8 @@ describe("logger configuration", () => {
     const customLogger = new MockLogger({});
     const options = {
       ...defaultOptions,
-      logger: customLogger,
-      skipOpenTelemetrySetup: true,
+      debug: { logger: customLogger },
+      advanced: { skipOpenTelemetrySetup: true },
     };
 
     setupObservability(options);
@@ -697,7 +829,10 @@ describe("logger configuration", () => {
   });
 
   it("passes log level to default logger", () => {
-    const options = { ...defaultOptions, logLevel: "debug" as const };
+    const options = {
+      ...defaultOptions,
+      debug: { logLevel: "debug" as const }
+    };
 
     setupObservability(options);
 
@@ -724,8 +859,8 @@ describe("UNSAFE_forceOpenTelemetryReinitialization", () => {
     const logger = new MockLogger({});
     const options = {
       ...defaultOptions,
-      logger,
-      UNSAFE_forceOpenTelemetryReinitialization: true,
+      debug: { logger },
+      advanced: { UNSAFE_forceOpenTelemetryReinitialization: true },
     };
 
     setupObservability(options);
@@ -743,8 +878,8 @@ describe("UNSAFE_forceOpenTelemetryReinitialization", () => {
     const logger = new MockLogger({});
     const options = {
       ...defaultOptions,
-      logger,
-      UNSAFE_forceOpenTelemetryReinitialization: true,
+      debug: { logger },
+      advanced: { UNSAFE_forceOpenTelemetryReinitialization: true },
     };
 
     setupObservability(options);
@@ -777,16 +912,16 @@ describe("error handling in setup", () => {
 
     const options = {
       ...defaultOptions,
-      logger,
+      debug: { logger },
       resource: badResource,
-      throwOnSetupError: false,
+      advanced: { throwOnSetupError: false },
     };
 
     setupObservability(options);
 
     // Since the setup is actually succeeding now, we need to check for the success message
     expect(logger.debug).toHaveBeenCalledWith(
-      expect.stringContaining("Using LangWatch TraceExporter for SDK"),
+      expect.stringContaining("Using LangWatch simple processors for tracing and logging"),
     );
   });
 
@@ -799,7 +934,7 @@ describe("error handling in setup", () => {
 
     const options = {
       ...defaultOptions,
-      throwOnSetupError: true,
+      advanced: { throwOnSetupError: true },
     };
 
     expect(() => setupObservability(options)).toThrow("Test error message");
@@ -815,8 +950,8 @@ describe("error handling in setup", () => {
 
     const options = {
       ...defaultOptions,
-      logger,
-      throwOnSetupError: false,
+      debug: { logger },
+      advanced: { throwOnSetupError: false },
     };
 
     const handle = setupObservability(options);
@@ -854,7 +989,7 @@ describe("NodeSDK configuration", () => {
 
     const options = {
       ...defaultOptions,
-      logger,
+      debug: { logger },
       autoDetectResources: false,
       contextManager: fakeContextManager as any,
       textMapPropagator: fakeTextMapPropagator as any,
