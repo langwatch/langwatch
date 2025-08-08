@@ -10,6 +10,9 @@ if TYPE_CHECKING:
     from ..models.post_api_prompts_by_id_versions_body_config_data_demonstrations_columns_item import (
         PostApiPromptsByIdVersionsBodyConfigDataDemonstrationsColumnsItem,
     )
+    from ..models.post_api_prompts_by_id_versions_body_config_data_demonstrations_inline import (
+        PostApiPromptsByIdVersionsBodyConfigDataDemonstrationsInline,
+    )
     from ..models.post_api_prompts_by_id_versions_body_config_data_demonstrations_rows_item import (
         PostApiPromptsByIdVersionsBodyConfigDataDemonstrationsRowsItem,
     )
@@ -24,10 +27,16 @@ class PostApiPromptsByIdVersionsBodyConfigDataDemonstrations:
     Attributes:
         columns (list['PostApiPromptsByIdVersionsBodyConfigDataDemonstrationsColumnsItem']):
         rows (Union[Unset, list['PostApiPromptsByIdVersionsBodyConfigDataDemonstrationsRowsItem']]):
+        id (Union[Unset, str]):
+        name (Union[Unset, str]):
+        inline (Union[Unset, PostApiPromptsByIdVersionsBodyConfigDataDemonstrationsInline]):
     """
 
     columns: list["PostApiPromptsByIdVersionsBodyConfigDataDemonstrationsColumnsItem"]
     rows: Union[Unset, list["PostApiPromptsByIdVersionsBodyConfigDataDemonstrationsRowsItem"]] = UNSET
+    id: Union[Unset, str] = UNSET
+    name: Union[Unset, str] = UNSET
+    inline: Union[Unset, "PostApiPromptsByIdVersionsBodyConfigDataDemonstrationsInline"] = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -43,6 +52,14 @@ class PostApiPromptsByIdVersionsBodyConfigDataDemonstrations:
                 rows_item = rows_item_data.to_dict()
                 rows.append(rows_item)
 
+        id = self.id
+
+        name = self.name
+
+        inline: Union[Unset, dict[str, Any]] = UNSET
+        if not isinstance(self.inline, Unset):
+            inline = self.inline.to_dict()
+
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
         field_dict.update(
@@ -52,6 +69,12 @@ class PostApiPromptsByIdVersionsBodyConfigDataDemonstrations:
         )
         if rows is not UNSET:
             field_dict["rows"] = rows
+        if id is not UNSET:
+            field_dict["id"] = id
+        if name is not UNSET:
+            field_dict["name"] = name
+        if inline is not UNSET:
+            field_dict["inline"] = inline
 
         return field_dict
 
@@ -59,6 +82,9 @@ class PostApiPromptsByIdVersionsBodyConfigDataDemonstrations:
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
         from ..models.post_api_prompts_by_id_versions_body_config_data_demonstrations_columns_item import (
             PostApiPromptsByIdVersionsBodyConfigDataDemonstrationsColumnsItem,
+        )
+        from ..models.post_api_prompts_by_id_versions_body_config_data_demonstrations_inline import (
+            PostApiPromptsByIdVersionsBodyConfigDataDemonstrationsInline,
         )
         from ..models.post_api_prompts_by_id_versions_body_config_data_demonstrations_rows_item import (
             PostApiPromptsByIdVersionsBodyConfigDataDemonstrationsRowsItem,
@@ -81,9 +107,23 @@ class PostApiPromptsByIdVersionsBodyConfigDataDemonstrations:
 
             rows.append(rows_item)
 
+        id = d.pop("id", UNSET)
+
+        name = d.pop("name", UNSET)
+
+        _inline = d.pop("inline", UNSET)
+        inline: Union[Unset, PostApiPromptsByIdVersionsBodyConfigDataDemonstrationsInline]
+        if isinstance(_inline, Unset):
+            inline = UNSET
+        else:
+            inline = PostApiPromptsByIdVersionsBodyConfigDataDemonstrationsInline.from_dict(_inline)
+
         post_api_prompts_by_id_versions_body_config_data_demonstrations = cls(
             columns=columns,
             rows=rows,
+            id=id,
+            name=name,
+            inline=inline,
         )
 
         post_api_prompts_by_id_versions_body_config_data_demonstrations.additional_properties = d

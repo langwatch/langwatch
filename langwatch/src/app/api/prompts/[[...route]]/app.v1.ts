@@ -160,7 +160,25 @@ app.post(
         "Successfully created prompt with initial version"
       );
 
-      return c.json(newConfig);
+      const result: z.infer<typeof promptOutputSchema> = {
+        id: newConfig.id,
+        handle: newConfig.handle,
+        scope: newConfig.scope,
+        name: newConfig.name,
+        updatedAt: newConfig.updatedAt,
+        projectId: newConfig.projectId,
+        organizationId: newConfig.organizationId,
+        version: newConfig.latestVersion.version,
+        versionId: newConfig.latestVersion.id,
+        versionCreatedAt: newConfig.latestVersion.createdAt,
+        model: newConfig.latestVersion.configData?.model || "",
+        prompt: newConfig.latestVersion.configData?.prompt || "",
+        messages: newConfig.latestVersion.configData?.messages || [],
+        response_format:
+          newConfig.latestVersion.configData?.response_format || null,
+      };
+
+      return c.json(result);
     } catch (error: any) {
       logger.error({ projectId: project.id, error }, "Error creating prompt");
       handlePossibleConflictError(error, data.scope);
@@ -556,12 +574,13 @@ const transformConfigToPromptOutput = (
 
   id: string
 ): z.infer<typeof promptOutputSchema> => {
+  console.log("SDFDSFSDFSDFSD");
   return {
     id,
     name: config.name,
     handle: config.handle,
     scope: config.scope,
-    version: config.latestVersion.version,
+    version: config.latestVersion.version ?? 0,
     versionId: config.latestVersion.id ?? "",
     versionCreatedAt: config.latestVersion.createdAt ?? new Date(),
     model: config.latestVersion.configData.model,

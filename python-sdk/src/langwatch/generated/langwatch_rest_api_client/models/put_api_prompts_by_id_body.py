@@ -1,8 +1,11 @@
 from collections.abc import Mapping
-from typing import Any, TypeVar
+from typing import Any, TypeVar, Union
 
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
+
+from ..models.put_api_prompts_by_id_body_scope import PutApiPromptsByIdBodyScope
+from ..types import UNSET, Unset
 
 T = TypeVar("T", bound="PutApiPromptsByIdBody")
 
@@ -12,13 +15,23 @@ class PutApiPromptsByIdBody:
     """
     Attributes:
         name (str):
+        handle (Union[Unset, str]):
+        scope (Union[Unset, PutApiPromptsByIdBodyScope]):
     """
 
     name: str
+    handle: Union[Unset, str] = UNSET
+    scope: Union[Unset, PutApiPromptsByIdBodyScope] = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         name = self.name
+
+        handle = self.handle
+
+        scope: Union[Unset, str] = UNSET
+        if not isinstance(self.scope, Unset):
+            scope = self.scope.value
 
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
@@ -27,6 +40,10 @@ class PutApiPromptsByIdBody:
                 "name": name,
             }
         )
+        if handle is not UNSET:
+            field_dict["handle"] = handle
+        if scope is not UNSET:
+            field_dict["scope"] = scope
 
         return field_dict
 
@@ -35,8 +52,19 @@ class PutApiPromptsByIdBody:
         d = dict(src_dict)
         name = d.pop("name")
 
+        handle = d.pop("handle", UNSET)
+
+        _scope = d.pop("scope", UNSET)
+        scope: Union[Unset, PutApiPromptsByIdBodyScope]
+        if isinstance(_scope, Unset):
+            scope = UNSET
+        else:
+            scope = PutApiPromptsByIdBodyScope(_scope)
+
         put_api_prompts_by_id_body = cls(
             name=name,
+            handle=handle,
+            scope=scope,
         )
 
         put_api_prompts_by_id_body.additional_properties = d

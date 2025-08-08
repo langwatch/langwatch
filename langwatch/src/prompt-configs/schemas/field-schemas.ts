@@ -86,3 +86,15 @@ export const commitMessageSchema = z.string();
  * Schema for prompt configuration version
  */
 export const versionSchema = z.number();
+
+/**
+ * Schema for response format specification
+ * Used to define structured output formats for LLM responses
+ */
+export const responseFormatSchema = z.object({
+  type: z.enum(["json_schema"]),
+  json_schema: z.object({
+    name: z.string(),
+    schema: z.object({}),
+  }),
+});

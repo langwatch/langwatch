@@ -19,6 +19,9 @@ if TYPE_CHECKING:
     from ..models.post_api_prompts_by_id_versions_body_config_data_outputs_item import (
         PostApiPromptsByIdVersionsBodyConfigDataOutputsItem,
     )
+    from ..models.post_api_prompts_by_id_versions_body_config_data_prompting_technique import (
+        PostApiPromptsByIdVersionsBodyConfigDataPromptingTechnique,
+    )
 
 
 T = TypeVar("T", bound="PostApiPromptsByIdVersionsBodyConfigData")
@@ -32,22 +35,24 @@ class PostApiPromptsByIdVersionsBodyConfigData:
         inputs (list['PostApiPromptsByIdVersionsBodyConfigDataInputsItem']):
         outputs (list['PostApiPromptsByIdVersionsBodyConfigDataOutputsItem']):
         model (str):
-        demonstrations (PostApiPromptsByIdVersionsBodyConfigDataDemonstrations):
         version (Union[Unset, float]):
         messages (Union[Unset, list['PostApiPromptsByIdVersionsBodyConfigDataMessagesItem']]):
         temperature (Union[Unset, float]):
         max_tokens (Union[Unset, float]):
+        demonstrations (Union[Unset, PostApiPromptsByIdVersionsBodyConfigDataDemonstrations]):
+        prompting_technique (Union[Unset, PostApiPromptsByIdVersionsBodyConfigDataPromptingTechnique]):
     """
 
     prompt: str
     inputs: list["PostApiPromptsByIdVersionsBodyConfigDataInputsItem"]
     outputs: list["PostApiPromptsByIdVersionsBodyConfigDataOutputsItem"]
     model: str
-    demonstrations: "PostApiPromptsByIdVersionsBodyConfigDataDemonstrations"
     version: Union[Unset, float] = UNSET
     messages: Union[Unset, list["PostApiPromptsByIdVersionsBodyConfigDataMessagesItem"]] = UNSET
     temperature: Union[Unset, float] = UNSET
     max_tokens: Union[Unset, float] = UNSET
+    demonstrations: Union[Unset, "PostApiPromptsByIdVersionsBodyConfigDataDemonstrations"] = UNSET
+    prompting_technique: Union[Unset, "PostApiPromptsByIdVersionsBodyConfigDataPromptingTechnique"] = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -65,8 +70,6 @@ class PostApiPromptsByIdVersionsBodyConfigData:
 
         model = self.model
 
-        demonstrations = self.demonstrations.to_dict()
-
         version = self.version
 
         messages: Union[Unset, list[dict[str, Any]]] = UNSET
@@ -80,6 +83,14 @@ class PostApiPromptsByIdVersionsBodyConfigData:
 
         max_tokens = self.max_tokens
 
+        demonstrations: Union[Unset, dict[str, Any]] = UNSET
+        if not isinstance(self.demonstrations, Unset):
+            demonstrations = self.demonstrations.to_dict()
+
+        prompting_technique: Union[Unset, dict[str, Any]] = UNSET
+        if not isinstance(self.prompting_technique, Unset):
+            prompting_technique = self.prompting_technique.to_dict()
+
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
         field_dict.update(
@@ -88,7 +99,6 @@ class PostApiPromptsByIdVersionsBodyConfigData:
                 "inputs": inputs,
                 "outputs": outputs,
                 "model": model,
-                "demonstrations": demonstrations,
             }
         )
         if version is not UNSET:
@@ -99,6 +109,10 @@ class PostApiPromptsByIdVersionsBodyConfigData:
             field_dict["temperature"] = temperature
         if max_tokens is not UNSET:
             field_dict["max_tokens"] = max_tokens
+        if demonstrations is not UNSET:
+            field_dict["demonstrations"] = demonstrations
+        if prompting_technique is not UNSET:
+            field_dict["prompting_technique"] = prompting_technique
 
         return field_dict
 
@@ -115,6 +129,9 @@ class PostApiPromptsByIdVersionsBodyConfigData:
         )
         from ..models.post_api_prompts_by_id_versions_body_config_data_outputs_item import (
             PostApiPromptsByIdVersionsBodyConfigDataOutputsItem,
+        )
+        from ..models.post_api_prompts_by_id_versions_body_config_data_prompting_technique import (
+            PostApiPromptsByIdVersionsBodyConfigDataPromptingTechnique,
         )
 
         d = dict(src_dict)
@@ -136,8 +153,6 @@ class PostApiPromptsByIdVersionsBodyConfigData:
 
         model = d.pop("model")
 
-        demonstrations = PostApiPromptsByIdVersionsBodyConfigDataDemonstrations.from_dict(d.pop("demonstrations"))
-
         version = d.pop("version", UNSET)
 
         messages = []
@@ -151,16 +166,33 @@ class PostApiPromptsByIdVersionsBodyConfigData:
 
         max_tokens = d.pop("max_tokens", UNSET)
 
+        _demonstrations = d.pop("demonstrations", UNSET)
+        demonstrations: Union[Unset, PostApiPromptsByIdVersionsBodyConfigDataDemonstrations]
+        if isinstance(_demonstrations, Unset):
+            demonstrations = UNSET
+        else:
+            demonstrations = PostApiPromptsByIdVersionsBodyConfigDataDemonstrations.from_dict(_demonstrations)
+
+        _prompting_technique = d.pop("prompting_technique", UNSET)
+        prompting_technique: Union[Unset, PostApiPromptsByIdVersionsBodyConfigDataPromptingTechnique]
+        if isinstance(_prompting_technique, Unset):
+            prompting_technique = UNSET
+        else:
+            prompting_technique = PostApiPromptsByIdVersionsBodyConfigDataPromptingTechnique.from_dict(
+                _prompting_technique
+            )
+
         post_api_prompts_by_id_versions_body_config_data = cls(
             prompt=prompt,
             inputs=inputs,
             outputs=outputs,
             model=model,
-            demonstrations=demonstrations,
             version=version,
             messages=messages,
             temperature=temperature,
             max_tokens=max_tokens,
+            demonstrations=demonstrations,
+            prompting_technique=prompting_technique,
         )
 
         post_api_prompts_by_id_versions_body_config_data.additional_properties = d

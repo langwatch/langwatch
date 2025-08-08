@@ -18,7 +18,9 @@ def _extract_error(resp: Response[Any]) -> str | None:
 
     Attempts to extract error message from response in the following order:
     1. From parsed response object's 'error' attribute
-    2. From response body JSON 'error' field
+    2. From parsed response object's 'message' attribute or additional_properties
+    3. From response body JSON 'error' field
+    4. From response body JSON 'message' field
 
     Args:
         resp: The API response object
@@ -32,18 +34,53 @@ def _extract_error(resp: Response[Any]) -> str | None:
     """
     # Prefer parsed.error if available
     parsed = resp.parsed
-    if parsed is not None and hasattr(parsed, "error"):
+    if parsed is not None:
+        error_parts: list[str] = []
+
+        # Get error from parsed object
+        if hasattr(parsed, "error"):
+            try:
+                error_val = getattr(parsed, "error")
+                if isinstance(error_val, str):
+                    error_parts.append(error_val)
+            except Exception:
+                pass
+
+        # Get message from parsed object or additional_properties
         try:
-            return getattr(parsed, "error")
+            message_val = None
+            if hasattr(parsed, "message"):
+                message_val = getattr(parsed, "message")
+            elif hasattr(parsed, "additional_properties"):
+                additional_props = getattr(parsed, "additional_properties")
+                if isinstance(additional_props, dict):
+                    message_val = additional_props.get("message")
+
+            if isinstance(message_val, str):
+                error_parts.append(message_val)
         except Exception:
             pass
-    # Fallback to body JSON "error"
+
+        if error_parts:
+            return " - ".join(error_parts)
+
+    # Fallback to body JSON "error" and "message"
     try:
         text = resp.content.decode(errors="ignore")
         data: dict[str, Any] = json.loads(text) if text else {}
-        val = data.get("error")
-        if isinstance(val, str):
-            return val
+
+        # Collect both error and message fields
+        error_parts = []
+        error_val = data.get("error")
+        if isinstance(error_val, str):
+            error_parts.append(error_val)
+
+        message_val = data.get("message")
+        if isinstance(message_val, str):
+            error_parts.append(message_val)
+
+        if error_parts:
+            return " - ".join(error_parts)
     except Exception:
         pass
     return None
@@ -88,5 +125,8 @@ def unwrap_response(
     if status == 401:
         raise RuntimeError("Authentication error")
     if status >= 500:
-        raise RuntimeError(f"Server error during prompt {op}")
+        error_detail = f" - {msg}" if msg else ""
+        raise RuntimeError(
+            f"Server error during prompt {op} (status {status}){error_detail}"
+        )
     raise RuntimeError(f"Unexpected status {status} during prompt {op}")

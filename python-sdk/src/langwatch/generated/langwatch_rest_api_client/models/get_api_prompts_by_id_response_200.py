@@ -4,6 +4,8 @@ from typing import TYPE_CHECKING, Any, TypeVar, Union, cast
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
 
+from ..models.get_api_prompts_by_id_response_200_scope import GetApiPromptsByIdResponse200Scope
+
 if TYPE_CHECKING:
     from ..models.get_api_prompts_by_id_response_200_messages_item import GetApiPromptsByIdResponse200MessagesItem
     from ..models.get_api_prompts_by_id_response_200_response_format_type_0 import (
@@ -28,6 +30,8 @@ class GetApiPromptsByIdResponse200:
         prompt (str):
         messages (list['GetApiPromptsByIdResponse200MessagesItem']):
         response_format (Union['GetApiPromptsByIdResponse200ResponseFormatType0', None]):
+        handle (Union[None, str]):
+        scope (GetApiPromptsByIdResponse200Scope):
     """
 
     id: str
@@ -40,6 +44,8 @@ class GetApiPromptsByIdResponse200:
     prompt: str
     messages: list["GetApiPromptsByIdResponse200MessagesItem"]
     response_format: Union["GetApiPromptsByIdResponse200ResponseFormatType0", None]
+    handle: Union[None, str]
+    scope: GetApiPromptsByIdResponse200Scope
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -74,6 +80,11 @@ class GetApiPromptsByIdResponse200:
         else:
             response_format = self.response_format
 
+        handle: Union[None, str]
+        handle = self.handle
+
+        scope = self.scope.value
+
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
         field_dict.update(
@@ -88,6 +99,8 @@ class GetApiPromptsByIdResponse200:
                 "prompt": prompt,
                 "messages": messages,
                 "response_format": response_format,
+                "handle": handle,
+                "scope": scope,
             }
         )
 
@@ -139,6 +152,15 @@ class GetApiPromptsByIdResponse200:
 
         response_format = _parse_response_format(d.pop("response_format"))
 
+        def _parse_handle(data: object) -> Union[None, str]:
+            if data is None:
+                return data
+            return cast(Union[None, str], data)
+
+        handle = _parse_handle(d.pop("handle"))
+
+        scope = GetApiPromptsByIdResponse200Scope(d.pop("scope"))
+
         get_api_prompts_by_id_response_200 = cls(
             id=id,
             name=name,
@@ -150,6 +172,8 @@ class GetApiPromptsByIdResponse200:
             prompt=prompt,
             messages=messages,
             response_format=response_format,
+            handle=handle,
+            scope=scope,
         )
 
         get_api_prompts_by_id_response_200.additional_properties = d

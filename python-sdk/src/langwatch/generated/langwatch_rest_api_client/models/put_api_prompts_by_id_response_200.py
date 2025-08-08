@@ -1,8 +1,10 @@
 from collections.abc import Mapping
-from typing import Any, TypeVar
+from typing import Any, TypeVar, Union, cast
 
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
+
+from ..models.put_api_prompts_by_id_response_200_scope import PutApiPromptsByIdResponse200Scope
 
 T = TypeVar("T", bound="PutApiPromptsByIdResponse200")
 
@@ -14,11 +16,15 @@ class PutApiPromptsByIdResponse200:
         id (str):
         name (str):
         updated_at (str):
+        handle (Union[None, str]):
+        scope (PutApiPromptsByIdResponse200Scope):
     """
 
     id: str
     name: str
     updated_at: str
+    handle: Union[None, str]
+    scope: PutApiPromptsByIdResponse200Scope
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -28,6 +34,11 @@ class PutApiPromptsByIdResponse200:
 
         updated_at = self.updated_at
 
+        handle: Union[None, str]
+        handle = self.handle
+
+        scope = self.scope.value
+
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
         field_dict.update(
@@ -35,6 +46,8 @@ class PutApiPromptsByIdResponse200:
                 "id": id,
                 "name": name,
                 "updatedAt": updated_at,
+                "handle": handle,
+                "scope": scope,
             }
         )
 
@@ -49,10 +62,21 @@ class PutApiPromptsByIdResponse200:
 
         updated_at = d.pop("updatedAt")
 
+        def _parse_handle(data: object) -> Union[None, str]:
+            if data is None:
+                return data
+            return cast(Union[None, str], data)
+
+        handle = _parse_handle(d.pop("handle"))
+
+        scope = PutApiPromptsByIdResponse200Scope(d.pop("scope"))
+
         put_api_prompts_by_id_response_200 = cls(
             id=id,
             name=name,
             updated_at=updated_at,
+            handle=handle,
+            scope=scope,
         )
 
         put_api_prompts_by_id_response_200.additional_properties = d
