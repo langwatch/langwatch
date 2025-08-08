@@ -58,8 +58,10 @@ describe("Tracer Integration Tests", () => {
     observabilityHandle = setupObservability({
       serviceName: "tracer-integration-test",
       spanProcessors: [spanProcessor],
-      logger: new NoOpLogger(),
-      throwOnSetupError: true,
+      debug: { logger: new NoOpLogger() },
+      advanced: {
+        throwOnSetupError: true,
+      },
       attributes: {
         "test.suite": "tracer-integration",
         "test.environment": "vitest"
@@ -384,8 +386,8 @@ describe("Tracer Integration Tests", () => {
 
       // Verify all spans were properly created and ended
       const allCompleted = exportedSpans.every(span =>
-        span.status.code === 1 && // OK status
-        span.endTime[0] > 0 // Has end time
+        span.status.code === SpanStatusCode.OK &&
+        span.endTime[0] > 0
       );
       expect(allCompleted).toBe(true);
     });

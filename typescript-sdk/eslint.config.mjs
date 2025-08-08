@@ -1,7 +1,8 @@
 import eslint from "@eslint/js";
 import tseslint from "typescript-eslint";
 
-export default tseslint.config(
+/** @type {import('typescript-eslint').Config} */
+const config = tseslint.config(
     {
         ignores: [
             "dist/**",
@@ -47,3 +48,5 @@ export default tseslint.config(
         },
     }
 );
+
+export default config;

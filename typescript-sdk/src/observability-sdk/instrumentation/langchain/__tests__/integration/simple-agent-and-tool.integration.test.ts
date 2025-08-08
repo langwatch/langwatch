@@ -3,7 +3,7 @@ import {
   InMemorySpanExporter,
   SimpleSpanProcessor,
 } from "@opentelemetry/sdk-trace-base";
-import { trace } from "@opentelemetry/api";
+import { SpanStatusCode, trace } from "@opentelemetry/api";
 import { ChatOpenAI } from "@langchain/openai";
 import { DynamicTool } from "@langchain/core/tools";
 import { AgentExecutor, createToolCallingAgent } from "langchain/agents";
@@ -35,10 +35,12 @@ describe("LangChain Integration Tests", () => {
 
     observabilityHandle = setupObservability({
       serviceName: "langchain-integration-test",
-      logger: new NoOpLogger(),
-      throwOnSetupError: true,
+      debug: { logger: new NoOpLogger() },
       spanProcessors: [spanProcessor],
-      UNSAFE_forceOpenTelemetryReinitialization: true,
+      advanced: {
+        throwOnSetupError: true,
+        UNSAFE_forceOpenTelemetryReinitialization: true,
+      },
       attributes: {
         "test.suite": "langchain-integration",
         "test.component": "langchain-callbacks",
@@ -233,7 +235,7 @@ describe("LangChain Integration Tests", () => {
 
     // Verify error span was created
     const errorSpans = finishedSpans.filter(
-      (span) => span.status.code === 2, // ERROR status code
+      (span) => span.status.code === SpanStatusCode.ERROR,
     );
     expect(errorSpans.length).toBeGreaterThan(0);
   });
