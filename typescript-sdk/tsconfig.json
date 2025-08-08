@@ -26,12 +26,11 @@
             "@/internal/*": ["./src/internal/*"]
         }
     },
-    "include": ["**/*.ts", "vitest.config.mts"],
+    "include": ["**/*.ts", "vitest.config.mts", "vitest.e2e.config.mts", "eslint.config.mjs"],
     "exclude": [
         "node_modules",
         "./dist/**/*",
         "./example/**/*",
-        "./examples/**/*",
-        "**/__tests__/**/*"
+        "./examples/**/*"
     ]
 }
