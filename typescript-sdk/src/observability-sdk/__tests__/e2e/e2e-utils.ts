@@ -63,11 +63,13 @@ export function setupE2EObservability(): [LangWatchExporter, SimpleSpanProcessor
 
   console.log("🔧 Calling setupObservability...");
   setupObservability({
-    apiKey: E2E_CONFIG.apiKey!,
-    endpoint: E2E_CONFIG.endpoint,
+    langwatch: {
+      apiKey: E2E_CONFIG.apiKey!,
+      endpoint: E2E_CONFIG.endpoint,
+    },
     spanProcessors: [spanProcessor],
-    logLevel: "debug", // Enable debug logging to see what's happening
-    UNSAFE_forceOpenTelemetryReinitialization: true, // Allow reinitialization for e2e tests
+    debug: { logLevel: "debug" },
+    advanced: { UNSAFE_forceOpenTelemetryReinitialization: true },
   });
 
   console.log("✅ E2E observability setup complete");

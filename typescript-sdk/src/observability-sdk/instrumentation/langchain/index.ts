@@ -17,14 +17,21 @@ import {
   type BaseMessage,
   type StoredMessage,
 } from "@langchain/core/messages";
-import type { ChatGeneration, LLMResult } from "@langchain/core/outputs";
+import type {
+  ChatGeneration,
+  Generation,
+  LLMResult,
+} from "@langchain/core/outputs";
+import type {
+  ChatMessage,
+  ChatRichContent,
+} from "../../../internal/generated/types/tracer";
 import type { ChainValues } from "@langchain/core/utils/types";
 import { getLangWatchTracer } from "../../tracer";
-import type { LangWatchSpan } from "../../types";
+import type { LangWatchSpan } from "../../span";
 import { context, trace, SpanStatusCode, Attributes } from "@opentelemetry/api";
 import { chatMessageSchema } from "../../../internal/generated/types/tracer.generated";
 import { shouldCaptureInput, shouldCaptureOutput } from "../../config";
-import * as intSemconv from "../../semconv";
 import { z } from "zod";
 
 export class LangWatchCallbackHandler extends BaseCallbackHandler {
@@ -67,18 +74,21 @@ export class LangWatchCallbackHandler extends BaseCallbackHandler {
 
     span.setType("llm");
 
-    if (shouldCaptureInput()) {
-      span.setInput(prompts);
+    if (shouldCaptureInput() && prompts) {
+      span.setInput(
+        "list",
+        prompts.map((prompt) => ({ type: "text", value: prompt })),
+      );
     }
 
     if (_tags) {
-      span.setAttribute(intSemconv.ATTR_LANGWATCH_LANGCHAIN_RUN_TAGS, _tags);
+      span.setAttribute("langwatch.langchain.run.tags", _tags);
     }
     if (extraParams) {
       span.setAttributes(
         Object.fromEntries(
           Object.entries(extraParams).map(([key, value]) => [
-            [`${intSemconv.ATTR_LANGWATCH_LANGCHAIN_RUN_EXTRA_PARAMS}.${key}`],
+            [`langwatch.langchain.run.extra_params.${key}`],
             wrapNonScalarValues(value),
           ]),
         ),
@@ -93,7 +103,7 @@ export class LangWatchCallbackHandler extends BaseCallbackHandler {
       span.setAttributes(
         Object.fromEntries(
           Object.entries(metadata).map(([key, value]) => [
-            [`${intSemconv.ATTR_LANGWATCH_LANGCHAIN_RUN_METADATA}.${key}`],
+            [`langwatch.langchain.run.metadata.${key}`],
             wrapNonScalarValues(value),
           ]),
         ),
@@ -122,17 +132,20 @@ export class LangWatchCallbackHandler extends BaseCallbackHandler {
     span.setType("llm");
 
     if (shouldCaptureInput()) {
-      span.setInput(messages.flatMap(convertFromLangChainMessages));
+      span.setInput(
+        "chat_messages",
+        messages.flatMap(convertFromLangChainMessages),
+      );
     }
 
     if (_tags) {
-      span.setAttribute(intSemconv.ATTR_LANGWATCH_LANGCHAIN_RUN_TAGS, _tags);
+      span.setAttribute("langwatch.langchain.run.tags", _tags);
     }
     if (extraParams) {
       span.setAttributes(
         Object.fromEntries(
           Object.entries(extraParams).map(([key, value]) => [
-            [`${intSemconv.ATTR_LANGWATCH_LANGCHAIN_RUN_EXTRA_PARAMS}.${key}`],
+            [`langwatch.langchain.run.extra_params.${key}`],
             wrapNonScalarValues(value),
           ]),
         ),
@@ -146,7 +159,7 @@ export class LangWatchCallbackHandler extends BaseCallbackHandler {
       span.setAttributes(
         Object.fromEntries(
           Object.entries(metadata).map(([key, value]) => [
-            [`${intSemconv.ATTR_LANGWATCH_LANGCHAIN_RUN_METADATA}.${key}`],
+            [`langwatch.langchain.run.metadata.${key}`],
             wrapNonScalarValues(value),
           ]),
         ),
@@ -163,26 +176,21 @@ export class LangWatchCallbackHandler extends BaseCallbackHandler {
   ): Promise<void> {
     const span = this.getSpan(runId);
     if (!span) return;
-    const outputs: unknown[] = [];
-    for (const generation of response.generations) {
-      for (const generation_ of generation) {
-        if ("message" in generation_ && generation_.message) {
-          outputs.push(
-            convertFromLangChainMessages([
-              (generation_ as ChatGeneration).message,
-            ]),
-          );
-        } else if ("text" in generation_) {
-          outputs.push(generation_.text);
-        } else {
-          outputs.push(JSON.stringify(generation_));
-        }
-      }
-    }
-    const output = outputs.length === 1 ? outputs[0] : outputs;
 
     if (shouldCaptureOutput()) {
-      span.setOutput(output);
+      const outputs = response.generations.flat().map((generation_) => {
+        if ("message" in generation_ && generation_.message) {
+          return convertFromLangChainMessages([
+            (generation_ as ChatGeneration).message,
+          ]);
+        } else if ("text" in generation_ && generation_.text) {
+          return (generation_ as Generation).text;
+        } else {
+          return generation_;
+        }
+      });
+
+      span.setOutput(outputs);
     }
 
     addLangChainEvent(span, "handleLLMEnd", runId, _parentRunId);
@@ -229,20 +237,20 @@ export class LangWatchCallbackHandler extends BaseCallbackHandler {
     }
 
     if (_tags) {
-      span.setAttribute(intSemconv.ATTR_LANGWATCH_LANGCHAIN_RUN_TAGS, _tags);
+      span.setAttribute("langwatch.langchain.run.tags", _tags);
     }
     if (_metadata) {
       span.setAttributes(
         Object.fromEntries(
           Object.entries(_metadata).map(([key, value]) => [
-            [`${intSemconv.ATTR_LANGWATCH_LANGCHAIN_RUN_METADATA}.${key}`],
+            [`langwatch.langchain.run.metadata.${key}`],
             wrapNonScalarValues(value),
           ]),
         ),
       );
     }
     if (_runType) {
-      span.setAttribute(intSemconv.ATTR_LANGWATCH_LANGCHAIN_RUN_TYPE, _runType);
+      span.setAttribute("langwatch.langchain.run.type", _runType);
     }
 
     this.spans[runId] = span;
@@ -298,22 +306,22 @@ export class LangWatchCallbackHandler extends BaseCallbackHandler {
     span.setType("tool");
 
     if (shouldCaptureInput()) {
-      span.setInputString(input);
+      span.setInput("text", input);
     }
 
     span.setAttributes({
-      [intSemconv.ATTR_LANGWATCH_LANGCHAIN_RUN_ID]: runId,
-      [intSemconv.ATTR_LANGWATCH_LANGCHAIN_RUN_PARENT_ID]: parentRunId,
+      "langwatch.langchain.run.id": runId,
+      "langwatch.langchain.run.parent_id": parentRunId,
     });
 
     if (_tags) {
-      span.setAttribute(intSemconv.ATTR_LANGWATCH_LANGCHAIN_RUN_TAGS, _tags);
+      span.setAttribute("langwatch.langchain.run.tags", _tags);
     }
     if (_metadata) {
       span.setAttributes(
         Object.fromEntries(
           Object.entries(_metadata).map(([key, value]) => [
-            [`${intSemconv.ATTR_LANGWATCH_LANGCHAIN_RUN_METADATA}.${key}`],
+            [`langwatch.langchain.run.metadata.${key}`],
             wrapNonScalarValues(value),
           ]),
         ),
@@ -330,7 +338,7 @@ export class LangWatchCallbackHandler extends BaseCallbackHandler {
     const span = this.getSpan(runId);
     if (!span) return;
     if (shouldCaptureOutput()) {
-      span.setOutputString(output);
+      span.setOutput("text", output);
     }
 
     addLangChainEvent(span, "handleToolEnd", runId, _parentRunId);
@@ -376,16 +384,16 @@ export class LangWatchCallbackHandler extends BaseCallbackHandler {
     span.setType("rag");
 
     if (shouldCaptureInput()) {
-      span.setInputString(query);
+      span.setInput("text", query);
     }
     if (_tags) {
-      span.setAttribute(intSemconv.ATTR_LANGWATCH_LANGCHAIN_RUN_TAGS, _tags);
+      span.setAttribute("langwatch.langchain.run.tags", _tags);
     }
     if (_metadata) {
       span.setAttributes(
         Object.fromEntries(
           Object.entries(_metadata).map(([key, value]) => [
-            [`${intSemconv.ATTR_LANGWATCH_LANGCHAIN_RUN_METADATA}.${key}`],
+            [`langwatch.langchain.run.metadata.${key}`],
             wrapNonScalarValues(value),
           ]),
         ),
@@ -393,8 +401,8 @@ export class LangWatchCallbackHandler extends BaseCallbackHandler {
     }
 
     span.setAttributes({
-      [intSemconv.ATTR_LANGWATCH_LANGCHAIN_RUN_ID]: runId,
-      [intSemconv.ATTR_LANGWATCH_LANGCHAIN_RUN_PARENT_ID]: parentRunId,
+      "langwatch.langchain.run.id": runId,
+      "langwatch.langchain.run.parent_id": parentRunId,
     });
 
     this.spans[runId] = span;
@@ -468,7 +476,7 @@ export class LangWatchCallbackHandler extends BaseCallbackHandler {
     addLangChainEvent(span, "handleAgentEnd", runId, _parentRunId, _tags);
 
     if (shouldCaptureOutput()) {
-      span.setOutput(action.returnValues);
+      span.setOutput("json", action.returnValues);
     }
 
     span.end();
@@ -478,8 +486,8 @@ export class LangWatchCallbackHandler extends BaseCallbackHandler {
 
 export const convertFromLangChainMessages = (
   messages: BaseMessage[],
-): any[] => {
-  const chatMessages: any[] = [];
+): ChatMessage[] => {
+  const chatMessages: ChatMessage[] = [];
   for (const message of messages) {
     chatMessages.push(
       convertFromLangChainMessage(message as BaseMessage & { id?: string[] }),
@@ -490,8 +498,8 @@ export const convertFromLangChainMessages = (
 
 const convertFromLangChainMessage = (
   message: BaseMessage & { id?: string[] },
-): any => {
-  let role: string = "user";
+): ChatMessage => {
+  let role: ChatMessage["role"] = "user";
   const message_: (BaseMessage | StoredMessage) & {
     id?: string[];
     type?: string;
@@ -539,21 +547,24 @@ const convertFromLangChainMessage = (
   ) {
     role = "tool";
   }
-  const content =
+
+  const content: ChatMessage["content"] =
     typeof message.content === "string"
       ? message.content
       : message.content == null
-      ? ""
+      ? null
       : Array.isArray(message.content)
-      ? message.content.map((content: any) =>
-          content.type === "text"
-            ? { type: "text", text: content.text }
-            : content.type == "image_url"
-            ? { type: "image_url", image_url: content.image_url }
-            : { type: "text", text: JSON.stringify(content) },
+      ? message.content.map(
+          (content: any): ChatRichContent =>
+            content.type === "text"
+              ? { type: "text" as const, text: content.text }
+              : content.type === "image_url"
+              ? { type: "image_url" as const, image_url: content.image_url }
+              : { type: "text" as const, text: JSON.stringify(content) },
         )
       : JSON.stringify(message.content);
   const functionCall = message.additional_kwargs as any;
+
   return {
     role,
     content,
@@ -565,11 +576,17 @@ const convertFromLangChainMessage = (
   };
 };
 
-function wrapNonScalarValues(value: unknown): string | number | boolean | undefined {
+function wrapNonScalarValues(
+  value: unknown,
+): string | number | boolean | undefined {
   if (value === void 0) {
     return void 0;
   }
-  if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
+  if (
+    typeof value === "string" ||
+    typeof value === "number" ||
+    typeof value === "boolean"
+  ) {
     return value;
   }
 
@@ -607,14 +624,14 @@ function addLangChainEvent(
   attributes?: Attributes,
 ) {
   const attrs: Attributes = {
-    [intSemconv.ATTR_LANGWATCH_LANGCHAIN_RUN_ID]: runId,
-    [intSemconv.ATTR_LANGWATCH_LANGCHAIN_RUN_PARENT_ID]: parentRunId,
-    [intSemconv.ATTR_LANGWATCH_LANGCHAIN_EVENT_NAME]: eventName,
+    "langwatch.langchain.run.id": runId,
+    "langwatch.langchain.run.parent_id": parentRunId,
+    "langwatch.langchain.event.name": eventName,
     ...attributes,
   };
 
   if (tags) {
-    attrs[intSemconv.ATTR_LANGWATCH_LANGCHAIN_TAGS] = tags;
+    attrs["langwatch.langchain.run.tags"] = tags;
   }
   if (metadata) {
     Object.entries(metadata).forEach(([key, value]) => {
@@ -622,5 +639,5 @@ function addLangChainEvent(
     });
   }
 
-  span.addEvent(intSemconv.EVNT_LANGWATCH_LANGCHAIN_CALLBACK, attrs);
+  span.addEvent("langwatch.langchain.callback", attrs);
 }

@@ -58,16 +58,10 @@ describe("Real LLM Interactions E2E", () => {
       traceId = getTraceIdFromSpan(span);
       const rawTraceId = getRawTraceIdFromSpan(span);
 
-      console.log(`🔍 Raw OpenTelemetry trace ID (${rawTraceId.length} chars): ${rawTraceId}`);
-      console.log(`🔍 Converted trace ID (${traceId.length} chars): ${traceId}`);
-      console.log(`🔍 Test user ID: ${testIds.userId}`);
-      console.log(`🔍 Test thread ID: ${testIds.threadId}`);
-
       span.setAttributes({
         [semconv.ATTR_LANGWATCH_CUSTOMER_ID]: testIds.userId,
         [semconv.ATTR_LANGWATCH_THREAD_ID]: testIds.threadId,
         "test.scenario": "chat-completion",
-        "llm.model": chatRequest.model,
       });
 
       span.setType("llm");
@@ -90,34 +84,18 @@ describe("Real LLM Interactions E2E", () => {
 
     console.log(`🔍 Attempting trace lookup with ID: ${traceId}`);
 
-    try {
-      // Try the exact trace ID lookup with more detailed error info
-      const trace = await expectTraceToBeIngested(setup.client, traceId, 1);
+    // Try the exact trace ID lookup with more detailed error info
+    const trace = await expectTraceToBeIngested(setup.client, traceId, 1);
 
-      // If we get here, the test passed!
-      const span = trace.spans?.[0];
-      expect(span).toBeDefined();
-      expect(span!.name).toBe("chat-completion");
-      expect(span!.type).toBe("llm");
-      expectSpanAttribute(span!, "test.scenario", "chat-completion");
-      expectSpanAttribute(span!, "llm.model", "gpt-4o-mini");
-      expect(span!.input).toBeTruthy();
-      expect(span!.output).toBeTruthy();
-      expect(span!.metrics).toBeTruthy();
-
-      console.log(`✅ Test passed! Found trace with ID: ${traceId}`);
-      console.log(`✅ Actual stored trace ID in response: ${span!.trace_id}`);
-
-    } catch (error) {
-      console.log(`❌ Trace lookup failed for ID: ${traceId}`);
-      console.log(`❌ Error: ${(error as Error).message}`);
-      console.log(`❌ This suggests the backend is storing traces with different IDs than what OpenTelemetry generates`);
-      console.log(`❌ Expected format: 32 chars (${traceId})`);
-      console.log(`❌ Backend likely stores: 48 chars (like f5ff3573769f7f9f5fd746f779fdb8779d1ad1bf34d7cdb6)`);
-
-      // Re-throw the error to fail the test, but with better context
-      throw new Error(`Trace ID mismatch: OpenTelemetry generated "${traceId}" but backend expects different format. Original error: ${(error as Error).message}`);
-    }
+    // If we get here, the test passed!
+    const span = trace.spans?.[0];
+    expect(span).toBeDefined();
+    expect(span!.name).toBe("chat-completion");
+    expect(span!.type).toBe("llm");
+    expectSpanAttribute(span!, "test.scenario", "chat-completion");
+    expect(span!.input).toBeTruthy();
+    expect(span!.output).toBeTruthy();
+    expect(span!.metrics).toBeTruthy();
   }, E2E_CONFIG.timeout);
 
   it("should handle streaming responses", async () => {
@@ -144,8 +122,8 @@ describe("Real LLM Interactions E2E", () => {
         [semconv.ATTR_LANGWATCH_CUSTOMER_ID]: testIds.userId,
         [semconv.ATTR_LANGWATCH_THREAD_ID]: testIds.threadId,
         "test.scenario": "streaming",
-        "llm.model": streamRequest.model,
-        "llm.streaming": true,
+        "gen_ai.request.model": streamRequest.model,
+        "langwatch.gen_ai.streaming": true,
       });
 
       span.setType("llm");
@@ -170,7 +148,7 @@ describe("Real LLM Interactions E2E", () => {
     expect(span!.name).toBe("streaming-generation");
     expect(span!.type).toBe("llm");
     expectSpanAttribute(span!, "test.scenario", "streaming");
-    expectSpanAttribute(span!, "llm.streaming", true);
+    expectSpanAttribute(span!, "langwatch.gen_ai.streaming", true);
     expect(span!.input).toBeTruthy();
     expect(span!.output).toBeTruthy();
   }, E2E_CONFIG.timeout);
@@ -209,7 +187,7 @@ describe("Real LLM Interactions E2E", () => {
         [semconv.ATTR_LANGWATCH_CUSTOMER_ID]: testIds.userId,
         [semconv.ATTR_LANGWATCH_THREAD_ID]: testIds.threadId,
         "test.scenario": "function-calling",
-        "llm.model": functionRequest.model,
+        "gen_ai.request.model": functionRequest.model,
       });
 
       span.setType("llm");
@@ -263,7 +241,7 @@ describe("Real LLM Interactions E2E", () => {
         [semconv.ATTR_LANGWATCH_CUSTOMER_ID]: testIds.userId,
         [semconv.ATTR_LANGWATCH_THREAD_ID]: testIds.threadId,
         "test.scenario": "llm-error",
-        "llm.model": errorRequest.model,
+        "gen_ai.request.model": errorRequest.model,
       });
 
       span.setType("llm");

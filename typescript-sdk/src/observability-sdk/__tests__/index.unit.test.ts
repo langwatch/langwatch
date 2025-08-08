@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { setupTestEnvironment, testScenarios, MockTracerProvider } from "./test-utils";
-import { createLangWatchSpan } from "../span";
+import { createLangWatchSpan, LangWatchSpan } from "../span";
 import { getLangWatchTracer, getLangWatchTracerFromProvider } from "../tracer";
 import { FilterableBatchSpanProcessor } from "../processors";
 import { LangWatchExporter } from "../exporters";
@@ -452,7 +452,7 @@ describe("index.ts", () => {
       const mockTracer = mockProvider.getTracerByName("perf-test")!;
 
       const spanCount = 50;
-      const spans = [];
+      const spans: LangWatchSpan[] = [];
 
       // Create many spans quickly
       for (let i = 0; i < spanCount; i++) {
