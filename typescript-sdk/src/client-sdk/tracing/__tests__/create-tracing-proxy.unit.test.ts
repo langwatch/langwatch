@@ -1,10 +1,10 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { SpanKind } from "@opentelemetry/api";
 import { createTracingProxy } from "../create-tracing-proxy";
-import { getLangWatchTracerFromProvider, LangWatchTracer } from "../../../observability-sdk";
+import { getLangWatchTracerFromProvider, type LangWatchTracer } from "../../../observability-sdk";
 import {
   MockSpan,
-  MockTracer,
+  type MockTracer,
   MockTracerProvider,
   setupTestEnvironment,
   flushPromises,

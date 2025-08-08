@@ -602,8 +602,8 @@ describe('createTracingProxy', () => {
       const proxy = createTracingProxy(target, tracer);
 
       expect(proxy['method-with-dash']()).toBe('dash result');
-      expect(proxy['method_with_underscore']()).toBe('underscore result');
-      expect(proxy['methodWithCamelCase']()).toBe('camel result');
+      expect(proxy.method_with_underscore()).toBe('underscore result');
+      expect(proxy.methodWithCamelCase()).toBe('camel result');
 
       expect(tracer.withActiveSpan).toHaveBeenCalledTimes(3);
     });
@@ -696,7 +696,7 @@ describe('createTracingProxy', () => {
 
     it('should handle methods with default parameters', () => {
       class TestClass {
-        publicMethod(param1: string = 'default', param2: number = 42) {
+        publicMethod(param1 = 'default', param2 = 42) {
           return `${param1}-${param2}`;
         }
       }

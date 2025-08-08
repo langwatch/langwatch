@@ -4,7 +4,7 @@ import chalk from "chalk";
 import ora from "ora";
 import * as yaml from "js-yaml";
 import { PromptConverter } from "@/cli/utils/promptConverter";
-import { ConfigData, PromptsError, type SyncAction } from "@/client-sdk/services/prompts";
+import { type ConfigData, PromptsError, type SyncAction } from "@/client-sdk/services/prompts";
 import { createLangWatchClient } from "../utils/langwatch";
 import type { SyncResult } from "../types";
 import { FileManager } from "../utils/fileManager";

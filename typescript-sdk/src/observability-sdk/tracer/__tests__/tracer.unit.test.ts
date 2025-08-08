@@ -4,8 +4,8 @@ import {
   getLangWatchTracer,
   getLangWatchTracerFromProvider,
 } from "..";
-import { LangWatchTracer } from "../types";
-import { LangWatchSpan } from "../../span";
+import { type LangWatchTracer } from "../types";
+import { type LangWatchSpan } from "../../span";
 import {
   MockTracer,
   MockTracerProvider,

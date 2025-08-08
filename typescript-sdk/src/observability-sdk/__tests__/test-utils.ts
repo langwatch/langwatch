@@ -1,18 +1,18 @@
 import { vi, expect } from "vitest";
 import {
-  Span,
-  SpanContext,
-  SpanStatus,
-  Link,
-  Exception,
-  AttributeValue,
-  Attributes,
-  Tracer,
-  TracerProvider,
-  SpanOptions,
-  Context,
+  type Span,
+  type SpanContext,
+  type SpanStatus,
+  type Link,
+  type Exception,
+  type AttributeValue,
+  type Attributes,
+  type Tracer,
+  type TracerProvider,
+  type SpanOptions,
+  type Context,
   SpanKind,
-  SpanStatusCode,
+  type SpanStatusCode,
 } from "@opentelemetry/api";
 import { createLangWatchSpan } from "../span";
 import { getLangWatchTracerFromProvider } from "../tracer";
@@ -30,7 +30,7 @@ export class MockSpan implements Span {
   private _startTime: number;
   private _endTime?: number;
 
-  constructor(name: string = "test-span") {
+  constructor(name = "test-span") {
     this._name = name;
     this._ended = false;
     this._startTime = Date.now();
@@ -238,14 +238,14 @@ export class MockTracer implements Tracer {
     if (typeof fnOrOptions === "function") {
       actualFn = fnOrOptions;
     } else if (typeof optionsOrContextOrFn === "function") {
-      options = fnOrOptions as SpanOptions;
+      options = fnOrOptions;
       actualFn = optionsOrContextOrFn;
     } else if (typeof contextOrFn === "function") {
-      options = fnOrOptions as SpanOptions;
+      options = fnOrOptions;
       context = optionsOrContextOrFn as Context;
       actualFn = contextOrFn;
     } else if (typeof fn === "function") {
-      options = fnOrOptions as SpanOptions;
+      options = fnOrOptions;
       context = optionsOrContextOrFn as Context;
       actualFn = fn;
     } else {
@@ -278,7 +278,7 @@ export class MockTracer implements Tracer {
  * Mock implementation of OpenTelemetry TracerProvider for testing
  */
 export class MockTracerProvider implements TracerProvider {
-  private _tracers: Map<string, MockTracer> = new Map();
+  private _tracers = new Map<string, MockTracer>();
 
   public readonly getTracer = vi.fn((name: string, version?: string): MockTracer => {
     const key = `${name}@${version || "latest"}`;
@@ -483,7 +483,7 @@ export function createRejectedPromise(error: Error): Promise<never> {
 /**
  * Utility to create a delayed promise
  */
-export function createDelayedPromise<T>(value: T, delay: number = 0): Promise<T> {
+export function createDelayedPromise<T>(value: T, delay = 0): Promise<T> {
   return new Promise(resolve => setTimeout(() => resolve(value), delay));
 }
 
@@ -494,7 +494,7 @@ export const testScenarios = {
   /**
    * Creates a basic span test scenario
    */
-  createSpanTest: (spanName: string = "test-span") => {
+  createSpanTest: (spanName = "test-span") => {
     const mockSpan = new MockSpan(spanName);
     const langwatchSpan = createLangWatchSpan(mockSpan);
     return { mockSpan, langwatchSpan };
@@ -503,7 +503,7 @@ export const testScenarios = {
   /**
    * Creates a tracer test scenario with provider
    */
-  createTracerTest: (tracerName: string = "test-tracer", version?: string) => {
+  createTracerTest: (tracerName = "test-tracer", version?: string) => {
     const mockProvider = new MockTracerProvider();
     const langwatchTracer = getLangWatchTracerFromProvider(mockProvider, tracerName, version);
     const mockTracer = mockProvider.getTracerByName(tracerName, version)!;

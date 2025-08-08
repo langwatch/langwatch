@@ -1,20 +1,20 @@
 import semconv from "@opentelemetry/semantic-conventions/incubating";
 import {
-  Span,
-  SpanContext,
-  SpanStatus,
-  Attributes,
-  AttributeValue,
-  Link,
-  Exception,
+  type Span,
+  type SpanContext,
+  type SpanStatus,
+  type Attributes,
+  type AttributeValue,
+  type Link,
+  type Exception,
 } from "@opentelemetry/api";
 import {
-  LangWatchSpan,
-  LangWatchSpanMetrics,
-  LangWatchSpanRAGContext,
-  SpanType,
+  type LangWatchSpan,
+  type LangWatchSpanMetrics,
+  type LangWatchSpanRAGContext,
+  type SpanType,
 } from "./types";
-import { Prompt } from "@/client-sdk/services/prompts";
+import { type Prompt } from "@/client-sdk/services/prompts";
 import * as intSemconv from "../semconv/attributes";
 import { processSpanInputOutput, type SpanInputOutputMethod } from "./input-output";
 import type { SemConvAttributeKey, SemConvAttributes } from "../semconv";

@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { SimpleSpanProcessor } from "@opentelemetry/sdk-trace-base";
 import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-http";
 import { setupObservability } from '../../setup';
-import { SetupObservabilityOptions } from '../../types';
+import { type SetupObservabilityOptions } from '../../types';
 import { resourceFromAttributes } from '@opentelemetry/resources';
 import { trace } from '@opentelemetry/api';
 import { getConcreteProvider } from '../../../utils';

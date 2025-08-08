@@ -1,6 +1,6 @@
 import {
-  Context,
-  Tracer,
+  type Context,
+  type Tracer,
 } from "@opentelemetry/api";
 import type { LangWatchSpan, LangWatchSpanOptions } from "../span/types";
 

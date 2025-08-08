@@ -6,8 +6,8 @@ import { LANGWATCH_SDK_LANGUAGE, LANGWATCH_SDK_NAME_OBSERVABILITY, LANGWATCH_SDK
 export type LangwatchApiClient = ReturnType<typeof openApiCreateClient<paths>>;
 
 export function createLangWatchApiClient(
-  apiKey?: string | undefined,
-  endpoint?: string | undefined,
+  apiKey?: string  ,
+  endpoint?: string  ,
 ): LangwatchApiClient {
   return openApiCreateClient<paths>({
     baseUrl: endpoint,

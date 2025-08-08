@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { Logger } from '../../logger';
+import { type Logger } from '../../logger';
 
 class MockLogger implements Logger {
   debug = vi.fn();

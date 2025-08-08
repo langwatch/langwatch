@@ -1,10 +1,10 @@
 
 // Utility type to pull out all values of keys on an object, and only allow types which
 
-import { AttributeValue } from "@opentelemetry/api";
-import { AnyValue } from "@opentelemetry/api-logs";
-import * as semconvAttributes from "@opentelemetry/semantic-conventions/incubating";
-import * as langwatchAttributes from "./attributes";
+import { type AttributeValue } from "@opentelemetry/api";
+import { type AnyValue } from "@opentelemetry/api-logs";
+import type * as semconvAttributes from "@opentelemetry/semantic-conventions/incubating";
+import type * as langwatchAttributes from "./attributes";
 
 // are strings, while preserving the auto-completion of the keys.
 type OnlyStringValues<T> = {

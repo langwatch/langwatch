@@ -3,8 +3,8 @@ import {
   chatMessageSchema,
   spanInputOutputSchema,
 } from "../../internal/generated/types/tracer.generated";
-import { ChatMessage, SpanInputOutput } from "../../internal/generated/types/tracer";
-import { JsonSerializable } from "./types";
+import { type ChatMessage, type SpanInputOutput } from "../../internal/generated/types/tracer";
+import { type JsonSerializable } from "./types";
 
 /**
  * Valid input/output types for span data

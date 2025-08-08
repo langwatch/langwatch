@@ -2,15 +2,22 @@ import eslint from "@eslint/js";
 import tseslint from "typescript-eslint";
 
 export default tseslint.config(
+    {
+        ignores: [
+            "dist/**",
+            "coverage/**",
+            "examples/**",
+            "ts-to-zod.config.js"
+        ]
+    },
     eslint.configs.recommended,
     ...tseslint.configs.recommendedTypeChecked,
     ...tseslint.configs.stylisticTypeChecked,
     {
         languageOptions: {
             parserOptions: {
-                projectService: true,
+                project: "./tsconfig.json",
                 tsconfigRootDir: import.meta.dirname,
-                projectFolderIgnoreList: ["**/__tests__/**/*"]
             },
         },
     },

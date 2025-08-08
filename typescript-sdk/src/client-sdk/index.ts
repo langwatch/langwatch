@@ -2,9 +2,9 @@ import { type CacheStore, InMemoryCacheStore } from "./cache";
 import { PromptFacade as PromptsFacade } from "./services/prompts";
 import { type InternalConfig } from "./types";
 import { createLangWatchApiClient } from "../internal/api/client";
-import { Logger, NoOpLogger } from "../logger";
+import { type Logger, NoOpLogger } from "../logger";
 import { TracesFacade } from "./services/traces/facade";
-import { getLangWatchTracer, LangWatchTracer } from "@/observability-sdk";
+import { getLangWatchTracer, type LangWatchTracer } from "@/observability-sdk";
 import { LANGWATCH_SDK_NAME_CLIENT, LANGWATCH_SDK_VERSION } from "@/internal/constants";
 
 const DEFAULT_ENDPOINT = "https://api.langwatch.com";

@@ -28,9 +28,9 @@ describe('utils.ts', () => {
       const serviceName = 'my-service';
       const givenResource = resourceFromAttributes({ baz: 'qux' });
       const merged = utils.createMergedResource(attributes, serviceName, givenResource);
-      expect(merged.attributes['foo']).toBe('bar');
-      expect(merged.attributes['bar']).toBe(1);
-      expect(merged.attributes['baz']).toBe('qux');
+      expect(merged.attributes.foo).toBe('bar');
+      expect(merged.attributes.bar).toBe(1);
+      expect(merged.attributes.baz).toBe('qux');
       expect(merged.attributes['service.name']).toBe('my-service');
     });
     it('uses default service name if not provided', () => {
@@ -45,7 +45,7 @@ describe('utils.ts', () => {
       const givenResource = resourceFromAttributes({ foo: 'bar' });
       const merged = utils.createMergedResource({ bar: 'baz' }, 'svc', givenResource);
       expect(givenResource.attributes).toEqual({ foo: 'bar' });
-      expect(merged.attributes['bar']).toBe('baz');
+      expect(merged.attributes.bar).toBe('baz');
     });
   });
 });

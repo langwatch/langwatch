@@ -1,7 +1,7 @@
 import {
   trace,
 } from "@opentelemetry/api";
-import { LangWatchTracer } from "./types";
+import { type LangWatchTracer } from "./types";
 import { getLangWatchTracerFromProvider } from "./implementation";
 
 /**

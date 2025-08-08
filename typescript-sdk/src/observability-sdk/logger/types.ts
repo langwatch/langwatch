@@ -1,8 +1,8 @@
 import {
-  Logger,
-  LogRecord,
+  type Logger,
+  type LogRecord,
 } from "@opentelemetry/api-logs";
-import * as intSemconv from "../semconv";
+import type * as intSemconv from "../semconv";
 import {
   type SemConvAttributes,
   type SemConvLogRecordAttributes,

@@ -1,4 +1,4 @@
-import { DataCaptureMode } from "./types";
+import { type DataCaptureMode } from "./types";
 
 /**
  * Helper function to create environment-aware capture configurations.
