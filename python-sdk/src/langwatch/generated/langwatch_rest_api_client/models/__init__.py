@@ -116,9 +116,7 @@ from .get_api_prompts_response_200_item_response_format_type_0_type import (
 )
 from .get_api_prompts_response_200_item_scope import GetApiPromptsResponse200ItemScope
 from .get_api_prompts_response_400 import GetApiPromptsResponse400
-from .get_api_prompts_response_400_error import GetApiPromptsResponse400Error
 from .get_api_prompts_response_401 import GetApiPromptsResponse401
-from .get_api_prompts_response_401_error import GetApiPromptsResponse401Error
 from .get_api_prompts_response_500 import GetApiPromptsResponse500
 from .get_api_trace_id_response_200 import GetApiTraceIdResponse200
 from .get_api_trace_id_response_200_error_type_0 import GetApiTraceIdResponse200ErrorType0
@@ -369,9 +367,7 @@ from .post_api_prompts_response_200_response_format_type_0_json_schema_schema im
 from .post_api_prompts_response_200_response_format_type_0_type import PostApiPromptsResponse200ResponseFormatType0Type
 from .post_api_prompts_response_200_scope import PostApiPromptsResponse200Scope
 from .post_api_prompts_response_400 import PostApiPromptsResponse400
-from .post_api_prompts_response_400_error import PostApiPromptsResponse400Error
 from .post_api_prompts_response_401 import PostApiPromptsResponse401
-from .post_api_prompts_response_401_error import PostApiPromptsResponse401Error
 from .post_api_prompts_response_500 import PostApiPromptsResponse500
 from .post_api_scenario_events_body_type_0 import PostApiScenarioEventsBodyType0
 from .post_api_scenario_events_body_type_0_metadata import PostApiScenarioEventsBodyType0Metadata
@@ -490,9 +486,7 @@ __all__ = (
     "GetApiPromptsResponse200ItemResponseFormatType0Type",
     "GetApiPromptsResponse200ItemScope",
     "GetApiPromptsResponse400",
-    "GetApiPromptsResponse400Error",
     "GetApiPromptsResponse401",
-    "GetApiPromptsResponse401Error",
     "GetApiPromptsResponse500",
     "GetApiTraceIdResponse200",
     "GetApiTraceIdResponse200ErrorType0",
@@ -623,9 +617,7 @@ __all__ = (
     "PostApiPromptsResponse200ResponseFormatType0Type",
     "PostApiPromptsResponse200Scope",
     "PostApiPromptsResponse400",
-    "PostApiPromptsResponse400Error",
     "PostApiPromptsResponse401",
-    "PostApiPromptsResponse401Error",
     "PostApiPromptsResponse500",
     "PostApiScenarioEventsBodyType0",
     "PostApiScenarioEventsBodyType0Metadata",

@@ -1,10 +1,8 @@
 from collections.abc import Mapping
-from typing import Any, TypeVar, Union
+from typing import Any, TypeVar
 
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
-
-from ..types import UNSET, Unset
 
 T = TypeVar("T", bound="GetApiDatasetBySlugOrIdResponse401")
 
@@ -15,20 +13,16 @@ class GetApiDatasetBySlugOrIdResponse401:
     Attributes:
         status (str):  Default: 'error'.
         message (str):
-        error (Union[Unset, str]):
     """
 
     message: str
     status: str = "error"
-    error: Union[Unset, str] = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         status = self.status
 
         message = self.message
-
-        error = self.error
 
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
@@ -38,8 +32,6 @@ class GetApiDatasetBySlugOrIdResponse401:
                 "message": message,
             }
         )
-        if error is not UNSET:
-            field_dict["error"] = error
 
         return field_dict
 
@@ -50,12 +42,9 @@ class GetApiDatasetBySlugOrIdResponse401:
 
         message = d.pop("message")
 
-        error = d.pop("error", UNSET)
-
         get_api_dataset_by_slug_or_id_response_401 = cls(
             status=status,
             message=message,
-            error=error,
         )
 
         get_api_dataset_by_slug_or_id_response_401.additional_properties = d

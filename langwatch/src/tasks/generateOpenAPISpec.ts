@@ -1,11 +1,13 @@
-import { generateSpecs } from "hono-openapi";
-import { app as datasetApp } from "../app/api/dataset/[[...route]]/app";
-import { app as llmConfigsApp } from "../app/api/prompts/[[...route]]/app";
-import { app as scenarioEventsApp } from "../app/api/scenario-events/[[...route]]/app";
-import deepmerge from "deepmerge";
-import currentSpec from "../app/api/openapiLangWatch.json";
 import fs from "fs";
 import path from "path";
+
+import deepmerge from "deepmerge";
+import { generateSpecs } from "hono-openapi";
+
+import { app as datasetApp } from "../app/api/dataset/[[...route]]/app";
+import currentSpec from "../app/api/openapiLangWatch.json";
+import { app as llmConfigsApp } from "../app/api/prompts/[[...route]]/app";
+import { app as scenarioEventsApp } from "../app/api/scenario-events/[[...route]]/app";
 
 const overwriteMerge = (_destinationArray: any[], sourceArray: any[]) =>
   sourceArray;
@@ -46,6 +48,16 @@ export default async function execute() {
     ],
     {
       arrayMerge: overwriteMerge,
+      customMerge(key) {
+        if (
+          key.includes("/api/prompts") ||
+          key.includes("/api/dataset") ||
+          key.includes("/api/scenario-events")
+        ) {
+          // Replace with new
+          return (_target, source) => source;
+        }
+      },
     }
   );
 
