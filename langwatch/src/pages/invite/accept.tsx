@@ -12,6 +12,7 @@ export default function Accept() {
   const router = useRouter();
   const { inviteCode } = router.query;
   const acceptInviteMutation = api.organization.acceptInvite.useMutation();
+  const queryClient = api.useContext();
 
   const { data: session } = useRequiredSession();
   const triggerInvite = typeof inviteCode === "string" && !!session;
@@ -23,6 +24,9 @@ export default function Accept() {
       { inviteCode },
       {
         onSuccess: (data) => {
+          // Invalidate queries to refresh user's organization data
+          void queryClient.organization.getAll.invalidate();
+
           toaster.create({
             title: "Invite Accepted",
             description: `You have successfully accepted the invite for ${data.invite.organization.name}.`,
@@ -33,6 +37,7 @@ export default function Accept() {
             placement: "top-end",
             duration: 5000,
           });
+
           void router.push(`/${data.project?.slug ?? ""}`);
         },
       }
