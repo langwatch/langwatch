@@ -38,7 +38,7 @@ export class NoOpLogger implements Logger {
 }
 
 interface ConsoleLoggerOptions {
-  level?: LogLevel;
+  level: LogLevel;
   prefix?: string;
 }
 
@@ -50,8 +50,8 @@ export class ConsoleLogger implements Logger {
   private level: LogLevel;
   private prefix?: string;
 
-  constructor(options: ConsoleLoggerOptions = {}) {
-    this.level = options.level ?? "info";
+  constructor(options: ConsoleLoggerOptions = { level: "warn" }) {
+    this.level = options.level;
     this.prefix = options.prefix;
   }
 

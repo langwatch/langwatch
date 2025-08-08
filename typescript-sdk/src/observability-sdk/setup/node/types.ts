@@ -1,81 +1,95 @@
-import { Logger } from "../../../logger";
-import { Instrumentation } from "@opentelemetry/instrumentation";
-import { SpanExporter, SpanProcessor } from "@opentelemetry/sdk-trace-base";
-import { ContextManager, TextMapPropagator } from "@opentelemetry/api";
-import { LogRecordProcessor } from "@opentelemetry/sdk-logs";
-import { IMetricReader } from "@opentelemetry/sdk-metrics";
-import { ViewOptions } from "@opentelemetry/sdk-metrics";
-import { Resource, ResourceDetector } from "@opentelemetry/resources";
-import { Sampler, SpanLimits } from "@opentelemetry/sdk-trace-base";
-import { IdGenerator } from "@opentelemetry/sdk-trace-base";
-import { SemConvAttributes } from "../../types";
-import { DataCaptureOptions } from "../../features/data-capture/types";
+import { type Logger } from "../../../logger";
+import { type Instrumentation } from "@opentelemetry/instrumentation";
+import { type SpanExporter, type SpanProcessor } from "@opentelemetry/sdk-trace-base";
+import { type ContextManager, type TextMapPropagator } from "@opentelemetry/api";
+import { type LogRecordProcessor, LogRecordExporter } from "@opentelemetry/sdk-logs";
+import { type IMetricReader } from "@opentelemetry/sdk-metrics";
+import { type ViewOptions } from "@opentelemetry/sdk-metrics";
+import { type Resource, type ResourceDetector } from "@opentelemetry/resources";
+import { type Sampler, type SpanLimits } from "@opentelemetry/sdk-trace-base";
+import { type IdGenerator } from "@opentelemetry/sdk-trace-base";
+import { type SemConvAttributes } from "../../semconv";
+import { type DataCaptureOptions } from "../../features/data-capture/types";
 
 /**
  * Configuration options for setting up LangWatch observability.
  *
  * This interface provides comprehensive configuration for initializing
- * LangWatch tracing with both basic and advanced OpenTelemetry options.
+ * LangWatch tracing with a familiar flat structure for main options
+ * and grouped sections for debug and advanced configuration.
  *
  * @example
  * ```typescript
  * const options: SetupObservabilityOptions = {
- *   apiKey: "your-api-key",
+ *   langwatch: {
+ *     apiKey: "sk-lw-1234567890abcdef"
+ *   },
  *   serviceName: "my-service",
  *   attributes: {
  *     "service.version": "1.0.0",
  *     "deployment.environment": "production"
  *   },
- *   debug: true,
+ *   spanProcessors: [new BatchSpanProcessor(new JaegerExporter())],
+ *   debug: {
+ *     consoleTracing: true,
+ *     logLevel: 'debug'
+ *   }
  * };
  * ```
  */
 export interface SetupObservabilityOptions {
   /**
-   * LangWatch API key for authentication.
+   * LangWatch configuration for sending observability data to LangWatch.
    *
-   * Required for sending traces to LangWatch. Can also be set via
-   * the `LANGWATCH_API_KEY` environment variable.
-   *
-   * @example "sk-lw-1234567890abcdef"
+   * Set to 'disabled' to completely disable LangWatch integration.
+   * API key and endpoint can also be set via LANGWATCH_API_KEY and
+   * LANGWATCH_ENDPOINT environment variables.
    */
-  apiKey?: string;
+  langwatch?:
+    | {
+        /**
+         * LangWatch API key for authentication.
+         * Defaults to LANGWATCH_API_KEY environment variable.
+         *
+         * @example "sk-lw-1234567890abcdef"
+         * @default LANGWATCH_API_KEY environment variable
+         */
+        apiKey?: string;
 
-  /**
-   * LangWatch endpoint URL for sending traces.
-   *
-   * Defaults to the production LangWatch endpoint. Can also be set via
-   * the `LANGWATCH_ENDPOINT` environment variable.
-   *
-   * @example "https://api.langwatch.ai"
-   * @default "https://api.langwatch.ai"
-   */
-  endpoint?: string;
+        /**
+         * LangWatch endpoint URL for sending traces and logs.
+         * Defaults to LANGWATCH_ENDPOINT environment variable or production endpoint.
+         *
+         * @default "https://api.langwatch.ai"
+         * @default LANGWATCH_ENDPOINT environment variable
+         */
+        endpoint?: string;
+
+        /**
+         * Type of span processor to use for LangWatch exporter.
+         *
+         * - 'simple': Exports spans immediately (good for debugging)
+         * - 'batch': Batches spans for better performance (recommended for production)
+         *
+         * @default 'simple'
+         */
+        processorType?: "simple" | "batch";
+      }
+    | "disabled";
 
   /**
    * Name of the service being instrumented.
-   *
-   * This will be used as the service name in traces and metrics.
-   * Can also be set via the `LANGWATCH_SERVICE_NAME` environment variable.
+   * Used to identify your service in traces, logs, and metrics.
    *
    * @example "user-service"
    */
   serviceName?: string;
 
   /**
-   * Global attributes to be added to all spans created by this tracer.
-   *
-   * These attributes will be merged with any attributes set on individual spans.
+   * Global attributes added to all telemetry data.
    * Useful for adding service-level metadata like version, environment, etc.
    *
-   * @example
-   * ```typescript
-   * attributes: {
-   *   "service.version": "1.0.0",
-   *   "deployment.environment": "production",
-   *   "team.name": "backend"
-   * }
-   * ```
+   * @example { "service.version": "1.0.0", "deployment.environment": "production" }
    */
   attributes?: SemConvAttributes;
 
@@ -122,279 +136,198 @@ export interface SetupObservabilityOptions {
   dataCapture?: DataCaptureOptions;
 
   /**
-   * Whether to throw an error if there was an issue setting up OpenTelemetry.
-   *
-   * When enabled, LangWatch will throw an error if OpenTelemetry fails to initialize.
-   * If disabled, LangWatch will log the error and continue.
-   *
-   * @default false
-   */
-  throwOnSetupError?: boolean;
-
-  /**
-   * Custom logger instance for LangWatch internal logging.
-   *
-   * If not provided, LangWatch will use a default console logger.
-   * Useful for integrating with existing logging infrastructure.
-   *
-   * @example
-   * ```typescript
-   * logger: {
-   *   debug: (msg) => myLogger.debug(msg),
-   *   info: (msg) => myLogger.info(msg),
-   *   warn: (msg) => myLogger.warn(msg),
-   *   error: (msg) => myLogger.error(msg)
-   * }
-   * ```
-   */
-  logger?: Logger;
-
-  /**
-   * Log level for LangWatch internal logging.
-   *
-   * This will only affect the logs produced by the LangWatch Observability SDK
-   * itself. It will log the level provided, and any logs at a higher level.
-   *
-   * @default "warn"
-   */
-  logLevel?: "debug" | "info" | "warn" | "error";
-
-  /**
-   * When this is enabled, LangWatch will log spans to the console.
-   *
-   * This is useful for debugging and troubleshooting, and should only be enabled
-   * when running in a development environment on a local machine.
-   *
-   * @default false
-   */
-  consoleTracing?: boolean;
-
-  /**
-   * When this is enabled, LangWatch will log OpenTelemetry logs to the console.
-   *
-   * This is useful for debugging and troubleshooting, and should only be enabled
-   * when running in a development environment on a local machine.
-   *
-   * @default false
-   */
-  consoleLogging?: boolean;
-
-  /**
-   * When this is enabled, LangWatch will not set up OpenTelemetry.
-   *
-   * This is useful when you're using the Observability SDK in an environment
-   * where OpenTelemetry is already set up, or you don't have control over the
-   * OpenTelemetry tracing provider.
-   *
-   * @default false
-   */
-  skipOpenTelemetrySetup?: boolean;
-
-  /**
-   * OpenTelemetry instrumentations to register with the tracer.
-   *
-   * These instrumentations will automatically create spans for common
-   * operations like HTTP requests, database queries, etc.
-   *
-   * @example
-   * ```typescript
-   * instrumentations: [
-   *   new HttpInstrumentation(),
-   *   new ExpressInstrumentation(),
-   *   new MongoDBInstrumentation()
-   * ]
-   * ```
-   */
-  instrumentations?: (Instrumentation | Instrumentation[])[];
-
-  /**
-   * Custom span processors for trace processing pipeline.
-   *
-   * Span processors handle tasks like batching, filtering, and
-   * custom processing of spans before they are exported.
-   *
-   * @example
-   * ```typescript
-   * spanProcessors: [
-   *   new BatchSpanProcessor(exporter),
-   *   new SimpleSpanProcessor(consoleExporter)
-   * ]
-   * ```
-   */
-  spanProcessors?: SpanProcessor[];
-
-  /**
    * Custom trace exporter for sending spans to external systems.
+   * If not provided, LangWatch will create its own exporter.
+   * This is a simpler alternative to spanProcessors for single exporter use cases.
    *
-   * If not provided, LangWatch will create its own OTLP exporter
-   * configured for the LangWatch endpoint.
-   *
-   * @example
-   * ```typescript
-   * traceExporter: new OTLPTraceExporter({
-   *   url: "https://custom-collector.com/v1/traces"
-   * })
-   * ```
+   * @example new OTLPTraceExporter({ url: "https://custom-collector.com/v1/traces" })
    */
   traceExporter?: SpanExporter;
 
   /**
-   * Whether to automatically detect and configure resources.
+   * Custom span processors for advanced trace processing.
+   * Use this when you need full control over batching, filtering, or
+   * custom processing logic.
    *
-   * When enabled, OpenTelemetry will automatically detect information
-   * about the host, process, and deployment environment.
-   *
-   * @default true
+   * @example [new SimpleSpanProcessor(new LangWatchExporter())]
+   * @example [new BatchSpanProcessor(exporter, { maxExportBatchSize: 100 })]
    */
-  autoDetectResources?: boolean;
+  spanProcessors?: SpanProcessor[];
 
   /**
-   * Custom context manager for managing trace context.
+   * Span limits configuration.
+   * Controls the maximum number of attributes, events, and links per span.
    *
-   * The context manager handles how trace context is propagated
-   * across async operations and between different execution contexts.
+   * @example { attributeCountLimit: 128, eventCountLimit: 128 }
    */
-  contextManager?: ContextManager;
+  spanLimits?: SpanLimits;
 
   /**
-   * Custom text map propagator for trace context propagation.
+   * Sampling strategy for controlling which traces to collect.
    *
-   * Controls how trace context is serialized and deserialized
-   * when propagating across service boundaries (e.g., HTTP headers).
-   *
-   * @example
-   * ```typescript
-   * textMapPropagator: new W3CTraceContextPropagator()
-   * ```
+   * @example new TraceIdRatioBasedSampler(0.1) // Sample 10% of traces
    */
-  textMapPropagator?: TextMapPropagator;
+  sampler?: Sampler;
 
   /**
-   * Custom log record processors for log processing pipeline.
+   * Custom ID generator for span and trace IDs.
    *
-   * These processors handle tasks like batching and filtering
-   * of log records before they are exported.
+   * @example new RandomIdGenerator()
+   */
+  idGenerator?: IdGenerator;
+
+  /**
+   * Custom log record processors for advanced log processing.
+   * Use this when you need full control over batching, filtering, or
+   * custom processing logic.
+   *
+   * @example [new BatchLogRecordProcessor(exporter, { maxExportBatchSize: 100 })]
    */
   logRecordProcessors?: LogRecordProcessor[];
 
   /**
    * Custom metric reader for collecting and exporting metrics.
    *
-   * Controls how metrics are collected and sent to external systems.
-   *
-   * @example
-   * ```typescript
-   * metricReader: new PeriodicExportingMetricReader({
-   *   exporter: new OTLPMetricExporter()
-   * })
-   * ```
+   * @example new PeriodicExportingMetricReader({ exporter: new PrometheusExporter() })
    */
   metricReader?: IMetricReader;
 
   /**
-   * Custom metric views for aggregating and filtering metrics.
+   * Metric views for controlling aggregation and filtering.
+   * Views determine which metrics are collected and how they are processed.
    *
-   * Views control which metrics are collected and how they are
-   * aggregated before being exported.
-   *
-   * @example
-   * ```typescript
-   * views: [
-   *   {
-   *     instrumentName: "http.server.duration",
-   *     aggregation: AggregationTemporality.CUMULATIVE
-   *   }
-   * ]
-   * ```
+   * @example [{ instrumentName: 'http.server.duration', aggregation: Aggregation.Histogram() }]
    */
   views?: ViewOptions[];
 
   /**
-   * Custom resource configuration for the service.
+   * Auto-instrumentation libraries to enable.
+   * These automatically capture telemetry from common libraries and frameworks.
    *
-   * The resource represents the entity being monitored (e.g., service,
-   * host, deployment) and its associated metadata.
-   *
-   * @example
-   * ```typescript
-   * resource: new Resource({
-   *   "service.name": "my-service",
-   *   "service.version": "1.0.0",
-   *   "deployment.environment": "production"
-   * })
-   * ```
+   * @example [new HttpInstrumentation(), new ExpressInstrumentation()]
    */
-  resource?: Resource;
+  instrumentations?: (Instrumentation | Instrumentation[])[];
 
   /**
-   * Custom resource detectors for automatic resource detection.
+   * Whether to automatically detect and configure resource attributes.
+   * When enabled, OpenTelemetry automatically detects host, process, and environment info.
    *
-   * These detectors automatically discover information about the
-   * runtime environment, host, and deployment.
+   * @default true
+   */
+  autoDetectResources?: boolean;
+
+  /**
+   * Custom context manager for managing trace context across async operations.
+   */
+  contextManager?: ContextManager;
+
+  /**
+   * Text map propagator for trace context propagation across service boundaries.
+   * Controls how trace context is serialized in HTTP headers and other carriers.
    *
-   * @example
-   * ```typescript
-   * resourceDetectors: [
-   *   new HostDetector(),
-   *   new ProcessDetector(),
-   *   new ContainerDetector()
-   * ]
-   * ```
+   * @example new W3CTraceContextPropagator()
+   */
+  textMapPropagator?: TextMapPropagator;
+
+  /**
+   * Resource detectors for automatic resource attribute detection.
+   * These detect information about the runtime environment.
+   *
+   * @example [envDetector, processDetector, hostDetector]
    */
   resourceDetectors?: Array<ResourceDetector>;
 
   /**
-   * Custom sampler for controlling trace sampling decisions.
+   * Custom resource configuration representing the entity being monitored.
+   * Includes service, host, and deployment metadata.
    *
-   * The sampler determines which traces are recorded and exported
-   * based on sampling policies and rates.
-   *
-   * @example
-   * ```typescript
-   * sampler: new TraceIdRatioBasedSampler(0.1) // 10% sampling
-   * ```
+   * @example new Resource({ "service.name": "my-service", "service.version": "1.0.0" })
    */
-  sampler?: Sampler;
+  resource?: Resource;
 
   /**
-   * Custom span limits for controlling span behavior.
-   *
-   * Controls limits on span attributes, events, and links to
-   * prevent excessive memory usage.
-   *
-   * @example
-   * ```typescript
-   * spanLimits: {
-   *   attributeCountLimit: 128,
-   *   eventCountLimit: 128,
-   *   linkCountLimit: 128
-   * }
-   * ```
+   * Debug and development options.
+   * These control console output and SDK internal logging behavior.
    */
-  spanLimits?: SpanLimits;
+  debug?: {
+    /**
+     * Enable console output for traces (debugging).
+     * When true, spans will be logged to the console in addition
+     * to any other configured exporters.
+     *
+     * @default false
+     */
+    consoleTracing?: boolean;
+
+    /**
+     * Enable console output for logs (debugging).
+     * When true, log records will be logged to the console in addition
+     * to any other configured exporters.
+     *
+     * @default false
+     */
+    consoleLogging?: boolean;
+
+    /**
+     * Log level for LangWatch SDK internal logging.
+     * Controls verbosity of SDK diagnostic messages.
+     *
+     * @default 'warn'
+     */
+    logLevel?: "debug" | "info" | "warn" | "error";
+
+    /**
+     * Custom logger for LangWatch SDK internal logging.
+     * If not provided, a console logger will be used.
+     */
+    logger?: Logger;
+  };
 
   /**
-   * Custom ID generator for creating trace and span IDs.
-   *
-   * Controls how unique identifiers are generated for traces
-   * and spans. Useful for testing or custom ID formats.
-   *
-   * @example
-   * ```typescript
-   * idGenerator: new RandomIdGenerator()
-   * ```
+   * Advanced and potentially unsafe configuration options.
+   * These options are for special use cases and should be used with caution.
    */
-  idGenerator?: IdGenerator;
+  advanced?: {
+    /**
+     * Whether to throw errors during setup or return no-op handles.
+     *
+     * When false (default), setup errors are logged but the function
+     * returns no-op handles to prevent breaking your application.
+     * When true, setup errors will be thrown.
+     *
+     * @default false
+     */
+    throwOnSetupError?: boolean;
 
-  /**
-   * Force reinitialization even if OpenTelemetry is already set up.
-   *
-   * This is useful for testing and debugging, but pls pls do not use this in production,
-   * unless you are very sure you know what you are doing. 🙏🙏🙏
-   *
-   * @default false
-   */
-  UNSAFE_forceOpenTelemetryReinitialization?: boolean;
+    /**
+     * Skip OpenTelemetry setup entirely and return no-op handles.
+     * Useful when you want to handle OpenTelemetry setup yourself.
+     *
+     * @default false
+     */
+    skipOpenTelemetrySetup?: boolean;
+
+    /**
+     * Force reinitialization of OpenTelemetry even if already set up.
+     *
+     * WARNING: This can cause conflicts and is primarily intended for testing.
+     * Use with extreme caution in production.
+     *
+     * @default false
+     */
+    UNSAFE_forceOpenTelemetryReinitialization?: boolean;
+
+    /**
+     * Disable all observability setup and return no-op handles.
+     *
+     * When true, no OpenTelemetry setup will occur and all operations
+     * will be no-ops. Useful for testing or when you want to completely
+     * disable observability without changing your code.
+     *
+     * @default false
+     */
+    disabled?: boolean;
+  };
 }
 
 /**
