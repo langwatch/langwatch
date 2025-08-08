@@ -17,10 +17,7 @@ import {
 } from "@chakra-ui/react";
 import { Link } from "../../components/ui/link";
 import { OrganizationUserRole } from "@prisma/client";
-import {
-  Select as MultiSelect,
-  chakraComponents,
-} from "chakra-react-select";
+import { Select as MultiSelect, chakraComponents } from "chakra-react-select";
 import { Lock, Mail, MoreVertical, Plus, Trash } from "react-feather";
 import { CopyInput } from "../../components/CopyInput";
 
@@ -37,6 +34,7 @@ import { Menu } from "../../components/ui/menu";
 import { toaster } from "../../components/ui/toaster";
 import { Tooltip } from "../../components/ui/tooltip";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
+import { useRequiredSession } from "../../hooks/useRequiredSession";
 import type {
   OrganizationWithMembersAndTheirTeams,
   TeamWithProjects,
@@ -96,6 +94,8 @@ function MembersList({
   teams: TeamWithProjects[];
   activePlan: PlanInfo;
 }) {
+  const { data: session } = useRequiredSession();
+  const user = session?.user;
   const teamOptions = teams.map((team) => ({
     label: team.name,
     value: team.id,
@@ -234,7 +234,10 @@ function MembersList({
           void queryClient.organization.getOrganizationWithMembersAndTheirTeams.invalidate();
           toaster.create({
             title: "Member role updated successfully",
-            description: `The member role has been updated to ${selectOptions.find(option => option.value === value)?.label || value}`,
+            description: `The member role has been updated to ${
+              selectOptions.find((option) => option.value === value)?.label ??
+              value
+            }`,
             type: "success",
             duration: 5000,
           });
@@ -243,7 +246,8 @@ function MembersList({
           toaster.create({
             title: "Error updating member role",
             type: "error",
-            description: error.message ?? "There was an error updating the member role",
+            description:
+              error.message ?? "There was an error updating the member role",
           });
         },
       }
@@ -318,7 +322,14 @@ function MembersList({
     );
   };
 
-  const sortedMembers = organization.members.sort((a, b) => b.user.id.localeCompare(a.user.id));
+  const sortedMembers = organization.members.sort((a, b) =>
+    b.user.id.localeCompare(a.user.id)
+  );
+
+  const currentUserIsAdmin = organization.members.some(
+    (member) =>
+      member.userId === user?.id && member.role === OrganizationUserRole.ADMIN
+  );
 
   return (
     <SettingsLayout>
@@ -349,16 +360,26 @@ function MembersList({
               </Button>
             </Tooltip>
           ) : (
-            <Button
-              size="sm"
-              colorPalette="orange"
-              onClick={() => onAddMembersOpen()}
+            <Tooltip
+              content={
+                !currentUserIsAdmin
+                  ? "You need admin privileges to add members"
+                  : undefined
+              }
+              positioning={{ placement: "top" }}
             >
-              <HStack gap={2}>
-                <Plus size={20} />
-                <Text>Add members</Text>
-              </HStack>
-            </Button>
+              <Button
+                size="sm"
+                colorPalette="orange"
+                onClick={() => onAddMembersOpen()}
+                disabled={!currentUserIsAdmin}
+              >
+                <HStack gap={2}>
+                  <Plus size={20} />
+                  <Text>Add members</Text>
+                </HStack>
+              </Button>
+            </Tooltip>
           )}
         </HStack>
         <Card.Root width="full">
@@ -368,15 +389,21 @@ function MembersList({
                 <Table.Row>
                   <Table.ColumnHeader>Name</Table.ColumnHeader>
                   <Table.ColumnHeader>Email</Table.ColumnHeader>
-                  <Table.ColumnHeader w={'20%'}>Role</Table.ColumnHeader>
+                  <Table.ColumnHeader w={"20%"}>Role</Table.ColumnHeader>
                   <Table.ColumnHeader>Teams</Table.ColumnHeader>
                   <Table.ColumnHeader>Actions</Table.ColumnHeader>
                 </Table.Row>
               </Table.Header>
               <Table.Body>
                 {sortedMembers.map((member) => {
-                  const relevantUpdateRoleMutation = updateOrganizationMemberRoleMutation.variables?.userId === member.userId && updateOrganizationMemberRoleMutation.variables?.organizationId === organization.id;
-                  const roleUpdateLoading = updateOrganizationMemberRoleMutation.isLoading && relevantUpdateRoleMutation;
+                  const relevantUpdateRoleMutation =
+                    updateOrganizationMemberRoleMutation.variables?.userId ===
+                      member.userId &&
+                    updateOrganizationMemberRoleMutation.variables
+                      ?.organizationId === organization.id;
+                  const roleUpdateLoading =
+                    updateOrganizationMemberRoleMutation.isLoading &&
+                    relevantUpdateRoleMutation;
 
                   return (
                     <LinkBox as={Table.Row} key={member.userId}>
@@ -399,10 +426,13 @@ function MembersList({
                       <Table.Cell>
                         <Flex gap={2} flexWrap="wrap">
                           {member.user.teamMemberships
-                            .flatMap(m => m.team)
-                            .filter(m => m.organizationId == organization.id)
-                            .map(m => (
-                              <Link href={`/settings/teams/${m.slug}`} key={m.id}>
+                            .flatMap((m) => m.team)
+                            .filter((m) => m.organizationId == organization.id)
+                            .map((m) => (
+                              <Link
+                                href={`/settings/teams/${m.slug}`}
+                                key={m.id}
+                              >
                                 <Badge size="xs" variant="surface">
                                   {m.name}
                                 </Badge>
@@ -455,17 +485,28 @@ function MembersList({
                     {pendingInvites.data?.map((invite) => (
                       <Table.Row key={invite.id}>
                         <Table.Cell>{invite.email}</Table.Cell>
-                        <Table.Cell>{selectOptions.find(option => option.value === invite.role)?.label || invite.role}</Table.Cell>
+                        <Table.Cell>
+                          {selectOptions.find(
+                            (option) => option.value === invite.role
+                          )?.label ?? invite.role}
+                        </Table.Cell>
                         <Table.Cell>
                           <Flex gap={2} flexWrap="wrap">
-                            {invite.teamIds.split(",").map(teamId => {
-                              const team = teams.find(team => team.id === teamId);
+                            {invite.teamIds.split(",").map((teamId) => {
+                              const team = teams.find(
+                                (team) => team.id === teamId
+                              );
 
                               if (!team) return null;
 
                               return (
-                                <Link href={`/settings/teams/${team.slug}`} key={teamId}>
-                                  <Badge size="xs" variant={"surface"}>{team.name}</Badge>
+                                <Link
+                                  href={`/settings/teams/${team.slug}`}
+                                  key={teamId}
+                                >
+                                  <Badge size="xs" variant={"surface"}>
+                                    {team.name}
+                                  </Badge>
                                 </Link>
                               );
                             })}
@@ -773,7 +814,8 @@ const OrganizationMemberSelect = ({
   disabled,
 }: RoleSelectProps) => {
   return (
-    <MultiSelect size={'sm'}
+    <MultiSelect
+      size={"sm"}
       options={selectOptions}
       defaultValue={selectOptions.find(
         (option) => option.value === defaultValue
@@ -791,7 +833,7 @@ const OrganizationMemberSelect = ({
             {...props}
             innerProps={{
               ...props.innerProps,
-              style: { width: "350px" },
+              style: { width: "350px", zIndex: 10 },
             }}
           >
             {children}

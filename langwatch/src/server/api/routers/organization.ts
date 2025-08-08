@@ -670,13 +670,26 @@ export const organizationRouter = createTRPCRouter({
       }
 
       await prisma.$transaction(async (prisma) => {
-        await prisma.organizationUser.create({
-          data: {
-            userId: session.user.id,
-            organizationId: invite.organizationId,
-            role: invite.role,
+        // Check if user is already a member of the organization
+        const existingOrgMembership = await prisma.organizationUser.findUnique({
+          where: {
+            userId_organizationId: {
+              userId: session.user.id,
+              organizationId: invite.organizationId,
+            },
           },
         });
+
+        // Only create organization membership if it doesn't exist
+        if (!existingOrgMembership) {
+          await prisma.organizationUser.create({
+            data: {
+              userId: session.user.id,
+              organizationId: invite.organizationId,
+              role: invite.role,
+            },
+          });
+        }
 
         const organizationToTeamRoleMap: {
           [K in OrganizationUserRole]: TeamUserRole;
@@ -688,13 +701,26 @@ export const organizationRouter = createTRPCRouter({
 
         const teamIds = invite.teamIds.split(",");
         for (const teamId of teamIds) {
-          await prisma.teamUser.create({
-            data: {
-              userId: session.user.id,
-              teamId: teamId,
-              role: organizationToTeamRoleMap[invite.role],
+          // Check if user is already a member of the team
+          const existingTeamMembership = await prisma.teamUser.findUnique({
+            where: {
+              userId_teamId: {
+                userId: session.user.id,
+                teamId: teamId,
+              },
             },
           });
+
+          // Only create team membership if it doesn't exist
+          if (!existingTeamMembership) {
+            await prisma.teamUser.create({
+              data: {
+                userId: session.user.id,
+                teamId: teamId,
+                role: organizationToTeamRoleMap[invite.role],
+              },
+            });
+          }
         }
 
         await prisma.organizationInvite.update({

@@ -11,6 +11,7 @@ import {
 } from "@chakra-ui/react";
 import type { GetServerSidePropsContext } from "next";
 import { useRouter } from "next/router";
+import { useEffect } from "react";
 import {
   DocumentsCountsSummary,
   DocumentsCountsTable,
@@ -64,11 +65,27 @@ function Index() {
 
   const router = useRouter();
   const returnTo = router.query.return_to;
-  if (
-    typeof returnTo === "string" &&
-    (returnTo.startsWith("/") || returnTo.startsWith(window.location.origin))
-  ) {
-    void router.push(returnTo);
+
+  /**
+   * Validates if a returnTo URL is safe to redirect to
+   * @param url - The URL to validate
+   * @returns True if the URL is safe to redirect to
+   */
+  function isValidReturnToUrl(url: string): boolean {
+    return (
+      url.startsWith("/") ||
+      (typeof window !== "undefined" && url.startsWith(window.location.origin))
+    );
+  }
+
+  useEffect(() => {
+    if (typeof returnTo === "string" && isValidReturnToUrl(returnTo)) {
+      void router.push(returnTo);
+    }
+  }, [returnTo, router]);
+
+  // Don't render anything while redirecting
+  if (typeof returnTo === "string" && isValidReturnToUrl(returnTo)) {
     return null;
   }
 
