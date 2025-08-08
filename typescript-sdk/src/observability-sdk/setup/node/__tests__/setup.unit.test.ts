@@ -124,7 +124,7 @@ describe("langwatch configuration", () => {
     }, logger, resourceFromAttributes({}));
 
     expect(logger.debug).toHaveBeenCalledWith(
-      "Using LangWatch simple processors for tracing and logging"
+      "Added LangWatch simple SpanProcessor and LogRecordProcessor to SDK"
     );
     expect(sdk).toBeDefined();
   });
@@ -140,7 +140,7 @@ describe("langwatch configuration", () => {
     }, logger, resourceFromAttributes({}));
 
     expect(logger.debug).toHaveBeenCalledWith(
-      "Added LangWatch batchSpanProcessor and LogRecordProcessor to SDK"
+      "Added LangWatch batch SpanProcessor and LogRecordProcessor to SDK"
     );
     expect(sdk).toBeDefined();
   });
@@ -161,7 +161,7 @@ describe("langwatch configuration", () => {
     }, logger, resourceFromAttributes({}));
 
     expect(logger.debug).toHaveBeenCalledWith(
-      "LangWatch integration disabled, using user-provided SpanProcessors and LogRecordProcessors"
+      "Added user-provided 1 SpanProcessors to SDK"
     );
     expect(sdk).toBeDefined();
   });
@@ -645,7 +645,7 @@ describe("log record processors configuration", () => {
 
     expect(sdk).toBeDefined();
     expect(logger.debug).toHaveBeenCalledWith(
-      "Added LangWatch simpleSpanProcessor and LogRecordProcessor to SDK",
+      "Added LangWatch simple SpanProcessor and LogRecordProcessor to SDK",
     );
   });
 
@@ -723,7 +723,7 @@ describe("span processors configuration", () => {
 
     expect(sdk).toBeDefined();
     expect(logger.debug).toHaveBeenCalledWith(
-      "Added LangWatch simpleSpanProcessor and LogRecordProcessor to SDK",
+      "Added LangWatch simple SpanProcessor and LogRecordProcessor to SDK",
     );
   });
 
@@ -921,7 +921,7 @@ describe("error handling in setup", () => {
 
     // Since the setup is actually succeeding now, we need to check for the success message
     expect(logger.debug).toHaveBeenCalledWith(
-      expect.stringContaining("Using LangWatch simple processors for tracing and logging"),
+      expect.stringContaining("Added LangWatch simple SpanProcessor and LogRecordProcessor to SDK"),
     );
   });
 
@@ -1022,6 +1022,6 @@ describe("NodeSDK configuration", () => {
     );
 
     expect(sdk).toBeDefined();
-    expect(logger.debug).toHaveBeenCalledWith("NodeSDK started successfully");
+    expect(logger.info).toHaveBeenCalledWith("NodeSDK started successfully");
   });
 });

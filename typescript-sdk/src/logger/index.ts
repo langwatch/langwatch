@@ -31,10 +31,10 @@ export interface Logger {
 }
 
 export class NoOpLogger implements Logger {
-  debug(): void {}
-  info(): void {}
-  warn(): void {}
-  error(): void {}
+  debug(): void { /* noop */ }
+  info(): void { /* noop */ }
+  warn(): void { /* noop */ }
+  error(): void { /* noop */ }
 }
 
 interface ConsoleLoggerOptions {

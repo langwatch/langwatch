@@ -12,7 +12,6 @@ const tracer = getLangWatchTracer("langchain-sdk-example");
 
 async function main() {
   const threadId = crypto.randomUUID();
-  const langWatchCallback = new LangWatchCallbackHandler();
 
   const rl = readline.createInterface({
     input: process.stdin,
@@ -23,11 +22,14 @@ async function main() {
   console.log("---");
 
   // Initialize LangChain chat model
-  const chatModel = new ChatOpenAI({
-    modelName: "gpt-4o-mini",
+  const chatModelBase = new ChatOpenAI({
+    // use "model" in recent LC, not "modelName"
+    model: "gpt-4o-mini",
     temperature: 0.7,
-    callbacks: [langWatchCallback],
   });
+
+  const langWatchCallback = new LangWatchCallbackHandler();
+  const chatModel = chatModelBase.withConfig({ callbacks: [langWatchCallback] });
 
   const conversationHistory: Array<HumanMessage | SystemMessage> = [
     new SystemMessage(
@@ -71,7 +73,7 @@ async function main() {
         // Generate AI response
         console.log("🤖 Thinking...");
 
-        const result = await chatModel.invoke(conversationHistory, { callbacks: [langWatchCallback] });
+        const result = await chatModel.invoke(conversationHistory);
         const aiResponse = result.content as string;
 
         // Add AI response to conversation history
