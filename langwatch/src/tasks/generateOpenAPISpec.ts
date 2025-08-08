@@ -48,6 +48,16 @@ export default async function execute() {
     ],
     {
       arrayMerge: overwriteMerge,
+      customMerge(key) {
+        if (
+          key.includes("/api/prompts") ||
+          key.includes("/api/dataset") ||
+          key.includes("/api/scenario-events")
+        ) {
+          // Replace with new
+          return (_target, source) => source;
+        }
+      },
     }
   );
 

@@ -833,6 +833,7 @@
       "get": {
         "responses": {
           "200": {
+            "description": "Success",
             "content": {
               "application/json": {
                 "schema": {
@@ -843,10 +844,29 @@
                       "id": {
                         "type": "string"
                       },
+                      "handle": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      },
+                      "scope": {
+                        "type": "string",
+                        "enum": [
+                          "ORGANIZATION",
+                          "PROJECT"
+                        ]
+                      },
                       "name": {
                         "type": "string"
                       },
                       "updatedAt": {
+                        "type": "string"
+                      },
+                      "projectId": {
+                        "type": "string"
+                      },
+                      "organizationId": {
                         "type": "string"
                       },
                       "version": {
@@ -920,25 +940,6 @@
                           "type",
                           "json_schema"
                         ]
-                      },
-                      "handle": {
-                        "type": [
-                          "string",
-                          "null"
-                        ]
-                      },
-                      "scope": {
-                        "type": "string",
-                        "enum": [
-                          "ORGANIZATION",
-                          "PROJECT"
-                        ]
-                      },
-                      "projectId": {
-                        "type": "string"
-                      },
-                      "organizationId": {
-                        "type": "string"
                       }
                     },
                     "required": [
@@ -960,21 +961,17 @@
                   }
                 }
               }
-            },
-            "description": "Success"
+            }
           },
           "400": {
+            "description": "Bad Request",
             "content": {
               "application/json": {
                 "schema": {
-                  "_cached": null,
                   "type": "object",
                   "properties": {
                     "error": {
-                      "type": "string",
-                      "enum": [
-                        "Bad Request"
-                      ]
+                      "type": "string"
                     }
                   },
                   "required": [
@@ -982,31 +979,25 @@
                   ]
                 }
               }
-            },
-            "description": "Bad Request"
+            }
           },
           "401": {
+            "description": "Unauthorized",
             "content": {
               "application/json": {
                 "schema": {
-                  "_cached": null,
                   "type": "object",
                   "properties": {
                     "error": {
-                      "type": "string",
-                      "enum": [
-                        "Unauthorized"
-                      ]
+                      "type": "string"
                     }
                   },
                   "required": [
                     "error"
-                  ],
-                  "error": "Unauthorized"
+                  ]
                 }
               }
-            },
-            "description": "Unauthorized"
+            }
           },
           "500": {
             "description": "Internal Server Error",
@@ -1034,19 +1025,38 @@
       "post": {
         "responses": {
           "200": {
+            "description": "Success",
             "content": {
               "application/json": {
                 "schema": {
-                  "_cached": null,
                   "type": "object",
                   "properties": {
                     "id": {
                       "type": "string"
                     },
+                    "handle": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "scope": {
+                      "type": "string",
+                      "enum": [
+                        "ORGANIZATION",
+                        "PROJECT"
+                      ]
+                    },
                     "name": {
                       "type": "string"
                     },
                     "updatedAt": {
+                      "type": "string"
+                    },
+                    "projectId": {
+                      "type": "string"
+                    },
+                    "organizationId": {
                       "type": "string"
                     },
                     "version": {
@@ -1120,25 +1130,6 @@
                         "type",
                         "json_schema"
                       ]
-                    },
-                    "handle": {
-                      "type": [
-                        "string",
-                        "null"
-                      ]
-                    },
-                    "scope": {
-                      "type": "string",
-                      "enum": [
-                        "ORGANIZATION",
-                        "PROJECT"
-                      ]
-                    },
-                    "projectId": {
-                      "type": "string"
-                    },
-                    "organizationId": {
-                      "type": "string"
                     }
                   },
                   "required": [
@@ -1159,21 +1150,17 @@
                   ]
                 }
               }
-            },
-            "description": "Success"
+            }
           },
           "400": {
+            "description": "Bad Request",
             "content": {
               "application/json": {
                 "schema": {
-                  "_cached": null,
                   "type": "object",
                   "properties": {
                     "error": {
-                      "type": "string",
-                      "enum": [
-                        "Bad Request"
-                      ]
+                      "type": "string"
                     }
                   },
                   "required": [
@@ -1181,31 +1168,25 @@
                   ]
                 }
               }
-            },
-            "description": "Bad Request"
+            }
           },
           "401": {
+            "description": "Unauthorized",
             "content": {
               "application/json": {
                 "schema": {
-                  "_cached": null,
                   "type": "object",
                   "properties": {
                     "error": {
-                      "type": "string",
-                      "enum": [
-                        "Unauthorized"
-                      ]
+                      "type": "string"
                     }
                   },
                   "required": [
                     "error"
-                  ],
-                  "error": "Unauthorized"
+                  ]
                 }
               }
-            },
-            "description": "Unauthorized"
+            }
           },
           "500": {
             "description": "Internal Server Error",
@@ -3442,9 +3423,6 @@
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "error": {
-                      "type": "string"
-                    },
                     "status": {
                       "type": "string",
                       "default": "error"
@@ -3468,9 +3446,6 @@
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "error": {
-                      "type": "string"
-                    },
                     "status": {
                       "type": "string",
                       "default": "error"
@@ -3494,9 +3469,6 @@
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "error": {
-                      "type": "string"
-                    },
                     "status": {
                       "type": "string",
                       "default": "error"
@@ -3543,9 +3515,6 @@
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "error": {
-                      "type": "string"
-                    },
                     "status": {
                       "type": "string",
                       "default": "error"

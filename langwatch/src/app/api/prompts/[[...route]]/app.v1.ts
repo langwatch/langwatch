@@ -574,7 +574,6 @@ const transformConfigToPromptOutput = (
 
   id: string
 ): z.infer<typeof promptOutputSchema> => {
-  console.log("SDFDSFSDFSDFSD");
   return {
     id,
     name: config.name,
