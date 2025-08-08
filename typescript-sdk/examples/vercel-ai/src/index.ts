@@ -1,12 +1,24 @@
-import { setupLangWatch } from "langwatch/node";
 import { getLangWatchTracer } from "langwatch";
-import { semconv } from "langwatch/observability";
 import { openai } from "@ai-sdk/openai";
 import { generateText } from "ai";
 import * as readline from "readline";
 import cliMarkdown from "cli-markdown";
+import { registerOTel } from '@vercel/otel';
+import { LangWatchExporter } from "langwatch"
+import { setupObservability } from "langwatch/observability/node";
 
-await setupLangWatch();
+const isLangWatchEnvironment = process.env.USE_LANGWATCH === '1';
+
+if (isLangWatchEnvironment) {
+  // Use Vercel OTEL with LangWatch exporter
+  registerOTel({
+    serviceName: 'vercel-ai-sdk-example',
+    traceExporter: new LangWatchExporter(),
+  });
+} else {
+  // Use LangWatch observability setup
+  setupObservability();
+}
 
 const tracer = getLangWatchTracer("vercel-ai-sdk-example");
 
@@ -37,7 +49,7 @@ async function main() {
 
     await tracer.withActiveSpan("iteration", {
       attributes: {
-        [semconv.ATTR_LANGWATCH_THREAD_ID]: threadId,
+        'langwatch.thread.id': threadId,
       },
     }, async (span) => {
       try {
