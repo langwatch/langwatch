@@ -1,13 +1,13 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { SpanStatusCode } from "@opentelemetry/api";
-import { SpanType } from "../types";
+import { SpanType } from "../../span/types";
 import {
   setupTestEnvironment,
   testData,
   testScenarios,
   performanceUtils
-} from "./test-utils";
-import * as intSemconv from "../semconv";
+} from "../../__tests__/test-utils";
+import * as intSemconv from "../../semconv";
 import semconv from "@opentelemetry/semantic-conventions/incubating";
 
 describe("span.ts", () => {
@@ -23,7 +23,7 @@ describe("span.ts", () => {
 
   describe("createLangWatchSpan", () => {
     it("should create a LangWatchSpan from an OpenTelemetry Span", () => {
-      const { mockSpan, langwatchSpan } = testScenarios.createSpanTest();
+      const { langwatchSpan } = testScenarios.createSpanTest();
 
       expect(langwatchSpan).toBeDefined();
       expect(typeof langwatchSpan.setType).toBe("function");
@@ -272,7 +272,7 @@ describe("span.ts", () => {
         expect(mockSpan.setAttribute).toHaveBeenCalledWith(
           intSemconv.ATTR_LANGWATCH_INPUT,
           JSON.stringify({
-            type: "json",
+            type: "text",
             value: input,
           })
         );
@@ -287,8 +287,12 @@ describe("span.ts", () => {
         expect(mockSpan.setAttribute).toHaveBeenCalledWith(
           intSemconv.ATTR_LANGWATCH_INPUT,
           JSON.stringify({
-            type: "json",
-            value: input,
+            type: "list",
+            value: [
+              { type: "text", value: "item1" },
+              { type: "text", value: "item2" },
+              { type: "text", value: "item3" }
+            ],
           })
         );
       });
@@ -298,7 +302,7 @@ describe("span.ts", () => {
       it("should set string input with text type", () => {
         const { mockSpan, langwatchSpan } = testScenarios.createSpanTest();
         const input = "String input for LLM";
-        const result = langwatchSpan.setInputString(input);
+        const result = langwatchSpan.setInput(input);
 
         expect(result).toBe(langwatchSpan);
         expect(mockSpan.setAttribute).toHaveBeenCalledWith(
@@ -336,7 +340,7 @@ describe("span.ts", () => {
         expect(mockSpan.setAttribute).toHaveBeenCalledWith(
           intSemconv.ATTR_LANGWATCH_OUTPUT,
           JSON.stringify({
-            type: "json",
+            type: "text",
             value: output,
           })
         );
@@ -347,7 +351,7 @@ describe("span.ts", () => {
       it("should set string output with text type", () => {
         const { mockSpan, langwatchSpan } = testScenarios.createSpanTest();
         const output = "Generated text response";
-        const result = langwatchSpan.setOutputString(output);
+        const result = langwatchSpan.setOutput(output);
 
         expect(result).toBe(langwatchSpan);
         expect(mockSpan.setAttribute).toHaveBeenCalledWith(

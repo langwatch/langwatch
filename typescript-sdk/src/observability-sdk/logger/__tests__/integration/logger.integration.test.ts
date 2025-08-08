@@ -1,10 +1,10 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { InMemoryLogRecordExporter, SimpleLogRecordProcessor } from "@opentelemetry/sdk-logs";
-import { getLangWatchLogger, getLangWatchLoggerFromProvider } from "../../logger";
-import { NoOpLogger } from "../../../logger";
-import { setupObservability } from "../../setup/node";
+import { getLangWatchLogger, getLangWatchLoggerFromProvider } from "../..";
+import { NoOpLogger } from "../../../../logger";
+import { setupObservability } from "../../../setup/node";
 import { LangWatchLogRecord } from "../../types";
-import { resetObservabilitySdkConfig } from "../../config";
+import { resetObservabilitySdkConfig } from "../../../config";
 
 /**
  * Integration tests for LangWatch logger with real OpenTelemetry setup.
@@ -58,8 +58,8 @@ describe("Logger Integration Tests", () => {
     observabilityHandle = setupObservability({
       serviceName: "logger-integration-test",
       logRecordProcessors: [logRecordProcessor],
-      logger: new NoOpLogger(),
-      throwOnSetupError: true,
+      debug: { logger: new NoOpLogger() },
+      advanced: { throwOnSetupError: true },
       attributes: {
         "test.suite": "logger-integration",
         "test.environment": "vitest"
@@ -224,8 +224,8 @@ describe("Logger Integration Tests", () => {
       observabilityHandle = setupObservability({
         serviceName: "logger-integration-test",
         logRecordProcessors: [logRecordProcessor],
-        logger: new NoOpLogger(),
-        throwOnSetupError: true,
+        debug: { logger: new NoOpLogger() },
+        advanced: { throwOnSetupError: true },
         dataCapture: "all",
         attributes: {
           "test.suite": "logger-integration",
@@ -264,8 +264,8 @@ describe("Logger Integration Tests", () => {
       observabilityHandle = setupObservability({
         serviceName: "logger-integration-test",
         logRecordProcessors: [logRecordProcessor],
-        logger: new NoOpLogger(),
-        throwOnSetupError: true,
+        debug: { logger: new NoOpLogger() },
+        advanced: { throwOnSetupError: true },
         dataCapture: "output",
         attributes: {
           "test.suite": "logger-integration",
@@ -304,8 +304,8 @@ describe("Logger Integration Tests", () => {
       observabilityHandle = setupObservability({
         serviceName: "logger-integration-test",
         logRecordProcessors: [logRecordProcessor],
-        logger: new NoOpLogger(),
-        throwOnSetupError: true,
+        debug: { logger: new NoOpLogger() },
+        advanced: { throwOnSetupError: true },
         dataCapture: "input",
         attributes: {
           "test.suite": "logger-integration",
@@ -344,8 +344,8 @@ describe("Logger Integration Tests", () => {
       observabilityHandle = setupObservability({
         serviceName: "logger-integration-test",
         logRecordProcessors: [logRecordProcessor],
-        logger: new NoOpLogger(),
-        throwOnSetupError: true,
+        debug: { logger: new NoOpLogger() },
+        advanced: { throwOnSetupError: true },
         dataCapture: "none",
         attributes: {
           "test.suite": "logger-integration",
@@ -381,8 +381,8 @@ describe("Logger Integration Tests", () => {
       observabilityHandle = setupObservability({
         serviceName: "logger-integration-test",
         logRecordProcessors: [logRecordProcessor],
-        logger: new NoOpLogger(),
-        throwOnSetupError: true,
+        debug: { logger: new NoOpLogger() },
+        advanced: { throwOnSetupError: true },
         dataCapture: "input",
         attributes: {
           "test.suite": "logger-integration",
@@ -426,8 +426,8 @@ describe("Logger Integration Tests", () => {
       observabilityHandle = setupObservability({
         serviceName: "logger-integration-test",
         logRecordProcessors: [logRecordProcessor],
-        logger: new NoOpLogger(),
-        throwOnSetupError: true,
+        debug: { logger: new NoOpLogger() },
+        advanced: { throwOnSetupError: true },
         dataCapture: "input",
         attributes: {
           "test.suite": "logger-integration",

@@ -3,11 +3,11 @@ import {
   InMemorySpanExporter,
   SimpleSpanProcessor,
 } from "@opentelemetry/sdk-trace-base";
-import { setupObservability } from "../../setup/node";
-import { getLangWatchTracer } from "../../tracer";
-import { createLangWatchSpan } from "../../span";
-import { NoOpLogger } from "../../../logger";
-import * as semconv from "../../semconv";
+import { setupObservability } from "../../../setup/node";
+import { getLangWatchTracer } from "../../../tracer";
+import { createLangWatchSpan } from "../..";
+import { NoOpLogger } from "../../../../logger";
+import * as semconv from "../../../semconv";
 import { SpanStatusCode, trace } from "@opentelemetry/api";
 
 /**
@@ -73,13 +73,14 @@ describe("Span Integration Tests", () => {
 
     observabilityHandle = setupObservability({
       serviceName: "span-integration-test",
-      logger: new NoOpLogger(),
-      throwOnSetupError: true,
+      langwatch: "disabled",
       attributes: {
         "test.suite": "span-integration",
         "test.component": "span-data-formats",
       },
       spanProcessors: [spanProcessor],
+      debug: { logger: new NoOpLogger() },
+      advanced: { throwOnSetupError: true }
     });
   });
 
@@ -216,8 +217,8 @@ describe("Span Integration Tests", () => {
       await tracer.withActiveSpan("string-input-span", async (span) => {
         span
           .setType("llm")
-          .setInputString(testString)
-          .setOutputString("Processed: " + testString);
+          .setInput("text", testString)
+          .setOutput("text", "Processed: " + testString);
       });
 
       await tracer.withActiveSpan("object-input-span", async (span) => {

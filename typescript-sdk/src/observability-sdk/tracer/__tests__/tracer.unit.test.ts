@@ -3,20 +3,18 @@ import { SpanStatusCode, SpanKind, trace as otelTrace } from "@opentelemetry/api
 import {
   getLangWatchTracer,
   getLangWatchTracerFromProvider,
-} from "../tracer";
-import { LangWatchTracer, LangWatchSpan } from "../types";
+} from "..";
+import { LangWatchTracer } from "../types";
+import { LangWatchSpan } from "../../span";
 import {
-  MockSpan,
   MockTracer,
   MockTracerProvider,
   setupTestEnvironment,
-  flushPromises,
-  createRejectedPromise,
   createDelayedPromise,
   testScenarios,
   errorTestUtils,
   performanceUtils,
-} from "./test-utils";
+} from "../../__tests__/test-utils";
 
 describe("tracer.ts", () => {
   let testEnv: ReturnType<typeof setupTestEnvironment>;
@@ -50,7 +48,7 @@ describe("tracer.ts", () => {
     });
 
     it("should handle version parameter correctly", () => {
-      const tracerWithoutVersion = getLangWatchTracerFromProvider(mockProvider, "no-version");
+      getLangWatchTracerFromProvider(mockProvider, "no-version");
       expect(mockProvider.getTracer).toHaveBeenCalledWith("no-version", undefined);
     });
   });

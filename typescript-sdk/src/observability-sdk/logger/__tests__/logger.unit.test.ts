@@ -1,8 +1,8 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { getLangWatchLogger, getLangWatchLoggerFromProvider, setLangWatchLoggerProvider, createLangWatchLogger } from "../logger";
+import { getLangWatchLogger, getLangWatchLoggerFromProvider, setLangWatchLoggerProvider, createLangWatchLogger } from "..";
 import { logs, NoopLoggerProvider } from "@opentelemetry/api-logs";
 import { LangWatchLogger, LangWatchLogRecord } from "../types";
-import { resetObservabilitySdkConfig, initializeObservabilitySdkConfig } from "../config";
+import { resetObservabilitySdkConfig, initializeObservabilitySdkConfig } from "../../config";
 
 vi.mock("@opentelemetry/api-logs", () => ({
   logs: {
@@ -15,14 +15,7 @@ vi.mock("@opentelemetry/api-logs", () => ({
   })),
 }));
 
-// Mock the setLangWatchLoggerProvider function
-vi.mock("../logger", async () => {
-  const actual = await vi.importActual("../logger");
-  return {
-    ...actual,
-    setLangWatchLoggerProvider: vi.fn(),
-  };
-});
+
 
 describe("LangWatch Logger", () => {
   let mockLogger: any;
@@ -52,14 +45,26 @@ describe("LangWatch Logger", () => {
 
   describe("setLangWatchLoggerProvider", () => {
     it("should set the logger provider for LangWatch logging", () => {
+      const customLoggerInstance = {
+        emit: vi.fn(),
+      };
       const customProvider = {
-        getLogger: vi.fn().mockReturnValue(mockLogger),
+        getLogger: vi.fn().mockReturnValue(customLoggerInstance),
       };
 
       setLangWatchLoggerProvider(customProvider as any);
 
-      // Verify the function was called
-      expect(setLangWatchLoggerProvider).toHaveBeenCalledWith(customProvider);
+      // Verify that subsequent logger calls use the custom provider
+      const logger = getLangWatchLogger("test-logger");
+      expect(customProvider.getLogger).toHaveBeenCalledWith("test-logger", undefined);
+
+      // Verify that the logger returned uses the custom instance
+      logger.emit({
+        severityNumber: 9,
+        severityText: "INFO",
+        body: "test message",
+      });
+      expect(customLoggerInstance.emit).toHaveBeenCalled();
     });
   });
 
