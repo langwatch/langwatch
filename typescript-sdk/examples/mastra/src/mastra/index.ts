@@ -16,6 +16,6 @@ export const mastra = new Mastra({
   }),
   telemetry: {
     enabled: true,
-    serviceName: "mastra-and-vercel-ai-sdk-example",
+    serviceName: "mastra-example",
   },
 });
