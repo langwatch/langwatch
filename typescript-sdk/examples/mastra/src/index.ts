@@ -1,11 +1,10 @@
-import { setupLangWatch } from "langwatch/node";
-import { getLangWatchTracer } from "langwatch";
-import { semconv } from "langwatch/observability";
+import { setupObservability } from "langwatch/observability/node";
+import { getLangWatchTracer } from "langwatch"
 import * as readline from "readline";
 import cliMarkdown from "cli-markdown";
 import { mastra } from "./mastra/index.js";
 
-await setupLangWatch();
+setupObservability();
 
 const tracer = getLangWatchTracer("mastra-weather-agent-example");
 
@@ -21,10 +20,7 @@ async function main() {
   console.log("Ask me about weather for any location and I'll help you plan activities!");
   console.log("---");
 
-  const conversationHistory: Array<{
-    role: "user" | "assistant" | "system";
-    content: string;
-  }> = [
+  const conversationHistory = [
     {
       role: "system",
       content:
@@ -37,7 +33,7 @@ async function main() {
 
     await tracer.withActiveSpan("iteration", {
       attributes: {
-        [semconv.ATTR_LANGWATCH_THREAD_ID]: threadId,
+        "langwatch.thread_id": threadId,
       },
     }, async (span) => {
       try {
@@ -64,8 +60,8 @@ async function main() {
         // Add user message to conversation history
         conversationHistory.push({ role: "user", content: userInput });
 
-        // Set input string for tracing
-        span.setInputString(userInput);
+        // Set input for tracing
+        // span.setInput("json", conversationHistory);
 
         // Generate AI response using Mastra agent
         console.log("🌤️  Checking weather and planning activities...");
@@ -75,18 +71,21 @@ async function main() {
           throw new Error("Weather agent not found");
         }
 
-        const response = await agent.generate([
-          {
-            role: "user",
-            content: userInput,
-          },
-        ]);
+        // @ts-expect-error - conversationHistory is not a string
+        const response = await agent.generate(conversationHistory, {
+          telemetry: {
+            isEnabled: true,
+            functionId: 'weather-agent-generate',
+            tracer: tracer,
+          }
+        });
 
         // Add AI response to conversation history
-        conversationHistory.push({ role: "assistant", content: response.text });
+        const assistantMessage = { role: "assistant", content: response.text };
+        // conversationHistory.push(assistantMessage);
 
-        // Set output string for tracing
-        span.setOutputString(response.text);
+        // Set output for tracing
+        // span.setOutput("chat_messages", [assistantMessage]);
 
         // Display AI response with markdown formatting
         console.log("\nAI:");
