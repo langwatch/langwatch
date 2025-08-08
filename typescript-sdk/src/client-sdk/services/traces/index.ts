@@ -1,1 +1,3 @@
-export { EvaluationsFacade } from "./facade";
+export * from "./facade";
+export * from "./service";
+export * from "./types";

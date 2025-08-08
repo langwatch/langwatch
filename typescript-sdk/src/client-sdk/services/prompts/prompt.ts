@@ -1,7 +1,7 @@
 import { Liquid } from "liquidjs";
 import type { paths } from "@/internal/generated/openapi/api-client";
-import { PromptTracingDecorator } from "./tracing/prompt-tracing.decorator";
-import { createTracingProxy } from "./tracing";
+import { PromptTracingDecorator, tracer } from "./tracing";
+import { createTracingProxy } from "@/client-sdk/tracing/create-tracing-proxy";
 
 // Extract the prompt response type from OpenAPI schema
 export type PromptResponse = NonNullable<
@@ -62,7 +62,7 @@ export class Prompt implements PromptResponse {
     this.response_format = promptData.response_format;
 
     // Return a proxy that wraps specific methods for tracing
-    return createTracingProxy(this as Prompt, PromptTracingDecorator);
+    return createTracingProxy(this as Prompt, tracer, PromptTracingDecorator);
   }
 
   /**

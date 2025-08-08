@@ -1,7 +1,8 @@
 import type { paths } from "@/internal/generated/openapi/api-client";
 import { Prompt, type PromptResponse } from "./prompt";
 import { PromptConverter } from "@/cli/utils/promptConverter";
-import { PromptServiceTracingDecorator, createTracingProxy } from "./tracing";
+import { PromptServiceTracingDecorator, tracer } from "./tracing";
+import { createTracingProxy } from "@/client-sdk/tracing/create-tracing-proxy";
 import { InternalConfig } from "@/client-sdk/types";
 import { CreatePromptBody, CreateVersionBody, UpdatePromptBody } from "./types";
 
@@ -59,6 +60,7 @@ export class PromptsService {
      */
     return createTracingProxy(
       this as PromptsService,
+      tracer,
       PromptServiceTracingDecorator,
     );
   }

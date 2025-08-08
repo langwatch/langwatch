@@ -1,4 +1,4 @@
-import { PromptsService } from "./service";
+import { PromptsService, SyncResult } from "./service";
 import type { Prompt } from "./prompt";
 import type { CreatePromptBody, UpdatePromptBody } from "./types";
 import { InternalConfig } from "@/client-sdk/types";
@@ -41,6 +41,15 @@ export class PromptsFacade {
   }
 
   /**
+   * Retrieves all prompts.
+   * @returns Array of Prompt instances.
+   * @throws {PromptsError} If the API call fails.
+   */
+  async getAll(): Promise<Prompt[]> {
+    return this.service.getAll();
+  }
+
+  /**
    * Updates an existing prompt.
    * @param handleOrId The prompt's handle or unique identifier.
    * @param newData The update payload.
@@ -58,6 +67,21 @@ export class PromptsFacade {
    */
   async delete(handleOrId: string): Promise<{ success: boolean }> {
     return this.service.delete(handleOrId);
+  }
+
+  /**
+   * Syncs a prompt with the server.
+   * @param params The sync parameters.
+   * @returns The sync result.
+   * @throws {PromptsError} If the API call fails.
+   */
+  async sync(params: {
+    name: string;
+    configData: any;
+    localVersion?: number;
+    commitMessage?: string;
+  }): Promise<SyncResult> {
+    return this.service.sync(params);
   }
 
   /**

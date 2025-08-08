@@ -1,28 +1,131 @@
-import { tracer } from "./tracer";
 import { PromptsService } from "../service";
+import { Prompt } from "../prompt";
+import type { LangWatchSpan } from "@/observability-sdk";
+import { shouldCaptureInput } from "@/observability-sdk";
+import type { CreatePromptBody, UpdatePromptBody } from "../types";
+import type { SyncResult } from "../service";
 
 /**
  * Class that decorates the target prompt service,
- * adding tracing to the get method.
+ * adding tracing to key methods.
  */
 export class PromptServiceTracingDecorator {
   constructor(private readonly target: PromptsService) {}
 
-  async get(...args: Parameters<PromptsService["get"]>) {
-    return tracer.withActiveSpan("retrieve prompt", async (span) => {
-      span.setType("prompt");
-      span.setAttribute('langwatch.prompt.id', args[0]);
+  async get(
+    span: LangWatchSpan,
+    id: string,
+    options?: { version?: string }
+  ): Promise<Prompt | null> {
+    const result = await this.target.get(id, options);
 
-      const result = await this.target.get.apply(this.target, args);
+    span.setType("prompt");
+    span.setAttribute('langwatch.prompt.id', id);
 
-      if (result) {
-        span.setAttributes({
-          'langwatch.prompt.version.id': result.versionId,
-          'langwatch.prompt.version.number': result.version,
-        });
-      }
+    if (result) {
+      span.setAttributes({
+        'langwatch.prompt.version.id': result.versionId,
+        'langwatch.prompt.version.number': result.version,
+      });
+    }
 
-      return result;
-    });
+    return result;
+  }
+
+  async create(
+    span: LangWatchSpan,
+    params: CreatePromptBody
+  ): Promise<Prompt> {
+    const result = await this.target.create(params);
+
+    span.setType("prompt");
+    span.setAttribute('langwatch.prompt.handle', result.handle || '');
+    span.setAttribute('langwatch.prompt.scope', result.scope);
+    span.setAttribute('langwatch.prompt.version.id', result.versionId);
+    span.setAttribute('langwatch.prompt.version.number', result.version);
+
+    if (shouldCaptureInput()) {
+      span.setInput(params);
+    }
+
+    return result;
+  }
+
+  async update(
+    span: LangWatchSpan,
+    id: string,
+    params: UpdatePromptBody
+  ): Promise<Prompt> {
+    const result = await this.target.update(id, params);
+
+    span.setType("prompt");
+    span.setAttribute('langwatch.prompt.id', id);
+    span.setAttribute('langwatch.prompt.handle', result.handle || '');
+    span.setAttribute('langwatch.prompt.scope', result.scope);
+    span.setAttribute('langwatch.prompt.version.id', result.versionId);
+    span.setAttribute('langwatch.prompt.version.number', result.version);
+
+    if (shouldCaptureInput()) {
+      span.setInput(params);
+    }
+
+    return result;
+  }
+
+  async delete(
+    span: LangWatchSpan,
+    id: string
+  ): Promise<{ success: boolean }> {
+    const result = await this.target.delete(id);
+
+    span.setType("prompt");
+    span.setAttribute('langwatch.prompt.id', id);
+    span.setAttribute('langwatch.prompt.deleted', 'true');
+
+    return result;
+  }
+
+  async upsert(
+    span: LangWatchSpan,
+    handle: string,
+    config: any
+  ): Promise<{ created: boolean; prompt: Prompt }> {
+    const result = await this.target.upsert(handle, config);
+
+    span.setType("prompt");
+    span.setAttribute('langwatch.prompt.handle', handle);
+    span.setAttribute('langwatch.prompt.created', result.created.toString());
+    span.setAttribute('langwatch.prompt.id', result.prompt.id);
+    span.setAttribute('langwatch.prompt.version.id', result.prompt.versionId);
+    span.setAttribute('langwatch.prompt.version.number', result.prompt.version);
+
+    if (shouldCaptureInput()) {
+      span.setInput(config);
+    }
+
+    return result;
+  }
+
+  async sync(
+    span: LangWatchSpan,
+    params: any
+  ): Promise<any> {
+    const result = await this.target.sync(params);
+
+    span.setType("prompt");
+    span.setAttribute('langwatch.prompt.name', params.name);
+    span.setAttribute('langwatch.prompt.sync.action', result.action);
+
+    if (result.conflictInfo) {
+      span.setAttribute('langwatch.prompt.sync.has_conflict', 'true');
+      span.setAttribute('langwatch.prompt.sync.local_version', result.conflictInfo.localVersion.toString());
+      span.setAttribute('langwatch.prompt.sync.remote_version', result.conflictInfo.remoteVersion.toString());
+    }
+
+    if (shouldCaptureInput()) {
+      span.setInput(params);
+    }
+
+    return result;
   }
 }

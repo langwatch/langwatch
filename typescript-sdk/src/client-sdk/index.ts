@@ -1,10 +1,11 @@
 import { type CacheStore, InMemoryCacheStore } from "./cache";
-import { PromptFacade } from "./services/prompts";
+import { PromptFacade as PromptsFacade } from "./services/prompts";
 import { type InternalConfig } from "./types";
 import { createLangWatchApiClient } from "../internal/api/client";
 import { Logger, NoOpLogger } from "../logger";
 import { TracesFacade } from "./services/traces/facade";
-import { DataCaptureOptions, getLangWatchTracer, LangWatchTracer } from "@/observability-sdk";
+import { getLangWatchTracer, LangWatchTracer } from "@/observability-sdk";
+import { LANGWATCH_SDK_NAME_CLIENT, LANGWATCH_SDK_VERSION } from "@/internal/constants";
 
 const DEFAULT_ENDPOINT = "https://api.langwatch.com";
 
@@ -22,24 +23,24 @@ export interface LangWatchConstructorOptions {
 }
 
 export class LangWatch {
-  readonly #config: InternalConfig;
-  readonly #tracer: LangWatchTracer = getLangWatchTracer("langwatch");
+  private readonly config: InternalConfig;
+  private readonly tracer: LangWatchTracer = getLangWatchTracer(LANGWATCH_SDK_NAME_CLIENT, LANGWATCH_SDK_VERSION);
 
-  readonly prompts: PromptFacade;
+  readonly prompts: PromptsFacade;
   readonly traces: TracesFacade;
 
   constructor(options: LangWatchConstructorOptions = {}) {
     const apiKey = options.apiKey ?? process.env.LANGWATCH_API_KEY ?? "";
     const endpoint = options.endpoint ?? process.env.LANGWATCH_ENDPOINT ?? DEFAULT_ENDPOINT;
 
-    this.#config = this.#createInternalConfig({
+    this.config = this.#createInternalConfig({
       apiKey,
       endpoint,
       options: options.options,
     });
 
-    this.prompts = new PromptFacade(this.#config);
-    this.traces = new TracesFacade(this.#config);
+    this.prompts = new PromptsFacade(this.config);
+    this.traces = new TracesFacade(this.config);
   }
 
   #createInternalConfig({
@@ -55,7 +56,7 @@ export class LangWatch {
       logger: options?.logger ?? new NoOpLogger(),
       cacheStore: options?.cacheStore ?? new InMemoryCacheStore(),
       prompts: {
-        ...PromptFacade.defaultOptions,
+        ...PromptsFacade.defaultOptions,
         ...options?.prompts,
       },
       traces: {

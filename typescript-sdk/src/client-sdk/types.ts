@@ -16,5 +16,6 @@ export interface InternalConfig {
 export interface BaseRequestOptions {
   apiKey?: string;
   endpoint?: string;
+  timeoutMs?: number;
   ignoreTracing?: boolean;
 }
