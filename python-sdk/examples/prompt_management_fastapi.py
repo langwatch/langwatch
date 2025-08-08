@@ -28,7 +28,20 @@ def main():
     # 1. Create a new prompt
     print("1. Creating a new prompt...")
     short_uuid = str(uuid.uuid4())[:8]
-    prompt = langwatch.prompts.create(f"example_prompt_{short_uuid}")
+    prompt = langwatch.prompts.create(
+        handle=f"example_prompt_{short_uuid}",
+        scope="PROJECT",  # optional - 'ORGANIZATION' or 'PROJECT'
+        author_id=None,  # optional
+        prompt="You are a helpful assistant. Answer the user's question: {question}",  # optional
+        messages=[  # optional
+            {"role": "system", "content": "You are a helpful assistant."},
+            {"role": "user", "content": "{question}"},
+        ],
+        inputs=[{"identifier": "question", "type": "string"}],  # optional
+        outputs=[  # optional
+            {"identifier": "answer", "type": "string", "json_schema": None}
+        ],
+    )
     print(f"Created prompt with ID: {prompt.id}")
     print(f"Prompt name: {prompt.name}\n")
 
@@ -46,7 +59,11 @@ def main():
 
     # 3. Update the prompt
     print("3. Updating the prompt...")
-    updated_prompt = langwatch.prompts.update(prompt.id, "updated_example_prompt")
+    updated_prompt = langwatch.prompts.update(
+        prompt_id=prompt.id,
+        handle=f"updated_example_prompt_{short_uuid}",  # optional
+        scope="PROJECT",  # optional - 'ORGANIZATION' or 'PROJECT'
+    )
     print(f"Updated prompt name: {updated_prompt.name}")
     print(f"Prompt ID remains: {updated_prompt.id}")
 

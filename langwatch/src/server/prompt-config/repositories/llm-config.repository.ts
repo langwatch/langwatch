@@ -22,6 +22,7 @@ import {
 } from "./llm-config-versions.repository";
 
 const logger = createLogger("langwatch:prompt-config:llm-config.repository");
+const DEFAULT_MODEL = "openai/gpt-4o-mini" as const;
 
 /**
  * Interface for LLM Config data transfer objects
@@ -370,7 +371,12 @@ export class LlmConfigRepository {
           handle: configData.handle,
           scope: configData.scope,
         },
+        include: {
+          project: true,
+        },
       });
+      const { project } = newConfig;
+      const defaultModel = project.defaultModel ?? DEFAULT_MODEL;
 
       // Set the version data to the provided version data, or undefined if no version data is provided.
       let newVersionData: Partial<CreateLlmConfigVersionParams> | undefined =
@@ -378,9 +384,8 @@ export class LlmConfigRepository {
 
       // If no version data is provided, we'll create a default (draft) version.
       if (!newVersionData) {
-        const configData = await this.buildDefaultVersionConfigData({
-          projectId: newConfig.projectId,
-          tx,
+        const configData = this.buildDefaultVersionConfigData({
+          model: defaultModel,
         });
 
         newVersionData = {
@@ -389,6 +394,11 @@ export class LlmConfigRepository {
           schemaVersion: LATEST_SCHEMA_VERSION,
           commitMessage: "Initial version",
         };
+      }
+
+      // Ensure a model is set
+      if (!(newVersionData.configData as any)?.model) {
+        (newVersionData.configData as any).model = defaultModel;
       }
 
       const newVersion = await tx.llmPromptConfigVersion.create({
@@ -659,20 +669,10 @@ export class LlmConfigRepository {
   /**
    * Build a default version base for a config
    */
-  private async buildDefaultVersionConfigData(params: {
-    projectId: string;
-    tx?: Prisma.TransactionClient;
-  }): Promise<CreateLlmConfigVersionParams["configData"]> {
-    const { projectId } = params;
-    const client = params.tx ?? this.prisma;
-
-    // Get the default model for the project
-    const defaultModel = await client.project.findUnique({
-      where: { id: projectId },
-    });
-
+  private buildDefaultVersionConfigData(
+    params: Record<string, unknown>
+  ): CreateLlmConfigVersionParams["configData"] {
     return {
-      model: defaultModel?.defaultModel ?? "openai/gpt-4o-mini",
       prompt: "You are a helpful assistant",
       messages: [
         {
@@ -688,6 +688,7 @@ export class LlmConfigRepository {
           columnTypes: [],
         },
       },
-    };
+      ...params,
+    } as Prisma.JsonValue;
   }
 }
