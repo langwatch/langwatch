@@ -8,7 +8,7 @@ describe('constants.ts', () => {
     expect(constants.LANGWATCH_SDK_LANGUAGE).toBe('typescript');
     expect(typeof constants.LANGWATCH_SDK_VERSION).toBe('string');
     expect(constants.DEFAULT_ENDPOINT).toBe('https://app.langwatch.ai/');
-    expect(constants.DEFAULT_SERVICE_NAME).toBe('langwatch-observed-service');
+    expect(constants.DEFAULT_SERVICE_NAME).toBe('unknown-service.langwatch');
     expect(constants.TRACES_PATH).toBe('/api/otel/v1/traces');
     expect(constants.LOGS_PATH).toBe('/api/otel/v1/logs');
     expect(constants.METRICS_PATH).toBe('/api/otel/v1/metrics');

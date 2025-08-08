@@ -16,7 +16,7 @@ export const LANGWATCH_SDK_LANGUAGE = "typescript";
 export const LANGWATCH_SDK_VERSION = version;
 
 export const DEFAULT_ENDPOINT = "https://app.langwatch.ai/";
-export const DEFAULT_SERVICE_NAME = "langwatch-observed-service";
+export const DEFAULT_SERVICE_NAME = "unknown-service.langwatch";
 
 export const TRACES_PATH = "/api/otel/v1/traces";
 export const LOGS_PATH = "/api/otel/v1/logs";

@@ -1,12 +1,12 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { LangWatchTraceExporter, LangWatchTraceExporterOptions } from "../langwatch-trace-exporter";
 import {
-  LANGWATCH_SDK_NAME,
+  LANGWATCH_SDK_NAME_OBSERVABILITY,
   LANGWATCH_SDK_LANGUAGE,
   LANGWATCH_SDK_VERSION,
   LANGWATCH_SDK_RUNTIME,
   TRACES_PATH,
-} from "../../setup/constants";
+} from "../../../internal/constants.js";
 import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-http";
 
 // Mock the OTLP exporter
@@ -57,7 +57,7 @@ describe("LangWatchExporter", () => {
 
       const headers = (exporter as any).headers;
       expect(headers).toMatchObject({
-        "x-langwatch-sdk-name": LANGWATCH_SDK_NAME,
+        "x-langwatch-sdk-name": LANGWATCH_SDK_NAME_OBSERVABILITY,
         "x-langwatch-sdk-language": LANGWATCH_SDK_LANGUAGE,
         "x-langwatch-sdk-version": LANGWATCH_SDK_VERSION,
         "x-langwatch-sdk-runtime": LANGWATCH_SDK_RUNTIME(),
@@ -145,7 +145,7 @@ describe("LangWatchExporter", () => {
 
       const headers = (exporter as any).headers;
       expect(headers).toMatchObject({
-        "x-langwatch-sdk-name": LANGWATCH_SDK_NAME,
+        "x-langwatch-sdk-name": LANGWATCH_SDK_NAME_OBSERVABILITY,
         "x-langwatch-sdk-language": LANGWATCH_SDK_LANGUAGE,
         "x-langwatch-sdk-version": LANGWATCH_SDK_VERSION,
         "x-langwatch-sdk-runtime": LANGWATCH_SDK_RUNTIME(),
@@ -256,7 +256,7 @@ describe("LangWatchExporter", () => {
       expect(vi.mocked(OTLPTraceExporter)).toHaveBeenCalledWith(
         expect.objectContaining({
           headers: expect.objectContaining({
-            "x-langwatch-sdk-name": LANGWATCH_SDK_NAME,
+            "x-langwatch-sdk-name": LANGWATCH_SDK_NAME_OBSERVABILITY,
             "x-langwatch-sdk-language": LANGWATCH_SDK_LANGUAGE,
             "x-langwatch-sdk-version": LANGWATCH_SDK_VERSION,
             "x-langwatch-sdk-runtime": LANGWATCH_SDK_RUNTIME(),
