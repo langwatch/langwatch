@@ -1,4 +1,4 @@
-import type { Prompt } from "../../prompt/prompt";
+import type { Prompt } from "@/client-sdk/services/prompts/prompt";
 import type { LocalPromptConfig, MaterializedPrompt } from "../types";
 
 /**
