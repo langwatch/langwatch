@@ -54,7 +54,7 @@ func main() {
 	client := openai.NewClient(
 		oaioption.WithAPIKey(os.Getenv("OPENAI_API_KEY")),
 		oaioption.WithMiddleware(otelopenai.Middleware("my-app",
-			otelopenai.WithCaptureInput(),
+			otelopenai.WithCaptureAllInput(),
 			otelopenai.WithCaptureOutput(),
 		)),
 	)
@@ -139,7 +139,7 @@ client := openai.NewClient(
 	option.WithBaseURL("https://api.anthropic.com/v1"),
 	option.WithAPIKey(os.Getenv("ANTHROPIC_API_KEY")),
 	option.WithMiddleware(otelopenai.Middleware("my-app-anthropic",
-		otelopenai.WithCaptureInput(),
+		otelopenai.WithCaptureAllInput(),
 		otelopenai.WithCaptureOutput(),
 		otelopenai.WithGenAISystem(semconv.GenAISystemKey.String("anthropic")),
 	)),
@@ -164,7 +164,7 @@ client := openai.NewClient(
 	option.WithBaseURL("https://your-resource.openai.azure.com/openai/deployments/your-deployment"),
 	option.WithAPIKey(os.Getenv("AZURE_OPENAI_API_KEY")),
 	option.WithMiddleware(otelopenai.Middleware("my-app-azure",
-		otelopenai.WithCaptureInput(),
+		otelopenai.WithCaptureAllInput(),
 		otelopenai.WithCaptureOutput(),
 		otelopenai.WithGenAISystem(semconv.GenAISystemKey.String("azure.openai")),
 	)),
@@ -178,7 +178,7 @@ client := openai.NewClient(
 	option.WithBaseURL("http://localhost:11434/v1"),
 	option.WithAPIKey("not-needed"), // Ollama doesn't require API key
 	option.WithMiddleware(otelopenai.Middleware("my-app-local",
-		otelopenai.WithCaptureInput(),
+		otelopenai.WithCaptureAllInput(),
 		otelopenai.WithCaptureOutput(),
 		otelopenai.WithGenAISystem(semconv.GenAISystemKey.String("ollama")),
 	)),
