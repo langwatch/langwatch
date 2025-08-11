@@ -12,8 +12,8 @@ function createMockLogger() {
 
 
 describe('setupObservability Integration - Log Records Functionality', () => {
-  const logRecordExporter = new InMemoryLogRecordExporter();
-  const logRecordProcessor = new SimpleLogRecordProcessor(logRecordExporter);
+  let logRecordExporter: InMemoryLogRecordExporter;
+  let logRecordProcessor: SimpleLogRecordProcessor;
   let observabilityHandle: ReturnType<typeof setupObservability>;
 
   beforeEach(() => {
@@ -21,9 +21,14 @@ describe('setupObservability Integration - Log Records Functionality', () => {
     vi.resetModules();
     resetObservabilitySdkConfig();
 
+    // Create fresh processor and exporter for each test
+    logRecordExporter = new InMemoryLogRecordExporter();
+    logRecordProcessor = new SimpleLogRecordProcessor(logRecordExporter);
+
     // Setup observability with real OpenTelemetry SDK
     observabilityHandle = setupObservability({
       serviceName: "log-records-functionality-test",
+      langwatch: 'disabled', // Disable LangWatch to use only custom processors
       logRecordProcessors: [logRecordProcessor],
       debug: { logger: createMockLogger() },
       advanced: { throwOnSetupError: true },
@@ -73,6 +78,36 @@ describe('setupObservability Integration - Log Records Functionality', () => {
     expect(record.attributes["log.source"]).toBe('test-integration');
     expect(record.attributes["log.category"]).toBe('test');
     expect(record.attributes["user.id"]).toBe('12345');
+  });
+
+  it('should handle log records with custom log record processors', async () => {
+    const logRecordLogger = getLangWatchLogger('custom-processor-test');
+
+    const logRecord = {
+      severityText: 'INFO',
+      severityNumber: 9,
+      body: 'Custom processor test message',
+      attributes: {
+        'custom.processor': true,
+        'test.feature': 'custom-processors',
+      },
+    };
+
+    logRecordLogger.emit(logRecord);
+
+    await logRecordProcessor.forceFlush();
+    const exportedLogRecords = logRecordExporter.getFinishedLogRecords();
+    expect(exportedLogRecords).toHaveLength(1);
+
+    const record = exportedLogRecords[0];
+    if (!record) {
+      throw new Error('No record found');
+    }
+    expect(record.severityText).toBe('INFO');
+    expect(record.severityNumber).toBe(9);
+    expect(record.body).toBe('Custom processor test message');
+    expect(record.attributes?.['custom.processor']).toBe(true);
+    expect(record.attributes?.['test.feature']).toBe('custom-processors');
   });
 
   it('should handle different log severity levels', async () => {
@@ -286,36 +321,6 @@ describe('setupObservability Integration - Log Records Functionality', () => {
     });
 
     expect(logRecordLogger).toBeDefined();
-  });
-
-    it('should handle log records with custom log record processors', async () => {
-    const logRecordLogger = getLangWatchLogger('custom-processor-test');
-
-    const logRecord = {
-      severityText: 'INFO',
-      severityNumber: 9,
-      body: 'Custom processor test message',
-      attributes: {
-        'custom.processor': true,
-        'test.feature': 'custom-processors',
-      },
-    };
-
-    logRecordLogger.emit(logRecord);
-
-    await logRecordProcessor.forceFlush();
-    const exportedLogRecords = logRecordExporter.getFinishedLogRecords();
-    expect(exportedLogRecords).toHaveLength(1);
-
-    const record = exportedLogRecords[0];
-    if (!record) {
-      throw new Error('No record found');
-    }
-    expect(record.severityText).toBe('INFO');
-    expect(record.severityNumber).toBe(9);
-    expect(record.body).toBe('Custom processor test message');
-    expect(record.attributes?.['custom.processor']).toBe(true);
-    expect(record.attributes?.['test.feature']).toBe('custom-processors');
   });
 
   it('should handle log records with error conditions', () => {
