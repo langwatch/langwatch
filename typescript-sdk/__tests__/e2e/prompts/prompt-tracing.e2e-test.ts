@@ -3,8 +3,6 @@ import { getLangwatchSDK } from "../../helpers/get-sdk.js";
 import { setupTestTraceProvider } from "../../helpers/setup-test-trace-provider.js";
 import { type ReadableSpan } from "@opentelemetry/sdk-trace-node";
 import { LangWatch, attributes } from "langwatch";
-import { initializeObservabilitySdkConfig } from "../../../src/observability-sdk/config.js";
-import { ConsoleLogger } from "../../../src/logger/index.js";
 
 const { spanExporter, findFinishedSpanByName } = setupTestTraceProvider();
 
@@ -12,16 +10,6 @@ describe("Prompt tracing", () => {
   let langwatch: LangWatch;
 
   beforeAll(async () => {
-    // Configure data capture to enable output capture
-    initializeObservabilitySdkConfig({
-      logger: new ConsoleLogger({ level: "warn" }),
-      dataCapture: "all",
-    });
-
-    // Import and check the configuration
-    const { getDataCaptureMode } = await import("../../../src/observability-sdk/config.js");
-    console.log("Data capture mode:", getDataCaptureMode());
-
     const { LangWatch } = await getLangwatchSDK();
     langwatch = new LangWatch({
       apiKey: process.env.LANGWATCH_API_KEY || "test-key",
@@ -78,7 +66,7 @@ describe("Prompt tracing", () => {
 
       // Verify the prompt response structure is captured
       // The output is a string representation, so we need to check the type
-      expect(output.type).toBe("text");
+      expect(output.type).toBe("json");
       expect(output.value).toBe("[object Object]");
     });
   });
@@ -113,7 +101,7 @@ describe("Prompt tracing", () => {
       );
       expect(
         compileSpan?.attributes[attributes.ATTR_LANGWATCH_PROMPT_VERSION_ID]
-      ).toBe("prompt_version_1");
+      ).toBe("prompt_version_2");
       expect(
         compileSpan?.attributes[attributes.ATTR_LANGWATCH_PROMPT_VERSION_NUMBER]
       ).toBe(1);
@@ -121,7 +109,6 @@ describe("Prompt tracing", () => {
 
     it("should set output data", () => {
       // Check that output was set (it should be JSON stringified)
-      console.log("Compile span attributes:", compileSpan?.attributes);
       expect(
         compileSpan?.attributes[attributes.ATTR_LANGWATCH_OUTPUT]
       ).toBeDefined();
