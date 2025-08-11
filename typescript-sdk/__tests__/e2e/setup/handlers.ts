@@ -3,7 +3,7 @@ import { type paths } from "../../../src/internal/generated/openapi/api-client";
 import { promptResponseFactory } from "../../factories/prompt.factory";
 
 const http = createOpenApiHttp<paths>({
-  baseUrl: "https://app.langwatch.ai",
+  baseUrl: "https://app.langwatch.local",
 });
 
 export const handles = [

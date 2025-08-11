@@ -9,7 +9,7 @@ describe("Prompt management", () => {
     const { LangWatch } = await getLangwatchSDK();
     langwatch = new LangWatch({
       apiKey: "test-key",
-      endpoint: "http://localhost:3000",
+      endpoint: "https://app.langwatch.local",
     });
   });
 

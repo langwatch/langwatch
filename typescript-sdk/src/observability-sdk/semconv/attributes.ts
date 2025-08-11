@@ -101,6 +101,7 @@ export const ATTR_LANGWATCH_STREAMING = "langwatch.gen_ai.streaming";
  * Used to identify the specific prompt being used
  */
 export const ATTR_LANGWATCH_PROMPT_ID = "langwatch.prompt.id";
+
 /**
  * LangWatch prompt ID attribute key
  * Used to identify the specific prompt being used
