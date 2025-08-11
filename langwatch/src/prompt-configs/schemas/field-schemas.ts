@@ -85,7 +85,9 @@ export const commitMessageSchema = z.string();
 /**
  * Schema for prompt configuration version
  */
-export const versionSchema = z.number();
+export const versionSchema = z
+  .number()
+  .min(0, "Version must be greater than 0");
 
 /**
  * Schema for response format specification

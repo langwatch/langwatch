@@ -14,6 +14,7 @@ import {
   outputsSchema,
   promptingTechniqueSchema,
   responseFormatSchema,
+  versionSchema,
 } from "~/prompt-configs/schemas/field-schemas";
 
 const logger = createLogger(
@@ -49,7 +50,7 @@ const configSchemaV1_0 = z.object({
   configId: z.string().min(1, "Config ID cannot be empty"),
   schemaVersion: z.literal(SchemaVersion.V1_0),
   commitMessage: z.string(),
-  version: z.number().min(0, "Version must be greater than 0"),
+  version: versionSchema,
   createdAt: z.date(),
   configData: z.object({
     prompt: z.string(),
