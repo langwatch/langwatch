@@ -4,7 +4,7 @@ import chalk from "chalk";
 import ora from "ora";
 import prompts from "prompts";
 const getEndpoint = (): string => {
-  return process.env.LANGWATCH_ENDPOINT || "https://api.langwatch.com";
+  return process.env.LANGWATCH_ENDPOINT || "https://app.langwatch.ai";
 };
 
 const updateEnvFile = (
