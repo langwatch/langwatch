@@ -53,7 +53,7 @@ from langwatch.state import get_instance
 from .prompt import Prompt
 from .errors import unwrap_response
 
-from .decorators.tracing import prompt_service_tracing
+from .decorators.prompt_service_tracing import prompt_service_tracing
 
 
 class PromptService:

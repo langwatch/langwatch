@@ -2829,6 +2829,7 @@ dependencies = [
     { name = "deprecated" },
     { name = "dspy-ai" },
     { name = "httpx" },
+    { name = "liquidpy" },
     { name = "litellm" },
     { name = "nanoid" },
     { name = "openinference-instrumentation-haystack" },
@@ -2900,6 +2901,7 @@ requires-dist = [
     { name = "dspy-ai", specifier = ">=2.5.2,<3.0.0" },
     { name = "dspy-ai", marker = "extra == 'dspy'", specifier = ">=2.5.2,<3.0.0" },
     { name = "httpx", specifier = ">=0.27.0" },
+    { name = "liquidpy", specifier = ">=0.8.4" },
     { name = "litellm", specifier = ">=1.52.1" },
     { name = "nanoid", specifier = ">=2.0.0,<3.0.0" },
     { name = "openinference-instrumentation-haystack", specifier = ">=0.1.20" },
@@ -2967,6 +2969,18 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/af/07/6236eec8d2c547407626139440e927e2554473d2b516f8df9820786d3246/lazy_imports-0.4.0.tar.gz", hash = "sha256:c3d9e4e295e6118588f58c6710d152bb2836e0276f790a120ee4ab608829cece", size = 17347, upload-time = "2024-12-23T10:38:21.442Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/7a/64/184ba00d3bbdc6f2c790ac10a138c77cee0d3f30ce12944169af9a3b981b/lazy_imports-0.4.0-py3-none-any.whl", hash = "sha256:de0625cbbd781091c46a66003ec3953c87f0130e85a257cd1a24304237e4966b", size = 12804, upload-time = "2024-12-23T10:38:19.882Z" },
+]
+
+[[package]]
+name = "liquidpy"
+version = "0.8.4"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "jinja2" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/bc/4b/899664dabedf5f5bdc3188190abb86a1550baeb78a36ecbf8cf3ea06ee1d/liquidpy-0.8.4.tar.gz", hash = "sha256:fc797de8bd4f262f43d0d1a13dd991da424f508da21b7a93edc690debc6c0742", size = 26439, upload-time = "2025-03-05T19:27:02.803Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/02/ba/52eed908c28dc62122cb3ecde5ab41caca83ec61fe0ee3ac8fe0c6eb5190/liquidpy-0.8.4-py3-none-any.whl", hash = "sha256:2d2b1039df6ce6ab66782b1bf55f92155ecee9ec86097fd9e217d5f4a6288100", size = 32796, upload-time = "2025-03-05T19:27:01.123Z" },
 ]
 
 [[package]]
