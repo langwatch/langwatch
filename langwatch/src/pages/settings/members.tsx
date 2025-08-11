@@ -21,7 +21,7 @@ import { Select as MultiSelect, chakraComponents } from "chakra-react-select";
 import { Lock, Mail, MoreVertical, Plus, Trash } from "react-feather";
 import { CopyInput } from "../../components/CopyInput";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import {
   Controller,
   useFieldArray,
@@ -41,6 +41,7 @@ import type {
 } from "../../server/api/routers/organization";
 import { type PlanInfo } from "../../server/subscriptionHandler";
 import { api } from "../../utils/api";
+import * as Sentry from "@sentry/nextjs";
 
 type Option = { label: string; value: string; description?: string };
 
@@ -243,6 +244,12 @@ function MembersList({
           });
         },
         onError: (error) => {
+          Sentry.captureException(error, {
+            tags: {
+              userId,
+              organizationId: organization.id,
+            },
+          });
           toaster.create({
             title: "Error updating member role",
             type: "error",
@@ -322,13 +329,22 @@ function MembersList({
     );
   };
 
-  const sortedMembers = [...organization.members].sort((a, b) =>
-    b.user.id.localeCompare(a.user.id)
+  const sortedMembers = useMemo(
+    () =>
+      [...organization.members].sort((a, b) =>
+        b.user.id.localeCompare(a.user.id)
+      ),
+    [organization.members]
   );
 
-  const currentUserIsAdmin = organization.members.some(
-    (member) =>
-      member.userId === user?.id && member.role === OrganizationUserRole.ADMIN
+  const currentUserIsAdmin = useMemo(
+    () =>
+      organization.members.some(
+        (member) =>
+          member.userId === user?.id &&
+          member.role === OrganizationUserRole.ADMIN
+      ),
+    [organization.members, user?.id]
   );
 
   return (

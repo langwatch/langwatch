@@ -26,6 +26,7 @@ import { api } from "../../utils/api";
 import GraphsLayout from "../../components/GraphsLayout";
 import { AnalyticsHeader } from "../../components/analytics/AnalyticsHeader";
 import { LLMMetrics } from "../../components/LLMMetrics";
+import * as Sentry from "@sentry/nextjs";
 
 export default function ProjectRouter() {
   const router = useRouter();
@@ -77,7 +78,12 @@ function Index() {
     try {
       const target = new URL(url, window.location.origin);
       return target.origin === window.location.origin;
-    } catch {
+    } catch (error) {
+      Sentry.captureException(error, {
+        tags: {
+          url,
+        },
+      });
       return false;
     }
   }
