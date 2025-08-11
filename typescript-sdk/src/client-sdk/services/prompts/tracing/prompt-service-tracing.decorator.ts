@@ -29,7 +29,10 @@ export class PromptServiceTracingDecorator {
     }
 
     // Temporarily hardcode output capture for testing
-    span.setOutput(result);
+    if (result && shouldCaptureOutput()) {
+      // Use JSON.parse/stringify to strip out non-serializable properties and index signatures
+      span.setOutput("json", result.raw);
+    }
 
     return result;
   }
@@ -50,7 +53,6 @@ export class PromptServiceTracingDecorator {
     span.setAttribute('langwatch.prompt.scope', result.scope);
     span.setAttribute('langwatch.prompt.version.id', result.versionId);
     span.setAttribute('langwatch.prompt.version.number', result.version);
-
 
     return result;
   }
