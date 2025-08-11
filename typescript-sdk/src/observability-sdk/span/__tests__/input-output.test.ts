@@ -170,6 +170,31 @@ describe("processSpanInputOutput", () => {
       // The function should handle circular references gracefully
       expect(result.value).toBeDefined();
     });
+
+    it("should prefer explicit type over auto-detection", () => {
+      // This object would normally auto-detect as "json", but explicit "text" should be preferred
+      const obj = { key: "value" };
+      const result = processSpanInputOutput("text", obj);
+
+      expect(result.type).toBe("text");
+      expect(typeof result.value).toBe("string");
+    });
+
+    it("should prefer explicit json type for string input", () => {
+      // This string would normally auto-detect as "text", but explicit "json" should be preferred
+      const result = processSpanInputOutput("json", "Hello world");
+
+      expect(result.type).toBe("json");
+      expect(result.value).toBe("Hello world");
+    });
+
+    it("should prefer explicit raw type for complex object", () => {
+      const complexObj = { nested: { data: [1, 2, 3] } };
+      const result = processSpanInputOutput("raw", complexObj);
+
+      expect(result.type).toBe("raw");
+      expect(result.value).toBe("[object]"); // Objects are converted to string representation even for raw type
+    });
   });
 
   describe("auto-detection scenarios", () => {
@@ -249,11 +274,11 @@ describe("processSpanInputOutput", () => {
       const numberResult = processSpanInputOutput(42);
       const booleanResult = processSpanInputOutput(true);
 
-      expect(numberResult.type).toBe("json");
-      expect(numberResult.value).toBe(42);
+      expect(numberResult.type).toBe("text");
+      expect(numberResult.value).toBe("42");
 
-      expect(booleanResult.type).toBe("json");
-      expect(booleanResult.value).toBe(true);
+      expect(booleanResult.type).toBe("text");
+      expect(booleanResult.value).toBe("true");
     });
 
     it("should handle empty array", () => {
@@ -373,11 +398,35 @@ describe("processSpanInputOutput", () => {
       expect(result2.type).toBe("json");
     });
 
-    it("should handle fallback scenarios", () => {
-      // Test fallback to text when no other type matches
-      const result = processSpanInputOutput("unknown_type", "test value");
-      expect(result.type).toBe("json"); // Invalid types default to json
-      expect(result.value).toBe("test value");
+    it("should handle objects with safe fallback", () => {
+      // Test objects that can't be JSON serialized
+      const objWithCircularRef: any = { name: "test" };
+      objWithCircularRef.self = objWithCircularRef;
+
+      const result = processSpanInputOutput(objWithCircularRef);
+      expect(result.type).toBe("json");
+      expect(result.value).toBeDefined();
+    });
+
+    it("should handle non-serializable objects gracefully", () => {
+      // Test with objects that have non-serializable properties
+      const objWithFunction = {
+        data: "test",
+        method: () => "hello"
+      };
+
+      const result = processSpanInputOutput(objWithFunction);
+      expect(result.type).toBe("json");
+      expect(result.value).toBeDefined();
+    });
+
+    it("should provide meaningful fallback for objects in text mode", () => {
+      const obj = { key: "value" };
+      const result = processSpanInputOutput("text", obj);
+
+      expect(result.type).toBe("text");
+      expect(typeof result.value).toBe("string");
+      expect(result.value).toBe("[object]"); // Objects are converted to '[object]' string representation
     });
   });
 });

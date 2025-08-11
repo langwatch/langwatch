@@ -510,4 +510,178 @@ describe("span.ts", () => {
       });
     });
   });
+
+  describe("setInput and setOutput function overloads", () => {
+    it("should support explicit type overloads for setInput", () => {
+      const { mockSpan, langwatchSpan } = testScenarios.createSpanTest();
+
+      // Test explicit text type
+      langwatchSpan.setInput("text", "Hello world");
+      expect(mockSpan.setAttribute).toHaveBeenCalledWith(
+        intSemconv.ATTR_LANGWATCH_INPUT,
+        JSON.stringify({
+          type: "text",
+          value: "Hello world"
+        })
+      );
+
+      // Test explicit json type
+      const obj = { key: "value" };
+      langwatchSpan.setInput("json", obj);
+      expect(mockSpan.setAttribute).toHaveBeenCalledWith(
+        intSemconv.ATTR_LANGWATCH_INPUT,
+        JSON.stringify({
+          type: "json",
+          value: obj
+        })
+      );
+
+      // Test explicit raw type
+      langwatchSpan.setInput("raw", "Raw content");
+      expect(mockSpan.setAttribute).toHaveBeenCalledWith(
+        intSemconv.ATTR_LANGWATCH_INPUT,
+        JSON.stringify({
+          type: "raw",
+          value: "Raw content"
+        })
+      );
+    });
+
+    it("should support explicit type overloads for setOutput", () => {
+      const { mockSpan, langwatchSpan } = testScenarios.createSpanTest();
+
+      // Test explicit text type
+      langwatchSpan.setOutput("text", "Response");
+      expect(mockSpan.setAttribute).toHaveBeenCalledWith(
+        intSemconv.ATTR_LANGWATCH_OUTPUT,
+        JSON.stringify({
+          type: "text",
+          value: "Response"
+        })
+      );
+
+      // Test explicit json type
+      const obj = { response: "data" };
+      langwatchSpan.setOutput("json", obj);
+      expect(mockSpan.setAttribute).toHaveBeenCalledWith(
+        intSemconv.ATTR_LANGWATCH_OUTPUT,
+        JSON.stringify({
+          type: "json",
+          value: obj
+        })
+      );
+
+      // Test explicit raw type
+      langwatchSpan.setOutput("raw", "Raw response");
+      expect(mockSpan.setAttribute).toHaveBeenCalledWith(
+        intSemconv.ATTR_LANGWATCH_OUTPUT,
+        JSON.stringify({
+          type: "raw",
+          value: "Raw response"
+        })
+      );
+    });
+
+    it("should prefer explicit types over auto-detection", () => {
+      const { mockSpan, langwatchSpan } = testScenarios.createSpanTest();
+
+      // Object that would auto-detect as "json", but explicit "text" should be preferred
+      const obj = { key: "value" };
+      (langwatchSpan.setInput as any)("text", obj);
+      expect(mockSpan.setAttribute).toHaveBeenCalledWith(
+        intSemconv.ATTR_LANGWATCH_INPUT,
+        JSON.stringify({
+          type: "text",
+          value: "[object]" // Objects are converted to '[object]' string representation
+        })
+      );
+
+      // String that would auto-detect as "text", but explicit "json" should be preferred
+      (langwatchSpan.setOutput as any)("json", "Hello world");
+      expect(mockSpan.setAttribute).toHaveBeenCalledWith(
+        intSemconv.ATTR_LANGWATCH_OUTPUT,
+        JSON.stringify({
+          type: "json",
+          value: "Hello world"
+        })
+      );
+    });
+
+    it("should handle chat_messages type correctly", () => {
+      const { mockSpan, langwatchSpan } = testScenarios.createSpanTest();
+
+      const messages = [
+        { role: "user", content: "Hello" },
+        { role: "assistant", content: "Hi!" }
+      ];
+
+      (langwatchSpan.setInput as any)("chat_messages", messages);
+      expect(mockSpan.setAttribute).toHaveBeenCalledWith(
+        intSemconv.ATTR_LANGWATCH_INPUT,
+        JSON.stringify({
+          type: "chat_messages",
+          value: messages
+        })
+      );
+
+      (langwatchSpan.setOutput as any)("chat_messages", messages);
+      expect(mockSpan.setAttribute).toHaveBeenCalledWith(
+        intSemconv.ATTR_LANGWATCH_OUTPUT,
+        JSON.stringify({
+          type: "chat_messages",
+          value: messages
+        })
+      );
+    });
+
+    it("should handle list type correctly", () => {
+      const { mockSpan, langwatchSpan } = testScenarios.createSpanTest();
+
+      const list = [
+        { type: "text", value: "Item 1" },
+        { type: "text", value: "Item 2" }
+      ];
+
+      (langwatchSpan.setInput as any)("list", list);
+      expect(mockSpan.setAttribute).toHaveBeenCalledWith(
+        intSemconv.ATTR_LANGWATCH_INPUT,
+        JSON.stringify({
+          type: "list",
+          value: list
+        })
+      );
+
+      (langwatchSpan.setOutput as any)("list", list);
+      expect(mockSpan.setAttribute).toHaveBeenCalledWith(
+        intSemconv.ATTR_LANGWATCH_OUTPUT,
+        JSON.stringify({
+          type: "list",
+          value: list
+        })
+      );
+    });
+
+    it("should handle invalid types gracefully", () => {
+      const { mockSpan, langwatchSpan } = testScenarios.createSpanTest();
+
+      // Invalid type should fall back to json
+      (langwatchSpan.setInput as any)("invalid_type", "test");
+      expect(mockSpan.setAttribute).toHaveBeenCalledWith(
+        intSemconv.ATTR_LANGWATCH_INPUT,
+        JSON.stringify({
+          type: "json",
+          value: "test"
+        })
+      );
+
+      (langwatchSpan.setOutput as any)("invalid_type", "test");
+      expect(mockSpan.setAttribute).toHaveBeenCalledWith(
+        intSemconv.ATTR_LANGWATCH_OUTPUT,
+        JSON.stringify({
+          type: "json",
+          value: "test"
+        })
+      );
+    });
+  });
 });
