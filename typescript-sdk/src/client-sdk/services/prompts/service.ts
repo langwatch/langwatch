@@ -97,13 +97,13 @@ export class PromptsService {
   /**
    * Fetches a single prompt by its ID.
    * @param id The prompt's unique identifier.
-   * @returns The Prompt instance or null if not found.
+   * @returns The Prompt instance.
    * @throws {PromptsError} If the API call fails.
    */
   async get(
     id: string,
     options?: { version?: string },
-  ): Promise<Prompt | null> {
+  ): Promise<Prompt> {
     const { data, error } = await this.config.langwatchApiClient.GET("/api/prompts/{id}", {
       params: { path: { id } },
       query: {
@@ -125,10 +125,14 @@ export class PromptsService {
    */
   async exists(id: string): Promise<boolean> {
     try {
-      const prompt = await this.get(id);
-      return prompt !== null;
+      await this.get(id);
+      return true;
     } catch (error) {
-      throw error; // Re-throw non-404 errors
+      if (error instanceof PromptsError && error.originalError?.statusCode === 404) {
+        return false;
+      }
+
+      throw error;
     }
   }
 

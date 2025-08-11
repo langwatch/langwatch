@@ -15,7 +15,7 @@ export class PromptServiceTracingDecorator {
     span: LangWatchSpan,
     id: string,
     options?: { version?: string }
-  ): Promise<Prompt | null> {
+  ): Promise<Prompt> {
     const result = await this.target.get(id, options);
 
     span.setType("prompt");
