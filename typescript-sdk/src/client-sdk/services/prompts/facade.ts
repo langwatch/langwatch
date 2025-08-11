@@ -83,11 +83,4 @@ export class PromptsFacade {
   }): Promise<SyncResult> {
     return this.service.sync(params);
   }
-
-  /**
-   * Default configuration for the the prompts. This is used in the main sdk class.
-   */
-  static defaultOptions: InternalConfig["prompts"] = {
-    defaultCacheTtlMs: 1000 * 60 * 60 * 24, // 5 minutes
-  };
 }

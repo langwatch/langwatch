@@ -5,8 +5,5 @@ import { LangWatch } from "@/client-sdk";
  * Uses environment variables for configuration
  */
 export function createLangWatchClient(): LangWatch {
-  return new LangWatch({
-    apiKey: process.env.LANGWATCH_API_KEY,
-    endpoint: process.env.LANGWATCH_ENDPOINT,
-  });
-} 
+  return new LangWatch();
+}

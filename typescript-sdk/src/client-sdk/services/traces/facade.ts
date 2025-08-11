@@ -14,6 +14,4 @@ export class TracesFacade {
   async get(traceId: string, params?: GetTraceParams): Promise<GetTraceResponse> {
     return this.#service.get(traceId, params);
   }
-
-  static defaultOptions: InternalConfig["traces"] = {};
 }

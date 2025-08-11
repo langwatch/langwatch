@@ -16,10 +16,10 @@ export class PromptServiceTracingDecorator {
     id: string,
     options?: { version?: string }
   ): Promise<Prompt> {
-    const result = await this.target.get(id, options);
-
     span.setType("prompt");
     span.setAttribute('langwatch.prompt.id', id);
+
+    const result = await this.target.get(id, options);
 
     if (result) {
       span.setAttributes({
@@ -41,14 +41,14 @@ export class PromptServiceTracingDecorator {
     span: LangWatchSpan,
     params: CreatePromptBody
   ): Promise<Prompt> {
+    span.setType("prompt");
 
-    if (shouldCaptureInput({ spanType: "prompt" })) {
+    if (shouldCaptureInput()) {
       span.setInput(params);
     }
 
     const result = await this.target.create(params);
 
-    span.setType("prompt");
     span.setAttribute('langwatch.prompt.id', result.id);
     span.setAttribute('langwatch.prompt.handle', result.handle ?? '');
     span.setAttribute('langwatch.prompt.scope', result.scope);
@@ -64,7 +64,7 @@ export class PromptServiceTracingDecorator {
     params: UpdatePromptBody
   ): Promise<Prompt> {
 
-    if (shouldCaptureInput({ spanType: "prompt" })) {
+    if (shouldCaptureInput()) {
       span.setInput(params);
     }
 

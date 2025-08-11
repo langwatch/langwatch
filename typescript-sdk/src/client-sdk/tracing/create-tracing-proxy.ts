@@ -45,8 +45,7 @@ export function createTracingProxy<
       if (
         typeof prop === "string" &&
         !prop.startsWith("_") && // Skip private methods
-        !prop.startsWith("get ") && // Skip getters
-        !prop.startsWith("set ") && // Skip setters
+        !isGetterOrSetter(target, prop) && // Skip actual getters/setters
         prop !== "constructor" && // Skip constructor
         prop !== "toString" && // Skip built-in methods
         prop !== "valueOf" &&
@@ -80,3 +79,20 @@ export function createTracingProxy<
     },
   });
 }
+
+// Helper function to check if a property is a getter or setter
+const isGetterOrSetter = (target: any, prop: string | symbol): boolean => {
+  // First check own properties
+  let descriptor = Object.getOwnPropertyDescriptor(target, prop);
+
+  // If not found on own properties, check prototype chain
+  if (!descriptor) {
+    const prototype = Object.getPrototypeOf(target);
+    if (prototype) {
+      descriptor = Object.getOwnPropertyDescriptor(prototype, prop);
+    }
+  }
+
+  // Return true if it's a getter or setter
+  return !!(descriptor?.get ?? descriptor?.set);
+};

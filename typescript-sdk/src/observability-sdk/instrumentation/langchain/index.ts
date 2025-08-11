@@ -609,7 +609,7 @@ function wrapNonScalarValues(
       }
       return val;
     });
-    return json.length;
+    return json;
   } catch {
     return JSON.stringify({ type: "raw", value: "[Non-Serializable]" });
   }

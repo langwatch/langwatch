@@ -53,6 +53,8 @@ describe("Prompt tracing", () => {
     });
 
     it("should set output data", () => {
+      // Check that output was set (it should be JSON stringified)
+      console.log("Get span attributes:", getSpan?.attributes);
       expect(
         getSpan?.attributes[attributes.ATTR_LANGWATCH_OUTPUT]
       ).toBeDefined();
@@ -63,6 +65,7 @@ describe("Prompt tracing", () => {
       const output = JSON.parse(outputAttr);
 
       // Verify the prompt response structure is captured
+      // The output is a string representation, so we need to check the type
       expect(output.type).toBe("json");
       expect(output.value).toBeDefined();
       expect(output.value.id).toBe("prompt_123");
@@ -89,6 +92,7 @@ describe("Prompt tracing", () => {
     });
 
     it("should set span type to 'prompt'", () => {
+      console.log(compileSpan?.attributes);
       expect(compileSpan?.attributes[attributes.ATTR_LANGWATCH_SPAN_TYPE]).toBe(
         "prompt"
       );

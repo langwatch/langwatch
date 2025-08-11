@@ -9,9 +9,6 @@ import type { LangWatchSpan } from "@/observability-sdk";
 export class PromptTracingDecorator {
   constructor(private readonly target: Prompt) {}
 
-export class PromptTracingDecorator {
-  constructor(private readonly target: Prompt) {}
-
   private traceCompilation(
     span: LangWatchSpan,
     variables: TemplateVariables,
@@ -19,7 +16,7 @@ export class PromptTracingDecorator {
   ): CompiledPrompt {
     span.setType("prompt");
 
-    if (shouldCaptureInput({ spanType: "prompt" })) {
+    if (shouldCaptureInput()) {
       span.setInput(this.target.raw);
 
       if (variables) {
@@ -42,7 +39,7 @@ export class PromptTracingDecorator {
       'langwatch.prompt.version.number': result.version,
     });
 
-    if (shouldCaptureOutput({ spanType: "prompt" })) {
+    if (shouldCaptureOutput()) {
       span.setOutput(result.raw);
     }
 
@@ -64,5 +61,4 @@ export class PromptTracingDecorator {
       () => this.target.compileStrict(variables),
     );
   }
-}
 }
