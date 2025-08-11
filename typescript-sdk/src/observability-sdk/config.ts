@@ -196,7 +196,15 @@ export function getDataCaptureMode(
       environment: context.environment,
     };
 
-    return config.dataCapture(fullContext);
+    const mode = config.dataCapture(fullContext);
+    const validModes: DataCaptureMode[] = ["none", "input", "output", "all"];
+    if (!validModes.includes(mode as DataCaptureMode)) {
+      getObservabilitySdkLogger().warn(
+        `Invalid data capture mode from predicate: ${String(mode)}. Using default: "all"`
+      );
+      return "all";
+    }
+    return mode as DataCaptureMode;
   }
 
   if (typeof config.dataCapture === "object" && config.dataCapture.mode) {
