@@ -14,4 +14,4 @@
 export * from "./attributes";
 export * from "./values";
 export * from "./events";
-export * from "./types";
+export type * from "./types";
