@@ -670,12 +670,16 @@ export const organizationRouter = createTRPCRouter({
       }
 
       await prisma.$transaction(async (prisma) => {
-        await prisma.organizationUser.create({
-          data: {
-            userId: session.user.id,
-            organizationId: invite.organizationId,
-            role: invite.role,
-          },
+        // Create org membership; skip if it already exists
+        await prisma.organizationUser.createMany({
+          data: [
+            {
+              userId: session.user.id,
+              organizationId: invite.organizationId,
+              role: invite.role,
+            },
+          ],
+          skipDuplicates: true,
         });
 
         const organizationToTeamRoleMap: {
@@ -686,14 +690,25 @@ export const organizationRouter = createTRPCRouter({
           [OrganizationUserRole.EXTERNAL]: TeamUserRole.VIEWER,
         };
 
-        const teamIds = invite.teamIds.split(",");
-        for (const teamId of teamIds) {
-          await prisma.teamUser.create({
-            data: {
-              userId: session.user.id,
-              teamId: teamId,
-              role: organizationToTeamRoleMap[invite.role],
-            },
+        const dedupedTeamIds = Array.from(
+          new Set(
+            invite.teamIds
+              .split(",")
+              .map((s) => s.trim())
+              .filter(Boolean)
+          )
+        );
+
+        if (dedupedTeamIds.length > 0) {
+          const teamMembershipData = dedupedTeamIds.map((teamId) => ({
+            userId: session.user.id,
+            teamId,
+            role: organizationToTeamRoleMap[invite.role],
+          }));
+
+          await prisma.teamUser.createMany({
+            data: teamMembershipData,
+            skipDuplicates: true, // safe under concurrency and preserves existing roles
           });
         }
 

@@ -11,6 +11,7 @@ import {
 } from "@chakra-ui/react";
 import type { GetServerSidePropsContext } from "next";
 import { useRouter } from "next/router";
+import { useEffect } from "react";
 import {
   DocumentsCountsSummary,
   DocumentsCountsTable,
@@ -25,6 +26,7 @@ import { api } from "../../utils/api";
 import GraphsLayout from "../../components/GraphsLayout";
 import { AnalyticsHeader } from "../../components/analytics/AnalyticsHeader";
 import { LLMMetrics } from "../../components/LLMMetrics";
+import * as Sentry from "@sentry/nextjs";
 
 export default function ProjectRouter() {
   const router = useRouter();
@@ -64,11 +66,36 @@ function Index() {
 
   const router = useRouter();
   const returnTo = router.query.return_to;
-  if (
-    typeof returnTo === "string" &&
-    (returnTo.startsWith("/") || returnTo.startsWith(window.location.origin))
-  ) {
-    void router.push(returnTo);
+
+  /**
+   * Validates if a returnTo URL is safe to redirect to
+   * @param url - The URL to validate
+   * @returns True if the URL is safe to redirect to
+   */
+  function isValidReturnToUrl(url: string): boolean {
+    if (url.startsWith("/")) return true; // relative path
+    if (typeof window === "undefined") return false;
+    try {
+      const target = new URL(url, window.location.origin);
+      return target.origin === window.location.origin;
+    } catch (error) {
+      Sentry.captureException(error, {
+        tags: {
+          url,
+        },
+      });
+      return false;
+    }
+  }
+
+  useEffect(() => {
+    if (typeof returnTo === "string" && isValidReturnToUrl(returnTo)) {
+      void router.push(returnTo);
+    }
+  }, [returnTo, router]);
+
+  // Don't render anything while redirecting
+  if (typeof returnTo === "string" && isValidReturnToUrl(returnTo)) {
     return null;
   }
 
