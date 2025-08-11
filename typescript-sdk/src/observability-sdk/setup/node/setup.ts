@@ -81,6 +81,7 @@ const warnIfMisconfigured = (options: SetupObservabilityOptions, langwatch: Retu
       options.spanProcessors?.length ??
       options.logRecordProcessors?.length ??
       options.debug?.consoleTracing ??
+      options.debug?.consoleLogging ??
       options.traceExporter;
 
     if (!hasAlternativeExport) {
@@ -89,8 +90,8 @@ const warnIfMisconfigured = (options: SetupObservabilityOptions, langwatch: Retu
         "OpenTelemetry will be set up but traces will not be exported anywhere. " +
         "Either:\n" +
         "  1. Enable LangWatch integration (remove langwatch: 'disabled')\n" +
-        "  2. Provide custom spanProcessors or traceExporter\n" +
-        "  3. Enable debug.consoleTracing for development\n" +
+        "  2. Provide custom spanProcessors, logRecordProcessors, or traceExporter\n" +
+        "  3. Enable debug.consoleTracing or debug.consoleLogging for development\n" +
         "  4. Use advanced.disabled to completely disable observability\n" +
         "  5. Use advanced.skipOpenTelemetrySetup to handle OpenTelemetry setup yourself";
 
