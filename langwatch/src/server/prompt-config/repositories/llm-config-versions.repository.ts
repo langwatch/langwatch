@@ -168,6 +168,8 @@ export class LlmConfigVersionsRepository {
 
     // Omit the version field from the validator since auto-incremented by the database
     const validator = getVersionValidator(versionData.schemaVersion).omit({
+      id: true,
+      createdAt: true,
       version: true,
     });
 
