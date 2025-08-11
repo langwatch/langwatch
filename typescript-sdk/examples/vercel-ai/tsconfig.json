@@ -15,10 +15,6 @@
     "declarationMap": true,
     "sourceMap": true
   },
-  "ts-node": {
-    "esm": true,
-    "experimentalSpecifierResolution": "node"
-  },
   "include": [
     "src/**/*"
   ],

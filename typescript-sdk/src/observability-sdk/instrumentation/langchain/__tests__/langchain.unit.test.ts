@@ -377,18 +377,21 @@ describe('Helper Functions', () => {
 
     it('handles arrays', () => {
       const array = [1, 2, 3];
-      expect(wrapNonScalarValues(array)).toBe(7); // Returns JSON string length for arrays
+      expect(wrapNonScalarValues(array)).toBe(JSON.stringify(array)); // Returns JSON string length for arrays
     });
 
     it('handles objects', () => {
       const obj = { key: 'value' };
-      expect(wrapNonScalarValues(obj)).toBe(15); // Returns JSON string length
+      expect(wrapNonScalarValues(obj)).toBe(JSON.stringify(obj)); // Returns JSON string length
     });
 
     it('handles circular references', () => {
       const circular: any = { name: 'test' };
       circular.self = circular;
-      expect(wrapNonScalarValues(circular)).toBe(35); // Should handle circular refs
+      const result = wrapNonScalarValues(circular);
+      expect(typeof result).toBe('string');
+      expect(result).toContain('"name":"test"');
+      expect(result).toContain('"self":"[Circular]"');
     });
   });
 
