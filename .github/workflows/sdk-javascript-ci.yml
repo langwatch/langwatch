@@ -38,6 +38,10 @@ jobs:
           LANGWATCH_API_KEY: ${{ secrets.TYPESCRIPT_SDK_LANGWATCH_API_KEY }}
         run: pnpm test
 
+      - name: Build
+        working-directory: typescript-sdk
+        run: pnpm run build
+
       - name: Run e2e tests
         working-directory: typescript-sdk
         env:
