@@ -1,6 +1,7 @@
 import { Spinner, VStack } from "@chakra-ui/react";
 import { useUpdateNodeInternals, type Node } from "@xyflow/react";
 import debounce from "lodash-es/debounce";
+import { nanoid } from "nanoid";
 import { useEffect, useMemo, useRef } from "react";
 import { FormProvider, useFieldArray } from "react-hook-form";
 import { useShallow } from "zustand/react/shallow";
@@ -45,7 +46,12 @@ import {
 import { PromptConfigProvider } from "~/prompt-configs/providers/PromptConfigProvider";
 import { usePromptConfigContext } from "~/prompt-configs/providers/PromptConfigProvider";
 import { api } from "~/utils/api";
+import { createLogger } from "~/utils/logger";
 import { snakeCase } from "~/utils/stringCasing";
+
+const logger = createLogger(
+  "langwatch:optimization-studio:signature-properties-panel"
+);
 
 /**
  * Properties panel for the Signature node in the optimization studio.
@@ -406,11 +412,11 @@ export function SignaturePropertiesPanel({
             (node.data as LlmPromptConfigComponent).name ??
             createNewOptimizationStudioPromptName(workflowName, nodes);
 
-          // Convert the name to the handle standard
-          const handle = snakeCase(tempName);
+          // Convert the name to the handle standard and make it unique
+          const handle = snakeCase(tempName + "-" + nanoid(5));
 
           // Reset the node name
-          node.data.name = handle;
+          node.data.name = tempName;
 
           // Create a new config
           const newConfig = await createMutation.mutateAsync({
@@ -467,7 +473,7 @@ export function SignaturePropertiesPanel({
             data: newNodeData,
           });
         } catch (error) {
-          console.error(error);
+          logger.error({ error }, "Failed to migrate legacy node");
           toaster.error({
             title: "Failed to migrate legacy node",
             description:
