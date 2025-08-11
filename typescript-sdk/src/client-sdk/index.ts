@@ -7,8 +7,7 @@ import { TracesFacade } from "./services/traces/facade";
 import { getLangWatchTracer, type LangWatchTracer } from "@/observability-sdk";
 import { LANGWATCH_SDK_NAME_CLIENT, LANGWATCH_SDK_VERSION } from "@/internal/constants";
 
-const DEFAULT_ENDPOINT = "https://api.langwatch.com";
-
+import { LANGWATCH_SDK_NAME_CLIENT, LANGWATCH_SDK_VERSION, DEFAULT_ENDPOINT } from "@/internal/constants";
 export interface LangWatchConstructorOptions {
   apiKey?: string;
   endpoint?: string;
