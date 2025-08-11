@@ -9,7 +9,14 @@ import type { LangWatchSpan } from "@/observability-sdk";
 export class PromptTracingDecorator {
   constructor(private readonly target: Prompt) {}
 
-  compile(span: LangWatchSpan, variables: TemplateVariables = {}): CompiledPrompt {
+export class PromptTracingDecorator {
+  constructor(private readonly target: Prompt) {}
+
+  private traceCompilation(
+    span: LangWatchSpan,
+    variables: TemplateVariables,
+    compileFn: () => CompiledPrompt
+  ): CompiledPrompt {
     span.setType("prompt");
 
     if (shouldCaptureInput({ spanType: "prompt" })) {
@@ -26,40 +33,7 @@ export class PromptTracingDecorator {
       }
     }
 
-    const result = this.target.compile(variables);
-
-    span.setAttributes({
-      'langwatch.prompt.id': result.id,
-      'langwatch.prompt.handle': result.handle ?? '',
-      'langwatch.prompt.version.id': result.versionId,
-      'langwatch.prompt.version.number': result.version,
-    });
-
-    if (shouldCaptureOutput()) {
-      span.setOutput(result.raw);
-    }
-
-    return result;
-  }
-
-  compileStrict(span: LangWatchSpan, variables: TemplateVariables): CompiledPrompt {
-    const result = this.target.compileStrict(variables);
-
-    span.setType("prompt");
-
-    if (shouldCaptureInput({ spanType: "prompt" })) {
-      span.setInput(this.target.raw);
-
-      if (variables) {
-        span.setAttribute(
-          'langwatch.prompt.variables',
-          JSON.stringify({
-            type: "json",
-            value: variables,
-          }),
-        );
-      }
-    }
+    const result = compileFn();
 
     span.setAttributes({
       'langwatch.prompt.id': result.id,
@@ -74,4 +48,21 @@ export class PromptTracingDecorator {
 
     return result;
   }
+
+  compile(span: LangWatchSpan, variables: TemplateVariables = {}): CompiledPrompt {
+    return this.traceCompilation(
+      span,
+      variables,
+      () => this.target.compile(variables),
+    );
+  }
+
+  compileStrict(span: LangWatchSpan, variables: TemplateVariables): CompiledPrompt {
+    return this.traceCompilation(
+      span,
+      variables,
+      () => this.target.compileStrict(variables),
+    );
+  }
+}
 }
