@@ -79,6 +79,7 @@ const warnIfMisconfigured = (options: SetupObservabilityOptions, langwatch: Retu
   if (langwatch.disabled) {
     const hasAlternativeExport =
       options.spanProcessors?.length ??
+      options.logRecordProcessors?.length ??
       options.debug?.consoleTracing ??
       options.traceExporter;
 
