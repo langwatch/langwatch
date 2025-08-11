@@ -15,6 +15,7 @@ import {
   type SpanType,
 } from "./types";
 import { type Prompt } from "@/client-sdk/services/prompts";
+import { type ChatMessage, type SpanInputOutput } from "../../internal/generated/types/tracer";
 import * as intSemconv from "../semconv/attributes";
 import { processSpanInputOutput, type SpanInputOutputMethod } from "./input-output";
 import type { SemConvAttributeKey, SemConvAttributes } from "../semconv";
@@ -118,27 +119,33 @@ class LangWatchSpanInternal implements LangWatchSpan {
     );
   }
 
-  setInput: SpanInputOutputMethod<this> = (
-    typeOrInput: string | unknown,
-    input?: unknown
-  ): this => {
+  setInput(type: "text", input: string): this;
+  setInput(type: "raw", input: any): this;
+  setInput(type: "chat_messages", input: ChatMessage[]): this;
+  setInput(type: "list", input: SpanInputOutput[]): this;
+  setInput(type: "json", input: any): this;
+  setInput(input: any): this;
+  setInput(typeOrInput: any, input?: any): this {
     const spanInput = processSpanInputOutput(typeOrInput, input);
     return this.setAttribute(
       intSemconv.ATTR_LANGWATCH_INPUT,
       JSON.stringify(spanInput)
     );
-  };
+  }
 
-  setOutput: SpanInputOutputMethod<this> = (
-    typeOrOutput: string | unknown,
-    output?: unknown
-  ): this => {
+  setOutput(type: "text", output: string): this;
+  setOutput(type: "raw", output: any): this;
+  setOutput(type: "chat_messages", output: ChatMessage[]): this;
+  setOutput(type: "list", output: SpanInputOutput[]): this;
+  setOutput(type: "json", output: any): this;
+  setOutput(output: any): this;
+  setOutput(typeOrOutput: any, output?: any): this {
     const spanOutput = processSpanInputOutput(typeOrOutput, output);
     return this.setAttribute(
       intSemconv.ATTR_LANGWATCH_OUTPUT,
       JSON.stringify(spanOutput)
     );
-  };
+  }
 }
 
 /**

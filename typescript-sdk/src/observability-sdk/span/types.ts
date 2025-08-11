@@ -15,7 +15,7 @@ export type JsonSerializable =
   | boolean
   | null
   | JsonSerializable[]
-  | { [key: string]: JsonSerializable };
+  | Record<string, any>;
 
 // Import attributes types from parent
 import type { SemConvAttributes } from "../semconv";
@@ -248,7 +248,7 @@ export interface LangWatchSpan extends Span {
    * @param input - Any JSON-serializable value
    * @returns this
    */
-  setInput(type: "json", input: JsonSerializable): this;
+  setInput(type: "json", input: unknown): this;
   /**
    * Record the input to the span with automatic type detection.
    *
@@ -299,7 +299,7 @@ export interface LangWatchSpan extends Span {
    * @param output - Any JSON-serializable value
    * @returns this
    */
-  setOutput(type: "json", output: JsonSerializable): this;
+  setOutput(type: "json", output: unknown): this;
   /**
    * Record the output from the span with automatic type detection.
    *

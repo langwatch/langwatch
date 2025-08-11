@@ -85,17 +85,30 @@ function convertToSpanInputOutput(value: unknown): SpanInputOutput {
       });
     }
 
-    // Try to parse as JSON
-    try {
-      JSON.stringify(value);
-      return spanInputOutputSchema.parse({ type: "json", value });
-    } catch {
-      // If value can't be serialized, convert to string
-      return spanInputOutputSchema.parse({ type: "text", value: String(value) });
+    // Handle objects (fallback to json type)
+    if (isObject(value)) {
+      try {
+        return spanInputOutputSchema.parse({ type: "json", value });
+      } catch {
+        // If json type fails, fall back to text with a safe string representation
+        // eslint-disable-next-line @typescript-eslint/no-base-to-string
+        return spanInputOutputSchema.parse({ type: "text", value: String(value) });
+      }
     }
+
+    // Ultimate fallback for any other type
+    const fallbackValue = typeof value === 'object' && value !== null
+      ? `[${typeof value}]`
+      // This is the only way to get a string representation of the object
+      // eslint-disable-next-line @typescript-eslint/no-base-to-string
+      : String(value);
+    return spanInputOutputSchema.parse({ type: "text", value: fallbackValue });
   } catch {
     // Ultimate fallback - if any Zod validation fails, return as text
-    return { type: "text", value: String(value) } as SpanInputOutput;
+    const fallbackValue = typeof value === 'object' && value !== null
+      ? `[${typeof value}]`
+      : String(value);
+    return { type: "text", value: fallbackValue } as SpanInputOutput;
   }
 }
 
@@ -111,30 +124,46 @@ export function isValidInputOutputType(type: string): type is InputOutputType {
  */
 function validateValueForInputOutputType(type: InputOutputType, value: unknown): unknown {
   switch (type) {
-    case "text":
-    case "raw":
-      const stringResult = z.string().safeParse(value);
-      return stringResult.success ? stringResult.data : String(value);
-
-    case "chat_messages":
+    case "chat_messages": {
       if (!Array.isArray(value)) {
         value = [value];
       }
       const chatResult = z.array(chatMessageSchema).safeParse(value);
-      return chatResult.success ? chatResult.data : [{ role: "user", content: String(value) }];
+      const safeValue = typeof value === 'object' && value !== null
+        ? `[${typeof value}]`
+        : String(value);
+      return chatResult.success ? chatResult.data : [{ role: "user", content: safeValue }];
+    }
 
-    case "list":
+    case "list": {
       const listResult = z.array(spanInputOutputSchema).safeParse(value);
-      return listResult.success ? listResult.data : [{ type: "text", value: String(value) }];
+      const safeValue = typeof value === 'object' && value !== null
+        ? `[${typeof value}]`
+        : String(value);
+      return listResult.success ? listResult.data : [{ type: "text", value: safeValue }];
+    }
 
-    case "json":
+    case "json": {
       // For JSON, we accept any serializable value
       try {
         JSON.stringify(value);
         return value;
       } catch {
-        return String(value);
+        const safeValue = typeof value === 'object' && value !== null
+          ? `[${typeof value}]`
+          : String(value);
+        return safeValue;
       }
+    }
+
+    case "text":
+    case "raw": {
+      const stringResult = z.string().safeParse(value);
+      const safeValue = typeof value === 'object' && value !== null
+        ? `[${typeof value}]`
+        : String(value);
+      return stringResult.success ? stringResult.data : safeValue;
+    }
 
     default:
       return value;
@@ -144,31 +173,38 @@ function validateValueForInputOutputType(type: InputOutputType, value: unknown):
 /**
  * Processes input/output values for span storage with soft Zod validation.
  * Never throws errors, always returns a valid SpanInputOutput.
+ * When a type is explicitly provided, it will be preferred over auto-detection.
  *
  * @param typeOrValue - Either the explicit type string or the value to auto-detect
  * @param value - The value when explicit type is provided
  * @returns A valid SpanInputOutput object ready for span storage
  */
 export function processSpanInputOutput(
-  typeOrValue: string | unknown,
+  typeOrValue: unknown,
   value?: unknown
 ): SpanInputOutput {
   try {
-    // If explicit type is provided
+    // If explicit type is provided, prefer it over auto-detection
     if (typeof typeOrValue === "string" && value !== undefined) {
       const type = isValidInputOutputType(typeOrValue) ? typeOrValue : "json";
       const validatedValue = validateValueForInputOutputType(type, value);
 
       // Final validation with spanInputOutputSchema
       const result = spanInputOutputSchema.safeParse({ type, value: validatedValue });
-      return result.success ? result.data : { type: "raw", value: String(validatedValue) };
+      const safeValue = typeof validatedValue === 'object' && validatedValue !== null
+        ? `[${typeof validatedValue}]`
+        : String(validatedValue);
+      return result.success ? result.data : { type: "raw", value: safeValue };
     }
 
-    // Auto-detect type
+    // Auto-detect type when no explicit type is provided
     return convertToSpanInputOutput(typeOrValue);
   } catch {
     // Ultimate fallback - if any validation fails, return as text
-    return { type: "text", value: String(typeOrValue) } as SpanInputOutput;
+    const fallbackValue = typeof typeOrValue === 'object' && typeOrValue !== null
+      ? `[${typeof typeOrValue}]`
+      : String(typeOrValue);
+    return { type: "text", value: fallbackValue } as SpanInputOutput;
   }
 }
 
