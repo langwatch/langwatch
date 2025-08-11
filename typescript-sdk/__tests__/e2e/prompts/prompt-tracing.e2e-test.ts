@@ -12,8 +12,8 @@ describe("Prompt tracing", () => {
   beforeAll(async () => {
     const { LangWatch } = await getLangwatchSDK();
     langwatch = new LangWatch({
-      apiKey: process.env.LANGWATCH_API_KEY || "test-key",
-      endpoint: process.env.LANGWATCH_ENDPOINT || "http://localhost:3000",
+      apiKey: "test-key",
+      endpoint: "http://localhost:3000",
     });
   });
 
