@@ -4,8 +4,11 @@ import { describeRoute } from "hono-openapi";
 import { validator as zValidator, resolver } from "hono-openapi/zod";
 import { z } from "zod";
 
-import { type PromptService } from "~/server/prompt-config/prompt.service";
-import { getLatestConfigVersionSchema } from "~/server/prompt-config/repositories/llm-config-version-schema";
+import {
+  getLatestConfigVersionSchema,
+  type SchemaVersion,
+  type LatestConfigVersionSchema,
+} from "~/server/prompt-config/repositories/llm-config-version-schema";
 
 import {
   organizationMiddleware,
@@ -19,16 +22,17 @@ import {
 import { baseResponses } from "../../shared/base-responses";
 
 import {
-  llmPromptConfigSchema,
-  promptOutputSchema,
-  versionInputSchema,
-  versionOutputSchema,
+  apiResponsePromptWithVersionDataSchema,
+  apiResponseVersionOutputSchema,
+  type ApiReponsePromptVersion,
+  type ApiResponsePrompt,
 } from "./schemas";
-import {
-  buildStandardSuccessResponse,
-  getOutputsToResponseFormat,
-} from "./utils";
+import { buildStandardSuccessResponse } from "./utils";
 import { handlePossibleConflictError } from "./utils";
+import {
+  mapPromptToApiPromptResponse,
+  mapVersionToApiPromptVersionResponse,
+} from "./utils/api-mappings";
 
 import { badRequestSchema, successSchema } from "~/app/api/shared/schemas";
 import {
@@ -71,7 +75,9 @@ app.get(
       200: {
         description: "Success",
         content: {
-          "application/json": { schema: resolver(z.array(promptOutputSchema)) },
+          "application/json": {
+            schema: resolver(z.array(apiResponsePromptWithVersionDataSchema)),
+          },
         },
       },
     },
@@ -93,12 +99,11 @@ app.get(
       "Retrieved prompts for project"
     );
 
-    const transformedConfigs = configs.map((config) =>
-      transformConfigToPromptOutput(config, config.id)
-    );
-
+    const transformedConfigs = configs.map(mapPromptToApiPromptResponse);
     return c.json(
-      transformedConfigs satisfies z.infer<typeof promptOutputSchema>[]
+      transformedConfigs satisfies z.infer<
+        typeof apiResponsePromptWithVersionDataSchema
+      >[]
     );
   }
 );
@@ -110,7 +115,7 @@ app.post(
     description: "Create a new prompt with default initial version",
     responses: {
       ...baseResponses,
-      200: buildStandardSuccessResponse(promptOutputSchema),
+      200: buildStandardSuccessResponse(apiResponsePromptWithVersionDataSchema),
     },
   }),
   zValidator(
@@ -160,23 +165,7 @@ app.post(
         "Successfully created prompt with initial version"
       );
 
-      const result: z.infer<typeof promptOutputSchema> = {
-        id: newConfig.id,
-        handle: newConfig.handle,
-        scope: newConfig.scope,
-        name: newConfig.name,
-        updatedAt: newConfig.updatedAt,
-        projectId: newConfig.projectId,
-        organizationId: newConfig.organizationId,
-        version: newConfig.latestVersion.version,
-        versionId: newConfig.latestVersion.id,
-        versionCreatedAt: newConfig.latestVersion.createdAt,
-        model: newConfig.latestVersion.configData?.model || "",
-        prompt: newConfig.latestVersion.configData?.prompt || "",
-        messages: newConfig.latestVersion.configData?.messages || [],
-        response_format:
-          newConfig.latestVersion.configData?.response_format || null,
-      };
+      const result: ApiResponsePrompt = mapPromptToApiPromptResponse(newConfig);
 
       return c.json(result);
     } catch (error: any) {
@@ -193,10 +182,11 @@ app.post(
 app.get(
   "/:id{.+?}/versions",
   describeRoute({
-    description: "Get all versions for a prompt",
+    description:
+      "Get all versions for a prompt. Does not include base prompt data, only versioned data.",
     responses: {
       ...baseResponses,
-      200: buildStandardSuccessResponse(versionOutputSchema),
+      200: buildStandardSuccessResponse(apiResponseVersionOutputSchema),
       404: {
         description: "Prompt not found",
         content: {
@@ -228,59 +218,19 @@ app.get(
       "Successfully retrieved prompt versions"
     );
 
-    return c.json(versions);
-  }
-);
+    const results: ApiReponsePromptVersion[] = versions.map((item) => {
+      return mapVersionToApiPromptVersionResponse({
+        ...item,
+        schemaVersion: item.schemaVersion as SchemaVersion,
+        commitMessage: item.commitMessage ?? "",
+        configData: item.configData as LatestConfigVersionSchema["configData"],
+        author: item.author?.name
+          ? { id: item.author.id, name: item.author.name }
+          : null,
+      });
+    });
 
-// Create version
-app.post(
-  "/:id{.+?}/versions",
-  describeRoute({
-    description: "Create a new version for a prompt",
-    responses: {
-      ...baseResponses,
-      200: buildStandardSuccessResponse(versionOutputSchema),
-      404: {
-        description: "Prompt not found",
-        content: {
-          "application/json": { schema: resolver(badRequestSchema) },
-        },
-      },
-    },
-  }),
-  zValidator("json", versionInputSchema),
-  async (c) => {
-    const service = c.get("promptService");
-    const project = c.get("project");
-    const organization = c.get("organization");
-    const { id } = c.req.param();
-    const data = c.req.valid("json");
-
-    logger.info(
-      { projectId: project.id, promptId: id, model: data.configData?.model },
-      "Creating new version for prompt"
-    );
-
-    const version = await service.repository.versions.createVersion(
-      {
-        ...data,
-        configId: id,
-        projectId: project.id,
-      },
-      organization.id
-    );
-
-    logger.info(
-      {
-        projectId: project.id,
-        promptId: id,
-        versionId: version.id,
-        version: version.version,
-      },
-      "Successfully created new prompt version"
-    );
-
-    return c.json(version);
+    return c.json(results);
   }
 );
 
@@ -300,7 +250,7 @@ app.get(
     ],
     responses: {
       ...baseResponses,
-      200: buildStandardSuccessResponse(promptOutputSchema),
+      200: buildStandardSuccessResponse(apiResponsePromptWithVersionDataSchema),
       404: {
         description: "Prompt not found",
         content: {
@@ -333,7 +283,7 @@ app.get(
       });
     }
 
-    const response = transformConfigToPromptOutput(config, id);
+    const response = mapPromptToApiPromptResponse(config);
 
     return c.json(response);
   }
@@ -346,7 +296,7 @@ app.put(
     description: "Update a prompt",
     responses: {
       ...baseResponses,
-      200: buildStandardSuccessResponse(llmPromptConfigSchema),
+      200: buildStandardSuccessResponse(apiResponsePromptWithVersionDataSchema),
       404: {
         description: "Prompt not found",
         content: {
@@ -398,6 +348,12 @@ app.put(
         data,
       });
 
+      if (!updatedConfig) {
+        throw new HTTPException(404, {
+          message: "Prompt not found",
+        });
+      }
+
       logger.info(
         {
           projectId,
@@ -408,7 +364,10 @@ app.put(
         "Successfully updated prompt"
       );
 
-      return c.json(updatedConfig);
+      const result: ApiResponsePrompt =
+        mapPromptToApiPromptResponse(updatedConfig);
+
+      return c.json(result);
     } catch (error: any) {
       logger.error({ projectId, promptId: id, error }, "Error updating prompt");
       handlePossibleConflictError(error, data.scope);
@@ -477,7 +436,7 @@ app.post(
                   "conflict",
                   "up_to_date",
                 ]),
-                prompt: promptOutputSchema.optional(),
+                prompt: apiResponsePromptWithVersionDataSchema.optional(),
                 conflictInfo: z
                   .object({
                     localVersion: z.number(),
@@ -529,7 +488,7 @@ app.post(
       };
 
       if (syncResult.prompt) {
-        response.prompt = transformConfigToPromptOutput(syncResult.prompt, id);
+        response.prompt = mapPromptToApiPromptResponse(syncResult.prompt);
       }
 
       if (syncResult.conflictInfo) {
@@ -563,57 +522,3 @@ app.post(
     }
   }
 );
-
-// Helper function to transform config to promptOutputSchema format
-const transformConfigToPromptOutput = (
-  config: Awaited<
-    ReturnType<
-      typeof PromptService.prototype.repository.getAllWithLatestVersion
-    >
-  >[0],
-
-  id: string
-): z.infer<typeof promptOutputSchema> => {
-  return {
-    id,
-    name: config.name,
-    handle: config.handle,
-    scope: config.scope,
-    version: config.latestVersion.version ?? 0,
-    versionId: config.latestVersion.id ?? "",
-    versionCreatedAt: config.latestVersion.createdAt ?? new Date(),
-    model: config.latestVersion.configData.model,
-    prompt: config.latestVersion.configData.prompt,
-    updatedAt: config.updatedAt,
-    projectId: config.projectId,
-    organizationId: config.organizationId,
-    messages: buildMessages(config),
-    response_format: getOutputsToResponseFormat(config),
-  };
-};
-
-/**
- * Build messages array from config data.
- *
- * While there shouldn't be a case where both a prompt and a system message are provided,
- * this should have been addressed on ingestion, and this isn't the place to handle it.
- */
-function buildMessages(
-  config: Awaited<
-    ReturnType<
-      typeof PromptService.prototype.repository.getAllWithLatestVersion
-    >
-  >[0]
-): z.infer<typeof promptOutputSchema>["messages"] {
-  const { prompt } = config.latestVersion.configData;
-  const messages = [...config.latestVersion.configData.messages];
-
-  if (prompt) {
-    messages.unshift({
-      role: "system",
-      content: prompt,
-    });
-  }
-
-  return messages;
-}

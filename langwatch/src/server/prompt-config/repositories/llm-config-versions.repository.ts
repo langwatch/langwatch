@@ -62,7 +62,7 @@ export class LlmConfigVersionsRepository {
     }
 
     // Get all versions
-    return this.prisma.llmPromptConfigVersion.findMany({
+    return await this.prisma.llmPromptConfigVersion.findMany({
       where: { configId: config.id, projectId },
       orderBy: { createdAt: "desc" },
       include: {

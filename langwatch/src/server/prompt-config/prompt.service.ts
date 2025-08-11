@@ -1,5 +1,4 @@
 import {
-  type LlmPromptConfig,
   type Prisma,
   type PrismaClient,
   type PromptScope,
@@ -155,12 +154,18 @@ export class PromptService {
     id: string;
     projectId: string;
     data: Partial<Pick<CreateLlmConfigParams, "handle" | "scope">>;
-  }): Promise<LlmPromptConfig> {
+  }): Promise<LlmConfigWithLatestVersion | null> {
     const { id, projectId, data } = params;
 
-    return this.repository.updateConfig(id, projectId, {
+    const updatedConfig = await this.repository.updateConfig(id, projectId, {
       handle: data.handle,
       scope: data.scope,
+    });
+
+    return await this.repository.getConfigByIdOrHandleWithLatestVersion({
+      idOrHandle: id,
+      projectId,
+      organizationId: updatedConfig.organizationId,
     });
   }
 

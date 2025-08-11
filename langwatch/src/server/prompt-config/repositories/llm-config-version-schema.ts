@@ -40,6 +40,7 @@ const configSchemaV1_0 = z.object({
   authorId: z.string().nullable().optional(),
   author: z
     .object({
+      id: z.string(),
       name: z.string(),
     })
     .nullable()
