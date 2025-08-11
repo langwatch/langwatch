@@ -23,14 +23,14 @@ export class PromptServiceTracingDecorator {
 
     if (result) {
       span.setAttributes({
+        'langwatch.prompt.id': result.id,
+        'langwatch.prompt.handle': result.handle ?? '',
         'langwatch.prompt.version.id': result.versionId,
         'langwatch.prompt.version.number': result.version,
       });
     }
 
-    // Temporarily hardcode output capture for testing
     if (result && shouldCaptureOutput()) {
-      // Use JSON.parse/stringify to strip out non-serializable properties and index signatures
       span.setOutput("json", result.raw);
     }
 
@@ -49,6 +49,7 @@ export class PromptServiceTracingDecorator {
     const result = await this.target.create(params);
 
     span.setType("prompt");
+    span.setAttribute('langwatch.prompt.id', result.id);
     span.setAttribute('langwatch.prompt.handle', result.handle ?? '');
     span.setAttribute('langwatch.prompt.scope', result.scope);
     span.setAttribute('langwatch.prompt.version.id', result.versionId);

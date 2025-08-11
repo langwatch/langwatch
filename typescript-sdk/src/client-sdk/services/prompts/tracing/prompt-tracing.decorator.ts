@@ -30,11 +30,12 @@ export class PromptTracingDecorator {
 
     span.setAttributes({
       'langwatch.prompt.id': result.id,
+      'langwatch.prompt.handle': result.handle ?? '',
       'langwatch.prompt.version.id': result.versionId,
       'langwatch.prompt.version.number': result.version,
     });
 
-    if (shouldCaptureOutput({ spanType: "prompt" })) {
+    if (shouldCaptureOutput()) {
       span.setOutput(result.raw);
     }
 
@@ -62,6 +63,7 @@ export class PromptTracingDecorator {
 
     span.setAttributes({
       'langwatch.prompt.id': result.id,
+      'langwatch.prompt.handle': result.handle ?? '',
       'langwatch.prompt.version.id': result.versionId,
       'langwatch.prompt.version.number': result.version,
     });
