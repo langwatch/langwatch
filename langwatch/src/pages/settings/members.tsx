@@ -232,7 +232,16 @@ function MembersList({
       },
       {
         onSuccess: () => {
-          void queryClient.organization.getOrganizationWithMembersAndTheirTeams.invalidate();
+          void queryClient.organization.getOrganizationWithMembersAndTheirTeams
+            .invalidate()
+            .catch((error) => {
+              Sentry.captureException(error, {
+                tags: {
+                  userId,
+                  organizationId: organization.id,
+                },
+              });
+            });
           toaster.create({
             title: "Member role updated successfully",
             description: `The member role has been updated to ${
@@ -280,7 +289,16 @@ function MembersList({
             placement: "top-end",
           });
           // how to refect this organizationWithMembers
-          void queryClient.organization.getOrganizationWithMembersAndTheirTeams.invalidate();
+          void queryClient.organization.getOrganizationWithMembersAndTheirTeams
+            .invalidate()
+            .catch((error) => {
+              Sentry.captureException(error, {
+                tags: {
+                  userId,
+                  organizationId: organization.id,
+                },
+              });
+            });
         },
         onError: () => {
           toaster.create({
@@ -440,21 +458,10 @@ function MembersList({
                         />
                       </Table.Cell>
                       <Table.Cell>
-                        <Flex gap={2} flexWrap="wrap">
-                          {member.user.teamMemberships
-                            .flatMap((m) => m.team)
-                            .filter((m) => m.organizationId == organization.id)
-                            .map((m) => (
-                              <Link
-                                href={`/settings/teams/${m.slug}`}
-                                key={m.id}
-                              >
-                                <Badge size="xs" variant="surface">
-                                  {m.name}
-                                </Badge>
-                              </Link>
-                            ))}
-                        </Flex>
+                        <TeamMembershipsDisplay
+                          teamMemberships={member.user.teamMemberships}
+                          organizationId={organization.id}
+                        />
                       </Table.Cell>
                       <Table.Cell>
                         <Menu.Root>
@@ -507,26 +514,10 @@ function MembersList({
                           )?.label ?? invite.role}
                         </Table.Cell>
                         <Table.Cell>
-                          <Flex gap={2} flexWrap="wrap">
-                            {invite.teamIds.split(",").map((teamId) => {
-                              const team = teams.find(
-                                (team) => team.id === teamId
-                              );
-
-                              if (!team) return null;
-
-                              return (
-                                <Link
-                                  href={`/settings/teams/${team.slug}`}
-                                  key={teamId}
-                                >
-                                  <Badge size="xs" variant={"surface"}>
-                                    {team.name}
-                                  </Badge>
-                                </Link>
-                              );
-                            })}
-                          </Flex>
+                          <TeamIdsDisplay
+                            teamIds={invite.teamIds}
+                            teams={teams}
+                          />
                         </Table.Cell>
                         <Table.Cell>
                           <Menu.Root>
@@ -803,6 +794,66 @@ interface RoleSelectProps {
   loading?: boolean;
   disabled?: boolean;
 }
+
+interface TeamMembershipsDisplayProps {
+  teamMemberships: Array<{
+    team: { id: string; name: string; slug: string; organizationId: string };
+  }>;
+  organizationId: string;
+}
+
+/**
+ * Reusable component to display team memberships as clickable badges
+ * Single Responsibility: Renders team memberships as a list of clickable badges
+ */
+const TeamMembershipsDisplay = ({
+  teamMemberships,
+  organizationId,
+}: TeamMembershipsDisplayProps) => {
+  return (
+    <Flex gap={2} flexWrap="wrap">
+      {teamMemberships
+        .flatMap((m) => m.team)
+        .filter((m) => m.organizationId === organizationId)
+        .map((m) => (
+          <Link href={`/settings/teams/${m.slug}`} key={m.id}>
+            <Badge size="xs" variant="surface">
+              {m.name}
+            </Badge>
+          </Link>
+        ))}
+    </Flex>
+  );
+};
+
+interface TeamIdsDisplayProps {
+  teamIds: string;
+  teams: Array<{ id: string; name: string; slug: string }>;
+}
+
+/**
+ * Reusable component to display team IDs as clickable badges
+ * Single Responsibility: Renders team IDs as a list of clickable badges
+ */
+const TeamIdsDisplay = ({ teamIds, teams }: TeamIdsDisplayProps) => {
+  return (
+    <Flex gap={2} flexWrap="wrap">
+      {teamIds.split(",").map((teamId) => {
+        const team = teams.find((team) => team.id === teamId);
+
+        if (!team) return null;
+
+        return (
+          <Link href={`/settings/teams/${team.slug}`} key={teamId}>
+            <Badge size="xs" variant="surface">
+              {team.name}
+            </Badge>
+          </Link>
+        );
+      })}
+    </Flex>
+  );
+};
 
 const selectOptions = [
   {

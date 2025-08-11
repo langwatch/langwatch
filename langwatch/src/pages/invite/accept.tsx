@@ -7,6 +7,7 @@ import { SetupLayout } from "../../components/SetupLayout";
 import { toaster } from "../../components/ui/toaster";
 import { useRequiredSession } from "../../hooks/useRequiredSession";
 import { api } from "../../utils/api";
+import * as Sentry from "@sentry/nextjs";
 
 export default function Accept() {
   const router = useRouter();
@@ -25,7 +26,13 @@ export default function Accept() {
       {
         onSuccess: (data) => {
           // Invalidate queries to refresh user's organization data
-          void queryClient.organization.getAll.invalidate();
+          void queryClient.organization.getAll.invalidate().catch((error) => {
+            Sentry.captureException(error, {
+              tags: {
+                inviteCode,
+              },
+            });
+          });
 
           toaster.create({
             title: "Invite Accepted",
@@ -38,7 +45,13 @@ export default function Accept() {
             duration: 5000,
           });
 
-          void router.push(`/${data.project?.slug ?? ""}`);
+          void router.push(`/${data.project?.slug ?? ""}`).catch((error) => {
+            Sentry.captureException(error, {
+              tags: {
+                inviteCode,
+              },
+            });
+          });
         },
       }
     );
