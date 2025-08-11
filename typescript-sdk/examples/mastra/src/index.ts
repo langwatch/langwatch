@@ -66,7 +66,7 @@ async function main() {
         conversationHistory.push({ role: "user", content: userInput });
 
         // Set input for tracing
-        // span.setInput("json", conversationHistory);
+        span.setInput("chat_messages", conversationHistory);
 
         // Generate AI response using Mastra agent
         console.log("🌤️  Checking weather and planning activities...");
@@ -87,10 +87,10 @@ async function main() {
 
         // Add AI response to conversation history
         const assistantMessage = { role: "assistant", content: response.text };
-        // conversationHistory.push(assistantMessage);
+        conversationHistory.push(assistantMessage);
 
         // Set output for tracing
-        // span.setOutput("chat_messages", [assistantMessage]);
+        span.setOutput("chat_messages", [assistantMessage]);
 
         // Display AI response with markdown formatting
         console.log("\nAI:");
