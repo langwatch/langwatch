@@ -83,7 +83,8 @@ services:
     environment:
       - discovery.type=single-node
       - DISABLE_SECURITY_PLUGIN=true
-      # - "_JAVA_OPTIONS=-XX:UseSVE=0" # Uncomment for arm64, or override this file with: docker-compose.arm64.override.yml
+      # Uncomment the next line if running on Mac M4 processors to disable SVE
+      # - "_JAVA_OPTIONS=-XX:UseSVE=0"
       # Performance settings
       - "OPENSEARCH_JAVA_OPTS=-Xms256m -Xmx256m -XX:+UseG1GC -XX:-UseSerialGC -XX:G1ReservePercent=25 -XX:+AlwaysPreTouch -XX:InitiatingHeapOccupancyPercent=30"
       - "cluster.routing.allocation.disk.threshold_enabled=false"

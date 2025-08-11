@@ -147,3 +147,12 @@ metadata:
     prometheus.io/port: "5560" # For main app
     prometheus.io/path: "/metrics" # For workers with custom paths
 ```
+
+## 🍎 Mac M4 Compatibility
+
+If you're running on a Mac with M4 processor, you may need to uncomment the Java options line in the `values.yaml` file to disable SVE (Scalable Vector Extension) for OpenSearch:
+
+```bash
+# Uncomment the next line if running on Mac M4 processors to disable SVE
+# - "_JAVA_OPTIONS=-XX:UseSVE=0"
+```
