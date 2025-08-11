@@ -11,8 +11,12 @@ from typing import (
     cast,
 )
 
-import nanoid
-from langwatch.tracer import ContextSpan, ContextTrace, get_current_trace
+from langwatch.tracer import (
+    ContextSpan,
+    ContextTrace,
+    get_current_span,
+    get_current_trace,
+)
 
 from langwatch.domain import (
     ChatMessage,
@@ -120,7 +124,7 @@ class LiteLLMPatch:
 
         span = trace.span(
             type="llm",
-            parent=trace.get_current_span(),
+            parent=get_current_span(),
         ).__enter__()
 
         started_at = milliseconds_timestamp()
