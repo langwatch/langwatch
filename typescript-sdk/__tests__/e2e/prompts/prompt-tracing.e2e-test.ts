@@ -53,8 +53,6 @@ describe("Prompt tracing", () => {
     });
 
     it("should set output data", () => {
-      // Check that output was set (it should be JSON stringified)
-      console.log("Get span attributes:", getSpan?.attributes);
       expect(
         getSpan?.attributes[attributes.ATTR_LANGWATCH_OUTPUT]
       ).toBeDefined();
@@ -65,9 +63,11 @@ describe("Prompt tracing", () => {
       const output = JSON.parse(outputAttr);
 
       // Verify the prompt response structure is captured
-      // The output is a string representation, so we need to check the type
       expect(output.type).toBe("json");
-      expect(output.value).toBe("[object Object]");
+      expect(output.value).toBeDefined();
+      expect(output.value.id).toBe("prompt_123");
+      expect(output.value.name).toBe("Test Prompt 1");
+      expect(output.value.handle).toBe("test-prompt-1");
     });
   });
 
@@ -89,7 +89,6 @@ describe("Prompt tracing", () => {
     });
 
     it("should set span type to 'prompt'", () => {
-      console.log(compileSpan?.attributes);
       expect(compileSpan?.attributes[attributes.ATTR_LANGWATCH_SPAN_TYPE]).toBe(
         "prompt"
       );
@@ -101,7 +100,7 @@ describe("Prompt tracing", () => {
       );
       expect(
         compileSpan?.attributes[attributes.ATTR_LANGWATCH_PROMPT_VERSION_ID]
-      ).toBe("prompt_version_2");
+      ).toBe("prompt_version_1");
       expect(
         compileSpan?.attributes[attributes.ATTR_LANGWATCH_PROMPT_VERSION_NUMBER]
       ).toBe(1);
