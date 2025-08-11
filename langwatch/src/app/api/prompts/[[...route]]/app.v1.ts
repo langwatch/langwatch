@@ -24,7 +24,7 @@ import { baseResponses } from "../../shared/base-responses";
 import {
   apiResponsePromptWithVersionDataSchema,
   apiResponseVersionOutputSchema,
-  type ApiReponsePromptVersion,
+  type ApiResponsePromptVersion,
   type ApiResponsePrompt,
 } from "./schemas";
 import { buildStandardSuccessResponse } from "./utils";
@@ -218,7 +218,7 @@ app.get(
       "Successfully retrieved prompt versions"
     );
 
-    const results: ApiReponsePromptVersion[] = versions.map((item) => {
+    const results: ApiResponsePromptVersion[] = versions.map((item) => {
       return mapVersionToApiPromptVersionResponse({
         ...item,
         schemaVersion: item.schemaVersion as SchemaVersion,

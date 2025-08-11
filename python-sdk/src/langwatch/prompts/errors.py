@@ -38,23 +38,25 @@ def _extract_error(resp: Response[Any]) -> str | None:
         error_parts: list[str] = []
 
         # Get error from parsed object
-        if hasattr(parsed, "error"):
-            try:
-                error_val = getattr(parsed, "error")
-                if isinstance(error_val, str):
-                    error_parts.append(error_val)
-            except Exception:
-                pass
+        try:
+            error_val = parsed.error
+            if isinstance(error_val, str):
+                error_parts.append(error_val)
+        except AttributeError:
+            pass
 
         # Get message from parsed object or additional_properties
         try:
             message_val = None
-            if hasattr(parsed, "message"):
-                message_val = getattr(parsed, "message")
-            elif hasattr(parsed, "additional_properties"):
-                additional_props = getattr(parsed, "additional_properties")
-                if isinstance(additional_props, dict):
-                    message_val = additional_props.get("message")
+            try:
+                message_val = parsed.message
+            except AttributeError:
+                try:
+                    additional_props = parsed.additional_properties
+                    if isinstance(additional_props, dict):
+                        message_val = additional_props.get("message")
+                except AttributeError:
+                    pass
 
             if isinstance(message_val, str):
                 error_parts.append(message_val)
@@ -88,7 +90,7 @@ def _extract_error(resp: Response[Any]) -> str | None:
 
 def unwrap_response(
     resp: Response[Any], *, ok_type: Type[R], subject: str, op: str
-) -> R:
+) -> R | None:
     """
     Unwrap API response with proper error handling and type safety.
 
@@ -97,12 +99,13 @@ def unwrap_response(
 
     Args:
         resp: The API response object to unwrap
-        ok_type: Expected type for successful response (200 status)
+        ok_type: Expected type for successful response (200/201 status)
         subject: Description of the resource being operated on (for error messages)
         op: Description of the operation being performed (for error messages)
 
     Returns:
-        Parsed response data of type R for successful requests
+        Parsed response data of type R for successful requests (200/201),
+        None for 204 No Content responses
 
     Raises:
         ValueError: For 400 (bad request) and 404 (not found) errors
@@ -113,15 +116,28 @@ def unwrap_response(
         Error message extraction is delegated to _extract_error function.
     """
     status = int(resp.status_code)
+
+    # Handle success status codes
     if status == 200:
         if isinstance(resp.parsed, ok_type):
             return resp.parsed  # type: ignore[return-value]
         raise RuntimeError(f"Unexpected 200 payload for prompt {op}")
+
+    if status == 201:
+        if isinstance(resp.parsed, ok_type):
+            return resp.parsed  # type: ignore[return-value]
+        raise RuntimeError(f"Unexpected 201 payload for prompt {op}")
+
+    if status == 204:
+        return None
+
+    # Handle error status codes
     msg = _extract_error(resp)
     if status == 404:
         raise ValueError(f"Prompt not found: {subject}")
     if status == 400:
-        raise ValueError(f"Invalid prompt request: {msg}")
+        error_detail = f": {msg}" if msg else ""
+        raise ValueError(f"Invalid prompt request{error_detail}")
     if status == 401:
         raise RuntimeError("Authentication error")
     if status >= 500:
@@ -129,4 +145,6 @@ def unwrap_response(
         raise RuntimeError(
             f"Server error during prompt {op} (status {status}){error_detail}"
         )
-    raise RuntimeError(f"Unexpected status {status} during prompt {op}")
+
+    error_detail = f": {msg}" if msg else ""
+    raise RuntimeError(f"Unexpected status {status} during prompt {op}{error_detail}")

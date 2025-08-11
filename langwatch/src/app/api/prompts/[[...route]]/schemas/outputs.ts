@@ -36,14 +36,7 @@ export const apiResponsePromptWithVersionDataSchema =
       versionCreatedAt: z.date(),
       model: z.string(),
       prompt: z.string(),
-      messages: z.array(
-        z
-          .object({
-            role: z.enum(["user", "assistant", "system"]),
-            content: z.string(),
-          })
-          .passthrough()
-      ),
+      messages: z.array(messageSchema),
       response_format: responseFormatSchema.nullable(),
     })
   );
@@ -57,6 +50,8 @@ export type ApiResponsePrompt = z.infer<
  * Extends the input schema with metadata about the created version
  */
 export const apiResponseVersionOutputSchema = z.object({
+  configId: z.string(),
+  projectId: z.string(),
   versionId: z.string(),
   authorId: z.string().nullable(),
   version: z.number(),
@@ -74,6 +69,6 @@ export const apiResponseVersionOutputSchema = z.object({
   responseFormat: responseFormatSchema.optional(),
 });
 
-export type ApiReponsePromptVersion = z.infer<
+export type ApiResponsePromptVersion = z.infer<
   typeof apiResponseVersionOutputSchema
 >;

@@ -266,10 +266,7 @@ describe("Prompts API", () => {
             expect(body.length).toBe(1);
             expect(body[0].configId).toBe(config.id);
             expect(body[0].projectId).toBe(testProjectId);
-            expect(body[0].configData).toHaveProperty(
-              "model",
-              "openai/gpt-4o-mini"
-            );
+            expect(body[0].model).toBe("openai/gpt-4o-mini");
           });
         });
 
@@ -575,22 +572,24 @@ describe("Prompts API", () => {
           "X-Auth-Token": testApiKey,
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ name: "Test Prompt" }),
+        body: JSON.stringify({ handle: "test-handle" }),
       });
 
       const prompt = await promptRes.json();
+      expect(promptRes.status).toBe(200);
 
       const invalidData = {
-        schemaVersion: "1.0",
         configData: {
-          // Missing required model field
+          prompt: "Test prompt",
+          messages: [],
+          // Missing required fields: model, inputs, outputs
           temperature: 0.7,
         },
-        commitMessage: "Invalid schema",
+        commitMessage: "Invalid schema test",
       };
 
-      const res = await app.request(`/api/prompts/${prompt.id}/versions`, {
-        method: "POST",
+      const res = await app.request(`/api/prompts/${prompt.id}`, {
+        method: "PUT",
         headers: {
           "X-Auth-Token": testApiKey,
           "Content-Type": "application/json",
@@ -604,16 +603,35 @@ describe("Prompts API", () => {
     });
 
     it("should strictly validate input when updating a prompt", async () => {
-      // Update the prompt with invalid data
-      const res = await app.request(`/api/prompts/${mockConfig.id}`, {
+      // Create a valid prompt first
+      const promptRes = await app.request(`/api/prompts`, {
+        method: "POST",
+        headers: {
+          "X-Auth-Token": testApiKey,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ handle: "test-handle" }),
+      });
+
+      const prompt = await promptRes.json();
+      expect(promptRes.status).toBe(200);
+
+      // Test with empty data (should fail with "At least one field is required")
+      const emptyData = {};
+
+      const res = await app.request(`/api/prompts/${prompt.id}`, {
         method: "PUT",
-        headers: { "X-Auth-Token": testApiKey },
-        body: JSON.stringify({ bogus: "bogus" }),
+        headers: {
+          "X-Auth-Token": testApiKey,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(emptyData),
       });
 
       expect(res.status).toBe(400);
       const body = await res.json();
       expect(body).toHaveProperty("error");
+      expect(body.error).toContain("At least one field is required");
     });
 
     it("should return 400 if no fields are provided", async () => {

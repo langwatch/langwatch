@@ -2,7 +2,7 @@ import type { LlmConfigWithLatestVersion } from "~/server/prompt-config/reposito
 import type { LatestConfigVersionSchema } from "~/server/prompt-config/repositories/llm-config-version-schema";
 
 import { llmOutputFieldToJsonSchemaTypeMap } from "../constants";
-import type { ApiReponsePromptVersion, ApiResponsePrompt } from "../schemas";
+import type { ApiResponsePromptVersion, ApiResponsePrompt } from "../schemas";
 
 // Helper function to transform config to apiResponsePromptWithVersionDataSchema format
 export const mapPromptToApiPromptResponse = (
@@ -28,12 +28,14 @@ export const mapPromptToApiPromptResponse = (
 
 export function mapVersionToApiPromptVersionResponse(
   version: LatestConfigVersionSchema
-): ApiReponsePromptVersion {
+): ApiResponsePromptVersion {
   return {
+    projectId: version.projectId,
+    configId: version.configId,
     versionId: version.id,
     version: version.version,
     commitMessage: version.commitMessage,
-    authorId: version.author?.id ?? null,
+    authorId: version.authorId ?? version.author?.id ?? null,
     createdAt: version.createdAt,
     model: version.configData.model,
     prompt: version.configData.prompt,

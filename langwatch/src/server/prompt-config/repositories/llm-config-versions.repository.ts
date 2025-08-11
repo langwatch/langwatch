@@ -147,7 +147,7 @@ export class LlmConfigVersionsRepository {
    * Create a new version for an existing config
    */
   async createVersion(
-    versionData: Omit<LlmConfigVersionDTO, "author">,
+    versionData: Omit<LlmConfigVersionDTO, "author" | "id" | "createdAt">,
     organizationId: string
   ): Promise<LlmPromptConfigVersion & { schemaVersion: SchemaVersion }> {
     // Verify the config exists

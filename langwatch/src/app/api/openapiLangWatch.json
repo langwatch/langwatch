@@ -904,8 +904,7 @@
                           "required": [
                             "role",
                             "content"
-                          ],
-                          "additionalProperties": true
+                          ]
                         }
                       },
                       "response_format": {
@@ -1094,8 +1093,7 @@
                         "required": [
                           "role",
                           "content"
-                        ],
-                        "additionalProperties": true
+                        ]
                       }
                     },
                     "response_format": {
@@ -1566,6 +1564,9 @@
                     "id": {
                       "type": "string"
                     },
+                    "name": {
+                      "type": "string"
+                    },
                     "updatedAt": {
                       "type": "string"
                     },
@@ -1587,6 +1588,7 @@
                     "id",
                     "handle",
                     "scope",
+                    "name",
                     "updatedAt"
                   ]
                 }
@@ -1694,6 +1696,10 @@
               "schema": {
                 "type": "object",
                 "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1
+                  },
                   "handle": {
                     "type": "string"
                   },
@@ -1704,7 +1710,10 @@
                       "PROJECT"
                     ]
                   }
-                }
+                },
+                "required": [
+                  "name"
+                ]
               }
             }
           }

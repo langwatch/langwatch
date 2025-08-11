@@ -1,3 +1,5 @@
+import type { PromptScope } from "@prisma/client";
+
 import {
   SchemaVersion,
   type LatestConfigVersionSchema,
@@ -5,7 +7,6 @@ import {
 
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
-import type { PromptScope } from "@prisma/client";
 
 /**
  * Custom hook to abstract the logic of prompt config and version operations
