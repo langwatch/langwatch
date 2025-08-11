@@ -6,8 +6,34 @@ import {
 import {
   type SpanInputOutput,
   type ChatMessage,
+  type ChatRichContent,
 } from "../../internal/generated/types/tracer";
 import { type Prompt } from "@/client-sdk/services/prompts";
+
+
+/**
+ * Simple chat message type with just role and content
+ */
+export interface SimpleChatMessage {
+  role: string;
+  content: string | null | undefined | ChatRichContent[];
+}
+
+/**
+ * Valid input/output types for span data
+ */
+export const INPUT_OUTPUT_TYPES = [
+  "text",
+  "raw",
+  "chat_messages",
+  "list",
+  "json",
+  "guardrail_result",
+  "evaluation_result"
+] as const;
+
+export type InputOutputType = typeof INPUT_OUTPUT_TYPES[number];
+
 
 export type JsonSerializable =
   | string
@@ -229,10 +255,10 @@ export interface LangWatchSpan extends Span {
    * Record the input to the span with explicit type control.
    *
    * @param type - Force as "chat_messages" type
-   * @param input - Chat messages array
+   * @param input - Chat messages array (supports both ChatMessage[] and SimpleChatMessage[])
    * @returns this
    */
-  setInput(type: "chat_messages", input: ChatMessage[]): this;
+  setInput(type: "chat_messages", input: ChatMessage[] | SimpleChatMessage[]): this;
   /**
    * Record the input to the span with explicit type control.
    *
@@ -249,6 +275,22 @@ export interface LangWatchSpan extends Span {
    * @returns this
    */
   setInput(type: "json", input: unknown): this;
+  /**
+   * Record the input to the span with explicit type control.
+   *
+   * @param type - Force as "guardrail_result" type
+   * @param input - Guardrail result value
+   * @returns this
+   */
+  setInput(type: "guardrail_result", input: unknown): this;
+  /**
+   * Record the input to the span with explicit type control.
+   *
+   * @param type - Force as "evaluation_result" type
+   * @param input - Evaluation result value
+   * @returns this
+   */
+  setInput(type: "evaluation_result", input: unknown): this;
   /**
    * Record the input to the span with automatic type detection.
    *
@@ -280,10 +322,10 @@ export interface LangWatchSpan extends Span {
    * Record the output from the span with explicit type control.
    *
    * @param type - Force as "chat_messages" type
-   * @param output - Chat messages array
+   * @param output - Chat messages array (supports both ChatMessage[] and SimpleChatMessage[])
    * @returns this
    */
-  setOutput(type: "chat_messages", output: ChatMessage[]): this;
+  setOutput(type: "chat_messages", output: ChatMessage[] | SimpleChatMessage[]): this;
   /**
    * Record the output from the span with explicit type control.
    *
@@ -300,6 +342,22 @@ export interface LangWatchSpan extends Span {
    * @returns this
    */
   setOutput(type: "json", output: unknown): this;
+  /**
+   * Record the output from the span with explicit type control.
+   *
+   * @param type - Force as "guardrail_result" type
+   * @param output - Guardrail result value
+   * @returns this
+   */
+  setOutput(type: "guardrail_result", output: unknown): this;
+  /**
+   * Record the output from the span with explicit type control.
+   *
+   * @param type - Force as "evaluation_result" type
+   * @param output - Evaluation result value
+   * @returns this
+   */
+  setOutput(type: "evaluation_result", output: unknown): this;
   /**
    * Record the output from the span with automatic type detection.
    *

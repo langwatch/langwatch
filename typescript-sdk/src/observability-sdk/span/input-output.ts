@@ -4,22 +4,35 @@ import {
   spanInputOutputSchema,
 } from "../../internal/generated/types/tracer.generated";
 import { type ChatMessage, type SpanInputOutput } from "../../internal/generated/types/tracer";
-import { type JsonSerializable } from "./types";
+import { type SimpleChatMessage, type JsonSerializable, type InputOutputType, INPUT_OUTPUT_TYPES } from "./types";
 
 /**
- * Valid input/output types for span data
+ * Zod schema for simple chat messages (less strict than the generated one)
  */
-export const INPUT_OUTPUT_TYPES = [
-  "text",
-  "raw",
-  "chat_messages",
-  "list",
-  "json",
-  "guardrail_result",
-  "evaluation_result"
-] as const;
+const simpleChatMessageSchema = z.object({
+  role: z.string(),
+  content: z.union([z.string(), z.array(z.any())]).nullable().optional()
+});
 
-export type InputOutputType = typeof INPUT_OUTPUT_TYPES[number];
+const simpleChatMessageArraySchema = z.array(simpleChatMessageSchema);
+
+/**
+ * Utility function to create a safe fallback value
+ */
+function createSafeFallbackValue(value: unknown): string {
+  if (typeof value === 'object' && value !== null) {
+    return `[${typeof value}]`;
+  }
+  return String(value);
+}
+
+/**
+ * Utility function to create a safe SpanInputOutput fallback
+ */
+function createSafeSpanInputOutput(type: "text" | "raw", value: unknown): SpanInputOutput {
+  const safeValue = createSafeFallbackValue(value);
+  return { type, value: safeValue } as SpanInputOutput;
+}
 
 /**
  * Simple type checks for common input/output types
@@ -32,7 +45,7 @@ function isObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-function isChatMessage(value: unknown): value is ChatMessage {
+function isChatMessage(value: unknown): value is ChatMessage | SimpleChatMessage {
   if (!isObject(value)) return false;
   return (
     typeof value.role === "string" &&
@@ -40,8 +53,31 @@ function isChatMessage(value: unknown): value is ChatMessage {
   );
 }
 
-function isChatMessageArray(value: unknown): value is ChatMessage[] {
+function isChatMessageArray(value: unknown): value is (ChatMessage | SimpleChatMessage)[] {
   return Array.isArray(value) && value.every(isChatMessage);
+}
+
+/**
+ * Attempts to validate and convert chat messages with fallback strategies
+ */
+function processChatMessages(value: unknown): SpanInputOutput {
+  // Ensure we have an array
+  const messages = Array.isArray(value) ? value : [value];
+
+  // Strategy 1: Try strict schema first
+  const strictResult = z.array(chatMessageSchema).safeParse(messages);
+  if (strictResult.success) {
+    return { type: "chat_messages", value: strictResult.data } as SpanInputOutput;
+  }
+
+  // Strategy 2: Try simple schema
+  const simpleResult = simpleChatMessageArraySchema.safeParse(messages);
+  if (simpleResult.success) {
+    return { type: "chat_messages", value: simpleResult.data } as SpanInputOutput;
+  }
+
+  // Strategy 3: Fallback to text
+  return createSafeSpanInputOutput("text", JSON.stringify(messages));
 }
 
 /**
@@ -60,25 +96,13 @@ function convertToSpanInputOutput(value: unknown): SpanInputOutput {
       return spanInputOutputSchema.parse({ type: "text", value });
     }
 
-    // Handle chat messages (single message)
-    if (isChatMessage(value)) {
-      return spanInputOutputSchema.parse({
-        type: "chat_messages",
-        value: [value]
-      });
+    // Handle chat messages (single message or array)
+    if (isChatMessage(value) || (Array.isArray(value) && value.length > 0 && isChatMessageArray(value))) {
+      return processChatMessages(value);
     }
 
-    // Handle arrays
+    // Handle arrays (non-chat messages)
     if (Array.isArray(value)) {
-      // Check if it's an array of chat messages
-      if (value.length > 0 && isChatMessageArray(value)) {
-        return spanInputOutputSchema.parse({
-          type: "chat_messages",
-          value
-        });
-      }
-
-      // Otherwise convert to list type
       return spanInputOutputSchema.parse({
         type: "list",
         value: value.map(item => convertToSpanInputOutput(item))
@@ -90,25 +114,16 @@ function convertToSpanInputOutput(value: unknown): SpanInputOutput {
       try {
         return spanInputOutputSchema.parse({ type: "json", value });
       } catch {
-        // If json type fails, fall back to text with a safe string representation
-        // eslint-disable-next-line @typescript-eslint/no-base-to-string
-        return spanInputOutputSchema.parse({ type: "text", value: String(value) });
+        // If json type fails, fall back to text
+        return createSafeSpanInputOutput("text", value);
       }
     }
 
     // Ultimate fallback for any other type
-    const fallbackValue = typeof value === 'object' && value !== null
-      ? `[${typeof value}]`
-      // This is the only way to get a string representation of the object
-      // eslint-disable-next-line @typescript-eslint/no-base-to-string
-      : String(value);
-    return spanInputOutputSchema.parse({ type: "text", value: fallbackValue });
+    return createSafeSpanInputOutput("text", value);
   } catch {
     // Ultimate fallback - if any Zod validation fails, return as text
-    const fallbackValue = typeof value === 'object' && value !== null
-      ? `[${typeof value}]`
-      : String(value);
-    return { type: "text", value: fallbackValue } as SpanInputOutput;
+    return createSafeSpanInputOutput("text", value);
   }
 }
 
@@ -125,22 +140,27 @@ export function isValidInputOutputType(type: string): type is InputOutputType {
 function validateValueForInputOutputType(type: InputOutputType, value: unknown): unknown {
   switch (type) {
     case "chat_messages": {
-      if (!Array.isArray(value)) {
-        value = [value];
+      const messages = Array.isArray(value) ? value : [value];
+
+      // Try strict schema first
+      const strictResult = z.array(chatMessageSchema).safeParse(messages);
+      if (strictResult.success) {
+        return strictResult.data;
       }
-      const chatResult = z.array(chatMessageSchema).safeParse(value);
-      const safeValue = typeof value === 'object' && value !== null
-        ? `[${typeof value}]`
-        : String(value);
-      return chatResult.success ? chatResult.data : [{ role: "user", content: safeValue }];
+
+      // Try simple schema
+      const simpleResult = simpleChatMessageArraySchema.safeParse(messages);
+      if (simpleResult.success) {
+        return simpleResult.data;
+      }
+
+      // Fallback
+      return [{ role: "user", content: createSafeFallbackValue(value) }];
     }
 
     case "list": {
       const listResult = z.array(spanInputOutputSchema).safeParse(value);
-      const safeValue = typeof value === 'object' && value !== null
-        ? `[${typeof value}]`
-        : String(value);
-      return listResult.success ? listResult.data : [{ type: "text", value: safeValue }];
+      return listResult.success ? listResult.data : [{ type: "text", value: createSafeFallbackValue(value) }];
     }
 
     case "json": {
@@ -149,20 +169,25 @@ function validateValueForInputOutputType(type: InputOutputType, value: unknown):
         JSON.stringify(value);
         return value;
       } catch {
-        const safeValue = typeof value === 'object' && value !== null
-          ? `[${typeof value}]`
-          : String(value);
-        return safeValue;
+        return createSafeFallbackValue(value);
       }
     }
 
     case "text":
     case "raw": {
       const stringResult = z.string().safeParse(value);
-      const safeValue = typeof value === 'object' && value !== null
-        ? `[${typeof value}]`
-        : String(value);
-      return stringResult.success ? stringResult.data : safeValue;
+      return stringResult.success ? stringResult.data : createSafeFallbackValue(value);
+    }
+
+    case "guardrail_result":
+    case "evaluation_result": {
+      // These types accept any value, just ensure it's serializable
+      try {
+        JSON.stringify(value);
+        return value;
+      } catch {
+        return createSafeFallbackValue(value);
+      }
     }
 
     default:
@@ -191,20 +216,14 @@ export function processSpanInputOutput(
 
       // Final validation with spanInputOutputSchema
       const result = spanInputOutputSchema.safeParse({ type, value: validatedValue });
-      const safeValue = typeof validatedValue === 'object' && validatedValue !== null
-        ? `[${typeof validatedValue}]`
-        : String(validatedValue);
-      return result.success ? result.data : { type: "raw", value: safeValue };
+      return result.success ? result.data : createSafeSpanInputOutput("raw", validatedValue);
     }
 
     // Auto-detect type when no explicit type is provided
     return convertToSpanInputOutput(typeOrValue);
   } catch {
     // Ultimate fallback - if any validation fails, return as text
-    const fallbackValue = typeof typeOrValue === 'object' && typeOrValue !== null
-      ? `[${typeof typeOrValue}]`
-      : String(typeOrValue);
-    return { type: "text", value: fallbackValue } as SpanInputOutput;
+    return createSafeSpanInputOutput("text", typeOrValue);
   }
 }
 
@@ -213,9 +232,11 @@ export function processSpanInputOutput(
  */
 export type SpanInputOutputMethod<T> = {
   (type: "text", value: string): T;
-  (type: "raw", value: string): T;
-  (type: "chat_messages", value: ChatMessage[]): T;
+  (type: "raw", value: unknown): T;
+  (type: "chat_messages", value: ChatMessage[] | SimpleChatMessage[]): T;
   (type: "list", value: SpanInputOutput[]): T;
   (type: "json", value: JsonSerializable): T;
+  (type: "guardrail_result", value: unknown): T;
+  (type: "evaluation_result", value: unknown): T;
   (value: unknown): T;
 }
