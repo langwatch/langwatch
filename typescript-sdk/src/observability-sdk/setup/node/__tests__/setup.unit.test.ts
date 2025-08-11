@@ -49,7 +49,7 @@ describe("setupObservability", () => {
     resetObservabilitySdkConfig();
   });
 
-  it("returns shutdown noop if skipOpenTelemetrySetup is true", () => {
+  it("returns shutdown noop if skipOpenTelemetrySetup is true", async () => {
     const logger = new MockLogger({});
     const handle = setupObservability({
       langwatch: { apiKey: "test" },
@@ -58,7 +58,7 @@ describe("setupObservability", () => {
     });
     expect(logger.debug).toHaveBeenCalledWith("Skipping OpenTelemetry setup");
     expect(typeof handle.shutdown).toBe("function");
-    expect(handle.shutdown()).resolves.toBeUndefined();
+    await expect(handle.shutdown()).resolves.toBeUndefined();
   });
 
   it("returns shutdown noop if already setup", async () => {
@@ -69,13 +69,13 @@ describe("setupObservability", () => {
     await expect(handle.shutdown()).resolves.toBeUndefined();
   });
 
-  it("calls createAndStartNodeSdk and returns shutdown", () => {
+  it("calls createAndStartNodeSdk and returns shutdown", async () => {
     const handle = setupObservability(defaultOptions);
     expect(typeof handle.shutdown).toBe("function");
-    expect(handle.shutdown()).resolves.toBeUndefined();
+    await expect(handle.shutdown()).resolves.toBeUndefined();
   });
 
-  it("logs and returns noop shutdown on error if throwOnSetupError is false", () => {
+  it("logs and returns noop shutdown on error if throwOnSetupError is false", async () => {
     const badResource = resourceFromAttributes({});
     Object.defineProperty(badResource, "attributes", {
       get() {
@@ -88,10 +88,10 @@ describe("setupObservability", () => {
       advanced: { throwOnSetupError: false },
     });
     expect(typeof handle.shutdown).toBe("function");
-    expect(handle.shutdown()).resolves.toBeUndefined();
+    await expect(handle.shutdown()).resolves.toBeUndefined();
   });
 
-  it("returns no-op handle when advanced.disabled is true", () => {
+  it("returns no-op handle when advanced.disabled is true", async () => {
     const logger = new MockLogger({});
     const handle = setupObservability({
       langwatch: { apiKey: "test" },
@@ -101,7 +101,7 @@ describe("setupObservability", () => {
 
     expect(logger.debug).toHaveBeenCalledWith("Observability disabled via advanced.disabled");
     expect(typeof handle.shutdown).toBe("function");
-    expect(handle.shutdown()).resolves.toBeUndefined();
+    await expect(handle.shutdown()).resolves.toBeUndefined();
   });
 });
 
@@ -448,7 +448,7 @@ describe("createAndStartNodeSdk", () => {
     const logger = new MockLogger({});
     // Provide a minimal valid OTLPTraceExporter mock
     class FakeExporter extends OTLPTraceExporter {
-      export() {}
+      export() { /* */ }
       shutdown() {
         return Promise.resolve();
       }

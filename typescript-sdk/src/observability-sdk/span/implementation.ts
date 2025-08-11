@@ -17,7 +17,7 @@ import {
 import { type Prompt } from "@/client-sdk/services/prompts";
 import { type ChatMessage, type SpanInputOutput } from "../../internal/generated/types/tracer";
 import * as intSemconv from "../semconv/attributes";
-import { processSpanInputOutput, type SpanInputOutputMethod } from "./input-output";
+import { processSpanInputOutput } from "./input-output";
 import type { SemConvAttributeKey, SemConvAttributes } from "../semconv";
 
 class LangWatchSpanInternal implements LangWatchSpan {

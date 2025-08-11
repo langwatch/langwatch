@@ -40,7 +40,7 @@ export function createMergedResource(
  * Returns the concrete OpenTelemetry provider (NodeTracerProvider or BasicTracerProvider),
  * either from the given provider or its delegate, or undefined if not found.
  */
-export function getConcreteProvider(provider: unknown): unknown | undefined {
+export function getConcreteProvider(provider: unknown): unknown {
   if (!provider || typeof provider !== "object") return undefined;
 
   // Check provider itself

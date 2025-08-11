@@ -2,7 +2,7 @@ import { type Logger } from "../../../logger";
 import { type Instrumentation } from "@opentelemetry/instrumentation";
 import { type SpanExporter, type SpanProcessor } from "@opentelemetry/sdk-trace-base";
 import { type ContextManager, type TextMapPropagator } from "@opentelemetry/api";
-import { type LogRecordProcessor, LogRecordExporter } from "@opentelemetry/sdk-logs";
+import { type LogRecordProcessor } from "@opentelemetry/sdk-logs";
 import { type IMetricReader } from "@opentelemetry/sdk-metrics";
 import { type ViewOptions } from "@opentelemetry/sdk-metrics";
 import { type Resource, type ResourceDetector } from "@opentelemetry/resources";

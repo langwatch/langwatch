@@ -74,7 +74,7 @@ export const addCommand = async (name: string, options: AddOptions): Promise<voi
     checkApiKey();
 
     const langwatch = createLangWatchClient();
-    const version = options.version || "latest";
+    const version = options.version ?? "latest";
 
         // Fetch and materialize the prompt (like sync does for individual prompts)
     const spinner = ora(`Adding ${chalk.cyan(`${name}@${version}`)}...`).start();

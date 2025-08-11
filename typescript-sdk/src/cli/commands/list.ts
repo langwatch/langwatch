@@ -24,7 +24,7 @@ const formatTable = (
   headers.forEach((header) => {
     colWidths[header] = Math.max(
       header.length,
-      ...data.map((row) => stripAnsi(row[header] || "").length),
+      ...data.map((row) => stripAnsi(row[header] ?? "").length),
     );
   });
 
@@ -44,7 +44,7 @@ const formatTable = (
   data.forEach((row) => {
     const dataRow = headers
       .map((header) => {
-        const value = row[header] || "";
+        const value = row[header] ?? "";
         const strippedLength = stripAnsi(value).length;
         const paddingNeeded = colWidths[header]! - strippedLength;
         const paddedValue = value + " ".repeat(Math.max(0, paddingNeeded));
@@ -122,9 +122,9 @@ export const listCommand = async (): Promise<void> => {
 
       // Format prompts for table display
       const tableData = prompts.map((prompt) => ({
-        Name: prompt.handle || `${prompt.name} ` + chalk.gray(`(${prompt.id})`),
+        Name: prompt.handle ?? `${prompt.name} ` + chalk.gray(`(${prompt.id})`),
         Version: prompt.version ? `${prompt.version}` : "N/A",
-        Model: prompt.model || "N/A",
+        Model: prompt.model ?? "N/A",
         Updated: formatRelativeTime(prompt.updatedAt),
       }));
 

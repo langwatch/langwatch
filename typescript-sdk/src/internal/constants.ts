@@ -3,9 +3,7 @@ import { version } from "../../package.json";
 export type JsRuntime = "node" | "deno" | "bun" | "web" | "unknown";
 let _runtime: JsRuntime | undefined;
 export const LANGWATCH_SDK_RUNTIME = (): JsRuntime => {
-  if (!_runtime) {
-    _runtime = detectRuntime();
-  }
+  _runtime ??= detectRuntime();
   return _runtime;
 };
 

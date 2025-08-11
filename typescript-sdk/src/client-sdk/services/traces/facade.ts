@@ -1,4 +1,3 @@
-import { trace, Tracer } from "@opentelemetry/api";
 import { type InternalConfig } from "../../types";
 import { TracesService } from "./service";
 import { type GetTraceParams, type GetTraceResponse } from "./types";

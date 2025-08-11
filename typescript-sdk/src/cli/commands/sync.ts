@@ -10,6 +10,7 @@ import type { SyncResult } from "../types";
 import { FileManager } from "../utils/fileManager";
 import { ensureProjectInitialized } from "../utils/init";
 import { checkApiKey } from "../utils/apiKey";
+import readline from "node:readline";
 
 // Handle conflict resolution - show diff and ask user to choose
 const handleConflict = async (
@@ -44,7 +45,6 @@ const handleConflict = async (
   console.log("  [r] Use remote version (overwrite local)");
   console.log("  [a] Abort sync for this prompt");
 
-  const readline = require("readline");
   const rl = readline.createInterface({
     input: process.stdin,
     output: process.stdout,
@@ -114,7 +114,7 @@ export const syncCommand = async (): Promise<void> => {
           const versionSpec =
             typeof dependency === "string"
               ? dependency
-              : dependency.version || "latest";
+              : dependency.version ?? "latest";
 
           // Check if we already have this prompt with the same version
           const lockEntry = lock.prompts[name];
@@ -309,14 +309,14 @@ export const syncCommand = async (): Promise<void> => {
               actionText = "Pulled"; // User chose to use remote version
               result.fetched.push({
                 name: promptName,
-                version: syncResult.conflictInfo?.remoteVersion || 0,
+                version: syncResult.conflictInfo?.remoteVersion ?? 0,
                 versionSpec: "latest", // Default for conflict resolution
               });
             } else {
               actionText = "Pushed"; // User chose to use local version (or forced push)
               result.pushed.push({
                 name: promptName,
-                version: (syncResult.conflictInfo?.remoteVersion || 0) + 1, // New version after push
+                version: (syncResult.conflictInfo?.remoteVersion ?? 0) + 1, // New version after push
               });
             }
           } else if (syncResult.action === "up_to_date") {
@@ -333,7 +333,7 @@ export const syncCommand = async (): Promise<void> => {
             actionText = actionMap[syncResult.action as SyncAction] || "Pushed";
             result.pushed.push({
               name: promptName,
-              version: syncResult.prompt?.version || 0,
+              version: syncResult.prompt?.version ?? 0,
             });
           }
 
@@ -341,8 +341,8 @@ export const syncCommand = async (): Promise<void> => {
             promptName,
           )} ${chalk.gray(
             `(version ${
-              syncResult.prompt?.version ||
-              syncResult.conflictInfo?.remoteVersion ||
+              syncResult.prompt?.version ??
+              syncResult.conflictInfo?.remoteVersion ??
               "unknown"
             })`,
           )} ${conflictResolution === "remote" ? "to" : "from"} ${chalk.gray(

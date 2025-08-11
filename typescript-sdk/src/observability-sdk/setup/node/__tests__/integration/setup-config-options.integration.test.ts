@@ -186,9 +186,9 @@ describe('setupObservability Integration - Configuration Options', () => {
       debug: { logger },
     };
     // Test that setup doesn't throw an error with custom instrumentations
-    expect(() => {
+    expect(async () => {
       const handle = setupObservability(options);
-      handle.shutdown();
+      await handle.shutdown();
     }).not.toThrow();
   });
 
@@ -205,9 +205,9 @@ describe('setupObservability Integration - Configuration Options', () => {
       debug: { logger },
     };
     // Test that setup doesn't throw an error with custom context manager
-    expect(() => {
+    expect(async () => {
       const handle = setupObservability(options);
-      handle.shutdown();
+      await handle.shutdown();
     }).not.toThrow();
   });
 
@@ -246,9 +246,9 @@ describe('setupObservability Integration - Configuration Options', () => {
       debug: { logger },
     };
     // Test that setup doesn't throw an error with custom metric reader
-    expect(() => {
+    expect(async () => {
       const handle = setupObservability(options);
-      handle.shutdown();
+      await handle.shutdown();
     }).not.toThrow();
   });
 

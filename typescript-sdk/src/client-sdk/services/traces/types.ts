@@ -1,5 +1,4 @@
 import type { paths } from "@/internal/generated/openapi/api-client";
-import { BaseRequestOptions } from "@/client-sdk/types";
 
 export interface GetTraceParams {
   includeSpans?: boolean;

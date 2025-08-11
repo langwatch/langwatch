@@ -36,6 +36,7 @@ describe('setupObservability Integration - Log Records Functionality', () => {
 
   afterEach(async () => {
     await logRecordProcessor.forceFlush();
+    await observabilityHandle.shutdown();
     logRecordExporter.reset();
     resetObservabilitySdkConfig();
   });

@@ -18,7 +18,7 @@ describe('utils.ts', () => {
       expect(utils.isConcreteProvider({ foo: 1 })).toBe(false);
     });
     it('returns false for object with addSpanProcessor function', () => {
-      expect(utils.isConcreteProvider({ addSpanProcessor: () => {} })).toBe(true);
+      expect(utils.isConcreteProvider({ addSpanProcessor: () => { /* */ } })).toBe(true);
     });
   });
 
