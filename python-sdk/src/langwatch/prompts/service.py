@@ -6,10 +6,6 @@ This module provides a high-level interface for CRUD operations on prompts,
 handling API communication, error handling, and response unwrapping.
 """
 from typing import Dict, Literal
-import asyncio
-from functools import wraps
-from opentelemetry import trace
-from langwatch.attributes import AttributeKey
 from langwatch.generated.langwatch_rest_api_client.types import UNSET, Unset
 from langwatch.generated.langwatch_rest_api_client.client import (
     Client as LangWatchRestApiClient,
@@ -57,7 +53,7 @@ from langwatch.state import get_instance
 from .prompt import Prompt
 from .errors import unwrap_response
 
-# from .tracing import trace_prompt  # commented out since unused
+from .decorators.tracing import prompt_service_tracing
 
 
 class PromptService:
@@ -103,7 +99,7 @@ class PromptService:
             )
         return cls(instance.rest_api_client)
 
-    # @trace_prompt("get", lambda _self, prompt_id, **_: {"inputs.prompt_id": prompt_id})
+    @prompt_service_tracing.get
     def get(self, prompt_id: str) -> Prompt:
         """
         Retrieve a prompt by its ID.
@@ -127,7 +123,7 @@ class PromptService:
         )
         return Prompt(ok)
 
-    # @trace_prompt("create", lambda _self, name, **_: {"inputs.name": name})
+    @prompt_service_tracing.create
     def create(
         self,
         handle: str,

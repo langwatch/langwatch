@@ -21,7 +21,7 @@ load_dotenv()
 
 def main():
     # Initialize LangWatch (ensure you have LANGWATCH_API_KEY set)
-    langwatch.setup()
+    langwatch.setup(debug=True)
 
     print("=== LangWatch Prompt Management Example ===\n")
 
