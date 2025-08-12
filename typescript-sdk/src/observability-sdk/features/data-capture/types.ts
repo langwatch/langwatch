@@ -50,4 +50,4 @@ export interface DataCaptureConfig {
 /**
  * Union type for all supported data capture configuration formats.
  */
-export type DataCaptureOptions = DataCaptureMode | DataCaptureConfig | DataCapturePredicate;
+export type DataCaptureOptions = DataCaptureMode | DataCaptureConfig;

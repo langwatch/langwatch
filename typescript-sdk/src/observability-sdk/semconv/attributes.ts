@@ -85,6 +85,12 @@ export const ATTR_LANGWATCH_CUSTOMER_ID = "langwatch.customer.id";
 export const ATTR_LANGWATCH_THREAD_ID = "langwatch.thread.id";
 
 /**
+ * LangWatch user ID attribute key
+ * Used to store the user ID for a span or event
+ */
+export const ATTR_LANGWATCH_USER_ID = "langwatch.user.id";
+
+/**
  * LangWatch tags attribute key
  * Used to store tags for a span or event
  */

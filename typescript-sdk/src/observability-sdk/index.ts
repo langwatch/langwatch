@@ -18,7 +18,6 @@ export {
   type DataCapturePredicate,
   type DataCaptureOptions,
   DataCapturePresets,
-  createEnvironmentAwareConfig,
 } from "./features/data-capture";
 
 export {
@@ -26,6 +25,13 @@ export {
   type LangWatchSpan,
   type SpanType,
   spanTypes,
+  type LangWatchSpanMetrics,
+  type LangWatchSpanRAGContext,
+  type LangWatchSpanOptions,
+  type InputOutputType,
+  type JsonSerializable,
+  type SimpleChatMessage,
+  type INPUT_OUTPUT_TYPES,
 } from "./span";
 
 export {
