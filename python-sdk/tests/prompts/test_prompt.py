@@ -6,14 +6,11 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 import pytest
 from langwatch.prompts.prompt import Prompt, PromptCompilationError
 from fixtures import GetPromptResponseFactory
-from langwatch.generated.langwatch_rest_api_client.models.post_api_prompts_response_200_messages_item import (
-    PostApiPromptsResponse200MessagesItem,
+from langwatch.generated.langwatch_rest_api_client.models.get_api_prompts_by_id_response_200 import (
+    GetApiPromptsByIdResponse200,
 )
 from langwatch.generated.langwatch_rest_api_client.models.post_api_prompts_response_200_messages_item_role import (
     PostApiPromptsResponse200MessagesItemRole,
-)
-from langwatch.generated.langwatch_rest_api_client.models.get_api_prompts_by_id_response_200 import (
-    GetApiPromptsByIdResponse200,
 )
 
 

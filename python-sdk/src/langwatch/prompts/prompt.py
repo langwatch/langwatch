@@ -169,23 +169,29 @@ class Prompt:
 
     @prompt_tracing.compile
     def compile(
-        self, variables: Optional[TemplateVariables] = None
+        self, variables: Optional[TemplateVariables] = None, **kwargs: Any
     ) -> "CompiledPrompt":
         """
         Compile the prompt template with provided variables (lenient - missing variables become empty).
 
         Args:
             variables: Dictionary containing variable values for template compilation
+            **kwargs: Alternative way to pass variables as keyword arguments
 
         Returns:
             CompiledPrompt instance with compiled content
         """
         if variables is None:
             variables = {}
-        return self._compile(variables, strict=False)
 
-    @prompt_tracing.compile
-    def compile_strict(self, variables: TemplateVariables) -> "CompiledPrompt":
+        # Merge explicit dict with kwargs, kwargs take precedence for conflicts
+        merged_variables = {**variables, **kwargs}
+        return self._compile(merged_variables, strict=False)
+
+    @prompt_tracing.compile_strict
+    def compile_strict(
+        self, variables: Optional[TemplateVariables] = None, **kwargs: Any
+    ) -> "CompiledPrompt":
         """
         Compile with validation - throws error if required variables are missing.
 
@@ -198,7 +204,12 @@ class Prompt:
         Raises:
             PromptCompilationError: If required variables are missing or compilation fails
         """
-        return self._compile(variables, strict=True)
+        if variables is None:
+            variables = {}
+
+        # Merge explicit dict with kwargs, kwargs take precedence for conflicts
+        merged_variables = {**variables, **kwargs}
+        return self._compile(merged_variables, strict=True)
 
     def format_messages(self, **variables: Any) -> List[ChatCompletionMessageParam]:
         """
