@@ -251,17 +251,37 @@ export class LlmConfigRepository {
    * Update an LLM config's metadata (name only)
    */
   async updateConfig(
-    id: string,
+    idOrHandle: string,
     projectId: string,
     data: Partial<CreateLlmConfigParams>
   ): Promise<LlmPromptConfig> {
+    // Get organizationId first using the proper approach
+    const project = await this.prisma.project.findUnique({
+      where: { id: projectId },
+      include: {
+        team: {
+          include: { organization: true },
+        },
+      },
+    });
+
+    const organizationId = project?.team?.organization.id;
+
+    if (!organizationId) {
+      throw new NotFoundError(
+        `Organization not found. Project ID: ${projectId}`
+      );
+    }
+
     // Verify the config exists
-    const existingConfig = await this.prisma.llmPromptConfig.findUnique({
-      where: { id, projectId },
+    const existingConfig = await this.getPromptByIdOrHandle({
+      idOrHandle,
+      projectId,
+      organizationId,
     });
 
     if (!existingConfig) {
-      throw new NotFoundError(`Prompt config not found. ID: ${id}`);
+      throw new NotFoundError(`Prompt config not found. ID: ${idOrHandle}`);
     }
 
     // Format handle with organization/project context if provided
@@ -280,7 +300,7 @@ export class LlmConfigRepository {
     }
 
     const updatedConfig = await this.prisma.llmPromptConfig.update({
-      where: { id, projectId },
+      where: { id: existingConfig.id, projectId },
       data: {
         // Only update if the field is explicitly provided (including null)
         name: "name" in data ? data.name : existingConfig.name,

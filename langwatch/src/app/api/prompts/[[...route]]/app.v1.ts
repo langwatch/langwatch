@@ -343,14 +343,14 @@ app.put(
 
     try {
       const updatedConfig = await service.updatePrompt({
-        id,
+        idOrHandle: id,
         projectId,
         data,
       });
 
       if (!updatedConfig) {
         throw new HTTPException(404, {
-          message: "Prompt not found",
+          message: `Prompt not found: ${id}`,
         });
       }
 

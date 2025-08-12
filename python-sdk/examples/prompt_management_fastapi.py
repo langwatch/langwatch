@@ -85,7 +85,7 @@ def main():
 
     # 5. Delete the prompt
     print("5. Deleting the prompt...")
-    result = langwatch.prompts.delete(prompt.handle)
+    result = langwatch.prompts.delete(prompt.id)
     print(f"Deletion result: {result}")
     print("Prompt management example completed successfully!")
 

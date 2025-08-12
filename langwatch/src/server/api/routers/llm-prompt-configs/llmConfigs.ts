@@ -112,7 +112,7 @@ export const llmConfigsRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       const service = new PromptService(ctx.prisma);
       const updatedConfig = await service.updatePrompt({
-        id: input.id,
+        idOrHandle: input.id,
         projectId: input.projectId,
         data: {
           handle: input.handle,

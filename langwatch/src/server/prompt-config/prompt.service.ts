@@ -145,25 +145,31 @@ export class PromptService {
    * If a handle is provided, it will be formatted with the organization and project context.
    *
    * @param params - The parameters object
-   * @param params.id - The prompt configuration ID
+   * @param params.idOrHandle - The prompt configuration ID or handle
    * @param params.projectId - The project ID for authorization and context
    * @param params.data - The update data containing name and optional handle
    * @returns The updated prompt configuration
    */
   async updatePrompt(params: {
-    id: string;
+    idOrHandle: string;
     projectId: string;
     data: Partial<Pick<CreateLlmConfigParams, "handle" | "scope">>;
   }): Promise<LlmConfigWithLatestVersion | null> {
-    const { id, projectId, data } = params;
+    const { idOrHandle, projectId, data } = params;
 
-    const updatedConfig = await this.repository.updateConfig(id, projectId, {
-      handle: data.handle,
-      scope: data.scope,
-    });
+    const updatedConfig = await this.repository.updateConfig(
+      idOrHandle,
+      projectId,
+      {
+        handle: data.handle,
+        scope: data.scope,
+      }
+    );
+
+    console.log("UPDATED CONFIG", updatedConfig);
 
     return await this.repository.getConfigByIdOrHandleWithLatestVersion({
-      idOrHandle: id,
+      idOrHandle: updatedConfig.id,
       projectId,
       organizationId: updatedConfig.organizationId,
     });
