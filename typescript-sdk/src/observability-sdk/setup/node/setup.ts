@@ -248,12 +248,12 @@ export function createAndStartNodeSdk(
   if (!options.advanced?.disableAutoShutdown) {
     process.on('SIGTERM', () => {
       void (async () => {
-        console.log('SIGTERM received: shutting down OpenTelemetry...');
+        logger.debug('SIGTERM received: shutting down OpenTelemetry...');
         try {
           await sdk.shutdown();
-          console.log('OpenTelemetry shutdown complete');
+          logger.debug('OpenTelemetry shutdown complete');
         } catch (err) {
-          console.error('Error shutting down OpenTelemetry', err);
+          logger.error('Error shutting down OpenTelemetry', err);
         } finally {
           process.exit(0);
         }
