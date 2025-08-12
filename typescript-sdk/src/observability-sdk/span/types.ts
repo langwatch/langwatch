@@ -6,7 +6,6 @@ import {
 import {
   type SpanInputOutput,
   type ChatMessage,
-  type ChatRichContent,
 } from "../../internal/generated/types/tracer";
 import { type Prompt } from "@/client-sdk/services/prompts";
 
@@ -16,7 +15,7 @@ import { type Prompt } from "@/client-sdk/services/prompts";
  */
 export interface SimpleChatMessage {
   role: string;
-  content: string | null | undefined | ChatRichContent[];
+  content: unknown;
 }
 
 /**

@@ -3,6 +3,7 @@ import { getLangWatchTracer } from "langwatch"
 import * as readline from "readline";
 import cliMarkdown from "cli-markdown";
 import { mastra } from "./mastra/index.js";
+import { CoreMessage } from "@mastra/core";
 
 setupObservability({
   attributes: {
@@ -24,7 +25,7 @@ async function main() {
   console.log("Ask me about weather for any location and I'll help you plan activities!");
   console.log("---");
 
-  const conversationHistory = [
+  const conversationHistory: CoreMessage[] = [
     {
       role: "system",
       content:
@@ -76,7 +77,6 @@ async function main() {
           throw new Error("Weather agent not found");
         }
 
-        // @ts-expect-error - conversationHistory is not a string
         const response = await agent.generate(conversationHistory, {
           telemetry: {
             isEnabled: true,
@@ -86,7 +86,7 @@ async function main() {
         });
 
         // Add AI response to conversation history
-        const assistantMessage = { role: "assistant", content: response.text };
+        const assistantMessage: CoreMessage = { role: "assistant", content: response.text };
         conversationHistory.push(assistantMessage);
 
         // Set output for tracing
