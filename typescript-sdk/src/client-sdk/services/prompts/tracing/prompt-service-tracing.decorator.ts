@@ -98,7 +98,7 @@ export class PromptServiceTracingDecorator {
     handle: string,
     config: any
   ): Promise<{ created: boolean; prompt: Prompt }> {
-    if (shouldCaptureInput({ spanType: "prompt" })) {
+    if (shouldCaptureInput()) {
       span.setInput(config);
     }
 

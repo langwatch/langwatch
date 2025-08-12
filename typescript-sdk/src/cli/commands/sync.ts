@@ -233,7 +233,7 @@ export const syncCommand = async (): Promise<void> => {
             pushSpinner.stop();
             conflictResolution = await handleConflict(
               promptName,
-              syncResult.conflictInfo,
+              syncResult.conflictInfo!,
             );
             if (conflictResolution === "abort") {
               result.errors.push({
