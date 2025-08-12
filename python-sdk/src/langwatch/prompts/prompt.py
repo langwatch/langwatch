@@ -1,14 +1,13 @@
 import warnings
-from typing import List, Any, Dict, Union, Optional
+from typing import List, Any, Dict, Union, Optional, cast
 from openai.types.chat import ChatCompletionMessageParam
-from opentelemetry import trace
-from functools import wraps
-from liquid import Template
-from liquid.exceptions import LiquidSyntaxError, UndefinedError
+from liquid import Environment, StrictUndefined, Undefined
+from liquid.exceptions import UndefinedError
 from langwatch.generated.langwatch_rest_api_client.models.get_api_prompts_by_id_response_200 import (
     GetApiPromptsByIdResponse200,
 )
-from .formatter import PromptFormatter, MissingPromptVariableError
+from .formatter import PromptFormatter
+from .decorators.prompt_tracing import prompt_tracing
 
 
 class PromptCompilationError(Exception):
@@ -24,7 +23,9 @@ class PromptCompilationError(Exception):
 
 
 # Type for template variables - supporting common data types
-TemplateVariables = Dict[str, Union[str, int, float, bool, dict, list, None]]
+TemplateVariables = Dict[
+    str, Union[str, int, float, bool, Dict[str, Any], List[Any], None]
+]
 
 
 class Prompt:
@@ -59,6 +60,31 @@ class Prompt:
         """Returns the version number of the prompt."""
         return int(self._config.version)
 
+    def _extract_message_info(
+        self, message: Union[Dict[str, Any], Any]
+    ) -> tuple[str, str]:
+        """
+        Extract role and content from a message, handling both dict and object formats.
+
+        Args:
+            message: Message object or dictionary
+
+        Returns:
+            Tuple of (role_str, content_str)
+        """
+        if isinstance(message, dict):
+            # Dictionary format (from tests/fixtures)
+            role = message["role"]
+            content = message["content"]
+            role_str = role.value if hasattr(role, "value") else str(role)
+            content_str = str(content)
+        else:
+            # Object format (from API responses)
+            role_str = message.role.value
+            content_str = message.content
+
+        return role_str, content_str
+
     def _compile(self, variables: TemplateVariables, strict: bool) -> "CompiledPrompt":
         """
         Internal method to compile the prompt template with provided variables.
@@ -74,61 +100,44 @@ class Prompt:
             PromptCompilationError: If template compilation fails
         """
         try:
+            # Create environment based on strict mode
+            env = Environment(undefined=StrictUndefined if strict else Undefined)
+
             # Compile main prompt
             compiled_prompt = ""
-            if hasattr(self._config, "prompt") and self._config.prompt:
-                template = Template(self._config.prompt)
-                if strict:
-                    # In strict mode, check for undefined variables first
-                    compiled_prompt = template.render(
-                        **variables, strict_variables=True
-                    )
-                else:
-                    # In lenient mode, undefined variables become empty strings
-                    compiled_prompt = template.render(
-                        **variables, strict_variables=False
-                    )
+            if self._config.prompt:
+                template = env.from_string(self._config.prompt)
+                compiled_prompt = template.render(**variables)
 
             # Compile messages
-            compiled_messages = []
-            if hasattr(self._config, "messages"):
+            compiled_messages: List[Dict[str, str]] = []
+            if self._config.messages:
                 for message in self._config.messages:
-                    if hasattr(message, "content") and message.content:
-                        template = Template(message.content)
-                        if strict:
-                            compiled_content = template.render(
-                                **variables, strict_variables=True
-                            )
-                        else:
-                            compiled_content = template.render(
-                                **variables, strict_variables=False
-                            )
+                    role_str, content_str = self._extract_message_info(message)
 
-                        # Create a new message dict with compiled content
+                    if content_str:
+                        template = env.from_string(content_str)
+                        compiled_content = template.render(**variables)
                         compiled_message = {
-                            "role": (
-                                message.role.value
-                                if hasattr(message.role, "value")
-                                else message.role
-                            ),
+                            "role": role_str,
                             "content": compiled_content,
                         }
-                        compiled_messages.append(compiled_message)
                     else:
                         # Keep message as-is if no content to compile
                         compiled_message = {
-                            "role": (
-                                message.role.value
-                                if hasattr(message.role, "value")
-                                else message.role
-                            ),
-                            "content": getattr(message, "content", ""),
+                            "role": role_str,
+                            "content": content_str,
                         }
-                        compiled_messages.append(compiled_message)
+                    compiled_messages.append(compiled_message)
 
             # Create a mock config object with compiled content
             class CompiledConfig:
-                def __init__(self, original_config, compiled_prompt, compiled_messages):
+                def __init__(
+                    self,
+                    original_config: Any,
+                    compiled_prompt: str,
+                    compiled_messages: List[Dict[str, str]],
+                ):
                     # Copy all original attributes
                     for attr in dir(original_config):
                         if not attr.startswith("_"):
@@ -139,32 +148,26 @@ class Prompt:
                                 pass
 
                     # Override with compiled content
-                    if hasattr(original_config, "prompt"):
-                        self.prompt = compiled_prompt
-                    if hasattr(original_config, "messages"):
-                        self.messages = compiled_messages
+                    self.prompt = compiled_prompt
+                    self.messages = compiled_messages
 
             compiled_config = CompiledConfig(
                 self._config, compiled_prompt, compiled_messages
             )
             return CompiledPrompt(compiled_config, self)
 
-        except (LiquidSyntaxError, UndefinedError) as error:
-            template_str = getattr(self._config, "prompt", "") or str(
-                getattr(self._config, "messages", [])
-            )
+        except UndefinedError as error:
+            template_str = self._config.prompt or str(self._config.messages or [])
             raise PromptCompilationError(
                 f"Failed to compile prompt template: {str(error)}", template_str, error
             )
         except Exception as error:
-            template_str = getattr(self._config, "prompt", "") or str(
-                getattr(self._config, "messages", [])
-            )
+            template_str = self._config.prompt or str(self._config.messages or [])
             raise PromptCompilationError(
                 f"Failed to compile prompt template: {str(error)}", template_str, error
             )
 
-    @_compile_tracing
+    @prompt_tracing.compile
     def compile(
         self, variables: Optional[TemplateVariables] = None
     ) -> "CompiledPrompt":
@@ -181,7 +184,7 @@ class Prompt:
             variables = {}
         return self._compile(variables, strict=False)
 
-    @_compile_tracing
+    @prompt_tracing.compile
     def compile_strict(self, variables: TemplateVariables) -> "CompiledPrompt":
         """
         Compile with validation - throws error if required variables are missing.
@@ -208,7 +211,7 @@ class Prompt:
             **variables: Variables to format the prompt messages with
 
         Returns:
-            List[Dict[str, str]]: List of formatted messages
+            List of formatted messages compatible with ChatCompletionMessageParam
 
         Raises:
             MissingPromptVariableError: If required variables are missing
@@ -220,13 +223,18 @@ class Prompt:
             stacklevel=2,
         )
 
-        return [
+        compiled_messages = self.compile(variables)
+
+        formatted_messages = [
             {
-                "role": msg.role.value,
-                "content": self._formatter.format(msg.content, variables),
+                "role": msg["role"],
+                "content": msg["content"],
             }
-            for msg in self._config.messages
+            for msg in compiled_messages.messages
         ]
+
+        # Cast to ChatCompletionMessageParam for type compatibility
+        return cast(List[ChatCompletionMessageParam], formatted_messages)
 
     def raw_config(self) -> Any:
         """Returns the raw prompt configuration (legacy method)."""
