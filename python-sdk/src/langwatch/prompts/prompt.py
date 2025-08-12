@@ -88,16 +88,6 @@ class Prompt:
     def _compile(self, variables: TemplateVariables, strict: bool) -> "CompiledPrompt":
         """
         Internal method to compile the prompt template with provided variables.
-
-        Args:
-            variables: Dictionary of variables for template compilation
-            strict: Whether to enforce strict variable checking
-
-        Returns:
-            CompiledPrompt instance with compiled content
-
-        Raises:
-            PromptCompilationError: If template compilation fails
         """
         try:
             # Create environment based on strict mode
@@ -123,38 +113,19 @@ class Prompt:
                             "content": compiled_content,
                         }
                     else:
-                        # Keep message as-is if no content to compile
                         compiled_message = {
                             "role": role_str,
                             "content": content_str,
                         }
                     compiled_messages.append(compiled_message)
 
-            # Create a mock config object with compiled content
-            class CompiledConfig:
-                def __init__(
-                    self,
-                    original_config: Any,
-                    compiled_prompt: str,
-                    compiled_messages: List[Dict[str, str]],
-                ):
-                    # Copy all original attributes
-                    for attr in dir(original_config):
-                        if not attr.startswith("_"):
-                            try:
-                                setattr(self, attr, getattr(original_config, attr))
-                            except AttributeError:
-                                # Skip attributes that can't be set
-                                pass
-
-                    # Override with compiled content
-                    self.prompt = compiled_prompt
-                    self.messages = compiled_messages
-
-            compiled_config = CompiledConfig(
-                self._config, compiled_prompt, compiled_messages
+            # Return simplified CompiledPrompt with variables preserved
+            return CompiledPrompt(
+                original_prompt=self,
+                compiled_prompt=compiled_prompt,
+                compiled_messages=compiled_messages,
+                variables=variables.copy(),  # Store a copy of the variables
             )
-            return CompiledPrompt(compiled_config, self)
 
         except UndefinedError as error:
             template_str = self._config.prompt or str(self._config.messages or [])
@@ -252,11 +223,29 @@ class Prompt:
         return self._config
 
 
-class CompiledPrompt(Prompt):
+class CompiledPrompt:
     """
-    Represents a compiled prompt that extends Prompt with reference to the original template
+    Represents a compiled prompt with compiled content and original variables
     """
 
-    def __init__(self, compiled_config: Any, original: Prompt):
-        super().__init__(compiled_config)
-        self.original = original
+    def __init__(
+        self,
+        original_prompt: "Prompt",
+        compiled_prompt: str,
+        compiled_messages: List[Dict[str, str]],
+        variables: TemplateVariables,
+    ):
+        self.original = original_prompt
+        self.prompt = compiled_prompt
+        self.messages = compiled_messages
+        self.variables = variables  # Store the original compilation variables
+
+        # Expose original prompt properties for convenience
+        self.id = original_prompt.id
+        self.version = original_prompt.version
+        self.version_id = original_prompt.version_id
+        # ... other properties as needed
+
+    def __getattr__(self, name: str) -> Any:
+        """Delegate unknown attributes to original prompt for backward compatibility"""
+        return getattr(self.original, name)

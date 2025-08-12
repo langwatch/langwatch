@@ -26,6 +26,7 @@ class PromptTracing:
                 with trace.get_tracer(__name__).start_as_current_span(
                     span_name
                 ) as span:
+                    # Set base prompt
                     span.set_attributes({"langwatch.prompt.type": "prompt"})
                     span.set_attribute("langwatch.prompt.id", self.id)
                     span.set_attribute("langwatch.prompt.version.id", self.version_id)
@@ -33,7 +34,7 @@ class PromptTracing:
                         "langwatch.prompt.version.number", int(self.version)
                     )
 
-                    # Combine variables dict (if provided as first arg) with kwargs
+                    # Create variables dict from args and kwargs
                     variables_dict: dict[str, Any] = {}
                     if args and args[0] is not None:
                         variables_dict.update(args[0])
