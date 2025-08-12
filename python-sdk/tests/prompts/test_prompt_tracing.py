@@ -120,3 +120,51 @@ def test_prompt_compile_strict_creates_trace_span(
     assert span.attributes.get("langwatch.prompt.id") == "prompt_123"
     assert span.attributes.get("langwatch.prompt.version.id") == "version_1"
     assert span.attributes.get("langwatch.prompt.version.number") == 1
+
+
+def test_prompt_compile_captures_input_variables(
+    span_exporter: MockSpanExporter, prompt: Prompt
+):
+    """Test that Prompt.compile captures input variables when automatic capture is enabled"""
+    prompt.compile(name="Alice")
+
+    # Verify span was created
+    span = span_exporter.find_span_by_name("compile")
+    assert span is not None
+
+    # Type assertion for linter
+    assert span.attributes is not None
+
+    # Check that input variables were captured
+    variables_attr = span.attributes.get("langwatch.prompt.variables")
+    assert variables_attr is not None
+
+    import json
+
+    variables = json.loads(str(variables_attr))
+    assert variables["type"] == "json"
+    assert variables["value"] == {"name": "Alice"}
+
+
+def test_prompt_compile_strict_captures_input_variables(
+    span_exporter: MockSpanExporter, prompt: Prompt
+):
+    """Test that Prompt.compile_strict captures input variables when automatic capture is enabled"""
+    prompt.compile_strict(name="Alice", greeting="Hello")
+
+    # Verify span was created
+    span = span_exporter.find_span_by_name("compile_strict")
+    assert span is not None
+
+    # Type assertion for linter
+    assert span.attributes is not None
+
+    # Check that input variables were captured
+    variables_attr = span.attributes.get("langwatch.prompt.variables")
+    assert variables_attr is not None
+
+    import json
+
+    variables = json.loads(str(variables_attr))
+    assert variables["type"] == "json"
+    assert variables["value"] == {"name": "Alice", "greeting": "Hello"}

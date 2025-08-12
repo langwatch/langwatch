@@ -1,6 +1,7 @@
 from functools import wraps
 from opentelemetry import trace
 from typing import TYPE_CHECKING, TypeVar, Callable, Any
+import json
 
 if TYPE_CHECKING:
     from langwatch.prompts.prompt import Prompt, CompiledPrompt
@@ -30,6 +31,22 @@ class PromptTracing:
                     span.set_attribute("langwatch.prompt.version.id", self.version_id)
                     span.set_attribute(
                         "langwatch.prompt.version.number", int(self.version)
+                    )
+
+                    # Combine variables dict (if provided as first arg) with kwargs
+                    variables_dict: dict[str, Any] = {}
+                    if args and args[0] is not None:
+                        variables_dict.update(args[0])
+                    variables_dict.update(kwargs)
+
+                    span.set_attribute(
+                        "langwatch.prompt.variables",
+                        json.dumps(
+                            {
+                                "type": "json",
+                                "value": variables_dict,
+                            }
+                        ),
                     )
 
                     try:
