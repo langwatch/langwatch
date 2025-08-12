@@ -18,13 +18,6 @@ export default defineConfig({
     resolve: {
         alias: {
             "@": resolve(__dirname, "./src"),
-            "@/cli": resolve(__dirname, "./src/cli"),
-            "@/client-sdk": resolve(__dirname, "./src/client-sdk"),
-            "@/observability-sdk": resolve(
-                __dirname,
-                "./src/observability-sdk",
-            ),
-            "@/internal": resolve(__dirname, "./src/internal"),
         },
     },
 });

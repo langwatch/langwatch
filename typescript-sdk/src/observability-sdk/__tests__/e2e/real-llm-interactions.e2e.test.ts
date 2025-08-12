@@ -15,7 +15,6 @@ import {
   E2E_CONFIG,
   expectTraceToBeIngested,
   getTraceIdFromSpan,
-  getRawTraceIdFromSpan,
   expectSpanAttribute,
 } from "./e2e-utils";
 import * as semconv from "../../semconv";
@@ -56,7 +55,6 @@ describe("Real LLM Interactions E2E", () => {
 
     await tracer.withActiveSpan("chat-completion", async (span) => {
       traceId = getTraceIdFromSpan(span);
-      const rawTraceId = getRawTraceIdFromSpan(span);
 
       span.setAttributes({
         [semconv.ATTR_LANGWATCH_CUSTOMER_ID]: testIds.userId,

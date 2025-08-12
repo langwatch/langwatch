@@ -4,6 +4,7 @@ import {
   type DataCaptureContext,
   type DataCaptureOptions,
 } from "./features/data-capture/types.js";
+import { validateDataCaptureMode } from "./features/data-capture/utils.js";
 
 /**
  * @module observability/config
@@ -181,7 +182,7 @@ export function getDataCaptureMode(): DataCaptureMode {
     return "all";
   }
 
-  if (typeof config.dataCapture === "object" && config.dataCapture.mode) {
+  if (typeof config.dataCapture === "object" && config.dataCapture.mode &&validateDataCaptureMode(config.dataCapture.mode)) {
     return config.dataCapture.mode;
   }
 
@@ -189,34 +190,30 @@ export function getDataCaptureMode(): DataCaptureMode {
 }
 
 /**
- * Determines if input data should be captured for a given context.
+ * Determines if input data should be captured.
  *
- * @param context - (Optional) Partial context for data capture decision.
  * @returns `true` if input should be captured, otherwise `false`.
  *
  * @example
  * ```ts
- * if (shouldCaptureInput({ operationName: "userLogin" })) {
+ * if (shouldCaptureInput()) {
  *   // Capture input
  * }
  * ```
  */
-export function shouldCaptureInput(
-  context?: Partial<DataCaptureContext>,
-): boolean {
+export function shouldCaptureInput(): boolean {
   const mode = getDataCaptureMode();
   return mode === "input" || mode === "all";
 }
 
 /**
- * Determines if output data should be captured for a given context.
+ * Determines if output data should be captured.
  *
- * @param context - (Optional) Partial context for data capture decision.
  * @returns `true` if output should be captured, otherwise `false`.
  *
  * @example
  * ```ts
- * if (shouldCaptureOutput({ operationName: "userLogin" })) {
+ * if (shouldCaptureOutput()) {
  *   // Capture output
  * }
  * ```

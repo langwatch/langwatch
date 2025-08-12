@@ -9,6 +9,7 @@ import {
   type Exception,
 } from "@opentelemetry/api";
 import {
+  type SimpleChatMessage,
   type LangWatchSpan,
   type LangWatchSpanMetrics,
   type LangWatchSpanRAGContext,
@@ -121,7 +122,7 @@ class LangWatchSpanInternal implements LangWatchSpan {
 
   setInput(type: "text", input: string): this;
   setInput(type: "raw", input: any): this;
-  setInput(type: "chat_messages", input: ChatMessage[]): this;
+  setInput(type: "chat_messages", input: ChatMessage[] | SimpleChatMessage[]): this;
   setInput(type: "list", input: SpanInputOutput[]): this;
   setInput(type: "json", input: any): this;
   setInput(input: any): this;
@@ -135,7 +136,7 @@ class LangWatchSpanInternal implements LangWatchSpan {
 
   setOutput(type: "text", output: string): this;
   setOutput(type: "raw", output: any): this;
-  setOutput(type: "chat_messages", output: ChatMessage[]): this;
+  setOutput(type: "chat_messages", output: ChatMessage[] | SimpleChatMessage[]): this;
   setOutput(type: "list", output: SpanInputOutput[]): this;
   setOutput(type: "json", output: any): this;
   setOutput(output: any): this;

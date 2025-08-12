@@ -5,7 +5,7 @@ import ora from "ora";
 import * as yaml from "js-yaml";
 import { PromptConverter } from "@/cli/utils/promptConverter";
 import { type ConfigData, PromptsError, type SyncAction } from "@/client-sdk/services/prompts";
-import { createLangWatchClient } from "../utils/langwatch";
+import { LangWatch } from "@/client-sdk";
 import type { SyncResult } from "../types";
 import { FileManager } from "../utils/fileManager";
 import { ensureProjectInitialized } from "../utils/init";
@@ -73,7 +73,7 @@ export const syncCommand = async (): Promise<void> => {
     checkApiKey();
 
     // Get LangWatch client
-    const langwatch = createLangWatchClient();
+    const langwatch = new LangWatch();
 
     // Ensure project is initialized (prompts.json, lock file, directories)
     await ensureProjectInitialized(false); // Don't prompt for .gitignore in sync
@@ -233,7 +233,7 @@ export const syncCommand = async (): Promise<void> => {
             pushSpinner.stop();
             conflictResolution = await handleConflict(
               promptName,
-              syncResult.conflictInfo!,
+              syncResult.conflictInfo,
             );
             if (conflictResolution === "abort") {
               result.errors.push({

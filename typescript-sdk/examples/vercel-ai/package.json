@@ -4,8 +4,8 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "start:langwatch": "USE_LANGWATCH=1 tsc && dotenv -- node dist/index.js",
-    "start:vercel": "USE_LANGWATCH=0 tsc && dotenv -- node dist/index.js",
+    "start:langwatch": "tsc && dotenv -- node dist/index.js",
+    "start:vercel": "tsc && dotenv -- node dist/using-vercel-otel.js",
     "build": "tsc",
     "test": "echo \"Error: no test specified\" && exit 1"
   },

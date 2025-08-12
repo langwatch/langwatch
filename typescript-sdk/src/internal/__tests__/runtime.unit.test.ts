@@ -1,7 +1,12 @@
-import { describe, it, expect } from 'vitest';
-import { detectRuntime } from '../runtime';
+import { describe, it, expect, beforeEach } from 'vitest';
+import { detectRuntime, getRuntime, resetRuntimeCache } from '../runtime';
 
 describe('runtime.ts', () => {
+  beforeEach(() => {
+    // Reset the cached runtime between tests
+    resetRuntimeCache();
+  });
+
   describe('detectRuntime', () => {
     it('detects node', () => {
       expect(detectRuntime({ process: { versions: { node: '18.0.0' } } })).toBe('node');
@@ -25,6 +30,14 @@ describe('runtime.ts', () => {
       expect(detectRuntime(new Proxy({}, {
         get() { throw new Error('Simulated error'); }
       }))).toBe('unknown');
+    });
+  });
+
+  describe('getRuntime', () => {
+    it('caches the runtime detection result', () => {
+      const firstCall = getRuntime();
+      const secondCall = getRuntime();
+      expect(firstCall).toBe(secondCall);
     });
   });
 });

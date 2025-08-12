@@ -3,10 +3,14 @@ import { openai } from "@ai-sdk/openai";
 import { generateText } from "ai";
 import * as readline from "readline";
 import cliMarkdown from "cli-markdown";
-import { setupObservability } from "langwatch/observability/node";
+import { registerOTel } from '@vercel/otel';
+import { LangWatchExporter } from "langwatch"
 
-// Use LangWatch observability setup
-setupObservability();
+// Use Vercel OTEL with LangWatch exporter
+registerOTel({
+  serviceName: 'vercel-ai-sdk-example',
+  traceExporter: new LangWatchExporter(),
+});
 
 const tracer = getLangWatchTracer("vercel-ai-sdk-example");
 

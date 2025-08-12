@@ -4,10 +4,10 @@ import chalk from "chalk";
 import ora from "ora";
 import { FileManager } from "../utils/fileManager";
 import { PromptsError } from "@/client-sdk/services/prompts";
-import { createLangWatchClient } from "../utils/langwatch";
 import { PromptConverter } from "../utils/promptConverter";
 import { ensureProjectInitialized } from "../utils/init";
 import { checkApiKey } from "../utils/apiKey";
+import { LangWatch } from "@/client-sdk";
 
 interface AddOptions {
   version?: string;
@@ -73,7 +73,7 @@ export const addCommand = async (name: string, options: AddOptions): Promise<voi
     // Check API key before doing anything else
     checkApiKey();
 
-    const langwatch = createLangWatchClient();
+    const langwatch = new LangWatch();
     const version = options.version ?? "latest";
 
         // Fetch and materialize the prompt (like sync does for individual prompts)

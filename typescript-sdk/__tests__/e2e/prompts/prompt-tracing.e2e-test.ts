@@ -13,7 +13,7 @@ describe("Prompt tracing", () => {
     const { LangWatch } = await getLangwatchSDK();
     langwatch = new LangWatch({
       apiKey: "test-key",
-      endpoint: "https://app.langwatch.local",
+      endpoint: "https://app.langwatch.test",
     });
   });
 
@@ -53,8 +53,6 @@ describe("Prompt tracing", () => {
     });
 
     it("should set output data", () => {
-      // Check that output was set (it should be JSON stringified)
-      console.log("Get span attributes:", getSpan?.attributes);
       expect(
         getSpan?.attributes[attributes.ATTR_LANGWATCH_OUTPUT]
       ).toBeDefined();
@@ -92,7 +90,6 @@ describe("Prompt tracing", () => {
     });
 
     it("should set span type to 'prompt'", () => {
-      console.log(compileSpan?.attributes);
       expect(compileSpan?.attributes[attributes.ATTR_LANGWATCH_SPAN_TYPE]).toBe(
         "prompt"
       );

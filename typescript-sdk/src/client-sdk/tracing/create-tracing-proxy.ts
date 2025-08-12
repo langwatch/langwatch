@@ -46,10 +46,7 @@ export function createTracingProxy<
         typeof prop === "string" &&
         !prop.startsWith("_") && // Skip private methods
         !isGetterOrSetter(target, prop) && // Skip actual getters/setters
-        prop !== "constructor" && // Skip constructor
-        prop !== "toString" && // Skip built-in methods
-        prop !== "valueOf" &&
-        prop !== "toJSON"
+        !isBuiltInMethod(prop) // Skip built-in methods
       ) {
         return (...args: any[]) => {
           const spanName = `${target.constructor.name}.${prop}`;
@@ -95,4 +92,25 @@ const isGetterOrSetter = (target: any, prop: string | symbol): boolean => {
 
   // Return true if it's a getter or setter
   return !!(descriptor?.get ?? descriptor?.set);
+};
+
+// Helper function to check if a method is a built-in method that should not be traced
+const isBuiltInMethod = (prop: string | symbol): boolean => {
+  if (typeof prop !== "string") {
+    return false;
+  }
+
+  // List of built-in methods that should not be traced
+  const builtInMethods = [
+    'toString',
+    'valueOf',
+    'toJSON',
+    'toLocaleString',
+    'hasOwnProperty',
+    'isPrototypeOf',
+    'propertyIsEnumerable',
+    'constructor'
+  ];
+
+  return builtInMethods.includes(prop);
 };
