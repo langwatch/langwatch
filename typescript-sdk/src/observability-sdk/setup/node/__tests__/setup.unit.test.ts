@@ -330,66 +330,6 @@ describe("data capture configuration", () => {
     });
   });
 
-  describe("predicate function configuration", () => {
-    it("calls predicate function with context for dynamic decisions", () => {
-      const mockPredicate = vi.fn().mockReturnValue("all");
-
-      setupObservability({
-        ...defaultOptions,
-        dataCapture: mockPredicate,
-      });
-
-      const context = {
-        spanType: "llm",
-        operationName: "chat_completion",
-        spanAttributes: { model: "gpt-4" },
-      };
-
-      shouldCaptureInput(context);
-
-      expect(mockPredicate).toHaveBeenCalledWith({
-        spanType: "llm",
-        operationName: "chat_completion",
-        spanAttributes: { model: "gpt-4" },
-        environment: undefined,
-      });
-    });
-
-    it("respects predicate function return values", () => {
-      setupObservability({
-        ...defaultOptions,
-        dataCapture: (ctx) => {
-          if (ctx.spanType === "llm") return "all";
-          if (ctx.spanType === "tool") return "input";
-          return "none";
-        },
-      });
-
-      // LLM spans should capture both
-      expect(shouldCaptureInput({ spanType: "llm" })).toBe(true);
-      expect(shouldCaptureOutput({ spanType: "llm" })).toBe(true);
-
-      // Tool spans should capture input only
-      expect(shouldCaptureInput({ spanType: "tool" })).toBe(true);
-      expect(shouldCaptureOutput({ spanType: "tool" })).toBe(false);
-
-      // Other spans should capture nothing
-      expect(shouldCaptureInput({ spanType: "chain" })).toBe(false);
-      expect(shouldCaptureOutput({ spanType: "chain" })).toBe(false);
-    });
-
-    it("falls back to 'all' when no context provided to predicate", () => {
-      setupObservability({
-        ...defaultOptions,
-        dataCapture: () => "input", // Predicate would return "input" with context; without context falls back to "all"
-      });
-
-      // Without context, should fall back to default
-      expect(shouldCaptureInput()).toBe(true);
-      expect(shouldCaptureOutput()).toBe(true);
-    });
-  });
-
   describe("config object format", () => {
     it("works with config object containing mode", () => {
       setupObservability({
@@ -399,46 +339,6 @@ describe("data capture configuration", () => {
 
       expect(shouldCaptureInput()).toBe(true);
       expect(shouldCaptureOutput()).toBe(false);
-    });
-  });
-
-  describe("context parameter handling", () => {
-    it("provides default values for missing context properties", () => {
-      const mockPredicate = vi.fn().mockReturnValue("all");
-
-      setupObservability({
-        ...defaultOptions,
-        dataCapture: mockPredicate,
-      });
-
-      shouldCaptureInput({ spanType: "llm" }); // Partial context
-
-      expect(mockPredicate).toHaveBeenCalledWith({
-        spanType: "llm",
-        operationName: "unknown",
-        spanAttributes: {},
-        environment: undefined,
-      });
-    });
-
-    it("preserves provided context properties", () => {
-      const mockPredicate = vi.fn().mockReturnValue("all");
-
-      setupObservability({
-        ...defaultOptions,
-        dataCapture: mockPredicate,
-      });
-
-      const fullContext = {
-        spanType: "llm",
-        operationName: "chat_completion",
-        spanAttributes: { model: "gpt-4" },
-        environment: "production",
-      };
-
-      shouldCaptureInput(fullContext);
-
-      expect(mockPredicate).toHaveBeenCalledWith(fullContext);
     });
   });
 });

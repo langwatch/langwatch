@@ -541,28 +541,5 @@ describe('setupObservability Integration - Configuration Options', () => {
 
       await handle.shutdown();
     });
-
-    it('should work with predicate functions', async () => {
-      const logger = createMockLogger();
-      const options: SetupObservabilityOptions = {
-        langwatch: { apiKey: 'test-api-key' },
-        dataCapture: (ctx) => ctx.spanType === "llm" ? "all" : "none",
-        debug: { logger },
-      };
-      const handle = setupObservability(options);
-
-      // Import config module to check predicate behavior
-      const { shouldCaptureInput, shouldCaptureOutput } = await import('../../../../config.js');
-
-      // LLM spans should capture both
-      expect(shouldCaptureInput({ spanType: "llm" })).toBe(true);
-      expect(shouldCaptureOutput({ spanType: "llm" })).toBe(true);
-
-      // Other spans should capture nothing
-      expect(shouldCaptureInput({ spanType: "tool" })).toBe(false);
-      expect(shouldCaptureOutput({ spanType: "tool" })).toBe(false);
-
-      await handle.shutdown();
-    });
   });
 });

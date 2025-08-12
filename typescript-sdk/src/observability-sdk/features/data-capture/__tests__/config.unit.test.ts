@@ -7,7 +7,6 @@ import {
   shouldCaptureInput,
   shouldCaptureOutput,
 } from '../../../config.js';
-import { type DataCaptureContext } from '../types.js';
 
 class MockLogger implements Logger {
   debug = vi.fn();
@@ -111,110 +110,6 @@ describe('Data Capture Config', () => {
     it('defaults to "all" mode when dataCapture not specified', () => {
       const logger = new MockLogger();
       initializeObservabilitySdkConfig({ logger });
-
-      expect(shouldCaptureInput()).toBe(true);
-      expect(shouldCaptureOutput()).toBe(true);
-    });
-  });
-
-  describe('predicate functions', () => {
-    it('calls predicate function with proper context', () => {
-      const mockPredicate = vi.fn().mockReturnValue("input");
-      const logger = new MockLogger();
-      initializeObservabilitySdkConfig({
-        logger,
-        dataCapture: mockPredicate
-      });
-
-      const context = {
-        spanType: "llm",
-        operationName: "chat_completion",
-        spanAttributes: { model: "gpt-4" }
-      };
-
-      shouldCaptureInput(context);
-
-      expect(mockPredicate).toHaveBeenCalledWith({
-        spanType: "llm",
-        operationName: "chat_completion",
-        spanAttributes: { model: "gpt-4" },
-        environment: undefined
-      });
-    });
-
-    it('respects predicate function return values', () => {
-      const logger = new MockLogger();
-      initializeObservabilitySdkConfig({
-        logger,
-        dataCapture: (ctx: DataCaptureContext) => {
-          if (ctx.spanType === "llm") return "all";
-          if (ctx.spanType === "tool") return "input";
-          return "none";
-        }
-      });
-
-      // LLM spans should capture both
-      expect(shouldCaptureInput({ spanType: "llm" })).toBe(true);
-      expect(shouldCaptureOutput({ spanType: "llm" })).toBe(true);
-
-      // Tool spans should capture input only
-      expect(shouldCaptureInput({ spanType: "tool" })).toBe(true);
-      expect(shouldCaptureOutput({ spanType: "tool" })).toBe(false);
-
-      // Other spans should capture nothing
-      expect(shouldCaptureInput({ spanType: "chain" })).toBe(false);
-      expect(shouldCaptureOutput({ spanType: "chain" })).toBe(false);
-    });
-
-    it('falls back to "all" when no context provided to predicate', () => {
-      const logger = new MockLogger();
-      initializeObservabilitySdkConfig({
-        logger,
-        dataCapture: () => "input" // Would normally return input only
-      });
-
-      // Without context, should fall back to default
-      expect(shouldCaptureInput()).toBe(true);
-      expect(shouldCaptureOutput()).toBe(true);
-    });
-
-    it('provides default values for missing context properties', () => {
-      const mockPredicate = vi.fn().mockReturnValue("all");
-      const logger = new MockLogger();
-      initializeObservabilitySdkConfig({
-        logger,
-        dataCapture: mockPredicate
-      });
-
-      shouldCaptureInput({ spanType: "llm" }); // Partial context
-
-      expect(mockPredicate).toHaveBeenCalledWith({
-        spanType: "llm",
-        operationName: "unknown",
-        spanAttributes: {},
-        environment: undefined
-      });
-    });
-  });
-
-  describe('config object format', () => {
-    it('works with config object containing mode', () => {
-      const logger = new MockLogger();
-      initializeObservabilitySdkConfig({
-        logger,
-        dataCapture: { mode: "input" }
-      });
-
-      expect(shouldCaptureInput()).toBe(true);
-      expect(shouldCaptureOutput()).toBe(false);
-    });
-
-    it('falls back to default when config object has no mode', () => {
-      const logger = new MockLogger();
-      initializeObservabilitySdkConfig({
-        logger,
-        dataCapture: {} as any
-      });
 
       expect(shouldCaptureInput()).toBe(true);
       expect(shouldCaptureOutput()).toBe(true);

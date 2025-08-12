@@ -147,9 +147,8 @@ export function getObservabilitySdkLogger(): Logger {
 }
 
 /**
- * Determines the effective data capture mode for a given context.
+ * Determines the effective data capture mode.
  *
- * @param context - (Optional) Partial context for data capture decision.
  * @returns The resolved {@link DataCaptureMode} ("all", "input", or "output").
  *
  * @remarks
@@ -157,12 +156,10 @@ export function getObservabilitySdkLogger(): Logger {
  *
  * @example
  * ```ts
- * const mode = getDataCaptureMode({ spanType: "http" });
+ * const mode = getDataCaptureMode();
  * ```
  */
-export function getDataCaptureMode(
-  context?: Partial<DataCaptureContext>,
-): DataCaptureMode {
+export function getDataCaptureMode(): DataCaptureMode {
   const config = getObservabilitySdkConfig();
 
   if (!config.dataCapture) {
@@ -182,29 +179,6 @@ export function getDataCaptureMode(
     );
 
     return "all";
-  }
-
-  if (typeof config.dataCapture === "function") {
-    if (!context) {
-      return "all"; // Default when no context
-    }
-
-    const fullContext: DataCaptureContext = {
-      spanType: context.spanType ?? "unknown",
-      operationName: context.operationName ?? "unknown",
-      spanAttributes: context.spanAttributes ?? {},
-      environment: context.environment,
-    };
-
-    const mode = config.dataCapture(fullContext);
-    const validModes: DataCaptureMode[] = ["none", "input", "output", "all"];
-    if (!validModes.includes(mode as DataCaptureMode)) {
-      getObservabilitySdkLogger().warn(
-        `Invalid data capture mode from predicate: ${String(mode)}. Using default: "all"`
-      );
-      return "all";
-    }
-    return mode as DataCaptureMode;
   }
 
   if (typeof config.dataCapture === "object" && config.dataCapture.mode) {
@@ -230,7 +204,7 @@ export function getDataCaptureMode(
 export function shouldCaptureInput(
   context?: Partial<DataCaptureContext>,
 ): boolean {
-  const mode = getDataCaptureMode(context);
+  const mode = getDataCaptureMode();
   return mode === "input" || mode === "all";
 }
 
@@ -247,9 +221,7 @@ export function shouldCaptureInput(
  * }
  * ```
  */
-export function shouldCaptureOutput(
-  context?: Partial<DataCaptureContext>,
-): boolean {
-  const mode = getDataCaptureMode(context);
+export function shouldCaptureOutput(): boolean {
+  const mode = getDataCaptureMode();
   return mode === "output" || mode === "all";
 }
