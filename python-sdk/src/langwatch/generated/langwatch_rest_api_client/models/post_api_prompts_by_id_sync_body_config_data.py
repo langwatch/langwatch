@@ -22,6 +22,9 @@ if TYPE_CHECKING:
     from ..models.post_api_prompts_by_id_sync_body_config_data_prompting_technique import (
         PostApiPromptsByIdSyncBodyConfigDataPromptingTechnique,
     )
+    from ..models.post_api_prompts_by_id_sync_body_config_data_response_format import (
+        PostApiPromptsByIdSyncBodyConfigDataResponseFormat,
+    )
 
 
 T = TypeVar("T", bound="PostApiPromptsByIdSyncBodyConfigData")
@@ -35,24 +38,24 @@ class PostApiPromptsByIdSyncBodyConfigData:
         inputs (list['PostApiPromptsByIdSyncBodyConfigDataInputsItem']):
         outputs (list['PostApiPromptsByIdSyncBodyConfigDataOutputsItem']):
         model (str):
-        version (Union[Unset, float]):
         messages (Union[Unset, list['PostApiPromptsByIdSyncBodyConfigDataMessagesItem']]):
         temperature (Union[Unset, float]):
         max_tokens (Union[Unset, float]):
         demonstrations (Union[Unset, PostApiPromptsByIdSyncBodyConfigDataDemonstrations]):
         prompting_technique (Union[Unset, PostApiPromptsByIdSyncBodyConfigDataPromptingTechnique]):
+        response_format (Union[Unset, PostApiPromptsByIdSyncBodyConfigDataResponseFormat]):
     """
 
     prompt: str
     inputs: list["PostApiPromptsByIdSyncBodyConfigDataInputsItem"]
     outputs: list["PostApiPromptsByIdSyncBodyConfigDataOutputsItem"]
     model: str
-    version: Union[Unset, float] = UNSET
     messages: Union[Unset, list["PostApiPromptsByIdSyncBodyConfigDataMessagesItem"]] = UNSET
     temperature: Union[Unset, float] = UNSET
     max_tokens: Union[Unset, float] = UNSET
     demonstrations: Union[Unset, "PostApiPromptsByIdSyncBodyConfigDataDemonstrations"] = UNSET
     prompting_technique: Union[Unset, "PostApiPromptsByIdSyncBodyConfigDataPromptingTechnique"] = UNSET
+    response_format: Union[Unset, "PostApiPromptsByIdSyncBodyConfigDataResponseFormat"] = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -69,8 +72,6 @@ class PostApiPromptsByIdSyncBodyConfigData:
             outputs.append(outputs_item)
 
         model = self.model
-
-        version = self.version
 
         messages: Union[Unset, list[dict[str, Any]]] = UNSET
         if not isinstance(self.messages, Unset):
@@ -91,6 +92,10 @@ class PostApiPromptsByIdSyncBodyConfigData:
         if not isinstance(self.prompting_technique, Unset):
             prompting_technique = self.prompting_technique.to_dict()
 
+        response_format: Union[Unset, dict[str, Any]] = UNSET
+        if not isinstance(self.response_format, Unset):
+            response_format = self.response_format.to_dict()
+
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
         field_dict.update(
@@ -101,8 +106,6 @@ class PostApiPromptsByIdSyncBodyConfigData:
                 "model": model,
             }
         )
-        if version is not UNSET:
-            field_dict["version"] = version
         if messages is not UNSET:
             field_dict["messages"] = messages
         if temperature is not UNSET:
@@ -113,6 +116,8 @@ class PostApiPromptsByIdSyncBodyConfigData:
             field_dict["demonstrations"] = demonstrations
         if prompting_technique is not UNSET:
             field_dict["prompting_technique"] = prompting_technique
+        if response_format is not UNSET:
+            field_dict["response_format"] = response_format
 
         return field_dict
 
@@ -133,6 +138,9 @@ class PostApiPromptsByIdSyncBodyConfigData:
         from ..models.post_api_prompts_by_id_sync_body_config_data_prompting_technique import (
             PostApiPromptsByIdSyncBodyConfigDataPromptingTechnique,
         )
+        from ..models.post_api_prompts_by_id_sync_body_config_data_response_format import (
+            PostApiPromptsByIdSyncBodyConfigDataResponseFormat,
+        )
 
         d = dict(src_dict)
         prompt = d.pop("prompt")
@@ -152,8 +160,6 @@ class PostApiPromptsByIdSyncBodyConfigData:
             outputs.append(outputs_item)
 
         model = d.pop("model")
-
-        version = d.pop("version", UNSET)
 
         messages = []
         _messages = d.pop("messages", UNSET)
@@ -180,17 +186,24 @@ class PostApiPromptsByIdSyncBodyConfigData:
         else:
             prompting_technique = PostApiPromptsByIdSyncBodyConfigDataPromptingTechnique.from_dict(_prompting_technique)
 
+        _response_format = d.pop("response_format", UNSET)
+        response_format: Union[Unset, PostApiPromptsByIdSyncBodyConfigDataResponseFormat]
+        if isinstance(_response_format, Unset):
+            response_format = UNSET
+        else:
+            response_format = PostApiPromptsByIdSyncBodyConfigDataResponseFormat.from_dict(_response_format)
+
         post_api_prompts_by_id_sync_body_config_data = cls(
             prompt=prompt,
             inputs=inputs,
             outputs=outputs,
             model=model,
-            version=version,
             messages=messages,
             temperature=temperature,
             max_tokens=max_tokens,
             demonstrations=demonstrations,
             prompting_technique=prompting_technique,
+            response_format=response_format,
         )
 
         post_api_prompts_by_id_sync_body_config_data.additional_properties = d

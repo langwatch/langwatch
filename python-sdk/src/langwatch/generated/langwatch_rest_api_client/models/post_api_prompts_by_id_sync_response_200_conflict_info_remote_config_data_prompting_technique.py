@@ -1,10 +1,19 @@
 from collections.abc import Mapping
-from typing import Any, TypeVar, Union
+from typing import TYPE_CHECKING, Any, TypeVar, Union
 
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
 
+from ..models.post_api_prompts_by_id_sync_response_200_conflict_info_remote_config_data_prompting_technique_type import (
+    PostApiPromptsByIdSyncResponse200ConflictInfoRemoteConfigDataPromptingTechniqueType,
+)
 from ..types import UNSET, Unset
+
+if TYPE_CHECKING:
+    from ..models.post_api_prompts_by_id_sync_response_200_conflict_info_remote_config_data_prompting_technique_demonstrations import (
+        PostApiPromptsByIdSyncResponse200ConflictInfoRemoteConfigDataPromptingTechniqueDemonstrations,
+    )
+
 
 T = TypeVar("T", bound="PostApiPromptsByIdSyncResponse200ConflictInfoRemoteConfigDataPromptingTechnique")
 
@@ -13,30 +22,61 @@ T = TypeVar("T", bound="PostApiPromptsByIdSyncResponse200ConflictInfoRemoteConfi
 class PostApiPromptsByIdSyncResponse200ConflictInfoRemoteConfigDataPromptingTechnique:
     """
     Attributes:
-        ref (Union[Unset, str]):
+        type_ (PostApiPromptsByIdSyncResponse200ConflictInfoRemoteConfigDataPromptingTechniqueType):
+        demonstrations (Union[Unset,
+            PostApiPromptsByIdSyncResponse200ConflictInfoRemoteConfigDataPromptingTechniqueDemonstrations]):
     """
 
-    ref: Union[Unset, str] = UNSET
+    type_: PostApiPromptsByIdSyncResponse200ConflictInfoRemoteConfigDataPromptingTechniqueType
+    demonstrations: Union[
+        Unset, "PostApiPromptsByIdSyncResponse200ConflictInfoRemoteConfigDataPromptingTechniqueDemonstrations"
+    ] = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
-        ref = self.ref
+        type_ = self.type_.value
+
+        demonstrations: Union[Unset, dict[str, Any]] = UNSET
+        if not isinstance(self.demonstrations, Unset):
+            demonstrations = self.demonstrations.to_dict()
 
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
-        field_dict.update({})
-        if ref is not UNSET:
-            field_dict["ref"] = ref
+        field_dict.update(
+            {
+                "type": type_,
+            }
+        )
+        if demonstrations is not UNSET:
+            field_dict["demonstrations"] = demonstrations
 
         return field_dict
 
     @classmethod
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
+        from ..models.post_api_prompts_by_id_sync_response_200_conflict_info_remote_config_data_prompting_technique_demonstrations import (
+            PostApiPromptsByIdSyncResponse200ConflictInfoRemoteConfigDataPromptingTechniqueDemonstrations,
+        )
+
         d = dict(src_dict)
-        ref = d.pop("ref", UNSET)
+        type_ = PostApiPromptsByIdSyncResponse200ConflictInfoRemoteConfigDataPromptingTechniqueType(d.pop("type"))
+
+        _demonstrations = d.pop("demonstrations", UNSET)
+        demonstrations: Union[
+            Unset, PostApiPromptsByIdSyncResponse200ConflictInfoRemoteConfigDataPromptingTechniqueDemonstrations
+        ]
+        if isinstance(_demonstrations, Unset):
+            demonstrations = UNSET
+        else:
+            demonstrations = (
+                PostApiPromptsByIdSyncResponse200ConflictInfoRemoteConfigDataPromptingTechniqueDemonstrations.from_dict(
+                    _demonstrations
+                )
+            )
 
         post_api_prompts_by_id_sync_response_200_conflict_info_remote_config_data_prompting_technique = cls(
-            ref=ref,
+            type_=type_,
+            demonstrations=demonstrations,
         )
 
         post_api_prompts_by_id_sync_response_200_conflict_info_remote_config_data_prompting_technique.additional_properties = d

@@ -4,8 +4,6 @@ from typing import Any, TypeVar
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
 
-from ..models.get_api_prompts_by_id_versions_response_401_error import GetApiPromptsByIdVersionsResponse401Error
-
 T = TypeVar("T", bound="GetApiPromptsByIdVersionsResponse401")
 
 
@@ -13,14 +11,14 @@ T = TypeVar("T", bound="GetApiPromptsByIdVersionsResponse401")
 class GetApiPromptsByIdVersionsResponse401:
     """
     Attributes:
-        error (GetApiPromptsByIdVersionsResponse401Error):
+        error (str):
     """
 
-    error: GetApiPromptsByIdVersionsResponse401Error
+    error: str
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
-        error = self.error.value
+        error = self.error
 
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
@@ -35,7 +33,7 @@ class GetApiPromptsByIdVersionsResponse401:
     @classmethod
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
         d = dict(src_dict)
-        error = GetApiPromptsByIdVersionsResponse401Error(d.pop("error"))
+        error = d.pop("error")
 
         get_api_prompts_by_id_versions_response_401 = cls(
             error=error,

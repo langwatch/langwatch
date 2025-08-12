@@ -27,6 +27,8 @@ class PostApiPromptsByIdSyncResponse200Prompt:
         scope (PostApiPromptsByIdSyncResponse200PromptScope):
         name (str):
         updated_at (str):
+        project_id (str):
+        organization_id (str):
         version (float):
         version_id (str):
         version_created_at (str):
@@ -41,6 +43,8 @@ class PostApiPromptsByIdSyncResponse200Prompt:
     scope: PostApiPromptsByIdSyncResponse200PromptScope
     name: str
     updated_at: str
+    project_id: str
+    organization_id: str
     version: float
     version_id: str
     version_created_at: str
@@ -65,6 +69,10 @@ class PostApiPromptsByIdSyncResponse200Prompt:
         name = self.name
 
         updated_at = self.updated_at
+
+        project_id = self.project_id
+
+        organization_id = self.organization_id
 
         version = self.version
 
@@ -96,6 +104,8 @@ class PostApiPromptsByIdSyncResponse200Prompt:
                 "scope": scope,
                 "name": name,
                 "updatedAt": updated_at,
+                "projectId": project_id,
+                "organizationId": organization_id,
                 "version": version,
                 "versionId": version_id,
                 "versionCreatedAt": version_created_at,
@@ -132,6 +142,10 @@ class PostApiPromptsByIdSyncResponse200Prompt:
         name = d.pop("name")
 
         updated_at = d.pop("updatedAt")
+
+        project_id = d.pop("projectId")
+
+        organization_id = d.pop("organizationId")
 
         version = d.pop("version")
 
@@ -173,6 +187,8 @@ class PostApiPromptsByIdSyncResponse200Prompt:
             scope=scope,
             name=name,
             updated_at=updated_at,
+            project_id=project_id,
+            organization_id=organization_id,
             version=version,
             version_id=version_id,
             version_created_at=version_created_at,

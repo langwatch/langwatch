@@ -1,18 +1,29 @@
 from collections.abc import Mapping
-from typing import TYPE_CHECKING, Any, Literal, TypeVar, Union, cast
+from typing import TYPE_CHECKING, Any, TypeVar, Union, cast
 
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
 
-from ..models.get_api_prompts_by_id_versions_response_200_scope import GetApiPromptsByIdVersionsResponse200Scope
 from ..types import UNSET, Unset
 
 if TYPE_CHECKING:
-    from ..models.get_api_prompts_by_id_versions_response_200_author_type_0 import (
-        GetApiPromptsByIdVersionsResponse200AuthorType0,
+    from ..models.get_api_prompts_by_id_versions_response_200_demonstrations import (
+        GetApiPromptsByIdVersionsResponse200Demonstrations,
     )
-    from ..models.get_api_prompts_by_id_versions_response_200_config_data import (
-        GetApiPromptsByIdVersionsResponse200ConfigData,
+    from ..models.get_api_prompts_by_id_versions_response_200_inputs_item import (
+        GetApiPromptsByIdVersionsResponse200InputsItem,
+    )
+    from ..models.get_api_prompts_by_id_versions_response_200_messages_item import (
+        GetApiPromptsByIdVersionsResponse200MessagesItem,
+    )
+    from ..models.get_api_prompts_by_id_versions_response_200_outputs_item import (
+        GetApiPromptsByIdVersionsResponse200OutputsItem,
+    )
+    from ..models.get_api_prompts_by_id_versions_response_200_prampting_technique import (
+        GetApiPromptsByIdVersionsResponse200PramptingTechnique,
+    )
+    from ..models.get_api_prompts_by_id_versions_response_200_response_format import (
+        GetApiPromptsByIdVersionsResponse200ResponseFormat,
     )
 
 
@@ -23,60 +34,76 @@ T = TypeVar("T", bound="GetApiPromptsByIdVersionsResponse200")
 class GetApiPromptsByIdVersionsResponse200:
     """
     Attributes:
-        id (str):
-        author_id (Union[None, str]):
-        project_id (str):
         config_id (str):
-        schema_version (Literal['1.0']):
+        project_id (str):
+        version_id (str):
+        author_id (Union[None, str]):
         version (float):
         created_at (str):
-        config_data (GetApiPromptsByIdVersionsResponse200ConfigData):
-        handle (Union[None, str]):
-        scope (GetApiPromptsByIdVersionsResponse200Scope):
+        prompt (str):
+        messages (list['GetApiPromptsByIdVersionsResponse200MessagesItem']):
+        inputs (list['GetApiPromptsByIdVersionsResponse200InputsItem']):
+        outputs (list['GetApiPromptsByIdVersionsResponse200OutputsItem']):
+        model (str):
         commit_message (Union[None, Unset, str]):
-        author (Union['GetApiPromptsByIdVersionsResponse200AuthorType0', None, Unset]):
+        temperature (Union[Unset, float]):
+        max_tokens (Union[Unset, float]):
+        demonstrations (Union[Unset, GetApiPromptsByIdVersionsResponse200Demonstrations]):
+        prampting_technique (Union[Unset, GetApiPromptsByIdVersionsResponse200PramptingTechnique]):
+        response_format (Union[Unset, GetApiPromptsByIdVersionsResponse200ResponseFormat]):
     """
 
-    id: str
-    author_id: Union[None, str]
-    project_id: str
     config_id: str
-    schema_version: Literal["1.0"]
+    project_id: str
+    version_id: str
+    author_id: Union[None, str]
     version: float
     created_at: str
-    config_data: "GetApiPromptsByIdVersionsResponse200ConfigData"
-    handle: Union[None, str]
-    scope: GetApiPromptsByIdVersionsResponse200Scope
+    prompt: str
+    messages: list["GetApiPromptsByIdVersionsResponse200MessagesItem"]
+    inputs: list["GetApiPromptsByIdVersionsResponse200InputsItem"]
+    outputs: list["GetApiPromptsByIdVersionsResponse200OutputsItem"]
+    model: str
     commit_message: Union[None, Unset, str] = UNSET
-    author: Union["GetApiPromptsByIdVersionsResponse200AuthorType0", None, Unset] = UNSET
+    temperature: Union[Unset, float] = UNSET
+    max_tokens: Union[Unset, float] = UNSET
+    demonstrations: Union[Unset, "GetApiPromptsByIdVersionsResponse200Demonstrations"] = UNSET
+    prampting_technique: Union[Unset, "GetApiPromptsByIdVersionsResponse200PramptingTechnique"] = UNSET
+    response_format: Union[Unset, "GetApiPromptsByIdVersionsResponse200ResponseFormat"] = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
-        from ..models.get_api_prompts_by_id_versions_response_200_author_type_0 import (
-            GetApiPromptsByIdVersionsResponse200AuthorType0,
-        )
-
-        id = self.id
-
-        author_id: Union[None, str]
-        author_id = self.author_id
+        config_id = self.config_id
 
         project_id = self.project_id
 
-        config_id = self.config_id
+        version_id = self.version_id
 
-        schema_version = self.schema_version
+        author_id: Union[None, str]
+        author_id = self.author_id
 
         version = self.version
 
         created_at = self.created_at
 
-        config_data = self.config_data.to_dict()
+        prompt = self.prompt
 
-        handle: Union[None, str]
-        handle = self.handle
+        messages = []
+        for messages_item_data in self.messages:
+            messages_item = messages_item_data.to_dict()
+            messages.append(messages_item)
 
-        scope = self.scope.value
+        inputs = []
+        for inputs_item_data in self.inputs:
+            inputs_item = inputs_item_data.to_dict()
+            inputs.append(inputs_item)
+
+        outputs = []
+        for outputs_item_data in self.outputs:
+            outputs_item = outputs_item_data.to_dict()
+            outputs.append(outputs_item)
+
+        model = self.model
 
         commit_message: Union[None, Unset, str]
         if isinstance(self.commit_message, Unset):
@@ -84,48 +111,81 @@ class GetApiPromptsByIdVersionsResponse200:
         else:
             commit_message = self.commit_message
 
-        author: Union[None, Unset, dict[str, Any]]
-        if isinstance(self.author, Unset):
-            author = UNSET
-        elif isinstance(self.author, GetApiPromptsByIdVersionsResponse200AuthorType0):
-            author = self.author.to_dict()
-        else:
-            author = self.author
+        temperature = self.temperature
+
+        max_tokens = self.max_tokens
+
+        demonstrations: Union[Unset, dict[str, Any]] = UNSET
+        if not isinstance(self.demonstrations, Unset):
+            demonstrations = self.demonstrations.to_dict()
+
+        prampting_technique: Union[Unset, dict[str, Any]] = UNSET
+        if not isinstance(self.prampting_technique, Unset):
+            prampting_technique = self.prampting_technique.to_dict()
+
+        response_format: Union[Unset, dict[str, Any]] = UNSET
+        if not isinstance(self.response_format, Unset):
+            response_format = self.response_format.to_dict()
 
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
         field_dict.update(
             {
-                "id": id,
-                "authorId": author_id,
-                "projectId": project_id,
                 "configId": config_id,
-                "schemaVersion": schema_version,
+                "projectId": project_id,
+                "versionId": version_id,
+                "authorId": author_id,
                 "version": version,
                 "createdAt": created_at,
-                "configData": config_data,
-                "handle": handle,
-                "scope": scope,
+                "prompt": prompt,
+                "messages": messages,
+                "inputs": inputs,
+                "outputs": outputs,
+                "model": model,
             }
         )
         if commit_message is not UNSET:
             field_dict["commitMessage"] = commit_message
-        if author is not UNSET:
-            field_dict["author"] = author
+        if temperature is not UNSET:
+            field_dict["temperature"] = temperature
+        if max_tokens is not UNSET:
+            field_dict["maxTokens"] = max_tokens
+        if demonstrations is not UNSET:
+            field_dict["demonstrations"] = demonstrations
+        if prampting_technique is not UNSET:
+            field_dict["pramptingTechnique"] = prampting_technique
+        if response_format is not UNSET:
+            field_dict["responseFormat"] = response_format
 
         return field_dict
 
     @classmethod
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
-        from ..models.get_api_prompts_by_id_versions_response_200_author_type_0 import (
-            GetApiPromptsByIdVersionsResponse200AuthorType0,
+        from ..models.get_api_prompts_by_id_versions_response_200_demonstrations import (
+            GetApiPromptsByIdVersionsResponse200Demonstrations,
         )
-        from ..models.get_api_prompts_by_id_versions_response_200_config_data import (
-            GetApiPromptsByIdVersionsResponse200ConfigData,
+        from ..models.get_api_prompts_by_id_versions_response_200_inputs_item import (
+            GetApiPromptsByIdVersionsResponse200InputsItem,
+        )
+        from ..models.get_api_prompts_by_id_versions_response_200_messages_item import (
+            GetApiPromptsByIdVersionsResponse200MessagesItem,
+        )
+        from ..models.get_api_prompts_by_id_versions_response_200_outputs_item import (
+            GetApiPromptsByIdVersionsResponse200OutputsItem,
+        )
+        from ..models.get_api_prompts_by_id_versions_response_200_prampting_technique import (
+            GetApiPromptsByIdVersionsResponse200PramptingTechnique,
+        )
+        from ..models.get_api_prompts_by_id_versions_response_200_response_format import (
+            GetApiPromptsByIdVersionsResponse200ResponseFormat,
         )
 
         d = dict(src_dict)
-        id = d.pop("id")
+        config_id = d.pop("configId")
+
+        project_id = d.pop("projectId")
+
+        version_id = d.pop("versionId")
 
         def _parse_author_id(data: object) -> Union[None, str]:
             if data is None:
@@ -134,28 +194,34 @@ class GetApiPromptsByIdVersionsResponse200:
 
         author_id = _parse_author_id(d.pop("authorId"))
 
-        project_id = d.pop("projectId")
-
-        config_id = d.pop("configId")
-
-        schema_version = cast(Literal["1.0"], d.pop("schemaVersion"))
-        if schema_version != "1.0":
-            raise ValueError(f"schemaVersion must match const '1.0', got '{schema_version}'")
-
         version = d.pop("version")
 
         created_at = d.pop("createdAt")
 
-        config_data = GetApiPromptsByIdVersionsResponse200ConfigData.from_dict(d.pop("configData"))
+        prompt = d.pop("prompt")
 
-        def _parse_handle(data: object) -> Union[None, str]:
-            if data is None:
-                return data
-            return cast(Union[None, str], data)
+        messages = []
+        _messages = d.pop("messages")
+        for messages_item_data in _messages:
+            messages_item = GetApiPromptsByIdVersionsResponse200MessagesItem.from_dict(messages_item_data)
 
-        handle = _parse_handle(d.pop("handle"))
+            messages.append(messages_item)
 
-        scope = GetApiPromptsByIdVersionsResponse200Scope(d.pop("scope"))
+        inputs = []
+        _inputs = d.pop("inputs")
+        for inputs_item_data in _inputs:
+            inputs_item = GetApiPromptsByIdVersionsResponse200InputsItem.from_dict(inputs_item_data)
+
+            inputs.append(inputs_item)
+
+        outputs = []
+        _outputs = d.pop("outputs")
+        for outputs_item_data in _outputs:
+            outputs_item = GetApiPromptsByIdVersionsResponse200OutputsItem.from_dict(outputs_item_data)
+
+            outputs.append(outputs_item)
+
+        model = d.pop("model")
 
         def _parse_commit_message(data: object) -> Union[None, Unset, str]:
             if data is None:
@@ -166,36 +232,49 @@ class GetApiPromptsByIdVersionsResponse200:
 
         commit_message = _parse_commit_message(d.pop("commitMessage", UNSET))
 
-        def _parse_author(data: object) -> Union["GetApiPromptsByIdVersionsResponse200AuthorType0", None, Unset]:
-            if data is None:
-                return data
-            if isinstance(data, Unset):
-                return data
-            try:
-                if not isinstance(data, dict):
-                    raise TypeError()
-                author_type_0 = GetApiPromptsByIdVersionsResponse200AuthorType0.from_dict(data)
+        temperature = d.pop("temperature", UNSET)
 
-                return author_type_0
-            except:  # noqa: E722
-                pass
-            return cast(Union["GetApiPromptsByIdVersionsResponse200AuthorType0", None, Unset], data)
+        max_tokens = d.pop("maxTokens", UNSET)
 
-        author = _parse_author(d.pop("author", UNSET))
+        _demonstrations = d.pop("demonstrations", UNSET)
+        demonstrations: Union[Unset, GetApiPromptsByIdVersionsResponse200Demonstrations]
+        if isinstance(_demonstrations, Unset):
+            demonstrations = UNSET
+        else:
+            demonstrations = GetApiPromptsByIdVersionsResponse200Demonstrations.from_dict(_demonstrations)
+
+        _prampting_technique = d.pop("pramptingTechnique", UNSET)
+        prampting_technique: Union[Unset, GetApiPromptsByIdVersionsResponse200PramptingTechnique]
+        if isinstance(_prampting_technique, Unset):
+            prampting_technique = UNSET
+        else:
+            prampting_technique = GetApiPromptsByIdVersionsResponse200PramptingTechnique.from_dict(_prampting_technique)
+
+        _response_format = d.pop("responseFormat", UNSET)
+        response_format: Union[Unset, GetApiPromptsByIdVersionsResponse200ResponseFormat]
+        if isinstance(_response_format, Unset):
+            response_format = UNSET
+        else:
+            response_format = GetApiPromptsByIdVersionsResponse200ResponseFormat.from_dict(_response_format)
 
         get_api_prompts_by_id_versions_response_200 = cls(
-            id=id,
-            author_id=author_id,
-            project_id=project_id,
             config_id=config_id,
-            schema_version=schema_version,
+            project_id=project_id,
+            version_id=version_id,
+            author_id=author_id,
             version=version,
             created_at=created_at,
-            config_data=config_data,
-            handle=handle,
-            scope=scope,
+            prompt=prompt,
+            messages=messages,
+            inputs=inputs,
+            outputs=outputs,
+            model=model,
             commit_message=commit_message,
-            author=author,
+            temperature=temperature,
+            max_tokens=max_tokens,
+            demonstrations=demonstrations,
+            prampting_technique=prampting_technique,
+            response_format=response_format,
         )
 
         get_api_prompts_by_id_versions_response_200.additional_properties = d

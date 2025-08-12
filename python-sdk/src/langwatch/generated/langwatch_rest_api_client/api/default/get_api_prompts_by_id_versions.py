@@ -93,7 +93,7 @@ def sync_detailed(
         GetApiPromptsByIdVersionsResponse500,
     ]
 ]:
-    """Get all versions for a prompt
+    """Get all versions for a prompt. Does not include base prompt data, only versioned data.
 
     Args:
         id (str):
@@ -130,7 +130,7 @@ def sync(
         GetApiPromptsByIdVersionsResponse500,
     ]
 ]:
-    """Get all versions for a prompt
+    """Get all versions for a prompt. Does not include base prompt data, only versioned data.
 
     Args:
         id (str):
@@ -162,7 +162,7 @@ async def asyncio_detailed(
         GetApiPromptsByIdVersionsResponse500,
     ]
 ]:
-    """Get all versions for a prompt
+    """Get all versions for a prompt. Does not include base prompt data, only versioned data.
 
     Args:
         id (str):
@@ -197,7 +197,7 @@ async def asyncio(
         GetApiPromptsByIdVersionsResponse500,
     ]
 ]:
-    """Get all versions for a prompt
+    """Get all versions for a prompt. Does not include base prompt data, only versioned data.
 
     Args:
         id (str):

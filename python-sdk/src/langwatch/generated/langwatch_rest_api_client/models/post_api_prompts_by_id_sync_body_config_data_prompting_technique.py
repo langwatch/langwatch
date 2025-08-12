@@ -1,10 +1,19 @@
 from collections.abc import Mapping
-from typing import Any, TypeVar, Union
+from typing import TYPE_CHECKING, Any, TypeVar, Union
 
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
 
+from ..models.post_api_prompts_by_id_sync_body_config_data_prompting_technique_type import (
+    PostApiPromptsByIdSyncBodyConfigDataPromptingTechniqueType,
+)
 from ..types import UNSET, Unset
+
+if TYPE_CHECKING:
+    from ..models.post_api_prompts_by_id_sync_body_config_data_prompting_technique_demonstrations import (
+        PostApiPromptsByIdSyncBodyConfigDataPromptingTechniqueDemonstrations,
+    )
+
 
 T = TypeVar("T", bound="PostApiPromptsByIdSyncBodyConfigDataPromptingTechnique")
 
@@ -13,30 +22,54 @@ T = TypeVar("T", bound="PostApiPromptsByIdSyncBodyConfigDataPromptingTechnique")
 class PostApiPromptsByIdSyncBodyConfigDataPromptingTechnique:
     """
     Attributes:
-        ref (Union[Unset, str]):
+        type_ (PostApiPromptsByIdSyncBodyConfigDataPromptingTechniqueType):
+        demonstrations (Union[Unset, PostApiPromptsByIdSyncBodyConfigDataPromptingTechniqueDemonstrations]):
     """
 
-    ref: Union[Unset, str] = UNSET
+    type_: PostApiPromptsByIdSyncBodyConfigDataPromptingTechniqueType
+    demonstrations: Union[Unset, "PostApiPromptsByIdSyncBodyConfigDataPromptingTechniqueDemonstrations"] = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
-        ref = self.ref
+        type_ = self.type_.value
+
+        demonstrations: Union[Unset, dict[str, Any]] = UNSET
+        if not isinstance(self.demonstrations, Unset):
+            demonstrations = self.demonstrations.to_dict()
 
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
-        field_dict.update({})
-        if ref is not UNSET:
-            field_dict["ref"] = ref
+        field_dict.update(
+            {
+                "type": type_,
+            }
+        )
+        if demonstrations is not UNSET:
+            field_dict["demonstrations"] = demonstrations
 
         return field_dict
 
     @classmethod
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
+        from ..models.post_api_prompts_by_id_sync_body_config_data_prompting_technique_demonstrations import (
+            PostApiPromptsByIdSyncBodyConfigDataPromptingTechniqueDemonstrations,
+        )
+
         d = dict(src_dict)
-        ref = d.pop("ref", UNSET)
+        type_ = PostApiPromptsByIdSyncBodyConfigDataPromptingTechniqueType(d.pop("type"))
+
+        _demonstrations = d.pop("demonstrations", UNSET)
+        demonstrations: Union[Unset, PostApiPromptsByIdSyncBodyConfigDataPromptingTechniqueDemonstrations]
+        if isinstance(_demonstrations, Unset):
+            demonstrations = UNSET
+        else:
+            demonstrations = PostApiPromptsByIdSyncBodyConfigDataPromptingTechniqueDemonstrations.from_dict(
+                _demonstrations
+            )
 
         post_api_prompts_by_id_sync_body_config_data_prompting_technique = cls(
-            ref=ref,
+            type_=type_,
+            demonstrations=demonstrations,
         )
 
         post_api_prompts_by_id_sync_body_config_data_prompting_technique.additional_properties = d

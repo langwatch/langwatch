@@ -34,6 +34,7 @@ export default async function execute() {
   const datasetSpec = await generateSpecs(datasetApp);
   console.log("Building llm configs spec...");
   const llmConfigsSpec = await generateSpecs(llmConfigsApp);
+  console.log("llmConfigsSpec", llmConfigsSpec);
   console.log("Building scenario events spec...");
   const scenarioEventsSpec = await generateSpecs(scenarioEventsApp);
   console.log("Merging specs...");
@@ -57,7 +58,9 @@ export default async function execute() {
           key.includes("/api/scenario-events")
         ) {
           // Replace with new
-          return (_target, source) => source;
+          return (_target, source) => {
+            return source;
+          };
         }
       },
     }

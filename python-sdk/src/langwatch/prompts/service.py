@@ -177,18 +177,17 @@ class PromptService:
         )
         return Prompt(ok)
 
-    # @trace_prompt(
-    #     "update",
-    #     lambda _self, prompt_id, name, **_: {
-    #         "inputs.prompt_id": prompt_id,
-    #         "inputs.name": name,
-    #     },
-    # )
     def update(
         self,
+        # base config data
         prompt_id: str,
         scope: Literal["PROJECT", "ORGANIZATION"],
         handle: str | Unset = UNSET,
+        # version data
+        prompt: str | Unset = UNSET,
+        messages: list[PostApiPromptsBodyMessagesItem] | Unset = UNSET,
+        inputs: list[PostApiPromptsBodyInputsItem] | Unset = UNSET,
+        outputs: list[PostApiPromptsBodyOutputsItem] | Unset = UNSET,
     ) -> Prompt:
         """
         Update an existing prompt's properties.
@@ -214,7 +213,13 @@ class PromptService:
             client=self._client,
             # Name shouldn't be required here, but it is.
             body=PutApiPromptsByIdBody(
-                handle=handle, scope=PutApiPromptsByIdBodyScope[scope]
+                name=name,
+                handle=handle,
+                scope=PutApiPromptsByIdBodyScope[scope],
+                prompt=prompt,
+                messages=_normalize_messages(messages),
+                inputs=_normalize_inputs(inputs),
+                outputs=_normalize_outputs(outputs),
             ),
         )
         unwrap_response(
@@ -225,9 +230,6 @@ class PromptService:
         )
         return self.get(prompt_id)
 
-    # @trace_prompt(
-    #     "delete", lambda _self, prompt_id, **_: {"inputs.prompt_id": prompt_id}
-    # )
     def delete(self, prompt_id: str) -> Dict[str, bool]:
         """
         Delete a prompt by its ID.

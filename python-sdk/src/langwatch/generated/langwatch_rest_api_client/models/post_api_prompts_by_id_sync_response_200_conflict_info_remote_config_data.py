@@ -22,6 +22,9 @@ if TYPE_CHECKING:
     from ..models.post_api_prompts_by_id_sync_response_200_conflict_info_remote_config_data_prompting_technique import (
         PostApiPromptsByIdSyncResponse200ConflictInfoRemoteConfigDataPromptingTechnique,
     )
+    from ..models.post_api_prompts_by_id_sync_response_200_conflict_info_remote_config_data_response_format import (
+        PostApiPromptsByIdSyncResponse200ConflictInfoRemoteConfigDataResponseFormat,
+    )
 
 
 T = TypeVar("T", bound="PostApiPromptsByIdSyncResponse200ConflictInfoRemoteConfigData")
@@ -36,12 +39,12 @@ class PostApiPromptsByIdSyncResponse200ConflictInfoRemoteConfigData:
         inputs (list['PostApiPromptsByIdSyncResponse200ConflictInfoRemoteConfigDataInputsItem']):
         outputs (list['PostApiPromptsByIdSyncResponse200ConflictInfoRemoteConfigDataOutputsItem']):
         model (str):
-        version (Union[Unset, float]):
         temperature (Union[Unset, float]):
         max_tokens (Union[Unset, float]):
         demonstrations (Union[Unset, PostApiPromptsByIdSyncResponse200ConflictInfoRemoteConfigDataDemonstrations]):
         prompting_technique (Union[Unset,
             PostApiPromptsByIdSyncResponse200ConflictInfoRemoteConfigDataPromptingTechnique]):
+        response_format (Union[Unset, PostApiPromptsByIdSyncResponse200ConflictInfoRemoteConfigDataResponseFormat]):
     """
 
     prompt: str
@@ -49,13 +52,13 @@ class PostApiPromptsByIdSyncResponse200ConflictInfoRemoteConfigData:
     inputs: list["PostApiPromptsByIdSyncResponse200ConflictInfoRemoteConfigDataInputsItem"]
     outputs: list["PostApiPromptsByIdSyncResponse200ConflictInfoRemoteConfigDataOutputsItem"]
     model: str
-    version: Union[Unset, float] = UNSET
     temperature: Union[Unset, float] = UNSET
     max_tokens: Union[Unset, float] = UNSET
     demonstrations: Union[Unset, "PostApiPromptsByIdSyncResponse200ConflictInfoRemoteConfigDataDemonstrations"] = UNSET
     prompting_technique: Union[
         Unset, "PostApiPromptsByIdSyncResponse200ConflictInfoRemoteConfigDataPromptingTechnique"
     ] = UNSET
+    response_format: Union[Unset, "PostApiPromptsByIdSyncResponse200ConflictInfoRemoteConfigDataResponseFormat"] = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -78,8 +81,6 @@ class PostApiPromptsByIdSyncResponse200ConflictInfoRemoteConfigData:
 
         model = self.model
 
-        version = self.version
-
         temperature = self.temperature
 
         max_tokens = self.max_tokens
@@ -92,6 +93,10 @@ class PostApiPromptsByIdSyncResponse200ConflictInfoRemoteConfigData:
         if not isinstance(self.prompting_technique, Unset):
             prompting_technique = self.prompting_technique.to_dict()
 
+        response_format: Union[Unset, dict[str, Any]] = UNSET
+        if not isinstance(self.response_format, Unset):
+            response_format = self.response_format.to_dict()
+
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
         field_dict.update(
@@ -103,8 +108,6 @@ class PostApiPromptsByIdSyncResponse200ConflictInfoRemoteConfigData:
                 "model": model,
             }
         )
-        if version is not UNSET:
-            field_dict["version"] = version
         if temperature is not UNSET:
             field_dict["temperature"] = temperature
         if max_tokens is not UNSET:
@@ -113,6 +116,8 @@ class PostApiPromptsByIdSyncResponse200ConflictInfoRemoteConfigData:
             field_dict["demonstrations"] = demonstrations
         if prompting_technique is not UNSET:
             field_dict["prompting_technique"] = prompting_technique
+        if response_format is not UNSET:
+            field_dict["response_format"] = response_format
 
         return field_dict
 
@@ -132,6 +137,9 @@ class PostApiPromptsByIdSyncResponse200ConflictInfoRemoteConfigData:
         )
         from ..models.post_api_prompts_by_id_sync_response_200_conflict_info_remote_config_data_prompting_technique import (
             PostApiPromptsByIdSyncResponse200ConflictInfoRemoteConfigDataPromptingTechnique,
+        )
+        from ..models.post_api_prompts_by_id_sync_response_200_conflict_info_remote_config_data_response_format import (
+            PostApiPromptsByIdSyncResponse200ConflictInfoRemoteConfigDataResponseFormat,
         )
 
         d = dict(src_dict)
@@ -166,8 +174,6 @@ class PostApiPromptsByIdSyncResponse200ConflictInfoRemoteConfigData:
 
         model = d.pop("model")
 
-        version = d.pop("version", UNSET)
-
         temperature = d.pop("temperature", UNSET)
 
         max_tokens = d.pop("max_tokens", UNSET)
@@ -194,17 +200,26 @@ class PostApiPromptsByIdSyncResponse200ConflictInfoRemoteConfigData:
                 )
             )
 
+        _response_format = d.pop("response_format", UNSET)
+        response_format: Union[Unset, PostApiPromptsByIdSyncResponse200ConflictInfoRemoteConfigDataResponseFormat]
+        if isinstance(_response_format, Unset):
+            response_format = UNSET
+        else:
+            response_format = PostApiPromptsByIdSyncResponse200ConflictInfoRemoteConfigDataResponseFormat.from_dict(
+                _response_format
+            )
+
         post_api_prompts_by_id_sync_response_200_conflict_info_remote_config_data = cls(
             prompt=prompt,
             messages=messages,
             inputs=inputs,
             outputs=outputs,
             model=model,
-            version=version,
             temperature=temperature,
             max_tokens=max_tokens,
             demonstrations=demonstrations,
             prompting_technique=prompting_technique,
+            response_format=response_format,
         )
 
         post_api_prompts_by_id_sync_response_200_conflict_info_remote_config_data.additional_properties = d

@@ -4,8 +4,6 @@ from typing import Any, TypeVar
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
 
-from ..models.delete_api_prompts_by_id_response_400_error import DeleteApiPromptsByIdResponse400Error
-
 T = TypeVar("T", bound="DeleteApiPromptsByIdResponse400")
 
 
@@ -13,14 +11,14 @@ T = TypeVar("T", bound="DeleteApiPromptsByIdResponse400")
 class DeleteApiPromptsByIdResponse400:
     """
     Attributes:
-        error (DeleteApiPromptsByIdResponse400Error):
+        error (str):
     """
 
-    error: DeleteApiPromptsByIdResponse400Error
+    error: str
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
-        error = self.error.value
+        error = self.error
 
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
@@ -35,7 +33,7 @@ class DeleteApiPromptsByIdResponse400:
     @classmethod
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
         d = dict(src_dict)
-        error = DeleteApiPromptsByIdResponse400Error(d.pop("error"))
+        error = d.pop("error")
 
         delete_api_prompts_by_id_response_400 = cls(
             error=error,
