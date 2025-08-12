@@ -3,7 +3,8 @@
 
 import { type AttributeValue } from "@opentelemetry/api";
 import { type AnyValue } from "@opentelemetry/api-logs";
-import type * as semconvAttributes from "@opentelemetry/semantic-conventions/incubating";
+import type * as semconvAttributes from "@opentelemetry/semantic-conventions";
+import type * as semconvIncubatingAttributes from "@opentelemetry/semantic-conventions/incubating";
 import type * as langwatchAttributes from "./attributes";
 
 // are strings, while preserving the auto-completion of the keys.
@@ -30,6 +31,7 @@ type OnlyStringValues<T> = {
  * ```
  */
 export type SemConvAttributeKey =
+  | OnlyStringValues<typeof semconvIncubatingAttributes>
   | OnlyStringValues<typeof semconvAttributes>
   | OnlyStringValues<typeof langwatchAttributes>
   | (string & {});
@@ -71,7 +73,6 @@ export type SemConvAttributes = Partial<Record<SemConvAttributeKey, AttributeVal
  *   "array.attr": ["item1", "item2", "item3"],
  *   "object.attr": { key1: "value1", key2: "value2" },
  *   "null.attr": null,
- *   "undefined.attr": undefined
  * };
  * ```
  */

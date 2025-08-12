@@ -5,19 +5,19 @@ import { DEFAULT_SERVICE_NAME } from '../../../internal/constants.js';
 
 describe('utils.ts', () => {
   describe('isConcreteProvider', () => {
-    it('returns true for null/undefined', () => {
+    it('returns false for null/undefined', () => {
       expect(utils.isConcreteProvider(null)).toBe(false);
       expect(utils.isConcreteProvider(undefined)).toBe(false);
     });
-    it('returns true for non-object', () => {
+    it('returns false for non-object', () => {
       expect(utils.isConcreteProvider(42)).toBe(false);
       expect(utils.isConcreteProvider('foo')).toBe(false);
     });
-    it('returns true for object without addSpanProcessor', () => {
+    it('returns false for object without addSpanProcessor', () => {
       expect(utils.isConcreteProvider({})).toBe(false);
       expect(utils.isConcreteProvider({ foo: 1 })).toBe(false);
     });
-    it('returns false for object with addSpanProcessor function', () => {
+    it('returns true for object with addSpanProcessor function', () => {
       expect(utils.isConcreteProvider({ addSpanProcessor: () => { /* */ } })).toBe(true);
     });
   });

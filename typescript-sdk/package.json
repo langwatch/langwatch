@@ -108,14 +108,14 @@
     "zod": "^4.0.14"
   },
   "peerDependencies": {
-    "@ai-sdk/openai": ">=2.0.0",
-    "@langchain/core": ">=0.3.0",
-    "@langchain/langgraph": ">=0.4.0",
-    "@langchain/openai": ">=0.6.0",
-    "@opentelemetry/context-async-hooks": ">=1.19.0",
-    "@opentelemetry/context-zone": ">=1.19.0",
-    "@opentelemetry/sdk-node": ">=0.200.0",
-    "@opentelemetry/sdk-trace-web": ">=1.19.0",
-    "langchain": ">=0.3.0"
+    "@ai-sdk/openai": ">=2.0.0 <3.0.0",
+    "@langchain/core": ">=0.3.0 <1.0.0",
+    "@langchain/langgraph": ">=0.4.0 <1.0.0",
+    "@langchain/openai": ">=0.6.0 <1.0.0",
+    "langchain": ">=0.3.0 <1.0.0",
+    "@opentelemetry/context-async-hooks": ">=1.19.0 <2.0.0",
+    "@opentelemetry/context-zone": ">=1.19.0 <2.0.0",
+    "@opentelemetry/sdk-node": ">=0.200.0 <1.0.0",
+    "@opentelemetry/sdk-trace-web": ">=1.19.0 <3.0.0"
   }
 }

@@ -68,7 +68,7 @@ async function main() {
         console.log("🤖 Thinking...");
 
         const result = await generateText({
-          model: openai("gpt-4.1-mini"),
+          model: openai("gpt-5-mini"),
           messages: conversationHistory,
           experimental_telemetry: { isEnabled: true },
         });

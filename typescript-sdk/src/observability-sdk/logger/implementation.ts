@@ -49,13 +49,9 @@ export class LangWatchLoggerInternal implements LangWatchLogger {
     system?: intSemconv.VAL_GEN_AI_SYSTEMS | (string & {}),
     attributes?: SemConvLogRecordAttributes,
   ): void {
-    if (body.role === void 0) {
-      body.role = "system";
-    }
-
     this.emitGenAIEvent(
       intSemconv.LOG_EVNT_GEN_AI_SYSTEM_MESSAGE,
-      { ...body },
+      { ...body, role: body.role ?? "system" } satisfies LangWatchSpanGenAISystemMessageEventBody,
       {
         ...attributes,
         "gen_ai.system": system,
@@ -68,13 +64,9 @@ export class LangWatchLoggerInternal implements LangWatchLogger {
     system?: intSemconv.VAL_GEN_AI_SYSTEMS | (string & {}),
     attributes?: SemConvLogRecordAttributes,
   ) {
-    if (body.role === void 0) {
-      body.role = "user";
-    }
-
     this.emitGenAIEvent(
       intSemconv.LOG_EVNT_GEN_AI_USER_MESSAGE,
-      { ...body },
+      { ...body, role: body.role ?? "user" } satisfies LangWatchSpanGenAIUserMessageEventBody,
       {
         ...attributes,
         "gen_ai.system": system,
@@ -87,13 +79,9 @@ export class LangWatchLoggerInternal implements LangWatchLogger {
     system?: intSemconv.VAL_GEN_AI_SYSTEMS | (string & {}),
     attributes?: SemConvLogRecordAttributes,
   ) {
-    if (body.role === void 0) {
-      body.role = "assistant";
-    }
-
     this.emitGenAIEvent(
       intSemconv.LOG_EVNT_GEN_AI_ASSISTANT_MESSAGE,
-      { ...body },
+      { ...body, role: body.role ?? "assistant" } satisfies LangWatchSpanGenAIAssistantMessageEventBody,
       {
         ...attributes,
         "gen_ai.system": system,
@@ -131,7 +119,10 @@ export class LangWatchLoggerInternal implements LangWatchLogger {
 
     this.emitGenAIEvent(
       intSemconv.LOG_EVNT_GEN_AI_CHOICE,
-      { ...body },
+      {
+        ...body,
+        message: { ...body.message, role: body.message?.role ?? "assistant" },
+      } satisfies LangWatchSpanGenAIChoiceEventBody,
       {
         ...attributes,
         "gen_ai.system": system,
