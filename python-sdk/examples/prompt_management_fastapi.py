@@ -37,19 +37,16 @@ def main():
             {"role": "system", "content": "You are a helpful assistant."},
             {"role": "user", "content": "{question}"},
         ],
-        inputs=[{"identifier": "question", "type": "string"}],  # optional
-        outputs=[  # optional
-            {"identifier": "answer", "type": "string", "json_schema": None}
-        ],
+        inputs=[{"identifier": "question", "type": "str"}],  # optional
+        outputs=[{"identifier": "answer", "type": "str"}],  # optional
     )
-    print(f"Created prompt with ID: {prompt.id}")
-    print(f"Prompt name: {prompt.name}\n")
+    print(f"Created prompt with id: {prompt.id}")
+    print(f"Created prompt with handle: {prompt.handle}")
 
     # 2. Get and use the prompt
     print("2. Retrieving the prompt...")
     retrieved_prompt = langwatch.prompts.get(prompt.handle)
-    print(f"Retrieved prompt: {retrieved_prompt.name}")
-    print(f"Prompt ID: {retrieved_prompt.id}")
+    print(f"Retrieved prompt: {retrieved_prompt.handle}")
 
     # Use the prompt (example usage)
     print("Using the prompt...")
@@ -60,37 +57,37 @@ def main():
     )
     print(f"Compiled prompt: {compiled_prompt}")
 
-    # # 3. Update the prompt
-    # print("3. Updating the prompt...")
-    # updated_prompt = langwatch.prompts.update(
-    #     prompt_id=prompt.id,
-    #     handle=f"updated_example_prompt_{short_uuid}",  # optional
-    #     scope="PROJECT",  # optional - 'ORGANIZATION' or 'PROJECT'
-    #     prompt="You are a helpful assistant specializing in {subject}.",  # optional
+    # 3. Update the prompt
+    print("3. Updating the prompt...")
+    updated_prompt = langwatch.prompts.update(
+        prompt.handle,
+        handle=f"updated_example_prompt_{short_uuid}",  # optional
+        scope="PROJECT",  # optional - 'ORGANIZATION' or 'PROJECT'
+        prompt="You are a helpful assistant specializing in {subject}.",  # optional
+    )
+    print(f"Updated prompt name: {updated_prompt.name}")
+    print(f"Prompt ID remains: {updated_prompt.id}")
+
+    # 4. Use the updated prompt
+    print("Using the updated prompt...")
+
+    # Compile the updated prompt to show the difference
+    updated_compiled = updated_prompt.compile(subject="quantum computing")
+    print(f"Updated compiled prompt: {updated_compiled}")
+
+    # This is where you would use the prompt in your application
+    # For example, you could use the prompt to generate a response
+    # response = langwatch.chat.completions.create(
+    #     model="gpt-4o-mini",
+    #     messages=[{"role": "user", "content": "What is the capital of France?"}],
     # )
-    # print(f"Updated prompt name: {updated_prompt.name}")
-    # print(f"Prompt ID remains: {updated_prompt.id}")
+    # print(f"Response: {response}")
 
-    # # 4. Use the updated prompt
-    # print("Using the updated prompt...")
-
-    # # Compile the updated prompt to show the difference
-    # updated_compiled = updated_prompt.compile(subject="quantum computing")
-    # print(f"Updated compiled prompt: {updated_compiled}")
-
-    # # This is where you would use the prompt in your application
-    # # For example, you could use the prompt to generate a response
-    # # response = langwatch.chat.completions.create(
-    # #     model="gpt-4o-mini",
-    # #     messages=[{"role": "user", "content": "What is the capital of France?"}],
-    # # )
-    # # print(f"Response: {response}")
-
-    # # 5. Delete the prompt
-    # print("5. Deleting the prompt...")
-    # result = langwatch.prompts.delete(prompt.id)
-    # print(f"Deletion result: {result}")
-    # print("Prompt management example completed successfully!")
+    # 5. Delete the prompt
+    print("5. Deleting the prompt...")
+    result = langwatch.prompts.delete(prompt.handle)
+    print(f"Deletion result: {result}")
+    print("Prompt management example completed successfully!")
 
 
 if __name__ == "__main__":

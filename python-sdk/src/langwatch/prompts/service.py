@@ -4,9 +4,10 @@ Service layer for managing LangWatch prompts via REST API.
 
 This module provides a high-level interface for CRUD operations on prompts,
 handling API communication, error handling, and response unwrapping.
+Uses TypedDict for clean interfaces and from_dict methods for type safety.
 """
-from typing import Dict, Literal
-from langwatch.generated.langwatch_rest_api_client.types import UNSET, Unset
+from typing import Dict, List, Literal, Optional, Any, TypedDict
+from langwatch.generated.langwatch_rest_api_client.types import UNSET
 from langwatch.generated.langwatch_rest_api_client.client import (
     Client as LangWatchRestApiClient,
 )
@@ -41,6 +42,15 @@ from langwatch.generated.langwatch_rest_api_client.models.put_api_prompts_by_id_
     PutApiPromptsByIdBody,
     PutApiPromptsByIdBodyScope,
 )
+from langwatch.generated.langwatch_rest_api_client.models.put_api_prompts_by_id_body_messages_item import (
+    PutApiPromptsByIdBodyMessagesItem,
+)
+from langwatch.generated.langwatch_rest_api_client.models.put_api_prompts_by_id_body_inputs_item import (
+    PutApiPromptsByIdBodyInputsItem,
+)
+from langwatch.generated.langwatch_rest_api_client.models.put_api_prompts_by_id_body_outputs_item import (
+    PutApiPromptsByIdBodyOutputsItem,
+)
 from langwatch.generated.langwatch_rest_api_client.models.put_api_prompts_by_id_response_200 import (
     PutApiPromptsByIdResponse200,
 )
@@ -52,8 +62,39 @@ from langwatch.utils.initialization import ensure_setup
 from langwatch.state import get_instance
 from .prompt import Prompt
 from .errors import unwrap_response
-
 from .decorators.prompt_service_tracing import prompt_service_tracing
+
+
+# Clean TypedDict interfaces that match the API exactly
+class MessageDict(TypedDict):
+    """Message dictionary that matches the API structure."""
+
+    role: Literal["system", "user", "assistant"]
+    content: str
+
+
+class InputDict(TypedDict):
+    """Input dictionary that matches the API structure."""
+
+    identifier: str
+    type: Literal["str", "int", "float", "bool", "json"]
+
+
+class OutputDict(TypedDict):
+    """Output dictionary that matches the API structure."""
+
+    identifier: str
+    type: Literal["str", "int", "float", "bool", "json"]
+    json_schema: Optional[Dict[str, Any]]
+
+
+def _convert_api_response_to_get_format(response: Any) -> GetApiPromptsByIdResponse200:
+    """Convert any API response to GetApiPromptsByIdResponse200 format using from_dict."""
+    if isinstance(response, GetApiPromptsByIdResponse200):
+        return response
+
+    # All response types have the same structure, so we can convert via dict
+    return GetApiPromptsByIdResponse200.from_dict(response.to_dict())
 
 
 class PromptService:
@@ -61,36 +102,16 @@ class PromptService:
     Service for managing LangWatch prompts via REST API.
 
     Provides CRUD operations for prompts with proper error handling and response
-    unwrapping. Follows single responsibility principle by focusing solely on
-    prompt API operations.
-
-    Attributes:
-        _client: The REST API client for making HTTP requests
+    unwrapping. Uses TypedDict interfaces for clean, type-safe API.
     """
 
     def __init__(self, rest_api_client: LangWatchRestApiClient):
-        """
-        Initialize the prompt service with a REST API client.
-
-        Args:
-            rest_api_client: Configured LangWatch REST API client
-        """
+        """Initialize the prompt service with a REST API client."""
         self._client = rest_api_client
 
     @classmethod
     def from_global(cls) -> "PromptService":
-        """
-        Create a PromptService instance using the global LangWatch configuration.
-
-        Ensures LangWatch is properly initialized and retrieves the global
-        REST API client instance.
-
-        Returns:
-            PromptService instance configured with global client
-
-        Raises:
-            RuntimeError: If LangWatch has not been initialized via setup()
-        """
+        """Create a PromptService instance using the global LangWatch configuration."""
         ensure_setup()
         instance = get_instance()
         if instance is None:
@@ -101,19 +122,7 @@ class PromptService:
 
     @prompt_service_tracing.get
     def get(self, prompt_id: str) -> Prompt:
-        """
-        Retrieve a prompt by its ID.
-
-        Args:
-            prompt_id: Unique identifier for the prompt
-
-        Returns:
-            Prompt object containing the retrieved prompt data
-
-        Raises:
-            ValueError: If prompt is not found (404) or request is invalid (400)
-            RuntimeError: For authentication (401) or server errors (5xx)
-        """
+        """Retrieve a prompt by its ID."""
         resp = get_api_prompts_by_id.sync_detailed(id=prompt_id, client=self._client)
         ok = unwrap_response(
             resp,
@@ -121,52 +130,63 @@ class PromptService:
             subject=f'id="{prompt_id}"',
             op="fetch",
         )
+        if ok is None:
+            raise RuntimeError(f"Failed to fetch prompt with id={prompt_id}")
         return Prompt(ok)
 
     @prompt_service_tracing.create
     def create(
         self,
         handle: str,
-        author_id: str,
-        scope: Literal["PROJECT", "ORGANIZATION"],
-        prompt: str | Unset = UNSET,
-        messages: list[PostApiPromptsBodyMessagesItem] | Unset = UNSET,
-        inputs: list[PostApiPromptsBodyInputsItem] | Unset = UNSET,
-        outputs: list[PostApiPromptsBodyOutputsItem] | Unset = UNSET,
+        author_id: Optional[str] = None,
+        scope: Literal["PROJECT", "ORGANIZATION"] = "PROJECT",
+        prompt: Optional[str] = None,
+        messages: Optional[List[MessageDict]] = None,
+        inputs: Optional[List[InputDict]] = None,
+        outputs: Optional[List[OutputDict]] = None,
     ) -> Prompt:
         """
-        Create a new prompt with the specified parameters.
+        Create a new prompt with clean dictionary interfaces.
 
         Args:
-            handle: Unique identifier for the prompt (required)
-            name: Display name for the prompt
-            scope: Scope of the prompt ('ORGANIZATION' or 'PROJECT', defaults to 'PROJECT')
+            handle: Unique identifier for the prompt
             author_id: ID of the author
+            scope: Scope of the prompt ('PROJECT' or 'ORGANIZATION')
             prompt: The prompt text content
-            messages: List of message objects with role and content
-            inputs: List of input definitions with identifier and type
-            outputs: List of output definitions with identifier, type, and optional json_schema
+            messages: List of message dicts with 'role' and 'content' keys
+            inputs: List of input dicts with 'identifier' and 'type' keys
+            outputs: List of output dicts with 'identifier', 'type', and optional 'json_schema' keys
 
         Returns:
             Prompt object containing the created prompt data
-
-        Raises:
-            ValueError: If request is invalid (400)
-            RuntimeError: For authentication (401) or server errors (5xx)
         """
-        # Normalize author_id: None -> UNSET
-        author_id_value = UNSET if author_id is None else author_id
+        # Convert dicts to API models using from_dict
+        api_messages = UNSET
+        if messages:
+            api_messages = [
+                PostApiPromptsBodyMessagesItem.from_dict(msg) for msg in messages
+            ]
+
+        api_inputs = UNSET
+        if inputs:
+            api_inputs = [PostApiPromptsBodyInputsItem.from_dict(inp) for inp in inputs]
+
+        api_outputs = UNSET
+        if outputs:
+            api_outputs = [
+                PostApiPromptsBodyOutputsItem.from_dict(out) for out in outputs
+            ]
 
         resp = post_api_prompts.sync_detailed(
             client=self._client,
             body=PostApiPromptsBody(
                 handle=handle,
                 scope=PostApiPromptsBodyScope(scope),
-                author_id=author_id_value,
-                prompt=prompt,
-                messages=_normalize_messages(messages),
-                inputs=_normalize_inputs(inputs),
-                outputs=_normalize_outputs(outputs),
+                author_id=author_id or UNSET,
+                prompt=prompt or UNSET,
+                messages=api_messages,
+                inputs=api_inputs,
+                outputs=api_outputs,
             ),
         )
         ok = unwrap_response(
@@ -175,75 +195,84 @@ class PromptService:
             subject=f'handle="{handle}"',
             op="create",
         )
-        return Prompt(ok)
+        if ok is None:
+            raise RuntimeError(f"Failed to create prompt with handle={handle}")
+
+        # Convert response to expected format for Prompt class
+        converted = _convert_api_response_to_get_format(ok)
+        return Prompt(converted)
 
     def update(
         self,
-        # base config data
-        prompt_id: str,
+        prompt_id_or_handle: str,
         scope: Literal["PROJECT", "ORGANIZATION"],
-        handle: str | Unset = UNSET,
-        # version data
-        prompt: str | Unset = UNSET,
-        messages: list[PostApiPromptsBodyMessagesItem] | Unset = UNSET,
-        inputs: list[PostApiPromptsBodyInputsItem] | Unset = UNSET,
-        outputs: list[PostApiPromptsBodyOutputsItem] | Unset = UNSET,
+        handle: Optional[str] = None,
+        prompt: Optional[str] = None,
+        messages: Optional[List[MessageDict]] = None,
+        inputs: Optional[List[InputDict]] = None,
+        outputs: Optional[List[OutputDict]] = None,
     ) -> Prompt:
         """
-        Update an existing prompt's properties.
-
-        Note: After updating, fetches the latest prompt data to ensure consistency.
-        This approach trades an extra API call for data accuracy.
+        Update an existing prompt with clean dictionary interfaces.
 
         Args:
-            prompt_id: Unique identifier for the prompt to update
-            name: New name for the prompt
+            prompt_id_or_handle: ID or handle of the prompt to update
+            scope: Scope of the prompt
             handle: New handle for the prompt
-            scope: New scope for the prompt ('ORGANIZATION' or 'PROJECT')
+            prompt: New prompt text content
+            messages: New list of message dicts
+            inputs: New list of input dicts
+            outputs: New list of output dicts
 
         Returns:
             Prompt object containing the updated prompt data
-
-        Raises:
-            ValueError: If prompt is not found (404) or request is invalid (400)
-            RuntimeError: For authentication (401) or server errors (5xx)
         """
+        # Convert dicts to API models using from_dict
+        api_messages = UNSET
+        if messages:
+            api_messages = [
+                PutApiPromptsByIdBodyMessagesItem.from_dict(msg) for msg in messages
+            ]
+
+        api_inputs = UNSET
+        if inputs:
+            api_inputs = [
+                PutApiPromptsByIdBodyInputsItem.from_dict(inp) for inp in inputs
+            ]
+
+        api_outputs = UNSET
+        if outputs:
+            api_outputs = [
+                PutApiPromptsByIdBodyOutputsItem.from_dict(out) for out in outputs
+            ]
+
         resp = put_api_prompts_by_id.sync_detailed(
-            id=prompt_id,
+            id=prompt_id_or_handle,
             client=self._client,
-            # Name shouldn't be required here, but it is.
             body=PutApiPromptsByIdBody(
-                name=name,
-                handle=handle,
+                handle=handle or UNSET,
                 scope=PutApiPromptsByIdBodyScope[scope],
-                prompt=prompt,
-                messages=_normalize_messages(messages),
-                inputs=_normalize_inputs(inputs),
-                outputs=_normalize_outputs(outputs),
+                prompt=prompt or UNSET,
+                messages=api_messages,
+                inputs=api_inputs,
+                outputs=api_outputs,
             ),
         )
-        unwrap_response(
+        ok = unwrap_response(
             resp,
             ok_type=PutApiPromptsByIdResponse200,
-            subject=f'id="{prompt_id}"',
+            subject=f'id="{prompt_id_or_handle}"',
             op="update",
         )
-        return self.get(prompt_id)
+        if ok is None:
+            raise RuntimeError(f"Failed to update prompt with id={prompt_id_or_handle}")
+
+        # Convert response to expected format for Prompt class
+        converted = _convert_api_response_to_get_format(ok)
+        return Prompt(converted)
 
     def delete(self, prompt_id: str) -> Dict[str, bool]:
-        """
-        Delete a prompt by its ID.
-
-        Args:
-            prompt_id: Unique identifier for the prompt to delete
-
-        Returns:
-            Dictionary with 'success' key indicating deletion result
-
-        Raises:
-            ValueError: If prompt is not found (404) or request is invalid (400)
-            RuntimeError: For authentication (401) or server errors (5xx)
-        """
+        """Delete a prompt by its ID."""
         resp = delete_api_prompts_by_id.sync_detailed(id=prompt_id, client=self._client)
         ok = unwrap_response(
             resp,
@@ -251,86 +280,6 @@ class PromptService:
             subject=f'id="{prompt_id}"',
             op="delete",
         )
+        if ok is None:
+            raise RuntimeError(f"Failed to delete prompt with id={prompt_id}")
         return {"success": bool(ok.success)}
-
-
-def _normalize_messages(messages):
-    """
-    Normalize messages input to proper model instances.
-
-    Accepts dict objects and converts them to PostApiPromptsBodyMessagesItem instances.
-    """
-    if messages is None or isinstance(messages, Unset):
-        return UNSET
-
-    result = []
-    for m in messages:
-        if isinstance(m, PostApiPromptsBodyMessagesItem):
-            result.append(m)
-        elif isinstance(m, dict):
-            # Let model handle enum coercion (role)
-            result.append(PostApiPromptsBodyMessagesItem.from_dict(m))
-        else:
-            raise TypeError(
-                "messages items must be dict or PostApiPromptsBodyMessagesItem"
-            )
-    return result
-
-
-def _normalize_inputs(inputs):
-    """
-    Normalize inputs to proper model instances.
-
-    Accepts dict objects, converts friendly type names (string -> str),
-    and creates PostApiPromptsBodyInputsItem instances.
-    """
-    if inputs is None or isinstance(inputs, Unset):
-        return UNSET
-
-    result = []
-    for i in inputs:
-        if isinstance(i, PostApiPromptsBodyInputsItem):
-            result.append(i)
-        elif isinstance(i, dict):
-            d = dict(i)
-            # Map friendly types to enum values
-            if isinstance(d.get("type"), str):
-                t = d["type"]
-                if t == "string":
-                    d["type"] = "str"
-            result.append(PostApiPromptsBodyInputsItem.from_dict(d))
-        else:
-            raise TypeError("inputs items must be dict or PostApiPromptsBodyInputsItem")
-    return result
-
-
-def _normalize_outputs(outputs):
-    """
-    Normalize outputs to proper model instances.
-
-    Accepts dict objects, converts friendly type names (string -> str),
-    handles json_schema=None by removing it, and creates PostApiPromptsBodyOutputsItem instances.
-    """
-    if outputs is None or isinstance(outputs, Unset):
-        return UNSET
-
-    result = []
-    for o in outputs:
-        if isinstance(o, PostApiPromptsBodyOutputsItem):
-            result.append(o)
-        elif isinstance(o, dict):
-            d = dict(o)
-            # Map friendly types to enum values
-            if isinstance(d.get("type"), str):
-                t = d["type"]
-                if t == "string":
-                    d["type"] = "str"
-            # Drop null json_schema (model expects unset or object)
-            if "json_schema" in d and d["json_schema"] is None:
-                d.pop("json_schema")
-            result.append(PostApiPromptsBodyOutputsItem.from_dict(d))
-        else:
-            raise TypeError(
-                "outputs items must be dict or PostApiPromptsBodyOutputsItem"
-            )
-    return result
