@@ -327,14 +327,22 @@ export interface SetupObservabilityOptions {
      * @default false
      */
     disabled?: boolean;
+
+    /**
+     * Disable the automatic shutdown of the observability system when the application
+     * terminates.
+     *
+     * @default false
+     */
+    disableAutoShutdown?: boolean;
   };
 }
 
 /**
- * Handle returned from observability setup containing the shutdown function.
- *
- * This interface provides a method to properly shut down the observability system
- * when the application terminates.
+ * Handle returned from observability setup. If you disable the automatic shutdown,
+ * do you are running in an environment where you can't listen to SIGTERM to handle
+ * shutdowns, you can use the shutdown function to manually shut down the
+ * observability system, and ensure that no data is lost.
  *
  * @example
  * ```typescript

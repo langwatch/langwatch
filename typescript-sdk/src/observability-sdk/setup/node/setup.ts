@@ -245,5 +245,21 @@ export function createAndStartNodeSdk(
     logger.debug("Set LangWatch logger provider");
   }
 
+  if (!options.advanced?.disableAutoShutdown) {
+    process.on('SIGTERM', () => {
+      void (async () => {
+        console.log('SIGTERM received: shutting down OpenTelemetry...');
+        try {
+          await sdk.shutdown();
+          console.log('OpenTelemetry shutdown complete');
+        } catch (err) {
+          console.error('Error shutting down OpenTelemetry', err);
+        } finally {
+          process.exit(0);
+        }
+      })();
+    });
+  }
+
   return sdk;
 }
