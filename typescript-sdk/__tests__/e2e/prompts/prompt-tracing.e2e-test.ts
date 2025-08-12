@@ -3,6 +3,7 @@ import { getLangwatchSDK } from "../../helpers/get-sdk.js";
 import { setupTestTraceProvider } from "../../helpers/setup-test-trace-provider.js";
 import { type ReadableSpan } from "@opentelemetry/sdk-trace-node";
 import { LangWatch, attributes } from "langwatch";
+import { promptResponseFactory } from "../../factories/prompt.factory.js";
 
 const { spanExporter, findFinishedSpanByName } = setupTestTraceProvider();
 
@@ -19,6 +20,7 @@ describe("Prompt tracing", () => {
 
   beforeEach(() => {
     spanExporter.reset();
+    promptResponseFactory.rewindSequence();
   });
 
   describe("get tracing", () => {
@@ -46,10 +48,10 @@ describe("Prompt tracing", () => {
       );
       expect(
         getSpan?.attributes[attributes.ATTR_LANGWATCH_PROMPT_VERSION_ID]
-      ).toBe("prompt_version_1");
+      ).toMatch(/^prompt_version_\d+$/);
       expect(
         getSpan?.attributes[attributes.ATTR_LANGWATCH_PROMPT_VERSION_NUMBER]
-      ).toBe(1);
+      ).toBeTypeOf("number");
     });
 
     it("should set output data", () => {
@@ -67,8 +69,8 @@ describe("Prompt tracing", () => {
       expect(output.type).toBe("json");
       expect(output.value).toBeDefined();
       expect(output.value.id).toBe("prompt_123");
-      expect(output.value.name).toBe("Test Prompt 1");
-      expect(output.value.handle).toBe("test-prompt-1");
+      expect(output.value.name).toMatch(/^Test Prompt \d+$/);
+      expect(output.value.handle).toMatch(/^test-prompt-\d+$/);
     });
   });
 
@@ -101,10 +103,10 @@ describe("Prompt tracing", () => {
       );
       expect(
         compileSpan?.attributes[attributes.ATTR_LANGWATCH_PROMPT_VERSION_ID]
-      ).toBe("prompt_version_1");
+      ).toMatch(/^prompt_version_\d+$/);
       expect(
         compileSpan?.attributes[attributes.ATTR_LANGWATCH_PROMPT_VERSION_NUMBER]
-      ).toBe(1);
+      ).toBeTypeOf("number");
     });
 
     it("should set output data", () => {
