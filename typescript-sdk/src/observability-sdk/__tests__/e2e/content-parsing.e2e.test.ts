@@ -60,8 +60,8 @@ describe("Content Parsing E2E", () => {
       span.setInput(chatInput);
 
       // Add message events
-      logger.emitGenAISystemMessageEvent({ content: chatInput.messages[0]?.content || "" });
-      logger.emitGenAIUserMessageEvent({ content: chatInput.messages[1]?.content || "" });
+      logger.emitGenAISystemMessageEvent({ content: chatInput.messages[0]?.content ?? "" });
+      logger.emitGenAIUserMessageEvent({ content: chatInput.messages[1]?.content ?? "" });
 
       await delay(50);
 
@@ -72,13 +72,15 @@ describe("Content Parsing E2E", () => {
       });
 
       logger.emitGenAIAssistantMessageEvent({
-        content: chatOutput.choices[0]?.message.content || ""
+        content: chatOutput.choices[0]?.message.content ?? ""
       });
 
       span.setStatus({ code: SpanStatusCode.OK });
     });
 
     // Verify trace ingestion
+    await setup.spanProcessor.forceFlush();
+
     const trace = await expectTraceToBeIngested(setup.client, traceId!, 1);
     const span = trace.spans?.[0];
 
