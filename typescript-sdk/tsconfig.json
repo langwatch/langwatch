@@ -17,14 +17,17 @@
         "jsx": "preserve",
         "incremental": true,
         "noUncheckedIndexedAccess": true,
-        "tsBuildInfoFile": "./tsconfig.tsbuildinfo"
+        "tsBuildInfoFile": "./tsconfig.tsbuildinfo",
+        "paths": {
+            "@/*": ["./src/*"],
+        }
     },
-    "include": ["**/*.ts", "vitest.config.mts"],
+    "include": ["**/*.ts", "vitest.config.mts", "vitest.e2e.config.mts", "eslint.config.mjs"],
     "exclude": [
         "node_modules",
         "./dist/**/*",
-        "./example/**/*",
         "./examples/**/*",
-        "**/__tests__/**/*"
+        "./coverage/**/*",
+        "./__tests__/**/*"
     ]
 }

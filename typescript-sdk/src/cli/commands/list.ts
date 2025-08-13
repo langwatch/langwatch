@@ -1,6 +1,7 @@
 import chalk from "chalk";
 import ora from "ora";
-import { PromptService, PromptsError } from "../../prompt/service";
+import { PromptsError } from "@/client-sdk/services/prompts";
+import { LangWatch } from "@/client-sdk";
 import { checkApiKey } from "../utils/apiKey";
 
 // Helper to strip ANSI codes for length calculation
@@ -23,7 +24,7 @@ const formatTable = (
   headers.forEach((header) => {
     colWidths[header] = Math.max(
       header.length,
-      ...data.map((row) => stripAnsi(row[header] || "").length),
+      ...data.map((row) => stripAnsi(row[header] ?? "").length),
     );
   });
 
@@ -43,7 +44,7 @@ const formatTable = (
   data.forEach((row) => {
     const dataRow = headers
       .map((header) => {
-        const value = row[header] || "";
+        const value = row[header] ?? "";
         const strippedLength = stripAnsi(value).length;
         const paddingNeeded = colWidths[header]! - strippedLength;
         const paddedValue = value + " ".repeat(Math.max(0, paddingNeeded));
@@ -89,14 +90,14 @@ export const listCommand = async (): Promise<void> => {
     // Check API key before doing anything else
     checkApiKey();
 
-    // Get prompt service
-    const promptService = PromptService.getInstance();
+    // Get LangWatch client
+    const langwatch = new LangWatch();
 
     const spinner = ora("Fetching prompts from server...").start();
 
     try {
       // Fetch all prompts
-      const allPrompts = await promptService.getAll();
+      const allPrompts = await langwatch.prompts.getAll();
       const prompts = allPrompts.filter((prompt) => prompt.version);
       const draftPrompts = allPrompts.filter((prompt) => !prompt.version);
 
@@ -121,9 +122,9 @@ export const listCommand = async (): Promise<void> => {
 
       // Format prompts for table display
       const tableData = prompts.map((prompt) => ({
-        Name: prompt.handle || `${prompt.name} ` + chalk.gray(`(${prompt.id})`),
+        Name: prompt.handle ?? `${prompt.name} ` + chalk.gray(`(${prompt.id})`),
         Version: prompt.version ? `${prompt.version}` : "N/A",
-        Model: prompt.model || "N/A",
+        Model: prompt.model ?? "N/A",
         Updated: formatRelativeTime(prompt.updatedAt),
       }));
 

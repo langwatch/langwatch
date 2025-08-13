@@ -1,12 +1,12 @@
-import { setupLangWatch } from "langwatch/node";
 import { getLangWatchTracer } from "langwatch";
-import { semconv } from "langwatch/observability";
 import { openai } from "@ai-sdk/openai";
 import { generateText } from "ai";
 import * as readline from "readline";
 import cliMarkdown from "cli-markdown";
+import { setupObservability } from "langwatch/observability/node";
 
-await setupLangWatch();
+// Use LangWatch observability setup
+setupObservability();
 
 const tracer = getLangWatchTracer("vercel-ai-sdk-example");
 
@@ -37,7 +37,7 @@ async function main() {
 
     await tracer.withActiveSpan("iteration", {
       attributes: {
-        [semconv.ATTR_LANGWATCH_THREAD_ID]: threadId,
+        'langwatch.thread.id': threadId,
       },
     }, async (span) => {
       try {
@@ -68,7 +68,7 @@ async function main() {
         console.log("🤖 Thinking...");
 
         const result = await generateText({
-          model: openai("gpt-4.1-mini"),
+          model: openai("gpt-5-mini"),
           messages: conversationHistory,
           experimental_telemetry: { isEnabled: true },
         });

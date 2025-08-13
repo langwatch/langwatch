@@ -1,19 +1,17 @@
-import { setupLangWatch } from "langwatch/node";
+import { setupObservability } from "langwatch/observability/node";
 import { LangWatchCallbackHandler } from "langwatch/observability/instrumentation/langchain";
 import { getLangWatchTracer } from "langwatch";
-import { semconv } from "langwatch/observability";
 import { ChatOpenAI } from "@langchain/openai";
 import { HumanMessage, SystemMessage } from "@langchain/core/messages";
 import * as readline from "readline";
 import cliMarkdown from "cli-markdown";
 
-await setupLangWatch();
+setupObservability();
 
 const tracer = getLangWatchTracer("langchain-sdk-example");
 
 async function main() {
   const threadId = crypto.randomUUID();
-  const langWatchCallback = new LangWatchCallbackHandler();
 
   const rl = readline.createInterface({
     input: process.stdin,
@@ -24,11 +22,14 @@ async function main() {
   console.log("---");
 
   // Initialize LangChain chat model
-  const chatModel = new ChatOpenAI({
-    modelName: "gpt-4o-mini",
+  const chatModelBase = new ChatOpenAI({
+    // use "model" in recent LC, not "modelName"
+    model: "gpt-4o-mini",
     temperature: 0.7,
-    callbacks: [langWatchCallback],
   });
+
+  const langWatchCallback = new LangWatchCallbackHandler();
+  const chatModel = chatModelBase.withConfig({ callbacks: [langWatchCallback] });
 
   const conversationHistory: Array<HumanMessage | SystemMessage> = [
     new SystemMessage(
@@ -41,9 +42,10 @@ async function main() {
 
     await tracer.withActiveSpan("iteration", {
       attributes: {
-        [semconv.ATTR_LANGWATCH_THREAD_ID]: threadId,
+        "langwatch.thread_id": threadId,
+        "langwatch.tags": ["langchain.sdk.example"],
       },
-    }, async (span) => {
+    }, async () => {
       try {
         // Get user input
         const userInput = await new Promise<string>((resolve) => {
@@ -71,7 +73,7 @@ async function main() {
         // Generate AI response
         console.log("🤖 Thinking...");
 
-        const result = await chatModel.invoke(conversationHistory, { callbacks: [] });
+        const result = await chatModel.invoke(conversationHistory);
         const aiResponse = result.content as string;
 
         // Add AI response to conversation history
