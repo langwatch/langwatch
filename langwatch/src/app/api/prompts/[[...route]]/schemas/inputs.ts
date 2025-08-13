@@ -1,3 +1,4 @@
+import { PromptScope } from "@prisma/client";
 import { z } from "zod";
 
 import { getLatestConfigVersionSchema } from "~/server/prompt-config/repositories/llm-config-version-schema";
@@ -24,7 +25,7 @@ export const versionInputSchema = getLatestConfigVersionSchema();
  */
 export const createPromptInputSchema = z.strictObject({
   handle: handleSchema,
-  scope: scopeSchema.optional(),
+  scope: scopeSchema.optional().default(PromptScope.PROJECT),
   // Version data
   model: modelNameSchema.optional(),
   temperature: z.number().optional(),
@@ -38,8 +39,14 @@ export const createPromptInputSchema = z.strictObject({
   schemaVersion: schemaVersionSchema.optional(),
 });
 
-export const updatePromptInputSchema = createPromptInputSchema.merge(
-  z.object({
-    handle: handleSchema.optional(),
+export const updatePromptInputSchema = createPromptInputSchema
+  .omit({
+    scope: true,
   })
-);
+  .merge(
+    z.object({
+      // Scope is optional, but on the update we don't want to set the default
+      scope: scopeSchema.optional(),
+      handle: handleSchema.optional(),
+    })
+  );

@@ -83,7 +83,9 @@ app.get(
       version: "latest",
     });
 
-    return c.json(configs);
+    return c.json(
+      apiResponsePromptWithVersionDataSchema.array().parse(configs)
+    );
   }
 );
 
@@ -128,7 +130,9 @@ app.get(
       "Successfully retrieved prompt versions"
     );
 
-    return c.json(versions);
+    return c.json(
+      apiResponsePromptWithVersionDataSchema.array().parse(versions)
+    );
   }
 );
 
@@ -181,7 +185,7 @@ app.get(
       });
     }
 
-    return c.json(config);
+    return c.json(apiResponsePromptWithVersionDataSchema.parse(config));
   }
 );
 
@@ -230,7 +234,7 @@ app.post(
         "Successfully created prompt with initial version"
       );
 
-      return c.json(newConfig);
+      return c.json(apiResponsePromptWithVersionDataSchema.parse(newConfig));
     } catch (error: any) {
       logger.error({ projectId: project.id, error }, "Error creating prompt");
       handlePossibleConflictError(error, data.scope);
@@ -409,7 +413,9 @@ app.put(
         "Successfully updated prompt"
       );
 
-      return c.json(updatedConfig);
+      return c.json(
+        apiResponsePromptWithVersionDataSchema.parse(updatedConfig)
+      );
     } catch (error: any) {
       logger.error({ projectId, promptId: id, error }, "Error updating prompt");
       handlePossibleConflictError(error, data.scope);
@@ -455,6 +461,6 @@ app.delete(
       "Successfully deleted prompt"
     );
 
-    return c.json(result satisfies z.infer<typeof successSchema>);
+    return c.json(successSchema.parse(result));
   }
 );

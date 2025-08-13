@@ -1220,8 +1220,7 @@
                     "inputs",
                     "outputs",
                     "model"
-                  ],
-                  "additionalProperties": false
+                  ]
                 }
               }
             }
@@ -1738,8 +1737,7 @@
                     "inputs",
                     "outputs",
                     "model"
-                  ],
-                  "additionalProperties": false
+                  ]
                 }
               }
             }
@@ -1838,14 +1836,6 @@
                   "handle": {
                     "type": "string",
                     "pattern": "^[a-z0-9_-]+(?:\\/[a-z0-9_-]+)?$"
-                  },
-                  "scope": {
-                    "type": "string",
-                    "enum": [
-                      "ORGANIZATION",
-                      "PROJECT"
-                    ],
-                    "default": "PROJECT"
                   },
                   "model": {
                     "type": "string"
@@ -1961,12 +1951,15 @@
                     "enum": [
                       "1.0"
                     ]
+                  },
+                  "scope": {
+                    "type": "string",
+                    "enum": [
+                      "ORGANIZATION",
+                      "PROJECT"
+                    ]
                   }
-                },
-                "required": [
-                  "handle"
-                ],
-                "additionalProperties": false
+                }
               }
             }
           }
@@ -2498,8 +2491,7 @@
                       "inputs",
                       "outputs",
                       "model"
-                    ],
-                    "additionalProperties": false
+                    ]
                   }
                 }
               }
@@ -3021,8 +3013,7 @@
                         "inputs",
                         "outputs",
                         "model"
-                      ],
-                      "additionalProperties": false
+                      ]
                     },
                     "conflictInfo": {
                       "type": "object",
@@ -4476,8 +4467,7 @@
                       "inputs",
                       "outputs",
                       "model"
-                    ],
-                    "additionalProperties": false
+                    ]
                   }
                 }
               }
@@ -4958,8 +4948,7 @@
                     "inputs",
                     "outputs",
                     "model"
-                  ],
-                  "additionalProperties": false
+                  ]
                 }
               }
             }

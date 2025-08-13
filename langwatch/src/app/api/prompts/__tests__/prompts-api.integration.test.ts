@@ -674,8 +674,8 @@ describe("Prompts API", () => {
         prompt: "Test prompt",
       });
 
-      expect(createRes.status).toBe(200);
       promptToDelete = await createRes.json();
+      expect(createRes.status).toBe(200);
     });
 
     it("should require authentication to delete a prompt", async () => {
@@ -722,8 +722,9 @@ describe("Prompts API", () => {
         }
       );
 
-      expect(deleteRes.status).toBe(200);
       const deleteBody = await deleteRes.json();
+      console.log(promptToDelete.handle, deleteBody);
+      expect(deleteRes.status).toBe(200);
       expect(deleteBody).toHaveProperty("success", true);
 
       // Verify the prompt is deleted by trying to get it by ID

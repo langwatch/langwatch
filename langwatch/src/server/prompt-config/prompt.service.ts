@@ -104,6 +104,7 @@ export class PromptService {
     idOrHandle: string;
     projectId: string;
     organizationId: string;
+    version?: number;
   }): Promise<VersionedPrompt | null> {
     const { idOrHandle, projectId, organizationId } = params;
 
@@ -112,6 +113,7 @@ export class PromptService {
         idOrHandle,
         projectId,
         organizationId,
+        version: params.version,
       }
     );
 
