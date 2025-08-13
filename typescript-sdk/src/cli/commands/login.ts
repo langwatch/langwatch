@@ -3,8 +3,10 @@ import * as path from "path";
 import chalk from "chalk";
 import ora from "ora";
 import prompts from "prompts";
+import { DEFAULT_ENDPOINT } from "@/internal/constants";
+
 const getEndpoint = (): string => {
-  return process.env.LANGWATCH_ENDPOINT ?? "https://app.langwatch.ai";
+  return process.env.LANGWATCH_ENDPOINT ?? DEFAULT_ENDPOINT;
 };
 
 const updateEnvFile = (

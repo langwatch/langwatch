@@ -1,5 +1,6 @@
 import { OTLPLogExporter } from "@opentelemetry/exporter-logs-otlp-http";
 import {
+  DEFAULT_ENDPOINT,
   LANGWATCH_SDK_LANGUAGE,
   LANGWATCH_SDK_NAME_OBSERVABILITY,
   LANGWATCH_SDK_RUNTIME,
@@ -50,7 +51,7 @@ export class LangWatchLogsExporter extends OTLPLogExporter {
     const endpoint =
       opts?.endpoint ??
       process.env.LANGWATCH_ENDPOINT ??
-      "https://app.langwatch.ai";
+      DEFAULT_ENDPOINT;
 
     const url = new URL(LOGS_PATH, endpoint);
     const otelEndpoint = url.toString();
