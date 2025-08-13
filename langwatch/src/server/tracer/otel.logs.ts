@@ -114,9 +114,6 @@ export const openTelemetryLogsRequestToTracesForCollection = (
 						existingSpan.output = output;
 					}
 				}
-
-				console.log("logRecord", logRecord);
-				console.dir(trace, { depth: null });
 			}
 		}
 	}
