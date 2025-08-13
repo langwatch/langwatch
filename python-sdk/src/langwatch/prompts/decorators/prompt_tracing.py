@@ -3,6 +3,8 @@ from opentelemetry import trace
 from typing import TYPE_CHECKING, TypeVar, Callable, Any
 import json
 
+from langwatch.attributes import AttributeKey
+
 if TYPE_CHECKING:
     from langwatch.prompts.prompt import Prompt, CompiledPrompt
 
@@ -27,11 +29,13 @@ class PromptTracing:
                     span_name
                 ) as span:
                     # Set base prompt
-                    span.set_attributes({"langwatch.prompt.type": "prompt"})
-                    span.set_attribute("langwatch.prompt.id", self.id)
-                    span.set_attribute("langwatch.prompt.version.id", self.version_id)
-                    span.set_attribute(
-                        "langwatch.prompt.version.number", int(self.version)
+                    span.set_attributes(
+                        {
+                            AttributeKey.LangWatchPromptId: self.id,
+                            AttributeKey.LangWatchPromptHandle: self.handle,
+                            AttributeKey.LangWatchPromptVersionId: self.version_id,
+                            AttributeKey.LangWatchPromptVersionNumber: self.version,
+                        }
                     )
 
                     # Create variables dict from args and kwargs
@@ -41,7 +45,7 @@ class PromptTracing:
                     variables_dict.update(kwargs)
 
                     span.set_attribute(
-                        "langwatch.prompt.variables",
+                        AttributeKey.LangWatchPromptVariables,
                         json.dumps(
                             {
                                 "type": "json",

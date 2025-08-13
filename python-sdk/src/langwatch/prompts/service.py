@@ -134,7 +134,6 @@ class PromptService:
             raise RuntimeError(f"Failed to fetch prompt with id={prompt_id}")
         return Prompt(ok)
 
-    @prompt_service_tracing.create
     def create(
         self,
         handle: str,

@@ -1,6 +1,6 @@
 from functools import wraps
 from opentelemetry import trace
-from typing import TYPE_CHECKING, TypeVar, Callable, Any
+from typing import TYPE_CHECKING, TypeVar, Callable
 
 if TYPE_CHECKING:
     from langwatch.prompts.prompt import Prompt
@@ -23,29 +23,9 @@ class PromptServiceTracing:
 
                 try:
                     result = func(self, prompt_id)
+                    span.set_attribute("langwatch.prompt.selected.id", result.id)
                     span.set_attribute("langwatch.prompt.version.id", result.version_id)
-                    return result
-                except Exception as ex:
-                    span.record_exception(ex)
-                    raise
-
-        return wrapper
-
-    @staticmethod
-    def create(func: Callable[..., "Prompt"]) -> Callable[..., "Prompt"]:
-        """Decorator for PromptService.create method with OpenTelemetry tracing"""
-
-        @wraps(func)
-        def wrapper(self: Any, handle: str, *args: Any, **kwargs: Any) -> "Prompt":
-            with trace.get_tracer(__name__).start_as_current_span(
-                "prompt.create"
-            ) as span:
-                span.set_attributes({"langwatch.prompt.type": "prompt"})
-                span.set_attribute("langwatch.prompt.handle", handle)
-
-                try:
-                    result = func(self, handle, *args, **kwargs)
-                    span.set_attribute("langwatch.prompt.id", result.id)
+                    span.set_attribute("langwatch.prompt.handle", result.handle)
                     return result
                 except Exception as ex:
                     span.record_exception(ex)

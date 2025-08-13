@@ -15,7 +15,9 @@ from opentelemetry.sdk.trace.export import (
 from opentelemetry.sdk.trace import ReadableSpan
 from opentelemetry import trace
 
+from langwatch.prompts.prompt import Prompt
 from langwatch.prompts.service import PromptService
+from langwatch.attributes import AttributeKey
 
 
 class TestSpanExporter(SpanExporter):
@@ -51,8 +53,11 @@ def test_get_method_creates_trace_span(span_exporter: TestSpanExporter):
     mock_client = Mock()
     service = PromptService(mock_client)
 
-    mock_config = Mock()
-    mock_config.version_id = "prompt_version_3"
+    mock_config = Mock(
+        id="prompt_123",
+        version_id="prompt_version_3",
+        handle="prompt_123",
+    )
 
     with (
         patch("langwatch.prompts.service.get_api_prompts_by_id") as mock_api,
@@ -70,6 +75,9 @@ def test_get_method_creates_trace_span(span_exporter: TestSpanExporter):
 
         # Type assertion for linter
         assert span.attributes is not None
-        assert span.attributes.get("langwatch.prompt.type") == "prompt"
-        assert span.attributes.get("langwatch.prompt.id") == "prompt_123"
-        assert span.attributes.get("langwatch.prompt.version.id") == "prompt_version_3"
+        assert span.attributes.get(AttributeKey.LangWatchPromptId) == "prompt_123"
+        assert span.attributes.get(AttributeKey.LangWatchPromptHandle) == "prompt_123"
+        assert (
+            span.attributes.get(AttributeKey.LangWatchPromptVersionId)
+            == "prompt_version_3"
+        )

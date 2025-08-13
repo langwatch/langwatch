@@ -26,6 +26,7 @@ from fixtures import GetPromptResponseFactory
 from langwatch.generated.langwatch_rest_api_client.models.post_api_prompts_response_200_messages_item_role import (
     PostApiPromptsResponse200MessagesItemRole,
 )
+from langwatch.attributes import AttributeKey
 
 
 class MockSpanExporter(SpanExporter):
@@ -71,6 +72,7 @@ def mock_config() -> GetApiPromptsByIdResponse200:
         id="prompt_123",
         version=1.0,  # Use float instead of string for proper typing
         prompt="Hello {{ name }}!",
+        handle="prompt_123",
         messages=[
             {
                 "role": PostApiPromptsResponse200MessagesItemRole.USER,
@@ -98,10 +100,11 @@ def test_prompt_compile_creates_trace_span(
 
     # Type assertion for linter
     assert span.attributes is not None
-    assert span.attributes.get("langwatch.prompt.type") == "prompt"
-    assert span.attributes.get("langwatch.prompt.id") == "prompt_123"
-    assert span.attributes.get("langwatch.prompt.version.id") == "version_0"
-    assert span.attributes.get("langwatch.prompt.version.number") == 1
+    assert span.attributes.get(AttributeKey.LangWatchPromptId) == prompt.id
+    assert span.attributes.get(AttributeKey.LangWatchPromptHandle) == prompt.handle
+    assert (
+        span.attributes.get(AttributeKey.LangWatchPromptVersionId) == prompt.version_id
+    )
 
 
 def test_prompt_compile_strict_creates_trace_span(
@@ -116,10 +119,11 @@ def test_prompt_compile_strict_creates_trace_span(
 
     # Type assertion for linter
     assert span.attributes is not None
-    assert span.attributes.get("langwatch.prompt.type") == "prompt"
-    assert span.attributes.get("langwatch.prompt.id") == "prompt_123"
-    assert span.attributes.get("langwatch.prompt.version.id") == "version_1"
-    assert span.attributes.get("langwatch.prompt.version.number") == 1
+    assert span.attributes.get(AttributeKey.LangWatchPromptId) == prompt.id
+    assert span.attributes.get(AttributeKey.LangWatchPromptHandle) == prompt.handle
+    assert (
+        span.attributes.get(AttributeKey.LangWatchPromptVersionId) == prompt.version_id
+    )
 
 
 def test_prompt_compile_captures_input_variables(
@@ -136,7 +140,7 @@ def test_prompt_compile_captures_input_variables(
     assert span.attributes is not None
 
     # Check that input variables were captured
-    variables_attr = span.attributes.get("langwatch.prompt.variables")
+    variables_attr = span.attributes.get(AttributeKey.LangWatchPromptVariables)
     assert variables_attr is not None
 
     import json
@@ -160,7 +164,7 @@ def test_prompt_compile_strict_captures_input_variables(
     assert span.attributes is not None
 
     # Check that input variables were captured
-    variables_attr = span.attributes.get("langwatch.prompt.variables")
+    variables_attr = span.attributes.get(AttributeKey.LangWatchPromptVariables)
     assert variables_attr is not None
 
     import json
