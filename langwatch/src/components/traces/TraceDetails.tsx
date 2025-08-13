@@ -1,6 +1,7 @@
 import {
   Button,
   HStack,
+  Portal,
   Spacer,
   Tabs,
   Text,
@@ -37,6 +38,8 @@ import { Events } from "./Events";
 import { ShareButton } from "./ShareButton";
 import { SpanTree } from "./SpanTree";
 import { TraceSummary } from "./Summary";
+import { Menu } from "../ui/menu";
+import { ChevronDownIcon } from "lucide-react";
 
 export function TraceDetails(props: {
   traceId: string;
@@ -176,6 +179,17 @@ export function TraceDetails(props: {
     );
   };
 
+  const threadTraces = api.traces.getTracesByThreadId.useQuery(
+    {
+      projectId: project?.id ?? "",
+      threadId: threadId ?? "",
+      traceId: props.traceId,
+    },
+    {
+      enabled: !!project && !!threadId,
+    }
+  );
+
   const [annotators, setAnnotators] = useState<{ id: string; name: string }[]>(
     []
   );
@@ -280,18 +294,58 @@ export function TraceDetails(props: {
                 </>
               )}
               {hasTeamPermission(TeamRoleGroup.DATASETS_MANAGE) && (
-                <Button
-                  type="submit"
-                  variant="outline"
-                  minWidth="fit-content"
-                  onClick={() => {
-                    openDrawer("addDatasetRecord", {
-                      traceId: props.traceId,
-                    });
-                  }}
-                >
-                  Add to Dataset
-                </Button>
+                <>
+                  {(threadTraces.data?.length ?? 0) > 0 ? (
+                    <Menu.Root>
+                      <Menu.Trigger asChild>
+                        <Button variant="outline" size="sm">
+                          Add to Dataset
+                          <ChevronDownIcon size={16} />
+                        </Button>
+                      </Menu.Trigger>
+                      <Portal>
+                        <Menu.Content zIndex="popover">
+                          <Menu.Item
+                            onClick={() => {
+                              openDrawer("addDatasetRecord", {
+                                traceId: props.traceId,
+                              });
+                            }}
+                            value="add-trace"
+                          >
+                            Add Trace
+                          </Menu.Item>
+                          <Menu.Item
+                            onClick={() => {
+                              openDrawer("addDatasetRecord", {
+                                selectedTraceIds: threadTraces.data!.map(
+                                  (t) => t.trace_id
+                                ),
+                              });
+                            }}
+                            value="add-complete-thread"
+                          >
+                            Add Complete Thread
+                          </Menu.Item>
+                        </Menu.Content>
+                      </Portal>
+                    </Menu.Root>
+                  ) : (
+                    <Button
+                      type="submit"
+                      variant="outline"
+                      minWidth="fit-content"
+                      loading={threadTraces.isLoading}
+                      onClick={() => {
+                        openDrawer("addDatasetRecord", {
+                          traceId: props.traceId,
+                        });
+                      }}
+                    >
+                      Add to Dataset
+                    </Button>
+                  )}
+                </>
               )}
               {project && (
                 <ShareButton project={project} traceId={props.traceId} />
