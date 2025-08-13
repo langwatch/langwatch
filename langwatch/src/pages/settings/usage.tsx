@@ -89,7 +89,10 @@ export default function Usage() {
                   <Progress.Root
                     defaultValue={0}
                     max={usage.data?.activePlan.maxMessagesPerMonth}
-                    value={usage.data?.currentMonthMessagesCount}
+                    value={Math.min(
+                      usage.data?.currentMonthMessagesCount,
+                      usage.data?.activePlan.maxMessagesPerMonth
+                    )}
                     maxW="sm"
                     colorPalette="orange"
                     width="full"
