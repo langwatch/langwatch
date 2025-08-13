@@ -6,6 +6,7 @@ import {
 } from "@prisma/client";
 import { type z } from "zod";
 
+import { SystemPromptConflictError } from "./errors";
 import {
   type CreateLlmConfigParams,
   type CreateLlmConfigVersionParams,
@@ -145,6 +146,32 @@ export class PromptService {
         params.prompting_technique !== undefined
     );
 
+    shouldCreateVersion &&
+      this.assertNoSystemPromptConflict({
+        prompt: params.prompt,
+        messages: params.messages,
+      });
+
+    const messageSystemPrompt = params.messages?.find(
+      (msg) => msg.role === "system"
+    )?.content;
+
+    // If the system prompt is provided in the messages, set the prompt to the system prompt
+    params.prompt ??= messageSystemPrompt;
+
+    if (!messageSystemPrompt && !params.prompt) {
+      throw new SystemPromptConflictError(
+        "A system prompt is required when creating a prompt"
+      );
+    } else if (!messageSystemPrompt && params.prompt) {
+      params.messages = [
+        { role: "system", content: params.prompt },
+        ...(params.messages ?? []),
+      ];
+    } else {
+      // All good, do nothing
+    }
+
     const config = await this.repository.createConfigWithInitialVersion({
       configData: {
         name: params.name ?? params.handle,
@@ -159,8 +186,8 @@ export class PromptService {
             configData: {
               prompt: params.prompt,
               messages: params.messages,
-              inputs: params.inputs,
-              outputs: params.outputs,
+              inputs: params.inputs ?? undefined,
+              outputs: params.outputs ?? undefined,
               model: params.model,
               temperature: params.temperature,
               max_tokens: params.max_tokens,
@@ -206,6 +233,8 @@ export class PromptService {
   }): Promise<VersionedPrompt> {
     const { idOrHandle, projectId, data } = params;
     const { handle, scope, ...newVersionData } = data;
+
+    this.assertNoSystemPromptConflict(newVersionData);
 
     // Handle in a transaction to ensure atomicity
     const result = await this.prisma.$transaction(
@@ -521,5 +550,24 @@ export class PromptService {
       messages: config.latestVersion.configData.messages,
       response_format: config.latestVersion.configData.response_format,
     };
+  }
+
+  /**
+   * Validates that a prompt and system message are not set at the same time.
+   * @param params - The parameters object
+   * @param params.prompt - The prompt to validate
+   * @param params.messages - The messages to validate
+   * @throws SystemPromptConflictError if a prompt and system message are set at the same time
+   */
+  private assertNoSystemPromptConflict(params: {
+    prompt?: string;
+    messages?: z.infer<typeof messageSchema>[];
+  }): void {
+    if (
+      params.prompt &&
+      params.messages?.some((msg) => msg.role === "system")
+    ) {
+      throw new SystemPromptConflictError();
+    }
   }
 }

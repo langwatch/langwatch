@@ -633,6 +633,99 @@ describe("Prompts API", () => {
           updatedPrompt.latestVersion.configData.outputs[0].identifier
         ).toBe("updated_response");
       });
+
+      it("should throw error when trying to set both system prompt message and prompt", async () => {
+        // Create a prompt first
+        const createRes = await helpers.api.post("/api/prompts", {
+          handle: "conflict-test",
+        });
+        expect(createRes.status).toBe(200);
+        const createdPrompt = await createRes.json();
+
+        // Try to update with both prompt and system message - should fail
+        const updateRes = await helpers.api.put(
+          `/api/prompts/${createdPrompt.id}`,
+          {
+            prompt: "This is a prompt text",
+            messages: [
+              { role: "system", content: "This is a system message" },
+              { role: "user", content: "User message" },
+            ],
+          }
+        );
+
+        expect(updateRes.status).toBe(400);
+        const errorBody = await updateRes.json();
+        expect(errorBody.error).toContain("system prompt");
+      });
+
+      it("should update the prompt when system message is provided", async () => {
+        // Create a prompt with initial prompt text
+        const createRes = await helpers.api.post("/api/prompts", {
+          handle: "system-to-prompt-test",
+          prompt: "Initial prompt text",
+        });
+        expect(createRes.status).toBe(200);
+        const createdPrompt = await createRes.json();
+
+        // Update with system message - should convert to messages format
+        const updateRes = await helpers.api.put(
+          `/api/prompts/${createdPrompt.id}`,
+          {
+            messages: [
+              { role: "system", content: "New system message" },
+              { role: "user", content: "User message" },
+            ],
+          }
+        );
+
+        expect(updateRes.status).toBe(200);
+        const updatedPrompt = await updateRes.json();
+
+        // Should have messages instead of prompt
+        expect(updatedPrompt.latestVersion.configData.prompt).toBeUndefined();
+        expect(updatedPrompt.latestVersion.configData.messages).toHaveLength(2);
+        expect(updatedPrompt.latestVersion.configData.messages[0].role).toBe(
+          "system"
+        );
+        expect(updatedPrompt.latestVersion.configData.messages[0].content).toBe(
+          "New system message"
+        );
+      });
+
+      it("should update the system message when prompt is provided", async () => {
+        // Create a prompt with initial messages including system message
+        const createRes = await helpers.api.post("/api/prompts", {
+          handle: "prompt-to-system-test",
+          messages: [
+            { role: "system", content: "Initial system message" },
+            { role: "user", content: "User message" },
+          ],
+          inputs: [{ identifier: "variable", type: "str" }],
+          outputs: [
+            {
+              identifier: "response",
+              type: "str",
+            },
+          ],
+        });
+        expect(createRes.status).toBe(200);
+        const createdPrompt = await createRes.json();
+
+        // Update with prompt text - should convert to prompt format
+        const updateRes = await helpers.api.put(
+          `/api/prompts/${createdPrompt.id}`,
+          {
+            prompt: "New prompt text with {{variable}}",
+          }
+        );
+
+        expect(updateRes.status).toBe(200);
+        const updatedPrompt = await updateRes.json();
+
+        // Should have prompt instead of messages
+        expect(updatedPrompt.prompt).toBe("New prompt text with {{variable}}");
+      });
     });
   });
 

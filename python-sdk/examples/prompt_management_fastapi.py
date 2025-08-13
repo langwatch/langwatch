@@ -40,8 +40,7 @@ def example():
         scope="PROJECT",  # optional - 'ORGANIZATION' or 'PROJECT'
         author_id=None,  # optional
         prompt="You are a helpful assistant. Specialize in {{subject}}.",  # optional
-        messages=[  # optional
-            {"role": "system", "content": "You are a helpful assistant."},
+        messages=[  # optional -- you cannot set a system message and a prompt at the same time
             {"role": "user", "content": "{{question}}"},
         ],
         inputs=[{"identifier": "question", "type": "str"}],  # optional
