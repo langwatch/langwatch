@@ -5,6 +5,7 @@ import { z } from "zod";
 
 import { nodeDatasetSchema } from "../../../optimization_studio/types/dsl";
 import { createLogger } from "../../../utils/logger";
+import { SchemaVersion } from "../enums";
 
 import type { LlmConfigVersionDTO } from "./llm-config-versions.repository";
 
@@ -20,15 +21,6 @@ import {
 const logger = createLogger(
   "langwatch:prompt-config:llm-config-version-schema"
 );
-
-/**
- * Schema version enum for LLM configuration
- * Used to track and manage schema evolution over time
- * Corresponds to the schemaVersion field in LlmPromptConfigVersion model
- */
-export enum SchemaVersion {
-  V1_0 = "1.0",
-}
 
 export const LATEST_SCHEMA_VERSION = SchemaVersion.V1_0 as const;
 

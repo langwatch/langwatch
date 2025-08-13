@@ -706,6 +706,7 @@ export class LlmConfigRepository {
   ): CreateLlmConfigVersionParams["configData"] {
     return {
       prompt: "You are a helpful assistant",
+      model: "openai/gpt-4o-mini",
       messages: [
         {
           role: "user",
@@ -720,7 +721,14 @@ export class LlmConfigRepository {
           columnTypes: [],
         },
       },
+      response_format: {
+        type: "json_schema",
+        json_schema: {
+          name: "response",
+          schema: { type: "str" },
+        },
+      },
       ...params,
-    } as Prisma.JsonValue;
+    };
   }
 }

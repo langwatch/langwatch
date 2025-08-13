@@ -4,11 +4,7 @@ import { describeRoute } from "hono-openapi";
 import { validator as zValidator, resolver } from "hono-openapi/zod";
 import { z } from "zod";
 
-import {
-  getLatestConfigVersionSchema,
-  type SchemaVersion,
-  type LatestConfigVersionSchema,
-} from "~/server/prompt-config/repositories/llm-config-version-schema";
+import { getLatestConfigVersionSchema } from "~/server/prompt-config/repositories/llm-config-version-schema";
 
 import {
   organizationMiddleware,
@@ -23,27 +19,19 @@ import { baseResponses } from "../../shared/base-responses";
 
 import {
   apiResponsePromptWithVersionDataSchema,
-  apiResponseVersionOutputSchema,
-  type ApiResponsePromptVersion,
+  createPromptInputSchema,
+  updatePromptInputSchema,
   type ApiResponsePrompt,
 } from "./schemas";
 import { buildStandardSuccessResponse } from "./utils";
 import { handlePossibleConflictError } from "./utils";
-import {
-  mapPromptToApiPromptResponse,
-  mapVersionToApiPromptVersionResponse,
-} from "./utils";
+import { mapPromptToApiPromptResponse } from "./utils";
 import { handleSystemPromptConflict } from "./utils/handle-system-prompt-conflict";
 
 import { badRequestSchema, successSchema } from "~/app/api/shared/schemas";
 import {
-  handleSchema,
-  scopeSchema,
   commitMessageSchema,
   versionSchema,
-  outputsSchema,
-  messageSchema,
-  inputsSchema,
 } from "~/prompt-configs/schemas/field-schemas";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
 import { createLogger } from "~/utils/logger";
@@ -117,7 +105,9 @@ app.get(
       "Get all versions for a prompt. Does not include base prompt data, only versioned data.",
     responses: {
       ...baseResponses,
-      200: buildStandardSuccessResponse(apiResponseVersionOutputSchema),
+      200: buildStandardSuccessResponse(
+        z.array(apiResponsePromptWithVersionDataSchema)
+      ),
       404: {
         description: "Prompt not found",
         content: {
@@ -137,31 +127,18 @@ app.get(
       "Getting versions for prompt"
     );
 
-    const versions =
-      await service.repository.versions.getVersionsForConfigByIdOrHandle({
-        idOrHandle: id,
-        projectId: project.id,
-        organizationId: organization.id,
-      });
+    const versions: ApiResponsePrompt[] = await service.getAllVersions({
+      idOrHandle: id,
+      projectId: project.id,
+      organizationId: organization.id,
+    });
 
     logger.info(
       { projectId: project.id, promptId: id, versionCount: versions.length },
       "Successfully retrieved prompt versions"
     );
 
-    const results: ApiResponsePromptVersion[] = versions.map((item) => {
-      return mapVersionToApiPromptVersionResponse({
-        ...item,
-        schemaVersion: item.schemaVersion as SchemaVersion,
-        commitMessage: item.commitMessage ?? "",
-        configData: item.configData as LatestConfigVersionSchema["configData"],
-        author: item.author?.name
-          ? { id: item.author.id, name: item.author.name }
-          : null,
-      });
-    });
-
-    return c.json(results);
+    return c.json(versions);
   }
 );
 
@@ -228,19 +205,7 @@ app.post(
       200: buildStandardSuccessResponse(apiResponsePromptWithVersionDataSchema),
     },
   }),
-  zValidator(
-    "json",
-    z.object({
-      handle: handleSchema,
-      scope: scopeSchema,
-      // Version data
-      authorId: z.string().optional(),
-      prompt: z.string().optional(),
-      messages: z.array(messageSchema).optional(),
-      inputs: z.array(inputsSchema).optional(),
-      outputs: z.array(outputsSchema).optional(),
-    })
-  ),
+  zValidator("json", createPromptInputSchema),
   async (c) => {
     const service = c.get("promptService");
     const project = c.get("project");
@@ -408,19 +373,7 @@ app.put(
       },
     },
   }),
-  zValidator(
-    "json",
-    z.strictObject({
-      handle: handleSchema.optional(),
-      scope: scopeSchema.optional(),
-      // Version data
-      authorId: z.string().optional(),
-      prompt: z.string().optional(),
-      messages: z.array(messageSchema).optional(),
-      inputs: z.array(inputsSchema).optional(),
-      outputs: z.array(outputsSchema).optional(),
-    })
-  ),
+  zValidator("json", updatePromptInputSchema),
   async (c) => {
     const service = c.get("promptService");
     const project = c.get("project");

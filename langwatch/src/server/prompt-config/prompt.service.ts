@@ -6,7 +6,7 @@ import {
 } from "@prisma/client";
 import { type z } from "zod";
 
-import { SystemPromptConflictError } from "./errors";
+import { NotFoundError, SystemPromptConflictError } from "./errors";
 import {
   type CreateLlmConfigParams,
   type CreateLlmConfigVersionParams,
@@ -46,16 +46,18 @@ export type VersionedPrompt = {
   versionCreatedAt: Date;
   model: string;
   prompt: string;
-  updatedAt: Date;
   projectId: string;
   organizationId: string;
   messages: Array<{
     role: LatestConfigVersionSchema["configData"]["messages"][number]["role"];
     content: string;
   }>;
+  authorId: string | null;
   inputs: LatestConfigVersionSchema["configData"]["inputs"];
   outputs: LatestConfigVersionSchema["configData"]["outputs"];
   response_format: LatestConfigVersionSchema["configData"]["response_format"];
+  updatedAt: Date;
+  createdAt: Date;
 };
 
 /**
@@ -99,6 +101,49 @@ export class PromptService {
     }
 
     return this.transformToVersionedPrompt(config);
+  }
+
+  /**
+   * Get all versions for a prompt
+   */
+  async getAllVersions(params: {
+    idOrHandle: string;
+    projectId: string;
+    organizationId?: string;
+  }): Promise<VersionedPrompt[]> {
+    // If no organizationId is provided, get it from the projectId
+    const organizationId: string =
+      params.organizationId ??
+      (await this.getOrganizationIdFromProjectId(params.projectId));
+
+    // Get the config
+    const config = await this.repository.getConfigByIdOrHandleWithLatestVersion(
+      {
+        idOrHandle: params.idOrHandle,
+        projectId: params.projectId,
+        organizationId,
+      }
+    );
+
+    // If the config doesn't exist, return an empty array
+    if (!config) {
+      throw new NotFoundError("Prompt not found");
+    }
+
+    // Get the versions
+    const versions =
+      (await this.repository.versions.getVersionsForConfigByIdOrHandle({
+        idOrHandle: params.idOrHandle,
+        projectId: params.projectId,
+        organizationId,
+      })) as LatestConfigVersionSchema[];
+
+    return versions.map((version) =>
+      this.transformToVersionedPrompt({
+        ...config,
+        latestVersion: version,
+      })
+    );
   }
 
   /**
@@ -358,6 +403,19 @@ export class PromptService {
 
   /**
    * Sync/upsert a prompt from local content with conflict resolution
+   *
+   * If the prompt doesn't exist on the server, it will be created.
+   * If the prompt exists on the server, it will be updated.
+   * If the local version is newer than the remote version, it will be updated.
+   * If the local version is older than the remote version, it will be conflict.
+   *
+   * @param params - The parameters object
+   * @param params.idOrHandle - The ID or handle of the prompt
+   * @param params.localConfigData - The local config data
+   * @param params.localVersion - The local version number
+   * @param params.projectId - The project ID
+   * @param params.organizationId - The organization ID
+   * @param params.authorId - The author ID
    */
   async syncPrompt(params: {
     idOrHandle: string;
@@ -541,22 +599,7 @@ export class PromptService {
   }
 
   /**
-   * Gets all prompts for a project and returns them as versioned prompt shapes.
-   *
-   * @param params - The parameters object
-   * @returns Array of versioned prompt shapes ready for API response
-   */
-  async getAllVersionedPrompts(params: {
-    projectId: string;
-    organizationId: string;
-  }): Promise<VersionedPrompt[]> {
-    const configs = await this.repository.getAllWithLatestVersion(params);
-    return configs.map((config) => this.transformToVersionedPrompt(config));
-  }
-
-  /**
    * Transforms a LlmConfigWithLatestVersion to the versioned prompt shape.
-   * This handles building the messages array and response format.
    */
   private transformToVersionedPrompt(
     config: LlmConfigWithLatestVersion
@@ -571,13 +614,15 @@ export class PromptService {
       versionCreatedAt: config.latestVersion.createdAt ?? new Date(),
       model: config.latestVersion.configData.model,
       prompt: config.latestVersion.configData.prompt,
-      updatedAt: config.updatedAt,
       projectId: config.projectId,
       organizationId: config.organizationId,
       messages: config.latestVersion.configData.messages,
       inputs: config.latestVersion.configData.inputs,
       outputs: config.latestVersion.configData.outputs,
       response_format: config.latestVersion.configData.response_format,
+      authorId: config.latestVersion.authorId ?? null,
+      updatedAt: config.updatedAt,
+      createdAt: config.latestVersion.createdAt,
     };
   }
 
@@ -598,5 +643,20 @@ export class PromptService {
     ) {
       throw new SystemPromptConflictError();
     }
+  }
+
+  private async getOrganizationIdFromProjectId(
+    projectId: string
+  ): Promise<string> {
+    const team = await this.prisma.team.findUnique({
+      where: { id: projectId },
+      include: { organization: true },
+    });
+
+    if (!team?.organizationId) {
+      throw new Error("Organization not found");
+    }
+
+    return team.organizationId;
   }
 }

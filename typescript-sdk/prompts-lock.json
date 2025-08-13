@@ -1,0 +1,15 @@
+{
+  "lockfileVersion": 1,
+  "prompts": {
+    "updated_example_prompt_b046c968": {
+      "version": 1,
+      "versionId": "r9tlcGPl6dBgFN_ym7AtB",
+      "materialized": "prompts/.materialized/updated_example_prompt_b046c968.prompt.yaml"
+    },
+    "new-test-prompt": {
+      "version": 5,
+      "versionId": "prompt_version_HXvRkeoZSFkzr6j7NNbme",
+      "materialized": "prompts/.materialized/new-test-prompt.prompt.yaml"
+    }
+  }
+}

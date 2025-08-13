@@ -8,7 +8,13 @@ from ..models.get_api_prompts_response_200_item_scope import GetApiPromptsRespon
 from ..types import UNSET, Unset
 
 if TYPE_CHECKING:
+    from ..models.get_api_prompts_response_200_item_demonstrations import GetApiPromptsResponse200ItemDemonstrations
+    from ..models.get_api_prompts_response_200_item_inputs_item import GetApiPromptsResponse200ItemInputsItem
     from ..models.get_api_prompts_response_200_item_messages_item import GetApiPromptsResponse200ItemMessagesItem
+    from ..models.get_api_prompts_response_200_item_outputs_item import GetApiPromptsResponse200ItemOutputsItem
+    from ..models.get_api_prompts_response_200_item_prompting_technique import (
+        GetApiPromptsResponse200ItemPromptingTechnique,
+    )
     from ..models.get_api_prompts_response_200_item_response_format import GetApiPromptsResponse200ItemResponseFormat
 
 
@@ -26,12 +32,20 @@ class GetApiPromptsResponse200Item:
         updated_at (str):
         project_id (str):
         organization_id (str):
-        version (float):
         version_id (str):
-        version_created_at (str):
-        model (str):
+        author_id (Union[None, str]):
+        version (float):
+        created_at (str):
         prompt (str):
         messages (list['GetApiPromptsResponse200ItemMessagesItem']):
+        inputs (list['GetApiPromptsResponse200ItemInputsItem']):
+        outputs (list['GetApiPromptsResponse200ItemOutputsItem']):
+        model (str):
+        commit_message (Union[None, Unset, str]):
+        temperature (Union[Unset, float]):
+        max_tokens (Union[Unset, float]):
+        demonstrations (Union[Unset, GetApiPromptsResponse200ItemDemonstrations]):
+        prompting_technique (Union[Unset, GetApiPromptsResponse200ItemPromptingTechnique]):
         response_format (Union[Unset, GetApiPromptsResponse200ItemResponseFormat]):
     """
 
@@ -42,12 +56,20 @@ class GetApiPromptsResponse200Item:
     updated_at: str
     project_id: str
     organization_id: str
-    version: float
     version_id: str
-    version_created_at: str
-    model: str
+    author_id: Union[None, str]
+    version: float
+    created_at: str
     prompt: str
     messages: list["GetApiPromptsResponse200ItemMessagesItem"]
+    inputs: list["GetApiPromptsResponse200ItemInputsItem"]
+    outputs: list["GetApiPromptsResponse200ItemOutputsItem"]
+    model: str
+    commit_message: Union[None, Unset, str] = UNSET
+    temperature: Union[Unset, float] = UNSET
+    max_tokens: Union[Unset, float] = UNSET
+    demonstrations: Union[Unset, "GetApiPromptsResponse200ItemDemonstrations"] = UNSET
+    prompting_technique: Union[Unset, "GetApiPromptsResponse200ItemPromptingTechnique"] = UNSET
     response_format: Union[Unset, "GetApiPromptsResponse200ItemResponseFormat"] = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
@@ -67,13 +89,14 @@ class GetApiPromptsResponse200Item:
 
         organization_id = self.organization_id
 
-        version = self.version
-
         version_id = self.version_id
 
-        version_created_at = self.version_created_at
+        author_id: Union[None, str]
+        author_id = self.author_id
 
-        model = self.model
+        version = self.version
+
+        created_at = self.created_at
 
         prompt = self.prompt
 
@@ -81,6 +104,36 @@ class GetApiPromptsResponse200Item:
         for messages_item_data in self.messages:
             messages_item = messages_item_data.to_dict()
             messages.append(messages_item)
+
+        inputs = []
+        for inputs_item_data in self.inputs:
+            inputs_item = inputs_item_data.to_dict()
+            inputs.append(inputs_item)
+
+        outputs = []
+        for outputs_item_data in self.outputs:
+            outputs_item = outputs_item_data.to_dict()
+            outputs.append(outputs_item)
+
+        model = self.model
+
+        commit_message: Union[None, Unset, str]
+        if isinstance(self.commit_message, Unset):
+            commit_message = UNSET
+        else:
+            commit_message = self.commit_message
+
+        temperature = self.temperature
+
+        max_tokens = self.max_tokens
+
+        demonstrations: Union[Unset, dict[str, Any]] = UNSET
+        if not isinstance(self.demonstrations, Unset):
+            demonstrations = self.demonstrations.to_dict()
+
+        prompting_technique: Union[Unset, dict[str, Any]] = UNSET
+        if not isinstance(self.prompting_technique, Unset):
+            prompting_technique = self.prompting_technique.to_dict()
 
         response_format: Union[Unset, dict[str, Any]] = UNSET
         if not isinstance(self.response_format, Unset):
@@ -97,22 +150,41 @@ class GetApiPromptsResponse200Item:
                 "updatedAt": updated_at,
                 "projectId": project_id,
                 "organizationId": organization_id,
-                "version": version,
                 "versionId": version_id,
-                "versionCreatedAt": version_created_at,
-                "model": model,
+                "authorId": author_id,
+                "version": version,
+                "createdAt": created_at,
                 "prompt": prompt,
                 "messages": messages,
+                "inputs": inputs,
+                "outputs": outputs,
+                "model": model,
             }
         )
+        if commit_message is not UNSET:
+            field_dict["commitMessage"] = commit_message
+        if temperature is not UNSET:
+            field_dict["temperature"] = temperature
+        if max_tokens is not UNSET:
+            field_dict["maxTokens"] = max_tokens
+        if demonstrations is not UNSET:
+            field_dict["demonstrations"] = demonstrations
+        if prompting_technique is not UNSET:
+            field_dict["promptingTechnique"] = prompting_technique
         if response_format is not UNSET:
-            field_dict["response_format"] = response_format
+            field_dict["responseFormat"] = response_format
 
         return field_dict
 
     @classmethod
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
+        from ..models.get_api_prompts_response_200_item_demonstrations import GetApiPromptsResponse200ItemDemonstrations
+        from ..models.get_api_prompts_response_200_item_inputs_item import GetApiPromptsResponse200ItemInputsItem
         from ..models.get_api_prompts_response_200_item_messages_item import GetApiPromptsResponse200ItemMessagesItem
+        from ..models.get_api_prompts_response_200_item_outputs_item import GetApiPromptsResponse200ItemOutputsItem
+        from ..models.get_api_prompts_response_200_item_prompting_technique import (
+            GetApiPromptsResponse200ItemPromptingTechnique,
+        )
         from ..models.get_api_prompts_response_200_item_response_format import (
             GetApiPromptsResponse200ItemResponseFormat,
         )
@@ -137,13 +209,18 @@ class GetApiPromptsResponse200Item:
 
         organization_id = d.pop("organizationId")
 
-        version = d.pop("version")
-
         version_id = d.pop("versionId")
 
-        version_created_at = d.pop("versionCreatedAt")
+        def _parse_author_id(data: object) -> Union[None, str]:
+            if data is None:
+                return data
+            return cast(Union[None, str], data)
 
-        model = d.pop("model")
+        author_id = _parse_author_id(d.pop("authorId"))
+
+        version = d.pop("version")
+
+        created_at = d.pop("createdAt")
 
         prompt = d.pop("prompt")
 
@@ -154,7 +231,50 @@ class GetApiPromptsResponse200Item:
 
             messages.append(messages_item)
 
-        _response_format = d.pop("response_format", UNSET)
+        inputs = []
+        _inputs = d.pop("inputs")
+        for inputs_item_data in _inputs:
+            inputs_item = GetApiPromptsResponse200ItemInputsItem.from_dict(inputs_item_data)
+
+            inputs.append(inputs_item)
+
+        outputs = []
+        _outputs = d.pop("outputs")
+        for outputs_item_data in _outputs:
+            outputs_item = GetApiPromptsResponse200ItemOutputsItem.from_dict(outputs_item_data)
+
+            outputs.append(outputs_item)
+
+        model = d.pop("model")
+
+        def _parse_commit_message(data: object) -> Union[None, Unset, str]:
+            if data is None:
+                return data
+            if isinstance(data, Unset):
+                return data
+            return cast(Union[None, Unset, str], data)
+
+        commit_message = _parse_commit_message(d.pop("commitMessage", UNSET))
+
+        temperature = d.pop("temperature", UNSET)
+
+        max_tokens = d.pop("maxTokens", UNSET)
+
+        _demonstrations = d.pop("demonstrations", UNSET)
+        demonstrations: Union[Unset, GetApiPromptsResponse200ItemDemonstrations]
+        if isinstance(_demonstrations, Unset):
+            demonstrations = UNSET
+        else:
+            demonstrations = GetApiPromptsResponse200ItemDemonstrations.from_dict(_demonstrations)
+
+        _prompting_technique = d.pop("promptingTechnique", UNSET)
+        prompting_technique: Union[Unset, GetApiPromptsResponse200ItemPromptingTechnique]
+        if isinstance(_prompting_technique, Unset):
+            prompting_technique = UNSET
+        else:
+            prompting_technique = GetApiPromptsResponse200ItemPromptingTechnique.from_dict(_prompting_technique)
+
+        _response_format = d.pop("responseFormat", UNSET)
         response_format: Union[Unset, GetApiPromptsResponse200ItemResponseFormat]
         if isinstance(_response_format, Unset):
             response_format = UNSET
@@ -169,12 +289,20 @@ class GetApiPromptsResponse200Item:
             updated_at=updated_at,
             project_id=project_id,
             organization_id=organization_id,
-            version=version,
             version_id=version_id,
-            version_created_at=version_created_at,
-            model=model,
+            author_id=author_id,
+            version=version,
+            created_at=created_at,
             prompt=prompt,
             messages=messages,
+            inputs=inputs,
+            outputs=outputs,
+            model=model,
+            commit_message=commit_message,
+            temperature=temperature,
+            max_tokens=max_tokens,
+            demonstrations=demonstrations,
+            prompting_technique=prompting_technique,
             response_format=response_format,
         )
 

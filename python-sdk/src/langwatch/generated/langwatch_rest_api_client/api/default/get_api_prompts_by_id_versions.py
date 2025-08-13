@@ -5,7 +5,7 @@ import httpx
 
 from ... import errors
 from ...client import AuthenticatedClient, Client
-from ...models.get_api_prompts_by_id_versions_response_200 import GetApiPromptsByIdVersionsResponse200
+from ...models.get_api_prompts_by_id_versions_response_200_item import GetApiPromptsByIdVersionsResponse200Item
 from ...models.get_api_prompts_by_id_versions_response_400 import GetApiPromptsByIdVersionsResponse400
 from ...models.get_api_prompts_by_id_versions_response_401 import GetApiPromptsByIdVersionsResponse401
 from ...models.get_api_prompts_by_id_versions_response_404 import GetApiPromptsByIdVersionsResponse404
@@ -28,15 +28,20 @@ def _parse_response(
     *, client: Union[AuthenticatedClient, Client], response: httpx.Response
 ) -> Optional[
     Union[
-        GetApiPromptsByIdVersionsResponse200,
         GetApiPromptsByIdVersionsResponse400,
         GetApiPromptsByIdVersionsResponse401,
         GetApiPromptsByIdVersionsResponse404,
         GetApiPromptsByIdVersionsResponse500,
+        list["GetApiPromptsByIdVersionsResponse200Item"],
     ]
 ]:
     if response.status_code == 200:
-        response_200 = GetApiPromptsByIdVersionsResponse200.from_dict(response.json())
+        response_200 = []
+        _response_200 = response.json()
+        for response_200_item_data in _response_200:
+            response_200_item = GetApiPromptsByIdVersionsResponse200Item.from_dict(response_200_item_data)
+
+            response_200.append(response_200_item)
 
         return response_200
     if response.status_code == 400:
@@ -65,11 +70,11 @@ def _build_response(
     *, client: Union[AuthenticatedClient, Client], response: httpx.Response
 ) -> Response[
     Union[
-        GetApiPromptsByIdVersionsResponse200,
         GetApiPromptsByIdVersionsResponse400,
         GetApiPromptsByIdVersionsResponse401,
         GetApiPromptsByIdVersionsResponse404,
         GetApiPromptsByIdVersionsResponse500,
+        list["GetApiPromptsByIdVersionsResponse200Item"],
     ]
 ]:
     return Response(
@@ -86,11 +91,11 @@ def sync_detailed(
     client: Union[AuthenticatedClient, Client],
 ) -> Response[
     Union[
-        GetApiPromptsByIdVersionsResponse200,
         GetApiPromptsByIdVersionsResponse400,
         GetApiPromptsByIdVersionsResponse401,
         GetApiPromptsByIdVersionsResponse404,
         GetApiPromptsByIdVersionsResponse500,
+        list["GetApiPromptsByIdVersionsResponse200Item"],
     ]
 ]:
     """Get all versions for a prompt. Does not include base prompt data, only versioned data.
@@ -103,7 +108,7 @@ def sync_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[Union[GetApiPromptsByIdVersionsResponse200, GetApiPromptsByIdVersionsResponse400, GetApiPromptsByIdVersionsResponse401, GetApiPromptsByIdVersionsResponse404, GetApiPromptsByIdVersionsResponse500]]
+        Response[Union[GetApiPromptsByIdVersionsResponse400, GetApiPromptsByIdVersionsResponse401, GetApiPromptsByIdVersionsResponse404, GetApiPromptsByIdVersionsResponse500, list['GetApiPromptsByIdVersionsResponse200Item']]]
     """
 
     kwargs = _get_kwargs(
@@ -123,11 +128,11 @@ def sync(
     client: Union[AuthenticatedClient, Client],
 ) -> Optional[
     Union[
-        GetApiPromptsByIdVersionsResponse200,
         GetApiPromptsByIdVersionsResponse400,
         GetApiPromptsByIdVersionsResponse401,
         GetApiPromptsByIdVersionsResponse404,
         GetApiPromptsByIdVersionsResponse500,
+        list["GetApiPromptsByIdVersionsResponse200Item"],
     ]
 ]:
     """Get all versions for a prompt. Does not include base prompt data, only versioned data.
@@ -140,7 +145,7 @@ def sync(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Union[GetApiPromptsByIdVersionsResponse200, GetApiPromptsByIdVersionsResponse400, GetApiPromptsByIdVersionsResponse401, GetApiPromptsByIdVersionsResponse404, GetApiPromptsByIdVersionsResponse500]
+        Union[GetApiPromptsByIdVersionsResponse400, GetApiPromptsByIdVersionsResponse401, GetApiPromptsByIdVersionsResponse404, GetApiPromptsByIdVersionsResponse500, list['GetApiPromptsByIdVersionsResponse200Item']]
     """
 
     return sync_detailed(
@@ -155,11 +160,11 @@ async def asyncio_detailed(
     client: Union[AuthenticatedClient, Client],
 ) -> Response[
     Union[
-        GetApiPromptsByIdVersionsResponse200,
         GetApiPromptsByIdVersionsResponse400,
         GetApiPromptsByIdVersionsResponse401,
         GetApiPromptsByIdVersionsResponse404,
         GetApiPromptsByIdVersionsResponse500,
+        list["GetApiPromptsByIdVersionsResponse200Item"],
     ]
 ]:
     """Get all versions for a prompt. Does not include base prompt data, only versioned data.
@@ -172,7 +177,7 @@ async def asyncio_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[Union[GetApiPromptsByIdVersionsResponse200, GetApiPromptsByIdVersionsResponse400, GetApiPromptsByIdVersionsResponse401, GetApiPromptsByIdVersionsResponse404, GetApiPromptsByIdVersionsResponse500]]
+        Response[Union[GetApiPromptsByIdVersionsResponse400, GetApiPromptsByIdVersionsResponse401, GetApiPromptsByIdVersionsResponse404, GetApiPromptsByIdVersionsResponse500, list['GetApiPromptsByIdVersionsResponse200Item']]]
     """
 
     kwargs = _get_kwargs(
@@ -190,11 +195,11 @@ async def asyncio(
     client: Union[AuthenticatedClient, Client],
 ) -> Optional[
     Union[
-        GetApiPromptsByIdVersionsResponse200,
         GetApiPromptsByIdVersionsResponse400,
         GetApiPromptsByIdVersionsResponse401,
         GetApiPromptsByIdVersionsResponse404,
         GetApiPromptsByIdVersionsResponse500,
+        list["GetApiPromptsByIdVersionsResponse200Item"],
     ]
 ]:
     """Get all versions for a prompt. Does not include base prompt data, only versioned data.
@@ -207,7 +212,7 @@ async def asyncio(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Union[GetApiPromptsByIdVersionsResponse200, GetApiPromptsByIdVersionsResponse400, GetApiPromptsByIdVersionsResponse401, GetApiPromptsByIdVersionsResponse404, GetApiPromptsByIdVersionsResponse500]
+        Union[GetApiPromptsByIdVersionsResponse400, GetApiPromptsByIdVersionsResponse401, GetApiPromptsByIdVersionsResponse404, GetApiPromptsByIdVersionsResponse500, list['GetApiPromptsByIdVersionsResponse200Item']]
     """
 
     return (

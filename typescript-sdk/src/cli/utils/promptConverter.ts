@@ -25,7 +25,6 @@ export class PromptConverter {
       messages: prompt.messages,
       prompt: prompt.prompt,
       updatedAt: prompt.updatedAt,
-      versionCreatedAt: prompt.versionCreatedAt,
     };
   }
 
@@ -72,16 +71,26 @@ export class PromptConverter {
    * Extracts the system prompt from messages array.
    * Used when converting to API format that separates system prompt from messages.
    */
-  static extractSystemPrompt(messages: Array<{ role: string; content: string }>): string {
-    return messages.find(m => m.role === "system")?.content || "";
+  static extractSystemPrompt(
+    messages: Array<{ role: string; content: string }>,
+  ): string {
+    return messages.find((m) => m.role === "system")?.content || "";
   }
 
   /**
    * Filters out system messages from the messages array.
    * Used when converting to API format that handles system prompt separately.
    */
-  static filterNonSystemMessages(messages: Array<{ role: string; content: string }>) {
-    return messages.filter(m => m.role !== "system");
+  static filterNonSystemMessages(
+    messages: Array<{
+      role: "system" | "user" | "assistant";
+      content: string;
+    }>,
+  ): Array<{ role: "user" | "assistant"; content: string }> {
+    return messages.filter((m) => m.role !== "system") as Array<{
+      role: "user" | "assistant";
+      content: string;
+    }>;
   }
 
   /**
@@ -123,7 +132,9 @@ export class PromptConverter {
     if (config.messages) {
       config.messages.forEach((message, index) => {
         if (!["system", "user", "assistant"].includes(message.role)) {
-          errors.push(`Message ${index}: role must be 'system', 'user', or 'assistant'`);
+          errors.push(
+            `Message ${index}: role must be 'system', 'user', or 'assistant'`,
+          );
         }
         if (!message.content?.trim()) {
           errors.push(`Message ${index}: content cannot be empty`);

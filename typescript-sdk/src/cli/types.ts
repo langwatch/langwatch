@@ -49,7 +49,6 @@ export type MaterializedPrompt = {
   }>;
   prompt: string;
   updatedAt: string;
-  versionCreatedAt: string;
 };
 
 export type SyncResult = {
