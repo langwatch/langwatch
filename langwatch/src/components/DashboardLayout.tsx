@@ -509,7 +509,10 @@ export const DashboardLayout = ({
               <Progress.Root
                 defaultValue={0}
                 max={usage.data?.activePlan.maxMessagesPerMonth}
-                value={usage.data?.currentMonthMessagesCount}
+                value={Math.min(
+                  usage.data?.currentMonthMessagesCount,
+                  usage.data?.activePlan.maxMessagesPerMonth
+                )}
                 maxW="150px"
                 colorPalette="orange"
                 width="full"
