@@ -14,23 +14,17 @@ export function EvaluationProgressBar({
   const isIndeterminate =
     evaluationState?.status === "waiting" || !evaluationState?.total;
 
-  // Ensure progress never exceeds total to prevent validation errors
-  const safeProgress = Math.min(progress, total);
-  const safeTotal = Math.max(total, 1); // Ensure total is at least 1
-
   return (
     <HStack width="full" gap={4}>
       {!isIndeterminate && size !== "xs" && (
-        <Text whiteSpace="nowrap">
-          {Math.round((safeProgress / safeTotal) * 100)}%
-        </Text>
+        <Text whiteSpace="nowrap">{Math.round((progress / total) * 100)}%</Text>
       )}
       <Progress.Root
         size={size}
         width="full"
         colorPalette="blue"
-        value={isIndeterminate ? null : safeProgress}
-        max={safeTotal}
+        value={isIndeterminate ? null : progress}
+        max={total ? total : undefined}
         animated
         striped
       >
@@ -40,7 +34,7 @@ export function EvaluationProgressBar({
       </Progress.Root>
       {!isIndeterminate && size !== "xs" && (
         <Text whiteSpace="nowrap">
-          {safeProgress} / {safeTotal}
+          {progress} / {total}
         </Text>
       )}
     </HStack>
