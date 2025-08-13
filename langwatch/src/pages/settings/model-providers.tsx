@@ -181,62 +181,68 @@ function ModelProviderForm({
     }));
   };
 
-  const { register, handleSubmit, formState, watch, setValue, control } =
-    useForm<ModelProviderForm>({
-      defaultValues: {
-        id: provider.id,
-        provider: provider.provider,
-        enabled: provider.enabled,
-        useCustomKeys: !!provider.customKeys,
-        customKeys: provider.customKeys as object | null,
-        customModels: getStoredModelOptions(
-          provider.models ?? [],
-          provider.provider,
-          "chat"
-        ),
-        customEmbeddingsModels: getStoredModelOptions(
-          provider.embeddingsModels ?? [],
-          provider.provider,
-          "embedding"
-        ),
-      },
-      resolver: (data, ...args) => {
-        const data_ = {
-          ...data,
-          customKeys: data.useCustomKeys ? data.customKeys : null,
-          customModels: data.customModels ?? [],
-          customEmbeddingsModels: data.customEmbeddingsModels ?? [],
-        };
+  const form = useForm<ModelProviderForm>({
+    defaultValues: {
+      id: provider.id,
+      provider: provider.provider,
+      enabled: provider.enabled,
+      useCustomKeys: !!provider.customKeys,
+      customKeys: provider.customKeys as object | null,
+      customModels: getStoredModelOptions(
+        provider.models ?? [],
+        provider.provider,
+        "chat"
+      ),
+      customEmbeddingsModels: getStoredModelOptions(
+        provider.embeddingsModels ?? [],
+        provider.provider,
+        "embedding"
+      ),
+    },
+    resolver: (data, ...args) => {
+      const data_ = {
+        ...data,
+        customKeys: data.useCustomKeys ? data.customKeys : null,
+        customModels: data.customModels ?? [],
+        customEmbeddingsModels: data.customEmbeddingsModels ?? [],
+      };
 
-        return zodResolver(
-          z.object({
-            id: z.string().optional(),
-            provider: z.enum(Object.keys(modelProvidersRegistry) as any),
-            enabled: z.boolean(),
-            useCustomKeys: z.boolean(),
-            customKeys: providerDefinition.keysSchema.optional().nullable(),
-            customModels: z
-              .array(
-                z.object({
-                  value: z.string(),
-                  label: z.string(),
-                })
-              )
-              .optional()
-              .nullable(),
-            customEmbeddingsModels: z
-              .array(
-                z.object({
-                  value: z.string(),
-                  label: z.string(),
-                })
-              )
-              .optional()
-              .nullable(),
-          })
-        )(data_, ...args);
-      },
-    });
+      return zodResolver(
+        z.object({
+          id: z.string().optional(),
+          provider: z.enum(Object.keys(modelProvidersRegistry) as any),
+          enabled: z.boolean(),
+          useCustomKeys: z.boolean(),
+          customKeys: z
+            .union([
+              providerDefinition.keysSchema,
+              z.object({ MANAGED: z.string() }),
+            ])
+            .optional()
+            .nullable(),
+          customModels: z
+            .array(
+              z.object({
+                value: z.string(),
+                label: z.string(),
+              })
+            )
+            .optional()
+            .nullable(),
+          customEmbeddingsModels: z
+            .array(
+              z.object({
+                value: z.string(),
+                label: z.string(),
+              })
+            )
+            .optional()
+            .nullable(),
+        })
+      )(data_, ...args);
+    },
+  });
+  const { register, handleSubmit, formState, watch, setValue, control } = form;
 
   const onSubmit = useCallback(
     async (data: ModelProviderForm) => {
@@ -408,7 +414,7 @@ function ModelProviderForm({
             {useCustomKeys && (
               <>
                 {ManagedModelProvider ? (
-                  <ManagedModelProvider provider={provider} />
+                  <ManagedModelProvider provider={provider} form={form} />
                 ) : (
                   <Field.Root invalid={!!formState.errors.customKeys}>
                     <Grid

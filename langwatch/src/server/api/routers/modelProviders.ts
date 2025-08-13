@@ -57,8 +57,10 @@ export const modelProviderRouter = createTRPCRouter({
         throw new Error("Invalid provider");
       }
 
-      const validator =
-        modelProviders[provider as keyof typeof modelProviders]!.keysSchema;
+      const validator = z.union([
+        modelProviders[provider as keyof typeof modelProviders]!.keysSchema,
+        z.object({ MANAGED: z.string() }),
+      ]);
       let validatedKeys;
       try {
         validatedKeys = customKeys ? validator.parse(customKeys) : null;
@@ -176,7 +178,12 @@ export const getProjectModelProviders = async (
       where: { projectId },
     })
   )
-    .filter((modelProvider) => modelProvider.customKeys)
+    .filter(
+      (modelProvider) =>
+        modelProvider.customKeys ||
+        modelProvider.enabled !==
+          defaultModelProviders[modelProvider.provider]?.enabled
+    )
     .reduce(
       (acc, modelProvider) => {
         const modelProvider_: MaybeStoredModelProvider = {

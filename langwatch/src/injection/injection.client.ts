@@ -1,6 +1,7 @@
 import type { NextPage } from "next";
 import type React from "react";
 import type { MaybeStoredModelProvider } from "../server/modelProviders/registry";
+import type { UseFormReturn } from "react-hook-form";
 
 export interface Dependencies {
   SubscriptionPage?: React.FC;
@@ -11,7 +12,12 @@ export interface Dependencies {
     projectId: string;
     organizationId: string;
     provider: MaybeStoredModelProvider;
-  }) => React.FC<{ provider: MaybeStoredModelProvider }> | undefined;
+  }) =>
+    | React.FC<{
+        provider: MaybeStoredModelProvider;
+        form: UseFormReturn<any>;
+      }>
+    | undefined;
 }
 
 const dependencies: Dependencies = {};
