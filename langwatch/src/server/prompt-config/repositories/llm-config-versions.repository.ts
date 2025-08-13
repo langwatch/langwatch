@@ -8,9 +8,10 @@ import {
 import { TRPCError } from "@trpc/server";
 import { nanoid } from "nanoid";
 
+import { type SchemaVersion } from "../enums";
+
 import {
   type LatestConfigVersionSchema,
-  type SchemaVersion,
   getVersionValidator,
 } from "./llm-config-version-schema";
 import { LlmConfigRepository } from "./llm-config.repository";
@@ -240,8 +241,8 @@ export class LlmConfigVersionsRepository {
       throw new Error(`Version ${id} not found.`);
     }
 
-    const newVersion = await this.createVersion(
-      {
+    const newVersion = await this.createVersion({
+      versionData: {
         authorId,
         projectId: version.projectId,
         configId: version.configId,
@@ -249,8 +250,8 @@ export class LlmConfigVersionsRepository {
         schemaVersion: version.schemaVersion as SchemaVersion,
         configData: version.configData as LlmConfigVersionDTO["configData"],
       },
-      organizationId
-    );
+      organizationId,
+    });
 
     return newVersion;
   }

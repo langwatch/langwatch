@@ -56,6 +56,8 @@ export type VersionedPrompt = {
   inputs: LatestConfigVersionSchema["configData"]["inputs"];
   outputs: LatestConfigVersionSchema["configData"]["outputs"];
   response_format: LatestConfigVersionSchema["configData"]["response_format"];
+  demonstrations: LatestConfigVersionSchema["configData"]["demonstrations"];
+  promptingTechnique: LatestConfigVersionSchema["configData"]["prompting_technique"];
   updatedAt: Date;
   createdAt: Date;
 };
@@ -622,6 +624,8 @@ export class PromptService {
       authorId: config.latestVersion.authorId ?? null,
       updatedAt: config.updatedAt,
       createdAt: config.latestVersion.createdAt,
+      demonstrations: config.latestVersion.configData.demonstrations,
+      promptingTechnique: config.latestVersion.configData.prompting_technique,
     };
   }
 

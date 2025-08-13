@@ -1220,7 +1220,8 @@
                     "inputs",
                     "outputs",
                     "model"
-                  ]
+                  ],
+                  "additionalProperties": false
                 }
               }
             }
@@ -1737,7 +1738,8 @@
                     "inputs",
                     "outputs",
                     "model"
-                  ]
+                  ],
+                  "additionalProperties": false
                 }
               }
             }
@@ -2496,7 +2498,8 @@
                       "inputs",
                       "outputs",
                       "model"
-                    ]
+                    ],
+                    "additionalProperties": false
                   }
                 }
               }
@@ -3018,7 +3021,8 @@
                         "inputs",
                         "outputs",
                         "model"
-                      ]
+                      ],
+                      "additionalProperties": false
                     },
                     "conflictInfo": {
                       "type": "object",
@@ -4472,7 +4476,8 @@
                       "inputs",
                       "outputs",
                       "model"
-                    ]
+                    ],
+                    "additionalProperties": false
                   }
                 }
               }
@@ -4953,7 +4958,8 @@
                     "inputs",
                     "outputs",
                     "model"
-                  ]
+                  ],
+                  "additionalProperties": false
                 }
               }
             }

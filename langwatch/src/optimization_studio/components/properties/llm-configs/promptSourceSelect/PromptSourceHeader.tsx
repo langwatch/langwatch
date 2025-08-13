@@ -23,7 +23,6 @@ import { type PromptConfigFormValues } from "~/prompt-configs/hooks/usePromptCon
 import {
   llmConfigToOptimizationStudioNodeData,
   llmConfigToPromptConfigFormValues,
-  versionedPromptToLlmConfigWithLatestVersion,
 } from "~/prompt-configs/llmPromptConfigUtils";
 import { api } from "~/utils/api";
 import { createLogger } from "~/utils/logger";
@@ -96,7 +95,7 @@ export function PromptSourceHeader({
         });
 
         // Trigger the save version mutation for the new config
-        triggerSaveVersion(versionedPromptToLlmConfigWithLatestVersion(newConfig), values);
+        triggerSaveVersion(newConfig, values);
       } catch (error) {
         console.error(error);
         toaster.error({

@@ -87,12 +87,28 @@ export const llmConfigsRouter = createTRPCRouter({
       const organizationId = await getOrganizationIdForProject(input.projectId);
       const authorId = ctx.session?.user?.id;
 
-      return await service.createPrompt({
+      const config = await service.createPrompt({
         ...input,
         authorId,
         organizationId,
         scope: PromptScope.PROJECT,
       });
+
+      const configWithLatestVersion =
+        await service.repository.getConfigByIdOrHandleWithLatestVersion({
+          idOrHandle: config.id,
+          projectId: input.projectId,
+          organizationId,
+        });
+
+      if (!configWithLatestVersion) {
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "Failed to create prompt config with initial version",
+        });
+      }
+
+      return configWithLatestVersion;
     }),
 
   /**

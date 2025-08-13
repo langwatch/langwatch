@@ -90,9 +90,9 @@ export const llmConfigVersionsRouter = createTRPCRouter({
   create: protectedProcedure
     .input(
       getLatestConfigVersionSchema().omit({
-        id: true,
         version: true,
         authorId: true,
+        id: true,
         createdAt: true,
       })
     )

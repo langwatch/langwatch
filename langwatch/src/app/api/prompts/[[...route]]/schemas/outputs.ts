@@ -27,7 +27,7 @@ const apiResponsePromptSchemaBase = z.object({
  * Schema for version output responses
  * Extends the input schema with metadata about the created version
  */
-const apiResponseVersionOutputSchema = z.object({
+const apiResponseVersionOutputSchema = z.strictObject({
   configId: z.string(),
   projectId: z.string(),
   versionId: z.string(),

@@ -34,7 +34,6 @@ export default async function execute() {
   const datasetSpec = await generateSpecs(datasetApp);
   console.log("Building llm configs spec...");
   const llmConfigsSpec = await generateSpecs(llmConfigsApp);
-  console.log("llmConfigsSpec", llmConfigsSpec);
   console.log("Building scenario events spec...");
   const scenarioEventsSpec = await generateSpecs(scenarioEventsApp);
   console.log("Merging specs...");

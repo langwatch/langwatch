@@ -99,7 +99,9 @@ export function getVersionValidator(schemaVersion: SchemaVersion) {
  * @throws ZodError if the config data is invalid
  */
 export function parseLlmConfigVersion(
-  llmConfigVersion: LlmPromptConfigVersion | LlmConfigVersionDTO
+  llmConfigVersion:
+    | Omit<LlmPromptConfigVersion, "deletedAt">
+    | LlmConfigVersionDTO
 ): LatestConfigVersionSchema {
   const { schemaVersion } = llmConfigVersion;
 

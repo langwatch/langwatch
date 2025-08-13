@@ -12,7 +12,7 @@ import {
   type SchemaVersion,
   parseLlmConfigVersion,
   type schemaValidators,
-} from "~/server/prompt-config/repositories/llm-config-version-schema";
+} from "~/server/prompt-config";
 
 import type { NodeDataset } from "../optimization_studio/types/dsl";
 
