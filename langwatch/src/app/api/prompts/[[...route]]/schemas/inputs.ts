@@ -24,7 +24,7 @@ export const versionInputSchema = getLatestConfigVersionSchema();
  */
 export const createPromptInputSchema = z.strictObject({
   handle: handleSchema,
-  scope: scopeSchema,
+  scope: scopeSchema.optional(),
   // Version data
   model: modelNameSchema.optional(),
   temperature: z.number().optional(),
@@ -38,4 +38,8 @@ export const createPromptInputSchema = z.strictObject({
   schemaVersion: schemaVersionSchema.optional(),
 });
 
-export const updatePromptInputSchema = createPromptInputSchema;
+export const updatePromptInputSchema = createPromptInputSchema.merge(
+  z.object({
+    handle: handleSchema.optional(),
+  })
+);

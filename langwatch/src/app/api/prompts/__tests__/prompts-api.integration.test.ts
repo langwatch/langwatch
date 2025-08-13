@@ -205,7 +205,6 @@ describe("Prompts API", () => {
         beforeEach(async () => {
           // Create a new prompt with the handle
           const createRes = await helpers.api.post(`/api/prompts`, {
-            name: "Test Prompt",
             handle,
             prompt: "test",
           });
@@ -234,15 +233,14 @@ describe("Prompts API", () => {
 
         beforeEach(async () => {
           const createRes = await helpers.api.post(`/api/prompts`, {
-            name: "Test Org Prompt",
             handle,
             scope: "ORGANIZATION",
             prompt: "test",
           });
 
           // Verify the prompt was created with the organization-scoped handle
-          expect(createRes.status).toBe(200);
           const createBody = await createRes.json();
+          expect(createRes.status).toBe(200);
           expect(createBody.handle).toBe(handle);
           expect(createBody.scope).toBe("ORGANIZATION");
         });
@@ -292,7 +290,7 @@ describe("Prompts API", () => {
             const body = await res.json();
             expect(Array.isArray(body)).toBe(true);
             expect(body.length).toBe(1);
-            expect(body[0].configId).toBe(config.id);
+            expect(body[0].id).toBe(config.id);
             expect(body[0].projectId).toBe(testProjectId);
             expect(body[0].model).toBe("openai/gpt-4o-mini");
           });
@@ -314,8 +312,8 @@ describe("Prompts API", () => {
               }
             );
 
-            expect(res.status).toBe(200);
             const body = await res.json();
+            expect(res.status).toBe(200);
             expect(Array.isArray(body)).toBe(true);
             expect(body.length).toBe(0);
           });
@@ -353,7 +351,6 @@ describe("Prompts API", () => {
     describe("when scoping by project (default)", () => {
       it("should create a new prompt with a handle scoped to project", async () => {
         const res = await helpers.api.post(`/api/prompts`, {
-          name: "Test Prompt",
           handle: "my-custom-ref",
           prompt: "test",
         });
@@ -368,7 +365,6 @@ describe("Prompts API", () => {
     describe("when scoping by organization", () => {
       it("should create a new prompt with a handle scoped to organization", async () => {
         const res = await helpers.api.post(`/api/prompts`, {
-          name: "Test Prompt",
           handle: "my-custom-ref",
           scope: "ORGANIZATION",
           prompt: "test",
@@ -388,7 +384,6 @@ describe("Prompts API", () => {
       it("should allow duplicate handles across different scopes", async () => {
         // Create first prompt with organization scope
         const prompt1Res = await helpers.api.post(`/api/prompts`, {
-          name: "Test Prompt 1",
           handle: "shared-ref",
           scope: "ORGANIZATION",
           prompt: "test",
@@ -400,7 +395,6 @@ describe("Prompts API", () => {
 
         // Create second prompt with project scope using same handle - should succeed
         const prompt2Res = await helpers.api.post(`/api/prompts`, {
-          name: "Test Prompt 2",
           handle: "shared-ref",
           scope: "PROJECT",
           prompt: "test",
@@ -474,7 +468,6 @@ describe("Prompts API", () => {
         it("should prevent duplicate handles within the same organization", async () => {
           // Create first prompt with organization scope
           const prompt1Res = await helpers.api.post(`/api/prompts`, {
-            name: "Test Prompt 1",
             handle: "org-duplicate-ref",
             scope: "ORGANIZATION",
             prompt: "This is a prompt text",
@@ -484,7 +477,6 @@ describe("Prompts API", () => {
 
           // Try to create second prompt with same handle and organization scope - should fail
           const prompt2Res = await helpers.api.post(`/api/prompts`, {
-            name: "Test Prompt 2",
             handle: "org-duplicate-ref",
             scope: "ORGANIZATION",
             prompt: "This is a prompt text",
@@ -503,7 +495,6 @@ describe("Prompts API", () => {
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            name: "Initial Prompt",
             handle: "update-all-fields-test",
             scope: "PROJECT",
             prompt: "Initial prompt text with {{variable}}",
@@ -524,8 +515,8 @@ describe("Prompts API", () => {
           }),
         });
 
-        expect(createRes.status).toBe(200);
         const createdPrompt = await createRes.json();
+        expect(createRes.status).toBe(200);
 
         // Update all supported fields
         const updateRes = await helpers.api.put(
@@ -790,13 +781,7 @@ describe("Prompts API", () => {
       expect(promptRes.status).toBe(200);
 
       const invalidData = {
-        configData: {
-          prompt: "Test prompt",
-          messages: [],
-          // Missing required fields: model, inputs, outputs
-          temperature: 0.7,
-        },
-        commitMessage: "Invalid schema test",
+        thisDoesntExist: "test",
       };
 
       const res = await app.request(`/api/prompts/${prompt.id}`, {
@@ -808,8 +793,8 @@ describe("Prompts API", () => {
         body: JSON.stringify(invalidData),
       });
 
-      expect(res.status).toBe(400);
       const body = await res.json();
+      expect(res.status).toBe(400);
       expect(body).toHaveProperty("error");
     });
 

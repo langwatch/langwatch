@@ -104,7 +104,6 @@ export class PromptService {
     idOrHandle: string;
     projectId: string;
     organizationId: string;
-    version?: number;
   }): Promise<VersionedPrompt | null> {
     const { idOrHandle, projectId, organizationId } = params;
 
@@ -137,13 +136,11 @@ export class PromptService {
       (await this.getOrganizationIdFromProjectId(params.projectId));
 
     // Get the config
-    const config = await this.repository.getConfigByIdOrHandleWithLatestVersion(
-      {
-        idOrHandle: params.idOrHandle,
-        projectId: params.projectId,
-        organizationId,
-      }
-    );
+    const config = await this.repository.getPromptByIdOrHandle({
+      idOrHandle: params.idOrHandle,
+      projectId: params.projectId,
+      organizationId,
+    });
 
     // If the config doesn't exist, return an empty array
     if (!config) {
@@ -603,7 +600,7 @@ export class PromptService {
    * Transforms a LlmConfigWithLatestVersion to the versioned prompt shape.
    */
   private transformToVersionedPrompt(
-    config: LlmConfigWithLatestVersion
+    config: Omit<LlmConfigWithLatestVersion, "deletedAt">
   ): VersionedPrompt {
     return {
       id: config.id,

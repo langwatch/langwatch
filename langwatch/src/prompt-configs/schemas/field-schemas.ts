@@ -75,9 +75,7 @@ export const nameSchema = z
  * Schema for prompt configuration scope
  * Defines the visibility and access level of the prompt configuration
  */
-export const scopeSchema = z
-  .nativeEnum(PromptScope)
-  .default(PromptScope.PROJECT);
+export const scopeSchema = z.nativeEnum(PromptScope);
 
 /**
  * Schema for commit message
