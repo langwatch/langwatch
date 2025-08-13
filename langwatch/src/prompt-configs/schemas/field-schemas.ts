@@ -95,8 +95,10 @@ export const versionSchema = z
  */
 export const responseFormatSchema = z.object({
   type: z.enum(["json_schema"]),
-  json_schema: z.object({
-    name: z.string(),
-    schema: z.object({}),
-  }),
+  json_schema: z
+    .object({
+      name: z.string(),
+      schema: z.object({}),
+    })
+    .nullable(),
 });

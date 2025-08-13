@@ -5,12 +5,11 @@ from attrs import define as _attrs_define
 from attrs import field as _attrs_field
 
 from ..models.post_api_prompts_response_200_scope import PostApiPromptsResponse200Scope
+from ..types import UNSET, Unset
 
 if TYPE_CHECKING:
     from ..models.post_api_prompts_response_200_messages_item import PostApiPromptsResponse200MessagesItem
-    from ..models.post_api_prompts_response_200_response_format_type_0 import (
-        PostApiPromptsResponse200ResponseFormatType0,
-    )
+    from ..models.post_api_prompts_response_200_response_format import PostApiPromptsResponse200ResponseFormat
 
 
 T = TypeVar("T", bound="PostApiPromptsResponse200")
@@ -33,7 +32,7 @@ class PostApiPromptsResponse200:
         model (str):
         prompt (str):
         messages (list['PostApiPromptsResponse200MessagesItem']):
-        response_format (Union['PostApiPromptsResponse200ResponseFormatType0', None]):
+        response_format (Union[Unset, PostApiPromptsResponse200ResponseFormat]):
     """
 
     id: str
@@ -49,14 +48,10 @@ class PostApiPromptsResponse200:
     model: str
     prompt: str
     messages: list["PostApiPromptsResponse200MessagesItem"]
-    response_format: Union["PostApiPromptsResponse200ResponseFormatType0", None]
+    response_format: Union[Unset, "PostApiPromptsResponse200ResponseFormat"] = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
-        from ..models.post_api_prompts_response_200_response_format_type_0 import (
-            PostApiPromptsResponse200ResponseFormatType0,
-        )
-
         id = self.id
 
         handle: Union[None, str]
@@ -87,11 +82,9 @@ class PostApiPromptsResponse200:
             messages_item = messages_item_data.to_dict()
             messages.append(messages_item)
 
-        response_format: Union[None, dict[str, Any]]
-        if isinstance(self.response_format, PostApiPromptsResponse200ResponseFormatType0):
+        response_format: Union[Unset, dict[str, Any]] = UNSET
+        if not isinstance(self.response_format, Unset):
             response_format = self.response_format.to_dict()
-        else:
-            response_format = self.response_format
 
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
@@ -110,18 +103,17 @@ class PostApiPromptsResponse200:
                 "model": model,
                 "prompt": prompt,
                 "messages": messages,
-                "response_format": response_format,
             }
         )
+        if response_format is not UNSET:
+            field_dict["response_format"] = response_format
 
         return field_dict
 
     @classmethod
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
         from ..models.post_api_prompts_response_200_messages_item import PostApiPromptsResponse200MessagesItem
-        from ..models.post_api_prompts_response_200_response_format_type_0 import (
-            PostApiPromptsResponse200ResponseFormatType0,
-        )
+        from ..models.post_api_prompts_response_200_response_format import PostApiPromptsResponse200ResponseFormat
 
         d = dict(src_dict)
         id = d.pop("id")
@@ -160,20 +152,12 @@ class PostApiPromptsResponse200:
 
             messages.append(messages_item)
 
-        def _parse_response_format(data: object) -> Union["PostApiPromptsResponse200ResponseFormatType0", None]:
-            if data is None:
-                return data
-            try:
-                if not isinstance(data, dict):
-                    raise TypeError()
-                response_format_type_0 = PostApiPromptsResponse200ResponseFormatType0.from_dict(data)
-
-                return response_format_type_0
-            except:  # noqa: E722
-                pass
-            return cast(Union["PostApiPromptsResponse200ResponseFormatType0", None], data)
-
-        response_format = _parse_response_format(d.pop("response_format"))
+        _response_format = d.pop("response_format", UNSET)
+        response_format: Union[Unset, PostApiPromptsResponse200ResponseFormat]
+        if isinstance(_response_format, Unset):
+            response_format = UNSET
+        else:
+            response_format = PostApiPromptsResponse200ResponseFormat.from_dict(_response_format)
 
         post_api_prompts_response_200 = cls(
             id=id,

@@ -1,5 +1,5 @@
 from collections.abc import Mapping
-from typing import TYPE_CHECKING, Any, TypeVar
+from typing import TYPE_CHECKING, Any, TypeVar, Union, cast
 
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
@@ -9,8 +9,8 @@ from ..models.post_api_prompts_by_id_sync_response_200_conflict_info_remote_conf
 )
 
 if TYPE_CHECKING:
-    from ..models.post_api_prompts_by_id_sync_response_200_conflict_info_remote_config_data_response_format_json_schema import (
-        PostApiPromptsByIdSyncResponse200ConflictInfoRemoteConfigDataResponseFormatJsonSchema,
+    from ..models.post_api_prompts_by_id_sync_response_200_conflict_info_remote_config_data_response_format_json_schema_type_0 import (
+        PostApiPromptsByIdSyncResponse200ConflictInfoRemoteConfigDataResponseFormatJsonSchemaType0,
     )
 
 
@@ -22,17 +22,30 @@ class PostApiPromptsByIdSyncResponse200ConflictInfoRemoteConfigDataResponseForma
     """
     Attributes:
         type_ (PostApiPromptsByIdSyncResponse200ConflictInfoRemoteConfigDataResponseFormatType):
-        json_schema (PostApiPromptsByIdSyncResponse200ConflictInfoRemoteConfigDataResponseFormatJsonSchema):
+        json_schema (Union['PostApiPromptsByIdSyncResponse200ConflictInfoRemoteConfigDataResponseFormatJsonSchemaType0',
+            None]):
     """
 
     type_: PostApiPromptsByIdSyncResponse200ConflictInfoRemoteConfigDataResponseFormatType
-    json_schema: "PostApiPromptsByIdSyncResponse200ConflictInfoRemoteConfigDataResponseFormatJsonSchema"
+    json_schema: Union[
+        "PostApiPromptsByIdSyncResponse200ConflictInfoRemoteConfigDataResponseFormatJsonSchemaType0", None
+    ]
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
+        from ..models.post_api_prompts_by_id_sync_response_200_conflict_info_remote_config_data_response_format_json_schema_type_0 import (
+            PostApiPromptsByIdSyncResponse200ConflictInfoRemoteConfigDataResponseFormatJsonSchemaType0,
+        )
+
         type_ = self.type_.value
 
-        json_schema = self.json_schema.to_dict()
+        json_schema: Union[None, dict[str, Any]]
+        if isinstance(
+            self.json_schema, PostApiPromptsByIdSyncResponse200ConflictInfoRemoteConfigDataResponseFormatJsonSchemaType0
+        ):
+            json_schema = self.json_schema.to_dict()
+        else:
+            json_schema = self.json_schema
 
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
@@ -47,16 +60,36 @@ class PostApiPromptsByIdSyncResponse200ConflictInfoRemoteConfigDataResponseForma
 
     @classmethod
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
-        from ..models.post_api_prompts_by_id_sync_response_200_conflict_info_remote_config_data_response_format_json_schema import (
-            PostApiPromptsByIdSyncResponse200ConflictInfoRemoteConfigDataResponseFormatJsonSchema,
+        from ..models.post_api_prompts_by_id_sync_response_200_conflict_info_remote_config_data_response_format_json_schema_type_0 import (
+            PostApiPromptsByIdSyncResponse200ConflictInfoRemoteConfigDataResponseFormatJsonSchemaType0,
         )
 
         d = dict(src_dict)
         type_ = PostApiPromptsByIdSyncResponse200ConflictInfoRemoteConfigDataResponseFormatType(d.pop("type"))
 
-        json_schema = PostApiPromptsByIdSyncResponse200ConflictInfoRemoteConfigDataResponseFormatJsonSchema.from_dict(
-            d.pop("json_schema")
-        )
+        def _parse_json_schema(
+            data: object,
+        ) -> Union["PostApiPromptsByIdSyncResponse200ConflictInfoRemoteConfigDataResponseFormatJsonSchemaType0", None]:
+            if data is None:
+                return data
+            try:
+                if not isinstance(data, dict):
+                    raise TypeError()
+                json_schema_type_0 = PostApiPromptsByIdSyncResponse200ConflictInfoRemoteConfigDataResponseFormatJsonSchemaType0.from_dict(
+                    data
+                )
+
+                return json_schema_type_0
+            except:  # noqa: E722
+                pass
+            return cast(
+                Union[
+                    "PostApiPromptsByIdSyncResponse200ConflictInfoRemoteConfigDataResponseFormatJsonSchemaType0", None
+                ],
+                data,
+            )
+
+        json_schema = _parse_json_schema(d.pop("json_schema"))
 
         post_api_prompts_by_id_sync_response_200_conflict_info_remote_config_data_response_format = cls(
             type_=type_,

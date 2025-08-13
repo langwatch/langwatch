@@ -5,13 +5,14 @@ from attrs import define as _attrs_define
 from attrs import field as _attrs_field
 
 from ..models.post_api_prompts_by_id_sync_response_200_prompt_scope import PostApiPromptsByIdSyncResponse200PromptScope
+from ..types import UNSET, Unset
 
 if TYPE_CHECKING:
     from ..models.post_api_prompts_by_id_sync_response_200_prompt_messages_item import (
         PostApiPromptsByIdSyncResponse200PromptMessagesItem,
     )
-    from ..models.post_api_prompts_by_id_sync_response_200_prompt_response_format_type_0 import (
-        PostApiPromptsByIdSyncResponse200PromptResponseFormatType0,
+    from ..models.post_api_prompts_by_id_sync_response_200_prompt_response_format import (
+        PostApiPromptsByIdSyncResponse200PromptResponseFormat,
     )
 
 
@@ -35,7 +36,7 @@ class PostApiPromptsByIdSyncResponse200Prompt:
         model (str):
         prompt (str):
         messages (list['PostApiPromptsByIdSyncResponse200PromptMessagesItem']):
-        response_format (Union['PostApiPromptsByIdSyncResponse200PromptResponseFormatType0', None]):
+        response_format (Union[Unset, PostApiPromptsByIdSyncResponse200PromptResponseFormat]):
     """
 
     id: str
@@ -51,14 +52,10 @@ class PostApiPromptsByIdSyncResponse200Prompt:
     model: str
     prompt: str
     messages: list["PostApiPromptsByIdSyncResponse200PromptMessagesItem"]
-    response_format: Union["PostApiPromptsByIdSyncResponse200PromptResponseFormatType0", None]
+    response_format: Union[Unset, "PostApiPromptsByIdSyncResponse200PromptResponseFormat"] = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
-        from ..models.post_api_prompts_by_id_sync_response_200_prompt_response_format_type_0 import (
-            PostApiPromptsByIdSyncResponse200PromptResponseFormatType0,
-        )
-
         id = self.id
 
         handle: Union[None, str]
@@ -89,11 +86,9 @@ class PostApiPromptsByIdSyncResponse200Prompt:
             messages_item = messages_item_data.to_dict()
             messages.append(messages_item)
 
-        response_format: Union[None, dict[str, Any]]
-        if isinstance(self.response_format, PostApiPromptsByIdSyncResponse200PromptResponseFormatType0):
+        response_format: Union[Unset, dict[str, Any]] = UNSET
+        if not isinstance(self.response_format, Unset):
             response_format = self.response_format.to_dict()
-        else:
-            response_format = self.response_format
 
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
@@ -112,9 +107,10 @@ class PostApiPromptsByIdSyncResponse200Prompt:
                 "model": model,
                 "prompt": prompt,
                 "messages": messages,
-                "response_format": response_format,
             }
         )
+        if response_format is not UNSET:
+            field_dict["response_format"] = response_format
 
         return field_dict
 
@@ -123,8 +119,8 @@ class PostApiPromptsByIdSyncResponse200Prompt:
         from ..models.post_api_prompts_by_id_sync_response_200_prompt_messages_item import (
             PostApiPromptsByIdSyncResponse200PromptMessagesItem,
         )
-        from ..models.post_api_prompts_by_id_sync_response_200_prompt_response_format_type_0 import (
-            PostApiPromptsByIdSyncResponse200PromptResponseFormatType0,
+        from ..models.post_api_prompts_by_id_sync_response_200_prompt_response_format import (
+            PostApiPromptsByIdSyncResponse200PromptResponseFormat,
         )
 
         d = dict(src_dict)
@@ -164,22 +160,12 @@ class PostApiPromptsByIdSyncResponse200Prompt:
 
             messages.append(messages_item)
 
-        def _parse_response_format(
-            data: object,
-        ) -> Union["PostApiPromptsByIdSyncResponse200PromptResponseFormatType0", None]:
-            if data is None:
-                return data
-            try:
-                if not isinstance(data, dict):
-                    raise TypeError()
-                response_format_type_0 = PostApiPromptsByIdSyncResponse200PromptResponseFormatType0.from_dict(data)
-
-                return response_format_type_0
-            except:  # noqa: E722
-                pass
-            return cast(Union["PostApiPromptsByIdSyncResponse200PromptResponseFormatType0", None], data)
-
-        response_format = _parse_response_format(d.pop("response_format"))
+        _response_format = d.pop("response_format", UNSET)
+        response_format: Union[Unset, PostApiPromptsByIdSyncResponse200PromptResponseFormat]
+        if isinstance(_response_format, Unset):
+            response_format = UNSET
+        else:
+            response_format = PostApiPromptsByIdSyncResponse200PromptResponseFormat.from_dict(_response_format)
 
         post_api_prompts_by_id_sync_response_200_prompt = cls(
             id=id,

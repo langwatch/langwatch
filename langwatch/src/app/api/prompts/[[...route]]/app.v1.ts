@@ -32,7 +32,7 @@ import { handlePossibleConflictError } from "./utils";
 import {
   mapPromptToApiPromptResponse,
   mapVersionToApiPromptVersionResponse,
-} from "./utils/api-mappings";
+} from "./utils";
 
 import { badRequestSchema, successSchema } from "~/app/api/shared/schemas";
 import {
@@ -213,9 +213,7 @@ app.get(
       });
     }
 
-    const response = mapPromptToApiPromptResponse(config);
-
-    return c.json(response);
+    return c.json(config);
   }
 );
 
@@ -259,7 +257,7 @@ app.post(
     );
 
     try {
-      const newConfig = await service.createPrompt({
+      const newConfig: ApiResponsePrompt = await service.createPrompt({
         projectId: project.id,
         handle: data.handle,
         organizationId: organization.id,
@@ -276,9 +274,7 @@ app.post(
         "Successfully created prompt with initial version"
       );
 
-      const result: ApiResponsePrompt = mapPromptToApiPromptResponse(newConfig);
-
-      return c.json(result);
+      return c.json(newConfig);
     } catch (error: any) {
       logger.error({ projectId: project.id, error }, "Error creating prompt");
       handlePossibleConflictError(error, data.scope);

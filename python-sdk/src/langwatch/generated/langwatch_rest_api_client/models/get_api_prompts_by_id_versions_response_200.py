@@ -19,8 +19,8 @@ if TYPE_CHECKING:
     from ..models.get_api_prompts_by_id_versions_response_200_outputs_item import (
         GetApiPromptsByIdVersionsResponse200OutputsItem,
     )
-    from ..models.get_api_prompts_by_id_versions_response_200_prampting_technique import (
-        GetApiPromptsByIdVersionsResponse200PramptingTechnique,
+    from ..models.get_api_prompts_by_id_versions_response_200_prompting_technique import (
+        GetApiPromptsByIdVersionsResponse200PromptingTechnique,
     )
     from ..models.get_api_prompts_by_id_versions_response_200_response_format import (
         GetApiPromptsByIdVersionsResponse200ResponseFormat,
@@ -49,7 +49,7 @@ class GetApiPromptsByIdVersionsResponse200:
         temperature (Union[Unset, float]):
         max_tokens (Union[Unset, float]):
         demonstrations (Union[Unset, GetApiPromptsByIdVersionsResponse200Demonstrations]):
-        prampting_technique (Union[Unset, GetApiPromptsByIdVersionsResponse200PramptingTechnique]):
+        prompting_technique (Union[Unset, GetApiPromptsByIdVersionsResponse200PromptingTechnique]):
         response_format (Union[Unset, GetApiPromptsByIdVersionsResponse200ResponseFormat]):
     """
 
@@ -67,15 +67,9 @@ class GetApiPromptsByIdVersionsResponse200:
     commit_message: Union[None, Unset, str] = UNSET
     temperature: Union[Unset, float] = UNSET
     max_tokens: Union[Unset, float] = UNSET
-    demonstrations: Union[
-        Unset, "GetApiPromptsByIdVersionsResponse200Demonstrations"
-    ] = UNSET
-    prampting_technique: Union[
-        Unset, "GetApiPromptsByIdVersionsResponse200PramptingTechnique"
-    ] = UNSET
-    response_format: Union[
-        Unset, "GetApiPromptsByIdVersionsResponse200ResponseFormat"
-    ] = UNSET
+    demonstrations: Union[Unset, "GetApiPromptsByIdVersionsResponse200Demonstrations"] = UNSET
+    prompting_technique: Union[Unset, "GetApiPromptsByIdVersionsResponse200PromptingTechnique"] = UNSET
+    response_format: Union[Unset, "GetApiPromptsByIdVersionsResponse200ResponseFormat"] = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -125,9 +119,9 @@ class GetApiPromptsByIdVersionsResponse200:
         if not isinstance(self.demonstrations, Unset):
             demonstrations = self.demonstrations.to_dict()
 
-        prampting_technique: Union[Unset, dict[str, Any]] = UNSET
-        if not isinstance(self.prampting_technique, Unset):
-            prampting_technique = self.prampting_technique.to_dict()
+        prompting_technique: Union[Unset, dict[str, Any]] = UNSET
+        if not isinstance(self.prompting_technique, Unset):
+            prompting_technique = self.prompting_technique.to_dict()
 
         response_format: Union[Unset, dict[str, Any]] = UNSET
         if not isinstance(self.response_format, Unset):
@@ -158,8 +152,8 @@ class GetApiPromptsByIdVersionsResponse200:
             field_dict["maxTokens"] = max_tokens
         if demonstrations is not UNSET:
             field_dict["demonstrations"] = demonstrations
-        if prampting_technique is not UNSET:
-            field_dict["promptingTechnique"] = prampting_technique
+        if prompting_technique is not UNSET:
+            field_dict["promptingTechnique"] = prompting_technique
         if response_format is not UNSET:
             field_dict["responseFormat"] = response_format
 
@@ -179,8 +173,8 @@ class GetApiPromptsByIdVersionsResponse200:
         from ..models.get_api_prompts_by_id_versions_response_200_outputs_item import (
             GetApiPromptsByIdVersionsResponse200OutputsItem,
         )
-        from ..models.get_api_prompts_by_id_versions_response_200_prampting_technique import (
-            GetApiPromptsByIdVersionsResponse200PramptingTechnique,
+        from ..models.get_api_prompts_by_id_versions_response_200_prompting_technique import (
+            GetApiPromptsByIdVersionsResponse200PromptingTechnique,
         )
         from ..models.get_api_prompts_by_id_versions_response_200_response_format import (
             GetApiPromptsByIdVersionsResponse200ResponseFormat,
@@ -209,27 +203,21 @@ class GetApiPromptsByIdVersionsResponse200:
         messages = []
         _messages = d.pop("messages")
         for messages_item_data in _messages:
-            messages_item = GetApiPromptsByIdVersionsResponse200MessagesItem.from_dict(
-                messages_item_data
-            )
+            messages_item = GetApiPromptsByIdVersionsResponse200MessagesItem.from_dict(messages_item_data)
 
             messages.append(messages_item)
 
         inputs = []
         _inputs = d.pop("inputs")
         for inputs_item_data in _inputs:
-            inputs_item = GetApiPromptsByIdVersionsResponse200InputsItem.from_dict(
-                inputs_item_data
-            )
+            inputs_item = GetApiPromptsByIdVersionsResponse200InputsItem.from_dict(inputs_item_data)
 
             inputs.append(inputs_item)
 
         outputs = []
         _outputs = d.pop("outputs")
         for outputs_item_data in _outputs:
-            outputs_item = GetApiPromptsByIdVersionsResponse200OutputsItem.from_dict(
-                outputs_item_data
-            )
+            outputs_item = GetApiPromptsByIdVersionsResponse200OutputsItem.from_dict(outputs_item_data)
 
             outputs.append(outputs_item)
 
@@ -253,37 +241,21 @@ class GetApiPromptsByIdVersionsResponse200:
         if isinstance(_demonstrations, Unset):
             demonstrations = UNSET
         else:
-            demonstrations = (
-                GetApiPromptsByIdVersionsResponse200Demonstrations.from_dict(
-                    _demonstrations
-                )
-            )
+            demonstrations = GetApiPromptsByIdVersionsResponse200Demonstrations.from_dict(_demonstrations)
 
-        _prampting_technique = d.pop("promptingTechnique", UNSET)
-        prampting_technique: Union[
-            Unset, GetApiPromptsByIdVersionsResponse200PramptingTechnique
-        ]
-        if isinstance(_prampting_technique, Unset):
-            prampting_technique = UNSET
+        _prompting_technique = d.pop("promptingTechnique", UNSET)
+        prompting_technique: Union[Unset, GetApiPromptsByIdVersionsResponse200PromptingTechnique]
+        if isinstance(_prompting_technique, Unset):
+            prompting_technique = UNSET
         else:
-            prampting_technique = (
-                GetApiPromptsByIdVersionsResponse200PramptingTechnique.from_dict(
-                    _prampting_technique
-                )
-            )
+            prompting_technique = GetApiPromptsByIdVersionsResponse200PromptingTechnique.from_dict(_prompting_technique)
 
         _response_format = d.pop("responseFormat", UNSET)
-        response_format: Union[
-            Unset, GetApiPromptsByIdVersionsResponse200ResponseFormat
-        ]
+        response_format: Union[Unset, GetApiPromptsByIdVersionsResponse200ResponseFormat]
         if isinstance(_response_format, Unset):
             response_format = UNSET
         else:
-            response_format = (
-                GetApiPromptsByIdVersionsResponse200ResponseFormat.from_dict(
-                    _response_format
-                )
-            )
+            response_format = GetApiPromptsByIdVersionsResponse200ResponseFormat.from_dict(_response_format)
 
         get_api_prompts_by_id_versions_response_200 = cls(
             config_id=config_id,
@@ -301,7 +273,7 @@ class GetApiPromptsByIdVersionsResponse200:
             temperature=temperature,
             max_tokens=max_tokens,
             demonstrations=demonstrations,
-            prampting_technique=prampting_technique,
+            prompting_technique=prompting_technique,
             response_format=response_format,
         )
 

@@ -19,7 +19,6 @@ import {
   type LatestConfigVersionSchema,
 } from "./repositories/llm-config-version-schema";
 
-import { llmOutputFieldToJsonSchemaTypeMap } from "~/app/api/prompts/[[...route]]/constants";
 import {
   type inputsSchema,
   type messageSchema,
@@ -81,14 +80,22 @@ export class PromptService {
     projectId: string;
     organizationId: string;
     version?: number;
-  }): Promise<LlmConfigWithLatestVersion | null> {
+  }): Promise<VersionedPrompt | null> {
     const { idOrHandle, projectId, organizationId } = params;
 
-    return this.repository.getConfigByIdOrHandleWithLatestVersion({
-      idOrHandle,
-      projectId,
-      organizationId,
-    });
+    const config = await this.repository.getConfigByIdOrHandleWithLatestVersion(
+      {
+        idOrHandle,
+        projectId,
+        organizationId,
+      }
+    );
+
+    if (!config) {
+      return null;
+    }
+
+    return this.transformToVersionedPrompt(config);
   }
 
   /**
@@ -123,7 +130,7 @@ export class PromptService {
     temperature?: number;
     max_tokens?: number;
     prompting_technique?: z.infer<typeof promptingTechniqueSchema>;
-  }): Promise<LlmConfigWithLatestVersion> {
+  }): Promise<VersionedPrompt> {
     // If any of the version data is provided,
     // we should create a version from that data
     // and it's not consideered a draft
@@ -138,7 +145,7 @@ export class PromptService {
         params.prompting_technique !== undefined
     );
 
-    return this.repository.createConfigWithInitialVersion({
+    const config = await this.repository.createConfigWithInitialVersion({
       configData: {
         name: params.name ?? params.handle,
         handle: params.handle ?? null,
@@ -166,6 +173,8 @@ export class PromptService {
           }
         : undefined,
     });
+
+    return this.transformToVersionedPrompt(config);
   }
 
   /**
@@ -213,11 +222,11 @@ export class PromptService {
         );
 
         // Get the latest version
-        const latestVersion = await this.repository.versions.getLatestVersion(
+        const latestVersion = (await this.repository.versions.getLatestVersion(
           updatedConfig.id,
           projectId,
           { tx }
-        );
+        )) as LatestConfigVersionSchema;
 
         const parsedLatestVersionData =
           getLatestConfigVersionSchema().parse(latestVersion);
@@ -476,28 +485,6 @@ export class PromptService {
   }
 
   /**
-   * Gets a prompt by ID or handle and returns the full versioned prompt shape.
-   * This includes the combined messages array and response format.
-   *
-   * @param params - The parameters object
-   * @returns The full versioned prompt shape ready for API response
-   */
-  async getVersionedPromptByIdOrHandle(params: {
-    idOrHandle: string;
-    projectId: string;
-    organizationId: string;
-    version?: number;
-  }): Promise<VersionedPrompt | null> {
-    const config = await this.getPromptByIdOrHandle(params);
-
-    if (!config) {
-      return null;
-    }
-
-    return this.transformToVersionedPrompt(config);
-  }
-
-  /**
    * Gets all prompts for a project and returns them as versioned prompt shapes.
    *
    * @param params - The parameters object
@@ -518,8 +505,6 @@ export class PromptService {
   private transformToVersionedPrompt(
     config: LlmConfigWithLatestVersion
   ): VersionedPrompt {
-    const messages = this.buildMessages(config);
-
     return {
       id: config.id,
       name: config.name,
@@ -533,73 +518,8 @@ export class PromptService {
       updatedAt: config.updatedAt,
       projectId: config.projectId,
       organizationId: config.organizationId,
-      messages,
+      messages: config.latestVersion.configData.messages,
       response_format: config.latestVersion.configData.response_format,
-    };
-  }
-
-  /**
-   * Build messages array from config data.
-   *
-   * While there shouldn't be a case where both a prompt and a system message are provided,
-   * this should have been addressed on ingestion, and this isn't the place to handle it.
-   */
-  private buildMessages(
-    config: LlmConfigWithLatestVersion
-  ): VersionedPrompt["messages"] {
-    const { prompt } = config.latestVersion.configData;
-    const messages = [...config.latestVersion.configData.messages];
-
-    if (prompt) {
-      messages.unshift({
-        role: "system",
-        content: prompt,
-      });
-    }
-
-    return messages;
-  }
-
-  /**
-   * Build response format from outputs configuration.
-   */
-  private buildResponseFormat(
-    config: LlmConfigWithLatestVersion
-  ): VersionedPrompt["response_format"] {
-    const outputs = config.latestVersion.configData.outputs;
-
-    if (
-      !outputs.length ||
-      (outputs.length === 1 && outputs[0]?.type === "str")
-    ) {
-      return null;
-    }
-
-    return {
-      type: "json_schema",
-      json_schema: {
-        name: "outputs",
-        schema: {
-          type: "object",
-          properties: Object.fromEntries(
-            outputs.map((output) => {
-              if (output.type === "json_schema") {
-                return [
-                  output.identifier,
-                  output.json_schema ?? { type: "object", properties: {} },
-                ];
-              }
-              return [
-                output.identifier,
-                {
-                  type: llmOutputFieldToJsonSchemaTypeMap[output.type],
-                },
-              ];
-            })
-          ),
-          required: outputs.map((output) => output.identifier),
-        },
-      },
     };
   }
 }

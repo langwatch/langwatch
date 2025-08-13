@@ -5,12 +5,11 @@ from attrs import define as _attrs_define
 from attrs import field as _attrs_field
 
 from ..models.get_api_prompts_by_id_response_200_scope import GetApiPromptsByIdResponse200Scope
+from ..types import UNSET, Unset
 
 if TYPE_CHECKING:
     from ..models.get_api_prompts_by_id_response_200_messages_item import GetApiPromptsByIdResponse200MessagesItem
-    from ..models.get_api_prompts_by_id_response_200_response_format_type_0 import (
-        GetApiPromptsByIdResponse200ResponseFormatType0,
-    )
+    from ..models.get_api_prompts_by_id_response_200_response_format import GetApiPromptsByIdResponse200ResponseFormat
 
 
 T = TypeVar("T", bound="GetApiPromptsByIdResponse200")
@@ -33,7 +32,7 @@ class GetApiPromptsByIdResponse200:
         model (str):
         prompt (str):
         messages (list['GetApiPromptsByIdResponse200MessagesItem']):
-        response_format (Union['GetApiPromptsByIdResponse200ResponseFormatType0', None]):
+        response_format (Union[Unset, GetApiPromptsByIdResponse200ResponseFormat]):
     """
 
     id: str
@@ -49,14 +48,10 @@ class GetApiPromptsByIdResponse200:
     model: str
     prompt: str
     messages: list["GetApiPromptsByIdResponse200MessagesItem"]
-    response_format: Union["GetApiPromptsByIdResponse200ResponseFormatType0", None]
+    response_format: Union[Unset, "GetApiPromptsByIdResponse200ResponseFormat"] = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
-        from ..models.get_api_prompts_by_id_response_200_response_format_type_0 import (
-            GetApiPromptsByIdResponse200ResponseFormatType0,
-        )
-
         id = self.id
 
         handle: Union[None, str]
@@ -87,11 +82,9 @@ class GetApiPromptsByIdResponse200:
             messages_item = messages_item_data.to_dict()
             messages.append(messages_item)
 
-        response_format: Union[None, dict[str, Any]]
-        if isinstance(self.response_format, GetApiPromptsByIdResponse200ResponseFormatType0):
+        response_format: Union[Unset, dict[str, Any]] = UNSET
+        if not isinstance(self.response_format, Unset):
             response_format = self.response_format.to_dict()
-        else:
-            response_format = self.response_format
 
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
@@ -110,17 +103,18 @@ class GetApiPromptsByIdResponse200:
                 "model": model,
                 "prompt": prompt,
                 "messages": messages,
-                "response_format": response_format,
             }
         )
+        if response_format is not UNSET:
+            field_dict["response_format"] = response_format
 
         return field_dict
 
     @classmethod
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
         from ..models.get_api_prompts_by_id_response_200_messages_item import GetApiPromptsByIdResponse200MessagesItem
-        from ..models.get_api_prompts_by_id_response_200_response_format_type_0 import (
-            GetApiPromptsByIdResponse200ResponseFormatType0,
+        from ..models.get_api_prompts_by_id_response_200_response_format import (
+            GetApiPromptsByIdResponse200ResponseFormat,
         )
 
         d = dict(src_dict)
@@ -160,20 +154,12 @@ class GetApiPromptsByIdResponse200:
 
             messages.append(messages_item)
 
-        def _parse_response_format(data: object) -> Union["GetApiPromptsByIdResponse200ResponseFormatType0", None]:
-            if data is None:
-                return data
-            try:
-                if not isinstance(data, dict):
-                    raise TypeError()
-                response_format_type_0 = GetApiPromptsByIdResponse200ResponseFormatType0.from_dict(data)
-
-                return response_format_type_0
-            except:  # noqa: E722
-                pass
-            return cast(Union["GetApiPromptsByIdResponse200ResponseFormatType0", None], data)
-
-        response_format = _parse_response_format(d.pop("response_format"))
+        _response_format = d.pop("response_format", UNSET)
+        response_format: Union[Unset, GetApiPromptsByIdResponse200ResponseFormat]
+        if isinstance(_response_format, Unset):
+            response_format = UNSET
+        else:
+            response_format = GetApiPromptsByIdResponse200ResponseFormat.from_dict(_response_format)
 
         get_api_prompts_by_id_response_200 = cls(
             id=id,

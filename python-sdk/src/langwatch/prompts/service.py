@@ -223,18 +223,21 @@ class PromptService:
                 PutApiPromptsByIdBodyOutputsItem.from_dict(out) for out in outputs
             ]
 
+        body = PutApiPromptsByIdBody(
+            handle=handle or UNSET,
+            scope=PutApiPromptsByIdBodyScope[scope],
+            prompt=prompt or UNSET,
+            messages=api_messages,
+            inputs=api_inputs,
+            outputs=api_outputs,
+        )
+
         resp = put_api_prompts_by_id.sync_detailed(
             id=prompt_id_or_handle,
             client=self._client,
-            body=PutApiPromptsByIdBody(
-                handle=handle or UNSET,
-                scope=PutApiPromptsByIdBodyScope[scope],
-                prompt=prompt or UNSET,
-                messages=api_messages,
-                inputs=api_inputs,
-                outputs=api_outputs,
-            ),
+            body=body,
         )
+
         ok = unwrap_response(
             resp,
             ok_type=PutApiPromptsByIdResponse200,
