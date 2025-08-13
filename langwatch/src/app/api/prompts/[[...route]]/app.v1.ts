@@ -440,15 +440,14 @@ app.put(
     logger.info(
       {
         projectId: project.id,
-        promptId: id,
-        newHandle: data.handle,
-        newScope: data.scope,
+        handleOrId: id,
+        data,
       },
       "Updating prompt"
     );
 
     try {
-      const updatedConfig = await service.updatePrompt({
+      const updatedConfig: ApiResponsePrompt = await service.updatePrompt({
         idOrHandle: id,
         projectId,
         data,
@@ -470,10 +469,7 @@ app.put(
         "Successfully updated prompt"
       );
 
-      const result: ApiResponsePrompt =
-        mapPromptToApiPromptResponse(updatedConfig);
-
-      return c.json(result);
+      return c.json(updatedConfig);
     } catch (error: any) {
       logger.error({ projectId, promptId: id, error }, "Error updating prompt");
       handlePossibleConflictError(error, data.scope);

@@ -2,20 +2,24 @@ import {
   type Prisma,
   type PrismaClient,
   type PromptScope,
+  type LlmPromptConfigVersion,
 } from "@prisma/client";
 import { type z } from "zod";
 
 import {
   type CreateLlmConfigParams,
+  type CreateLlmConfigVersionParams,
   LlmConfigRepository,
   type LlmConfigWithLatestVersion,
 } from "./repositories";
 import {
-  type getLatestConfigVersionSchema,
+  getLatestConfigVersionSchema,
   SchemaVersion,
   LATEST_SCHEMA_VERSION,
+  type LatestConfigVersionSchema,
 } from "./repositories/llm-config-version-schema";
 
+import { llmOutputFieldToJsonSchemaTypeMap } from "~/app/api/prompts/[[...route]]/constants";
 import {
   type inputsSchema,
   type messageSchema,
@@ -27,6 +31,30 @@ import {
 type ConfigData = z.infer<
   ReturnType<typeof getLatestConfigVersionSchema>
 >["configData"];
+
+/**
+ * Full prompt shape that combines prompt config with version data.
+ * This is the complete shape that should be returned to API consumers.
+ */
+export type VersionedPrompt = {
+  id: string;
+  name: string;
+  handle: string | null;
+  scope: PromptScope;
+  version: number;
+  versionId: string;
+  versionCreatedAt: Date;
+  model: string;
+  prompt: string;
+  updatedAt: Date;
+  projectId: string;
+  organizationId: string;
+  messages: Array<{
+    role: LatestConfigVersionSchema["configData"]["messages"][number]["role"];
+    content: string;
+  }>;
+  response_format: LatestConfigVersionSchema["configData"]["response_format"];
+};
 
 /**
  * Service layer for managing LLM prompt configurations.
@@ -130,7 +158,7 @@ export class PromptService {
               temperature: params.temperature,
               max_tokens: params.max_tokens,
               prompting_technique: params.prompting_technique,
-            } as Prisma.JsonValue,
+            } as LatestConfigVersionSchema["configData"],
             schemaVersion: LATEST_SCHEMA_VERSION,
             commitMessage: "Initial version",
             authorId: params.authorId ?? null,
@@ -153,24 +181,71 @@ export class PromptService {
   async updatePrompt(params: {
     idOrHandle: string;
     projectId: string;
-    data: Partial<Pick<CreateLlmConfigParams, "handle" | "scope">>;
-  }): Promise<LlmConfigWithLatestVersion | null> {
+    data: Partial<
+      Omit<
+        CreateLlmConfigParams &
+          CreateLlmConfigVersionParams &
+          CreateLlmConfigVersionParams["configData"],
+        | "id"
+        | "createdAt"
+        | "updatedAt"
+        | "deletedAt"
+        | "configId"
+        | "projectId"
+      >
+    >;
+  }): Promise<VersionedPrompt> {
     const { idOrHandle, projectId, data } = params;
+    const { handle, scope, ...newVersionData } = data;
 
-    const updatedConfig = await this.repository.updateConfig(
-      idOrHandle,
-      projectId,
-      {
-        handle: data.handle,
-        scope: data.scope,
+    // Handle in a transaction to ensure atomicity
+    const result = await this.prisma.$transaction(
+      async (tx: Prisma.TransactionClient) => {
+        // Update the config
+        const updatedConfig = await this.repository.updateConfig(
+          idOrHandle,
+          projectId,
+          {
+            handle,
+            scope,
+          },
+          { tx }
+        );
+
+        // Get the latest version
+        const latestVersion = await this.repository.versions.getLatestVersion(
+          updatedConfig.id,
+          projectId,
+          { tx }
+        );
+
+        const parsedLatestVersionData =
+          getLatestConfigVersionSchema().parse(latestVersion);
+
+        // Update the version
+        const updatedVersion: LlmPromptConfigVersion =
+          await tx.llmPromptConfigVersion.create({
+            data: {
+              configId: updatedConfig.id,
+              projectId,
+              commitMessage: newVersionData.commitMessage ?? "Updated from API",
+              configData: {
+                ...parsedLatestVersionData.configData,
+                ...newVersionData,
+              } as any,
+              schemaVersion: LATEST_SCHEMA_VERSION,
+              version: latestVersion.version + 1,
+            },
+          });
+
+        return this.transformToVersionedPrompt({
+          ...updatedConfig,
+          latestVersion: updatedVersion,
+        } as LlmConfigWithLatestVersion);
       }
     );
 
-    return await this.repository.getConfigByIdOrHandleWithLatestVersion({
-      idOrHandle: updatedConfig.id,
-      projectId,
-      organizationId: updatedConfig.organizationId,
-    });
+    return result;
   }
 
   /**
@@ -396,6 +471,134 @@ export class PromptService {
             remoteConfigData
           ).differences ?? [],
         remoteConfigData,
+      },
+    };
+  }
+
+  /**
+   * Gets a prompt by ID or handle and returns the full versioned prompt shape.
+   * This includes the combined messages array and response format.
+   *
+   * @param params - The parameters object
+   * @returns The full versioned prompt shape ready for API response
+   */
+  async getVersionedPromptByIdOrHandle(params: {
+    idOrHandle: string;
+    projectId: string;
+    organizationId: string;
+    version?: number;
+  }): Promise<VersionedPrompt | null> {
+    const config = await this.getPromptByIdOrHandle(params);
+
+    if (!config) {
+      return null;
+    }
+
+    return this.transformToVersionedPrompt(config);
+  }
+
+  /**
+   * Gets all prompts for a project and returns them as versioned prompt shapes.
+   *
+   * @param params - The parameters object
+   * @returns Array of versioned prompt shapes ready for API response
+   */
+  async getAllVersionedPrompts(params: {
+    projectId: string;
+    organizationId: string;
+  }): Promise<VersionedPrompt[]> {
+    const configs = await this.repository.getAllWithLatestVersion(params);
+    return configs.map((config) => this.transformToVersionedPrompt(config));
+  }
+
+  /**
+   * Transforms a LlmConfigWithLatestVersion to the versioned prompt shape.
+   * This handles building the messages array and response format.
+   */
+  private transformToVersionedPrompt(
+    config: LlmConfigWithLatestVersion
+  ): VersionedPrompt {
+    const messages = this.buildMessages(config);
+
+    return {
+      id: config.id,
+      name: config.name,
+      handle: config.handle,
+      scope: config.scope,
+      version: config.latestVersion.version ?? 0,
+      versionId: config.latestVersion.id ?? "",
+      versionCreatedAt: config.latestVersion.createdAt ?? new Date(),
+      model: config.latestVersion.configData.model,
+      prompt: config.latestVersion.configData.prompt,
+      updatedAt: config.updatedAt,
+      projectId: config.projectId,
+      organizationId: config.organizationId,
+      messages,
+      response_format: config.latestVersion.configData.response_format,
+    };
+  }
+
+  /**
+   * Build messages array from config data.
+   *
+   * While there shouldn't be a case where both a prompt and a system message are provided,
+   * this should have been addressed on ingestion, and this isn't the place to handle it.
+   */
+  private buildMessages(
+    config: LlmConfigWithLatestVersion
+  ): VersionedPrompt["messages"] {
+    const { prompt } = config.latestVersion.configData;
+    const messages = [...config.latestVersion.configData.messages];
+
+    if (prompt) {
+      messages.unshift({
+        role: "system",
+        content: prompt,
+      });
+    }
+
+    return messages;
+  }
+
+  /**
+   * Build response format from outputs configuration.
+   */
+  private buildResponseFormat(
+    config: LlmConfigWithLatestVersion
+  ): VersionedPrompt["response_format"] {
+    const outputs = config.latestVersion.configData.outputs;
+
+    if (
+      !outputs.length ||
+      (outputs.length === 1 && outputs[0]?.type === "str")
+    ) {
+      return null;
+    }
+
+    return {
+      type: "json_schema",
+      json_schema: {
+        name: "outputs",
+        schema: {
+          type: "object",
+          properties: Object.fromEntries(
+            outputs.map((output) => {
+              if (output.type === "json_schema") {
+                return [
+                  output.identifier,
+                  output.json_schema ?? { type: "object", properties: {} },
+                ];
+              }
+              return [
+                output.identifier,
+                {
+                  type: llmOutputFieldToJsonSchemaTypeMap[output.type],
+                },
+              ];
+            })
+          ),
+          required: outputs.map((output) => output.identifier),
+        },
       },
     };
   }

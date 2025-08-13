@@ -37,7 +37,7 @@ export const apiResponsePromptWithVersionDataSchema =
       model: z.string(),
       prompt: z.string(),
       messages: z.array(messageSchema),
-      response_format: responseFormatSchema.nullable(),
+      response_format: responseFormatSchema.optional(),
     })
   );
 

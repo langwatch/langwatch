@@ -253,10 +253,15 @@ export class LlmConfigRepository {
   async updateConfig(
     idOrHandle: string,
     projectId: string,
-    data: Partial<CreateLlmConfigParams>
+    data: Partial<CreateLlmConfigParams>,
+    options?: {
+      tx?: Prisma.TransactionClient;
+    }
   ): Promise<LlmPromptConfig> {
+    const { tx } = options ?? {};
+    const client = tx ?? this.prisma;
     // Get organizationId first using the proper approach
-    const project = await this.prisma.project.findUnique({
+    const project = await client.project.findUnique({
       where: { id: projectId },
       include: {
         team: {
@@ -299,7 +304,7 @@ export class LlmConfigRepository {
       });
     }
 
-    const updatedConfig = await this.prisma.llmPromptConfig.update({
+    const updatedConfig = await client.llmPromptConfig.update({
       where: { id: existingConfig.id, projectId },
       data: {
         // Only update if the field is explicitly provided (including null)
@@ -361,7 +366,12 @@ export class LlmConfigRepository {
      * The version data should not include the configId, or projectId.
      * These will be set automatically from the newly created config.
      */
-    versionData?: Omit<CreateLlmConfigVersionParams, "configId" | "projectId">;
+    versionData?: Omit<
+      CreateLlmConfigVersionParams,
+      "configId" | "projectId"
+    > & {
+      prompt?: string;
+    };
   }): Promise<LlmConfigWithLatestVersion> {
     const { configData, versionData } = params;
 

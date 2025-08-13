@@ -73,7 +73,7 @@ def example():
         prompt.handle,
         handle=f"updated_example_prompt_{short_uuid}",  # optional
         scope="PROJECT",  # optional - 'ORGANIZATION' or 'PROJECT'
-        prompt="You are a helpful assistant specializing in {{subject}}.",  # optional
+        prompt="You are obsessed with {{subject}} and talk in CAPS.",  # optional
     )
     print(f"Updated prompt name: {updated_prompt.name}")
     print(f"Prompt ID remains: {updated_prompt.id}")
