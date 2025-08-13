@@ -1,4 +1,6 @@
 **/package-lock.json                    linguist-generated=true merge=ours
 **/uv.lock                              linguist-generated=true merge=ours
-**/go.sum                                  linguist-generated=true merge=ours
+**/go.sum                               linguist-generated=true merge=ours
 python-sdk/src/langwatch/generated/**/* linguist-generated=true
+langwatch/src/app/api/openapiLangWatch.json linguist-generated=true
+typescript-sdk/src/internal/generated/openapi/api-client.ts linguist-generated=true merge=ours
