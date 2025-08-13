@@ -92,6 +92,7 @@ export const llmConfigsRouter = createTRPCRouter({
         authorId,
         organizationId,
         scope: PromptScope.PROJECT,
+        prompt: "You are a helpful assistant",
       });
 
       const configWithLatestVersion =

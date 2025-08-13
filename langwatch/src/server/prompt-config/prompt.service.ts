@@ -230,13 +230,6 @@ export class PromptService {
       throw new SystemPromptConflictError(
         "A system prompt is required when creating a prompt"
       );
-    } else if (!messageSystemPrompt && params.prompt) {
-      params.messages = [
-        { role: "system", content: params.prompt },
-        ...(params.messages ?? []),
-      ];
-    } else {
-      // All good, do nothing
     }
 
     // If only system message is provided
@@ -604,6 +597,8 @@ export class PromptService {
   private transformToVersionedPrompt(
     config: Omit<LlmConfigWithLatestVersion, "deletedAt">
   ): VersionedPrompt {
+    const prompt = config.latestVersion.configData.prompt;
+
     return {
       id: config.id,
       name: config.name,
@@ -613,10 +608,15 @@ export class PromptService {
       versionId: config.latestVersion.id ?? "",
       versionCreatedAt: config.latestVersion.createdAt ?? new Date(),
       model: config.latestVersion.configData.model,
-      prompt: config.latestVersion.configData.prompt,
+      prompt,
       projectId: config.projectId,
       organizationId: config.organizationId,
-      messages: config.latestVersion.configData.messages,
+      // The VersionedPrompt contains the system message,
+      // but in the database, we only have the prompt field above
+      messages: [
+        { role: "system", content: prompt },
+        ...(config.latestVersion.configData.messages ?? []),
+      ],
       inputs: config.latestVersion.configData.inputs,
       outputs: config.latestVersion.configData.outputs,
       response_format: config.latestVersion.configData.response_format,
