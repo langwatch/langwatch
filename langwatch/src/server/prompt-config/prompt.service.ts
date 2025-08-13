@@ -166,8 +166,6 @@ export class PromptService {
       }
     );
 
-    console.log("UPDATED CONFIG", updatedConfig);
-
     return await this.repository.getConfigByIdOrHandleWithLatestVersion({
       idOrHandle: updatedConfig.id,
       projectId,

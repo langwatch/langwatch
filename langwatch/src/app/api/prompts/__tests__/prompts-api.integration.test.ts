@@ -543,6 +543,98 @@ describe("Prompts API", () => {
     });
   });
 
+  // DELETE endpoints tests
+  describe.only("DELETE endpoints", () => {
+    let promptToDelete: LlmPromptConfig;
+
+    beforeEach(async () => {
+      // Create a prompt first
+      const createRes = await app.request(`/api/prompts`, {
+        method: "POST",
+        headers: {
+          "X-Auth-Token": testApiKey,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          handle: "delete-by-id-test",
+        }),
+      });
+
+      expect(createRes.status).toBe(200);
+      promptToDelete = await createRes.json();
+    });
+
+    it("should require authentication to delete a prompt", async () => {
+      const deleteRes = await app.request(`/api/prompts/some-id`, {
+        method: "DELETE",
+      });
+
+      expect(deleteRes.status).toBe(401);
+    });
+
+    it.only("should delete a prompt by ID", async () => {
+      // Delete the prompt by ID
+      const deleteRes = await app.request(`/api/prompts/${promptToDelete.id}`, {
+        method: "DELETE",
+        headers: {
+          "X-Auth-Token": testApiKey,
+        },
+      });
+
+      expect(deleteRes.status).toBe(200);
+      const deleteBody = await deleteRes.json();
+      expect(deleteBody).toHaveProperty("success", true);
+
+      // Verify the prompt is deleted by trying to get it
+      const getRes = await app.request(`/api/prompts/${promptToDelete.id}`, {
+        method: "GET",
+        headers: {
+          "X-Auth-Token": testApiKey,
+        },
+      });
+
+      expect(getRes.status).toBe(404);
+    });
+
+    it("should delete a prompt by handle", async () => {
+      // Delete the prompt by handle
+      const deleteRes = await app.request(
+        `/api/prompts/${promptToDelete.handle}`,
+        {
+          method: "DELETE",
+          headers: {
+            "X-Auth-Token": testApiKey,
+          },
+        }
+      );
+
+      expect(deleteRes.status).toBe(200);
+      const deleteBody = await deleteRes.json();
+      expect(deleteBody).toHaveProperty("success", true);
+
+      // Verify the prompt is deleted by trying to get it by ID
+      const getRes = await app.request(`/api/prompts/${promptToDelete.id}`, {
+        method: "GET",
+        headers: {
+          "X-Auth-Token": testApiKey,
+        },
+      });
+
+      expect(getRes.status).toBe(404);
+    });
+
+    it("should return 404 when trying to delete a non-existent prompt", async () => {
+      const deleteRes = await app.request(`/api/prompts/non-existent-id`, {
+        method: "DELETE",
+        headers: {
+          "X-Auth-Token": testApiKey,
+        },
+      });
+
+      expect(deleteRes.status).toBe(404);
+    });
+  });
+
   // Validation/unhappy path tests
   describe("Validation tests", () => {
     it("should validate input when creating a prompt", async () => {
