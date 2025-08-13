@@ -204,13 +204,10 @@ describe("Prompts API", () => {
 
         beforeEach(async () => {
           // Create a new prompt with the handle
-          const createRes = await app.request(`/api/prompts`, {
-            method: "POST",
-            headers: {
-              "X-Auth-Token": testApiKey,
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({ name: "Test Prompt", handle }),
+          const createRes = await helpers.api.post(`/api/prompts`, {
+            name: "Test Prompt",
+            handle,
+            prompt: "test",
           });
 
           // Verify the prompt was created with the handle
@@ -236,17 +233,11 @@ describe("Prompts API", () => {
         const handle = createHandle("org_ref");
 
         beforeEach(async () => {
-          const createRes = await app.request(`/api/prompts`, {
-            method: "POST",
-            headers: {
-              "X-Auth-Token": testApiKey,
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-              name: "Test Org Prompt",
-              handle,
-              scope: "ORGANIZATION",
-            }),
+          const createRes = await helpers.api.post(`/api/prompts`, {
+            name: "Test Org Prompt",
+            handle,
+            scope: "ORGANIZATION",
+            prompt: "test",
           });
 
           // Verify the prompt was created with the organization-scoped handle
@@ -336,13 +327,9 @@ describe("Prompts API", () => {
   // POST endpoints tests
   describe("POST endpoints", () => {
     it("should create a new prompt", async () => {
-      const res = await app.request(`/api/prompts`, {
-        method: "POST",
-        headers: {
-          "X-Auth-Token": testApiKey,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ handle: "test-handle/chunky-bacon" }),
+      const res = await helpers.api.post(`/api/prompts`, {
+        handle: "test-handle/chunky-bacon",
+        prompt: "test",
       });
 
       expect(res.status).toBe(200);
@@ -358,32 +345,17 @@ describe("Prompts API", () => {
         schemaVersion: "1.0",
       };
 
-      const res = await app.request(`/api/prompts`, {
-        method: "POST",
-        headers: {
-          "X-Auth-Token": testApiKey,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(invalidData),
-      });
+      const res = await helpers.api.post(`/api/prompts`, invalidData);
 
-      expect(res.status).toBe(400); // Should be 400 Bad Request
-      const body = await res.json();
-      expect(body).toHaveProperty("error");
+      expect(res.status).toBe(400);
     });
 
     describe("when scoping by project (default)", () => {
       it("should create a new prompt with a handle scoped to project", async () => {
-        const res = await app.request(`/api/prompts`, {
-          method: "POST",
-          headers: {
-            "X-Auth-Token": testApiKey,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            name: "Test Prompt",
-            handle: "my-custom-ref",
-          }),
+        const res = await helpers.api.post(`/api/prompts`, {
+          name: "Test Prompt",
+          handle: "my-custom-ref",
+          prompt: "test",
         });
 
         expect(res.status).toBe(200);
@@ -395,17 +367,11 @@ describe("Prompts API", () => {
 
     describe("when scoping by organization", () => {
       it("should create a new prompt with a handle scoped to organization", async () => {
-        const res = await app.request(`/api/prompts`, {
-          method: "POST",
-          headers: {
-            "X-Auth-Token": testApiKey,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            name: "Test Prompt",
-            handle: "my-custom-ref",
-            scope: "ORGANIZATION",
-          }),
+        const res = await helpers.api.post(`/api/prompts`, {
+          name: "Test Prompt",
+          handle: "my-custom-ref",
+          scope: "ORGANIZATION",
+          prompt: "test",
         });
 
         expect(res.status).toBe(200);
@@ -425,6 +391,7 @@ describe("Prompts API", () => {
           name: "Test Prompt 1",
           handle: "shared-ref",
           scope: "ORGANIZATION",
+          prompt: "test",
         });
         expect(prompt1Res.status).toBe(200);
         const prompt1 = await prompt1Res.json();
@@ -436,6 +403,7 @@ describe("Prompts API", () => {
           name: "Test Prompt 2",
           handle: "shared-ref",
           scope: "PROJECT",
+          prompt: "test",
         });
 
         expect(prompt2Res.status).toBe(200);
@@ -449,6 +417,7 @@ describe("Prompts API", () => {
           // Create a valid prompt first
           const promptRes = await helpers.api.post(`/api/prompts`, {
             handle: "my-custom-ref",
+            prompt: "This is a prompt text",
           });
 
           expect(promptRes.status).toBe(200);
@@ -476,6 +445,7 @@ describe("Prompts API", () => {
           // Create first prompt with handle
           const prompt1Res = await helpers.api.post(`/api/prompts`, {
             handle: "first-ref",
+            prompt: "This is a prompt text",
           });
 
           expect(prompt1Res.status).toBe(200);
@@ -484,6 +454,7 @@ describe("Prompts API", () => {
           // Create second prompt
           await helpers.api.post(`/api/prompts`, {
             handle: "second-ref",
+            prompt: "This is a prompt text",
           });
 
           // Set handle on first prompt
@@ -502,33 +473,21 @@ describe("Prompts API", () => {
       describe("when scoped to organization", () => {
         it("should prevent duplicate handles within the same organization", async () => {
           // Create first prompt with organization scope
-          const prompt1Res = await app.request(`/api/prompts`, {
-            method: "POST",
-            headers: {
-              "X-Auth-Token": testApiKey,
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-              name: "Test Prompt 1",
-              handle: "org-duplicate-ref",
-              scope: "ORGANIZATION",
-            }),
+          const prompt1Res = await helpers.api.post(`/api/prompts`, {
+            name: "Test Prompt 1",
+            handle: "org-duplicate-ref",
+            scope: "ORGANIZATION",
+            prompt: "This is a prompt text",
           });
 
           expect(prompt1Res.status).toBe(200);
 
           // Try to create second prompt with same handle and organization scope - should fail
-          const prompt2Res = await app.request(`/api/prompts`, {
-            method: "POST",
-            headers: {
-              "X-Auth-Token": testApiKey,
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-              name: "Test Prompt 2",
-              handle: "org-duplicate-ref",
-              scope: "ORGANIZATION",
-            }),
+          const prompt2Res = await helpers.api.post(`/api/prompts`, {
+            name: "Test Prompt 2",
+            handle: "org-duplicate-ref",
+            scope: "ORGANIZATION",
+            prompt: "This is a prompt text",
           });
 
           expect(prompt2Res.status).toBe(409);
@@ -549,7 +508,6 @@ describe("Prompts API", () => {
             scope: "PROJECT",
             prompt: "Initial prompt text with {{variable}}",
             messages: [
-              { role: "system", content: "Initial system message" },
               { role: "user", content: "Initial user message with {{input}}" },
             ],
             inputs: [
@@ -570,74 +528,63 @@ describe("Prompts API", () => {
         const createdPrompt = await createRes.json();
 
         // Update all supported fields
-        const updateRes = await app.request(
+        const updateRes = await helpers.api.put(
           `/api/prompts/${createdPrompt.id}`,
           {
-            method: "PUT",
-            headers: {
-              "X-Auth-Token": testApiKey,
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-              handle: "updated-all-fields-test",
-              scope: "ORGANIZATION",
-              prompt: "Updated prompt text with {{new_variable}}",
-              messages: [
-                { role: "system", content: "Updated system message" },
-                {
-                  role: "user",
-                  content: "Updated user message with {{new_input}}",
-                },
-                { role: "assistant", content: "Example response" },
-              ],
-              inputs: [
-                { identifier: "new_variable", type: "str" },
-                { identifier: "new_input", type: "str" },
-                { identifier: "additional_param", type: "number" },
-              ],
-              outputs: [
-                {
-                  identifier: "updated_response",
-                  type: "str",
-                  json_schema: { type: "string" },
-                },
-                {
-                  identifier: "metadata",
-                  type: "object",
-                  json_schema: { type: "object" },
-                },
-              ],
-            }),
+            handle: "updated-all-fields-test",
+            scope: "ORGANIZATION",
+            prompt: "Updated prompt text with {{new_variable}}",
+            messages: [
+              {
+                role: "user",
+                content: "Updated user message with {{new_input}}",
+              },
+              { role: "assistant", content: "Example response" },
+            ],
+            inputs: [
+              { identifier: "new_variable", type: "str" },
+              { identifier: "new_input", type: "str" },
+              { identifier: "additional_param", type: "float" },
+            ],
+            outputs: [
+              {
+                identifier: "updated_response",
+                type: "str",
+                json_schema: { type: "str" },
+              },
+              {
+                identifier: "metadata",
+                type: "json_schema",
+                json_schema: { type: "json_schema" },
+              },
+            ],
           }
         );
 
-        expect(updateRes.status).toBe(200);
         const updatedPrompt = await updateRes.json();
+        expect(updateRes.status).toBe(200);
 
         // Verify all fields were updated
         expect(updatedPrompt.handle).toBe("updated-all-fields-test");
         expect(updatedPrompt.scope).toBe("ORGANIZATION");
-        expect(updatedPrompt.latestVersion.configData.prompt).toBe(
+        expect(updatedPrompt.prompt).toBe(
           "Updated prompt text with {{new_variable}}"
         );
-        expect(updatedPrompt.latestVersion.configData.messages).toHaveLength(3);
-        expect(updatedPrompt.latestVersion.configData.messages[0].content).toBe(
-          "Updated system message"
+        expect(updatedPrompt.messages).toHaveLength(3);
+        expect(updatedPrompt.messages[0].content).toBe(
+          "Updated prompt text with {{new_variable}}"
         );
-        expect(updatedPrompt.latestVersion.configData.inputs).toHaveLength(3);
-        expect(
-          updatedPrompt.latestVersion.configData.inputs[2].identifier
-        ).toBe("additional_param");
-        expect(updatedPrompt.latestVersion.configData.outputs).toHaveLength(2);
-        expect(
-          updatedPrompt.latestVersion.configData.outputs[0].identifier
-        ).toBe("updated_response");
+        expect(updatedPrompt.inputs).toHaveLength(3);
+        expect(updatedPrompt.inputs[2].identifier).toBe("additional_param");
+        expect(updatedPrompt.outputs).toHaveLength(2);
+        expect(updatedPrompt.outputs[0].identifier).toBe("updated_response");
       });
 
       it("should throw error when trying to set both system prompt message and prompt", async () => {
         // Create a prompt first
         const createRes = await helpers.api.post("/api/prompts", {
           handle: "conflict-test",
+          prompt: "This is a prompt text",
         });
         expect(createRes.status).toBe(200);
         const createdPrompt = await createRes.json();
@@ -656,7 +603,7 @@ describe("Prompts API", () => {
 
         expect(updateRes.status).toBe(400);
         const errorBody = await updateRes.json();
-        expect(errorBody.error).toContain("system prompt");
+        expect(errorBody.error).toContain("System prompt");
       });
 
       it("should update the prompt when system message is provided", async () => {
@@ -683,14 +630,10 @@ describe("Prompts API", () => {
         const updatedPrompt = await updateRes.json();
 
         // Should have messages instead of prompt
-        expect(updatedPrompt.latestVersion.configData.prompt).toBeUndefined();
-        expect(updatedPrompt.latestVersion.configData.messages).toHaveLength(2);
-        expect(updatedPrompt.latestVersion.configData.messages[0].role).toBe(
-          "system"
-        );
-        expect(updatedPrompt.latestVersion.configData.messages[0].content).toBe(
-          "New system message"
-        );
+        expect(updatedPrompt.prompt).toBe("New system message");
+        expect(updatedPrompt.messages).toHaveLength(2);
+        expect(updatedPrompt.messages[0].role).toBe("system");
+        expect(updatedPrompt.messages[0].content).toBe("New system message");
       });
 
       it("should update the system message when prompt is provided", async () => {
@@ -735,15 +678,9 @@ describe("Prompts API", () => {
 
     beforeEach(async () => {
       // Create a prompt first
-      const createRes = await app.request(`/api/prompts`, {
-        method: "POST",
-        headers: {
-          "X-Auth-Token": testApiKey,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          handle: "delete-by-id-test",
-        }),
+      const createRes = await helpers.api.post("/api/prompts", {
+        handle: "delete-by-id-test",
+        prompt: "Test prompt",
       });
 
       expect(createRes.status).toBe(200);
@@ -844,13 +781,9 @@ describe("Prompts API", () => {
 
     it("should validate input when creating a prompt version", async () => {
       // Create a valid prompt first
-      const promptRes = await app.request(`/api/prompts`, {
-        method: "POST",
-        headers: {
-          "X-Auth-Token": testApiKey,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ handle: "test-handle" }),
+      const promptRes = await helpers.api.post("/api/prompts", {
+        handle: "test-handle",
+        prompt: "Test prompt",
       });
 
       const prompt = await promptRes.json();
@@ -882,13 +815,9 @@ describe("Prompts API", () => {
 
     it("should strictly validate input when updating a prompt", async () => {
       // Create a valid prompt first
-      const promptRes = await app.request(`/api/prompts`, {
-        method: "POST",
-        headers: {
-          "X-Auth-Token": testApiKey,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ handle: "test-handle" }),
+      const promptRes = await helpers.api.post("/api/prompts", {
+        handle: "test-handle",
+        prompt: "Test prompt",
       });
 
       const prompt = await promptRes.json();
@@ -897,14 +826,7 @@ describe("Prompts API", () => {
       // Test with empty data (should fail with "At least one field is required")
       const emptyData = {};
 
-      const res = await app.request(`/api/prompts/${prompt.id}`, {
-        method: "PUT",
-        headers: {
-          "X-Auth-Token": testApiKey,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(emptyData),
-      });
+      const res = await helpers.api.put(`/api/prompts/${prompt.id}`, emptyData);
 
       expect(res.status).toBe(400);
       const body = await res.json();

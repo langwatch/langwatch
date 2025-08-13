@@ -53,6 +53,8 @@ export type VersionedPrompt = {
     role: LatestConfigVersionSchema["configData"]["messages"][number]["role"];
     content: string;
   }>;
+  inputs: LatestConfigVersionSchema["configData"]["inputs"];
+  outputs: LatestConfigVersionSchema["configData"]["outputs"];
   response_format: LatestConfigVersionSchema["configData"]["response_format"];
 };
 
@@ -172,6 +174,14 @@ export class PromptService {
       // All good, do nothing
     }
 
+    // If only system message is provided
+    if (params.messages?.length === 1) {
+      params.messages.push({
+        role: "user",
+        content: "{{input}}",
+      });
+    }
+
     const config = await this.repository.createConfigWithInitialVersion({
       configData: {
         name: params.name ?? params.handle,
@@ -186,8 +196,10 @@ export class PromptService {
             configData: {
               prompt: params.prompt,
               messages: params.messages,
-              inputs: params.inputs ?? undefined,
-              outputs: params.outputs ?? undefined,
+              inputs: params.inputs ?? [{ identifier: "input", type: "str" }],
+              outputs: params.outputs ?? [
+                { identifier: "output", type: "str" },
+              ],
               model: params.model,
               temperature: params.temperature,
               max_tokens: params.max_tokens,
@@ -235,6 +247,21 @@ export class PromptService {
     const { handle, scope, ...newVersionData } = data;
 
     this.assertNoSystemPromptConflict(newVersionData);
+
+    const messageSystemPrompt = newVersionData.messages?.find(
+      (msg) => msg.role === "system"
+    )?.content;
+
+    if (messageSystemPrompt && !newVersionData.prompt) {
+      newVersionData.prompt = messageSystemPrompt;
+    } else if (!messageSystemPrompt && newVersionData.prompt) {
+      newVersionData.messages = [
+        { role: "system", content: newVersionData.prompt },
+        ...(newVersionData.messages ?? []),
+      ];
+    } else {
+      // All good, do nothing
+    }
 
     // Handle in a transaction to ensure atomicity
     const result = await this.prisma.$transaction(
@@ -548,6 +575,8 @@ export class PromptService {
       projectId: config.projectId,
       organizationId: config.organizationId,
       messages: config.latestVersion.configData.messages,
+      inputs: config.latestVersion.configData.inputs,
+      outputs: config.latestVersion.configData.outputs,
       response_format: config.latestVersion.configData.response_format,
     };
   }

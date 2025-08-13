@@ -33,6 +33,7 @@ import {
   mapPromptToApiPromptResponse,
   mapVersionToApiPromptVersionResponse,
 } from "./utils";
+import { handleSystemPromptConflict } from "./utils/handle-system-prompt-conflict";
 
 import { badRequestSchema, successSchema } from "~/app/api/shared/schemas";
 import {
@@ -469,6 +470,7 @@ app.put(
     } catch (error: any) {
       logger.error({ projectId, promptId: id, error }, "Error updating prompt");
       handlePossibleConflictError(error, data.scope);
+      handleSystemPromptConflict(error);
 
       // Re-throw other errors to be handled by the error middleware
       throw error;

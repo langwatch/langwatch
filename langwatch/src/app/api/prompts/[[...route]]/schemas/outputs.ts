@@ -13,7 +13,7 @@ import {
 /**
  * Base schema for API Response (only llm config)
  */
-const apiResponsePromptWithVersionDataSchemaBase = z.object({
+const apiResponsePromptSchemaBase = z.object({
   id: z.string(),
   handle: z.string().nullable(),
   scope: z.nativeEnum(PromptScope),
@@ -22,28 +22,6 @@ const apiResponsePromptWithVersionDataSchemaBase = z.object({
   projectId: z.string(),
   organizationId: z.string(),
 });
-
-/**
- * Expected shape for a returned prompt from the API
- *
- * Includes llm config + version data
- */
-export const apiResponsePromptWithVersionDataSchema =
-  apiResponsePromptWithVersionDataSchemaBase.merge(
-    z.object({
-      version: z.number(),
-      versionId: z.string(),
-      versionCreatedAt: z.date(),
-      model: z.string(),
-      prompt: z.string(),
-      messages: z.array(messageSchema),
-      response_format: responseFormatSchema.optional(),
-    })
-  );
-
-export type ApiResponsePrompt = z.infer<
-  typeof apiResponsePromptWithVersionDataSchema
->;
 
 /**
  * Schema for version output responses
@@ -68,6 +46,22 @@ export const apiResponseVersionOutputSchema = z.object({
   promptingTechnique: promptingTechniqueSchema.optional(),
   responseFormat: responseFormatSchema.optional(),
 });
+
+/**
+ * Expected shape for a returned prompt from the API
+ *
+ * Includes llm config + version data
+ */
+export const apiResponsePromptWithVersionDataSchema =
+  apiResponsePromptSchemaBase.merge(
+    apiResponseVersionOutputSchema.omit({
+      configId: true,
+    })
+  );
+
+export type ApiResponsePrompt = z.infer<
+  typeof apiResponsePromptWithVersionDataSchema
+>;
 
 export type ApiResponsePromptVersion = z.infer<
   typeof apiResponseVersionOutputSchema

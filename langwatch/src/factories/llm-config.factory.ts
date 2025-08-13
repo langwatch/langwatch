@@ -32,7 +32,7 @@ export const llmPromptConfigFactory = Factory.define<
   createdAt: new Date(),
   updatedAt: new Date(),
   deletedAt: null,
-  handle: null,
+  handle: `test-handle-${sequence}`,
   scope: PromptScope.PROJECT,
 }));
 
