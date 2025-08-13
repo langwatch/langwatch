@@ -14,6 +14,7 @@ import { LangWatchLogsExporter, LangWatchTraceExporter } from "../../exporters";
 import { ConsoleLogger, type Logger } from "../../../logger";
 import { initializeObservabilitySdkConfig } from "../../config";
 import { setLangWatchLoggerProvider } from "../../logger";
+import { DEFAULT_ENDPOINT } from "@/internal/constants";
 
 // Helper functions
 const createNoOpHandle = (logger: Logger): ObservabilityHandle => ({
@@ -29,7 +30,7 @@ const getLangWatchConfig = (options: SetupObservabilityOptions) => {
   return {
     disabled: isDisabled,
     apiKey: isDisabled ? void 0 : (config.apiKey ?? process.env.LANGWATCH_API_KEY),
-    endpoint: isDisabled ? void 0 : (config.endpoint ?? process.env.LANGWATCH_ENDPOINT ?? 'https://api.langwatch.ai'),
+    endpoint: isDisabled ? void 0 : (config.endpoint ?? process.env.LANGWATCH_ENDPOINT ?? DEFAULT_ENDPOINT),
     processorType: config.processorType ?? 'simple'
   };
 };

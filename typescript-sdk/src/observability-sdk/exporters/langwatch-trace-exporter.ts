@@ -1,5 +1,6 @@
 import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-http";
 import {
+  DEFAULT_ENDPOINT,
   LANGWATCH_SDK_LANGUAGE,
   LANGWATCH_SDK_NAME_OBSERVABILITY,
   LANGWATCH_SDK_RUNTIME,
@@ -54,7 +55,7 @@ export class LangWatchTraceExporter extends OTLPTraceExporter {
     const endpoint =
       opts?.endpoint ??
       process.env.LANGWATCH_ENDPOINT ??
-      "https://app.langwatch.ai";
+      DEFAULT_ENDPOINT;
 
     if (opts && opts.includeAllSpans !== void 0) {
       console.warn(
