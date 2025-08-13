@@ -295,7 +295,7 @@ export function TraceDetails(props: {
               )}
               {hasTeamPermission(TeamRoleGroup.DATASETS_MANAGE) && (
                 <>
-                  {(threadTraces.data?.length ?? 0) > 0 ? (
+                  {threadTraces.data && threadTraces.data.length > 0 ? (
                     <Menu.Root>
                       <Menu.Trigger asChild>
                         <Button variant="outline" size="sm">
@@ -318,7 +318,7 @@ export function TraceDetails(props: {
                           <Menu.Item
                             onClick={() => {
                               openDrawer("addDatasetRecord", {
-                                selectedTraceIds: threadTraces.data!.map(
+                                selectedTraceIds: threadTraces.data.map(
                                   (t) => t.trace_id
                                 ),
                               });
