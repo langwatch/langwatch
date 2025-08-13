@@ -25,7 +25,6 @@ import {
 } from "./schemas";
 import { buildStandardSuccessResponse } from "./utils";
 import { handlePossibleConflictError } from "./utils";
-import { mapPromptToApiPromptResponse } from "./utils";
 import { handleSystemPromptConflict } from "./utils/handle-system-prompt-conflict";
 
 import { badRequestSchema, successSchema } from "~/app/api/shared/schemas";
@@ -78,22 +77,13 @@ app.get(
 
     logger.info({ projectId: project.id }, "Getting all prompts for project");
 
-    const configs = await service.repository.getAllWithLatestVersion({
+    const configs: ApiResponsePrompt[] = await service.getAllPrompts({
       projectId: project.id,
       organizationId: organization.id,
+      version: "latest",
     });
 
-    logger.info(
-      { projectId: project.id, count: configs.length },
-      "Retrieved prompts for project"
-    );
-
-    const transformedConfigs = configs.map(mapPromptToApiPromptResponse);
-    return c.json(
-      transformedConfigs satisfies z.infer<
-        typeof apiResponsePromptWithVersionDataSchema
-      >[]
-    );
+    return c.json(configs);
   }
 );
 

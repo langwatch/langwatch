@@ -72,6 +72,24 @@ export class PromptService {
   }
 
   /**
+   * Get all prompts for a project
+   */
+  async getAllPrompts(params: {
+    projectId: string;
+    organizationId: string;
+    version?: "latest" | "all";
+  }): Promise<VersionedPrompt[]> {
+    const { projectId, organizationId } = params;
+
+    const configs = await this.repository.getAllWithLatestVersion({
+      projectId,
+      organizationId,
+    });
+
+    return configs.map((config) => this.transformToVersionedPrompt(config));
+  }
+
+  /**
    * Gets a prompt by ID or handle.
    * If a handle is provided, it will be formatted with the organization and project context.
    *
