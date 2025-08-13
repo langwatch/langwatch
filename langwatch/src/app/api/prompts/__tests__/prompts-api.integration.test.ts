@@ -572,7 +572,7 @@ describe("Prompts API", () => {
       expect(deleteRes.status).toBe(401);
     });
 
-    it.only("should delete a prompt by ID", async () => {
+    it("should delete a prompt by ID", async () => {
       // Delete the prompt by ID
       const deleteRes = await app.request(`/api/prompts/${promptToDelete.id}`, {
         method: "DELETE",
