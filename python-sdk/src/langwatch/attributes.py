@@ -72,9 +72,13 @@ class AttributeKey:
     LangWatchEventEvaluationCustom = "langwatch.evaluation.custom"
     LangWatchEventEvaluationLog = "langwatch.evaluation.log"
 
+    # LangWatch Prompt attributes
     LangWatchPromptId = "langwatch.prompt.id"
+    LangWatchPromptHandle = "langwatch.prompt.handle"
     LangWatchPromptVersionId = "langwatch.prompt.version.id"
     LangWatchPromptVersionNumber = "langwatch.prompt.version.number"
+    LangWatchPromptVariables = "langwatch.prompt.variables"
+    LangWatchPromptSelectedId = "langwatch.prompt.selected.id"
 
     # Deprecated attributes
     DeprecatedTraceId = "deprecated.trace.id"
