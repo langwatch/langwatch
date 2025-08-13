@@ -18,7 +18,9 @@ if TYPE_CHECKING:
     import langwatch.dataset as dataset
     import langwatch.dspy as dspy
     import langwatch.langchain as langchain
-    import langchain.prompts as prompts
+    from .prompts.service import PromptService
+
+    prompts: PromptService
 
 
 @module_property

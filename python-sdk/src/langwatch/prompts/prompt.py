@@ -1,5 +1,5 @@
 import warnings
-from typing import List, Any, Dict, Union, Optional, cast
+from typing import List, Any, Dict, Union, Optional, cast, Literal
 from openai.types.chat import ChatCompletionMessageParam
 from liquid import Environment, StrictUndefined, Undefined
 from liquid.exceptions import UndefinedError
@@ -8,6 +8,7 @@ from langwatch.generated.langwatch_rest_api_client.models.get_api_prompts_by_id_
 )
 from .formatter import PromptFormatter
 from .decorators.prompt_tracing import prompt_tracing
+from .types import MessageDict
 
 
 class PromptCompilationError(Exception):
@@ -60,31 +61,6 @@ class Prompt:
         """Returns the version number of the prompt."""
         return int(self._config.version)
 
-    def _extract_message_info(
-        self, message: Union[Dict[str, Any], Any]
-    ) -> tuple[str, str]:
-        """
-        Extract role and content from a message, handling both dict and object formats.
-
-        Args:
-            message: Message object or dictionary
-
-        Returns:
-            Tuple of (role_str, content_str)
-        """
-        if isinstance(message, dict):
-            # Dictionary format (from tests/fixtures)
-            role = message["role"]
-            content = message["content"]
-            role_str = role.value if hasattr(role, "value") else str(role)
-            content_str = str(content)
-        else:
-            # Object format (from API responses)
-            role_str = message.role.value
-            content_str = message.content
-
-        return role_str, content_str
-
     def _compile(self, variables: TemplateVariables, strict: bool) -> "CompiledPrompt":
         """
         Internal method to compile the prompt template with provided variables.
@@ -100,23 +76,21 @@ class Prompt:
                 compiled_prompt = template.render(**variables)
 
             # Compile messages
-            compiled_messages: List[Dict[str, str]] = []
+            compiled_messages: List[MessageDict] = []
             if self._config.messages:
                 for message in self._config.messages:
-                    role_str, content_str = self._extract_message_info(message)
-
-                    if content_str:
-                        template = env.from_string(content_str)
+                    if message.content:
+                        template = env.from_string(message.content)
                         compiled_content = template.render(**variables)
-                        compiled_message = {
-                            "role": role_str,
-                            "content": compiled_content,
-                        }
+                        compiled_message = MessageDict(
+                            role=message.role.value,
+                            content=compiled_content,
+                        )
                     else:
-                        compiled_message = {
-                            "role": role_str,
-                            "content": content_str,
-                        }
+                        compiled_message = MessageDict(
+                            role=message.role.value,
+                            content=message.content,
+                        )
                     compiled_messages.append(compiled_message)
 
             # Return simplified CompiledPrompt with variables preserved
@@ -205,18 +179,8 @@ class Prompt:
             stacklevel=2,
         )
 
-        compiled_messages = self.compile(variables)
-
-        formatted_messages = [
-            {
-                "role": msg["role"],
-                "content": msg["content"],
-            }
-            for msg in compiled_messages.messages
-        ]
-
-        # Cast to ChatCompletionMessageParam for type compatibility
-        return cast(List[ChatCompletionMessageParam], formatted_messages)
+        compiled_prompt = self.compile(variables)
+        return compiled_prompt.messages
 
     def raw_config(self) -> Any:
         """Returns the raw prompt configuration (legacy method)."""
@@ -232,19 +196,32 @@ class CompiledPrompt:
         self,
         original_prompt: "Prompt",
         compiled_prompt: str,
-        compiled_messages: List[Dict[str, str]],
+        compiled_messages: List[MessageDict],
         variables: TemplateVariables,
     ):
         self.original = original_prompt
         self.prompt = compiled_prompt
-        self.messages = compiled_messages
         self.variables = variables  # Store the original compilation variables
+        self._compiled_messages = compiled_messages
 
         # Expose original prompt properties for convenience
         self.id = original_prompt.id
         self.version = original_prompt.version
         self.version_id = original_prompt.version_id
         # ... other properties as needed
+
+    @property
+    def messages(self) -> List[ChatCompletionMessageParam]:
+        """
+        Returns the compiled messages as a list of ChatCompletionMessageParam objects.
+        This is a convenience method to make the messages accessible as a list of
+        ChatCompletionMessageParam objects, which is the format expected by the OpenAI API.
+        """
+        messages = [
+            cast(ChatCompletionMessageParam, msg) for msg in self._compiled_messages
+        ]
+
+        return messages
 
     def __getattr__(self, name: str) -> Any:
         """Delegate unknown attributes to original prompt for backward compatibility"""

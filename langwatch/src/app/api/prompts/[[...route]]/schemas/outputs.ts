@@ -65,7 +65,7 @@ export const apiResponseVersionOutputSchema = z.object({
   temperature: z.number().optional(),
   maxTokens: z.number().optional(),
   demonstrations: nodeDatasetSchema.optional(),
-  pramptingTechnique: promptingTechniqueSchema.optional(),
+  promptingTechnique: promptingTechniqueSchema.optional(),
   responseFormat: responseFormatSchema.optional(),
 });
 

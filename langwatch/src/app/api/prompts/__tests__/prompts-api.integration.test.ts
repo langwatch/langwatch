@@ -544,7 +544,7 @@ describe("Prompts API", () => {
   });
 
   // DELETE endpoints tests
-  describe.only("DELETE endpoints", () => {
+  describe("DELETE endpoints", () => {
     let promptToDelete: LlmPromptConfig;
 
     beforeEach(async () => {

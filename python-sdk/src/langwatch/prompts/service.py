@@ -63,29 +63,7 @@ from langwatch.state import get_instance
 from .prompt import Prompt
 from .errors import unwrap_response
 from .decorators.prompt_service_tracing import prompt_service_tracing
-
-
-# Clean TypedDict interfaces that match the API exactly
-class MessageDict(TypedDict):
-    """Message dictionary that matches the API structure."""
-
-    role: Literal["system", "user", "assistant"]
-    content: str
-
-
-class InputDict(TypedDict):
-    """Input dictionary that matches the API structure."""
-
-    identifier: str
-    type: Literal["str", "int", "float", "bool", "json"]
-
-
-class OutputDict(TypedDict):
-    """Output dictionary that matches the API structure."""
-
-    identifier: str
-    type: Literal["str", "int", "float", "bool", "json"]
-    json_schema: Optional[Dict[str, Any]]
+from .types import MessageDict, InputDict, OutputDict
 
 
 def _convert_api_response_to_get_format(response: Any) -> GetApiPromptsByIdResponse200:

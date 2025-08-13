@@ -26,7 +26,7 @@ class PromptTracing:
             @wraps(func)
             def wrapper(self: "Prompt", *args: Any, **kwargs: Any) -> "CompiledPrompt":
                 with trace.get_tracer(__name__).start_as_current_span(
-                    span_name
+                    PromptTracing._create_span_name(span_name)
                 ) as span:
                     # Set base prompt
                     span.set_attributes(
@@ -78,6 +78,11 @@ class PromptTracing:
     ) -> Callable[..., "CompiledPrompt"]:
         """Decorator for Prompt.compile_strict method with OpenTelemetry tracing"""
         return PromptTracing._create_compile_decorator("compile_strict")(func)
+
+    @staticmethod
+    def _create_span_name(span_name: str) -> str:
+        """Create a span name for the prompt"""
+        return "Prompt" + "." + span_name
 
 
 prompt_tracing = PromptTracing()
