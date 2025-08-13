@@ -1,9 +1,7 @@
 import type { PromptScope } from "@prisma/client";
 
-import {
-  SchemaVersion,
-  type LatestConfigVersionSchema,
-} from "~/server/prompt-config/repositories/llm-config-version-schema";
+import { SchemaVersion } from "~/server/prompt-config/enums";
+import { type LatestConfigVersionSchema } from "~/server/prompt-config/repositories/llm-config-version-schema";
 
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";

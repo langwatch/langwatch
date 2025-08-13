@@ -236,6 +236,7 @@ from .post_api_prompts_body_messages_item_role import PostApiPromptsBodyMessages
 from .post_api_prompts_body_outputs_item import PostApiPromptsBodyOutputsItem
 from .post_api_prompts_body_outputs_item_json_schema import PostApiPromptsBodyOutputsItemJsonSchema
 from .post_api_prompts_body_outputs_item_type import PostApiPromptsBodyOutputsItemType
+from .post_api_prompts_body_schema_version import PostApiPromptsBodySchemaVersion
 from .post_api_prompts_body_scope import PostApiPromptsBodyScope
 from .post_api_prompts_by_id_sync_body import PostApiPromptsByIdSyncBody
 from .post_api_prompts_by_id_sync_body_config_data import PostApiPromptsByIdSyncBodyConfigData
@@ -533,6 +534,7 @@ from .put_api_prompts_by_id_body_messages_item_role import PutApiPromptsByIdBody
 from .put_api_prompts_by_id_body_outputs_item import PutApiPromptsByIdBodyOutputsItem
 from .put_api_prompts_by_id_body_outputs_item_json_schema import PutApiPromptsByIdBodyOutputsItemJsonSchema
 from .put_api_prompts_by_id_body_outputs_item_type import PutApiPromptsByIdBodyOutputsItemType
+from .put_api_prompts_by_id_body_schema_version import PutApiPromptsByIdBodySchemaVersion
 from .put_api_prompts_by_id_body_scope import PutApiPromptsByIdBodyScope
 from .put_api_prompts_by_id_response_200 import PutApiPromptsByIdResponse200
 from .put_api_prompts_by_id_response_200_demonstrations import PutApiPromptsByIdResponse200Demonstrations
@@ -738,6 +740,7 @@ __all__ = (
     "PostApiPromptsBodyOutputsItem",
     "PostApiPromptsBodyOutputsItemJsonSchema",
     "PostApiPromptsBodyOutputsItemType",
+    "PostApiPromptsBodySchemaVersion",
     "PostApiPromptsBodyScope",
     "PostApiPromptsByIdSyncBody",
     "PostApiPromptsByIdSyncBodyConfigData",
@@ -887,6 +890,7 @@ __all__ = (
     "PutApiPromptsByIdBodyOutputsItem",
     "PutApiPromptsByIdBodyOutputsItemJsonSchema",
     "PutApiPromptsByIdBodyOutputsItemType",
+    "PutApiPromptsByIdBodySchemaVersion",
     "PutApiPromptsByIdBodyScope",
     "PutApiPromptsByIdResponse200",
     "PutApiPromptsByIdResponse200Demonstrations",

@@ -42,6 +42,7 @@
     },
     "scripts": {
         "prepare": "pnpm run generate:server-types && pnpm run generate:openapi-types",
+        "cli": "node dist/cli/index.js",
         "lint": "eslint .",
         "test": "vitest",
         "test:e2e": "vitest run -c ./vitest.e2e.config.mts",

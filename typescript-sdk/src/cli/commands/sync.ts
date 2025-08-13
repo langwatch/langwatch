@@ -4,7 +4,11 @@ import chalk from "chalk";
 import ora from "ora";
 import * as yaml from "js-yaml";
 import { PromptConverter } from "@/cli/utils/promptConverter";
-import { type ConfigData, PromptsError, type SyncAction } from "@/client-sdk/services/prompts";
+import {
+  type ConfigData,
+  PromptsError,
+  type SyncAction,
+} from "@/client-sdk/services/prompts";
 import { LangWatch } from "@/client-sdk";
 import type { SyncResult } from "../types";
 import { FileManager } from "../utils/fileManager";
@@ -66,6 +70,8 @@ const handleConflict = async (
 };
 
 export const syncCommand = async (): Promise<void> => {
+  console.log("🔄 Starting sync...");
+
   const startTime = Date.now();
 
   try {
@@ -445,7 +451,9 @@ export const syncCommand = async (): Promise<void> => {
         const localPath = `./prompts/${name}.prompt.yaml`;
         console.log(
           chalk.green(
-            `✓ Pushed ${chalk.cyan(name)} ${chalk.gray(`(version ${version})`)} from ${chalk.gray(localPath)}`,
+            `✓ Pushed ${chalk.cyan(name)} ${chalk.gray(
+              `(version ${version})`,
+            )} from ${chalk.gray(localPath)}`,
           ),
         );
       }

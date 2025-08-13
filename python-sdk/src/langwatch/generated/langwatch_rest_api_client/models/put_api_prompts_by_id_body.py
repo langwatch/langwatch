@@ -3,6 +3,7 @@ from typing import TYPE_CHECKING, Any, TypeVar, Union
 
 from attrs import define as _attrs_define
 
+from ..models.put_api_prompts_by_id_body_schema_version import PutApiPromptsByIdBodySchemaVersion
 from ..models.put_api_prompts_by_id_body_scope import PutApiPromptsByIdBodyScope
 from ..types import UNSET, Unset
 
@@ -19,22 +20,32 @@ T = TypeVar("T", bound="PutApiPromptsByIdBody")
 class PutApiPromptsByIdBody:
     """
     Attributes:
-        handle (Union[Unset, str]):
+        handle (str):
         scope (Union[Unset, PutApiPromptsByIdBodyScope]):  Default: PutApiPromptsByIdBodyScope.PROJECT.
+        model (Union[Unset, str]):
+        temperature (Union[Unset, float]):
+        max_tokens (Union[Unset, float]):
+        commit_message (Union[Unset, str]):
         author_id (Union[Unset, str]):
         prompt (Union[Unset, str]):
         messages (Union[Unset, list['PutApiPromptsByIdBodyMessagesItem']]):
         inputs (Union[Unset, list['PutApiPromptsByIdBodyInputsItem']]):
         outputs (Union[Unset, list['PutApiPromptsByIdBodyOutputsItem']]):
+        schema_version (Union[Unset, PutApiPromptsByIdBodySchemaVersion]):
     """
 
-    handle: Union[Unset, str] = UNSET
+    handle: str
     scope: Union[Unset, PutApiPromptsByIdBodyScope] = PutApiPromptsByIdBodyScope.PROJECT
+    model: Union[Unset, str] = UNSET
+    temperature: Union[Unset, float] = UNSET
+    max_tokens: Union[Unset, float] = UNSET
+    commit_message: Union[Unset, str] = UNSET
     author_id: Union[Unset, str] = UNSET
     prompt: Union[Unset, str] = UNSET
     messages: Union[Unset, list["PutApiPromptsByIdBodyMessagesItem"]] = UNSET
     inputs: Union[Unset, list["PutApiPromptsByIdBodyInputsItem"]] = UNSET
     outputs: Union[Unset, list["PutApiPromptsByIdBodyOutputsItem"]] = UNSET
+    schema_version: Union[Unset, PutApiPromptsByIdBodySchemaVersion] = UNSET
 
     def to_dict(self) -> dict[str, Any]:
         handle = self.handle
@@ -42,6 +53,14 @@ class PutApiPromptsByIdBody:
         scope: Union[Unset, str] = UNSET
         if not isinstance(self.scope, Unset):
             scope = self.scope.value
+
+        model = self.model
+
+        temperature = self.temperature
+
+        max_tokens = self.max_tokens
+
+        commit_message = self.commit_message
 
         author_id = self.author_id
 
@@ -68,12 +87,26 @@ class PutApiPromptsByIdBody:
                 outputs_item = outputs_item_data.to_dict()
                 outputs.append(outputs_item)
 
+        schema_version: Union[Unset, str] = UNSET
+        if not isinstance(self.schema_version, Unset):
+            schema_version = self.schema_version.value
+
         field_dict: dict[str, Any] = {}
-        field_dict.update({})
-        if handle is not UNSET:
-            field_dict["handle"] = handle
+        field_dict.update(
+            {
+                "handle": handle,
+            }
+        )
         if scope is not UNSET:
             field_dict["scope"] = scope
+        if model is not UNSET:
+            field_dict["model"] = model
+        if temperature is not UNSET:
+            field_dict["temperature"] = temperature
+        if max_tokens is not UNSET:
+            field_dict["maxTokens"] = max_tokens
+        if commit_message is not UNSET:
+            field_dict["commitMessage"] = commit_message
         if author_id is not UNSET:
             field_dict["authorId"] = author_id
         if prompt is not UNSET:
@@ -84,6 +117,8 @@ class PutApiPromptsByIdBody:
             field_dict["inputs"] = inputs
         if outputs is not UNSET:
             field_dict["outputs"] = outputs
+        if schema_version is not UNSET:
+            field_dict["schemaVersion"] = schema_version
 
         return field_dict
 
@@ -94,7 +129,7 @@ class PutApiPromptsByIdBody:
         from ..models.put_api_prompts_by_id_body_outputs_item import PutApiPromptsByIdBodyOutputsItem
 
         d = dict(src_dict)
-        handle = d.pop("handle", UNSET)
+        handle = d.pop("handle")
 
         _scope = d.pop("scope", UNSET)
         scope: Union[Unset, PutApiPromptsByIdBodyScope]
@@ -102,6 +137,14 @@ class PutApiPromptsByIdBody:
             scope = UNSET
         else:
             scope = PutApiPromptsByIdBodyScope(_scope)
+
+        model = d.pop("model", UNSET)
+
+        temperature = d.pop("temperature", UNSET)
+
+        max_tokens = d.pop("maxTokens", UNSET)
+
+        commit_message = d.pop("commitMessage", UNSET)
 
         author_id = d.pop("authorId", UNSET)
 
@@ -128,14 +171,26 @@ class PutApiPromptsByIdBody:
 
             outputs.append(outputs_item)
 
+        _schema_version = d.pop("schemaVersion", UNSET)
+        schema_version: Union[Unset, PutApiPromptsByIdBodySchemaVersion]
+        if isinstance(_schema_version, Unset):
+            schema_version = UNSET
+        else:
+            schema_version = PutApiPromptsByIdBodySchemaVersion(_schema_version)
+
         put_api_prompts_by_id_body = cls(
             handle=handle,
             scope=scope,
+            model=model,
+            temperature=temperature,
+            max_tokens=max_tokens,
+            commit_message=commit_message,
             author_id=author_id,
             prompt=prompt,
             messages=messages,
             inputs=inputs,
             outputs=outputs,
+            schema_version=schema_version,
         )
 
         return put_api_prompts_by_id_body

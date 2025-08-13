@@ -37,8 +37,7 @@ export const handleError = async (
       path,
       method,
       routeParams,
-      error: error.message || String(error),
-      stack: error.stack,
+      error,
     },
     `API Error: ${error.message || String(error)}`
   );

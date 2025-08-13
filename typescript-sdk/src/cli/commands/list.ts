@@ -102,7 +102,9 @@ export const listCommand = async (): Promise<void> => {
       const draftPrompts = allPrompts.filter((prompt) => !prompt.version);
 
       spinner.succeed(
-        `Found ${prompts.length} published prompt${prompts.length !== 1 ? "s" : ""} ` +
+        `Found ${prompts.length} published prompt${
+          prompts.length !== 1 ? "s" : ""
+        } ` +
           chalk.gray(
             `(+${draftPrompts.length} draft${
               draftPrompts.length !== 1 ? "s" : ""

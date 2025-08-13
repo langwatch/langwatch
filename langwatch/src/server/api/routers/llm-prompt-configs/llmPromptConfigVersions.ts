@@ -103,13 +103,13 @@ export const llmConfigVersionsRouter = createTRPCRouter({
       const organizationId = await getOrganizationIdForProject(input.projectId);
 
       try {
-        const version = await repository.versions.createVersion(
-          {
+        const version = await repository.versions.createVersion({
+          versionData: {
             ...input,
             authorId,
           },
-          organizationId
-        );
+          organizationId,
+        });
 
         return version;
       } catch (error) {

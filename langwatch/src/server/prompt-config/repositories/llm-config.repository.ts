@@ -7,13 +7,13 @@ import {
 import { nanoid } from "nanoid";
 
 import { createLogger } from "../../../utils/logger";
+import { SchemaVersion } from "../enums";
 import { NotFoundError } from "../errors";
 
 import {
   parseLlmConfigVersion,
   type LatestConfigVersionSchema,
   getSchemaValidator,
-  SchemaVersion,
   LATEST_SCHEMA_VERSION,
 } from "./llm-config-version-schema";
 import {
@@ -82,6 +82,7 @@ export class LlmConfigRepository {
             author: {
               select: {
                 name: true,
+                id: true,
               },
             },
           },

@@ -322,7 +322,7 @@ app.post(
       };
 
       if (syncResult.prompt) {
-        response.prompt = mapPromptToApiPromptResponse(syncResult.prompt);
+        response.prompt = syncResult.prompt;
       }
 
       if (syncResult.conflictInfo) {

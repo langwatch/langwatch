@@ -6,6 +6,7 @@ import {
 } from "@prisma/client";
 import { type z } from "zod";
 
+import { SchemaVersion } from "./enums";
 import { NotFoundError, SystemPromptConflictError } from "./errors";
 import {
   type CreateLlmConfigParams,
@@ -15,7 +16,6 @@ import {
 } from "./repositories";
 import {
   getLatestConfigVersionSchema,
-  SchemaVersion,
   LATEST_SCHEMA_VERSION,
   type LatestConfigVersionSchema,
 } from "./repositories/llm-config-version-schema";
@@ -178,6 +178,7 @@ export class PromptService {
     temperature?: number;
     max_tokens?: number;
     prompting_technique?: z.infer<typeof promptingTechniqueSchema>;
+    commitMessage?: string;
   }): Promise<VersionedPrompt> {
     // If any of the version data is provided,
     // we should create a version from that data
@@ -251,7 +252,7 @@ export class PromptService {
               prompting_technique: params.prompting_technique,
             } as LatestConfigVersionSchema["configData"],
             schemaVersion: LATEST_SCHEMA_VERSION,
-            commitMessage: "Initial version",
+            commitMessage: params.commitMessage ?? "Initial version",
             authorId: params.authorId ?? null,
             version: 1,
           }
@@ -427,7 +428,7 @@ export class PromptService {
     commitMessage?: string;
   }): Promise<{
     action: "created" | "updated" | "conflict" | "up_to_date";
-    prompt?: LlmConfigWithLatestVersion;
+    prompt?: VersionedPrompt;
     conflictInfo?: {
       localVersion: number;
       remoteVersion: number;
@@ -454,40 +455,20 @@ export class PromptService {
 
     // Case 1: Prompt doesn't exist on server - create new
     if (!existingPrompt) {
-      const newPrompt = await this.repository.createConfigWithInitialVersion({
-        configData: {
-          name: idOrHandle,
-          handle: idOrHandle,
-          projectId,
-          organizationId,
-          scope: "PROJECT" as PromptScope,
-        },
+      const createdPrompt = await this.createPrompt({
+        name: idOrHandle,
+        handle: idOrHandle,
+        projectId,
+        organizationId,
+        scope: "PROJECT" as PromptScope,
+        authorId,
+        commitMessage: commitMessage ?? "Synced from local file",
+        ...localConfigData,
       });
-
-      // Create a new version with the local content
-      const newVersion = await this.repository.versions.createVersion(
-        {
-          configId: newPrompt.id,
-          projectId,
-          authorId,
-          commitMessage: commitMessage ?? "Synced from local file",
-          configData: localConfigData,
-          schemaVersion: SchemaVersion.V1_0,
-        },
-        organizationId
-      );
 
       return {
         action: "created",
-        prompt: {
-          ...newPrompt,
-          latestVersion: {
-            ...newVersion,
-            commitMessage: newVersion.commitMessage ?? "Synced from local file",
-            version: newVersion.version,
-            configData: localConfigData,
-          },
-        },
+        prompt: createdPrompt,
       };
     }
 
@@ -504,8 +485,15 @@ export class PromptService {
       );
     }
 
-    const remoteVersion = existingPrompt.latestVersion.version;
-    const remoteConfigData = existingPrompt.latestVersion.configData;
+    const remoteVersion = existingPrompt.version;
+    const remoteConfigData: LatestConfigVersionSchema["configData"] = {
+      model: existingPrompt.model,
+      prompt: existingPrompt.prompt,
+      messages: existingPrompt.messages,
+      inputs: existingPrompt.inputs,
+      outputs: existingPrompt.outputs,
+      response_format: existingPrompt.response_format,
+    };
 
     // Case 2: Same version - check content
     if (localVersion === remoteVersion) {
@@ -519,27 +507,20 @@ export class PromptService {
         return { action: "up_to_date", prompt: existingPrompt };
       } else {
         // Content differs - create new version
-        const newVersion = await this.repository.versions.createVersion(
-          {
-            configId: existingPrompt.id,
-            projectId,
+        const updatedPrompt = await this.updatePrompt({
+          idOrHandle: existingPrompt.id,
+          projectId,
+          data: {
             authorId,
             commitMessage: commitMessage ?? "Updated from local file",
             configData: localConfigData,
             schemaVersion: SchemaVersion.V1_0,
           },
-          organizationId
-        );
+        });
 
         return {
           action: "updated",
-          prompt: {
-            ...existingPrompt,
-            latestVersion: {
-              ...newVersion,
-              configData: localConfigData,
-            } as any,
-          },
+          prompt: updatedPrompt,
         };
       }
     }
