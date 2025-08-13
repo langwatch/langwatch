@@ -14,11 +14,13 @@
   "dependencies": {
     "@langchain/openai": "^0.6.3",
     "@langchain/core": "^0.3.66",
+    "@langchain/community": "^0.3.50",
     "langchain": "^0.3.30",
-    "@langchain/langgraph": "^0.4.2",
+    "@langchain/langgraph": "^0.4.3",
     "@opentelemetry/context-async-hooks": "^2.0.1",
     "@opentelemetry/sdk-node": "^0.203.0",
     "cli-markdown": "^3.5.1",
+    "zod": "^3.22.4",
     "langwatch": "file:../../"
   },
   "devDependencies": {

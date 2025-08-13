@@ -3,12 +3,14 @@ import * as path from "path";
 import chalk from "chalk";
 import ora from "ora";
 import * as yaml from "js-yaml";
-import { PromptConverter } from "../../prompt/converter";
-import { ConfigData, PromptService, PromptsError } from "../../prompt/service";
+import { PromptConverter } from "@/cli/utils/promptConverter";
+import { type ConfigData, PromptsError, type SyncAction } from "@/client-sdk/services/prompts";
+import { LangWatch } from "@/client-sdk";
 import type { SyncResult } from "../types";
 import { FileManager } from "../utils/fileManager";
 import { ensureProjectInitialized } from "../utils/init";
 import { checkApiKey } from "../utils/apiKey";
+import readline from "node:readline";
 
 // Handle conflict resolution - show diff and ask user to choose
 const handleConflict = async (
@@ -43,7 +45,6 @@ const handleConflict = async (
   console.log("  [r] Use remote version (overwrite local)");
   console.log("  [a] Abort sync for this prompt");
 
-  const readline = require("readline");
   const rl = readline.createInterface({
     input: process.stdin,
     output: process.stdout,
@@ -71,8 +72,8 @@ export const syncCommand = async (): Promise<void> => {
     // Check API key before doing anything else
     checkApiKey();
 
-    // Get prompt service
-    const promptService = PromptService.getInstance();
+    // Get LangWatch client
+    const langwatch = new LangWatch();
 
     // Ensure project is initialized (prompts.json, lock file, directories)
     await ensureProjectInitialized(false); // Don't prompt for .gitignore in sync
@@ -113,13 +114,13 @@ export const syncCommand = async (): Promise<void> => {
           const versionSpec =
             typeof dependency === "string"
               ? dependency
-              : dependency.version || "latest";
+              : dependency.version ?? "latest";
 
           // Check if we already have this prompt with the same version
           const lockEntry = lock.prompts[name];
 
           // Fetch the prompt from the API to check current version
-          const prompt = await promptService.get(name);
+          const prompt = await langwatch.prompts.get(name);
 
           if (prompt) {
             // Check if we need to update (new version or not materialized)
@@ -217,7 +218,7 @@ export const syncCommand = async (): Promise<void> => {
           };
 
           // Use new sync API with conflict detection
-          const syncResult = await promptService.sync({
+          const syncResult = await langwatch.prompts.sync({
             name: promptName,
             configData,
             localVersion: currentVersion,
@@ -308,14 +309,14 @@ export const syncCommand = async (): Promise<void> => {
               actionText = "Pulled"; // User chose to use remote version
               result.fetched.push({
                 name: promptName,
-                version: syncResult.conflictInfo?.remoteVersion || 0,
+                version: syncResult.conflictInfo?.remoteVersion ?? 0,
                 versionSpec: "latest", // Default for conflict resolution
               });
             } else {
               actionText = "Pushed"; // User chose to use local version (or forced push)
               result.pushed.push({
                 name: promptName,
-                version: (syncResult.conflictInfo?.remoteVersion || 0) + 1, // New version after push
+                version: (syncResult.conflictInfo?.remoteVersion ?? 0) + 1, // New version after push
               });
             }
           } else if (syncResult.action === "up_to_date") {
@@ -323,14 +324,16 @@ export const syncCommand = async (): Promise<void> => {
             actionText = "Up-to-date";
             result.unchanged.push(promptName);
           } else {
-            actionText =
-              {
-                created: "Created",
-                updated: "Updated",
-              }[syncResult.action] || "Pushed";
+            const actionMap: Record<SyncAction, string> = {
+              created: "Created",
+              updated: "Updated",
+              conflict: "Conflict resolved",
+              up_to_date: "Up to date",
+            };
+            actionText = actionMap[syncResult.action as SyncAction] || "Pushed";
             result.pushed.push({
               name: promptName,
-              version: syncResult.prompt?.version || 0,
+              version: syncResult.prompt?.version ?? 0,
             });
           }
 
@@ -338,8 +341,8 @@ export const syncCommand = async (): Promise<void> => {
             promptName,
           )} ${chalk.gray(
             `(version ${
-              syncResult.prompt?.version ||
-              syncResult.conflictInfo?.remoteVersion ||
+              syncResult.prompt?.version ??
+              syncResult.conflictInfo?.remoteVersion ??
               "unknown"
             })`,
           )} ${conflictResolution === "remote" ? "to" : "from"} ${chalk.gray(

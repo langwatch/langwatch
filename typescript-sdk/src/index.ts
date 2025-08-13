@@ -1,14 +1,19 @@
-export { getLangWatchTracer, type LangWatchSpan } from "./observability";
+import { ConsoleLogger, NoOpLogger } from "./logger";
+
+export {
+  getLangWatchTracer,
+  getLangWatchLogger,
+  attributes,
+} from "./observability-sdk";
+
 export {
   FilterableBatchSpanProcessor,
   type SpanProcessingExcludeRule,
-} from "./observability/processors";
-export { LangWatchExporter } from "./observability/exporters";
+} from "./observability-sdk/processors";
+export { LangWatchExporter } from "./observability-sdk/exporters";
+export { LangWatch } from "./client-sdk";
 
-export { recordEvaluation, runEvaluation } from "./evaluation";
-
-export { getPrompt, getPromptVersion } from "./prompt";
-
-import { PromptFacade } from "./prompt/facade";
-
-export const prompts = PromptFacade.getInstance();
+export const logger = {
+  ConsoleLogger,
+  NoOpLogger,
+};

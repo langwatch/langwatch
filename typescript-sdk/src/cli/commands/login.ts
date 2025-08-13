@@ -3,7 +3,9 @@ import * as path from "path";
 import chalk from "chalk";
 import ora from "ora";
 import prompts from "prompts";
-import { getEndpoint } from "../../client";
+const getEndpoint = (): string => {
+  return process.env.LANGWATCH_ENDPOINT ?? "https://app.langwatch.ai";
+};
 
 const updateEnvFile = (
   apiKey: string,
