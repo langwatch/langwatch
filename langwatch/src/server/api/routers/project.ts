@@ -20,7 +20,6 @@ import {
 } from "../permission";
 import { getOrganizationProjectsCount } from "./limits";
 import { dependencies } from "../../../injection/dependencies.server";
-import { allowedTopicClusteringModels } from "../../topicClustering/types";
 import {
   ProjectSensitiveDataVisibilityLevel,
   type Project,
@@ -353,7 +352,7 @@ export const projectRouter = createTRPCRouter({
     .input(
       z.object({
         projectId: z.string(),
-        topicClusteringModel: z.enum(allowedTopicClusteringModels as any),
+        topicClusteringModel: z.string(),
       })
     )
     .use(checkUserPermissionForProject(TeamRoleGroup.SETUP_PROJECT))

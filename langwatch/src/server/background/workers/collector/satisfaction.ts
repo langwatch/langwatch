@@ -50,10 +50,11 @@ export const scoreSatisfactionFromInput = async ({
       body: JSON.stringify({
         text: input.value,
         embeddings_litellm_params: {
-          ...prepareLitellmParams(
-            embeddingsModel.model,
-            embeddingsModel.modelProvider
-          ),
+          ...(await prepareLitellmParams({
+            model: embeddingsModel.model,
+            modelProvider: embeddingsModel.modelProvider,
+            projectId,
+          })),
           dimensions: OPENAI_EMBEDDING_DIMENSION,
         },
       }),

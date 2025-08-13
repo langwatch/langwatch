@@ -11,6 +11,7 @@ import {
   type MaybeStoredModelProvider,
 } from "../../modelProviders/registry";
 import { prisma } from "../../db";
+import { dependencies } from "../../../injection/dependencies.server";
 
 export const modelProviderRouter = createTRPCRouter({
   getAllForProject: protectedProcedure
@@ -272,10 +273,15 @@ export const prepareEnvKeys = (modelProvider: MaybeStoredModelProvider) => {
   );
 };
 
-export const prepareLitellmParams = (
-  model: string,
-  modelProvider: MaybeStoredModelProvider
-) => {
+export const prepareLitellmParams = async ({
+  model,
+  modelProvider,
+  projectId,
+}: {
+  model: string;
+  modelProvider: MaybeStoredModelProvider;
+  projectId: string;
+}) => {
   const params: Record<string, string> = {};
 
   params.model = model.replace("custom/", "openai/");
@@ -310,6 +316,15 @@ export const prepareLitellmParams = (
   if (modelProvider.provider === "atla") {
     params.model = model.replace("atla/", "openai/");
     params.api_base = "https://api.atla-ai.com/v1";
+  }
+
+  if (dependencies.managedModelProviderLitellmParams) {
+    return await dependencies.managedModelProviderLitellmParams({
+      params,
+      projectId,
+      model,
+      modelProvider,
+    });
   }
 
   // TODO: add azure deployment as params.model as azure/<deployment-name>

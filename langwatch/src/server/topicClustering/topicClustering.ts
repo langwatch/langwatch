@@ -294,15 +294,17 @@ export const batchClusterTraces = async (
   }
   const embeddingsModel = await getProjectEmbeddingsModel(project.id);
   const clusteringResult = await fetchTopicsBatchClustering(project.id, {
-    litellm_params: prepareLitellmParams(
-      topicModel.model,
-      topicModel.modelProvider
-    ),
+    litellm_params: await prepareLitellmParams({
+      model: topicModel.model,
+      modelProvider: topicModel.modelProvider,
+      projectId: project.id,
+    }),
     embeddings_litellm_params: {
-      ...prepareLitellmParams(
-        embeddingsModel.model,
-        embeddingsModel.modelProvider
-      ),
+      ...(await prepareLitellmParams({
+        model: embeddingsModel.model,
+        modelProvider: embeddingsModel.modelProvider,
+        projectId: project.id,
+      })),
       dimensions: OPENAI_EMBEDDING_DIMENSION,
     },
     traces,
@@ -357,15 +359,17 @@ export const incrementalClustering = async (
   }
   const embeddingsModel = await getProjectEmbeddingsModel(project.id);
   const clusteringResult = await fetchTopicsIncrementalClustering(project.id, {
-    litellm_params: prepareLitellmParams(
-      topicModel.model,
-      topicModel.modelProvider
-    ),
+    litellm_params: await prepareLitellmParams({
+      model: topicModel.model,
+      modelProvider: topicModel.modelProvider,
+      projectId: project.id,
+    }),
     embeddings_litellm_params: {
-      ...prepareLitellmParams(
-        embeddingsModel.model,
-        embeddingsModel.modelProvider
-      ),
+      ...(await prepareLitellmParams({
+        model: embeddingsModel.model,
+        modelProvider: embeddingsModel.modelProvider,
+        projectId: project.id,
+      })),
       dimensions: OPENAI_EMBEDDING_DIMENSION,
     },
     traces,
@@ -490,7 +494,10 @@ export const fetchTopicsBatchClustering = async (
   params: BatchClusteringParams
 ): Promise<TopicClusteringResponse | undefined> => {
   if (!env.TOPIC_CLUSTERING_SERVICE) {
-    logger.warn({ projectId }, "Topic clustering service URL not set, skipping topic clustering");
+    logger.warn(
+      { projectId },
+      "Topic clustering service URL not set, skipping topic clustering"
+    );
     return;
   }
 
@@ -514,7 +521,7 @@ export const fetchTopicsBatchClustering = async (
         .split("\n")
         .slice(0, 10)
         .join("\n");
-    } catch { }
+    } catch {}
     throw new Error(
       `Failed to fetch topics batch clustering: ${response.statusText}\n\n${body}`
     );
@@ -530,7 +537,10 @@ export const fetchTopicsIncrementalClustering = async (
   params: IncrementalClusteringParams
 ): Promise<TopicClusteringResponse | undefined> => {
   if (!env.TOPIC_CLUSTERING_SERVICE) {
-    logger.warn({ projectId }, "Topic clustering service URL not set, skipping topic clustering");
+    logger.warn(
+      { projectId },
+      "Topic clustering service URL not set, skipping topic clustering"
+    );
     return;
   }
 

@@ -81,7 +81,11 @@ export async function POST(req: NextRequest) {
     });
   }
 
-  const litellmParams = prepareLitellmParams(model, modelProvider);
+  const litellmParams = await prepareLitellmParams({
+    model,
+    modelProvider,
+    projectId,
+  });
   const headers = Object.fromEntries(
     Object.entries(litellmParams).map(([key, value]) => [
       `x-litellm-${key}`,

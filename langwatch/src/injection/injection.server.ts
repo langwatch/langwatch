@@ -8,6 +8,7 @@ import type {
 } from "next";
 import type { ProcedureRouterRecord } from "@trpc/server";
 import type { NextRequest } from "next/server";
+import type { MaybeStoredModelProvider } from "../server/modelProviders/registry";
 
 export interface RegistrationCbUser {
   name?: string | null;
@@ -51,6 +52,12 @@ export interface Dependencies {
     org: RegistrationCbOrganization
   ) => void | Promise<void>;
   planLimits?: (organizationId: string, plan: string) => void | Promise<void>;
+  managedModelProviderLitellmParams?: (args: {
+    params: Record<string, string>;
+    projectId: string;
+    model: string;
+    modelProvider: MaybeStoredModelProvider;
+  }) => Promise<Record<string, string>>;
 }
 
 const dependencies: Dependencies = {

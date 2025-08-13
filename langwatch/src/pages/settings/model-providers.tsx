@@ -34,7 +34,6 @@ import {
   modelProviders as modelProvidersRegistry,
   type MaybeStoredModelProvider,
 } from "../../server/modelProviders/registry";
-import { allowedTopicClusteringModels } from "../../server/topicClustering/types";
 import { api } from "../../utils/api";
 
 import CreatableSelect from "react-select/creatable";
@@ -46,6 +45,7 @@ import {
   DEFAULT_TOPIC_CLUSTERING_MODEL,
   DEFAULT_MODEL,
 } from "../../utils/constants";
+import { dependencies } from "../../injection/dependencies.client";
 
 export default function ModelsPage() {
   const { project, organizations } = useOrganizationTeamProject();
@@ -156,7 +156,7 @@ function ModelProviderForm({
   refetch: () => Promise<any>;
   updateMutation: ReturnType<typeof api.modelProvider.update.useMutation>;
 }) {
-  const { project } = useOrganizationTeamProject();
+  const { project, organization } = useOrganizationTeamProject();
 
   const localUpdateMutation = api.modelProvider.update.useMutation();
   const deleteMutation = api.modelProvider.delete.useMutation();
@@ -345,6 +345,12 @@ function ModelProviderForm({
       : providerDefinition.keysSchema._def.schema.shape;
   const useCustomKeys = watch("useCustomKeys");
 
+  const ManagedModelProvider = dependencies.managedModelProviderComponent?.({
+    projectId: project?.id ?? "",
+    organizationId: organization?.id ?? "",
+    provider,
+  });
+
   return (
     <Box
       width="full"
@@ -401,44 +407,51 @@ function ModelProviderForm({
 
             {useCustomKeys && (
               <>
-                <Field.Root invalid={!!formState.errors.customKeys}>
-                  <Grid
-                    templateColumns="auto auto"
-                    gap={4}
-                    rowGap={2}
-                    paddingTop={4}
-                    width="full"
-                  >
-                    <GridItem color="gray.500">
-                      <SmallLabel>Key</SmallLabel>
-                    </GridItem>
-                    <GridItem color="gray.500">
-                      <SmallLabel>Value</SmallLabel>
-                    </GridItem>
-                    {Object.keys(providerKeys).map((key) => (
-                      <React.Fragment key={key}>
-                        <GridItem alignContent="center" fontFamily="monospace">
-                          {key}
-                        </GridItem>
-                        <GridItem>
-                          <Input
-                            {...register(`customKeys.${key}`)}
-                            autoComplete="off"
-                            placeholder={
-                              (providerKeys as any)[key]._def.typeName ===
-                              "ZodOptional"
-                                ? "optional"
-                                : undefined
-                            }
-                          />
-                        </GridItem>
-                      </React.Fragment>
-                    ))}
-                  </Grid>
-                  <Field.ErrorText>
-                    {formState.errors.customKeys?.root?.message}
-                  </Field.ErrorText>
-                </Field.Root>
+                {ManagedModelProvider ? (
+                  <ManagedModelProvider provider={provider} />
+                ) : (
+                  <Field.Root invalid={!!formState.errors.customKeys}>
+                    <Grid
+                      templateColumns="auto auto"
+                      gap={4}
+                      rowGap={2}
+                      paddingTop={4}
+                      width="full"
+                    >
+                      <GridItem color="gray.500">
+                        <SmallLabel>Key</SmallLabel>
+                      </GridItem>
+                      <GridItem color="gray.500">
+                        <SmallLabel>Value</SmallLabel>
+                      </GridItem>
+                      {Object.keys(providerKeys).map((key) => (
+                        <React.Fragment key={key}>
+                          <GridItem
+                            alignContent="center"
+                            fontFamily="monospace"
+                          >
+                            {key}
+                          </GridItem>
+                          <GridItem>
+                            <Input
+                              {...register(`customKeys.${key}`)}
+                              autoComplete="off"
+                              placeholder={
+                                (providerKeys as any)[key]._def.typeName ===
+                                "ZodOptional"
+                                  ? "optional"
+                                  : undefined
+                              }
+                            />
+                          </GridItem>
+                        </React.Fragment>
+                      ))}
+                    </Grid>
+                    <Field.ErrorText>
+                      {formState.errors.customKeys?.root?.message}
+                    </Field.ErrorText>
+                  </Field.Root>
+                )}
 
                 <VStack width="full" gap={4}>
                   <Box width="full" maxWidth="408px">
@@ -636,7 +649,9 @@ function TopicClusteringModel() {
           render={({ field }) => (
             <ModelSelector
               model={field.value}
-              options={allowedTopicClusteringModels}
+              options={modelSelectorOptions
+                .filter((option) => option.mode === "chat")
+                .map((option) => option.value)}
               onChange={(model) => {
                 field.onChange(model);
                 void handleSubmit(onUpdateSubmit)();

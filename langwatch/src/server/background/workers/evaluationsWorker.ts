@@ -244,7 +244,11 @@ export const runEvaluation = async ({
         embeddings ? "embedding models" : "models"
       } list for ${provider}, please select another model for running this evaluation`;
     }
-    const params = prepareLitellmParams(model, modelProvider);
+    const params = await prepareLitellmParams({
+      model,
+      modelProvider,
+      projectId,
+    });
 
     let env = Object.fromEntries(
       Object.entries(params).map(([key, value]) => [

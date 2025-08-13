@@ -32,7 +32,11 @@ export const getVercelAIModel = async (
     );
   }
 
-  const litellmParams = prepareLitellmParams(model_, modelProvider);
+  const litellmParams = await prepareLitellmParams({
+    model: model_,
+    modelProvider,
+    projectId,
+  });
   const headers = Object.fromEntries(
     Object.entries(litellmParams).map(([key, value]) => [
       `x-litellm-${key}`,

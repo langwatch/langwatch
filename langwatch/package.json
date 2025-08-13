@@ -45,7 +45,6 @@
     "@aws-sdk/client-lambda": "^3.744.0",
     "@aws-sdk/client-s3": "^3.750.0",
     "@aws-sdk/client-ses": "^3.645.0",
-    "@aws-sdk/client-sns": "^3.637.0",
     "@chakra-ui/next-js": "^2.4.2",
     "@chakra-ui/react": "^3.8.1",
     "@copilotkit/react-core": "^1.8.13",

@@ -38,50 +38,57 @@ export const addEnvs = async (
     event.type === "execute_optimization" ||
     event.type === "execute_evaluation";
 
-  const getDefaultLLM = () => {
+  const getDefaultLLM = async () => {
     if (!("workflow" in event.payload)) {
       throw new Error("Workflow is required");
     }
-    return addLiteLLMParams(
-      event.payload.workflow.default_llm,
+    return await addLiteLLMParams({
+      llm: event.payload.workflow.default_llm,
       modelProviders,
-      onlyCustomKeys
-    );
+      customKeysOnly: onlyCustomKeys,
+      projectId,
+    });
   };
 
   const workflow: ServerWorkflow = {
     ...(event.payload.workflow as Workflow),
     workflow_id,
     api_key: apiKey,
-    nodes: (event.payload.workflow.nodes as Workflow["nodes"]).map((node) => {
-      const parameters = node.data.parameters?.map((p) => {
-        if (p.type === "llm") {
-          return {
-            ...p,
-            value: p.value
-              ? addLiteLLMParams(
-                  p.value as LLMConfig,
-                  modelProviders,
-                  onlyCustomKeys
-                )
-              : getDefaultLLM(),
-          };
-        }
-        return p;
-      });
+    nodes: await Promise.all(
+      (event.payload.workflow.nodes as Workflow["nodes"]).map(async (node) => {
+        const parameters = await Promise.all(
+          node.data.parameters?.map(async (p) => {
+            if (p.type === "llm") {
+              return {
+                ...p,
+                value: p.value
+                  ? await addLiteLLMParams({
+                      llm: p.value as LLMConfig,
+                      modelProviders,
+                      customKeysOnly: onlyCustomKeys,
+                      projectId,
+                    })
+                  : await getDefaultLLM(),
+              };
+            }
+            return p;
+          }) ?? []
+        );
 
-      return { ...node, data: { ...node.data, parameters } };
-    }),
+        return { ...node, data: { ...node.data, parameters } };
+      })
+    ),
   };
 
   if (event.type === "execute_optimization" && "llm" in event.payload.params) {
     event.payload.params.llm = event.payload.params.llm
-      ? addLiteLLMParams(
-          event.payload.params.llm,
+      ? await addLiteLLMParams({
+          llm: event.payload.params.llm,
           modelProviders,
-          onlyCustomKeys
-        )
-      : getDefaultLLM();
+          customKeysOnly: onlyCustomKeys,
+          projectId,
+        })
+      : await getDefaultLLM();
   }
 
   return {
@@ -93,11 +100,17 @@ export const addEnvs = async (
   };
 };
 
-const addLiteLLMParams = (
-  llm: LLMConfig,
-  modelProviders: Record<string, MaybeStoredModelProvider>,
-  customKeysOnly: boolean
-) => {
+const addLiteLLMParams = async ({
+  llm,
+  modelProviders,
+  customKeysOnly,
+  projectId,
+}: {
+  llm: LLMConfig;
+  modelProviders: Record<string, MaybeStoredModelProvider>;
+  customKeysOnly: boolean;
+  projectId: string;
+}) => {
   const provider = llm.model.split("/")[0]!;
   const modelProvider = modelProviders[provider];
   if (!modelProvider) {
@@ -114,7 +127,11 @@ const addLiteLLMParams = (
 
   return {
     ...llm,
-    litellm_params: prepareLitellmParams(llm.model, modelProvider),
+    litellm_params: await prepareLitellmParams({
+      model: llm.model,
+      modelProvider,
+      projectId,
+    }),
   };
 };
 
