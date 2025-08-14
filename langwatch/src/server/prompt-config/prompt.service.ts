@@ -232,14 +232,6 @@ export class PromptService {
       );
     }
 
-    // If only system message is provided
-    if (params.messages?.length === 1) {
-      params.messages.push({
-        role: "user",
-        content: "{{input}}",
-      });
-    }
-
     const config = await this.repository.createConfigWithInitialVersion({
       configData: {
         name: params.name ?? params.handle,

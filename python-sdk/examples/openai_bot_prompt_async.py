@@ -33,12 +33,13 @@ async def main(message: cl.Message):
     # Autobuilt prompt { model: 'gpt-4o-mini', messages: [{ role: 'system', content: 'The user is John Doe and their email is john.doe@example.com' }, { role: 'user', content: 'I like to eat pizza' }]}
     # Public documentation example prompt
     prompt = await langwatch.prompt.async_get_prompt("pizza-prompt")
-    print(prompt.raw_config())
     messages = prompt.format_messages(
         user_name="John Doe",
         user_email="john.doe@example.com",
         input="I like to eat pizza",
     )
+
+    print(messages)
 
     completion = client.chat.completions.create(
         model=prompt.model.split("openai/")[1],

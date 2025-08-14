@@ -88,8 +88,8 @@ class Prompt:
                         )
                     else:
                         compiled_message = MessageDict(
-                            role=message.role.value,
-                            content=message.content,
+                            role=message["role"].value,
+                            content=message["content"],
                         )
                     compiled_messages.append(compiled_message)
 

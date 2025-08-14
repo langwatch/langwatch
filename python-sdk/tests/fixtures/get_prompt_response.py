@@ -16,20 +16,23 @@ Usage:
 from datetime import datetime
 
 from factory.base import Factory
-from factory.declarations import Sequence, LazyFunction, LazyAttribute
+from factory.declarations import Sequence, LazyFunction
 
 # Import actual API response types
+from langwatch.generated.langwatch_rest_api_client.models.get_api_prompts_by_id_response_200 import (
+    GetApiPromptsByIdResponse200,
+)
 from langwatch.generated.langwatch_rest_api_client.models.post_api_prompts_response_200 import (
     PostApiPromptsResponse200,
 )
-from langwatch.generated.langwatch_rest_api_client.models.post_api_prompts_response_200_messages_item import (
-    PostApiPromptsResponse200MessagesItem,
-)
-from langwatch.generated.langwatch_rest_api_client.models.post_api_prompts_response_200_messages_item_role import (
-    PostApiPromptsResponse200MessagesItemRole,
+from langwatch.generated.langwatch_rest_api_client.models.get_api_prompts_by_id_response_200_messages_item import (
+    GetApiPromptsByIdResponse200MessagesItem,
 )
 from langwatch.generated.langwatch_rest_api_client.models.post_api_prompts_response_200_scope import (
     PostApiPromptsResponse200Scope,
+)
+from langwatch.generated.langwatch_rest_api_client.models.get_api_prompts_by_id_response_200_messages_item_role import (
+    GetApiPromptsByIdResponse200MessagesItemRole,
 )
 
 
@@ -37,7 +40,7 @@ class GetPromptResponseFactory(Factory[PostApiPromptsResponse200]):
     """Simple factory for creating GetPrompt API response fixtures."""
 
     class Meta:
-        model = PostApiPromptsResponse200
+        model = GetApiPromptsByIdResponse200
 
     # Simple defaults
     id = Sequence(lambda n: f"prompt_{n}")
@@ -49,21 +52,22 @@ class GetPromptResponseFactory(Factory[PostApiPromptsResponse200]):
     organization_id = Sequence(lambda n: f"org_{n}")
     version = 1.0
     version_id = Sequence(lambda n: f"version_{n}")
-    version_created_at = LazyFunction(lambda: datetime.now().isoformat() + "Z")
     model = "gpt-4"
     prompt = "Hello {{ name }}!"
     response_format = None
+    author_id = None
+    created_at = LazyFunction(lambda: datetime.now().isoformat() + "Z")
+    inputs = []
+    outputs = []
 
     # Provide default messages as a factory attribute instead of post_generation
-    messages = LazyAttribute(
-        lambda obj: [
-            PostApiPromptsResponse200MessagesItem(
-                role=PostApiPromptsResponse200MessagesItemRole.USER,
-                content="Say {{ greeting }} to {{ name }}",
-            ),
-            PostApiPromptsResponse200MessagesItem(
-                role=PostApiPromptsResponse200MessagesItemRole.ASSISTANT,
-                content="{{ greeting }}, {{ name }}!",
-            ),
-        ]
-    )
+    messages = [
+        GetApiPromptsByIdResponse200MessagesItem(
+            role=GetApiPromptsByIdResponse200MessagesItemRole.SYSTEM,
+            content="You are a helpful assistant",
+        ),
+        GetApiPromptsByIdResponse200MessagesItem(
+            role=GetApiPromptsByIdResponse200MessagesItemRole.ASSISTANT,
+            content="{{ greeting }}, {{ name }}!",
+        ),
+    ]
