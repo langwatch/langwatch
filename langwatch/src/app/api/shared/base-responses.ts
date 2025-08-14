@@ -1,10 +1,13 @@
+import { resolver } from "hono-openapi/zod";
+
+import type { RouteResponse } from "./types";
+
 import {
   badRequestSchema,
   unauthorizedSchema,
   errorSchema,
+  conflictSchema,
 } from "~/app/api/shared/schemas";
-import { resolver } from "hono-openapi/zod";
-import type { RouteResponse } from "./types";
 
 export const baseResponses: Record<number, RouteResponse> = {
   401: {
@@ -23,6 +26,15 @@ export const baseResponses: Record<number, RouteResponse> = {
     description: "Internal Server Error",
     content: {
       "application/json": { schema: resolver(errorSchema) },
+    },
+  },
+};
+
+export const conflictResponses: Record<409, RouteResponse> = {
+  409: {
+    description: "Conflict",
+    content: {
+      "application/json": { schema: resolver(conflictSchema) },
     },
   },
 };

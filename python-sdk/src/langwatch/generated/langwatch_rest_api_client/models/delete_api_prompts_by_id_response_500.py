@@ -1,8 +1,10 @@
 from collections.abc import Mapping
-from typing import Any, TypeVar
+from typing import Any, TypeVar, Union
 
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
+
+from ..types import UNSET, Unset
 
 T = TypeVar("T", bound="DeleteApiPromptsByIdResponse500")
 
@@ -12,13 +14,17 @@ class DeleteApiPromptsByIdResponse500:
     """
     Attributes:
         error (str):
+        message (Union[Unset, str]):
     """
 
     error: str
+    message: Union[Unset, str] = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         error = self.error
+
+        message = self.message
 
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
@@ -27,6 +33,8 @@ class DeleteApiPromptsByIdResponse500:
                 "error": error,
             }
         )
+        if message is not UNSET:
+            field_dict["message"] = message
 
         return field_dict
 
@@ -35,8 +43,11 @@ class DeleteApiPromptsByIdResponse500:
         d = dict(src_dict)
         error = d.pop("error")
 
+        message = d.pop("message", UNSET)
+
         delete_api_prompts_by_id_response_500 = cls(
             error=error,
+            message=message,
         )
 
         delete_api_prompts_by_id_response_500.additional_properties = d

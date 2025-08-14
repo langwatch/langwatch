@@ -69,7 +69,7 @@ fetch('https://app.langwatch.ai/api/prompts/${promptId}', options)
     },
     {
       content: `
-import { LangWatch } from '@langwatch/sdk';
+import { LangWatch } from 'langwatch';
 
 // Initialize LangWatch client
 const langwatch = new LangWatch({

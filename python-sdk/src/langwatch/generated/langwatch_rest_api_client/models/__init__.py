@@ -475,6 +475,7 @@ from .post_api_prompts_response_200_response_format_type import PostApiPromptsRe
 from .post_api_prompts_response_200_scope import PostApiPromptsResponse200Scope
 from .post_api_prompts_response_400 import PostApiPromptsResponse400
 from .post_api_prompts_response_401 import PostApiPromptsResponse401
+from .post_api_prompts_response_409 import PostApiPromptsResponse409
 from .post_api_prompts_response_500 import PostApiPromptsResponse500
 from .post_api_scenario_events_body_type_0 import PostApiScenarioEventsBodyType0
 from .post_api_scenario_events_body_type_0_metadata import PostApiScenarioEventsBodyType0Metadata
@@ -582,6 +583,8 @@ from .put_api_prompts_by_id_response_200_scope import PutApiPromptsByIdResponse2
 from .put_api_prompts_by_id_response_400 import PutApiPromptsByIdResponse400
 from .put_api_prompts_by_id_response_401 import PutApiPromptsByIdResponse401
 from .put_api_prompts_by_id_response_404 import PutApiPromptsByIdResponse404
+from .put_api_prompts_by_id_response_409 import PutApiPromptsByIdResponse409
+from .put_api_prompts_by_id_response_422 import PutApiPromptsByIdResponse422
 from .put_api_prompts_by_id_response_500 import PutApiPromptsByIdResponse500
 from .search_request import SearchRequest
 from .search_request_filters import SearchRequestFilters
@@ -841,6 +844,7 @@ __all__ = (
     "PostApiPromptsResponse200Scope",
     "PostApiPromptsResponse400",
     "PostApiPromptsResponse401",
+    "PostApiPromptsResponse409",
     "PostApiPromptsResponse500",
     "PostApiScenarioEventsBodyType0",
     "PostApiScenarioEventsBodyType0Metadata",
@@ -918,6 +922,8 @@ __all__ = (
     "PutApiPromptsByIdResponse400",
     "PutApiPromptsByIdResponse401",
     "PutApiPromptsByIdResponse404",
+    "PutApiPromptsByIdResponse409",
+    "PutApiPromptsByIdResponse422",
     "PutApiPromptsByIdResponse500",
     "SearchRequest",
     "SearchRequestFilters",

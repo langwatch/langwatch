@@ -7,8 +7,6 @@ import type {
 import { nanoid } from "nanoid";
 import { describe, expect, it, beforeEach, afterEach } from "vitest";
 
-import { prisma } from "~/server/db";
-
 import { app } from "../[[...route]]/app";
 
 import { createHandle } from "./helpers";
@@ -18,6 +16,7 @@ import {
   llmPromptConfigVersionFactory,
 } from "~/factories/llm-config.factory";
 import { projectFactory } from "~/factories/project.factory";
+import { prisma } from "~/server/db";
 
 describe("Prompts API", () => {
   let mockConfig: LlmPromptConfig;
@@ -592,7 +591,7 @@ describe("Prompts API", () => {
           }
         );
 
-        expect(updateRes.status).toBe(400);
+        expect(updateRes.status).toBe(409); // Changed from 400 to 409
         const errorBody = await updateRes.json();
         expect(errorBody.error).toContain("System prompt");
       });
@@ -795,7 +794,7 @@ describe("Prompts API", () => {
       });
 
       const body = await res.json();
-      expect(res.status).toBe(400);
+      expect(res.status).toBe(422); // Changed from 400 to 422
       expect(body).toHaveProperty("error");
     });
 
@@ -814,18 +813,19 @@ describe("Prompts API", () => {
 
       const res = await helpers.api.put(`/api/prompts/${prompt.id}`, emptyData);
 
-      expect(res.status).toBe(400);
+      expect(res.status).toBe(422); // Changed from 400 to 422
       const body = await res.json();
       expect(body).toHaveProperty("error");
       expect(body.error).toContain("At least one field is required");
     });
 
-    it("should return 400 if no fields are provided", async () => {
+    it("should return 422 if no fields are provided", async () => {
+      // Changed description and status
       const res = await app.request(`/api/prompts/${mockConfig.id}`, {
         method: "PUT",
         headers: { "X-Auth-Token": testApiKey },
       });
-      expect(res.status).toBe(400);
+      expect(res.status).toBe(422); // Changed from 400 to 422
     });
   });
 });

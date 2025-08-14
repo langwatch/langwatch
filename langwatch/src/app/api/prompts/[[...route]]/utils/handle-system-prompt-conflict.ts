@@ -12,7 +12,7 @@ import { SystemPromptConflictError } from "~/server/prompt-config/errors";
  */
 export const handleSystemPromptConflict = (error: any) => {
   if (error instanceof SystemPromptConflictError) {
-    throw new HTTPException(400, {
+    throw new HTTPException(409, {
       message: error.message,
       cause: error,
     });

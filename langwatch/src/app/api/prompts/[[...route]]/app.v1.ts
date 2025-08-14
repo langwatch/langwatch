@@ -4,8 +4,6 @@ import { describeRoute } from "hono-openapi";
 import { validator as zValidator, resolver } from "hono-openapi/zod";
 import { z } from "zod";
 
-import { getLatestConfigVersionSchema } from "~/server/prompt-config/repositories/llm-config-version-schema";
-
 import {
   organizationMiddleware,
   type AuthMiddlewareVariables,
@@ -15,7 +13,7 @@ import {
   promptServiceMiddleware,
   type PromptServiceMiddlewareVariables,
 } from "../../middleware/prompt-service";
-import { baseResponses } from "../../shared/base-responses";
+import { baseResponses, conflictResponses } from "../../shared/base-responses";
 
 import {
   apiResponsePromptWithVersionDataSchema,
@@ -32,6 +30,7 @@ import {
   commitMessageSchema,
   versionSchema,
 } from "~/prompt-configs/schemas/field-schemas";
+import { getLatestConfigVersionSchema } from "~/server/prompt-config/repositories/llm-config-version-schema";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
 import { createLogger } from "~/utils/logger";
 
@@ -197,6 +196,7 @@ app.post(
     responses: {
       ...baseResponses,
       200: buildStandardSuccessResponse(apiResponsePromptWithVersionDataSchema),
+      409: conflictResponses[409],
     },
   }),
   zValidator("json", createPromptInputSchema),
@@ -365,6 +365,13 @@ app.put(
           "application/json": { schema: resolver(badRequestSchema) },
         },
       },
+      409: conflictResponses[409],
+      422: {
+        description: "Invalid input",
+        content: {
+          "application/json": { schema: resolver(badRequestSchema) },
+        },
+      },
     },
   }),
   zValidator("json", updatePromptInputSchema),
@@ -376,7 +383,7 @@ app.put(
     const projectId = project.id;
 
     if (Object.keys(data).length === 0) {
-      throw new HTTPException(400, {
+      throw new HTTPException(422, {
         message: "At least one field is required",
       });
     }

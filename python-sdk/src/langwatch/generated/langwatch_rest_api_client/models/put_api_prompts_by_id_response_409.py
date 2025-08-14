@@ -1,24 +1,22 @@
 from collections.abc import Mapping
-from typing import Any, TypeVar, Union
+from typing import Any, TypeVar
 
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
 
-from ..types import UNSET, Unset
-
-T = TypeVar("T", bound="PutApiPromptsByIdResponse404")
+T = TypeVar("T", bound="PutApiPromptsByIdResponse409")
 
 
 @_attrs_define
-class PutApiPromptsByIdResponse404:
+class PutApiPromptsByIdResponse409:
     """
     Attributes:
         error (str):
-        message (Union[Unset, str]):
+        message (str):
     """
 
     error: str
-    message: Union[Unset, str] = UNSET
+    message: str
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -31,10 +29,9 @@ class PutApiPromptsByIdResponse404:
         field_dict.update(
             {
                 "error": error,
+                "message": message,
             }
         )
-        if message is not UNSET:
-            field_dict["message"] = message
 
         return field_dict
 
@@ -43,15 +40,15 @@ class PutApiPromptsByIdResponse404:
         d = dict(src_dict)
         error = d.pop("error")
 
-        message = d.pop("message", UNSET)
+        message = d.pop("message")
 
-        put_api_prompts_by_id_response_404 = cls(
+        put_api_prompts_by_id_response_409 = cls(
             error=error,
             message=message,
         )
 
-        put_api_prompts_by_id_response_404.additional_properties = d
-        return put_api_prompts_by_id_response_404
+        put_api_prompts_by_id_response_409.additional_properties = d
+        return put_api_prompts_by_id_response_409
 
     @property
     def additional_keys(self) -> list[str]:

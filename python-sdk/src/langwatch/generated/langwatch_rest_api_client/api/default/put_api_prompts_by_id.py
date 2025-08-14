@@ -10,6 +10,8 @@ from ...models.put_api_prompts_by_id_response_200 import PutApiPromptsByIdRespon
 from ...models.put_api_prompts_by_id_response_400 import PutApiPromptsByIdResponse400
 from ...models.put_api_prompts_by_id_response_401 import PutApiPromptsByIdResponse401
 from ...models.put_api_prompts_by_id_response_404 import PutApiPromptsByIdResponse404
+from ...models.put_api_prompts_by_id_response_409 import PutApiPromptsByIdResponse409
+from ...models.put_api_prompts_by_id_response_422 import PutApiPromptsByIdResponse422
 from ...models.put_api_prompts_by_id_response_500 import PutApiPromptsByIdResponse500
 from ...types import Response
 
@@ -43,6 +45,8 @@ def _parse_response(
         PutApiPromptsByIdResponse400,
         PutApiPromptsByIdResponse401,
         PutApiPromptsByIdResponse404,
+        PutApiPromptsByIdResponse409,
+        PutApiPromptsByIdResponse422,
         PutApiPromptsByIdResponse500,
     ]
 ]:
@@ -62,6 +66,14 @@ def _parse_response(
         response_404 = PutApiPromptsByIdResponse404.from_dict(response.json())
 
         return response_404
+    if response.status_code == 409:
+        response_409 = PutApiPromptsByIdResponse409.from_dict(response.json())
+
+        return response_409
+    if response.status_code == 422:
+        response_422 = PutApiPromptsByIdResponse422.from_dict(response.json())
+
+        return response_422
     if response.status_code == 500:
         response_500 = PutApiPromptsByIdResponse500.from_dict(response.json())
 
@@ -80,6 +92,8 @@ def _build_response(
         PutApiPromptsByIdResponse400,
         PutApiPromptsByIdResponse401,
         PutApiPromptsByIdResponse404,
+        PutApiPromptsByIdResponse409,
+        PutApiPromptsByIdResponse422,
         PutApiPromptsByIdResponse500,
     ]
 ]:
@@ -102,6 +116,8 @@ def sync_detailed(
         PutApiPromptsByIdResponse400,
         PutApiPromptsByIdResponse401,
         PutApiPromptsByIdResponse404,
+        PutApiPromptsByIdResponse409,
+        PutApiPromptsByIdResponse422,
         PutApiPromptsByIdResponse500,
     ]
 ]:
@@ -116,7 +132,7 @@ def sync_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[Union[PutApiPromptsByIdResponse200, PutApiPromptsByIdResponse400, PutApiPromptsByIdResponse401, PutApiPromptsByIdResponse404, PutApiPromptsByIdResponse500]]
+        Response[Union[PutApiPromptsByIdResponse200, PutApiPromptsByIdResponse400, PutApiPromptsByIdResponse401, PutApiPromptsByIdResponse404, PutApiPromptsByIdResponse409, PutApiPromptsByIdResponse422, PutApiPromptsByIdResponse500]]
     """
 
     kwargs = _get_kwargs(
@@ -142,6 +158,8 @@ def sync(
         PutApiPromptsByIdResponse400,
         PutApiPromptsByIdResponse401,
         PutApiPromptsByIdResponse404,
+        PutApiPromptsByIdResponse409,
+        PutApiPromptsByIdResponse422,
         PutApiPromptsByIdResponse500,
     ]
 ]:
@@ -156,7 +174,7 @@ def sync(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Union[PutApiPromptsByIdResponse200, PutApiPromptsByIdResponse400, PutApiPromptsByIdResponse401, PutApiPromptsByIdResponse404, PutApiPromptsByIdResponse500]
+        Union[PutApiPromptsByIdResponse200, PutApiPromptsByIdResponse400, PutApiPromptsByIdResponse401, PutApiPromptsByIdResponse404, PutApiPromptsByIdResponse409, PutApiPromptsByIdResponse422, PutApiPromptsByIdResponse500]
     """
 
     return sync_detailed(
@@ -177,6 +195,8 @@ async def asyncio_detailed(
         PutApiPromptsByIdResponse400,
         PutApiPromptsByIdResponse401,
         PutApiPromptsByIdResponse404,
+        PutApiPromptsByIdResponse409,
+        PutApiPromptsByIdResponse422,
         PutApiPromptsByIdResponse500,
     ]
 ]:
@@ -191,7 +211,7 @@ async def asyncio_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[Union[PutApiPromptsByIdResponse200, PutApiPromptsByIdResponse400, PutApiPromptsByIdResponse401, PutApiPromptsByIdResponse404, PutApiPromptsByIdResponse500]]
+        Response[Union[PutApiPromptsByIdResponse200, PutApiPromptsByIdResponse400, PutApiPromptsByIdResponse401, PutApiPromptsByIdResponse404, PutApiPromptsByIdResponse409, PutApiPromptsByIdResponse422, PutApiPromptsByIdResponse500]]
     """
 
     kwargs = _get_kwargs(
@@ -215,6 +235,8 @@ async def asyncio(
         PutApiPromptsByIdResponse400,
         PutApiPromptsByIdResponse401,
         PutApiPromptsByIdResponse404,
+        PutApiPromptsByIdResponse409,
+        PutApiPromptsByIdResponse422,
         PutApiPromptsByIdResponse500,
     ]
 ]:
@@ -229,7 +251,7 @@ async def asyncio(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Union[PutApiPromptsByIdResponse200, PutApiPromptsByIdResponse400, PutApiPromptsByIdResponse401, PutApiPromptsByIdResponse404, PutApiPromptsByIdResponse500]
+        Union[PutApiPromptsByIdResponse200, PutApiPromptsByIdResponse400, PutApiPromptsByIdResponse401, PutApiPromptsByIdResponse404, PutApiPromptsByIdResponse409, PutApiPromptsByIdResponse422, PutApiPromptsByIdResponse500]
     """
 
     return (
