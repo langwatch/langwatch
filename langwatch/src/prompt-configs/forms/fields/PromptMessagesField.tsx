@@ -6,22 +6,31 @@ import {
   NativeSelect,
   Spacer,
 } from "@chakra-ui/react";
+import { ChevronDown } from "lucide-react";
+import { useMemo } from "react";
 import {
   useFormContext,
   type UseFieldArrayReturn,
   Controller,
 } from "react-hook-form";
-
-import type { PromptConfigFormValues } from "../../hooks/usePromptConfigForm";
-
 import { LuMinus, LuPlus } from "react-icons/lu";
-import { VerticalFormControl } from "~/components/VerticalFormControl";
-import { ChevronDown } from "lucide-react";
+
 import { PropertySectionTitle } from "../../../optimization_studio/components/properties/BasePropertiesPanel";
 import {
   PromptTextArea,
   type PromptTextAreaOnAddMention,
 } from "../../components/ui/PromptTextArea";
+import type { PromptConfigFormValues } from "../../hooks/usePromptConfigForm";
+
+import { VerticalFormControl } from "~/components/VerticalFormControl";
+
+/**
+ * Type for message field errors
+ */
+type MessageError = {
+  role?: { message?: string };
+  content?: { message?: string };
+};
 
 export function PromptMessagesField({
   messageFields,
@@ -44,13 +53,15 @@ export function PromptMessagesField({
   ) => void;
 }) {
   const form = useFormContext<PromptConfigFormValues>();
-  const { register, formState } = form;
+  const { formState } = form;
   const { errors } = formState;
 
-  type MessageError = {
-    role?: { message?: string };
-    content?: { message?: string };
-  };
+  /**
+   * Get the error for a specific message field
+   * @param index - The index of the message field
+   * @param key - The key of the message field to get the error for
+   * @returns The error for the message field
+   */
   const getMessageError = (index: number, key: "role" | "content") => {
     const messageErrors =
       (errors.version?.configData?.messages as MessageError[] | undefined) ??
@@ -58,9 +69,36 @@ export function PromptMessagesField({
     return messageErrors[index]?.[key];
   };
 
-  return messageFields.fields.map((field, idx) => {
-    register(`version.configData.messages.${idx}.content` as const);
+  /**
+   * Get the error for the messages field group
+   * @returns The error for the messages field group
+   */
+  const messageErrors = useMemo(() => {
+    return Array.isArray(errors.version?.configData?.messages)
+      ? errors.version?.configData?.messages
+          .map((message) => message.content?.message)
+          .join(", ")
+      : typeof errors.version?.configData?.messages === "string"
+      ? errors.version?.configData?.messages
+      : undefined;
+  }, [errors]);
 
+  /**
+   * Filter out system message, since the prompt field is
+   * used for the system prompt
+   */
+  const filteredMessageFields = useMemo(() => {
+    return {
+      ...messageFields,
+      fields: messageFields.fields.filter((field) => field.role !== "system"),
+    } as UseFieldArrayReturn<
+      PromptConfigFormValues,
+      "version.configData.messages",
+      "id"
+    >;
+  }, [messageFields]);
+
+  return filteredMessageFields.fields.map((field, idx) => {
     return (
       <VerticalFormControl
         key={field.id}
@@ -103,28 +141,17 @@ export function PromptMessagesField({
                   </NativeSelect.Root>
                 </HStack>
                 <Spacer />
-                {idx === messageFields.fields.length - 1 && (
-                  <AddRemoveMessageFieldButton messageFields={messageFields} />
+                {idx === filteredMessageFields.fields.length - 1 && (
+                  <AddRemoveMessageFieldButton
+                    messageFields={filteredMessageFields}
+                  />
                 )}
               </HStack>
             )}
           />
         }
         invalid={!!errors.version?.configData?.messages}
-        helper={
-          Array.isArray(errors.version?.configData?.messages)
-            ? undefined
-            : typeof errors.version?.configData?.messages === "string"
-            ? errors.version?.configData?.messages
-            : undefined
-        }
-        error={
-          Array.isArray(errors.version?.configData?.messages)
-            ? undefined
-            : typeof errors.version?.configData?.messages === "string"
-            ? errors.version?.configData?.messages
-            : undefined
-        }
+        error={messageErrors}
         size="sm"
       >
         <Controller

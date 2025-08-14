@@ -35,31 +35,25 @@ const liquid = new Liquid({
 
 export class Prompt implements PromptResponse {
   public readonly id!: string;
+  public readonly projectId!: string;
+  public readonly organizationId!: string;
   public readonly handle!: string | null;
   public readonly scope!: "ORGANIZATION" | "PROJECT";
   public readonly name!: string;
   public readonly updatedAt!: string;
   public readonly version!: number;
   public readonly versionId!: string;
-  public readonly versionCreatedAt!: string;
   public readonly model!: string;
   public readonly prompt!: string;
   public readonly messages!: PromptResponse["messages"];
-  public readonly response_format!: PromptResponse["response_format"];
+  public readonly responseFormat!: PromptResponse["responseFormat"];
+  public readonly authorId!: string | null;
+  public readonly createdAt!: string;
+  public readonly inputs!: PromptResponse["inputs"];
+  public readonly outputs!: PromptResponse["outputs"];
 
   constructor(private readonly promptData: PromptResponse) {
-    this.id = promptData.id;
-    this.handle = promptData.handle;
-    this.scope = promptData.scope;
-    this.name = promptData.name;
-    this.updatedAt = promptData.updatedAt;
-    this.version = promptData.version;
-    this.versionId = promptData.versionId;
-    this.versionCreatedAt = promptData.versionCreatedAt;
-    this.model = promptData.model;
-    this.prompt = promptData.prompt;
-    this.messages = promptData.messages;
-    this.response_format = promptData.response_format;
+    Object.assign(this, promptData);
 
     // Return a proxy that wraps specific methods for tracing
     return createTracingProxy(this as Prompt, tracer, PromptTracingDecorator);

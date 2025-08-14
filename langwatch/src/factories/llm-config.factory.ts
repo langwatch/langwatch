@@ -12,7 +12,7 @@ import {
   type SchemaVersion,
   parseLlmConfigVersion,
   type schemaValidators,
-} from "~/server/prompt-config/repositories/llm-config-version-schema";
+} from "~/server/prompt-config";
 
 import type { NodeDataset } from "../optimization_studio/types/dsl";
 
@@ -32,7 +32,7 @@ export const llmPromptConfigFactory = Factory.define<
   createdAt: new Date(),
   updatedAt: new Date(),
   deletedAt: null,
-  handle: null,
+  handle: `test-handle-${sequence}`,
   scope: PromptScope.PROJECT,
 }));
 

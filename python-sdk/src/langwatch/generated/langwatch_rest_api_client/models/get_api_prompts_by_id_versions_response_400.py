@@ -1,10 +1,10 @@
 from collections.abc import Mapping
-from typing import Any, TypeVar
+from typing import Any, TypeVar, Union
 
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
 
-from ..models.get_api_prompts_by_id_versions_response_400_error import GetApiPromptsByIdVersionsResponse400Error
+from ..types import UNSET, Unset
 
 T = TypeVar("T", bound="GetApiPromptsByIdVersionsResponse400")
 
@@ -13,14 +13,18 @@ T = TypeVar("T", bound="GetApiPromptsByIdVersionsResponse400")
 class GetApiPromptsByIdVersionsResponse400:
     """
     Attributes:
-        error (GetApiPromptsByIdVersionsResponse400Error):
+        error (str):
+        message (Union[Unset, str]):
     """
 
-    error: GetApiPromptsByIdVersionsResponse400Error
+    error: str
+    message: Union[Unset, str] = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
-        error = self.error.value
+        error = self.error
+
+        message = self.message
 
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
@@ -29,16 +33,21 @@ class GetApiPromptsByIdVersionsResponse400:
                 "error": error,
             }
         )
+        if message is not UNSET:
+            field_dict["message"] = message
 
         return field_dict
 
     @classmethod
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
         d = dict(src_dict)
-        error = GetApiPromptsByIdVersionsResponse400Error(d.pop("error"))
+        error = d.pop("error")
+
+        message = d.pop("message", UNSET)
 
         get_api_prompts_by_id_versions_response_400 = cls(
             error=error,
+            message=message,
         )
 
         get_api_prompts_by_id_versions_response_400.additional_properties = d

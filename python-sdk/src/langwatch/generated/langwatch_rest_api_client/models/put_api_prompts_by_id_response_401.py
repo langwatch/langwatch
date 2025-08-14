@@ -1,10 +1,10 @@
 from collections.abc import Mapping
-from typing import Any, TypeVar
+from typing import Any, TypeVar, Union
 
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
 
-from ..models.put_api_prompts_by_id_response_401_error import PutApiPromptsByIdResponse401Error
+from ..types import UNSET, Unset
 
 T = TypeVar("T", bound="PutApiPromptsByIdResponse401")
 
@@ -13,14 +13,18 @@ T = TypeVar("T", bound="PutApiPromptsByIdResponse401")
 class PutApiPromptsByIdResponse401:
     """
     Attributes:
-        error (PutApiPromptsByIdResponse401Error):
+        error (str):
+        message (Union[Unset, str]):
     """
 
-    error: PutApiPromptsByIdResponse401Error
+    error: str
+    message: Union[Unset, str] = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
-        error = self.error.value
+        error = self.error
+
+        message = self.message
 
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
@@ -29,16 +33,21 @@ class PutApiPromptsByIdResponse401:
                 "error": error,
             }
         )
+        if message is not UNSET:
+            field_dict["message"] = message
 
         return field_dict
 
     @classmethod
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
         d = dict(src_dict)
-        error = PutApiPromptsByIdResponse401Error(d.pop("error"))
+        error = d.pop("error")
+
+        message = d.pop("message", UNSET)
 
         put_api_prompts_by_id_response_401 = cls(
             error=error,
+            message=message,
         )
 
         put_api_prompts_by_id_response_401.additional_properties = d

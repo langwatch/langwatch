@@ -7,6 +7,7 @@ import { LlmConfigRepository } from "../../../prompt-config/repositories/llm-con
 import { TeamRoleGroup } from "../../permission";
 import { checkUserPermissionForProject } from "../../permission";
 import { createTRPCRouter, protectedProcedure } from "../../trpc";
+
 import { getOrganizationIdForProject } from "./llmConfigs";
 
 const idSchema = z.object({
@@ -88,7 +89,12 @@ export const llmConfigVersionsRouter = createTRPCRouter({
    */
   create: protectedProcedure
     .input(
-      getLatestConfigVersionSchema().omit({ version: true, authorId: true })
+      getLatestConfigVersionSchema().omit({
+        version: true,
+        authorId: true,
+        id: true,
+        createdAt: true,
+      })
     )
     .use(checkUserPermissionForProject(TeamRoleGroup.PROMPTS_MANAGE))
     .mutation(async ({ ctx, input }) => {
@@ -97,13 +103,13 @@ export const llmConfigVersionsRouter = createTRPCRouter({
       const organizationId = await getOrganizationIdForProject(input.projectId);
 
       try {
-        const version = await repository.versions.createVersion(
-          {
+        const version = await repository.versions.createVersion({
+          versionData: {
             ...input,
             authorId,
           },
-          organizationId
-        );
+          organizationId,
+        });
 
         return version;
       } catch (error) {

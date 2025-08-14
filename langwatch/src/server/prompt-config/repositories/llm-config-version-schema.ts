@@ -5,6 +5,7 @@ import { z } from "zod";
 
 import { nodeDatasetSchema } from "../../../optimization_studio/types/dsl";
 import { createLogger } from "../../../utils/logger";
+import { SchemaVersion } from "../enums";
 
 import type { LlmConfigVersionDTO } from "./llm-config-versions.repository";
 
@@ -13,20 +14,13 @@ import {
   messageSchema,
   outputsSchema,
   promptingTechniqueSchema,
+  responseFormatSchema,
+  versionSchema,
 } from "~/prompt-configs/schemas/field-schemas";
 
 const logger = createLogger(
   "langwatch:prompt-config:llm-config-version-schema"
 );
-
-/**
- * Schema version enum for LLM configuration
- * Used to track and manage schema evolution over time
- * Corresponds to the schemaVersion field in LlmPromptConfigVersion model
- */
-export enum SchemaVersion {
-  V1_0 = "1.0",
-}
 
 export const LATEST_SCHEMA_VERSION = SchemaVersion.V1_0 as const;
 
@@ -35,10 +29,11 @@ export const LATEST_SCHEMA_VERSION = SchemaVersion.V1_0 as const;
  * Validates the configData JSON field in LlmPromptConfigVersion
  */
 const configSchemaV1_0 = z.object({
-  id: z.string().optional(),
+  id: z.string(),
   authorId: z.string().nullable().optional(),
   author: z
     .object({
+      id: z.string(),
       name: z.string(),
     })
     .nullable()
@@ -47,10 +42,9 @@ const configSchemaV1_0 = z.object({
   configId: z.string().min(1, "Config ID cannot be empty"),
   schemaVersion: z.literal(SchemaVersion.V1_0),
   commitMessage: z.string(),
-  version: z.number(),
-  createdAt: z.date().optional(),
+  version: versionSchema,
+  createdAt: z.date(),
   configData: z.object({
-    version: z.number().min(1, "Version must be greater than 0").optional(),
     prompt: z.string(),
     messages: z.array(messageSchema).default([]),
     inputs: z.array(inputsSchema).min(1, "At least one input is required"),
@@ -60,6 +54,7 @@ const configSchemaV1_0 = z.object({
     max_tokens: z.number().optional(),
     demonstrations: nodeDatasetSchema.optional(),
     prompting_technique: promptingTechniqueSchema.optional(),
+    response_format: responseFormatSchema.optional(),
   }),
 });
 
@@ -104,7 +99,9 @@ export function getVersionValidator(schemaVersion: SchemaVersion) {
  * @throws ZodError if the config data is invalid
  */
 export function parseLlmConfigVersion(
-  llmConfigVersion: LlmPromptConfigVersion | LlmConfigVersionDTO
+  llmConfigVersion:
+    | Omit<LlmPromptConfigVersion, "deletedAt">
+    | LlmConfigVersionDTO
 ): LatestConfigVersionSchema {
   const { schemaVersion } = llmConfigVersion;
 

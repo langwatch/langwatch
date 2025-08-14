@@ -1,10 +1,10 @@
 from collections.abc import Mapping
-from typing import Any, TypeVar
+from typing import Any, TypeVar, Union
 
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
 
-from ..models.post_api_prompts_response_400_error import PostApiPromptsResponse400Error
+from ..types import UNSET, Unset
 
 T = TypeVar("T", bound="PostApiPromptsResponse400")
 
@@ -13,14 +13,18 @@ T = TypeVar("T", bound="PostApiPromptsResponse400")
 class PostApiPromptsResponse400:
     """
     Attributes:
-        error (PostApiPromptsResponse400Error):
+        error (str):
+        message (Union[Unset, str]):
     """
 
-    error: PostApiPromptsResponse400Error
+    error: str
+    message: Union[Unset, str] = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
-        error = self.error.value
+        error = self.error
+
+        message = self.message
 
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
@@ -29,16 +33,21 @@ class PostApiPromptsResponse400:
                 "error": error,
             }
         )
+        if message is not UNSET:
+            field_dict["message"] = message
 
         return field_dict
 
     @classmethod
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
         d = dict(src_dict)
-        error = PostApiPromptsResponse400Error(d.pop("error"))
+        error = d.pop("error")
+
+        message = d.pop("message", UNSET)
 
         post_api_prompts_response_400 = cls(
             error=error,
+            message=message,
         )
 
         post_api_prompts_response_400.additional_properties = d

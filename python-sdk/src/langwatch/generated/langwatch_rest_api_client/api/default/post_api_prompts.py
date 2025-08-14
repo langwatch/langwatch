@@ -9,6 +9,7 @@ from ...models.post_api_prompts_body import PostApiPromptsBody
 from ...models.post_api_prompts_response_200 import PostApiPromptsResponse200
 from ...models.post_api_prompts_response_400 import PostApiPromptsResponse400
 from ...models.post_api_prompts_response_401 import PostApiPromptsResponse401
+from ...models.post_api_prompts_response_409 import PostApiPromptsResponse409
 from ...models.post_api_prompts_response_500 import PostApiPromptsResponse500
 from ...types import Response
 
@@ -36,7 +37,13 @@ def _get_kwargs(
 def _parse_response(
     *, client: Union[AuthenticatedClient, Client], response: httpx.Response
 ) -> Optional[
-    Union[PostApiPromptsResponse200, PostApiPromptsResponse400, PostApiPromptsResponse401, PostApiPromptsResponse500]
+    Union[
+        PostApiPromptsResponse200,
+        PostApiPromptsResponse400,
+        PostApiPromptsResponse401,
+        PostApiPromptsResponse409,
+        PostApiPromptsResponse500,
+    ]
 ]:
     if response.status_code == 200:
         response_200 = PostApiPromptsResponse200.from_dict(response.json())
@@ -50,6 +57,10 @@ def _parse_response(
         response_401 = PostApiPromptsResponse401.from_dict(response.json())
 
         return response_401
+    if response.status_code == 409:
+        response_409 = PostApiPromptsResponse409.from_dict(response.json())
+
+        return response_409
     if response.status_code == 500:
         response_500 = PostApiPromptsResponse500.from_dict(response.json())
 
@@ -63,7 +74,13 @@ def _parse_response(
 def _build_response(
     *, client: Union[AuthenticatedClient, Client], response: httpx.Response
 ) -> Response[
-    Union[PostApiPromptsResponse200, PostApiPromptsResponse400, PostApiPromptsResponse401, PostApiPromptsResponse500]
+    Union[
+        PostApiPromptsResponse200,
+        PostApiPromptsResponse400,
+        PostApiPromptsResponse401,
+        PostApiPromptsResponse409,
+        PostApiPromptsResponse500,
+    ]
 ]:
     return Response(
         status_code=HTTPStatus(response.status_code),
@@ -78,7 +95,13 @@ def sync_detailed(
     client: Union[AuthenticatedClient, Client],
     body: PostApiPromptsBody,
 ) -> Response[
-    Union[PostApiPromptsResponse200, PostApiPromptsResponse400, PostApiPromptsResponse401, PostApiPromptsResponse500]
+    Union[
+        PostApiPromptsResponse200,
+        PostApiPromptsResponse400,
+        PostApiPromptsResponse401,
+        PostApiPromptsResponse409,
+        PostApiPromptsResponse500,
+    ]
 ]:
     """Create a new prompt with default initial version
 
@@ -90,7 +113,7 @@ def sync_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[Union[PostApiPromptsResponse200, PostApiPromptsResponse400, PostApiPromptsResponse401, PostApiPromptsResponse500]]
+        Response[Union[PostApiPromptsResponse200, PostApiPromptsResponse400, PostApiPromptsResponse401, PostApiPromptsResponse409, PostApiPromptsResponse500]]
     """
 
     kwargs = _get_kwargs(
@@ -109,7 +132,13 @@ def sync(
     client: Union[AuthenticatedClient, Client],
     body: PostApiPromptsBody,
 ) -> Optional[
-    Union[PostApiPromptsResponse200, PostApiPromptsResponse400, PostApiPromptsResponse401, PostApiPromptsResponse500]
+    Union[
+        PostApiPromptsResponse200,
+        PostApiPromptsResponse400,
+        PostApiPromptsResponse401,
+        PostApiPromptsResponse409,
+        PostApiPromptsResponse500,
+    ]
 ]:
     """Create a new prompt with default initial version
 
@@ -121,7 +150,7 @@ def sync(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Union[PostApiPromptsResponse200, PostApiPromptsResponse400, PostApiPromptsResponse401, PostApiPromptsResponse500]
+        Union[PostApiPromptsResponse200, PostApiPromptsResponse400, PostApiPromptsResponse401, PostApiPromptsResponse409, PostApiPromptsResponse500]
     """
 
     return sync_detailed(
@@ -135,7 +164,13 @@ async def asyncio_detailed(
     client: Union[AuthenticatedClient, Client],
     body: PostApiPromptsBody,
 ) -> Response[
-    Union[PostApiPromptsResponse200, PostApiPromptsResponse400, PostApiPromptsResponse401, PostApiPromptsResponse500]
+    Union[
+        PostApiPromptsResponse200,
+        PostApiPromptsResponse400,
+        PostApiPromptsResponse401,
+        PostApiPromptsResponse409,
+        PostApiPromptsResponse500,
+    ]
 ]:
     """Create a new prompt with default initial version
 
@@ -147,7 +182,7 @@ async def asyncio_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[Union[PostApiPromptsResponse200, PostApiPromptsResponse400, PostApiPromptsResponse401, PostApiPromptsResponse500]]
+        Response[Union[PostApiPromptsResponse200, PostApiPromptsResponse400, PostApiPromptsResponse401, PostApiPromptsResponse409, PostApiPromptsResponse500]]
     """
 
     kwargs = _get_kwargs(
@@ -164,7 +199,13 @@ async def asyncio(
     client: Union[AuthenticatedClient, Client],
     body: PostApiPromptsBody,
 ) -> Optional[
-    Union[PostApiPromptsResponse200, PostApiPromptsResponse400, PostApiPromptsResponse401, PostApiPromptsResponse500]
+    Union[
+        PostApiPromptsResponse200,
+        PostApiPromptsResponse400,
+        PostApiPromptsResponse401,
+        PostApiPromptsResponse409,
+        PostApiPromptsResponse500,
+    ]
 ]:
     """Create a new prompt with default initial version
 
@@ -176,7 +217,7 @@ async def asyncio(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Union[PostApiPromptsResponse200, PostApiPromptsResponse400, PostApiPromptsResponse401, PostApiPromptsResponse500]
+        Union[PostApiPromptsResponse200, PostApiPromptsResponse400, PostApiPromptsResponse401, PostApiPromptsResponse409, PostApiPromptsResponse500]
     """
 
     return (

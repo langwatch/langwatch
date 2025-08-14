@@ -77,7 +77,9 @@ export const llmConfigsRouter = createTRPCRouter({
     }),
 
   /**
-   * Create a new LLM prompt config with its initial version.
+   * Create a new LLM prompt config with its initial (draft) version.
+   * TODO: How this works is a bit confusing. We only create drafts via
+   * the UI, and this is the only place we'd pre-fill all of the data.
    */
   createConfigWithInitialVersion: protectedProcedure
     .input(configDataSchema)
@@ -87,12 +89,35 @@ export const llmConfigsRouter = createTRPCRouter({
       const organizationId = await getOrganizationIdForProject(input.projectId);
       const authorId = ctx.session?.user?.id;
 
-      return await service.createPrompt({
+      const config = await service.createPrompt({
         ...input,
         authorId,
         organizationId,
         scope: PromptScope.PROJECT,
+        prompt: "You are a helpful assistant",
+        messages: [
+          {
+            role: "user",
+            content: "{{input}}",
+          },
+        ],
       });
+
+      const configWithLatestVersion =
+        await service.repository.getConfigByIdOrHandleWithLatestVersion({
+          idOrHandle: config.id,
+          projectId: input.projectId,
+          organizationId,
+        });
+
+      if (!configWithLatestVersion) {
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "Failed to create prompt config with initial version",
+        });
+      }
+
+      return configWithLatestVersion;
     }),
 
   /**
@@ -112,7 +137,7 @@ export const llmConfigsRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       const service = new PromptService(ctx.prisma);
       const updatedConfig = await service.updatePrompt({
-        id: input.id,
+        idOrHandle: input.id,
         projectId: input.projectId,
         data: {
           handle: input.handle,

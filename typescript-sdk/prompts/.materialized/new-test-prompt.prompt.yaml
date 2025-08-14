@@ -1,0 +1,6 @@
+model: openai/gpt-4o-mini
+modelParameters:
+    temperature: 0.8
+messages:
+    - role: user
+      content: "{{input}}"

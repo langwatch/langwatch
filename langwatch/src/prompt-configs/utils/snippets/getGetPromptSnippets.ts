@@ -15,26 +15,26 @@ export function getGetPromptSnippets(params?: {
   return [
     {
       content: `
-import asyncio
-import langwatch.prompt
+import langwatch
 
 # Setup LangWatch (ensure LANGWATCH_API_KEY is set in environment)
 langwatch.setup(api_key="${apiKey}")
 
-# Synchronous example
-prompt = langwatch.prompt.get_prompt("${promptId}")
+# Fetch prompt
+prompt = langwatch.prompts.get("${promptId}")
 
 # Access prompt properties
 print(f"Prompt Name: {prompt.name}")
 print(f"Model: {prompt.model}")
 print(f"Version: {prompt.version_number}")
 
-# Format messages with variables (example)
-messages = prompt.format_messages(
+# Compile with variables (preferred)
+compiled = prompt.compile(
     user_name="John Doe",
     input="Hello world"
 )
-print(f"Formatted messages: {messages}")
+print(f"Compiled prompt: {compiled.prompt}")
+print(f"Compiled messages: {compiled.messages}")
 `,
       target: "python_python3",
       title: "Get Prompts (Python SDK)",
@@ -63,7 +63,38 @@ fetch('https://app.langwatch.ai/api/prompts/${promptId}', options)
   .catch(err => console.error(err));
 `,
       target: "node_native",
-      title: "Get Prompts",
+      title: "Get Prompts (HTTP)",
+      path: "/api/prompts/{id}",
+      method: "GET",
+    },
+    {
+      content: `
+import { LangWatch } from 'langwatch';
+
+// Initialize LangWatch client
+const langwatch = new LangWatch({
+  apiKey: '${apiKey}'
+});
+
+// Fetch prompt
+const prompt = await langwatch.prompts.get('${promptId}');
+
+// Access prompt properties
+console.log(\`Prompt Name: \${prompt.name}\`);
+console.log(\`Model: \${prompt.model}\`);
+console.log(\`Version: \${prompt.version}\`);
+
+// Compile with variables
+const compiled = prompt.compile({
+  user_name: 'John Doe',
+  input: 'Hello world'
+});
+
+console.log(\`Compiled prompt: \${compiled.prompt}\`);
+console.log(\`Compiled messages: \${compiled.messages}\`);
+`,
+      target: "node_native",
+      title: "Get Prompts (TypeScript SDK)",
       path: "/api/prompts/{id}",
       method: "GET",
     },

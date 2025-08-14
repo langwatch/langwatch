@@ -7,3 +7,7 @@ src/internal/generated/openapi/*
 !src/internal/generated/types/.gitkeep
 !src/internal/generated/openapi/.gitkeep
 coverage/
+
+prompts/*
+prompts-lock.json
+prompts.json
