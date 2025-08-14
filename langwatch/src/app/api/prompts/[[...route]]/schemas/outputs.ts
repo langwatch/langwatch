@@ -31,7 +31,7 @@ const apiResponseVersionOutputSchema = z.object({
   configId: z.string(),
   projectId: z.string(),
   versionId: z.string(),
-  authorId: z.string().nullable(),
+  authorId: z.string().nullable().optional(),
   version: z.number(),
   createdAt: z.date(),
   commitMessage: z.string().optional().nullable(),

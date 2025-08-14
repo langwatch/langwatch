@@ -31,7 +31,6 @@ class PostApiPromptsResponse200:
         project_id (str):
         organization_id (str):
         version_id (str):
-        author_id (Union[None, str]):
         version (float):
         created_at (str):
         prompt (str):
@@ -39,6 +38,7 @@ class PostApiPromptsResponse200:
         inputs (list['PostApiPromptsResponse200InputsItem']):
         outputs (list['PostApiPromptsResponse200OutputsItem']):
         model (str):
+        author_id (Union[None, Unset, str]):
         commit_message (Union[None, Unset, str]):
         temperature (Union[Unset, float]):
         max_tokens (Union[Unset, float]):
@@ -55,7 +55,6 @@ class PostApiPromptsResponse200:
     project_id: str
     organization_id: str
     version_id: str
-    author_id: Union[None, str]
     version: float
     created_at: str
     prompt: str
@@ -63,6 +62,7 @@ class PostApiPromptsResponse200:
     inputs: list["PostApiPromptsResponse200InputsItem"]
     outputs: list["PostApiPromptsResponse200OutputsItem"]
     model: str
+    author_id: Union[None, Unset, str] = UNSET
     commit_message: Union[None, Unset, str] = UNSET
     temperature: Union[Unset, float] = UNSET
     max_tokens: Union[Unset, float] = UNSET
@@ -89,9 +89,6 @@ class PostApiPromptsResponse200:
 
         version_id = self.version_id
 
-        author_id: Union[None, str]
-        author_id = self.author_id
-
         version = self.version
 
         created_at = self.created_at
@@ -114,6 +111,12 @@ class PostApiPromptsResponse200:
             outputs.append(outputs_item)
 
         model = self.model
+
+        author_id: Union[None, Unset, str]
+        if isinstance(self.author_id, Unset):
+            author_id = UNSET
+        else:
+            author_id = self.author_id
 
         commit_message: Union[None, Unset, str]
         if isinstance(self.commit_message, Unset):
@@ -149,7 +152,6 @@ class PostApiPromptsResponse200:
                 "projectId": project_id,
                 "organizationId": organization_id,
                 "versionId": version_id,
-                "authorId": author_id,
                 "version": version,
                 "createdAt": created_at,
                 "prompt": prompt,
@@ -159,6 +161,8 @@ class PostApiPromptsResponse200:
                 "model": model,
             }
         )
+        if author_id is not UNSET:
+            field_dict["authorId"] = author_id
         if commit_message is not UNSET:
             field_dict["commitMessage"] = commit_message
         if temperature is not UNSET:
@@ -207,13 +211,6 @@ class PostApiPromptsResponse200:
 
         version_id = d.pop("versionId")
 
-        def _parse_author_id(data: object) -> Union[None, str]:
-            if data is None:
-                return data
-            return cast(Union[None, str], data)
-
-        author_id = _parse_author_id(d.pop("authorId"))
-
         version = d.pop("version")
 
         created_at = d.pop("createdAt")
@@ -242,6 +239,15 @@ class PostApiPromptsResponse200:
             outputs.append(outputs_item)
 
         model = d.pop("model")
+
+        def _parse_author_id(data: object) -> Union[None, Unset, str]:
+            if data is None:
+                return data
+            if isinstance(data, Unset):
+                return data
+            return cast(Union[None, Unset, str], data)
+
+        author_id = _parse_author_id(d.pop("authorId", UNSET))
 
         def _parse_commit_message(data: object) -> Union[None, Unset, str]:
             if data is None:
@@ -286,7 +292,6 @@ class PostApiPromptsResponse200:
             project_id=project_id,
             organization_id=organization_id,
             version_id=version_id,
-            author_id=author_id,
             version=version,
             created_at=created_at,
             prompt=prompt,
@@ -294,6 +299,7 @@ class PostApiPromptsResponse200:
             inputs=inputs,
             outputs=outputs,
             model=model,
+            author_id=author_id,
             commit_message=commit_message,
             temperature=temperature,
             max_tokens=max_tokens,

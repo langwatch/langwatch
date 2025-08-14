@@ -2,54 +2,12 @@
 Simple test for PromptService.get tracing functionality.
 """
 
-import pytest
-from typing import Optional, Sequence
 from unittest.mock import Mock, patch
-
-from opentelemetry.sdk import trace as trace_sdk
-from opentelemetry.sdk.trace.export import (
-    SpanExportResult,
-    SpanExporter,
-    SimpleSpanProcessor,
-)
-from opentelemetry.sdk.trace import ReadableSpan
-from opentelemetry import trace
-
+import pytest
 from langwatch.prompts.service import PromptService
 from langwatch.attributes import AttributeKey
 
-tracer_provider = trace_sdk.TracerProvider()
-
-
-class MockSpanExporter(SpanExporter):
-    """Simple span exporter that captures spans for testing"""
-
-    def __init__(self):
-        self.spans: list[ReadableSpan] = []
-
-    def export(self, spans: Sequence[ReadableSpan]):
-        self.spans.extend(spans)
-        return SpanExportResult.SUCCESS
-
-    def find_span_by_name(self, name: str) -> Optional[ReadableSpan]:
-        for span in self.spans:
-            if span.name == name:
-                return span
-        return None
-
-
-@pytest.fixture
-def span_exporter() -> MockSpanExporter:
-    """Set up span exporter for each test"""
-    exporter = MockSpanExporter()
-
-    provider = trace.get_tracer_provider()
-    if not hasattr(provider, "add_span_processor"):
-        trace.set_tracer_provider(trace_sdk.TracerProvider())
-        provider = trace.get_tracer_provider()
-
-    provider.add_span_processor(SimpleSpanProcessor(exporter))
-    yield exporter
+from fixtures.span_exporter import MockSpanExporter, span_exporter
 
 
 def test_get_method_creates_trace_span(span_exporter: MockSpanExporter):

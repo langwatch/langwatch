@@ -8,16 +8,7 @@ import os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 import pytest
-from typing import Optional, Sequence
 
-from opentelemetry.sdk import trace as trace_sdk
-from opentelemetry.sdk.trace.export import (
-    SpanExportResult,
-    SpanExporter,
-    SimpleSpanProcessor,
-)
-from opentelemetry.sdk.trace import ReadableSpan
-from opentelemetry import trace
 from langwatch.prompts.prompt import Prompt
 from langwatch.generated.langwatch_rest_api_client.models.get_api_prompts_by_id_response_200 import (
     GetApiPromptsByIdResponse200,
@@ -30,39 +21,7 @@ from langwatch.generated.langwatch_rest_api_client.models.get_api_prompts_by_id_
     GetApiPromptsByIdResponse200MessagesItemRole,
 )
 from langwatch.attributes import AttributeKey
-
-tracer_provider = trace_sdk.TracerProvider()
-
-
-class MockSpanExporter(SpanExporter):
-    """Simple span exporter that captures spans for testing"""
-
-    def __init__(self):
-        self.spans: list[ReadableSpan] = []
-
-    def export(self, spans: Sequence[ReadableSpan]):
-        self.spans.extend(spans)
-        return SpanExportResult.SUCCESS
-
-    def find_span_by_name(self, name: str) -> Optional[ReadableSpan]:
-        for span in self.spans:
-            if span.name == name:
-                return span
-        return None
-
-
-@pytest.fixture
-def span_exporter() -> MockSpanExporter:
-    """Set up span exporter for each test"""
-    exporter = MockSpanExporter()
-
-    provider = trace.get_tracer_provider()
-    if not hasattr(provider, "add_span_processor"):
-        trace.set_tracer_provider(trace_sdk.TracerProvider())
-        provider = trace.get_tracer_provider()
-
-    provider.add_span_processor(SimpleSpanProcessor(exporter))
-    yield exporter
+from fixtures.span_exporter import MockSpanExporter, span_exporter
 
 
 @pytest.fixture

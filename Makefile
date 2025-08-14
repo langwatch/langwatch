@@ -1,4 +1,5 @@
-.PHONY: start
+.PHONY: start sync-all-openapi quickstart
+
 
 install:
 	cd langwatch && npm install
@@ -30,4 +31,4 @@ quickstart:
 sync-all-openapi:
 	npm run task generateOpenAPISpec
 	cd typescript-sdk && npm run generate:openapi-types
-	cd python-sdk && make generate-openapi-types
+	cd python-sdk && make generate/api-client
