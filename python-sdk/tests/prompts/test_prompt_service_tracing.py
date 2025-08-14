@@ -18,8 +18,10 @@ from opentelemetry import trace
 from langwatch.prompts.service import PromptService
 from langwatch.attributes import AttributeKey
 
+tracer_provider = trace_sdk.TracerProvider()
 
-class TestSpanExporter(SpanExporter):
+
+class MockSpanExporter(SpanExporter):
     """Simple span exporter that captures spans for testing"""
 
     def __init__(self):
@@ -37,16 +39,20 @@ class TestSpanExporter(SpanExporter):
 
 
 @pytest.fixture
-def span_exporter():
-    """Set up tracing with test exporter"""
-    exporter = TestSpanExporter()
-    tracer_provider = trace_sdk.TracerProvider()
-    tracer_provider.add_span_processor(SimpleSpanProcessor(exporter))
-    trace.set_tracer_provider(tracer_provider)
-    return exporter
+def span_exporter() -> MockSpanExporter:
+    """Set up span exporter for each test"""
+    exporter = MockSpanExporter()
+
+    provider = trace.get_tracer_provider()
+    if not hasattr(provider, "add_span_processor"):
+        trace.set_tracer_provider(trace_sdk.TracerProvider())
+        provider = trace.get_tracer_provider()
+
+    provider.add_span_processor(SimpleSpanProcessor(exporter))
+    yield exporter
 
 
-def test_get_method_creates_trace_span(span_exporter: TestSpanExporter):
+def test_get_method_creates_trace_span(span_exporter: MockSpanExporter):
     """Test that PromptService.get creates a trace span"""
     # Setup mocks
     mock_client = Mock()

@@ -31,6 +31,8 @@ from langwatch.generated.langwatch_rest_api_client.models.get_api_prompts_by_id_
 )
 from langwatch.attributes import AttributeKey
 
+tracer_provider = trace_sdk.TracerProvider()
+
 
 class MockSpanExporter(SpanExporter):
     """Simple span exporter that captures spans for testing"""
@@ -49,23 +51,18 @@ class MockSpanExporter(SpanExporter):
         return None
 
 
-@pytest.fixture(scope="session")
-def tracer_provider():
-    """Set up tracing with test tracer provider (session-scoped)"""
-    tracer_provider = trace_sdk.TracerProvider()
-    trace.set_tracer_provider(tracer_provider)
-    return tracer_provider
-
-
 @pytest.fixture
-def span_exporter(tracer_provider: trace_sdk.TracerProvider):
+def span_exporter() -> MockSpanExporter:
     """Set up span exporter for each test"""
     exporter = MockSpanExporter()
-    tracer_provider.add_span_processor(SimpleSpanProcessor(exporter))
 
+    provider = trace.get_tracer_provider()
+    if not hasattr(provider, "add_span_processor"):
+        trace.set_tracer_provider(trace_sdk.TracerProvider())
+        provider = trace.get_tracer_provider()
+
+    provider.add_span_processor(SimpleSpanProcessor(exporter))
     yield exporter
-
-    # tracer_provider.force_flush()
 
 
 @pytest.fixture
