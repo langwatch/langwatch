@@ -310,15 +310,13 @@ export class PromptService {
       (msg) => msg.role === "system"
     )?.content;
 
-    if (messageSystemPrompt && !newVersionData.prompt) {
+    // We want to ensure that the system prompt is always in the prompt field
+    // and the messages array doesn't contain the system message
+    if (messageSystemPrompt) {
       newVersionData.prompt = messageSystemPrompt;
-    } else if (!messageSystemPrompt && newVersionData.prompt) {
-      newVersionData.messages = [
-        { role: "system", content: newVersionData.prompt },
-        ...(newVersionData.messages ?? []),
-      ];
-    } else {
-      // All good, do nothing
+      newVersionData.messages = newVersionData.messages?.filter(
+        (msg) => msg.role !== "system"
+      );
     }
 
     // Handle in a transaction to ensure atomicity
