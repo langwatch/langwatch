@@ -15,7 +15,6 @@ from opentelemetry.sdk.trace.export import (
 from opentelemetry.sdk.trace import ReadableSpan
 from opentelemetry import trace
 
-from langwatch.prompts.prompt import Prompt
 from langwatch.prompts.service import PromptService
 from langwatch.attributes import AttributeKey
 
@@ -70,7 +69,7 @@ def test_get_method_creates_trace_span(span_exporter: TestSpanExporter):
         service.get("prompt_123")
 
         # Verify span was created
-        span = span_exporter.find_span_by_name("prompt.get")
+        span = span_exporter.find_span_by_name("PromptService.get")
         assert span is not None
 
         # Type assertion for linter

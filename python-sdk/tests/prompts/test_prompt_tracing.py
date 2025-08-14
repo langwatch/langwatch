@@ -23,11 +23,11 @@ from langwatch.generated.langwatch_rest_api_client.models.get_api_prompts_by_id_
     GetApiPromptsByIdResponse200,
 )
 from fixtures import GetPromptResponseFactory
-from langwatch.generated.langwatch_rest_api_client.models.post_api_prompts_response_200_messages_item_role import (
-    PostApiPromptsResponse200MessagesItemRole,
+from langwatch.generated.langwatch_rest_api_client.models.get_api_prompts_by_id_response_200_messages_item import (
+    GetApiPromptsByIdResponse200MessagesItem,
 )
-from langwatch.generated.langwatch_rest_api_client.models.post_api_prompts_response_200_messages_item import (
-    PostApiPromptsResponse200MessagesItem,
+from langwatch.generated.langwatch_rest_api_client.models.get_api_prompts_by_id_response_200_messages_item_role import (
+    GetApiPromptsByIdResponse200MessagesItemRole,
 )
 from langwatch.attributes import AttributeKey
 
@@ -65,7 +65,7 @@ def span_exporter(tracer_provider: trace_sdk.TracerProvider):
 
     yield exporter
 
-    tracer_provider.force_flush()
+    # tracer_provider.force_flush()
 
 
 @pytest.fixture
@@ -77,8 +77,8 @@ def mock_config() -> GetApiPromptsByIdResponse200:
         prompt="Hello {{ name }}!",
         handle="prompt_123",
         messages=[
-            PostApiPromptsResponse200MessagesItem(
-                role=PostApiPromptsResponse200MessagesItemRole.USER,
+            GetApiPromptsByIdResponse200MessagesItem(
+                role=GetApiPromptsByIdResponse200MessagesItemRole.USER,
                 content="Say {{ greeting }} to {{ name }}",
             ),
         ],
@@ -98,7 +98,7 @@ def test_prompt_compile_creates_trace_span(
     prompt.compile(name="Alice")
 
     # Verify span was created
-    span = span_exporter.find_span_by_name("compile")
+    span = span_exporter.find_span_by_name("Prompt.compile")
     assert span is not None
 
     # Type assertion for linter
@@ -117,7 +117,7 @@ def test_prompt_compile_strict_creates_trace_span(
     prompt.compile_strict(name="Alice", greeting="Hello")
 
     # Verify span was created
-    span = span_exporter.find_span_by_name("compile_strict")
+    span = span_exporter.find_span_by_name("Prompt.compile_strict")
     assert span is not None
 
     # Type assertion for linter
@@ -136,7 +136,7 @@ def test_prompt_compile_captures_input_variables(
     prompt.compile(name="Alice")
 
     # Verify span was created
-    span = span_exporter.find_span_by_name("compile")
+    span = span_exporter.find_span_by_name("Prompt.compile")
     assert span is not None
 
     # Type assertion for linter
@@ -160,7 +160,7 @@ def test_prompt_compile_strict_captures_input_variables(
     prompt.compile_strict(name="Alice", greeting="Hello")
 
     # Verify span was created
-    span = span_exporter.find_span_by_name("compile_strict")
+    span = span_exporter.find_span_by_name("Prompt.compile_strict")
     assert span is not None
 
     # Type assertion for linter

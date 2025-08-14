@@ -9,8 +9,11 @@ from fixtures import GetPromptResponseFactory
 from langwatch.generated.langwatch_rest_api_client.models.get_api_prompts_by_id_response_200 import (
     GetApiPromptsByIdResponse200,
 )
-from langwatch.generated.langwatch_rest_api_client.models.post_api_prompts_response_200_messages_item_role import (
-    PostApiPromptsResponse200MessagesItemRole,
+from langwatch.generated.langwatch_rest_api_client.models.get_api_prompts_by_id_response_200_messages_item import (
+    GetApiPromptsByIdResponse200MessagesItem,
+)
+from langwatch.generated.langwatch_rest_api_client.models.get_api_prompts_by_id_response_200_messages_item_role import (
+    GetApiPromptsByIdResponse200MessagesItemRole,
 )
 
 
@@ -22,10 +25,10 @@ def mock_config():
         version=1.0,  # Use float instead of string for proper typing
         prompt="Hello {{ name }}!",
         messages=[
-            {
-                "role": PostApiPromptsResponse200MessagesItemRole.USER,
-                "content": "Say {{ greeting }} to {{ name }}",
-            },
+            GetApiPromptsByIdResponse200MessagesItem(
+                role=GetApiPromptsByIdResponse200MessagesItemRole.USER,
+                content="Say {{ greeting }} to {{ name }}",
+            ),
         ],
     )
 
