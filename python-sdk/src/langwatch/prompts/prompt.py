@@ -79,18 +79,13 @@ class Prompt:
             compiled_messages: List[MessageDict] = []
             if self._config.messages:
                 for message in self._config.messages:
-                    if message.content:
-                        template = env.from_string(message.content)
-                        compiled_content = template.render(**variables)
-                        compiled_message = MessageDict(
-                            role=message.role.value,
-                            content=compiled_content,
-                        )
-                    else:
-                        compiled_message = MessageDict(
-                            role=message["role"].value,
-                            content=message["content"],
-                        )
+                    content: str = message.content
+                    template = env.from_string(content)
+                    compiled_content = template.render(**variables)
+                    compiled_message = MessageDict(
+                        role=message.role.value,
+                        content=compiled_content,
+                    )
                     compiled_messages.append(compiled_message)
 
             # Return simplified CompiledPrompt with variables preserved

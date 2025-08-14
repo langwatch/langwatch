@@ -26,6 +26,9 @@ from fixtures import GetPromptResponseFactory
 from langwatch.generated.langwatch_rest_api_client.models.post_api_prompts_response_200_messages_item_role import (
     PostApiPromptsResponse200MessagesItemRole,
 )
+from langwatch.generated.langwatch_rest_api_client.models.post_api_prompts_response_200_messages_item import (
+    PostApiPromptsResponse200MessagesItem,
+)
 from langwatch.attributes import AttributeKey
 
 
@@ -74,10 +77,10 @@ def mock_config() -> GetApiPromptsByIdResponse200:
         prompt="Hello {{ name }}!",
         handle="prompt_123",
         messages=[
-            {
-                "role": PostApiPromptsResponse200MessagesItemRole.USER,
-                "content": "Say {{ greeting }} to {{ name }}",
-            },
+            PostApiPromptsResponse200MessagesItem(
+                role=PostApiPromptsResponse200MessagesItemRole.USER,
+                content="Say {{ greeting }} to {{ name }}",
+            ),
         ],
     )
 
