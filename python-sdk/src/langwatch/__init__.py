@@ -12,6 +12,7 @@ from .utils.initialization import ensure_setup, setup
 # Type hints for IntelliSense (only imported for typing)
 from typing import TYPE_CHECKING
 
+# Type hints for IntelliSense (only imported for typing)
 if TYPE_CHECKING:
     import langwatch.evaluations as evaluations
     import langwatch.evaluation as evaluation
@@ -20,6 +21,8 @@ if TYPE_CHECKING:
     import langwatch.langchain as langchain
     from .prompts.service import PromptService
 
+    # Type hint for the prompts service specifically
+    # required to get the instance typing correct
     prompts: PromptService
 
 

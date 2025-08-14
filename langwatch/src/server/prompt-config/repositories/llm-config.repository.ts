@@ -21,8 +21,9 @@ import {
   type CreateLlmConfigVersionParams,
 } from "./llm-config-versions.repository";
 
+import { DEFAULT_MODEL } from "~/utils/constants";
+
 const logger = createLogger("langwatch:prompt-config:llm-config.repository");
-const DEFAULT_MODEL = "openai/gpt-4o-mini" as const;
 
 /**
  * Interface for LLM Config data transfer objects
@@ -429,9 +430,9 @@ export class LlmConfigRepository {
         };
       }
 
-      // Ensure a model is set
-      if (!(newVersionData.configData as any)?.model) {
-        (newVersionData.configData as any).model = defaultModel;
+      // Ensure a model is set if configData is provided
+      if (newVersionData.configData && !newVersionData.configData.model) {
+        newVersionData.configData.model = defaultModel;
       }
 
       const newVersion = await tx.llmPromptConfigVersion.create({

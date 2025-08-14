@@ -77,7 +77,9 @@ export const llmConfigsRouter = createTRPCRouter({
     }),
 
   /**
-   * Create a new LLM prompt config with its initial version.
+   * Create a new LLM prompt config with its initial (draft) version.
+   * TODO: How this works is a bit confusing. We only create drafts via
+   * the UI, and this is the only place we'd pre-fill all of the data.
    */
   createConfigWithInitialVersion: protectedProcedure
     .input(configDataSchema)
@@ -93,6 +95,12 @@ export const llmConfigsRouter = createTRPCRouter({
         organizationId,
         scope: PromptScope.PROJECT,
         prompt: "You are a helpful assistant",
+        messages: [
+          {
+            role: "user",
+            content: "{{input}}",
+          },
+        ],
       });
 
       const configWithLatestVersion =

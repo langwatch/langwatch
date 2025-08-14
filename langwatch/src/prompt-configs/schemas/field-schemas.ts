@@ -87,7 +87,7 @@ export const commitMessageSchema = z.string();
  */
 export const versionSchema = z
   .number()
-  .min(0, "Version must be greater than 0");
+  .min(0, "Version must be greater than or equal to 0");
 
 /**
  * Schema for response format specification

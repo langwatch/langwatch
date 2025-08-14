@@ -103,26 +103,7 @@ def test_compile_strict_with_missing_variables(prompt: Prompt):
         prompt.compile_strict(variables)
 
 
-def test_format_messages_deprecated(prompt: Prompt):
-    """Test format_messages method (deprecated)"""
-    variables = {"name": "World", "greeting": "Hello"}
-
-    with pytest.warns(DeprecationWarning, match="deprecated"):
-        messages = prompt.format_messages(**variables)
-
-    assert len(messages) == 1
-    assert messages[0]["role"] == "user"
-    assert messages[0]["content"] == "Say Hello to World"
-
-
 def test_prompt_attribute_error(prompt: Prompt):
     """Test that accessing non-existent attributes raises AttributeError"""
     with pytest.raises(AttributeError):
         _ = prompt.nonexistent_attribute
-
-
-def test_raw_config_legacy_method(
-    prompt: Prompt, mock_config: GetApiPromptsByIdResponse200
-):
-    """Test raw_config legacy method"""
-    assert prompt.raw_config() == mock_config

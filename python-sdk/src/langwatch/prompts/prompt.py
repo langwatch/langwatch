@@ -1,5 +1,4 @@
-import warnings
-from typing import List, Any, Dict, Union, Optional, cast, Literal
+from typing import List, Any, Dict, Union, Optional, cast
 from openai.types.chat import ChatCompletionMessageParam
 from liquid import Environment, StrictUndefined, Undefined
 from liquid.exceptions import UndefinedError
@@ -150,36 +149,6 @@ class Prompt:
         # Merge explicit dict with kwargs, kwargs take precedence for conflicts
         merged_variables = {**variables, **kwargs}
         return self._compile(merged_variables, strict=True)
-
-    def format_messages(self, **variables: Any) -> List[ChatCompletionMessageParam]:
-        """
-        Formats the prompt messages with the provided variables.
-
-        **DEPRECATED**: This method is deprecated and will be removed in a future version.
-        Please use the `compile()` method instead.
-
-        Args:
-            **variables: Variables to format the prompt messages with
-
-        Returns:
-            List of formatted messages compatible with ChatCompletionMessageParam
-
-        Raises:
-            MissingPromptVariableError: If required variables are missing
-        """
-        warnings.warn(
-            "The 'format_messages' method is deprecated and will be removed in a future version. "
-            "Please use the 'compile()' method instead.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-
-        compiled_prompt = self.compile(variables)
-        return compiled_prompt.messages
-
-    def raw_config(self) -> Any:
-        """Returns the raw prompt configuration (legacy method)."""
-        return self._config
 
 
 class CompiledPrompt:
