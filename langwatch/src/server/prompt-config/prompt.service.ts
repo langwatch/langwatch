@@ -612,7 +612,7 @@ export class PromptService {
       response_format: config.latestVersion.configData.response_format,
       authorId: config.latestVersion.authorId ?? null,
       updatedAt: config.updatedAt,
-      createdAt: config.latestVersion.createdAt,
+      createdAt: config.createdAt,
       demonstrations: config.latestVersion.configData.demonstrations,
       promptingTechnique: config.latestVersion.configData.prompting_technique,
     };
