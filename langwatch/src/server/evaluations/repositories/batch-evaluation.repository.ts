@@ -10,6 +10,8 @@ import { type ExperimentRepository } from "./experiment.repository";
 
 const logger = createLogger("langwatch:evaluations:batch-repository");
 
+import { type ExperimentType, type Experiment } from "@prisma/client";
+
 export interface BatchEvaluationRepository {
   findOrCreateExperiment(options: {
     projectId: string;
@@ -17,7 +19,7 @@ export interface BatchEvaluationRepository {
     experiment_type: ExperimentType;
     experiment_name?: string;
     workflowId?: string;
-  }): Promise<any>;
+  }): Promise<Experiment>;
   storeBatchEvaluation(batchEvaluation: ESBatchEvaluation): Promise<void>;
 }
 
