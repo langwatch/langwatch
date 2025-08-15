@@ -15,6 +15,7 @@ import { type ExperimentType, type Experiment } from "@prisma/client";
 export interface BatchEvaluationRepository {
   findOrCreateExperiment(options: {
     projectId: string;
+    experiment_id?: string | null;
     experiment_slug?: string | null;
     experiment_type: ExperimentType;
     experiment_name?: string;
