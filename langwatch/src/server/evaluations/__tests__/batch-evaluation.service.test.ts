@@ -106,9 +106,6 @@ describe("BatchEvaluationService", () => {
         params: {
           run_id: "test-run",
           experiment_id: "test-experiment",
-          project_id: "test-project",
-          evaluator_id: "test-evaluator",
-          results: [{ score: 0.8, passed: true }],
         },
       });
 
@@ -127,12 +124,10 @@ describe("BatchEvaluationService", () => {
       await expect(
         batchEvaluationService.logResults({
           projectId: "test-project",
-          params: {
-            run_id: "test-run",
-            project_id: "test-project",
-            evaluator_id: "test-evaluator",
-            // Missing both experiment_id and experiment_slug
-          },
+                  params: {
+          run_id: "test-run",
+          // Missing both experiment_id and experiment_slug
+        },
         })
       ).rejects.toThrow("Either experiment_id or experiment_slug is required");
     });
@@ -144,7 +139,7 @@ describe("BatchEvaluationService", () => {
       (eSBatchEvaluationRESTParamsSchema.parse as any).mockImplementation(() => {
         const error = new Error("Validation failed");
         error.name = "ZodError";
-        error.issues = [{ 
+        (error as any).issues = [{ 
           code: "custom",
           message: "Validation failed",
           path: ["params"]
@@ -155,6 +150,7 @@ describe("BatchEvaluationService", () => {
       const options = {
         projectId: "test-project",
         params: {
+          run_id: "test-run",
           invalid: "data",
         },
       };
@@ -175,7 +171,7 @@ describe("BatchEvaluationService", () => {
 
       // Mock the repository to throw an error
       const { ElasticsearchBatchEvaluationRepository } = await import("~/server/evaluations/repositories/batch-evaluation.repository");
-      const mockRepository = new ElasticsearchBatchEvaluationRepository();
+      const mockRepository = new ElasticsearchBatchEvaluationRepository({} as any);
       mockRepository.storeBatchEvaluation = vi.fn().mockRejectedValue(new Error("Failed to store batch evaluation results"));
       
       const tempService = new BatchEvaluationService(mockRepository);
@@ -184,9 +180,7 @@ describe("BatchEvaluationService", () => {
         projectId: "test-project",
         params: {
           experiment_id: "test-experiment",
-          project_id: "test-project",
-          evaluator_id: "test-evaluator",
-          results: [],
+          run_id: "test-run",
         },
       };
 

@@ -15,7 +15,7 @@ export interface EvaluationRepository {
     referenceId: string;
     amount: number;
     currency: string;
-    extraInfo: Record<string, unknown> | null;
+    extraInfo: any;
   }): Promise<void>;
 }
 
@@ -45,7 +45,7 @@ export class PrismaEvaluationRepository implements EvaluationRepository {
     referenceId: string;
     amount: number;
     currency: string;
-    extraInfo: Record<string, unknown> | null;
+    extraInfo: any;
   }): Promise<void> {
     try {
       await prisma.cost.create({

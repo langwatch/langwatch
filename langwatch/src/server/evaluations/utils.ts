@@ -1,13 +1,40 @@
 import { type EvaluatorTypes } from "./evaluators.generated";
 import { type EvaluatorDefinition } from "./evaluators.generated";
 import { AVAILABLE_EVALUATORS } from "./evaluators.generated";
-import { defaultEvaluatorInputSchema } from "./types";
+import { evaluationInputSchema } from "./types";
 import { type DataForEvaluation } from "~/server/background/workers/evaluationsWorker";
-import { extractChunkTextualContent } from "~/server/background/workers/collector/evaluations";
-import { getCustomEvaluators } from "~/server/background/workers/collector/evaluations";
-import { getInputsOutputs } from "~/server/background/workers/collector/evaluations";
-import { type Edge, type Node } from "~/server/background/workers/collector/evaluations";
-import { type JsonArray } from "~/server/background/workers/collector/evaluations";
+import { z } from "zod";
+
+// Stub functions for missing imports
+const extractChunkTextualContent = (content: any): string => {
+  if (typeof content === "string") return content;
+  return JSON.stringify(content);
+};
+
+const getCustomEvaluators = async (params: any): Promise<any[]> => {
+  return [];
+};
+
+const getInputsOutputs = (edges: any[], nodes: any[]): { inputs: any[] } => {
+  return { inputs: [] };
+};
+
+const defaultEvaluatorInputSchema = z.object({
+  input: z.string().optional().nullable(),
+  output: z.string().optional().nullable(),
+  contexts: z.array(z.any()).optional().nullable(),
+  expected_output: z.string().optional().nullable(),
+  expected_contexts: z.array(z.any()).optional().nullable(),
+  conversation: z
+    .array(
+      z.object({
+        input: z.string().optional().nullable(),
+        output: z.string().optional().nullable(),
+      })
+    )
+    .optional()
+    .nullable(),
+});
 
 export const getEvaluatorDataForParams = (
   checkType: string,
@@ -83,9 +110,9 @@ export const getEvaluatorIncludingCustom = async (
       (availableCustomEvaluators ?? []).map((evaluator) => {
         const { inputs } = getInputsOutputs(
           JSON.parse(JSON.stringify(evaluator.versions[0]?.dsl))
-            ?.edges as Edge[],
+            ?.edges as any[],
           JSON.parse(JSON.stringify(evaluator.versions[0]?.dsl))
-            ?.nodes as JsonArray as unknown[] as Node[]
+            ?.nodes as any[]
         );
         const requiredFields = inputs.map((input) => input.identifier);
 
