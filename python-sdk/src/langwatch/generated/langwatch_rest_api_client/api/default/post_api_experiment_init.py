@@ -5,23 +5,23 @@ import httpx
 
 from ... import errors
 from ...client import AuthenticatedClient, Client
-from ...models.post_index_body import PostIndexBody
-from ...models.post_index_response_200 import PostIndexResponse200
-from ...models.post_index_response_400 import PostIndexResponse400
-from ...models.post_index_response_401 import PostIndexResponse401
-from ...models.post_index_response_500 import PostIndexResponse500
+from ...models.post_api_experiment_init_body import PostApiExperimentInitBody
+from ...models.post_api_experiment_init_response_200 import PostApiExperimentInitResponse200
+from ...models.post_api_experiment_init_response_400 import PostApiExperimentInitResponse400
+from ...models.post_api_experiment_init_response_401 import PostApiExperimentInitResponse401
+from ...models.post_api_experiment_init_response_500 import PostApiExperimentInitResponse500
 from ...types import Response
 
 
 def _get_kwargs(
     *,
-    body: PostIndexBody,
+    body: PostApiExperimentInitBody,
 ) -> dict[str, Any]:
     headers: dict[str, Any] = {}
 
     _kwargs: dict[str, Any] = {
         "method": "post",
-        "url": "/",
+        "url": "/api/experiment/init",
     }
 
     _kwargs["json"] = body.to_dict()
@@ -34,21 +34,28 @@ def _get_kwargs(
 
 def _parse_response(
     *, client: Union[AuthenticatedClient, Client], response: httpx.Response
-) -> Optional[Union[PostIndexResponse200, PostIndexResponse400, PostIndexResponse401, PostIndexResponse500]]:
+) -> Optional[
+    Union[
+        PostApiExperimentInitResponse200,
+        PostApiExperimentInitResponse400,
+        PostApiExperimentInitResponse401,
+        PostApiExperimentInitResponse500,
+    ]
+]:
     if response.status_code == 200:
-        response_200 = PostIndexResponse200.from_dict(response.json())
+        response_200 = PostApiExperimentInitResponse200.from_dict(response.json())
 
         return response_200
     if response.status_code == 400:
-        response_400 = PostIndexResponse400.from_dict(response.json())
+        response_400 = PostApiExperimentInitResponse400.from_dict(response.json())
 
         return response_400
     if response.status_code == 401:
-        response_401 = PostIndexResponse401.from_dict(response.json())
+        response_401 = PostApiExperimentInitResponse401.from_dict(response.json())
 
         return response_401
     if response.status_code == 500:
-        response_500 = PostIndexResponse500.from_dict(response.json())
+        response_500 = PostApiExperimentInitResponse500.from_dict(response.json())
 
         return response_500
     if client.raise_on_unexpected_status:
@@ -59,7 +66,14 @@ def _parse_response(
 
 def _build_response(
     *, client: Union[AuthenticatedClient, Client], response: httpx.Response
-) -> Response[Union[PostIndexResponse200, PostIndexResponse400, PostIndexResponse401, PostIndexResponse500]]:
+) -> Response[
+    Union[
+        PostApiExperimentInitResponse200,
+        PostApiExperimentInitResponse400,
+        PostApiExperimentInitResponse401,
+        PostApiExperimentInitResponse500,
+    ]
+]:
     return Response(
         status_code=HTTPStatus(response.status_code),
         content=response.content,
@@ -71,19 +85,26 @@ def _build_response(
 def sync_detailed(
     *,
     client: Union[AuthenticatedClient, Client],
-    body: PostIndexBody,
-) -> Response[Union[PostIndexResponse200, PostIndexResponse400, PostIndexResponse401, PostIndexResponse500]]:
-    """Create a new prompt with default initial version
+    body: PostApiExperimentInitBody,
+) -> Response[
+    Union[
+        PostApiExperimentInitResponse200,
+        PostApiExperimentInitResponse400,
+        PostApiExperimentInitResponse401,
+        PostApiExperimentInitResponse500,
+    ]
+]:
+    """Initialize or find an experiment
 
     Args:
-        body (PostIndexBody):
+        body (PostApiExperimentInitBody):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[Union[PostIndexResponse200, PostIndexResponse400, PostIndexResponse401, PostIndexResponse500]]
+        Response[Union[PostApiExperimentInitResponse200, PostApiExperimentInitResponse400, PostApiExperimentInitResponse401, PostApiExperimentInitResponse500]]
     """
 
     kwargs = _get_kwargs(
@@ -100,19 +121,26 @@ def sync_detailed(
 def sync(
     *,
     client: Union[AuthenticatedClient, Client],
-    body: PostIndexBody,
-) -> Optional[Union[PostIndexResponse200, PostIndexResponse400, PostIndexResponse401, PostIndexResponse500]]:
-    """Create a new prompt with default initial version
+    body: PostApiExperimentInitBody,
+) -> Optional[
+    Union[
+        PostApiExperimentInitResponse200,
+        PostApiExperimentInitResponse400,
+        PostApiExperimentInitResponse401,
+        PostApiExperimentInitResponse500,
+    ]
+]:
+    """Initialize or find an experiment
 
     Args:
-        body (PostIndexBody):
+        body (PostApiExperimentInitBody):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Union[PostIndexResponse200, PostIndexResponse400, PostIndexResponse401, PostIndexResponse500]
+        Union[PostApiExperimentInitResponse200, PostApiExperimentInitResponse400, PostApiExperimentInitResponse401, PostApiExperimentInitResponse500]
     """
 
     return sync_detailed(
@@ -124,19 +152,26 @@ def sync(
 async def asyncio_detailed(
     *,
     client: Union[AuthenticatedClient, Client],
-    body: PostIndexBody,
-) -> Response[Union[PostIndexResponse200, PostIndexResponse400, PostIndexResponse401, PostIndexResponse500]]:
-    """Create a new prompt with default initial version
+    body: PostApiExperimentInitBody,
+) -> Response[
+    Union[
+        PostApiExperimentInitResponse200,
+        PostApiExperimentInitResponse400,
+        PostApiExperimentInitResponse401,
+        PostApiExperimentInitResponse500,
+    ]
+]:
+    """Initialize or find an experiment
 
     Args:
-        body (PostIndexBody):
+        body (PostApiExperimentInitBody):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[Union[PostIndexResponse200, PostIndexResponse400, PostIndexResponse401, PostIndexResponse500]]
+        Response[Union[PostApiExperimentInitResponse200, PostApiExperimentInitResponse400, PostApiExperimentInitResponse401, PostApiExperimentInitResponse500]]
     """
 
     kwargs = _get_kwargs(
@@ -151,19 +186,26 @@ async def asyncio_detailed(
 async def asyncio(
     *,
     client: Union[AuthenticatedClient, Client],
-    body: PostIndexBody,
-) -> Optional[Union[PostIndexResponse200, PostIndexResponse400, PostIndexResponse401, PostIndexResponse500]]:
-    """Create a new prompt with default initial version
+    body: PostApiExperimentInitBody,
+) -> Optional[
+    Union[
+        PostApiExperimentInitResponse200,
+        PostApiExperimentInitResponse400,
+        PostApiExperimentInitResponse401,
+        PostApiExperimentInitResponse500,
+    ]
+]:
+    """Initialize or find an experiment
 
     Args:
-        body (PostIndexBody):
+        body (PostApiExperimentInitBody):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Union[PostIndexResponse200, PostIndexResponse400, PostIndexResponse401, PostIndexResponse500]
+        Union[PostApiExperimentInitResponse200, PostApiExperimentInitResponse400, PostApiExperimentInitResponse401, PostApiExperimentInitResponse500]
     """
 
     return (
