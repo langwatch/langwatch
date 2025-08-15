@@ -1,6 +1,8 @@
 import { PromptScope } from "@prisma/client";
 import { z } from "zod";
 
+import { SchemaVersion } from "~/server/prompt-config/enums";
+
 import { nodeDatasetSchema } from "~/optimization_studio/types/dsl";
 import { LlmConfigInputTypes, LlmConfigOutputTypes } from "~/types";
 
@@ -73,9 +75,7 @@ export const nameSchema = z
  * Schema for prompt configuration scope
  * Defines the visibility and access level of the prompt configuration
  */
-export const scopeSchema = z
-  .nativeEnum(PromptScope)
-  .default(PromptScope.PROJECT);
+export const scopeSchema = z.nativeEnum(PromptScope);
 
 /**
  * Schema for commit message
@@ -85,4 +85,30 @@ export const commitMessageSchema = z.string();
 /**
  * Schema for prompt configuration version
  */
-export const versionSchema = z.number();
+export const versionSchema = z
+  .number()
+  .min(0, "Version must be greater than or equal to 0");
+
+/**
+ * Schema for response format specification
+ * Used to define structured output formats for LLM responses
+ */
+export const responseFormatSchema = z.object({
+  type: z.enum(["json_schema"]),
+  json_schema: z
+    .object({
+      name: z.string(),
+      schema: z.object({}),
+    })
+    .nullable(),
+});
+
+/**
+ * Schema for model name
+ */
+export const modelNameSchema = z.string();
+
+/**
+ * Schema for schema version
+ */
+export const schemaVersionSchema = z.nativeEnum(SchemaVersion);

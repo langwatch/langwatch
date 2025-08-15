@@ -48,6 +48,20 @@ export default async function execute() {
     ],
     {
       arrayMerge: overwriteMerge,
+      customMerge(key) {
+        // Since we get these routes from the app directly,
+        // we don't want to merge, we just want to replace.
+        if (
+          key.includes("/api/prompts") ||
+          key.includes("/api/dataset") ||
+          key.includes("/api/scenario-events")
+        ) {
+          // Replace with new
+          return (_target, source) => {
+            return source;
+          };
+        }
+      },
     }
   );
 

@@ -1,10 +1,10 @@
 from collections.abc import Mapping
-from typing import Any, TypeVar
+from typing import Any, TypeVar, Union
 
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
 
-from ..models.delete_api_prompts_by_id_response_401_error import DeleteApiPromptsByIdResponse401Error
+from ..types import UNSET, Unset
 
 T = TypeVar("T", bound="DeleteApiPromptsByIdResponse401")
 
@@ -13,14 +13,18 @@ T = TypeVar("T", bound="DeleteApiPromptsByIdResponse401")
 class DeleteApiPromptsByIdResponse401:
     """
     Attributes:
-        error (DeleteApiPromptsByIdResponse401Error):
+        error (str):
+        message (Union[Unset, str]):
     """
 
-    error: DeleteApiPromptsByIdResponse401Error
+    error: str
+    message: Union[Unset, str] = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
-        error = self.error.value
+        error = self.error
+
+        message = self.message
 
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
@@ -29,16 +33,21 @@ class DeleteApiPromptsByIdResponse401:
                 "error": error,
             }
         )
+        if message is not UNSET:
+            field_dict["message"] = message
 
         return field_dict
 
     @classmethod
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
         d = dict(src_dict)
-        error = DeleteApiPromptsByIdResponse401Error(d.pop("error"))
+        error = d.pop("error")
+
+        message = d.pop("message", UNSET)
 
         delete_api_prompts_by_id_response_401 = cls(
             error=error,
+            message=message,
         )
 
         delete_api_prompts_by_id_response_401.additional_properties = d

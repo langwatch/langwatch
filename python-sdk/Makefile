@@ -42,6 +42,8 @@ ensure-openapi-python-client:
 	fi
 
 generate/api-client: ensure-openapi-python-client
+	@echo "Deleting old API client..."
+	@rm -rf src/langwatch/generated/langwatch_rest_api_client
 	@echo "Building API client..."
 	@mkdir -p .tmp/api-client
 	uv run openapi-python-client generate \

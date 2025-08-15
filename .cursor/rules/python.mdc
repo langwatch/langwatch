@@ -1,0 +1,6 @@
+---
+globs: *.py
+alwaysApply: false
+---
+
+All python code should be type-safe. Everything should be typed.

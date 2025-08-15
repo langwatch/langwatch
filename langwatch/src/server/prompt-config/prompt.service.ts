@@ -1,20 +1,23 @@
 import {
-  type LlmPromptConfig,
   type Prisma,
   type PrismaClient,
   type PromptScope,
+  type LlmPromptConfigVersion,
 } from "@prisma/client";
 import { type z } from "zod";
 
+import { SchemaVersion } from "./enums";
+import { NotFoundError, SystemPromptConflictError } from "./errors";
 import {
   type CreateLlmConfigParams,
+  type CreateLlmConfigVersionParams,
   LlmConfigRepository,
   type LlmConfigWithLatestVersion,
 } from "./repositories";
 import {
-  type getLatestConfigVersionSchema,
-  SchemaVersion,
+  getLatestConfigVersionSchema,
   LATEST_SCHEMA_VERSION,
+  type LatestConfigVersionSchema,
 } from "./repositories/llm-config-version-schema";
 
 import {
@@ -30,6 +33,36 @@ type ConfigData = z.infer<
 >["configData"];
 
 /**
+ * Full prompt shape that combines prompt config with version data.
+ * This is the complete shape that should be returned to API consumers.
+ */
+export type VersionedPrompt = {
+  id: string;
+  name: string;
+  handle: string | null;
+  scope: PromptScope;
+  version: number;
+  versionId: string;
+  versionCreatedAt: Date;
+  model: string;
+  prompt: string;
+  projectId: string;
+  organizationId: string;
+  messages: Array<{
+    role: LatestConfigVersionSchema["configData"]["messages"][number]["role"];
+    content: string;
+  }>;
+  authorId: string | null;
+  inputs: LatestConfigVersionSchema["configData"]["inputs"];
+  outputs: LatestConfigVersionSchema["configData"]["outputs"];
+  response_format: LatestConfigVersionSchema["configData"]["response_format"];
+  demonstrations: LatestConfigVersionSchema["configData"]["demonstrations"];
+  promptingTechnique: LatestConfigVersionSchema["configData"]["prompting_technique"];
+  updatedAt: Date;
+  createdAt: Date;
+};
+
+/**
  * Service layer for managing LLM prompt configurations.
  * Handles business logic for prompt operations including handle formatting.
  */
@@ -38,6 +71,24 @@ export class PromptService {
 
   constructor(private readonly prisma: PrismaClient) {
     this.repository = new LlmConfigRepository(prisma);
+  }
+
+  /**
+   * Get all prompts for a project
+   */
+  async getAllPrompts(params: {
+    projectId: string;
+    organizationId: string;
+    version?: "latest" | "all";
+  }): Promise<VersionedPrompt[]> {
+    const { projectId, organizationId } = params;
+
+    const configs = await this.repository.getAllWithLatestVersion({
+      projectId,
+      organizationId,
+    });
+
+    return configs.map((config) => this.transformToVersionedPrompt(config));
   }
 
   /**
@@ -54,14 +105,64 @@ export class PromptService {
     projectId: string;
     organizationId: string;
     version?: number;
-  }): Promise<LlmConfigWithLatestVersion | null> {
+  }): Promise<VersionedPrompt | null> {
     const { idOrHandle, projectId, organizationId } = params;
 
-    return this.repository.getConfigByIdOrHandleWithLatestVersion({
-      idOrHandle,
-      projectId,
+    const config = await this.repository.getConfigByIdOrHandleWithLatestVersion(
+      {
+        idOrHandle,
+        projectId,
+        organizationId,
+        version: params.version,
+      }
+    );
+
+    if (!config) {
+      return null;
+    }
+
+    return this.transformToVersionedPrompt(config);
+  }
+
+  /**
+   * Get all versions for a prompt
+   */
+  async getAllVersions(params: {
+    idOrHandle: string;
+    projectId: string;
+    organizationId?: string;
+  }): Promise<VersionedPrompt[]> {
+    // If no organizationId is provided, get it from the projectId
+    const organizationId: string =
+      params.organizationId ??
+      (await this.getOrganizationIdFromProjectId(params.projectId));
+
+    // Get the config
+    const config = await this.repository.getPromptByIdOrHandle({
+      idOrHandle: params.idOrHandle,
+      projectId: params.projectId,
       organizationId,
     });
+
+    // If the config doesn't exist, return an empty array
+    if (!config) {
+      throw new NotFoundError("Prompt not found");
+    }
+
+    // Get the versions
+    const versions =
+      (await this.repository.versions.getVersionsForConfigByIdOrHandle({
+        idOrHandle: params.idOrHandle,
+        projectId: params.projectId,
+        organizationId,
+      })) as LatestConfigVersionSchema[];
+
+    return versions.map((version) =>
+      this.transformToVersionedPrompt({
+        ...config,
+        latestVersion: version,
+      })
+    );
   }
 
   /**
@@ -96,7 +197,8 @@ export class PromptService {
     temperature?: number;
     max_tokens?: number;
     prompting_technique?: z.infer<typeof promptingTechniqueSchema>;
-  }): Promise<LlmConfigWithLatestVersion> {
+    commitMessage?: string;
+  }): Promise<VersionedPrompt> {
     // If any of the version data is provided,
     // we should create a version from that data
     // and it's not consideered a draft
@@ -111,7 +213,26 @@ export class PromptService {
         params.prompting_technique !== undefined
     );
 
-    return this.repository.createConfigWithInitialVersion({
+    shouldCreateVersion &&
+      this.assertNoSystemPromptConflict({
+        prompt: params.prompt,
+        messages: params.messages,
+      });
+
+    const messageSystemPrompt = params.messages?.find(
+      (msg) => msg.role === "system"
+    )?.content;
+
+    // If the system prompt is provided in the messages, set the prompt to the system prompt
+    params.prompt ??= messageSystemPrompt;
+
+    if (!messageSystemPrompt && !params.prompt) {
+      throw new SystemPromptConflictError(
+        "A system prompt is required when creating a prompt"
+      );
+    }
+
+    const config = await this.repository.createConfigWithInitialVersion({
       configData: {
         name: params.name ?? params.handle,
         handle: params.handle ?? null,
@@ -125,20 +246,24 @@ export class PromptService {
             configData: {
               prompt: params.prompt,
               messages: params.messages,
-              inputs: params.inputs,
-              outputs: params.outputs,
+              inputs: params.inputs ?? [{ identifier: "input", type: "str" }],
+              outputs: params.outputs ?? [
+                { identifier: "output", type: "str" },
+              ],
               model: params.model,
               temperature: params.temperature,
               max_tokens: params.max_tokens,
               prompting_technique: params.prompting_technique,
-            } as Prisma.JsonValue,
+            } as LatestConfigVersionSchema["configData"],
             schemaVersion: LATEST_SCHEMA_VERSION,
-            commitMessage: "Initial version",
+            commitMessage: params.commitMessage ?? "Initial version",
             authorId: params.authorId ?? null,
             version: 1,
           }
         : undefined,
     });
+
+    return this.transformToVersionedPrompt(config);
   }
 
   /**
@@ -146,22 +271,94 @@ export class PromptService {
    * If a handle is provided, it will be formatted with the organization and project context.
    *
    * @param params - The parameters object
-   * @param params.id - The prompt configuration ID
+   * @param params.idOrHandle - The prompt configuration ID or handle
    * @param params.projectId - The project ID for authorization and context
    * @param params.data - The update data containing name and optional handle
    * @returns The updated prompt configuration
    */
   async updatePrompt(params: {
-    id: string;
+    idOrHandle: string;
     projectId: string;
-    data: Partial<Pick<CreateLlmConfigParams, "handle" | "scope">>;
-  }): Promise<LlmPromptConfig> {
-    const { id, projectId, data } = params;
+    data: Partial<
+      Omit<
+        CreateLlmConfigParams &
+          CreateLlmConfigVersionParams &
+          CreateLlmConfigVersionParams["configData"],
+        | "id"
+        | "createdAt"
+        | "updatedAt"
+        | "deletedAt"
+        | "configId"
+        | "projectId"
+      >
+    >;
+  }): Promise<VersionedPrompt> {
+    const { idOrHandle, projectId, data } = params;
+    const { handle, scope, ...newVersionData } = data;
 
-    return this.repository.updateConfig(id, projectId, {
-      handle: data.handle,
-      scope: data.scope,
-    });
+    this.assertNoSystemPromptConflict(newVersionData);
+
+    const messageSystemPrompt = newVersionData.messages?.find(
+      (msg) => msg.role === "system"
+    )?.content;
+
+    // We want to ensure that the system prompt is always in the prompt field
+    // and the messages array doesn't contain the system message
+    if (messageSystemPrompt) {
+      newVersionData.prompt = messageSystemPrompt;
+      newVersionData.messages = newVersionData.messages?.filter(
+        (msg) => msg.role !== "system"
+      );
+    }
+
+    // Handle in a transaction to ensure atomicity
+    const result = await this.prisma.$transaction(
+      async (tx: Prisma.TransactionClient) => {
+        // Update the config
+        const updatedConfig = await this.repository.updateConfig(
+          idOrHandle,
+          projectId,
+          {
+            handle,
+            scope,
+          },
+          { tx }
+        );
+
+        // Get the latest version
+        const latestVersion = (await this.repository.versions.getLatestVersion(
+          updatedConfig.id,
+          projectId,
+          { tx }
+        )) as LatestConfigVersionSchema;
+
+        const parsedLatestVersionData =
+          getLatestConfigVersionSchema().parse(latestVersion);
+
+        // Update the version
+        const updatedVersion: LlmPromptConfigVersion =
+          await tx.llmPromptConfigVersion.create({
+            data: {
+              configId: updatedConfig.id,
+              projectId,
+              commitMessage: newVersionData.commitMessage ?? "Updated from API",
+              configData: {
+                ...parsedLatestVersionData.configData,
+                ...newVersionData,
+              } as any,
+              schemaVersion: LATEST_SCHEMA_VERSION,
+              version: latestVersion.version + 1,
+            },
+          });
+
+        return this.transformToVersionedPrompt({
+          ...updatedConfig,
+          latestVersion: updatedVersion,
+        } as LlmConfigWithLatestVersion);
+      }
+    );
+
+    return result;
   }
 
   /**
@@ -209,6 +406,19 @@ export class PromptService {
 
   /**
    * Sync/upsert a prompt from local content with conflict resolution
+   *
+   * If the prompt doesn't exist on the server, it will be created.
+   * If the prompt exists on the server, it will be updated.
+   * If the local version is newer than the remote version, it will be updated.
+   * If the local version is older than the remote version, it will be conflict.
+   *
+   * @param params - The parameters object
+   * @param params.idOrHandle - The ID or handle of the prompt
+   * @param params.localConfigData - The local config data
+   * @param params.localVersion - The local version number
+   * @param params.projectId - The project ID
+   * @param params.organizationId - The organization ID
+   * @param params.authorId - The author ID
    */
   async syncPrompt(params: {
     idOrHandle: string;
@@ -220,7 +430,7 @@ export class PromptService {
     commitMessage?: string;
   }): Promise<{
     action: "created" | "updated" | "conflict" | "up_to_date";
-    prompt?: LlmConfigWithLatestVersion;
+    prompt?: VersionedPrompt;
     conflictInfo?: {
       localVersion: number;
       remoteVersion: number;
@@ -247,40 +457,20 @@ export class PromptService {
 
     // Case 1: Prompt doesn't exist on server - create new
     if (!existingPrompt) {
-      const newPrompt = await this.repository.createConfigWithInitialVersion({
-        configData: {
-          name: idOrHandle,
-          handle: idOrHandle,
-          projectId,
-          organizationId,
-          scope: "PROJECT" as PromptScope,
-        },
+      const createdPrompt = await this.createPrompt({
+        name: idOrHandle,
+        handle: idOrHandle,
+        projectId,
+        organizationId,
+        scope: "PROJECT" as PromptScope,
+        authorId,
+        commitMessage: commitMessage ?? "Synced from local file",
+        ...localConfigData,
       });
-
-      // Create a new version with the local content
-      const newVersion = await this.repository.versions.createVersion(
-        {
-          configId: newPrompt.id,
-          projectId,
-          authorId,
-          commitMessage: commitMessage ?? "Synced from local file",
-          configData: localConfigData,
-          schemaVersion: SchemaVersion.V1_0,
-        },
-        organizationId
-      );
 
       return {
         action: "created",
-        prompt: {
-          ...newPrompt,
-          latestVersion: {
-            ...newVersion,
-            commitMessage: newVersion.commitMessage ?? "Synced from local file",
-            version: newVersion.version,
-            configData: localConfigData,
-          },
-        },
+        prompt: createdPrompt,
       };
     }
 
@@ -297,8 +487,15 @@ export class PromptService {
       );
     }
 
-    const remoteVersion = existingPrompt.latestVersion.version;
-    const remoteConfigData = existingPrompt.latestVersion.configData;
+    const remoteVersion = existingPrompt.version;
+    const remoteConfigData: LatestConfigVersionSchema["configData"] = {
+      model: existingPrompt.model,
+      prompt: existingPrompt.prompt,
+      messages: existingPrompt.messages,
+      inputs: existingPrompt.inputs,
+      outputs: existingPrompt.outputs,
+      response_format: existingPrompt.response_format,
+    };
 
     // Case 2: Same version - check content
     if (localVersion === remoteVersion) {
@@ -312,27 +509,20 @@ export class PromptService {
         return { action: "up_to_date", prompt: existingPrompt };
       } else {
         // Content differs - create new version
-        const newVersion = await this.repository.versions.createVersion(
-          {
-            configId: existingPrompt.id,
-            projectId,
+        const updatedPrompt = await this.updatePrompt({
+          idOrHandle: existingPrompt.id,
+          projectId,
+          data: {
             authorId,
             commitMessage: commitMessage ?? "Updated from local file",
             configData: localConfigData,
             schemaVersion: SchemaVersion.V1_0,
           },
-          organizationId
-        );
+        });
 
         return {
           action: "updated",
-          prompt: {
-            ...existingPrompt,
-            latestVersion: {
-              ...newVersion,
-              configData: localConfigData,
-            } as any,
-          },
+          prompt: updatedPrompt,
         };
       }
     }
@@ -389,5 +579,76 @@ export class PromptService {
         remoteConfigData,
       },
     };
+  }
+
+  /**
+   * Transforms a LlmConfigWithLatestVersion to the versioned prompt shape.
+   */
+  private transformToVersionedPrompt(
+    config: Omit<LlmConfigWithLatestVersion, "deletedAt">
+  ): VersionedPrompt {
+    const prompt = config.latestVersion.configData.prompt;
+
+    return {
+      id: config.id,
+      name: config.name,
+      handle: config.handle,
+      scope: config.scope,
+      version: config.latestVersion.version ?? 0,
+      versionId: config.latestVersion.id ?? "",
+      versionCreatedAt: config.latestVersion.createdAt ?? new Date(),
+      model: config.latestVersion.configData.model,
+      prompt,
+      projectId: config.projectId,
+      organizationId: config.organizationId,
+      // The VersionedPrompt contains the system message,
+      // but in the database, we only have the prompt field above
+      messages: [
+        { role: "system", content: prompt },
+        ...(config.latestVersion.configData.messages ?? []),
+      ],
+      inputs: config.latestVersion.configData.inputs,
+      outputs: config.latestVersion.configData.outputs,
+      response_format: config.latestVersion.configData.response_format,
+      authorId: config.latestVersion.authorId ?? null,
+      updatedAt: config.updatedAt,
+      createdAt: config.createdAt,
+      demonstrations: config.latestVersion.configData.demonstrations,
+      promptingTechnique: config.latestVersion.configData.prompting_technique,
+    };
+  }
+
+  /**
+   * Validates that a prompt and system message are not set at the same time.
+   * @param params - The parameters object
+   * @param params.prompt - The prompt to validate
+   * @param params.messages - The messages to validate
+   * @throws SystemPromptConflictError if a prompt and system message are set at the same time
+   */
+  private assertNoSystemPromptConflict(params: {
+    prompt?: string;
+    messages?: z.infer<typeof messageSchema>[];
+  }): void {
+    if (
+      params.prompt &&
+      params.messages?.some((msg) => msg.role === "system")
+    ) {
+      throw new SystemPromptConflictError();
+    }
+  }
+
+  private async getOrganizationIdFromProjectId(
+    projectId: string
+  ): Promise<string> {
+    const team = await this.prisma.team.findUnique({
+      where: { id: projectId },
+      include: { organization: true },
+    });
+
+    if (!team?.organizationId) {
+      throw new Error("Organization not found");
+    }
+
+    return team.organizationId;
   }
 }

@@ -1,4 +1,5 @@
 import {
+  type Prisma,
   type LlmPromptConfig,
   type LlmPromptConfigVersion,
   type PrismaClient,
@@ -7,9 +8,10 @@ import {
 import { TRPCError } from "@trpc/server";
 import { nanoid } from "nanoid";
 
+import { type SchemaVersion } from "../enums";
+
 import {
   type LatestConfigVersionSchema,
-  type SchemaVersion,
   getVersionValidator,
 } from "./llm-config-version-schema";
 import { LlmConfigRepository } from "./llm-config.repository";
@@ -21,8 +23,10 @@ export type LlmConfigVersionDTO = Omit<LatestConfigVersionSchema, "version">;
 
 export type CreateLlmConfigVersionParams = Omit<
   LlmPromptConfigVersion,
-  "id" | "author" | "config" | "createdAt"
->;
+  "id" | "author" | "config" | "createdAt" | "configData"
+> & {
+  configData: LatestConfigVersionSchema["configData"];
+};
 
 /**
  * Repository for managing LLM Configuration Versions
@@ -62,7 +66,7 @@ export class LlmConfigVersionsRepository {
     }
 
     // Get all versions
-    return this.prisma.llmPromptConfigVersion.findMany({
+    return await this.prisma.llmPromptConfigVersion.findMany({
       where: { configId: config.id, projectId },
       orderBy: { createdAt: "desc" },
       include: {
@@ -110,10 +114,15 @@ export class LlmConfigVersionsRepository {
    */
   async getLatestVersion(
     configId: string,
-    projectId: string
+    projectId: string,
+    options?: {
+      tx?: Prisma.TransactionClient;
+    }
   ): Promise<LlmPromptConfigVersion & { author: User | null }> {
+    const { tx } = options ?? {};
+    const client = tx ?? this.prisma;
     // Verify the config exists
-    const config = await this.prisma.llmPromptConfig.findUnique({
+    const config = await client.llmPromptConfig.findUnique({
       where: { id: configId, projectId },
     });
 
@@ -125,7 +134,7 @@ export class LlmConfigVersionsRepository {
     }
 
     // Get the latest version
-    const latestVersion = await this.prisma.llmPromptConfigVersion.findFirst({
+    const latestVersion = await client.llmPromptConfigVersion.findFirst({
       where: { configId, projectId },
       orderBy: { createdAt: "desc" },
       include: {
@@ -146,10 +155,11 @@ export class LlmConfigVersionsRepository {
   /**
    * Create a new version for an existing config
    */
-  async createVersion(
-    versionData: Omit<LlmConfigVersionDTO, "author">,
-    organizationId: string
-  ): Promise<LlmPromptConfigVersion & { schemaVersion: SchemaVersion }> {
+  async createVersion(params: {
+    versionData: Omit<LlmConfigVersionDTO, "author" | "id" | "createdAt">;
+    organizationId: string;
+  }): Promise<LlmPromptConfigVersion & { schemaVersion: SchemaVersion }> {
+    const { versionData, organizationId } = params;
     // Verify the config exists
     const promptRepository = new LlmConfigRepository(this.prisma);
     const config =
@@ -231,8 +241,8 @@ export class LlmConfigVersionsRepository {
       throw new Error(`Version ${id} not found.`);
     }
 
-    const newVersion = await this.createVersion(
-      {
+    const newVersion = await this.createVersion({
+      versionData: {
         authorId,
         projectId: version.projectId,
         configId: version.configId,
@@ -240,8 +250,8 @@ export class LlmConfigVersionsRepository {
         schemaVersion: version.schemaVersion as SchemaVersion,
         configData: version.configData as LlmConfigVersionDTO["configData"],
       },
-      organizationId
-    );
+      organizationId,
+    });
 
     return newVersion;
   }

@@ -4,7 +4,7 @@ import { PromptConverter } from "@/cli/utils/promptConverter";
 import { PromptServiceTracingDecorator, tracer } from "./tracing";
 import { createTracingProxy } from "@/client-sdk/tracing/create-tracing-proxy";
 import { type InternalConfig } from "@/client-sdk/types";
-import { type CreatePromptBody, type CreateVersionBody, type UpdatePromptBody } from "./types";
+import { type CreatePromptBody, type UpdatePromptBody } from "./types";
 
 /**
  * Custom error class for Prompts API operations.
@@ -89,7 +89,8 @@ export class PromptsService {
    * @throws {PromptsError} If the API call fails.
    */
   async getAll(): Promise<Prompt[]> {
-    const { data, error } = await this.config.langwatchApiClient.GET("/api/prompts");
+    const { data, error } =
+      await this.config.langwatchApiClient.GET("/api/prompts");
     if (error) this.handleApiError("fetch all prompts", error);
     return data.map((promptData) => new Prompt(promptData));
   }
@@ -100,16 +101,16 @@ export class PromptsService {
    * @returns The Prompt instance.
    * @throws {PromptsError} If the API call fails.
    */
-  async get(
-    id: string,
-    options?: { version?: string },
-  ): Promise<Prompt> {
-    const { data, error } = await this.config.langwatchApiClient.GET("/api/prompts/{id}", {
-      params: { path: { id } },
-      query: {
-        version: options?.version,
+  async get(id: string, options?: { version?: string }): Promise<Prompt> {
+    const { data, error } = await this.config.langwatchApiClient.GET(
+      "/api/prompts/{id}",
+      {
+        params: { path: { id } },
+        query: {
+          version: options?.version,
+        },
       },
-    });
+    );
 
     if (error) {
       this.handleApiError(`fetch prompt with ID "${id}"`, error);
@@ -128,7 +129,10 @@ export class PromptsService {
       await this.get(id);
       return true;
     } catch (error) {
-      if (error instanceof PromptsError && error.originalError?.statusCode === 404) {
+      if (
+        error instanceof PromptsError &&
+        error.originalError?.statusCode === 404
+      ) {
         return false;
       }
 
@@ -143,9 +147,12 @@ export class PromptsService {
    * @throws {PromptsError} If the API call fails.
    */
   async create(params: CreatePromptBody): Promise<Prompt> {
-    const { data, error } = await this.config.langwatchApiClient.POST("/api/prompts", {
-      body: params,
-    });
+    const { data, error } = await this.config.langwatchApiClient.POST(
+      "/api/prompts",
+      {
+        body: params,
+      },
+    );
     if (error) this.handleApiError("create prompt", error);
     return new Prompt(data);
   }
@@ -160,10 +167,13 @@ export class PromptsService {
    *   The API does not return the updated prompt directly, so this method fetches it after updating.
    */
   async update(id: string, params: UpdatePromptBody): Promise<Prompt> {
-    const { error } = await this.config.langwatchApiClient.PUT("/api/prompts/{id}", {
-      params: { path: { id } },
-      body: params,
-    });
+    const { error } = await this.config.langwatchApiClient.PUT(
+      "/api/prompts/{id}",
+      {
+        params: { path: { id } },
+        body: params,
+      },
+    );
     if (error) this.handleApiError(`update prompt with ID "${id}"`, error);
     // TODO: This is a workaround to get the updated prompt. It would be better to return the updated prompt directly.
     const updatedPrompt = await this.get(id);
@@ -183,9 +193,12 @@ export class PromptsService {
    * @throws {PromptsError} If the API call fails.
    */
   async delete(id: string): Promise<{ success: boolean }> {
-    const { data, error } = await this.config.langwatchApiClient.DELETE("/api/prompts/{id}", {
-      params: { path: { id } },
-    });
+    const { data, error } = await this.config.langwatchApiClient.DELETE(
+      "/api/prompts/{id}",
+      {
+        params: { path: { id } },
+      },
+    );
     if (error) this.handleApiError(`delete prompt with ID "${id}"`, error);
 
     return data;
@@ -196,7 +209,7 @@ export class PromptsService {
    * @param id The prompt's unique identifier.
    * @throws {PromptsError} If the API call fails.
    */
-  async getVersions(id: string): Promise<Record<string, Prompt>> {
+  async getVersions(id: string): Promise<Prompt[]> {
     const { data, error } = await this.config.langwatchApiClient.GET(
       "/api/prompts/{id}/versions",
       {
@@ -206,57 +219,7 @@ export class PromptsService {
     if (error)
       this.handleApiError(`fetch versions for prompt with ID "${id}"`, error);
 
-    const prompts: Record<string, Prompt> = {};
-    const dataTypeCorrected = data as unknown as NonNullable<
-      paths["/api/prompts/{id}/versions"]["get"]["responses"]["200"]["content"]["application/json"]
-    >[];
-
-    for (const version of dataTypeCorrected) {
-      prompts[version.id] = new Prompt({
-        id: version.configId,
-        handle: version.handle,
-        scope: version.scope,
-        messages: version.configData.messages,
-        model: version.configData.model,
-        prompt: version.configData.prompt,
-        response_format: null,
-        name: `Prompt ${version.configId}@${version.id}`,
-        updatedAt: version.createdAt,
-        version: version.configData.version ?? 0,
-        versionCreatedAt: version.createdAt,
-        versionId: version.id,
-      });
-    }
-
-    return prompts;
-  }
-
-  /**
-   * Creates a new version for a given prompt.
-   * @param id The prompt's unique identifier.
-   * @param params The version creation payload, matching the OpenAPI schema.
-   * @returns The updated Prompt instance.
-   * @throws {PromptsError} If the API call fails.
-   * @remarks
-   *   The API does not return the updated prompt directly, so this method fetches it after creation.
-   */
-  async createVersion(id: string, params: CreateVersionBody): Promise<Prompt> {
-    const { error } = await this.config.langwatchApiClient.POST("/api/prompts/{id}/versions", {
-      params: { path: { id } },
-      body: params,
-    });
-    if (error)
-      this.handleApiError(`create version for prompt with ID "${id}"`, error);
-    // TODO: This is a workaround to get the updated prompt. It would be better to return the updated prompt directly.
-    const updatedPrompt = await this.get(id);
-    if (!updatedPrompt) {
-      throw new PromptsError(
-        "Prompt not found after version creation",
-        "create version",
-        null,
-      );
-    }
-    return updatedPrompt;
+    return data.map((version) => new Prompt(version));
   }
 
   /**
@@ -280,39 +243,34 @@ export class PromptsService {
       }>;
     },
   ): Promise<{ created: boolean; prompt: Prompt }> {
-    let prompt = await this.get(handle);
-    let created = false;
-
-    if (!prompt) {
-      prompt = await this.create({ handle });
-      created = true;
-    }
-
-    // Create a new version with the updated config using the converter
-    const versionData = {
-      configData: {
-        version: 1,
-        model: config.model,
-        prompt: PromptConverter.extractSystemPrompt(config.messages),
-        messages: PromptConverter.filterNonSystemMessages(config.messages),
-        temperature: config.modelParameters?.temperature,
-        max_tokens: config.modelParameters?.max_tokens,
-        inputs: [{ identifier: "input", type: "str" as const }],
-        outputs: [{ identifier: "output", type: "str" as const }],
-      },
+    const payload: CreatePromptBody | UpdatePromptBody = {
+      handle,
+      model: config.model,
+      prompt: PromptConverter.extractSystemPrompt(config.messages),
+      messages: PromptConverter.filterNonSystemMessages(config.messages),
+      temperature: config.modelParameters?.temperature,
+      maxTokens: config.modelParameters?.max_tokens,
+      inputs: [{ identifier: "input", type: "str" as const }],
+      outputs: [{ identifier: "output", type: "str" as const }],
       commitMessage: `Updated via CLI sync`,
-      projectId: "placeholder", // Will be overridden by the API
-      configId: prompt.id,
-      schemaVersion: "1.0" as const,
-      version: 1, // Will be auto-incremented by the API
-    } as any; // Type assertion to bypass strict typing for now
-
-    const updatedPrompt = await this.createVersion(prompt.id, versionData);
-
-    return {
-      created,
-      prompt: updatedPrompt,
+      schemaVersion: "1.0",
     };
+
+    // Creating a prompt with the same handle will fail, so we try to update instead
+    try {
+      const prompt = await this.create(payload);
+      return {
+        created: true,
+        prompt,
+      };
+    } catch {
+      const prompt = await this.update(handle, payload);
+
+      return {
+        created: false,
+        prompt,
+      };
+    }
   }
 
   /**
@@ -325,14 +283,17 @@ export class PromptsService {
     commitMessage?: string;
   }): Promise<SyncResult> {
     try {
-      const response = await this.config.langwatchApiClient.POST("/api/prompts/{id}/sync", {
-        params: { path: { id: params.name } },
-        body: {
-          configData: params.configData,
-          localVersion: params.localVersion,
-          commitMessage: params.commitMessage,
+      const response = await this.config.langwatchApiClient.POST(
+        "/api/prompts/{id}/sync",
+        {
+          params: { path: { id: params.name } },
+          body: {
+            configData: params.configData,
+            localVersion: params.localVersion,
+            commitMessage: params.commitMessage,
+          },
         },
-      });
+      );
 
       if (response.error) {
         const errorMessage =

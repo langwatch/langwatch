@@ -12,12 +12,18 @@ from .utils.initialization import ensure_setup, setup
 # Type hints for IntelliSense (only imported for typing)
 from typing import TYPE_CHECKING
 
+# Type hints for IntelliSense (only imported for typing)
 if TYPE_CHECKING:
     import langwatch.evaluations as evaluations
     import langwatch.evaluation as evaluation
     import langwatch.dataset as dataset
     import langwatch.dspy as dspy
     import langwatch.langchain as langchain
+    from .prompts.service import PromptService
+
+    # Type hint for the prompts service specifically
+    # required to get the instance typing correct
+    prompts: PromptService
 
 
 @module_property
@@ -54,6 +60,13 @@ def __getattr__(name: str):
             # Cache it in the module globals for subsequent access
             globals()[name] = module
             return module
+    elif name == "prompts":
+        # Special-case: expose a PromptService instance at langwatch.prompts
+        from .prompts.service import PromptService
+
+        svc = PromptService.from_global()
+        globals()[name] = svc  # Cache for subsequent access
+        return svc
 
     raise AttributeError(f"module '{__name__}' has no attribute '{name}'")
 
@@ -140,4 +153,5 @@ __all__ = [
     "evaluations",
     "langchain",
     "dspy",
+    "prompts",
 ]

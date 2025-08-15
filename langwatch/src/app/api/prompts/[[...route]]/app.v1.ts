@@ -4,9 +4,6 @@ import { describeRoute } from "hono-openapi";
 import { validator as zValidator, resolver } from "hono-openapi/zod";
 import { z } from "zod";
 
-import { type PromptService } from "~/server/prompt-config/prompt.service";
-import { getLatestConfigVersionSchema } from "~/server/prompt-config/repositories/llm-config-version-schema";
-
 import {
   organizationMiddleware,
   type AuthMiddlewareVariables,
@@ -16,30 +13,24 @@ import {
   promptServiceMiddleware,
   type PromptServiceMiddlewareVariables,
 } from "../../middleware/prompt-service";
-import { baseResponses } from "../../shared/base-responses";
+import { baseResponses, conflictResponses } from "../../shared/base-responses";
 
 import {
-  llmPromptConfigSchema,
-  promptOutputSchema,
-  versionInputSchema,
-  versionOutputSchema,
+  apiResponsePromptWithVersionDataSchema,
+  createPromptInputSchema,
+  updatePromptInputSchema,
+  type ApiResponsePrompt,
 } from "./schemas";
-import {
-  buildStandardSuccessResponse,
-  getOutputsToResponseFormat,
-} from "./utils";
+import { buildStandardSuccessResponse } from "./utils";
 import { handlePossibleConflictError } from "./utils";
+import { handleSystemPromptConflict } from "./utils/handle-system-prompt-conflict";
 
 import { badRequestSchema, successSchema } from "~/app/api/shared/schemas";
 import {
-  handleSchema,
-  scopeSchema,
   commitMessageSchema,
   versionSchema,
-  outputsSchema,
-  messageSchema,
-  inputsSchema,
 } from "~/prompt-configs/schemas/field-schemas";
+import { getLatestConfigVersionSchema } from "~/server/prompt-config/repositories/llm-config-version-schema";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
 import { createLogger } from "~/utils/logger";
 
@@ -71,7 +62,9 @@ app.get(
       200: {
         description: "Success",
         content: {
-          "application/json": { schema: resolver(z.array(promptOutputSchema)) },
+          "application/json": {
+            schema: resolver(z.array(apiResponsePromptWithVersionDataSchema)),
+          },
         },
       },
     },
@@ -83,91 +76,15 @@ app.get(
 
     logger.info({ projectId: project.id }, "Getting all prompts for project");
 
-    const configs = await service.repository.getAllWithLatestVersion({
+    const configs: ApiResponsePrompt[] = await service.getAllPrompts({
       projectId: project.id,
       organizationId: organization.id,
+      version: "latest",
     });
 
-    logger.info(
-      { projectId: project.id, count: configs.length },
-      "Retrieved prompts for project"
-    );
-
-    const transformedConfigs = configs.map((config) =>
-      transformConfigToPromptOutput(config, config.id)
-    );
-
     return c.json(
-      transformedConfigs satisfies z.infer<typeof promptOutputSchema>[]
+      apiResponsePromptWithVersionDataSchema.array().parse(configs)
     );
-  }
-);
-
-// Create prompt with initial version
-app.post(
-  "/",
-  describeRoute({
-    description: "Create a new prompt with default initial version",
-    responses: {
-      ...baseResponses,
-      200: buildStandardSuccessResponse(promptOutputSchema),
-    },
-  }),
-  zValidator(
-    "json",
-    z.object({
-      handle: handleSchema,
-      scope: scopeSchema,
-      // Version data
-      authorId: z.string().optional(),
-      prompt: z.string().optional(),
-      messages: z.array(messageSchema).optional(),
-      inputs: z.array(inputsSchema).optional(),
-      outputs: z.array(outputsSchema).optional(),
-    })
-  ),
-  async (c) => {
-    const service = c.get("promptService");
-    const project = c.get("project");
-    const organization = c.get("organization");
-    const data = c.req.valid("json");
-
-    logger.info(
-      {
-        handle: data.handle,
-        scope: data.scope,
-        projectId: project.id,
-        organizationId: organization.id,
-      },
-      "Creating new prompt with initial version"
-    );
-
-    try {
-      const newConfig = await service.createPrompt({
-        projectId: project.id,
-        handle: data.handle,
-        organizationId: organization.id,
-        scope: data.scope,
-        authorId: data.authorId,
-        prompt: data.prompt,
-        messages: data.messages,
-        inputs: data.inputs,
-        outputs: data.outputs,
-      });
-
-      logger.info(
-        { promptId: newConfig.id },
-        "Successfully created prompt with initial version"
-      );
-
-      return c.json(newConfig);
-    } catch (error: any) {
-      logger.error({ projectId: project.id, error }, "Error creating prompt");
-      handlePossibleConflictError(error, data.scope);
-
-      // Re-throw other errors to be handled by the error middleware
-      throw error;
-    }
   }
 );
 
@@ -175,10 +92,13 @@ app.post(
 app.get(
   "/:id{.+?}/versions",
   describeRoute({
-    description: "Get all versions for a prompt",
+    description:
+      "Get all versions for a prompt. Does not include base prompt data, only versioned data.",
     responses: {
       ...baseResponses,
-      200: buildStandardSuccessResponse(versionOutputSchema),
+      200: buildStandardSuccessResponse(
+        z.array(apiResponsePromptWithVersionDataSchema)
+      ),
       404: {
         description: "Prompt not found",
         content: {
@@ -198,71 +118,20 @@ app.get(
       "Getting versions for prompt"
     );
 
-    const versions =
-      await service.repository.versions.getVersionsForConfigByIdOrHandle({
-        idOrHandle: id,
-        projectId: project.id,
-        organizationId: organization.id,
-      });
+    const versions: ApiResponsePrompt[] = await service.getAllVersions({
+      idOrHandle: id,
+      projectId: project.id,
+      organizationId: organization.id,
+    });
 
     logger.info(
       { projectId: project.id, promptId: id, versionCount: versions.length },
       "Successfully retrieved prompt versions"
     );
 
-    return c.json(versions);
-  }
-);
-
-// Create version
-app.post(
-  "/:id{.+?}/versions",
-  describeRoute({
-    description: "Create a new version for a prompt",
-    responses: {
-      ...baseResponses,
-      200: buildStandardSuccessResponse(versionOutputSchema),
-      404: {
-        description: "Prompt not found",
-        content: {
-          "application/json": { schema: resolver(badRequestSchema) },
-        },
-      },
-    },
-  }),
-  zValidator("json", versionInputSchema),
-  async (c) => {
-    const service = c.get("promptService");
-    const project = c.get("project");
-    const organization = c.get("organization");
-    const { id } = c.req.param();
-    const data = c.req.valid("json");
-
-    logger.info(
-      { projectId: project.id, promptId: id, model: data.configData?.model },
-      "Creating new version for prompt"
+    return c.json(
+      apiResponsePromptWithVersionDataSchema.array().parse(versions)
     );
-
-    const version = await service.repository.versions.createVersion(
-      {
-        ...data,
-        configId: id,
-        projectId: project.id,
-      },
-      organization.id
-    );
-
-    logger.info(
-      {
-        projectId: project.id,
-        promptId: id,
-        versionId: version.id,
-        version: version.version,
-      },
-      "Successfully created new prompt version"
-    );
-
-    return c.json(version);
   }
 );
 
@@ -282,7 +151,7 @@ app.get(
     ],
     responses: {
       ...baseResponses,
-      200: buildStandardSuccessResponse(promptOutputSchema),
+      200: buildStandardSuccessResponse(apiResponsePromptWithVersionDataSchema),
       404: {
         description: "Prompt not found",
         content: {
@@ -315,128 +184,64 @@ app.get(
       });
     }
 
-    const response = transformConfigToPromptOutput(config, id);
-
-    return c.json(response);
+    return c.json(apiResponsePromptWithVersionDataSchema.parse(config));
   }
 );
 
-// Update prompt
-app.put(
-  "/:id{.+}",
+// Create prompt with initial version
+app.post(
+  "/",
   describeRoute({
-    description: "Update a prompt",
+    description: "Create a new prompt with default initial version",
     responses: {
       ...baseResponses,
-      200: buildStandardSuccessResponse(llmPromptConfigSchema),
-      404: {
-        description: "Prompt not found",
-        content: {
-          "application/json": { schema: resolver(badRequestSchema) },
-        },
-      },
+      200: buildStandardSuccessResponse(apiResponsePromptWithVersionDataSchema),
+      409: conflictResponses[409],
     },
   }),
-  zValidator(
-    "json",
-    z.strictObject({
-      handle: handleSchema.optional(),
-      scope: scopeSchema.optional(),
-      // Version data
-      authorId: z.string().optional(),
-      prompt: z.string().optional(),
-      messages: z.array(messageSchema).optional(),
-      inputs: z.array(inputsSchema).optional(),
-      outputs: z.array(outputsSchema).optional(),
-    })
-  ),
+  zValidator("json", createPromptInputSchema),
   async (c) => {
     const service = c.get("promptService");
     const project = c.get("project");
-    const { id } = c.req.param();
+    const organization = c.get("organization");
     const data = c.req.valid("json");
-    const projectId = project.id;
-
-    if (Object.keys(data).length === 0) {
-      throw new HTTPException(400, {
-        message: "At least one field is required",
-      });
-    }
 
     logger.info(
       {
+        handle: data.handle,
+        scope: data.scope,
         projectId: project.id,
-        promptId: id,
-        newHandle: data.handle,
-        newScope: data.scope,
+        organizationId: organization.id,
       },
-      "Updating prompt"
+      "Creating new prompt with initial version"
     );
 
     try {
-      const updatedConfig = await service.updatePrompt({
-        id,
-        projectId,
-        data,
+      const newConfig: ApiResponsePrompt = await service.createPrompt({
+        projectId: project.id,
+        handle: data.handle,
+        organizationId: organization.id,
+        scope: data.scope,
+        authorId: data.authorId,
+        prompt: data.prompt,
+        messages: data.messages,
+        inputs: data.inputs,
+        outputs: data.outputs,
       });
 
       logger.info(
-        {
-          projectId,
-          promptId: id,
-          handle: updatedConfig.handle,
-          scope: updatedConfig.scope,
-        },
-        "Successfully updated prompt"
+        { promptId: newConfig.id },
+        "Successfully created prompt with initial version"
       );
 
-      return c.json(updatedConfig);
+      return c.json(apiResponsePromptWithVersionDataSchema.parse(newConfig));
     } catch (error: any) {
-      logger.error({ projectId, promptId: id, error }, "Error updating prompt");
+      logger.error({ projectId: project.id, error }, "Error creating prompt");
       handlePossibleConflictError(error, data.scope);
 
       // Re-throw other errors to be handled by the error middleware
       throw error;
     }
-  }
-);
-
-// Delete prompt
-app.delete(
-  "/:id{.+}",
-  describeRoute({
-    description: "Delete a prompt",
-    responses: {
-      ...baseResponses,
-      200: buildStandardSuccessResponse(successSchema),
-      404: {
-        description: "Prompt not found",
-        content: {
-          "application/json": { schema: resolver(badRequestSchema) },
-        },
-      },
-    },
-  }),
-  async (c) => {
-    const service = c.get("promptService");
-    const project = c.get("project");
-    const organization = c.get("organization");
-    const { id } = c.req.param();
-
-    logger.info({ projectId: project.id, promptId: id }, "Deleting prompt");
-
-    const result = await service.repository.deleteConfig(
-      id,
-      project.id,
-      organization.id
-    );
-
-    logger.info(
-      { projectId: project.id, promptId: id, success: result.success },
-      "Successfully deleted prompt"
-    );
-
-    return c.json(result satisfies z.infer<typeof successSchema>);
   }
 );
 
@@ -459,7 +264,7 @@ app.post(
                   "conflict",
                   "up_to_date",
                 ]),
-                prompt: promptOutputSchema.optional(),
+                prompt: apiResponsePromptWithVersionDataSchema.optional(),
                 conflictInfo: z
                   .object({
                     localVersion: z.number(),
@@ -511,7 +316,7 @@ app.post(
       };
 
       if (syncResult.prompt) {
-        response.prompt = transformConfigToPromptOutput(syncResult.prompt, id);
+        response.prompt = syncResult.prompt;
       }
 
       if (syncResult.conflictInfo) {
@@ -546,56 +351,123 @@ app.post(
   }
 );
 
-// Helper function to transform config to promptOutputSchema format
-const transformConfigToPromptOutput = (
-  config: Awaited<
-    ReturnType<
-      typeof PromptService.prototype.repository.getAllWithLatestVersion
-    >
-  >[0],
+// Update prompt
+app.put(
+  "/:id{.+}",
+  describeRoute({
+    description: "Update a prompt",
+    responses: {
+      ...baseResponses,
+      200: buildStandardSuccessResponse(apiResponsePromptWithVersionDataSchema),
+      404: {
+        description: "Prompt not found",
+        content: {
+          "application/json": { schema: resolver(badRequestSchema) },
+        },
+      },
+      409: conflictResponses[409],
+      422: {
+        description: "Invalid input",
+        content: {
+          "application/json": { schema: resolver(badRequestSchema) },
+        },
+      },
+    },
+  }),
+  zValidator("json", updatePromptInputSchema),
+  async (c) => {
+    const service = c.get("promptService");
+    const project = c.get("project");
+    const { id } = c.req.param();
+    const data = c.req.valid("json");
+    const projectId = project.id;
 
-  id: string
-): z.infer<typeof promptOutputSchema> => {
-  return {
-    id,
-    name: config.name,
-    handle: config.handle,
-    scope: config.scope,
-    version: config.latestVersion.version,
-    versionId: config.latestVersion.id ?? "",
-    versionCreatedAt: config.latestVersion.createdAt ?? new Date(),
-    model: config.latestVersion.configData.model,
-    prompt: config.latestVersion.configData.prompt,
-    updatedAt: config.updatedAt,
-    projectId: config.projectId,
-    organizationId: config.organizationId,
-    messages: buildMessages(config),
-    response_format: getOutputsToResponseFormat(config),
-  };
-};
+    if (Object.keys(data).length === 0) {
+      throw new HTTPException(422, {
+        message: "At least one field is required",
+      });
+    }
 
-/**
- * Build messages array from config data.
- *
- * While there shouldn't be a case where both a prompt and a system message are provided,
- * this should have been addressed on ingestion, and this isn't the place to handle it.
- */
-function buildMessages(
-  config: Awaited<
-    ReturnType<
-      typeof PromptService.prototype.repository.getAllWithLatestVersion
-    >
-  >[0]
-): z.infer<typeof promptOutputSchema>["messages"] {
-  const { prompt } = config.latestVersion.configData;
-  const messages = [...config.latestVersion.configData.messages];
+    logger.info(
+      {
+        projectId: project.id,
+        handleOrId: id,
+        data,
+      },
+      "Updating prompt"
+    );
 
-  if (prompt) {
-    messages.unshift({
-      role: "system",
-      content: prompt,
-    });
+    try {
+      const updatedConfig: ApiResponsePrompt = await service.updatePrompt({
+        idOrHandle: id,
+        projectId,
+        data,
+      });
+
+      if (!updatedConfig) {
+        throw new HTTPException(404, {
+          message: `Prompt not found: ${id}`,
+        });
+      }
+
+      logger.info(
+        {
+          projectId,
+          promptId: id,
+          handle: updatedConfig.handle,
+          scope: updatedConfig.scope,
+        },
+        "Successfully updated prompt"
+      );
+
+      return c.json(
+        apiResponsePromptWithVersionDataSchema.parse(updatedConfig)
+      );
+    } catch (error: any) {
+      logger.error({ projectId, promptId: id, error }, "Error updating prompt");
+      handlePossibleConflictError(error, data.scope);
+      handleSystemPromptConflict(error);
+
+      // Re-throw other errors to be handled by the error middleware
+      throw error;
+    }
   }
+);
+// Delete prompt
+app.delete(
+  "/:id{.+}",
+  describeRoute({
+    description: "Delete a prompt",
+    responses: {
+      ...baseResponses,
+      200: buildStandardSuccessResponse(successSchema),
+      404: {
+        description: "Prompt not found",
+        content: {
+          "application/json": { schema: resolver(badRequestSchema) },
+        },
+      },
+    },
+  }),
+  async (c) => {
+    const service = c.get("promptService");
+    const project = c.get("project");
+    const organization = c.get("organization");
+    const { id } = c.req.param();
 
-  return messages;
-}
+    logger.info({ projectId: project.id, promptId: id }, "Deleting prompt");
+
+    const result = await service.repository.deleteConfig(
+      id,
+      project.id,
+      organization.id
+    );
+
+    logger.info(
+      { projectId: project.id, promptId: id, success: result.success },
+      "Successfully deleted prompt"
+    );
+
+    return c.json(successSchema.parse(result));
+  }
+);

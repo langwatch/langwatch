@@ -7,8 +7,6 @@ import type {
 import { nanoid } from "nanoid";
 import { describe, expect, it, beforeEach, afterEach } from "vitest";
 
-import { prisma } from "~/server/db";
-
 import { app } from "../[[...route]]/app";
 
 import { createHandle } from "./helpers";
@@ -18,6 +16,7 @@ import {
   llmPromptConfigVersionFactory,
 } from "~/factories/llm-config.factory";
 import { projectFactory } from "~/factories/project.factory";
+import { prisma } from "~/server/db";
 
 describe("Prompts API", () => {
   let mockConfig: LlmPromptConfig;
@@ -26,6 +25,19 @@ describe("Prompts API", () => {
   let testOrganization: Organization;
   let testTeam: Team;
   let testProject: Project;
+  let helpers: {
+    api: {
+      put: (path: string, body: any) => Response | Promise<Response>;
+      post: (path: string, body: any) => Response | Promise<Response>;
+      get: (path: string) => Response | Promise<Response>;
+      delete: (path: string) => Response | Promise<Response>;
+    };
+  };
+
+  const createAuthHeaders = (apiKey: string) => ({
+    "X-Auth-Token": apiKey,
+    "Content-Type": "application/json",
+  });
 
   // Setup and teardown
   beforeEach(async () => {
@@ -66,6 +78,30 @@ describe("Prompts API", () => {
     mockConfig = llmPromptConfigFactory.build({
       projectId: testProjectId,
     });
+
+    helpers = {
+      api: {
+        get: (path: string) =>
+          app.request(path, { headers: { "X-Auth-Token": testApiKey } }),
+        post: (path: string, body: any) =>
+          app.request(path, {
+            method: "POST",
+            headers: createAuthHeaders(testApiKey),
+            body: JSON.stringify(body),
+          }),
+        put: (path: string, body: any) =>
+          app.request(path, {
+            method: "PUT",
+            headers: createAuthHeaders(testApiKey),
+            body: JSON.stringify(body),
+          }),
+        delete: (path: string) =>
+          app.request(path, {
+            method: "DELETE",
+            headers: createAuthHeaders(testApiKey),
+          }),
+      },
+    };
   });
 
   afterEach(async () => {
@@ -167,13 +203,9 @@ describe("Prompts API", () => {
 
         beforeEach(async () => {
           // Create a new prompt with the handle
-          const createRes = await app.request(`/api/prompts`, {
-            method: "POST",
-            headers: {
-              "X-Auth-Token": testApiKey,
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({ name: "Test Prompt", handle }),
+          const createRes = await helpers.api.post(`/api/prompts`, {
+            handle,
+            prompt: "test",
           });
 
           // Verify the prompt was created with the handle
@@ -199,22 +231,15 @@ describe("Prompts API", () => {
         const handle = createHandle("org_ref");
 
         beforeEach(async () => {
-          const createRes = await app.request(`/api/prompts`, {
-            method: "POST",
-            headers: {
-              "X-Auth-Token": testApiKey,
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-              name: "Test Org Prompt",
-              handle,
-              scope: "ORGANIZATION",
-            }),
+          const createRes = await helpers.api.post(`/api/prompts`, {
+            handle,
+            scope: "ORGANIZATION",
+            prompt: "test",
           });
 
           // Verify the prompt was created with the organization-scoped handle
-          expect(createRes.status).toBe(200);
           const createBody = await createRes.json();
+          expect(createRes.status).toBe(200);
           expect(createBody.handle).toBe(handle);
           expect(createBody.scope).toBe("ORGANIZATION");
         });
@@ -264,12 +289,9 @@ describe("Prompts API", () => {
             const body = await res.json();
             expect(Array.isArray(body)).toBe(true);
             expect(body.length).toBe(1);
-            expect(body[0].configId).toBe(config.id);
+            expect(body[0].id).toBe(config.id);
             expect(body[0].projectId).toBe(testProjectId);
-            expect(body[0].configData).toHaveProperty(
-              "model",
-              "openai/gpt-4o-mini"
-            );
+            expect(body[0].model).toBe("openai/gpt-4o-mini");
           });
         });
 
@@ -289,8 +311,8 @@ describe("Prompts API", () => {
               }
             );
 
-            expect(res.status).toBe(200);
             const body = await res.json();
+            expect(res.status).toBe(200);
             expect(Array.isArray(body)).toBe(true);
             expect(body.length).toBe(0);
           });
@@ -302,13 +324,9 @@ describe("Prompts API", () => {
   // POST endpoints tests
   describe("POST endpoints", () => {
     it("should create a new prompt", async () => {
-      const res = await app.request(`/api/prompts`, {
-        method: "POST",
-        headers: {
-          "X-Auth-Token": testApiKey,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ handle: "test-handle/chunky-bacon" }),
+      const res = await helpers.api.post(`/api/prompts`, {
+        handle: "test-handle/chunky-bacon",
+        prompt: "test",
       });
 
       expect(res.status).toBe(200);
@@ -324,32 +342,16 @@ describe("Prompts API", () => {
         schemaVersion: "1.0",
       };
 
-      const res = await app.request(`/api/prompts`, {
-        method: "POST",
-        headers: {
-          "X-Auth-Token": testApiKey,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(invalidData),
-      });
+      const res = await helpers.api.post(`/api/prompts`, invalidData);
 
-      expect(res.status).toBe(400); // Should be 400 Bad Request
-      const body = await res.json();
-      expect(body).toHaveProperty("error");
+      expect(res.status).toBe(400);
     });
 
     describe("when scoping by project (default)", () => {
       it("should create a new prompt with a handle scoped to project", async () => {
-        const res = await app.request(`/api/prompts`, {
-          method: "POST",
-          headers: {
-            "X-Auth-Token": testApiKey,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            name: "Test Prompt",
-            handle: "my-custom-ref",
-          }),
+        const res = await helpers.api.post(`/api/prompts`, {
+          handle: "my-custom-ref",
+          prompt: "test",
         });
 
         expect(res.status).toBe(200);
@@ -361,17 +363,10 @@ describe("Prompts API", () => {
 
     describe("when scoping by organization", () => {
       it("should create a new prompt with a handle scoped to organization", async () => {
-        const res = await app.request(`/api/prompts`, {
-          method: "POST",
-          headers: {
-            "X-Auth-Token": testApiKey,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            name: "Test Prompt",
-            handle: "my-custom-ref",
-            scope: "ORGANIZATION",
-          }),
+        const res = await helpers.api.post(`/api/prompts`, {
+          handle: "my-custom-ref",
+          scope: "ORGANIZATION",
+          prompt: "test",
         });
 
         expect(res.status).toBe(200);
@@ -384,165 +379,373 @@ describe("Prompts API", () => {
 
   // PUT endpoints tests
   describe("PUT endpoints", () => {
-    it("should allow duplicate handles across different scopes", async () => {
-      // Create first prompt with organization scope
-      const prompt1Res = await app.request(`/api/prompts`, {
-        method: "POST",
-        headers: {
-          "X-Auth-Token": testApiKey,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          name: "Test Prompt 1",
+    describe("when updating a prompt", () => {
+      it("should allow duplicate handles across different scopes", async () => {
+        // Create first prompt with organization scope
+        const prompt1Res = await helpers.api.post(`/api/prompts`, {
           handle: "shared-ref",
           scope: "ORGANIZATION",
-        }),
-      });
-
-      expect(prompt1Res.status).toBe(200);
-      const prompt1 = await prompt1Res.json();
-      expect(prompt1.handle).toBe("shared-ref");
-      expect(prompt1.scope).toBe("ORGANIZATION");
-
-      // Create second prompt with project scope using same handle - should succeed
-      const prompt2Res = await app.request(`/api/prompts`, {
-        method: "POST",
-        headers: {
-          "X-Auth-Token": testApiKey,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          name: "Test Prompt 2",
-          handle: "shared-ref",
-          scope: "PROJECT",
-        }),
-      });
-
-      expect(prompt2Res.status).toBe(200);
-      const prompt2 = await prompt2Res.json();
-      expect(prompt2.handle).toBe("shared-ref");
-      expect(prompt2.scope).toBe("PROJECT");
-    });
-
-    describe("with project scope (default)", () => {
-      it("should updte a prompt with a handle in correct format", async () => {
-        // Create a valid prompt first
-        const promptRes = await app.request(`/api/prompts`, {
-          method: "POST",
-          headers: {
-            "X-Auth-Token": testApiKey,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ handle: "my-custom-ref" }),
+          prompt: "test",
         });
-
-        expect(promptRes.status).toBe(200);
-
-        const prompt = await promptRes.json();
-
-        // Update the prompt with a handle
-        const updateRes = await app.request(`/api/prompts/${prompt.id}`, {
-          method: "PUT",
-          headers: {
-            "X-Auth-Token": testApiKey,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            handle: "my-custom-ref-updated",
-          }),
-        });
-
-        const updateBody = await updateRes.json();
-        expect(updateBody.handle).toBe("my-custom-ref-updated");
-
-        const realPrompt = await prisma.llmPromptConfig.findUnique({
-          where: { id: prompt.id, projectId: testProjectId },
-        });
-
-        // Verify the handle is in the correct format
-        expect(realPrompt?.handle).toBe(
-          `${testProjectId}/my-custom-ref-updated`
-        );
-      });
-
-      it("should enforce unique handle constraint", async () => {
-        // Create first prompt with handle
-        const prompt1Res = await app.request(`/api/prompts`, {
-          method: "POST",
-          headers: {
-            "X-Auth-Token": testApiKey,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            handle: "first-ref",
-          }),
-        });
-
         expect(prompt1Res.status).toBe(200);
         const prompt1 = await prompt1Res.json();
+        expect(prompt1.handle).toBe("shared-ref");
+        expect(prompt1.scope).toBe("ORGANIZATION");
 
-        // Create second prompt
-        await app.request(`/api/prompts`, {
+        // Create second prompt with project scope using same handle - should succeed
+        const prompt2Res = await helpers.api.post(`/api/prompts`, {
+          handle: "shared-ref",
+          scope: "PROJECT",
+          prompt: "test",
+        });
+
+        expect(prompt2Res.status).toBe(200);
+        const prompt2 = await prompt2Res.json();
+        expect(prompt2.handle).toBe("shared-ref");
+        expect(prompt2.scope).toBe("PROJECT");
+      });
+
+      describe("with project scope (default)", () => {
+        it("should updte a prompt with a handle in correct format", async () => {
+          // Create a valid prompt first
+          const promptRes = await helpers.api.post(`/api/prompts`, {
+            handle: "my-custom-ref",
+            prompt: "This is a prompt text",
+          });
+
+          expect(promptRes.status).toBe(200);
+          const prompt = await promptRes.json();
+
+          // Update the prompt with a handle
+          const updateRes = await helpers.api.put(`/api/prompts/${prompt.id}`, {
+            handle: "my-custom-ref-updated",
+          });
+
+          const updateBody = await updateRes.json();
+          expect(updateBody.handle).toBe("my-custom-ref-updated");
+
+          const realPrompt = await prisma.llmPromptConfig.findUnique({
+            where: { id: prompt.id, projectId: testProjectId },
+          });
+
+          // Verify the handle is in the correct format
+          expect(realPrompt?.handle).toBe(
+            `${testProjectId}/my-custom-ref-updated`
+          );
+        });
+
+        it("should enforce unique handle constraint", async () => {
+          // Create first prompt with handle
+          const prompt1Res = await helpers.api.post(`/api/prompts`, {
+            handle: "first-ref",
+            prompt: "This is a prompt text",
+          });
+
+          expect(prompt1Res.status).toBe(200);
+          const prompt1 = await prompt1Res.json();
+
+          // Create second prompt
+          await helpers.api.post(`/api/prompts`, {
+            handle: "second-ref",
+            prompt: "This is a prompt text",
+          });
+
+          // Set handle on first prompt
+          const updateRes = await helpers.api.put(
+            `/api/prompts/${prompt1.id}`,
+            {
+              handle: "second-ref",
+            }
+          );
+
+          // Should fail because the handle is already taken
+          expect(updateRes.status).toBe(409);
+        });
+      });
+
+      describe("when scoped to organization", () => {
+        it("should prevent duplicate handles within the same organization", async () => {
+          // Create first prompt with organization scope
+          const prompt1Res = await helpers.api.post(`/api/prompts`, {
+            handle: "org-duplicate-ref",
+            scope: "ORGANIZATION",
+            prompt: "This is a prompt text",
+          });
+
+          expect(prompt1Res.status).toBe(200);
+
+          // Try to create second prompt with same handle and organization scope - should fail
+          const prompt2Res = await helpers.api.post(`/api/prompts`, {
+            handle: "org-duplicate-ref",
+            scope: "ORGANIZATION",
+            prompt: "This is a prompt text",
+          });
+
+          expect(prompt2Res.status).toBe(409);
+        });
+      });
+
+      it("should support updating all supported fields", async () => {
+        // Create initial prompt with all fields
+        const createRes = await app.request(`/api/prompts`, {
           method: "POST",
           headers: {
             "X-Auth-Token": testApiKey,
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            handle: "second-ref",
+            handle: "update-all-fields-test",
+            scope: "PROJECT",
+            prompt: "Initial prompt text with {{variable}}",
+            messages: [
+              { role: "user", content: "Initial user message with {{input}}" },
+            ],
+            inputs: [
+              { identifier: "variable", type: "str" },
+              { identifier: "input", type: "str" },
+            ],
+            outputs: [
+              {
+                identifier: "response",
+                type: "str",
+                json_schema: { type: "string" },
+              },
+            ],
           }),
         });
 
-        // Set handle on first prompt
-        const updateRes = await app.request(`/api/prompts/${prompt1.id}`, {
-          method: "PUT",
-          headers: {
-            "X-Auth-Token": testApiKey,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            handle: "second-ref",
-          }),
-        });
+        const createdPrompt = await createRes.json();
+        expect(createRes.status).toBe(200);
 
-        // Should fail because the handle is already taken
-        expect(updateRes.status).toBe(409);
+        // Update all supported fields
+        const updateRes = await helpers.api.put(
+          `/api/prompts/${createdPrompt.id}`,
+          {
+            handle: "updated-all-fields-test",
+            scope: "ORGANIZATION",
+            prompt: "Updated prompt text with {{new_variable}}",
+            messages: [
+              {
+                role: "user",
+                content: "Updated user message with {{new_input}}",
+              },
+              { role: "assistant", content: "Example response" },
+            ],
+            inputs: [
+              { identifier: "new_variable", type: "str" },
+              { identifier: "new_input", type: "str" },
+              { identifier: "additional_param", type: "float" },
+            ],
+            outputs: [
+              {
+                identifier: "updated_response",
+                type: "str",
+                json_schema: { type: "str" },
+              },
+              {
+                identifier: "metadata",
+                type: "json_schema",
+                json_schema: { type: "json_schema" },
+              },
+            ],
+          }
+        );
+
+        const updatedPrompt = await updateRes.json();
+        expect(updateRes.status).toBe(200);
+
+        // Verify all fields were updated
+        expect(updatedPrompt.handle).toBe("updated-all-fields-test");
+        expect(updatedPrompt.scope).toBe("ORGANIZATION");
+        expect(updatedPrompt.prompt).toBe(
+          "Updated prompt text with {{new_variable}}"
+        );
+        expect(updatedPrompt.messages).toHaveLength(3);
+        expect(updatedPrompt.messages[0].content).toBe(
+          "Updated prompt text with {{new_variable}}"
+        );
+        expect(updatedPrompt.inputs).toHaveLength(3);
+        expect(updatedPrompt.inputs[2].identifier).toBe("additional_param");
+        expect(updatedPrompt.outputs).toHaveLength(2);
+        expect(updatedPrompt.outputs[0].identifier).toBe("updated_response");
+      });
+
+      it("should throw error when trying to set both system prompt message and prompt", async () => {
+        // Create a prompt first
+        const createRes = await helpers.api.post("/api/prompts", {
+          handle: "conflict-test",
+          prompt: "This is a prompt text",
+        });
+        expect(createRes.status).toBe(200);
+        const createdPrompt = await createRes.json();
+
+        // Try to update with both prompt and system message - should fail
+        const updateRes = await helpers.api.put(
+          `/api/prompts/${createdPrompt.id}`,
+          {
+            prompt: "This is a prompt text",
+            messages: [
+              { role: "system", content: "This is a system message" },
+              { role: "user", content: "User message" },
+            ],
+          }
+        );
+
+        expect(updateRes.status).toBe(409); // Changed from 400 to 409
+        const errorBody = await updateRes.json();
+        expect(errorBody.error).toContain("System prompt");
+      });
+
+      it("should update the prompt when system message is provided", async () => {
+        // Create a prompt with initial prompt text
+        const createRes = await helpers.api.post("/api/prompts", {
+          handle: "system-to-prompt-test",
+          prompt: "Initial prompt text",
+        });
+        expect(createRes.status).toBe(200);
+        const createdPrompt = await createRes.json();
+
+        // Update with system message - should convert to messages format
+        const updateRes = await helpers.api.put(
+          `/api/prompts/${createdPrompt.id}`,
+          {
+            messages: [
+              { role: "system", content: "New system message" },
+              { role: "user", content: "User message" },
+            ],
+          }
+        );
+
+        expect(updateRes.status).toBe(200);
+        const updatedPrompt = await updateRes.json();
+
+        // Should have messages instead of prompt
+        expect(updatedPrompt.prompt).toBe("New system message");
+        expect(updatedPrompt.messages).toHaveLength(2);
+        expect(updatedPrompt.messages[0].role).toBe("system");
+        expect(updatedPrompt.messages[0].content).toBe("New system message");
+      });
+
+      it("should update the system message when prompt is provided", async () => {
+        // Create a prompt with initial messages including system message
+        const createRes = await helpers.api.post("/api/prompts", {
+          handle: "prompt-to-system-test",
+          messages: [
+            { role: "system", content: "Initial system message" },
+            { role: "user", content: "User message" },
+          ],
+          inputs: [{ identifier: "variable", type: "str" }],
+          outputs: [
+            {
+              identifier: "response",
+              type: "str",
+            },
+          ],
+        });
+        expect(createRes.status).toBe(200);
+        const createdPrompt = await createRes.json();
+
+        // Update with prompt text - should convert to prompt format
+        const updateRes = await helpers.api.put(
+          `/api/prompts/${createdPrompt.id}`,
+          {
+            prompt: "New prompt text with {{variable}}",
+          }
+        );
+
+        expect(updateRes.status).toBe(200);
+        const updatedPrompt = await updateRes.json();
+
+        // Should have prompt instead of messages
+        expect(updatedPrompt.prompt).toBe("New prompt text with {{variable}}");
       });
     });
-    describe("when scoped to organization", () => {
-      it("should prevent duplicate handles within the same organization", async () => {
-        // Create first prompt with organization scope
-        const prompt1Res = await app.request(`/api/prompts`, {
-          method: "POST",
-          headers: {
-            "X-Auth-Token": testApiKey,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            name: "Test Prompt 1",
-            handle: "org-duplicate-ref",
-            scope: "ORGANIZATION",
-          }),
-        });
+  });
 
-        expect(prompt1Res.status).toBe(200);
+  // DELETE endpoints tests
+  describe("DELETE endpoints", () => {
+    let promptToDelete: LlmPromptConfig;
 
-        // Try to create second prompt with same handle and organization scope - should fail
-        const prompt2Res = await app.request(`/api/prompts`, {
-          method: "POST",
-          headers: {
-            "X-Auth-Token": testApiKey,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            name: "Test Prompt 2",
-            handle: "org-duplicate-ref",
-            scope: "ORGANIZATION",
-          }),
-        });
-
-        expect(prompt2Res.status).toBe(409);
+    beforeEach(async () => {
+      // Create a prompt first
+      const createRes = await helpers.api.post("/api/prompts", {
+        handle: "delete-by-id-test",
+        prompt: "Test prompt",
       });
+
+      promptToDelete = await createRes.json();
+      expect(createRes.status).toBe(200);
+    });
+
+    it("should require authentication to delete a prompt", async () => {
+      const deleteRes = await app.request(`/api/prompts/some-id`, {
+        method: "DELETE",
+      });
+
+      expect(deleteRes.status).toBe(401);
+    });
+
+    it("should delete a prompt by ID", async () => {
+      // Delete the prompt by ID
+      const deleteRes = await app.request(`/api/prompts/${promptToDelete.id}`, {
+        method: "DELETE",
+        headers: {
+          "X-Auth-Token": testApiKey,
+        },
+      });
+
+      expect(deleteRes.status).toBe(200);
+      const deleteBody = await deleteRes.json();
+      expect(deleteBody).toHaveProperty("success", true);
+
+      // Verify the prompt is deleted by trying to get it
+      const getRes = await app.request(`/api/prompts/${promptToDelete.id}`, {
+        method: "GET",
+        headers: {
+          "X-Auth-Token": testApiKey,
+        },
+      });
+
+      expect(getRes.status).toBe(404);
+    });
+
+    it("should delete a prompt by handle", async () => {
+      // Delete the prompt by handle
+      const deleteRes = await app.request(
+        `/api/prompts/${promptToDelete.handle}`,
+        {
+          method: "DELETE",
+          headers: {
+            "X-Auth-Token": testApiKey,
+          },
+        }
+      );
+
+      const deleteBody = await deleteRes.json();
+      console.log(promptToDelete.handle, deleteBody);
+      expect(deleteRes.status).toBe(200);
+      expect(deleteBody).toHaveProperty("success", true);
+
+      // Verify the prompt is deleted by trying to get it by ID
+      const getRes = await app.request(`/api/prompts/${promptToDelete.id}`, {
+        method: "GET",
+        headers: {
+          "X-Auth-Token": testApiKey,
+        },
+      });
+
+      expect(getRes.status).toBe(404);
+    });
+
+    it("should return 404 when trying to delete a non-existent prompt", async () => {
+      const deleteRes = await app.request(`/api/prompts/non-existent-id`, {
+        method: "DELETE",
+        headers: {
+          "X-Auth-Token": testApiKey,
+        },
+      });
+
+      expect(deleteRes.status).toBe(404);
     });
   });
 
@@ -569,28 +772,20 @@ describe("Prompts API", () => {
 
     it("should validate input when creating a prompt version", async () => {
       // Create a valid prompt first
-      const promptRes = await app.request(`/api/prompts`, {
-        method: "POST",
-        headers: {
-          "X-Auth-Token": testApiKey,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ name: "Test Prompt" }),
+      const promptRes = await helpers.api.post("/api/prompts", {
+        handle: "test-handle",
+        prompt: "Test prompt",
       });
 
       const prompt = await promptRes.json();
+      expect(promptRes.status).toBe(200);
 
       const invalidData = {
-        schemaVersion: "1.0",
-        configData: {
-          // Missing required model field
-          temperature: 0.7,
-        },
-        commitMessage: "Invalid schema",
+        thisDoesntExist: "test",
       };
 
-      const res = await app.request(`/api/prompts/${prompt.id}/versions`, {
-        method: "POST",
+      const res = await app.request(`/api/prompts/${prompt.id}`, {
+        method: "PUT",
         headers: {
           "X-Auth-Token": testApiKey,
           "Content-Type": "application/json",
@@ -598,30 +793,39 @@ describe("Prompts API", () => {
         body: JSON.stringify(invalidData),
       });
 
-      expect(res.status).toBe(400);
       const body = await res.json();
+      expect(res.status).toBe(422); // Changed from 400 to 422
       expect(body).toHaveProperty("error");
     });
 
     it("should strictly validate input when updating a prompt", async () => {
-      // Update the prompt with invalid data
-      const res = await app.request(`/api/prompts/${mockConfig.id}`, {
-        method: "PUT",
-        headers: { "X-Auth-Token": testApiKey },
-        body: JSON.stringify({ bogus: "bogus" }),
+      // Create a valid prompt first
+      const promptRes = await helpers.api.post("/api/prompts", {
+        handle: "test-handle",
+        prompt: "Test prompt",
       });
 
-      expect(res.status).toBe(400);
+      const prompt = await promptRes.json();
+      expect(promptRes.status).toBe(200);
+
+      // Test with empty data (should fail with "At least one field is required")
+      const emptyData = {};
+
+      const res = await helpers.api.put(`/api/prompts/${prompt.id}`, emptyData);
+
+      expect(res.status).toBe(422); // Changed from 400 to 422
       const body = await res.json();
       expect(body).toHaveProperty("error");
+      expect(body.error).toContain("At least one field is required");
     });
 
-    it("should return 400 if no fields are provided", async () => {
+    it("should return 422 if no fields are provided", async () => {
+      // Changed description and status
       const res = await app.request(`/api/prompts/${mockConfig.id}`, {
         method: "PUT",
         headers: { "X-Auth-Token": testApiKey },
       });
-      expect(res.status).toBe(400);
+      expect(res.status).toBe(422); // Changed from 400 to 422
     });
   });
 });

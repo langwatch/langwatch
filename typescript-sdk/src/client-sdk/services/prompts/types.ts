@@ -7,9 +7,6 @@ export type CreatePromptBody = NonNullable<
 export type UpdatePromptBody = NonNullable<
   paths["/api/prompts/{id}"]["put"]["requestBody"]
 >["content"]["application/json"];
-export type CreateVersionBody = NonNullable<
-  paths["/api/prompts/{id}/versions"]["post"]["requestBody"]
->["content"]["application/json"];
 export type SyncBody = NonNullable<
   paths["/api/prompts/{id}/sync"]["post"]["requestBody"]
 >["content"]["application/json"];
