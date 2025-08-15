@@ -52,22 +52,16 @@ docker compose up -d --wait --build
 open http://localhost:5560
 ```
 
-#### ARM (aarch64) note
+You'll be launched right into our onboarding flow. Welcome aboard 🫡.
 
-- The default Compose config targets amd64 and no longer sets SVE-related JVM flags.
-- On ARM (aarch64), include the ARM override to disable SVE in the JVM:
+### Note: 🍎 Mac M4 Compatibility
+
+If you're running on a Mac with M4 processor, you may need to uncomment the Java options line in the `compose.yml` file to disable SVE (Scalable Vector Extension) for OpenSearch:
 
 ```bash
-# On amd64 (no special flag)
-docker compose up
-
-# On aarch64 (ARM), include the override
-docker compose -f compose.yml -f docker-compose.arm64.override.yml up
+# Uncomment the next line if running on Mac M4 processors to disable SVE
+# - "_JAVA_OPTIONS=-XX:UseSVE=0"
 ```
-
-The override file `docker-compose.arm64.override.yml` lives at the repo root (next to `compose.yml`) and only adds `_JAVA_OPTIONS=-XX:UseSVE=0` for the `opensearch` service.
-
-You'll be launched right into our onboarding flow. Welcome aboard 🫡.
 
 ### Self-hosted ⚓️
 

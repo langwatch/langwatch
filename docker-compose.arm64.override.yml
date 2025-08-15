@@ -1,6 +1,0 @@
-services:
-  opensearch:
-    environment:
-      - "_JAVA_OPTIONS=-XX:UseSVE=0"
-
-
