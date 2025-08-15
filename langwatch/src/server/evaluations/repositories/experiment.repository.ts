@@ -63,10 +63,14 @@ export class PrismaExperimentRepository implements ExperimentRepository {
         },
       });
     } else if (experiment) {
-      if (!!experiment_name || !!workflowId) {
+      const updateData: { name?: string; workflowId?: string } = {};
+      if (experiment_name !== undefined) updateData.name = experiment_name;
+      if (workflowId !== undefined) updateData.workflowId = workflowId;
+      
+      if (Object.keys(updateData).length > 0) {
         experiment = await prisma.experiment.update({
           where: { id: experiment.id, projectId },
-          data: { name: experiment_name, workflowId: workflowId },
+          data: updateData,
         });
       }
     }
