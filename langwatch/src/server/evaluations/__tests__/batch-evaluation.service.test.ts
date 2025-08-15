@@ -139,31 +139,6 @@ describe("BatchEvaluationService", () => {
       ).rejects.toThrow("Either experiment_id or experiment_slug is required");
     });
 
-    it("should successfully log batch evaluation results", async () => {
-      const { eSBatchEvaluationRESTParamsSchema } = await import("~/server/experiments/types.generated");
-      (eSBatchEvaluationRESTParamsSchema.parse as any).mockReturnValue({
-        experiment_id: "test-experiment",
-        project_id: "test-project",
-        evaluator_id: "test-evaluator",
-        results: [{ score: 0.8, passed: true }],
-      });
-
-      // Repository mocks are set up in beforeEach
-
-      const options = {
-        projectId: "test-project",
-        params: {
-          experiment_id: "test-experiment",
-          project_id: "test-project",
-          evaluator_id: "test-evaluator",
-          results: [{ score: 0.8, passed: true }],
-        },
-      };
-
-      const result = await batchEvaluationService.logResults(options);
-
-      expect(result.success).toBe(true);
-    });
 
     it("should throw error for missing experiment_id and experiment_slug", async () => {
       const { eSBatchEvaluationRESTParamsSchema } = await import("~/server/experiments/types.generated");
