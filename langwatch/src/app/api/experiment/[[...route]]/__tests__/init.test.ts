@@ -9,6 +9,7 @@ vi.mock("~/server/db", () => ({
       findUnique: vi.fn().mockResolvedValue({
         id: "test-project",
         apiKey: "test-token",
+        slug: "test-project",
         organization: {
           id: "test-org",
           elasticsearchUrl: "http://localhost:9200",
@@ -69,24 +70,6 @@ describe("POST /init", () => {
   });
 
   it("should initialize experiment with valid data", async () => {
-    const mockExperiment = {
-      id: "experiment_123",
-      slug: "test-experiment",
-      name: "Test Experiment",
-      projectId: "project_123",
-      type: "DSPY" as const,
-      workflowId: null,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    };
-
-    const mockService = {
-      findOrCreateExperiment: vi.fn().mockResolvedValue(mockExperiment),
-    };
-
-    // Consider using a proper Hono test context or typed mock
-    // This manual mock may break if the Context interface changes
-
     // Create a mock request
     const req = new Request("http://localhost/api/experiment/init", {
       method: "POST",
@@ -108,7 +91,7 @@ describe("POST /init", () => {
     
     const data = await res.json();
     expect(data).toEqual({
-      path: "/undefined/experiments/test-experiment",
+      path: "/test-project/experiments/test-experiment",
       slug: "test-experiment",
     });
   });

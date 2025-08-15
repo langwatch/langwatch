@@ -3,7 +3,7 @@ import { createLogger } from "~/utils/logger";
 import { CostReferenceType, CostType } from "@prisma/client";
 import * as Sentry from "@sentry/nextjs";
 import { nanoid } from "nanoid";
-import { type z, type ZodError } from "zod";
+import { ZodError, type z } from "zod";
 
 import { updateEvaluationStatusInES } from "~/server/background/queues/evaluationsQueue";
 import { evaluationNameAutoslug } from "~/server/background/workers/collector/evaluations";
@@ -188,11 +188,17 @@ export class EvaluationService {
         params.data as Record<string, any>
       );
     } catch (error) {
-      logger.error({ error, params }, 'Invalid evaluation data received');
-      Sentry.captureException(error);
-      const validationError = fromZodError(error as ZodError);
-      throw new Error(validationError.message);
-    }
+        logger.error({ error, params }, "Invalid evaluation data received");
+
+        if (error instanceof ZodError) {
+          const validationError = fromZodError(error);
+          Sentry.captureException(error, { extra: { validationError: validationError.message } });
+          throw new Error(validationError.message);
+        }
+
+        Sentry.captureException(error);
+        throw new Error(error instanceof Error ? error.message : "Invalid evaluation data");
+      }
   }
 
   private validateRequiredFields(data: DataForEvaluation, evaluatorDefinition: any) {
