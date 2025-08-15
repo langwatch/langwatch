@@ -468,14 +468,42 @@ const updateTrace = async (
           if (ctx._source == null) {
             ctx._source = params.trace;
           } else {
-            // Simple merge for now - let's see if this works
-            for (String key : params.trace.keySet()) {
-              // Special handling for input/output - preserve existing truthy values
-              if ((key == "input" || key == "output") && ctx._source.containsKey(key) && ctx._source[key] != null && ctx._source[key] != "") {
-                // Keep existing truthy input/output values
-                continue;
+            // Check if any new spans have preserve flags
+            boolean hasNewSpansWithPreserveFlag = false;
+            for (def newSpan : params.newSpans) {
+              if (newSpan.params != null && 
+                  newSpan.params.containsKey("__internal_langwatch_preserve_existing_io") && 
+                  newSpan.params["__internal_langwatch_preserve_existing_io"] == true) {
+                hasNewSpansWithPreserveFlag = true;
+                break;
               }
-              ctx._source[key] = params.trace[key];
+            }
+            
+            // Check if trace has preserve flag
+            boolean traceHasPreserveFlag = params.trace.metadata != null && 
+              params.trace.metadata.custom != null && 
+              params.trace.metadata.custom.containsKey("__internal_langwatch_preserve_existing_io") && 
+              params.trace.metadata.custom["__internal_langwatch_preserve_existing_io"] == true;
+            
+            // Merge trace data with input/output preservation
+            for (String key : params.trace.keySet()) {
+              // Special handling for input/output - preserve existing truthy values when trace or new spans have preserve flags
+              if ((key == "input" || key == "output") && (hasNewSpansWithPreserveFlag || traceHasPreserveFlag)) {
+                // Only update if existing value is missing/null/empty and new value is set
+                boolean existingValueIsEmpty = !ctx._source.containsKey(key) ||
+                  ctx._source[key] == null ||
+                  ctx._source[key] == "";
+                boolean newValueIsSet = params.trace[key] != null &&
+                  params.trace[key] != "";
+                
+                if (existingValueIsEmpty && newValueIsSet) {
+                  ctx._source[key] = params.trace[key];
+                }
+                // Otherwise, preserve existing value
+              } else {
+                // Normal merge for non-input/output fields or when no preserve flags
+                ctx._source[key] = params.trace[key];
+              }
             }
           }
           
@@ -519,9 +547,19 @@ const updateTrace = async (
               
               // Deep merge spans with input/output preservation
               for (String key : newSpan.keySet()) {
-                // Special handling for input/output - preserve existing truthy values
-                if ((key == "input" || key == "output") && existingSpan.containsKey(key) && existingSpan[key] != null && existingSpan[key] != "") {
-                  // Keep existing truthy input/output values
+                // Check if new span has the preserve flag
+                boolean newSpanHasPreserveFlag = newSpan.params != null && 
+                  newSpan.params.containsKey("__internal_langwatch_preserve_existing_io") && 
+                  newSpan.params["__internal_langwatch_preserve_existing_io"] == true;
+                
+                // Check if existing span has the preserve flag
+                boolean existingSpanHasPreserveFlag = existingSpan.params != null && 
+                  existingSpan.params.containsKey("__internal_langwatch_preserve_existing_io") && 
+                  existingSpan.params["__internal_langwatch_preserve_existing_io"] == true;
+                
+                // Preserve input/output if either span has the preserve flag
+                if ((key == "input" || key == "output") && (newSpanHasPreserveFlag || existingSpanHasPreserveFlag)) {
+                  // Keep existing input/output values when preserve flag is set on either span
                   continue;
                 }
                 if (newSpan[key] instanceof Map) {
