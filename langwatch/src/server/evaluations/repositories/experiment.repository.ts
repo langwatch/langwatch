@@ -69,8 +69,6 @@ export class PrismaExperimentRepository implements ExperimentRepository {
           data: { name: experiment_name, workflowId: workflowId },
         });
       }
-    } else {
-      throw new Error("Experiment not found");
     }
     
     return experiment;
