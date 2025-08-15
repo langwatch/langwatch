@@ -24,6 +24,14 @@ from .get_api_dataset_by_slug_or_id_response_401 import GetApiDatasetBySlugOrIdR
 from .get_api_dataset_by_slug_or_id_response_404 import GetApiDatasetBySlugOrIdResponse404
 from .get_api_dataset_by_slug_or_id_response_422 import GetApiDatasetBySlugOrIdResponse422
 from .get_api_dataset_by_slug_or_id_response_500 import GetApiDatasetBySlugOrIdResponse500
+from .get_api_evaluations_response_200 import GetApiEvaluationsResponse200
+from .get_api_evaluations_response_200_evaluators import GetApiEvaluationsResponse200Evaluators
+from .get_api_evaluations_response_200_evaluators_additional_property import (
+    GetApiEvaluationsResponse200EvaluatorsAdditionalProperty,
+)
+from .get_api_evaluations_response_400 import GetApiEvaluationsResponse400
+from .get_api_evaluations_response_401 import GetApiEvaluationsResponse401
+from .get_api_evaluations_response_500 import GetApiEvaluationsResponse500
 from .get_api_prompts_by_id_response_200 import GetApiPromptsByIdResponse200
 from .get_api_prompts_by_id_response_200_demonstrations import GetApiPromptsByIdResponse200Demonstrations
 from .get_api_prompts_by_id_response_200_demonstrations_inline import GetApiPromptsByIdResponse200DemonstrationsInline
@@ -228,6 +236,16 @@ from .pagination import Pagination
 from .patch_api_annotations_id_body import PatchApiAnnotationsIdBody
 from .patch_api_annotations_id_response_200 import PatchApiAnnotationsIdResponse200
 from .post_api_annotations_trace_id_body import PostApiAnnotationsTraceIdBody
+from .post_api_evaluations_batch_log_results_response_200 import PostApiEvaluationsBatchLogResultsResponse200
+from .post_api_evaluations_batch_log_results_response_400 import PostApiEvaluationsBatchLogResultsResponse400
+from .post_api_evaluations_batch_log_results_response_401 import PostApiEvaluationsBatchLogResultsResponse401
+from .post_api_evaluations_batch_log_results_response_500 import PostApiEvaluationsBatchLogResultsResponse500
+from .post_api_experiment_init_body import PostApiExperimentInitBody
+from .post_api_experiment_init_body_experiment_type import PostApiExperimentInitBodyExperimentType
+from .post_api_experiment_init_response_200 import PostApiExperimentInitResponse200
+from .post_api_experiment_init_response_400 import PostApiExperimentInitResponse400
+from .post_api_experiment_init_response_401 import PostApiExperimentInitResponse401
+from .post_api_experiment_init_response_500 import PostApiExperimentInitResponse500
 from .post_api_prompts_body import PostApiPromptsBody
 from .post_api_prompts_body_inputs_item import PostApiPromptsBodyInputsItem
 from .post_api_prompts_body_inputs_item_type import PostApiPromptsBodyInputsItemType
@@ -617,6 +635,12 @@ __all__ = (
     "GetApiDatasetBySlugOrIdResponse404",
     "GetApiDatasetBySlugOrIdResponse422",
     "GetApiDatasetBySlugOrIdResponse500",
+    "GetApiEvaluationsResponse200",
+    "GetApiEvaluationsResponse200Evaluators",
+    "GetApiEvaluationsResponse200EvaluatorsAdditionalProperty",
+    "GetApiEvaluationsResponse400",
+    "GetApiEvaluationsResponse401",
+    "GetApiEvaluationsResponse500",
     "GetApiPromptsByIdResponse200",
     "GetApiPromptsByIdResponse200Demonstrations",
     "GetApiPromptsByIdResponse200DemonstrationsInline",
@@ -735,6 +759,16 @@ __all__ = (
     "PatchApiAnnotationsIdBody",
     "PatchApiAnnotationsIdResponse200",
     "PostApiAnnotationsTraceIdBody",
+    "PostApiEvaluationsBatchLogResultsResponse200",
+    "PostApiEvaluationsBatchLogResultsResponse400",
+    "PostApiEvaluationsBatchLogResultsResponse401",
+    "PostApiEvaluationsBatchLogResultsResponse500",
+    "PostApiExperimentInitBody",
+    "PostApiExperimentInitBodyExperimentType",
+    "PostApiExperimentInitResponse200",
+    "PostApiExperimentInitResponse400",
+    "PostApiExperimentInitResponse401",
+    "PostApiExperimentInitResponse500",
     "PostApiPromptsBody",
     "PostApiPromptsBodyInputsItem",
     "PostApiPromptsBodyInputsItemType",
