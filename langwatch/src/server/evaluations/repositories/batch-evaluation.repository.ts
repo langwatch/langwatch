@@ -69,7 +69,7 @@ export class ElasticsearchBatchEvaluationRepository implements BatchEvaluationRe
       });
     } catch (error) {
       logger.error({ error, runId: batchEvaluation.run_id }, "Failed to store batch evaluation in Elasticsearch");
-      throw new Error("Failed to store batch evaluation results");
+      throw new Error(`Failed to store batch evaluation results: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
 }

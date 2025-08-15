@@ -1,5 +1,5 @@
 import { prisma } from "~/server/db";
-import { type Monitor } from "@prisma/client";
+import { type Monitor, type CostType, type CostReferenceType } from "@prisma/client";
 import { createLogger } from "~/utils/logger";
 
 const logger = createLogger("langwatch:evaluations:repository");
@@ -9,13 +9,13 @@ export interface EvaluationRepository {
   createCost(data: {
     id: string;
     projectId: string;
-    costType: any;
+    costType: CostType;
     costName: string;
-    referenceType: any;
+    referenceType: CostReferenceType;
     referenceId: string;
     amount: number;
     currency: string;
-    extraInfo: any;
+    extraInfo: Record<string, unknown> | null;
   }): Promise<void>;
 }
 
@@ -39,13 +39,13 @@ export class PrismaEvaluationRepository implements EvaluationRepository {
   async createCost(data: {
     id: string;
     projectId: string;
-    costType: any;
+    costType: CostType;
     costName: string;
-    referenceType: any;
+    referenceType: CostReferenceType;
     referenceId: string;
     amount: number;
     currency: string;
-    extraInfo: any;
+    extraInfo: Record<string, unknown> | null;
   }): Promise<void> {
     try {
       await prisma.cost.create({

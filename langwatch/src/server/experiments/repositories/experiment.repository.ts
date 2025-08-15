@@ -39,9 +39,10 @@ export class PrismaExperimentRepository implements ExperimentRepository {
       }
     }
 
-    let slug_ = null;
+    let slug_: string | null = null;
     if (experiment_slug) {
       slug_ = slugify(experiment_slug);
+      // Try to locate an existing experiment by slug within the project
       experiment = await prisma.experiment.findUnique({
         where: { projectId_slug: { projectId: project.id, slug: slug_ } },
       });
@@ -52,14 +53,24 @@ export class PrismaExperimentRepository implements ExperimentRepository {
     }
 
     if (!experiment && slug_) {
-      experiment = await prisma.experiment.create({
-        data: {
+      // Use upsert to prevent duplicate creation under concurrency
+      experiment = await prisma.experiment.upsert({
+        where: { projectId_slug: { projectId: project.id, slug: slug_ } },
+        create: {
           id: `experiment_${nanoid()}`,
-          name: experiment_name ?? experiment_slug,
+          name:
+            experiment_name ??
+            (experiment_slug
+              ? experiment_slug.replace(/[-_]+/g, " ")
+              : slug_),
           slug: slug_,
           projectId: project.id,
           type: experiment_type,
           workflowId: workflowId,
+        },
+        update: {
+          ...(experiment_name ? { name: experiment_name } : {}),
+          ...(workflowId ? { workflowId } : {}),
         },
       });
     } else if (experiment) {

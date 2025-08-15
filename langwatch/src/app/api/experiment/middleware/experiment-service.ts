@@ -1,8 +1,8 @@
 import { type Context, type Next } from "hono";
-import { PrismaExperimentService, PrismaExperimentRepository } from "~/server/experiments";
+import { type ExperimentService, PrismaExperimentService, PrismaExperimentRepository } from "~/server/experiments";
 
 export interface ExperimentServiceMiddlewareVariables {
-  experimentService: PrismaExperimentService;
+  experimentService: ExperimentService;
 }
 
 export const experimentServiceMiddleware = async (

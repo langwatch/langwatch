@@ -4,7 +4,7 @@ This directory contains the new Hono-based Experiments API that follows the serv
 
 ## Structure
 
-```
+```text
 experiment/
 ├── [[...route]]/
 │   ├── app.ts              # Main Hono app with middleware

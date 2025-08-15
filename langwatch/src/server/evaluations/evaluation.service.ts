@@ -1,9 +1,9 @@
-import { fromZodError, type ZodError } from "zod-validation-error";
+import { fromZodError } from "zod-validation-error";
 import { createLogger } from "~/utils/logger";
 import { CostReferenceType, CostType } from "@prisma/client";
 import * as Sentry from "@sentry/nextjs";
 import { nanoid } from "nanoid";
-import { type z } from "zod";
+import { type z, type ZodError } from "zod";
 
 import { updateEvaluationStatusInES } from "~/server/background/queues/evaluationsQueue";
 import { evaluationNameAutoslug } from "~/server/background/workers/collector/evaluations";
@@ -63,7 +63,10 @@ export class EvaluationService {
     try {
       validatedParams = evaluationInputSchema.parse(params);
     } catch (error) {
-      logger.error({ error, params, projectId }, 'Invalid evaluation params received');
+      logger.error(
+        { error, projectId, paramKeys: Object.keys(params ?? {}) },
+        "Invalid evaluation params received"
+      );
       const validationError = fromZodError(error as ZodError);
       Sentry.captureException(error, {
         extra: {
@@ -223,7 +226,8 @@ export class EvaluationService {
       // Retry once in case of timeout error
       if (
         result.status === "error" &&
-        result.details.toLowerCase().includes("timed out")
+        (result.error_type === "TIMEOUT" || 
+         (typeof result.details === "string" && result.details.toLowerCase().includes("timed out")))
       ) {
         result = await runEval();
       }
@@ -300,7 +304,7 @@ export class EvaluationService {
           project_id: projectId,
         },
         status: result.status,
-        is_guardrail: isGuardrail ?? undefined,
+        is_guardrail: isGuardrail ? true : undefined,
         ...(result.status === "error"
           ? {
               error: {
@@ -325,7 +329,7 @@ export class EvaluationService {
     if (result.status === "error") {
       return {
         status: "error",
-        error_type: "EVALUATOR_ERROR",
+        error_type: "error_type" in result ? result.error_type : "EVALUATOR_ERROR",
         details: result.details,
         ...(isGuardrail ? { passed: true } : {}), // We don't want to fail the check if the evaluator throws, because this is likely a bug in the evaluator
       };

@@ -21,6 +21,7 @@ import { getEvaluatorDisplayName } from "~/server/evaluations/evaluator-names";
 import { createLogger } from "~/utils/logger";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
 import { type EvaluationServiceMiddlewareVariables } from "../middleware/evaluation-service";
+import z from "zod";
 
 const logger = createLogger("langwatch:api:evaluations");
 
@@ -72,8 +73,7 @@ app.get(
             ...value,
             name: getEvaluatorDisplayName(value.name),
             settings_json_schema: zodToJsonSchema(
-              // @ts-ignore
-              evaluatorsSchema.shape[key].shape.settings
+              (evaluatorsSchema.shape as any)[key]?.shape?.settings ?? z.object({})
             ),
           },
         ])
@@ -118,11 +118,19 @@ app.get(
 
       return c.json(result.result);
     } catch (error) {
+      logger.error({ error, projectId: project.id, evaluator }, "Evaluation failed");
+      
       if (error instanceof HTTPException) {
         throw error;
       }
-      logger.error({ error, projectId: project.id, evaluator }, "Evaluation failed");
-      throw new HTTPException(500, { message: error instanceof Error ? error.message : "Evaluation failed" });
+      
+      const statusCode = error instanceof Error && 'statusCode' in error 
+        ? (error as any).statusCode 
+        : 500;
+      
+      throw new HTTPException(statusCode, { 
+        message: error instanceof Error ? error.message : "Evaluation failed" 
+      });
     }
   }
   );

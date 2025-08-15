@@ -65,7 +65,7 @@ app.post(
   async (c) => {
     const service = c.get("experimentService");
     const project = c.get("project");
-    const body = c.req.valid("json") ;
+    const body = c.req.valid("json");
 
     logger.info(
       { 
@@ -118,6 +118,14 @@ app.post(
         }
         if (error.message === "Either experiment_id or experiment_slug is required") {
           throw new HTTPException(400, { message: error.message });
+        }
+        // Handle validation errors
+        if (error.message.includes("Validation") || error.message.includes("Invalid")) {
+          throw new HTTPException(400, { message: error.message });
+        }
+        // Handle database/connection errors
+        if (error.message.includes("database") || error.message.includes("connection")) {
+          throw new HTTPException(503, { message: "Service temporarily unavailable" });
         }
       }
 

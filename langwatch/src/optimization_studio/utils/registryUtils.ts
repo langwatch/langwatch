@@ -100,7 +100,7 @@ export const buildEvaluatorFromType = (
     cls: "LangWatchEvaluator",
     evaluator: evaluatorType,
     name: getEvaluatorDisplayName(definition.name)
-      .replace("Evaluator", "")
+      .replace(/Evaluator/g, "")
       .trim(),
     description: definition.description,
     inputs,
