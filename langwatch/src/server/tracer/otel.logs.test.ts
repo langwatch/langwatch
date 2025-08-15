@@ -277,8 +277,6 @@ describe("opentelemetry logs receiver", () => {
       z.array(spanSchema).parse(trace!.spans);
     } catch (error) {
       const validationError = fromZodError(error as ZodError);
-      console.log("trace", JSON.stringify(trace, undefined, 2));
-      console.log("validationError", validationError);
       assert.fail(validationError.message);
     }
 
@@ -344,8 +342,6 @@ describe("opentelemetry logs receiver", () => {
       z.array(spanSchema).parse(trace!.spans);
     } catch (error) {
       const validationError = fromZodError(error as ZodError);
-      console.log("trace", JSON.stringify(trace, undefined, 2));
-      console.log("validationError", validationError);
       assert.fail(validationError.message);
     }
 
@@ -394,8 +390,6 @@ describe("opentelemetry logs receiver", () => {
       z.array(spanSchema).parse(trace!.spans);
     } catch (error) {
       const validationError = fromZodError(error as ZodError);
-      console.log("trace", JSON.stringify(trace, undefined, 2));
-      console.log("validationError", validationError);
       assert.fail(validationError.message);
     }
 
@@ -453,8 +447,6 @@ describe("opentelemetry logs receiver", () => {
       z.array(spanSchema).parse(trace!.spans);
     } catch (error) {
       const validationError = fromZodError(error as ZodError);
-      console.log("trace", JSON.stringify(trace, undefined, 2));
-      console.log("validationError", validationError);
       assert.fail(validationError.message);
     }
 
