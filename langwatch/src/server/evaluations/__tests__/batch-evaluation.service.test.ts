@@ -82,8 +82,6 @@ describe("BatchEvaluationService", () => {
 
   beforeEach(async () => {
     vi.clearAllMocks();
-    const { PrismaExperimentRepository } = await import("~/server/evaluations/repositories/experiment.repository");
-    const { ElasticsearchBatchEvaluationRepository } = await import("~/server/evaluations/repositories/batch-evaluation.repository");
     
     const experimentRepository = new PrismaExperimentRepository();
     const batchEvaluationRepository = new ElasticsearchBatchEvaluationRepository(experimentRepository);

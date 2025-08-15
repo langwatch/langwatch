@@ -82,8 +82,12 @@ export class BatchEvaluationService {
     return { success: true };
   }
 
+  private generateExperimentSlug(experimentId?: string, experimentSlug?: string | null): string {
+    return experimentSlug ?? `experiment_${experimentId}`;
+  }
+
   private async findOrCreateExperiment(projectId: string, params: ESBatchEvaluationRESTParams) {
-    const experimentSlug = params.experiment_slug ?? `experiment_${params.experiment_id}`;
+    const experimentSlug = this.generateExperimentSlug(params.experiment_id, params.experiment_slug);
     
     return await this.batchEvaluationRepository.findOrCreateExperiment({
       projectId,

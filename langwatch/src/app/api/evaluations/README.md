@@ -4,7 +4,7 @@ This directory contains the new Hono-based Evaluations API that follows the serv
 
 ## Structure
 
-```
+```text
 evaluations/
 ├── [[...route]]/
 │   ├── app.ts              # Main Hono app with middleware
@@ -78,8 +78,8 @@ Run evaluation with a specific evaluator.
 
 Legacy route for evaluation with subpath (maintained for backward compatibility).
 
-**Request Body:** Same as `/:evaluator/evaluate`
-**Response:** Same as `/:evaluator/evaluate`
+- Request Body: Same as `/:evaluator/evaluate`
+- Response: Same as `/:evaluator/evaluate`
 
 ### POST /api/evaluations/batch/log_results
 
@@ -178,7 +178,7 @@ Manages experiment lifecycle:
 The API has been migrated from Next.js API routes to the new Hono pattern while maintaining full backward compatibility:
 
 ### Old Structure (Removed)
-```
+```text
 src/pages/api/evaluations/
 ├── list.ts
 ├── batch/
@@ -190,7 +190,7 @@ src/pages/api/evaluations/
 ```
 
 ### New Structure
-```
+```text
 src/app/api/evaluations/
 ├── [[...route]]/
 │   ├── app.ts

@@ -14,6 +14,13 @@ vi.mock("~/server/db", () => ({
   },
 }));
 
+vi.mock("~/server/evaluations/repositories/evaluation.repository", () => ({
+  PrismaEvaluationRepository: vi.fn().mockImplementation(() => ({
+    findStoredEvaluator: vi.fn().mockResolvedValue(null),
+    createCost: vi.fn().mockResolvedValue(undefined),
+  })),
+}));
+
 vi.mock("~/utils/logger", () => ({
   createLogger: vi.fn(() => ({
     info: vi.fn(),
@@ -75,12 +82,20 @@ describe("EvaluationService", () => {
         evaluatorSlug: "test/evaluator",
         params: {
           data: { input: "test input" },
+          as_guardrail: false,
         },
       });
 
       expect(result.result.status).toBe("processed");
-      expect(result.result.score).toBe(0.8);
+      expect((result.result as any).score).toBe(0.8);
       expect(result.result.passed).toBe(true);
+      
+      // Verify mocked functions were called
+      expect(getEvaluatorIncludingCustom).toHaveBeenCalledWith("test-project", "test/evaluator");
+      expect(getEvaluatorDataForParams).toHaveBeenCalledWith("test/evaluator", {
+        input: "test input",
+      });
+      expect(runEvaluation).toHaveBeenCalled();
     });
 
     it("should throw error for invalid evaluator", async () => {
@@ -92,6 +107,7 @@ describe("EvaluationService", () => {
         evaluatorSlug: "invalid/evaluator",
         params: {
           data: { input: "test" },
+          as_guardrail: false,
         },
       };
 
@@ -117,6 +133,7 @@ describe("EvaluationService", () => {
         evaluatorSlug: "test/evaluator",
         params: {
           data: {},
+          as_guardrail: false,
         },
       };
 
@@ -126,13 +143,16 @@ describe("EvaluationService", () => {
     });
 
     it("should handle disabled guardrail", async () => {
-      const { prisma } = await import("~/server/db");
-      (prisma.monitor.findUnique as any).mockResolvedValue({
+      const { PrismaEvaluationRepository } = await import("~/server/evaluations/repositories/evaluation.repository");
+      const mockRepository = new PrismaEvaluationRepository();
+      mockRepository.findStoredEvaluator = vi.fn().mockResolvedValue({
         id: "test-monitor",
         checkType: "test/evaluator",
         enabled: false,
         parameters: {},
-      });
+      } as any);
+      
+      const tempService = new EvaluationService(mockRepository);
 
       const { getEvaluatorIncludingCustom } = await import("~/server/evaluations/utils");
       (getEvaluatorIncludingCustom as any).mockResolvedValue({
@@ -145,14 +165,20 @@ describe("EvaluationService", () => {
         evaluatorSlug: "test-guardrail",
         params: {
           data: { input: "test" },
+          as_guardrail: true,
         },
         asGuardrail: true,
       };
 
-      const result = await evaluationService.runEvaluation(options);
+      const { runEvaluation } = await import("~/server/background/workers/evaluationsWorker");
+      
+      const result = await tempService.runEvaluation(options);
       expect(result.result.status).toBe("skipped");
       expect(result.result.details).toBe("Guardrail is not enabled");
       expect(result.result.passed).toBe(true);
+      
+      // Verify that evaluation was not executed
+      expect(runEvaluation).not.toHaveBeenCalled();
     });
   });
 });

@@ -161,21 +161,20 @@ describe("Evaluations API", () => {
       expect(res.status).toBe(200);
     });
 
-    it("should handle evaluation errors", async () => {
-      // For now, let's just test that the route exists and returns a response
-      // The actual error handling would require more complex mocking setup
-      const res = await app.request("/api/evaluations/test/evaluator/evaluate", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          data: { input: "test input" },
-        }),
-      });
-
-      // Since we're not actually triggering an error, expect 200
-      expect(res.status).toBe(200);
+    it.skip("should handle evaluation errors", async () => {
+      // TODO: Implement proper error handling test
+      // This test should:
+      // 1. Mock the evaluationService.runEvaluation to throw an error
+      // 2. Send a request that triggers the error
+      // 3. Assert that the endpoint returns appropriate error status (e.g., 500)
+      // 4. Verify error response format and message
+      // 
+      // Example implementation:
+      // const mockEvaluationService = {
+      //   runEvaluation: vi.fn().mockRejectedValue(new Error("Evaluation failed"))
+      // };
+      // // Mock the middleware to return the error-throwing service
+      // // Make request and assert 500 status with error message
     });
   });
 
@@ -214,23 +213,19 @@ describe("Evaluations API", () => {
       expect(res.status).toBe(200);
     });
 
-    it("should handle batch evaluation errors", async () => {
-      const res = await app.request("/api/evaluations/batch/log_results", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          run_id: "test-run",
-          experiment_id: "test-experiment",
-          project_id: "test-project",
-          evaluator_id: "test-evaluator",
-          results: [{ score: 0.8, passed: true }],
-        }),
-      });
-
-      // Since we're not actually triggering an error, expect 200
-      expect(res.status).toBe(200);
+    it.skip("should handle batch evaluation errors", async () => {
+      // TODO: Implement proper batch evaluation error handling test
+      // This test should:
+      // 1. Mock the batchEvaluationService.logResults to throw an error
+      // 2. Send a request with invalid/malformed data to trigger the error
+      // 3. Assert that the endpoint returns appropriate error status (e.g., 400, 500)
+      // 4. Verify error response format and message
+      //
+      // Example test cases to cover:
+      // - Invalid request body format
+      // - Missing required fields
+      // - Database/Elasticsearch connection errors
+      // - Validation errors from the service layer
     });
   });
 
