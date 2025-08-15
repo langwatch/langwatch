@@ -3,6 +3,7 @@ import { assert, describe, expect, it } from "vitest";
 import { z, type ZodError } from "zod";
 import { fromZodError } from "zod-validation-error";
 import type { DeepPartial } from "../../utils/types";
+import { INTERNAL_PRESERVE_KEY } from "../../utils/constants";
 import { openTelemetryLogsRequestToTracesForCollection } from "./otel.logs";
 import { spanSchema } from "./types.generated";
 
@@ -285,6 +286,9 @@ describe("opentelemetry logs receiver", () => {
         __internal_langwatch_preserve_existing_io: true,
       },
     });
+
+    expect(trace!.spans[0]?.params).toHaveProperty(INTERNAL_PRESERVE_KEY, true);
+    expect(trace!.customMetadata).toHaveProperty(INTERNAL_PRESERVE_KEY, true);
   });
 
   it("receives a Spring AI prompt-only request", async () => {
@@ -333,6 +337,9 @@ describe("opentelemetry logs receiver", () => {
         __internal_langwatch_preserve_existing_io: true,
       },
     });
+
+    expect(trace!.spans[0]?.params).toHaveProperty(INTERNAL_PRESERVE_KEY, true);
+    expect(trace!.customMetadata).toHaveProperty(INTERNAL_PRESERVE_KEY, true);
   });
 
   it("receives a Spring AI completion-only request", async () => {
@@ -381,6 +388,9 @@ describe("opentelemetry logs receiver", () => {
         __internal_langwatch_preserve_existing_io: true,
       },
     });
+
+    expect(trace!.spans[0]?.params).toHaveProperty(INTERNAL_PRESERVE_KEY, true);
+    expect(trace!.customMetadata).toHaveProperty(INTERNAL_PRESERVE_KEY, true);
   });
 
   it("receives multiple spans in the same trace", async () => {
@@ -409,6 +419,9 @@ describe("opentelemetry logs receiver", () => {
     expect(span1).toBeDefined();
     expect(span1?.input?.value).toEqual("MULTI_SPAN_CHAT_MODEL_PROMPT_CONTENT_1");
     expect(span1?.output?.value).toEqual("MULTI_SPAN_CHAT_MODEL_COMPLETION_1");
+    expect(span1?.input?.type).toEqual("text");
+    expect(span1?.output?.type).toEqual("text");
+    expect(span1?.params?.__internal_langwatch_preserve_existing_io).toBe(true);
 
     // Check second span
     const span2 = trace!.spans.find(
@@ -417,6 +430,9 @@ describe("opentelemetry logs receiver", () => {
     expect(span2).toBeDefined();
     expect(span2?.input?.value).toEqual("MULTI_SPAN_CHAT_MODEL_PROMPT_CONTENT_2");
     expect(span2?.output?.value).toEqual("MULTI_SPAN_CHAT_MODEL_COMPLETION_2");
+    expect(span2?.input?.type).toEqual("text");
+    expect(span2?.output?.type).toEqual("text");
+    expect(span2?.params?.__internal_langwatch_preserve_existing_io).toBe(true);
   });
 
   it("ignores logs with unsupported scope names", async () => {
@@ -450,7 +466,7 @@ describe("opentelemetry logs receiver", () => {
                   timeUnixNano: "1748353030869334708",
                   body: {
                     stringValue: `Chat Model Prompt Content:
-{"messages":[{"role":"user","content":"test"}]}`,
+IGNORED_CONTENT`,
                   },
                 },
               ],
