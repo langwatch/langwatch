@@ -144,10 +144,16 @@ describe("BatchEvaluationService", () => {
     it("should handle validation errors", async () => {
       const { eSBatchEvaluationRESTParamsSchema } = await import("~/server/experiments/types.generated");
       (eSBatchEvaluationRESTParamsSchema.parse as any).mockImplementation(() => {
-        const error = new Error("Validation failed");
-        error.name = "ZodError";
-        error.issues = [{ message: "Validation failed" }];
-        throw error;
+       (eSBatchEvaluationRESTParamsSchema.parse as any).mockImplementation(() => {
+         const error = new Error("Validation failed");
+         error.name = "ZodError";
+         error.issues = [{ 
+           code: "custom",
+           message: "Validation failed",
+           path: ["params"]
+         }];
+         throw error;
+       });
       });
 
       const options = {
