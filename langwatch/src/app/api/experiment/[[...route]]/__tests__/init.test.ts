@@ -34,6 +34,7 @@ vi.mock("../../middleware", () => ({
     c.set("project", { 
       id: "test-project", 
       apiKey: "test-token",
+      slug: "test-project",
       organization: {
         id: "test-org",
         elasticsearchUrl: "http://localhost:9200",
