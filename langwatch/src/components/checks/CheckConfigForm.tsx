@@ -257,9 +257,7 @@ export default function CheckConfigForm({
   return (
     <FormProvider {...form}>
       <form
-        onSubmit={void handleSubmit((data) => {
-          return onSubmit(data);
-        })}
+        onSubmit={handleSubmit(onSubmit)}
         style={{ width: "100%" }}
       >
         {!checkType || isChoosing || !availableEvaluators ? (
