@@ -23,8 +23,20 @@ import { reservedTraceMetadataSchema } from "../tracer/types.generated";
 import type { Protections } from "./protections";
 import { createLogger } from "../../utils/logger";
 import { parsePythonInsideJson } from "../../utils/parsePythonInsideJson";
+import { INTERNAL_PRESERVE_KEY } from "../../utils/constants";
 
 const logger = createLogger("langwatch:elasticsearch:transformers");
+
+// Utility function to filter out internal keys from objects
+const filterInternalKeys = <T extends Record<string, any>>(obj: T): T => {
+  if (!obj || typeof obj !== 'object') {
+    return obj;
+  }
+  
+  const filtered = { ...obj };
+  delete filtered[INTERNAL_PRESERVE_KEY];
+  return filtered;
+};
 
 export const esSpansToDatasetSpans = (spans: Span[]): DatasetSpan[] => {
   try {
@@ -55,17 +67,17 @@ export const transformElasticSearchTraceToTrace = (
       ([key]) => key in reservedTraceMetadataSchema.shape
     )
   ) as ReservedTraceMetadata;
-  const customMetadata = metadata.custom;
+  const customMetadata = filterInternalKeys(metadata.custom ?? {});
 
   let transformedEvents: Event[] = [];
   let transformedEvaluations: Evaluation[] = [];
-  let transformedSpans: Span[] = [];
+  const transformedSpans: Span[] = [];
 
   let transformedInput: TraceInput | undefined = void 0;
   let transformedOutput: TraceOutput | undefined = void 0;
   let transformedMetrics: Trace["metrics"] | undefined = void 0;
 
-  let redactions: Set<string> = new Set([
+  let redactions = new Set<string>([
     ...(!protections.canSeeCapturedInput
       ? extractRedactionsForObject(input)
       : []),
@@ -135,6 +147,12 @@ export const transformElasticSearchSpanToSpan =
   (protections: Protections, redactions: Set<string>) =>
   (esSpan: ElasticSearchSpan): Span => {
     const { input, output, metrics, ...spanFields } = esSpan;
+    
+    // Filter out internal keys from span params
+    const filteredSpanFields = {
+      ...spanFields,
+      params: filterInternalKeys(spanFields.params ?? {})
+    };
 
     let transformedInput: SpanInputOutput | null = null;
     let transformedOutput: SpanInputOutput | null = null;
@@ -173,7 +191,7 @@ export const transformElasticSearchSpanToSpan =
     }
 
     return {
-      ...spanFields,
+      ...filteredSpanFields,
       input: transformedInput,
       output: transformedOutput,
       metrics: transformedMetrics,
@@ -210,12 +228,12 @@ const extractRedactionsForObject = (object: any): string[] => {
     }
   }
   if (Array.isArray(object)) {
-    return object.flatMap(extractRedactionsForObject) as string[];
+    return object.flatMap(extractRedactionsForObject) ;
   }
   if (typeof object === "object" && object !== null) {
     return Object.values(object).flatMap(
       extractRedactionsForObject
-    ) as string[];
+    ) ;
   }
 
   return [];
