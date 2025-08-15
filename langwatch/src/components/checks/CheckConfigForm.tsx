@@ -54,7 +54,8 @@ import { HorizontalFormControl } from "../HorizontalFormControl";
 import { Tooltip } from "../ui/tooltip";
 import DynamicZodForm from "./DynamicZodForm";
 import { EvaluationManualIntegration } from "./EvaluationManualIntegration";
-import { EvaluatorSelection, evaluatorTempNameMap } from "./EvaluatorSelection";
+import { EvaluatorSelection } from "./EvaluatorSelection";
+import { getEvaluatorDisplayName } from "../../server/evaluations/evaluator-names";
 import { PreconditionsField } from "./PreconditionsField";
 import { TryItOut } from "./TryItOut";
 import { usePublicEnv } from "../../hooks/usePublicEnv";
@@ -184,9 +185,9 @@ export default function CheckConfigForm({
     if (!checkType) return;
 
     let defaultName = getEvaluatorDefinitions(checkType)?.name;
-    defaultName = evaluatorTempNameMap[defaultName ?? ""] ?? defaultName;
+    defaultName = getEvaluatorDisplayName(defaultName ?? "");
     const allDefaultNames = Object.values(availableEvaluators).map(
-      (evaluator) => evaluatorTempNameMap[evaluator.name] ?? evaluator.name
+      (evaluator) => getEvaluatorDisplayName(evaluator.name)
     );
     if (!nameValue || allDefaultNames.includes(nameValue)) {
       form.setValue(
@@ -256,7 +257,7 @@ export default function CheckConfigForm({
   return (
     <FormProvider {...form}>
       <form
-        onSubmit={handleSubmit((data) => {
+        onSubmit={void handleSubmit((data) => {
           return onSubmit(data);
         })}
         style={{ width: "100%" }}
@@ -276,9 +277,9 @@ export default function CheckConfigForm({
                     <VStack align="start" width="full">
                       <HStack gap={0} width="full">
                         <Text>
-                          {evaluatorTempNameMap[
+                          {getEvaluatorDisplayName(
                             availableEvaluators[checkType].name
-                          ] ?? availableEvaluators[checkType].name}
+                          )}
                         </Text>
                         <Button
                           variant="ghost"

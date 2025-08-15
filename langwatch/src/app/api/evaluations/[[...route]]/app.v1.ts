@@ -17,7 +17,7 @@ import {
 
 import { AVAILABLE_EVALUATORS } from "~/server/evaluations/evaluators.generated";
 import { evaluatorsSchema } from "~/server/evaluations/evaluators.zod.generated";
-import { evaluatorTempNameMap } from "~/components/checks/EvaluatorSelection";
+import { getEvaluatorDisplayName } from "~/server/evaluations/evaluator-names";
 import { createLogger } from "~/utils/logger";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
 import { type EvaluationServiceMiddlewareVariables } from "../middleware/evaluation-service";
@@ -70,7 +70,7 @@ app.get(
           key,
           {
             ...value,
-            name: evaluatorTempNameMap[value.name] ?? value.name,
+            name: getEvaluatorDisplayName(value.name),
             settings_json_schema: zodToJsonSchema(
               // @ts-ignore
               evaluatorsSchema.shape[key].shape.settings
