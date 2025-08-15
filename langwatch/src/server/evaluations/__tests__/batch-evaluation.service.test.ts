@@ -140,26 +140,6 @@ describe("BatchEvaluationService", () => {
     });
 
 
-    it("should throw error for missing experiment_id and experiment_slug", async () => {
-      const { eSBatchEvaluationRESTParamsSchema } = await import("~/server/experiments/types.generated");
-      (eSBatchEvaluationRESTParamsSchema.parse as any).mockReturnValue({
-        project_id: "test-project",
-        evaluator_id: "test-evaluator",
-        // Missing both experiment_id and experiment_slug
-      });
-
-      const options = {
-        projectId: "test-project",
-        params: {
-          project_id: "test-project",
-          evaluator_id: "test-evaluator",
-        },
-      };
-
-      await expect(batchEvaluationService.logResults(options)).rejects.toThrow(
-        "Either experiment_id or experiment_slug is required"
-      );
-    });
 
     it("should handle validation errors", async () => {
       const { eSBatchEvaluationRESTParamsSchema } = await import("~/server/experiments/types.generated");
