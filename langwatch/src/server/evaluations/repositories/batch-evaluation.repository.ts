@@ -1,5 +1,5 @@
 import { createLogger } from "~/utils/logger";
-import { type ExperimentType } from "@prisma/client";
+import { type ExperimentType, type Experiment } from "@prisma/client";
 import type { ESBatchEvaluation } from "~/server/experiments/types";
 import {
   BATCH_EVALUATION_INDEX,
@@ -9,8 +9,6 @@ import {
 import { type ExperimentRepository } from "./experiment.repository";
 
 const logger = createLogger("langwatch:evaluations:batch-repository");
-
-import { type ExperimentType, type Experiment } from "@prisma/client";
 
 export interface BatchEvaluationRepository {
   findOrCreateExperiment(options: {

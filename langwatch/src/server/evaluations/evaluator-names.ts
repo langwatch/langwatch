@@ -2,7 +2,7 @@
  * Evaluator name mapping for display purposes
  * Maps internal evaluator names to user-friendly display names
  */
-export const evaluatorNameMap = Object.freeze({
+export const evaluatorNameMap: Record<string, string> = Object.freeze({
   "Azure Content Safety": "Content Safety",
   "OpenAI Moderation": "Moderation",
   "Azure Jailbreak Detection": "Jailbreak Detection",

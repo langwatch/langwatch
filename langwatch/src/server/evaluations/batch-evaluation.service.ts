@@ -82,7 +82,7 @@ export class BatchEvaluationService {
     return { success: true };
   }
 
-  private generateExperimentSlug(experimentId?: string, experimentSlug?: string | null): string {
+  private generateExperimentSlug(experimentId?: string | null, experimentSlug?: string | null): string {
     return experimentSlug ?? `experiment_${experimentId}`;
   }
 

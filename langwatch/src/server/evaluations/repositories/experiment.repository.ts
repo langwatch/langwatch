@@ -71,6 +71,9 @@ export class PrismaExperimentRepository implements ExperimentRepository {
       }
     }
     
+    if (!experiment) {
+      throw new Error("Failed to find or create experiment");
+    }
     return experiment;
   }
 }
