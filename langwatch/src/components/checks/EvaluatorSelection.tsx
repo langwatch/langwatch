@@ -26,18 +26,9 @@ import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProje
 import { Link } from "../ui/link";
 import { Tooltip } from "../ui/tooltip";
 import { useRouter } from "next/router";
+import { getEvaluatorDisplayName } from "../../server/evaluations/evaluator-names";
 
 type Category = EvaluatorDefinition<any>["category"];
-
-// Temporary name map before we have support for grouping evaluations together
-export const evaluatorTempNameMap: Record<string, string> = {
-  "Azure Content Safety": "Content Safety",
-  "OpenAI Moderation": "Moderation",
-  "Azure Jailbreak Detection": "Jailbreak Detection",
-  "Presidio PII Detection": "PII Detection",
-  "Lingua Language Detection": "Language Detection",
-  "Azure Prompt Shield": "Prompt Injection Detection",
-};
 
 const sortingOrder = [
   // rag,
@@ -236,8 +227,7 @@ export function EvaluatorSelection({
                           </Tag.Root>
                         )}
                         <Heading as="h2" size="sm">
-                          {evaluatorTempNameMap[evaluator.name] ??
-                            evaluator.name}
+                          {getEvaluatorDisplayName(evaluator.name)}
                         </Heading>
                       </HStack>
                       {evaluator.missingEnvVars &&

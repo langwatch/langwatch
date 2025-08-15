@@ -55,8 +55,8 @@ vi.mock("~/server/evaluations/evaluators.zod.generated", () => ({
   },
 }));
 
-vi.mock("~/components/checks/EvaluatorSelection", () => ({
-  evaluatorTempNameMap: {},
+vi.mock("~/server/evaluations/evaluator-names", () => ({
+  getEvaluatorDisplayName: vi.fn((name) => name),
 }));
 
 // Mock zodToJsonSchema

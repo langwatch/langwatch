@@ -6,7 +6,6 @@ import type {
 } from "~/server/experiments/types";
 import {
   eSBatchEvaluationRESTParamsSchema,
-  eSBatchEvaluationSchema,
 } from "~/server/experiments/types.generated";
 import * as Sentry from "@sentry/nextjs";
 import { fromZodError } from "zod-validation-error";

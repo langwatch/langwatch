@@ -1,5 +1,5 @@
 import { createLogger } from "~/utils/logger";
-import { type ExperimentType, type Project } from "@prisma/client";
+import { type ExperimentType } from "@prisma/client";
 import type { ESBatchEvaluation } from "~/server/experiments/types";
 import {
   BATCH_EVALUATION_INDEX,
