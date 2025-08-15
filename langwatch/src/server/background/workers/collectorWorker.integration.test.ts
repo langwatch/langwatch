@@ -2,11 +2,9 @@ import { nanoid } from "nanoid";
 import {
   afterAll,
   beforeAll,
-  beforeEach,
   describe,
   expect,
   it,
-  vi,
 } from "vitest";
 import { TRACE_INDEX, esClient, traceIndexId } from "../../elasticsearch";
 import type {
