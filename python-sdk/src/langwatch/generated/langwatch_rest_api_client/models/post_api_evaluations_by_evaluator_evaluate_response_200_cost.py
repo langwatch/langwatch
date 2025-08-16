@@ -1,57 +1,54 @@
 from collections.abc import Mapping
-from typing import Any, TypeVar, Union
+from typing import Any, TypeVar
 
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
 
-from ..types import UNSET, Unset
-
-T = TypeVar("T", bound="PostApiEvaluationsBatchLogResultsResponse200")
+T = TypeVar("T", bound="PostApiEvaluationsByEvaluatorEvaluateResponse200Cost")
 
 
 @_attrs_define
-class PostApiEvaluationsBatchLogResultsResponse200:
+class PostApiEvaluationsByEvaluatorEvaluateResponse200Cost:
     """
     Attributes:
-        success (bool):
-        message (Union[Unset, str]):
+        amount (float):
+        currency (str):
     """
 
-    success: bool
-    message: Union[Unset, str] = UNSET
+    amount: float
+    currency: str
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
-        success = self.success
+        amount = self.amount
 
-        message = self.message
+        currency = self.currency
 
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
         field_dict.update(
             {
-                "success": success,
+                "amount": amount,
+                "currency": currency,
             }
         )
-        if message is not UNSET:
-            field_dict["message"] = message
 
         return field_dict
 
     @classmethod
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
         d = dict(src_dict)
-        success = d.pop("success")
+        amount = d.pop("amount")
 
-        message = d.pop("message", UNSET)
+        currency = d.pop("currency")
 
-        post_api_evaluations_batch_log_results_response_200 = cls(
-            success=success,
-            message=message,
+        post_api_evaluations_by_evaluator_evaluate_response_200_cost = cls(
+            amount=amount,
+            currency=currency,
         )
 
-        post_api_evaluations_batch_log_results_response_200.additional_properties = d
-        return post_api_evaluations_batch_log_results_response_200
+        post_api_evaluations_by_evaluator_evaluate_response_200_cost.additional_properties = d
+        return post_api_evaluations_by_evaluator_evaluate_response_200_cost
 
     @property
     def additional_keys(self) -> list[str]:
