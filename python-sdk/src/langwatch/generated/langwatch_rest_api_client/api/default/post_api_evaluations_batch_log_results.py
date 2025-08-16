@@ -12,12 +12,22 @@ from ...models.post_api_evaluations_batch_log_results_response_500 import PostAp
 from ...types import Response
 
 
-def _get_kwargs() -> dict[str, Any]:
+def _get_kwargs(
+    *,
+    body: Any,
+) -> dict[str, Any]:
+    headers: dict[str, Any] = {}
+
     _kwargs: dict[str, Any] = {
         "method": "post",
         "url": "/api/evaluations/batch/log_results",
     }
 
+    _kwargs["json"] = body
+
+    headers["Content-Type"] = "application/json"
+
+    _kwargs["headers"] = headers
     return _kwargs
 
 
@@ -74,6 +84,7 @@ def _build_response(
 def sync_detailed(
     *,
     client: Union[AuthenticatedClient, Client],
+    body: Any,
 ) -> Response[
     Union[
         PostApiEvaluationsBatchLogResultsResponse200,
@@ -84,6 +95,9 @@ def sync_detailed(
 ]:
     """Log batch evaluation results
 
+    Args:
+        body (Any):
+
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
@@ -92,7 +106,9 @@ def sync_detailed(
         Response[Union[PostApiEvaluationsBatchLogResultsResponse200, PostApiEvaluationsBatchLogResultsResponse400, PostApiEvaluationsBatchLogResultsResponse401, PostApiEvaluationsBatchLogResultsResponse500]]
     """
 
-    kwargs = _get_kwargs()
+    kwargs = _get_kwargs(
+        body=body,
+    )
 
     response = client.get_httpx_client().request(
         **kwargs,
@@ -104,6 +120,7 @@ def sync_detailed(
 def sync(
     *,
     client: Union[AuthenticatedClient, Client],
+    body: Any,
 ) -> Optional[
     Union[
         PostApiEvaluationsBatchLogResultsResponse200,
@@ -113,6 +130,9 @@ def sync(
     ]
 ]:
     """Log batch evaluation results
+
+    Args:
+        body (Any):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -124,12 +144,14 @@ def sync(
 
     return sync_detailed(
         client=client,
+        body=body,
     ).parsed
 
 
 async def asyncio_detailed(
     *,
     client: Union[AuthenticatedClient, Client],
+    body: Any,
 ) -> Response[
     Union[
         PostApiEvaluationsBatchLogResultsResponse200,
@@ -140,6 +162,9 @@ async def asyncio_detailed(
 ]:
     """Log batch evaluation results
 
+    Args:
+        body (Any):
+
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
@@ -148,7 +173,9 @@ async def asyncio_detailed(
         Response[Union[PostApiEvaluationsBatchLogResultsResponse200, PostApiEvaluationsBatchLogResultsResponse400, PostApiEvaluationsBatchLogResultsResponse401, PostApiEvaluationsBatchLogResultsResponse500]]
     """
 
-    kwargs = _get_kwargs()
+    kwargs = _get_kwargs(
+        body=body,
+    )
 
     response = await client.get_async_httpx_client().request(**kwargs)
 
@@ -158,6 +185,7 @@ async def asyncio_detailed(
 async def asyncio(
     *,
     client: Union[AuthenticatedClient, Client],
+    body: Any,
 ) -> Optional[
     Union[
         PostApiEvaluationsBatchLogResultsResponse200,
@@ -167,6 +195,9 @@ async def asyncio(
     ]
 ]:
     """Log batch evaluation results
+
+    Args:
+        body (Any):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -179,5 +210,6 @@ async def asyncio(
     return (
         await asyncio_detailed(
             client=client,
+            body=body,
         )
     ).parsed

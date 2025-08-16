@@ -15,6 +15,14 @@ import {
   batchEvaluationResultSchema,
 } from "./schemas/outputs";
 
+import {
+  evaluationInputSchema,
+} from "./schemas/inputs";
+
+import {
+  eSBatchEvaluationRESTParamsSchema,
+} from "~/server/experiments/types.generated";
+
 import { AVAILABLE_EVALUATORS } from "~/server/evaluations/evaluators.generated";
 import { evaluatorsSchema } from "~/server/evaluations/evaluators.zod.generated";
 import { getEvaluatorDisplayName } from "~/server/evaluations/evaluator-names";
@@ -88,6 +96,13 @@ app.get(
     "/:evaluator{.+?}/evaluate",
     describeRoute({
       description: "Run evaluation with a specific evaluator",
+      requestBody: {
+        content: {
+          "application/json": {
+            schema: resolver(evaluationInputSchema),
+          },
+        },
+      },
       responses: {
         ...baseResponses,
         200: {
@@ -140,6 +155,13 @@ app.post(
   "/batch/log_results",
   describeRoute({
     description: "Log batch evaluation results",
+    requestBody: {
+      content: {
+        "application/json": {
+          schema: resolver(eSBatchEvaluationRESTParamsSchema),
+        },
+      },
+    },
     responses: {
       ...baseResponses,
       200: {

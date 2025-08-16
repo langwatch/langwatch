@@ -6,23 +6,23 @@ from attrs import field as _attrs_field
 
 from ..types import UNSET, Unset
 
-T = TypeVar("T", bound="PostApiEvaluationsBatchLogResultsResponse200")
+T = TypeVar("T", bound="PostApiEvaluationsByEvaluatorEvaluateResponse401")
 
 
 @_attrs_define
-class PostApiEvaluationsBatchLogResultsResponse200:
+class PostApiEvaluationsByEvaluatorEvaluateResponse401:
     """
     Attributes:
-        success (bool):
+        error (str):
         message (Union[Unset, str]):
     """
 
-    success: bool
+    error: str
     message: Union[Unset, str] = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
-        success = self.success
+        error = self.error
 
         message = self.message
 
@@ -30,7 +30,7 @@ class PostApiEvaluationsBatchLogResultsResponse200:
         field_dict.update(self.additional_properties)
         field_dict.update(
             {
-                "success": success,
+                "error": error,
             }
         )
         if message is not UNSET:
@@ -41,17 +41,17 @@ class PostApiEvaluationsBatchLogResultsResponse200:
     @classmethod
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
         d = dict(src_dict)
-        success = d.pop("success")
+        error = d.pop("error")
 
         message = d.pop("message", UNSET)
 
-        post_api_evaluations_batch_log_results_response_200 = cls(
-            success=success,
+        post_api_evaluations_by_evaluator_evaluate_response_401 = cls(
+            error=error,
             message=message,
         )
 
-        post_api_evaluations_batch_log_results_response_200.additional_properties = d
-        return post_api_evaluations_batch_log_results_response_200
+        post_api_evaluations_by_evaluator_evaluate_response_401.additional_properties = d
+        return post_api_evaluations_by_evaluator_evaluate_response_401
 
     @property
     def additional_keys(self) -> list[str]:
