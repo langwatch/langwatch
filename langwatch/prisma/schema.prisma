@@ -156,9 +156,12 @@ model Organization {
     s3Bucket               String?
     useCustomS3            Boolean              @default(false)
     sentPlanLimitAlert     DateTime?
+    ssoDomain              String?
 
     promoCode String?
     features  OrganizationFeature[]
+
+    @@index([ssoDomain])
 }
 
 enum PIIRedactionLevel {

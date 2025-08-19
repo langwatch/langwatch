@@ -4,6 +4,7 @@ import {
   getServerSession,
   type DefaultSession,
   type NextAuthOptions,
+  type User,
 } from "next-auth";
 import Auth0Provider, { type Auth0Profile } from "next-auth/providers/auth0";
 import CognitoProvider, {
@@ -22,6 +23,7 @@ import GitHubProvider from "next-auth/providers/github";
 import GitlabProvider from "next-auth/providers/gitlab";
 import GoogleProvider from "next-auth/providers/google";
 import OktaProvider from "next-auth/providers/okta";
+import type { Account, Organization } from "@prisma/client";
 
 /**
  * Module augmentation for `next-auth` types. Allows us to add custom properties to the `session`
@@ -132,6 +134,22 @@ export const authOptions = (
 
         return true;
       } else {
+        const orgWithSsoDomain = await prisma.organization.findFirst({
+          where: {
+            ssoDomain: user.email.split("@")[1],
+          },
+        });
+
+        if (orgWithSsoDomain) {
+          const newUser = await createUserAndAddToOrganizationAndTeams(
+            user,
+            orgWithSsoDomain,
+            account! as Account
+          );
+          console.log("newUser", newUser);
+          //return true;
+        }
+
         const sessionToken = getNextAuthSessionToken(req as any);
         if (!sessionToken) return true;
 
@@ -297,6 +315,59 @@ export const authOptions = (
     signIn: "/auth/signin",
   },
 });
+
+const createUserAndAddToOrganizationAndTeams = async (
+  user: User,
+  organization: Organization,
+  account: Account
+) => {
+  const newUser = await prisma.user.create({
+    data: {
+      email: user.email,
+      name: user.name,
+      image: user.image,
+    },
+  });
+
+  await prisma.account.create({
+    data: {
+      userId: newUser.id,
+      type: account.type ?? "oauth",
+      provider: account.provider,
+      providerAccountId: user.id,
+      access_token: account.access_token,
+      refresh_token: account.refresh_token,
+      expires_at: account.expires_at,
+      token_type: account.token_type,
+      scope: account.scope,
+      id_token: account.id_token,
+    },
+  }),
+    await prisma.organizationUser.create({
+      data: {
+        userId: newUser.id,
+        organizationId: organization.id,
+        role: "MEMBER",
+      },
+    });
+  const orgTeams = await prisma.team.findMany({
+    where: {
+      organizationId: organization.id,
+    },
+  });
+
+  for (const team of orgTeams) {
+    await prisma.teamUser.create({
+      data: {
+        userId: newUser.id,
+        teamId: team.id,
+        role: "MEMBER",
+      },
+    });
+  }
+
+  return newUser;
+};
 
 /**
  * Wrapper for `getServerSession` so that you don't need to import the `authOptions` in every file.
