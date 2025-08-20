@@ -25,6 +25,7 @@ import GitlabProvider from "next-auth/providers/gitlab";
 import GoogleProvider from "next-auth/providers/google";
 import OktaProvider from "next-auth/providers/okta";
 import type { Account, Organization } from "@prisma/client";
+import * as Sentry from "@sentry/nextjs";
 
 /**
  * Module augmentation for `next-auth` types. Allows us to add custom properties to the `session`
@@ -343,36 +344,44 @@ const linkExistingUserToOAuthProvider = async (
   account: NextAuthAccount
 ) => {
   // Wrap operations in a transaction
-  await prisma.$transaction([
-    // Create the account link first
-    prisma.account.create({
-      data: {
-        userId: existingUser.id,
-        type: account.type ?? "oauth",
-        provider: account.provider,
-        providerAccountId: account.providerAccountId,
-        access_token: account.access_token,
-        refresh_token: account.refresh_token,
-        expires_at: account.expires_at,
-        token_type: account.token_type,
-        scope: account.scope,
-        id_token: account.id_token,
-      },
-    }),
+  try {
+    await prisma.$transaction([
+      // Create the account link first
+      prisma.account.create({
+        data: {
+          userId: existingUser.id,
+          type: account.type ?? "oauth",
+          provider: account.provider,
+          providerAccountId: account.providerAccountId,
+          access_token: account.access_token,
+          refresh_token: account.refresh_token,
+          expires_at: account.expires_at,
+          token_type: account.token_type,
+          scope: account.scope,
+          id_token: account.id_token,
+        },
+      }),
 
-    // Delete old accounts with the same provider (except the one we just created)
-    prisma.account.deleteMany({
-      where: {
-        userId: existingUser.id,
-        provider: account.provider,
-        providerAccountId: { not: user.id },
-      },
-    }),
-    prisma.user.update({
-      where: { id: existingUser.id },
-      data: { pendingSsoSetup: false },
-    }),
-  ]);
+      // Delete old accounts with the same provider (except the one we just created)
+      prisma.account.deleteMany({
+        where: {
+          userId: existingUser.id,
+          provider: account.provider,
+          providerAccountId: { not: user.id },
+        },
+      }),
+      prisma.user.update({
+        where: { id: existingUser.id },
+        data: { pendingSsoSetup: false },
+      }),
+    ]);
+  } catch (error: any) {
+    // Tying to link an account that already exists will throw a P2002 error, let's ignore it
+    if (error.code === "P2002") {
+      Sentry.captureException(error);
+      return;
+    }
+  }
 };
 
 /**
