@@ -150,22 +150,22 @@ export const TracesMapping = ({
   );
   const mapping = traceMappingState.mapping;
 
-  const availableExpansions = useMemo(
-    () =>
-      new Set(
-        Object.values(mapping)
-          .map((mapping) => {
-            const source = mapping.source && TRACE_MAPPINGS[mapping.source];
-            if (source && "expandable_by" in source && source.expandable_by) {
-              return source.expandable_by;
-            }
-            return;
-          })
-          .filter(Boolean)
-          .map((x) => x!)
-      ),
-    [mapping]
-  );
+  const availableExpansions = useMemo(() => {
+    const result = new Set(
+      Object.values(mapping)
+        .map((mapping) => {
+          const source = mapping.source && TRACE_MAPPINGS[mapping.source];
+          if (source && "expandable_by" in source && source.expandable_by) {
+            return source.expandable_by;
+          }
+          return;
+        })
+        .filter(Boolean)
+        .map((x) => x!)
+    );
+
+    return result;
+  }, [mapping]);
   const expansions = useMemo(
     () =>
       new Set(
