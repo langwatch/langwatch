@@ -5,6 +5,7 @@ import {
   type DefaultSession,
   type NextAuthOptions,
   type User,
+  type Account as NextAuthAccount,
 } from "next-auth";
 import Auth0Provider, { type Auth0Profile } from "next-auth/providers/auth0";
 import CognitoProvider, {
@@ -300,7 +301,7 @@ const createUserAndAddToOrganizationAndTeams = async (
       userId: newUser.id,
       type: account.type ?? "oauth",
       provider: account.provider,
-      providerAccountId: user.id,
+      providerAccountId: account.providerAccountId,
       access_token: account.access_token,
       refresh_token: account.refresh_token,
       expires_at: account.expires_at,
@@ -338,7 +339,7 @@ const createUserAndAddToOrganizationAndTeams = async (
 const linkExistingUserToOAuthProvider = async (
   existingUser: User,
   user: User,
-  account: Account
+  account: NextAuthAccount
 ) => {
   // Wrap operations in a transaction
   await prisma.$transaction([
@@ -348,7 +349,7 @@ const linkExistingUserToOAuthProvider = async (
         userId: existingUser.id,
         type: account.type ?? "oauth",
         provider: account.provider,
-        providerAccountId: user.id,
+        providerAccountId: account.providerAccountId,
         access_token: account.access_token,
         refresh_token: account.refresh_token,
         expires_at: account.expires_at,
