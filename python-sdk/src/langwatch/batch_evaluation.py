@@ -108,6 +108,7 @@ class BatchEvaluation:
         experiment: Optional[str] = None,
         run_id: Optional[str] = None,
         max_workers=4,
+        settings: Optional[dict[str, Any]] = None,
     ):
         self.dataset = dataset
         self.evaluations = evaluations
@@ -119,7 +120,7 @@ class BatchEvaluation:
         self.total = 0
         self.progress = 0
         self.created_at = int(time.time() * 1000)
-
+        self.settings = settings or {}
         self.lock = threading.Lock()
         self.batch = {"dataset": [], "evaluations": []}
         self.last_sent = 0
@@ -244,7 +245,9 @@ class BatchEvaluation:
 
         coroutines: list[Coroutine[Tuple[str, SingleEvaluationResult], Any, Any]] = []
         for evaluation in self.evaluations:
-            coroutines.append(run_evaluation(entry_with_output, evaluation, error))
+            coroutines.append(
+                run_evaluation(entry_with_output, evaluation, error, self.settings)
+            )
 
         async def gather_results(futures):
             evaluation_results = await asyncio.gather(*futures)
@@ -331,6 +334,7 @@ class BatchEvaluation:
                 "evaluations": self.batch["evaluations"],
                 "progress": self.progress,
                 "total": self.total,
+                "settings": self.settings,
                 "timestamps": {
                     "created_at": self.created_at,
                 },
@@ -382,6 +386,7 @@ async def run_evaluation(
     data: DatasetEntry,
     evaluation: str,
     error: Optional[Exception] = None,
+    settings: Optional[Dict[str, Any]] = None,
 ) -> Tuple[str, SingleEvaluationResult]:
     if error:
         return evaluation, EvaluationResultSkipped(
@@ -394,6 +399,10 @@ async def run_evaluation(
         json_data = {
             "data": data.model_dump(),
         }
+
+        # Include settings if provided
+        if settings:
+            json_data["settings"] = settings
 
         request_params = {
             "url": langwatch.get_endpoint() + f"/api/evaluations/{evaluation}/evaluate",
