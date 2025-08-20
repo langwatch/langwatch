@@ -101,7 +101,7 @@ export const TRACE_MAPPINGS = {
       }
       return filteredSpans.map((span) => span[subkey as keyof DatasetSpan]);
     },
-    expandable_by: "spans.llm.span_id",
+    expandable_by: "spans.all.span_id",
   },
   "spans.llm.input": {
     mapping: (trace: TraceWithAnnotations) =>
@@ -359,6 +359,16 @@ export const TRACE_EXPANSIONS = {
     label: "LLM span",
     expansion: (trace: TraceWithAnnotations) => {
       const spans = trace.spans?.filter((span) => span.type === "llm") ?? [];
+      return spans.map((span) => ({
+        ...trace,
+        spans: [span],
+      }));
+    },
+  },
+  "spans.all.span_id": {
+    label: "all spans",
+    expansion: (trace: TraceWithAnnotations) => {
+      const spans = trace.spans ?? [];
       return spans.map((span) => ({
         ...trace,
         spans: [span],
