@@ -100,39 +100,7 @@ export const authOptions = (
       });
 
       if (existingUser?.pendingSsoSetup && account?.provider) {
-        // Wrap operations in a transaction
-        await prisma.$transaction([
-          // Create the account link first
-          prisma.account.create({
-            data: {
-              userId: existingUser.id,
-              type: account.type ?? "oauth",
-              provider: account.provider,
-              providerAccountId: user.id,
-              access_token: account.access_token,
-              refresh_token: account.refresh_token,
-              expires_at: account.expires_at,
-              token_type: account.token_type,
-              scope: account.scope,
-              id_token: account.id_token,
-            },
-          }),
-
-          // Delete old accounts with the same provider (except the one we just created)
-          prisma.account.deleteMany({
-            where: {
-              userId: existingUser.id,
-              provider: account.provider,
-              providerAccountId: { not: user.id },
-            },
-          }),
-          prisma.user.update({
-            where: { id: existingUser.id },
-            data: { pendingSsoSetup: false },
-          }),
-        ]);
-
-        return true;
+        await linkExistingUserToOAuthProvider(existingUser, user, account);
       } else {
         const orgWithSsoDomain = await prisma.organization.findFirst({
           where: {
@@ -140,29 +108,27 @@ export const authOptions = (
           },
         });
 
-        if (orgWithSsoDomain) {
-          const newUser = await createUserAndAddToOrganizationAndTeams(
+        if (orgWithSsoDomain && !existingUser) {
+          await createUserAndAddToOrganizationAndTeams(
             user,
             orgWithSsoDomain,
             account! as Account
           );
-          console.log("newUser", newUser);
-          //return true;
         }
+      }
 
-        const sessionToken = getNextAuthSessionToken(req as any);
-        if (!sessionToken) return true;
+      const sessionToken = getNextAuthSessionToken(req as any);
+      if (!sessionToken) return true;
 
-        const dbSession = await prisma.session.findUnique({
-          where: { sessionToken },
-        });
-        const dbUser = await prisma.user.findUnique({
-          where: { id: dbSession?.userId },
-        });
+      const dbSession = await prisma.session.findUnique({
+        where: { sessionToken },
+      });
+      const dbUser = await prisma.user.findUnique({
+        where: { id: dbSession?.userId },
+      });
 
-        if (dbUser?.email !== user.email) {
-          throw new Error("DIFFERENT_EMAIL_NOT_ALLOWED");
-        }
+      if (dbUser?.email !== user.email) {
+        throw new Error("DIFFERENT_EMAIL_NOT_ALLOWED");
       }
 
       return true;
@@ -367,6 +333,44 @@ const createUserAndAddToOrganizationAndTeams = async (
   }
 
   return newUser;
+};
+
+const linkExistingUserToOAuthProvider = async (
+  existingUser: User,
+  user: User,
+  account: Account
+) => {
+  // Wrap operations in a transaction
+  await prisma.$transaction([
+    // Create the account link first
+    prisma.account.create({
+      data: {
+        userId: existingUser.id,
+        type: account.type ?? "oauth",
+        provider: account.provider,
+        providerAccountId: user.id,
+        access_token: account.access_token,
+        refresh_token: account.refresh_token,
+        expires_at: account.expires_at,
+        token_type: account.token_type,
+        scope: account.scope,
+        id_token: account.id_token,
+      },
+    }),
+
+    // Delete old accounts with the same provider (except the one we just created)
+    prisma.account.deleteMany({
+      where: {
+        userId: existingUser.id,
+        provider: account.provider,
+        providerAccountId: { not: user.id },
+      },
+    }),
+    prisma.user.update({
+      where: { id: existingUser.id },
+      data: { pendingSsoSetup: false },
+    }),
+  ]);
 };
 
 /**
