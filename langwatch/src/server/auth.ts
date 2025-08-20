@@ -103,9 +103,10 @@ export const authOptions = (
       if (existingUser?.pendingSsoSetup && account?.provider) {
         await linkExistingUserToOAuthProvider(existingUser, user, account);
       } else {
+        const domain = user.email.split("@")[1]?.toLowerCase();
         const orgWithSsoDomain = await prisma.organization.findFirst({
           where: {
-            ssoDomain: user.email.split("@")[1],
+            ssoDomain: domain,
           },
         });
 
