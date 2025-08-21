@@ -3,7 +3,7 @@ import { Factory } from "fishery";
 import { nanoid } from "nanoid";
 
 export const organizationFactory = Factory.define<
-  Organization & {
+  Omit<Organization, "stripeCustomerId" | "currency"> & {
     signupData: any;
   }
 >(({ sequence }) => ({
@@ -26,4 +26,5 @@ export const organizationFactory = Factory.define<
   useCustomS3: false,
   sentPlanLimitAlert: null,
   promoCode: null,
+  ssoDomain: null,
 }));

@@ -103,21 +103,33 @@ export const authOptions = (
 
       if (existingUser?.pendingSsoSetup && account?.provider) {
         await linkExistingUserToOAuthProvider(existingUser, user, account);
-      } else {
-        const domain = user.email.split("@")[1]?.toLowerCase();
-        const orgWithSsoDomain = await prisma.organization.findFirst({
-          where: {
-            ssoDomain: domain,
-          },
-        });
 
-        if (orgWithSsoDomain && !existingUser) {
-          await createUserAndAddToOrganizationAndTeams(
-            user,
-            orgWithSsoDomain,
-            account! as Account
-          );
-        }
+        return true;
+      }
+
+      const domain = user.email.split("@")[1]?.toLowerCase();
+      const orgWithSsoDomain = await prisma.organization.findFirst({
+        where: {
+          ssoDomain: domain,
+        },
+      });
+      // Cannot guarantee email domain on those providers, autolinking could be abused and a security risk
+      const disallowedProviders = new Set(["google", "github"]);
+
+      if (
+        domain &&
+        account &&
+        orgWithSsoDomain &&
+        !existingUser &&
+        !disallowedProviders.has(account.provider)
+      ) {
+        await createUserAndAddToOrganizationAndTeams(
+          user,
+          orgWithSsoDomain,
+          account as Account
+        );
+
+        return true;
       }
 
       const sessionToken = getNextAuthSessionToken(req as any);
@@ -130,7 +142,7 @@ export const authOptions = (
         where: { id: dbSession?.userId },
       });
 
-      if (dbUser?.email !== user.email) {
+      if (dbUser && dbUser?.email !== user.email) {
         throw new Error("DIFFERENT_EMAIL_NOT_ALLOWED");
       }
 
@@ -311,14 +323,16 @@ const createUserAndAddToOrganizationAndTeams = async (
       scope: account.scope,
       id_token: account.id_token,
     },
-  }),
-    await prisma.organizationUser.create({
-      data: {
-        userId: newUser.id,
-        organizationId: organization.id,
-        role: "MEMBER",
-      },
-    });
+  });
+
+  await prisma.organizationUser.create({
+    data: {
+      userId: newUser.id,
+      organizationId: organization.id,
+      role: "MEMBER",
+    },
+  });
+
   const orgTeams = await prisma.team.findMany({
     where: {
       organizationId: organization.id,
@@ -380,6 +394,8 @@ const linkExistingUserToOAuthProvider = async (
     if (error.code === "P2002") {
       Sentry.captureException(error);
       return;
+    } else {
+      throw error;
     }
   }
 };
