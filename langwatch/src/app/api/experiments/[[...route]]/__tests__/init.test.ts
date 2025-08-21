@@ -1,6 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { app } from "../app";
-import { PrismaExperimentService } from "~/server/experiments";
+import app from "../app";
 
 // Mock the database
 vi.mock("~/server/db", () => ({
