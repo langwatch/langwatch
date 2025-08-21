@@ -4,8 +4,16 @@ import { z } from "zod";
 export const evaluatorsResponseSchema = z.object({
   evaluators: z.record(z.string(), z.object({
     name: z.string(),
-    description: z.string().optional(),
-    settings_json_schema: z.unknown(),
+    description: z.string(),
+    category: z.string(),
+    docsUrl: z.string(),
+    isGuardrail: z.boolean(),
+    requiredFields: z.array(z.string()),
+    optionalFields: z.array(z.string()),
+    settings: z.record(z.unknown()),
+    envVars: z.array(z.string()),
+    result: z.array(z.unknown()),
+    settings_json_schema: z.array(z.unknown()),
   })),
 });
 
@@ -13,13 +21,15 @@ export type EvaluatorsResponse = z.infer<typeof evaluatorsResponseSchema>;
 
 // Evaluation result response
 export const evaluationResultSchema = z.object({
-  id: z.string().optional(),
-  status: z.enum(["pending", "running", "completed", "failed"]).optional(),
-  result: z.unknown().optional(),
+  status: z.enum(["pending", "running", "skipped", "completed", "failed"]).optional(),
+  score: z.number().nullable(),
+  passed: z.boolean().nullable(),
+  label: z.string().nullable(),
+  details: z.string().nullable(),
   cost: z.object({
     amount: z.number(),
     currency: z.string(),
-  }).optional(),
+  }).nullable(),
   error: z.string().optional(),
 });
 

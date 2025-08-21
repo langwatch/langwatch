@@ -4,9 +4,7 @@ import { describeRoute } from "hono-openapi";
 import { resolver } from "hono-openapi/zod";
 import { zodToJsonSchema } from "zod-to-json-schema";
 
-import {
-  type AuthMiddlewareVariables,
-} from "../../middleware";
+import { type AuthMiddlewareVariables } from "../../middleware";
 import { baseResponses } from "../../shared/base-responses";
 
 import {
@@ -14,14 +12,6 @@ import {
   evaluationResultSchema,
   batchEvaluationResultSchema,
 } from "./schemas/outputs";
-
-import {
-  evaluationInputSchema,
-} from "./schemas/inputs";
-
-import {
-  eSBatchEvaluationRESTParamsSchema,
-} from "~/server/experiments/types.generated";
 
 import { AVAILABLE_EVALUATORS } from "~/server/evaluations/evaluators.generated";
 import { evaluatorsSchema } from "~/server/evaluations/evaluators.zod.generated";
@@ -42,8 +32,6 @@ type Variables = AuthMiddlewareVariables & EvaluationServiceMiddlewareVariables;
 export const app = new Hono<{
   Variables: Variables;
 }>().basePath("/");
-
-
 
 // Get all available evaluators
 app.get(
@@ -81,7 +69,8 @@ app.get(
             ...value,
             name: getEvaluatorDisplayName(value.name),
             settings_json_schema: zodToJsonSchema(
-              (evaluatorsSchema.shape as any)[key]?.shape?.settings ?? z.object({})
+              (evaluatorsSchema.shape as any)[key]?.shape?.settings ??
+                z.object({})
             ),
           },
         ])
@@ -91,31 +80,24 @@ app.get(
   }
 );
 
-  // Evaluate with a specific evaluator
-  app.post(
-    "/:evaluator{.+?}/evaluate",
-    describeRoute({
-      description: "Run evaluation with a specific evaluator",
-      requestBody: {
+// Evaluate with a specific evaluator
+app.post(
+  "/:evaluator{.+?}/evaluate",
+  describeRoute({
+    description: "Run evaluation with a specific evaluator",
+    responses: {
+      ...baseResponses,
+      200: {
+        description: "Success",
         content: {
           "application/json": {
-            schema: resolver(evaluationInputSchema),
+            schema: resolver(evaluationResultSchema),
           },
         },
       },
-      responses: {
-        ...baseResponses,
-        200: {
-          description: "Success",
-          content: {
-            "application/json": {
-              schema: resolver(evaluationResultSchema),
-            },
-          },
-        },
-      },
-    }),
-      async (c) => {
+    },
+  }),
+  async (c) => {
     const project = c.get("project");
     const evaluationService = c.get("evaluationService");
     const evaluator = c.req.param("evaluator");
@@ -131,37 +113,34 @@ app.get(
         asGuardrail: false,
       });
 
-      return c.json(result.result);
+      return c.json(result);
     } catch (error) {
-      logger.error({ error, projectId: project.id, evaluator }, "Evaluation failed");
-      
+      logger.error(
+        { error, projectId: project.id, evaluator },
+        "Evaluation failed"
+      );
+
       if (error instanceof HTTPException) {
         throw error;
       }
-      
-      const statusCode = error instanceof Error && 'statusCode' in error 
-        ? (error as any).statusCode 
-        : 500;
-      
-      throw new HTTPException(statusCode, { 
-        message: error instanceof Error ? error.message : "Evaluation failed" 
+
+      const statusCode =
+        error instanceof Error && "statusCode" in error
+          ? (error as any).statusCode
+          : 500;
+
+      throw new HTTPException(statusCode, {
+        message: error instanceof Error ? error.message : "Evaluation failed",
       });
     }
   }
-  );
+);
 
 // Batch evaluation
 app.post(
   "/batch/log_results",
   describeRoute({
     description: "Log batch evaluation results",
-    requestBody: {
-      content: {
-        "application/json": {
-          schema: resolver(eSBatchEvaluationRESTParamsSchema),
-        },
-      },
-    },
     responses: {
       ...baseResponses,
       200: {
@@ -189,13 +168,18 @@ app.post(
 
       return c.json({ message: "ok" });
     } catch (error) {
-      logger.error({ error, projectId: project.id }, "Batch evaluation logging failed");
-      
+      logger.error(
+        { error, projectId: project.id },
+        "Batch evaluation logging failed"
+      );
+
       if (error instanceof Error) {
         throw new HTTPException(400, { message: error.message });
       }
-      
-      throw new HTTPException(500, { message: "Batch evaluation logging failed" });
+
+      throw new HTTPException(500, {
+        message: "Batch evaluation logging failed",
+      });
     }
   }
 );
@@ -224,7 +208,10 @@ app.post(
     const subpath = c.req.param("subpath");
     const body = await c.req.json();
 
-    logger.info({ projectId: project.id, evaluator, subpath }, "Running evaluation with subpath");
+    logger.info(
+      { projectId: project.id, evaluator, subpath },
+      "Running evaluation with subpath"
+    );
 
     try {
       const evaluatorSlug = `${evaluator}/${subpath}`;
@@ -235,14 +222,17 @@ app.post(
         asGuardrail: false,
       });
 
-      return c.json(result.result);
+      return c.json(result);
     } catch (error) {
-      logger.error({ error, projectId: project.id, evaluator, subpath }, "Evaluation failed");
-      
+      logger.error(
+        { error, projectId: project.id, evaluator, subpath },
+        "Evaluation failed"
+      );
+
       if (error instanceof Error) {
         throw new HTTPException(400, { message: error.message });
       }
-      
+
       throw new HTTPException(500, { message: "Evaluation failed" });
     }
   }

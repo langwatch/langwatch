@@ -4,6 +4,7 @@ import type {
   EvaluationResultError,
   EvaluationResultSkipped,
 } from "./evaluators.generated";
+import type { batchEvaluationResultSchema, singleEvaluationResultSchema } from "./evaluators.zod.generated";
 
 export type CheckPreconditionFields = "input" | "output" | "metadata.labels";
 
@@ -53,12 +54,7 @@ export const evaluationInputSchema = z.object({
   as_guardrail: z.boolean().optional().nullable().default(false),
 });
 
-export type EvaluationRESTParams = z.infer<typeof evaluationInputSchema>;
+export type SingleEvaluationResult = z.infer<typeof singleEvaluationResultSchema>;
+export type BatchEvaluationResult = z.infer<typeof batchEvaluationResultSchema>;
 
-export type EvaluationRESTResult = (
-  | EvaluationResult
-  | EvaluationResultSkipped
-  | Omit<EvaluationResultError, "traceback">
-) & {
-  passed?: boolean;
-};
+export type EvaluationRESTParams = z.infer<typeof evaluationInputSchema>;

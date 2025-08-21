@@ -15,7 +15,6 @@ module.exports = {
       "AnalyticsMetric",
       "NewDatasetEntries",
       "EvaluationRESTParams",
-      "EvaluationRESTResult",
       "Json",
       "Literal",
       "DatasetSpan",

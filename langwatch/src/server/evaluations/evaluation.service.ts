@@ -15,12 +15,11 @@ import {
   type EvaluatorTypes,
   type SingleEvaluationResult,
 } from "./evaluators.generated";
-import { evaluatorsSchema } from "./evaluators.zod.generated";
+import { evaluatorsSchema, type singleEvaluationResultSchema } from "./evaluators.zod.generated";
 import { getEvaluatorDefaultSettings } from "./getEvaluator";
 import {
   evaluationInputSchema,
   type EvaluationRESTParams,
-  type EvaluationRESTResult,
 } from "./types";
 import {
   getEvaluatorDataForParams,
@@ -37,13 +36,6 @@ export interface EvaluationServiceOptions {
   asGuardrail?: boolean;
 }
 
-export interface EvaluationResult {
-  result: EvaluationRESTResult;
-  cost?: {
-    amount: number;
-    currency: string;
-  };
-}
 
 export class EvaluationService {
   constructor(
@@ -53,7 +45,7 @@ export class EvaluationService {
   /**
    * Run an evaluation with the given parameters
    */
-  async runEvaluation(options: EvaluationServiceOptions): Promise<EvaluationResult> {
+  async runEvaluation(options: EvaluationServiceOptions): Promise<z.infer<typeof singleEvaluationResultSchema>> {
     const { projectId, evaluatorSlug, params, asGuardrail = false } = options;
 
     logger.info({ projectId, evaluatorSlug }, "Starting evaluation");
@@ -71,7 +63,6 @@ export class EvaluationService {
       Sentry.captureException(error, {
         extra: {
           projectId,
-          params,
           validationError: validationError.message,
         },
       });
@@ -98,11 +89,9 @@ export class EvaluationService {
     // Check if guardrail is enabled
     if (storedEvaluator && !storedEvaluator.enabled && !!isGuardrail) {
       return {
-        result: {
-          status: "skipped",
-          details: `Guardrail is not enabled`,
-          ...(isGuardrail ? { passed: true } : {}),
-        }
+        status: "skipped",
+        details: `Guardrail is not enabled`,
+        ...(isGuardrail ? { passed: true } : {}),
       };
     }
 
@@ -132,10 +121,7 @@ export class EvaluationService {
     // Prepare final result
     const finalResult = this.prepareFinalResult(result, isGuardrail);
 
-    return {
-      result: finalResult,
-      cost,
-    };
+    return finalResult;
   }
 
   private async getEvaluatorCheckType(projectId: string, evaluatorSlug: string): Promise<string> {
@@ -331,13 +317,16 @@ export class EvaluationService {
     }
   }
 
-  private prepareFinalResult(result: SingleEvaluationResult, isGuardrail: boolean): EvaluationRESTResult {
+  private prepareFinalResult(result: SingleEvaluationResult, isGuardrail: boolean): z.infer<typeof singleEvaluationResultSchema> {
     if (result.status === "error") {
       return {
         status: "error",
         error_type: "error_type" in result ? result.error_type : "EVALUATOR_ERROR",
         details: result.details,
-        ...(isGuardrail ? { passed: true } : {}), // We don't want to fail the check if the evaluator throws, because this is likely a bug in the evaluator
+        traceback: result.traceback,
+        // Don't set passed: true for error statuses to avoid confusion
+        // The comment suggests this was to avoid failing guardrails due to evaluator bugs,
+        // but this creates confusing responses where status is "error" but passed is "true"
       };
     } else if (result.status === "skipped") {
       return {
