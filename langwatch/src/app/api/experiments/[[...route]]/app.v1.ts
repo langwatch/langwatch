@@ -2,15 +2,13 @@ import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { describeRoute } from "hono-openapi";
 import { validator as zValidator, resolver } from "hono-openapi/zod";
-import { z } from "zod";
 
 import {
   type AuthMiddlewareVariables,
 } from "../../middleware";
 import {
-  experimentServiceMiddleware,
   type ExperimentServiceMiddlewareVariables,
-} from "../../experiment/middleware/experiment-service";
+} from "../middleware/experiment-service";
 import { baseResponses } from "../../shared/base-responses";
 
 import {
@@ -117,11 +115,11 @@ app.post(
           throw new HTTPException(404, { message: error.message });
         }
         if (error.message === "Either experiment_id or experiment_slug is required") {
-          throw new HTTPException(400, { message: error.message });
+          throw new HTTPException(422, { message: error.message });
         }
         // Handle validation errors
         if (error.message.includes("Validation") || error.message.includes("Invalid")) {
-          throw new HTTPException(400, { message: error.message });
+          throw new HTTPException(422, { message: error.message });
         }
         // Handle database/connection errors
         if (error.message.includes("database") || error.message.includes("connection")) {
