@@ -113,16 +113,8 @@ export const authOptions = (
           ssoDomain: domain,
         },
       });
-      // Cannot guarantee email domain on those providers, autolinking could be abused and a security risk
-      const disallowedProviders = new Set(["google", "github"]);
 
-      if (
-        domain &&
-        account &&
-        orgWithSsoDomain &&
-        !existingUser &&
-        !disallowedProviders.has(account.provider)
-      ) {
+      if (domain && account && orgWithSsoDomain && !existingUser) {
         await createUserAndAddToOrganizationAndTeams(
           user,
           orgWithSsoDomain,
