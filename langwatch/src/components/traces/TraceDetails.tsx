@@ -179,6 +179,7 @@ export function TraceDetails(props: {
     );
   };
 
+  const hasThread = Boolean(threadId);
   const threadTraces = api.traces.getTracesByThreadId.useQuery(
     {
       projectId: project?.id ?? "",
@@ -186,7 +187,7 @@ export function TraceDetails(props: {
       traceId: props.traceId,
     },
     {
-      enabled: !!project && !!threadId,
+      enabled: !!project && hasThread,
     }
   );
 
@@ -295,7 +296,7 @@ export function TraceDetails(props: {
               )}
               {hasTeamPermission(TeamRoleGroup.DATASETS_MANAGE) && (
                 <>
-                  {threadTraces.data && threadTraces.data.length > 0 ? (
+                  {hasThread && threadTraces.data && threadTraces.data.length > 0 ? (
                     <Menu.Root>
                       <Menu.Trigger asChild>
                         <Button variant="outline" size="sm">
@@ -335,7 +336,7 @@ export function TraceDetails(props: {
                       type="submit"
                       variant="outline"
                       minWidth="fit-content"
-                      loading={threadTraces.isLoading}
+                      loading={hasThread && threadTraces.isLoading}
                       onClick={() => {
                         openDrawer("addDatasetRecord", {
                           traceId: props.traceId,
