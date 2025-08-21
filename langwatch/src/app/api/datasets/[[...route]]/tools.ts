@@ -1,6 +1,5 @@
 import { tool } from "ai";
 import { z } from "zod";
-import { datasetColumnTypeSchema } from "../../../../server/datasets/types";
 
 export const addRow = tool({
   description: "Adds a row to the dataset, each row is an array of values matching each column of the dataset EXCEPT the id column",
@@ -17,13 +16,6 @@ export const updateRow = tool({
   }),
 });
 
-export const changeColumns = tool({
-  description: "Changes the columns of the dataset",
-  parameters: z.object({
-    columns: z.record(z.string(), datasetColumnTypeSchema),
-  }),
-});
-
 export const deleteRow = tool({
   description: "Deletes a row from the dataset by the id",
   parameters: z.object({
@@ -34,6 +26,5 @@ export const deleteRow = tool({
 export const tools = {
   addRow,
   updateRow,
-  // changeColumns,
   deleteRow,
 };
