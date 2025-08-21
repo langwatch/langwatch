@@ -86,9 +86,11 @@ describe("EvaluationService", () => {
         },
       });
 
-      expect(result.result.status).toBe("processed");
-      expect((result.result as any).score).toBe(0.8);
-      expect(result.result.passed).toBe(true);
+      expect(result.status).toBe("processed");
+      if (result.status === "processed") {
+        expect(result.score).toBe(0.8);
+        expect(result.passed).toBe(true);
+      }
       
       // Verify mocked functions were called
       expect(getEvaluatorIncludingCustom).toHaveBeenCalledWith("test-project", "test/evaluator");
@@ -173,9 +175,9 @@ describe("EvaluationService", () => {
       const { runEvaluation } = await import("~/server/background/workers/evaluationsWorker");
       
       const result = await tempService.runEvaluation(options);
-      expect(result.result.status).toBe("skipped");
-      expect(result.result.details).toBe("Guardrail is not enabled");
-      expect(result.result.passed).toBe(true);
+      expect(result.status).toBe("skipped");
+      expect(result.details).toBe("Guardrail is not enabled");
+      // For skipped results, passed property doesn't exist, so we don't test it
       
       // Verify that evaluation was not executed
       expect(runEvaluation).not.toHaveBeenCalled();

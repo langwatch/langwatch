@@ -2,7 +2,7 @@ import { Input, Button, Text, HStack, VStack, Spinner } from "@chakra-ui/react";
 import { LuSparkles, LuBot, LuChevronRight } from "react-icons/lu";
 import { toaster } from "../../../../ui/toaster";
 import { useChat } from "@ai-sdk/react";
-import { type tools } from "../../../../../app/api/dataset/generate/tools";
+import { type tools } from "../../../../../app/api/datasets/[[...route]]/tools";
 import type { z } from "zod";
 import { useEvaluationWizardStore } from "../../hooks/evaluation-wizard-store/useEvaluationWizardStore";
 import { useShallow } from "zustand/react/shallow";
