@@ -107,7 +107,7 @@ export const authOptions = (
         return true;
       }
 
-      const domain = user.email.split("@")[1]?.toLowerCase();
+      const domain = user.email.split("@")[1];
       const orgWithSsoDomain = await prisma.organization.findFirst({
         where: {
           ssoDomain: domain,
