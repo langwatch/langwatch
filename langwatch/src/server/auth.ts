@@ -102,7 +102,7 @@ export const authOptions = (
       });
 
       if (existingUser?.pendingSsoSetup && account?.provider) {
-        await linkExistingUserToOAuthProvider(existingUser, user, account);
+        await linkExistingUserToOAuthProvider(existingUser, account);
 
         return true;
       }
@@ -346,7 +346,6 @@ const createUserAndAddToOrganizationAndTeams = async (
 
 const linkExistingUserToOAuthProvider = async (
   existingUser: User,
-  user: User,
   account: NextAuthAccount
 ) => {
   // Wrap operations in a transaction
@@ -373,7 +372,7 @@ const linkExistingUserToOAuthProvider = async (
         where: {
           userId: existingUser.id,
           provider: account.provider,
-          providerAccountId: { not: user.id },
+          providerAccountId: { not: account.providerAccountId },
         },
       }),
       prisma.user.update({
