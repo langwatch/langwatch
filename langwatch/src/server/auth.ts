@@ -4,6 +4,8 @@ import {
   getServerSession,
   type DefaultSession,
   type NextAuthOptions,
+  type User,
+  type Account as NextAuthAccount,
 } from "next-auth";
 import Auth0Provider, { type Auth0Profile } from "next-auth/providers/auth0";
 import CognitoProvider, {
@@ -22,6 +24,8 @@ import GitHubProvider from "next-auth/providers/github";
 import GitlabProvider from "next-auth/providers/gitlab";
 import GoogleProvider from "next-auth/providers/google";
 import OktaProvider from "next-auth/providers/okta";
+import type { Account, Organization } from "@prisma/client";
+import * as Sentry from "@sentry/nextjs";
 
 /**
  * Module augmentation for `next-auth` types. Allows us to add custom properties to the `session`
@@ -98,53 +102,40 @@ export const authOptions = (
       });
 
       if (existingUser?.pendingSsoSetup && account?.provider) {
-        // Wrap operations in a transaction
-        await prisma.$transaction([
-          // Create the account link first
-          prisma.account.create({
-            data: {
-              userId: existingUser.id,
-              type: account.type ?? "oauth",
-              provider: account.provider,
-              providerAccountId: user.id,
-              access_token: account.access_token,
-              refresh_token: account.refresh_token,
-              expires_at: account.expires_at,
-              token_type: account.token_type,
-              scope: account.scope,
-              id_token: account.id_token,
-            },
-          }),
-
-          // Delete old accounts with the same provider (except the one we just created)
-          prisma.account.deleteMany({
-            where: {
-              userId: existingUser.id,
-              provider: account.provider,
-              providerAccountId: { not: user.id },
-            },
-          }),
-          prisma.user.update({
-            where: { id: existingUser.id },
-            data: { pendingSsoSetup: false },
-          }),
-        ]);
+        await linkExistingUserToOAuthProvider(existingUser, account);
 
         return true;
-      } else {
-        const sessionToken = getNextAuthSessionToken(req as any);
-        if (!sessionToken) return true;
+      }
 
-        const dbSession = await prisma.session.findUnique({
-          where: { sessionToken },
-        });
-        const dbUser = await prisma.user.findUnique({
-          where: { id: dbSession?.userId },
-        });
+      const domain = user.email.split("@")[1];
+      const orgWithSsoDomain = await prisma.organization.findFirst({
+        where: {
+          ssoDomain: domain,
+        },
+      });
 
-        if (dbUser?.email !== user.email) {
-          throw new Error("DIFFERENT_EMAIL_NOT_ALLOWED");
-        }
+      if (domain && account && orgWithSsoDomain && !existingUser) {
+        await createUserAndAddToOrganizationAndTeams(
+          user,
+          orgWithSsoDomain,
+          account as Account
+        );
+
+        return true;
+      }
+
+      const sessionToken = getNextAuthSessionToken(req as any);
+      if (!sessionToken) return true;
+
+      const dbSession = await prisma.session.findUnique({
+        where: { sessionToken },
+      });
+      const dbUser = await prisma.user.findUnique({
+        where: { id: dbSession?.userId },
+      });
+
+      if (dbUser && dbUser?.email !== user.email) {
+        throw new Error("DIFFERENT_EMAIL_NOT_ALLOWED");
       }
 
       return true;
@@ -297,6 +288,108 @@ export const authOptions = (
     signIn: "/auth/signin",
   },
 });
+
+const createUserAndAddToOrganizationAndTeams = async (
+  user: User,
+  organization: Organization,
+  account: Account
+) => {
+  const newUser = await prisma.user.create({
+    data: {
+      email: user.email,
+      name: user.name,
+      image: user.image,
+    },
+  });
+
+  await prisma.account.create({
+    data: {
+      userId: newUser.id,
+      type: account.type ?? "oauth",
+      provider: account.provider,
+      providerAccountId: account.providerAccountId,
+      access_token: account.access_token,
+      refresh_token: account.refresh_token,
+      expires_at: account.expires_at,
+      token_type: account.token_type,
+      scope: account.scope,
+      id_token: account.id_token,
+    },
+  });
+
+  await prisma.organizationUser.create({
+    data: {
+      userId: newUser.id,
+      organizationId: organization.id,
+      role: "MEMBER",
+    },
+  });
+
+  const orgTeams = await prisma.team.findMany({
+    where: {
+      organizationId: organization.id,
+    },
+  });
+
+  for (const team of orgTeams) {
+    await prisma.teamUser.create({
+      data: {
+        userId: newUser.id,
+        teamId: team.id,
+        role: "MEMBER",
+      },
+    });
+  }
+
+  return newUser;
+};
+
+const linkExistingUserToOAuthProvider = async (
+  existingUser: User,
+  account: NextAuthAccount
+) => {
+  // Wrap operations in a transaction
+  try {
+    await prisma.$transaction([
+      // Create the account link first
+      prisma.account.create({
+        data: {
+          userId: existingUser.id,
+          type: account.type ?? "oauth",
+          provider: account.provider,
+          providerAccountId: account.providerAccountId,
+          access_token: account.access_token,
+          refresh_token: account.refresh_token,
+          expires_at: account.expires_at,
+          token_type: account.token_type,
+          scope: account.scope,
+          id_token: account.id_token,
+        },
+      }),
+
+      // Delete old accounts with the same provider (except the one we just created)
+      prisma.account.deleteMany({
+        where: {
+          userId: existingUser.id,
+          provider: account.provider,
+          providerAccountId: { not: account.providerAccountId },
+        },
+      }),
+      prisma.user.update({
+        where: { id: existingUser.id },
+        data: { pendingSsoSetup: false },
+      }),
+    ]);
+  } catch (error: any) {
+    // Tying to link an account that already exists will throw a P2002 error, let's ignore it
+    if (error.code === "P2002") {
+      Sentry.captureException(error);
+      return;
+    } else {
+      throw error;
+    }
+  }
+};
 
 /**
  * Wrapper for `getServerSession` so that you don't need to import the `authOptions` in every file.
