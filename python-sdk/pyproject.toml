@@ -3,7 +3,7 @@ name = "langwatch"
 version = "0.2.11" # remember to also update it in src/langwatch/__version__.py
 description = "LangWatch Python SDK, for monitoring your LLMs"
 authors = [{ name = "Langwatch Engineers", email = "engineering@langwatch.ai" }]
-requires-python = ">=3.10,<3.13"
+requires-python = ">=3.10,<=3.13"
 license = { text = "MIT" }
 readme = "README.md"
 classifiers = [
