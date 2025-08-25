@@ -5,7 +5,7 @@ export default defineConfig({
   test: {
     setupFiles: ["./test-setup.ts"],
     include: ["**/*.integration.{test,spec}.?(c|m)[jt]s?(x)"],
-    exclude: [...configDefaults.exclude, ".next/**/*", ".next-saas/**/*"],
+    exclude: [...configDefaults.exclude, ".next/**/*", ".next-saas/**/*", "saas-src/**/*"],
     testTimeout: 10_000,
     hookTimeout: 10_000,
   },

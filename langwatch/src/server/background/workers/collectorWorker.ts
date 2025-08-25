@@ -357,8 +357,8 @@ const processCollectorJob_ = async (
       inserted_at: existingTrace?.inserted_at ?? Date.now(),
       updated_at: Date.now(),
     } as ElasticSearchTrace["timestamps"],
-    ...(input?.value ? { input } : {}),
-    ...(output?.value ? { output } : {}),
+    ...(input?.value && input.value !== "" ? { input } : {}),
+    ...(output?.value && output.value !== "" ? { output } : {}),
     ...(expectedOutput ? { expected_output: { value: expectedOutput } } : {}),
     metrics: computeTraceMetrics(uniqueSpans), // Use uniqueSpans for accurate total_cost calculation
     error,
