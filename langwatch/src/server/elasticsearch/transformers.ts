@@ -27,14 +27,17 @@ import { INTERNAL_PRESERVE_KEY } from "../../utils/constants";
 
 const logger = createLogger("langwatch:elasticsearch:transformers");
 
-// Utility function to filter out internal keys from objects
+// Filter out internal keys from objects
 const filterInternalKeys = <T extends Record<string, any>>(obj: T): T => {
-  if (!obj || typeof obj !== 'object') {
+  if (!obj || typeof obj !== "object") {
     return obj;
   }
-  
-  const filtered = { ...obj };
-  delete filtered[INTERNAL_PRESERVE_KEY];
+
+  const filtered = {
+    ...obj,
+    [INTERNAL_PRESERVE_KEY]: void 0,
+  } as T;
+
   return filtered;
 };
 
@@ -147,11 +150,11 @@ export const transformElasticSearchSpanToSpan =
   (protections: Protections, redactions: Set<string>) =>
   (esSpan: ElasticSearchSpan): Span => {
     const { input, output, metrics, ...spanFields } = esSpan;
-    
+
     // Filter out internal keys from span params
     const filteredSpanFields = {
       ...spanFields,
-      params: filterInternalKeys(spanFields.params ?? {})
+      params: filterInternalKeys(spanFields.params ?? {}),
     };
 
     let transformedInput: SpanInputOutput | null = null;
@@ -228,12 +231,10 @@ const extractRedactionsForObject = (object: any): string[] => {
     }
   }
   if (Array.isArray(object)) {
-    return object.flatMap(extractRedactionsForObject) ;
+    return object.flatMap(extractRedactionsForObject);
   }
   if (typeof object === "object" && object !== null) {
-    return Object.values(object).flatMap(
-      extractRedactionsForObject
-    ) ;
+    return Object.values(object).flatMap(extractRedactionsForObject);
   }
 
   return [];
