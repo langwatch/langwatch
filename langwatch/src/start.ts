@@ -7,8 +7,36 @@ import { register } from "prom-client";
 import promBundle from "express-prom-bundle";
 import { createLogger } from "./utils/logger";
 import { initializeBackgroundWorkers } from "./server/background/init";
+import { setupObservability } from "langwatch/observability/node";
+import { BatchSpanProcessor, SimpleSpanProcessor } from "@opentelemetry/sdk-trace-node";
+import { getNodeAutoInstrumentations } from "@opentelemetry/auto-instrumentations-node";
+import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-grpc";
 
 const logger = createLogger("langwatch:start");
+
+if (process.env.OTEL_EXPORTER_OTLP_ENDPOINT) {
+  setupObservability({
+    attributes: {
+      "deployment.environment.name": process.env.NODE_ENV,
+      "service.name": "langwatch",
+      "service.instance.id": process.env.INSTANCE_ID,
+    },
+    spanProcessors: [
+      process.env.NODE_ENV === "production"
+        ? new BatchSpanProcessor(
+          new OTLPTraceExporter({
+            url: `${process.env.OTEL_EXPORTER_OTLP_ENDPOINT}/v1/traces`,
+          })
+        )
+        : new SimpleSpanProcessor(
+          new OTLPTraceExporter({
+            url: `${process.env.OTEL_EXPORTER_OTLP_ENDPOINT}/v1/traces`,
+          })
+        ),
+    ],
+    instrumentations: [getNodeAutoInstrumentations()],
+  });
+}
 
 export const metricsMiddleware = promBundle({
   metricsPath: "/metrics",
