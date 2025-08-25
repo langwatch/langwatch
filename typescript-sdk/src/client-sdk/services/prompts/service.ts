@@ -243,7 +243,7 @@ export class PromptsService {
       }>;
     },
   ): Promise<{ created: boolean; prompt: Prompt }> {
-    const payload: CreatePromptBody | UpdatePromptBody = {
+    const payload: CreatePromptBody = {
       handle,
       model: config.model,
       prompt: PromptConverter.extractSystemPrompt(config.messages),
@@ -264,7 +264,7 @@ export class PromptsService {
         prompt,
       };
     } catch {
-      const prompt = await this.update(handle, payload);
+      const prompt = await this.update(handle, payload as UpdatePromptBody);
 
       return {
         created: false,
