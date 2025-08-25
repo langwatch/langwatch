@@ -20,6 +20,8 @@ import { createLogger } from "~/utils/logger";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
 import { type EvaluationServiceMiddlewareVariables } from "../middleware/evaluation-service";
 import z from "zod";
+import { zValidator } from "@hono/zod-validator";
+import { batchEvaluationInputSchema, evaluationInputSchema } from "./schemas";
 
 const logger = createLogger("langwatch:api:evaluations");
 
@@ -31,7 +33,7 @@ type Variables = AuthMiddlewareVariables & EvaluationServiceMiddlewareVariables;
 // Define the Hono app
 export const app = new Hono<{
   Variables: Variables;
-}>().basePath("/");
+}>();
 
 // Get all available evaluators
 app.get(
@@ -82,7 +84,7 @@ app.get(
 
 // Evaluate with a specific evaluator
 app.post(
-  "/:evaluator{.+?}/evaluate",
+  "/:evaluator/evaluate",
   describeRoute({
     description: "Run evaluation with a specific evaluator",
     responses: {
@@ -97,6 +99,7 @@ app.post(
       },
     },
   }),
+  zValidator("json", evaluationInputSchema),
   async (c) => {
     const project = c.get("project");
     const evaluationService = c.get("evaluationService");
@@ -153,6 +156,7 @@ app.post(
       },
     },
   }),
+  zValidator("json", batchEvaluationInputSchema),
   async (c) => {
     const project = c.get("project");
     const batchEvaluationService = c.get("batchEvaluationService");
@@ -186,7 +190,7 @@ app.post(
 
 // Legacy route support for backward compatibility
 app.post(
-  "/:evaluator{.+?}/:subpath{.+?}/evaluate",
+  "/:evaluator/:subpath/evaluate",
   describeRoute({
     description: "Run evaluation with evaluator and subpath (legacy route)",
     responses: {

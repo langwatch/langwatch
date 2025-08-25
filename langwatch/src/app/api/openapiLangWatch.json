@@ -4019,215 +4019,6 @@
         }
       }
     },
-    "/api/dataset/{slug}/entries": {
-      "post": {
-        "responses": {},
-        "operationId": "postApiDatasetBySlugEntries",
-        "parameters": [
-          {
-            "schema": {
-              "type": "string"
-            },
-            "in": "path",
-            "name": "slug",
-            "required": true
-          }
-        ],
-        "description": "Add entries to a dataset",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/DatasetPostEntries"
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/dataset/{slugOrId}": {
-      "get": {
-        "responses": {
-          "200": {
-            "description": "Success",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "data": {
-                      "type": "array",
-                      "items": {
-                        "type": "object",
-                        "properties": {
-                          "id": {
-                            "type": "string"
-                          },
-                          "datasetId": {
-                            "type": "string"
-                          },
-                          "projectId": {
-                            "type": "string"
-                          },
-                          "entry": {
-                            "type": "object",
-                            "additionalProperties": {}
-                          },
-                          "createdAt": {
-                            "type": "string"
-                          },
-                          "updatedAt": {
-                            "type": "string"
-                          }
-                        },
-                        "required": [
-                          "id",
-                          "datasetId",
-                          "projectId",
-                          "entry",
-                          "createdAt",
-                          "updatedAt"
-                        ]
-                      }
-                    }
-                  },
-                  "required": [
-                    "data"
-                  ]
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Bad Request",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "status": {
-                      "type": "string",
-                      "default": "error"
-                    },
-                    "message": {
-                      "type": "string"
-                    }
-                  },
-                  "required": [
-                    "status",
-                    "message"
-                  ]
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Unauthorized",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "status": {
-                      "type": "string",
-                      "default": "error"
-                    },
-                    "message": {
-                      "type": "string"
-                    }
-                  },
-                  "required": [
-                    "status",
-                    "message"
-                  ]
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Dataset not found",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "status": {
-                      "type": "string",
-                      "default": "error"
-                    },
-                    "message": {
-                      "type": "string"
-                    }
-                  },
-                  "required": [
-                    "status",
-                    "message"
-                  ]
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Unprocessable Entity",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "status": {
-                      "type": "string",
-                      "default": "error"
-                    },
-                    "message": {
-                      "type": "string"
-                    }
-                  },
-                  "required": [
-                    "status",
-                    "message"
-                  ]
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "Internal Server Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "status": {
-                      "type": "string",
-                      "default": "error"
-                    },
-                    "message": {
-                      "type": "string"
-                    }
-                  },
-                  "required": [
-                    "status",
-                    "message"
-                  ]
-                }
-              }
-            }
-          }
-        },
-        "operationId": "getApiDatasetBySlugOrId",
-        "parameters": [
-          {
-            "schema": {
-              "type": "string"
-            },
-            "in": "path",
-            "name": "slugOrId",
-            "required": true
-          }
-        ],
-        "description": "Get a dataset by its slug or id."
-      }
-    },
     "/api/prompts": {
       "get": {
         "responses": {
@@ -5974,198 +5765,7 @@
         "description": "Delete all events"
       }
     },
-    "/": {
-      "get": {
-        "responses": {
-          "200": {
-            "description": "Success",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "array",
-                  "items": {
-                    "type": "object",
-                    "properties": {
-                      "id": {
-                        "type": "string"
-                      },
-                      "handle": {
-                        "type": [
-                          "string",
-                          "null"
-                        ]
-                      },
-                      "scope": {
-                        "type": "string",
-                        "enum": [
-                          "ORGANIZATION",
-                          "PROJECT"
-                        ]
-                      },
-                      "name": {
-                        "type": "string"
-                      },
-                      "updatedAt": {
-                        "type": "string"
-                      },
-                      "projectId": {
-                        "type": "string"
-                      },
-                      "organizationId": {
-                        "type": "string"
-                      },
-                      "version": {
-                        "type": "number"
-                      },
-                      "versionId": {
-                        "type": "string"
-                      },
-                      "versionCreatedAt": {
-                        "type": "string"
-                      },
-                      "model": {
-                        "type": "string"
-                      },
-                      "prompt": {
-                        "type": "string"
-                      },
-                      "messages": {
-                        "type": "array",
-                        "items": {
-                          "type": "object",
-                          "properties": {
-                            "role": {
-                              "type": "string",
-                              "enum": [
-                                "user",
-                                "assistant",
-                                "system"
-                              ]
-                            },
-                            "content": {
-                              "type": "string"
-                            }
-                          },
-                          "required": [
-                            "role",
-                            "content"
-                          ]
-                        }
-                      },
-                      "response_format": {
-                        "type": [
-                          "object",
-                          "null"
-                        ],
-                        "properties": {
-                          "type": {
-                            "type": "string",
-                            "enum": [
-                              "json_schema"
-                            ]
-                          },
-                          "json_schema": {
-                            "type": "object",
-                            "properties": {
-                              "name": {
-                                "type": "string"
-                              },
-                              "schema": {
-                                "type": "object"
-                              }
-                            },
-                            "required": [
-                              "name",
-                              "schema"
-                            ]
-                          }
-                        },
-                        "required": [
-                          "type",
-                          "json_schema"
-                        ]
-                      }
-                    },
-                    "required": [
-                      "id",
-                      "handle",
-                      "scope",
-                      "name",
-                      "updatedAt",
-                      "projectId",
-                      "organizationId",
-                      "version",
-                      "versionId",
-                      "versionCreatedAt",
-                      "model",
-                      "prompt",
-                      "messages",
-                      "response_format"
-                    ]
-                  }
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Bad Request",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "error": {
-                      "type": "string"
-                    }
-                  },
-                  "required": [
-                    "error"
-                  ]
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Unauthorized",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "error": {
-                      "type": "string"
-                    }
-                  },
-                  "required": [
-                    "error"
-                  ]
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "Internal Server Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "error": {
-                      "type": "string"
-                    }
-                  },
-                  "required": [
-                    "error"
-                  ]
-                }
-              }
-            }
-          }
-        },
-        "operationId": "getIndex",
-        "parameters": [],
-        "description": "Get all prompts for a project"
-      },
+    "/api/datasets/{slugOrId}/entries": {
       "post": {
         "responses": {
           "200": {
@@ -6175,121 +5775,12 @@
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "id": {
-                      "type": "string"
-                    },
-                    "handle": {
-                      "type": [
-                        "string",
-                        "null"
-                      ]
-                    },
-                    "scope": {
-                      "type": "string",
-                      "enum": [
-                        "ORGANIZATION",
-                        "PROJECT"
-                      ]
-                    },
-                    "name": {
-                      "type": "string"
-                    },
-                    "updatedAt": {
-                      "type": "string"
-                    },
-                    "projectId": {
-                      "type": "string"
-                    },
-                    "organizationId": {
-                      "type": "string"
-                    },
-                    "version": {
-                      "type": "number"
-                    },
-                    "versionId": {
-                      "type": "string"
-                    },
-                    "versionCreatedAt": {
-                      "type": "string"
-                    },
-                    "model": {
-                      "type": "string"
-                    },
-                    "prompt": {
-                      "type": "string"
-                    },
-                    "messages": {
-                      "type": "array",
-                      "items": {
-                        "type": "object",
-                        "properties": {
-                          "role": {
-                            "type": "string",
-                            "enum": [
-                              "user",
-                              "assistant",
-                              "system"
-                            ]
-                          },
-                          "content": {
-                            "type": "string"
-                          }
-                        },
-                        "required": [
-                          "role",
-                          "content"
-                        ]
-                      }
-                    },
-                    "response_format": {
-                      "type": [
-                        "object",
-                        "null"
-                      ],
-                      "properties": {
-                        "type": {
-                          "type": "string",
-                          "enum": [
-                            "json_schema"
-                          ]
-                        },
-                        "json_schema": {
-                          "type": "object",
-                          "properties": {
-                            "name": {
-                              "type": "string"
-                            },
-                            "schema": {
-                              "type": "object"
-                            }
-                          },
-                          "required": [
-                            "name",
-                            "schema"
-                          ]
-                        }
-                      },
-                      "required": [
-                        "type",
-                        "json_schema"
-                      ]
+                    "success": {
+                      "type": "boolean"
                     }
                   },
                   "required": [
-                    "id",
-                    "handle",
-                    "scope",
-                    "name",
-                    "updatedAt",
-                    "projectId",
-                    "organizationId",
-                    "version",
-                    "versionId",
-                    "versionCreatedAt",
-                    "model",
-                    "prompt",
-                    "messages",
-                    "response_format"
+                    "success"
                   ]
                 }
               }
@@ -6303,6 +5794,9 @@
                   "type": "object",
                   "properties": {
                     "error": {
+                      "type": "string"
+                    },
+                    "message": {
                       "type": "string"
                     }
                   },
@@ -6322,6 +5816,30 @@
                   "properties": {
                     "error": {
                       "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
                     }
                   },
                   "required": [
@@ -6340,6 +5858,9 @@
                   "properties": {
                     "error": {
                       "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
                     }
                   },
                   "required": [
@@ -6350,127 +5871,408 @@
             }
           }
         },
-        "operationId": "postIndex",
-        "parameters": [],
-        "description": "Create a new prompt with default initial version",
+        "operationId": "postApiDatasetsBySlugOrIdEntries",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "slugOrId",
+            "required": true
+          }
+        ],
+        "description": "Add entries to a dataset",
         "requestBody": {
           "content": {
             "application/json": {
               "schema": {
                 "type": "object",
                 "properties": {
-                  "handle": {
-                    "type": "string",
-                    "pattern": "^[a-z0-9_-]+(?:\\/[a-z0-9_-]+)?$"
-                  },
-                  "scope": {
-                    "type": "string",
-                    "enum": [
-                      "ORGANIZATION",
-                      "PROJECT"
-                    ],
-                    "default": "PROJECT"
-                  },
-                  "authorId": {
-                    "type": "string"
-                  },
-                  "prompt": {
-                    "type": "string"
-                  },
-                  "messages": {
+                  "entries": {
                     "type": "array",
                     "items": {
                       "type": "object",
-                      "properties": {
-                        "role": {
-                          "type": "string",
-                          "enum": [
-                            "user",
-                            "assistant",
-                            "system"
-                          ]
-                        },
-                        "content": {
-                          "type": "string"
-                        }
-                      },
-                      "required": [
-                        "role",
-                        "content"
-                      ]
-                    }
-                  },
-                  "inputs": {
-                    "type": "array",
-                    "items": {
-                      "type": "object",
-                      "properties": {
-                        "identifier": {
-                          "type": "string",
-                          "minLength": 1
-                        },
-                        "type": {
-                          "type": "string",
-                          "enum": [
-                            "str",
-                            "float",
-                            "bool",
-                            "image",
-                            "list[str]",
-                            "list[float]",
-                            "list[int]",
-                            "list[bool]",
-                            "dict"
-                          ]
-                        }
-                      },
-                      "required": [
-                        "identifier",
-                        "type"
-                      ]
-                    }
-                  },
-                  "outputs": {
-                    "type": "array",
-                    "items": {
-                      "type": "object",
-                      "properties": {
-                        "identifier": {
-                          "type": "string",
-                          "minLength": 1
-                        },
-                        "type": {
-                          "type": "string",
-                          "enum": [
-                            "str",
-                            "float",
-                            "bool",
-                            "json_schema"
-                          ]
-                        },
-                        "json_schema": {
-                          "type": "object",
-                          "properties": {
-                            "type": {
-                              "type": "string",
-                              "minLength": 1
-                            }
-                          },
-                          "required": [
-                            "type"
-                          ],
-                          "additionalProperties": true
-                        }
-                      },
-                      "required": [
-                        "identifier",
-                        "type"
-                      ]
+                      "additionalProperties": {}
                     }
                   }
                 },
                 "required": [
-                  "handle"
+                  "entries"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/datasets/{slugOrId}": {
+      "get": {
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "datasetId": {
+                            "type": "string"
+                          },
+                          "projectId": {
+                            "type": "string"
+                          },
+                          "entry": {
+                            "type": "object",
+                            "additionalProperties": {}
+                          },
+                          "createdAt": {
+                            "type": "string"
+                          },
+                          "updatedAt": {
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "datasetId",
+                          "projectId",
+                          "entry",
+                          "createdAt",
+                          "updatedAt"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Dataset not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "operationId": "getApiDatasetsBySlugOrId",
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "in": "path",
+            "name": "slugOrId",
+            "required": true
+          }
+        ],
+        "description": "Get a dataset by its slug or id."
+      }
+    },
+    "/api/datasets/generate": {
+      "post": {
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "operationId": "postApiDatasetsGenerate",
+        "parameters": [],
+        "description": "Generate dataset entries using AI",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "messages": {
+                    "type": "array",
+                    "items": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "role": {
+                              "type": "string",
+                              "const": "user"
+                            },
+                            "content": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "role",
+                            "content"
+                          ]
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "role": {
+                              "type": "string",
+                              "const": "assistant"
+                            },
+                            "content": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "role",
+                            "content"
+                          ]
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "role": {
+                              "type": "string",
+                              "const": "system"
+                            },
+                            "content": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "role",
+                            "content"
+                          ]
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "role": {
+                              "type": "string",
+                              "const": "tool"
+                            },
+                            "content": {
+                              "type": "string"
+                            },
+                            "toolCallId": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "role",
+                            "content",
+                            "toolCallId"
+                          ]
+                        }
+                      ]
+                    }
+                  },
+                  "dataset": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "projectId": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "messages",
+                  "dataset",
+                  "projectId"
                 ]
               }
             }
@@ -6652,256 +6454,6 @@
         "description": "Get all available evaluators"
       }
     },
-    "/api/evaluations/batch/log_results": {
-      "post": {
-        "responses": {
-          "200": {
-            "description": "Success",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "success": {
-                      "type": "boolean"
-                    },
-                    "message": {
-                      "type": "string"
-                    }
-                  },
-                  "required": [
-                    "success"
-                  ]
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Bad Request",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "error": {
-                      "type": "string"
-                    },
-                    "message": {
-                      "type": "string"
-                    }
-                  },
-                  "required": [
-                    "error"
-                  ]
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Unauthorized",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "error": {
-                      "type": "string"
-                    },
-                    "message": {
-                      "type": "string"
-                    }
-                  },
-                  "required": [
-                    "error"
-                  ]
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "Unprocessable Entity",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "error": {
-                      "type": "string"
-                    },
-                    "message": {
-                      "type": "string"
-                    }
-                  },
-                  "required": [
-                    "error"
-                  ]
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "Internal Server Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "error": {
-                      "type": "string"
-                    },
-                    "message": {
-                      "type": "string"
-                    }
-                  },
-                  "required": [
-                    "error"
-                  ]
-                }
-              }
-            }
-          }
-        },
-        "operationId": "postApiEvaluationsBatchLog_results",
-        "parameters": [],
-        "description": "Log batch evaluation results"
-      }
-    },
-    "/api/experiment/init": {
-      "post": {
-        "responses": {
-          "200": {
-            "description": "Success",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "path": {
-                      "type": "string"
-                    },
-                    "slug": {
-                      "type": "string"
-                    }
-                  },
-                  "required": [
-                    "path",
-                    "slug"
-                  ],
-                  "additionalProperties": false
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Bad Request",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "error": {
-                      "type": "string"
-                    },
-                    "message": {
-                      "type": "string"
-                    }
-                  },
-                  "required": [
-                    "error"
-                  ]
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Unauthorized",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "error": {
-                      "type": "string"
-                    },
-                    "message": {
-                      "type": "string"
-                    }
-                  },
-                  "required": [
-                    "error"
-                  ]
-                }
-              }
-            }
-          },
-          "500": {
-            "description": "Internal Server Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "error": {
-                      "type": "string"
-                    },
-                    "message": {
-                      "type": "string"
-                    }
-                  },
-                  "required": [
-                    "error"
-                  ]
-                }
-              }
-            }
-          }
-        },
-        "operationId": "postApiExperimentInit",
-        "parameters": [],
-        "description": "Initialize or find an experiment",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "experiment_id": {
-                    "type": [
-                      "string",
-                      "null"
-                    ]
-                  },
-                  "experiment_slug": {
-                    "type": [
-                      "string",
-                      "null"
-                    ]
-                  },
-                  "experiment_type": {
-                    "type": "string",
-                    "enum": [
-                      "DSPY",
-                      "BATCH_EVALUATION",
-                      "BATCH_EVALUATION_V2"
-                    ]
-                  },
-                  "experiment_name": {
-                    "type": "string"
-                  },
-                  "workflowId": {
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "experiment_type"
-                ],
-                "additionalProperties": false
-              }
-            }
-          }
-        }
-      }
-    },
     "/api/evaluations/{evaluator}/evaluate": {
       "post": {
         "responses": {
@@ -7076,6 +6628,120 @@
           }
         ],
         "description": "Run evaluation with a specific evaluator"
+      }
+    },
+    "/api/evaluations/batch/log_results": {
+      "post": {
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "success"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "operationId": "postApiEvaluationsBatchLog_results",
+        "parameters": [],
+        "description": "Log batch evaluation results"
       }
     },
     "/api/evaluations/{evaluator}/{subpath}/evaluate": {
@@ -7260,6 +6926,163 @@
           }
         ],
         "description": "Run evaluation with evaluator and subpath (legacy route)"
+      }
+    },
+    "/api/experiments/init": {
+      "post": {
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "path": {
+                      "type": "string"
+                    },
+                    "slug": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "path",
+                    "slug"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "operationId": "postApiExperimentsInit",
+        "parameters": [],
+        "description": "Initialize or find an experiment",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "experiment_id": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "experiment_slug": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "experiment_type": {
+                    "type": "string",
+                    "enum": [
+                      "DSPY",
+                      "BATCH_EVALUATION",
+                      "BATCH_EVALUATION_V2"
+                    ]
+                  },
+                  "experiment_name": {
+                    "type": "string"
+                  },
+                  "workflowId": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "experiment_type"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        }
       }
     }
   },

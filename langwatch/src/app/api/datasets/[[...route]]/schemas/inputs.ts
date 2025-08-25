@@ -23,7 +23,7 @@ export const datasetGenerateInputSchema = z.object({
       content: z.string(),
       toolCallId: z.string(),
     }),
-  ])),
-  dataset: z.record(z.string(), z.unknown()),
+  ])).describe("The message chain to pass into the model to generate the dataset entries. A system prompt is prepended automatically to help guide."),
+  dataset: z.string().trim().min(1).describe("The current dataset. This is also used to help the model understand the columns of the dataset. Example: `id,input,output\\r\\n`"),
   projectId: z.string(),
 });
