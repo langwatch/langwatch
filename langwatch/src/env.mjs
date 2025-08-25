@@ -90,6 +90,9 @@ export const env = createEnv({
     POSTHOG_HOST: z.string().optional(),
     DISABLE_USAGE_STATS: z.boolean().optional(),
     LANGWATCH_NLP_LAMBDA_CONFIG: z.string().optional(),
+
+    // Observability
+    OTEL_EXPORTER_OTLP_ENDPOINT: z.string().optional(),
   },
 
   /**
@@ -181,6 +184,7 @@ export const env = createEnv({
     OKTA_CLIENT_ID: process.env.OKTA_CLIENT_ID,
     OKTA_CLIENT_SECRET: process.env.OKTA_CLIENT_SECRET,
     OKTA_ISSUER: process.env.OKTA_ISSUER,
+    OTEL_EXPORTER_OTLP_ENDPOINT: process.env.OTEL_EXPORTER_OTLP_ENDPOINT,
   },
   /**
    * Run `build` or `dev` with `SKIP_ENV_VALIDATION` to skip env validation.
