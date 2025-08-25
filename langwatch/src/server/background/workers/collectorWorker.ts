@@ -272,7 +272,9 @@ const processCollectorJob_ = async (
 
   const existingSpans: Span[] = [];
   const existingEvaluations: Evaluation[] = [];
-  const hasIgnoreTimestamps = false;
+  const hasIgnoreTimestamps = (spans ?? []).some(
+    (s) => s.timestamps?.ignore_timestamps_on_write === true
+  );
 
   if (existingTrace?.inserted_at) {
     // TODO: check for quickwit
@@ -312,8 +314,8 @@ const processCollectorJob_ = async (
     return acc;
   }, [] as Span[]);
 
-  const hasPreserveFlags = uniqueSpans.some(span => 
-    span.params?.[INTERNAL_PRESERVE_KEY] === true
+  const hasPreserveFlags = uniqueSpans.some(
+    (span) => span.params?.[INTERNAL_PRESERVE_KEY] === true
   );
 
   // If there are preserve flags and we have an existing trace, preserve existing input/output
@@ -328,6 +330,9 @@ const processCollectorJob_ = async (
       { value: getLastOutputAsText(uniqueSpans) },
     ]);
   }
+  
+  input = asNonEmptyIO(input);
+  output = asNonEmptyIO(output);
   const error = getLastOutputError(uniqueSpans);
 
   const evaluations = mapEvaluations(data)?.concat(existingEvaluations);
@@ -370,8 +375,8 @@ const processCollectorJob_ = async (
       inserted_at: existingTrace?.inserted_at ?? Date.now(),
       updated_at: Date.now(),
     } as ElasticSearchTrace["timestamps"],
-    ...(input?.value && input.value !== "" ? { input } : {}),
-    ...(output?.value && output.value !== "" ? { output } : {}),
+    ...(input ? { input } : {}),
+    ...(output ? { output } : {}),
     ...(expectedOutput ? { expected_output: { value: expectedOutput } } : {}),
     metrics: computeTraceMetrics(uniqueSpans), // Use uniqueSpans for accurate total_cost calculation
     error,
@@ -492,16 +497,23 @@ const updateTrace = async (
               }
             }
             
-            // Check if trace has preserve flag
+            // Check if trace has preserve flag (new params + existing doc)
             boolean traceHasPreserveFlag = params.trace.metadata != null && 
               params.trace.metadata.custom != null && 
               params.trace.metadata.custom.containsKey("__internal_langwatch_preserve_existing_io") && 
               params.trace.metadata.custom["__internal_langwatch_preserve_existing_io"] == true;
+            boolean existingTraceHasPreserveFlag = ctx._source != null &&
+              ctx._source.containsKey("metadata") &&
+              ctx._source.metadata != null &&
+              ctx._source.metadata.containsKey("custom") &&
+              ctx._source.metadata.custom != null &&
+              ctx._source.metadata.custom.containsKey("__internal_langwatch_preserve_existing_io") &&
+              ctx._source.metadata.custom["__internal_langwatch_preserve_existing_io"] == true;
             
             // Merge trace data with input/output preservation
             for (String key : params.trace.keySet()) {
               // Special handling for input/output - preserve existing truthy values when trace or new spans have preserve flags
-              if ((key == "input" || key == "output") && (hasNewSpansWithPreserveFlag || traceHasPreserveFlag)) {
+              if ((key == "input" || key == "output") && (hasNewSpansWithPreserveFlag || traceHasPreserveFlag || existingTraceHasPreserveFlag)) {
                 // Only update if existing value is missing/null/empty and new value is set
                 boolean existingValueIsEmpty = !ctx._source.containsKey(key) ||
                   ctx._source[key] == null ||
@@ -512,7 +524,6 @@ const updateTrace = async (
                 if (existingValueIsEmpty && newValueIsSet) {
                   ctx._source[key] = params.trace[key];
                 }
-                // Otherwise, preserve existing value
               } else {
                 // Normal merge for non-input/output fields or when no preserve flags
                 ctx._source[key] = params.trace[key];
@@ -750,10 +761,10 @@ export const processCollectorCheckAndAdjustJob = async (
     body: {
       script: {
         source: `
-          if (params.input != null) {
+          if (params.input != null && params.input.value != null && params.input.value != "") {
             ctx._source.input = params.input;
           }
-          if (params.output != null) {
+          if (params.output != null && params.output.value != null && params.output.value != "") {
             ctx._source.output = params.output;
           }
           if (params.error != null) {
@@ -850,6 +861,15 @@ const typedValueToElasticSearch = (
     type: typed.type,
     value: JSON.stringify(typed.value),
   };
+};
+
+export const asNonEmptyIO = (
+  io: { value: string } | null | undefined
+): { value: string } | undefined => {
+  if (!io?.value || io.value.trim() === "") {
+    return undefined;
+  }
+  return io;
 };
 
 // TODO: test, move to common, and fix this sorting on the TODO right below
