@@ -25,7 +25,8 @@ import {
   dSPyStepRESTParamsSchema,
   dSPyStepSchema,
 } from "../../../server/experiments/types.generated";
-import { findOrCreateExperiment } from "../experiment/init";
+import { PrismaExperimentService } from "~/server/experiments/experiment.service";
+import { PrismaExperimentRepository } from "~/server/experiments/repositories/experiment.repository";
 import {
   getLLMModelCosts,
   type MaybeStoredLLMModelCost,
@@ -135,7 +136,10 @@ export default async function handler(
 const processDSPyStep = async (project: Project, param: DSPyStepRESTParams) => {
   const { run_id, index, experiment_id, experiment_slug } = param;
 
-  const experiment = await findOrCreateExperiment({
+  const experimentRepository = new PrismaExperimentRepository();
+  const experimentService = new PrismaExperimentService(experimentRepository);
+  
+  const experiment = await experimentService.findOrCreateExperiment({
     project,
     experiment_id,
     experiment_slug,

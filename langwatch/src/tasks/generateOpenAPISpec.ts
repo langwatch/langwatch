@@ -4,10 +4,12 @@ import path from "path";
 import deepmerge from "deepmerge";
 import { generateSpecs } from "hono-openapi";
 
-import { app as datasetApp } from "../app/api/dataset/[[...route]]/app";
 import currentSpec from "../app/api/openapiLangWatch.json";
+import { app as datasetApp } from "../app/api/dataset/[[...route]]/app";
 import { app as llmConfigsApp } from "../app/api/prompts/[[...route]]/app";
 import { app as scenarioEventsApp } from "../app/api/scenario-events/[[...route]]/app";
+import { app as evaluationsApp } from "../app/api/evaluations/[[...route]]/app";
+import { app as experimentsApp } from "../app/api/experiment/[[...route]]/app";
 
 const overwriteMerge = (_destinationArray: any[], sourceArray: any[]) =>
   sourceArray;
@@ -36,6 +38,10 @@ export default async function execute() {
   const llmConfigsSpec = await generateSpecs(llmConfigsApp);
   console.log("Building scenario events spec...");
   const scenarioEventsSpec = await generateSpecs(scenarioEventsApp);
+  console.log("Building evaluations spec...");
+  const evaluationsSpec = await generateSpecs(evaluationsApp);
+  console.log("Building experiments spec...");
+  const experimentsSpec = await generateSpecs(experimentsApp);
   console.log("Merging specs...");
   const mergedSpec = deepmerge.all(
     // Merges this way ==>
@@ -44,6 +50,8 @@ export default async function execute() {
       datasetSpec,
       llmConfigsSpec,
       scenarioEventsSpec,
+      evaluationsSpec,
+      experimentsSpec,
       langwatchSpec,
     ],
     {
@@ -54,7 +62,9 @@ export default async function execute() {
         if (
           key.includes("/api/prompts") ||
           key.includes("/api/dataset") ||
-          key.includes("/api/scenario-events")
+          key.includes("/api/scenario-events") ||
+          key.includes("/api/evaluations") ||
+          key.includes("/api/experiment")
         ) {
           // Replace with new
           return (_target, source) => {

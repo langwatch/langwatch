@@ -26,15 +26,14 @@ def _get_kwargs(
         "url": "/api/scenario-events",
     }
 
-    _body: dict[str, Any]
+    _kwargs["json"]: dict[str, Any]
     if isinstance(body, PostApiScenarioEventsBodyType0):
-        _body = body.to_dict()
+        _kwargs["json"] = body.to_dict()
     elif isinstance(body, PostApiScenarioEventsBodyType1):
-        _body = body.to_dict()
+        _kwargs["json"] = body.to_dict()
     else:
-        _body = body.to_dict()
+        _kwargs["json"] = body.to_dict()
 
-    _kwargs["json"] = _body
     headers["Content-Type"] = "application/json"
 
     _kwargs["headers"] = headers
