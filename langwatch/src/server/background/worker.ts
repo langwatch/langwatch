@@ -26,13 +26,7 @@ import path from "path";
 import fs from "fs";
 import { workerRestartsCounter } from "../metrics";
 import { startUsageStatsWorker } from "./workers/usageStatsWorker";
-
-export class WorkersRestart extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "WorkersRestart";
-  }
-}
+import { WorkersRestart } from "./errors";
 
 const logger = createLogger("langwatch:workers");
 
