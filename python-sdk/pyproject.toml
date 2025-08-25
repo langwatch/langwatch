@@ -1,9 +1,9 @@
 [project]
 name = "langwatch"
-version = "0.2.11" # remember to also update it in src/langwatch/__version__.py
+version = "0.2.12" # remember to also update it in src/langwatch/__version__.py
 description = "LangWatch Python SDK, for monitoring your LLMs"
 authors = [{ name = "Langwatch Engineers", email = "engineering@langwatch.ai" }]
-requires-python = ">=3.10,<3.13"
+requires-python = ">=3.10,<3.14"
 license = { text = "MIT" }
 readme = "README.md"
 classifiers = [
@@ -16,6 +16,7 @@ classifiers = [
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
     "Topic :: Software Development :: Libraries :: Python Modules",
 ]
 
