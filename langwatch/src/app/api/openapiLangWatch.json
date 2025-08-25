@@ -6627,7 +6627,63 @@
             "required": true
           }
         ],
-        "description": "Run evaluation with a specific evaluator"
+        "description": "Run evaluation with a specific evaluator",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "trace_id": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "evaluation_id": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "evaluator_id": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "name": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "data": {
+                    "type": [
+                      "object",
+                      "null"
+                    ],
+                    "additionalProperties": true
+                  },
+                  "settings": {
+                    "type": [
+                      "object",
+                      "null"
+                    ],
+                    "additionalProperties": true
+                  },
+                  "as_guardrail": {
+                    "type": [
+                      "boolean",
+                      "null"
+                    ],
+                    "default": false
+                  }
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/api/evaluations/batch/log_results": {
@@ -6741,7 +6797,73 @@
         },
         "operationId": "postApiEvaluationsBatchLog_results",
         "parameters": [],
-        "description": "Log batch evaluation results"
+        "description": "Log batch evaluation results",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "experiment_slug": {
+                    "type": "string"
+                  },
+                  "name": {
+                    "type": "string"
+                  },
+                  "run_id": {
+                    "type": "string"
+                  },
+                  "dataset": {
+                    "type": "array",
+                    "items": {}
+                  },
+                  "evaluations": {
+                    "type": "array",
+                    "items": {}
+                  },
+                  "progress": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "total": {
+                    "type": "integer",
+                    "minimum": 1
+                  },
+                  "timestamps": {
+                    "type": "object",
+                    "properties": {
+                      "created_at": {
+                        "type": "integer",
+                        "minimum": 0
+                      },
+                      "finished_at": {
+                        "type": "integer",
+                        "minimum": 0
+                      },
+                      "stopped_at": {
+                        "type": "integer",
+                        "minimum": 0
+                      }
+                    },
+                    "required": [
+                      "created_at"
+                    ]
+                  }
+                },
+                "required": [
+                  "experiment_slug",
+                  "name",
+                  "run_id",
+                  "dataset",
+                  "evaluations",
+                  "progress",
+                  "total",
+                  "timestamps"
+                ]
+              }
+            }
+          }
+        }
       }
     },
     "/api/evaluations/{evaluator}/{subpath}/evaluate": {
@@ -6925,7 +7047,63 @@
             "required": true
           }
         ],
-        "description": "Run evaluation with evaluator and subpath (legacy route)"
+        "description": "Run evaluation with evaluator and subpath (legacy route)",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "trace_id": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "evaluation_id": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "evaluator_id": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "name": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "data": {
+                    "type": [
+                      "object",
+                      "null"
+                    ],
+                    "additionalProperties": true
+                  },
+                  "settings": {
+                    "type": [
+                      "object",
+                      "null"
+                    ],
+                    "additionalProperties": true
+                  },
+                  "as_guardrail": {
+                    "type": [
+                      "boolean",
+                      "null"
+                    ],
+                    "default": false
+                  }
+                }
+              }
+            }
+          }
+        }
       }
     },
     "/api/experiments/init": {
