@@ -292,6 +292,13 @@ export const runEvaluation = async ({
 
   const startTime = performance.now();
 
+  console.log("evaluatorType", evaluatorType);
+  console.log("data", data);
+  console.log("settings", settings);
+  console.log("trace", trace);
+  console.log("retries", retries);
+  console.log("env", env.LANGEVALS_ENDPOINT);
+
   let response;
   try {
     response = await fetch(
@@ -324,6 +331,8 @@ export const runEvaluation = async ({
       }
     );
   } catch (error) {
+    logger.error({ error }, "error running evaluation");
+
     if (error instanceof Error && error.message.includes("fetch failed")) {
       throw new Error("Evaluator cannot be reached");
     }

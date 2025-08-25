@@ -9,24 +9,13 @@ import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
 
 patchZodOpenapi();
 
-function createDatasetApp() {
-  const app = new Hono();
+// Define the Hono app
+export const app = new Hono().basePath("/api/datasets");
 
-  app.use(loggerMiddleware());
-  app.use(authMiddleware);
+// Middleware
+app.use(loggerMiddleware());
+app.use(authMiddleware);
+// https://hono.dev/docs/api/hono#error-handling
+app.onError(handleError);
 
-  // https://hono.dev/docs/api/hono#error-handling
-  app.onError(handleError);
-
-  app.route("/", appV1);
-
-  return app;
-}
-
-const root = new Hono();
-const datasets = createDatasetApp();
-
-root.route("/api/datasets", datasets);
-root.route("/api/dataset", datasets);
-
-export default root;
+app.route("/", appV1);

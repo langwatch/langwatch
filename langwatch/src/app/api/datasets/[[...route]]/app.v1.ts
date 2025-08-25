@@ -10,7 +10,7 @@ import { createManyDatasetRecords } from "../../../../server/api/routers/dataset
 import type { DatasetColumns } from "../../../../server/datasets/types";
 import { prisma } from "../../../../server/db";
 import { getVercelAIModel } from "../../../../server/modelProviders/utils";
-import { smoothStream, streamText, type CoreMessage } from "ai";
+import { smoothStream, stepCountIs, streamText, type CoreMessage } from "ai";
 
 import { datasetOutputSchema, datasetEntriesInputSchema, datasetGenerateInputSchema } from "./schemas";
 import { errorSchema, successSchema } from "../../shared/schemas";
@@ -19,7 +19,7 @@ import { tools } from "./tools";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
 import { createLogger } from "~/utils/logger";
 
-const logger = createLogger("langwatch:api:dataset");
+const logger = createLogger("langwatch:api:datasets");
 
 patchZodOpenapi();
 
@@ -29,7 +29,7 @@ type Variables = AuthMiddlewareVariables;
 // Define the Hono app
 export const app = new Hono<{
   Variables: Variables;
-}>().basePath("/");
+}>();
 
 // Add entries to a dataset
 app.post(
@@ -206,11 +206,9 @@ ${JSON.stringify(dataset)}
     const result = streamText({
       model,
       messages: messages as CoreMessage[],
-      maxTokens: 4096 * 2,
-      maxSteps: 20,
+      maxOutputTokens: 4096 * 2,
+      stopWhen: stepCountIs(20),
       experimental_transform: smoothStream({ chunking: "word" }),
-      experimental_continueSteps: true,
-      toolCallStreaming: true,
       tools: tools,
       maxRetries: 3,
       onError: (error) => {
@@ -218,6 +216,6 @@ ${JSON.stringify(dataset)}
       },
     });
 
-    return result.toDataStreamResponse();
+    return result.toTextStreamResponse();
   }
 );

@@ -32,7 +32,7 @@ type Variables = ExperimentServiceMiddlewareVariables &
 // Define the Hono app
 export const app = new Hono<{
   Variables: Variables;
-}>().basePath("/");
+}>();
 
 // Initialize experiment
 app.post(
