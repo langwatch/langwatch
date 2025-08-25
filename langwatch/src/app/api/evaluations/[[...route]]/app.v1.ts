@@ -1,8 +1,8 @@
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { describeRoute } from "hono-openapi";
-import { resolver } from "hono-openapi/zod";
 import { zodToJsonSchema } from "zod-to-json-schema";
+import { validator as zValidator, resolver } from "hono-openapi/zod";
 
 import { type AuthMiddlewareVariables } from "../../middleware";
 import { baseResponses } from "../../shared/base-responses";
@@ -20,7 +20,6 @@ import { createLogger } from "~/utils/logger";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
 import { type EvaluationServiceMiddlewareVariables } from "../middleware/evaluation-service";
 import z from "zod";
-import { zValidator } from "@hono/zod-validator";
 import { batchEvaluationInputSchema, evaluationInputSchema } from "./schemas";
 
 const logger = createLogger("langwatch:api:evaluations");
@@ -84,7 +83,7 @@ app.get(
 
 // Evaluate with a specific evaluator
 app.post(
-  "/:evaluator/evaluate",
+  "/:evaluator{.+?}/evaluate",
   describeRoute({
     description: "Run evaluation with a specific evaluator",
     responses: {
@@ -104,7 +103,7 @@ app.post(
     const project = c.get("project");
     const evaluationService = c.get("evaluationService");
     const evaluator = c.req.param("evaluator");
-    const body = await c.req.json();
+    const body = c.req.valid("json");
 
     logger.info({ projectId: project.id, evaluator }, "Running evaluation");
 
@@ -160,7 +159,7 @@ app.post(
   async (c) => {
     const project = c.get("project");
     const batchEvaluationService = c.get("batchEvaluationService");
-    const body = await c.req.json();
+    const body = c.req.valid("json");
 
     logger.info({ projectId: project.id }, "Logging batch evaluation results");
 
@@ -190,7 +189,7 @@ app.post(
 
 // Legacy route support for backward compatibility
 app.post(
-  "/:evaluator/:subpath/evaluate",
+  "/:evaluator{.+?}/:subpath{.+?}/evaluate",
   describeRoute({
     description: "Run evaluation with evaluator and subpath (legacy route)",
     responses: {
@@ -205,12 +204,13 @@ app.post(
       },
     },
   }),
+  zValidator("json", evaluationInputSchema),
   async (c) => {
     const project = c.get("project");
     const evaluationService = c.get("evaluationService");
     const evaluator = c.req.param("evaluator");
     const subpath = c.req.param("subpath");
-    const body = await c.req.json();
+    const body = c.req.valid("json");
 
     logger.info(
       { projectId: project.id, evaluator, subpath },
