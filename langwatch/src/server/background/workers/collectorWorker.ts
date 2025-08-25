@@ -502,18 +502,11 @@ const updateTrace = async (
               params.trace.metadata.custom != null && 
               params.trace.metadata.custom.containsKey("__internal_langwatch_preserve_existing_io") && 
               params.trace.metadata.custom["__internal_langwatch_preserve_existing_io"] == true;
-            boolean existingTraceHasPreserveFlag = ctx._source != null &&
-              ctx._source.containsKey("metadata") &&
-              ctx._source.metadata != null &&
-              ctx._source.metadata.containsKey("custom") &&
-              ctx._source.metadata.custom != null &&
-              ctx._source.metadata.custom.containsKey("__internal_langwatch_preserve_existing_io") &&
-              ctx._source.metadata.custom["__internal_langwatch_preserve_existing_io"] == true;
-            
+
             // Merge trace data with input/output preservation
             for (String key : params.trace.keySet()) {
               // Special handling for input/output - preserve existing truthy values when trace or new spans have preserve flags
-              if ((key == "input" || key == "output") && (hasNewSpansWithPreserveFlag || traceHasPreserveFlag || existingTraceHasPreserveFlag)) {
+              if ((key == "input" || key == "output") && (hasNewSpansWithPreserveFlag || traceHasPreserveFlag)) {
                 // Only update if existing value is missing/null/empty and new value is set
                 boolean existingValueIsEmpty = !ctx._source.containsKey(key) ||
                   ctx._source[key] == null ||
