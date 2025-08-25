@@ -11,6 +11,7 @@ export default defineConfig({
       ".next/**/*",
       ".next-saas/**/*",
       "**/e2e/**/*",
+      "saas-src/**/*",
     ],
   },
   resolve: {
