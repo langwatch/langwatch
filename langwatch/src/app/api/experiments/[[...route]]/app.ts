@@ -28,7 +28,7 @@ patchZodOpenapi();
 const root = new Hono();
 const experiments = createExperimentsApp();
 
-root.route("/api/experiment", experiments);
 root.route("/api/experiments", experiments);
+root.route("/api/experiment", experiments);
 
 export default root;

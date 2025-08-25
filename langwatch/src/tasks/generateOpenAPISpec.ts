@@ -61,10 +61,10 @@ export default async function execute() {
         // we don't want to merge, we just want to replace.
         if (
           key.includes("/api/prompts") ||
-          key.includes("/api/dataset") ||
+          key.includes("/api/datasets") ||
           key.includes("/api/scenario-events") ||
           key.includes("/api/evaluations") ||
-          key.includes("/api/experiment")
+          key.includes("/api/experiments")
         ) {
           // Replace with new
           return (_target, source) => {

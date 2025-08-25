@@ -26,7 +26,7 @@ function createDatasetApp() {
 const root = new Hono();
 const datasets = createDatasetApp();
 
-root.route("/api/dataset", datasets);
 root.route("/api/datasets", datasets);
+root.route("/api/dataset", datasets);
 
 export default root;
