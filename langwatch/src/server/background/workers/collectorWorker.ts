@@ -47,6 +47,7 @@ import {
   searchTracesWithInternals,
 } from "~/server/elasticsearch/traces";
 import { prewarmTiktokenModels } from "./collector/cost";
+import { INTERNAL_PRESERVE_KEY } from "~/utils/constants";
 
 const logger = createLogger("langwatch:workers:collectorWorker");
 
@@ -311,10 +312,22 @@ const processCollectorJob_ = async (
     return acc;
   }, [] as Span[]);
 
-  const [input, output] = await Promise.all([
-    { value: getFirstInputAsText(uniqueSpans) },
-    { value: getLastOutputAsText(uniqueSpans) },
-  ]);
+  const hasPreserveFlags = uniqueSpans.some(span => 
+    span.params?.[INTERNAL_PRESERVE_KEY] === true
+  );
+
+  // If there are preserve flags and we have an existing trace, preserve existing input/output
+  let input, output;
+  if (hasPreserveFlags && existingTrace?.inserted_at) {
+    // Don't recalculate input/output - let the Elasticsearch script handle preservation
+    input = { value: "" };
+    output = { value: "" };
+  } else {
+    [input, output] = await Promise.all([
+      { value: getFirstInputAsText(uniqueSpans) },
+      { value: getLastOutputAsText(uniqueSpans) },
+    ]);
+  }
   const error = getLastOutputError(uniqueSpans);
 
   const evaluations = mapEvaluations(data)?.concat(existingEvaluations);
