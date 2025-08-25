@@ -1,4 +1,4 @@
-import semconv from "@opentelemetry/semantic-conventions/incubating";
+import * as semconv from "@opentelemetry/semantic-conventions/incubating";
 import {
   type Span,
   type SpanContext,
