@@ -47,6 +47,7 @@ import {
   searchTracesWithInternals,
 } from "~/server/elasticsearch/traces";
 import { prewarmTiktokenModels } from "./collector/cost";
+import { INTERNAL_PRESERVE_KEY } from "~/utils/constants";
 
 const logger = createLogger("langwatch:workers:collectorWorker");
 
@@ -271,7 +272,9 @@ const processCollectorJob_ = async (
 
   const existingSpans: Span[] = [];
   const existingEvaluations: Evaluation[] = [];
-  const hasIgnoreTimestamps = false;
+  const hasIgnoreTimestamps = (spans ?? []).some(
+    (s) => s.timestamps?.ignore_timestamps_on_write === true
+  );
 
   if (existingTrace?.inserted_at) {
     // TODO: check for quickwit
@@ -311,10 +314,25 @@ const processCollectorJob_ = async (
     return acc;
   }, [] as Span[]);
 
-  const [input, output] = await Promise.all([
-    { value: getFirstInputAsText(uniqueSpans) },
-    { value: getLastOutputAsText(uniqueSpans) },
-  ]);
+  const hasPreserveFlags = uniqueSpans.some(
+    (span) => span.params?.[INTERNAL_PRESERVE_KEY] === true
+  );
+
+  // If there are preserve flags and we have an existing trace, preserve existing input/output
+  let input, output;
+  if (hasPreserveFlags && existingTrace?.inserted_at) {
+    // Don't recalculate input/output - let the Elasticsearch script handle preservation
+    input = { value: "" };
+    output = { value: "" };
+  } else {
+    [input, output] = await Promise.all([
+      { value: getFirstInputAsText(uniqueSpans) },
+      { value: getLastOutputAsText(uniqueSpans) },
+    ]);
+  }
+  
+  input = asNonEmptyIO(input);
+  output = asNonEmptyIO(output);
   const error = getLastOutputError(uniqueSpans);
 
   const evaluations = mapEvaluations(data)?.concat(existingEvaluations);
@@ -357,8 +375,8 @@ const processCollectorJob_ = async (
       inserted_at: existingTrace?.inserted_at ?? Date.now(),
       updated_at: Date.now(),
     } as ElasticSearchTrace["timestamps"],
-    ...(input?.value ? { input } : {}),
-    ...(output?.value ? { output } : {}),
+    ...(input ? { input } : {}),
+    ...(output ? { output } : {}),
     ...(expectedOutput ? { expected_output: { value: expectedOutput } } : {}),
     metrics: computeTraceMetrics(uniqueSpans), // Use uniqueSpans for accurate total_cost calculation
     error,
@@ -468,29 +486,52 @@ const updateTrace = async (
           if (ctx._source == null) {
             ctx._source = params.trace;
           } else {
-            // Deep merge
+            // Check if any new spans have preserve flags
+            boolean hasNewSpansWithPreserveFlag = false;
+            for (def newSpan : params.newSpans) {
+              if (newSpan.params != null && 
+                  newSpan.params.containsKey("__internal_langwatch_preserve_existing_io") && 
+                  newSpan.params["__internal_langwatch_preserve_existing_io"] == true) {
+                hasNewSpansWithPreserveFlag = true;
+                break;
+              }
+            }
+            
+            // Check if trace has preserve flag (new params + existing doc)
+            boolean traceHasPreserveFlag = params.trace.metadata != null && 
+              params.trace.metadata.custom != null && 
+              params.trace.metadata.custom.containsKey("__internal_langwatch_preserve_existing_io") && 
+              params.trace.metadata.custom["__internal_langwatch_preserve_existing_io"] == true;
+
+            // Merge trace data with input/output preservation
             for (String key : params.trace.keySet()) {
-              if (params.trace[key] instanceof Map) {
-                if (!ctx._source.containsKey(key) || !(ctx._source[key] instanceof Map)) {
-                  ctx._source[key] = new HashMap();
-                }
-                Map nestedSource = ctx._source[key];
-                Map nestedUpdate = params.trace[key];
-                for (String nestedKey : nestedUpdate.keySet()) {
-                  nestedSource[nestedKey] = nestedUpdate[nestedKey];
+              // Special handling for input/output - preserve existing truthy values when trace or new spans have preserve flags
+              if ((key == "input" || key == "output") && (hasNewSpansWithPreserveFlag || traceHasPreserveFlag)) {
+                // Only update if existing value is missing/null/empty and new value is set
+                boolean existingValueIsEmpty = !ctx._source.containsKey(key) ||
+                  ctx._source[key] == null ||
+                  ctx._source[key] == "";
+                boolean newValueIsSet = params.trace[key] != null &&
+                  params.trace[key] != "";
+                
+                if (existingValueIsEmpty && newValueIsSet) {
+                  ctx._source[key] = params.trace[key];
                 }
               } else {
+                // Normal merge for non-input/output fields or when no preserve flags
                 ctx._source[key] = params.trace[key];
               }
             }
           }
-
-          def currentTime = System.currentTimeMillis();
-
-          // Handle spans
+          
+          // Ensure spans are properly initialized
           if (ctx._source.spans == null) {
             ctx._source.spans = [];
           }
+          
+          def currentTime = System.currentTimeMillis();
+          
+          // Handle spans - merge new spans with existing spans
           for (def newSpan : params.newSpans) {
             def existingSpanIndex = -1;
             for (int i = 0; i < ctx._source.spans.size(); i++) {
@@ -500,6 +541,7 @@ const updateTrace = async (
               }
             }
             if (existingSpanIndex >= 0) {
+              // Span already exists - deep merge it
               def existingSpan = ctx._source.spans[existingSpanIndex];
               if (newSpan.timestamps == null) {
                 newSpan.timestamps = new HashMap();
@@ -520,16 +562,30 @@ const updateTrace = async (
               
               newSpan.timestamps.updated_at = currentTime;
               
-              // Deep merge spans
+              // Deep merge spans with input/output preservation
               for (String key : newSpan.keySet()) {
+                // Check if new span has the preserve flag
+                boolean newSpanHasPreserveFlag = newSpan.params != null && 
+                  newSpan.params.containsKey("__internal_langwatch_preserve_existing_io") && 
+                  newSpan.params["__internal_langwatch_preserve_existing_io"] == true;
+                
+                // Check if existing span has the preserve flag
+                boolean existingSpanHasPreserveFlag = existingSpan.params != null && 
+                  existingSpan.params.containsKey("__internal_langwatch_preserve_existing_io") && 
+                  existingSpan.params["__internal_langwatch_preserve_existing_io"] == true;
+                
+                // Preserve input/output if either span has the preserve flag
+                if ((key == "input" || key == "output") && (newSpanHasPreserveFlag || existingSpanHasPreserveFlag)) {
+                  // Keep existing input/output values when preserve flag is set on either span
+                  continue;
+                }
                 if (newSpan[key] instanceof Map) {
                   if (!existingSpan.containsKey(key) || !(existingSpan[key] instanceof Map)) {
                     existingSpan[key] = new HashMap();
                   }
-                  Map nestedSource = existingSpan[key];
-                  Map nestedUpdate = newSpan[key];
-                  for (String nestedKey : nestedUpdate.keySet()) {
-                    nestedSource[nestedKey] = nestedUpdate[nestedKey];
+                  // Deep merge nested maps
+                  for (String nestedKey : newSpan[key].keySet()) {
+                    existingSpan[key][nestedKey] = newSpan[key][nestedKey];
                   }
                 } else {
                   existingSpan[key] = newSpan[key];
@@ -537,9 +593,11 @@ const updateTrace = async (
               }
               ctx._source.spans[existingSpanIndex] = existingSpan;
             } else {
+              // Span doesn't exist - create it
               ctx._source.spans.add(newSpan);
             }
           }
+          // Note: Existing spans not in params.newSpans are automatically preserved (not deleted)
 
           // Limit the number of spans to 200
           if (ctx._source.spans != null && ctx._source.spans.size() > 200) {
@@ -559,6 +617,7 @@ const updateTrace = async (
               }
             }
             if (existingEvaluationIndex >= 0) {
+              // Evaluation already exists - kinda-merge it
               def existingEvaluation = ctx._source.evaluations[existingEvaluationIndex];
               if (newEvaluation.timestamps == null) {
                 newEvaluation.timestamps = new HashMap();
@@ -579,11 +638,16 @@ const updateTrace = async (
               }
               
               newEvaluation.timestamps.updated_at = currentTime;
+              
+              // Replace evaluation completely
               ctx._source.evaluations[existingEvaluationIndex] = newEvaluation;
             } else {
+              // Evaluation doesn't exist - create it
               ctx._source.evaluations.add(newEvaluation);
             }
           }
+
+          // Note: Existing evaluations not in params.newEvaluations are automatically preserved (not deleted)
 
           // Limit the number of evaluations to 50
           if (ctx._source.evaluations != null && ctx._source.evaluations.size() > 50) {
@@ -690,10 +754,10 @@ export const processCollectorCheckAndAdjustJob = async (
     body: {
       script: {
         source: `
-          if (params.input != null) {
+          if (params.input != null && params.input.value != null && params.input.value != "") {
             ctx._source.input = params.input;
           }
-          if (params.output != null) {
+          if (params.output != null && params.output.value != null && params.output.value != "") {
             ctx._source.output = params.output;
           }
           if (params.error != null) {
@@ -790,6 +854,15 @@ const typedValueToElasticSearch = (
     type: typed.type,
     value: JSON.stringify(typed.value),
   };
+};
+
+export const asNonEmptyIO = (
+  io: { value: string } | null | undefined
+): { value: string } | undefined => {
+  if (!io?.value || io.value.trim() === "") {
+    return undefined;
+  }
+  return io;
 };
 
 // TODO: test, move to common, and fix this sorting on the TODO right below
