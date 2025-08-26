@@ -3,7 +3,6 @@ import { assert, describe, expect, it } from "vitest";
 import { z, type ZodError } from "zod";
 import { fromZodError } from "zod-validation-error";
 import type { DeepPartial } from "../../utils/types";
-import { INTERNAL_PRESERVE_KEY } from "../../utils/constants";
 import { openTelemetryLogsRequestToTracesForCollection } from "./otel.logs";
 import { spanSchema } from "./types.generated";
 
@@ -32,7 +31,7 @@ const springAICompleteChatRequest: DeepPartial<IExportLogsServiceRequest> = {
               timeUnixNano: "1748353030869334708",
               body: {
                 stringValue: `Chat Model Prompt Content:
-PROMPT_CONTENT`,
+{"messages":[{"role":"user","content":"Hello, how are you?"}],"model":"gpt-4o-mini","temperature":0.7}`,
               },
             },
           ],
@@ -48,7 +47,7 @@ PROMPT_CONTENT`,
               timeUnixNano: "1748353033397302125",
               body: {
                 stringValue: `Chat Model Completion:
-MODEL_COMPLETION_CONTENT`,
+{"choices":[{"message":{"role":"assistant","content":"Hello! I'm doing well, thank you for asking. How can I assist you today?"},"finish_reason":"stop"}],"model":"gpt-4o-mini-2024-07-18","usage":{"prompt_tokens":11,"completion_tokens":17,"total_tokens":28}}`,
               },
             },
           ],
@@ -83,7 +82,7 @@ const springAIPromptOnlyRequest: DeepPartial<IExportLogsServiceRequest> = {
               timeUnixNano: "1748353030869334708",
               body: {
                 stringValue: `Chat Model Prompt Content:
-CHAT_MODEL_PROMPT_CONTENT`,
+{"messages":[{"role":"system","content":"You are a helpful assistant."},{"role":"user","content":"What is the weather like?"}],"model":"gpt-3.5-turbo","temperature":0.5}`,
               },
             },
           ],
@@ -118,7 +117,7 @@ const springAICompletionOnlyRequest: DeepPartial<IExportLogsServiceRequest> = {
               timeUnixNano: "1748353033397302125",
               body: {
                 stringValue: `Chat Model Completion:
-CHAT_MODEL_COMPLETION_CONTENT`,
+{"choices":[{"message":{"role":"assistant","content":"I don't have access to real-time weather data. Please check a weather service for current conditions."},"finish_reason":"stop"}],"model":"gpt-3.5-turbo-2024-01-25","usage":{"prompt_tokens":25,"completion_tokens":23,"total_tokens":48}}`,
               },
             },
           ],
@@ -153,7 +152,7 @@ const multipleSpansRequest: DeepPartial<IExportLogsServiceRequest> = {
               timeUnixNano: "1748353030000000000",
               body: {
                 stringValue: `Chat Model Prompt Content:
-MULTI_SPAN_CHAT_MODEL_PROMPT_CONTENT_1`,
+{"messages":[{"role":"user","content":"First question"}],"model":"gpt-4o-mini"}`,
               },
             },
             {
@@ -162,7 +161,7 @@ MULTI_SPAN_CHAT_MODEL_PROMPT_CONTENT_1`,
               timeUnixNano: "1748353031000000000",
               body: {
                 stringValue: `Chat Model Prompt Content:
-MULTI_SPAN_CHAT_MODEL_PROMPT_CONTENT_2`,
+{"messages":[{"role":"user","content":"Second question"}],"model":"gpt-4o-mini"}`,
               },
             },
           ],
@@ -178,7 +177,7 @@ MULTI_SPAN_CHAT_MODEL_PROMPT_CONTENT_2`,
               timeUnixNano: "1748353032000000000",
               body: {
                 stringValue: `Chat Model Completion:
-MULTI_SPAN_CHAT_MODEL_COMPLETION_1`,
+{"choices":[{"message":{"role":"assistant","content":"First answer"},"finish_reason":"stop"}],"model":"gpt-4o-mini-2024-07-18"}`,
               },
             },
             {
@@ -187,7 +186,7 @@ MULTI_SPAN_CHAT_MODEL_COMPLETION_1`,
               timeUnixNano: "1748353033000000000",
               body: {
                 stringValue: `Chat Model Completion:
-MULTI_SPAN_CHAT_MODEL_COMPLETION_2`,
+{"choices":[{"message":{"role":"assistant","content":"Second answer"},"finish_reason":"stop"}],"model":"gpt-4o-mini-2024-07-18"}`,
               },
             },
           ],
@@ -222,7 +221,35 @@ const unsupportedScopeRequest: DeepPartial<IExportLogsServiceRequest> = {
               timeUnixNano: "1748353030869334708",
               body: {
                 stringValue: `Some Other Content:
-Some random content here`,
+{"data":"should be ignored"}`,
+              },
+            },
+          ],
+        },
+      ],
+    },
+  ],
+};
+
+const invalidJsonRequest: DeepPartial<IExportLogsServiceRequest> = {
+  resourceLogs: [
+    {
+      resource: {
+        attributes: [],
+      },
+      scopeLogs: [
+        {
+          scope: {
+            name: "org.springframework.ai.chat.observation.ChatModelPromptContentObservationHandler",
+          },
+          logRecords: [
+            {
+              traceId: "755b1db22272958b92cb003f30058e74",
+              spanId: "0dedf6826df097a9",
+              timeUnixNano: "1748353030869334708",
+              body: {
+                stringValue: `Chat Model Prompt Content:
+{invalid json content here}`,
               },
             },
           ],
@@ -263,32 +290,45 @@ describe("opentelemetry logs receiver", () => {
           trace_id: "755b1db22272958b92cb003f30058e74",
           type: "llm",
           input: {
-            type: "text",
-            value: "PROMPT_CONTENT",
+            type: "json",
+            value: {
+              messages: [{ role: "user", content: "Hello, how are you?" }],
+              model: "gpt-4o-mini",
+              temperature: 0.7,
+            },
           },
           output: {
-            type: "text",
-            value: "MODEL_COMPLETION_CONTENT",
-          },
-          params: {
-            __internal_langwatch_preserve_existing_io: true,
+            type: "json",
+            value: {
+              choices: [
+                {
+                  message: {
+                    role: "assistant",
+                    content:
+                      "Hello! I'm doing well, thank you for asking. How can I assist you today?",
+                  },
+                  finish_reason: "stop",
+                },
+              ],
+              model: "gpt-4o-mini-2024-07-18",
+              usage: {
+                prompt_tokens: 11,
+                completion_tokens: 17,
+                total_tokens: 28,
+              },
+            },
           },
           timestamps: {
             ignore_timestamps_on_write: true,
             started_at: 1748353030869,
-            finished_at: 1748353030869,
+            finished_at: 0,
           },
         },
       ],
       evaluations: [],
       reservedTraceMetadata: {},
-      customMetadata: {
-        __internal_langwatch_preserve_existing_io: true,
-      },
+      customMetadata: {},
     });
-
-    expect(trace!.spans[0]?.params).toHaveProperty(INTERNAL_PRESERVE_KEY, true);
-    expect(trace!.customMetadata).toHaveProperty(INTERNAL_PRESERVE_KEY, true);
   });
 
   it("receives a Spring AI prompt-only request", async () => {
@@ -317,29 +357,28 @@ describe("opentelemetry logs receiver", () => {
           trace_id: "755b1db22272958b92cb003f30058e74",
           type: "llm",
           input: {
-            type: "text",
-            value: "CHAT_MODEL_PROMPT_CONTENT",
+            type: "json",
+            value: {
+              messages: [
+                { role: "system", content: "You are a helpful assistant." },
+                { role: "user", content: "What is the weather like?" },
+              ],
+              model: "gpt-3.5-turbo",
+              temperature: 0.5,
+            },
           },
           output: null,
-          params: {
-            __internal_langwatch_preserve_existing_io: true,
-          },
           timestamps: {
             ignore_timestamps_on_write: true,
             started_at: 1748353030869,
-            finished_at: 1748353030869,
+            finished_at: 0,
           },
         },
       ],
       evaluations: [],
       reservedTraceMetadata: {},
-      customMetadata: {
-        __internal_langwatch_preserve_existing_io: true,
-      },
+      customMetadata: {},
     });
-
-    expect(trace!.spans[0]?.params).toHaveProperty(INTERNAL_PRESERVE_KEY, true);
-    expect(trace!.customMetadata).toHaveProperty(INTERNAL_PRESERVE_KEY, true);
   });
 
   it("receives a Spring AI completion-only request", async () => {
@@ -369,28 +408,37 @@ describe("opentelemetry logs receiver", () => {
           type: "llm",
           input: null,
           output: {
-            type: "text",
-            value: "CHAT_MODEL_COMPLETION_CONTENT",
-          },
-          params: {
-            __internal_langwatch_preserve_existing_io: true,
+            type: "json",
+            value: {
+              choices: [
+                {
+                  message: {
+                    role: "assistant",
+                    content:
+                      "I don't have access to real-time weather data. Please check a weather service for current conditions.",
+                  },
+                  finish_reason: "stop",
+                },
+              ],
+              model: "gpt-3.5-turbo-2024-01-25",
+              usage: {
+                prompt_tokens: 25,
+                completion_tokens: 23,
+                total_tokens: 48,
+              },
+            },
           },
           timestamps: {
             ignore_timestamps_on_write: true,
             started_at: 1748353033397,
-            finished_at: 1748353033397,
+            finished_at: 0,
           },
         },
       ],
       evaluations: [],
       reservedTraceMetadata: {},
-      customMetadata: {
-        __internal_langwatch_preserve_existing_io: true,
-      },
+      customMetadata: {},
     });
-
-    expect(trace!.spans[0]?.params).toHaveProperty(INTERNAL_PRESERVE_KEY, true);
-    expect(trace!.customMetadata).toHaveProperty(INTERNAL_PRESERVE_KEY, true);
   });
 
   it("receives multiple spans in the same trace", async () => {
@@ -417,22 +465,38 @@ describe("opentelemetry logs receiver", () => {
       (s) => s.span_id === "span1111111111111111"
     );
     expect(span1).toBeDefined();
-    expect(span1?.input?.value).toEqual("MULTI_SPAN_CHAT_MODEL_PROMPT_CONTENT_1");
-    expect(span1?.output?.value).toEqual("MULTI_SPAN_CHAT_MODEL_COMPLETION_1");
-    expect(span1?.input?.type).toEqual("text");
-    expect(span1?.output?.type).toEqual("text");
-    expect(span1?.params?.__internal_langwatch_preserve_existing_io).toBe(true);
+    expect(span1?.input?.value).toEqual({
+      messages: [{ role: "user", content: "First question" }],
+      model: "gpt-4o-mini",
+    });
+    expect(span1?.output?.value).toEqual({
+      choices: [
+        {
+          message: { role: "assistant", content: "First answer" },
+          finish_reason: "stop",
+        },
+      ],
+      model: "gpt-4o-mini-2024-07-18",
+    });
 
     // Check second span
     const span2 = trace!.spans.find(
       (s) => s.span_id === "span2222222222222222"
     );
     expect(span2).toBeDefined();
-    expect(span2?.input?.value).toEqual("MULTI_SPAN_CHAT_MODEL_PROMPT_CONTENT_2");
-    expect(span2?.output?.value).toEqual("MULTI_SPAN_CHAT_MODEL_COMPLETION_2");
-    expect(span2?.input?.type).toEqual("text");
-    expect(span2?.output?.type).toEqual("text");
-    expect(span2?.params?.__internal_langwatch_preserve_existing_io).toBe(true);
+    expect(span2?.input?.value).toEqual({
+      messages: [{ role: "user", content: "Second question" }],
+      model: "gpt-4o-mini",
+    });
+    expect(span2?.output?.value).toEqual({
+      choices: [
+        {
+          message: { role: "assistant", content: "Second answer" },
+          finish_reason: "stop",
+        },
+      ],
+      model: "gpt-4o-mini-2024-07-18",
+    });
   });
 
   it("ignores logs with unsupported scope names", async () => {
@@ -441,6 +505,19 @@ describe("opentelemetry logs receiver", () => {
     );
 
     expect(traces).toHaveLength(0);
+  });
+
+  it("handles logs with invalid JSON content by falling back to string array", async () => {
+    const traces =
+      openTelemetryLogsRequestToTracesForCollection(invalidJsonRequest);
+
+    expect(traces).toHaveLength(1);
+
+    const trace = traces[0];
+    expect(trace?.spans).toHaveLength(1);
+
+    const span = trace?.spans[0];
+    expect(span?.input?.value).toEqual(["{invalid json content here}"]);
   });
 
   it("handles empty logs request", async () => {
@@ -466,7 +543,7 @@ describe("opentelemetry logs receiver", () => {
                   timeUnixNano: "1748353030869334708",
                   body: {
                     stringValue: `Chat Model Prompt Content:
-IGNORED_CONTENT`,
+{"messages":[{"role":"user","content":"test"}]}`,
                   },
                 },
               ],
