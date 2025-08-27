@@ -17,7 +17,7 @@ const supportedScopeNames = [
 export const openTelemetryLogsRequestToTracesForCollection = async (
 	otelLogs: DeepPartial<IExportLogsServiceRequest>
 ): Promise<TraceForCollection[]> => {
-	return tracer.withActiveSpan(
+	return await tracer.withActiveSpan(
 		"openTelemetryLogsRequestToTracesForCollection",
 		{ kind: SpanKind.INTERNAL },
 		async (span) => {
