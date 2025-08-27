@@ -5,7 +5,7 @@ import { prisma } from "../../../../server/db";
 import { getServerSession } from "next-auth";
 import { authOptions } from "../../../../server/auth";
 import { getVercelAIModel } from "../../../../server/modelProviders/utils";
-import { smoothStream, streamText } from "ai";
+import { smoothStream, stepCountIs, streamText } from "ai";
 import { tools } from "./tools";
 
 import { createLogger } from "../../../../utils/logger";
@@ -61,18 +61,14 @@ ${JSON.stringify(dataset)}
     `,
   });
 
-  const model = await getVercelAIModel(projectId, undefined, {
-    parallelToolCalls: false,
-  });
+  const model = await getVercelAIModel(projectId);
 
   const result = streamText({
     model,
     messages,
-    maxTokens: 4096 * 2,
-    maxSteps: 20,
+    maxOutputTokens: 4096 * 2,
+    stopWhen: stepCountIs(20),
     experimental_transform: smoothStream({ chunking: "word" }),
-    experimental_continueSteps: true,
-    toolCallStreaming: true,
     tools: tools,
     maxRetries: 3,
     onError: (error) => {
@@ -80,5 +76,5 @@ ${JSON.stringify(dataset)}
     },
   });
 
-  return result.toDataStreamResponse();
+  return result.toTextStreamResponse();
 }

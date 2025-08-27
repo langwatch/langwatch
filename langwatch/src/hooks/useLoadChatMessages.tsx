@@ -1,6 +1,6 @@
 import { api } from "~/utils/api";
 import React from "react";
-import type { Message } from "ai";
+import type { UIMessage } from "ai";
 
 // eslint-disable-next-line @typescript-eslint/no-namespace
 export declare namespace useLoadChatMessagesEffect {
@@ -9,7 +9,7 @@ export declare namespace useLoadChatMessagesEffect {
     traceId?: string;
     projectId?: string;
     chatWindowIds?: string[];
-    onSetMessages: (windowId: string, messages: Message[]) => void;
+    onSetMessages: (windowId: string, messages: UIMessage[]) => void;
     onChangeSystemPrompt: (windowId: string, systemPrompt: string) => void;
   }
   export type Return = void;
@@ -46,8 +46,8 @@ export function useLoadChatMessagesEffect({
       const input = spanObj.input;
       const output = spanObj.output;
 
-      const inputMessages: Message[] = [];
-      const outputMessages: Message[] = [];
+      const inputMessages: UIMessage[] = [];
+      const outputMessages: UIMessage[] = [];
 
       if (input) {
         if (typeof input === "string") {
@@ -55,7 +55,7 @@ export function useLoadChatMessagesEffect({
         } else if (Array.isArray(input)) {
           inputMessages.push(...input);
         } else {
-          inputMessages.push(input as unknown as Message);
+          inputMessages.push(input as unknown as UIMessage);
         }
       }
       if (output) {
@@ -64,21 +64,21 @@ export function useLoadChatMessagesEffect({
         } else if (Array.isArray(output)) {
           outputMessages.push(...output);
         } else {
-          outputMessages.push(output as unknown as Message);
+          outputMessages.push(output as unknown as UIMessage);
         }
       }
 
       const inputMessagesArr = (
         Array.isArray(inputMessages) ? inputMessages : [inputMessages]
       ).map((message) =>
-        message.role ? message : { id: void 0, role: "user", content: message.toString() }
+        message.role ? message : { id: void 0, role: "user", parts: message.parts }
       );
       const outputMessagesArr = (
         Array.isArray(outputMessages) ? outputMessages : [outputMessages]
       ).map((message) =>
         message.role
           ? message
-          : { id: void 0, role: "assistant", content: message.toString() }
+          : { id: void 0, role: "assistant", parts: message.parts }
       );
 
       // Generate message id placeholders in case they are missing
@@ -86,7 +86,7 @@ export function useLoadChatMessagesEffect({
       // keys in lists.
       const messages = [...inputMessagesArr, ...outputMessagesArr].map(
         (message, ix) => {
-          return { ...message, id: message.id || `${spanObj?.span_id}_${ix}` };
+          return { ...message, id: message.id ?? `${spanObj?.span_id}_${ix}` };
         }
       );
 
@@ -94,9 +94,12 @@ export function useLoadChatMessagesEffect({
       const nonSystemMessages = messages.filter((m) => m.role !== "system");
 
       for (const chatWindowId of chatWindowIds) {
-        onSetMessages(chatWindowId, nonSystemMessages as Message[]);
+        onSetMessages(chatWindowId, nonSystemMessages as UIMessage[]);
         if (systemMessage) {
-          onChangeSystemPrompt(chatWindowId, systemMessage.content);
+          const systemPrompt = systemMessage.parts.find(p => p.type === "text")?.text;
+          if (systemPrompt) {
+            onChangeSystemPrompt(chatWindowId, systemPrompt);
+          }
         }
       }
     }
