@@ -24,12 +24,12 @@ if (process.env.OTEL_EXPORTER_OTLP_ENDPOINT) {
       process.env.NODE_ENV === "production"
         ? new BatchSpanProcessor(
           new OTLPTraceExporter({
-            url: `${process.env.OTEL_EXPORTER_OTLP_ENDPOINT}/v1/traces`,
+            url: `${process.env.OTEL_EXPORTER_OTLP_ENDPOINT}`,
           })
         )
         : new SimpleSpanProcessor(
           new OTLPTraceExporter({
-            url: `${process.env.OTEL_EXPORTER_OTLP_ENDPOINT}/v1/traces`,
+            url: `${process.env.OTEL_EXPORTER_OTLP_ENDPOINT}`,
           })
         ),
     ],
