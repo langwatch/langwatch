@@ -40,7 +40,10 @@ export class PromptTracingDecorator {
     });
 
     if (shouldCaptureOutput()) {
-      span.setOutput(result.raw);
+      span.setOutput({
+        ...result,
+        raw: void 0, // TODO(afr): Figure out a better way to do this.
+      });
     }
 
     return result;

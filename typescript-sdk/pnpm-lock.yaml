@@ -27,10 +27,10 @@ importers:
         specifier: 0.203.0
         version: 0.203.0
       '@opentelemetry/context-async-hooks':
-        specifier: '>=1.19.0 <2.0.0'
-        version: 1.30.1(@opentelemetry/api@1.9.0)
+        specifier: '>=1.19.0 <3.0.0'
+        version: 2.0.1(@opentelemetry/api@1.9.0)
       '@opentelemetry/context-zone':
-        specifier: '>=1.19.0 <2.0.0'
+        specifier: '>=1.19.0 <3.0.0'
         version: 1.30.1(@opentelemetry/api@1.9.0)
       '@opentelemetry/core':
         specifier: ^2.0.1
@@ -594,12 +594,6 @@ packages:
   '@opentelemetry/api@1.9.0':
     resolution: {integrity: sha512-3giAOQvZiH5F9bMlMiv8+GSPMeqg0dbaeo58/0SlA9sxSqZhnUtxzX9/2FzyhS9sWQf5S0GJE0AKBrFqjpeYcg==}
     engines: {node: '>=8.0.0'}
-
-  '@opentelemetry/context-async-hooks@1.30.1':
-    resolution: {integrity: sha512-s5vvxXPVdjqS3kTLKMeBMvop9hbWkwzBpu+mUO2M7sZtlkyDJGwFe33wRKnbaYDo8ExRVBIIdwIGrqpxHuKttA==}
-    engines: {node: '>=14'}
-    peerDependencies:
-      '@opentelemetry/api': '>=1.0.0 <1.10.0'
 
   '@opentelemetry/context-async-hooks@2.0.1':
     resolution: {integrity: sha512-XuY23lSI3d4PEqKA+7SLtAgwqIfc6E/E9eAQWLN1vlpC53ybO3o6jW4BsXo1xvz9lYyyWItfQDDLzezER01mCw==}
@@ -3167,10 +3161,6 @@ snapshots:
       '@opentelemetry/api': 1.9.0
 
   '@opentelemetry/api@1.9.0': {}
-
-  '@opentelemetry/context-async-hooks@1.30.1(@opentelemetry/api@1.9.0)':
-    dependencies:
-      '@opentelemetry/api': 1.9.0
 
   '@opentelemetry/context-async-hooks@2.0.1(@opentelemetry/api@1.9.0)':
     dependencies:

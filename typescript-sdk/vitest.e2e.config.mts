@@ -7,8 +7,7 @@ export default defineConfig({
         hookTimeout: 30_000,
         setupFiles: ["dotenv/config", "./__tests__/e2e/setup/msw-setup.ts"],
         include: [
-            "__tests__/e2e/**/*.e2e.test.ts",
-            "src/__tests__/e2e/**/*.e2e.test.ts",
+            "**/*.e2e.test.ts"
         ],
     },
     resolve: {
