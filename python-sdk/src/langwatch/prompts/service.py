@@ -109,12 +109,12 @@ class PromptService:
         ok = unwrap_response(
             resp,
             ok_type=GetApiPromptsByIdResponse200,
-            subject=f'id="{prompt_id}"',
+            subject=f'handle_or_id="{prompt_id}"',
             op="fetch",
         )
         if ok is None:
             raise RuntimeError(
-                f"Failed to fetch prompt with id={prompt_id} version={version_number if version_number is not None else 'latest'}"
+                f"Failed to fetch prompt with handle_or_id={prompt_id} version={version_number if version_number is not None else 'latest'}"
             )
         return Prompt(ok)
 
