@@ -99,9 +99,13 @@ class PromptService:
         return cls(instance.rest_api_client)
 
     @prompt_service_tracing.get
-    def get(self, prompt_id: str) -> Prompt:
-        """Retrieve a prompt by its ID."""
-        resp = get_api_prompts_by_id.sync_detailed(id=prompt_id, client=self._client)
+    def get(self, prompt_id: str, version_number: Optional[int] = None) -> Prompt:
+        """Retrieve a prompt by its ID. You can optionally specify a version number to get a specific version of the prompt."""
+        resp = get_api_prompts_by_id.sync_detailed(
+            id=prompt_id,
+            client=self._client,
+            version=version_number if version_number is not None else UNSET,
+        )
         ok = unwrap_response(
             resp,
             ok_type=GetApiPromptsByIdResponse200,
@@ -109,7 +113,9 @@ class PromptService:
             op="fetch",
         )
         if ok is None:
-            raise RuntimeError(f"Failed to fetch prompt with id={prompt_id}")
+            raise RuntimeError(
+                f"Failed to fetch prompt with id={prompt_id} version={version_number if version_number is not None else 'latest'}"
+            )
         return Prompt(ok)
 
     def create(
