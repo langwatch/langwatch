@@ -117,7 +117,7 @@
     "hono-openapi": "^0.4.8",
     "ioredis": "^5.3.2",
     "jsonwebtoken": "^9.0.2",
-    "langwatch": "^0.4.1",
+    "langwatch": "^0.4.2",
     "lodash-es": "^4.17.21",
     "lodash.clonedeep": "^4.5.0",
     "lodash.debounce": "^4.0.8",
