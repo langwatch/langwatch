@@ -2,7 +2,7 @@ import { Input, Button, Text, HStack, VStack, Spinner } from "@chakra-ui/react";
 import { LuSparkles, LuBot, LuChevronRight } from "react-icons/lu";
 import { toaster } from "../../../../ui/toaster";
 import { useChat } from "@ai-sdk/react";
-import { type tools } from "../../../../../app/api/dataset/generate/tools";
+import { type deleteRowInputSchema, type updateRowInputSchema, type addRowInputSchema, type tools } from "../../../../../app/api/dataset/generate/tools";
 import type { z } from "zod";
 import { useEvaluationWizardStore } from "../../hooks/evaluation-wizard-store/useEvaluationWizardStore";
 import { useShallow } from "zustand/react/shallow";
@@ -15,6 +15,7 @@ import type { DatasetColumns } from "../../../../../server/datasets/types";
 import { AISparklesLoader } from "../../../../icons/AISparklesLoader";
 import { Markdown } from "../../../../Markdown";
 import { nanoid } from "nanoid";
+import { DefaultChatTransport } from "ai";
 
 export function DatasetGeneration() {
   const { project } = useOrganizationTeamProject();
@@ -59,14 +60,16 @@ export function DatasetGeneration() {
   }, [columnTypes, databaseDataset.data]);
 
   const [isReady, setIsReady] = useState(false);
+  const [input, setInput] = useState("");
 
-  const { messages, handleSubmit, input, setInput, status } = useChat({
-    api: "/api/dataset/generate",
-    body: {
-      dataset: datasetCsv,
-      projectId: project?.id,
-    },
-    maxSteps: 20,
+  const { messages, sendMessage, status } = useChat({
+    transport: new DefaultChatTransport({
+      api: "/api/dataset/generate",
+      body: {
+        dataset: datasetCsv,
+        projectId: project?.id,
+      },
+    }),
     onError: (error) => {
       console.error(error);
       toaster.create({
@@ -79,16 +82,17 @@ export function DatasetGeneration() {
         },
       });
     },
-    onToolCall: async (toolCall) => {
+    onToolCall: async ({ toolCall }) => {
       if (!datasetGridRef?.current) return;
       const gridApi = datasetGridRef.current.api;
 
       const toolExecutor: {
-        [T in keyof typeof tools]: (
-          args: z.infer<(typeof tools)[T]["parameters"]>
-        ) => Promise<any>;
+        addRow: (args: z.infer<typeof addRowInputSchema>) => Promise<any>,
+        updateRow: (args: z.infer<typeof updateRowInputSchema>) => Promise<any>,
+        deleteRow: (args: z.infer<typeof deleteRowInputSchema>) => Promise<any>,
       } = {
-        addRow: async ({ row }) => {
+        addRow: async (args) => {
+          const { row } = args;
           let columnNames = columnTypes.map((col) => col.name);
           if (row.length > columnNames.length) {
             columnNames = ["id", ...columnNames];
@@ -105,7 +109,8 @@ export function DatasetGeneration() {
           upsertRecord(rowData.id, rowData);
           return { success: true };
         },
-        updateRow: async ({ id, row }) => {
+        updateRow: async (args) => {
+          const { id, row } = args;
           let columnNames = columnTypes.map((col) => col.name);
           if (row.length > columnNames.length) {
             columnNames = ["id", ...columnNames];
@@ -125,7 +130,8 @@ export function DatasetGeneration() {
         //   gridApi.applyColumnDefs(columns);
         //   return;
         // },
-        deleteRow: async ({ id }) => {
+        deleteRow: async (args) => {
+          const { id } = args;
           gridApi.applyTransaction({
             remove: [id],
           });
@@ -136,24 +142,26 @@ export function DatasetGeneration() {
       };
 
       const tool =
-        toolExecutor[toolCall.toolCall.toolName as keyof typeof tools];
+        toolExecutor[toolCall.toolName as keyof typeof tools];
 
       if (!tool) {
         toaster.create({
           title: "Error",
-          description: `Unknown tool: ${toolCall.toolCall.toolName}`,
+          description: `Unknown tool: ${toolCall.toolName}`,
           type: "error",
           duration: 5000,
           meta: {
             closable: true,
           },
         });
-        return { error: `Unknown tool: ${toolCall.toolCall.toolName}` };
+        return { error: `Unknown tool: ${toolCall.toolName}` };
       }
 
       let result: any;
       try {
-        result = await tool(toolCall.toolCall.args as any);
+        // Access the arguments from the tool call
+        const args = (toolCall as any).args;
+        result = await tool(args);
       } catch (error) {
         console.error(error);
         toaster.create({
@@ -279,51 +287,54 @@ export function DatasetGeneration() {
         Describe the sample data you need for running the evaluation or ask for
         modifications to the dataset.
       </Text>
-      <form onSubmit={handleSubmit} style={{ width: "100%" }}>
-        <VStack gap={2} width="full" align="start">
-          <Input
-            placeholder="e.g. Add 10 customer support examples"
-            border="1px solid"
-            borderColor="gray.200"
-            borderRadius="md"
-            padding={2}
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            width="full"
-          />
-          <Button
-            colorPalette="blue"
-            type="submit"
-            disabled={status === "submitted" || status === "streaming"}
-          >
-            {status === "submitted" || status === "streaming" ? (
-              <AISparklesLoader color="white" />
-            ) : (
-              <LuBot size={16} />
-            )}
-            Generate
-          </Button>
-        </VStack>
-      </form>
+      <VStack gap={2} width="full" align="start">
+        <Input
+          placeholder="e.g. Add 10 customer support examples"
+          border="1px solid"
+          borderColor="gray.200"
+          borderRadius="md"
+          padding={2}
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          width="full"
+        />
+        <Button
+          colorPalette="blue"
+          onClick={() => {
+            if (input.trim()) {
+              void sendMessage({ role: "user", parts: [{ type: "text", text: input }] });
+              setInput("");
+            }
+          }}
+          disabled={status === "submitted" || status === "streaming"}
+        >
+          {status === "submitted" || status === "streaming" ? (
+            <AISparklesLoader color="white" />
+          ) : (
+            <LuBot size={16} />
+          )}
+          Generate
+        </Button>
+      </VStack>
       <VStack gap={2} width="full" align="start" paddingTop={2}>
         {lastUserMessage && (
           <HStack gap={1} _icon={{ marginTop: "1px", marginLeft: "-4px" }}>
             <LuChevronRight size={16} />
             <Text fontSize="14px" color="gray.500">
-              {lastUserMessage.content}
+              {lastUserMessage.parts[0]?.type === "text" ? lastUserMessage.parts[0].text : ""}
             </Text>
           </HStack>
         )}
         <Text fontSize="13px" color="gray.500">
-          <Markdown className="">{assistantMessage?.content ?? ""}</Markdown>
+          <Markdown className="">{assistantMessage?.parts[0]?.type === "text" ? assistantMessage.parts[0].text : ""}</Markdown>
         </Text>
-        {!isReady && lastPart?.type === "tool-invocation" && (
+        {!isReady && lastPart?.type?.startsWith("tool-") && (
           <HStack>
             <Spinner size="sm" />{" "}
             <Text fontSize="13px" color="gray.500">
               {
                 toolNames[
-                  lastPart.toolInvocation.toolName as keyof typeof tools
+                  (lastPart as any).toolName as keyof typeof tools
                 ]
               }
             </Text>
