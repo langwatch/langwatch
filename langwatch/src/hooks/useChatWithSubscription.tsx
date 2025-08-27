@@ -1,6 +1,7 @@
-import { useChat, type Message } from "ai/react";
+import { useChat, type UIMessage } from "@ai-sdk/react";
 import { useCallback, useEffect, useRef, type FormEvent } from "react";
 import { useOrganizationTeamProject } from "./useOrganizationTeamProject";
+import { DefaultChatTransport } from "ai";
 
 export const useChatWithSubscription = (
   id: string,
@@ -12,31 +13,32 @@ export const useChatWithSubscription = (
   const {
     messages: localMessages,
     setMessages: setLocalMessages,
-    handleInputChange,
-    handleSubmit,
+    sendMessage,
     error,
-    isLoading,
+    status,
     stop,
   } = useChat({
     id: id,
-    api: "/api/playground",
-    headers: {
-      "X-Model": model ?? "",
-      "X-System-Prompt": encodeURIComponent(systemPrompt ?? ""),
-      "X-Project-Id": project?.id ?? "",
-    },
+    transport: new DefaultChatTransport({
+      api: "/api/playground",
+      headers: {
+        "X-Model": model ?? "",
+        "X-System-Prompt": encodeURIComponent(systemPrompt ?? ""),
+        "X-Project-Id": project?.id ?? "",
+      },
+    }),
   });
 
   // Create an object as a ref that can be subscribed to with addEventListener and removeEventListener so that events using this won't trigger re-render as there is no hook change, but will be able to listen to new messages on the subscription
-  const listeners = useRef<Set<(messages: Message[]) => void>>(new Set());
+  const listeners = useRef<Set<(messages: UIMessage[]) => void>>(new Set());
   const addMessagesListener = useCallback(
-    (listener: (messages: Message[]) => void) => {
+    (listener: (messages: UIMessage[]) => void) => {
       listeners.current.add(listener);
     },
     []
   );
   const removeMessagesListener = useCallback(
-    (listener: (messages: Message[]) => void) => {
+    (listener: (messages: UIMessage[]) => void) => {
       listeners.current.delete(listener);
     },
     []
@@ -48,17 +50,17 @@ export const useChatWithSubscription = (
   }, [localMessages]);
 
   const handleSubmitWithUpdate = useCallback(
-    (e: FormEvent<HTMLFormElement>) => {
-      stop();
-      handleSubmit(e);
+    async (message: string) => {
+      await stop();
+      void sendMessage({ role: "user", parts: [{ type: "text", text: message }] });
       listeners.current.forEach((listener) =>
         listener(localMessagesRef.current)
       );
     },
-    [handleSubmit, stop]
+    [sendMessage, stop]
   );
 
-  const previousMessageRef = useRef<Message[]>([]);
+  const previousMessageRef = useRef<UIMessage[]>([]);
   useEffect(() => {
     if (Object.is(previousMessageRef.current, localMessages)) {
       return;
@@ -72,11 +74,10 @@ export const useChatWithSubscription = (
     addMessagesListener,
     removeMessagesListener,
     setLocalMessages,
-    handleInputChange,
     handleSubmit: handleSubmitWithUpdate,
     stop,
     error,
-    isLoading,
+    status,
   };
 };
 

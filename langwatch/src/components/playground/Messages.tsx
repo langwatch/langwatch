@@ -1,5 +1,5 @@
 import { Avatar, Box, Text, VStack, HStack } from "@chakra-ui/react";
-import { type Message } from "ai/react";
+import { type UIMessage } from "@ai-sdk/react";
 import React, { useCallback, useEffect, useRef } from "react";
 import { usePlaygroundStore } from "../../hooks/usePlaygroundStore";
 import { useRequiredSession } from "../../hooks/useRequiredSession";
@@ -16,8 +16,8 @@ export function Messages({
   error,
   isLoading,
 }: {
-  addMessagesListener: (listener: (messages: Message[]) => void) => void;
-  removeMessagesListener: (listener: (messages: Message[]) => void) => void;
+  addMessagesListener: (listener: (messages: UIMessage[]) => void) => void;
+  removeMessagesListener: (listener: (messages: UIMessage[]) => void) => void;
   chatRef: React.MutableRefObject<ChatRef>;
   tabIndex: number;
   windowId: string;
@@ -40,10 +40,10 @@ export function Messages({
   });
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const lastSetMessagesRef = useRef<Message[]>(messages);
+  const lastSetMessagesRef = useRef<UIMessage[]>(messages);
 
   const setMessagesWithoutHistory = useCallback(
-    (messages: Message[]) => {
+    (messages: UIMessage[]) => {
       if (Object.is(messages, lastSetMessagesRef.current)) {
         return;
       }
@@ -61,9 +61,9 @@ export function Messages({
   );
 
   const debounceIntervalRef = useRef<NodeJS.Timeout | null>(null);
-  const localMessagesRef = useRef<Message[]>(messages);
+  const localMessagesRef = useRef<UIMessage[]>(messages);
   const debouncedSetMessages = useCallback(
-    (messages: Message[]) => {
+    (messages: UIMessage[]) => {
       localMessagesRef.current = messages;
       if (!debounceIntervalRef.current) {
         setMessagesWithoutHistory(messages);
@@ -80,13 +80,13 @@ export function Messages({
   );
 
   useEffect(() => {
-    const listener = (localMessages: Message[]) => {
+    const listener = (localMessages: UIMessage[]) => {
       const lastMessage = localMessages[localMessages.length - 1];
       const lastMessageElement = document.getElementById(
         `message-${lastMessage?.id}`
       );
       if (lastMessage && lastMessageElement) {
-        lastMessageElement.textContent = lastMessage.content;
+        lastMessageElement.textContent = lastMessage.parts.find((part) => part.type === "text")?.text ?? "";
       }
       messagesEndRef.current?.scrollIntoView({
         behavior: "instant",
@@ -108,7 +108,7 @@ export function Messages({
 
   useEffect(() => {
     if (!Object.is(messages, lastSetMessagesRef.current)) {
-      chatRef.current.stop();
+      void chatRef.current.stop();
       chatRef.current.setLocalMessages(messages);
     }
   }, [chatRef, messages]);
@@ -166,7 +166,9 @@ export function Messages({
             </Box>
           )}
           <Text paddingTop="2px" whiteSpace="pre-wrap">
-            <span id={`message-${message.id}`}>{message.content}</span>
+            <span id={`message-${message.id}`}>
+              {message.parts.find((part) => part.type === "text")?.text ?? ""}
+            </span>
             {lastMessage?.role === "assistant" &&
               message.id === lastMessage.id &&
               debouncedLoading && <span className="chat-loading-circle" />}
@@ -185,7 +187,7 @@ export function Messages({
         <>
           {debouncedLoading && (
             <MessageBlock
-              message={{ id: "loading", role: "assistant", content: "" }}
+              message={{ id: "loading", role: "assistant", parts: [{ type: "text", text: "" }] }}
               index={messages.length}
             >
               <Box minWidth="22px" height="22px" padding="1px">
@@ -204,7 +206,7 @@ export function Messages({
           )}
           {error && (
             <MessageBlock
-              message={{ id: "loading", role: "assistant", content: "" }}
+              message={{ id: "loading", role: "assistant", parts: [{ type: "text", text: "" }] }}
               index={messages.length}
             >
               <Box minWidth="22px" height="22px" padding="1px">
@@ -246,7 +248,7 @@ function MessageBlock({
   index,
   children,
 }: {
-  message: Message;
+  message: UIMessage;
   index: number;
   children: React.ReactNode;
 }) {
