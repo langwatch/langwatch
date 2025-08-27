@@ -56,7 +56,7 @@ export type TraceForCollection = Pick<
 export const openTelemetryTraceRequestToTracesForCollection = async (
   otelTrace: DeepPartial<IExportTraceServiceRequest>
 ): Promise<TraceForCollection[]> => {
-  return tracer.withActiveSpan(
+  return await tracer.withActiveSpan(
     "openTelemetryTraceRequestToTracesForCollection",
     { kind: SpanKind.INTERNAL },
     async (span) => {
