@@ -435,7 +435,7 @@ describe("opentelemetry logs receiver", () => {
 
   it("handles empty logs request", async () => {
     const traces =
-      openTelemetryLogsRequestToTracesForCollection(emptyLogsRequest);
+      await openTelemetryLogsRequestToTracesForCollection(emptyLogsRequest);
 
     expect(traces).toHaveLength(0);
   });
@@ -467,7 +467,7 @@ IGNORED_CONTENT`,
     };
 
     const traces =
-      openTelemetryLogsRequestToTracesForCollection(invalidIdsRequest);
+      await openTelemetryLogsRequestToTracesForCollection(invalidIdsRequest);
 
     expect(traces).toHaveLength(0);
   });
@@ -528,7 +528,7 @@ IGNORED_CONTENT`,
     };
 
     const traces =
-      openTelemetryLogsRequestToTracesForCollection(malformedRequest);
+      await openTelemetryLogsRequestToTracesForCollection(malformedRequest);
 
     expect(traces).toHaveLength(0);
   });
