@@ -348,20 +348,26 @@ export class ScenarioEventRepository {
   }
 
   /**
-   * Retrieves all batch run IDs associated with a scenario set.
-   * Results are sorted by latest timestamp in descending order.
+   * Retrieves batch run IDs associated with a scenario set with pagination support.
+   * Results are sorted by latest timestamp in descending order (most recent first).
    *
    * @param projectId - The project identifier
    * @param scenarioSetId - The scenario set identifier
-   * @returns Array of batch run IDs, ordered by most recent first
+   * @param limit - Maximum number of batch run IDs to return
+   * @param offset - Number of batch run IDs to skip (for pagination)
+   * @returns Array of batch run IDs, ordered by most recent first, limited by pagination
    * @throws {z.ZodError} If validation fails for projectId or scenarioSetId
    */
   async getBatchRunIdsForScenarioSet({
     projectId,
     scenarioSetId,
+    limit = 10000,
+    offset = 0,
   }: {
     projectId: string;
     scenarioSetId: string;
+    limit?: number;
+    offset?: number;
   }): Promise<string[]> {
     const validatedProjectId = projectIdSchema.parse(projectId);
     const validatedScenarioSetId = scenarioIdSchema.parse(scenarioSetId);
@@ -372,7 +378,7 @@ export class ScenarioEventRepository {
       body: {
         query: {
           bool: {
-            must: [
+            filter: [
               { term: { [ES_FIELDS.projectId]: validatedProjectId } },
               { term: { [ES_FIELDS.scenarioSetId]: validatedScenarioSetId } },
               { exists: { field: ES_FIELDS.batchRunId } },
@@ -383,7 +389,7 @@ export class ScenarioEventRepository {
           unique_batch_runs: {
             terms: {
               field: ES_FIELDS.batchRunId,
-              size: 10000,
+              size: limit + offset, // Get enough to apply offset
               // Sort by latest timestamp to get most recent batch runs first
               order: {
                 latest_timestamp: "desc",
@@ -402,13 +408,69 @@ export class ScenarioEventRepository {
       },
     });
 
-    return (
+    const buckets =
       (
         response.aggregations?.unique_batch_runs as {
           buckets: Array<{ key: string }>;
         }
-      )?.buckets ?? []
-    ).map((bucket) => bucket.key);
+      )?.buckets ?? [];
+
+    // Apply offset and limit to the results
+    return buckets.slice(offset, offset + limit).map((bucket) => bucket.key);
+  }
+
+  /**
+   * Gets the total count of batch runs for a scenario set.
+   * Used for pagination calculations.
+   *
+   * @param projectId - The project identifier
+   * @param scenarioSetId - The scenario set identifier
+   * @returns Total count of batch runs
+   * @throws {z.ZodError} If validation fails for projectId or scenarioSetId
+   */
+  async getBatchRunCountForScenarioSet({
+    projectId,
+    scenarioSetId,
+  }: {
+    projectId: string;
+    scenarioSetId: string;
+  }): Promise<number> {
+    const validatedProjectId = projectIdSchema.parse(projectId);
+    const validatedScenarioSetId = scenarioIdSchema.parse(scenarioSetId);
+    const client = await this.getClient();
+
+    const response = await client.search({
+      index: this.indexName,
+      body: {
+        query: {
+          bool: {
+            filter: [
+              { term: { [ES_FIELDS.projectId]: validatedProjectId } },
+              { term: { [ES_FIELDS.scenarioSetId]: validatedScenarioSetId } },
+              { exists: { field: ES_FIELDS.batchRunId } },
+            ],
+          },
+        },
+        aggs: {
+          unique_batch_runs: {
+            terms: {
+              field: ES_FIELDS.batchRunId,
+              size: 10000, // Get all unique batch run IDs to count them
+            },
+          },
+        },
+        size: 0,
+      },
+    });
+
+    const buckets =
+      (
+        response.aggregations?.unique_batch_runs as {
+          buckets: Array<{ key: string }>;
+        }
+      )?.buckets ?? [];
+
+    return buckets.length;
   }
 
   /**

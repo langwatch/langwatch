@@ -1,5 +1,17 @@
 import React, { useState } from "react";
-import { Box, Text, Accordion, VStack, Skeleton, Flex, EmptyState, Spinner, HStack, Button, Icon } from "@chakra-ui/react";
+import {
+  Box,
+  Text,
+  Accordion,
+  VStack,
+  Skeleton,
+  Flex,
+  EmptyState,
+  Spinner,
+  HStack,
+  Button,
+  Icon,
+} from "@chakra-ui/react";
 import { ChevronLeft, ChevronRight } from "react-feather";
 import { useColorModeValue } from "../../ui/color-mode";
 import { useSetRunHistorySidebarController } from "./useSetRunHistorySidebarController";
@@ -32,18 +44,16 @@ export const SetRunHistorySidebarComponent = (
       </Text>
 
       {/* Pagination Info */}
-      {pagination.totalCount > 0 && (
-        <Box p={4} borderBottom="1px solid" borderColor="gray.200">
-          <HStack justify="space-between" align="center">
-            <Text fontSize="sm" color="gray.600">
-              {pagination.totalCount} total runs
-            </Text>
-            <Text fontSize="sm" color="gray.600">
-              Page {pagination.page} of {pagination.totalPages}
-            </Text>
-          </HStack>
-        </Box>
-      )}
+      <Box p={4} borderBottom="1px solid" borderColor="gray.200">
+        <HStack justify="space-between" align="center">
+          <Text fontSize="sm" color="gray.600">
+            {pagination.totalCount} total runs
+          </Text>
+          <Text fontSize="sm" color="gray.600">
+            Page {pagination.page} of {pagination.totalPages}
+          </Text>
+        </HStack>
+      </Box>
 
       {isLoading && runs.length === 0 && (
         <VStack gap={3} align="stretch" p={4}>
@@ -115,11 +125,11 @@ export const SetRunHistorySidebarComponent = (
               <Icon as={ChevronLeft} />
               Previous
             </Button>
-            
+
             <Text fontSize="sm" color="gray.600">
               {pagination.page} of {pagination.totalPages}
             </Text>
-            
+
             <Button
               size="sm"
               variant="outline"

@@ -175,20 +175,16 @@ export class ScenarioEventService {
     limit?: number;
     offset?: number;
   }) {
-    // Use provided batchRunIds or fetch them for the scenario set
-    const resolvedBatchRunIds =
+    // Use the new paginated repository method - pagination happens at DB level
+    const paginatedBatchRunIds =
       await this.eventRepository.getBatchRunIdsForScenarioSet({
         projectId,
         scenarioSetId,
+        limit,
+        offset,
       });
 
-    if (resolvedBatchRunIds.length === 0) return [];
-
-    // Apply pagination to batch run IDs
-    const paginatedBatchRunIds = resolvedBatchRunIds.slice(
-      offset,
-      offset + limit
-    );
+    if (paginatedBatchRunIds.length === 0) return [];
 
     return await this.getRunDataForBatchIds({
       projectId,
@@ -319,12 +315,9 @@ export class ScenarioEventService {
     projectId: string;
     scenarioSetId: string;
   }): Promise<number> {
-    const batchRunIds = await this.eventRepository.getBatchRunIdsForScenarioSet(
-      {
-        projectId,
-        scenarioSetId,
-      }
-    );
-    return batchRunIds.length;
+    return await this.eventRepository.getBatchRunCountForScenarioSet({
+      projectId,
+      scenarioSetId,
+    });
   }
 }

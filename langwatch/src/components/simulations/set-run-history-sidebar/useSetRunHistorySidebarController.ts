@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { api } from "~/utils/api";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useSimulationRouter } from "~/hooks/simulations/useSimulationRouter";
@@ -26,8 +26,13 @@ export const useSetRunHistorySidebarController = () => {
 
   // Pagination state
   const [page, setPage] = useState(1);
-  const [limit] = useState(10); // Fixed limit for now
+  const limit = 10; // Fixed limit for now
   const offset = (page - 1) * limit;
+
+  // Reset page when navigating to a different scenario set
+  useEffect(() => {
+    setPage(1);
+  }, [scenarioSetId]);
 
   // Fetch scenario run data with pagination
   const {
@@ -63,12 +68,17 @@ export const useSetRunHistorySidebarController = () => {
   const totalCount = countData?.count ?? 0;
   const totalPages = Math.ceil(totalCount / limit);
 
+  // Clamp page to valid range when total count changes
+  useEffect(() => {
+    setPage((p) => Math.min(Math.max(1, p), Math.max(1, totalPages)));
+  }, [totalPages]);
+
   // Memoize the expensive data transformation to prevent unnecessary re-renders
   // This transforms raw API data into the UI-friendly Run format
   const runs = useMemo(() => {
     if (!runData?.length) return [];
-    return transformRunDataToBatchRuns(runData);
-  }, [runData]);
+    return transformRunDataToBatchRuns(runData, page, limit, totalCount);
+  }, [runData, page, limit, totalCount]);
 
   // Extract click handler for better testability and performance
   // Memoized to prevent child component re-renders when dependencies haven't changed
@@ -134,7 +144,12 @@ export const useSetRunHistorySidebarController = () => {
  * @param runData - Array of raw scenario run data from the API
  * @returns Array of Run objects ready for UI consumption
  */
-const transformRunDataToBatchRuns = (runData: ScenarioRunData[]): Run[] => {
+const transformRunDataToBatchRuns = (
+  runData: ScenarioRunData[],
+  currentPage: number,
+  limit: number,
+  totalCount: number
+): Run[] => {
   // Group runs by batchRunId using a functional reduce approach
   // Each batch run contains metadata and an array of individual scenario runs
   const batchRunsMap = runData.reduce(
@@ -162,12 +177,11 @@ const transformRunDataToBatchRuns = (runData: ScenarioRunData[]): Run[] => {
   // Sort by timestamp (numerical) for accurate chronological ordering
   // Then add display labels and format dates for UI consumption
   return Object.values(batchRunsMap)
-    .sort((a, b) => a.timestamp - b.timestamp) // Chronological sort by actual timestamp
+    .sort((a, b) => b.timestamp - a.timestamp) // Sort newest first (descending)
     .map((run, idx) => ({
       ...run,
-      label: `Run #${idx + 1}`, // Sequential labeling based on chronological order
-    }))
-    .reverse(); // Newest runs first for better UX
+      label: `Run #${totalCount - ((currentPage - 1) * limit + idx)}`, // Newest gets highest number
+    }));
 };
 
 /**
