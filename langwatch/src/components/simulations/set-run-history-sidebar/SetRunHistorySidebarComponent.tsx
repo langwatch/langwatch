@@ -50,7 +50,7 @@ export const SetRunHistorySidebarComponent = (
             {pagination.totalCount} total runs
           </Text>
           <Text fontSize="sm" color="gray.600">
-            Page {pagination.page} of {pagination.totalPages}
+            Page {pagination.page} of {Math.max(1, pagination.totalPages)}
           </Text>
         </HStack>
       </Box>

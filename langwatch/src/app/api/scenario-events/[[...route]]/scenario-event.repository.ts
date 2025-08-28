@@ -361,7 +361,7 @@ export class ScenarioEventRepository {
   async getBatchRunIdsForScenarioSet({
     projectId,
     scenarioSetId,
-    limit = 10000,
+    limit = 1000,
     offset = 0,
   }: {
     projectId: string;
@@ -452,10 +452,9 @@ export class ScenarioEventRepository {
           },
         },
         aggs: {
-          unique_batch_runs: {
-            terms: {
+          unique_batch_run_count: {
+            cardinality: {
               field: ES_FIELDS.batchRunId,
-              size: 10000, // Get all unique batch run IDs to count them
             },
           },
         },
@@ -463,14 +462,9 @@ export class ScenarioEventRepository {
       },
     });
 
-    const buckets =
-      (
-        response.aggregations?.unique_batch_runs as {
-          buckets: Array<{ key: string }>;
-        }
-      )?.buckets ?? [];
-
-    return buckets.length;
+    const count =
+      (response.aggregations as any)?.unique_batch_run_count?.value ?? 0;
+    return count;
   }
 
   /**
