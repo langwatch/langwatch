@@ -646,14 +646,15 @@ const addOpenTelemetrySpanAsSpan = (
 
   // logfire
   if (!output) {
-    const genAIChoice = (attributesMap?.events as unknown as any[])?.find(
-      (event) => event?.["event.name"] === "gen_ai.choice"
-    );
-    if (genAIChoice?.message) {
-      output = {
-        type: "chat_messages",
-        value: [genAIChoice.message],
-      };
+    if (Array.isArray(attributesMap?.events)) {
+      // event && typeof event === "object" -> this is needed as `null` is typeof object!
+      const event = attributesMap.events.find((event) => event && typeof event === "object" && event["event.name"] === "gen_ai.choice");
+      if (event?.message) {
+        output = {
+          type: "chat_messages",
+          value: [event.message],
+        };
+      }
     }
   }
 
