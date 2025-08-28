@@ -543,9 +543,10 @@ export class ScenarioEventRepository {
     const response = await client.search({
       index: this.indexName,
       body: {
+        track_total_hits: false,
         query: {
           bool: {
-            must: [
+            filter: [
               { term: { [ES_FIELDS.projectId]: validatedProjectId } },
               { terms: { [ES_FIELDS.scenarioRunId]: validatedScenarioRunIds } },
               { term: { type: ScenarioEventType.RUN_STARTED } },
@@ -553,7 +554,14 @@ export class ScenarioEventRepository {
           },
         },
         sort: [{ timestamp: "desc" }],
-        collapse: { field: ES_FIELDS.scenarioRunId },
+        collapse: {
+          field: ES_FIELDS.scenarioRunId,
+          inner_hits: {
+            name: "latest",
+            size: 1,
+            sort: [{ timestamp: "desc" }],
+          },
+        },
         size: Math.min(validatedScenarioRunIds.length, 10000),
       },
     });
@@ -561,7 +569,8 @@ export class ScenarioEventRepository {
     const results = new Map<string, ScenarioRunStartedEvent>();
 
     for (const hit of response.hits.hits) {
-      const rawResult = hit._source as Record<string, unknown>;
+      const rawResult = ((hit as any).inner_hits?.latest?.hits?.hits?.[0]
+        ?._source ?? hit._source) as Record<string, unknown>;
       if (rawResult) {
         const event = transformFromElasticsearch(
           rawResult
@@ -604,9 +613,10 @@ export class ScenarioEventRepository {
     const response = await client.search({
       index: this.indexName,
       body: {
+        track_total_hits: false,
         query: {
           bool: {
-            must: [
+            filter: [
               { term: { [ES_FIELDS.projectId]: validatedProjectId } },
               { terms: { [ES_FIELDS.scenarioRunId]: validatedScenarioRunIds } },
               { term: { type: ScenarioEventType.MESSAGE_SNAPSHOT } },
@@ -614,7 +624,14 @@ export class ScenarioEventRepository {
           },
         },
         sort: [{ timestamp: "desc" }],
-        collapse: { field: ES_FIELDS.scenarioRunId },
+        collapse: {
+          field: ES_FIELDS.scenarioRunId,
+          inner_hits: {
+            name: "latest",
+            size: 1,
+            sort: [{ timestamp: "desc" }],
+          },
+        },
         size: Math.min(validatedScenarioRunIds.length, 10000),
       },
     });
@@ -622,7 +639,8 @@ export class ScenarioEventRepository {
     const results = new Map<string, ScenarioMessageSnapshotEvent>();
 
     for (const hit of response.hits.hits) {
-      const rawResult = hit._source as Record<string, unknown>;
+      const rawResult = ((hit as any).inner_hits?.latest?.hits?.hits?.[0]
+        ?._source ?? hit._source) as Record<string, unknown>;
       if (rawResult) {
         const event = transformFromElasticsearch(
           rawResult
@@ -665,9 +683,10 @@ export class ScenarioEventRepository {
     const response = await client.search({
       index: this.indexName,
       body: {
+        track_total_hits: false,
         query: {
           bool: {
-            must: [
+            filter: [
               { term: { [ES_FIELDS.projectId]: validatedProjectId } },
               { terms: { [ES_FIELDS.scenarioRunId]: validatedScenarioRunIds } },
               { term: { type: ScenarioEventType.RUN_FINISHED } },
@@ -675,7 +694,14 @@ export class ScenarioEventRepository {
           },
         },
         sort: [{ timestamp: "desc" }],
-        collapse: { field: ES_FIELDS.scenarioRunId },
+        collapse: {
+          field: ES_FIELDS.scenarioRunId,
+          inner_hits: {
+            name: "latest",
+            size: 1,
+            sort: [{ timestamp: "desc" }],
+          },
+        },
         size: Math.min(validatedScenarioRunIds.length, 10000),
       },
     });
@@ -683,7 +709,8 @@ export class ScenarioEventRepository {
     const results = new Map<string, ScenarioRunFinishedEvent>();
 
     for (const hit of response.hits.hits) {
-      const rawResult = hit._source as Record<string, unknown>;
+      const rawResult = ((hit as any).inner_hits?.latest?.hits?.hits?.[0]
+        ?._source ?? hit._source) as Record<string, unknown>;
       if (rawResult) {
         const event = transformFromElasticsearch(
           rawResult
