@@ -389,15 +389,14 @@ export class ScenarioEventRepository {
         const decodedCursor = Buffer.from(cursor, "base64").toString("utf-8");
         const cursorData = JSON.parse(decodedCursor);
 
-        // Validate cursor shape - should be an array of sort values
-        if (Array.isArray(cursorData) && cursorData.length >= 2) {
-          // Ensure first value is a number (timestamp) and second is a string (batch run ID)
-          if (
-            typeof cursorData[0] === "number" &&
-            typeof cursorData[1] === "string"
-          ) {
-            searchAfter = cursorData;
-          }
+        // Validate cursor shape - expected: [timestamp:number, batchRunId:string, _id?:string]
+        if (
+          Array.isArray(cursorData) &&
+          (cursorData.length === 2 || cursorData.length === 3) &&
+          typeof cursorData[0] === "number" &&
+          typeof cursorData[1] === "string"
+        ) {
+          searchAfter = cursorData;
         }
       } catch (e) {
         // Try legacy JSON cursor format for backward compatibility
@@ -465,12 +464,8 @@ export class ScenarioEventRepository {
 
     // Convert to array and sort by timestamp descending, then by batch run ID
     const sortedBatchRuns = Array.from(batchRunMap.entries()).sort(
-      ([, a], [, b]) => {
-        if (b.timestamp !== a.timestamp) {
-          return b.timestamp - a.timestamp;
-        }
-        return a.timestamp.toString().localeCompare(b.timestamp.toString());
-      }
+      ([keyA, a], [keyB, b]) =>
+        b.timestamp - a.timestamp || keyA.localeCompare(keyB)
     );
 
     // Determine if there are more results

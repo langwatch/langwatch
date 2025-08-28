@@ -111,9 +111,9 @@ export class ScenarioEventService {
   }
 
   /**
-   * Retrieves run data for all scenarios in a scenario set.
-   * Note: This is a temporary implementation that may be optimized in the future.
-   * TODO: Optimize this.
+   * Retrieves run data for a specific scenario (by scenarioId).
+   * Single Responsibility: fetch run data for one scenario without mixing set-level concerns.
+   * Note: Temporary implementation; optimize batching later.
    * @param {Object} params - The parameters for retrieving scenario run data
    * @param {string} params.projectId - The ID of the project
    * @param {string} params.scenarioId - The ID of the scenario

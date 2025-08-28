@@ -26,7 +26,9 @@ export const useSetRunHistorySidebarController = () => {
 
   // Cursor-based pagination state
   const [cursor, setCursor] = useState<string | undefined>();
-  const [cursorHistory, setCursorHistory] = useState<string[]>([]);
+  const [cursorHistory, setCursorHistory] = useState<(string | undefined)[]>(
+    []
+  );
   const limit = 10; // Fixed limit for now
 
   // Reset cursor when navigating to a different scenario set
@@ -107,7 +109,7 @@ export const useSetRunHistorySidebarController = () => {
   // Cursor-based pagination handlers
   const handleNextPage = () => {
     if (runData?.nextCursor) {
-      setCursorHistory((prev) => [...prev, cursor!]);
+      setCursorHistory((prev) => [...prev, cursor]);
       setCursor(runData.nextCursor);
     }
   };
