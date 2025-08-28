@@ -377,7 +377,11 @@ export class ScenarioEventRepository {
     const validatedScenarioSetId = scenarioIdSchema.parse(scenarioSetId);
     const client = await this.getClient();
 
-    // Get batch run IDs using composite aggregation with search_after
+    // Validate and clamp the limit to prevent ES result window issues
+    const actualLimit = Math.min(limit, 20); // But respect the actual requested limit for pagination
+
+    // SIMPLE APPROACH: Get all unique batch runs first, then paginate through them
+    // This avoids all the cursor complexity and ensures each page gets the right results
     const response = await client.search({
       index: this.indexName,
       body: {
@@ -392,18 +396,19 @@ export class ScenarioEventRepository {
         },
         aggs: {
           unique_batch_runs: {
-            composite: {
-              size: limit,
-              sources: [
-                {
-                  batchRunId: {
-                    terms: {
-                      field: ES_FIELDS.batchRunId,
-                    },
-                  },
+            terms: {
+              field: ES_FIELDS.batchRunId,
+              size: 1000, // Get all unique batch runs
+              order: {
+                latest_timestamp: "desc",
+              },
+            },
+            aggs: {
+              latest_timestamp: {
+                max: {
+                  field: "timestamp",
                 },
-              ],
-              after: cursor ? JSON.parse(cursor) : undefined,
+              },
             },
           },
         },
@@ -415,25 +420,39 @@ export class ScenarioEventRepository {
       (
         response.aggregations?.unique_batch_runs as {
           buckets: Array<{
-            key: { batchRunId: string };
+            key: string;
+            latest_timestamp: { value: number };
           }>;
-          after_key?: { batchRunId: string };
         }
       )?.buckets ?? [];
 
-    const batchRunIds = buckets.map((bucket) => bucket.key.batchRunId);
+    // SIMPLE PAGINATION: Just slice the results based on page number
+    let currentPage = 0;
+    if (cursor) {
+      try {
+        const cursorData = JSON.parse(cursor);
+        if (cursorData.page !== undefined) {
+          currentPage = cursorData.page;
+        }
+      } catch (e) {
+        currentPage = 0;
+      }
+    }
 
-    // Get the after_key for the next cursor
+    const startIndex = currentPage * actualLimit;
+    const batchRunIds = buckets
+      .slice(startIndex, startIndex + actualLimit)
+      .map((bucket) => bucket.key);
+
+    // Create simple page-based cursor
+    const nextPage = currentPage + 1;
     const nextCursor =
-      response.aggregations &&
-      (response.aggregations.unique_batch_runs as any)?.after_key
-        ? JSON.stringify(
-            (response.aggregations.unique_batch_runs as any).after_key
-          )
+      nextPage * actualLimit < buckets.length
+        ? JSON.stringify({ page: nextPage })
         : undefined;
 
-    // Determine if there are more pages by checking if we got the full limit
-    const hasMore = buckets.length === limit;
+    // Simple hasMore logic
+    const hasMore = nextPage * actualLimit < buckets.length;
 
     return {
       batchRunIds,
