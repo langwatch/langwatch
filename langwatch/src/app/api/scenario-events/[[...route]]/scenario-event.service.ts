@@ -229,6 +229,7 @@ export class ScenarioEventService {
     let cursor: string | undefined = undefined;
     const pageLimit = 100; // repository/server cap
     const maxPages = 200; // safety guard (20k ids)
+    let truncated = false;
 
     for (let i = 0; i < maxPages; i++) {
       const { batchRunIds: ids, nextCursor } =
@@ -238,9 +239,20 @@ export class ScenarioEventService {
           limit: pageLimit,
           cursor,
         });
+      if (ids.length === 0) break;
       ids.forEach((id) => batchRunIds.add(id));
-      if (!nextCursor) break;
+      if (!nextCursor || nextCursor === cursor) break;
+      if (i === maxPages - 1 && nextCursor) {
+        truncated = true;
+        break;
+      }
       cursor = nextCursor;
+    }
+    if (truncated) {
+      throw new Error(
+        `Too many runs to fetch exhaustively (cap ${maxPages * pageLimit}). ` +
+          "Refine filters or use the paginated API."
+      );
     }
 
     if (batchRunIds.size === 0) return [];
