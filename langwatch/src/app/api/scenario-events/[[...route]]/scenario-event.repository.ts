@@ -15,6 +15,7 @@ import {
   transformFromElasticsearch,
   ES_FIELDS,
 } from "./utils/elastic-search-transformers";
+import * as Sentry from "@sentry/nextjs";
 
 const projectIdSchema = z.string();
 const scenarioRunIdSchema = z.string();
@@ -378,10 +379,44 @@ export class ScenarioEventRepository {
     const client = await this.getClient();
 
     // Validate and clamp the limit to prevent ES result window issues
-    const actualLimit = Math.min(limit, 20); // But respect the actual requested limit for pagination
+    const actualLimit = Math.min(limit, 20);
 
-    // SIMPLE APPROACH: Get all unique batch runs first, then paginate through them
-    // This avoids all the cursor complexity and ensures each page gets the right results
+    // Parse cursor to get search_after values
+    let searchAfter: any[] | undefined;
+    if (cursor) {
+      try {
+        // Try to decode base64 cursor first (new stable format)
+        const decodedCursor = Buffer.from(cursor, "base64").toString("utf-8");
+        const cursorData = JSON.parse(decodedCursor);
+
+        // Validate cursor shape - should be an array of sort values
+        if (Array.isArray(cursorData) && cursorData.length >= 2) {
+          // Ensure first value is a number (timestamp) and second is a string (batch run ID)
+          if (
+            typeof cursorData[0] === "number" &&
+            typeof cursorData[1] === "string"
+          ) {
+            searchAfter = cursorData;
+          }
+        }
+      } catch (e) {
+        // Try legacy JSON cursor format for backward compatibility
+        try {
+          const cursorData = JSON.parse(cursor);
+          if (cursorData.searchAfter && Array.isArray(cursorData.searchAfter)) {
+            searchAfter = cursorData.searchAfter;
+          }
+        } catch (legacyError) {
+          Sentry.captureException(legacyError);
+          // Invalid cursor in both formats, start from beginning
+        }
+      }
+    }
+
+    // Request more items to account for potential deduplication
+    // We need to ensure we get enough unique batch runs after deduplication
+    const requestSize = Math.max(actualLimit * 3, 50); // Request 3x the limit or at least 50
+
     const response = await client.search({
       index: this.indexName,
       body: {
@@ -394,65 +429,76 @@ export class ScenarioEventRepository {
             ],
           },
         },
-        aggs: {
-          unique_batch_runs: {
-            terms: {
-              field: ES_FIELDS.batchRunId,
-              size: 1000, // Get all unique batch runs
-              order: {
-                latest_timestamp: "desc",
-              },
-            },
-            aggs: {
-              latest_timestamp: {
-                max: {
-                  field: "timestamp",
-                },
-              },
-            },
-          },
-        },
-        size: 0,
+        sort: [
+          { timestamp: { order: "desc" } },
+          { [ES_FIELDS.batchRunId]: { order: "asc" } }, // Tiebreaker for stable sorting
+        ],
+        size: requestSize,
+        ...(searchAfter && { search_after: searchAfter }),
       },
     });
 
-    const buckets =
-      (
-        response.aggregations?.unique_batch_runs as {
-          buckets: Array<{
-            key: string;
-            latest_timestamp: { value: number };
-          }>;
-        }
-      )?.buckets ?? [];
+    const hits = response.hits?.hits ?? [];
 
-    // SIMPLE PAGINATION: Just slice the results based on page number
-    let currentPage = 0;
-    if (cursor) {
-      try {
-        const cursorData = JSON.parse(cursor);
-        if (cursorData.page !== undefined) {
-          currentPage = cursorData.page;
+    // Deduplicate by batch run ID, keeping the latest timestamp for each
+    const batchRunMap = new Map<
+      string,
+      { timestamp: number; sort: any[]; hit: any }
+    >();
+
+    for (const hit of hits) {
+      const source = hit._source as Record<string, any>;
+      const batchRunId = source?.batch_run_id as string;
+      const timestamp = source?.timestamp as number;
+
+      if (batchRunId && timestamp !== undefined) {
+        const existing = batchRunMap.get(batchRunId);
+        if (!existing || timestamp > existing.timestamp) {
+          batchRunMap.set(batchRunId, {
+            timestamp,
+            sort: hit.sort ?? [],
+            hit: hit, // Keep the original hit for cursor generation
+          });
         }
-      } catch (e) {
-        currentPage = 0;
       }
     }
 
-    const startIndex = currentPage * actualLimit;
-    const batchRunIds = buckets
-      .slice(startIndex, startIndex + actualLimit)
-      .map((bucket) => bucket.key);
+    // Convert to array and sort by timestamp descending, then by batch run ID
+    const sortedBatchRuns = Array.from(batchRunMap.entries()).sort(
+      ([, a], [, b]) => {
+        if (b.timestamp !== a.timestamp) {
+          return b.timestamp - a.timestamp;
+        }
+        return a.timestamp.toString().localeCompare(b.timestamp.toString());
+      }
+    );
 
-    // Create simple page-based cursor
-    const nextPage = currentPage + 1;
-    const nextCursor =
-      nextPage * actualLimit < buckets.length
-        ? JSON.stringify({ page: nextPage })
-        : undefined;
+    // Determine if there are more results
+    // We have more if we got the full requested size from ES (indicating more data available)
+    // OR if we have more unique batch runs than requested
+    const hasMore =
+      hits.length >= requestSize || sortedBatchRuns.length > actualLimit;
+    let nextCursor: string | undefined;
 
-    // Simple hasMore logic
-    const hasMore = nextPage * actualLimit < buckets.length;
+    if (hasMore && sortedBatchRuns.length > actualLimit) {
+      // Get the sort values from the extra item in the deduplicated results
+      const extraItem = sortedBatchRuns[actualLimit];
+      if (extraItem) {
+        const searchAfterValues = [
+          extraItem[1].timestamp,
+          extraItem[0], // batch run ID as tiebreaker
+        ];
+        // Encode cursor as base64 for stability and compactness
+        nextCursor = Buffer.from(JSON.stringify(searchAfterValues)).toString(
+          "base64"
+        );
+      }
+    }
+
+    // Slice to actualLimit before returning
+    const batchRunIds = sortedBatchRuns
+      .slice(0, actualLimit)
+      .map(([batchRunId]) => batchRunId);
 
     return {
       batchRunIds,
