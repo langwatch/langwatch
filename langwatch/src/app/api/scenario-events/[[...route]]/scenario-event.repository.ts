@@ -534,8 +534,8 @@ export class ScenarioEventRepository {
     }
 
     const validatedProjectId = projectIdSchema.parse(projectId);
-    const validatedScenarioRunIds = scenarioRunIds.map((id) =>
-      scenarioRunIdSchema.parse(id)
+    const validatedScenarioRunIds = Array.from(
+      new Set(scenarioRunIds.map((id) => scenarioRunIdSchema.parse(id)))
     );
 
     const client = await this.getClient();
@@ -553,7 +553,8 @@ export class ScenarioEventRepository {
           },
         },
         sort: [{ timestamp: "desc" }],
-        size: 10000,
+        collapse: { field: ES_FIELDS.scenarioRunId },
+        size: Math.min(validatedScenarioRunIds.length, 10000),
       },
     });
 
@@ -566,10 +567,7 @@ export class ScenarioEventRepository {
           rawResult
         ) as ScenarioRunStartedEvent;
         const scenarioRunId = event.scenarioRunId;
-        // Only keep the latest event per scenario run (due to sort by timestamp desc)
-        if (!results.has(scenarioRunId)) {
-          results.set(scenarioRunId, event);
-        }
+        results.set(scenarioRunId, event);
       }
     }
 
@@ -597,8 +595,8 @@ export class ScenarioEventRepository {
     }
 
     const validatedProjectId = projectIdSchema.parse(projectId);
-    const validatedScenarioRunIds = scenarioRunIds.map((id) =>
-      scenarioRunIdSchema.parse(id)
+    const validatedScenarioRunIds = Array.from(
+      new Set(scenarioRunIds.map((id) => scenarioRunIdSchema.parse(id)))
     );
 
     const client = await this.getClient();
@@ -616,7 +614,8 @@ export class ScenarioEventRepository {
           },
         },
         sort: [{ timestamp: "desc" }],
-        size: 10000,
+        collapse: { field: ES_FIELDS.scenarioRunId },
+        size: Math.min(validatedScenarioRunIds.length, 10000),
       },
     });
 
@@ -629,10 +628,7 @@ export class ScenarioEventRepository {
           rawResult
         ) as ScenarioMessageSnapshotEvent;
         const scenarioRunId = event.scenarioRunId;
-        // Only keep the latest event per scenario run (due to sort by timestamp desc)
-        if (!results.has(scenarioRunId)) {
-          results.set(scenarioRunId, event);
-        }
+        results.set(scenarioRunId, event);
       }
     }
 
@@ -660,8 +656,8 @@ export class ScenarioEventRepository {
     }
 
     const validatedProjectId = projectIdSchema.parse(projectId);
-    const validatedScenarioRunIds = scenarioRunIds.map((id) =>
-      scenarioRunIdSchema.parse(id)
+    const validatedScenarioRunIds = Array.from(
+      new Set(scenarioRunIds.map((id) => scenarioRunIdSchema.parse(id)))
     );
 
     const client = await this.getClient();
@@ -679,7 +675,8 @@ export class ScenarioEventRepository {
           },
         },
         sort: [{ timestamp: "desc" }],
-        size: 10000,
+        collapse: { field: ES_FIELDS.scenarioRunId },
+        size: Math.min(validatedScenarioRunIds.length, 10000),
       },
     });
 
@@ -692,10 +689,7 @@ export class ScenarioEventRepository {
           rawResult
         ) as ScenarioRunFinishedEvent;
         const scenarioRunId = event.scenarioRunId;
-        // Only keep the latest event per scenario run (due to sort by timestamp desc)
-        if (!results.has(scenarioRunId)) {
-          results.set(scenarioRunId, event);
-        }
+        results.set(scenarioRunId, event);
       }
     }
 
