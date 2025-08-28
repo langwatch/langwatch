@@ -238,27 +238,30 @@ export class ScenarioEventService {
       return [];
     }
 
+    // Dedupe to reduce payload and ensure stable, unique iteration order
+    const uniqueScenarioRunIds = Array.from(new Set(scenarioRunIds));
+
     // Fetch all data in 3 batch queries instead of 3N individual queries
     const [runStartedEvents, messageEvents, runFinishedEvents] =
       await Promise.all([
         this.eventRepository.getRunStartedEventsByScenarioRunIds({
           projectId,
-          scenarioRunIds,
+          scenarioRunIds: uniqueScenarioRunIds,
         }),
         this.eventRepository.getLatestMessageSnapshotEventsByScenarioRunIds({
           projectId,
-          scenarioRunIds,
+          scenarioRunIds: uniqueScenarioRunIds,
         }),
         this.eventRepository.getLatestRunFinishedEventsByScenarioRunIds({
           projectId,
-          scenarioRunIds,
+          scenarioRunIds: uniqueScenarioRunIds,
         }),
       ]);
 
     // Compose the data for each scenario run
     const runs: ScenarioRunData[] = [];
 
-    for (const scenarioRunId of scenarioRunIds) {
+    for (const scenarioRunId of uniqueScenarioRunIds) {
       const runStartedEvent = runStartedEvents.get(scenarioRunId);
       const messageEvent = messageEvents.get(scenarioRunId);
       const runFinishedEvent = runFinishedEvents.get(scenarioRunId);
@@ -280,7 +283,10 @@ export class ScenarioEventService {
         description: runStartedEvent?.metadata?.description ?? null,
         durationInMs:
           runStartedEvent?.timestamp && runFinishedEvent?.timestamp
-            ? runFinishedEvent.timestamp - runStartedEvent.timestamp
+            ? Math.max(
+                0,
+                runFinishedEvent.timestamp - runStartedEvent.timestamp
+              )
             : 0,
       });
     }
