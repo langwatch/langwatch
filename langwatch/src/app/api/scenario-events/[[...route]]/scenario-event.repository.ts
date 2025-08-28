@@ -348,33 +348,33 @@ export class ScenarioEventRepository {
   }
 
   /**
-   * Retrieves batch run IDs associated with a scenario set with pagination support.
+   * Retrieves batch run IDs associated with a scenario set with cursor-based pagination.
    * Results are sorted by latest timestamp in descending order (most recent first).
    *
    * @param projectId - The project identifier
    * @param scenarioSetId - The scenario set identifier
    * @param limit - Maximum number of batch run IDs to return
-   * @param offset - Number of batch run IDs to skip (for pagination)
-   * @returns Array of batch run IDs, ordered by most recent first, limited by pagination
+   * @param cursor - Cursor for pagination (search_after value)
+   * @returns Object containing batch run IDs and pagination info
    * @throws {z.ZodError} If validation fails for projectId or scenarioSetId
    */
   async getBatchRunIdsForScenarioSet({
     projectId,
     scenarioSetId,
-    limit = 100,
-    offset = 0,
+    limit = 20,
+    cursor,
   }: {
     projectId: string;
     scenarioSetId: string;
     limit?: number;
-    offset?: number;
-  }): Promise<string[]> {
+    cursor?: string;
+  }): Promise<{
+    batchRunIds: string[];
+    nextCursor?: string;
+    hasMore: boolean;
+  }> {
     const validatedProjectId = projectIdSchema.parse(projectId);
     const validatedScenarioSetId = scenarioIdSchema.parse(scenarioSetId);
-    const validatedLimit = z.number().int().min(1).max(100).parse(limit);
-    const validatedOffset = z.number().int().min(0).max(10_000).parse(offset);
-    const aggSize = validatedLimit + validatedOffset;
-
     const client = await this.getClient();
 
     const response = await client.search({
@@ -393,7 +393,7 @@ export class ScenarioEventRepository {
           unique_batch_runs: {
             terms: {
               field: ES_FIELDS.batchRunId,
-              size: aggSize, // Get enough to apply offset
+              size: 1000, // Get enough to handle pagination
               // Sort by latest timestamp to get most recent batch runs first
               order: {
                 latest_timestamp: "desc",
@@ -419,8 +419,31 @@ export class ScenarioEventRepository {
         }
       )?.buckets ?? [];
 
-    // Apply offset and limit to the results
-    return buckets.slice(offset, offset + limit).map((bucket) => bucket.key);
+    // Apply cursor-based pagination manually
+    let startIndex = 0;
+    if (cursor) {
+      try {
+        const cursorData = JSON.parse(cursor);
+        startIndex = cursorData.index || 0;
+      } catch (e) {
+        startIndex = 0;
+      }
+    }
+
+    const batchRunIds = buckets
+      .slice(startIndex, startIndex + limit)
+      .map((bucket) => bucket.key);
+
+    const hasMore = startIndex + limit < buckets.length;
+    const nextCursor = hasMore
+      ? JSON.stringify({ index: startIndex + limit })
+      : undefined;
+
+    return {
+      batchRunIds,
+      nextCursor,
+      hasMore,
+    };
   }
 
   /**

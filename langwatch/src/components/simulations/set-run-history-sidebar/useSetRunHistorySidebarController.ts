@@ -24,17 +24,18 @@ export const useSetRunHistorySidebarController = () => {
   const { goToSimulationBatchRuns, scenarioSetId } = useSimulationRouter();
   const { project } = useOrganizationTeamProject();
 
-  // Pagination state
-  const [page, setPage] = useState(1);
-  const limit = 10; // Fixed limit for now
-  const offset = (page - 1) * limit;
+  // Cursor-based pagination state
+  const [cursor, setCursor] = useState<string | undefined>();
+  const [cursorHistory, setCursorHistory] = useState<string[]>([]);
+  const limit = 2; // Fixed limit for now
 
-  // Reset page when navigating to a different scenario set
+  // Reset cursor when navigating to a different scenario set
   useEffect(() => {
-    setPage(1);
+    setCursor(undefined);
+    setCursorHistory([]);
   }, [scenarioSetId]);
 
-  // Fetch scenario run data with pagination
+  // Fetch scenario run data with cursor-based pagination
   const {
     data: runData,
     error,
@@ -44,7 +45,7 @@ export const useSetRunHistorySidebarController = () => {
       projectId: project?.id ?? "",
       scenarioSetId: scenarioSetId ?? "",
       limit,
-      offset,
+      cursor,
     },
     {
       // Only fetch when we have both required IDs to avoid unnecessary API calls
@@ -53,7 +54,7 @@ export const useSetRunHistorySidebarController = () => {
     }
   );
 
-  // Fetch total count for pagination
+  // Fetch total count for pagination info
   const { data: countData } =
     api.scenarios.getScenarioSetBatchRunCount.useQuery(
       {
@@ -66,19 +67,29 @@ export const useSetRunHistorySidebarController = () => {
     );
 
   const totalCount = countData?.count ?? 0;
+  const hasMore = runData?.hasMore ?? false;
+  const currentPage = cursorHistory.length + 1;
   const totalPages = Math.ceil(totalCount / limit);
 
-  // Clamp page to valid range when total count changes
+  // Clamp cursor to valid range when total count changes
   useEffect(() => {
-    setPage((p) => Math.min(Math.max(1, p), Math.max(1, totalPages)));
-  }, [totalPages]);
+    if (totalCount === 0 && cursor) {
+      setCursor(undefined);
+      setCursorHistory([]);
+    }
+  }, [totalCount, cursor]);
 
   // Memoize the expensive data transformation to prevent unnecessary re-renders
   // This transforms raw API data into the UI-friendly Run format
   const runs = useMemo(() => {
-    if (!runData?.length) return [];
-    return transformRunDataToBatchRuns(runData, page, limit, totalCount);
-  }, [runData, page, limit, totalCount]);
+    if (!runData?.runs?.length) return [];
+    return transformRunDataToBatchRuns(
+      runData.runs,
+      currentPage,
+      limit,
+      totalCount
+    );
+  }, [runData?.runs, currentPage, limit, totalCount]);
 
   // Extract click handler for better testability and performance
   // Memoized to prevent child component re-renders when dependencies haven't changed
@@ -93,20 +104,34 @@ export const useSetRunHistorySidebarController = () => {
     [scenarioSetId, goToSimulationBatchRuns]
   );
 
-  // Pagination handlers
-  const handlePageChange = (newPage: number) => {
-    setPage(Math.max(1, Math.min(newPage, totalPages)));
-  };
-
+  // Cursor-based pagination handlers
   const handleNextPage = () => {
-    if (page < totalPages) {
-      setPage(page + 1);
+    if (runData?.nextCursor) {
+      setCursorHistory((prev) => [...prev, cursor!]);
+      setCursor(runData.nextCursor);
     }
   };
 
   const handlePrevPage = () => {
-    if (page > 1) {
-      setPage(page - 1);
+    if (cursorHistory.length > 0) {
+      const newHistory = [...cursorHistory];
+      const prevCursor = newHistory.pop();
+      setCursorHistory(newHistory);
+      setCursor(prevCursor);
+    }
+  };
+
+  const handlePageChange = (newPage: number) => {
+    // For cursor-based pagination, we can't jump to arbitrary pages
+    // Reset to beginning and navigate forward
+    if (newPage === 1) {
+      setCursor(undefined);
+      setCursorHistory([]);
+    } else if (newPage > currentPage) {
+      // Navigate forward from current position
+      const stepsForward = newPage - currentPage;
+      // This is simplified - in practice you'd need to fetch each page
+      // For now, just allow forward navigation
     }
   };
 
@@ -119,12 +144,12 @@ export const useSetRunHistorySidebarController = () => {
 
     // Pagination state and controls
     pagination: {
-      page,
+      page: currentPage,
       limit,
       totalCount,
       totalPages,
-      hasNextPage: page < totalPages,
-      hasPrevPage: page > 1,
+      hasNextPage: hasMore,
+      hasPrevPage: cursorHistory.length > 0,
       onPageChange: handlePageChange,
       onNextPage: handleNextPage,
       onPrevPage: handlePrevPage,

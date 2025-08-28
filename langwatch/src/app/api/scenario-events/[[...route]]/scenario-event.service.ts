@@ -111,7 +111,9 @@ export class ScenarioEventService {
   }
 
   /**
-   * Retrieves run data for all runs of a specific scenario.
+   * Retrieves run data for all scenarios in a scenario set.
+   * Note: This is a temporary implementation that may be optimized in the future.
+   * TODO: Optimize this.
    * @param {Object} params - The parameters for retrieving scenario run data
    * @param {string} params.projectId - The ID of the project
    * @param {string} params.scenarioId - The ID of the scenario
@@ -156,39 +158,86 @@ export class ScenarioEventService {
   }
 
   /**
-   * Retrieves run data for all scenarios in a scenario set.
+   * Retrieves run data for all scenarios in a scenario set with cursor-based pagination.
    * Note: This is a temporary implementation that may be optimized in the future.
    * TODO: Optimize this.
    * @param {Object} params - The parameters for retrieving run data
    * @param {string} params.projectId - The ID of the project
    * @param {string} params.scenarioSetId - The ID of the scenario set
-   * @returns {Promise<ScenarioRunData[]>} Array of scenario run data
+   * @param {number} [params.limit] - Maximum number of runs to return
+   * @param {string} [params.cursor] - Cursor for pagination
+   * @returns {Promise<{runs: ScenarioRunData[], nextCursor?: string, hasMore: boolean}>} Paginated scenario run data
    */
   async getRunDataForScenarioSet({
     projectId,
     scenarioSetId,
     limit = 20,
-    offset = 0,
+    cursor,
   }: {
     projectId: string;
     scenarioSetId: string;
     limit?: number;
-    offset?: number;
+    cursor?: string;
   }) {
-    // Use the new paginated repository method - pagination happens at DB level
-    const paginatedBatchRunIds =
+    // Validate limit to prevent abuse
+    const validatedLimit = Math.min(Math.max(1, limit), 100);
+
+    // Use the new cursor-based repository method
+    const result = await this.eventRepository.getBatchRunIdsForScenarioSet({
+      projectId,
+      scenarioSetId,
+      limit: validatedLimit,
+      cursor,
+    });
+
+    if (result.batchRunIds.length === 0) {
+      return {
+        runs: [],
+        nextCursor: undefined,
+        hasMore: false,
+      };
+    }
+
+    const runs = await this.getRunDataForBatchIds({
+      projectId,
+      batchRunIds: result.batchRunIds,
+    });
+
+    return {
+      runs,
+      nextCursor: result.nextCursor,
+      hasMore: result.hasMore,
+    };
+  }
+
+  /**
+   * Retrieves ALL run data for a scenario set without pagination.
+   * Used when the full dataset is needed (e.g., for simulation grids).
+   * @param {Object} params - The parameters for retrieving run data
+   * @param {string} params.projectId - The ID of the project
+   * @param {string} params.scenarioSetId - The ID of the scenario set
+   * @returns {Promise<ScenarioRunData[]>} Array of all scenario run data
+   */
+  async getAllRunDataForScenarioSet({
+    projectId,
+    scenarioSetId,
+  }: {
+    projectId: string;
+    scenarioSetId: string;
+  }): Promise<ScenarioRunData[]> {
+    // Get all batch run IDs for the scenario set
+    const allBatchRunIds =
       await this.eventRepository.getBatchRunIdsForScenarioSet({
         projectId,
         scenarioSetId,
-        limit,
-        offset,
+        limit: 10000, // Get all (with reasonable cap)
       });
 
-    if (paginatedBatchRunIds.length === 0) return [];
+    if (allBatchRunIds.batchRunIds.length === 0) return [];
 
     return await this.getRunDataForBatchIds({
       projectId,
-      batchRunIds: paginatedBatchRunIds,
+      batchRunIds: allBatchRunIds.batchRunIds,
     });
   }
 

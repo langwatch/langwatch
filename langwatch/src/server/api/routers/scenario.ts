@@ -31,7 +31,7 @@ export const scenarioRouter = createTRPCRouter({
       projectSchema.extend({
         scenarioSetId: z.string(),
         limit: z.number().min(1).max(100).default(20),
-        offset: z.number().min(0).default(0),
+        cursor: z.string().optional(), // Cursor for pagination
       })
     )
     .use(checkUserPermissionForProject(TeamRoleGroup.SCENARIOS_VIEW))
@@ -41,7 +41,20 @@ export const scenarioRouter = createTRPCRouter({
         projectId: input.projectId,
         scenarioSetId: input.scenarioSetId,
         limit: input.limit,
-        offset: input.offset,
+        cursor: input.cursor,
+      });
+      return data;
+    }),
+
+  // Get ALL run data for a scenario set without pagination
+  getAllScenarioSetRunData: protectedProcedure
+    .input(projectSchema.extend({ scenarioSetId: z.string() }))
+    .use(checkUserPermissionForProject(TeamRoleGroup.SCENARIOS_VIEW))
+    .query(async ({ input, ctx }) => {
+      const scenarioRunnerService = new ScenarioEventService();
+      const data = await scenarioRunnerService.getAllRunDataForScenarioSet({
+        projectId: input.projectId,
+        scenarioSetId: input.scenarioSetId,
       });
       return data;
     }),
