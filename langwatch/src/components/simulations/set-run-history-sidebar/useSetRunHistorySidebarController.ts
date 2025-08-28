@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { api } from "~/utils/api";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useSimulationRouter } from "~/hooks/simulations/useSimulationRouter";
@@ -12,18 +12,24 @@ const logger = createLogger("useSetRunHistorySidebarController");
  * Custom hook that manages the state and behavior for the Set Run History Sidebar.
  *
  * This hook handles:
- * - Fetching scenario run data from the API
+ * - Fetching scenario run data from the API with pagination
  * - Transforming raw run data into grouped batch runs for display
  * - Providing navigation handlers for run selection
  * - Managing loading and error states
+ * - Pagination state management
  *
- * @returns Object containing runs data, click handlers, and state flags
+ * @returns Object containing runs data, click handlers, pagination controls, and state flags
  */
 export const useSetRunHistorySidebarController = () => {
   const { goToSimulationBatchRuns, scenarioSetId } = useSimulationRouter();
   const { project } = useOrganizationTeamProject();
 
-  // Fetch scenario run data with proper error handling and loading states
+  // Pagination state
+  const [page, setPage] = useState(1);
+  const [limit] = useState(10); // Fixed limit for now
+  const offset = (page - 1) * limit;
+
+  // Fetch scenario run data with pagination
   const {
     data: runData,
     error,
@@ -32,6 +38,8 @@ export const useSetRunHistorySidebarController = () => {
     {
       projectId: project?.id ?? "",
       scenarioSetId: scenarioSetId ?? "",
+      limit,
+      offset,
     },
     {
       // Only fetch when we have both required IDs to avoid unnecessary API calls
@@ -39,6 +47,21 @@ export const useSetRunHistorySidebarController = () => {
       refetchInterval: 1000,
     }
   );
+
+  // Fetch total count for pagination
+  const { data: countData } =
+    api.scenarios.getScenarioSetBatchRunCount.useQuery(
+      {
+        projectId: project?.id ?? "",
+        scenarioSetId: scenarioSetId ?? "",
+      },
+      {
+        enabled: !!project?.id && !!scenarioSetId,
+      }
+    );
+
+  const totalCount = countData?.count ?? 0;
+  const totalPages = Math.ceil(totalCount / limit);
 
   // Memoize the expensive data transformation to prevent unnecessary re-renders
   // This transforms raw API data into the UI-friendly Run format
@@ -60,12 +83,42 @@ export const useSetRunHistorySidebarController = () => {
     [scenarioSetId, goToSimulationBatchRuns]
   );
 
+  // Pagination handlers
+  const handlePageChange = (newPage: number) => {
+    setPage(Math.max(1, Math.min(newPage, totalPages)));
+  };
+
+  const handleNextPage = () => {
+    if (page < totalPages) {
+      setPage(page + 1);
+    }
+  };
+
+  const handlePrevPage = () => {
+    if (page > 1) {
+      setPage(page - 1);
+    }
+  };
+
   return {
     runs,
     onRunClick: handleRunClick,
     scenarioSetId,
     isLoading,
     error, // Expose error state for better UX handling in components
+
+    // Pagination state and controls
+    pagination: {
+      page,
+      limit,
+      totalCount,
+      totalPages,
+      hasNextPage: page < totalPages,
+      hasPrevPage: page > 1,
+      onPageChange: handlePageChange,
+      onNextPage: handleNextPage,
+      onPrevPage: handlePrevPage,
+    },
   };
 };
 

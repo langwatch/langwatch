@@ -167,9 +167,13 @@ export class ScenarioEventService {
   async getRunDataForScenarioSet({
     projectId,
     scenarioSetId,
+    limit = 20,
+    offset = 0,
   }: {
     projectId: string;
     scenarioSetId: string;
+    limit?: number;
+    offset?: number;
   }) {
     // Use provided batchRunIds or fetch them for the scenario set
     const resolvedBatchRunIds =
@@ -180,9 +184,15 @@ export class ScenarioEventService {
 
     if (resolvedBatchRunIds.length === 0) return [];
 
+    // Apply pagination to batch run IDs
+    const paginatedBatchRunIds = resolvedBatchRunIds.slice(
+      offset,
+      offset + limit
+    );
+
     return await this.getRunDataForBatchIds({
       projectId,
-      batchRunIds: resolvedBatchRunIds,
+      batchRunIds: paginatedBatchRunIds,
     });
   }
 
@@ -292,5 +302,29 @@ export class ScenarioEventService {
     }
 
     return runs;
+  }
+
+  /**
+   * Gets the total count of batch runs for a scenario set.
+   * Used for pagination calculations.
+   * @param {Object} params - The parameters for retrieving the count
+   * @param {string} params.projectId - The ID of the project
+   * @param {string} params.scenarioSetId - The ID of the scenario set
+   * @returns {Promise<number>} Total count of batch runs
+   */
+  async getBatchRunCountForScenarioSet({
+    projectId,
+    scenarioSetId,
+  }: {
+    projectId: string;
+    scenarioSetId: string;
+  }): Promise<number> {
+    const batchRunIds = await this.eventRepository.getBatchRunIdsForScenarioSet(
+      {
+        projectId,
+        scenarioSetId,
+      }
+    );
+    return batchRunIds.length;
   }
 }
