@@ -361,12 +361,12 @@ export class ScenarioEventRepository {
   async getBatchRunIdsForScenarioSet({
     projectId,
     scenarioSetId,
-    limit = 20,
+    limit,
     cursor,
   }: {
     projectId: string;
     scenarioSetId: string;
-    limit?: number;
+    limit: number;
     cursor?: string;
   }): Promise<{
     batchRunIds: string[];
@@ -377,6 +377,7 @@ export class ScenarioEventRepository {
     const validatedScenarioSetId = scenarioIdSchema.parse(scenarioSetId);
     const client = await this.getClient();
 
+    // Get batch run IDs using composite aggregation with search_after
     const response = await client.search({
       index: this.indexName,
       body: {
@@ -391,20 +392,18 @@ export class ScenarioEventRepository {
         },
         aggs: {
           unique_batch_runs: {
-            terms: {
-              field: ES_FIELDS.batchRunId,
-              size: 1000, // Get enough to handle pagination
-              // Sort by latest timestamp to get most recent batch runs first
-              order: {
-                latest_timestamp: "desc",
-              },
-            },
-            aggs: {
-              latest_timestamp: {
-                max: {
-                  field: "timestamp",
+            composite: {
+              size: limit,
+              sources: [
+                {
+                  batchRunId: {
+                    terms: {
+                      field: ES_FIELDS.batchRunId,
+                    },
+                  },
                 },
-              },
+              ],
+              after: cursor ? JSON.parse(cursor) : undefined,
             },
           },
         },
@@ -415,29 +414,26 @@ export class ScenarioEventRepository {
     const buckets =
       (
         response.aggregations?.unique_batch_runs as {
-          buckets: Array<{ key: string }>;
+          buckets: Array<{
+            key: { batchRunId: string };
+          }>;
+          after_key?: { batchRunId: string };
         }
       )?.buckets ?? [];
 
-    // Apply cursor-based pagination manually
-    let startIndex = 0;
-    if (cursor) {
-      try {
-        const cursorData = JSON.parse(cursor);
-        startIndex = cursorData.index || 0;
-      } catch (e) {
-        startIndex = 0;
-      }
-    }
+    const batchRunIds = buckets.map((bucket) => bucket.key.batchRunId);
 
-    const batchRunIds = buckets
-      .slice(startIndex, startIndex + limit)
-      .map((bucket) => bucket.key);
+    // Get the after_key for the next cursor
+    const nextCursor =
+      response.aggregations &&
+      (response.aggregations.unique_batch_runs as any)?.after_key
+        ? JSON.stringify(
+            (response.aggregations.unique_batch_runs as any).after_key
+          )
+        : undefined;
 
-    const hasMore = startIndex + limit < buckets.length;
-    const nextCursor = hasMore
-      ? JSON.stringify({ index: startIndex + limit })
-      : undefined;
+    // Determine if there are more pages by checking if we got the full limit
+    const hasMore = buckets.length === limit;
 
     return {
       batchRunIds,
