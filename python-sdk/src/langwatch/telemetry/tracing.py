@@ -71,6 +71,7 @@ class LangWatchTrace:
 
     def __init__(
         self,
+        *,
         trace_id: Optional[Union[str, UUID]] = None,
         metadata: Optional[TraceMetadata] = None,
         expected_output: Optional[str] = None,
@@ -306,6 +307,7 @@ class LangWatchTrace:
 
     def update(
         self,
+        *,
         trace_id: Optional[Union[str, UUID]] = None,
         metadata: Optional[TraceMetadata] = None,
         expected_output: Optional[str] = None,
