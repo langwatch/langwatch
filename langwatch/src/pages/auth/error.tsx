@@ -116,6 +116,19 @@ export function SignInError({ error }: { error: string }) {
                     </Button>
                   </VStack>
                 </Alert.Description>
+              ) : error === "SSO_PROVIDER_NOT_ALLOWED" ? (
+                <Alert.Description>
+                  <VStack gap={1} align="start">
+                    <Text>
+                      You cannot sign in with this authentication method. Please
+                      sign in via email first in order to login via your
+                      company&apos;s SSO provider.
+                    </Text>
+                    <Button asChild marginTop={4} color="white">
+                      <Link href="/">Back to Login</Link>
+                    </Button>
+                  </VStack>
+                </Alert.Description>
               ) : (
                 <Alert.Description>
                   Redirecting back to sign in, please try again...

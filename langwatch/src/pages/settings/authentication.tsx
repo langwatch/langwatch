@@ -17,6 +17,7 @@ import { titleCase } from "../../utils/stringCasing";
 import { HorizontalFormControl } from "../../components/HorizontalFormControl";
 import { LuKeyRound, LuX } from "react-icons/lu";
 import { toaster } from "../../components/ui/toaster";
+import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 
 const getProviderDisplayName = (
   provider: string,
@@ -44,10 +45,13 @@ const getProviderDisplayName = (
 export default function AuthenticationSettings() {
   const { data: accounts, isLoading } = api.user.getLinkedAccounts.useQuery({});
   const unlinkAccount = api.user.unlinkAccount.useMutation();
+  const { organization } = useOrganizationTeamProject();
   const { data: session } = useSession();
   const publicEnv = usePublicEnv();
   const isAuthProvider = publicEnv.data?.NEXTAUTH_PROVIDER;
   const apiContext = api.useContext();
+
+  const hasSSOProvider = !!organization?.ssoProvider;
 
   if (!isAuthProvider) {
     return null;
@@ -109,12 +113,20 @@ export default function AuthenticationSettings() {
             <HorizontalFormControl
               label="Linked Sign-in Methods"
               helper={
-                <Text>
-                  You can link additional sign-in methods to your account.
-                  <br />
-                  All linked methods must use the same email address as your
-                  main account.
-                </Text>
+                !hasSSOProvider ? (
+                  <Text>
+                    You can link additional sign-in methods to your account.
+                    <br />
+                    All linked methods must use the same email address as your
+                    main account.
+                  </Text>
+                ) : (
+                  <Text>
+                    You are linked via your company&apos;s SSO provider.
+                    <br />
+                    No additional sign-in methods can be linked.
+                  </Text>
+                )
               }
             >
               {isLoading ? (
@@ -146,7 +158,11 @@ export default function AuthenticationSettings() {
                       </HStack>
                     ))}
                   </VStack>
-                  <Button onClick={handleLinkProvider} colorPalette="orange">
+                  <Button
+                    onClick={handleLinkProvider}
+                    colorPalette="orange"
+                    disabled={hasSSOProvider}
+                  >
                     Link New Sign-in Method
                   </Button>
                 </VStack>

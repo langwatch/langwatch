@@ -101,18 +101,22 @@ export const authOptions = (
         where: { email: user.email },
       });
 
-      if (existingUser?.pendingSsoSetup && account?.provider) {
-        await linkExistingUserToOAuthProvider(existingUser, account);
-
-        return true;
-      }
-
       const domain = user.email.split("@")[1];
       const orgWithSsoDomain = await prisma.organization.findFirst({
         where: {
           ssoDomain: domain,
         },
       });
+
+      if (existingUser?.pendingSsoSetup && account?.provider) {
+        await linkExistingUserToOAuthProvider(existingUser, account);
+
+        return true;
+      }
+      // If the user is trying to sign in without their SSO provider, throw an error
+      if (orgWithSsoDomain && account) {
+        await checkIfSsoProviderIsAllowed(orgWithSsoDomain, account);
+      }
 
       if (domain && account && orgWithSsoDomain && !existingUser) {
         await createUserAndAddToOrganizationAndTeams(
@@ -391,6 +395,19 @@ const linkExistingUserToOAuthProvider = async (
   }
 };
 
+const checkIfSsoProviderIsAllowed = async (
+  org: Organization,
+  provider: NextAuthAccount
+) => {
+  if (
+    org?.ssoProvider &&
+    !provider.providerAccountId.startsWith(org.ssoProvider)
+  ) {
+    throw new Error("SSO_PROVIDER_NOT_ALLOWED");
+  }
+
+  return true;
+};
 /**
  * Wrapper for `getServerSession` so that you don't need to import the `authOptions` in every file.
  *
