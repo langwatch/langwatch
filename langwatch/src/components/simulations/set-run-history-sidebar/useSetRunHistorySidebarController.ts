@@ -150,7 +150,7 @@ export const useSetRunHistorySidebarController = () => {
       limit,
       totalCount,
       totalPages,
-      hasNextPage: hasMore,
+      hasNextPage: Boolean(runData?.nextCursor),
       hasPrevPage: cursorHistory.length > 0,
       onPageChange: handlePageChange,
       onNextPage: handleNextPage,

@@ -225,19 +225,28 @@ export class ScenarioEventService {
     projectId: string;
     scenarioSetId: string;
   }): Promise<ScenarioRunData[]> {
-    // Get all batch run IDs for the scenario set
-    const allBatchRunIds =
-      await this.eventRepository.getBatchRunIdsForScenarioSet({
-        projectId,
-        scenarioSetId,
-        limit: 10000, // Get all (with reasonable cap)
-      });
+    const batchRunIds = new Set<string>();
+    let cursor: string | undefined = undefined;
+    const pageLimit = 100; // repository/server cap
+    const maxPages = 200; // safety guard (20k ids)
 
-    if (allBatchRunIds.batchRunIds.length === 0) return [];
+    for (let i = 0; i < maxPages; i++) {
+      const { batchRunIds: ids, nextCursor } =
+        await this.eventRepository.getBatchRunIdsForScenarioSet({
+          projectId,
+          scenarioSetId,
+          limit: pageLimit,
+          cursor,
+        });
+      ids.forEach((id) => batchRunIds.add(id));
+      if (!nextCursor) break;
+      cursor = nextCursor;
+    }
 
+    if (batchRunIds.size === 0) return [];
     return await this.getRunDataForBatchIds({
       projectId,
-      batchRunIds: allBatchRunIds.batchRunIds,
+      batchRunIds: Array.from(batchRunIds),
     });
   }
 
