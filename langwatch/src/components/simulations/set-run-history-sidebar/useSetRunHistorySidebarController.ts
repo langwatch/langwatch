@@ -27,7 +27,7 @@ export const useSetRunHistorySidebarController = () => {
   // Cursor-based pagination state
   const [cursor, setCursor] = useState<string | undefined>();
   const [cursorHistory, setCursorHistory] = useState<string[]>([]);
-  const limit = 2; // Fixed limit for now
+  const limit = 10; // Fixed limit for now
 
   // Reset cursor when navigating to a different scenario set
   useEffect(() => {
