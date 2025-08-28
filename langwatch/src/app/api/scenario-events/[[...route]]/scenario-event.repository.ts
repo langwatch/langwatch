@@ -361,7 +361,7 @@ export class ScenarioEventRepository {
   async getBatchRunIdsForScenarioSet({
     projectId,
     scenarioSetId,
-    limit = 1000,
+    limit = 100,
     offset = 0,
   }: {
     projectId: string;
@@ -371,6 +371,10 @@ export class ScenarioEventRepository {
   }): Promise<string[]> {
     const validatedProjectId = projectIdSchema.parse(projectId);
     const validatedScenarioSetId = scenarioIdSchema.parse(scenarioSetId);
+    const validatedLimit = z.number().int().min(1).max(100).parse(limit);
+    const validatedOffset = z.number().int().min(0).max(10_000).parse(offset);
+    const aggSize = validatedLimit + validatedOffset;
+
     const client = await this.getClient();
 
     const response = await client.search({
@@ -389,7 +393,7 @@ export class ScenarioEventRepository {
           unique_batch_runs: {
             terms: {
               field: ES_FIELDS.batchRunId,
-              size: limit + offset, // Get enough to apply offset
+              size: aggSize, // Get enough to apply offset
               // Sort by latest timestamp to get most recent batch runs first
               order: {
                 latest_timestamp: "desc",
