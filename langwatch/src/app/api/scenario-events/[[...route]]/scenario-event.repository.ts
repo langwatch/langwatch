@@ -380,7 +380,7 @@ export class ScenarioEventRepository {
     const client = await this.getClient();
 
     // Validate and clamp the limit to prevent ES result window issues
-    const actualLimit = Math.min(limit, 20); // Increased from 20 to 100
+    const actualLimit = Math.min(limit, 20);
 
     // Parse cursor to get search_after values
     let searchAfter: any[] | undefined;
