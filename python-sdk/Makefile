@@ -1,12 +1,10 @@
 .PHONY: test install example
 
 test:
-	uv pip install strands-agents==0.1.4; \
 	LANGWATCH_API_KEY="testkey" PYTHONPATH=$$PYTHONPATH:. uv run pytest -s -vv -m "not integration" $(filter-out $@,$(MAKECMDGOALS))
 
 # Call it with `make test-examples -- -k examples/openai_bot.py` to run a specific example
 test-examples:
-	uv pip install strands-agents==0.1.4; \
 	PYTHONPATH=$$PYTHONPATH:. uv run pytest tests/test_examples.py -p no:warnings -s -x $(filter-out $@,$(MAKECMDGOALS))
 
 install:
@@ -21,7 +19,6 @@ build:
 
 example:
 	@args="$(filter-out $@,$(MAKECMDGOALS))"; \
-	uv pip install strands-agents; \
 	if [[ $$args =~ "fastapi" ]]; then \
 		uv run python $$args; \
 	elif [[ $$args =~ "streamlit" ]]; then \
