@@ -450,26 +450,6 @@ export class ScenarioEventRepository {
     const buckets =
       (response.aggregations as any)?.unique_batch_runs?.buckets ?? [];
 
-    // Debug logging
-    console.log(`[DEBUG] getBatchRunIdsForScenarioSet:`, {
-      projectId: validatedProjectId,
-      scenarioSetId: validatedScenarioSetId,
-      limit,
-      actualLimit,
-      requestSize,
-      totalHits: response.hits?.total,
-      bucketsReturned: buckets.length,
-      searchAfter,
-    });
-
-    // Debug: Show first few buckets to understand the data
-    console.log(
-      `[DEBUG] First few buckets:`,
-      buckets.slice(0, 5).map((bucket: any) => ({
-        batchRunId: bucket.key.batchRunId,
-      }))
-    );
-
     // Since we're using composite aggregation, we don't need deduplication
     // Each bucket represents a unique batch run
     const batchRunData = buckets.map((bucket: any) => ({
@@ -561,15 +541,6 @@ export class ScenarioEventRepository {
     const batchRunIds = sortedBatchRuns
       .slice(0, actualLimit)
       .map((item: any) => item.batchRunId);
-
-    // Final debug logging
-    console.log(`[DEBUG] Final result:`, {
-      sortedBatchRunsLength: sortedBatchRuns.length,
-      actualLimit,
-      finalBatchRunIds: batchRunIds,
-      hasMore,
-      nextCursor: nextCursor ? "present" : "undefined",
-    });
 
     return {
       batchRunIds,
