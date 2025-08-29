@@ -60,7 +60,7 @@ export interface SetupObservabilityOptions {
          * LangWatch endpoint URL for sending traces and logs.
          * Defaults to LANGWATCH_ENDPOINT environment variable or production endpoint.
          *
-         * @default "https://api.langwatch.ai"
+         * @default "https://app.langwatch.ai"
          * @default LANGWATCH_ENDPOINT environment variable
          */
         endpoint?: string;

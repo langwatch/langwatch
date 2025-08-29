@@ -5,23 +5,18 @@ import langwatch
 
 from openinference.instrumentation.litellm import LiteLLMInstrumentor
 
-from typing import cast
 from dotenv import load_dotenv
 
 load_dotenv()
 
 import chainlit as cl
-import litellm
-from litellm import CustomStreamWrapper
-from litellm.types.utils import StreamingChoices
-from strands.telemetry.tracer import get_tracer
+from strands.telemetry import StrandsTelemetry
 
-tracer = get_tracer(
-    service_name="strands-bot",
-    otlp_endpoint=f"{os.environ.get('LANGWATCH_ENDPOINT', 'https://app.langwatch.ai')}/api/otel/v1/traces",
-    otlp_headers={"Authorization": "Bearer " + os.environ["LANGWATCH_API_KEY"]},
-    enable_console_export=True,  # Helpful for development
+strands_telemetry = StrandsTelemetry().setup_otlp_exporter(
+    endpoint="https://app.langwatch.ai/api/otel/v1/traces",
+    headers={"Authorization": f"Bearer {os.environ['LANGWATCH_API_KEY']}"},
 )
+
 
 class KiteAgent:
     def __init__(self):
