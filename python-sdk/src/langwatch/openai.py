@@ -18,7 +18,6 @@ from langwatch.utils.capture import (
     capture_chunks_with_timings_and_reyield,
 )
 from langwatch.utils.utils import milliseconds_timestamp, safe_get
-import nanoid
 from langwatch.telemetry.span import LangWatchSpan
 from langwatch.telemetry.tracing import LangWatchTrace
 
@@ -65,9 +64,7 @@ class OpenAITracer:
         if trace:
             self.trace = trace
         else:
-            self.trace = ContextTrace(
-                trace_id=trace_id or nanoid.generate(), metadata=metadata
-            )
+            self.trace = ContextTrace()
         self.completion_tracer = OpenAICompletionTracer(client=client, trace=self.trace)
         self.chat_completion_tracer = OpenAIChatCompletionTracer(
             client=client, trace=self.trace
@@ -123,9 +120,7 @@ class OpenAICompletionTracer:
         if trace:
             self.trace = trace
         else:
-            self.trace = ContextTrace(
-                trace_id=trace_id or nanoid.generate(), metadata=metadata
-            )
+            self.trace = ContextTrace()
         self.tracked_traces.add(self.trace)
 
         if not hasattr(self.client.completions, "_original_create"):
@@ -403,9 +398,7 @@ class OpenAIChatCompletionTracer:
         if trace:
             self.trace = trace
         else:
-            self.trace = ContextTrace(
-                trace_id=trace_id or nanoid.generate(), metadata=metadata
-            )
+            self.trace = ContextTrace()
         self.tracked_traces.add(self.trace)
 
         if not hasattr(self.client.chat.completions, "_original_create"):

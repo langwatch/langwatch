@@ -38,6 +38,7 @@ dependencies = [
     "python-liquid>=2.0.2",
     "pydantic>=2",
     "attrs>=24",
+    "pksuid>=1.1.2",
 ]
 
 [project.optional-dependencies]
@@ -82,7 +83,6 @@ examples = [
     "openinference-instrumentation-dspy>=0.1.23,<0.2.0",
     "opentelemetry-instrumentation-fastapi>=0.53b1",
     "langgraph>=0.2.35,<0.3.0",
-    "nanoid>=2.0.0",
     "openai>=1.68.2",
     "pydantic>=1,<2.10.2", # v2.10.2 is broken for chainlit
     "pytest>=7.4.2,<8.0.0",
