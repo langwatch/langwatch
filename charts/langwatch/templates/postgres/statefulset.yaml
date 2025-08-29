@@ -1,3 +1,4 @@
+{{- if .Values.postgres.enabled }}
 # StatefulSet for PostgreSQL database
 apiVersion: apps/v1
 kind: StatefulSet
@@ -75,3 +76,4 @@ spec:
           requests:
             storage: {{ .Values.postgres.persistence.size }}
   {{- end }}
+{{- end }}

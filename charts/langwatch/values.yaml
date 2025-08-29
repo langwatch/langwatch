@@ -134,6 +134,7 @@ langevals:
       memory: 6144Mi
 
 postgres:
+  enabled: true # Set to false to disable built-in PostgreSQL and use external database
   service:
     type: ClusterIP
     port: 5432
@@ -154,6 +155,7 @@ postgres:
     storageClass: ""
 
 redis:
+  enabled: true # Set to false to disable built-in Redis and use external Redis service
   service:
     type: ClusterIP
     port: 6379
@@ -170,6 +172,7 @@ redis:
     storageClass: ""
 
 opensearch:
+  enabled: true
   service:
     type: ClusterIP
     ports:
