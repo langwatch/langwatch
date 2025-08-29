@@ -468,16 +468,6 @@ export class ScenarioEventRepository {
       }
     }
 
-    // Debug logging for deduplication
-    console.log(`[DEBUG] Deduplication results:`, {
-      totalHits: hits.length,
-      uniqueBatchRuns: batchRunMap.size,
-      // batchRunIds: Array.from(batchRunMap.keys()), // Commented out to reduce noise
-      // sampleTimestamps: Array.from(batchRunMap.entries())
-      //   .slice(0, 3)
-      //   .map(([id, data]) => ({ id, timestamp: data.timestamp })),
-    });
-
     // Convert to array and sort by timestamp descending, then by batch run ID
     const sortedBatchRuns = Array.from(batchRunMap.entries()).sort(
       ([keyA, a], [keyB, b]) => {
@@ -847,11 +837,19 @@ export class ScenarioEventRepository {
 
     const results = new Map<string, ScenarioMessageSnapshotEvent>();
 
+    const buckets =
+      (response.aggregations as any)?.by_scenario_run?.buckets ?? [];
     for (const bucket of buckets) {
       const hit = bucket.latest_event.hits.hits[0];
       if (hit) {
         const rawResult = hit._source as Record<string, unknown>;
         if (rawResult) {
+          const event = transformFromElasticsearch(
+            rawResult
+          ) as ScenarioMessageSnapshotEvent;
+          const scenarioRunId = event.scenarioRunId;
+          results.set(scenarioRunId, event);
+        }
       }
     }
 
@@ -885,6 +883,7 @@ export class ScenarioEventRepository {
 
     const client = await this.getClient();
 
+    // Use terms aggregation with top_hits for better performance than collapse
     const response = await client.search({
       index: this.indexName,
       body: {
