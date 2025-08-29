@@ -399,16 +399,11 @@ export class ScenarioEventRepository {
           searchAfter = cursorData;
         }
       } catch (e) {
-        // Try legacy JSON cursor format for backward compatibility
-        try {
-          const cursorData = JSON.parse(cursor);
-          if (cursorData.searchAfter && Array.isArray(cursorData.searchAfter)) {
-            searchAfter = cursorData.searchAfter;
-          }
-        } catch (legacyError) {
-          Sentry.captureException(legacyError);
-          // Invalid cursor in both formats, start from beginning
-        }
+        Sentry.captureException({
+          message: "Malformed cursor",
+          cursor,
+          error: e,
+        });
       }
     }
 
