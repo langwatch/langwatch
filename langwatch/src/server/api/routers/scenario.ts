@@ -111,4 +111,23 @@ export const scenarioRouter = createTRPCRouter({
       });
       return { data };
     }),
+
+  // Get scenario run data for a specific batch run
+  getBatchRunData: protectedProcedure
+    .input(
+      projectSchema.extend({
+        scenarioSetId: z.string(),
+        batchRunId: z.string(),
+      })
+    )
+    .use(checkUserPermissionForProject(TeamRoleGroup.SCENARIOS_VIEW))
+    .query(async ({ input, ctx }) => {
+      const scenarioRunnerService = new ScenarioEventService();
+      const data = await scenarioRunnerService.getRunDataForBatchRun({
+        projectId: input.projectId,
+        scenarioSetId: input.scenarioSetId,
+        batchRunId: input.batchRunId,
+      });
+      return data;
+    }),
 });

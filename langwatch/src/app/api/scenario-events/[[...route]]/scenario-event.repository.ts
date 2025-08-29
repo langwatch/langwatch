@@ -17,8 +17,9 @@ import {
 } from "./utils/elastic-search-transformers";
 import * as Sentry from "@sentry/nextjs";
 
+import { batchRunIdSchema, scenarioRunIdSchema } from "./schemas/event-schemas";
+
 const projectIdSchema = z.string();
-const scenarioRunIdSchema = z.string();
 const scenarioIdSchema = z.string();
 
 /**
@@ -563,6 +564,56 @@ export class ScenarioEventRepository {
   }
 
   /**
+   * Retrieves all scenario run IDs associated with a specific batch run.
+   * Used to find all scenario runs that were part of a specific batch execution.
+   *
+   * @param projectId - The project identifier
+   * @param scenarioSetId - The scenario set identifier
+   * @param batchRunId - The specific batch run ID to search for
+   * @returns Array of scenario run IDs
+   * @throws {z.ZodError} If validation fails for projectId
+   */
+  async getScenarioRunIdsForBatchRun({
+    projectId,
+    scenarioSetId,
+    batchRunId,
+  }: {
+    projectId: string;
+    scenarioSetId: string;
+    batchRunId: string;
+  }): Promise<string[]> {
+    const validatedProjectId = projectIdSchema.parse(projectId);
+    const validatedScenarioSetId = scenarioIdSchema.parse(scenarioSetId);
+    const validatedBatchRunId = batchRunIdSchema.parse(batchRunId);
+    const client = await this.getClient();
+
+    const response = await client.search({
+      index: this.indexName,
+      body: {
+        query: {
+          bool: {
+            filter: [
+              { term: { [ES_FIELDS.projectId]: validatedProjectId } },
+              { term: { [ES_FIELDS.scenarioSetId]: validatedScenarioSetId } },
+              { term: { [ES_FIELDS.batchRunId]: validatedBatchRunId } },
+            ],
+          },
+        },
+        size: 10000, // Large size to get all scenario runs for this batch
+        sort: [{ timestamp: { order: "desc" } }],
+      },
+    });
+
+    const hits = response.hits?.hits ?? [];
+    return hits
+      .map((hit) => {
+        const source = hit._source as Record<string, any>;
+        return source?.scenario_run_id as string;
+      })
+      .filter(Boolean);
+  }
+
+  /**
    * Retrieves all scenario run IDs associated with a list of batch runs.
    * Used to find all scenario runs that were part of specific batch executions.
    *
@@ -719,33 +770,43 @@ export class ScenarioEventRepository {
             ],
           },
         },
-        sort: [{ timestamp: "desc" }],
-        collapse: {
-          field: ES_FIELDS.scenarioRunId,
-          inner_hits: {
-            name: "latest",
-            size: 1,
-            sort: [{ timestamp: "desc" }],
+        aggs: {
+          by_scenario_run: {
+            terms: {
+              field: ES_FIELDS.scenarioRunId,
+              size: 1000, // Limit to prevent timeouts
+            },
+            aggs: {
+              latest_event: {
+                top_hits: {
+                  size: 1,
+                  sort: [{ timestamp: "desc" }],
+                },
+              },
+            },
           },
         },
-        size: Math.min(validatedScenarioRunIds.length, 10000),
+        size: 0, // We only need aggregation results
       },
     });
 
     const results = new Map<string, ScenarioRunStartedEvent>();
 
-    for (const hit of response.hits.hits) {
-      const rawResult = ((hit as any).inner_hits?.latest?.hits?.hits?.[0]
-        ?._source ?? hit._source) as Record<string, unknown>;
-      if (rawResult) {
-        const event = transformFromElasticsearch(
-          rawResult
-        ) as ScenarioRunStartedEvent;
-        const scenarioRunId = event.scenarioRunId;
-        results.set(scenarioRunId, event);
+    const buckets =
+      (response.aggregations as any)?.by_scenario_run?.buckets ?? [];
+    for (const bucket of buckets) {
+      const hit = bucket.latest_event.hits.hits[0];
+      if (hit) {
+        const rawResult = hit._source as Record<string, unknown>;
+        if (rawResult) {
+          const event = transformFromElasticsearch(
+            rawResult
+          ) as ScenarioRunStartedEvent;
+          const scenarioRunId = event.scenarioRunId;
+          results.set(scenarioRunId, event);
+        }
       }
     }
-
     return results;
   }
 
@@ -789,33 +850,43 @@ export class ScenarioEventRepository {
             ],
           },
         },
-        sort: [{ timestamp: "desc" }],
-        collapse: {
-          field: ES_FIELDS.scenarioRunId,
-          inner_hits: {
-            name: "latest",
-            size: 1,
-            sort: [{ timestamp: "desc" }],
+        aggs: {
+          by_scenario_run: {
+            terms: {
+              field: ES_FIELDS.scenarioRunId,
+              size: 1000, // Limit to prevent timeouts
+            },
+            aggs: {
+              latest_event: {
+                top_hits: {
+                  size: 1,
+                  sort: [{ timestamp: "desc" }],
+                },
+              },
+            },
           },
         },
-        size: Math.min(validatedScenarioRunIds.length, 10000),
+        size: 0, // We only need aggregation results
       },
     });
 
     const results = new Map<string, ScenarioMessageSnapshotEvent>();
 
-    for (const hit of response.hits.hits) {
-      const rawResult = ((hit as any).inner_hits?.latest?.hits?.hits?.[0]
-        ?._source ?? hit._source) as Record<string, unknown>;
-      if (rawResult) {
-        const event = transformFromElasticsearch(
-          rawResult
-        ) as ScenarioMessageSnapshotEvent;
-        const scenarioRunId = event.scenarioRunId;
-        results.set(scenarioRunId, event);
+    const buckets =
+      (response.aggregations as any)?.by_scenario_run?.buckets ?? [];
+    for (const bucket of buckets) {
+      const hit = bucket.latest_event.hits.hits[0];
+      if (hit) {
+        const rawResult = hit._source as Record<string, unknown>;
+        if (rawResult) {
+          const event = transformFromElasticsearch(
+            rawResult
+          ) as ScenarioMessageSnapshotEvent;
+          const scenarioRunId = event.scenarioRunId;
+          results.set(scenarioRunId, event);
+        }
       }
     }
-
     return results;
   }
 
@@ -859,33 +930,43 @@ export class ScenarioEventRepository {
             ],
           },
         },
-        sort: [{ timestamp: "desc" }],
-        collapse: {
-          field: ES_FIELDS.scenarioRunId,
-          inner_hits: {
-            name: "latest",
-            size: 1,
-            sort: [{ timestamp: "desc" }],
+        aggs: {
+          by_scenario_run: {
+            terms: {
+              field: ES_FIELDS.scenarioRunId,
+              size: 1000, // Limit to prevent timeouts
+            },
+            aggs: {
+              latest_event: {
+                top_hits: {
+                  size: 1,
+                  sort: [{ timestamp: "desc" }],
+                },
+              },
+            },
           },
         },
-        size: Math.min(validatedScenarioRunIds.length, 10000),
+        size: 0, // We only need aggregation results
       },
     });
 
     const results = new Map<string, ScenarioRunFinishedEvent>();
 
-    for (const hit of response.hits.hits) {
-      const rawResult = ((hit as any).inner_hits?.latest?.hits?.hits?.[0]
-        ?._source ?? hit._source) as Record<string, unknown>;
-      if (rawResult) {
-        const event = transformFromElasticsearch(
-          rawResult
-        ) as ScenarioRunFinishedEvent;
-        const scenarioRunId = event.scenarioRunId;
-        results.set(scenarioRunId, event);
+    const buckets =
+      (response.aggregations as any)?.by_scenario_run?.buckets ?? [];
+    for (const bucket of buckets) {
+      const hit = bucket.latest_event.hits.hits[0];
+      if (hit) {
+        const rawResult = hit._source as Record<string, unknown>;
+        if (rawResult) {
+          const event = transformFromElasticsearch(
+            rawResult
+          ) as ScenarioRunFinishedEvent;
+          const scenarioRunId = event.scenarioRunId;
+          results.set(scenarioRunId, event);
+        }
       }
     }
-
     return results;
   }
 
