@@ -102,6 +102,10 @@ app:
     CRON_API_KEY: "" # Users must provide this value for cronjob authentication
     METRICS_API_KEY: "" # Set this for metrics authentication (will be stored in Kubernetes Secret)
     # SENDGRID_API_KEY: ""  # Optional
+    # SSO Configuration (Azure AD example)
+    # AZURE_AD_CLIENT_ID: "" # Set for Azure AD SSO
+    # AZURE_AD_CLIENT_SECRET: "" # Set for Azure AD SSO
+    # NEXTAUTH_PROVIDERS: "" # JSON string for SSO providers
 
 langwatch_nlp:
   replicaCount: 1
