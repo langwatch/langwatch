@@ -1,3 +1,4 @@
+{{- if .Values.opensearch.enabled }}
 # Service for OpenSearch
 apiVersion: v1
 kind: Service
@@ -18,3 +19,4 @@ spec:
   selector:
     app.kubernetes.io/name: {{ .Release.Name }}-opensearch
     app.kubernetes.io/instance: {{ .Release.Name }}
+{{- end }}

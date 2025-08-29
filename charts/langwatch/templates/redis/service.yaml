@@ -1,3 +1,4 @@
+{{- if .Values.redis.enabled }}
 # Service for Redis
 apiVersion: v1
 kind: Service
@@ -16,3 +17,4 @@ spec:
   selector:
     app.kubernetes.io/name: {{ .Release.Name }}-redis
     app.kubernetes.io/instance: {{ .Release.Name }}
+{{- end }}
