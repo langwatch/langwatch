@@ -121,71 +121,20 @@ EOF
 
 The chart includes a production-ready values file. Here's how to use it:
 
-#### Step 1: Copy and Customize Production Values
+#### Step 1: Create Production Values File
+
+Since you may not have cloned this repository, create your production values file based on the example below:
 
 ```bash
-# Copy the production values file
-cp values-production.yaml my-production-values.yaml
-
-# Edit the file with your specific configuration
-vim my-production-values.yaml
+# Create your production values file
+vim values-production.yaml
 ```
 
-#### Step 2: Customize the Production Values
+#### Step 2: Use the Production Values Template
 
-```yaml
-# my-production-values.yaml
-global:
-  env: production
-  monitoring:
-    enabled: true
+Copy the following production-ready configuration into your `values-production.yaml` file. You can use the [values-production.example.yaml](values-production.example.yaml) as a template to build from.
 
-app:
-  replicaCount: 2
-  resources:
-    requests:
-      cpu: 200m
-      memory: 1Gi
-    limits:
-      cpu: 1000m
-      memory: 2Gi
-  env:
-    # Update these with your actual values
-    BASE_HOST: "https://langwatch.yourcompany.com"
-    NEXTAUTH_URL: "https://langwatch.yourcompany.com"
-    DATABASE_URL: "postgresql://langwatch_user:secure_password@your-postgres-host:5432/langwatch?sslmode=require"
-    REDIS_URL: "redis://:redis_password@your-redis-host:6379/0"
-
-# External services configuration
-postgres:
-  enabled: false  # Using external PostgreSQL
-
-redis:
-  enabled: false  # Using external Redis
-
-# Monitoring configuration
-prometheus:
-  enabled: true
-  storage:
-    size: 10Gi
-  retention: 30d
-
-# Ingress configuration
-ingress:
-  enabled: true
-  className: "nginx"
-  hosts:
-    - host: langwatch.yourcompany.com
-      http:
-        paths:
-          - path: /
-            pathType: Prefix
-            backend:
-              service:
-                name: langwatch-app
-                port:
-                  number: 5560
-```
+**Note:** This configuration completely replaces the default values. You don't need to merge it with `values.yaml` - Helm will automatically handle the merging when you use the `-f` flag.
 
 #### Step 3: Deploy with Production Values
 
@@ -197,8 +146,7 @@ export CRON_API_KEY=$(openssl rand -base64 32)
 export METRICS_API_KEY=$(openssl rand -base64 32)
 
 # Deploy with production values and secrets
-helm install langwatch ./langwatch \
-  -f my-production-values.yaml \
+helm install langwatch ./langwatch -f values-production.yaml \
   --set app.env.NEXTAUTH_SECRET=$NEXTAUTH_SECRET \
   --set app.env.API_TOKEN_JWT_SECRET=$API_TOKEN_JWT_SECRET \
   --set app.env.CRON_API_KEY=$CRON_API_KEY \
