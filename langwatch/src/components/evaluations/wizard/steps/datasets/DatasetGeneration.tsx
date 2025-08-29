@@ -63,7 +63,7 @@ export function DatasetGeneration() {
   const [isReady, setIsReady] = useState(false);
   const [input, setInput] = useState("");
 
-  const { messages, sendMessage, status } = useChat({
+  const { messages, sendMessage, addToolResult, status } = useChat({
     transport: new DefaultChatTransport({
       api: "/api/dataset/generate",
     }),
@@ -149,9 +149,9 @@ export function DatasetGeneration() {
           const rowData = Object.fromEntries(
             columnNames.map((col, index) => [col, row[index]])
           );
-          if (!rowData.id) {
-            rowData.id = `${Date.now()}-${nanoid()}`;
-          }
+                      if (!rowData.id) {
+              rowData.id = nanoid();
+            }
 
           gridApi.applyTransaction({
             add: [rowData],
@@ -236,13 +236,12 @@ export function DatasetGeneration() {
             closable: true,
           },
         });
-        return { error: `Unknown tool: ${toolCall.toolName}` };
+        throw new Error(`Unknown tool: ${toolCall.toolName}`);
       }
 
-      let result: any;
       try {
-        // Access the arguments from the tool call
-        result = await tool(toolCall.input as any);
+        const result = await tool(toolCall.input as any);
+        void addToolResult({ tool: toolCall.toolName, toolCallId: toolCall.toolCallId, output: result });
       } catch (error) {
         console.error("Error executing tool", error);
         toaster.create({
@@ -255,8 +254,6 @@ export function DatasetGeneration() {
           },
         });
       }
-
-      return result;
     },
   });
 
@@ -313,6 +310,13 @@ export function DatasetGeneration() {
             {
               onSuccess: () => resolve(),
               onError: (error) => {
+                // Don't show error toast for unique constraint violations as they're expected
+                if (error?.message?.includes('Unique constraint failed')) {
+                  console.warn('Record already exists, skipping:', update.id);
+                  resolve();
+                  return;
+                }
+                
                 toaster.create({
                   title: "Error updating record.",
                   description: "Changes will be reverted, please try again",
@@ -326,6 +330,9 @@ export function DatasetGeneration() {
             }
           );
         });
+
+        // Small delay to prevent race conditions
+        await new Promise(resolve => setTimeout(resolve, 50));
       } catch (error) {
         console.error("Error processing update queue:", error);
         break;
@@ -350,8 +357,8 @@ export function DatasetGeneration() {
               datasetId: datasetId,
             },
           });
+          console.error("Error processing queue during upsert:", error);
         });
-        console.error("Error processing queue during upsert:", error);
       }
     },
     [datasetId, processQueue]
