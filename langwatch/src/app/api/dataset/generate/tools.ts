@@ -42,6 +42,5 @@ export const deleteRow = tool({
 export const tools = {
   addRow,
   updateRow,
-  // changeColumns,
   deleteRow,
 };
