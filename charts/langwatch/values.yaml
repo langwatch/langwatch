@@ -102,6 +102,10 @@ app:
     CRON_API_KEY: "" # Users must provide this value for cronjob authentication
     METRICS_API_KEY: "" # Set this for metrics authentication (will be stored in Kubernetes Secret)
     # SENDGRID_API_KEY: ""  # Optional
+    # SSO Configuration (Azure AD example)
+    # AZURE_AD_CLIENT_ID: "" # Set for Azure AD SSO
+    # AZURE_AD_CLIENT_SECRET: "" # Set for Azure AD SSO
+    # NEXTAUTH_PROVIDERS: "" # JSON string for SSO providers
 
 langwatch_nlp:
   replicaCount: 1
@@ -134,6 +138,7 @@ langevals:
       memory: 6144Mi
 
 postgres:
+  enabled: true # Set to false to disable built-in PostgreSQL and use external database
   service:
     type: ClusterIP
     port: 5432
@@ -154,6 +159,7 @@ postgres:
     storageClass: ""
 
 redis:
+  enabled: true # Set to false to disable built-in Redis and use external Redis service
   service:
     type: ClusterIP
     port: 6379
@@ -170,6 +176,7 @@ redis:
     storageClass: ""
 
 opensearch:
+  enabled: true
   service:
     type: ClusterIP
     ports:

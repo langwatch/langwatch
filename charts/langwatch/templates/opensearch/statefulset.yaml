@@ -1,3 +1,4 @@
+{{- if .Values.opensearch.enabled }}
 # StatefulSet for OpenSearch
 apiVersion: apps/v1
 kind: StatefulSet
@@ -81,3 +82,4 @@ spec:
           requests:
             storage: {{ .Values.opensearch.persistence.size }}
   {{- end }}
+{{- end }}
