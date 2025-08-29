@@ -111,7 +111,9 @@ export class ScenarioEventService {
   }
 
   /**
-   * Retrieves run data for all runs of a specific scenario.
+   * Retrieves run data for a specific scenario (by scenarioId).
+   * Single Responsibility: fetch run data for one scenario without mixing set-level concerns.
+   * Note: Temporary implementation; optimize batching later.
    * @param {Object} params - The parameters for retrieving scenario run data
    * @param {string} params.projectId - The ID of the project
    * @param {string} params.scenarioId - The ID of the scenario
@@ -156,43 +158,107 @@ export class ScenarioEventService {
   }
 
   /**
-   * Retrieves run data for all scenarios in a scenario set.
+   * Retrieves run data for all scenarios in a scenario set with cursor-based pagination.
    * Note: This is a temporary implementation that may be optimized in the future.
    * TODO: Optimize this.
    * @param {Object} params - The parameters for retrieving run data
    * @param {string} params.projectId - The ID of the project
    * @param {string} params.scenarioSetId - The ID of the scenario set
-   * @returns {Promise<ScenarioRunData[]>} Array of scenario run data
+   * @param {number} [params.limit] - Maximum number of runs to return
+   * @param {string} [params.cursor] - Cursor for pagination
+   * @returns {Promise<{runs: ScenarioRunData[], nextCursor?: string, hasMore: boolean}>} Paginated scenario run data
    */
   async getRunDataForScenarioSet({
     projectId,
     scenarioSetId,
     limit = 20,
-    offset = 0,
+    cursor,
   }: {
     projectId: string;
     scenarioSetId: string;
     limit?: number;
-    offset?: number;
+    cursor?: string;
   }) {
-    // Use provided batchRunIds or fetch them for the scenario set
-    const resolvedBatchRunIds =
-      await this.eventRepository.getBatchRunIdsForScenarioSet({
-        projectId,
-        scenarioSetId,
-      });
+    // Validate limit to prevent abuse
+    const validatedLimit = Math.min(Math.max(1, limit), 100);
 
-    if (resolvedBatchRunIds.length === 0) return [];
+    // Use the new cursor-based repository method
+    const result = await this.eventRepository.getBatchRunIdsForScenarioSet({
+      projectId,
+      scenarioSetId,
+      limit: validatedLimit,
+      cursor,
+    });
 
-    // Apply pagination to batch run IDs
-    const paginatedBatchRunIds = resolvedBatchRunIds.slice(
-      offset,
-      offset + limit
-    );
+    if (result.batchRunIds.length === 0) {
+      return {
+        runs: [],
+        nextCursor: undefined,
+        hasMore: false,
+      };
+    }
 
+    const runs = await this.getRunDataForBatchIds({
+      projectId,
+      batchRunIds: result.batchRunIds,
+    });
+
+    return {
+      runs,
+      nextCursor: result.nextCursor,
+      hasMore: result.hasMore,
+    };
+  }
+
+  /**
+   * Retrieves ALL run data for a scenario set without pagination.
+   * Used when the full dataset is needed (e.g., for simulation grids).
+   * @param {Object} params - The parameters for retrieving run data
+   * @param {string} params.projectId - The ID of the project
+   * @param {string} params.scenarioSetId - The ID of the scenario set
+   * @returns {Promise<ScenarioRunData[]>} Array of all scenario run data
+   */
+  async getAllRunDataForScenarioSet({
+    projectId,
+    scenarioSetId,
+  }: {
+    projectId: string;
+    scenarioSetId: string;
+  }): Promise<ScenarioRunData[]> {
+    const batchRunIds = new Set<string>();
+    let cursor: string | undefined = undefined;
+    const pageLimit = 100; // repository/server cap
+    const maxPages = 200; // safety guard (20k ids)
+    let truncated = false;
+
+    for (let i = 0; i < maxPages; i++) {
+      const { batchRunIds: ids, nextCursor } =
+        await this.eventRepository.getBatchRunIdsForScenarioSet({
+          projectId,
+          scenarioSetId,
+          limit: pageLimit,
+          cursor,
+        });
+      if (ids.length === 0) break;
+      ids.forEach((id) => batchRunIds.add(id));
+      if (!nextCursor || nextCursor === cursor) break;
+      if (i === maxPages - 1 && nextCursor) {
+        truncated = true;
+        break;
+      }
+      cursor = nextCursor;
+    }
+    if (truncated) {
+      throw new Error(
+        `Too many runs to fetch exhaustively (cap ${maxPages * pageLimit}). ` +
+          "Refine filters or use the paginated API."
+      );
+    }
+
+    if (batchRunIds.size === 0) return [];
     return await this.getRunDataForBatchIds({
       projectId,
-      batchRunIds: paginatedBatchRunIds,
+      batchRunIds: Array.from(batchRunIds),
     });
   }
 
@@ -319,12 +385,9 @@ export class ScenarioEventService {
     projectId: string;
     scenarioSetId: string;
   }): Promise<number> {
-    const batchRunIds = await this.eventRepository.getBatchRunIdsForScenarioSet(
-      {
-        projectId,
-        scenarioSetId,
-      }
-    );
-    return batchRunIds.length;
+    return await this.eventRepository.getBatchRunCountForScenarioSet({
+      projectId,
+      scenarioSetId,
+    });
   }
 }

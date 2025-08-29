@@ -17,7 +17,7 @@ export default function SimulationSetPage() {
   const { batchRunId, goToSimulationBatchRuns } = useSimulationRouter();
 
   const { data: scenarioSetData } =
-    api.scenarios.getScenarioSetRunData.useQuery(
+    api.scenarios.getAllScenarioSetRunData.useQuery(
       {
         projectId: project?.id ?? "",
         scenarioSetId: scenarioSetId ?? "",
