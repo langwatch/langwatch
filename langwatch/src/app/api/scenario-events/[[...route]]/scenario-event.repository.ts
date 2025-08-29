@@ -389,12 +389,9 @@ export class ScenarioEventRepository {
         const decodedCursor = Buffer.from(cursor, "base64").toString("utf-8");
         const cursorData = JSON.parse(decodedCursor);
 
-        // Validate cursor shape - expected: [batchRunId:string] for composite aggregation
-        if (
-          Array.isArray(cursorData) &&
-          cursorData.length === 1 &&
-          typeof cursorData[0] === "string"
-        ) {
+        // Validate cursor shape - expected: sort values from search results
+        // These come from Elasticsearch's sort values for the documents
+        if (Array.isArray(cursorData) && cursorData.length > 0) {
           searchAfter = cursorData;
         }
       } catch (e) {
@@ -409,10 +406,10 @@ export class ScenarioEventRepository {
 
     // Request more items to account for potential deduplication
     // We need to ensure we get enough unique batch runs after deduplication
-    const requestSize = Math.max(actualLimit * 3, 50); // Request 3x the limit or at least 50
+    const requestSize = Math.max(actualLimit * 5, 1000); // Request 5x the limit or at least 1000
 
-    // Use composite aggregation to get unique batch run IDs
-    // This ensures we get diverse batch runs instead of potentially many events from the same batch run
+    // Use search_after with manual deduplication for reliable pagination
+    // This approach is more reliable than collapse with search_after
     const response = await client.search({
       index: this.indexName,
       body: {
@@ -425,122 +422,103 @@ export class ScenarioEventRepository {
             ],
           },
         },
-        aggs: {
-          unique_batch_runs: {
-            composite: {
-              size: requestSize,
-              ...(searchAfter && { after: { batchRunId: searchAfter[0] } }),
-              sources: [
-                {
-                  batchRunId: {
-                    terms: {
-                      field: ES_FIELDS.batchRunId,
-                    },
-                  },
-                },
-              ],
-            },
-          },
-        },
-        size: 0, // We don't need the actual documents, just the aggregation
+        sort: [
+          { timestamp: { order: "desc" } },
+          { [ES_FIELDS.batchRunId]: { order: "asc" } }, // Tiebreaker for stable sorting
+        ],
+        size: requestSize,
+        ...(searchAfter && { search_after: searchAfter }),
       },
     });
 
-    // Extract batch run data from the aggregation
-    const buckets =
-      (response.aggregations as any)?.unique_batch_runs?.buckets ?? [];
+    const hits = response.hits?.hits ?? [];
 
-    // Since we're using composite aggregation, we don't need deduplication
-    // Each bucket represents a unique batch run
-    const batchRunData = buckets.map((bucket: any) => ({
-      batchRunId: bucket.key.batchRunId as string,
-      timestamp: 0, // We'll get the actual timestamp in the next step
-      sort: [], // No direct sort values for composite aggregation
-      hit: bucket, // Keep the bucket for cursor generation
-    }));
-
-    // Now we need to get the latest timestamp for each batch run
-    // We'll do this by querying each batch run ID to get its latest event
-    const uniqueBatchRunIds = batchRunData.map((item: any) => item.batchRunId);
-
-    // Get the latest timestamp for each batch run
-    const timestampResponse = await client.search({
-      index: this.indexName,
-      body: {
-        query: {
-          bool: {
-            filter: [
-              { term: { [ES_FIELDS.projectId]: validatedProjectId } },
-              { terms: { [ES_FIELDS.batchRunId]: uniqueBatchRunIds } },
-            ],
-          },
-        },
-        aggs: {
-          batch_run_timestamps: {
-            terms: {
-              field: ES_FIELDS.batchRunId,
-              size: uniqueBatchRunIds.length,
-            },
-            aggs: {
-              latest_timestamp: {
-                max: {
-                  field: "timestamp",
-                },
-              },
-            },
-          },
-        },
-        size: 0,
-      },
-    });
-
-    const timestampBuckets =
-      (timestampResponse.aggregations as any)?.batch_run_timestamps?.buckets ??
-      [];
-
-    // Create a map of batch run ID to latest timestamp
-    const timestampMap = new Map<string, number>();
-    for (const bucket of timestampBuckets) {
-      timestampMap.set(bucket.key, bucket.latest_timestamp.value);
+    // Debug: Show distribution of batch runs in raw data
+    const batchRunDistribution = new Map<string, number>();
+    for (const hit of hits) {
+      const source = hit._source as Record<string, any>;
+      const batchRunId = source?.batch_run_id as string;
+      if (batchRunId) {
+        batchRunDistribution.set(
+          batchRunId,
+          (batchRunDistribution.get(batchRunId) ?? 0) + 1
+        );
+      }
     }
 
-    // Update batch run data with actual timestamps
-    const enrichedBatchRunData = batchRunData.map((item: any) => ({
-      ...item,
-      timestamp: timestampMap.get(item.batchRunId) ?? 0,
-    }));
+    // Manual deduplication by batch run ID, keeping the latest timestamp for each
+    const batchRunMap = new Map<
+      string,
+      { timestamp: number; sort: any[]; hit: any }
+    >();
 
-    // Sort by timestamp descending, then by batch run ID
-    const sortedBatchRuns = enrichedBatchRunData.sort(
-      (a: any, b: any) =>
-        b.timestamp - a.timestamp || a.batchRunId.localeCompare(b.batchRunId)
+    for (const hit of hits) {
+      const source = hit._source as Record<string, any>;
+      const batchRunId = source?.batch_run_id as string;
+      const timestamp = source?.timestamp as number;
+
+      if (batchRunId && timestamp !== undefined) {
+        const existing = batchRunMap.get(batchRunId);
+        if (!existing || timestamp > existing.timestamp) {
+          // Ensure we have valid sort values for pagination
+          const sortValues = hit.sort;
+          if (Array.isArray(sortValues) && sortValues.length > 0) {
+            batchRunMap.set(batchRunId, {
+              timestamp,
+              sort: sortValues,
+              hit: hit,
+            });
+          }
+        }
+      }
+    }
+
+    // Convert to array and sort by timestamp descending, then by batch run ID
+    const sortedBatchRuns = Array.from(batchRunMap.entries()).sort(
+      ([keyA, a], [keyB, b]) => {
+        if (b.timestamp !== a.timestamp) {
+          return b.timestamp - a.timestamp;
+        }
+        return String(keyA) < String(keyB)
+          ? -1
+          : String(keyA) > String(keyB)
+          ? 1
+          : 0;
+      }
     );
 
     // Determine if there are more results
-    // We have more if we got the full requested size from ES (indicating more data available)
+    // We have more if we got the full requested size from the aggregation
     // OR if we have more unique batch runs than requested
     const hasMore =
-      buckets.length >= requestSize || sortedBatchRuns.length > actualLimit;
+      hits.length >= requestSize || sortedBatchRuns.length > actualLimit;
+
     let nextCursor: string | undefined;
 
     if (hasMore && sortedBatchRuns.length > actualLimit) {
       // Get the sort values from the extra item in the deduplicated results
       const extraItem = sortedBatchRuns[actualLimit];
       if (extraItem) {
-        const searchAfterValues = [
-          extraItem.batchRunId, // batch run ID for composite aggregation pagination
-        ];
-        // Encode cursor as base64 for stability and compactness
-        nextCursor = Buffer.from(JSON.stringify(searchAfterValues)).toString(
-          "base64"
-        );
+        // Use the sort values from the hit for search_after pagination
+        const searchAfterValues = extraItem[1].sort;
+
+        if (
+          Array.isArray(searchAfterValues) &&
+          searchAfterValues.length > 0 &&
+          searchAfterValues.every((val: any) => val !== undefined)
+        ) {
+          // Encode cursor as base64 for stability and compactness
+          nextCursor = Buffer.from(JSON.stringify(searchAfterValues)).toString(
+            "base64"
+          );
+        }
       }
     }
 
     // Slice to actualLimit before returning
     const batchRunIds = sortedBatchRuns
       .slice(0, actualLimit)
-      .map((item: any) => item.batchRunId);
+      .map((item: any) => item[0]); // item[0] is the batchRunId key from the Map entry
 
     return {
       batchRunIds,
@@ -617,6 +595,21 @@ export class ScenarioEventRepository {
       return [];
     }
 
+    // Validate that all batchRunIds are valid strings
+    const validBatchRunIds = batchRunIds.filter(
+      (id) => typeof id === "string" && id.length > 0
+    );
+    if (validBatchRunIds.length !== batchRunIds.length) {
+      Sentry.captureException({
+        message: "Invalid batchRunIds",
+        batchRunIds,
+      });
+    }
+
+    if (validBatchRunIds.length === 0) {
+      return [];
+    }
+
     const client = await this.getClient();
 
     const response = await client.search({
@@ -626,7 +619,7 @@ export class ScenarioEventRepository {
           bool: {
             must: [
               { term: { [ES_FIELDS.projectId]: projectId } },
-              { terms: { [ES_FIELDS.batchRunId]: batchRunIds } },
+              { terms: { [ES_FIELDS.batchRunId]: validBatchRunIds } },
               { exists: { field: ES_FIELDS.scenarioRunId } },
             ],
           },
