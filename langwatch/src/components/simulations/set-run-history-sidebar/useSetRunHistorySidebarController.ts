@@ -29,7 +29,7 @@ export const useSetRunHistorySidebarController = () => {
   const [cursorHistory, setCursorHistory] = useState<(string | undefined)[]>(
     []
   );
-  const limit = 2; // Fixed limit for now
+  const limit = 8; // Fixed limit for now
 
   // Reset cursor when navigating to a different scenario set
   useEffect(() => {

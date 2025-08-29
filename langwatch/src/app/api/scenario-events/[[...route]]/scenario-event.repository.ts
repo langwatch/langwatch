@@ -216,7 +216,7 @@ export class ScenarioEventRepository {
         aggs: {
           unique_runs: {
             composite: {
-              size: 1000,
+              size: 10000, // Increased from 1000 to handle larger datasets
               sources: [
                 {
                   runId: {
@@ -292,7 +292,7 @@ export class ScenarioEventRepository {
           scenario_sets: {
             terms: {
               field: ES_FIELDS.scenarioSetId,
-              size: 1000, // Reasonable limit for scenario sets per project
+              size: 10000, // Increased from 1000 to handle larger datasets
             },
             aggs: {
               // Count unique scenarios within each set
@@ -414,7 +414,7 @@ export class ScenarioEventRepository {
 
     // Request more items to account for potential deduplication
     // We need to ensure we get enough unique batch runs after deduplication
-    const requestSize = Math.max(actualLimit * 5, 100); // Request 5x the limit or at least 100
+    const requestSize = Math.max(actualLimit * 5, 1000); // Request 5x the limit or at least 100
 
     // Use search_after with manual deduplication for reliable pagination
     // This approach is more reliable than collapse with search_after
@@ -633,7 +633,7 @@ export class ScenarioEventRepository {
           unique_scenario_runs: {
             terms: {
               field: ES_FIELDS.scenarioRunId,
-              size: 1000,
+              size: 10000, // Increased from 1000 to handle larger datasets
               order: {
                 _key: "asc",
               },
@@ -644,13 +644,15 @@ export class ScenarioEventRepository {
       },
     });
 
-    return (
+    const result = (
       (
         response.aggregations?.unique_scenario_runs as {
           buckets: Array<{ key: string }>;
         }
       )?.buckets ?? []
     ).map((bucket) => bucket.key);
+
+    return result;
   }
 
   /**
@@ -727,6 +729,7 @@ export class ScenarioEventRepository {
 
     const client = await this.getClient();
 
+    // Use terms aggregation with top_hits for better performance than collapse
     const response = await client.search({
       index: this.indexName,
       body: {
@@ -740,30 +743,41 @@ export class ScenarioEventRepository {
             ],
           },
         },
-        sort: [{ timestamp: "desc" }],
-        collapse: {
-          field: ES_FIELDS.scenarioRunId,
-          inner_hits: {
-            name: "latest",
-            size: 1,
-            sort: [{ timestamp: "desc" }],
+        aggs: {
+          by_scenario_run: {
+            terms: {
+              field: ES_FIELDS.scenarioRunId,
+              size: Math.min(validatedScenarioRunIds.length, 100), // Limit to prevent timeouts
+            },
+            aggs: {
+              latest_event: {
+                top_hits: {
+                  size: 1,
+                  sort: [{ timestamp: "desc" }],
+                },
+              },
+            },
           },
         },
-        size: Math.min(validatedScenarioRunIds.length, 1000),
+        size: 0, // We only need aggregation results
       },
     });
 
     const results = new Map<string, ScenarioRunStartedEvent>();
 
-    for (const hit of response.hits.hits) {
-      const rawResult = ((hit as any).inner_hits?.latest?.hits?.hits?.[0]
-        ?._source ?? hit._source) as Record<string, unknown>;
-      if (rawResult) {
-        const event = transformFromElasticsearch(
-          rawResult
-        ) as ScenarioRunStartedEvent;
-        const scenarioRunId = event.scenarioRunId;
-        results.set(scenarioRunId, event);
+    const buckets =
+      (response.aggregations as any)?.by_scenario_run?.buckets ?? [];
+    for (const bucket of buckets) {
+      const hit = bucket.latest_event.hits.hits[0];
+      if (hit) {
+        const rawResult = hit._source as Record<string, unknown>;
+        if (rawResult) {
+          const event = transformFromElasticsearch(
+            rawResult
+          ) as ScenarioRunStartedEvent;
+          const scenarioRunId = event.scenarioRunId;
+          results.set(scenarioRunId, event);
+        }
       }
     }
 
@@ -797,6 +811,7 @@ export class ScenarioEventRepository {
 
     const client = await this.getClient();
 
+    // Use terms aggregation with top_hits for better performance than collapse
     const response = await client.search({
       index: this.indexName,
       body: {
@@ -810,30 +825,33 @@ export class ScenarioEventRepository {
             ],
           },
         },
-        sort: [{ timestamp: "desc" }],
-        collapse: {
-          field: ES_FIELDS.scenarioRunId,
-          inner_hits: {
-            name: "latest",
-            size: 1,
-            sort: [{ timestamp: "desc" }],
+        aggs: {
+          by_scenario_run: {
+            terms: {
+              field: ES_FIELDS.scenarioRunId,
+              size: Math.min(validatedScenarioRunIds.length, 100), // Limit to prevent timeouts
+            },
+            aggs: {
+              latest_event: {
+                top_hits: {
+                  size: 1,
+                  sort: [{ timestamp: "desc" }],
+                },
+              },
+            },
           },
         },
-        size: Math.min(validatedScenarioRunIds.length, 1000),
+        size: 0, // We only need aggregation results
       },
     });
 
     const results = new Map<string, ScenarioMessageSnapshotEvent>();
 
-    for (const hit of response.hits.hits) {
-      const rawResult = ((hit as any).inner_hits?.latest?.hits?.hits?.[0]
-        ?._source ?? hit._source) as Record<string, unknown>;
-      if (rawResult) {
-        const event = transformFromElasticsearch(
-          rawResult
-        ) as ScenarioMessageSnapshotEvent;
-        const scenarioRunId = event.scenarioRunId;
-        results.set(scenarioRunId, event);
+    for (const bucket of buckets) {
+      const hit = bucket.latest_event.hits.hits[0];
+      if (hit) {
+        const rawResult = hit._source as Record<string, unknown>;
+        if (rawResult) {
       }
     }
 
@@ -880,30 +898,41 @@ export class ScenarioEventRepository {
             ],
           },
         },
-        sort: [{ timestamp: "desc" }],
-        collapse: {
-          field: ES_FIELDS.scenarioRunId,
-          inner_hits: {
-            name: "latest",
-            size: 1,
-            sort: [{ timestamp: "desc" }],
+        aggs: {
+          by_scenario_run: {
+            terms: {
+              field: ES_FIELDS.scenarioRunId,
+              size: Math.min(validatedScenarioRunIds.length, 100), // Limit to prevent timeouts
+            },
+            aggs: {
+              latest_event: {
+                top_hits: {
+                  size: 1,
+                  sort: [{ timestamp: "desc" }],
+                },
+              },
+            },
           },
         },
-        size: Math.min(validatedScenarioRunIds.length, 1000),
+        size: 0, // We only need aggregation results
       },
     });
 
     const results = new Map<string, ScenarioRunFinishedEvent>();
 
-    for (const hit of response.hits.hits) {
-      const rawResult = ((hit as any).inner_hits?.latest?.hits?.hits?.[0]
-        ?._source ?? hit._source) as Record<string, unknown>;
-      if (rawResult) {
-        const event = transformFromElasticsearch(
-          rawResult
-        ) as ScenarioRunFinishedEvent;
-        const scenarioRunId = event.scenarioRunId;
-        results.set(scenarioRunId, event);
+    const buckets =
+      (response.aggregations as any)?.by_scenario_run?.buckets ?? [];
+    for (const bucket of buckets) {
+      const hit = bucket.latest_event.hits.hits[0];
+      if (hit) {
+        const rawResult = hit._source as Record<string, unknown>;
+        if (rawResult) {
+          const event = transformFromElasticsearch(
+            rawResult
+          ) as ScenarioRunFinishedEvent;
+          const scenarioRunId = event.scenarioRunId;
+          results.set(scenarioRunId, event);
+        }
       }
     }
 
@@ -911,8 +940,8 @@ export class ScenarioEventRepository {
   }
 
   /**
-   * Gets all unique batch run IDs for a scenario set efficiently using aggregations.
-   * This is much faster than paginating through individual documents.
+   * Gets all unique batch run IDs for a scenario set efficiently using composite aggregations.
+   * This handles unlimited results by paginating through them automatically.
    *
    * @param projectId - The project identifier
    * @param scenarioSetId - The scenario set identifier
@@ -930,47 +959,75 @@ export class ScenarioEventRepository {
     const validatedScenarioSetId = scenarioIdSchema.parse(scenarioSetId);
     const client = await this.getClient();
 
-    // Use terms aggregation to get all unique batch run IDs in a single query
-    const response = await client.search({
-      index: this.indexName,
-      body: {
-        query: {
-          bool: {
-            filter: [
-              { term: { [ES_FIELDS.projectId]: validatedProjectId } },
-              { term: { [ES_FIELDS.scenarioSetId]: validatedScenarioSetId } },
-              { exists: { field: ES_FIELDS.batchRunId } },
-            ],
-          },
-        },
-        aggs: {
-          unique_batch_runs: {
-            terms: {
-              field: ES_FIELDS.batchRunId,
-              size: 1000, // Large enough to get all unique batch runs
-              order: {
-                _key: "asc",
+    const batchRunIds: string[] = [];
+    let after: Record<string, unknown> | undefined;
+    let iterationCount = 0;
+    const maxIterations = 1000; // Safety limit to prevent infinite loops
+
+    try {
+      do {
+        iterationCount++;
+
+        if (iterationCount > maxIterations) {
+          console.warn(
+            `[WARNING] getAllBatchRunIdsForScenarioSet: Hit maximum iteration limit (${maxIterations}). This may indicate an issue with the data or query.`
+          );
+          break;
+        }
+
+        // Use composite aggregation to get all unique batch run IDs without size limits
+        const response = await client.search({
+          index: this.indexName,
+          body: {
+            query: {
+              bool: {
+                filter: [
+                  { term: { [ES_FIELDS.projectId]: validatedProjectId } },
+                  {
+                    term: { [ES_FIELDS.scenarioSetId]: validatedScenarioSetId },
+                  },
+                  { exists: { field: ES_FIELDS.batchRunId } },
+                ],
               },
             },
+            aggs: {
+              unique_batch_runs: {
+                composite: {
+                  size: 1000, // Process in chunks of 1000 for better performance
+                  sources: [
+                    {
+                      batch_run_id: {
+                        terms: {
+                          field: ES_FIELDS.batchRunId,
+                        },
+                      },
+                    },
+                  ],
+                  ...(after && { after }),
+                },
+              },
+            },
+            size: 0, // We don't need the actual documents, just the aggregation
           },
-        },
-        size: 0, // We don't need the actual documents, just the aggregation
-      },
-    });
+        });
 
-    const buckets =
-      (response.aggregations as any)?.unique_batch_runs?.buckets ?? [];
+        const buckets =
+          (response.aggregations as any)?.unique_batch_runs?.buckets ?? [];
 
-    // Extract batch run IDs from the aggregation
-    const batchRunIds = buckets.map((bucket: any) => bucket.key);
+        // Extract batch run IDs from the aggregation
+        const newBatchRunIds = buckets.map(
+          (bucket: any) => bucket.key.batch_run_id
+        );
+        batchRunIds.push(...newBatchRunIds);
 
-    console.log(`[DEBUG] getAllBatchRunIdsForScenarioSet:`, {
-      projectId: validatedProjectId,
-      scenarioSetId: validatedScenarioSetId,
-      totalUniqueBatchRuns: batchRunIds.length,
-    });
+        // Check if there are more results
+        after = (response.aggregations as any)?.unique_batch_runs?.after_key;
+      } while (after);
 
-    return batchRunIds;
+      return batchRunIds;
+    } catch (error) {
+      throw error;
+    }
   }
 
   /**
