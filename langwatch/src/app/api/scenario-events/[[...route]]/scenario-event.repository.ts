@@ -215,9 +215,17 @@ export class ScenarioEventRepository {
         },
         aggs: {
           unique_runs: {
-            terms: {
-              field: ES_FIELDS.scenarioRunId,
-              size: 10000,
+            composite: {
+              size: 1000,
+              sources: [
+                {
+                  runId: {
+                    terms: {
+                      field: ES_FIELDS.scenarioRunId,
+                    },
+                  },
+                },
+              ],
             },
           },
         },
@@ -406,7 +414,7 @@ export class ScenarioEventRepository {
 
     // Request more items to account for potential deduplication
     // We need to ensure we get enough unique batch runs after deduplication
-    const requestSize = Math.max(actualLimit * 5, 1000); // Request 5x the limit or at least 300
+    const requestSize = Math.max(actualLimit * 5, 100); // Request 5x the limit or at least 100
 
     // Use search_after with manual deduplication for reliable pagination
     // This approach is more reliable than collapse with search_after
@@ -459,6 +467,16 @@ export class ScenarioEventRepository {
         }
       }
     }
+
+    // Debug logging for deduplication
+    console.log(`[DEBUG] Deduplication results:`, {
+      totalHits: hits.length,
+      uniqueBatchRuns: batchRunMap.size,
+      // batchRunIds: Array.from(batchRunMap.keys()), // Commented out to reduce noise
+      // sampleTimestamps: Array.from(batchRunMap.entries())
+      //   .slice(0, 3)
+      //   .map(([id, data]) => ({ id, timestamp: data.timestamp })),
+    });
 
     // Convert to array and sort by timestamp descending, then by batch run ID
     const sortedBatchRuns = Array.from(batchRunMap.entries()).sort(
@@ -615,7 +633,10 @@ export class ScenarioEventRepository {
           unique_scenario_runs: {
             terms: {
               field: ES_FIELDS.scenarioRunId,
-              size: 10000,
+              size: 1000,
+              order: {
+                _key: "asc",
+              },
             },
           },
         },
@@ -728,7 +749,7 @@ export class ScenarioEventRepository {
             sort: [{ timestamp: "desc" }],
           },
         },
-        size: Math.min(validatedScenarioRunIds.length, 10000),
+        size: Math.min(validatedScenarioRunIds.length, 1000),
       },
     });
 
@@ -798,7 +819,7 @@ export class ScenarioEventRepository {
             sort: [{ timestamp: "desc" }],
           },
         },
-        size: Math.min(validatedScenarioRunIds.length, 10000),
+        size: Math.min(validatedScenarioRunIds.length, 1000),
       },
     });
 
@@ -868,7 +889,7 @@ export class ScenarioEventRepository {
             sort: [{ timestamp: "desc" }],
           },
         },
-        size: Math.min(validatedScenarioRunIds.length, 10000),
+        size: Math.min(validatedScenarioRunIds.length, 1000),
       },
     });
 
@@ -887,6 +908,69 @@ export class ScenarioEventRepository {
     }
 
     return results;
+  }
+
+  /**
+   * Gets all unique batch run IDs for a scenario set efficiently using aggregations.
+   * This is much faster than paginating through individual documents.
+   *
+   * @param projectId - The project identifier
+   * @param scenarioSetId - The scenario set identifier
+   * @returns Array of all unique batch run IDs
+   * @throws {z.ZodError} If validation fails for projectId or scenarioSetId
+   */
+  async getAllBatchRunIdsForScenarioSet({
+    projectId,
+    scenarioSetId,
+  }: {
+    projectId: string;
+    scenarioSetId: string;
+  }): Promise<string[]> {
+    const validatedProjectId = projectIdSchema.parse(projectId);
+    const validatedScenarioSetId = scenarioIdSchema.parse(scenarioSetId);
+    const client = await this.getClient();
+
+    // Use terms aggregation to get all unique batch run IDs in a single query
+    const response = await client.search({
+      index: this.indexName,
+      body: {
+        query: {
+          bool: {
+            filter: [
+              { term: { [ES_FIELDS.projectId]: validatedProjectId } },
+              { term: { [ES_FIELDS.scenarioSetId]: validatedScenarioSetId } },
+              { exists: { field: ES_FIELDS.batchRunId } },
+            ],
+          },
+        },
+        aggs: {
+          unique_batch_runs: {
+            terms: {
+              field: ES_FIELDS.batchRunId,
+              size: 1000, // Large enough to get all unique batch runs
+              order: {
+                _key: "asc",
+              },
+            },
+          },
+        },
+        size: 0, // We don't need the actual documents, just the aggregation
+      },
+    });
+
+    const buckets =
+      (response.aggregations as any)?.unique_batch_runs?.buckets ?? [];
+
+    // Extract batch run IDs from the aggregation
+    const batchRunIds = buckets.map((bucket: any) => bucket.key);
+
+    console.log(`[DEBUG] getAllBatchRunIdsForScenarioSet:`, {
+      projectId: validatedProjectId,
+      scenarioSetId: validatedScenarioSetId,
+      totalUniqueBatchRuns: batchRunIds.length,
+    });
+
+    return batchRunIds;
   }
 
   /**

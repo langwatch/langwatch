@@ -59,6 +59,20 @@ export const scenarioRouter = createTRPCRouter({
       return data;
     }),
 
+  // Get ALL run data for a scenario set efficiently (new optimized version)
+  getAllScenarioSetRunDataEfficient: protectedProcedure
+    .input(projectSchema.extend({ scenarioSetId: z.string() }))
+    .use(checkUserPermissionForProject(TeamRoleGroup.SCENARIOS_VIEW))
+    .query(async ({ input, ctx }) => {
+      const scenarioRunnerService = new ScenarioEventService();
+      const data =
+        await scenarioRunnerService.getAllRunDataForScenarioSetEfficient({
+          projectId: input.projectId,
+          scenarioSetId: input.scenarioSetId,
+        });
+      return data;
+    }),
+
   // Get scenario run state
   getRunState: protectedProcedure
     .input(
