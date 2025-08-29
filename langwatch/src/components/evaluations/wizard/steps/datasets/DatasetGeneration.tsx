@@ -8,7 +8,7 @@ import { useEvaluationWizardStore } from "../../hooks/evaluation-wizard-store/us
 import { useShallow } from "zustand/react/shallow";
 import { api } from "../../../../../utils/api";
 import { useOrganizationTeamProject } from "../../../../../hooks/useOrganizationTeamProject";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, useRef } from "react";
 import Parse from "papaparse";
 import { datasetValueToGridValue } from "../../../../datasets/DatasetGrid";
 import type { DatasetColumns } from "../../../../../server/datasets/types";
@@ -16,6 +16,7 @@ import { AISparklesLoader } from "../../../../icons/AISparklesLoader";
 import { Markdown } from "../../../../Markdown";
 import { nanoid } from "nanoid";
 import { DefaultChatTransport } from "ai";
+import { captureException } from "@sentry/node";
 
 export function DatasetGeneration() {
   const { project } = useOrganizationTeamProject();
@@ -65,13 +66,9 @@ export function DatasetGeneration() {
   const { messages, sendMessage, status } = useChat({
     transport: new DefaultChatTransport({
       api: "/api/dataset/generate",
-      body: {
-        dataset: datasetCsv,
-        projectId: project?.id,
-      },
     }),
     onError: (error) => {
-      console.error(error);
+      console.error("Error in useChat", error);
       toaster.create({
         title: "Error",
         description: error.message,
@@ -86,6 +83,11 @@ export function DatasetGeneration() {
       if (!datasetGridRef?.current) return;
       const gridApi = datasetGridRef.current.api;
 
+      // Ensure database data is loaded
+      if (!databaseDataset.data) {
+        console.warn("Database data not loaded yet, fallback will be used...");
+      }
+
       const toolExecutor: {
         addRow: (args: z.infer<typeof addRowInputSchema>) => Promise<any>,
         updateRow: (args: z.infer<typeof updateRowInputSchema>) => Promise<any>,
@@ -93,28 +95,112 @@ export function DatasetGeneration() {
       } = {
         addRow: async (args) => {
           const { row } = args;
-          let columnNames = columnTypes.map((col) => col.name);
-          if (row.length > columnNames.length) {
-            columnNames = ["id", ...columnNames];
+          
+          // Get column types directly from database data to ensure we have the latest
+          const currentColumnTypes = databaseDataset.data?.columnTypes as DatasetColumns || [];
+
+          // If database data is not available, try to get column names from grid API
+          let columnNames = ["id"];
+          if (currentColumnTypes.length > 0) {
+            columnNames = ["id", ...currentColumnTypes.map((col) => col.name)];
+          } else {
+            // Fallback: try to get column names from the grid
+            try {
+              const gridColumns = gridApi.getColumnDefs();
+              if (gridColumns && gridColumns.length > 1) {
+                // Filter out internal columns and get only data columns
+                const dataColumns = gridColumns
+                  .filter((col: any) => {
+                    // Skip internal columns like 'selected', row index columns, etc.
+                    return col.field && 
+                           col.field !== 'selected' && 
+                           !col.field.match(/^\d+$/) && // Skip numeric-only field names
+                           col.colId !== 'selected' &&
+                           col.colId !== '0';
+                  })
+                  .map((col: any) => col.field || col.colId);
+                
+                columnNames = ["id", ...dataColumns];
+              }
+            } catch (error) {
+              toaster.create({
+                title: "Error",
+                description: "Failed to get grid columns via fallback",
+                type: "error",
+                duration: 5000,
+                meta: { closable: true },
+              });
+              return;
+            }
           }
+
+          // If we still don't have column names, create generic ones based on row length
+          if (columnNames.length === 1 && row.length > 1) {
+            toaster.create({
+              title: "Error",
+              description: "Failed to get grid columns",
+              type: "error",
+              duration: 5000,
+              meta: { closable: true },
+            });
+            return;
+          }
+
           const rowData = Object.fromEntries(
             columnNames.map((col, index) => [col, row[index]])
           );
           if (!rowData.id) {
             rowData.id = `${Date.now()}-${nanoid()}`;
           }
+
           gridApi.applyTransaction({
             add: [rowData],
           });
           upsertRecord(rowData.id, rowData);
+
           return { success: true };
         },
         updateRow: async (args) => {
           const { id, row } = args;
-          let columnNames = columnTypes.map((col) => col.name);
-          if (row.length > columnNames.length) {
-            columnNames = ["id", ...columnNames];
+          // Get column types directly from database data to ensure we have the latest
+          const currentColumnTypes = databaseDataset.data?.columnTypes as DatasetColumns || [];
+          
+          // If database data is not available, try to get column names from grid API
+          let columnNames = ["id"];
+          if (currentColumnTypes.length > 0) {
+            columnNames = ["id", ...currentColumnTypes.map((col) => col.name)];
+          } else {
+            // Fallback: try to get column names from the grid
+            try {
+              const gridColumns = gridApi.getColumnDefs();
+              if (gridColumns && gridColumns.length > 1) {
+                // Filter out internal columns and get only data columns
+                const dataColumns = gridColumns
+                  .filter((col: any) => {
+                    // Skip internal columns like 'selected', row index columns, etc.
+                    return col.field && 
+                           col.field !== 'selected' && 
+                           !col.field.match(/^\d+$/) && // Skip numeric-only field names
+                           col.colId !== 'selected' &&
+                           col.colId !== '0';
+                  })
+                  .map((col: any) => col.field || col.colId);
+                
+                columnNames = ["id", ...dataColumns];
+              }
+            } catch (error) {
+              toaster.create({
+                title: "Error",
+                description: "Failed to get grid columns via fallback",
+                type: "error",
+                duration: 5000,
+                meta: { closable: true },
+              });
+
+              return;
+            }
           }
+          
           const rowData = Object.fromEntries(
             columnNames.map((col, index) => [col, row[index]])
           );
@@ -126,10 +212,6 @@ export function DatasetGeneration() {
           upsertRecord(rowData.id, rowData);
           return { success: true };
         },
-        // changeColumns: async ({ columns }) => {
-        //   gridApi.applyColumnDefs(columns);
-        //   return;
-        // },
         deleteRow: async (args) => {
           const { id } = args;
           gridApi.applyTransaction({
@@ -160,10 +242,9 @@ export function DatasetGeneration() {
       let result: any;
       try {
         // Access the arguments from the tool call
-        const args = (toolCall as any).args;
-        result = await tool(args);
+        result = await tool(toolCall.input as any);
       } catch (error) {
-        console.error(error);
+        console.error("Error executing tool", error);
         toaster.create({
           title: "Error",
           description: "An error occurred while executing the tool",
@@ -178,10 +259,6 @@ export function DatasetGeneration() {
       return result;
     },
   });
-
-  if (typeof window !== "undefined") {
-    (window as any).messages = messages;
-  }
 
   const lastMessage = messages.at(-1);
   const assistantMessage =
@@ -211,32 +288,73 @@ export function DatasetGeneration() {
   const updateDatasetRecord = api.datasetRecord.update.useMutation();
   const deleteDatasetRecord = api.datasetRecord.deleteMany.useMutation();
 
+  // Queue-based update system
+  const updateQueue = useRef<Array<{ id: string; record: any }>>([]);
+  const isProcessing = useRef(false);
+
+  const processQueue = useCallback(async () => {
+    if (isProcessing.current || updateQueue.current.length === 0 || !datasetId) return;
+
+    isProcessing.current = true;
+
+    while (updateQueue.current.length > 0) {
+      const update = updateQueue.current.shift();
+      if (!update) continue;
+
+      try {
+        await new Promise<void>((resolve, reject) => {
+          updateDatasetRecord.mutate(
+            {
+              projectId: project?.id ?? "",
+              datasetId: datasetId,
+              recordId: update.id,
+              updatedRecord: update.record,
+            },
+            {
+              onSuccess: () => resolve(),
+              onError: (error) => {
+                toaster.create({
+                  title: "Error updating record.",
+                  description: "Changes will be reverted, please try again",
+                  type: "error",
+                  duration: 5000,
+                  meta: { closable: true },
+                });
+                void databaseDataset.refetch();
+                reject(error);
+              },
+            }
+          );
+        });
+      } catch (error) {
+        console.error("Error processing update queue:", error);
+        break;
+      }
+    }
+
+    isProcessing.current = false;
+  }, [datasetId, project?.id, updateDatasetRecord, databaseDataset]);
+
   const upsertRecord = useCallback(
     (id: string, record: any) => {
       if (!datasetId) return;
 
-      updateDatasetRecord.mutate(
-        {
-          projectId: project?.id ?? "",
-          datasetId: datasetId,
-          recordId: id,
-          updatedRecord: record,
-        },
-        {
-          onError: () => {
-            toaster.create({
-              title: "Error updating record.",
-              description: "Changes will be reverted, please try again",
-              type: "error",
-              duration: 5000,
-              meta: { closable: true },
-            });
-            void databaseDataset.refetch();
-          },
-        }
-      );
+      // Add to queue
+      updateQueue.current.push({ id, record });
+
+      // Start processing if not already processing
+      if (!isProcessing.current) {
+        processQueue().catch((error) => {
+          captureException(error, {
+            tags: {
+              datasetId: datasetId,
+            },
+          });
+        });
+        console.error("Error processing queue during upsert:", error);
+      }
     },
-    [databaseDataset, datasetId, project?.id, updateDatasetRecord]
+    [datasetId, processQueue]
   );
 
   const deleteRecord = useCallback(
@@ -269,6 +387,53 @@ export function DatasetGeneration() {
     [databaseDataset, datasetId, project?.id, deleteDatasetRecord]
   );
 
+  // Cleanup effect to process remaining queue items
+  useEffect(() => {
+    const queue = updateQueue.current;
+    const processing = isProcessing.current;
+    
+    return () => {
+      if (queue?.length > 0 && !processing) {
+        processQueue().catch((error) => {
+          captureException(error, {
+            tags: {
+              datasetId: datasetId,
+            },
+          });
+          console.error("Error processing queue during cleanup:", error);
+        });
+      }
+    };
+  }, [processQueue, datasetId]);
+
+  // Process queue when dataset changes
+  useEffect(() => {
+    if (updateQueue.current?.length > 0 && !isProcessing.current) {
+      processQueue().catch((error) => {
+        console.error("Error processing queue during dataset change:", error);captureException(error, {
+          tags: {
+            datasetId: datasetId,
+          },
+        });
+        console.error("Error processing queue during cleanup:", error);
+      });
+    }
+  }, [datasetId, processQueue]);
+
+  async function generate() {
+    if (status !== "ready") return;
+
+    if (input.trim()) {
+      await sendMessage({ role: "user", parts: [{ type: "text", text: input }] }, {
+        body: {
+          dataset: datasetCsv,
+          projectId: project?.id,
+        },
+      });
+      setInput("");
+    }
+  }
+
   return (
     <VStack
       width="full"
@@ -295,18 +460,19 @@ export function DatasetGeneration() {
           borderRadius="md"
           padding={2}
           value={input}
+          disabled={status !== "ready"}
           onChange={(e) => setInput(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              void generate();
+            }
+          }}
           width="full"
         />
         <Button
           colorPalette="blue"
-          onClick={() => {
-            if (input.trim()) {
-              void sendMessage({ role: "user", parts: [{ type: "text", text: input }] });
-              setInput("");
-            }
-          }}
-          disabled={status === "submitted" || status === "streaming"}
+          onClick={() => void generate()}
+          disabled={status !== "ready"}
         >
           {status === "submitted" || status === "streaming" ? (
             <AISparklesLoader color="white" />

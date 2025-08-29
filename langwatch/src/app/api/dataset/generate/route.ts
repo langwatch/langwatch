@@ -5,12 +5,18 @@ import { prisma } from "../../../../server/db";
 import { getServerSession } from "next-auth";
 import { authOptions } from "../../../../server/auth";
 import { getVercelAIModel } from "../../../../server/modelProviders/utils";
-import { smoothStream, stepCountIs, streamText } from "ai";
+import { convertToModelMessages, smoothStream, stepCountIs, streamText, type UIMessage } from "ai";
 import { tools } from "./tools";
 
 import { createLogger } from "../../../../utils/logger";
 
 const logger = createLogger("langwatch:api:dataset:generate");
+
+interface Body {
+  messages: UIMessage[];
+  dataset: string;
+  projectId: string;
+}
 
 export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions(req));
@@ -21,7 +27,7 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const { messages, dataset, projectId } = await req.json();
+  const { messages, dataset, projectId } = await req.json() as Body;
 
   if (!projectId) {
     return NextResponse.json(
@@ -42,14 +48,13 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  // , also a tool for changing columns in the dataset.
-
   // Add system prompts
   messages.unshift({
     role: "system",
-    content: `
-You are a dataset generation assistant. You will be given a dataset, user instructions and a set of tools to use \
-for adding, updating and deleting rows.
+    parts: [{
+      type: "text",
+      text: `
+You are a dataset generation assistant. You will be given a dataset, user instructions and a set of tools to use for adding, updating and deleting rows.
 If the user asks for more than 30 rows, generate only 30 rows and tell them you can only generate 30 rows at a time (it can go over 30 rows if the user asks for more on subsequent messages).
 Keep calling the tools in sequence as many times as you need to to generate the dataset.
 Keep your non-tool textual responses short and concise.
@@ -57,24 +62,23 @@ Only call 5 tools in parallel max.
 
 Current dataset:
 
-${JSON.stringify(dataset)}
-    `,
-  });
+${JSON.stringify(dataset)}`,
+    }],
+  } as UIMessage);
 
   const model = await getVercelAIModel(projectId);
-
   const result = streamText({
     model,
-    messages,
+    messages: convertToModelMessages(messages),
+    tools,
     maxOutputTokens: 4096 * 2,
     stopWhen: stepCountIs(20),
     experimental_transform: smoothStream({ chunking: "word" }),
-    tools: tools,
     maxRetries: 3,
     onError: (error) => {
       logger.error({ error }, "error in streamtext");
     },
   });
 
-  return result.toTextStreamResponse();
+  return result.toUIMessageStreamResponse();
 }
