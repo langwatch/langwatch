@@ -917,10 +917,6 @@ export class ScenarioEventRepository {
 
     const client = await this.getClient();
 
-    console.log(
-      `[DEBUG] Getting latest run finished events for ${validatedScenarioRunIds.length} scenario runs`
-    );
-
     const response = await client.search({
       index: this.indexName,
       body: {

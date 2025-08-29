@@ -228,7 +228,7 @@ export class ScenarioEventService {
     const batchRunIds = new Set<string>();
     let cursor: string | undefined = undefined;
     const pageLimit = 100; // repository/server cap
-    const maxPages = 1000; // safety guard (100k ids) - increased from 200
+    const maxPages = 200; // safety guard (20k ids)
     let truncated = false;
 
     for (let i = 0; i < maxPages; i++) {
