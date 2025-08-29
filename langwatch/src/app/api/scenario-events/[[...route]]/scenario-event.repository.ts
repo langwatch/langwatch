@@ -404,6 +404,7 @@ export class ScenarioEventRepository {
           cursor,
           error: e,
         });
+        throw new Error(`Malformed cursor: ${cursor}`);
       }
     }
 
