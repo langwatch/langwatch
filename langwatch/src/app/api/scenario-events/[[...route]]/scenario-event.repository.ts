@@ -406,7 +406,7 @@ export class ScenarioEventRepository {
 
     // Request more items to account for potential deduplication
     // We need to ensure we get enough unique batch runs after deduplication
-    const requestSize = Math.max(actualLimit * 5, 1000); // Request 5x the limit or at least 1000
+    const requestSize = Math.max(actualLimit * 5, 1000); // Request 5x the limit or at least 300
 
     // Use search_after with manual deduplication for reliable pagination
     // This approach is more reliable than collapse with search_after
@@ -432,19 +432,6 @@ export class ScenarioEventRepository {
     });
 
     const hits = response.hits?.hits ?? [];
-
-    // Debug: Show distribution of batch runs in raw data
-    const batchRunDistribution = new Map<string, number>();
-    for (const hit of hits) {
-      const source = hit._source as Record<string, any>;
-      const batchRunId = source?.batch_run_id as string;
-      if (batchRunId) {
-        batchRunDistribution.set(
-          batchRunId,
-          (batchRunDistribution.get(batchRunId) ?? 0) + 1
-        );
-      }
-    }
 
     // Manual deduplication by batch run ID, keeping the latest timestamp for each
     const batchRunMap = new Map<
