@@ -1,5 +1,6 @@
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 from opentelemetry import trace
+from opentelemetry.trace import NoOpTracer
 from langwatch.generated.langwatch_rest_api_client.api.default import (
     get_api_dataset_by_slug_or_id,
 )
@@ -14,6 +15,7 @@ from langwatch.generated.langwatch_rest_api_client.models import (
 )
 from langwatch.state import get_instance
 import pandas as pd
+from pydantic import BaseModel
 
 from langwatch.utils.initialization import ensure_setup
 
@@ -37,10 +39,20 @@ class Dataset:
         return pd.DataFrame([entry.entry for entry in self.entries])
 
 
-def get_dataset(slug_or_id: str) -> Dataset:
+class GetDatasetOptions(BaseModel):
+    ignore_tracing: Optional[bool] = False
+
+
+def get_dataset(
+    slug_or_id: str, options: Optional[GetDatasetOptions] = None
+) -> Dataset:
     ensure_setup()
 
-    with _tracer.start_as_current_span("get_dataset") as span:
+    tracer = NoOpTracer() if options and options.ignore_tracing is True else _tracer
+
+    with tracer.start_as_current_span(
+        "get_dataset",
+    ) as span:
         span.set_attribute("inputs.slug_or_id", slug_or_id)
 
         try:
