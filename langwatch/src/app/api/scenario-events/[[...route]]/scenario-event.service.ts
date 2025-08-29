@@ -228,7 +228,7 @@ export class ScenarioEventService {
     const batchRunIds = new Set<string>();
     let cursor: string | undefined = undefined;
     const pageLimit = 100; // repository/server cap
-    const maxPages = 200; // safety guard (20k ids)
+    const maxPages = 1000; // safety guard (100k ids) - increased from 200
     let truncated = false;
 
     for (let i = 0; i < maxPages; i++) {
@@ -241,6 +241,7 @@ export class ScenarioEventService {
         });
       if (ids.length === 0) break;
       ids.forEach((id) => batchRunIds.add(id));
+
       if (!nextCursor || nextCursor === cursor) break;
       if (i === maxPages - 1 && nextCursor) {
         truncated = true;
@@ -260,6 +261,42 @@ export class ScenarioEventService {
       projectId,
       batchRunIds: Array.from(batchRunIds),
     });
+  }
+
+  /**
+   * Retrieves run data for a specific batch run.
+   * @param {Object} params - The parameters for retrieving batch run data
+   * @param {string} params.projectId - The ID of the project
+   * @param {string} params.scenarioSetId - The ID of the scenario set
+   * @param {string} params.batchRunId - The ID of the specific batch run
+   * @returns {Promise<ScenarioRunData[]>} Array of scenario run data for the batch run
+   */
+  async getRunDataForBatchRun({
+    projectId,
+    scenarioSetId,
+    batchRunId,
+  }: {
+    projectId: string;
+    scenarioSetId: string;
+    batchRunId: string;
+  }) {
+    // Get scenario run IDs for this specific batch run
+    const scenarioRunIds =
+      await this.eventRepository.getScenarioRunIdsForBatchRun({
+        projectId,
+        scenarioSetId,
+        batchRunId,
+      });
+
+    if (scenarioRunIds.length === 0) return [];
+
+    // Use batch method to get the actual run data
+    const runs = await this.getScenarioRunDataBatch({
+      projectId,
+      scenarioRunIds,
+    });
+
+    return runs;
   }
 
   /**
