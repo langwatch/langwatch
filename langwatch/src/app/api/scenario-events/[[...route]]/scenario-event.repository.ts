@@ -17,10 +17,10 @@ import {
 } from "./utils/elastic-search-transformers";
 import * as Sentry from "@sentry/nextjs";
 
+import { batchRunIdSchema, scenarioRunIdSchema } from "./schemas/event-schemas";
+
 const projectIdSchema = z.string();
-const scenarioRunIdSchema = z.string();
 const scenarioIdSchema = z.string();
-const batchRunIdSchema = z.string();
 
 /**
  * Repository class for managing scenario events in Elasticsearch.
