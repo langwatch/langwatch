@@ -101,14 +101,14 @@ export async function POST(req: NextRequest) {
 
   const systemPrompt = req.headers.get("x-system-prompt");
   try {
-    const result = await streamText({
+    const result = streamText({
       model: vercelProvider(model),
       system: systemPrompt?.trim() ? systemPrompt : undefined,
       messages,
       maxRetries: modelProvider.customKeys ? 1 : 3,
     });
 
-    return result.toDataStreamResponse();
+    return result.toTextStreamResponse();
   } catch (e: any) {
     try {
       if (e.statusCode === 401 || e.statusCode === 403) {

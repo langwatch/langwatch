@@ -265,7 +265,7 @@ const emptyLogsRequest: DeepPartial<IExportLogsServiceRequest> = {
 
 describe("opentelemetry logs receiver", () => {
   it("receives a complete Spring AI chat interaction (prompt + completion)", async () => {
-    const traces = openTelemetryLogsRequestToTracesForCollection(
+    const traces = await openTelemetryLogsRequestToTracesForCollection(
       springAICompleteChatRequest
     );
 
@@ -332,7 +332,7 @@ describe("opentelemetry logs receiver", () => {
   });
 
   it("receives a Spring AI prompt-only request", async () => {
-    const traces = openTelemetryLogsRequestToTracesForCollection(
+    const traces = await openTelemetryLogsRequestToTracesForCollection(
       springAIPromptOnlyRequest
     );
 
@@ -382,7 +382,7 @@ describe("opentelemetry logs receiver", () => {
   });
 
   it("receives a Spring AI completion-only request", async () => {
-    const traces = openTelemetryLogsRequestToTracesForCollection(
+    const traces = await openTelemetryLogsRequestToTracesForCollection(
       springAICompletionOnlyRequest
     );
 
@@ -390,8 +390,12 @@ describe("opentelemetry logs receiver", () => {
 
     const trace = traces[0];
 
+    if (!trace) {
+      assert.fail("No trace found");
+    }
+
     try {
-      z.array(spanSchema).parse(trace!.spans);
+      z.array(spanSchema).parse(trace.spans);
     } catch (error) {
       const validationError = fromZodError(error as ZodError);
       console.log("trace", JSON.stringify(trace, undefined, 2));
@@ -442,15 +446,19 @@ describe("opentelemetry logs receiver", () => {
   });
 
   it("receives multiple spans in the same trace", async () => {
-    const traces =
-      openTelemetryLogsRequestToTracesForCollection(multipleSpansRequest);
+    const traces = await openTelemetryLogsRequestToTracesForCollection(
+      multipleSpansRequest
+    );
 
     expect(traces).toHaveLength(1);
 
     const trace = traces[0];
+    if (!trace) {
+      assert.fail("No trace found");
+    }
 
     try {
-      z.array(spanSchema).parse(trace!.spans);
+      z.array(spanSchema).parse(trace.spans);
     } catch (error) {
       const validationError = fromZodError(error as ZodError);
       console.log("trace", JSON.stringify(trace, undefined, 2));
@@ -458,10 +466,10 @@ describe("opentelemetry logs receiver", () => {
       assert.fail(validationError.message);
     }
 
-    expect(trace!.spans).toHaveLength(2);
+    expect(trace.spans).toHaveLength(2);
 
     // Check first span
-    const span1 = trace!.spans.find(
+    const span1 = trace.spans.find(
       (s) => s.span_id === "span1111111111111111"
     );
     expect(span1).toBeDefined();
@@ -480,7 +488,7 @@ describe("opentelemetry logs receiver", () => {
     });
 
     // Check second span
-    const span2 = trace!.spans.find(
+    const span2 = trace.spans.find(
       (s) => s.span_id === "span2222222222222222"
     );
     expect(span2).toBeDefined();
@@ -500,7 +508,7 @@ describe("opentelemetry logs receiver", () => {
   });
 
   it("ignores logs with unsupported scope names", async () => {
-    const traces = openTelemetryLogsRequestToTracesForCollection(
+    const traces = await openTelemetryLogsRequestToTracesForCollection(
       unsupportedScopeRequest
     );
 
@@ -508,8 +516,9 @@ describe("opentelemetry logs receiver", () => {
   });
 
   it("handles logs with invalid JSON content by falling back to string array", async () => {
-    const traces =
-      openTelemetryLogsRequestToTracesForCollection(invalidJsonRequest);
+    const traces = await openTelemetryLogsRequestToTracesForCollection(
+      invalidJsonRequest
+    );
 
     expect(traces).toHaveLength(1);
 
@@ -522,7 +531,7 @@ describe("opentelemetry logs receiver", () => {
 
   it("handles empty logs request", async () => {
     const traces =
-      openTelemetryLogsRequestToTracesForCollection(emptyLogsRequest);
+      await openTelemetryLogsRequestToTracesForCollection(emptyLogsRequest);
 
     expect(traces).toHaveLength(0);
   });
@@ -554,7 +563,7 @@ describe("opentelemetry logs receiver", () => {
     };
 
     const traces =
-      openTelemetryLogsRequestToTracesForCollection(invalidIdsRequest);
+      await openTelemetryLogsRequestToTracesForCollection(invalidIdsRequest);
 
     expect(traces).toHaveLength(0);
   });
@@ -583,7 +592,7 @@ describe("opentelemetry logs receiver", () => {
       ],
     };
 
-    const traces = openTelemetryLogsRequestToTracesForCollection(noBodyRequest);
+    const traces = await openTelemetryLogsRequestToTracesForCollection(noBodyRequest);
 
     expect(traces).toHaveLength(0);
   });
@@ -615,7 +624,7 @@ describe("opentelemetry logs receiver", () => {
     };
 
     const traces =
-      openTelemetryLogsRequestToTracesForCollection(malformedRequest);
+      await openTelemetryLogsRequestToTracesForCollection(malformedRequest);
 
     expect(traces).toHaveLength(0);
   });
