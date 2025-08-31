@@ -38,7 +38,7 @@ jobs:
           GROQ_API_KEY: ${{ secrets.PYTHON_SDK_GROQ_API_KEY }}
           OPENAI_API_KEY: ${{ secrets.PYTHON_SDK_OPENAI_API_KEY }}
           CEREBRAS_API_KEY: ${{ secrets.PYTHON_SDK_CEREBRAS_API_KEY }}
-        run: uv run pytest
+        run: make test
 
   build:
     runs-on: ubuntu-latest
