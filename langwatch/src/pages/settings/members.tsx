@@ -21,7 +21,7 @@ import { Select as MultiSelect, chakraComponents } from "chakra-react-select";
 import { Lock, Mail, MoreVertical, Plus, Trash } from "react-feather";
 import { CopyInput } from "../../components/CopyInput";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import {
   Controller,
   useFieldArray,
@@ -148,6 +148,13 @@ function MembersList({
     { inviteCode: string; email: string }[]
   >([]);
 
+  // Watch for changes in selectedInvites and open popup when it changes
+  useEffect(() => {
+    if (selectedInvites.length > 0) {
+      onInviteLinkOpen();
+    }
+  }, [selectedInvites, onInviteLinkOpen]);
+
   const publicEnv = usePublicEnv();
   const hasEmailProvider = publicEnv.data?.HAS_EMAIL_PROVIDER_KEY;
 
@@ -190,7 +197,7 @@ function MembersList({
             } created successfully`,
             description: description,
             type: "success",
-            duration: 5000,
+            duration: 2000,
             meta: {
               closable: true,
             },
@@ -199,9 +206,6 @@ function MembersList({
           onAddMembersClose();
           resetForm();
           void pendingInvites.refetch();
-          if (newInvites.length > 0) {
-            onInviteLinkOpen();
-          }
         },
         onError: () => {
           toaster.create({
@@ -574,9 +578,7 @@ function MembersList({
 
       <Dialog.Root
         open={isInviteLinkOpen}
-        onOpenChange={({ open }) =>
-          open ? onInviteLinkOpen() : onInviteModalClose()
-        }
+        onOpenChange={({ open }) => (open ? undefined : onInviteModalClose())}
       >
         <Dialog.Backdrop />
         <Dialog.Content>
