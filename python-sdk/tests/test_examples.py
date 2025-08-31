@@ -71,6 +71,10 @@ async def test_example(example_file: str):
         pytest.skip(
             "langchain_rag_bot_vertex_ai.py is broken due to a bug in current langchain version of global state mutation when running together with other langchain"
         )
+    if example_file == "litellm_bot.py" and not os.getenv("CEREBRAS_API_KEY"):
+        pytest.skip(
+            "litellm_bot.py requires CEREBRAS_API_KEY environment variable to be set"
+        )
 
     module_name = f"examples.{example_file[:-3].replace('/', '.')}"
     module = importlib.import_module(module_name)
@@ -147,11 +151,9 @@ async def test_example(example_file: str):
                 if "opentelemetry/openinference_dspy_bot.py" in example_file and (
                     "'topk'" in str(e) or "KeyError" in str(e)
                 ):
-                    pytest.skip(f"ColBERTv2 service temporarily unavailable: {str(e)}")
+                    pytest.skip(f"ColBERTv2 service temporarily unavailable: {e!s}")
                 else:
-                    pytest.fail(
-                        f"Error running main function in {example_file}: {str(e)}"
-                    )
+                    pytest.fail(f"Error running main function in {example_file}: {e!s}")
 
         trace.send_spans()
         trace_urls[example_file] = trace.share()

@@ -142,6 +142,14 @@ class Client(LangWatchClientProtocol):
                 Client._skip_open_telemetry_setup = skip_open_telemetry_setup
             if base_attributes is not None:
                 Client._base_attributes = base_attributes
+                # Ensure required SDK attributes remain present after reconfiguration
+                Client._base_attributes[AttributeKey.LangWatchSDKName] = (
+                    "langwatch-observability-sdk"
+                )
+                Client._base_attributes[AttributeKey.LangWatchSDKVersion] = str(
+                    __version__
+                )
+                Client._base_attributes[AttributeKey.LangWatchSDKLanguage] = "python"
             if instrumentors is not None:
                 Client._instrumentors = instrumentors
             if tracer_provider is not None:
@@ -410,7 +418,7 @@ class Client(LangWatchClientProtocol):
 
     @disable_sending.setter
     def disable_sending(self, value: bool) -> None:
-        """Set whether sending is disabled. If enabling, this will create a new global tracer provider."""
+        """Set whether sending is disabled. Spans are still created; the exporter conditionally drops them."""
         if Client._disable_sending == value:
             return
 
@@ -584,8 +592,10 @@ class ConditionalSpanExporter(SpanExporter):
     def shutdown(self) -> None:
         return self.wrapped_exporter.shutdown()
 
-    def force_flush(self, timeout_millis: int = 30000) -> bool:
+    def force_flush(self, timeout_millis: Optional[int] = 30000) -> bool:
         client = get_instance()
         if client and client.disable_sending:
             return True  # Nothing to flush
-        return self.wrapped_exporter.force_flush(timeout_millis)
+        # Handle None case by providing default value
+        actual_timeout = timeout_millis if timeout_millis is not None else 30000
+        return self.wrapped_exporter.force_flush(actual_timeout)

@@ -16,7 +16,7 @@ def make_client(
     )
 
 
-def test_singleton_returns_same_instance():
+def test_singleton_returns_same_instance() -> None:
     """Test that multiple Client() calls return the same instance."""
     # Reset singleton to start fresh
     Client.reset_for_testing()
@@ -34,7 +34,7 @@ def test_singleton_returns_same_instance():
     assert Client.get_singleton_instance() is client1
 
 
-def test_singleton_updates_existing_instance():
+def test_singleton_updates_existing_instance() -> None:
     """Test that subsequent Client() calls update the existing instance."""
     # Reset singleton to start fresh
     Client.reset_for_testing()
@@ -55,7 +55,7 @@ def test_singleton_updates_existing_instance():
     assert client1.debug is False
 
 
-def test_singleton_preserves_initialized_state():
+def test_singleton_preserves_initialized_state() -> None:
     """Test that the singleton properly tracks initialization state."""
     # Reset singleton to start fresh
     Client.reset_for_testing()
@@ -70,7 +70,7 @@ def test_singleton_preserves_initialized_state():
     assert client2.is_initialized
 
 
-def test_singleton_updates_via_public_setters():
+def test_singleton_updates_via_public_setters() -> None:
     """Test that singleton updates use public setters for proper side effects."""
     # Reset singleton to start fresh
     Client.reset_for_testing()
@@ -92,7 +92,7 @@ def test_singleton_updates_via_public_setters():
     assert client1.api_key != original_api_key
 
 
-def test_singleton_reset_clears_instance():
+def test_singleton_reset_clears_instance() -> None:
     """Test that _reset_instance properly clears the singleton."""
     # Create an instance
     client1 = Client(api_key="test-key")
@@ -108,7 +108,7 @@ def test_singleton_reset_clears_instance():
     assert Client.get_singleton_instance() is client2
 
 
-def test_singleton_with_complex_parameters():
+def test_singleton_with_complex_parameters() -> None:
     """Test singleton behavior with complex parameters like tracer_provider and instrumentors."""
     # Reset singleton to start fresh
     Client.reset_for_testing()
@@ -133,7 +133,7 @@ def test_singleton_with_complex_parameters():
     assert client1.debug is False
 
 
-def test_singleton_idempotent_initialization():
+def test_singleton_idempotent_initialization() -> None:
     """Test that calling Client() multiple times with the same parameters is idempotent."""
     # Reset singleton to start fresh
     Client.reset_for_testing()
@@ -151,7 +151,7 @@ def test_singleton_idempotent_initialization():
     assert client1.debug is True
 
 
-def test_singleton_with_none_parameters():
+def test_singleton_with_none_parameters() -> None:
     """Test that singleton handles None parameters correctly."""
     # Reset singleton to start fresh
     Client.reset_for_testing()
@@ -170,7 +170,7 @@ def test_singleton_with_none_parameters():
     assert client1.debug is True
 
 
-def test_singleton_after_reset():
+def test_singleton_after_reset() -> None:
     """Test that singleton works correctly after reset."""
     # Create initial instance
     client1 = Client(api_key="first-key")
@@ -191,7 +191,7 @@ def test_singleton_after_reset():
     assert client3.api_key == "third-key"
 
 
-def test_api_key_setter_same_key():
+def test_api_key_setter_same_key() -> None:
     client = make_client(api_key="abc123")
     with (
         patch.object(client, "_Client__shutdown_tracer_provider") as shutdown,
@@ -204,7 +204,7 @@ def test_api_key_setter_same_key():
         setup_rest.assert_not_called()
 
 
-def test_api_key_setter_new_key_reinitializes():
+def test_api_key_setter_new_key_reinitializes() -> None:
     client = make_client(api_key="abc123")
     with (
         patch.object(client, "_Client__shutdown_tracer_provider") as shutdown,
@@ -218,7 +218,7 @@ def test_api_key_setter_new_key_reinitializes():
         assert client.api_key == "def456"
 
 
-def test_api_key_setter_disable_sending():
+def test_api_key_setter_disable_sending() -> None:
     client = make_client(api_key="abc123", disable_sending=True)
     with (
         patch.object(client, "_Client__shutdown_tracer_provider") as shutdown,
@@ -232,7 +232,7 @@ def test_api_key_setter_disable_sending():
         assert client.api_key == "def456"
 
 
-def test_api_key_setter_empty_key():
+def test_api_key_setter_empty_key() -> None:
     client = make_client(api_key="abc123")
     with (
         patch.object(client, "_Client__shutdown_tracer_provider") as shutdown,
@@ -246,7 +246,7 @@ def test_api_key_setter_empty_key():
         assert client.api_key == ""
 
 
-def test_api_key_change_always_calls_shutdown():
+def test_api_key_change_always_calls_shutdown() -> None:
     client = make_client(api_key="first-key")
     with (
         patch.object(client, "_Client__shutdown_tracer_provider") as shutdown,
@@ -260,7 +260,7 @@ def test_api_key_change_always_calls_shutdown():
         assert client.api_key == "second-key"
 
 
-def test_api_key_change_to_empty_always_calls_shutdown():
+def test_api_key_change_to_empty_always_calls_shutdown() -> None:
     client = make_client(api_key="first-key")
     with (
         patch.object(client, "_Client__shutdown_tracer_provider") as shutdown,
@@ -274,7 +274,7 @@ def test_api_key_change_to_empty_always_calls_shutdown():
         assert client.api_key == ""
 
 
-def test_no_data_leak_between_api_keys(monkeypatch: pytest.MonkeyPatch):
+def test_no_data_leak_between_api_keys(monkeypatch: pytest.MonkeyPatch) -> None:
     # We'll check that the rest_api_client is re-initialized with the new key
     client = make_client(api_key="first-key")
     from langwatch.generated.langwatch_rest_api_client.client import Client as ApiClient
@@ -309,7 +309,7 @@ def test_no_data_leak_between_api_keys(monkeypatch: pytest.MonkeyPatch):
     assert "second-key" not in created_clients[-1]._headers.values()  # type: ignore[protected-access]
 
 
-def test_tracer_provider_reinitialized_on_api_key_change():
+def test_tracer_provider_reinitialized_on_api_key_change() -> None:
     client = make_client(api_key="first-key")
     with (
         patch.object(client, "_Client__shutdown_tracer_provider") as shutdown,
@@ -329,7 +329,7 @@ def test_tracer_provider_reinitialized_on_api_key_change():
         setup_tracer2.assert_not_called()
 
 
-def test_skip_open_telemetry_setup_property():
+def test_skip_open_telemetry_setup_property() -> None:
     """Test that skip_open_telemetry_setup property returns the correct value."""
     # Reset singleton to start fresh
     Client.reset_for_testing()
@@ -347,7 +347,7 @@ def test_skip_open_telemetry_setup_property():
     assert client3.skip_open_telemetry_setup is False
 
 
-def test_skip_open_telemetry_setup_api_key_setter():
+def test_skip_open_telemetry_setup_api_key_setter() -> None:
     """Test that skip_open_telemetry_setup prevents OpenTelemetry reinitialization when API key changes."""
     client = make_client(api_key="first-key", skip_open_telemetry_setup=True)
 
@@ -364,7 +364,7 @@ def test_skip_open_telemetry_setup_api_key_setter():
         setup_rest.assert_called_once()
 
 
-def test_nested_trace_linking_behavior():
+def test_nested_trace_linking_behavior() -> None:
     """Test that nested traces are properly linked via OpenTelemetry links."""
     from langwatch import trace
     from unittest.mock import patch

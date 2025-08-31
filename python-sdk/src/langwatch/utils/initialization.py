@@ -11,7 +11,7 @@ from langwatch.state import get_instance, set_instance
 from langwatch.client import Client
 from langwatch.domain import BaseAttributes, SpanProcessingExcludeRule
 
-logger = logging.getLogger(__name__)
+logger: logging.Logger = logging.getLogger(__name__)
 
 
 def _setup_logging(debug: bool = False) -> None:
@@ -112,10 +112,6 @@ def ensure_setup(api_key: Optional[str] = None) -> None:
 
     # Verify we have a valid tracer provider
     tracer_provider = trace.get_tracer_provider()
-    if tracer_provider is None:  # type: ignore
-        logger.warning("No tracer provider found, creating new one")
-        # setup() will now automatically preserve existing parameters
-        client = setup(api_key=api_key)
-    elif isinstance(tracer_provider, trace.ProxyTracerProvider):
+    if isinstance(tracer_provider, trace.ProxyTracerProvider):
         logger.debug("Found proxy tracer provider, will be replaced with real provider")
         # This is fine - the client will replace it with a real provider
