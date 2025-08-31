@@ -6,6 +6,7 @@ from typing import Optional, Sequence, cast
 import pytest
 import asyncio
 import chainlit as cl
+import chainlit.config as chainlit_config
 
 import langwatch
 from chainlit.context import init_http_context
@@ -20,6 +21,9 @@ import litellm
 from litellm.files.main import ModelResponse
 
 trace_urls: dict[str, str] = {}
+
+
+chainlit_config.config.project.enable_telemetry = False
 
 
 class TraceIdCapturerExporter(SpanExporter):

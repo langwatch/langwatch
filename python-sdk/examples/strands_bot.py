@@ -1,36 +1,50 @@
+import os
+
 from strands import Agent
 from strands.models.litellm import LiteLLMModel
-import os
 import langwatch
-
-from openinference.instrumentation.litellm import LiteLLMInstrumentor
 
 from dotenv import load_dotenv
 
 load_dotenv()
 
 import chainlit as cl
-from strands.telemetry import StrandsTelemetry
 
-strands_telemetry = StrandsTelemetry().setup_otlp_exporter(
-    endpoint="https://app.langwatch.ai/api/otel/v1/traces",
-    headers={"Authorization": f"Bearer {os.environ['LANGWATCH_API_KEY']}"},
-)
+# OpenTelemetry Setup Options:
+
+
+# Option 1: Use only the LangWatch SDK. This is the simplest option.
+langwatch.setup()  # The api key is set from the environment variable automatically
+
+
+# Option 2: Use StrandsTelemetry to handle complete OpenTelemetry setup
+# (Creates new tracer provider and sets it as global)
+# from strands.telemetry import StrandsTelemetry
+# strands_telemetry = StrandsTelemetry()
+# strands_telemetry.setup_otlp_exporter(
+#     endpoint=f"{os.environ.get('LANGWATCH_ENDPOINT', 'https://app.langwatch.ai')}/api/otel/v1/traces",
+#     headers={"Authorization": "Bearer " + os.environ["LANGWATCH_API_KEY"]},
+# )
+# As OTel is managed by StrandsTelemetry, we must skip setting it up in LangWatch
+# langwatch.setup(skip_open_telemetry_setup=True)
 
 
 class KiteAgent:
     def __init__(self):
-        langwatch.setup(instrumentors=[LiteLLMInstrumentor()])
-
         self.model = LiteLLMModel(
             client_args={
                 "api_key": os.getenv("OPENAI_API_KEY"),
             },
-            model_id="openai/gpt-4.1-nano",
+            model_id="openai/gpt-5-mini",
         )
         self.agent = Agent(
+            name="kite-agent",
             model=self.model,
             tools=[],
+            trace_attributes={
+                "custom.model_id": "openai/gpt-5-mini",
+                "custom.example.attribute": "swift",
+            },
         )
 
     def run(self, prompt: str):
@@ -38,17 +52,20 @@ class KiteAgent:
 
 
 @cl.on_message
-# @langwatch.trace()
+@langwatch.trace()
 async def main(message: cl.Message):
-    # langwatch.get_current_trace().autotrack_litellm_calls(litellm)
-
     msg = cl.Message(
         content="",
+    )
+
+    langwatch.get_current_trace().update(
+        metadata={
+            "custom.example.attribute": "swift",
+        }
     )
 
     agent = KiteAgent()
     response = agent.run(message.content)
 
     await msg.stream_token(str(response))
-
     await msg.update()
