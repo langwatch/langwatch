@@ -1,7 +1,7 @@
 .PHONY: test install example
 
 test:
-	LANGWATCH_API_KEY="testkey" PYTHONPATH=$$PYTHONPATH:. uv run pytest -s -vv -m "not integration" $(filter-out $@,$(MAKECMDGOALS))
+	LANGWATCH_API_KEY="testkey" PYTHONPATH=$$PYTHONPATH:. uv run pytest -s -vv -m "not integration" -k "not test_example" $(filter-out $@,$(MAKECMDGOALS))
 
 # Call it with `make test-examples -- -k examples/openai_bot.py` to run a specific example
 test-examples:
