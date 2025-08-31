@@ -25,7 +25,7 @@ from .generated.langwatch_rest_api_client import Client as LangWatchApiClient
 import opentelemetry.trace
 from opentelemetry.util._once import Once
 
-logger = logging.getLogger(__name__)
+logger: logging.Logger = logging.getLogger(__name__)
 
 
 class Client(LangWatchClientProtocol):
@@ -52,9 +52,9 @@ class Client(LangWatchClientProtocol):
     ] = {}
 
     # Regular attributes for protocol compatibility
-    base_attributes: BaseAttributes = {}
-    tracer_provider: Optional[TracerProvider] = None
-    instrumentors: Sequence[BaseInstrumentor] = []
+    base_attributes: BaseAttributes
+    tracer_provider: Optional[TracerProvider]
+    instrumentors: Sequence[BaseInstrumentor]
 
     def __init__(
         self,
@@ -201,10 +201,12 @@ class Client(LangWatchClientProtocol):
                     instrumentor
                 )
 
-        # Set instance attributes for protocol compatibility
-        self.base_attributes = self._base_attributes
+        # Initialize instance attributes for protocol compatibility
+        self.base_attributes = (
+            self._base_attributes.copy() if self._base_attributes else {}
+        )
         self.tracer_provider = self._tracer_provider
-        self.instrumentors = self._instrumentors
+        self.instrumentors = list(self._instrumentors) if self._instrumentors else []
 
         self._setup_rest_api_client()
 
