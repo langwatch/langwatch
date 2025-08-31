@@ -7,9 +7,9 @@ import type {
   ScenarioSetData,
   ScenarioRunStartedEvent,
 } from "./types";
-import { Client as ElasticClient } from "@elastic/elasticsearch";
+import { type Client as ElasticClient } from "@elastic/elasticsearch";
 import { z } from "zod";
-import { esClient } from "~/server/elasticsearch";
+import { esClient, SCENARIO_EVENTS_INDEX } from "~/server/elasticsearch";
 import {
   transformToElasticsearch,
   transformFromElasticsearch,
@@ -34,7 +34,6 @@ const scenarioIdSchema = z.string();
  * Uses Elasticsearch for efficient querying and aggregation of event data.
  */
 export class ScenarioEventRepository {
-  private readonly indexName = "scenario-events";
   private client: ElasticClient | null = null;
 
   /**
@@ -62,7 +61,7 @@ export class ScenarioEventRepository {
     });
 
     await client.index({
-      index: this.indexName,
+      index: SCENARIO_EVENTS_INDEX.alias,
       body: elasticsearchEvent,
     });
   }
@@ -89,7 +88,7 @@ export class ScenarioEventRepository {
     const client = await this.getClient();
 
     const response = await client.search({
-      index: this.indexName,
+      index: SCENARIO_EVENTS_INDEX.alias,
       body: {
         query: {
           bool: {
@@ -136,7 +135,7 @@ export class ScenarioEventRepository {
     const client = await this.getClient();
 
     const response = await client.search({
-      index: this.indexName,
+      index: SCENARIO_EVENTS_INDEX.alias,
       body: {
         query: {
           bool: {
@@ -173,7 +172,7 @@ export class ScenarioEventRepository {
     const client = await this.getClient();
 
     await client.deleteByQuery({
-      index: this.indexName,
+      index: SCENARIO_EVENTS_INDEX.alias,
       body: {
         query: {
           term: { [ES_FIELDS.projectId]: validatedProjectId },
@@ -204,7 +203,7 @@ export class ScenarioEventRepository {
     const client = await this.getClient();
 
     const response = await client.search({
-      index: this.indexName,
+      index: SCENARIO_EVENTS_INDEX.alias,
       body: {
         query: {
           bool: {
@@ -270,7 +269,7 @@ export class ScenarioEventRepository {
     const client = await this.getClient();
 
     const response = await client.search({
-      index: this.indexName,
+      index: SCENARIO_EVENTS_INDEX.alias,
       body: {
         query: {
           bool: {
@@ -412,7 +411,7 @@ export class ScenarioEventRepository {
     // Use search_after with manual deduplication for reliable pagination
     // This approach is more reliable than collapse with search_after
     const response = await client.search({
-      index: this.indexName,
+      index: SCENARIO_EVENTS_INDEX.alias,
       body: {
         query: {
           bool: {
@@ -536,7 +535,7 @@ export class ScenarioEventRepository {
     const client = await this.getClient();
 
     const response = await client.search({
-      index: this.indexName,
+      index: SCENARIO_EVENTS_INDEX.alias,
       body: {
         query: {
           bool: {
@@ -588,7 +587,7 @@ export class ScenarioEventRepository {
     const client = await this.getClient();
 
     const response = await client.search({
-      index: this.indexName,
+      index: SCENARIO_EVENTS_INDEX.alias,
       body: {
         query: {
           bool: {
@@ -651,7 +650,7 @@ export class ScenarioEventRepository {
     const client = await this.getClient();
 
     const response = await client.search({
-      index: this.indexName,
+      index: SCENARIO_EVENTS_INDEX.alias,
       body: {
         query: {
           bool: {
@@ -705,7 +704,7 @@ export class ScenarioEventRepository {
     const client = await this.getClient();
 
     const response = await client.search({
-      index: this.indexName,
+      index: SCENARIO_EVENTS_INDEX.alias,
       body: {
         query: {
           bool: {
@@ -758,7 +757,7 @@ export class ScenarioEventRepository {
     const client = await this.getClient();
 
     const response = await client.search({
-      index: this.indexName,
+      index: SCENARIO_EVENTS_INDEX.alias,
       body: {
         track_total_hits: false,
         query: {
@@ -838,7 +837,7 @@ export class ScenarioEventRepository {
     const client = await this.getClient();
 
     const response = await client.search({
-      index: this.indexName,
+      index: SCENARIO_EVENTS_INDEX.alias,
       body: {
         track_total_hits: false,
         query: {
@@ -918,7 +917,7 @@ export class ScenarioEventRepository {
     const client = await this.getClient();
 
     const response = await client.search({
-      index: this.indexName,
+      index: SCENARIO_EVENTS_INDEX.alias,
       body: {
         track_total_hits: false,
         query: {

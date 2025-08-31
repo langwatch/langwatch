@@ -80,6 +80,7 @@ const messageSnapshotMapping: ElasticSearchMappingFrom<
       content: { type: "text" }, // maybe we need to json stringify when content is a json
       tool_call_id: { type: "keyword" },
       name: { type: "text" },
+      trace_id: { type: "keyword" },
     },
   },
 };
