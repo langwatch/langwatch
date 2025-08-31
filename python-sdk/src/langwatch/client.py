@@ -1,7 +1,7 @@
 import atexit
 import os
 import logging
-from typing import List, Optional, Sequence
+from typing import List, Optional, Sequence, ClassVar
 
 from langwatch.__version__ import __version__
 from langwatch.attributes import AttributeKey
@@ -34,21 +34,21 @@ class Client(LangWatchClientProtocol):
     """
 
     # Class variables - shared across all instances
-    _instance: Optional["Client"] = None
-    _debug: bool = False
-    _api_key: str = ""
-    _endpoint_url: str = ""
-    _base_attributes: BaseAttributes = {}
-    _instrumentors: Sequence[BaseInstrumentor] = []
-    _disable_sending: bool = False
-    _flush_on_exit: bool = True
-    _span_exclude_rules: List[SpanProcessingExcludeRule] = []
-    _ignore_global_tracer_provider_override_warning: bool = False
-    _skip_open_telemetry_setup: bool = False
-    _tracer_provider: Optional[TracerProvider] = None
-    _rest_api_client: Optional[LangWatchApiClient] = None
-    _registered_instrumentors: dict[
-        opentelemetry.trace.TracerProvider, set[BaseInstrumentor]
+    _instance: ClassVar[Optional["Client"]] = None
+    _debug: ClassVar[bool] = False
+    _api_key: ClassVar[str] = ""
+    _endpoint_url: ClassVar[str] = ""
+    _base_attributes: ClassVar[BaseAttributes] = {}
+    _instrumentors: ClassVar[Sequence[BaseInstrumentor]] = ()
+    _disable_sending: ClassVar[bool] = False
+    _flush_on_exit: ClassVar[bool] = True
+    _span_exclude_rules: ClassVar[List[SpanProcessingExcludeRule]] = []  # type: ignore[misc]
+    _ignore_global_tracer_provider_override_warning: ClassVar[bool] = False
+    _skip_open_telemetry_setup: ClassVar[bool] = False
+    _tracer_provider: ClassVar[Optional[TracerProvider]] = None
+    _rest_api_client: ClassVar[Optional[LangWatchApiClient]] = None
+    _registered_instrumentors: ClassVar[
+        dict[opentelemetry.trace.TracerProvider, set[BaseInstrumentor]]
     ] = {}
 
     # Regular attributes for protocol compatibility
@@ -95,29 +95,29 @@ class Client(LangWatchClientProtocol):
             existing = Client._instance
             # Update the existing instance with any new parameters
             if api_key is not None:
-                existing._api_key = api_key
+                Client._api_key = api_key
             if endpoint_url is not None:
-                existing._endpoint_url = endpoint_url
+                Client._endpoint_url = endpoint_url
             if debug is not None:
-                existing._debug = debug
+                Client._debug = debug
             if disable_sending is not None:
-                existing._disable_sending = disable_sending
+                Client._disable_sending = disable_sending
             if flush_on_exit is not None:
-                existing._flush_on_exit = flush_on_exit
+                Client._flush_on_exit = flush_on_exit
             if span_exclude_rules is not None:
-                existing._span_exclude_rules = span_exclude_rules
+                Client._span_exclude_rules = span_exclude_rules
             if ignore_global_tracer_provider_override_warning is not None:
-                existing._ignore_global_tracer_provider_override_warning = (
+                Client._ignore_global_tracer_provider_override_warning = (
                     ignore_global_tracer_provider_override_warning
                 )
             if skip_open_telemetry_setup is not None:
-                existing._skip_open_telemetry_setup = skip_open_telemetry_setup
+                Client._skip_open_telemetry_setup = skip_open_telemetry_setup
             if base_attributes is not None:
-                existing._base_attributes = base_attributes
+                Client._base_attributes = base_attributes
             if instrumentors is not None:
-                existing._instrumentors = instrumentors
+                Client._instrumentors = instrumentors
             if tracer_provider is not None:
-                existing._tracer_provider = tracer_provider
+                Client._tracer_provider = tracer_provider
             # Copy the existing instance's attributes to this instance and return
             self.__dict__.update(existing.__dict__)
             return
@@ -127,77 +127,77 @@ class Client(LangWatchClientProtocol):
 
         # Update class variables with provided values or environment defaults
         if api_key is not None:
-            self._api_key = api_key
-        elif not self._api_key:
-            self._api_key = os.getenv("LANGWATCH_API_KEY", "")
+            Client._api_key = api_key
+        elif not Client._api_key:
+            Client._api_key = os.getenv("LANGWATCH_API_KEY", "")
 
         if endpoint_url is not None:
-            self._endpoint_url = endpoint_url
-        elif not self._endpoint_url:
-            self._endpoint_url = (
+            Client._endpoint_url = endpoint_url
+        elif not Client._endpoint_url:
+            Client._endpoint_url = (
                 os.getenv("LANGWATCH_ENDPOINT") or "https://app.langwatch.ai"
             )
 
         if debug is not None:
-            self._debug = debug
-        elif not self._debug:
-            self._debug = os.getenv("LANGWATCH_DEBUG") == "true"
+            Client._debug = debug
+        elif not Client._debug:
+            Client._debug = os.getenv("LANGWATCH_DEBUG") == "true"
 
         if disable_sending is not None:
-            self._disable_sending = disable_sending
+            Client._disable_sending = disable_sending
 
         if flush_on_exit is not None:
-            self._flush_on_exit = flush_on_exit
+            Client._flush_on_exit = flush_on_exit
 
         if span_exclude_rules is not None:
-            self._span_exclude_rules = span_exclude_rules
+            Client._span_exclude_rules = span_exclude_rules
 
         if ignore_global_tracer_provider_override_warning is not None:
-            self._ignore_global_tracer_provider_override_warning = (
+            Client._ignore_global_tracer_provider_override_warning = (
                 ignore_global_tracer_provider_override_warning
             )
 
         if skip_open_telemetry_setup is not None:
-            self._skip_open_telemetry_setup = skip_open_telemetry_setup
+            Client._skip_open_telemetry_setup = skip_open_telemetry_setup
 
         if base_attributes is not None:
-            self._base_attributes = base_attributes
-        elif not self._base_attributes:
-            self._base_attributes = {}
+            Client._base_attributes = base_attributes
+        elif not Client._base_attributes:
+            Client._base_attributes = {}
 
         if instrumentors is not None:
-            self._instrumentors = instrumentors
-        elif not self._instrumentors:
-            self._instrumentors = []
+            Client._instrumentors = instrumentors
+        elif not Client._instrumentors:
+            Client._instrumentors = []
 
         if tracer_provider is not None:
-            self._tracer_provider = tracer_provider
+            Client._tracer_provider = tracer_provider
 
         # Set up base attributes with SDK info
-        self._base_attributes[AttributeKey.LangWatchSDKName] = (
+        Client._base_attributes[AttributeKey.LangWatchSDKName] = (
             "langwatch-observability-sdk"
         )
-        self._base_attributes[AttributeKey.LangWatchSDKVersion] = str(__version__)
-        self._base_attributes[AttributeKey.LangWatchSDKLanguage] = "python"
+        Client._base_attributes[AttributeKey.LangWatchSDKVersion] = str(__version__)
+        Client._base_attributes[AttributeKey.LangWatchSDKLanguage] = "python"
 
         # Set up OpenTelemetry if not skipped
-        if not self._skip_open_telemetry_setup:
-            self._tracer_provider = self.__ensure_otel_setup(self._tracer_provider)
-        elif self._debug:
+        if not Client._skip_open_telemetry_setup:
+            Client._tracer_provider = self.__ensure_otel_setup(Client._tracer_provider)
+        elif Client._debug:
             logger.debug("Skipping OpenTelemetry setup as requested")
 
         # Run instrumentors only if they haven't been registered with the current tracer provider
-        current_tracer_provider = self._tracer_provider or trace.get_tracer_provider()
-        if current_tracer_provider not in self._registered_instrumentors:
-            self._registered_instrumentors[current_tracer_provider] = set()
+        current_tracer_provider = Client._tracer_provider or trace.get_tracer_provider()
+        if current_tracer_provider not in Client._registered_instrumentors:
+            Client._registered_instrumentors[current_tracer_provider] = set()
 
-        for instrumentor in self._instrumentors:
+        for instrumentor in Client._instrumentors:
             if (
                 instrumentor
-                not in self._registered_instrumentors[current_tracer_provider]
+                not in Client._registered_instrumentors[current_tracer_provider]
             ):
                 instrumentor.instrument(tracer_provider=current_tracer_provider)
-                self._registered_instrumentors[current_tracer_provider].add(
+                Client._registered_instrumentors[current_tracer_provider].add(
                     instrumentor
                 )
 
@@ -277,39 +277,39 @@ class Client(LangWatchClientProtocol):
     @property
     def debug(self) -> bool:
         """Get the debug flag for the client."""
-        return self._debug
+        return Client._debug
 
     @debug.setter
     def debug(self, value: bool) -> None:
         """Set the debug flag for the client."""
-        self._debug = value
+        Client._debug = value
 
     @property
     def endpoint_url(self) -> str:
         """Get the endpoint URL for the client."""
-        return self._endpoint_url
+        return Client._endpoint_url
 
     @property
     def flush_on_exit(self) -> bool:
         """Get the flush on exit flag for the client."""
-        return self._flush_on_exit
+        return Client._flush_on_exit
 
     @property
     def api_key(self) -> str:
         """Get the API key for the client."""
-        return self._api_key
+        return Client._api_key
 
     @api_key.setter
     def api_key(self, value: str) -> None:
         """Set the API key for the client."""
-        if value == self._api_key:
+        if value == Client._api_key:
             return
 
-        api_key_has_changed = bool(self._api_key)
+        api_key_has_changed = bool(Client._api_key)
 
-        self._api_key = value
+        Client._api_key = value
 
-        if api_key_has_changed and not self._skip_open_telemetry_setup:
+        if api_key_has_changed and not Client._skip_open_telemetry_setup:
             # Shut down any existing tracer provider, as API key change requires re-initialization.
             self.__shutdown_tracer_provider()
 
@@ -318,7 +318,7 @@ class Client(LangWatchClientProtocol):
             opentelemetry.trace._TRACER_PROVIDER_SET_ONCE = Once()  # type: ignore
 
             # If a new API key is provided and sending is not disabled, set up a new tracer provider.
-            if value and not self._disable_sending:
+            if value and not Client._disable_sending:
                 self.__setup_tracer_provider()
 
         if value:
@@ -327,33 +327,33 @@ class Client(LangWatchClientProtocol):
     @property
     def disable_sending(self) -> bool:
         """Get whether sending is disabled."""
-        return self._disable_sending
+        return Client._disable_sending
 
     @property
     def rest_api_client(self) -> LangWatchApiClient:
         """Get the REST API client for the client."""
-        if self._rest_api_client is None:
+        if Client._rest_api_client is None:
             raise RuntimeError(
                 "REST API client not initialized. Call _setup_rest_api_client() first."
             )
-        return self._rest_api_client
+        return Client._rest_api_client
 
     @property
     def skip_open_telemetry_setup(self) -> bool:
         """Get whether OpenTelemetry setup is skipped."""
-        return self._skip_open_telemetry_setup
+        return Client._skip_open_telemetry_setup
 
     @disable_sending.setter
     def disable_sending(self, value: bool) -> None:
         """Set whether sending is disabled. If enabling, this will create a new global tracer provider."""
-        if self._disable_sending == value:
+        if Client._disable_sending == value:
             return
 
         # force flush the tracer provider before changing the disable_sending flag
-        if self._tracer_provider and not self._skip_open_telemetry_setup:
-            self._tracer_provider.force_flush()
+        if Client._tracer_provider and not Client._skip_open_telemetry_setup:
+            Client._tracer_provider.force_flush()
 
-        self._disable_sending = value
+        Client._disable_sending = value
 
     def __shutdown_tracer_provider(self) -> None:
         """Shuts down the current tracer provider, including flushing."""
@@ -372,26 +372,27 @@ class Client(LangWatchClientProtocol):
                     logger.debug("Forcing flush of tracer provider before shutdown.")
                 self._tracer_provider.force_flush()
 
-            if self._debug:
+            if Client._debug:
                 logger.debug("Shutting down tracer provider.")
-            self._tracer_provider.shutdown()
-            self._tracer_provider = None
+            if Client._tracer_provider is not None:
+                Client._tracer_provider.shutdown()
+            Client._tracer_provider = None
 
     def __setup_tracer_provider(self) -> None:
         """Sets up the tracer provider if not already active."""
-        if self._skip_open_telemetry_setup:
-            if self._debug:
+        if Client._skip_open_telemetry_setup:
+            if Client._debug:
                 logger.debug("Skipping tracer provider setup as requested.")
             return
 
-        if not self._tracer_provider:
-            if self._debug:
+        if not Client._tracer_provider:
+            if Client._debug:
                 logger.debug("Setting up new tracer provider.")
-            self._tracer_provider = self.__ensure_otel_setup()
+            Client._tracer_provider = self.__ensure_otel_setup()
 
             return
 
-        if self._debug:
+        if Client._debug:
             logger.debug("Tracer provider already active, not setting up again.")
 
     def __ensure_otel_setup(
@@ -422,21 +423,21 @@ class Client(LangWatchClientProtocol):
 
     def __create_new_tracer_provider(self) -> TracerProvider:
         try:
-            resource = Resource.create(self._base_attributes)
-            sampler = ALWAYS_OFF if self._disable_sending else TraceIdRatioBased(1.0)
+            resource = Resource.create(Client._base_attributes)
+            sampler = ALWAYS_OFF if Client._disable_sending else TraceIdRatioBased(1.0)
             provider = TracerProvider(resource=resource, sampler=sampler)
 
             # Only set up LangWatch exporter if sending is not disabled
-            if not self._disable_sending:
+            if not Client._disable_sending:
                 self.__set_langwatch_exporter(provider)
 
-            if self._flush_on_exit:
+            if Client._flush_on_exit:
                 logger.info(
                     "Registering atexit handler to flush tracer provider on exit"
                 )
                 atexit.register(provider.force_flush)
 
-            if self._debug:
+            if Client._debug:
                 logger.info(
                     "Successfully configured tracer provider with OTLP exporter"
                 )
@@ -448,21 +449,21 @@ class Client(LangWatchClientProtocol):
             ) from e
 
     def __set_langwatch_exporter(self, provider: TracerProvider) -> None:
-        if not self._api_key:
+        if not Client._api_key:
             raise ValueError("LangWatch API key is required but not provided")
 
         headers = {
-            "Authorization": f"Bearer {self._api_key}",
+            "Authorization": f"Bearer {Client._api_key}",
             "X-LangWatch-SDK-Version": str(__version__),
         }
 
-        if self._debug:
+        if Client._debug:
             logger.info(
-                f"Configuring OTLP exporter with endpoint: {self._endpoint_url}/api/otel/v1/traces"
+                f"Configuring OTLP exporter with endpoint: {Client._endpoint_url}/api/otel/v1/traces"
             )
 
         otlp_exporter = OTLPSpanExporter(
-            endpoint=f"{self._endpoint_url}/api/otel/v1/traces",
+            endpoint=f"{Client._endpoint_url}/api/otel/v1/traces",
             headers=headers,
             timeout=int(os.getenv("OTEL_EXPORTER_OTLP_TRACES_TIMEOUT", 30)),
         )
@@ -474,7 +475,7 @@ class Client(LangWatchClientProtocol):
 
         processor = FilterableBatchSpanProcessor(
             span_exporter=conditional_exporter,
-            exclude_rules=self._span_exclude_rules,
+            exclude_rules=Client._span_exclude_rules,
             max_export_batch_size=int(os.getenv("OTEL_BSP_MAX_EXPORT_BATCH_SIZE", 100)),
             max_queue_size=int(os.getenv("OTEL_BSP_MAX_QUEUE_SIZE", 512)),
             schedule_delay_millis=float(os.getenv("OTEL_BSP_SCHEDULE_DELAY", 1000)),
@@ -486,13 +487,13 @@ class Client(LangWatchClientProtocol):
         """
         Sets up the REST API client for the client.
         """
-        self._rest_api_client = LangWatchApiClient(
-            base_url=self._endpoint_url,
-            headers={"X-Auth-Token": self._api_key},
+        Client._rest_api_client = LangWatchApiClient(
+            base_url=Client._endpoint_url,
+            headers={"X-Auth-Token": Client._api_key},
             raise_on_unexpected_status=True,
         )
 
-        return self._rest_api_client
+        return Client._rest_api_client
 
 
 class ConditionalSpanExporter(SpanExporter):
