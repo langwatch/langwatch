@@ -46,7 +46,10 @@ export const useOrganizationTeamProject = (
     { enabled: !!publicShare.data?.projectId && !!publicShare.data?.id }
   );
 
-  const isDemo = router.query.project === publicEnv.data?.DEMO_PROJECT_SLUG;
+  const isDemo = Boolean(
+    publicEnv.data?.DEMO_PROJECT_SLUG &&
+      router.query.project === publicEnv.data.DEMO_PROJECT_SLUG
+  );
 
   const organizations = api.organization.getAll.useQuery(
     { isDemo: isDemo },

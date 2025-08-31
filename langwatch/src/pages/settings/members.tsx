@@ -42,6 +42,7 @@ import type {
 import { type PlanInfo } from "../../server/subscriptionHandler";
 import { api } from "../../utils/api";
 import * as Sentry from "@sentry/nextjs";
+import { usePublicEnv } from "../../hooks/usePublicEnv";
 
 type Option = { label: string; value: string; description?: string };
 
@@ -176,18 +177,14 @@ function MembersList({
 
           setSelectedInvites(newInvites);
 
-          const title =
-            newInvites.length > 0
-              ? "Invites created successfully"
-              : "Invites sent successfully";
-
-          const description =
-            newInvites.length > 0
-              ? "All invites have been created."
-              : "All invites have been sent.";
+          const description = publicEnv.data?.HAS_EMAIL_PROVIDER_KEY
+            ? "All invites have been sent."
+            : "All invites have been created. View invite link under actions menu.";
 
           toaster.create({
-            title: title,
+            title: `${
+              newInvites.length > 1 ? "Invites" : "Invite"
+            } created successfully`,
             description: description,
             type: "success",
             duration: 5000,
@@ -364,6 +361,8 @@ function MembersList({
       ),
     [organization.members, user?.id]
   );
+
+  const publicEnv = usePublicEnv();
 
   return (
     <SettingsLayout>
@@ -776,7 +775,11 @@ function MembersList({
                   ) : (
                     <Mail size={18} />
                   )}
-                  <Text>Send invites</Text>
+                  <Text>
+                    {publicEnv.data?.HAS_EMAIL_PROVIDER_KEY
+                      ? "Send invites"
+                      : "Create invites"}
+                  </Text>
                 </HStack>
               </Button>
             </Dialog.Footer>

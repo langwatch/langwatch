@@ -105,19 +105,28 @@ function SignInForm() {
   const onSubmit = async (values: z.infer<typeof schema>) => {
     try {
       setSignInLoading(true);
-      const response: any = await signIn("credentials", {
+      const response = await signIn("credentials", {
         email: values.email,
         password: values.password,
       });
       setSignInLoading(false);
 
-      if (!response.ok) {
+      if (response?.error) {
+        throw new Error("Sign in failed");
+      }
+
+      if (response?.status && response.status >= 400) {
         throw new Error("Network response was not ok");
+      }
+
+      // Success - redirect to dashboard or return URL
+      if (response?.url) {
+        window.location.href = response.url;
       }
     } catch (e) {
       toaster.create({
         title: "Error",
-        description: "Failed to sign up",
+        description: "Failed to sign in",
         type: "error",
         placement: "top-end",
         meta: {

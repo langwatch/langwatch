@@ -119,6 +119,10 @@ export function SignInError({ error }: { error: string }) {
               ) : (
                 <Alert.Description>
                   Redirecting back to sign in, please try again...
+                  <br />
+                  <Button asChild marginTop={4} color="white">
+                    <Link href="/auth/signin">Try Sign In Again</Link>
+                  </Button>
                 </Alert.Description>
               )}
             </Alert.Content>
