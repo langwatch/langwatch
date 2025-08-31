@@ -107,7 +107,9 @@ class Client(LangWatchClientProtocol):
             if span_exclude_rules is not None:
                 existing._span_exclude_rules = span_exclude_rules
             if ignore_global_tracer_provider_override_warning is not None:
-                existing._ignore_global_tracer_provider_override_warning = ignore_global_tracer_provider_override_warning
+                existing._ignore_global_tracer_provider_override_warning = (
+                    ignore_global_tracer_provider_override_warning
+                )
             if skip_open_telemetry_setup is not None:
                 existing._skip_open_telemetry_setup = skip_open_telemetry_setup
             if base_attributes is not None:
@@ -254,7 +256,7 @@ class Client(LangWatchClientProtocol):
             ):
                 cls._instance.__shutdown_tracer_provider()
             cls._instance = None
-        
+
         # Reset all class variables to their default values
         cls._debug = False
         cls._api_key = ""
