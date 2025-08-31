@@ -36,6 +36,7 @@ import { HStack, VStack } from "@chakra-ui/react";
 import { toaster } from "../components/ui/toaster";
 import { Select } from "../components/ui/select";
 import { Tooltip } from "~/components/ui/tooltip";
+import { Switch } from "../components/ui/switch";
 import { Lock } from "react-feather";
 
 type OrganizationFormData = {
@@ -301,6 +302,7 @@ type ProjectFormData = {
   piiRedactionLevel: PIIRedactionLevel;
   capturedInputVisibility: ProjectSensitiveDataVisibilityLevel;
   capturedOutputVisibility: ProjectSensitiveDataVisibilityLevel;
+  traceSharingEnabled: boolean;
 };
 
 function ProjectSettingsForm({ project }: { project: Project }) {
@@ -391,6 +393,7 @@ function ProjectSettingsForm({ project }: { project: Project }) {
     piiRedactionLevel: project.piiRedactionLevel,
     capturedInputVisibility: project.capturedInputVisibility,
     capturedOutputVisibility: project.capturedOutputVisibility,
+    traceSharingEnabled: project.traceSharingEnabled,
   };
   const [previousValues, setPreviousValues] =
     useState<ProjectFormData>(defaultValues);
@@ -421,6 +424,7 @@ function ProjectSettingsForm({ project }: { project: Project }) {
         // Only admins can change the visibility settings, this is enforced in the backend
         capturedInputVisibility: userIsAdmin ? data.capturedInputVisibility : void 0,
         capturedOutputVisibility: userIsAdmin ? data.capturedOutputVisibility : void 0,
+        traceSharingEnabled: userIsAdmin ? data.traceSharingEnabled : void 0,
       },
       {
         onSuccess: () => {
@@ -651,6 +655,38 @@ function ProjectSettingsForm({ project }: { project: Project }) {
                       ))}
                     </Select.Content>
                   </Select.Root>
+                )}
+              />
+            </HorizontalFormControl>
+
+            <HorizontalFormControl
+              label="Trace Sharing"
+              helper={
+                <VStack align="start" gap={1}>
+                  <Text>Allow users to share traces with public links</Text>
+                  {!userIsAdmin && (
+                    <Badge colorPalette="blue" variant="surface" size={"xs"}>
+                      <Tooltip content="Contact your admin to change this setting">
+                        <HStack>
+                          <Lock size={10} />
+                          <Text>Admin only</Text>
+                        </HStack>
+                      </Tooltip>
+                    </Badge>
+                  )}
+                </VStack>
+              }
+              invalid={!!formState.errors.traceSharingEnabled}
+            >
+              <Controller
+                control={control}
+                name="traceSharingEnabled"
+                render={({ field }) => (
+                  <Switch
+                    checked={field.value}
+                    onChange={(e) => field.onChange(e.target.checked)}
+                    disabled={!userIsAdmin}
+                  />
                 )}
               />
             </HorizontalFormControl>
