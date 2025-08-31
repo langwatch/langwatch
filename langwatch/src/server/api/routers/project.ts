@@ -28,6 +28,7 @@ import {
 } from "@prisma/client";
 import { encrypt } from "~/utils/encryption";
 import type { Session } from "next-auth";
+import { revokeAllTraceShares } from "./share";
 
 export const projectRouter = createTRPCRouter({
   publicGetById: publicProcedure
@@ -318,6 +319,14 @@ export const projectRouter = createTRPCRouter({
           s3Bucket: input.s3Bucket,
         },
       });
+
+      // If trace sharing was disabled, revoke all existing trace shares
+      if (
+        input.traceSharingEnabled === false &&
+        project.traceSharingEnabled === true
+      ) {
+        await revokeAllTraceShares(input.projectId);
+      }
 
       return { success: true, projectSlug: updatedProject.slug };
     }),

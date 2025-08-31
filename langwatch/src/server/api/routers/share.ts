@@ -25,7 +25,19 @@ export const shareRouter = createTRPCRouter({
 
       const share = await ctx.prisma.publicShare.findFirst({
         where: { id },
+        include: {
+          project: {
+            select: {
+              traceSharingEnabled: true,
+            },
+          },
+        },
       });
+
+      // If this is a trace share and trace sharing is disabled, return null
+      if (share?.resourceType === "TRACE" && !share.project.traceSharingEnabled) {
+        return null;
+      }
 
       return share;
     }),
@@ -109,6 +121,19 @@ export const shareRouter = createTRPCRouter({
 
       await unshareItem({ projectId, resourceType, resourceId });
     }),
+
+  revokeAllTraceShares: protectedProcedure
+    .input(
+      z.object({
+        projectId: z.string(),
+      })
+    )
+    .use(checkUserPermissionForProject(TeamRoleGroup.PROJECT_CHANGE_CAPTURED_DATA_VISIBILITY))
+    .mutation(async ({ input }) => {
+      const { projectId } = input;
+
+      await revokeAllTraceShares(projectId);
+    }),
 });
 
 export const createShare = async ({
@@ -158,6 +183,15 @@ export const unshareItem = async ({
       projectId,
       resourceType,
       resourceId,
+    },
+  });
+};
+
+export const revokeAllTraceShares = async (projectId: string) => {
+  await prisma.publicShare.deleteMany({
+    where: {
+      projectId,
+      resourceType: "TRACE",
     },
   });
 };
