@@ -158,7 +158,7 @@ def test_skip_open_telemetry_setup_property():
     """Test that skip_open_telemetry_setup property returns the correct value."""
     # Reset singleton to start fresh
     Client._reset_instance()
-    
+
     client = make_client(api_key="test-key", skip_open_telemetry_setup=True)
     assert client.skip_open_telemetry_setup is True
 
@@ -193,33 +193,35 @@ def test_nested_trace_linking_behavior():
     """Test that nested traces are properly linked via OpenTelemetry links."""
     from langwatch import trace
     from unittest.mock import patch
-    
+
     # Reset any existing singleton
     Client._reset_instance()
-    
+
     # Mock the setup to avoid API key requirement
-    with patch('langwatch.utils.initialization.setup') as mock_setup, \
-         patch('langwatch.telemetry.context._set_current_trace') as mock_set_trace, \
-         patch('langwatch.telemetry.context._reset_current_trace') as mock_reset_trace:
-        
+    with (
+        patch("langwatch.utils.initialization.setup") as mock_setup,
+        patch("langwatch.telemetry.context._set_current_trace") as mock_set_trace,
+        patch("langwatch.telemetry.context._reset_current_trace") as mock_reset_trace,
+    ):
+
         # Create a mock client
         mock_client = make_client(api_key="test-key", disable_sending=True)
         mock_setup.return_value = mock_client
-        
+
         @trace(name="outer")
         @trace(name="inner")
         def test_function():
             return "test result"
-        
+
         # Call the decorated function
         result = test_function()
-        
+
         # Verify the function works
         assert result == "test result"
-        
+
         # Verify that both traces were created and properly managed
         assert mock_set_trace.call_count >= 2  # Both outer and inner traces
         assert mock_reset_trace.call_count >= 2  # Both traces cleaned up
-        
+
         # The key point is that both decorators create their own traces
         # and the existing linking logic in _create_root_span handles relationships
