@@ -150,10 +150,7 @@ class OpenAICompletionTracer:
         if not trace or trace not in self.tracked_traces:
             return cast(Any, self.client.completions)._original_create(*args, **kwargs)
 
-        span = trace.span(
-            type="llm",
-            parent=trace.get_current_span(),
-        ).__enter__()
+        span = trace.span(type="llm").__enter__()
 
         started_at = milliseconds_timestamp()
         try:
@@ -209,10 +206,7 @@ class OpenAICompletionTracer:
                 *args, **kwargs
             )
 
-        span = trace.span(
-            type="llm",
-            parent=trace.get_current_span(),
-        ).__enter__()
+        span = trace.span(type="llm").__enter__()
 
         started_at = milliseconds_timestamp()
         response: Union[Completion, AsyncStream[Completion]] = await cast(
@@ -553,7 +547,7 @@ class OpenAIChatCompletionTracer:
                 delta = choice.delta
                 if delta.role:
                     chat_message: ChatMessage = {
-                        "role": delta.role,
+                        "role": delta.role,  # type: ignore
                         "content": delta.content,
                     }
                     if delta.function_call:

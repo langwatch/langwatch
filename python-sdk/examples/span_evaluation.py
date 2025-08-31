@@ -53,7 +53,7 @@ async def extract_structured_user_bios(user_bios: list[str]) -> GetBioInfoList:
         output=str(get_bio_info_list),
         contexts=user_bios,
         settings={
-            "model": "openai/gpt-3.5-turbo-16k",
+            "model": "openai/gpt-5",
             "embeddings_model": "openai/text-embedding-ada-002",
             "max_tokens": 2048,
         },
@@ -211,7 +211,7 @@ async def main(message: cl.Message):
         output=answer,
         expected_output="Rogerio",
         settings={
-            "model": "openai/gpt-3.5-turbo-16k",
+            "model": "openai/gpt-5",
             "embeddings_model": "openai/text-embedding-ada-002",
             "max_tokens": 2048,
         },
