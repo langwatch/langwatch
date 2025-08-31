@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { TRPCError } from "@trpc/server";
 
 import {
   createTRPCRouter,
@@ -70,6 +71,21 @@ export const shareRouter = createTRPCRouter({
     .use(checkUserPermissionForProject(TeamRoleGroup.MESSAGES_SHARE))
     .mutation(async ({ input, ctx }) => {
       const { projectId, resourceType, resourceId } = input;
+
+      // Check if trace sharing is enabled for this project
+      if (resourceType === "TRACE") {
+        const project = await ctx.prisma.project.findUnique({
+          where: { id: projectId },
+          select: { traceSharingEnabled: true },
+        });
+
+        if (!project?.traceSharingEnabled) {
+          throw new TRPCError({
+            code: "FORBIDDEN",
+            message: "Trace sharing is disabled for this project",
+          });
+        }
+      }
 
       return createShare({
         projectId,
