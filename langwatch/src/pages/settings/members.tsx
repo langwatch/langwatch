@@ -177,7 +177,7 @@ function MembersList({
 
           setSelectedInvites(newInvites);
 
-          const description = publicEnv.data?.HAS_EMAIL_PROVIDER_KEY
+          const description = hasEmailProvider
             ? "All invites have been sent."
             : "All invites have been created. View invite link under actions menu.";
 
@@ -363,6 +363,7 @@ function MembersList({
   );
 
   const publicEnv = usePublicEnv();
+  const hasEmailProvider = publicEnv.data?.HAS_EMAIL_PROVIDER_KEY;
 
   return (
     <SettingsLayout>
@@ -776,9 +777,7 @@ function MembersList({
                     <Mail size={18} />
                   )}
                   <Text>
-                    {publicEnv.data?.HAS_EMAIL_PROVIDER_KEY
-                      ? "Send invites"
-                      : "Create invites"}
+                    {hasEmailProvider ? "Send invites" : "Create invites"}
                   </Text>
                 </HStack>
               </Button>
