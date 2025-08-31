@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { extractStrandsAgentsInputOutput, isStrandsAgentsInstrumentation } from "./strands-agents";
+import { extractStrandsAgentsInputOutput, isStrandsAgentsInstrumentation, extractStrandsAgentsMetadata } from "./strands-agents";
 import type { DeepPartial } from "~/utils/types";
 import type { ISpan, IEvent } from "@opentelemetry/otlp-transformer";
 
@@ -327,5 +327,503 @@ describe("extractStrandsAgentsInputOutput", () => {
         tool_result: void 0,
       },
     ]);
+  });
+});
+
+describe("extractStrandsAgentsMetadata", () => {
+  it("returns empty object for span with no attributes", () => {
+    const span: DeepPartial<ISpan> = {};
+    const result = extractStrandsAgentsMetadata(span);
+    expect(result).toEqual({});
+  });
+
+  it("returns empty object for span with null attributes", () => {
+    const span: DeepPartial<ISpan> = { attributes: null as any };
+    const result = extractStrandsAgentsMetadata(span);
+    expect(result).toEqual({});
+  });
+
+  it("returns empty object for span with undefined attributes", () => {
+    const span: DeepPartial<ISpan> = { attributes: undefined };
+    const result = extractStrandsAgentsMetadata(span);
+    expect(result).toEqual({});
+  });
+
+  it("extracts string attributes that don't start with scope or gen_ai", () => {
+    const span: DeepPartial<ISpan> = {
+      attributes: [
+        { key: "custom.attribute", value: { stringValue: "test value" } },
+        { key: "user.id", value: { stringValue: "user123" } },
+        { key: "session.name", value: { stringValue: "session1" } },
+      ],
+    };
+    const result = extractStrandsAgentsMetadata(span);
+    expect(result).toEqual({
+      "custom.attribute": "test value",
+      "user.id": "user123",
+      "session.name": "session1",
+    });
+  });
+
+  it("filters out attributes starting with scope", () => {
+    const span: DeepPartial<ISpan> = {
+      attributes: [
+        { key: "scope.name", value: { stringValue: "test" } },
+        { key: "scope.version", value: { stringValue: "1.0" } },
+        { key: "custom.attr", value: { stringValue: "should include" } },
+      ],
+    };
+    const result = extractStrandsAgentsMetadata(span);
+    expect(result).toEqual({
+      "custom.attr": "should include",
+    });
+  });
+
+  it("filters out attributes starting with gen_ai", () => {
+    const span: DeepPartial<ISpan> = {
+      attributes: [
+        { key: "gen_ai.model", value: { stringValue: "gpt-4" } },
+        { key: "gen_ai.temperature", value: { doubleValue: 0.7 } },
+        { key: "custom.attr", value: { stringValue: "should include" } },
+      ],
+    };
+    const result = extractStrandsAgentsMetadata(span);
+    expect(result).toEqual({
+      "custom.attr": "should include",
+    });
+  });
+
+  it("extracts boolean attributes", () => {
+    const span: DeepPartial<ISpan> = {
+      attributes: [
+        { key: "feature.enabled", value: { boolValue: true } },
+        { key: "debug.mode", value: { boolValue: false } },
+      ],
+    };
+    const result = extractStrandsAgentsMetadata(span);
+    expect(result).toEqual({
+      "feature.enabled": true,
+      "debug.mode": false,
+    });
+  });
+
+  it("extracts integer attributes", () => {
+    const span: DeepPartial<ISpan> = {
+      attributes: [
+        { key: "request.count", value: { intValue: 42 } },
+        { key: "user.age", value: { intValue: 25 } },
+      ],
+    };
+    const result = extractStrandsAgentsMetadata(span);
+    expect(result).toEqual({
+      "request.count": 42,
+      "user.age": 25,
+    });
+  });
+
+  it("extracts double attributes", () => {
+    const span: DeepPartial<ISpan> = {
+      attributes: [
+        { key: "response.time", value: { doubleValue: 1.234 } },
+        { key: "accuracy.score", value: { doubleValue: 0.95 } },
+      ],
+    };
+    const result = extractStrandsAgentsMetadata(span);
+    expect(result).toEqual({
+      "response.time": 1.234,
+      "accuracy.score": 0.95,
+    });
+  });
+
+  it("extracts bytes attributes", () => {
+    const span: DeepPartial<ISpan> = {
+      attributes: [
+        { key: "data.hash", value: { bytesValue: new Uint8Array([1, 2, 3, 4]) } },
+      ],
+    };
+    const result = extractStrandsAgentsMetadata(span);
+    expect(result).toEqual({
+      "data.hash": new Uint8Array([1, 2, 3, 4]),
+    });
+  });
+
+  it("skips attributes with null or undefined values", () => {
+    const span: DeepPartial<ISpan> = {
+      attributes: [
+        { key: "valid.attr", value: { stringValue: "valid" } },
+        { key: "null.attr", value: { stringValue: null } },
+        { key: "undefined.attr", value: { stringValue: undefined } },
+        { key: "empty.attr", value: { stringValue: "" } },
+      ],
+    };
+    const result = extractStrandsAgentsMetadata(span);
+    expect(result).toEqual({
+      "valid.attr": "valid",
+    });
+  });
+
+  it("skips attributes with missing key or value", () => {
+    const span: DeepPartial<ISpan> = {
+      attributes: [
+        { key: "valid.attr", value: { stringValue: "valid" } },
+        { key: null as any, value: { stringValue: "no key" } },
+        { key: "no.value", value: null as any },
+        { key: "undefined.value", value: undefined },
+      ],
+    };
+    const result = extractStrandsAgentsMetadata(span);
+    expect(result).toEqual({
+      "valid.attr": "valid",
+    });
+  });
+
+  it("handles mixed attribute types correctly", () => {
+    const span: DeepPartial<ISpan> = {
+      attributes: [
+        { key: "string.attr", value: { stringValue: "hello" } },
+        { key: "bool.attr", value: { boolValue: true } },
+        { key: "int.attr", value: { intValue: 42 } },
+        { key: "double.attr", value: { doubleValue: 3.14 } },
+        { key: "bytes.attr", value: { bytesValue: new Uint8Array([255]) } },
+        { key: "scope.should.filter", value: { stringValue: "filtered" } },
+        { key: "gen_ai.should.filter", value: { stringValue: "filtered" } },
+      ],
+    };
+    const result = extractStrandsAgentsMetadata(span);
+    expect(result).toEqual({
+      "string.attr": "hello",
+      "bool.attr": true,
+      "int.attr": 42,
+      "double.attr": 3.14,
+      "bytes.attr": new Uint8Array([255]),
+    });
+  });
+
+  it("extracts complex attribute types (kvlistValue, arrayValue)", () => {
+    const span: DeepPartial<ISpan> = {
+      attributes: [
+        { key: "simple.attr", value: { stringValue: "simple" } },
+        { 
+          key: "complex.attr", 
+          value: { 
+            kvlistValue: { 
+              values: [
+                { key: "nested.key", value: { stringValue: "nested value" } },
+                { key: "nested.number", value: { intValue: 42 } },
+              ] 
+            } 
+          } 
+        },
+        { 
+          key: "array.attr", 
+          value: { 
+            arrayValue: { 
+              values: [
+                { stringValue: "item1" },
+                { intValue: 123 },
+                { boolValue: true },
+              ] 
+            } 
+          } 
+        },
+      ],
+    };
+    const result = extractStrandsAgentsMetadata(span);
+    expect(result).toEqual({
+      "simple.attr": "simple",
+      "complex.attr": {
+        "nested": {
+          "key": "nested value",
+          "number": 42,
+        },
+      },
+      "array.attr": ["item1", 123, true],
+    });
+  });
+
+  it("handles edge case with empty string values", () => {
+    const span: DeepPartial<ISpan> = {
+      attributes: [
+        { key: "empty.string", value: { stringValue: "" } },
+        { key: "valid.string", value: { stringValue: "not empty" } },
+      ],
+    };
+    const result = extractStrandsAgentsMetadata(span);
+    expect(result).toEqual({
+      "valid.string": "not empty",
+    });
+  });
+
+  it("handles zero values correctly", () => {
+    const span: DeepPartial<ISpan> = {
+      attributes: [
+        { key: "zero.int", value: { intValue: 0 } },
+        { key: "zero.double", value: { doubleValue: 0.0 } },
+        { key: "false.bool", value: { boolValue: false } },
+      ],
+    };
+    const result = extractStrandsAgentsMetadata(span);
+    expect(result).toEqual({
+      "zero.int": 0,
+      "zero.double": 0.0,
+      "false.bool": false,
+    });
+  });
+
+  it("handles attributes with multiple value types set (should use first defined)", () => {
+    const span: DeepPartial<ISpan> = {
+      attributes: [
+        { 
+          key: "mixed.attr", 
+          value: { 
+            stringValue: "string value",
+            intValue: 42,
+            boolValue: true 
+          } 
+        },
+      ],
+    };
+    const result = extractStrandsAgentsMetadata(span);
+    expect(result).toEqual({
+      "mixed.attr": "string value", // Should use stringValue since it's checked first
+    });
+  });
+
+  it("handles case sensitivity in attribute key filtering", () => {
+    const span: DeepPartial<ISpan> = {
+      attributes: [
+        { key: "SCOPE.name", value: { stringValue: "should include" } },
+        { key: "scope.name", value: { stringValue: "should filter" } },
+        { key: "GEN_AI.model", value: { stringValue: "should include" } },
+        { key: "gen_ai.model", value: { stringValue: "should filter" } },
+      ],
+    };
+    const result = extractStrandsAgentsMetadata(span);
+    expect(result).toEqual({
+      "SCOPE.name": "should include",
+      "GEN_AI.model": "should include",
+    });
+  });
+
+  it("handles attributes with empty array", () => {
+    const span: DeepPartial<ISpan> = {
+      attributes: [],
+    };
+    const result = extractStrandsAgentsMetadata(span);
+    expect(result).toEqual({});
+  });
+
+  it("handles attributes with undefined/null in the array", () => {
+    const span: DeepPartial<ISpan> = {
+      attributes: [
+        { key: "valid.attr", value: { stringValue: "valid" } },
+        null as any,
+        undefined as any,
+        { key: "another.valid", value: { stringValue: "also valid" } },
+      ],
+    };
+    const result = extractStrandsAgentsMetadata(span);
+    expect(result).toEqual({
+      "valid.attr": "valid",
+      "another.valid": "also valid",
+    });
+  });
+
+  it("handles attributes with whitespace-only string values", () => {
+    const span: DeepPartial<ISpan> = {
+      attributes: [
+        { key: "whitespace.attr", value: { stringValue: "   " } },
+        { key: "valid.attr", value: { stringValue: "valid" } },
+        { key: "tab.attr", value: { stringValue: "\t\n" } },
+        { key: "empty.attr", value: { stringValue: "" } },
+      ],
+    };
+    const result = extractStrandsAgentsMetadata(span);
+    expect(result).toEqual({
+      "whitespace.attr": "   ",
+      "valid.attr": "valid",
+      "tab.attr": "\t\n",
+    });
+  });
+
+  it("handles attributes with numeric string values", () => {
+    const span: DeepPartial<ISpan> = {
+      attributes: [
+        { key: "numeric.string", value: { stringValue: "123" } },
+        { key: "decimal.string", value: { stringValue: "3.14" } },
+        { key: "negative.string", value: { stringValue: "-42" } },
+      ],
+    };
+    const result = extractStrandsAgentsMetadata(span);
+    expect(result).toEqual({
+      "numeric.string": "123",
+      "decimal.string": "3.14",
+      "negative.string": "-42",
+    });
+  });
+
+  it("handles deeply nested kvlistValue structures", () => {
+    const span: DeepPartial<ISpan> = {
+      attributes: [
+        { 
+          key: "deeply.nested", 
+          value: { 
+            kvlistValue: { 
+              values: [
+                { 
+                  key: "level1", 
+                  value: { 
+                    kvlistValue: { 
+                      values: [
+                        { key: "level2.key", value: { stringValue: "deep value" } },
+                        { key: "level2.number", value: { intValue: 999 } },
+                      ] 
+                    } 
+                  } 
+                },
+                { key: "top.level", value: { stringValue: "top value" } },
+              ] 
+            } 
+          } 
+        },
+      ],
+    };
+    const result = extractStrandsAgentsMetadata(span);
+    expect(result).toEqual({
+      "deeply.nested": {
+        "level1": {
+          "level2": {
+            "key": "deep value",
+            "number": 999,
+          },
+        },
+        "top": {
+          "level": "top value",
+        },
+      },
+    });
+  });
+
+  it("handles mixed complex types in arrays", () => {
+    const span: DeepPartial<ISpan> = {
+      attributes: [
+        { 
+          key: "mixed.array", 
+          value: { 
+            arrayValue: { 
+              values: [
+                { stringValue: "string item" },
+                { intValue: 456 },
+                { boolValue: false },
+                { 
+                  kvlistValue: { 
+                    values: [
+                      { key: "nested.key", value: { stringValue: "nested in array" } },
+                    ] 
+                  } 
+                },
+                { 
+                  arrayValue: { 
+                    values: [
+                      { stringValue: "nested array item" },
+                    ] 
+                  } 
+                },
+              ] 
+            } 
+          } 
+        },
+      ],
+    };
+    const result = extractStrandsAgentsMetadata(span);
+    expect(result).toEqual({
+      "mixed.array": [
+        "string item",
+        456,
+        false,
+        {
+          "nested": {
+            "key": "nested in array",
+          },
+        },
+        ["nested array item"],
+      ],
+    });
+  });
+
+  it("handles empty complex types", () => {
+    const span: DeepPartial<ISpan> = {
+      attributes: [
+        { key: "empty.kvlist", value: { kvlistValue: { values: [] } } },
+        { key: "empty.array", value: { arrayValue: { values: [] } } },
+        { key: "valid.attr", value: { stringValue: "valid" } },
+      ],
+    };
+    const result = extractStrandsAgentsMetadata(span);
+    expect(result).toEqual({
+      "empty.kvlist": {},
+      "empty.array": [],
+      "valid.attr": "valid",
+    });
+  });
+
+  it("handles complex types with filtering (scope/gen_ai)", () => {
+    const span: DeepPartial<ISpan> = {
+      attributes: [
+        { key: "valid.complex", value: { kvlistValue: { values: [{ key: "nested", value: { stringValue: "valid" } }] } } },
+        { key: "scope.should.filter", value: { kvlistValue: { values: [{ key: "nested", value: { stringValue: "filtered" } }] } } },
+        { key: "gen_ai.should.filter", value: { arrayValue: { values: [{ stringValue: "filtered" }] } } },
+      ],
+    };
+    const result = extractStrandsAgentsMetadata(span);
+    expect(result).toEqual({
+      "valid.complex": {
+        "nested": "valid",
+      },
+    });
+  });
+
+  it("handles JSON parsing in string values within complex types", () => {
+    const span: DeepPartial<ISpan> = {
+      attributes: [
+        { 
+          key: "json.in.kvlist", 
+          value: { 
+            kvlistValue: { 
+              values: [
+                { key: "json.string", value: { stringValue: '{"key": "value", "number": 42}' } },
+                { key: "plain.string", value: { stringValue: "plain text" } },
+              ] 
+            } 
+          } 
+        },
+        { 
+          key: "json.in.array", 
+          value: { 
+            arrayValue: { 
+              values: [
+                { stringValue: '{"nested": {"deep": "value"}}' },
+                { stringValue: "not json" },
+              ] 
+            } 
+          } 
+        },
+      ],
+    };
+    const result = extractStrandsAgentsMetadata(span);
+    expect(result).toEqual({
+      "json.in.kvlist": {
+        "json": {
+          "string": { key: "value", number: 42 },
+        },
+        "plain": {
+          "string": "plain text",
+        },
+      },
+      "json.in.array": [
+        { nested: { deep: "value" } },
+        "not json",
+      ],
+    });
   });
 });
