@@ -31,7 +31,7 @@ export default function SignIn({ session }: { session: Session | null }) {
 
   const publicEnv = usePublicEnv();
   const isAuthProvider = publicEnv.data?.NEXTAUTH_PROVIDER;
-  const callbackUrl = useSearchParams()?.get("callbackUrl") ?? undefined;
+  const callbackUrl = query?.get("callbackUrl") ?? undefined;
 
   useEffect(() => {
     if (!publicEnv.data) {
