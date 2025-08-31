@@ -91,8 +91,32 @@ class Client(LangWatchClientProtocol):
             debug_flag = debug or os.getenv("LANGWATCH_DEBUG") == "true"
             if debug_flag:
                 logger.debug("Returning existing LangWatch client instance")
-            # Return the existing instance by copying its attributes
+            # Return the existing instance directly
             existing = Client._instance
+            # Update the existing instance with any new parameters
+            if api_key is not None:
+                existing._api_key = api_key
+            if endpoint_url is not None:
+                existing._endpoint_url = endpoint_url
+            if debug is not None:
+                existing._debug = debug
+            if disable_sending is not None:
+                existing._disable_sending = disable_sending
+            if flush_on_exit is not None:
+                existing._flush_on_exit = flush_on_exit
+            if span_exclude_rules is not None:
+                existing._span_exclude_rules = span_exclude_rules
+            if ignore_global_tracer_provider_override_warning is not None:
+                existing._ignore_global_tracer_provider_override_warning = ignore_global_tracer_provider_override_warning
+            if skip_open_telemetry_setup is not None:
+                existing._skip_open_telemetry_setup = skip_open_telemetry_setup
+            if base_attributes is not None:
+                existing._base_attributes = base_attributes
+            if instrumentors is not None:
+                existing._instrumentors = instrumentors
+            if tracer_provider is not None:
+                existing._tracer_provider = tracer_provider
+            # Copy the existing instance's attributes to this instance and return
             self.__dict__.update(existing.__dict__)
             return
 
@@ -230,8 +254,21 @@ class Client(LangWatchClientProtocol):
             ):
                 cls._instance.__shutdown_tracer_provider()
             cls._instance = None
-            # Clear registered instrumentors to allow re-initialization
-            cls._registered_instrumentors.clear()
+        
+        # Reset all class variables to their default values
+        cls._debug = False
+        cls._api_key = ""
+        cls._endpoint_url = ""
+        cls._base_attributes = {}
+        cls._instrumentors = []
+        cls._disable_sending = False
+        cls._flush_on_exit = True
+        cls._span_exclude_rules = []
+        cls._ignore_global_tracer_provider_override_warning = False
+        cls._skip_open_telemetry_setup = False
+        cls._tracer_provider = None
+        cls._rest_api_client = None
+        cls._registered_instrumentors.clear()
 
     @property
     def debug(self) -> bool:
@@ -385,7 +422,9 @@ class Client(LangWatchClientProtocol):
             sampler = ALWAYS_OFF if self._disable_sending else TraceIdRatioBased(1.0)
             provider = TracerProvider(resource=resource, sampler=sampler)
 
-            self.__set_langwatch_exporter(provider)
+            # Only set up LangWatch exporter if sending is not disabled
+            if not self._disable_sending:
+                self.__set_langwatch_exporter(provider)
 
             if self._flush_on_exit:
                 logger.info(
