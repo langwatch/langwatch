@@ -70,6 +70,7 @@ export const getServerSideProps = async (
 };
 
 function SignUpForm() {
+  const callbackUrl = useSearchParams()?.get("callbackUrl") ?? undefined;
   const schema = z
     .object({
       name: z.string().min(1, { message: "Name is required" }),
@@ -101,6 +102,7 @@ function SignUpForm() {
       const response = await signIn("credentials", {
         email: values.email,
         password: values.password,
+        callbackUrl: callbackUrl,
       });
       setSignInLoading(false);
 
@@ -188,7 +190,14 @@ function SignUpForm() {
                 </Alert.Root>
               )}
               <HStack width="full" paddingTop={4}>
-                <Link href="/auth/signin" textDecoration="underline">
+                <Link
+                  href={`/auth/signin${
+                    callbackUrl
+                      ? `?callbackUrl=${encodeURIComponent(callbackUrl)}`
+                      : ""
+                  }`}
+                  textDecoration="underline"
+                >
                   Already have an account?
                 </Link>
                 <Spacer />
