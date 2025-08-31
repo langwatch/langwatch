@@ -148,6 +148,9 @@ function MembersList({
     { inviteCode: string; email: string }[]
   >([]);
 
+  const publicEnv = usePublicEnv();
+  const hasEmailProvider = publicEnv.data?.HAS_EMAIL_PROVIDER_KEY;
+
   const onSubmit: SubmitHandler<MembersForm> = (data) => {
     createInvitesMutation.mutate(
       {
@@ -361,9 +364,6 @@ function MembersList({
       ),
     [organization.members, user?.id]
   );
-
-  const publicEnv = usePublicEnv();
-  const hasEmailProvider = publicEnv.data?.HAS_EMAIL_PROVIDER_KEY;
 
   return (
     <SettingsLayout>
