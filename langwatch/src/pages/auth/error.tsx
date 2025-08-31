@@ -66,6 +66,9 @@ export default function Error({ session }: { session: Session | null }) {
 }
 
 export function SignInError({ error }: { error: string }) {
+  const query = useSearchParams();
+  const callbackUrl = query?.get("callbackUrl") ?? undefined;
+
   return (
     <Container maxW="container.md" paddingTop="calc(40vh - 164px)">
       <Card.Root>
@@ -121,7 +124,15 @@ export function SignInError({ error }: { error: string }) {
                   Redirecting back to sign in, please try again...
                   <br />
                   <Button asChild marginTop={4} color="white">
-                    <Link href="/auth/signin">Try Sign In Again</Link>
+                    <Link
+                      href={`/auth/signin${
+                        callbackUrl
+                          ? `?callbackUrl=${encodeURIComponent(callbackUrl)}`
+                          : ""
+                      }`}
+                    >
+                      Try Sign In Again
+                    </Link>
                   </Button>
                 </Alert.Description>
               )}

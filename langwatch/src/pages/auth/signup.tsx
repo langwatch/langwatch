@@ -70,7 +70,9 @@ export const getServerSideProps = async (
 };
 
 function SignUpForm() {
-  const callbackUrl = useSearchParams()?.get("callbackUrl") ?? undefined;
+  const query = useSearchParams();
+  const callbackUrl = query?.get("callbackUrl") ?? undefined;
+
   const schema = z
     .object({
       name: z.string().min(1, { message: "Name is required" }),
@@ -112,11 +114,6 @@ function SignUpForm() {
 
       if (response?.status && response.status >= 400) {
         throw new Error("Network response was not ok");
-      }
-
-      // Success - redirect to dashboard or return URL
-      if (response?.url) {
-        window.location.href = response.url;
       }
     } catch (e) {
       toaster.create({

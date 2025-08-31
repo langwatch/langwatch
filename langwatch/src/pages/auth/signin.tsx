@@ -120,11 +120,6 @@ function SignInForm() {
       if (response?.status && response.status >= 400) {
         throw new Error("Network response was not ok");
       }
-
-      // Success - redirect to dashboard or return URL
-      if (response?.url) {
-        window.location.href = response.url;
-      }
     } catch (e) {
       toaster.create({
         title: "Error",
