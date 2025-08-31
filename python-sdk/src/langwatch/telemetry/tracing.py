@@ -519,12 +519,12 @@ class LangWatchTrace:
                         items.append(item)
                         yield item
 
-                    output = (
-                        "".join(items)
-                        if all(isinstance(item, str) for item in items)
-                        else items
-                    )
-                    trace._set_callee_output_information(func, output)
+                        output = (
+                            "".join(items)
+                            if all(isinstance(item, str) for item in items)
+                            else items
+                        )
+                        trace._set_callee_output_information(func, output)
 
             return wrapper
         elif inspect.iscoroutinefunction(func):
@@ -543,7 +543,7 @@ class LangWatchTrace:
 
             @functools.wraps(func)
             def wrapper(*args: Any, **kwargs: Any) -> Any:
-                # Always create a new trace, but it will be nested if there's already a current trace
+                # Create new trace
                 with self._clone() as trace:
                     trace._set_callee_input_information(func, *args, **kwargs)
                     output = func(*args, **kwargs)
