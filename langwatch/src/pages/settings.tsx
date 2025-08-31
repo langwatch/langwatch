@@ -37,6 +37,7 @@ import { toaster } from "../components/ui/toaster";
 import { Select } from "../components/ui/select";
 import { Tooltip } from "~/components/ui/tooltip";
 import { Switch } from "../components/ui/switch";
+import { Dialog } from "../components/ui/dialog";
 import { Lock } from "react-feather";
 
 type OrganizationFormData = {
@@ -405,9 +406,33 @@ function ProjectSettingsForm({ project }: { project: Project }) {
   const updateProject = api.project.update.useMutation();
   const apiContext = api.useContext();
   const [changeLanguageFramework, setChangeLanguageFramework] = useState(false);
+  const [showTraceSharingDialog, setShowTraceSharingDialog] = useState(false);
+  const [pendingTraceSharingValue, setPendingTraceSharingValue] = useState<boolean | null>(null);
+
+  const handleTraceSharingChange = (newValue: boolean) => {
+    // Directly update the form value
+    form.setValue("traceSharingEnabled", newValue);
+  };
+
+  const confirmDisableTraceSharing = () => {
+    setShowTraceSharingDialog(false);
+    // Proceed with the form submission
+    handleSubmit(onSubmit)();
+  };
+
+  const cancelDisableTraceSharing = () => {
+    setShowTraceSharingDialog(false);
+  };
 
   const onSubmit: SubmitHandler<ProjectFormData> = (data: ProjectFormData) => {
     if (isEqual(data, previousValues)) return;
+
+    // Check if trace sharing is being disabled
+    if (data.traceSharingEnabled === false && project.traceSharingEnabled === true) {
+      // Show confirmation dialog before proceeding
+      setShowTraceSharingDialog(true);
+      return;
+    }
 
     setPreviousValues(data);
 
@@ -684,7 +709,7 @@ function ProjectSettingsForm({ project }: { project: Project }) {
                 render={({ field }) => (
                   <Switch
                     checked={field.value}
-                    onChange={(e) => field.onChange(e.target.checked)}
+                    onChange={(e) => handleTraceSharingChange(e.target.checked)}
                     disabled={!userIsAdmin}
                   />
                 )}
@@ -736,6 +761,58 @@ function ProjectSettingsForm({ project }: { project: Project }) {
           </form>
         </Card.Body>
       </Card.Root>
+
+      {/* Trace Sharing Disable Confirmation Dialog */}
+      <Dialog.Root open={showTraceSharingDialog} onOpenChange={({ open }) => setShowTraceSharingDialog(open)}>
+        <Dialog.Backdrop />
+        <Dialog.Content>
+          <Dialog.Header>
+            <Dialog.Title>Disable Trace Sharing?</Dialog.Title>
+          </Dialog.Header>
+          <Dialog.Body>
+            <VStack align="start" gap={4}>
+              <Text>
+                Are you sure you want to save these changes and disable trace sharing for this project?
+              </Text>
+              <VStack 
+                align="start" 
+                gap={2} 
+                padding={4} 
+                backgroundColor="orange.50" 
+                borderWidth="1px" 
+                borderColor="orange.200" 
+                borderRadius="md"
+              >
+                <HStack gap={2}>
+                  <Text fontWeight="semibold" color="orange.700">
+                    ⚠️ Warning
+                  </Text>
+                </HStack>
+                <Text fontSize="sm" color="orange.700">
+                  This action will <b>immediately revoke</b> all existing shared trace links. 
+                  Anyone with previously shared trace URLs will <b>no longer be able to access them</b>.
+                </Text>
+              </VStack>
+            </VStack>
+          </Dialog.Body>
+          <Dialog.Footer>
+            <HStack gap={2}>
+              <Button
+                variant="outline"
+                onClick={cancelDisableTraceSharing}
+              >
+                Cancel
+              </Button>
+              <Button
+                colorPalette="red"
+                onClick={confirmDisableTraceSharing}
+              >
+                Save & Disable Trace Sharing
+              </Button>
+            </HStack>
+          </Dialog.Footer>
+        </Dialog.Content>
+      </Dialog.Root>
     </>
   );
 }
