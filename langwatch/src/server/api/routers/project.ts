@@ -245,6 +245,7 @@ export const projectRouter = createTRPCRouter({
           capturedOutputVisibility: z
             .enum(["REDACTED_TO_ALL", "VISIBLE_TO_ADMIN", "VISIBLE_TO_ALL"])
             .optional(),
+          traceSharingEnabled: z.boolean().optional(),
           userLinkTemplate: z.string().optional(),
           s3Endpoint: z.string().optional(),
           s3AccessKeyId: z.string().optional(),
@@ -305,6 +306,8 @@ export const projectRouter = createTRPCRouter({
             input.capturedInputVisibility ?? project.capturedInputVisibility,
           capturedOutputVisibility:
             input.capturedOutputVisibility ?? project.capturedOutputVisibility,
+          traceSharingEnabled:
+            input.traceSharingEnabled ?? project.traceSharingEnabled,
           s3Endpoint: input.s3Endpoint ? encrypt(input.s3Endpoint) : null,
           s3AccessKeyId: input.s3AccessKeyId
             ? encrypt(input.s3AccessKeyId)
@@ -494,12 +497,14 @@ async function checkCapturedDataVisibilityPermission({
     projectId: string;
     capturedInputVisibility?: string;
     capturedOutputVisibility?: string;
+    traceSharingEnabled?: boolean;
   };
   next: () => Promise<any>;
 }) {
   if (
     (input.capturedInputVisibility !== void 0 ||
-      input.capturedOutputVisibility !== void 0) &&
+      input.capturedOutputVisibility !== void 0 ||
+      input.traceSharingEnabled !== void 0) &&
     !(await backendHasTeamProjectPermission(
       ctx,
       { projectId: input.projectId },
