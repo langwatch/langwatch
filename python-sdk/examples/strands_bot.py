@@ -1,5 +1,4 @@
 import os
-from typing import Any
 from strands import Agent
 from strands.models.litellm import LiteLLMModel
 import langwatch
@@ -8,7 +7,10 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+import chainlit.config as cl_config
 import chainlit as cl
+
+cl_config.config.project.enable_telemetry = False
 
 # OpenTelemetry Setup Options:
 
