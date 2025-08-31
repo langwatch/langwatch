@@ -11,6 +11,7 @@ import {
   Alert,
   Badge,
 } from "@chakra-ui/react";
+import { Switch } from "~/components/ui/switch";
 import { PIIRedactionLevel, ProjectSensitiveDataVisibilityLevel, type Project } from "@prisma/client";
 import isEqual from "lodash-es/isEqual";
 import { useState } from "react";
@@ -301,6 +302,7 @@ type ProjectFormData = {
   piiRedactionLevel: PIIRedactionLevel;
   capturedInputVisibility: ProjectSensitiveDataVisibilityLevel;
   capturedOutputVisibility: ProjectSensitiveDataVisibilityLevel;
+  traceSharingDisabled: boolean;
 };
 
 function ProjectSettingsForm({ project }: { project: Project }) {
@@ -378,6 +380,7 @@ function ProjectSettingsForm({ project }: { project: Project }) {
     redirectToOnboarding: false,
   });
   const userIsAdmin = hasTeamPermission(TeamRoleGroup.PROJECT_CHANGE_CAPTURED_DATA_VISIBILITY);
+  const userCanChangeTraceSharing = hasTeamPermission(TeamRoleGroup.PROJECT_CHANGE_TRACE_SHARING);
 
   const defaultValues = {
     name: project.name,
@@ -391,6 +394,7 @@ function ProjectSettingsForm({ project }: { project: Project }) {
     piiRedactionLevel: project.piiRedactionLevel,
     capturedInputVisibility: project.capturedInputVisibility,
     capturedOutputVisibility: project.capturedOutputVisibility,
+    traceSharingDisabled: project.traceSharingDisabled,
   };
   const [previousValues, setPreviousValues] =
     useState<ProjectFormData>(defaultValues);
@@ -421,6 +425,7 @@ function ProjectSettingsForm({ project }: { project: Project }) {
         // Only admins can change the visibility settings, this is enforced in the backend
         capturedInputVisibility: userIsAdmin ? data.capturedInputVisibility : void 0,
         capturedOutputVisibility: userIsAdmin ? data.capturedOutputVisibility : void 0,
+        traceSharingDisabled: userCanChangeTraceSharing ? data.traceSharingDisabled : void 0,
       },
       {
         onSuccess: () => {
@@ -651,6 +656,38 @@ function ProjectSettingsForm({ project }: { project: Project }) {
                       ))}
                     </Select.Content>
                   </Select.Root>
+                )}
+              />
+            </HorizontalFormControl>
+
+            <HorizontalFormControl
+              label="Disable Trace Sharing"
+              helper={
+                <VStack align="start" gap={1}>
+                  <Text>Prevent users from sharing traces publicly for this project</Text>
+                  {!userCanChangeTraceSharing && (
+                    <Badge colorPalette="blue" variant="surface" size={"xs"}>
+                      <Tooltip content="Contact your admin to change this setting">
+                        <HStack>
+                          <Lock size={10} />
+                          <Text>Admin only</Text>
+                        </HStack>
+                      </Tooltip>
+                    </Badge>
+                  )}
+                </VStack>
+              }
+            >
+              <Controller
+                control={control}
+                name="traceSharingDisabled"
+                render={({ field }) => (
+                  <Switch
+                    {...field}
+                    checked={field.value}
+                    onCheckedChange={(e) => field.onChange(e.checked)}
+                    disabled={!userCanChangeTraceSharing}
+                  />
                 )}
               />
             </HorizontalFormControl>

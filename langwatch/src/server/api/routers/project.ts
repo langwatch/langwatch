@@ -245,6 +245,7 @@ export const projectRouter = createTRPCRouter({
           capturedOutputVisibility: z
             .enum(["REDACTED_TO_ALL", "VISIBLE_TO_ADMIN", "VISIBLE_TO_ALL"])
             .optional(),
+          traceSharingDisabled: z.boolean().optional(),
           userLinkTemplate: z.string().optional(),
           s3Endpoint: z.string().optional(),
           s3AccessKeyId: z.string().optional(),
@@ -264,6 +265,7 @@ export const projectRouter = createTRPCRouter({
     )
     .use(checkUserPermissionForProject(TeamRoleGroup.SETUP_PROJECT))
     .use(checkCapturedDataVisibilityPermission)
+    .use(checkTraceSharingPermission)
     .mutation(async ({ input, ctx }) => {
       const prisma = ctx.prisma;
 
@@ -305,6 +307,7 @@ export const projectRouter = createTRPCRouter({
             input.capturedInputVisibility ?? project.capturedInputVisibility,
           capturedOutputVisibility:
             input.capturedOutputVisibility ?? project.capturedOutputVisibility,
+          traceSharingDisabled: input.traceSharingDisabled ?? project.traceSharingDisabled,
           s3Endpoint: input.s3Endpoint ? encrypt(input.s3Endpoint) : null,
           s3AccessKeyId: input.s3AccessKeyId
             ? encrypt(input.s3AccessKeyId)
@@ -510,6 +513,35 @@ async function checkCapturedDataVisibilityPermission({
       code: "FORBIDDEN",
       message:
         "You don't have permission to change captured data visibility settings",
+    });
+  }
+  return next();
+}
+
+async function checkTraceSharingPermission({
+  ctx,
+  input,
+  next,
+}: {
+  ctx: { prisma: PrismaClient; session: Session; permissionChecked: boolean };
+  input: {
+    projectId: string;
+    traceSharingDisabled?: boolean;
+  };
+  next: () => Promise<any>;
+}) {
+  if (
+    input.traceSharingDisabled !== void 0 &&
+    !(await backendHasTeamProjectPermission(
+      ctx,
+      { projectId: input.projectId },
+      TeamRoleGroup.PROJECT_CHANGE_TRACE_SHARING
+    ))
+  ) {
+    throw new TRPCError({
+      code: "FORBIDDEN",
+      message:
+        "You don't have permission to change trace sharing settings",
     });
   }
   return next();

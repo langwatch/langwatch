@@ -286,6 +286,10 @@ class LangWatchTrace:
                 headers={"X-Auth-Token": get_api_key()},
                 timeout=15,
             )
+            if response.status_code == 403:
+                error_data = response.json()
+                if "Trace sharing has been disabled" in error_data.get("message", ""):
+                    raise ValueError("Trace sharing has been disabled for this project by an admin")
             response.raise_for_status()
             path = response.json()["path"]
             return f"{endpoint}{path}"

@@ -53,6 +53,7 @@ export const teamRolePermissionMapping = {
   TEAM_MEMBERS_MANAGE: [TeamUserRole.ADMIN],
   TEAM_CREATE_NEW_PROJECTS: [TeamUserRole.ADMIN],
   PROJECT_CHANGE_CAPTURED_DATA_VISIBILITY: [TeamUserRole.ADMIN],
+  PROJECT_CHANGE_TRACE_SHARING: [TeamUserRole.ADMIN],
   SCENARIOS_VIEW: [
     TeamUserRole.ADMIN,
     TeamUserRole.MEMBER,

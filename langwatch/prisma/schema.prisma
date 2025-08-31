@@ -200,6 +200,7 @@ model Project {
     piiRedactionLevel        PIIRedactionLevel                   @default(ESSENTIAL)
     capturedInputVisibility  ProjectSensitiveDataVisibilityLevel @default(VISIBLE_TO_ALL)
     capturedOutputVisibility ProjectSensitiveDataVisibilityLevel @default(VISIBLE_TO_ALL)
+    traceSharingDisabled     Boolean                             @default(false)
     triggers                 Trigger[]
     experiments              Experiment[]
     annotations              Annotation[]

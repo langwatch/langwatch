@@ -39,6 +39,7 @@ export function ShareButton({
     onClose();
   }, [disableClose, onClose]);
 
+  // Hide share button if user doesn't have permission and trace isn't already shared
   if (!hasSharePermission && !shareState.data?.id) {
     return null;
   }
@@ -148,6 +149,13 @@ export function ShareButton({
                   )}
                 </HStack>
               </>
+            ) : project.traceSharingDisabled ? (
+              <VStack align="start" gap={3}>
+                <Text>Trace sharing has been disabled for this project by an admin.</Text>
+                <Text fontSize="sm" color="gray.600">
+                  Contact your project admin to enable trace sharing if needed.
+                </Text>
+              </VStack>
             ) : (
               <>
                 <Text>Are you sure you want to share this trace publicly?</Text>
