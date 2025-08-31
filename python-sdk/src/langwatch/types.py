@@ -1,6 +1,6 @@
 """Common types and protocols for LangWatch."""
 
-from typing import Protocol
+from typing import Protocol, Optional, Sequence, List
 from langwatch.domain import (
     BaseAttributes,
     AttributeValue,
@@ -28,11 +28,16 @@ from langwatch.domain import (
     SpanInputOutput,
     SpanTimestamps,
     TraceMetadata,
+    SpanProcessingExcludeRule,
 )
 from .generated.langwatch_rest_api_client import Client as LangWatchRestApiClient
+from opentelemetry.sdk.trace import TracerProvider
+from opentelemetry.instrumentation.instrumentor import BaseInstrumentor
+
 
 class LangWatchClientProtocol(Protocol):
     """Protocol defining the required interface for LangWatch client instances."""
+
     @property
     def endpoint_url(self) -> str:
         """Get the endpoint URL for the client."""
@@ -78,6 +83,17 @@ class LangWatchClientProtocol(Protocol):
     def rest_api_client(self) -> LangWatchRestApiClient:
         """Get the REST API client for the client."""
         ...
+
+    @property
+    def skip_open_telemetry_setup(self) -> bool:
+        """Get whether OpenTelemetry setup is skipped."""
+        ...
+
+    # Regular attributes (not properties)
+    base_attributes: BaseAttributes
+    tracer_provider: Optional[TracerProvider]
+    instrumentors: Sequence[BaseInstrumentor]
+    _span_exclude_rules: List[SpanProcessingExcludeRule]
 
 
 __all__ = [
