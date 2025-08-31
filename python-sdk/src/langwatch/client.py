@@ -56,6 +56,25 @@ class Client(LangWatchClientProtocol):
     tracer_provider: Optional[TracerProvider]
     instrumentors: Sequence[BaseInstrumentor]
 
+    def __new__(
+        cls,
+        api_key: Optional[str] = None,
+        endpoint_url: Optional[str] = None,
+        base_attributes: Optional[BaseAttributes] = None,
+        instrumentors: Optional[Sequence[BaseInstrumentor]] = None,
+        tracer_provider: Optional[TracerProvider] = None,
+        debug: Optional[bool] = None,
+        disable_sending: Optional[bool] = None,
+        flush_on_exit: Optional[bool] = None,
+        span_exclude_rules: Optional[List[SpanProcessingExcludeRule]] = None,
+        ignore_global_tracer_provider_override_warning: Optional[bool] = None,
+        skip_open_telemetry_setup: Optional[bool] = None,
+    ) -> "Client":
+        """Ensure only one instance of Client exists (singleton pattern)."""
+        if cls._instance is None:
+            cls._instance = super().__new__(cls)
+        return cls._instance
+
     def __init__(
         self,
         api_key: Optional[str] = None,
@@ -86,31 +105,31 @@ class Client(LangWatchClientProtocol):
                 skip_open_telemetry_setup: Optional. If True, OpenTelemetry setup will be skipped entirely. This is useful when you want to handle OpenTelemetry setup yourself.
         """
 
-        # Check if an instance already exists
-        if Client._instance is not None:
+        # Check if this instance has already been initialized
+        if hasattr(self, "_initialized"):
+            # Instance already exists, update it with new parameters
             debug_flag = debug or os.getenv("LANGWATCH_DEBUG") == "true"
             if debug_flag:
-                logger.debug("Returning existing LangWatch client instance")
-            # Return the existing instance directly
-            existing = Client._instance
+                logger.debug("Updating existing LangWatch client instance")
+
             # Update via public setters so side-effects run
-            if api_key is not None and api_key != existing.api_key:
-                existing.api_key = api_key
+            if api_key is not None and api_key != self.api_key:
+                self.api_key = api_key
             if endpoint_url is not None and endpoint_url != Client._endpoint_url:
                 Client._endpoint_url = endpoint_url
                 if (
                     not Client._skip_open_telemetry_setup
                     and not Client._disable_sending
                 ):
-                    existing.__shutdown_tracer_provider()
-                    existing.__setup_tracer_provider()
+                    self.__shutdown_tracer_provider()
+                    self.__setup_tracer_provider()
             if debug is not None:
                 Client._debug = debug
             if (
                 disable_sending is not None
                 and disable_sending != Client._disable_sending
             ):
-                existing.disable_sending = disable_sending
+                self.disable_sending = disable_sending
             if flush_on_exit is not None:
                 Client._flush_on_exit = flush_on_exit
             if span_exclude_rules is not None:
@@ -129,7 +148,7 @@ class Client(LangWatchClientProtocol):
                 Client._tracer_provider = tracer_provider
             # Ensure OTEL is configured and instrumentors are registered for the active provider
             if not Client._skip_open_telemetry_setup:
-                Client._tracer_provider = existing.__ensure_otel_setup(
+                Client._tracer_provider = self.__ensure_otel_setup(
                     Client._tracer_provider
                 )
             current_tracer_provider = (
@@ -147,13 +166,11 @@ class Client(LangWatchClientProtocol):
                         instrumentor
                     )
             # Refresh REST client for endpoint/api-key updates
-            existing._setup_rest_api_client()
-            # Copy the existing instance's attributes to this instance and return
-            self.__dict__.update(existing.__dict__)
+            self._setup_rest_api_client()
             return
 
-        # Store this instance as the singleton
-        Client._instance = self
+        # Mark this instance as initialized
+        self._initialized = True
 
         # Update class variables with provided values or environment defaults
         if api_key is not None:
@@ -303,6 +320,21 @@ class Client(LangWatchClientProtocol):
         cls._tracer_provider = None
         cls._rest_api_client = None
         cls._registered_instrumentors.clear()
+
+    @classmethod
+    def reset_for_testing(cls) -> None:
+        """Reset the singleton instance for testing purposes."""
+        cls._reset_instance()
+
+    @classmethod
+    def get_singleton_instance(cls) -> Optional["Client"]:
+        """Get the singleton instance for testing purposes."""
+        return cls._instance
+
+    @property
+    def is_initialized(self) -> bool:
+        """Check if this instance has been initialized for testing purposes."""
+        return hasattr(self, "_initialized") and self._initialized
 
     @property
     def debug(self) -> bool:

@@ -61,35 +61,21 @@ def setup(
     if debug:
         logger.info("Setting up LangWatch client...")
 
-    # Check if there's an existing client and preserve parameters if not explicitly provided
+    # Get existing client to check if we're changing the API key
     existing_client = get_instance()
     changed_api_key = False
 
-    if existing_client is not None:
-        # If parameters are not explicitly provided, use the existing client's values
-        if api_key is None:
-            api_key = existing_client.api_key
-        elif api_key != existing_client.api_key:
-            logger.warning(
-                "LangWatch was already setup before, and now it is being setup with a new API key. This will nuke the previous tracing providers. This is not recommended."
-            )
-            changed_api_key = True
+    if (
+        existing_client is not None
+        and api_key is not None
+        and api_key != existing_client.api_key
+    ):
+        logger.warning(
+            "LangWatch was already setup before, and now it is being setup with a new API key. This will nuke the previous tracing providers. This is not recommended."
+        )
+        changed_api_key = True
 
-        if endpoint_url is None:
-            endpoint_url = existing_client.endpoint_url
-        if base_attributes is None:
-            base_attributes = existing_client.base_attributes
-        if tracer_provider is None:
-            tracer_provider = existing_client.tracer_provider
-        if instrumentors is None:
-            instrumentors = existing_client.instrumentors
-        if span_exclude_rules is None:
-            span_exclude_rules = existing_client._span_exclude_rules  # type: ignore[attr-defined]
-        if debug is None:
-            debug = existing_client.debug
-        if skip_open_telemetry_setup is None:
-            skip_open_telemetry_setup = existing_client.skip_open_telemetry_setup
-
+    # Create or update the client (singleton pattern handles the rest)
     client = Client(
         api_key=api_key,
         endpoint_url=endpoint_url,
@@ -105,6 +91,7 @@ def setup(
     if debug:
         logger.info("LangWatch client setup complete")
 
+    # Update the state module to track the instance
     set_instance(client)
     return client
 
