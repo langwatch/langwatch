@@ -519,12 +519,12 @@ class LangWatchTrace:
                         items.append(item)
                         yield item
 
-                        output = (
-                            "".join(items)
-                            if all(isinstance(item, str) for item in items)
-                            else items
-                        )
-                        trace._set_callee_output_information(func, output)
+                    output = (
+                        "".join(items)
+                        if all(isinstance(item, str) for item in items)
+                        else items
+                    )
+                    trace._set_callee_output_information(func, output)
 
             return wrapper
         elif inspect.iscoroutinefunction(func):
