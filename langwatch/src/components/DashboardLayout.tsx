@@ -159,25 +159,30 @@ export const ProjectSelector = React.memo(function ProjectSelector({
                         >
                           <Link
                             key={project_.id}
-                            href={
-                              currentRoute?.path.includes("[project]")
-                                ? currentRoute.path
-                                    .replace("[project]", project_.slug)
-                                    .replace(/\[.*?\]/g, "")
-                                    .replace(/\/\/+/g, "/")
-                                : window.location.pathname.includes(
-                                    project.slug
-                                  )
-                                ? window.location.pathname.replace(
-                                    project.slug,
-                                    project_.slug
-                                  )
-                                : `/${
-                                    project_.slug
-                                  }?return_to=${encodeURIComponent(
-                                    window.location.pathname
-                                  )}`
-                            }
+                            href={(() => {
+                              const currentPath = window.location.pathname;
+                              const hasProjectInRoute =
+                                currentRoute?.path.includes("[project]");
+                              const hasProjectInPath = currentPath.includes(
+                                project.slug
+                              );
+
+                              if (hasProjectInRoute) {
+                                return currentRoute?.path
+                                  .replace("[project]", project_.slug)
+                                  .replace(/\[.*?\]/g, "")
+                                  .replace(/\/\/+/g, "/");
+                              } else if (hasProjectInPath) {
+                                return currentPath.replace(
+                                  project.slug,
+                                  project_.slug
+                                );
+                              } else {
+                                return `/${
+                                  project_.slug
+                                }?return_to=${encodeURIComponent(currentPath)}`;
+                              }
+                            })()}
                             _hover={{
                               textDecoration: "none",
                             }}
