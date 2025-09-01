@@ -26,7 +26,13 @@ jobs:
         working-directory: python-sdk
         run: uv sync --all-groups --all-extras
 
-      - name: Run tests
+      - name: Run unit tests
+        working-directory: python-sdk
+        env:
+          LANGWATCH_DEBUG: "true"
+        run: make test
+
+      - name: Run integration tests
         working-directory: python-sdk
         env:
           LANGWATCH_DEBUG: "true"
@@ -38,7 +44,7 @@ jobs:
           GROQ_API_KEY: ${{ secrets.PYTHON_SDK_GROQ_API_KEY }}
           OPENAI_API_KEY: ${{ secrets.PYTHON_SDK_OPENAI_API_KEY }}
           CEREBRAS_API_KEY: ${{ secrets.PYTHON_SDK_CEREBRAS_API_KEY }}
-        run: uv run pytest
+        run: make test-examples
 
   build:
     runs-on: ubuntu-latest
