@@ -48,6 +48,26 @@ helm install langwatch ./langwatch \
   --set app.env.NEXTAUTH_URL="http://localhost:5560"
 ```
 
+> **TIP**
+> 
+> You can also use a values file to avoid long command lines:
+> 
+> ```bash
+> # Create a quick-start values file
+> cat > quick-start.yaml << EOF
+> app:
+>   env:
+>     NEXTAUTH_SECRET: $NEXTAUTH_SECRET
+>     API_TOKEN_JWT_SECRET: $API_TOKEN_JWT_SECRET
+>     CRON_API_KEY: $CRON_API_KEY
+>     BASE_HOST: "http://localhost:5560"
+>     NEXTAUTH_URL: "http://localhost:5560"
+> EOF
+> 
+> # Install using the values file
+> helm install langwatch ./langwatch -f quick-start.yaml
+> ```
+
 ### 3. Access the Application
 
 ```bash
@@ -56,6 +76,10 @@ kubectl port-forward svc/langwatch-app 5560:5560
 ```
 
 Access LangWatch at: http://localhost:5560
+
+> **WARNING**
+> 
+> The default installation includes built-in PostgreSQL and Redis. For production deployments, consider using external managed services for better reliability and performance.
 
 ## Configuration
 
@@ -121,6 +145,38 @@ EOF
 
 The chart includes a production-ready values file. Here's how to use it:
 
+#### Deployment Scenarios
+
+**Local Development (from chart directory):**
+If you're working directly in the `charts/langwatch` directory:
+```bash
+helm install langwatch . -f values-production.example.yaml \
+  --set app.env.NEXTAUTH_SECRET=$NEXTAUTH_SECRET \
+  --set app.env.API_TOKEN_JWT_SECRET=$API_TOKEN_JWT_SECRET \
+  --set app.env.CRON_API_KEY=$CRON_API_KEY \
+  --set app.env.METRICS_API_KEY=$METRICS_API_KEY
+```
+
+**From Repository Root:**
+If you're in the repository root directory (recommended):
+```bash
+helm install langwatch ./charts/langwatch -f charts/langwatch/values-production.example.yaml \
+  --set app.env.NEXTAUTH_SECRET=$NEXTAUTH_SECRET \
+  --set app.env.API_TOKEN_JWT_SECRET=$API_TOKEN_JWT_SECRET \
+  --set app.env.CRON_API_KEY=$CRON_API_KEY \
+  --set app.env.METRICS_API_KEY=$METRICS_API_KEY
+```
+
+**From Helm Repository:**
+If you've added this chart to a Helm repository:
+```bash
+helm install langwatch langwatch/langwatch -f values-production.yaml \
+  --set app.env.NEXTAUTH_SECRET=$NEXTAUTH_SECRET \
+  --set app.env.API_TOKEN_JWT_SECRET=$API_TOKEN_JWT_SECRET \
+  --set app.env.CRON_API_KEY=$CRON_API_KEY \
+  --set app.env.METRICS_API_KEY=$METRICS_API_KEY
+```
+
 #### Step 1: Create Production Values File
 
 Since you may not have cloned this repository, create your production values file based on the example below:
@@ -146,7 +202,7 @@ export CRON_API_KEY=$(openssl rand -base64 32)
 export METRICS_API_KEY=$(openssl rand -base64 32)
 
 # Deploy with production values and secrets
-helm install langwatch ./langwatch -f values-production.yaml \
+helm install langwatch ./langwatch -f values-production.example.yaml \
   --set app.env.NEXTAUTH_SECRET=$NEXTAUTH_SECRET \
   --set app.env.API_TOKEN_JWT_SECRET=$API_TOKEN_JWT_SECRET \
   --set app.env.CRON_API_KEY=$CRON_API_KEY \
@@ -395,6 +451,61 @@ kubectl get pods -l app.kubernetes.io/name=langwatch
 
 # Check services
 kubectl get svc -l app.kubernetes.io/name=langwatch
+
+# Check Helm release status
+helm status langwatch
+
+# List all resources created by the chart
+helm get manifest langwatch
+
+# Check for any failed resources
+kubectl get all -l app.kubernetes.io/instance=langwatch
+```
+
+## Upgrading and Maintenance
+
+### Upgrading LangWatch
+
+```bash
+# Update the Helm repository (if using a repo)
+helm repo update
+
+# Upgrade the release
+helm upgrade langwatch ./langwatch -f your-values.yaml
+
+# Check the upgrade status
+helm status langwatch
+kubectl get pods -l app.kubernetes.io/instance=langwatch
+```
+
+### Uninstalling LangWatch
+
+```bash
+# Uninstall the Helm release
+helm uninstall langwatch
+
+# Remove persistent volumes (WARNING: This will delete all data!)
+kubectl delete pvc -l app.kubernetes.io/instance=langwatch
+
+# Remove any remaining resources
+kubectl delete all -l app.kubernetes.io/instance=langwatch
+```
+
+> **WARNING**
+> 
+> Uninstalling will remove all LangWatch data unless you're using external databases. Make sure to backup your data before uninstalling.
+
+### Rolling Back
+
+```bash
+# List previous revisions
+helm history langwatch
+
+# Rollback to a previous revision
+helm rollback langwatch <revision-number>
+
+# Check rollback status
+helm status langwatch
 ```
 
 ## Migration Guide
@@ -440,15 +551,71 @@ kubectl get svc -l app.kubernetes.io/name=langwatch
 - Use Kubernetes secrets or external secret management
 - Rotate secrets regularly
 - Use least-privilege access for database users
+- Enable RBAC and network policies
 
 #### Performance
 - Use connection pooling for external databases
 - Configure appropriate resource limits
 - Monitor resource usage with Prometheus
 - Use managed services for production workloads
+- Scale horizontally for high availability
 
 #### Monitoring
 - Enable Prometheus monitoring for observability
 - Set up alerts for critical metrics
 - Monitor database connection pools
 - Track application performance metrics
+- Use Grafana dashboards for visualization
+
+#### Backup and Recovery
+- Set up automated backups for PostgreSQL data
+- Test restore procedures regularly
+- Store backups in multiple locations
+- Document disaster recovery procedures
+
+## Quick Reference
+
+### Common Commands
+
+```bash
+# Install
+helm install langwatch ./langwatch -f values.yaml
+
+# Upgrade
+helm upgrade langwatch ./langwatch -f values.yaml
+
+# Uninstall
+helm uninstall langwatch
+
+# Check status
+helm status langwatch
+
+# View logs
+kubectl logs -f deployment/langwatch-app
+
+# Port forward
+kubectl port-forward svc/langwatch-app 5560:5560
+```
+
+### Default Ports
+
+| Service | Port | Description |
+|---------|------|-------------|
+| LangWatch App | 5560 | Main application |
+| PostgreSQL | 5432 | Database (if enabled) |
+| Redis | 6379 | Cache (if enabled) |
+| Prometheus | 9090 | Metrics (if enabled) |
+
+### Environment Variables
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `NEXTAUTH_SECRET` | Yes | Session encryption |
+| `API_TOKEN_JWT_SECRET` | Yes | API token signing |
+| `CRON_API_KEY` | Yes | Cronjob authentication |
+| `DATABASE_URL` | No* | PostgreSQL connection |
+| `REDIS_URL` | No* | Redis connection |
+| `BASE_HOST` | Yes | Application URL |
+| `NEXTAUTH_URL` | Yes | Auth callback URL |
+
+*Required if using external services
