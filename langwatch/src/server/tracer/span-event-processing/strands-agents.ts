@@ -1,4 +1,4 @@
-import type { IInstrumentationScope, IKeyValue, ISpan } from "@opentelemetry/otlp-transformer";
+import type { IInstrumentationScope, IKeyValue, ISpan, IAnyValue } from "@opentelemetry/otlp-transformer";
 import type { DeepPartial } from "~/utils/types";
 
 /**
@@ -104,4 +104,109 @@ export function extractStrandsAgentsInputOutput(otelSpan: DeepPartial<ISpan>): {
     input: inputMessages.length > 0 ? { type: "chat_messages", value: inputMessages } : null,
     output: outputChoices.length > 0 ? { type: "chat_messages", value: outputChoices } : null,
   };
+}
+
+/**
+ * Resolves OpenTelemetry AnyValue to a JavaScript value, handling complex types recursively.
+ */
+function resolveOtelAnyValue(anyValuePair?: DeepPartial<IAnyValue>): any {
+  if (!anyValuePair) return void 0;
+
+  if (anyValuePair.stringValue != null) {
+    if (isNumeric(anyValuePair.stringValue)) return anyValuePair.stringValue;
+
+    try {
+      return JSON.parse(anyValuePair.stringValue);
+    } catch {
+      return anyValuePair.stringValue;
+    }
+  }
+
+  if (anyValuePair.boolValue != null) return anyValuePair.boolValue;
+  if (anyValuePair.intValue != null) return anyValuePair.intValue;
+  if (anyValuePair.doubleValue != null) return anyValuePair.doubleValue;
+  if (anyValuePair.bytesValue != null) return anyValuePair.bytesValue;
+
+  if (anyValuePair.kvlistValue)
+    return otelAttributesToNestedAttributes(anyValuePair.kvlistValue.values);
+
+  if (anyValuePair.arrayValue?.values)
+    return anyValuePair.arrayValue.values.map(resolveOtelAnyValue);
+
+  return void 0;
+}
+
+/**
+ * Converts OpenTelemetry attributes to nested attributes (reused from main processing).
+ */
+function otelAttributesToNestedAttributes(
+  attributes: DeepPartial<IKeyValue[]> | undefined
+): Record<string, any> {
+  const result: Record<string, any> = {};
+
+  for (const kv of attributes ?? []) {
+    if (!kv?.key) continue;
+
+    const path = kv.key.split(".");
+    const last = path.pop()!;
+    let cursor: any = result;
+
+    // walk the paths, and create every segment *except* the last
+    path.forEach((seg, i) => {
+      const nextIsIndex = /^\d+$/.test(path[i + 1] ?? "");
+      const segIsIndex = /^\d+$/.test(seg);
+      const key = segIsIndex ? Number(seg) : seg;
+
+      // prepare the container for the next segment
+      if (typeof cursor[key] !== "object" || cursor[key] === null) {
+        cursor[key] = nextIsIndex ? [] : {};
+      }
+      cursor = cursor[key];
+    });
+
+    // detect leaf type and cast key to correct type
+    const leafIsIndex = /^\d+$/.test(last);
+    const key = leafIsIndex ? Number(last) : last;
+
+    cursor[key] = resolveOtelAnyValue(kv.value);
+  }
+
+  return result;
+}
+
+/**
+ * Helper function to check if a string is numeric.
+ */
+function isNumeric(n: any): boolean {
+  return !isNaN(parseFloat(n)) && isFinite(n);
+}
+
+/**
+ * Extracts metadata from strands-agents spans that don't start with 'scope' or 'gen_ai'.
+ * This function filters out attributes that should not be included in trace metadata.
+ * Now supports complex types (kvlistValue and arrayValue).
+ */
+export function extractStrandsAgentsMetadata(otelSpan: DeepPartial<ISpan>): Record<string, any> {
+  if (!otelSpan?.attributes) return {};
+
+  const metadata: Record<string, any> = {};
+
+  for (const attr of otelSpan.attributes) {
+    if (!attr?.key || !attr.value) continue;
+
+    // Skip attributes that start with 'scope' or 'gen_ai'
+    if (attr.key.startsWith('scope.') || attr.key.startsWith('gen_ai.')) {
+      continue;
+    }
+
+    // Extract the value using the same logic as the main OpenTelemetry processing
+    const value = resolveOtelAnyValue(attr.value);
+
+    // Only add non-empty values
+    if (value !== null && value !== undefined && value !== '') {
+      metadata[attr.key] = value;
+    }
+  }
+
+  return metadata;
 }
