@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { temporal } from "zundo";
-import type { Message } from "ai";
+import type { UIMessage } from "ai";
 import isDeepEqual from "fast-deep-equal";
 import { nanoid } from "nanoid";
 import { modelSelectorOptions } from "../components/ModelSelector";
@@ -20,7 +20,7 @@ interface PlaygroundStore {
   toggleSyncInputs: () => void;
   onChangeInput: (windowId: string, input: string) => void;
   onSubmit: (windowId: string, requestedSubmission: boolean) => void;
-  setMessages: (windowId: string, messages: Message[]) => void;
+  setMessages: (windowId: string, messages: UIMessage[]) => void;
   toggleSystemPromptExpanded: (windowId: string) => void;
   onChangeSystemPrompt: (windowId: string, systemPrompt: string) => void;
   toggleSyncSystemPrompts: (currentSystemPrompt: string) => void;
@@ -36,7 +36,7 @@ export interface ChatWindowState {
   model: string;
   input: string;
   requestedSubmission?: boolean;
-  messages: Message[];
+  messages: UIMessage[];
   systemPrompt: string;
   systemPromptExpanded: boolean;
 }

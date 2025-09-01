@@ -420,9 +420,13 @@ ${diff}
         tools: {
           commitMessage: {
             type: "function",
-            parameters: z.object({
+            inputSchema: z.object({
               message: z.string(),
             }),
+            outputSchema: z.string(),
+            execute: async ({ message }) => {
+              return message;
+            },
           },
         },
         toolChoice: {
@@ -431,7 +435,7 @@ ${diff}
         },
       });
 
-      const result = commitMessage.toolCalls[0]?.args.message;
+      const result = commitMessage.toolResults?.find(t => t.toolName === "commitMessage")?.output;
 
       // TODO: save call costs to user account
 

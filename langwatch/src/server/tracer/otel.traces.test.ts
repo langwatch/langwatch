@@ -1033,16 +1033,19 @@ const springAITrace: DeepPartial<IExportTraceServiceRequest> = {
 
 describe("opentelemetry traces receiver", () => {
   it("receives a basic openai trace for openinference", async () => {
-    const traces = openTelemetryTraceRequestToTracesForCollection(
+    const traces = await openTelemetryTraceRequestToTracesForCollection(
       openInferenceOpenAIRequest
     );
 
     expect(traces).toHaveLength(1);
 
     const trace = traces[0];
+    if (!trace) {
+      assert.fail("No trace found");
+    }
 
     try {
-      z.array(spanSchema).parse(trace!.spans);
+      z.array(spanSchema).parse(trace.spans);
     } catch (error) {
       const validationError = fromZodError(error as ZodError);
       console.log("trace", JSON.stringify(trace, undefined, 2));
@@ -1114,16 +1117,19 @@ describe("opentelemetry traces receiver", () => {
   });
 
   it("receives a basic openai trace for openllmetry", async () => {
-    const traces = openTelemetryTraceRequestToTracesForCollection(
+    const traces = await openTelemetryTraceRequestToTracesForCollection(
       openllmetryOpenAIRequest
     );
 
     expect(traces).toHaveLength(1);
 
     const trace = traces[0];
+    if (!trace) {
+      assert.fail("No trace found");
+    }
 
     try {
-      z.array(spanSchema).parse(trace!.spans);
+      z.array(spanSchema).parse(trace.spans);
     } catch (error) {
       const validationError = fromZodError(error as ZodError);
       console.log("trace", JSON.stringify(trace, undefined, 2));
@@ -1198,16 +1204,19 @@ describe("opentelemetry traces receiver", () => {
   });
 
   it("receives traditional opentelemetry trace for fastapi", async () => {
-    const traces = openTelemetryTraceRequestToTracesForCollection(
+    const traces = await openTelemetryTraceRequestToTracesForCollection(
       fastApiOpenTelemetryRequest
     );
 
     expect(traces).toHaveLength(1);
 
     const trace = traces[0];
+    if (!trace) {
+      assert.fail("No trace found");
+    }
 
     try {
-      z.array(spanSchema).parse(trace!.spans);
+      z.array(spanSchema).parse(trace.spans);
     } catch (error) {
       const validationError = fromZodError(error as ZodError);
       console.log("trace", JSON.stringify(trace, undefined, 2));
@@ -1295,15 +1304,19 @@ describe("opentelemetry traces receiver", () => {
   });
 
   it("receives a trace with an exception", async () => {
-    const traces =
-      openTelemetryTraceRequestToTracesForCollection(traceWithException);
+    const traces = await openTelemetryTraceRequestToTracesForCollection(
+      traceWithException
+    );
 
     expect(traces).toHaveLength(1);
 
     const trace = traces[0];
+    if (!trace) {
+      assert.fail("No trace found");
+    }
 
     try {
-      z.array(spanSchema).parse(trace!.spans);
+      z.array(spanSchema).parse(trace.spans);
     } catch (error) {
       const validationError = fromZodError(error as ZodError);
       console.log("trace", JSON.stringify(trace, undefined, 2));
@@ -1404,16 +1417,19 @@ describe("opentelemetry traces receiver", () => {
   });
 
   it("receives a langchain openlllmetry trace", async () => {
-    const traces = openTelemetryTraceRequestToTracesForCollection(
+    const traces = await openTelemetryTraceRequestToTracesForCollection(
       openllmetryLangChainRequest
     );
 
     expect(traces).toHaveLength(1);
 
     const trace = traces[0];
+    if (!trace) {
+      assert.fail("No trace found");
+    }
 
     try {
-      z.array(spanSchema).parse(trace!.spans);
+      z.array(spanSchema).parse(trace.spans);
     } catch (error) {
       const validationError = fromZodError(error as ZodError);
       console.log("trace", JSON.stringify(trace, undefined, 2));
@@ -1484,14 +1500,17 @@ describe("opentelemetry traces receiver", () => {
   });
 
   it("receives a strands trace", async () => {
-    const traces = openTelemetryTraceRequestToTracesForCollection(strandsTrace);
+    const traces = await openTelemetryTraceRequestToTracesForCollection(strandsTrace);
 
     expect(traces).toHaveLength(1);
 
     const trace = traces[0];
+    if (!trace) {
+      assert.fail("No trace found");
+    }
 
     try {
-      z.array(spanSchema).parse(trace!.spans);
+      z.array(spanSchema).parse(trace.spans);
     } catch (error) {
       const validationError = fromZodError(error as ZodError);
       console.log("trace", JSON.stringify(trace, undefined, 2));
@@ -1619,15 +1638,23 @@ describe("opentelemetry traces receiver", () => {
       ],
     };
 
-    const traces = openTelemetryTraceRequestToTracesForCollection(strandsAgentsTrace);
+    const traces = await openTelemetryTraceRequestToTracesForCollection(strandsAgentsTrace);
     expect(traces).toHaveLength(1);
     const trace = traces[0];
+    if (!trace) {
+      assert.fail("No trace found");
+    }
+
     expect(trace).toBeDefined();
-    expect(trace!.spans).toHaveLength(1);
-    const span = trace!.spans[0];
+    expect(trace.spans).toHaveLength(1);
+    const span = trace.spans[0];
+    if (!span) {
+      assert.fail("No span found");
+    }
+
     expect(span).toBeDefined();
     expect((span as any).model).toBe("openai/gpt-4.1-nano");
-    expect(span!.input).toEqual({
+    expect(span.input).toEqual({
       type: "chat_messages",
       value: [
         {
@@ -1637,7 +1664,7 @@ describe("opentelemetry traces receiver", () => {
         },
       ],
     });
-    expect(span!.output).toEqual({
+    expect(span.output).toEqual({
       type: "chat_messages",
       value: [
         {
@@ -1652,14 +1679,17 @@ describe("opentelemetry traces receiver", () => {
   });
 
   it("receives a Spring AI trace", async () => {
-    const traces = openTelemetryTraceRequestToTracesForCollection(springAITrace);
+    const traces = await openTelemetryTraceRequestToTracesForCollection(springAITrace);
 
     expect(traces).toHaveLength(1);
 
     const trace = traces[0];
+    if (!trace) {
+      assert.fail("No trace found");
+    }
 
     try {
-      z.array(spanSchema).parse(trace!.spans);
+      z.array(spanSchema).parse(trace.spans);
     } catch (error) {
       const validationError = fromZodError(error as ZodError);
       console.log("trace", JSON.stringify(trace, undefined, 2));

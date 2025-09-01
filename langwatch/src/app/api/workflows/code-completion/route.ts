@@ -60,7 +60,7 @@ app.post("/code-completion", async (c) => {
             content: `${prompt.instruction}\n\n${prompt.fileContent}`,
           },
         ],
-        maxTokens: 64,
+        maxOutputTokens: 64,
         temperature: 0,
       });
 
