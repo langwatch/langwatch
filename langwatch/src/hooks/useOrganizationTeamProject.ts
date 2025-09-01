@@ -211,7 +211,11 @@ export const useOrganizationTeamProject = (
       typeof router.query.project == "string" &&
       project.slug !== router.query.project
     ) {
-      void router.push(`/${project.slug}`);
+      const returnTo = router.query.return_to;
+      const returnToParam = returnTo
+        ? `?return_to=${encodeURIComponent(returnTo as string)}`
+        : "";
+      void router.push(`/${project.slug}${returnToParam}`);
     }
   }, [
     organization,
