@@ -172,7 +172,11 @@ export const ProjectSelector = React.memo(function ProjectSelector({
                                     project.slug,
                                     project_.slug
                                   )
-                                : `/${project_.slug}?return_to=${window.location.pathname}`
+                                : `/${
+                                    project_.slug
+                                  }?return_to=${encodeURIComponent(
+                                    window.location.pathname
+                                  )}`
                             }
                             _hover={{
                               textDecoration: "none",
