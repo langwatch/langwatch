@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { TRPCError } from "@trpc/server";
 
 import {
   createTRPCRouter,
@@ -24,7 +25,19 @@ export const shareRouter = createTRPCRouter({
 
       const share = await ctx.prisma.publicShare.findFirst({
         where: { id },
+        include: {
+          project: {
+            select: {
+              traceSharingEnabled: true,
+            },
+          },
+        },
       });
+
+      // If this is a trace share and trace sharing is disabled, return null
+      if (share?.resourceType === "TRACE" && !share.project.traceSharingEnabled) {
+        return null;
+      }
 
       return share;
     }),
@@ -71,6 +84,21 @@ export const shareRouter = createTRPCRouter({
     .mutation(async ({ input, ctx }) => {
       const { projectId, resourceType, resourceId } = input;
 
+      // Check if trace sharing is enabled for this project
+      if (resourceType === "TRACE") {
+        const project = await ctx.prisma.project.findUnique({
+          where: { id: projectId },
+          select: { traceSharingEnabled: true },
+        });
+
+        if (!project?.traceSharingEnabled) {
+          throw new TRPCError({
+            code: "FORBIDDEN",
+            message: "Trace sharing is disabled for this project",
+          });
+        }
+      }
+
       return createShare({
         projectId,
         resourceType,
@@ -92,6 +120,19 @@ export const shareRouter = createTRPCRouter({
       const { projectId, resourceType, resourceId } = input;
 
       await unshareItem({ projectId, resourceType, resourceId });
+    }),
+
+  revokeAllTraceShares: protectedProcedure
+    .input(
+      z.object({
+        projectId: z.string(),
+      })
+    )
+    .use(checkUserPermissionForProject(TeamRoleGroup.PROJECT_CHANGE_CAPTURED_DATA_VISIBILITY))
+    .mutation(async ({ input }) => {
+      const { projectId } = input;
+
+      await revokeAllTraceShares(projectId);
     }),
 });
 
@@ -142,6 +183,15 @@ export const unshareItem = async ({
       projectId,
       resourceType,
       resourceId,
+    },
+  });
+};
+
+export const revokeAllTraceShares = async (projectId: string) => {
+  await prisma.publicShare.deleteMany({
+    where: {
+      projectId,
+      resourceType: "TRACE",
     },
   });
 };

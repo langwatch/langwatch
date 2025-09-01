@@ -53,11 +53,13 @@ def example():
 
     # 2. Get and use the prompt
     print("2. Retrieving the prompt...")
-    retrieved_prompt = langwatch.prompts.get(prompt.handle)
-    print(f"Retrieved prompt: {retrieved_prompt.handle}")
+    retrieved_prompt_specific_version = langwatch.prompts.get(
+        prompt.handle, version_number=prompt.version_number
+    )
+    print(f"Retrieved prompt: {retrieved_prompt_specific_version.version_number}")
 
     # Use the prompt (example usage)
-    print("Using the prompt...")
+    print("Using the created prompt...")
 
     # Compile the prompt with variables
     compiled_prompt = retrieved_prompt.compile(

@@ -27,11 +27,32 @@ export const scenarioRouter = createTRPCRouter({
 
   // Get all run data for a scenario set
   getScenarioSetRunData: protectedProcedure
-    .input(projectSchema.extend({ scenarioSetId: z.string() }))
+    .input(
+      projectSchema.extend({
+        scenarioSetId: z.string(),
+        limit: z.number().min(1).max(100).default(20),
+        cursor: z.string().optional(), // Cursor for pagination
+      })
+    )
     .use(checkUserPermissionForProject(TeamRoleGroup.SCENARIOS_VIEW))
     .query(async ({ input, ctx }) => {
       const scenarioRunnerService = new ScenarioEventService();
       const data = await scenarioRunnerService.getRunDataForScenarioSet({
+        projectId: input.projectId,
+        scenarioSetId: input.scenarioSetId,
+        limit: input.limit,
+        cursor: input.cursor,
+      });
+      return data;
+    }),
+
+  // Get ALL run data for a scenario set without pagination
+  getAllScenarioSetRunData: protectedProcedure
+    .input(projectSchema.extend({ scenarioSetId: z.string() }))
+    .use(checkUserPermissionForProject(TeamRoleGroup.SCENARIOS_VIEW))
+    .query(async ({ input, ctx }) => {
+      const scenarioRunnerService = new ScenarioEventService();
+      const data = await scenarioRunnerService.getAllRunDataForScenarioSet({
         projectId: input.projectId,
         scenarioSetId: input.scenarioSetId,
       });
@@ -61,6 +82,19 @@ export const scenarioRouter = createTRPCRouter({
       return data;
     }),
 
+  // Get total count of batch runs for a scenario set (for pagination)
+  getScenarioSetBatchRunCount: protectedProcedure
+    .input(projectSchema.extend({ scenarioSetId: z.string() }))
+    .use(checkUserPermissionForProject(TeamRoleGroup.SCENARIOS_VIEW))
+    .query(async ({ input, ctx }) => {
+      const scenarioRunnerService = new ScenarioEventService();
+      const count = await scenarioRunnerService.getBatchRunCountForScenarioSet({
+        projectId: input.projectId,
+        scenarioSetId: input.scenarioSetId,
+      });
+      return { count };
+    }),
+
   // Get scenario run data by scenario id
   getRunDataByScenarioId: protectedProcedure
     .input(
@@ -76,5 +110,24 @@ export const scenarioRouter = createTRPCRouter({
         scenarioId: input.scenarioId,
       });
       return { data };
+    }),
+
+  // Get scenario run data for a specific batch run
+  getBatchRunData: protectedProcedure
+    .input(
+      projectSchema.extend({
+        scenarioSetId: z.string(),
+        batchRunId: z.string(),
+      })
+    )
+    .use(checkUserPermissionForProject(TeamRoleGroup.SCENARIOS_VIEW))
+    .query(async ({ input, ctx }) => {
+      const scenarioRunnerService = new ScenarioEventService();
+      const data = await scenarioRunnerService.getRunDataForBatchRun({
+        projectId: input.projectId,
+        scenarioSetId: input.scenarioSetId,
+        batchRunId: input.batchRunId,
+      });
+      return data;
     }),
 });

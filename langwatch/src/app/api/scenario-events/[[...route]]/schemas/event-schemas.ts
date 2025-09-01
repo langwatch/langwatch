@@ -2,9 +2,14 @@
  * Scenario event schemas
  * Extends the AG-UI base event schema to add scenario-specific fields.
  */
-import { EventType, MessagesSnapshotEventSchema } from "@ag-ui/core";
+import {
+  EventType,
+  MessageSchema,
+  MessagesSnapshotEventSchema,
+} from "@ag-ui/core";
 import { z } from "zod";
 import { ScenarioEventType, ScenarioRunStatus, Verdict } from "../enums";
+import { chatMessageSchema } from "../../../../../server/tracer/types.generated";
 
 /**
  * AG-UI Base Event Schema
@@ -89,6 +94,7 @@ export const scenarioRunFinishedSchema = baseScenarioEventSchema.extend({
 export const scenarioMessageSnapshotSchema = MessagesSnapshotEventSchema.merge(
   baseScenarioEventSchema.extend({
     type: z.literal(ScenarioEventType.MESSAGE_SNAPSHOT),
+    messages: z.array(z.union([MessageSchema, chatMessageSchema])),
   })
 );
 

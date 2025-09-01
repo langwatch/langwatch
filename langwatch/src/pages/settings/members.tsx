@@ -21,7 +21,7 @@ import { Select as MultiSelect, chakraComponents } from "chakra-react-select";
 import { Lock, Mail, MoreVertical, Plus, Trash } from "react-feather";
 import { CopyInput } from "../../components/CopyInput";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import {
   Controller,
   useFieldArray,
@@ -42,6 +42,7 @@ import type {
 import { type PlanInfo } from "../../server/subscriptionHandler";
 import { api } from "../../utils/api";
 import * as Sentry from "@sentry/nextjs";
+import { usePublicEnv } from "../../hooks/usePublicEnv";
 
 type Option = { label: string; value: string; description?: string };
 
@@ -147,6 +148,16 @@ function MembersList({
     { inviteCode: string; email: string }[]
   >([]);
 
+  // Watch for changes in selectedInvites and open popup when it changes
+  useEffect(() => {
+    if (selectedInvites.length > 0) {
+      onInviteLinkOpen();
+    }
+  }, [selectedInvites, onInviteLinkOpen]);
+
+  const publicEnv = usePublicEnv();
+  const hasEmailProvider = publicEnv.data?.HAS_EMAIL_PROVIDER_KEY;
+
   const onSubmit: SubmitHandler<MembersForm> = (data) => {
     createInvitesMutation.mutate(
       {
@@ -176,21 +187,17 @@ function MembersList({
 
           setSelectedInvites(newInvites);
 
-          const title =
-            newInvites.length > 0
-              ? "Invites created successfully"
-              : "Invites sent successfully";
-
-          const description =
-            newInvites.length > 0
-              ? "All invites have been created."
-              : "All invites have been sent.";
+          const description = hasEmailProvider
+            ? "All invites have been sent."
+            : "All invites have been created. View invite link under actions menu.";
 
           toaster.create({
-            title: title,
+            title: `${
+              newInvites.length > 1 ? "Invites" : "Invite"
+            } created successfully`,
             description: description,
             type: "success",
-            duration: 5000,
+            duration: 2000,
             meta: {
               closable: true,
             },
@@ -199,9 +206,6 @@ function MembersList({
           onAddMembersClose();
           resetForm();
           void pendingInvites.refetch();
-          if (newInvites.length > 0) {
-            onInviteLinkOpen();
-          }
         },
         onError: () => {
           toaster.create({
@@ -574,9 +578,7 @@ function MembersList({
 
       <Dialog.Root
         open={isInviteLinkOpen}
-        onOpenChange={({ open }) =>
-          open ? onInviteLinkOpen() : onInviteModalClose()
-        }
+        onOpenChange={({ open }) => (open ? undefined : onInviteModalClose())}
       >
         <Dialog.Backdrop />
         <Dialog.Content>
@@ -776,7 +778,9 @@ function MembersList({
                   ) : (
                     <Mail size={18} />
                   )}
-                  <Text>Send invites</Text>
+                  <Text>
+                    {hasEmailProvider ? "Send invites" : "Create invites"}
+                  </Text>
                 </HStack>
               </Button>
             </Dialog.Footer>

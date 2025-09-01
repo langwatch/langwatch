@@ -70,6 +70,9 @@ export const getServerSideProps = async (
 };
 
 function SignUpForm() {
+  const query = useSearchParams();
+  const callbackUrl = query?.get("callbackUrl") ?? undefined;
+
   const schema = z
     .object({
       name: z.string().min(1, { message: "Name is required" }),
@@ -98,13 +101,18 @@ function SignUpForm() {
       await register.mutateAsync(values);
 
       setSignInLoading(true);
-      const response: any = await signIn("credentials", {
+      const response = await signIn("credentials", {
         email: values.email,
         password: values.password,
+        callbackUrl: callbackUrl,
       });
       setSignInLoading(false);
 
-      if (!response.ok) {
+      if (response?.error) {
+        throw new Error("Sign up failed");
+      }
+
+      if (response?.status && response.status >= 400) {
         throw new Error("Network response was not ok");
       }
     } catch (e) {
@@ -179,7 +187,14 @@ function SignUpForm() {
                 </Alert.Root>
               )}
               <HStack width="full" paddingTop={4}>
-                <Link href="/auth/signin" textDecoration="underline">
+                <Link
+                  href={`/auth/signin${
+                    callbackUrl
+                      ? `?callbackUrl=${encodeURIComponent(callbackUrl)}`
+                      : ""
+                  }`}
+                  textDecoration="underline"
+                >
                   Already have an account?
                 </Link>
                 <Spacer />

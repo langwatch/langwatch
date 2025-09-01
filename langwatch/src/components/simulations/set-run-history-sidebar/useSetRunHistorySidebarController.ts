@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { api } from "~/utils/api";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useSimulationRouter } from "~/hooks/simulations/useSimulationRouter";
@@ -12,18 +12,32 @@ const logger = createLogger("useSetRunHistorySidebarController");
  * Custom hook that manages the state and behavior for the Set Run History Sidebar.
  *
  * This hook handles:
- * - Fetching scenario run data from the API
+ * - Fetching scenario run data from the API with pagination
  * - Transforming raw run data into grouped batch runs for display
  * - Providing navigation handlers for run selection
  * - Managing loading and error states
+ * - Pagination state management
  *
- * @returns Object containing runs data, click handlers, and state flags
+ * @returns Object containing runs data, click handlers, pagination controls, and state flags
  */
 export const useSetRunHistorySidebarController = () => {
   const { goToSimulationBatchRuns, scenarioSetId } = useSimulationRouter();
   const { project } = useOrganizationTeamProject();
 
-  // Fetch scenario run data with proper error handling and loading states
+  // Cursor-based pagination state
+  const [cursor, setCursor] = useState<string | undefined>();
+  const [cursorHistory, setCursorHistory] = useState<(string | undefined)[]>(
+    []
+  );
+  const limit = 8; // Fixed limit for now
+
+  // Reset cursor when navigating to a different scenario set
+  useEffect(() => {
+    setCursor(undefined);
+    setCursorHistory([]);
+  }, [scenarioSetId]);
+
+  // Fetch scenario run data with cursor-based pagination
   const {
     data: runData,
     error,
@@ -32,6 +46,8 @@ export const useSetRunHistorySidebarController = () => {
     {
       projectId: project?.id ?? "",
       scenarioSetId: scenarioSetId ?? "",
+      limit,
+      cursor,
     },
     {
       // Only fetch when we have both required IDs to avoid unnecessary API calls
@@ -40,12 +56,42 @@ export const useSetRunHistorySidebarController = () => {
     }
   );
 
+  // Fetch total count for pagination info
+  const { data: countData } =
+    api.scenarios.getScenarioSetBatchRunCount.useQuery(
+      {
+        projectId: project?.id ?? "",
+        scenarioSetId: scenarioSetId ?? "",
+      },
+      {
+        enabled: !!project?.id && !!scenarioSetId,
+      }
+    );
+
+  const totalCount = countData?.count ?? 0;
+  const hasMore = runData?.hasMore ?? false;
+  const currentPage = cursorHistory.length + 1;
+  const totalPages = Math.ceil(totalCount / limit);
+
+  // Clamp cursor to valid range when total count changes
+  useEffect(() => {
+    if (totalCount === 0 && cursor) {
+      setCursor(undefined);
+      setCursorHistory([]);
+    }
+  }, [totalCount, cursor]);
+
   // Memoize the expensive data transformation to prevent unnecessary re-renders
   // This transforms raw API data into the UI-friendly Run format
   const runs = useMemo(() => {
-    if (!runData?.length) return [];
-    return transformRunDataToBatchRuns(runData);
-  }, [runData]);
+    if (!runData?.runs?.length) return [];
+    return transformRunDataToBatchRuns(
+      runData.runs,
+      currentPage,
+      limit,
+      totalCount
+    );
+  }, [runData?.runs, currentPage, limit, totalCount]);
 
   // Extract click handler for better testability and performance
   // Memoized to prevent child component re-renders when dependencies haven't changed
@@ -60,12 +106,56 @@ export const useSetRunHistorySidebarController = () => {
     [scenarioSetId, goToSimulationBatchRuns]
   );
 
+  // Cursor-based pagination handlers
+  const handleNextPage = () => {
+    if (runData?.nextCursor) {
+      setCursorHistory((prev) => [...prev, cursor]);
+      setCursor(runData.nextCursor);
+    }
+  };
+
+  const handlePrevPage = () => {
+    if (cursorHistory.length > 0) {
+      const newHistory = [...cursorHistory];
+      const prevCursor = newHistory.pop();
+      setCursorHistory(newHistory);
+      setCursor(prevCursor);
+    }
+  };
+
+  const handlePageChange = (newPage: number) => {
+    // For cursor-based pagination, we can't jump to arbitrary pages
+    // Reset to beginning and navigate forward
+    if (newPage === 1) {
+      setCursor(undefined);
+      setCursorHistory([]);
+    } else if (newPage > currentPage) {
+      // Navigate forward from current position
+      const stepsForward = newPage - currentPage;
+      // This is simplified - in practice you'd need to fetch each page
+      // For now, just allow forward navigation
+    }
+  };
+
   return {
     runs,
     onRunClick: handleRunClick,
     scenarioSetId,
     isLoading,
     error, // Expose error state for better UX handling in components
+
+    // Pagination state and controls
+    pagination: {
+      page: currentPage,
+      limit,
+      totalCount,
+      totalPages,
+      hasNextPage: Boolean(runData?.nextCursor),
+      hasPrevPage: cursorHistory.length > 0,
+      onPageChange: handlePageChange,
+      onNextPage: handleNextPage,
+      onPrevPage: handlePrevPage,
+    },
   };
 };
 
@@ -81,7 +171,12 @@ export const useSetRunHistorySidebarController = () => {
  * @param runData - Array of raw scenario run data from the API
  * @returns Array of Run objects ready for UI consumption
  */
-const transformRunDataToBatchRuns = (runData: ScenarioRunData[]): Run[] => {
+const transformRunDataToBatchRuns = (
+  runData: ScenarioRunData[],
+  currentPage: number,
+  limit: number,
+  totalCount: number
+): Run[] => {
   // Group runs by batchRunId using a functional reduce approach
   // Each batch run contains metadata and an array of individual scenario runs
   const batchRunsMap = runData.reduce(
@@ -109,12 +204,11 @@ const transformRunDataToBatchRuns = (runData: ScenarioRunData[]): Run[] => {
   // Sort by timestamp (numerical) for accurate chronological ordering
   // Then add display labels and format dates for UI consumption
   return Object.values(batchRunsMap)
-    .sort((a, b) => a.timestamp - b.timestamp) // Chronological sort by actual timestamp
+    .sort((a, b) => b.timestamp - a.timestamp) // Sort newest first (descending)
     .map((run, idx) => ({
       ...run,
-      label: `Run #${idx + 1}`, // Sequential labeling based on chronological order
-    }))
-    .reverse(); // Newest runs first for better UX
+      label: `Run #${totalCount - ((currentPage - 1) * limit + idx)}`, // Newest gets highest number
+    }));
 };
 
 /**

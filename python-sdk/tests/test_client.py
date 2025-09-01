@@ -4,8 +4,16 @@ from typing import Optional
 import pytest
 
 
-def make_client(api_key: Optional[str] = None, disable_sending: bool = False) -> Client:
-    return Client(api_key=api_key, disable_sending=disable_sending)
+def make_client(
+    api_key: Optional[str] = None,
+    disable_sending: bool = False,
+    skip_open_telemetry_setup: bool = False,
+) -> Client:
+    return Client(
+        api_key=api_key,
+        disable_sending=disable_sending,
+        skip_open_telemetry_setup=skip_open_telemetry_setup,
+    )
 
 
 def test_api_key_setter_same_key():
@@ -144,3 +152,32 @@ def test_tracer_provider_reinitialized_on_api_key_change():
         client.api_key = "second-key"
         shutdown2.assert_not_called()
         setup_tracer2.assert_not_called()
+
+
+def test_skip_open_telemetry_setup_property():
+    """Test that skip_open_telemetry_setup property returns the correct value."""
+    client = make_client(api_key="test-key", skip_open_telemetry_setup=True)
+    assert client.skip_open_telemetry_setup is True
+
+    client2 = make_client(api_key="test-key", skip_open_telemetry_setup=False)
+    assert client2.skip_open_telemetry_setup is False
+
+    client3 = make_client(api_key="test-key")  # Default should be False
+    assert client3.skip_open_telemetry_setup is False
+
+
+def test_skip_open_telemetry_setup_api_key_setter():
+    """Test that skip_open_telemetry_setup prevents OpenTelemetry reinitialization when API key changes."""
+    client = make_client(api_key="first-key", skip_open_telemetry_setup=True)
+
+    with (
+        patch.object(client, "_Client__shutdown_tracer_provider") as shutdown,
+        patch.object(client, "_Client__setup_tracer_provider") as setup_tracer,
+        patch.object(client, "_setup_rest_api_client") as setup_rest,
+    ):
+        client.api_key = "second-key"
+        # Should not call shutdown or setup_tracer when skip_open_telemetry_setup is True
+        shutdown.assert_not_called()
+        setup_tracer.assert_not_called()
+        # Should still call setup_rest for the API client
+        setup_rest.assert_called_once()

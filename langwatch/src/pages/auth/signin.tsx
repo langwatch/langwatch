@@ -31,7 +31,7 @@ export default function SignIn({ session }: { session: Session | null }) {
 
   const publicEnv = usePublicEnv();
   const isAuthProvider = publicEnv.data?.NEXTAUTH_PROVIDER;
-  const callbackUrl = useSearchParams()?.get("callbackUrl") ?? undefined;
+  const callbackUrl = query?.get("callbackUrl") ?? undefined;
 
   useEffect(() => {
     if (!publicEnv.data) {
@@ -90,6 +90,7 @@ export const getServerSideProps = async (
 function SignInForm() {
   const query = useSearchParams();
   const error = query?.get("error");
+  const callbackUrl = query?.get("callbackUrl") ?? undefined;
 
   const schema = z.object({
     email: z.string().email(),
@@ -105,19 +106,24 @@ function SignInForm() {
   const onSubmit = async (values: z.infer<typeof schema>) => {
     try {
       setSignInLoading(true);
-      const response: any = await signIn("credentials", {
+      const response = await signIn("credentials", {
         email: values.email,
         password: values.password,
+        callbackUrl: callbackUrl,
       });
       setSignInLoading(false);
 
-      if (!response.ok) {
+      if (response?.error) {
+        throw new Error("Sign in failed");
+      }
+
+      if (response?.status && response.status >= 400) {
         throw new Error("Network response was not ok");
       }
     } catch (e) {
       toaster.create({
         title: "Error",
-        description: "Failed to sign up",
+        description: "Failed to sign in",
         type: "error",
         placement: "top-end",
         meta: {
@@ -169,7 +175,11 @@ function SignInForm() {
               <HStack width="full" paddingTop={4}>
                 <Box asChild>
                   <Link
-                    href="/auth/signup"
+                    href={`/auth/signup${
+                      callbackUrl
+                        ? `?callbackUrl=${encodeURIComponent(callbackUrl)}`
+                        : ""
+                    }`}
                     style={{ textDecoration: "underline" }}
                   >
                     Register new account

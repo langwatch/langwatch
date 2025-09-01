@@ -21,7 +21,7 @@ async def main(message: cl.Message):
     )
 
     response = litellm.completion(
-        model="groq/llama3-70b-8192",
+        model="cerebras/gpt-oss-120b",
         messages=[
             {
                 "role": "system",
