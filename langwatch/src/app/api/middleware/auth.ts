@@ -4,6 +4,7 @@ import { type MiddlewareHandler } from "hono";
 import { prisma } from "~/server/db";
 
 import { createLogger } from "~/utils/logger";
+import { activeProjectWhere } from "~/utils/activeProjectFilter";
 
 const logger = createLogger("langwatch:api:auth");
 
@@ -25,7 +26,7 @@ export const authMiddleware: MiddlewareHandler = async (c, next) => {
 
   try {
     const project = await prisma.project.findUnique({
-      where: { apiKey },
+      where: activeProjectWhere({ apiKey }),
     });
 
     if (!project) {

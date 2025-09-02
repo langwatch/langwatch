@@ -7,6 +7,7 @@ import { backendHasTeamProjectPermission, TeamRoleGroup } from "./permission";
 import type { Protections } from "../elasticsearch/protections";
 import type { Session } from "next-auth";
 import { isDemoProject } from "./permission";
+import { activeProjectWhere } from "~/utils/activeProjectFilter";
 
 export const extractCheckKeys = (
   inputObject: Record<string, any>
@@ -85,7 +86,7 @@ export async function getUserProtectionsForProject(
     ));
 
   const project = await ctx.prisma.project.findUniqueOrThrow({
-    where: { id: projectId },
+    where: activeProjectWhere({ id: projectId }),
     select: {
       capturedInputVisibility: true,
       capturedOutputVisibility: true,

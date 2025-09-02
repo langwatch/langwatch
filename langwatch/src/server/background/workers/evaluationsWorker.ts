@@ -5,6 +5,7 @@ import { nanoid } from "nanoid";
 import type { EvaluationJob } from "~/server/background/types";
 import type { Trace } from "~/server/tracer/types";
 import { env } from "../../../env.mjs";
+import { activeProjectWhere } from "~/utils/activeProjectFilter";
 import {
   AVAILABLE_EVALUATORS,
   type BatchEvaluationResult,
@@ -63,7 +64,9 @@ export async function runEvaluationJob(
     throw `check config ${job.data.check.evaluator_id} not found`;
   }
 
-  const protections = await getProtectionsForProject(prisma, { projectId: job.data.trace.project_id });
+  const protections = await getProtectionsForProject(prisma, {
+    projectId: job.data.trace.project_id,
+  });
 
   return await runEvaluationForTrace({
     projectId: job.data.trace.project_id,
@@ -146,7 +149,7 @@ export const runEvaluationForTrace = async ({
   settings: Record<string, any> | string | number | boolean | null;
   mappings: MappingState;
   protections: Protections;
-  }): Promise<SingleEvaluationResult> => {
+}): Promise<SingleEvaluationResult> => {
   const trace = await getTraceById({
     connConfig: { projectId },
     traceId,
@@ -194,7 +197,7 @@ export const runEvaluation = async ({
   retries?: number;
 }): Promise<SingleEvaluationResult> => {
   const project = await prisma.project.findUnique({
-    where: { id: projectId },
+    where: activeProjectWhere({ id: projectId }),
     include: { team: true },
   });
   if (!project) {
@@ -514,9 +517,9 @@ const customEvaluation = async (
   const workflowId = evaluatorType.split("/")[1];
 
   const project = await prisma.project.findUnique({
-    where: {
+    where: activeProjectWhere({
       id: projectId,
-    },
+    }),
   });
 
   if (!project) {

@@ -30,6 +30,7 @@ import {
   traceSpanCountHistogram,
 } from "../../server/metrics";
 import { withPagesRouterLogger } from "../../middleware/pages-router-logger";
+import { activeProjectWhere } from "~/utils/activeProjectFilter";
 
 const logger = createLogger("langwatch:collector");
 
@@ -77,7 +78,7 @@ async function handleCollectorRequest(
   }
 
   const project = await prisma.project.findUnique({
-    where: { apiKey: authToken as string },
+    where: activeProjectWhere({ apiKey: authToken as string }),
     include: {
       team: true,
     },
