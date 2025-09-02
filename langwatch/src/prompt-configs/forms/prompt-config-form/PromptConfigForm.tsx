@@ -89,23 +89,25 @@ function InnerPromptConfigForm(props: PromptConfigFormProps) {
   return (
     <form style={{ width: "100%", height: "100%" }}>
       <VStack width="full" height="full" gap={6} mb={6}>
-        <PromptHandleInfo config={savedConfig} methods={methods} />
-        <ModelSelectField />
-        <PromptField
-          templateAdapter="default"
-          messageFields={messageFields}
-          availableFields={availableFields}
-          otherNodesFields={{}}
-          isTemplateSupported={true}
-        />
-        <PromptMessagesField
-          messageFields={messageFields}
-          availableFields={availableFields}
-          otherNodesFields={{}}
-        />
-        <InputsFieldGroup />
-        <OutputsFieldGroup />
-        {hasDemonstrations && <DemonstrationsField />}
+        <VStack width="full" gap={6} mb={6} paddingBottom="70px">
+          <PromptHandleInfo config={savedConfig} methods={methods} />
+          <ModelSelectField />
+          <PromptField
+            templateAdapter="default"
+            messageFields={messageFields}
+            availableFields={availableFields}
+            otherNodesFields={{}}
+            isTemplateSupported={true}
+          />
+          <PromptMessagesField
+            messageFields={messageFields}
+            availableFields={availableFields}
+            otherNodesFields={{}}
+          />
+          <InputsFieldGroup />
+          <OutputsFieldGroup />
+          {hasDemonstrations && <DemonstrationsField />}
+        </VStack>
         <HStack
           gap={2}
           width="full"
