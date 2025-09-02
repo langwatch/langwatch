@@ -214,14 +214,36 @@ redis:
     storageClass: ""
 
 opensearch:
-  enabled: true
+  source: "built-in" # "built-in" or "external"
+
+  external:
+    # Reference to existing secret containing OpenSearch connection details
+    secretName: ""
+    secretKeys:
+      host: "host"
+      port: "port"
+      username: "username" # Optional for auth
+      password: "password" # Optional for auth
+      # Optional: full connection string as alternative
+      connectionString: "connection-string"
+      # SSL configuration if needed
+      sslCert: "ssl-cert"
+      sslKey: "ssl-key"
+      sslRootCert: "ssl-root-cert"
+
+  # Built-in OpenSearch configuration (when source: "built-in")
+  # Uses Bitnami OpenSearch chart dependency
+
+  # Service configuration to match old setup
   service:
     type: ClusterIP
     ports:
       - name: http
         port: 9200
       - name: transport
-        port: 9600
+        port: 9300
+
+  # Resources configuration to match old setup
   resources:
     requests:
       cpu: 500m
@@ -229,30 +251,54 @@ opensearch:
     limits:
       cpu: 1000m
       memory: 1Gi
-  env:
-    discovery.type: single-node
-    DISABLE_SECURITY_PLUGIN: "true"
-    # _JAVA_OPTIONS: "-XX:UseSVE=0"
-    OPENSEARCH_JAVA_OPTS: "-Xms512m -Xmx512m -XX:+UseG1GC -XX:-UseSerialGC -XX:G1ReservePercent=25 -XX:+AlwaysPreTouch -XX:InitiatingHeapOccupancyPercent=30"
-    cluster.routing.allocation.disk.threshold_enabled: "false"
-    bootstrap.memory_lock: "false"
-    cluster.routing.allocation.disk.watermark.low: "95%"
-    cluster.routing.allocation.disk.watermark.high: "96%"
-    cluster.routing.allocation.disk.watermark.flood_stage: "97%"
-    cluster.info.update.interval: "1m"
-    OPENSEARCH_INITIAL_ADMIN_PASSWORD: "Some-random-password-which-is-greater-than-16-chars-long~"
-    node.store.allow_mmap: "false"
-  persistence:
-    enabled: true
-    size: 10Gi
-    storageClass: ""
-  ulimits:
-    memlock:
-      soft: -1
-      hard: -1
-    nofile:
-      soft: 65536
-      hard: 65536
+
+  auth:
+    adminPassword: "" # Will be auto-generated if not provided
+    existingSecret: "" # Use existing secret for production
+    secretKeys:
+      adminPasswordKey: "admin-password"
+
+  # OpenSearch cluster configuration
+  clusterName: "langwatch-cluster"
+  nodeGroup:
+    master:
+      replicas: 1
+      persistence:
+        enabled: true
+        size: 10Gi
+        storageClass: ""
+      resources:
+        requests:
+          cpu: 500m
+          memory: 512Mi
+        limits:
+          cpu: 1000m
+          memory: 1Gi
+      javaOpts: "-Xms512m -Xmx512m -XX:+UseG1GC -XX:-UseSerialGC -XX:G1ReservePercent=25 -XX:+AlwaysPreTouch -XX:InitiatingHeapOccupancyPercent=30"
+
+      # Security context to match old setup
+      securityContext:
+        enabled: true
+        runAsUser: 1000
+        fsGroup: 1000
+        capabilities:
+          add:
+            - IPC_LOCK
+            - SYS_RESOURCE
+
+      # Health check configuration to match old setup
+      livenessProbe:
+        enabled: true
+        initialDelaySeconds: 90
+        periodSeconds: 30
+        timeoutSeconds: 30
+        failureThreshold: 3
+      readinessProbe:
+        enabled: true
+        initialDelaySeconds: 60
+        periodSeconds: 30
+        timeoutSeconds: 30
+        failureThreshold: 3
 
 # CronJobs configuration
 cronjobs:

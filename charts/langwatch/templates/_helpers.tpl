@@ -94,3 +94,42 @@ Generate DATABASE_URL based on configuration
 {{- end }}
 {{- end }}
 
+
+{{/*
+Return Prometheus hostname
+*/}}
+{{- define "langwatch.prometheus.hostname" -}}
+{{- if eq .Values.prometheus.source "built-in" }}
+{{- printf "%s-prometheus" .Release.Name -}}
+{{- else }}
+{{- .Values.prometheus.external.host }}
+{{- end }}
+{{- end }}
+
+{{/*
+Return Prometheus port
+*/}}
+{{- define "langwatch.prometheus.port" -}}
+{{- if eq .Values.prometheus.source "built-in" }}
+{{- 9090 | toString }}
+{{- else }}
+{{- .Values.prometheus.external.port | default 9090 | toString }}
+{{- end }}
+{{- end }}
+
+{{/*
+Generate Prometheus URL
+*/}}
+{{- define "langwatch.prometheus.url" -}}
+{{- if eq .Values.prometheus.source "built-in" }}
+{{- printf "http://%s:%s" (include "langwatch.prometheus.hostname" .) (include "langwatch.prometheus.port" .) }}
+{{- else if .Values.prometheus.external.connectionString }}
+{{- .Values.prometheus.external.connectionString }}
+{{- else }}
+{{- if and .Values.prometheus.external.username .Values.prometheus.external.password }}
+{{- printf "http://%s:%s@%s:%s" .Values.prometheus.external.username .Values.prometheus.external.password .Values.prometheus.external.host (.Values.prometheus.external.port | default 9090 | toString) }}
+{{- else }}
+{{- printf "http://%s:%s" .Values.prometheus.external.host (.Values.prometheus.external.port | default 9090 | toString) }}
+{{- end }}
+{{- end }}
+{{- end }}
