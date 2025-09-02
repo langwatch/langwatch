@@ -215,11 +215,16 @@ postgres:
 
   postgresqlDataDir: /var/lib/postgresql/data
 
-  persistence:
+  volumePermissions:
     enabled: true
-    existingClaim: "data-{{ .Release.Name }}-postgres-0"
-    size: 10Gi
-    storageClass: ""
+
+  primary:
+    persistence:
+      enabled: true
+      existingClaim: "data-langwatch-postgres-0"
+      mountPath: /var/lib/postgresql/data
+      size: 10Gi
+      storageClass: ""
 
   resources:
     requests:
