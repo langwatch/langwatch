@@ -142,7 +142,7 @@ Return OpenSearch hostname
 */}}
 {{- define "langwatch.opensearch.hostname" -}}
 {{- if eq .Values.opensearch.source "built-in" }}
-{{- printf "%s-opensearch-master" .Release.Name -}}
+{{- printf "%s-opensearch" .Release.Name -}}
 {{- else }}
 {{- .Values.opensearch.external.host }}
 {{- end }}

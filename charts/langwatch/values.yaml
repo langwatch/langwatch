@@ -255,7 +255,7 @@ redis:
   # Uses Bitnami Redis chart dependency
 
   auth:
-    enabled: true
+    enabled: false
     password: "" # Will be auto-generated if not provided
     existingSecret: "" # Use existing secret for production
     secretKeys:
@@ -324,6 +324,7 @@ opensearch:
     replicaCount: 0
 
   master:
+    masterOnly: false
     replicaCount: 1
     persistence:
       enabled: true
