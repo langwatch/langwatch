@@ -1,3 +1,4 @@
+{{- include "langwatch.validateSecrets" . }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -56,8 +57,30 @@ spec:
               value: {{ include "langwatch.redis.connectionUrl" . | quote }}
             - name: ELASTICSEARCH_NODE_URL
               value: {{ include "langwatch.opensearch.url" . | quote }}
+            # Secret-based environment variables
+            - name: API_TOKEN_JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.existingSecret | default (printf "%s-app-secrets" .Release.Name) }}
+                  key: {{ .Values.secrets.secretKeys.API_TOKEN_JWT_SECRET }}
+            - name: CRON_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.existingSecret | default (printf "%s-app-secrets" .Release.Name) }}
+                  key: {{ .Values.secrets.secretKeys.CRON_API_KEY }}
+            - name: METRICS_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.existingSecret | default (printf "%s-app-secrets" .Release.Name) }}
+                  key: {{ .Values.secrets.secretKeys.METRICS_API_KEY }}
+            - name: NEXTAUTH_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.existingSecret | default (printf "%s-app-secrets" .Release.Name) }}
+                  key: {{ .Values.secrets.secretKeys.NEXTAUTH_SECRET }}
+            # Non-secret environment variables
             {{- range $key, $value := .Values.app.env }}
-            {{- if and (ne $key "DATABASE_URL") (ne $key "REDIS_URL") (ne $key "ELASTICSEARCH_NODE_URL") }}
+            {{- if and (ne $key "DATABASE_URL") (ne $key "REDIS_URL") (ne $key "ELASTICSEARCH_NODE_URL") (ne $key "API_TOKEN_JWT_SECRET") (ne $key "CRON_API_KEY") (ne $key "METRICS_API_KEY") (ne $key "NEXTAUTH_SECRET") }}
             - name: {{ $key }}
               value: {{ tpl $value $ | quote }}
             {{- end }}

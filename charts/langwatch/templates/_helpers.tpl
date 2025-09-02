@@ -214,3 +214,53 @@ Generate Prometheus URL
 {{- end }}
 {{- end }}
 {{- end }}
+
+{{/*
+Validate secrets configuration
+*/}}
+{{- define "langwatch.validateSecrets" -}}
+{{- if and (not .Values.secrets.existingSecret) (not .Values.autogen.enabled) }}
+{{- fail "Either secrets.existingSecret must be set OR autogen.enabled must be true. Please configure one of these options for secure secrets handling." }}
+{{- end }}
+{{- end }}
+
+{{/*
+Get secret name for a service
+*/}}
+{{- define "langwatch.secretName" -}}
+{{- if .Values.secrets.existingSecret }}
+{{- .Values.secrets.existingSecret }}
+{{- else if .Values.autogen.enabled }}
+{{- .Values.autogen.secretNames.service | default (printf "%s-service-secrets" .Release.Name) }}
+{{- else }}
+{{- fail "No secret configuration found. Please set either secrets.existingSecret or autogen.enabled=true" }}
+{{- end }}
+{{- end }}
+
+{{/*
+Get CRON_API_KEY for cronjobs (no mocks)
+*/}}
+{{- define "langwatch.cronApiKey" -}}
+{{- if .Values.secrets.existingSecret }}
+{{- $secret := lookup "v1" "Secret" .Release.Namespace .Values.secrets.existingSecret }}
+{{- if $secret }}{{- index $secret.data .Values.secrets.secretKeys.CRON_API_KEY | b64dec | quote }}{{- else }}{{- fail (printf "Secret %s not found in namespace %s" .Values.secrets.existingSecret .Release.Namespace) }}{{- end }}
+{{- else if .Values.autogen.enabled }}
+{{- "" -}}
+{{- else }}
+{{- fail "No secret configuration found. Please set either secrets.existingSecret or autogen.enabled=true" }}
+{{- end }}
+{{- end }}
+
+{{/*
+Get METRICS_API_KEY for Prometheus (no mocks)
+*/}}
+{{- define "langwatch.metricsApiKey" -}}
+{{- if .Values.secrets.existingSecret }}
+{{- $secret := lookup "v1" "Secret" .Release.Namespace .Values.secrets.existingSecret }}
+{{- if $secret }}{{- index $secret.data .Values.secrets.secretKeys.METRICS_API_KEY | b64dec | quote }}{{- else }}{{- fail (printf "Secret %s not found in namespace %s" .Values.secrets.existingSecret .Release.Namespace) }}{{- end }}
+{{- else if .Values.autogen.enabled }}
+{{- "" -}}
+{{- else }}
+{{- fail "No secret configuration found. Please set either secrets.existingSecret or autogen.enabled=true" }}
+{{- end }}
+{{- end }}

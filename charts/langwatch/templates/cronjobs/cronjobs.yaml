@@ -1,4 +1,5 @@
 {{- if .Values.cronjobs.enabled }}
+{{- include "langwatch.validateSecrets" . }}
 {{- $root := . }}
 {{- range $jobName, $jobConfig := .Values.cronjobs.jobs }}
 {{- if $jobConfig.enabled }}
@@ -51,11 +52,17 @@ spec:
                 {{- toYaml $root.Values.global.containerSecurityContext | nindent 16 }}
               image: "{{ $root.Values.cronjobs.image.repository }}:{{ $root.Values.cronjobs.image.tag }}"
               imagePullPolicy: {{ $root.Values.cronjobs.image.pullPolicy }}
+              env:
+                - name: CRON_API_KEY
+                  valueFrom:
+                    secretKeyRef:
+                      name: {{ $root.Values.secrets.existingSecret | default ($root.Values.autogen.secretNames.app | default (printf "%s-app-secrets" $root.Release.Name)) }}
+                      key: {{ $root.Values.secrets.secretKeys.CRON_API_KEY }}
               command: ["/bin/sh", "-c"]
               args:
                 - |
                   curl -i \
-                    -H 'Authorization: Bearer {{ $root.Values.app.env.CRON_API_KEY }}' \
+                    -H "Authorization: Bearer ${CRON_API_KEY}" \
                     -X GET \
                     http://{{ $root.Release.Name }}-app:{{ $root.Values.app.service.port }}{{ $jobConfig.endpoint }}
               resources:
