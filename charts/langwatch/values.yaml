@@ -308,6 +308,13 @@ opensearch:
       cpu: 1000m
       memory: 1Gi
 
+  coordinating:
+    replicaCount: 0
+  ingest:
+    enabled: false
+  data:
+    replicaCount: 0
+
   master:
     replicaCount: 1
     persistence:
