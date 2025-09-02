@@ -252,7 +252,7 @@ export const runEvaluation = async ({
 
     let env = Object.fromEntries(
       Object.entries(params).map(([key, value]) => [
-        embeddings ? `LITELLM_EMBEDDINGS_${key}` : `LITELLM_${key}`,
+        embeddings ? `X_LITELLM_EMBEDDINGS_${key}` : `X_LITELLM_${key}`,
         value,
       ])
     );
