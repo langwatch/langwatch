@@ -73,7 +73,7 @@ function ProjectsList({
                   <Table.Header key={team.id}>
                     <Table.Row>
                       <Table.ColumnHeader>{team.name}</Table.ColumnHeader>
-                      <Table.Cell textAlign="right">
+                      <Table.Cell textAlign="right" width="full" colSpan={2}>
                         {hasTeamPermission(
                           TeamRoleGroup.TEAM_CREATE_NEW_PROJECTS,
                           team
@@ -139,6 +139,7 @@ function ProjectsList({
 
 export function TeamProjectsList({ team }: { team: TeamWithProjects }) {
   const queryClient = api.useContext();
+  const { project } = useOrganizationTeamProject();
   const deleteProject = api.project.deleteById.useMutation({
     onSuccess: () => {
       toaster.create({
@@ -155,36 +156,43 @@ export function TeamProjectsList({ team }: { team: TeamWithProjects }) {
         "Are you sure you want to delete this project? This action cannot be undone."
       )
     ) {
-      deleteProject.mutate({ projectId });
+      deleteProject.mutate({
+        projectId: project?.id ?? "",
+        projectToDeleteId: projectId,
+      });
     }
   };
 
   return (
     <Table.Body>
-      {team.projects.map((project) => (
-        <Table.Row key={project.id}>
-          <Table.Cell colSpan={2}>
+      {team.projects.map((teamProject) => (
+        <Table.Row key={teamProject.id}>
+          <Table.Cell colSpan={3}>
             <Box as="div" cursor="pointer">
-              <HStack width="full" gap={2} data-project-id={project.id}>
-                <ProjectTechStackIcon project={project} />
-                <Link href={`/${project.slug}/messages`}>{project.name}</Link>
+              <HStack width="full" gap={2} data-project-id={teamProject.id}>
+                <ProjectTechStackIcon project={teamProject} />
+                <Link href={`/${teamProject.slug}/messages`}>
+                  {teamProject.name}
+                </Link>
               </HStack>
             </Box>
           </Table.Cell>
           <Table.Cell textAlign="right">
-            <Button
-              size="sm"
-              colorPalette="red"
-              onClick={() => onDeleteProject(project.id)}
-            >
-              Delete
-            </Button>
+            {teamProject.id !== project?.id && (
+              <Button
+                size="sm"
+                colorPalette="red"
+                onClick={() => onDeleteProject(teamProject.id)}
+              >
+                Delete
+              </Button>
+            )}
           </Table.Cell>
         </Table.Row>
       ))}
       {team.projects.length === 0 && (
         <Table.Row>
-          <Table.Cell>
+          <Table.Cell colSpan={2}>
             <Text>No projects on this team</Text>
           </Table.Cell>
         </Table.Row>

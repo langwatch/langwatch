@@ -6,7 +6,6 @@ import { patchForOpensearchCompatibility } from "./elasticsearch/patchOpensearch
 import { patchForQuickwitCompatibility } from "./elasticsearch/patchQuickwitCompatibility";
 import { prisma } from "./db";
 import { decrypt } from "../utils/encryption";
-import { activeProjectWhere } from "~/utils/activeProjectFilter";
 export type IndexSpec = {
   alias: string;
   base: string;
@@ -36,7 +35,7 @@ export const SCENARIO_EVENTS_INDEX: IndexSpec = {
 
 const getOrgElasticsearchDetailsFromProject = async (projectId: string) => {
   const project = await prisma.project.findUnique({
-    where: activeProjectWhere({ id: projectId }),
+    where: { id: projectId, archivedAt: null },
     include: { team: { include: { organization: true } } },
   });
 

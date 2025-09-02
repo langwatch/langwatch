@@ -1,11 +1,10 @@
 import { CostReferenceType, CostType } from "@prisma/client";
 import * as Sentry from "@sentry/nextjs";
-import { Worker, type Job } from "bullmq";
+import { trace, Worker, type Job } from "bullmq";
 import { nanoid } from "nanoid";
 import type { EvaluationJob } from "~/server/background/types";
 import type { Trace } from "~/server/tracer/types";
 import { env } from "../../../env.mjs";
-import { activeProjectWhere } from "~/utils/activeProjectFilter";
 import {
   AVAILABLE_EVALUATORS,
   type BatchEvaluationResult,
@@ -197,7 +196,7 @@ export const runEvaluation = async ({
   retries?: number;
 }): Promise<SingleEvaluationResult> => {
   const project = await prisma.project.findUnique({
-    where: activeProjectWhere({ id: projectId }),
+    where: { id: projectId, archivedAt: null },
     include: { team: true },
   });
   if (!project) {
@@ -517,9 +516,7 @@ const customEvaluation = async (
   const workflowId = evaluatorType.split("/")[1];
 
   const project = await prisma.project.findUnique({
-    where: activeProjectWhere({
-      id: projectId,
-    }),
+    where: { id: projectId, archivedAt: null },
   });
 
   if (!project) {

@@ -13,7 +13,6 @@ import {
   getInternalProtectionsForProject,
 } from "../../api/utils";
 import { prisma } from "../../db";
-import { activeProjectWhere } from "~/utils/activeProjectFilter";
 import { TRACE_INDEX, esClient, traceIndexId } from "../../elasticsearch";
 import {
   collectorIndexDelayHistogram,
@@ -224,7 +223,7 @@ const processCollectorJob_ = async (
   } = data;
 
   const project = await prisma.project.findUniqueOrThrow({
-    where: activeProjectWhere({ id: projectId }),
+    where: { id: projectId, archivedAt: null },
   });
 
   spans = addGuardrailCosts(spans);
