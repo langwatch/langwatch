@@ -21,29 +21,131 @@ global:
 
 # Prometheus monitoring configuration
 prometheus:
-  enabled: false
-  image:
-    repository: quay.io/prometheus/prometheus
-    tag: "v3.0.1"
-    pullPolicy: IfNotPresent
-  service:
-    type: ClusterIP
-    port: 9090
-    annotations: {}
-  resources:
-    requests:
-      cpu: 200m
-      memory: 512Mi
-    limits:
-      cpu: 500m
-      memory: 2Gi
-  storage:
-    enabled: true
-    size: 6Gi
-    storageClass: ""
-  retention: 60d
-  rbac:
-    enabled: true
+  source: "built-in" # "built-in" or "external"
+
+  external:
+    # Reference to existing secret containing Prometheus connection details
+    secretName: ""
+    secretKeys:
+      host: "host"
+      port: "port"
+      username: "username" # Optional for basic auth
+      password: "password" # Optional for basic auth
+      # Optional: full connection string
+      connectionString: "connection-string"
+
+  # Prometheus server configuration
+  server:
+    # Global Prometheus configuration
+    global:
+      scrape_interval: 15s
+      evaluation_interval: 15s
+
+    # Persistence configuration
+    persistence:
+      enabled: true
+      size: 6Gi
+      storageClass: ""
+
+    # Retention and resources
+    retention: 60d
+    resources:
+      requests:
+        cpu: 200m
+        memory: 512Mi
+      limits:
+        cpu: 500m
+        memory: 2Gi
+
+    # RBAC configuration (enabled by default)
+    rbac:
+      create: true
+      includeDefaultRules: true
+
+    # ServiceAccount configuration
+    serviceAccount:
+      create: true
+
+    # Service configuration to match old setup
+    service:
+      type: ClusterIP
+      port: 9090
+
+    # Security context to match old setup
+    securityContext:
+      runAsNonRoot: true
+      runAsUser: 65534
+      fsGroup: 65534
+
+    # Custom scrape configs to match old setup
+    extraScrapeConfigs: |
+      - job_name: 'langwatch'
+        kubernetes_sd_configs:
+          - role: pod
+            namespaces:
+              names:
+                - {{ .Release.Namespace }}
+        metrics_path: '/metrics'
+        scheme: http
+        relabel_configs:
+          - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_scrape]
+            action: keep
+            regex: true
+          - source_labels: [__meta_kubernetes_pod_ip]
+            action: replace
+            target_label: __address__
+            replacement: $1:5560
+          - source_labels: [__meta_kubernetes_pod_name]
+            action: replace
+            target_label: pod
+        {{- if .Values.app.env.METRICS_API_KEY }}
+        bearer_token: "{{ .Values.app.env.METRICS_API_KEY }}"
+        {{- end }}
+
+      - job_name: 'langwatch-workers'
+        kubernetes_sd_configs:
+          - role: pod
+            namespaces:
+              names:
+                - {{ .Release.Namespace }}
+        metrics_path: '/metrics'
+        scheme: http
+        relabel_configs:
+          - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_scrape]
+            action: keep
+            regex: true
+          - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_path]
+            action: replace
+            target_label: __metrics_path__
+            regex: (.+)
+          - source_labels: [__meta_kubernetes_pod_ip]
+            action: replace
+            target_label: __address__
+            replacement: $1:2999
+          - source_labels: [__meta_kubernetes_pod_name]
+            action: replace
+            target_label: pod
+        {{- if .Values.app.env.METRICS_API_KEY }}
+        bearer_token: "{{ .Values.app.env.METRICS_API_KEY }}"
+        {{- end }}
+
+      - job_name: 'kubernetes-cadvisor'
+        scheme: https
+        tls_config:
+          ca_file: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+          insecure_skip_verify: true
+        bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+        kubernetes_sd_configs:
+          - role: node
+        relabel_configs:
+          - action: labelmap
+            regex: __meta_kubernetes_node_label_(.+)
+          - target_label: __address__
+            replacement: kubernetes.default.svc:443
+          - source_labels: [__meta_kubernetes_node_name]
+            regex: (.+)
+            target_label: __metrics_path__
+            replacement: /api/v1/nodes/$1/proxy/metrics/cadvisor
 
 # Image configurations
 images:
@@ -88,9 +190,13 @@ app:
   env:
     SKIP_ENV_VALIDATION: "true"
     DISABLE_PII_REDACTION: "true"
-    ELASTICSEARCH_NODE_URL: "http://{{ .Release.Name }}-opensearch:9200"
+    # PostgreSQL connection - automatically configured based on postgres.source
+    DATABASE_URL: "" # Will be set by template function
+    # OpenSearch connection - automatically configured based on opensearch.source
+    ELASTICSEARCH_NODE_URL: "" # Will be set by template function
     IS_OPENSEARCH: "true"
-    REDIS_URL: "redis://{{ .Release.Name }}-redis:6379"
+    # Redis connection - automatically configured based on redis.source
+    REDIS_URL: "" # Will be set by template function
     LANGWATCH_NLP_SERVICE: "http://{{ .Release.Name }}-langwatch-nlp:5561"
     LANGEVALS_ENDPOINT: "http://{{ .Release.Name }}-langevals:5562"
     # User provided environment variables
@@ -137,7 +243,7 @@ langevals:
       memory: 6144Mi
 
 postgres:
-  source: "built-in"  # "built-in" or "external"
+  source: "built-in" # "built-in" or "external"
 
   # External PostgreSQL (when source: "external")
   external:
@@ -145,7 +251,7 @@ postgres:
     secretName: ""
     secretKeys:
       host: "host"
-      port: "port" 
+      port: "port"
       database: "database"
       username: "username"
       password: "password"
@@ -156,11 +262,11 @@ postgres:
       sslCert: "ssl-cert"
       sslKey: "ssl-key"
       sslRootCert: "ssl-root-cert"
-  
+
   # Built-in PostgreSQL configuration (when source: "built-in")
   auth:
     username: prisma
-    password: ""  # Will be auto-generated if not provided
+    password: "" # Will be auto-generated if not provided
     database: mydb
     # Use existing secret for production
     existingSecret: ""
@@ -168,18 +274,12 @@ postgres:
       userPasswordKey: password
       databaseKey: database
       usernameKey: username
-  
-  primary:
-    service:
-      ports:
-        postgresql: 5432
-    architecture: standalone
-  
+
   persistence:
     enabled: true
     size: 10Gi
     storageClass: ""
-  
+
   resources:
     requests:
       cpu: 100m
@@ -187,14 +287,6 @@ postgres:
     limits:
       cpu: 500m
       memory: 512Mi
-  env:
-    POSTGRES_DB: mydb
-    POSTGRES_USER: prisma
-    POSTGRES_PASSWORD: prisma
-  persistence:
-    enabled: true
-    size: 10Gi
-    storageClass: ""
 
 redis:
   source: "built-in" # "built-in" or "external"
