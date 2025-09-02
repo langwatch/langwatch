@@ -487,6 +487,17 @@ export const projectRouter = createTRPCRouter({
         };
       }
     ),
+  deleteById: protectedProcedure
+    .input(z.object({ projectId: z.string() }))
+    .use(checkUserPermissionForProject(TeamRoleGroup.SETUP_PROJECT))
+    .mutation(async ({ input, ctx }) => {
+      const prisma = ctx.prisma;
+      await prisma.project.update({
+        where: { id: input.projectId },
+        data: { archivedAt: new Date() },
+      });
+      return { success: true };
+    }),
 });
 
 const generateApiKey = (): string => {

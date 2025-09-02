@@ -23,6 +23,7 @@ import { api } from "../../utils/api";
 import { trackEvent } from "../../utils/tracking";
 import { Link } from "../../components/ui/link";
 import { Tooltip } from "../../components/ui/tooltip";
+import { toaster } from "../../components/ui/toaster";
 
 export default function Projects() {
   const { organization } = useOrganizationTeamProject();
@@ -137,6 +138,27 @@ function ProjectsList({
 }
 
 export function TeamProjectsList({ team }: { team: TeamWithProjects }) {
+  const queryClient = api.useContext();
+  const deleteProject = api.project.deleteById.useMutation({
+    onSuccess: () => {
+      toaster.create({
+        title: "Project deleted successfully",
+        type: "success",
+      });
+      void queryClient.organization.getAll.invalidate();
+    },
+  });
+
+  const onDeleteProject = (projectId: string) => {
+    if (
+      confirm(
+        "Are you sure you want to delete this project? This action cannot be undone."
+      )
+    ) {
+      deleteProject.mutate({ projectId });
+    }
+  };
+
   return (
     <Table.Body>
       {team.projects.map((project) => (
@@ -148,6 +170,15 @@ export function TeamProjectsList({ team }: { team: TeamWithProjects }) {
                 <Link href={`/${project.slug}/messages`}>{project.name}</Link>
               </HStack>
             </Box>
+          </Table.Cell>
+          <Table.Cell textAlign="right">
+            <Button
+              size="sm"
+              colorPalette="red"
+              onClick={() => onDeleteProject(project.id)}
+            >
+              Delete
+            </Button>
           </Table.Cell>
         </Table.Row>
       ))}

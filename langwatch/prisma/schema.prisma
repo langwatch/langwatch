@@ -221,6 +221,7 @@ model Project {
     s3Bucket                 String?
     llmPromptConfigs         LlmPromptConfig[]
     analytics                Analytics[]
+    archivedAt               DateTime?
 
     @@index([teamId])
 }
