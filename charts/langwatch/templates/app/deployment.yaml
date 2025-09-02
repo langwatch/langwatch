@@ -54,8 +54,10 @@ spec:
               value: {{ include "langwatch.postgres.databaseUrl" . | quote }}
             - name: REDIS_URL
               value: {{ include "langwatch.redis.connectionUrl" . | quote }}
+            - name: ELASTICSEARCH_NODE_URL
+              value: {{ include "langwatch.opensearch.url" . | quote }}
             {{- range $key, $value := .Values.app.env }}
-            {{- if ne $key "DATABASE_URL" }}
+            {{- if and (ne $key "DATABASE_URL") (ne $key "REDIS_URL") (ne $key "ELASTICSEARCH_NODE_URL") }}
             - name: {{ $key }}
               value: {{ tpl $value $ | quote }}
             {{- end }}

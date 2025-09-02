@@ -138,6 +138,45 @@ Generate Redis connection URL
 {{- end }}
 
 {{/*
+Return OpenSearch hostname
+*/}}
+{{- define "langwatch.opensearch.hostname" -}}
+{{- if eq .Values.opensearch.source "built-in" }}
+{{- printf "%s-opensearch-master" .Release.Name -}}
+{{- else }}
+{{- .Values.opensearch.external.host }}
+{{- end }}
+{{- end }}
+
+{{/*
+Return OpenSearch port
+*/}}
+{{- define "langwatch.opensearch.port" -}}
+{{- if eq .Values.opensearch.source "built-in" }}
+{{- 9200 | toString }}
+{{- else }}
+{{- .Values.opensearch.external.port | default 9200 | toString }}
+{{- end }}
+{{- end }}
+
+{{/*
+Generate OpenSearch URL
+*/}}
+{{- define "langwatch.opensearch.url" -}}
+{{- if eq .Values.opensearch.source "built-in" }}
+{{- printf "http://%s:%s" (include "langwatch.opensearch.hostname" .) (include "langwatch.opensearch.port" .) }}
+{{- else if .Values.opensearch.external.connectionString }}
+{{- .Values.opensearch.external.connectionString }}
+{{- else }}
+{{- if and .Values.opensearch.external.username .Values.opensearch.external.password }}
+{{- printf "https://%s:%s@%s:%s" .Values.opensearch.external.username .Values.opensearch.external.password .Values.opensearch.external.host (.Values.opensearch.external.port | default 9200 | toString) }}
+{{- else }}
+{{- printf "https://%s:%s" .Values.opensearch.external.host (.Values.opensearch.external.port | default 9200 | toString) }}
+{{- end }}
+{{- end }}
+{{- end }}
+
+{{/*
 Return Prometheus hostname
 */}}
 {{- define "langwatch.prometheus.hostname" -}}
