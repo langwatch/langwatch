@@ -37,9 +37,6 @@ langwatch.setup()  # The api key is set from the environment variable automatica
 def get_user_location() -> str:
     """Get the user's location."""
 
-    with langwatch.span(type="tool") as span:
-        span.update(output="Seattle, USA")
-
     # Implement user location lookup logic here
     return "London, UK"
 
@@ -55,6 +52,7 @@ class KiteAgent:
         self.agent = Agent(
             name="kite-agent",
             model=self.model,
+            system_prompt="Always use the get_user_location tool before answering any questions.",
             tools=[get_user_location],
             trace_attributes={
                 "custom.model_id": "openai/gpt-5-mini",
