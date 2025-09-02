@@ -73,7 +73,7 @@ function ProjectsList({
                   <Table.Header key={team.id}>
                     <Table.Row>
                       <Table.ColumnHeader>{team.name}</Table.ColumnHeader>
-                      <Table.Cell textAlign="right" width="full" colSpan={2}>
+                      <Table.ColumnHeader textAlign="right">
                         {hasTeamPermission(
                           TeamRoleGroup.TEAM_CREATE_NEW_PROJECTS,
                           team
@@ -123,7 +123,7 @@ function ProjectsList({
                               </Link>
                             </Tooltip>
                           ))}
-                      </Table.Cell>
+                      </Table.ColumnHeader>
                     </Table.Row>
                   </Table.Header>
                   <TeamProjectsList team={team} />
@@ -167,7 +167,7 @@ export function TeamProjectsList({ team }: { team: TeamWithProjects }) {
     <Table.Body>
       {team.projects.map((teamProject) => (
         <Table.Row key={teamProject.id}>
-          <Table.Cell colSpan={3}>
+          <Table.Cell>
             <Box as="div" cursor="pointer">
               <HStack width="full" gap={2} data-project-id={teamProject.id}>
                 <ProjectTechStackIcon project={teamProject} />

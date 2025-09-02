@@ -498,6 +498,15 @@ export const projectRouter = createTRPCRouter({
           message: "You cannot delete the current project",
         });
       }
+      const canDeleteTarget = await backendHasTeamProjectPermission(
+        ctx,
+        { projectId: input.projectToDeleteId },
+        TeamRoleGroup.SETUP_PROJECT
+      );
+      if (!canDeleteTarget) {
+        throw new TRPCError({ code: "UNAUTHORIZED" });
+      }
+
       const result = await prisma.project.updateMany({
         where: { id: input.projectToDeleteId, archivedAt: null },
         data: { archivedAt: new Date() },
