@@ -213,7 +213,7 @@ postgres:
       databaseKey: database
       usernameKey: username
 
-  postgresqlDataDir: /var/lib/postgresql/data
+  postgresqlDataDir: /var/lib/postgresql/data/pgdata
 
   volumePermissions:
     enabled: true
