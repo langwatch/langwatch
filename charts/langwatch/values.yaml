@@ -213,6 +213,9 @@ postgresql:
       databaseKey: database
       usernameKey: username
 
+  image:
+    tag: 16.6.0-debian-12-r2
+
   postgresqlDataDir: /var/lib/postgresql/data/pgdata
 
   volumePermissions:
@@ -222,7 +225,7 @@ postgresql:
     persistence:
       enabled: true
       existingClaim: "data-langwatch-postgres-0"
-      mountPath: /var/lib/postgresql
+      mountPath: /var/lib/postgresql/data
       size: 10Gi
       storageClass: ""
 
