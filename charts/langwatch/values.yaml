@@ -19,6 +19,26 @@ global:
     enabled: false
     prometheusAnnotations: true
 
+# Secrets configuration
+secrets:
+  # Production mode: reference to existing secret
+  existingSecret: ""
+  # Secret keys mapping (can be customized if needed)
+  secretKeys:
+    API_TOKEN_JWT_SECRET: "API_TOKEN_JWT_SECRET"
+    CRON_API_KEY: "CRON_API_KEY"
+    METRICS_API_KEY: "METRICS_API_KEY"
+    NEXTAUTH_SECRET: "NEXTAUTH_SECRET"
+
+# Auto-generation mode (development only)
+autogen:
+  enabled: false
+  # Secret names for each service (auto-generated if not specified)
+  secretNames:
+    app: "" # defaults to {{ .Release.Name }}-app-secrets
+    langevals: "" # defaults to {{ .Release.Name }}-langevals-secrets
+    langwatch_nlp: "" # defaults to {{ .Release.Name }}-langwatch-nlp-secrets
+
 # Prometheus monitoring configuration
 prometheus:
   source: "built-in" # "built-in" or "external"
@@ -77,76 +97,6 @@ prometheus:
       runAsUser: 65534
       fsGroup: 65534
 
-    # Custom scrape configs to match old setup
-    extraScrapeConfigs: |
-      - job_name: 'langwatch'
-        kubernetes_sd_configs:
-          - role: pod
-            namespaces:
-              names:
-                - {{ .Release.Namespace }}
-        metrics_path: '/metrics'
-        scheme: http
-        relabel_configs:
-          - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_scrape]
-            action: keep
-            regex: true
-          - source_labels: [__meta_kubernetes_pod_ip]
-            action: replace
-            target_label: __address__
-            replacement: $1:5560
-          - source_labels: [__meta_kubernetes_pod_name]
-            action: replace
-            target_label: pod
-        {{- if .Values.app.env.METRICS_API_KEY }}
-        bearer_token: "{{ .Values.app.env.METRICS_API_KEY }}"
-        {{- end }}
-
-      - job_name: 'langwatch-workers'
-        kubernetes_sd_configs:
-          - role: pod
-            namespaces:
-              names:
-                - {{ .Release.Namespace }}
-        metrics_path: '/metrics'
-        scheme: http
-        relabel_configs:
-          - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_scrape]
-            action: keep
-            regex: true
-          - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_path]
-            action: replace
-            target_label: __metrics_path__
-            regex: (.+)
-          - source_labels: [__meta_kubernetes_pod_ip]
-            action: replace
-            target_label: __address__
-            replacement: $1:2999
-          - source_labels: [__meta_kubernetes_pod_name]
-            action: replace
-            target_label: pod
-        {{- if .Values.app.env.METRICS_API_KEY }}
-        bearer_token: "{{ .Values.app.env.METRICS_API_KEY }}"
-        {{- end }}
-
-      - job_name: 'kubernetes-cadvisor'
-        scheme: https
-        tls_config:
-          ca_file: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
-          insecure_skip_verify: true
-        bearer_token_file: /var/run/secrets/kubernetes.io/serviceaccount/token
-        kubernetes_sd_configs:
-          - role: node
-        relabel_configs:
-          - action: labelmap
-            regex: __meta_kubernetes_node_label_(.+)
-          - target_label: __address__
-            replacement: kubernetes.default.svc:443
-          - source_labels: [__meta_kubernetes_node_name]
-            regex: (.+)
-            target_label: __metrics_path__
-            replacement: /api/v1/nodes/$1/proxy/metrics/cadvisor
-
 # Image configurations
 images:
   app:
@@ -161,18 +111,6 @@ images:
     repository: langwatch/langevals
     tag: latest
     pullPolicy: Always
-  postgres:
-    repository: postgres
-    tag: "16"
-    pullPolicy: IfNotPresent
-  redis:
-    repository: redis
-    tag: alpine
-    pullPolicy: IfNotPresent
-  opensearch:
-    repository: langwatch/opensearch-lite
-    tag: latest
-    pullPolicy: IfNotPresent
 
 # Service configurations
 app:
@@ -202,10 +140,11 @@ app:
     # User provided environment variables
     BASE_HOST: "http://localhost:5560"
     NEXTAUTH_URL: "http://localhost:5560"
-    NEXTAUTH_SECRET: "" # Users must provide this values
-    API_TOKEN_JWT_SECRET: "" # Users must provide this values
-    CRON_API_KEY: "" # Users must provide this value for cronjob authentication
-    METRICS_API_KEY: "" # Set this for metrics authentication (will be stored in Kubernetes Secret)
+    # Secrets are now handled via Kubernetes Secrets - see secrets.existingSecret or autogen.enabled
+    # NEXTAUTH_SECRET: "" # Removed - now from secret
+    # API_TOKEN_JWT_SECRET: "" # Removed - now from secret
+    # CRON_API_KEY: "" # Removed - now from secret
+    # METRICS_API_KEY: "" # Removed - now from secret
     # SENDGRID_API_KEY: ""  # Optional
     # SSO Configuration (Azure AD example)
     # AZURE_AD_CLIENT_ID: "" # Set for Azure AD SSO
@@ -263,7 +202,6 @@ postgres:
       sslKey: "ssl-key"
       sslRootCert: "ssl-root-cert"
 
-  # Built-in PostgreSQL configuration (when source: "built-in")
   auth:
     username: prisma
     password: "" # Will be auto-generated if not provided
@@ -350,16 +288,18 @@ opensearch:
   # Built-in OpenSearch configuration (when source: "built-in")
   # Uses Bitnami OpenSearch chart dependency
 
-  # Service configuration to match old setup
-  service:
-    type: ClusterIP
-    ports:
-      - name: http
-        port: 9200
-      - name: transport
-        port: 9300
+  auth:
+    adminPassword: "" # Will be auto-generated if not provided
+    existingSecret: "" # Use existing secret for production
+    secretKeys:
+      adminPasswordKey: "admin-password"
 
-  # Resources configuration to match old setup
+  clusterName: "langwatch-cluster"
+
+  extraEnvVars:
+    - name: OS_JAVA_OPTS
+      value: "-Xms512m -Xmx512m -XX:+UseG1GC -XX:-UseSerialGC -XX:G1ReservePercent=25 -XX:+AlwaysPreTouch -XX:InitiatingHeapOccupancyPercent=30"
+
   resources:
     requests:
       cpu: 500m
@@ -368,53 +308,20 @@ opensearch:
       cpu: 1000m
       memory: 1Gi
 
-  auth:
-    adminPassword: "" # Will be auto-generated if not provided
-    existingSecret: "" # Use existing secret for production
-    secretKeys:
-      adminPasswordKey: "admin-password"
+  master:
+    replicaCount: 1
+    persistence:
+      enabled: true
+      size: 10Gi
 
-  # OpenSearch cluster configuration
-  clusterName: "langwatch-cluster"
-  nodeGroup:
-    master:
-      replicas: 1
-      persistence:
-        enabled: true
-        size: 10Gi
-        storageClass: ""
-      resources:
-        requests:
-          cpu: 500m
-          memory: 512Mi
-        limits:
-          cpu: 1000m
-          memory: 1Gi
-      javaOpts: "-Xms512m -Xmx512m -XX:+UseG1GC -XX:-UseSerialGC -XX:G1ReservePercent=25 -XX:+AlwaysPreTouch -XX:InitiatingHeapOccupancyPercent=30"
-
-      # Security context to match old setup
-      securityContext:
-        enabled: true
-        runAsUser: 1000
-        fsGroup: 1000
-        capabilities:
-          add:
-            - IPC_LOCK
-            - SYS_RESOURCE
-
-      # Health check configuration to match old setup
-      livenessProbe:
-        enabled: true
-        initialDelaySeconds: 90
-        periodSeconds: 30
-        timeoutSeconds: 30
-        failureThreshold: 3
-      readinessProbe:
-        enabled: true
-        initialDelaySeconds: 60
-        periodSeconds: 30
-        timeoutSeconds: 30
-        failureThreshold: 3
+    containerSecurityContext:
+      enabled: true
+      runAsUser: 1000
+      fsGroup: 1000
+      capabilities:
+        add:
+          - IPC_LOCK
+          - SYS_RESOURCE
 
 # CronJobs configuration
 cronjobs:
