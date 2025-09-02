@@ -74,7 +74,7 @@ const handleCreateMultipleOptions = (
 
 export default function ModelsPage() {
   const { project, organizations } = useOrganizationTeamProject();
-  const modelProviders = api.modelProvider.getAllForProject.useQuery(
+  const modelProviders = api.modelProvider.getAllForProjectForFrontend.useQuery(
     { projectId: project?.id ?? "" },
     { enabled: !!project }
   );

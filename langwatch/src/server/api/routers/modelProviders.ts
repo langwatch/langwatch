@@ -28,7 +28,21 @@ export const modelProviderRouter = createTRPCRouter({
 
       return await getProjectModelProviders(projectId, hasSetupPermission);
     }),
-
+  getAllForProjectForFrontend: protectedProcedure
+    .input(z.object({ projectId: z.string() }))
+    .use(checkUserPermissionForProject(TeamRoleGroup.PROJECT_VIEW))
+    .query(async ({ input, ctx }) => {
+      const { projectId } = input;
+      const hasSetupPermission = await backendHasTeamProjectPermission(
+        ctx,
+        { projectId },
+        TeamRoleGroup.SETUP_PROJECT
+      );
+      return await getProjectModelProvidersForFrontend(
+        projectId,
+        hasSetupPermission
+      );
+    }),
   update: protectedProcedure
     .input(
       z.object({
@@ -180,7 +194,7 @@ export const getProjectModelProviders = async (
   )
     .filter(
       (modelProvider) =>
-        modelProvider.customKeys ||
+        modelProvider.customKeys ??
         modelProvider.enabled !==
           defaultModelProviders[modelProvider.provider]?.enabled
     )
@@ -215,6 +229,37 @@ export const getProjectModelProviders = async (
     ...defaultModelProviders,
     ...savedModelProviders,
   };
+};
+
+// Frontend-only function that masks API keys for security
+export const getProjectModelProvidersForFrontend = async (
+  projectId: string,
+  includeKeys = true
+) => {
+  const modelProviders = await getProjectModelProviders(projectId, includeKeys);
+
+  if (!includeKeys) {
+    return modelProviders;
+  }
+
+  // Mask only API keys, keep URLs visible
+  const maskedProviders = { ...modelProviders };
+  for (const [provider, config] of Object.entries(maskedProviders)) {
+    if (config.customKeys) {
+      maskedProviders[provider] = {
+        ...config,
+        customKeys: Object.fromEntries(
+          Object.entries(config.customKeys).map(([key, value]) => [
+            key,
+            // Only mask values that look like API keys (contain "_KEY" pattern)
+            value?.toString().includes("_KEY") ? "HAS_KEY" : value,
+          ])
+        ),
+      };
+    }
+  }
+
+  return maskedProviders;
 };
 
 const getModelOrDefaultEnvKey = (
