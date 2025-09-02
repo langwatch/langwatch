@@ -52,6 +52,8 @@ spec:
           env:
             - name: DATABASE_URL
               value: {{ include "langwatch.postgres.databaseUrl" . | quote }}
+            - name: REDIS_URL
+              value: {{ include "langwatch.redis.connectionUrl" . | quote }}
             {{- range $key, $value := .Values.app.env }}
             {{- if ne $key "DATABASE_URL" }}
             - name: {{ $key }}

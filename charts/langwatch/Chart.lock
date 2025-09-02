@@ -4,6 +4,9 @@ dependencies:
   version: 16.4.9
 digest: sha256:9b5ba70e307ebdef04291a3f030283d6574fc240c4ede4af553b2a907fc3ee48
 generated: "2025-09-02T15:50:12.413809+02:00"
+- name: redis
+  repository: oci://registry-1.docker.io/bitnamicharts
+  version: 18.0.0
 - name: prometheus
   repository: oci://registry-1.docker.io/bitnamicharts
   version: 2.1.23

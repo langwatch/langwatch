@@ -197,21 +197,42 @@ postgres:
     storageClass: ""
 
 redis:
-  enabled: true # Set to false to disable built-in Redis and use external Redis service
-  service:
-    type: ClusterIP
-    port: 6379
-  resources:
-    requests:
-      cpu: 100m
-      memory: 128Mi
-    limits:
-      cpu: 300m
-      memory: 256Mi
-  persistence:
+  source: "built-in" # "built-in" or "external"
+
+  external:
+    # Reference to existing secret containing Redis connection details
+    secretName: ""
+    secretKeys:
+      host: "host"
+      port: "port"
+      password: "password" # Optional for auth
+      username: "username" # Optional for Redis 6+ ACL
+      # Optional: full connection string as alternative
+      connectionString: "connection-string"
+
+  # Built-in Redis configuration (when source: "built-in")
+  # Uses Bitnami Redis chart dependency
+
+  auth:
     enabled: true
-    size: 5Gi
-    storageClass: ""
+    password: "" # Will be auto-generated if not provided
+    existingSecret: "" # Use existing secret for production
+    secretKeys:
+      passwordKey: "password"
+
+  architecture: standalone
+  master:
+    persistence:
+      enabled: true
+      size: 5Gi
+      storageClass: ""
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        cpu: 300m
+        memory: 256Mi
 
 opensearch:
   source: "built-in" # "built-in" or "external"

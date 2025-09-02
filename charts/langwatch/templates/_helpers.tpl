@@ -94,6 +94,48 @@ Generate DATABASE_URL based on configuration
 {{- end }}
 {{- end }}
 
+{{/*
+Return Redis hostname
+*/}}
+{{- define "langwatch.redis.hostname" -}}
+{{- if eq .Values.redis.source "built-in" }}
+{{- printf "%s-redis-master" .Release.Name -}}
+{{- else }}
+{{- .Values.redis.external.host }}
+{{- end }}
+{{- end }}
+
+{{/*
+Return Redis port
+*/}}
+{{- define "langwatch.redis.port" -}}
+{{- if eq .Values.redis.source "built-in" }}
+{{- 6379 | toString }}
+{{- else }}
+{{- .Values.redis.external.port | default 6379 | toString }}
+{{- end }}
+{{- end }}
+
+{{/*
+Generate Redis connection URL
+*/}}
+{{- define "langwatch.redis.connectionUrl" -}}
+{{- if eq .Values.redis.source "built-in" }}
+{{- if .Values.redis.auth.password }}
+{{- printf "redis://:%s@%s:%s" .Values.redis.auth.password (include "langwatch.redis.hostname" .) (include "langwatch.redis.port" .) }}
+{{- else }}
+{{- printf "redis://%s:%s" (include "langwatch.redis.hostname" .) (include "langwatch.redis.port" .) }}
+{{- end }}
+{{- else if .Values.redis.external.connectionString }}
+{{- .Values.redis.external.connectionString }}
+{{- else }}
+{{- if .Values.redis.external.password }}
+{{- printf "redis://:%s@%s:%s" .Values.redis.external.password .Values.redis.external.host (.Values.redis.external.port | default 6379 | toString) }}
+{{- else }}
+{{- printf "redis://%s:%s" .Values.redis.external.host (.Values.redis.external.port | default 6379 | toString) }}
+{{- end }}
+{{- end }}
+{{- end }}
 
 {{/*
 Return Prometheus hostname

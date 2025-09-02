@@ -10,6 +10,10 @@ dependencies:
     version: 16.4.9
     repository: oci://registry-1.docker.io/bitnamicharts
     condition: eq .Values.postgres.source "built-in"
+  - name: redis
+    version: 18.0.0
+    repository: oci://registry-1.docker.io/bitnamicharts
+    condition: eq .Values.redis.source "built-in"
   - name: prometheus
     version: 2.1.23
     repository: oci://registry-1.docker.io/bitnamicharts
