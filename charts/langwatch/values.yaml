@@ -222,7 +222,7 @@ postgres:
     persistence:
       enabled: true
       existingClaim: "data-langwatch-postgres-0"
-      mountPath: /var/lib/postgresql/data
+      mountPath: /var/lib/postgresql
       size: 10Gi
       storageClass: ""
 
