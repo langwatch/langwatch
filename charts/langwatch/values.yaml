@@ -88,7 +88,6 @@ app:
   env:
     SKIP_ENV_VALIDATION: "true"
     DISABLE_PII_REDACTION: "true"
-    DATABASE_URL: "postgresql://prisma:prisma@{{ .Release.Name }}-postgres:5432/mydb?schema=mydb"
     ELASTICSEARCH_NODE_URL: "http://{{ .Release.Name }}-opensearch:9200"
     IS_OPENSEARCH: "true"
     REDIS_URL: "redis://{{ .Release.Name }}-redis:6379"
@@ -138,10 +137,49 @@ langevals:
       memory: 6144Mi
 
 postgres:
-  enabled: true # Set to false to disable built-in PostgreSQL and use external database
-  service:
-    type: ClusterIP
-    port: 5432
+  source: "built-in"  # "built-in" or "external"
+
+  # External PostgreSQL (when source: "external")
+  external:
+    # Reference to existing secret containing connection details
+    secretName: ""
+    secretKeys:
+      host: "host"
+      port: "port" 
+      database: "database"
+      username: "username"
+      password: "password"
+      # Optional: full connection string as alternative
+      connectionString: "connection-string"
+      # SSL configuration keys in secret
+      sslMode: "ssl-mode"
+      sslCert: "ssl-cert"
+      sslKey: "ssl-key"
+      sslRootCert: "ssl-root-cert"
+  
+  # Built-in PostgreSQL configuration (when source: "built-in")
+  auth:
+    username: prisma
+    password: ""  # Will be auto-generated if not provided
+    database: mydb
+    # Use existing secret for production
+    existingSecret: ""
+    secretKeys:
+      userPasswordKey: password
+      databaseKey: database
+      usernameKey: username
+  
+  primary:
+    service:
+      ports:
+        postgresql: 5432
+    architecture: standalone
+  
+  persistence:
+    enabled: true
+    size: 10Gi
+    storageClass: ""
+  
   resources:
     requests:
       cpu: 100m

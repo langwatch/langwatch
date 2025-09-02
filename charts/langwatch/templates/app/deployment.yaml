@@ -50,9 +50,13 @@ spec:
               containerPort: {{ .Values.app.service.port }}
               protocol: TCP
           env:
+            - name: DATABASE_URL
+              value: {{ include "langwatch.postgres.databaseUrl" . | quote }}
             {{- range $key, $value := .Values.app.env }}
+            {{- if ne $key "DATABASE_URL" }}
             - name: {{ $key }}
               value: {{ tpl $value $ | quote }}
+            {{- end }}
             {{- end }}
           resources:
             {{- toYaml .Values.app.resources | nindent 12 }}

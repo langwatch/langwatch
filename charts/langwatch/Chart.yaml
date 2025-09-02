@@ -2,5 +2,11 @@ apiVersion: v2
 name: langwatch-helm
 description: Helm chart for LangWatch application
 type: application
-version: 0.1.7
+version: 0.2.0
 appVersion: "1.0.0"
+
+dependencies:
+  - name: postgresql
+    version: 16.4.9
+    repository: oci://registry-1.docker.io/bitnamicharts
+    condition: eq .Values.postgres.source "built-in"
