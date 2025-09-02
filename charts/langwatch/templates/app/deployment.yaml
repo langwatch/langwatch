@@ -52,7 +52,7 @@ spec:
               protocol: TCP
           env:
             - name: DATABASE_URL
-              value: {{ include "langwatch.postgres.databaseUrl" . | quote }}
+              value: {{ include "langwatch.postgresql.databaseUrl" . | quote }}
             - name: REDIS_URL
               value: {{ include "langwatch.redis.connectionUrl" . | quote }}
             - name: ELASTICSEARCH_NODE_URL

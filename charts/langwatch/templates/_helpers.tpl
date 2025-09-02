@@ -29,68 +29,68 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{/*
 Return PostgreSQL hostname
 */}}
-{{- define "langwatch.postgres.hostname" -}}
-{{- if eq .Values.postgres.source "built-in" }}
+{{- define "langwatch.postgresql.hostname" -}}
+{{- if eq .Values.postgresql.source "built-in" }}
 {{- printf "%s-postgresql" .Release.Name -}}
 {{- else }}
-{{- .Values.postgres.external.host }}
+{{- .Values.postgresql.external.host }}
 {{- end }}
 {{- end }}
 
 {{/*
 Return PostgreSQL port
 */}}
-{{- define "langwatch.postgres.port" -}}
-{{- if eq .Values.postgres.source "built-in" }}
-{{- .Values.postgres.primary.service.ports.postgresql | toString | int }}
+{{- define "langwatch.postgresql.port" -}}
+{{- if eq .Values.postgresql.source "built-in" }}
+{{- 5432 | toString | int }}
 {{- else }}
-{{- .Values.postgres.external.port | default 5432 | toString | int }}
+{{- .Values.postgresql.external.port | default 5432 | toString | int }}
 {{- end }}
 {{- end }}
 
 {{/*
 Return PostgreSQL database name
 */}}
-{{- define "langwatch.postgres.database" -}}
-{{- if eq .Values.postgres.source "built-in" }}
-{{- .Values.postgres.auth.database }}
+{{- define "langwatch.postgresql.database" -}}
+{{- if eq .Values.postgresql.source "built-in" }}
+{{- .Values.postgresql.auth.database }}
 {{- else }}
-{{- .Values.postgres.external.database }}
+{{- .Values.postgresql.external.database }}
 {{- end }}
 {{- end }}
 
 {{/*
 Return PostgreSQL username
 */}}
-{{- define "langwatch.postgres.username" -}}
-{{- if eq .Values.postgres.source "built-in" }}
-{{- .Values.postgres.auth.username }}
+{{- define "langwatch.postgresql.username" -}}
+{{- if eq .Values.postgresql.source "built-in" }}
+{{- .Values.postgresql.auth.username }}
 {{- else }}
-{{- .Values.postgres.external.username }}
+{{- .Values.postgresql.external.username }}
 {{- end }}
 {{- end }}
 
 {{/*
 Return PostgreSQL password
 */}}
-{{- define "langwatch.postgres.password" -}}
-{{- if eq .Values.postgres.source "built-in" }}
-{{- .Values.postgres.auth.password }}
+{{- define "langwatch.postgresql.password" -}}
+{{- if eq .Values.postgresql.source "built-in" }}
+{{- .Values.postgresql.auth.password }}
 {{- else }}
-{{- .Values.postgres.external.password }}
+{{- .Values.postgresql.external.password }}
 {{- end }}
 {{- end }}
 
 {{/*
 Generate DATABASE_URL based on configuration
 */}}
-{{- define "langwatch.postgres.databaseUrl" -}}
-{{- if eq .Values.postgres.source "built-in" }}
-{{- printf "postgresql://%s:%s@%s:%s/%s?schema=%s" .Values.postgres.auth.username .Values.postgres.auth.password (include "langwatch.postgres.hostname" .) (include "langwatch.postgres.port" . | toString) .Values.postgres.auth.database .Values.postgres.auth.database }}
-{{- else if .Values.postgres.external.connectionString }}
-{{- .Values.postgres.external.connectionString }}
+{{- define "langwatch.postgresql.databaseUrl" -}}
+{{- if eq .Values.postgresql.source "built-in" }}
+{{- printf "postgresql://%s:%s@%s:%s/%s?schema=%s" .Values.postgresql.auth.username .Values.postgresql.auth.password (include "langwatch.postgresql.hostname" .) (include "langwatch.postgresql.port" . | toString) .Values.postgresql.auth.database .Values.postgresql.auth.database }}
+{{- else if .Values.postgresql.external.connectionString }}
+{{- .Values.postgresql.external.connectionString }}
 {{- else }}
-{{- printf "postgresql://%s:%s@%s:%s/%s?sslmode=%s" .Values.postgres.external.username .Values.postgres.external.password .Values.postgres.external.host (.Values.postgres.external.port | default 5432 | toString) .Values.postgres.external.database (.Values.postgres.external.sslMode | default "prefer") }}
+{{- printf "postgresql://%s:%s@%s:%s/%s?sslmode=%s" .Values.postgresql.external.username .Values.postgresql.external.password .Values.postgresql.external.host (.Values.postgresql.external.port | default 5432 | toString) .Values.postgresql.external.database (.Values.postgresql.external.sslMode | default "prefer") }}
 {{- end }}
 {{- end }}
 

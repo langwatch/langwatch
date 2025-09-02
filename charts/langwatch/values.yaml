@@ -181,7 +181,7 @@ langevals:
       cpu: 1000m
       memory: 6144Mi
 
-postgres:
+postgresql:
   source: "built-in" # "built-in" or "external"
 
   # External PostgreSQL (when source: "external")

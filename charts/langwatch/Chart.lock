@@ -11,5 +11,5 @@ dependencies:
 - name: prometheus
   repository: oci://registry-1.docker.io/bitnamicharts
   version: 2.1.23
-digest: sha256:eb1d8a991b872c888b1567dfd5256cf45bacffe25c24be9b41e3c9bf1c53608c
-generated: "2025-09-02T22:41:57.223194+02:00"
+digest: sha256:a4ea5545c477695926337c7d199fb3c60696ee51dba334ec3cd3944b060bbebb
+generated: "2025-09-02T23:06:51.800874+02:00"
