@@ -1,4 +1,4 @@
-from strands import Agent
+from strands import Agent, tool
 from strands.models.litellm import LiteLLMModel
 import os
 import langwatch
@@ -7,15 +7,26 @@ from openinference.instrumentation.litellm import LiteLLMInstrumentor
 
 from dotenv import load_dotenv
 
+from langwatch.telemetry.context import _is_on_child_thread
+
 load_dotenv()
 
 import chainlit as cl
 from strands.telemetry import StrandsTelemetry
+from strands_tools import calculator, file_read, shell
 
 strands_telemetry = StrandsTelemetry().setup_otlp_exporter(
     endpoint="https://app.langwatch.ai/api/otel/v1/traces",
     headers={"Authorization": f"Bearer {os.environ['LANGWATCH_API_KEY']}"},
 )
+
+@tool
+@langwatch.span(type="tool")
+def get_user_location() -> str:
+    """Get the user's location."""
+
+    # Implement user location lookup logic here
+    return "Seattle, USA"
 
 
 class KiteAgent:
@@ -30,7 +41,7 @@ class KiteAgent:
         )
         self.agent = Agent(
             model=self.model,
-            tools=[],
+            tools=[get_user_location]
         )
 
     def run(self, prompt: str):

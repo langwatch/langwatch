@@ -665,6 +665,7 @@ class LangWatchSpan:
         if not self.ignore_missing_trace_warning and not self.trace and not self.parent:
             warn("No current trace found, some spans may not be sent to LangWatch")
 
+        print("\n\nentering", self.type, "\n\n")
         self._create_span()
         self.span = cast(
             Type["LangWatchSpan"],
