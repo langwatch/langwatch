@@ -275,8 +275,11 @@ postgres:
       databaseKey: database
       usernameKey: username
 
+  postgresqlDataDir: /var/lib/postgresql/data
+
   persistence:
     enabled: true
+    existingClaim: "data-{{ .Release.Name }}-postgres-0"
     size: 10Gi
     storageClass: ""
 
