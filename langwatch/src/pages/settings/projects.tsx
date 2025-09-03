@@ -7,9 +7,7 @@ import {
   Text,
   VStack,
   Box,
-  MenuTrigger,
 } from "@chakra-ui/react";
-import NextLink from "next/link";
 import React from "react";
 import { Menu } from "../../components/ui/menu";
 import { Archive, MoreVertical, Plus } from "react-feather";
@@ -18,7 +16,7 @@ import { ProjectTechStackIcon } from "../../components/TechStack";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import type {
   FullyLoadedOrganization,
-  TeamWithProjects,
+  TeamWithProjectsAndMembers,
 } from "../../server/api/routers/organization";
 import { TeamRoleGroup } from "../../server/api/permission";
 import { api } from "../../utils/api";
@@ -139,9 +137,13 @@ function ProjectsList({
   );
 }
 
-export function TeamProjectsList({ team }: { team: TeamWithProjects }) {
+export function TeamProjectsList({
+  team,
+}: {
+  team: TeamWithProjectsAndMembers;
+}) {
   const queryClient = api.useContext();
-  const { project } = useOrganizationTeamProject();
+  const { project, hasTeamPermission } = useOrganizationTeamProject();
   const archiveProject = api.project.archiveById.useMutation({
     onSuccess: () => {
       toaster.create({
@@ -181,23 +183,24 @@ export function TeamProjectsList({ team }: { team: TeamWithProjects }) {
             </Box>
           </Table.Cell>
           <Table.Cell textAlign="right">
-            {teamProject.id !== project?.id && (
-              <Menu.Root>
-                <Menu.Trigger className="js-inner-menu">
-                  <MoreVertical size={18} />
-                </Menu.Trigger>
-                <Menu.Content className="js-inner-menu">
-                  <Menu.Item
-                    value="delete"
-                    color="red.500"
-                    onClick={() => onArchiveProject(teamProject.id)}
-                  >
-                    <Archive size={14} />
-                    Archive
-                  </Menu.Item>
-                </Menu.Content>
-              </Menu.Root>
-            )}
+            {teamProject.id !== project?.id &&
+              hasTeamPermission(TeamRoleGroup.ARCHIVE_PROJECT, team) && (
+                <Menu.Root>
+                  <Menu.Trigger className="js-inner-menu">
+                    <MoreVertical size={18} />
+                  </Menu.Trigger>
+                  <Menu.Content className="js-inner-menu">
+                    <Menu.Item
+                      value="delete"
+                      color="red.500"
+                      onClick={() => onArchiveProject(teamProject.id)}
+                    >
+                      <Archive size={14} />
+                      Archive
+                    </Menu.Item>
+                  </Menu.Content>
+                </Menu.Root>
+              )}
           </Table.Cell>
         </Table.Row>
       ))}

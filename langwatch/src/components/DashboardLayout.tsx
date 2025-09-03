@@ -11,7 +11,6 @@ import {
   Text,
   VStack,
   Progress,
-  Link,
   type StackProps,
 } from "@chakra-ui/react";
 import { type Organization, type Project, type Team } from "@prisma/client";
@@ -46,6 +45,7 @@ import { ProjectTechStackIcon } from "./TechStack";
 import { ChecklistIcon } from "./icons/Checklist";
 import { useColorRawValue } from "./ui/color-mode";
 import { InputGroup } from "./ui/input-group";
+import { Link } from "./ui/link";
 import { Menu } from "./ui/menu";
 import { Popover } from "./ui/popover";
 import { Tooltip } from "./ui/tooltip";
