@@ -11,7 +11,6 @@ import {
   Text,
   VStack,
   Progress,
-  Link,
   type StackProps,
 } from "@chakra-ui/react";
 import { type Organization, type Project, type Team } from "@prisma/client";
@@ -46,6 +45,7 @@ import { ProjectTechStackIcon } from "./TechStack";
 import { ChecklistIcon } from "./icons/Checklist";
 import { useColorRawValue } from "./ui/color-mode";
 import { InputGroup } from "./ui/input-group";
+import { Link } from "./ui/link";
 import { Menu } from "./ui/menu";
 import { Popover } from "./ui/popover";
 import { Tooltip } from "./ui/tooltip";
@@ -320,6 +320,9 @@ export const DashboardLayout = ({
 
   const user = session?.user;
   const currentRoute = findCurrentRoute(router.pathname);
+  const userIsPartOfTeam = team?.members.some(
+    (member) => member.userId === user?.id
+  );
 
   return (
     <HStack
@@ -651,7 +654,24 @@ export const DashboardLayout = ({
             </HStack>
           )}
         <CurrentDrawer />
-        {children}
+        {userIsPartOfTeam ? (
+          children
+        ) : (
+          <Alert.Root
+            status="warning"
+            width="full"
+            borderBottom="1px solid"
+            borderBottomColor="yellow.300"
+          >
+            <Alert.Indicator />
+            <Alert.Content>
+              <Text>
+                You are not part of any team in this organization, please ask
+                your administrator to add you to a team.
+              </Text>
+            </Alert.Content>
+          </Alert.Root>
+        )}
       </VStack>
     </HStack>
   );
