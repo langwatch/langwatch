@@ -140,25 +140,26 @@ function ProjectsList({
 export function TeamProjectsList({ team }: { team: TeamWithProjects }) {
   const queryClient = api.useContext();
   const { project } = useOrganizationTeamProject();
-  const deleteProject = api.project.deleteById.useMutation({
+  const archiveProject = api.project.archiveById.useMutation({
     onSuccess: () => {
       toaster.create({
-        title: "Project deleted successfully",
+        title: "Project archived successfully",
         type: "success",
       });
       void queryClient.organization.getAll.invalidate();
     },
   });
 
-  const onDeleteProject = (projectId: string) => {
+  const onArchiveProject = (projectId: string) => {
+    if (!project) return;
     if (
       confirm(
-        "Are you sure you want to delete this project? This action cannot be undone."
+        "Are you sure you want to archive this project? This action cannot be undone."
       )
     ) {
-      deleteProject.mutate({
+      archiveProject.mutate({
         projectId: project.id,
-        projectToDeleteId: projectId,
+        projectToArchiveId: projectId,
       });
     }
   };
@@ -182,9 +183,9 @@ export function TeamProjectsList({ team }: { team: TeamWithProjects }) {
               <Button
                 size="sm"
                 colorPalette="red"
-                onClick={() => onDeleteProject(teamProject.id)}
+                onClick={() => onArchiveProject(teamProject.id)}
               >
-                Delete
+                Archive
               </Button>
             )}
           </Table.Cell>

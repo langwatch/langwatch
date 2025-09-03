@@ -487,20 +487,20 @@ export const projectRouter = createTRPCRouter({
         };
       }
     ),
-  deleteById: protectedProcedure
-    .input(z.object({ projectId: z.string(), projectToDeleteId: z.string() }))
+  archiveById: protectedProcedure
+    .input(z.object({ projectId: z.string(), projectToArchiveId: z.string() }))
     .use(checkUserPermissionForProject(TeamRoleGroup.SETUP_PROJECT))
     .mutation(async ({ input, ctx }) => {
       const prisma = ctx.prisma;
-      if (input.projectToDeleteId === input.projectId) {
+      if (input.projectToArchiveId === input.projectId) {
         throw new TRPCError({
           code: "BAD_REQUEST",
-          message: "You cannot delete the current project",
+          message: "You cannot archive the current project",
         });
       }
       const canDeleteTarget = await backendHasTeamProjectPermission(
         ctx,
-        { projectId: input.projectToDeleteId },
+        { projectId: input.projectToArchiveId },
         TeamRoleGroup.SETUP_PROJECT
       );
       if (!canDeleteTarget) {
@@ -508,7 +508,7 @@ export const projectRouter = createTRPCRouter({
       }
 
       const result = await prisma.project.updateMany({
-        where: { id: input.projectToDeleteId, archivedAt: null },
+        where: { id: input.projectToArchiveId, archivedAt: null },
         data: { archivedAt: new Date() },
       });
       return { success: true, alreadyArchived: result.count === 0 };
