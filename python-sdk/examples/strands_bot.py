@@ -1,5 +1,5 @@
 import os
-from strands import Agent
+from strands import Agent, tool
 from strands.models.litellm import LiteLLMModel
 import langwatch
 
@@ -31,6 +31,16 @@ langwatch.setup()  # The api key is set from the environment variable automatica
 # langwatch.setup(skip_open_telemetry_setup=True)
 
 
+
+@tool
+@langwatch.span(type="tool")
+def get_user_location() -> str:
+    """Get the user's location."""
+
+    # Implement user location lookup logic here
+    return "London, UK"
+
+
 class KiteAgent:
     def __init__(self):
         self.model = LiteLLMModel(
@@ -42,7 +52,8 @@ class KiteAgent:
         self.agent = Agent(
             name="kite-agent",
             model=self.model,
-            tools=[],
+            system_prompt="Always use the get_user_location tool before answering any questions.",
+            tools=[get_user_location],
             trace_attributes={
                 "custom.model_id": "openai/gpt-5-mini",
                 "custom.example.attribute": "swift",
@@ -62,7 +73,7 @@ async def main(message: cl.Message):
 
     langwatch.get_current_trace().update(
         metadata={
-            "custom.example.attribute": "swift",
+            "custom.example.attribute2": "langwatch",
         }
     )
 
