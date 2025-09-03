@@ -320,9 +320,8 @@ export const DashboardLayout = ({
 
   const user = session?.user;
   const currentRoute = findCurrentRoute(router.pathname);
-  const userIsPartOfTeam = team?.members.some(
-    (member) => member.userId === user?.id
-  );
+  const userIsPartOfTeam =
+    publicPage || team?.members.some((member) => member.userId === user?.id);
 
   return (
     <HStack
