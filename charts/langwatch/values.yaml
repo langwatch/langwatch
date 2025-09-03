@@ -56,7 +56,7 @@ images:
 
 # Prometheus monitoring configuration
 prometheus:
-  source: "built-in" # "built-in" or "external"
+  chartManaged: true # true for chart-managed, false for external
 
   external:
     # Reference to existing secret containing Prometheus connection details
@@ -155,9 +155,9 @@ langevals:
       memory: 6144Mi
 
 postgresql:
-  source: "built-in" # "built-in" or "external"
+  chartManaged: true # true for chart-managed, false for external
 
-  # External PostgreSQL (when source: "external")
+  # External PostgreSQL (when chartManaged: false)
   external:
     # Reference to existing secret containing connection details
     existingSecret: ""
@@ -177,7 +177,7 @@ postgresql:
 
   auth:
     username: postgres  # Use default Bitnami username
-    password: ""        # Let Bitnami auto-generate
+    password: ""        # You must set this, it will not be auto-generated
     database: mydb
 
   image:
@@ -191,6 +191,10 @@ postgresql:
   primary:
     persistence:
       enabled: true
+      # if you are migrating from a `langwatch-helm` version before 1.0.0, you can set
+      # this property and value your values.yaml file, and you will not lose any data
+      # from the previous deployment
+
       # existingClaim: "data-langwatch-postgres-0"
       mountPath: /var/lib/postgresql/data
       size: 10Gi
@@ -210,7 +214,7 @@ postgresql:
       memory: 512Mi
 
 opensearch:
-  source: "built-in" # "built-in" or "external"
+  chartManaged: true # true for chart-managed, false for external
 
   external:
     # Reference to existing secret containing OpenSearch connection details
@@ -266,7 +270,7 @@ opensearch:
       memory: 2Gi
 
 redis:
-  source: "built-in" # "built-in" or "external"
+  chartManaged: true # true for chart-managed, false for external
 
   external:
     # Reference to existing secret containing Redis connection details
@@ -279,7 +283,7 @@ redis:
       # Optional: full connection string as alternative
       connectionString: "connection-string"
 
-  # Built-in Redis configuration (when source: "built-in")
+  # Built-in Redis configuration (when chartManaged: true)
   # Uses Bitnami Redis chart dependency
 
   auth:

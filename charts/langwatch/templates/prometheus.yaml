@@ -1,4 +1,4 @@
-{{- if eq .Values.prometheus.source "built-in" }}
+{{- if .Values.prometheus.chartManaged }}
 ---
 apiVersion: v1
 kind: ConfigMap

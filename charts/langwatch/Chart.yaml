@@ -13,16 +13,16 @@ dependencies:
   - name: postgresql
     version: 16.4.9
     repository: oci://registry-1.docker.io/bitnamicharts
-    condition: eq .Values.postgres.source "built-in"
+    condition: .Values.postgresql.chartManaged
   - name: redis
     version: 18.0.0
     repository: oci://registry-1.docker.io/bitnamicharts
-    condition: eq .Values.redis.source "built-in"
+    condition: .Values.redis.chartManaged
   - name: opensearch
-    version: 2.x.x       # pick the version you want from the repo
+    version: 2.x.x
     repository: "https://opensearch-project.github.io/helm-charts/"
-    condition: eq .Values.opensearch.source "built-in"
+    condition: .Values.opensearch.chartManaged
   - name: prometheus
     version: 2.1.23
     repository: oci://registry-1.docker.io/bitnamicharts
-    condition: eq .Values.prometheus.source "built-in"
+    condition: .Values.prometheus.chartManaged

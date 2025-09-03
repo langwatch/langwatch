@@ -25,16 +25,16 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 
 {{/* Must get PostgreSQL hostname */}}
 {{- define "langwatch.postgresql.hostname" -}}
-{{- if eq .Values.postgresql.source "built-in" -}}
+{{- if .Values.postgresql.chartManaged -}}
 {{ printf "%s-postgresql" .Release.Name }}
 {{- else -}}
-{{- required "postgresql.external.host is required when postgresql.source != built-in" .Values.postgresql.external.host -}}
+{{- required "postgresql.external.host is required when postgresql.chartManaged != true" .Values.postgresql.external.host -}}
 {{- end -}}
 {{- end -}}
 
 {{/* Get PostgreSQL port (or default) */}}
 {{- define "langwatch.postgresql.port" -}}
-{{- if eq .Values.postgresql.source "built-in" -}}
+{{- if .Values.postgresql.chartManaged -}}
 "5432"
 {{- else -}}
 {{ (.Values.postgresql.external.port | default 5432) | toString | quote }}
@@ -79,7 +79,7 @@ app.kubernetes.io/instance: {{ .Release.Name }}
   value: {{ required "postgresql.auth.database is required if not using secrets" .Values.postgresql.auth.database | quote }}
   {{- end }}
 - name: DATABASE_PASSWORD
-  {{- if eq .Values.postgresql.source "built-in" }}
+  {{- if .Values.postgresql.chartManaged }}
   value: {{ .Values.postgresql.auth.password | quote }}
   {{- else if .Values.postgresql.auth.existingSecret }}
   valueFrom:
@@ -97,7 +97,7 @@ app.kubernetes.io/instance: {{ .Release.Name }}
   value: ""
   {{- end }}
 - name: DATABASE_SSLMODE
-  value: {{ (ternary "disable" (.Values.postgresql.external.sslMode | default "prefer") (eq .Values.postgresql.source "built-in")) | quote }}
+  value: {{ (ternary "disable" (.Values.postgresql.external.sslMode | default "prefer") .Values.postgresql.chartManaged) | quote }}
 - name: DATABASE_URL
   value: "postgresql://$(DATABASE_USERNAME):$(DATABASE_PASSWORD)@$(DATABASE_HOST):$(DATABASE_PORT)/$(DATABASE_NAME)?sslmode=$(DATABASE_SSLMODE)"
 {{- end -}}
@@ -106,16 +106,16 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 
 {{/* Must get Redis hostname */}}
 {{- define "langwatch.redis.hostname" -}}
-{{- if eq .Values.redis.source "built-in" -}}
+{{- if .Values.redis.chartManaged -}}
 {{ printf "%s-redis-master" .Release.Name }}
 {{- else -}}
-{{- required "redis.external.host is required when redis.source != built-in" .Values.redis.external.host -}}
+{{- required "redis.external.host is required when redis.chartManaged != true" .Values.redis.external.host -}}
 {{- end -}}
 {{- end -}}
 
 {{/* Get Redis port (or default) */}}
 {{- define "langwatch.redis.port" -}}
-{{- if eq .Values.redis.source "built-in" -}}
+{{- if .Values.redis.chartManaged -}}
 "6379"
 {{- else -}}
 {{ (.Values.redis.external.port | default 6379) | toString | quote }}
@@ -129,7 +129,7 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 - name: REDIS_PORT
   value: {{ include "langwatch.redis.port" . }}
 - name: REDIS_PASSWORD
-  {{- if and (eq .Values.redis.source "built-in") .Values.autogen.enabled }}
+  {{- if and .Values.redis.chartManaged .Values.autogen.enabled }}
   valueFrom:
     secretKeyRef:
       name: {{ printf "%s-redis" .Release.Name | quote }}
@@ -152,16 +152,16 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 
 {{/* Must get OpenSearch hostname */}}
 {{- define "langwatch.opensearch.hostname" -}}
-{{- if eq .Values.opensearch.source "built-in" -}}
+{{- if .Values.opensearch.chartManaged -}}
 {{ printf "%s-opensearch" .Release.Name }}
 {{- else -}}
-{{- required "opensearch.external.host is required when opensearch.source != built-in" .Values.opensearch.external.host -}}
+{{- required "opensearch.external.host is required when opensearch.chartManaged != true" .Values.opensearch.external.host -}}
 {{- end -}}
 {{- end -}}
 
 {{/* Get OpenSearch port (or default) */}}
 {{- define "langwatch.opensearch.port" -}}
-{{- if eq .Values.opensearch.source "built-in" -}}
+{{- if .Values.opensearch.chartManaged -}}
 "9200"
 {{- else -}}
 {{ (.Values.opensearch.external.port | default 9200) | toString | quote }}
@@ -175,7 +175,7 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 - name: ELASTICSEARCH_NODE_PORT
   value: {{ include "langwatch.opensearch.port" . }}
 - name: ELASTICSEARCH_NODE_SCHEME
-  value: {{ (eq .Values.opensearch.source "built-in" | ternary "http" "https") | quote }}
+  value: {{ (.Values.opensearch.chartManaged | ternary "http" "https") | quote }}
 - name: ELASTICSEARCH_NODE_USERNAME
   {{- if and .Values.secrets.existingSecret .Values.opensearch.auth.secretKeys }}
   valueFrom:
@@ -202,16 +202,16 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 
 {{/* Must get Prometheus hostname */}}
 {{- define "langwatch.prometheus.hostname" -}}
-{{- if eq .Values.prometheus.source "built-in" -}}
+{{- if .Values.prometheus.chartManaged -}}
 {{ printf "%s-prometheus" .Release.Name }}
 {{- else -}}
-{{- required "prometheus.external.host is required when prometheus.source != built-in" .Values.prometheus.external.host -}}
+{{- required "prometheus.external.host is required when prometheus.chartManaged != true" .Values.prometheus.external.host -}}
 {{- end -}}
 {{- end -}}
 
 {{/* Get Prometheus port (or default) */}}
 {{- define "langwatch.prometheus.port" -}}
-{{- if eq .Values.prometheus.source "built-in" -}}
+{{- if .Values.prometheus.chartManaged -}}
 "9090"
 {{- else -}}
 {{ (.Values.prometheus.external.port | default 9090) | toString | quote }}
