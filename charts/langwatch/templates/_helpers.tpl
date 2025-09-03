@@ -99,7 +99,7 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 - name: DATABASE_SSLMODE
   value: {{ (ternary "disable" (.Values.postgresql.external.sslMode | default "prefer") .Values.postgresql.chartManaged) | quote }}
 - name: DATABASE_URL
-  value: "postgresql://$(DATABASE_USERNAME):$(DATABASE_PASSWORD)@$(DATABASE_HOST):$(DATABASE_PORT)/$(DATABASE_NAME)?sslmode=$(DATABASE_SSLMODE)"
+  value: "postgresql://$(DATABASE_USERNAME):$(DATABASE_PASSWORD)@$(DATABASE_HOST):$(DATABASE_PORT)/$(DATABASE_NAME)?sslmode=$(DATABASE_SSLMODE)&schema=$(DATABASE_NAME)"
 {{- end -}}
 
 {{/* ==== REDIS region ==== */}}
