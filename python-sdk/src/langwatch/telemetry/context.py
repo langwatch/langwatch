@@ -19,8 +19,6 @@ main_thread_langwatch_trace: List["LangWatchTrace"] = []
 stored_langwatch_span = contextvars.ContextVar["LangWatchSpan"]("stored_langwatch_span")
 main_thread_langwatch_span: List["LangWatchSpan"] = []
 
-spans_map: Dict[int, "LangWatchSpan"] = {}
-
 
 def get_current_trace(
     suppress_warning: bool = False, start_if_none: bool = False
@@ -73,10 +71,6 @@ def get_current_span() -> "LangWatchSpan":
     otel_span = trace_api.get_current_span()
     otel_span_id = otel_span.get_span_context().span_id
 
-    # First try getting from the mapping we have
-    if otel_span_id in spans_map:
-        return spans_map[otel_span_id]
-
     # If on a child thread and there is no parent, try to find a parent from the main thread
     if (
         _is_on_child_thread()
@@ -85,7 +79,6 @@ def get_current_span() -> "LangWatchSpan":
     ):
         return main_thread_langwatch_span[-1]
 
-    # Fallback to just wrapping the OpenTelemetry span
     from langwatch.telemetry.span import LangWatchSpan
 
     trace = get_current_trace()
@@ -105,9 +98,12 @@ def _set_current_trace(trace: "LangWatchTrace"):
 
 
 def _set_current_span(span: "LangWatchSpan"):
-    global main_thread_langwatch_span, spans_map
+    global main_thread_langwatch_span
     if not _is_on_child_thread():
         main_thread_langwatch_span.append(span)
+
+    # Dummy token, just for the main thread span list
+    return "token"
 
 
 def _reset_current_trace(token: contextvars.Token):
@@ -124,17 +120,11 @@ def _reset_current_trace(token: contextvars.Token):
             warnings.warn(f"Failed to reset LangWatch trace context: {e}")
 
 
-def _reset_current_span(token: contextvars.Token):
-    global main_thread_langwatch_span, spans_map
+def _reset_current_span(_token: str):
+    global main_thread_langwatch_span
     if not _is_on_child_thread():
         if len(main_thread_langwatch_span) > 0:
             main_thread_langwatch_span.pop()
-
-
-def _cleanup_span(span_id: int):
-    global spans_map
-    if span_id in spans_map:
-        del spans_map[span_id]
 
 
 def _is_on_child_thread() -> bool:

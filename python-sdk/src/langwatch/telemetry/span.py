@@ -652,7 +652,6 @@ class LangWatchSpan:
                     self._span_context_manager = None
 
 
-            langwatch.telemetry.context._cleanup_span(self._span.get_span_context().span_id)
             if self._context_token is not None:
                 langwatch.telemetry.context._reset_current_span(self._context_token)
                 self._context_token = None
