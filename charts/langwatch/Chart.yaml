@@ -19,8 +19,8 @@ dependencies:
     repository: oci://registry-1.docker.io/bitnamicharts
     condition: eq .Values.redis.source "built-in"
   - name: opensearch
-    version: 2.0.0
-    repository: oci://registry-1.docker.io/bitnamicharts
+    version: 2.x.x       # pick the version you want from the repo
+    repository: "https://opensearch-project.github.io/helm-charts/"
     condition: eq .Values.opensearch.source "built-in"
   - name: prometheus
     version: 2.1.23
