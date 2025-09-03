@@ -223,7 +223,7 @@ const processCollectorJob_ = async (
   } = data;
 
   const project = await prisma.project.findUniqueOrThrow({
-    where: { id: projectId },
+    where: { id: projectId, archivedAt: null },
   });
 
   spans = addGuardrailCosts(spans);

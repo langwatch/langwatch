@@ -77,7 +77,7 @@ async function handleCollectorRequest(
   }
 
   const project = await prisma.project.findUnique({
-    where: { apiKey: authToken as string },
+    where: { apiKey: authToken as string, archivedAt: null },
     include: {
       team: true,
     },

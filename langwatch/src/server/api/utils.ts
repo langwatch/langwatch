@@ -85,7 +85,7 @@ export async function getUserProtectionsForProject(
     ));
 
   const project = await ctx.prisma.project.findUniqueOrThrow({
-    where: { id: projectId },
+    where: { id: projectId, archivedAt: null },
     select: {
       capturedInputVisibility: true,
       capturedOutputVisibility: true,

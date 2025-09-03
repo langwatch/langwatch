@@ -241,7 +241,11 @@ export const organizationRouter = createTRPCRouter({
             teams: {
               include: {
                 members: true,
-                projects: true,
+                projects: {
+                  where: {
+                    archivedAt: null,
+                  },
+                },
               },
             },
           },
