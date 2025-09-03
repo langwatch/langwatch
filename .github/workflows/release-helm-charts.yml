@@ -6,6 +6,7 @@ on:
       - main
     paths:
       - "charts/**"
+      - .github/workflows/release-helm-charts.yml
 
 permissions:
   contents: write
