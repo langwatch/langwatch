@@ -33,7 +33,7 @@ import {
 import { openTelemetryToLangWatchMetadataMapping } from "./metadata";
 import { createLogger } from "~/utils/logger";
 import { z } from "zod";
-import { isStrandsAgentsInstrumentation, extractStrandsAgentsInputOutput } from "./span-event-processing/strands-agents";
+import { isStrandsAgentsInstrumentation, extractStrandsAgentsInputOutput, extractStrandsAgentsMetadata } from "./span-event-processing/strands-agents";
 
 const logger = createLogger("langwatch.tracer.opentelemetry");
 
@@ -316,6 +316,17 @@ const addOpenTelemetrySpanAsSpan = (
       type = "llm";
     } else {
       type = "agent";
+    }
+  }
+
+  // Extract metadata for agent spans from strands-agents
+  if (type === "agent" && isStrandsAgentsInstrumentation(otelScope, otelSpan)) {
+    const strandsMetadata = extractStrandsAgentsMetadata(otelSpan);
+    if (Object.keys(strandsMetadata).length > 0) {
+      metadata = {
+        ...metadata,
+        ...strandsMetadata,
+      };
     }
   }
   // infer for others otel gen_ai spec
