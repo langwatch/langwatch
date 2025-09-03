@@ -1,18 +1,16 @@
-{{- if .Values.prometheus.enabled }}
+{{- if .Values.prometheus.chartManaged }}
+---
 apiVersion: v1
 kind: ConfigMap
 metadata:
   name: {{ .Release.Name }}-prometheus-config
   labels:
-    app.kubernetes.io/name: {{ .Release.Name }}-prometheus
-    app.kubernetes.io/instance: {{ .Release.Name }}
-    app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
-    app.kubernetes.io/managed-by: {{ .Release.Service }}
+    {{- include "langwatch.labels" . | nindent 4 }}
 data:
   prometheus.yml: |
     global:
-      scrape_interval: 15s
-      evaluation_interval: 15s
+      scrape_interval: {{ .Values.prometheus.server.global.scrape_interval | default "15s" }}
+      evaluation_interval: {{ .Values.prometheus.server.global.evaluation_interval | default "15s" }}
 
     scrape_configs:
       - job_name: 'langwatch'
@@ -34,8 +32,8 @@ data:
           - source_labels: [__meta_kubernetes_pod_name]
             action: replace
             target_label: pod
-        {{- if .Values.app.env.METRICS_API_KEY }}
-        bearer_token: "{{ .Values.app.env.METRICS_API_KEY }}"
+        {{- if include "langwatch.metricsApiKey" . }}
+        bearer_token: {{ include "langwatch.metricsApiKey" . }}
         {{- end }}
 
       - job_name: 'langwatch-workers'
@@ -61,8 +59,8 @@ data:
           - source_labels: [__meta_kubernetes_pod_name]
             action: replace
             target_label: pod
-        {{- if .Values.app.env.METRICS_API_KEY }}
-        bearer_token: "{{ .Values.app.env.METRICS_API_KEY }}"
+        {{- if include "langwatch.metricsApiKey" . }}
+        bearer_token: {{ include "langwatch.metricsApiKey" . }}
         {{- end }}
 
       - job_name: 'kubernetes-cadvisor'
@@ -82,4 +80,4 @@ data:
             regex: (.+)
             target_label: __metrics_path__
             replacement: /api/v1/nodes/$1/proxy/metrics/cadvisor
-{{- end }} 
+{{- end }}

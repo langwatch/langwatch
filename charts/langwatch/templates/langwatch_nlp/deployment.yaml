@@ -1,4 +1,5 @@
 # Deployment for the LangWatch NLP service
+{{- include "langwatch.validateSecrets" . }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -33,9 +34,18 @@ spec:
               protocol: TCP
           # Environment variables for the NLP service
           env:
+            # Secret-based environment variables
+            - name: API_TOKEN_JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.existingSecret | default (printf "%s-langwatch-nlp-secrets" .Release.Name) }}
+                  key: {{ .Values.secrets.secretKeys.API_TOKEN_JWT_SECRET }}
+            # Non-secret environment variables
             {{- range $key, $value := .Values.langwatch_nlp.env }}
+            {{- if ne $key "API_TOKEN_JWT_SECRET" }}
             - name: {{ $key }}
               value: {{ tpl $value $ | quote }}
+            {{- end }}
             {{- end }}
           resources:
             {{- toYaml .Values.langwatch_nlp.resources | nindent 12 }}
