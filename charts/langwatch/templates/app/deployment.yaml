@@ -40,50 +40,76 @@ spec:
       tolerations:
         {{- toYaml . | nindent 8 }}
       {{- end }}
+      initContainers:
+      - name: wait-for-opensearch
+        image: curlimages/curl:latest
+        command: ['sh', '-c']
+        args:
+          - |
+            echo "Waiting for OpenSearch service..."
+            until curl -s -f "http://{{ .Release.Name }}-opensearch:9200/_cluster/health" | grep -q '"status":"green"\|"status":"yellow"'; do
+              echo "OpenSearch not ready yet, waiting..."
+              sleep 5
+            done
+            echo "OpenSearch is ready!"
       containers:
         - name: {{ .Chart.Name }}-app
           securityContext:
             {{- toYaml .Values.global.containerSecurityContext | nindent 12 }}
           image: "{{ .Values.images.app.repository }}:{{ .Values.images.app.tag }}"
-          imagePullPolicy: {{ .Values.images.app.pullPolicy }}
+          imagePullPolicy: "{{ .Values.images.app.pullPolicy }}"
           ports:
             - name: http
               containerPort: {{ .Values.app.service.port }}
               protocol: TCP
           env:
-            - name: DATABASE_URL
-              value: {{ include "langwatch.postgresql.databaseUrl" . | quote }}
-            - name: REDIS_URL
-              value: {{ include "langwatch.redis.connectionUrl" . | quote }}
-            - name: ELASTICSEARCH_NODE_URL
-              value: {{ include "langwatch.opensearch.url" . | quote }}
+            {{- include "langwatch.postgresqlEnvSet" . | nindent 12 }}
+            {{- include "langwatch.redisEnvSet" . | nindent 12 }}
+            {{- include "langwatch.opensearchEnvSet" . | nindent 12 }}
+
+            - name: SKIP_ENV_VALIDATION
+              value: "true"
+            - name: DISABLE_PII_REDACTION
+              value: "true"
+            - name: IS_OPENSEARCH
+              value: "true"
+
+            # Computed internal service URLs
+            - name: LANGWATCH_NLP_SERVICE
+              value: "http://{{ .Release.Name }}-langwatch-nlp:5561"
+            - name: LANGEVALS_ENDPOINT
+              value: "http://{{ .Release.Name }}-langevals:5562"
+            - name: BASE_HOST
+              value: "http://localhost:5560"
+            - name: NEXTAUTH_URL
+              value: "http://localhost:5560"
+
             # Secret-based environment variables
             - name: API_TOKEN_JWT_SECRET
               valueFrom:
                 secretKeyRef:
-                  name: {{ .Values.secrets.existingSecret | default (printf "%s-app-secrets" .Release.Name) }}
-                  key: {{ .Values.secrets.secretKeys.API_TOKEN_JWT_SECRET }}
+                  name: {{ .Values.autogen.secretNames.app | default (printf "%s-app-secrets" .Release.Name) }}
+                  key: "API_TOKEN_JWT_SECRET"
             - name: CRON_API_KEY
               valueFrom:
                 secretKeyRef:
-                  name: {{ .Values.secrets.existingSecret | default (printf "%s-app-secrets" .Release.Name) }}
-                  key: {{ .Values.secrets.secretKeys.CRON_API_KEY }}
+                  name: {{ .Values.autogen.secretNames.app | default (printf "%s-app-secrets" .Release.Name) }}
+                  key: "CRON_API_KEY"
             - name: METRICS_API_KEY
               valueFrom:
                 secretKeyRef:
-                  name: {{ .Values.secrets.existingSecret | default (printf "%s-app-secrets" .Release.Name) }}
-                  key: {{ .Values.secrets.secretKeys.METRICS_API_KEY }}
+                  name: {{ .Values.autogen.secretNames.app | default (printf "%s-app-secrets" .Release.Name) }}
+                  key: "METRICS_API_KEY"
             - name: NEXTAUTH_SECRET
               valueFrom:
                 secretKeyRef:
-                  name: {{ .Values.secrets.existingSecret | default (printf "%s-app-secrets" .Release.Name) }}
-                  key: {{ .Values.secrets.secretKeys.NEXTAUTH_SECRET }}
+                  name: {{ .Values.autogen.secretNames.app | default (printf "%s-app-secrets" .Release.Name) }}
+                  key: "NEXTAUTH_SECRET"
+
             # Non-secret environment variables
             {{- range $key, $value := .Values.app.env }}
-            {{- if and (ne $key "DATABASE_URL") (ne $key "REDIS_URL") (ne $key "ELASTICSEARCH_NODE_URL") (ne $key "API_TOKEN_JWT_SECRET") (ne $key "CRON_API_KEY") (ne $key "METRICS_API_KEY") (ne $key "NEXTAUTH_SECRET") }}
             - name: {{ $key }}
               value: {{ tpl $value $ | quote }}
-            {{- end }}
             {{- end }}
           resources:
             {{- toYaml .Values.app.resources | nindent 12 }}
