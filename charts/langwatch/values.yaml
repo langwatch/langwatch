@@ -19,31 +19,25 @@ global:
     enabled: false
     prometheusAnnotations: true
 
-# Prometheus monitoring configuration
-prometheus:
+# Secrets configuration
+secrets:
+  # Production mode: reference to existing secret
+  existingSecret: ""
+  # Secret keys mapping (can be customized if needed)
+  secretKeys:
+    API_TOKEN_JWT_SECRET: "API_TOKEN_JWT_SECRET"
+    CRON_API_KEY: "CRON_API_KEY"
+    METRICS_API_KEY: "METRICS_API_KEY"
+    NEXTAUTH_SECRET: "NEXTAUTH_SECRET"
+
+# Auto-generation mode (development only)
+autogen:
   enabled: false
-  image:
-    repository: quay.io/prometheus/prometheus
-    tag: "v3.0.1"
-    pullPolicy: IfNotPresent
-  service:
-    type: ClusterIP
-    port: 9090
-    annotations: {}
-  resources:
-    requests:
-      cpu: 200m
-      memory: 512Mi
-    limits:
-      cpu: 500m
-      memory: 2Gi
-  storage:
-    enabled: true
-    size: 6Gi
-    storageClass: ""
-  retention: 60d
-  rbac:
-    enabled: true
+  # Secret names for each service (auto-generated if not specified)
+  secretNames:
+    app: "" # defaults to {{ .Release.Name }}-app-secrets
+    langevals: "" # defaults to {{ .Release.Name }}-langevals-secrets
+    langwatch_nlp: "" # defaults to {{ .Release.Name }}-langwatch-nlp-secrets
 
 # Image configurations
 images:
@@ -59,18 +53,69 @@ images:
     repository: langwatch/langevals
     tag: latest
     pullPolicy: Always
-  postgres:
-    repository: postgres
-    tag: "16"
-    pullPolicy: IfNotPresent
-  redis:
-    repository: redis
-    tag: alpine
-    pullPolicy: IfNotPresent
-  opensearch:
-    repository: langwatch/opensearch-lite
-    tag: latest
-    pullPolicy: IfNotPresent
+
+# Prometheus monitoring configuration
+prometheus:
+  chartManaged: true # true for chart-managed, false for external
+
+  external:
+    # Reference to existing secret containing Prometheus connection details
+    existingSecret: ""
+    secretKeys:
+      host: "host"
+      port: "port"
+      username: "username" # Optional for basic auth
+      password: "password" # Optional for basic auth
+      # Optional: full connection string
+      connectionString: "connection-string"
+
+  alertmanager:
+    enabled: false
+
+  pushgateway:
+    enabled: false
+
+  # Prometheus server configuration
+  server:
+    replicaCount: 1
+    # Global Prometheus configuration
+    global:
+      scrape_interval: 15s
+      evaluation_interval: 15s
+
+    # Persistence configuration
+    persistence:
+      enabled: true
+      size: 6Gi
+      storageClass: ""
+
+    # Retention and resources
+    retention: 60d
+    resources:
+      requests:
+        cpu: 200m
+        memory: 512Mi
+      limits:
+        cpu: 500m
+        memory: 2Gi
+
+    # RBAC configuration (enabled by default)
+    rbac:
+      create: true
+      includeDefaultRules: true
+
+    # ServiceAccount configuration
+    serviceAccount:
+      create: true
+
+    service:
+      type: ClusterIP
+      port: 9090
+
+    securityContext:
+      runAsNonRoot: true
+      runAsUser: 65534
+      fsGroup: 65534
 
 # Service configurations
 app:
@@ -80,28 +125,11 @@ app:
     port: 5560
   resources:
     requests:
-      cpu: 100m
-      memory: 512Mi
+      cpu: 250m
+      memory: 2Gi
     limits:
-      cpu: 500m
-      memory: 1024Mi
-  env:
-    SKIP_ENV_VALIDATION: "true"
-    DISABLE_PII_REDACTION: "true"
-    DATABASE_URL: "postgresql://prisma:prisma@{{ .Release.Name }}-postgres:5432/mydb?schema=mydb"
-    ELASTICSEARCH_NODE_URL: "http://{{ .Release.Name }}-opensearch:9200"
-    IS_OPENSEARCH: "true"
-    REDIS_URL: "redis://{{ .Release.Name }}-redis:6379"
-    LANGWATCH_NLP_SERVICE: "http://{{ .Release.Name }}-langwatch-nlp:5561"
-    LANGEVALS_ENDPOINT: "http://{{ .Release.Name }}-langevals:5562"
-    # User provided environment variables
-    BASE_HOST: "http://localhost:5560"
-    NEXTAUTH_URL: "http://localhost:5560"
-    NEXTAUTH_SECRET: "" # Users must provide this values
-    API_TOKEN_JWT_SECRET: "" # Users must provide this values
-    CRON_API_KEY: "" # Users must provide this value for cronjob authentication
-    METRICS_API_KEY: "" # Set this for metrics authentication (will be stored in Kubernetes Secret)
-    # SENDGRID_API_KEY: ""  # Optional
+      cpu: 1000m
+      memory: 4Gi
 
 langwatch_nlp:
   replicaCount: 1
@@ -110,11 +138,11 @@ langwatch_nlp:
     port: 5561
   resources:
     requests:
-      cpu: 500m
-      memory: 1024Mi
-    limits:
       cpu: 1000m
-      memory: 2048Mi
+      memory: 2Gi
+    limits:
+      cpu: 2000m
+      memory: 4Gi
   env:
     LANGWATCH_ENDPOINT: "http://{{ .Release.Name }}-app:5560"
     # For when running on minikube on Mac OS
@@ -127,87 +155,164 @@ langevals:
     port: 5562
   resources:
     requests:
-      cpu: 500m
-      memory: 4096Mi
-    limits:
       cpu: 1000m
-      memory: 6144Mi
-
-postgres:
-  service:
-    type: ClusterIP
-    port: 5432
-  resources:
-    requests:
-      cpu: 100m
-      memory: 256Mi
+      memory: 6Gi
     limits:
-      cpu: 500m
-      memory: 512Mi
-  env:
-    POSTGRES_DB: mydb
-    POSTGRES_USER: prisma
-    POSTGRES_PASSWORD: prisma
-  persistence:
-    enabled: true
-    size: 10Gi
-    storageClass: ""
+      cpu: 2000m
+      memory: 8Gi
 
-redis:
-  service:
-    type: ClusterIP
-    port: 6379
+postgresql:
+  chartManaged: true # true for chart-managed, false for external
+
+  # External PostgreSQL (when chartManaged: false)
+  external:
+    # Reference to existing secret containing connection details
+    existingSecret: ""
+    secretKeys:
+      host: "host"
+      port: "port"
+      database: "database"
+      username: "username"
+      password: "password"
+      # Optional: full connection string as alternative
+      connectionString: "connection-string"
+      # SSL configuration keys in secret
+      sslMode: "ssl-mode"
+      sslCert: "ssl-cert"
+      sslKey: "ssl-key"
+      sslRootCert: "ssl-root-cert"
+
+  auth:
+    username: postgres  # Use default Bitnami username
+    password: ""        # You must set this, it will not be auto-generated
+    database: mydb
+
+  image:
+    tag: 16.6.0-debian-12-r2
+
+  postgresqlDataDir: /var/lib/postgresql/data/pgdata
+
+  volumePermissions:
+    enabled: true
+
+  primary:
+    persistence:
+      enabled: true
+      # if you are migrating from a `langwatch-helm` version before 1.0.0, you can set
+      # this property and value your values.yaml file, and you will not lose any data
+      # from the previous deployment
+
+      # existingClaim: "data-langwatch-postgres-0"
+      mountPath: /var/lib/postgresql/data
+      size: 20Gi
+      storageClass: ""
+
+      readinessProbe:
+        enabled: true
+      livenessProbe:
+        enabled: true
+
   resources:
     requests:
-      cpu: 100m
-      memory: 128Mi
-    limits:
-      cpu: 300m
-      memory: 256Mi
-  persistence:
-    enabled: true
-    size: 5Gi
-    storageClass: ""
-
-opensearch:
-  service:
-    type: ClusterIP
-    ports:
-      - name: http
-        port: 9200
-      - name: transport
-        port: 9600
-  resources:
-    requests:
-      cpu: 500m
+      cpu: 250m
       memory: 512Mi
     limits:
       cpu: 1000m
       memory: 1Gi
-  env:
-    discovery.type: single-node
-    DISABLE_SECURITY_PLUGIN: "true"
-    # _JAVA_OPTIONS: "-XX:UseSVE=0"
-    OPENSEARCH_JAVA_OPTS: "-Xms512m -Xmx512m -XX:+UseG1GC -XX:-UseSerialGC -XX:G1ReservePercent=25 -XX:+AlwaysPreTouch -XX:InitiatingHeapOccupancyPercent=30"
-    cluster.routing.allocation.disk.threshold_enabled: "false"
-    bootstrap.memory_lock: "false"
-    cluster.routing.allocation.disk.watermark.low: "95%"
-    cluster.routing.allocation.disk.watermark.high: "96%"
-    cluster.routing.allocation.disk.watermark.flood_stage: "97%"
-    cluster.info.update.interval: "1m"
-    OPENSEARCH_INITIAL_ADMIN_PASSWORD: "Some-random-password-which-is-greater-than-16-chars-long~"
-    node.store.allow_mmap: "false"
+
+opensearch:
+  chartManaged: true # true for chart-managed, false for external
+
+  external:
+    # Reference to existing secret containing OpenSearch connection details
+    existingSecret: ""
+    secretKeys:
+      host: "host"
+      port: "port"
+      username: "username" # Optional for auth
+      password: "password" # Optional for auth
+      # Optional: full connection string as alternative
+      connectionString: "connection-string"
+      # SSL configuration if needed
+      sslCert: "ssl-cert"
+      sslKey: "ssl-key"
+      sslRootCert: "ssl-root-cert"
+
+  # We only run a single node, so no need to deal with the suffixes
+  auth:
+    adminPassword: "" # Will be auto-generated if not provided
+    existingSecret: "" # Use existing secret for production
+    secretKeys:
+      adminPasswordKey: "admin-password"
+
+  fullnameOverride: langwatch-opensearch
+  masterService: langwatch-opensearch
+  clusterName: langwatch-opensearch
+  replicas: 1
+
+  config:
+    opensearch.yml: |
+      cluster.name: langwatch-opensearch
+      node.name: langwatch-opensearch
+      network.host: 0.0.0.0
+      discovery.type: single-node
+      plugins.security.disabled: true
+
+  extraEnvs:
+  - name: cluster.initial_master_nodes
+    value: ""   # force empty so the setting is gone
+
   persistence:
     enabled: true
-    size: 10Gi
-    storageClass: ""
-  ulimits:
-    memlock:
-      soft: -1
-      hard: -1
-    nofile:
-      soft: 65536
-      hard: 65536
+    size: 20Gi
+    accessModes: [ReadWriteOnce]
+    # storageClass: <set if you don’t have a default>
+
+  resources:
+    requests:
+      cpu: 1000m
+      memory: 2Gi
+    limits:
+      cpu: 2
+      memory: 4Gi
+
+redis:
+  chartManaged: true # true for chart-managed, false for external
+
+  external:
+    # Reference to existing secret containing Redis connection details
+    existingSecret: ""
+    secretKeys:
+      host: "host"
+      port: "port"
+      password: "password" # Optional for auth
+      username: "username" # Optional for Redis 6+ ACL
+      # Optional: full connection string as alternative
+      connectionString: "connection-string"
+
+  # Built-in Redis configuration (when chartManaged: true)
+  # Uses Bitnami Redis chart dependency
+
+  auth:
+    enabled: true
+    password: "" # Will be auto-generated if not provided
+    existingSecret: "" # Use existing secret for production
+    secretKeys:
+      passwordKey: "password"
+
+  architecture: standalone
+  master:
+    persistence:
+      enabled: true
+      size: 10Gi
+      storageClass: ""
+    resources:
+      requests:
+        cpu: 250m
+        memory: 256Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
 
 # CronJobs configuration
 cronjobs:
