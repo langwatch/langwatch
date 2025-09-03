@@ -39,13 +39,28 @@ autogen:
     langevals: "" # defaults to {{ .Release.Name }}-langevals-secrets
     langwatch_nlp: "" # defaults to {{ .Release.Name }}-langwatch-nlp-secrets
 
+# Image configurations
+images:
+  app:
+    repository: langwatch/langwatch
+    tag: latest
+    pullPolicy: Always
+  langwatch_nlp:
+    repository: langwatch/langwatch_nlp
+    tag: latest
+    pullPolicy: Always
+  langevals:
+    repository: langwatch/langevals
+    tag: latest
+    pullPolicy: Always
+
 # Prometheus monitoring configuration
 prometheus:
   source: "built-in" # "built-in" or "external"
 
   external:
     # Reference to existing secret containing Prometheus connection details
-    secretName: ""
+    existingSecret: ""
     secretKeys:
       host: "host"
       port: "port"
@@ -86,31 +101,14 @@ prometheus:
     serviceAccount:
       create: true
 
-    # Service configuration to match old setup
     service:
       type: ClusterIP
       port: 9090
 
-    # Security context to match old setup
     securityContext:
       runAsNonRoot: true
       runAsUser: 65534
       fsGroup: 65534
-
-# Image configurations
-images:
-  app:
-    repository: langwatch/langwatch
-    tag: latest
-    pullPolicy: Always
-  langwatch_nlp:
-    repository: langwatch/langwatch_nlp
-    tag: latest
-    pullPolicy: Always
-  langevals:
-    repository: langwatch/langevals
-    tag: latest
-    pullPolicy: Always
 
 # Service configurations
 app:
@@ -125,31 +123,6 @@ app:
     limits:
       cpu: 500m
       memory: 1024Mi
-  env:
-    SKIP_ENV_VALIDATION: "true"
-    DISABLE_PII_REDACTION: "true"
-    # PostgreSQL connection - automatically configured based on postgres.source
-    DATABASE_URL: "" # Will be set by template function
-    # OpenSearch connection - automatically configured based on opensearch.source
-    ELASTICSEARCH_NODE_URL: "" # Will be set by template function
-    IS_OPENSEARCH: "true"
-    # Redis connection - automatically configured based on redis.source
-    REDIS_URL: "" # Will be set by template function
-    LANGWATCH_NLP_SERVICE: "http://{{ .Release.Name }}-langwatch-nlp:5561"
-    LANGEVALS_ENDPOINT: "http://{{ .Release.Name }}-langevals:5562"
-    # User provided environment variables
-    BASE_HOST: "http://localhost:5560"
-    NEXTAUTH_URL: "http://localhost:5560"
-    # Secrets are now handled via Kubernetes Secrets - see secrets.existingSecret or autogen.enabled
-    # NEXTAUTH_SECRET: "" # Removed - now from secret
-    # API_TOKEN_JWT_SECRET: "" # Removed - now from secret
-    # CRON_API_KEY: "" # Removed - now from secret
-    # METRICS_API_KEY: "" # Removed - now from secret
-    # SENDGRID_API_KEY: ""  # Optional
-    # SSO Configuration (Azure AD example)
-    # AZURE_AD_CLIENT_ID: "" # Set for Azure AD SSO
-    # AZURE_AD_CLIENT_SECRET: "" # Set for Azure AD SSO
-    # NEXTAUTH_PROVIDERS: "" # JSON string for SSO providers
 
 langwatch_nlp:
   replicaCount: 1
@@ -187,7 +160,7 @@ postgresql:
   # External PostgreSQL (when source: "external")
   external:
     # Reference to existing secret containing connection details
-    secretName: ""
+    existingSecret: ""
     secretKeys:
       host: "host"
       port: "port"
@@ -203,15 +176,9 @@ postgresql:
       sslRootCert: "ssl-root-cert"
 
   auth:
-    username: prisma
-    password: "" # Will be auto-generated if not provided
+    username: postgres  # Use default Bitnami username
+    password: ""        # Let Bitnami auto-generate
     database: mydb
-    # Use existing secret for production
-    existingSecret: ""
-    secretKeys:
-      userPasswordKey: password
-      databaseKey: database
-      usernameKey: username
 
   image:
     tag: 16.6.0-debian-12-r2
@@ -224,10 +191,15 @@ postgresql:
   primary:
     persistence:
       enabled: true
-      existingClaim: "data-langwatch-postgres-0"
+      # existingClaim: "data-langwatch-postgres-0"
       mountPath: /var/lib/postgresql/data
       size: 10Gi
       storageClass: ""
+
+      readinessProbe:
+        enabled: true
+      livenessProbe:
+        enabled: true
 
   resources:
     requests:
@@ -237,12 +209,68 @@ postgresql:
       cpu: 500m
       memory: 512Mi
 
+opensearch:
+  source: "built-in" # "built-in" or "external"
+
+  external:
+    # Reference to existing secret containing OpenSearch connection details
+    existingSecret: ""
+    secretKeys:
+      host: "host"
+      port: "port"
+      username: "username" # Optional for auth
+      password: "password" # Optional for auth
+      # Optional: full connection string as alternative
+      connectionString: "connection-string"
+      # SSL configuration if needed
+      sslCert: "ssl-cert"
+      sslKey: "ssl-key"
+      sslRootCert: "ssl-root-cert"
+
+  # We only run a single node, so no need to deal with the suffixes
+  auth:
+    adminPassword: "" # Will be auto-generated if not provided
+    existingSecret: "" # Use existing secret for production
+    secretKeys:
+      adminPasswordKey: "admin-password"
+
+  fullnameOverride: langwatch-opensearch
+  masterService: langwatch-opensearch
+  clusterName: langwatch-opensearch
+  replicas: 1
+
+  config:
+    opensearch.yml: |
+      cluster.name: langwatch-opensearch
+      node.name: langwatch-opensearch
+      network.host: 0.0.0.0
+      discovery.type: single-node
+      plugins.security.disabled: true
+
+  extraEnvs:
+  - name: cluster.initial_master_nodes
+    value: ""   # force empty so the setting is gone
+
+  persistence:
+    enabled: true
+    size: 10Gi
+    accessModes: [ReadWriteOnce]
+    # storageClass: <set if you don’t have a default>
+
+  resources:
+    requests:
+      cpu: 500m
+      memory: 1Gi
+    limits:
+      cpu: 1
+      memory: 2Gi
+
 redis:
   source: "built-in" # "built-in" or "external"
 
   external:
     # Reference to existing secret containing Redis connection details
-    secretName: ""
+    existingSecret: ""
     secretKeys:
       host: "host"
       port: "port"
@@ -255,7 +283,7 @@ redis:
   # Uses Bitnami Redis chart dependency
 
   auth:
-    enabled: false
+    enabled: true
     password: "" # Will be auto-generated if not provided
     existingSecret: "" # Use existing secret for production
     secretKeys:
@@ -274,70 +302,6 @@ redis:
       limits:
         cpu: 300m
         memory: 256Mi
-
-opensearch:
-  source: "built-in" # "built-in" or "external"
-
-  external:
-    # Reference to existing secret containing OpenSearch connection details
-    secretName: ""
-    secretKeys:
-      host: "host"
-      port: "port"
-      username: "username" # Optional for auth
-      password: "password" # Optional for auth
-      # Optional: full connection string as alternative
-      connectionString: "connection-string"
-      # SSL configuration if needed
-      sslCert: "ssl-cert"
-      sslKey: "ssl-key"
-      sslRootCert: "ssl-root-cert"
-
-  # Built-in OpenSearch configuration (when source: "built-in")
-  # Uses Bitnami OpenSearch chart dependency
-
-  auth:
-    adminPassword: "" # Will be auto-generated if not provided
-    existingSecret: "" # Use existing secret for production
-    secretKeys:
-      adminPasswordKey: "admin-password"
-
-  clusterName: "langwatch-cluster"
-
-  extraEnvVars:
-    - name: OS_JAVA_OPTS
-      value: "-Xms512m -Xmx512m -XX:+UseG1GC -XX:-UseSerialGC -XX:G1ReservePercent=25 -XX:+AlwaysPreTouch -XX:InitiatingHeapOccupancyPercent=30"
-
-  resources:
-    requests:
-      cpu: 500m
-      memory: 512Mi
-    limits:
-      cpu: 1000m
-      memory: 1Gi
-
-  coordinating:
-    replicaCount: 0
-  ingest:
-    enabled: false
-  data:
-    replicaCount: 0
-
-  master:
-    masterOnly: false
-    replicaCount: 1
-    persistence:
-      enabled: true
-      size: 10Gi
-
-    containerSecurityContext:
-      enabled: true
-      runAsUser: 1000
-      fsGroup: 1000
-      capabilities:
-        add:
-          - IPC_LOCK
-          - SYS_RESOURCE
 
 # CronJobs configuration
 cronjobs:
