@@ -69,8 +69,15 @@ prometheus:
       # Optional: full connection string
       connectionString: "connection-string"
 
+  alertmanager:
+    enabled: false
+
+  pushgateway:
+    enabled: false
+
   # Prometheus server configuration
   server:
+    replicaCount: 1
     # Global Prometheus configuration
     global:
       scrape_interval: 15s
@@ -118,11 +125,11 @@ app:
     port: 5560
   resources:
     requests:
-      cpu: 100m
-      memory: 512Mi
+      cpu: 250m
+      memory: 2Gi
     limits:
-      cpu: 500m
-      memory: 1024Mi
+      cpu: 1000m
+      memory: 4Gi
 
 langwatch_nlp:
   replicaCount: 1
@@ -131,11 +138,11 @@ langwatch_nlp:
     port: 5561
   resources:
     requests:
-      cpu: 500m
-      memory: 1024Mi
-    limits:
       cpu: 1000m
-      memory: 2048Mi
+      memory: 2Gi
+    limits:
+      cpu: 2000m
+      memory: 4Gi
   env:
     LANGWATCH_ENDPOINT: "http://{{ .Release.Name }}-app:5560"
     # For when running on minikube on Mac OS
@@ -148,11 +155,11 @@ langevals:
     port: 5562
   resources:
     requests:
-      cpu: 500m
-      memory: 4096Mi
-    limits:
       cpu: 1000m
-      memory: 6144Mi
+      memory: 6Gi
+    limits:
+      cpu: 2000m
+      memory: 8Gi
 
 postgresql:
   chartManaged: true # true for chart-managed, false for external
@@ -197,7 +204,7 @@ postgresql:
 
       # existingClaim: "data-langwatch-postgres-0"
       mountPath: /var/lib/postgresql/data
-      size: 10Gi
+      size: 20Gi
       storageClass: ""
 
       readinessProbe:
@@ -207,11 +214,11 @@ postgresql:
 
   resources:
     requests:
-      cpu: 100m
-      memory: 256Mi
-    limits:
-      cpu: 500m
+      cpu: 250m
       memory: 512Mi
+    limits:
+      cpu: 1000m
+      memory: 1Gi
 
 opensearch:
   chartManaged: true # true for chart-managed, false for external
@@ -257,17 +264,17 @@ opensearch:
 
   persistence:
     enabled: true
-    size: 10Gi
+    size: 20Gi
     accessModes: [ReadWriteOnce]
     # storageClass: <set if you don’t have a default>
 
   resources:
     requests:
-      cpu: 500m
-      memory: 1Gi
-    limits:
-      cpu: 1
+      cpu: 1000m
       memory: 2Gi
+    limits:
+      cpu: 2
+      memory: 4Gi
 
 redis:
   chartManaged: true # true for chart-managed, false for external
@@ -297,15 +304,15 @@ redis:
   master:
     persistence:
       enabled: true
-      size: 5Gi
+      size: 10Gi
       storageClass: ""
     resources:
       requests:
-        cpu: 100m
-        memory: 128Mi
-      limits:
-        cpu: 300m
+        cpu: 250m
         memory: 256Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
 
 # CronJobs configuration
 cronjobs:
