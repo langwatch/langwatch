@@ -7,6 +7,37 @@ entries:
       maintainers: LangWatch Team
     apiVersion: v2
     appVersion: 1.0.0
+    created: "2025-09-03T09:02:03.651211275Z"
+    dependencies:
+    - condition: .Values.postgresql.chartManaged
+      name: postgresql
+      repository: oci://registry-1.docker.io/bitnamicharts
+      version: 16.4.9
+    - condition: .Values.redis.chartManaged
+      name: redis
+      repository: oci://registry-1.docker.io/bitnamicharts
+      version: 18.0.0
+    - condition: .Values.opensearch.chartManaged
+      name: opensearch
+      repository: https://opensearch-project.github.io/helm-charts/
+      version: 2.x.x
+    - condition: .Values.prometheus.chartManaged
+      name: prometheus
+      repository: oci://registry-1.docker.io/bitnamicharts
+      version: 2.1.23
+    description: Helm chart for LangWatch application
+    digest: ffb2988d5d6c01cb4c5dcfb446e829fb95149139e361bc94208020555abc28aa
+    name: langwatch-helm
+    type: application
+    urls:
+    - https://github.com/langwatch/langwatch/releases/download/langwatch-helm-1.0.1/langwatch-helm-1.0.1.tgz
+    version: 1.0.1
+  - annotations:
+      category: Observability
+      keywords: ai,observability,monitoring,secrets
+      maintainers: LangWatch Team
+    apiVersion: v2
+    appVersion: 1.0.0
     created: "2025-09-03T04:52:38.529218399Z"
     dependencies:
     - condition: .Values.postgresql.chartManaged
@@ -82,4 +113,4 @@ entries:
     urls:
     - https://github.com/langwatch/langwatch/releases/download/langwatch-helm-0.1.2/langwatch-helm-0.1.2.tgz
     version: 0.1.2
-generated: "2025-09-03T04:52:38.529263734Z"
+generated: "2025-09-03T09:02:03.651254696Z"
