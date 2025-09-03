@@ -55,6 +55,8 @@ def get_current_trace(
             context.attach(ctx)
         otel_span = trace_api.get_current_span()
 
+        trace.__exit__(None, None, None)
+
         return trace
     return trace
 
