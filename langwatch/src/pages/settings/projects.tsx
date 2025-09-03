@@ -157,7 +157,7 @@ export function TeamProjectsList({ team }: { team: TeamWithProjects }) {
       )
     ) {
       deleteProject.mutate({
-        projectId: project?.id ?? "",
+        projectId: project.id,
         projectToDeleteId: projectId,
       });
     }
