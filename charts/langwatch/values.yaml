@@ -1,34 +1,5 @@
 # Global configuration
 global:
-  env: production
-  podSecurityContext:
-    runAsNonRoot: true
-    runAsUser: 1000
-    fsGroup: 1000
-  containerSecurityContext:
-    allowPrivilegeEscalation: false
-    capabilities:
-      drop:
-        - ALL
-    readOnlyRootFilesystem: true
-  scheduling:
-    nodeSelector: {}
-    affinity: {}
-    tolerations: []
-  monitoring:
-    enabled: false
-    prometheusAnnotations: true
-
-# Secrets configuration
-secrets:
-  # Production mode: reference to existing secret
-  existingSecret: ""
-  # Secret keys mapping (can be customized if needed)
-  secretKeys:
-    API_TOKEN_JWT_SECRET: "API_TOKEN_JWT_SECRET"
-    CRON_API_KEY: "CRON_API_KEY"
-    METRICS_API_KEY: "METRICS_API_KEY"
-    NEXTAUTH_SECRET: "NEXTAUTH_SECRET"
 
 # Auto-generation mode (development only)
 autogen:
@@ -54,7 +25,300 @@ images:
     tag: latest
     pullPolicy: Always
 
-# Prometheus monitoring configuration
+# LangWatch app configurations
+app:
+  replicaCount: 1
+  service: { type: ClusterIP, port: 5560 }
+  resources:
+    requests: { cpu: 250m,  memory: 2Gi }
+    limits:   { cpu: 1000m, memory: 4Gi }
+
+  nodeEnv: "production"
+
+  credentialsEncryptionKey:
+    value: ""
+    secretKeyRef: { name: "", key: "" }
+
+  cronApiKey:
+    value: ""
+    secretKeyRef: { name: "", key: "" }
+
+  http:
+    baseHost: "http://localhost:5560"
+    publicUrl: "http://localhost:5560"
+
+  features:
+    skipEnvValidation: false
+    disablePiiRedaction: false
+    topicClustering: true
+
+  upstreams:
+    nlp:       { name: langwatch-nlp,  port: 5561 }
+    langevals: { name: langevals,      port: 5562 }
+
+  evaluators:
+    azureOpenAI:
+      enabled: false
+      endpoint:
+        value: ""
+        secretKeyRef: { name: "", key: "" }
+      apiKey:
+        value: ""
+        secretKeyRef: { name: "", key: "" }
+    google:
+      enabled: false
+      credentials:
+        value: ""
+        secretKeyRef: { name: "", key: "" }
+
+  datasetObjectStorage:
+    enabled: true
+    provider: awsS3
+    bucket: "langwatch-dataset"
+
+    providers:
+      awsS3:
+        accessKeyId:
+          value: ""
+          secretKeyRef: { name: "", key: "" }
+        secretAccessKey:
+          value: ""
+          secretKeyRef: { name: "", key: "" }
+        keySalt:
+          value: ""
+          secretKeyRef: { name: "", key: "" }
+
+  email:
+    enabled: false
+    defaultFrom: ""
+    provider: sendgrid
+    sendgrid:
+      apiKey:
+        value: ""
+        secretKeyRef: { name: "", key: "" }
+
+  # use http.publicUrl
+  nextAuth:
+    provider: email
+    secret:
+      value: ""
+      secretKeyRef: { name: "", key: "" }
+
+    providers:
+      auth0:
+        clientId:
+          value: ""
+          secretKeyRef: { name: "", key: "" }
+        clientSecret:
+          value: ""
+          secretKeyRef: { name: "", key: "" }
+        issuer:
+          value: ""
+          secretKeyRef: { name: "", key: "" }
+      azureAd:
+        clientId:
+          value: ""
+          secretKeyRef: { name: "", key: "" }
+        clientSecret:
+          value: ""
+          secretKeyRef: { name: "", key: "" }
+        tenantId:
+          value: ""
+          secretKeyRef: { name: "", key: "" }
+      cognito:
+        clientId:
+          value: ""
+          secretKeyRef: { name: "", key: "" }
+        clientSecret:
+          value: ""
+          secretKeyRef: { name: "", key: "" }
+        issuer:
+          value: ""
+          secretKeyRef: { name: "", key: "" }
+      github:
+        clientId:
+          value: ""
+          secretKeyRef: { name: "", key: "" }
+        clientSecret:
+          value: ""
+          secretKeyRef: { name: "", key: "" }
+      gitlab:
+        clientId:
+          value: ""
+          secretKeyRef: { name: "", key: "" }
+        clientSecret:
+          value: ""
+          secretKeyRef: { name: "", key: "" }
+      google:
+        clientId:
+          value: ""
+          secretKeyRef: { name: "", key: "" }
+        clientSecret:
+          value: ""
+          secretKeyRef: { name: "", key: "" }
+      okta:
+      clientId:
+        value: ""
+        secretKeyRef: { name: "", key: "" }
+      clientSecret:
+        value: ""
+        secretKeyRef: { name: "", key: "" }
+      issuer:
+        value: ""
+        secretKeyRef: { name: "", key: "" }
+
+  telemetry:
+    usage:
+      enabled: true
+    metrics:
+      enabled: false
+      apiKey:
+        value: ""
+        secretKeyRef: { name: "", key: "" }
+    sentry:
+      enabled: false
+      dsn:
+        value: ""
+        secretKeyRef: { name: "", key: "" }
+
+  # == Pass through directly to k8s ==
+
+  podSecurityContext: {}
+  securityContext: {}
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+  pod:
+    annotations: {}
+    labels: {}
+    topologySpreadConstraints: []
+  deployment:
+    annotations: {}
+    strategy: {}
+  revisionHistoryLimit: 10
+
+  extraEnvs: []
+  extraContainers: []
+  extraVolumes: []
+  extraInitContainers: []
+  extraVolumeMounts: []
+  extraLifecycle: {}
+
+# LangWatch NLP configuration
+langwatch_nlp:
+  replicaCount: 1
+  service: { type: ClusterIP, port: 5561 }
+  resources:
+    requests: { cpu: 1000m,  memory: 2Gi }
+    limits:   { cpu: 2000m, memory: 4Gi }
+
+  upstreams:
+    langwatch: { name: langwatch-app,  port: 5560 }
+
+  # == Pass through directly to k8s ==
+
+  podSecurityContext: {}
+  securityContext: {}
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+  pod:
+    annotations: {}
+    labels: {}
+    topologySpreadConstraints: []
+  deployment:
+    annotations: {}
+    strategy: {}
+  revisionHistoryLimit: 10
+
+  extraEnvs: []
+  extraContainers: []
+  extraVolumes: []
+  extraInitContainers: []
+  extraVolumeMounts: []
+  extraLifecycle: {}
+
+# LangEvals configuration
+langevals:
+  replicaCount: 1
+  service: { type: ClusterIP, port: 5562 }
+  resources:
+    requests: { cpu: 1000m,  memory: 6Gi }
+    limits: { cpu: 2000m, memory: 8Gi }
+
+  # == Pass through directly to k8s ==
+
+  podSecurityContext: {}
+  securityContext: {}
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+  pod:
+    annotations: {}
+    labels: {}
+    topologySpreadConstraints: []
+  deployment:
+    annotations: {}
+    strategy: {}
+  revisionHistoryLimit: 10
+
+  extraEnvs: []
+  extraContainers: []
+  extraVolumes: []
+  extraInitContainers: []
+  extraVolumeMounts: []
+  extraLifecycle: {}
+
+# CronJobs configuration
+cronjobs:
+  enabled: true
+  image:
+    repository: curlimages/curl
+    tag: latest
+    pullPolicy: IfNotPresent
+  resources:
+    requests: { cpu: 100m,  memory: 64Mi }
+    limits: { cpu: 100m, memory: 64Mi }
+
+  upstreams:
+    langwatch: { name: langwatch-app,  port: 5560 }
+
+  # Individual cronjob configurations
+  jobs:
+    topicClustering:
+      enabled: true
+      schedule: "0 0 * * *" # At midnight every day
+      endpoint: "/api/cron/schedule_topic_clustering"
+
+    alertTriggers:
+      enabled: true
+      schedule: "*/3 * * * *" # Every 3 minutes
+      endpoint: "/api/cron/triggers"
+
+    tracesRetentionCleanup:
+      enabled: true
+      schedule: "0 1 * * *" # At 1 AM every day
+      endpoint: "/api/cron/traces_retention_period_cleanup"
+
+# Ingress configuration
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+  hosts:
+    - host: chart-example.local
+      http:
+        paths:
+          - path: /
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: "langwatch-app"
+                port:
+                  number: 5560
+  tls: []
+
+# System Dependencies
 prometheus:
   chartManaged: true # true for chart-managed, false for external
 
@@ -117,50 +381,7 @@ prometheus:
       runAsUser: 65534
       fsGroup: 65534
 
-# Service configurations
-app:
-  replicaCount: 1
-  service:
-    type: ClusterIP
-    port: 5560
-  resources:
-    requests:
-      cpu: 250m
-      memory: 2Gi
-    limits:
-      cpu: 1000m
-      memory: 4Gi
-
-langwatch_nlp:
-  replicaCount: 1
-  service:
-    type: ClusterIP
-    port: 5561
-  resources:
-    requests:
-      cpu: 1000m
-      memory: 2Gi
-    limits:
-      cpu: 2000m
-      memory: 4Gi
-  env:
-    LANGWATCH_ENDPOINT: "http://{{ .Release.Name }}-app:5560"
-    # For when running on minikube on Mac OS
-    # STUDIO_RUNTIME: "async"
-
-langevals:
-  replicaCount: 1
-  service:
-    type: ClusterIP
-    port: 5562
-  resources:
-    requests:
-      cpu: 1000m
-      memory: 6Gi
-    limits:
-      cpu: 2000m
-      memory: 8Gi
-
+# PostgreSQL configuration
 postgresql:
   chartManaged: true # true for chart-managed, false for external
 
@@ -169,23 +390,18 @@ postgresql:
     # Reference to existing secret containing connection details
     existingSecret: ""
     secretKeys:
-      host: "host"
-      port: "port"
-      database: "database"
-      username: "username"
-      password: "password"
-      # Optional: full connection string as alternative
       connectionString: "connection-string"
-      # SSL configuration keys in secret
-      sslMode: "ssl-mode"
-      sslCert: "ssl-cert"
-      sslKey: "ssl-key"
-      sslRootCert: "ssl-root-cert"
 
   auth:
-    username: postgres  # Use default Bitnami username
-    password: ""        # You must set this, it will not be auto-generated
+    username: postgres
+    password: "" # You must set this, it will not be auto-generated
     database: mydb
+    existingSecret: ""
+    secretKeys:
+      usernameKey: "username"
+      adminPasswordKey: "postgres-password"
+      passwordKey: "password"
+      databaseKey: "database"
 
   image:
     tag: 16.6.0-debian-12-r2
@@ -220,25 +436,19 @@ postgresql:
       cpu: 1000m
       memory: 1Gi
 
+# OpenSearch configuration
 opensearch:
   chartManaged: true # true for chart-managed, false for external
 
   external:
-    # Reference to existing secret containing OpenSearch connection details
-    existingSecret: ""
-    secretKeys:
-      host: "host"
-      port: "port"
-      username: "username" # Optional for auth
-      password: "password" # Optional for auth
-      # Optional: full connection string as alternative
-      connectionString: "connection-string"
-      # SSL configuration if needed
-      sslCert: "ssl-cert"
-      sslKey: "ssl-key"
-      sslRootCert: "ssl-root-cert"
+    engine: opensearch # opensearch, elasticsearch, quickwit
+    nodeUrl:
+      value: ""
+      secretKeyRef: { name: "", key: "" }
+    apiKey:
+      value: ""
+      secretKeyRef: { name: "", key: "" }
 
-  # We only run a single node, so no need to deal with the suffixes
   auth:
     adminPassword: "" # Will be auto-generated if not provided
     existingSecret: "" # Use existing secret for production
@@ -276,22 +486,15 @@ opensearch:
       cpu: 2
       memory: 4Gi
 
+# Redis configuration
 redis:
   chartManaged: true # true for chart-managed, false for external
 
   external:
-    # Reference to existing secret containing Redis connection details
-    existingSecret: ""
-    secretKeys:
-      host: "host"
-      port: "port"
-      password: "password" # Optional for auth
-      username: "username" # Optional for Redis 6+ ACL
-      # Optional: full connection string as alternative
-      connectionString: "connection-string"
-
-  # Built-in Redis configuration (when chartManaged: true)
-  # Uses Bitnami Redis chart dependency
+    architecture: standalone # standalone or cluster
+    connectionString:
+      value: ""
+      secretKeyRef: { name: "", key: "" }
 
   auth:
     enabled: true
@@ -313,54 +516,3 @@ redis:
       limits:
         cpu: 500m
         memory: 512Mi
-
-# CronJobs configuration
-cronjobs:
-  enabled: true
-  # Global cronjob configuration
-  image:
-    repository: curlimages/curl
-    tag: latest
-    pullPolicy: IfNotPresent
-  resources:
-    requests:
-      cpu: 100m
-      memory: 64Mi
-    limits:
-      cpu: 100m
-      memory: 64Mi
-
-  # Individual cronjob configurations
-  jobs:
-    topicClustering:
-      enabled: true
-      schedule: "0 0 * * *" # At midnight every day
-      endpoint: "/api/cron/schedule_topic_clustering"
-
-    alertTriggers:
-      enabled: true
-      schedule: "*/3 * * * *" # Every 3 minutes
-      endpoint: "/api/cron/triggers"
-
-    tracesRetentionCleanup:
-      enabled: true
-      schedule: "0 1 * * *" # At 1 AM every day
-      endpoint: "/api/cron/traces_retention_period_cleanup"
-
-# Ingress configuration
-ingress:
-  enabled: false
-  className: ""
-  annotations: {}
-  hosts:
-    - host: chart-example.local
-      http:
-        paths:
-          - path: /
-            pathType: ImplementationSpecific
-            backend:
-              service:
-                name: "langwatch-app"
-                port:
-                  number: 5560
-  tls: []
