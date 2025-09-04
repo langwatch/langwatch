@@ -51,6 +51,7 @@ export const teamRouter = createTRPCRouter({
       const teams = await prisma.team.findMany({
         where: {
           organizationId: input.organizationId,
+          archivedAt: null,
         },
         include: {
           members: {

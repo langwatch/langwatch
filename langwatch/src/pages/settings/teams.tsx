@@ -52,6 +52,14 @@ function TeamsList({ teams }: { teams: TeamWithProjectsAndMembersAndUsers[] }) {
     },
   });
   const onArchiveProject = (teamId: string) => {
+    if (!hasTeamPermission(TeamRoleGroup.TEAM_ARCHIVE)) return;
+    if (teams.length === 1) {
+      toaster.create({
+        title: "You cannot archive the last team",
+        type: "error",
+      });
+      return;
+    }
     if (
       confirm(
         "Are you sure you want to archive this team? This action cannot be undone."
@@ -60,8 +68,6 @@ function TeamsList({ teams }: { teams: TeamWithProjectsAndMembersAndUsers[] }) {
       archiveTeam.mutate({ teamId, projectId: project?.id ?? "" });
     }
   };
-
-  console.log("currentTeam", currentTeam);
 
   return (
     <SettingsLayout>
@@ -116,27 +122,24 @@ function TeamsList({ teams }: { teams: TeamWithProjectsAndMembersAndUsers[] }) {
                       {team.projects.length == 1 ? "project" : "projects"}
                     </Table.Cell>
                     <Table.Cell align="right">
-                      {team.id !== team?.id &&
-                        hasTeamPermission(
-                          TeamRoleGroup.TEAM_ARCHIVE,
-                          currentTeam
-                        ) && (
-                          <Menu.Root>
-                            <Menu.Trigger className="js-inner-menu">
-                              <MoreVertical size={18} />
-                            </Menu.Trigger>
-                            <Menu.Content className="js-inner-menu">
-                              <Menu.Item
-                                value="delete"
-                                color="red.500"
-                                onClick={() => onArchiveProject(team.id)}
-                              >
-                                <Archive size={14} />
-                                Archive
-                              </Menu.Item>
-                            </Menu.Content>
-                          </Menu.Root>
-                        )}
+                      <Menu.Root>
+                        <Menu.Trigger className="js-inner-menu">
+                          <MoreVertical size={18} />
+                        </Menu.Trigger>
+                        <Menu.Content className="js-inner-menu">
+                          <Menu.Item
+                            value="delete"
+                            color="red.500"
+                            onClick={() => onArchiveProject(team.id)}
+                            disabled={
+                              !hasTeamPermission(TeamRoleGroup.TEAM_ARCHIVE)
+                            }
+                          >
+                            <Archive size={14} />
+                            Archive
+                          </Menu.Item>
+                        </Menu.Content>
+                      </Menu.Root>
                     </Table.Cell>
                   </Table.Row>
                 ))}

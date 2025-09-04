@@ -218,6 +218,7 @@ export const organizationRouter = createTRPCRouter({
                     {
                       teams: {
                         some: {
+                          archivedAt: null,
                           projects: {
                             some: { id: demoProjectId },
                           },
@@ -239,6 +240,9 @@ export const organizationRouter = createTRPCRouter({
             members: true,
             features: true,
             teams: {
+              where: {
+                archivedAt: null,
+              },
               include: {
                 members: true,
                 projects: {
@@ -471,6 +475,17 @@ export const organizationRouter = createTRPCRouter({
           message: "Organization not found",
         });
       }
+
+      // Filter out archived teams from team memberships
+      organization.members = organization.members.map((member) => ({
+        ...member,
+        user: {
+          ...member.user,
+          teamMemberships: member.user.teamMemberships.filter(
+            (membership) => membership.team.archivedAt === null
+          ),
+        },
+      }));
 
       return organization;
     }),
