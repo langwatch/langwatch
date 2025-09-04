@@ -133,7 +133,6 @@ model Team {
     archivedAt     DateTime?
 
     @@index([organizationId])
-    @@index([id])
 }
 
 model Organization {
