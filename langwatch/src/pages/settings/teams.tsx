@@ -51,7 +51,7 @@ function TeamsList({ teams }: { teams: TeamWithProjectsAndMembersAndUsers[] }) {
       void queryClient.team.getTeamsWithMembers.invalidate();
     },
   });
-  const onArchiveProject = (teamId: string) => {
+  const onArchiveTeam = (teamId: string) => {
     if (!hasTeamPermission(TeamRoleGroup.TEAM_ARCHIVE)) return;
     if (teams.length === 1) {
       toaster.create({
@@ -128,11 +128,12 @@ function TeamsList({ teams }: { teams: TeamWithProjectsAndMembersAndUsers[] }) {
                         </Menu.Trigger>
                         <Menu.Content className="js-inner-menu">
                           <Menu.Item
-                            value="delete"
+                            value="archive"
                             color="red.500"
-                            onClick={() => onArchiveProject(team.id)}
+                            onClick={() => onArchiveTeam(team.id)}
                             disabled={
-                              !hasTeamPermission(TeamRoleGroup.TEAM_ARCHIVE)
+                              !hasTeamPermission(TeamRoleGroup.TEAM_ARCHIVE) ||
+                              archiveTeam.isPending
                             }
                           >
                             <Archive size={14} />

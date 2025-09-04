@@ -458,9 +458,8 @@ export const organizationRouter = createTRPCRouter({
               user: {
                 include: {
                   teamMemberships: {
-                    include: {
-                      team: true,
-                    },
+                    where: { team: { archivedAt: null } },
+                    include: { team: true },
                   },
                 },
               },
@@ -477,15 +476,15 @@ export const organizationRouter = createTRPCRouter({
       }
 
       // Filter out archived teams from team memberships
-      organization.members = organization.members.map((member) => ({
-        ...member,
-        user: {
-          ...member.user,
-          teamMemberships: member.user.teamMemberships.filter(
-            (membership) => membership.team.archivedAt === null
-          ),
-        },
-      }));
+      // organization.members = organization.members.map((member) => ({
+      //   ...member,
+      //   user: {
+      //     ...member.user,
+      //     teamMemberships: member.user.teamMemberships.filter(
+      //       (membership) => membership.team.archivedAt === null
+      //     ),
+      //   },
+      // }));
 
       return organization;
     }),

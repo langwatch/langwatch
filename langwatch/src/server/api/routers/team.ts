@@ -59,7 +59,11 @@ export const teamRouter = createTRPCRouter({
               user: true,
             },
           },
-          projects: true,
+          projects: {
+            where: {
+              archivedAt: null,
+            },
+          },
         },
       });
 
