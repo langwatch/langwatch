@@ -30,4 +30,5 @@ export const projectFactory = Factory.define<Project>(({ sequence }) => ({
   s3AccessKeyId: null,
   s3SecretAccessKey: null,
   s3Bucket: null,
+  archivedAt: null,
 }));
