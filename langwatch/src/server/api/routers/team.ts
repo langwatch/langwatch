@@ -247,4 +247,15 @@ export const teamRouter = createTRPCRouter({
 
       return team;
     }),
+  archiveById: protectedProcedure
+    .input(z.object({ teamId: z.string(), projectId: z.string() }))
+    .use(checkUserPermissionForTeam(TeamRoleGroup.TEAM_ARCHIVE))
+    .mutation(async ({ input, ctx }) => {
+      const prisma = ctx.prisma;
+      await prisma.team.update({
+        where: { id: input.teamId },
+        data: { archivedAt: new Date() },
+      });
+      return { success: true };
+    }),
 });

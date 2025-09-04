@@ -14,9 +14,14 @@ import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProje
 import type { TeamWithProjectsAndMembersAndUsers } from "../../server/api/routers/organization";
 import { api } from "../../utils/api";
 import { Link } from "../../components/ui/link";
+import { toaster } from "~/components/ui/toaster";
+import { Menu } from "../../components/ui/menu";
+import { TeamRoleGroup } from "~/server/api/permission";
+import { MoreVertical } from "react-feather";
+import { Archive } from "react-feather";
 
 export default function Teams() {
-  const { organization } = useOrganizationTeamProject();
+  const { organization, hasTeamPermission } = useOrganizationTeamProject();
 
   const teams = api.team.getTeamsWithMembers.useQuery(
     {
@@ -31,6 +36,33 @@ export default function Teams() {
 }
 
 function TeamsList({ teams }: { teams: TeamWithProjectsAndMembersAndUsers[] }) {
+  const {
+    hasTeamPermission,
+    project,
+    team: currentTeam,
+  } = useOrganizationTeamProject();
+  const queryClient = api.useContext();
+  const archiveTeam = api.team.archiveById.useMutation({
+    onSuccess: () => {
+      toaster.create({
+        title: "Team archived successfully",
+        type: "success",
+      });
+      void queryClient.team.getTeamsWithMembers.invalidate();
+    },
+  });
+  const onArchiveProject = (teamId: string) => {
+    if (
+      confirm(
+        "Are you sure you want to archive this team? This action cannot be undone."
+      )
+    ) {
+      archiveTeam.mutate({ teamId, projectId: project?.id ?? "" });
+    }
+  };
+
+  console.log("currentTeam", currentTeam);
+
   return (
     <SettingsLayout>
       <VStack
@@ -61,6 +93,7 @@ function TeamsList({ teams }: { teams: TeamWithProjectsAndMembersAndUsers[] }) {
                   <Table.ColumnHeader>Name</Table.ColumnHeader>
                   <Table.ColumnHeader>Members</Table.ColumnHeader>
                   <Table.ColumnHeader>Projects</Table.ColumnHeader>
+                  <Table.ColumnHeader w={"10PX"}>Actions</Table.ColumnHeader>
                 </Table.Row>
               </Table.Header>
               <Table.Body>
@@ -81,6 +114,29 @@ function TeamsList({ teams }: { teams: TeamWithProjectsAndMembersAndUsers[] }) {
                     <Table.Cell>
                       {team.projects.length}{" "}
                       {team.projects.length == 1 ? "project" : "projects"}
+                    </Table.Cell>
+                    <Table.Cell align="right">
+                      {team.id !== team?.id &&
+                        hasTeamPermission(
+                          TeamRoleGroup.TEAM_ARCHIVE,
+                          currentTeam
+                        ) && (
+                          <Menu.Root>
+                            <Menu.Trigger className="js-inner-menu">
+                              <MoreVertical size={18} />
+                            </Menu.Trigger>
+                            <Menu.Content className="js-inner-menu">
+                              <Menu.Item
+                                value="delete"
+                                color="red.500"
+                                onClick={() => onArchiveProject(team.id)}
+                              >
+                                <Archive size={14} />
+                                Archive
+                              </Menu.Item>
+                            </Menu.Content>
+                          </Menu.Root>
+                        )}
                     </Table.Cell>
                   </Table.Row>
                 ))}
