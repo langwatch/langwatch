@@ -123,6 +123,76 @@ spec:
             - name: LANGEVALS_ENDPOINT
               value: {{ .Values.app.upstreams.langevals.schema | default "http" }}://{{ .Values.app.upstreams.langevals.name | default "langevals" }}:{{ .Values.app.upstreams.langevals.port | default 5562 }}
 
+            # PostgreSQL connection string
+            {{- if .Values.postgresql.chartManaged }}
+            - name: DATABASE_URL
+              value: "(TODO)"
+            {{- else }}
+            - name: DATABASE_URL
+              {{- if .Values.postgresql.external.connectionString.value }}
+              value: {{ .Values.postgresql.external.connectionString.value | quote }}
+              {{- else }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.postgresql.external.connectionString.secretKeyRef.name }}
+                  key: {{ .Values.postgresql.external.connectionString.secretKeyRef.key }}
+              {{- end }}
+            {{- end }}
+
+            # Redis connection string
+            {{- if .Values.redis.chartManaged }}
+            - name: REDIS_URL
+              value: "(TODO)"
+            {{- else }}
+            {{- if eq .Values.redis.external.architecture "standalone" }}
+            - name: REDIS_CLUSTER_ENDPOINTS
+            {{- else}}
+            - name: REDIS_URL
+            {{- end }}
+            {{- if .Values.redis.external.connectionString.value }}
+            value: {{ .Values.redis.external.connectionString.value | quote }}
+            {{- else }}
+            valueFrom:
+              secretKeyRef:
+                name: {{ .Values.redis.external.connectionString.secretKeyRef.name }}
+                key: {{ .Values.redis.external.connectionString.secretKeyRef.key }}
+            {{- end }}
+
+            # ElasticSearch/OpenSearch/Quickwit connection string
+            {{- if .Values.opensearch.chartManaged }}
+            {{- else}}
+            - name: ELASTICSEARCH_NODE_URL
+              value: {{ .Values.opensearch.external.nodeUrl.value | quote }}
+            - name: ELASTICSEARCH_API_KEY
+              value: {{ .Values.opensearch.external.apiKey.value | quote }}
+            {{- if eq .Values.opensearch.external.engine "opensearch" }}
+            - name: IS_OPENSEARCH
+              value: "true"
+            {{- else if eq .Values.opensearch.external.engine "quickwit" }}
+            - name: IS_QUICKWIT
+              value: "true"
+            {{- end }}
+            - name: ELASTICSEARCH_NODE_URL
+            {{- if .Values.opensearch.external.nodeUrl.value }}
+            value: {{ .Values.opensearch.external.nodeUrl.value | quote }}
+            {{- else }}
+            valueFrom:
+              secretKeyRef:
+                name: {{ .Values.opensearch.external.nodeUrl.secretKeyRef.name }}
+                key: {{ .Values.opensearch.external.nodeUrl.secretKeyRef.key }}
+            {{- end }}
+            - name: ELASTICSEARCH_API_KEY
+            {{- if .Values.opensearch.external.apiKey.value }}
+            value: {{ .Values.opensearch.external.apiKey.value | quote }}
+            {{- else }}
+            valueFrom:
+              secretKeyRef:
+                name: {{ .Values.opensearch.external.apiKey.secretKeyRef.name }}
+                key: {{ .Values.opensearch.external.apiKey.secretKeyRef.key }}
+            {{- end }}
+            {{- end }}
+            {{- end }}
+
             # Credentials encryption key
             {{- if .Values.app.credentialsEncryptionKey.secretKeyRef.name }}
             - name: CREDENTIALS_SECRET

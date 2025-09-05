@@ -796,13 +796,11 @@ postgresql:
   # Whether to manage PostgreSQL via this chart or use external instance
   chartManaged: true
 
-  # External PostgreSQL configuration (when chartManaged: false)
+  # Connection string to use for PostgreSQL when running in `chartManaged: false` mode
   external:
-    # Reference to existing secret containing connection details
-    # See: https://kubespec.dev/v1/Secret
-    existingSecret: ""
-    secretKeys:
-      connectionString: "connection-string"
+    connectionString:
+      value: ""
+      secretKeyRef: { name: "", key: "" }
 
   # Authentication and database configuration
   auth:
