@@ -1,0 +1,37 @@
+[
+  {
+    "title": "Python OpenAI Integration",
+    "language": "python",
+    "integration_type": "openai",
+    "input": "```python\nimport openai\nimport os\n\nclient = openai.OpenAI()\n\ndef openai_chat(messages: list):\n    # Make OpenAI call\n    response = client.chat.completions.create(\n        model=\"gpt-4\",\n        messages=messages,\n        temperature=0.7\n    )\n    \n    return response.choices[0].message.content\n\n# Usage\nmessages = [{\"role\": \"user\", \"content\": \"Hello!\"}]\nresult = openai_chat(messages)\n```",
+    "expected_output": "import langwatch\nimport openai\nimport os\n\n# Setup\nlangwatch.setup(api_key=os.getenv(\"LANGWATCH_API_KEY\"))\nclient = openai.OpenAI()\n\n@langwatch.trace()\ndef openai_chat(messages: list, user_id: str = None):\n    # Start an LLM span\n    with langwatch.span(type=\"llm\") as span:\n        span.update(\n            name=\"openai_chat\",\n            input=messages,\n            model=\"gpt-4\"\n        )\n        \n        # Make OpenAI call\n        response = client.chat.completions.create(\n            model=\"gpt-4\",\n            messages=messages,\n            temperature=0.7\n        )\n        \n        # Update span with results\n        span.update(\n            output=response.choices[0].message.content,\n            metrics={\n                \"prompt_tokens\": response.usage.prompt_tokens,\n                \"completion_tokens\": response.usage.completion_tokens,\n                \"total_cost\": response.usage.total_tokens * 0.00003  # example pricing\n            }\n        )\n        \n        return response.choices[0].message.content\n\n# Usage\nmessages = [{\"role\": \"user\", \"content\": \"Hello!\"}]\nresult = openai_chat(messages, user_id=\"user123\")"
+  },
+  {
+    "title": "Python Basic Integration",
+    "language": "python",
+    "integration_type": "basic",
+    "input": "```python\ndef chat_with_user(user_input: str, user_id: str = None):\n    # Your LLM logic here\n    response = f\"Response to: {user_input}\"\n    \n    return response\n\n# Usage\nresult = chat_with_user(\"What's the weather?\", user_id=\"user123\")\n```",
+    "expected_output": "import langwatch\nimport os\n\n# Setup\nlangwatch.setup(api_key=os.getenv(\"LANGWATCH_API_KEY\"))\n\n@langwatch.trace()\ndef chat_with_user(user_input: str, user_id: str = None):\n    # This automatically creates a trace\n    \n    # Add metadata\n    langwatch.get_current_trace().update(\n        user_id=user_id,\n        metadata={\"source\": \"web_chat\"}\n    )\n    \n    # Your LLM logic here\n    response = f\"Response to: {user_input}\"\n    \n    return response\n\n# Usage\nresult = chat_with_user(\"What's the weather?\", user_id=\"user123\")"
+  },
+  {
+    "title": "TypeScript OpenAI Integration",
+    "language": "typescript",
+    "integration_type": "openai",
+    "input": "```typescript\nimport OpenAI from \"openai\";\n\nconst openai = new OpenAI({\n  apiKey: process.env.OPENAI_API_KEY!\n});\n\nasync function openaiChat(messages: any[], userId?: string) {\n  try {\n    const response = await openai.chat.completions.create({\n      model: \"gpt-4\",\n      messages,\n      temperature: 0.7\n    });\n\n    const content = response.choices[0].message.content;\n    \n    return content;\n  } catch (error) {\n    throw error;\n  }\n}\n\n// Usage\nconst messages = [{ role: \"user\", content: \"Hello!\" }];\nconst result = await openaiChat(messages, \"user123\");\n```",
+    "expected_output": "import { LangWatch } from \"langwatch\";\nimport OpenAI from \"openai\";\n\nconst langwatch = new LangWatch({\n  apiKey: process.env.LANGWATCH_API_KEY!\n});\n\nconst openai = new OpenAI({\n  apiKey: process.env.OPENAI_API_KEY!\n});\n\nasync function openaiChat(messages: any[], userId?: string) {\n  const trace = langwatch.startTrace({\n    user_id: userId,\n    thread_id: `conversation-${Date.now()}`\n  });\n\n  const span = trace.startLLMSpan({\n    name: \"openai_chat\",\n    input: messages,\n    model: \"gpt-4\"\n  });\n\n  try {\n    const response = await openai.chat.completions.create({\n      model: \"gpt-4\",\n      messages,\n      temperature: 0.7\n    });\n\n    const content = response.choices[0].message.content;\n    \n    span.end({\n      output: content,\n      metrics: {\n        prompt_tokens: response.usage?.prompt_tokens,\n        completion_tokens: response.usage?.completion_tokens,\n        total_cost: (response.usage?.total_tokens || 0) * 0.00003\n      }\n    });\n\n    return content;\n  } catch (error) {\n    span.end({ error: error.message });\n    throw error;\n  } finally {\n    trace.end();\n  }\n}\n\n// Usage\nconst messages = [{ role: \"user\", content: \"Hello!\" }];\nconst result = await openaiChat(messages, \"user123\");"
+  },
+  {
+    "title": "Python Evaluation Integration",
+    "language": "python",
+    "integration_type": "evaluation",
+    "input": "```python\ndef llm_with_evaluation(user_input: str):\n    # Your LLM call\n    response = \"Generated response\"\n    \n    return response\n\nresult = llm_with_evaluation(\"What's AI?\")\n```",
+    "expected_output": "import langwatch\nimport os\n\n# Setup\nlangwatch.setup(api_key=os.getenv(\"LANGWATCH_API_KEY\"))\n\n@langwatch.trace()\ndef llm_with_evaluation(user_input: str):\n    # Your LLM call\n    response = \"Generated response\"\n    \n    # Add custom evaluation\n    langwatch.get_current_span().add_evaluation(\n        name=\"response_quality\",\n        passed=True,\n        score=0.85,\n        label=\"high_quality\",\n        details=\"Response is relevant and helpful\"\n    )\n    \n    # You can also add evaluations to the trace level\n    langwatch.get_current_trace().add_evaluation(\n        name=\"conversation_flow\",\n        passed=True,\n        score=0.9\n    )\n    \n    return response\n\nresult = llm_with_evaluation(\"What's AI?\")"
+  },
+  {
+    "title": "TypeScript Basic Integration",
+    "language": "typescript",
+    "integration_type": "basic",
+    "input": "```typescript\nasync function chatWithUser(userInput: string, userId?: string) {\n  try {\n    // Your LLM logic here\n    const response = `Response to: ${userInput}`;\n    return response;\n  } catch (error) {\n    throw error;\n  }\n}\n\n// Usage\nconst result = await chatWithUser(\"What's the weather?\", \"user123\");\n```",
+    "expected_output": "import { LangWatch } from \"langwatch\";\n\nconst langwatch = new LangWatch({\n  apiKey: process.env.LANGWATCH_API_KEY!\n});\n\nasync function chatWithUser(userInput: string, userId?: string) {\n  const trace = langwatch.startTrace({\n    user_id: userId,\n    metadata: { source: \"web_chat\" }\n  });\n\n  const span = trace.startLLMSpan({\n    name: \"chat_response\",\n    input: userInput,\n    model: \"gpt-4\"\n  });\n\n  try {\n    // Your LLM logic here\n    const response = `Response to: ${userInput}`;\n    \n    span.end({ output: response });\n    return response;\n  } catch (error) {\n    span.end({ error: error.message });\n    throw error;\n  } finally {\n    trace.end();\n  }\n}\n\n// Usage\nconst result = await chatWithUser(\"What's the weather?\", \"user123\");"
+  }
+]
