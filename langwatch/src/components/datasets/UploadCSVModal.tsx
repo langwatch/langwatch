@@ -169,14 +169,19 @@ export function UploadCSVForm({
     const { data, acceptedFile } = results;
 
     // Check for reserved column names and rename them
-    const columns: DatasetColumns = (data[0] ?? []).map((col: string) => {
-      const safeColumnName = getSafeColumnName(col);
+    const originalColumnNames = data[0] ?? [];
+    const existingNames = new Set<string>();
+    const columns: DatasetColumns = originalColumnNames.map((col: string) => {
+      const safeColumnName = getSafeColumnName(col, existingNames);
+
+      // Add the safe name to the set to prevent future collisions
+      existingNames.add(safeColumnName);
 
       // If this column name was changed, show a warning to the user
       if (safeColumnName !== col) {
         toaster.create({
           title: "Column Renamed",
-          description: `Column "${col}" is reserved and has been renamed to "${safeColumnName}"`,
+          description: `Column "${col}" is reserved or conflicts with existing columns and has been renamed to "${safeColumnName}"`,
           type: "warning",
           meta: {
             closable: true,

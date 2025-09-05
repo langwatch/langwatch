@@ -17,8 +17,39 @@ export function isReservedColumnName(columnName: string): boolean {
 }
 
 /**
- * Generates a safe column name by appending "_" to reserved names
+ * Generates a safe column name that avoids reserved names and collisions with existing names
+ * @param columnName - The original column name to make safe
+ * @param existingNames - Set of existing column names to avoid collisions with
+ * @returns A unique column name that is not reserved and doesn't collide with existing names
  */
-export function getSafeColumnName(columnName: string): string {
-  return isReservedColumnName(columnName) ? `${columnName}_` : columnName;
+export function getSafeColumnName(
+  columnName: string,
+  existingNames: Set<string>
+): string {
+  // If the name is not reserved and doesn't exist, return as-is
+  if (!isReservedColumnName(columnName) && !existingNames.has(columnName)) {
+    return columnName;
+  }
+
+  // Generate a unique name by trying different suffixes
+  let candidate = columnName;
+  let suffix = "_";
+  let counter = 0;
+
+  while (isReservedColumnName(candidate) || existingNames.has(candidate)) {
+    if (counter === 0) {
+      candidate = `${columnName}${suffix}`;
+    } else {
+      candidate = `${columnName}_${counter}`;
+    }
+    counter++;
+
+    // Safety check to prevent infinite loops (should never happen in practice)
+    if (counter > 1000) {
+      candidate = `${columnName}_${Date.now()}`;
+      break;
+    }
+  }
+
+  return candidate;
 }

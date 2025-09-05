@@ -29,18 +29,57 @@ describe("reservedColumns utilities", () => {
   });
 
   describe("getSafeColumnName", () => {
-    it("should append '_' to reserved names", () => {
-      expect(getSafeColumnName("id")).toBe("id_");
-      expect(getSafeColumnName("ID")).toBe("ID_");
-      expect(getSafeColumnName("selected")).toBe("selected_");
-      expect(getSafeColumnName("SELECTED")).toBe("SELECTED_");
+    it("should append '_' to reserved names when no collisions", () => {
+      const existingNames = new Set<string>();
+      expect(getSafeColumnName("id", existingNames)).toBe("id_");
+      expect(getSafeColumnName("ID", existingNames)).toBe("ID_");
+      expect(getSafeColumnName("selected", existingNames)).toBe("selected_");
+      expect(getSafeColumnName("SELECTED", existingNames)).toBe("SELECTED_");
     });
 
-    it("should return non-reserved names unchanged", () => {
-      expect(getSafeColumnName("name")).toBe("name");
-      expect(getSafeColumnName("email")).toBe("email");
-      expect(getSafeColumnName("user_id")).toBe("user_id");
-      expect(getSafeColumnName("")).toBe("");
+    it("should return non-reserved names unchanged when no collisions", () => {
+      const existingNames = new Set<string>();
+      expect(getSafeColumnName("name", existingNames)).toBe("name");
+      expect(getSafeColumnName("email", existingNames)).toBe("email");
+      expect(getSafeColumnName("user_id", existingNames)).toBe("user_id");
+      expect(getSafeColumnName("", existingNames)).toBe("");
+    });
+
+    it("should handle collisions with existing names", () => {
+      const existingNames = new Set(["name", "id_", "id_1"]);
+
+      // Non-reserved name that collides with existing
+      expect(getSafeColumnName("name", existingNames)).toBe("name_");
+
+      // Reserved name with collision resolution
+      expect(getSafeColumnName("id", existingNames)).toBe("id_2");
+    });
+
+    it("should handle multiple collision iterations", () => {
+      const existingNames = new Set([
+        "test",
+        "test_",
+        "test_1",
+        "test_2",
+        "test_3",
+      ]);
+
+      // Should find the first available numeric suffix when "test" is already taken
+      expect(getSafeColumnName("test", existingNames)).toBe("test_4");
+    });
+
+    it("should handle reserved names that collide with existing names", () => {
+      const existingNames = new Set(["selected_", "selected_1"]);
+
+      expect(getSafeColumnName("selected", existingNames)).toBe("selected_2");
+    });
+
+    it("should return original name if not reserved and no collision", () => {
+      const existingNames = new Set(["other_name"]);
+
+      expect(getSafeColumnName("unique_name", existingNames)).toBe(
+        "unique_name"
+      );
     });
   });
 
