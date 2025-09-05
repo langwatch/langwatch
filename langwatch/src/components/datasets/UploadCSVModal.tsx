@@ -26,6 +26,7 @@ import { toaster } from "../ui/toaster";
 import { api } from "~/utils/api";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { createLogger } from "~/utils/logger";
+import { getSafeColumnName } from "./utils/reservedColumns";
 export const MAX_ROWS_LIMIT = 10_000;
 
 const logger = createLogger("UploadCSVModal");
@@ -166,10 +167,30 @@ export function UploadCSVForm({
     acceptedFile: File;
   }) => {
     const { data, acceptedFile } = results;
-    const columns: DatasetColumns = (data[0] ?? []).map((col: string) => ({
-      name: col,
-      type: "string",
-    }));
+
+    // Check for reserved column names and rename them
+    const columns: DatasetColumns = (data[0] ?? []).map((col: string) => {
+      const safeColumnName = getSafeColumnName(col);
+
+      // If this column name was changed, show a warning to the user
+      if (safeColumnName !== col) {
+        toaster.create({
+          title: "Column Renamed",
+          description: `Column "${col}" is reserved and has been renamed to "${safeColumnName}"`,
+          type: "warning",
+          meta: {
+            closable: true,
+          },
+          placement: "top-end",
+        });
+      }
+
+      return {
+        name: safeColumnName,
+        type: "string" as const,
+      };
+    });
+
     const now = new Date().getTime();
     const records: DatasetRecordEntry[] = data
       .slice(1)
@@ -249,7 +270,10 @@ export function CSVReaderComponent({
   onUploadRemoved,
   children,
 }: {
-  onUploadAccepted: (results: { data: string[][]; acceptedFile: File }) => void;
+  onUploadAccepted: (results: {
+    data: string[][];
+    acceptedFile: File;
+  }) => void | Promise<void>;
   onUploadRemoved?: () => void;
   children?: (acceptedFile: boolean) => React.ReactNode;
 }) {
@@ -261,7 +285,7 @@ export function CSVReaderComponent({
 
   useEffect(() => {
     if (acceptedFile && results) {
-      onUploadAccepted({ ...results, acceptedFile });
+      void onUploadAccepted({ ...results, acceptedFile });
     } else if (!acceptedFile) {
       onUploadRemoved?.();
     }
