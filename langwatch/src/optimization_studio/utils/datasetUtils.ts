@@ -167,6 +167,7 @@ export const tryToMapPreviousColumnsToNewColumns = (
 ): DatasetRecordEntry[] => {
   const columnNameMap: Record<string, string | undefined> = {};
 
+  // First pass: exact name matches
   previousColumns.forEach((prevCol) => {
     const matchingNewCol = newColumns.find(
       (newCol) => newCol.name === prevCol.name
@@ -175,6 +176,28 @@ export const tryToMapPreviousColumnsToNewColumns = (
       columnNameMap[prevCol.name] = matchingNewCol.name;
     }
   });
+
+  // Second pass: map by position for unmapped columns
+  // This preserves data when column names are changed
+  const unmappedPrevColumns = previousColumns.filter(
+    (col) => !(col.name in columnNameMap)
+  );
+  const unmappedNewColumns = newColumns.filter(
+    (col) => !Object.values(columnNameMap).includes(col.name)
+  );
+
+  // Map remaining columns by position
+  for (
+    let i = 0;
+    i < Math.min(unmappedPrevColumns.length, unmappedNewColumns.length);
+    i++
+  ) {
+    const prevCol = unmappedPrevColumns[i];
+    const newCol = unmappedNewColumns[i];
+    if (prevCol && newCol) {
+      columnNameMap[prevCol.name] = newCol.name;
+    }
+  }
 
   const res = datasetRecords.map((record) => {
     const convertedRecord: DatasetRecordEntry = {
