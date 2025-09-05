@@ -43,18 +43,6 @@ export const SetRunHistorySidebarComponent = (
         History
       </Text>
 
-      {/* Pagination Info */}
-      <Box p={4} borderBottom="1px solid" borderColor="gray.200">
-        <HStack justify="space-between" align="center">
-          <Text fontSize="sm" color="gray.600">
-            {pagination.totalCount} total runs
-          </Text>
-          <Text fontSize="sm" color="gray.600">
-            Page {pagination.page} of {Math.max(1, pagination.totalPages)}
-          </Text>
-        </HStack>
-      </Box>
-
       {isLoading && runs.length === 0 && (
         <VStack gap={3} align="stretch" p={4}>
           {Array.from({ length: 3 }).map((_, idx) => (
@@ -111,6 +99,18 @@ export const SetRunHistorySidebarComponent = (
           ))}
         </Accordion.Root>
       )}
+
+      {/* Pagination Info */}
+      <Box p={4} borderBottom="1px solid" borderColor="gray.200">
+        <HStack justify="space-between" align="center">
+          <Text fontSize="sm" color="gray.600">
+            {pagination.totalCount} total runs
+          </Text>
+          <Text fontSize="sm" color="gray.600">
+            Page {pagination.page} of {Math.max(1, pagination.totalPages)}
+          </Text>
+        </HStack>
+      </Box>
 
       {/* Pagination Controls */}
       {pagination.totalPages > 1 && (
