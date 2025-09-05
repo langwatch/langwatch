@@ -1,16 +1,36 @@
-# Global configuration
+# =============================================================================
+# LangWatch Helm Chart Configuration
+# =============================================================================
+# This file contains all configuration options for deploying LangWatch on Kubernetes.
+# Each section is documented with helpful explanations and examples.
+# =============================================================================
+
+# Global configuration options that apply across all components
+# Use this section for settings that should be inherited by multiple services
 global:
 
-# Auto-generation mode (development only)
+# =============================================================================
+# Auto-Generation Mode (Development Only)
+# =============================================================================
+# This section enables automatic secret generation for development environments.
+# In production, you should manually create and manage secrets.
 autogen:
+  # Enable automatic secret generation (set to false in production)
   enabled: false
-  # Secret names for each service (auto-generated if not specified)
+  # Custom secret names for each service (auto-generated if not specified)
   secretNames:
+    # Secret name for the main LangWatch application
     app: "" # defaults to {{ .Release.Name }}-app-secrets
+    # Secret name for the LangEvals service
     langevals: "" # defaults to {{ .Release.Name }}-langevals-secrets
+    # Secret name for the NLP service
     langwatch_nlp: "" # defaults to {{ .Release.Name }}-langwatch-nlp-secrets
 
-# Image configurations
+# =============================================================================
+# Container Image Configurations
+# =============================================================================
+# Define the container images for each LangWatch component
+# You can override these to use custom images or different tags
 images:
   app:
     repository: langwatch/langwatch
@@ -25,38 +45,66 @@ images:
     tag: latest
     pullPolicy: Always
 
-# LangWatch app configurations
+# =============================================================================
+# LangWatch Main Application Configuration
+# =============================================================================
+# Core settings for the main LangWatch application service
 app:
+  # Number of application replicas to run
+  # See: https://kubespec.dev/apps/v1/Deployment#spec.replicas
   replicaCount: 1
+  
+  # Kubernetes service configuration
+  # See: https://kubespec.dev/v1/Service
   service: { type: ClusterIP, port: 5560 }
+  
+  # Resource requirements and limits for the application pods
+  # See: https://kubespec.dev/v1/Pod#spec.containers.resources
   resources:
     requests: { cpu: 250m,  memory: 2Gi }
     limits:   { cpu: 1000m, memory: 4Gi }
 
+  # Node.js environment setting
   nodeEnv: "production"
 
+  # Encryption key for securing sensitive credentials
+  # This key is used to encrypt/decrypt stored API keys and secrets
   credentialsEncryptionKey:
     value: ""
     secretKeyRef: { name: "", key: "" }
 
+  # API key for internal cron job authentication
+  # Used by scheduled tasks to authenticate with the application
   cronApiKey:
     value: ""
     secretKeyRef: { name: "", key: "" }
 
+  # HTTP configuration for the application
   http:
+    # Base host URL for internal communication
     baseHost: "http://localhost:5560"
+    # Public URL that users will access the application from
     publicUrl: "http://localhost:5560"
 
+  # Feature flags to enable/disable specific functionality
   features:
+    # Skip environment variable validation (useful for development)
     skipEnvValidation: false
+    # Disable PII (Personally Identifiable Information) redaction
     disablePiiRedaction: false
+    # Enable automatic topic clustering for conversations
     topicClustering: true
 
+  # Upstream service connections
+  # Define how the main app connects to other LangWatch services
   upstreams:
     nlp:       { name: langwatch-nlp,  port: 5561 }
     langevals: { name: langevals,      port: 5562 }
 
+  # AI model evaluator configurations
+  # These enable integration with various AI providers for evaluation tasks
   evaluators:
+    # Azure OpenAI integration for model evaluation
     azureOpenAI:
       enabled: false
       endpoint:
@@ -65,18 +113,27 @@ app:
       apiKey:
         value: ""
         secretKeyRef: { name: "", key: "" }
+    # Google AI integration for model evaluation
     google:
       enabled: false
       credentials:
         value: ""
         secretKeyRef: { name: "", key: "" }
 
+  # Dataset storage configuration
+  # Controls how LangWatch stores and manages training datasets
   datasetObjectStorage:
     enabled: true
+    # Storage provider to use. Options: awsS3 (default), azure, gcs
+    # When set to 'awsS3', enables AWS S3 native integration
+    # When set to 'azure', enables Azure Blob Storage native integration  
+    # When set to 'gcs', enables Google Cloud Storage native integration
     provider: awsS3
-    bucket: "langwatch-dataset"
+    bucket: "langwatch-dataset" # Bucket name for dataset storage
 
+    # Provider-specific configurations
     providers:
+      # AWS S3 configuration for dataset storage
       awsS3:
         accessKeyId:
           value: ""
@@ -88,23 +145,41 @@ app:
           value: ""
           secretKeyRef: { name: "", key: "" }
 
+  # Email notification configuration
+  # Enables sending alerts and notifications via email
   email:
     enabled: false
     defaultFrom: ""
+    # Email provider to use. Options: sendgrid (default)
+    # When set to 'sendgrid', enables SendGrid integration
     provider: sendgrid
-    sendgrid:
-      apiKey:
-        value: ""
-        secretKeyRef: { name: "", key: "" }
 
-  # use http.publicUrl
+    providers:
+      sendgrid:
+        apiKey:
+          value: ""
+          secretKeyRef: { name: "", key: "" }
+
+  # NextAuth.js authentication configuration
+  # Handles user authentication and session management
+  # Note: publicUrl is automatically used from http.publicUrl
   nextAuth:
+    # Authentication provider to use. Options: email (default), google, github, gitlab, azureAd, cognito, okta
+    # When set to 'email', enables email-based authentication
+    # When set to 'google', enables Google OAuth integration
+    # When set to 'github', enables GitHub OAuth integration
+    # When set to 'gitlab', enables GitLab OAuth integration
+    # When set to 'azureAd', enables Azure Active Directory OAuth integration
+    # When set to 'cognito', enables AWS Cognito OAuth integration
+    # When set to 'okta', enables Okta OAuth integration
     provider: email
     secret:
       value: ""
       secretKeyRef: { name: "", key: "" }
 
+    # SSO (Single Sign-On) OAuth provider configurations
     providers:
+      # Auth0 OAuth integration
       auth0:
         clientId:
           value: ""
@@ -115,6 +190,7 @@ app:
         issuer:
           value: ""
           secretKeyRef: { name: "", key: "" }
+      # Azure Active Directory OAuth integration
       azureAd:
         clientId:
           value: ""
@@ -125,6 +201,7 @@ app:
         tenantId:
           value: ""
           secretKeyRef: { name: "", key: "" }
+      # AWS Cognito OAuth integration
       cognito:
         clientId:
           value: ""
@@ -135,6 +212,7 @@ app:
         issuer:
           value: ""
           secretKeyRef: { name: "", key: "" }
+      # GitHub OAuth integration
       github:
         clientId:
           value: ""
@@ -142,6 +220,7 @@ app:
         clientSecret:
           value: ""
           secretKeyRef: { name: "", key: "" }
+      # GitLab OAuth integration
       gitlab:
         clientId:
           value: ""
@@ -149,6 +228,7 @@ app:
         clientSecret:
           value: ""
           secretKeyRef: { name: "", key: "" }
+      # Google OAuth integration
       google:
         clientId:
           value: ""
@@ -156,155 +236,340 @@ app:
         clientSecret:
           value: ""
           secretKeyRef: { name: "", key: "" }
+      # Okta OAuth integration
       okta:
-      clientId:
-        value: ""
-        secretKeyRef: { name: "", key: "" }
-      clientSecret:
-        value: ""
-        secretKeyRef: { name: "", key: "" }
-      issuer:
-        value: ""
-        secretKeyRef: { name: "", key: "" }
+        clientId:
+          value: ""
+          secretKeyRef: { name: "", key: "" }
+        clientSecret:
+          value: ""
+          secretKeyRef: { name: "", key: "" }
+        issuer:
+          value: ""
+          secretKeyRef: { name: "", key: "" }
 
+  # Telemetry and monitoring configuration
+  # Controls what metrics and error reporting are enabled
   telemetry:
+    # Usage analytics collection
     usage:
       enabled: true
+    # Metrics collection for monitoring
     metrics:
       enabled: false
       apiKey:
         value: ""
         secretKeyRef: { name: "", key: "" }
+    # Sentry error reporting integration
     sentry:
       enabled: false
       dsn:
         value: ""
         secretKeyRef: { name: "", key: "" }
 
-  # == Pass through directly to k8s ==
+  # =============================================================================
+  # Kubernetes Pass-Through Configuration
+  # =============================================================================
+  # These settings are passed directly to Kubernetes resources
+  # Modify these to customize pod behavior, scheduling, and security
 
+  # Pod security context (user, group, fsGroup, etc.)
+  # See: https://kubespec.dev/v1/Pod#spec.securityContext
   podSecurityContext: {}
+  # Container security context (capabilities, readOnlyRootFilesystem, etc.)
+  # See: https://kubespec.dev/v1/Pod#spec.containers.securityContext
   securityContext: {}
+  # Node selector for pod placement
+  # See: https://kubespec.dev/v1/Pod#spec.nodeSelector
   nodeSelector: {}
+  # Tolerations for tainted nodes
+  # See: https://kubespec.dev/v1/Pod#spec.tolerations
   tolerations: []
+  # Pod affinity and anti-affinity rules
+  # See: https://kubespec.dev/v1/Pod#spec.affinity
   affinity: {}
+  # Pod-level configurations
   pod:
+    # Pod annotations
+    # See: https://kubespec.dev/v1/Pod#metadata.annotations
     annotations: {}
+    # Pod labels
+    # See: https://kubespec.dev/v1/Pod#metadata.labels
     labels: {}
+    # Topology spread constraints for pod distribution
+    # See: https://kubespec.dev/v1/Pod#spec.topologySpreadConstraints
     topologySpreadConstraints: []
+  # Deployment-level configurations
   deployment:
+    # Deployment annotations
+    # See: https://kubespec.dev/apps/v1/Deployment#metadata.annotations
     annotations: {}
+    # Deployment strategy (RollingUpdate, Recreate)
+    # See: https://kubespec.dev/apps/v1/Deployment#spec.strategy
     strategy: {}
+  # Number of old replicasets to retain
+  # See: https://kubespec.dev/apps/v1/Deployment#spec.revisionHistoryLimit
   revisionHistoryLimit: 10
 
+  # Additional Kubernetes resources
+  # Extra environment variables
+  # See: https://kubespec.dev/v1/Pod#spec.containers.env
   extraEnvs: []
+  # Additional containers in the pod
+  # See: https://kubespec.dev/v1/Pod#spec.containers
   extraContainers: []
+  # Additional volumes for the pod
+  # See: https://kubespec.dev/v1/Pod#spec.volumes
   extraVolumes: []
+  # Additional init containers
+  # See: https://kubespec.dev/v1/Pod#spec.initContainers
   extraInitContainers: []
+  # Additional volume mounts for containers
+  # See: https://kubespec.dev/v1/Pod#spec.containers.volumeMounts
   extraVolumeMounts: []
+  # Additional lifecycle hooks
+  # See: https://kubespec.dev/v1/Pod#spec.containers.lifecycle
   extraLifecycle: {}
 
-# LangWatch NLP configuration
+# =============================================================================
+# LangWatch NLP Service Configuration
+# =============================================================================
+# Configuration for the Natural Language Processing service
+# This service handles text analysis, embeddings, and language model interactions
 langwatch_nlp:
+  # Number of NLP service replicas
+  # See: https://kubespec.dev/apps/v1/Deployment#spec.replicas
   replicaCount: 1
+  
+  # Kubernetes service configuration
+  # See: https://kubespec.dev/v1/Service
   service: { type: ClusterIP, port: 5561 }
+  
+  # Resource requirements for NLP processing
+  # See: https://kubespec.dev/v1/Pod#spec.containers.resources
   resources:
     requests: { cpu: 1000m,  memory: 2Gi }
     limits:   { cpu: 2000m, memory: 4Gi }
 
+  # Connection to the main LangWatch application
   upstreams:
     langwatch: { name: langwatch-app,  port: 5560 }
 
-  # == Pass through directly to k8s ==
+  # =============================================================================
+  # Kubernetes Pass-Through Configuration
+  # =============================================================================
+  # Same pass-through options as the main app
 
+  # Pod security context (user, group, fsGroup, etc.)
+  # See: https://kubespec.dev/v1/Pod#spec.securityContext
   podSecurityContext: {}
+  # Container security context (capabilities, readOnlyRootFilesystem, etc.)
+  # See: https://kubespec.dev/v1/Pod#spec.containers.securityContext
   securityContext: {}
+  # Node selector for pod placement
+  # See: https://kubespec.dev/v1/Pod#spec.nodeSelector
   nodeSelector: {}
+  # Tolerations for tainted nodes
+  # See: https://kubespec.dev/v1/Pod#spec.tolerations
   tolerations: []
+  # Pod affinity and anti-affinity rules
+  # See: https://kubespec.dev/v1/Pod#spec.affinity
   affinity: {}
+  # Pod-level configurations
   pod:
+    # Pod annotations
+    # See: https://kubespec.dev/v1/Pod#metadata.annotations
     annotations: {}
+    # Pod labels
+    # See: https://kubespec.dev/v1/Pod#metadata.labels
     labels: {}
+    # Topology spread constraints for pod distribution
+    # See: https://kubespec.dev/v1/Pod#spec.topologySpreadConstraints
     topologySpreadConstraints: []
+  # Deployment-level configurations
   deployment:
+    # Deployment annotations
+    # See: https://kubespec.dev/apps/v1/Deployment#metadata.annotations
     annotations: {}
+    # Deployment strategy (RollingUpdate, Recreate)
+    # See: https://kubespec.dev/apps/v1/Deployment#spec.strategy
     strategy: {}
+  # Number of old replicasets to retain
+  # See: https://kubespec.dev/apps/v1/Deployment#spec.revisionHistoryLimit
   revisionHistoryLimit: 10
 
+  # Additional Kubernetes resources
+  # Extra environment variables
+  # See: https://kubespec.dev/v1/Pod#spec.containers.env
   extraEnvs: []
+  # Additional containers in the pod
+  # See: https://kubespec.dev/v1/Pod#spec.containers
   extraContainers: []
+  # Additional volumes for the pod
+  # See: https://kubespec.dev/v1/Pod#spec.volumes
   extraVolumes: []
+  # Additional init containers
+  # See: https://kubespec.dev/v1/Pod#spec.initContainers
   extraInitContainers: []
+  # Additional volume mounts for containers
+  # See: https://kubespec.dev/v1/Pod#spec.containers.volumeMounts
   extraVolumeMounts: []
+  # Additional lifecycle hooks
+  # See: https://kubespec.dev/v1/Pod#spec.containers.lifecycle
   extraLifecycle: {}
 
-# LangEvals configuration
+# =============================================================================
+# LangEvals Service Configuration
+# =============================================================================
+# Configuration for the evaluation service
+# This service handles model evaluation, testing, and quality assessment
 langevals:
+  # Number of evaluation service replicas
+  # See: https://kubespec.dev/apps/v1/Deployment#spec.replicas
   replicaCount: 1
+  
+  # Kubernetes service configuration
+  # See: https://kubespec.dev/v1/Service
   service: { type: ClusterIP, port: 5562 }
+  
+  # Resource requirements for evaluation tasks
+  # Higher memory requirements due to model loading and evaluation
+  # See: https://kubespec.dev/v1/Pod#spec.containers.resources
   resources:
     requests: { cpu: 1000m,  memory: 6Gi }
     limits: { cpu: 2000m, memory: 8Gi }
 
-  # == Pass through directly to k8s ==
+  # =============================================================================
+  # Kubernetes Pass-Through Configuration
+  # =============================================================================
+  # Same pass-through options as other services
 
+  # Pod security context (user, group, fsGroup, etc.)
+  # See: https://kubespec.dev/v1/Pod#spec.securityContext
   podSecurityContext: {}
+  # Container security context (capabilities, readOnlyRootFilesystem, etc.)
+  # See: https://kubespec.dev/v1/Pod#spec.containers.securityContext
   securityContext: {}
+  # Node selector for pod placement
+  # See: https://kubespec.dev/v1/Pod#spec.nodeSelector
   nodeSelector: {}
+  # Tolerations for tainted nodes
+  # See: https://kubespec.dev/v1/Pod#spec.tolerations
   tolerations: []
+  # Pod affinity and anti-affinity rules
+  # See: https://kubespec.dev/v1/Pod#spec.affinity
   affinity: {}
+  # Pod-level configurations
   pod:
+    # Pod annotations
+    # See: https://kubespec.dev/v1/Pod#metadata.annotations
     annotations: {}
+    # Pod labels
+    # See: https://kubespec.dev/v1/Pod#metadata.labels
     labels: {}
+    # Topology spread constraints for pod distribution
+    # See: https://kubespec.dev/v1/Pod#spec.topologySpreadConstraints
     topologySpreadConstraints: []
+  # Deployment-level configurations
   deployment:
+    # Deployment annotations
+    # See: https://kubespec.dev/apps/v1/Deployment#metadata.annotations
     annotations: {}
+    # Deployment strategy (RollingUpdate, Recreate)
+    # See: https://kubespec.dev/apps/v1/Deployment#spec.strategy
     strategy: {}
+  # Number of old replicasets to retain
+  # See: https://kubespec.dev/apps/v1/Deployment#spec.revisionHistoryLimit
   revisionHistoryLimit: 10
 
+  # Additional Kubernetes resources
+  # Extra environment variables
+  # See: https://kubespec.dev/v1/Pod#spec.containers.env
   extraEnvs: []
+  # Additional containers in the pod
+  # See: https://kubespec.dev/v1/Pod#spec.containers
   extraContainers: []
+  # Additional volumes for the pod
+  # See: https://kubespec.dev/v1/Pod#spec.volumes
   extraVolumes: []
+  # Additional init containers
+  # See: https://kubespec.dev/v1/Pod#spec.initContainers
   extraInitContainers: []
+  # Additional volume mounts for containers
+  # See: https://kubespec.dev/v1/Pod#spec.containers.volumeMounts
   extraVolumeMounts: []
+  # Additional lifecycle hooks
+  # See: https://kubespec.dev/v1/Pod#spec.containers.lifecycle
   extraLifecycle: {}
 
-# CronJobs configuration
+# =============================================================================
+# CronJobs Configuration
+# =============================================================================
+# Scheduled tasks that run automatically to maintain LangWatch
+# These jobs handle data cleanup, clustering, and maintenance tasks
 cronjobs:
+  # Enable or disable all cron jobs
   enabled: true
+  
+  # Container image for the cron job pods
+  # See: https://kubespec.dev/batch/v1/CronJob#spec.jobTemplate.spec.template.spec.containers.image
   image:
     repository: curlimages/curl
     tag: latest
     pullPolicy: IfNotPresent
+  
+  # Resource requirements for cron job pods
+  # See: https://kubespec.dev/v1/Pod#spec.containers.resources
   resources:
     requests: { cpu: 100m,  memory: 64Mi }
     limits: { cpu: 100m, memory: 64Mi }
 
+  # Connection to the main LangWatch application
   upstreams:
     langwatch: { name: langwatch-app,  port: 5560 }
 
-  # Individual cronjob configurations
+  # Individual cron job configurations
   jobs:
+    # Topic clustering job - groups conversations by topic
+    # See: https://kubespec.dev/batch/v1/CronJob#spec.schedule
     topicClustering:
       enabled: true
       schedule: "0 0 * * *" # At midnight every day
       endpoint: "/api/cron/schedule_topic_clustering"
 
+    # Alert triggers job - checks and fires alerts
+    # See: https://kubespec.dev/batch/v1/CronJob#spec.schedule
     alertTriggers:
       enabled: true
       schedule: "*/3 * * * *" # Every 3 minutes
       endpoint: "/api/cron/triggers"
 
+    # Data retention cleanup job - removes old trace data
+    # See: https://kubespec.dev/batch/v1/CronJob#spec.schedule
     tracesRetentionCleanup:
       enabled: true
       schedule: "0 1 * * *" # At 1 AM every day
       endpoint: "/api/cron/traces_retention_period_cleanup"
 
-# Ingress configuration
+# =============================================================================
+# Ingress Configuration
+# =============================================================================
+# Kubernetes Ingress resource for external access to LangWatch
+# Configure this to expose the application outside the cluster
 ingress:
+  # Enable or disable the ingress
   enabled: false
+  
+  # Ingress class name (e.g., nginx, traefik)
+  # See: https://kubespec.dev/networking.k8s.io/v1/Ingress#spec.ingressClassName
   className: ""
+  
+  # Ingress annotations for specific behaviors
+  # See: https://kubespec.dev/networking.k8s.io/v1/Ingress#metadata.annotations
   annotations: {}
+  
+  # Host configurations for routing
+  # See: https://kubespec.dev/networking.k8s.io/v1/Ingress#spec.rules
   hosts:
     - host: chart-example.local
       http:
@@ -316,14 +581,29 @@ ingress:
                 name: "langwatch-app"
                 port:
                   number: 5560
+  
+  # TLS configuration for HTTPS
+  # See: https://kubespec.dev/networking.k8s.io/v1/Ingress#spec.tls
   tls: []
 
-# System Dependencies
-prometheus:
-  chartManaged: true # true for chart-managed, false for external
+# =============================================================================
+# System Dependencies Configuration
+# =============================================================================
+# External services and infrastructure components
+# These can be managed by the chart or connected to existing instances
 
+# =============================================================================
+# Prometheus Monitoring Configuration
+# =============================================================================
+# Prometheus metrics collection and monitoring
+prometheus:
+  # Whether to manage Prometheus via this chart or use external instance
+  chartManaged: true
+
+  # External Prometheus configuration (when chartManaged: false)
   external:
-    # Reference to existing secret containing Prometheus connection details
+    # Reference to existing secret containing connection details
+    # See: https://kubespec.dev/v1/Secret
     existingSecret: ""
     secretKeys:
       host: "host"
@@ -333,28 +613,39 @@ prometheus:
       # Optional: full connection string
       connectionString: "connection-string"
 
+  # Alertmanager configuration for alert routing
+  # See: https://kubespec.dev/v1/ConfigMap
   alertmanager:
     enabled: false
 
+  # Pushgateway for batch job metrics
+  # See: https://kubespec.dev/v1/Service
   pushgateway:
     enabled: false
 
   # Prometheus server configuration
   server:
+    # Number of Prometheus replicas
+    # See: https://kubespec.dev/apps/v1/Deployment#spec.replicas
     replicaCount: 1
+    
     # Global Prometheus configuration
     global:
       scrape_interval: 15s
       evaluation_interval: 15s
 
-    # Persistence configuration
+    # Persistent storage configuration
+    # See: https://kubespec.dev/v1/PersistentVolumeClaim
     persistence:
       enabled: true
       size: 6Gi
       storageClass: ""
 
-    # Retention and resources
+    # Data retention period
     retention: 60d
+    
+    # Resource requirements for Prometheus
+    # See: https://kubespec.dev/v1/Pod#spec.containers.resources
     resources:
       requests:
         cpu: 200m
@@ -363,59 +654,77 @@ prometheus:
         cpu: 500m
         memory: 2Gi
 
-    # RBAC configuration (enabled by default)
+    # Role-based access control configuration
+    # See: https://kubespec.dev/rbac.authorization.k8s.io/v1/ClusterRole
     rbac:
       create: true
       includeDefaultRules: true
 
-    # ServiceAccount configuration
+    # Service account configuration
+    # See: https://kubespec.dev/v1/ServiceAccount
     serviceAccount:
       create: true
 
+    # Service configuration
+    # See: https://kubespec.dev/v1/Service
     service:
       type: ClusterIP
       port: 9090
 
+    # Security context for the Prometheus container
+    # See: https://kubespec.dev/v1/Pod#spec.containers.securityContext
     securityContext:
       runAsNonRoot: true
       runAsUser: 65534
       fsGroup: 65534
 
-# PostgreSQL configuration
+# =============================================================================
+# PostgreSQL Database Configuration
+# =============================================================================
+# Primary database for LangWatch application data
 postgresql:
-  chartManaged: true # true for chart-managed, false for external
+  # Whether to manage PostgreSQL via this chart or use external instance
+  chartManaged: true
 
-  # External PostgreSQL (when chartManaged: false)
+  # External PostgreSQL configuration (when chartManaged: false)
   external:
     # Reference to existing secret containing connection details
+    # See: https://kubespec.dev/v1/Secret
     existingSecret: ""
     secretKeys:
       connectionString: "connection-string"
 
+  # Authentication and database configuration
   auth:
     username: postgres
     password: "" # You must set this, it will not be auto-generated
     database: mydb
-    existingSecret: ""
+    existingSecret: "" # See: https://kubespec.dev/v1/Secret
     secretKeys:
       usernameKey: "username"
       adminPasswordKey: "postgres-password"
       passwordKey: "password"
       databaseKey: "database"
 
+  # PostgreSQL container image
   image:
     tag: 16.6.0-debian-12-r2
 
+  # Data directory path
   postgresqlDataDir: /var/lib/postgresql/data/pgdata
 
+  # Volume permissions initialization
   volumePermissions:
     enabled: true
 
+  # Primary database configuration
   primary:
+    # Persistent storage configuration
+    # See: https://kubespec.dev/v1/PersistentVolumeClaim
     persistence:
       enabled: true
-      # if you are migrating from a `langwatch-helm` version before 1.0.0, you can set
-      # this property and value your values.yaml file, and you will not lose any data
+      # Migration note: if you are migrating from a `langwatch-helm` version before 1.0.0, you can set
+      # this property and value in your values.yaml file, and you will not lose any data
       # from the previous deployment
 
       # existingClaim: "data-langwatch-postgres-0"
@@ -423,11 +732,16 @@ postgresql:
       size: 20Gi
       storageClass: ""
 
+      # Health check probes
+      # See: https://kubespec.dev/v1/Pod#spec.containers.readinessProbe
       readinessProbe:
         enabled: true
+      # See: https://kubespec.dev/v1/Pod#spec.containers.livenessProbe
       livenessProbe:
         enabled: true
 
+  # Resource requirements for PostgreSQL
+  # See: https://kubespec.dev/v1/Pod#spec.containers.resources
   resources:
     requests:
       cpu: 250m
@@ -436,12 +750,21 @@ postgresql:
       cpu: 1000m
       memory: 1Gi
 
-# OpenSearch configuration
+# =============================================================================
+# OpenSearch Configuration
+# =============================================================================
+# Search and analytics engine for trace data and logs
 opensearch:
-  chartManaged: true # true for chart-managed, false for external
+  # Whether to manage OpenSearch via this chart or use external instance
+  chartManaged: true
 
+  # External search engine configuration (when chartManaged: false)
   external:
-    engine: opensearch # opensearch, elasticsearch, quickwit
+    # Search engine to use. Options: opensearch (default), elasticsearch, quickwit
+    # When set to 'opensearch', enables OpenSearch integration
+    # When set to 'elasticsearch', enables Elasticsearch integration
+    # When set to 'quickwit', enables Quickwit integration
+    engine: opensearch
     nodeUrl:
       value: ""
       secretKeyRef: { name: "", key: "" }
@@ -449,17 +772,20 @@ opensearch:
       value: ""
       secretKeyRef: { name: "", key: "" }
 
+  # Authentication configuration
   auth:
     adminPassword: "" # Will be auto-generated if not provided
     existingSecret: "" # Use existing secret for production
     secretKeys:
       adminPasswordKey: "admin-password"
 
+  # OpenSearch cluster configuration
   fullnameOverride: langwatch-opensearch
   masterService: langwatch-opensearch
   clusterName: langwatch-opensearch
   replicas: 1
 
+  # OpenSearch configuration file
   config:
     opensearch.yml: |
       cluster.name: langwatch-opensearch
@@ -468,16 +794,22 @@ opensearch:
       discovery.type: single-node
       plugins.security.disabled: true
 
+  # Additional environment variables
+  # See: https://kubespec.dev/v1/Pod#spec.containers.env
   extraEnvs:
   - name: cluster.initial_master_nodes
     value: ""   # force empty so the setting is gone
 
+  # Persistent storage configuration
+  # See: https://kubespec.dev/v1/PersistentVolumeClaim
   persistence:
     enabled: true
     size: 20Gi
     accessModes: [ReadWriteOnce]
-    # storageClass: <set if you don’t have a default>
+    # storageClass: <set if you don't have a default>
 
+  # Resource requirements for OpenSearch
+  # See: https://kubespec.dev/v1/Pod#spec.containers.resources
   resources:
     requests:
       cpu: 1000m
@@ -486,16 +818,25 @@ opensearch:
       cpu: 2
       memory: 4Gi
 
-# Redis configuration
+# =============================================================================
+# Redis Configuration
+# =============================================================================
+# In-memory data store for caching and session management
 redis:
-  chartManaged: true # true for chart-managed, false for external
+  # Whether to manage Redis via this chart or use external instance
+  chartManaged: true
 
+  # External Redis configuration (when chartManaged: false)
   external:
-    architecture: standalone # standalone or cluster
+    # Redis architecture to use. Options: standalone (default), cluster
+    # When set to 'standalone', enables single Redis instance
+    # When set to 'cluster', enables Redis cluster mode
+    architecture: standalone
     connectionString:
       value: ""
       secretKeyRef: { name: "", key: "" }
 
+  # Authentication configuration
   auth:
     enabled: true
     password: "" # Will be auto-generated if not provided
@@ -503,12 +844,23 @@ redis:
     secretKeys:
       passwordKey: "password"
 
+  # Redis architecture (single instance)
+  # Redis architecture to use. Options: standalone (default), cluster
+  # When set to 'standalone', enables single Redis instance
+  # When set to 'cluster', enables Redis cluster mode
   architecture: standalone
+
+  # Master node configuration
   master:
+    # Persistent storage configuration
+    # See: https://kubespec.dev/v1/PersistentVolumeClaim
     persistence:
       enabled: true
       size: 10Gi
       storageClass: ""
+    
+    # Resource requirements for Redis
+    # See: https://kubespec.dev/v1/Pod#spec.containers.resources
     resources:
       requests:
         cpu: 250m
