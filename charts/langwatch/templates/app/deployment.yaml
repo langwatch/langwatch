@@ -12,16 +12,16 @@ metadata:
     {{- end }}
   annotations:
     {{- if .Values.app.deployment.annotations }}
-    {{- toYaml .Values.deployment.annotations | nindent 4 }}
+    {{- toYaml .Values.app.deployment.annotations | nindent 4 }}
     {{- end }}
 spec:
   replicas: {{ .Values.app.replicaCount }}
-  {{- if .Values.deployment.strategy }}
+  {{- if .Values.app.deployment.strategy }}
   strategy: 
-    {{- toYaml .Values.deployment.strategy | nindent 8 }}
+    {{- toYaml .Values.app.deployment.strategy | nindent 8 }}
   {{- end }}
-  {{- if .Values.deployment.revisionHistoryLimit }}
-  revisionHistoryLimit: {{ .Values.deployment.revisionHistoryLimit }}
+  {{- if .Values.app.deployment.revisionHistoryLimit }}
+  revisionHistoryLimit: {{ .Values.app.deployment.revisionHistoryLimit }}
   {{- end }}
   selector:
     matchLabels:
@@ -524,10 +524,12 @@ spec:
             {{- toYaml . | nindent 12 }}
             {{- end }}
 
+          {{- if .Values.app.extraAppLifecycle}}
           lifecycle:
-            {{- with .Values.app.extraAppLifecycles}}
+            {{- with .Values.app.extraAppLifecycle}}
             {{- toYaml . | nindent 12 }}
             {{- end }}
+          {{- end }}
           resources:
             {{- toYaml .Values.app.resources | nindent 12 }}
           volumeMounts:

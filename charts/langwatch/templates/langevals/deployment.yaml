@@ -1,5 +1,4 @@
 # Deployment for the LangWatch Evaluations service
-{{- include "langwatch.validateSecrets" . }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -7,8 +6,23 @@ metadata:
   labels:
     app.kubernetes.io/name: {{ .Release.Name }}-langevals
     app.kubernetes.io/instance: {{ .Release.Name }}
+    {{- include "langwatch.labels" . | nindent 4 }}
+    {{- if .Values.langevals.labels }}
+    {{- toYaml .Values.langevals.labels | nindent 4 }}
+    {{- end }}
+  annotations:
+    {{- if .Values.langwatch_nlp.deployment.annotations }}
+    {{- toYaml .Values.langwatch_nlp.deployment.annotations | nindent 4 }}
+    {{- end }}
 spec:
   replicas: {{ .Values.langevals.replicaCount }}
+  {{- if .Values.langevals.deployment.strategy }}
+  strategy: 
+    {{- toYaml .Values.langwatch_nlp.deployment.strategy | nindent 8 }}
+  {{- end }}
+  {{- if .Values.langevals.deployment.revisionHistoryLimit }}
+  revisionHistoryLimit: {{ .Values.deployment.revisionHistoryLimit }}
+  {{- end }}
   selector:
     matchLabels:
       app.kubernetes.io/name: {{ .Release.Name }}-langevals
@@ -18,40 +32,82 @@ spec:
       labels:
         app.kubernetes.io/name: {{ .Release.Name }}-langevals
         app.kubernetes.io/instance: {{ .Release.Name }}
+        {{- if .Values.langevals.pod.labels }}
+        {{- toYaml .Values.langevals.labels | nindent 8 }}
+        {{- end }}
+      annotations:
+        {{- if .Values.langevals.podAnnotations }}
+        {{- toYaml .Values.langevals.podAnnotations | nindent 8 }}
+        {{- else if .Values.global.podAnnotations }}
+        {{- toYaml .Values.global.podAnnotations | nindent 8 }}
+        {{- end }}
     spec:
-      # Pod security context
+      # Pod security context - https://kubespec.dev/v1/Pod#spec.securityContext
+      {{- with (coalesce .Values.langevals.podSecurityContext .Values.global.podSecurityContext)}}
       securityContext:
-        {{- toYaml .Values.global.podSecurityContext | nindent 8 }}
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+
+      # Node selection - https://kubespec.dev/v1/Pod#spec.nodeSelector
+      {{- with (coalesce .Values.langevals.nodeSelector .Values.global.scheduling.nodeSelector)}}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+
+      # Tolerations - https://kubespec.dev/v1/Pod#spec.tolerations
+      {{- with (coalesce .Values.langevals.tolerations .Values.global.scheduling.tolerations)}}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+
+      # Affinity - https://kubespec.dev/v1/Pod#spec.affinity
+      {{- with (coalesce .Values.langevals.affinity .Values.global.scheduling.affinity)}}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+
+      initContainers:
+        {{- with .Values.langevals.extraInitContainers}}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+
       containers:
-        - name: {{ .Chart.Name }}-langevals
+        {{- with .Values.langevals.extraContainers}}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+        - name: {{ .Release.Name }}-langevals
           securityContext:
-            {{- toYaml .Values.global.containerSecurityContext | nindent 12 }}
+            {{- toYaml (coalesce .Values.langevals.containerSecurityContext .Values.global.containerSecurityContext) | nindent 12 }}
           image: "{{ .Values.images.langevals.repository }}:{{ .Values.images.langevals.tag }}"
           imagePullPolicy: {{ .Values.images.langevals.pullPolicy }}
           ports:
             - name: http
               containerPort: {{ .Values.langevals.service.port }}
               protocol: TCP
-          # Environment variables for the evaluations service
+
+          # Environment variables for the LangEvals service
           env:
-            # Secret-based environment variables
-            - name: API_TOKEN_JWT_SECRET
-              valueFrom:
-                secretKeyRef:
-                  name: {{ .Values.secrets.existingSecret | default (printf "%s-langevals-secrets" .Release.Name) }}
-                  key: {{ .Values.secrets.secretKeys.API_TOKEN_JWT_SECRET }}
-            # Non-secret environment variables
-            {{- range $key, $value := .Values.langevals.env }}
-            {{- if ne $key "API_TOKEN_JWT_SECRET" }}
-            - name: {{ $key }}
-              value: {{ $value | quote }}
+            {{- with .Values.langevals.extraEnvs}}
+            {{- toYaml . | nindent 12 }}
             {{- end }}
+
+          {{- if .Values.langevals.extraLangevalsLifecycle}}
+          lifecycle:
+            {{- with .Values.langevals.extraLangevalsLifecycle}}
+            {{- toYaml . | nindent 12 }}
             {{- end }}
+          {{- end }}
           resources:
             {{- toYaml .Values.langevals.resources | nindent 12 }}
           volumeMounts:
+            {{- with .Values.langevals.extraLangvalsVolumeMounts}}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
             - name: tmp-dir
               mountPath: /tmp
       volumes:
+      {{- with .Values.langevals.extraVolumes}}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
         - name: tmp-dir
           emptyDir: {}

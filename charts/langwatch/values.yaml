@@ -40,10 +40,22 @@ autogen:
   secretNames:
     # Secret name for the main LangWatch application
     app: "" # defaults to {{ .Release.Name }}-app-secrets
-    # Secret name for the LangEvals service
-    langevals: "" # defaults to {{ .Release.Name }}-langevals-secrets
-    # Secret name for the NLP service
-    langwatch_nlp: "" # defaults to {{ .Release.Name }}-langwatch-nlp-secrets
+
+# =============================================================================
+# Secrets Configuration
+# =============================================================================
+# Configuration for managing secrets across all LangWatch components
+# This section allows you to use existing secrets or define custom key mappings
+secrets:
+  # Reference to an existing secret that contains all required keys
+  # If not specified, autogen secrets will be used (when autogen.enabled: true)
+  existingSecret: ""
+  
+  # Custom key mappings for existing secrets
+  # These allow you to map LangWatch's expected keys to your existing secret keys
+  secretKeys:
+    # Key for credentials encryption (used by app)
+    credentialsEncryptionKey: "credentialsEncryptionKey"
 
 # =============================================================================
 # Container Image Configurations
@@ -347,9 +359,9 @@ app:
   # See: https://kubespec.dev/v1/Pod#spec.initContainers
   extraInitContainers: []
 
-  # Additional lifecycle hooks for the LangWatch app container
+  # Additional lifecycle hook for the LangWatch app container
   # See: https://kubespec.dev/v1/Pod#spec.containers.lifecycle
-  extraAppLifecycles: {}
+  extraAppLifecycle: {}
   # Additional volume mounts for the LangWatch app container
   # See: https://kubespec.dev/v1/Pod#spec.containers.volumeMounts
   extraAppVolumeMounts: []
@@ -372,23 +384,24 @@ langwatch_nlp:
   # See: https://kubespec.dev/v1/Pod#spec.containers.resources
   resources:
     requests: { cpu: 1000m,  memory: 2Gi }
-    limits:   { cpu: 2000m, memory: 4Gi }
+    limits:   { cpu: 2000m,  memory: 4Gi }
 
   # Connection to the main LangWatch application
   upstreams:
-    langwatch: { name: langwatch-app,  port: 5560 }
+    langwatch: { scheme: http, name: langwatch-app,  port: 5560 }
 
   # =============================================================================
   # Kubernetes Pass-Through Configuration
   # =============================================================================
-  # Same pass-through options as the main app
+  # These settings are passed directly to Kubernetes resources
+  # Modify these to customize pod behavior, scheduling, and security
 
   # Pod security context (user, group, fsGroup, etc.)
   # See: https://kubespec.dev/v1/Pod#spec.securityContext
   podSecurityContext: {}
   # Container security context (capabilities, readOnlyRootFilesystem, etc.)
   # See: https://kubespec.dev/v1/Pod#spec.containers.securityContext
-  securityContext: {}
+  containerSecurityContext: {}
   # Node selector for pod placement
   # See: https://kubespec.dev/v1/Pod#spec.nodeSelector
   nodeSelector: {}
@@ -398,6 +411,9 @@ langwatch_nlp:
   # Pod affinity and anti-affinity rules
   # See: https://kubespec.dev/v1/Pod#spec.affinity
   affinity: {}
+  # Topology spread constraints for pod distribution
+  # See: https://kubespec.dev/v1/Pod#spec.topologySpreadConstraints
+  topologySpreadConstraints: []
   # Pod-level configurations
   pod:
     # Pod annotations
@@ -406,21 +422,20 @@ langwatch_nlp:
     # Pod labels
     # See: https://kubespec.dev/v1/Pod#metadata.labels
     labels: {}
-    # Topology spread constraints for pod distribution
-    # See: https://kubespec.dev/v1/Pod#spec.topologySpreadConstraints
-    topologySpreadConstraints: []
   # Deployment-level configurations
   deployment:
     # Deployment annotations
     # See: https://kubespec.dev/apps/v1/Deployment#metadata.annotations
     annotations: {}
+    # Deployment labels
+    # See: https://kubespec.dev/v1/Pod#metadata.labels
+    labels: {}
     # Deployment strategy (RollingUpdate, Recreate)
     # See: https://kubespec.dev/apps/v1/Deployment#spec.strategy
     strategy: {}
   # Number of old replicasets to retain
   # See: https://kubespec.dev/apps/v1/Deployment#spec.revisionHistoryLimit
   revisionHistoryLimit: 10
-
   # Additional Kubernetes resources
   # Extra environment variables
   # See: https://kubespec.dev/v1/Pod#spec.containers.env
@@ -434,12 +449,13 @@ langwatch_nlp:
   # Additional init containers
   # See: https://kubespec.dev/v1/Pod#spec.initContainers
   extraInitContainers: []
-  # Additional volume mounts for containers
-  # See: https://kubespec.dev/v1/Pod#spec.containers.volumeMounts
-  extraVolumeMounts: []
-  # Additional lifecycle hooks
+
+  # Additional lifecycle hook for the LangWatch-NLP container
   # See: https://kubespec.dev/v1/Pod#spec.containers.lifecycle
-  extraLifecycle: {}
+  extraNlpLifecycle: {}
+  # Additional volume mounts for the LangWatch-NLP container
+  # See: https://kubespec.dev/v1/Pod#spec.containers.volumeMounts
+  extraNlpVolumeMounts: []
 
 # =============================================================================
 # LangEvals Service Configuration
@@ -465,14 +481,15 @@ langevals:
   # =============================================================================
   # Kubernetes Pass-Through Configuration
   # =============================================================================
-  # Same pass-through options as other services
+  # These settings are passed directly to Kubernetes resources
+  # Modify these to customize pod behavior, scheduling, and security
 
   # Pod security context (user, group, fsGroup, etc.)
   # See: https://kubespec.dev/v1/Pod#spec.securityContext
   podSecurityContext: {}
   # Container security context (capabilities, readOnlyRootFilesystem, etc.)
   # See: https://kubespec.dev/v1/Pod#spec.containers.securityContext
-  securityContext: {}
+  containerSecurityContext: {}
   # Node selector for pod placement
   # See: https://kubespec.dev/v1/Pod#spec.nodeSelector
   nodeSelector: {}
@@ -482,6 +499,9 @@ langevals:
   # Pod affinity and anti-affinity rules
   # See: https://kubespec.dev/v1/Pod#spec.affinity
   affinity: {}
+  # Topology spread constraints for pod distribution
+  # See: https://kubespec.dev/v1/Pod#spec.topologySpreadConstraints
+  topologySpreadConstraints: []
   # Pod-level configurations
   pod:
     # Pod annotations
@@ -490,21 +510,20 @@ langevals:
     # Pod labels
     # See: https://kubespec.dev/v1/Pod#metadata.labels
     labels: {}
-    # Topology spread constraints for pod distribution
-    # See: https://kubespec.dev/v1/Pod#spec.topologySpreadConstraints
-    topologySpreadConstraints: []
   # Deployment-level configurations
   deployment:
     # Deployment annotations
     # See: https://kubespec.dev/apps/v1/Deployment#metadata.annotations
     annotations: {}
+    # Deployment labels
+    # See: https://kubespec.dev/v1/Pod#metadata.labels
+    labels: {}
     # Deployment strategy (RollingUpdate, Recreate)
     # See: https://kubespec.dev/apps/v1/Deployment#spec.strategy
     strategy: {}
   # Number of old replicasets to retain
   # See: https://kubespec.dev/apps/v1/Deployment#spec.revisionHistoryLimit
   revisionHistoryLimit: 10
-
   # Additional Kubernetes resources
   # Extra environment variables
   # See: https://kubespec.dev/v1/Pod#spec.containers.env
@@ -518,12 +537,13 @@ langevals:
   # Additional init containers
   # See: https://kubespec.dev/v1/Pod#spec.initContainers
   extraInitContainers: []
-  # Additional volume mounts for containers
-  # See: https://kubespec.dev/v1/Pod#spec.containers.volumeMounts
-  extraVolumeMounts: []
-  # Additional lifecycle hooks
+
+  # Additional lifecycle hook for the Langevals container
   # See: https://kubespec.dev/v1/Pod#spec.containers.lifecycle
-  extraLifecycle: {}
+  extraLangevalsLifecycle: {}
+  # Additional volume mounts for the Langevals container
+  # See: https://kubespec.dev/v1/Pod#spec.containers.volumeMounts
+  extraLangevalsVolumeMounts: []
 
 # =============================================================================
 # CronJobs Configuration
@@ -574,6 +594,72 @@ cronjobs:
       schedule: "0 1 * * *" # At 1 AM every day
       endpoint: "/api/cron/traces_retention_period_cleanup"
 
+  # =============================================================================
+  # Kubernetes Pass-Through Configuration
+  # =============================================================================
+  # These settings are passed directly to Kubernetes resources
+  # Modify these to customize pod behavior, scheduling, and security
+
+  # Pod security context (user, group, fsGroup, etc.)
+  # See: https://kubespec.dev/v1/Pod#spec.securityContext
+  podSecurityContext: {}
+  # Container security context (capabilities, readOnlyRootFilesystem, etc.)
+  # See: https://kubespec.dev/v1/Pod#spec.containers.securityContext
+  containerSecurityContext: {}
+  # Node selector for pod placement
+  # See: https://kubespec.dev/v1/Pod#spec.nodeSelector
+  nodeSelector: {}
+  # Tolerations for tainted nodes
+  # See: https://kubespec.dev/v1/Pod#spec.tolerations
+  tolerations: []
+  # Pod affinity and anti-affinity rules
+  # See: https://kubespec.dev/v1/Pod#spec.affinity
+  affinity: {}
+  # Topology spread constraints for pod distribution
+  # See: https://kubespec.dev/v1/Pod#spec.topologySpreadConstraints
+  topologySpreadConstraints: []
+  # CronJob-level configurations
+  cronjob:
+    # CronJob annotations
+    # See: https://kubespec.dev/batch/v1/CronJob#metadata.annotations
+    annotations: {}
+    # CronJob labels
+    # See: https://kubespec.dev/batch/v1/CronJob#metadata.labels
+    labels: {}
+  # Deployment-level configurations
+  job:
+    # Job annotations
+    # See: https://kubespec.dev/batch/v1/Job#metadata.annotations
+    annotations: {}
+    # Job labels
+    # See: https://kubespec.dev/batch/v1/Job#metadata.labels
+    labels: {}
+  # Pod-level configurations
+  pod:
+    # Pod annotations
+    # See: https://kubespec.dev/v1/Pod#metadata.annotations
+    annotations: {}
+    # Pod labels
+    # See: https://kubespec.dev/v1/Pod#metadata.labels
+    labels: {}
+  # Additional Kubernetes resources
+  # Extra environment variables
+  # See: https://kubespec.dev/v1/Pod#spec.containers.env
+  extraEnvs: []
+  # Additional containers in the pod
+  # See: https://kubespec.dev/v1/Pod#spec.containers
+  extraContainers: []
+  # Additional volumes for the pod
+  # See: https://kubespec.dev/v1/Pod#spec.volumes
+  extraVolumes: []
+  # Additional init containers
+  # See: https://kubespec.dev/v1/Pod#spec.initContainers
+  extraInitContainers: []
+
+  # Additional lifecycle hook for the CronJobs container
+  # See: https://kubespec.dev/v1/Pod#spec.containers.lifecycle
+  extraCronjobsLifecycle: {}
+
 # =============================================================================
 # Ingress Configuration
 # =============================================================================
@@ -619,6 +705,7 @@ ingress:
 # Prometheus Monitoring Configuration
 # =============================================================================
 # Prometheus metrics collection and monitoring
+# If `app.telemetry.metrics.enabled: false`, Prometheus will be disabled
 prometheus:
   # Whether to manage Prometheus via this chart or use external instance
   chartManaged: true
