@@ -104,7 +104,7 @@ def ensure_setup(api_key: Optional[str] = None) -> None:
     Validates that we have a working tracer provider to prevent silent failures.
     """
 
-    # We want to skip auto-setup if not langwatch api key is available to avoid throwing errors
+    # We want to skip auto-setup if langwatch api key is not available to avoid throwing errors
     if not os.getenv("LANGWATCH_API_KEY", api_key):
         return
 
