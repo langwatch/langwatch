@@ -110,13 +110,13 @@ spec:
               value: {{ .Values.app.http.publicUrl | default "http://localhost:5560" }}
 
             - name: SKIP_ENV_VALIDATION
-              value: {{ .Values.app.features.skipEnvValidation | default "false" }}
+              value: {{ .Values.app.features.skipEnvValidation | default false | quote }}
             - name: DISABLE_PII_REDACTION
-              value: {{ .Values.app.features.disablePiiRedaction | default "false" }}
+              value: {{ .Values.app.features.disablePiiRedaction | default false | quote }}
 
             # (TODO)
             # - name: TOPIC_CLUSTERING_SERVICE
-            #   value: {{ .Values.app.features.topicClustering | default "false" }}
+            #   value: {{ .Values.app.features.topicClustering | default false | quote }}
 
             - name: LANGWATCH_NLP_SERVICE
               value: {{ .Values.app.upstreams.nlp.scheme | default "http" }}://{{ .Values.app.upstreams.nlp.name | default "langwatch-nlp" }}:{{ .Values.app.upstreams.nlp.port | default 5561 }}
@@ -145,9 +145,9 @@ spec:
               value: "(TODO)"
             {{- else }}
             {{- if eq .Values.redis.external.architecture "standalone" }}
-            - name: REDIS_CLUSTER_ENDPOINTS
-            {{- else}}
             - name: REDIS_URL
+            {{- else}}
+            - name: REDIS_CLUSTER_ENDPOINTS
             {{- end }}
             {{- if .Values.redis.external.connectionString.value }}
               value: {{ .Values.redis.external.connectionString.value | quote }}
@@ -558,7 +558,7 @@ spec:
 
             # Telemetry - Usage analytics collection
             - name: DISABLE_USAGE_STATS
-              value: {{ not (.Values.app.telemetry.usage.enabled | default true) | quote }}
+              value: {{ (not (.Values.app.telemetry.usage.enabled | default true)) | quote }}
             # Telemetry - Prometheus metrics collection
             {{- if .Values.app.telemetry.metrics.enabled }}
             {{- if .Values.app.telemetry.metrics.apiKey.secretKeyRef.name }}
