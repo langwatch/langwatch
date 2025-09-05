@@ -1,4 +1,4 @@
-import { VStack, Text, Button } from "@chakra-ui/react";
+import { VStack, Text, Button, HStack } from "@chakra-ui/react";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import type { ScenarioMessageSnapshotEvent } from "~/app/api/scenario-events/[[...route]]/types";
 import { CopilotKit, useCopilotChat } from "@copilotkit/react-core";
@@ -27,8 +27,10 @@ const logger = createLogger("CustomCopilotKitChat.tsx");
  */
 export function CustomCopilotKitChat({
   messages,
+  smallerView,
 }: {
   messages: ScenarioMessageSnapshotEvent["messages"];
+  smallerView?: boolean;
 }) {
   const { project } = useOrganizationTeamProject();
   return (
@@ -38,15 +40,20 @@ export function CustomCopilotKitChat({
         "X-Auth-Token": project?.apiKey ?? "",
       }}
     >
-      <CustomCopilotKitChatInner messages={messages} />
+      <CustomCopilotKitChatInner
+        messages={messages}
+        smallerView={smallerView}
+      />
     </CopilotKit>
   );
 }
 
 function CustomCopilotKitChatInner({
   messages,
+  smallerView,
 }: {
   messages: ScenarioMessageSnapshotEvent["messages"];
+  smallerView?: boolean;
 }) {
   const { project } = useOrganizationTeamProject();
   const { setMessages } = useCopilotChat({
@@ -98,30 +105,34 @@ function CustomCopilotKitChatInner({
             {UserMessage && message_.role === Role.User && (
               <UserMessage message={message_.content} rawData={message} />
             )}
-            {message_.traceId && message_.role === Role.Assistant && (
-              <Button
-                onClick={() => {
-                  if (drawerOpen("traceDetails")) {
-                    openDrawer(
-                      "traceDetails",
-                      {
-                        traceId: message_.traceId ?? "",
-                        selectedTab: "traceDetails",
-                      },
-                      { replace: true }
-                    );
-                  } else {
-                    openDrawer("traceDetails", {
-                      traceId: message_.traceId ?? "",
-                      selectedTab: "traceDetails",
-                    });
-                  }
-                }}
-              >
-                <LuListTree />
-                View Trace
-              </Button>
-            )}
+            {!smallerView &&
+              message_.traceId &&
+              message_.role === Role.Assistant && (
+                <HStack marginTop={-6} paddingBottom={4}>
+                  <Button
+                    onClick={() => {
+                      if (drawerOpen("traceDetails")) {
+                        openDrawer(
+                          "traceDetails",
+                          {
+                            traceId: message_.traceId ?? "",
+                            selectedTab: "traceDetails",
+                          },
+                          { replace: true }
+                        );
+                      } else {
+                        openDrawer("traceDetails", {
+                          traceId: message_.traceId ?? "",
+                          selectedTab: "traceDetails",
+                        });
+                      }
+                    }}
+                  >
+                    <LuListTree />
+                    View Trace
+                  </Button>
+                </HStack>
+              )}
           </VStack>
         );
       }}
