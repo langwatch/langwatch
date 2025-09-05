@@ -30,7 +30,7 @@ export function SimulationChatViewer({
       }
       status={data?.status}
     >
-      <CustomCopilotKitChat messages={data?.messages ?? []} />
+      <CustomCopilotKitChat messages={data?.messages ?? []} smallerView />
     </SimulationCard>
   );
 }
