@@ -1,6 +1,7 @@
 """Utility module for handling LangWatch initialization."""
 
 import logging
+import os
 import sys
 from typing import List, Optional, Sequence
 from opentelemetry.sdk.trace import TracerProvider
@@ -102,13 +103,18 @@ def ensure_setup(api_key: Optional[str] = None) -> None:
     If no client is setup, this will create a default client using environment variables.
     Validates that we have a working tracer provider to prevent silent failures.
     """
+
+    # We want to skip auto-setup if not langwatch api key is available to avoid throwing errors
+    if not os.getenv("LANGWATCH_API_KEY", api_key):
+        return
+
     client = get_instance()
     if client is None:
         logger.debug("No LangWatch client found, creating default client")
         client = setup(
-            debug=True,
+            debug=True,  # Enable debug logging for auto-created clients
             api_key=api_key,
-        )  # Enable debug logging for auto-created clients
+        )
 
     # Verify we have a valid tracer provider
     tracer_provider = trace.get_tracer_provider()
