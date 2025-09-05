@@ -102,7 +102,7 @@ spec:
               protocol: TCP
           env:
             - name: NODE_ENV
-              value: {{ .Values.app.nodeEnv | .Values.global.env | default "production" }}
+              value: {{ .Values.app.nodeEnv | default .Values.global.env | default "production" }}
 
             - name: BASE_HOST
               value: {{ .Values.app.http.baseHost | default "http://localhost:5560" }}
