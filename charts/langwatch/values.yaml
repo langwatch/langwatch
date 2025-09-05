@@ -2,12 +2,31 @@
 # LangWatch Helm Chart Configuration
 # =============================================================================
 # This file contains all configuration options for deploying LangWatch on Kubernetes.
-# Each section is documented with helpful explanations and examples.
+# Each section is documented with helpful explanations, and links to the Kubernetes
+# specification for the resource. Where appropriate, links to the LangWatch documentation
+# are also provided.
 # =============================================================================
 
 # Global configuration options that apply across all components
 # Use this section for settings that should be inherited by multiple services
+# If you specify a value here, it will be overridden if a value is set in the
+# service-specific section
 global:
+  env: production
+  podSecurityContext:
+    runAsNonRoot: true
+    runAsUser: 1000
+    fsGroup: 1000
+  containerSecurityContext:
+    allowPrivilegeEscalation: false
+    capabilities:
+      drop:
+        - ALL
+    readOnlyRootFilesystem: true
+  scheduling:
+    nodeSelector: {}
+    affinity: {}
+    tolerations: []
 
 # =============================================================================
 # Auto-Generation Mode (Development Only)
@@ -64,8 +83,8 @@ app:
     requests: { cpu: 250m,  memory: 2Gi }
     limits:   { cpu: 1000m, memory: 4Gi }
 
-  # Node.js environment setting
-  nodeEnv: "production"
+  # Node.js environment setting, if omitted the `global.env` will be used
+  nodeEnv: ""
 
   # Encryption key for securing sensitive credentials
   # This key is used to encrypt/decrypt stored API keys and secrets
@@ -98,8 +117,8 @@ app:
   # Upstream service connections
   # Define how the main app connects to other LangWatch services
   upstreams:
-    nlp:       { name: langwatch-nlp,  port: 5561 }
-    langevals: { name: langevals,      port: 5562 }
+    nlp:       { scheme: http, name: langwatch-nlp,  port: 5561 }
+    langevals: { schema: http, name: langevals,      port: 5562 }
 
   # AI model evaluator configurations
   # These enable integration with various AI providers for evaluation tasks
@@ -124,10 +143,8 @@ app:
   # Controls how LangWatch stores and manages training datasets
   datasetObjectStorage:
     enabled: true
-    # Storage provider to use. Options: awsS3 (default), azure, gcs
+    # Storage provider to use. Options: awsS3 (default)
     # When set to 'awsS3', enables AWS S3 native integration
-    # When set to 'azure', enables Azure Blob Storage native integration  
-    # When set to 'gcs', enables Google Cloud Storage native integration
     provider: awsS3
     bucket: "langwatch-dataset" # Bucket name for dataset storage
 
@@ -135,6 +152,9 @@ app:
     providers:
       # AWS S3 configuration for dataset storage
       awsS3:
+        endpoint:
+          value: ""
+          secretKeyRef: { name: "", key: "" }
         accessKeyId:
           value: ""
           secretKeyRef: { name: "", key: "" }
@@ -278,7 +298,7 @@ app:
   podSecurityContext: {}
   # Container security context (capabilities, readOnlyRootFilesystem, etc.)
   # See: https://kubespec.dev/v1/Pod#spec.containers.securityContext
-  securityContext: {}
+  containerSecurityContext: {}
   # Node selector for pod placement
   # See: https://kubespec.dev/v1/Pod#spec.nodeSelector
   nodeSelector: {}
@@ -288,6 +308,9 @@ app:
   # Pod affinity and anti-affinity rules
   # See: https://kubespec.dev/v1/Pod#spec.affinity
   affinity: {}
+  # Topology spread constraints for pod distribution
+  # See: https://kubespec.dev/v1/Pod#spec.topologySpreadConstraints
+  topologySpreadConstraints: []
   # Pod-level configurations
   pod:
     # Pod annotations
@@ -296,21 +319,20 @@ app:
     # Pod labels
     # See: https://kubespec.dev/v1/Pod#metadata.labels
     labels: {}
-    # Topology spread constraints for pod distribution
-    # See: https://kubespec.dev/v1/Pod#spec.topologySpreadConstraints
-    topologySpreadConstraints: []
   # Deployment-level configurations
   deployment:
     # Deployment annotations
     # See: https://kubespec.dev/apps/v1/Deployment#metadata.annotations
     annotations: {}
+    # Deployment labels
+    # See: https://kubespec.dev/v1/Pod#metadata.labels
+    labels: {}
     # Deployment strategy (RollingUpdate, Recreate)
     # See: https://kubespec.dev/apps/v1/Deployment#spec.strategy
     strategy: {}
   # Number of old replicasets to retain
   # See: https://kubespec.dev/apps/v1/Deployment#spec.revisionHistoryLimit
   revisionHistoryLimit: 10
-
   # Additional Kubernetes resources
   # Extra environment variables
   # See: https://kubespec.dev/v1/Pod#spec.containers.env
@@ -324,12 +346,13 @@ app:
   # Additional init containers
   # See: https://kubespec.dev/v1/Pod#spec.initContainers
   extraInitContainers: []
-  # Additional volume mounts for containers
-  # See: https://kubespec.dev/v1/Pod#spec.containers.volumeMounts
-  extraVolumeMounts: []
-  # Additional lifecycle hooks
+
+  # Additional lifecycle hooks for the LangWatch app container
   # See: https://kubespec.dev/v1/Pod#spec.containers.lifecycle
-  extraLifecycle: {}
+  extraAppLifecycles: {}
+  # Additional volume mounts for the LangWatch app container
+  # See: https://kubespec.dev/v1/Pod#spec.containers.volumeMounts
+  extraAppVolumeMounts: []
 
 # =============================================================================
 # LangWatch NLP Service Configuration
