@@ -154,7 +154,7 @@ app:
   # Dataset storage configuration
   # Controls how LangWatch stores and manages training datasets
   datasetObjectStorage:
-    enabled: true
+    enabled: false
     # Storage provider to use. Options: awsS3 (default)
     # When set to 'awsS3', enables AWS S3 native integration
     provider: awsS3
