@@ -74,7 +74,7 @@ const handleCreateMultipleOptions = (
 
 export default function ModelsPage() {
   const { project, organizations } = useOrganizationTeamProject();
-  const modelProviders = api.modelProvider.getAllForProject.useQuery(
+  const modelProviders = api.modelProvider.getAllForProjectForFrontend.useQuery(
     { projectId: project?.id ?? "" },
     { enabled: !!project }
   );
@@ -466,6 +466,7 @@ function ModelProviderForm({
                           <GridItem>
                             <Input
                               {...register(`customKeys.${key}`)}
+                              type={key.endsWith("KEY") ? "password" : "text"}
                               autoComplete="off"
                               placeholder={
                                 (providerKeys as any)[key]._def.typeName ===
