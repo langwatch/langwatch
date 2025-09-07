@@ -27,21 +27,20 @@ class LangWatchEvaluator(Evaluator):
         self.name = name
         self.settings = settings
 
+    # Hack for types autoparsing
+    def _forward_signature(
+        self,
+        *,
+        input: str,
+        output: str,
+        expected_output: str,
+        contexts: list[str],
+        expected_contexts: list[str],
+    ):
+        pass
+
     def forward(self, **kwargs) -> EvaluationResultWithMetadata:
         super().forward()
-
-        if "contexts" in kwargs and type(kwargs["contexts"]) != list:
-            kwargs["contexts"] = [kwargs["contexts"]]
-        if "expected_contexts" in kwargs and type(kwargs["expected_contexts"]) != list:
-            kwargs["expected_contexts"] = [kwargs["expected_contexts"]]
-        if "input" in kwargs and type(kwargs["input"]) != str:
-            kwargs["input"] = json.dumps(
-                kwargs["input"], cls=SerializableWithPydanticAndPredictEncoder
-            )
-        if "output" in kwargs and type(kwargs["output"]) != str:
-            kwargs["output"] = json.dumps(
-                kwargs["output"], cls=SerializableWithPydanticAndPredictEncoder
-            )
 
         start_time = time.time()
         result = _cached_langwatch_evaluate(
