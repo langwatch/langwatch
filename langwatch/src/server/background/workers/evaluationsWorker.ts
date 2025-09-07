@@ -241,7 +241,7 @@ export const runEvaluation = async ({
     const modelList = embeddings
       ? modelProvider.embeddingsModels
       : modelProvider.models;
-    if (modelList && !modelList.includes(model_)) {
+    if (modelList && modelList.length > 0 && !modelList.includes(model_)) {
       throw `Model ${model_} is not in the ${
         embeddings ? "embedding models" : "models"
       } list for ${provider}, please select another model for running this evaluation`;
