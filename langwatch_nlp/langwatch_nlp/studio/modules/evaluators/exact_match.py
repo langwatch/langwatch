@@ -19,9 +19,9 @@ class ExactMatchEvaluator(Evaluator):
         try:
             result = dspy.evaluate.answer_exact_match(
                 dspy.Example(
-                    answer=str(expected_output) if expected_output is not None else ""
+                    answer=str(expected_output.strip()) if expected_output is not None else ""
                 ),
-                dspy.Prediction(answer=str(output) if output is not None else ""),
+                dspy.Prediction(answer=str(output.strip()) if output is not None else ""),
             )
 
             return EvaluationResultWithMetadata(
