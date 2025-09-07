@@ -30,7 +30,7 @@ async def main(message: cl.Message):
     )
 
     completion = client.chat.completions.create(
-        model="gpt-4o-mini",
+        model="gpt-5",
         messages=[
             {
                 "role": "system",
@@ -71,7 +71,7 @@ async def main(message: cl.Message):
     weather = get_weather(weather_call["city"])
 
     completion = client.chat.completions.create(
-        model="gpt-4o-mini",
+        model="gpt-5",
         messages=[
             {
                 "role": "system",

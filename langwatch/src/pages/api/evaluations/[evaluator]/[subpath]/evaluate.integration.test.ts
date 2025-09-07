@@ -104,7 +104,7 @@ describe("Guardrail API Endpoint", () => {
             contexts: [],
           },
           settings: {
-            model: "openai/gpt-4o-mini",
+            model: "openai/gpt-5",
           },
         },
         query: {

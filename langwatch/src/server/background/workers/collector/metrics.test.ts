@@ -9,7 +9,7 @@ import {
 // Mock the LLM model costs
 vi.mock("../../../modelProviders/llmModelCost", () => ({
   getLLMModelCosts: vi.fn().mockResolvedValue({
-    "gpt-4o-mini": {
+    "gpt-5": {
       input_cost_per_1k_tokens: 0.00015,
       output_cost_per_1k_tokens: 0.0006,
     },
@@ -267,7 +267,7 @@ describe("Trace metrics", () => {
           trace_id: "trace_1",
           span_id: "span_1",
           type: "llm",
-          model: "gpt-4o-mini",
+          model: "gpt-5",
           input: {
             type: "text",
             value: "Hello, world!",
@@ -305,7 +305,7 @@ describe("Trace metrics", () => {
           trace_id: "trace_1",
           span_id: "span_1",
           type: "llm",
-          model: "gpt-4o-mini",
+          model: "gpt-5",
           input: {
             type: "text",
             value: "Hello, world!",

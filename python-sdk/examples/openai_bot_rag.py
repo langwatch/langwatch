@@ -55,7 +55,7 @@ async def main(message: cl.Message):
     contexts = rag_retrieval(message.content)
 
     completion = client.chat.completions.create(
-        model="gpt-4o-mini",
+        model="gpt-5",
         messages=[
             {
                 "role": "system",

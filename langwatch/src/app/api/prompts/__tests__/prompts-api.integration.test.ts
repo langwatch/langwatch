@@ -291,7 +291,7 @@ describe("Prompts API", () => {
             expect(body.length).toBe(1);
             expect(body[0].id).toBe(config.id);
             expect(body[0].projectId).toBe(testProjectId);
-            expect(body[0].model).toBe("openai/gpt-4o-mini");
+            expect(body[0].model).toBe("openai/gpt-5");
           });
         });
 

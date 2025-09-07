@@ -31,7 +31,7 @@ const springAICompleteChatRequest: DeepPartial<IExportLogsServiceRequest> = {
               timeUnixNano: "1748353030869334708",
               body: {
                 stringValue: `Chat Model Prompt Content:
-{"messages":[{"role":"user","content":"Hello, how are you?"}],"model":"gpt-4o-mini","temperature":0.7}`,
+{"messages":[{"role":"user","content":"Hello, how are you?"}],"model":"gpt-5","temperature":0.7}`,
               },
             },
           ],
@@ -47,7 +47,7 @@ const springAICompleteChatRequest: DeepPartial<IExportLogsServiceRequest> = {
               timeUnixNano: "1748353033397302125",
               body: {
                 stringValue: `Chat Model Completion:
-{"choices":[{"message":{"role":"assistant","content":"Hello! I'm doing well, thank you for asking. How can I assist you today?"},"finish_reason":"stop"}],"model":"gpt-4o-mini-2024-07-18","usage":{"prompt_tokens":11,"completion_tokens":17,"total_tokens":28}}`,
+{"choices":[{"message":{"role":"assistant","content":"Hello! I'm doing well, thank you for asking. How can I assist you today?"},"finish_reason":"stop"}],"model":"gpt-5","usage":{"prompt_tokens":11,"completion_tokens":17,"total_tokens":28}}`,
               },
             },
           ],
@@ -152,7 +152,7 @@ const multipleSpansRequest: DeepPartial<IExportLogsServiceRequest> = {
               timeUnixNano: "1748353030000000000",
               body: {
                 stringValue: `Chat Model Prompt Content:
-{"messages":[{"role":"user","content":"First question"}],"model":"gpt-4o-mini"}`,
+{"messages":[{"role":"user","content":"First question"}],"model":"gpt-5"}`,
               },
             },
             {
@@ -161,7 +161,7 @@ const multipleSpansRequest: DeepPartial<IExportLogsServiceRequest> = {
               timeUnixNano: "1748353031000000000",
               body: {
                 stringValue: `Chat Model Prompt Content:
-{"messages":[{"role":"user","content":"Second question"}],"model":"gpt-4o-mini"}`,
+{"messages":[{"role":"user","content":"Second question"}],"model":"gpt-5"}`,
               },
             },
           ],
@@ -177,7 +177,7 @@ const multipleSpansRequest: DeepPartial<IExportLogsServiceRequest> = {
               timeUnixNano: "1748353032000000000",
               body: {
                 stringValue: `Chat Model Completion:
-{"choices":[{"message":{"role":"assistant","content":"First answer"},"finish_reason":"stop"}],"model":"gpt-4o-mini-2024-07-18"}`,
+{"choices":[{"message":{"role":"assistant","content":"First answer"},"finish_reason":"stop"}],"model":"gpt-5"}`,
               },
             },
             {
@@ -186,7 +186,7 @@ const multipleSpansRequest: DeepPartial<IExportLogsServiceRequest> = {
               timeUnixNano: "1748353033000000000",
               body: {
                 stringValue: `Chat Model Completion:
-{"choices":[{"message":{"role":"assistant","content":"Second answer"},"finish_reason":"stop"}],"model":"gpt-4o-mini-2024-07-18"}`,
+{"choices":[{"message":{"role":"assistant","content":"Second answer"},"finish_reason":"stop"}],"model":"gpt-5"}`,
               },
             },
           ],
@@ -293,7 +293,7 @@ describe("opentelemetry logs receiver", () => {
             type: "json",
             value: {
               messages: [{ role: "user", content: "Hello, how are you?" }],
-              model: "gpt-4o-mini",
+              model: "gpt-5",
               temperature: 0.7,
             },
           },
@@ -310,7 +310,7 @@ describe("opentelemetry logs receiver", () => {
                   finish_reason: "stop",
                 },
               ],
-              model: "gpt-4o-mini-2024-07-18",
+              model: "gpt-5",
               usage: {
                 prompt_tokens: 11,
                 completion_tokens: 17,
@@ -467,7 +467,7 @@ describe("opentelemetry logs receiver", () => {
     expect(span1).toBeDefined();
     expect(span1?.input?.value).toEqual({
       messages: [{ role: "user", content: "First question" }],
-      model: "gpt-4o-mini",
+      model: "gpt-5",
     });
     expect(span1?.output?.value).toEqual({
       choices: [
@@ -476,7 +476,7 @@ describe("opentelemetry logs receiver", () => {
           finish_reason: "stop",
         },
       ],
-      model: "gpt-4o-mini-2024-07-18",
+      model: "gpt-5",
     });
 
     // Check second span
@@ -486,7 +486,7 @@ describe("opentelemetry logs receiver", () => {
     expect(span2).toBeDefined();
     expect(span2?.input?.value).toEqual({
       messages: [{ role: "user", content: "Second question" }],
-      model: "gpt-4o-mini",
+      model: "gpt-5",
     });
     expect(span2?.output?.value).toEqual({
       choices: [
@@ -495,7 +495,7 @@ describe("opentelemetry logs receiver", () => {
           finish_reason: "stop",
         },
       ],
-      model: "gpt-4o-mini-2024-07-18",
+      model: "gpt-5",
     });
   });
 

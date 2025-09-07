@@ -62,7 +62,7 @@ describe("LangChain Integration Tests", () => {
       { root: true },
       async () => {
         const llm = new ChatOpenAI({
-          model: "gpt-4o-mini",
+          model: "gpt-5",
           temperature: 0,
         });
 
@@ -87,7 +87,7 @@ describe("LangChain Integration Tests", () => {
     );
     expect(llmSpan).toBeDefined();
     expect(llmSpan?.attributes["langwatch.span.type"]).toBe("llm");
-    expect(llmSpan?.attributes["gen_ai.request.model"]).toBe("gpt-4o-mini");
+    expect(llmSpan?.attributes["gen_ai.request.model"]).toBe("gpt-5");
 
     // New naming: should not be prefixed with "LLM:" anymore
     expect(llmSpan?.name.startsWith("LLM:")).toBe(false);
@@ -124,7 +124,7 @@ describe("LangChain Integration Tests", () => {
       { root: true },
       async () => {
         const llm = new ChatOpenAI({
-          model: "gpt-4o-mini",
+          model: "gpt-5",
           temperature: 0,
         });
 
@@ -177,7 +177,7 @@ describe("LangChain Integration Tests", () => {
       { root: true },
       async () => {
         const llm = new ChatOpenAI({
-          model: "gpt-4o-mini",
+          model: "gpt-5",
           temperature: 0,
         });
 
@@ -256,7 +256,7 @@ describe("LangChain Integration Tests", () => {
         { root: true },
         async () => {
           const llm = new ChatOpenAI({
-            model: "gpt-4o-mini",
+            model: "gpt-5",
             temperature: 0.7,
           });
 
@@ -277,9 +277,9 @@ describe("LangChain Integration Tests", () => {
       );
       expect(llmSpan).toBeDefined();
 
-      // Verify naming follows the new pattern: "openai gpt-4o-mini (temp 0.7)"
-      expect(llmSpan?.name).toMatch(/openai gpt-4o-mini \(temp 0\.7\)/);
-      expect(llmSpan?.attributes["gen_ai.request.model"]).toBe("gpt-4o-mini");
+      // Verify naming follows the new pattern: "openai gpt-5 (temp 0.7)"
+      expect(llmSpan?.name).toMatch(/openai gpt-5 \(temp 0\.7\)/);
+      expect(llmSpan?.attributes["gen_ai.request.model"]).toBe("gpt-5");
       expect(llmSpan?.attributes["gen_ai.request.temperature"]).toBe(0.7);
     });
 
@@ -301,7 +301,7 @@ describe("LangChain Integration Tests", () => {
         { root: true },
         async () => {
           const llm = new ChatOpenAI({
-            model: "gpt-4o-mini",
+            model: "gpt-5",
             temperature: 0,
           });
 
@@ -362,7 +362,7 @@ describe("LangChain Integration Tests", () => {
         { root: true },
         async () => {
           const llm = new ChatOpenAI({
-            model: "gpt-4o-mini",
+            model: "gpt-5",
             temperature: 0,
           });
 
@@ -417,7 +417,7 @@ describe("LangChain Integration Tests", () => {
         { root: true },
         async () => {
           const llm = new ChatOpenAI({
-            model: "gpt-4o-mini",
+            model: "gpt-5",
             temperature: 0,
           });
 
@@ -460,7 +460,7 @@ describe("LangChain Integration Tests", () => {
         { root: true },
         async () => {
           const llm = new ChatOpenAI({
-            model: "gpt-4o-mini",
+            model: "gpt-5",
             temperature: 0,
           });
 
@@ -497,7 +497,7 @@ describe("LangChain Integration Tests", () => {
         { root: true },
         async () => {
           const llm = new ChatOpenAI({
-            model: "gpt-4o-mini",
+            model: "gpt-5",
             temperature: 0,
           });
 
@@ -531,7 +531,7 @@ describe("LangChain Integration Tests", () => {
         { root: true },
         async () => {
           const llm = new ChatOpenAI({
-            model: "gpt-4o-mini",
+            model: "gpt-5",
             temperature: 0.5,
           });
 
@@ -554,7 +554,7 @@ describe("LangChain Integration Tests", () => {
 
       // Verify GenAI attributes are present
       expect(llmSpan?.attributes["gen_ai.system"]).toBe("openai");
-      expect(llmSpan?.attributes["gen_ai.request.model"]).toBe("gpt-4o-mini");
+      expect(llmSpan?.attributes["gen_ai.request.model"]).toBe("gpt-5");
       expect(llmSpan?.attributes["gen_ai.request.temperature"]).toBe(0.5);
 
       // Verify no deprecated llm.* attributes
@@ -571,7 +571,7 @@ describe("LangChain Integration Tests", () => {
         { root: true },
         async () => {
           const llm = new ChatOpenAI({
-            model: "gpt-4o-mini",
+            model: "gpt-5",
             temperature: 0,
           });
 

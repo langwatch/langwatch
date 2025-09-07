@@ -34,7 +34,7 @@ describe("Content Parsing E2E", () => {
         { role: "system", content: "You are a helpful assistant." },
         { role: "user", content: "Hello, how are you?" }
       ],
-      model: "gpt-4o-mini"
+      model: "gpt-5"
     };
 
     const chatOutput = {
@@ -100,7 +100,7 @@ describe("Content Parsing E2E", () => {
 
     const ragInput = {
       query: "What are the benefits of renewable energy?",
-      model: "gpt-4o-mini"
+      model: "gpt-5"
     };
 
     const ragContexts = [
@@ -152,7 +152,7 @@ describe("Content Parsing E2E", () => {
     const functionInput = {
       messages: [{ role: "user", content: "What's the weather in Tokyo?" }],
       functions: [{ name: "get_weather", description: "Get weather for a city" }],
-      model: "gpt-4o-mini"
+      model: "gpt-5"
     };
 
     const functionOutput = {

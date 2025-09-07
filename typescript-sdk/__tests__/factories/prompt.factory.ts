@@ -21,7 +21,7 @@ export const promptResponseFactory = Factory.define<PromptResponse>(
     outputs: [],
     versionId: `prompt_version_${sequence}`,
     versionCreatedAt: new Date().toISOString(),
-    model: "gpt-4o-mini",
+    model: "gpt-5",
     prompt: "Hello {{name}}, how is the {{topic}} today?",
     messages: [
       {

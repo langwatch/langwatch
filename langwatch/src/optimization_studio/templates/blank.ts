@@ -35,7 +35,7 @@ export const blankTemplate: Workflow = {
   description: "Start a new workflow from scratch",
   version: "1.0",
   default_llm: {
-    model: "openai/gpt-4o-mini",
+    model: "openai/gpt-5",
     temperature: 0,
     max_tokens: 8192,
   },

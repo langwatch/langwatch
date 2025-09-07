@@ -15,7 +15,7 @@ langwatch.setup(
 )
 
 llm = dspy.OpenAI(
-    model="gpt-4o-mini",
+    model="gpt-5",
     max_tokens=2048,
     temperature=0,
     api_key=os.environ["OPENAI_API_KEY"],

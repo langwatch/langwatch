@@ -1615,7 +1615,7 @@ wheels = [
 
 [[package]]
 name = "langwatch"
-version = "0.2.16"
+version = "0.2.19"
 source = { editable = "../python-sdk" }
 dependencies = [
     { name = "attrs" },
@@ -1697,6 +1697,7 @@ examples = [
     { name = "pytest", specifier = ">=7.4.2,<8.0.0" },
     { name = "python-dotenv", specifier = "==1.0.1" },
     { name = "strands-agents", specifier = ">=1.6.0" },
+    { name = "strands-agents", extras = ["otel"], specifier = ">=1.0.0,<2.0.0" },
     { name = "streamlit", specifier = ">=1.37.1,<2.0.0" },
     { name = "unstructured", extras = ["pdf"], specifier = ">=0.18.3" },
     { name = "uvicorn", specifier = ">=0.25.0,<0.26.0" },

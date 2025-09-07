@@ -68,7 +68,7 @@ const openInferenceOpenAIRequest: DeepPartial<IExportTraceServiceRequest> = {
                   key: "input.value",
                   value: {
                     stringValue:
-                      '{"messages": [{"role": "system", "content": "You are a helpful assistant that only reply in short tweet-like responses, using lots of emojis."}, {"role": "user", "content": "hi"}], "model": "gpt-4o-mini", "stream": true}',
+                      '{"messages": [{"role": "system", "content": "You are a helpful assistant that only reply in short tweet-like responses, using lots of emojis."}, {"role": "user", "content": "hi"}], "model": "gpt-5", "stream": true}',
                   },
                 },
                 {
@@ -81,7 +81,7 @@ const openInferenceOpenAIRequest: DeepPartial<IExportTraceServiceRequest> = {
                   key: "output.value",
                   value: {
                     stringValue:
-                      '{"choices": [{"message": {"content": "Hey there! 😊👋 What\'s up? 🌟", "role": "assistant"}, "index": 0, "finish_reason": "stop"}], "id": "chatcmpl-9sdk9jAOO21SHl5mgTZSXVdCVJhDq", "created": 1722809513, "model": "gpt-4o-mini-2024-07-18", "object": "chat.completion.chunk", "system_fingerprint": "fp_611b667b19"}',
+                      '{"choices": [{"message": {"content": "Hey there! 😊👋 What\'s up? 🌟", "role": "assistant"}, "index": 0, "finish_reason": "stop"}], "id": "chatcmpl-9sdk9jAOO21SHl5mgTZSXVdCVJhDq", "created": 1722809513, "model": "gpt-5", "object": "chat.completion.chunk", "system_fingerprint": "fp_611b667b19"}',
                   },
                 },
                 {
@@ -93,7 +93,7 @@ const openInferenceOpenAIRequest: DeepPartial<IExportTraceServiceRequest> = {
                 {
                   key: "llm.invocation_parameters",
                   value: {
-                    stringValue: '{"model": "gpt-4o-mini", "stream": true}',
+                    stringValue: '{"model": "gpt-5", "stream": true}',
                   },
                 },
                 {
@@ -157,7 +157,7 @@ const openInferenceOpenAIRequest: DeepPartial<IExportTraceServiceRequest> = {
                 {
                   key: "llm.model_name",
                   value: {
-                    stringValue: "gpt-4o-mini-2024-07-18",
+                    stringValue: "gpt-5",
                   },
                 },
                 {
@@ -251,7 +251,7 @@ const openllmetryOpenAIRequest: DeepPartial<IExportTraceServiceRequest> = {
                 {
                   key: "gen_ai.request.model",
                   value: {
-                    stringValue: "gpt-4o-mini",
+                    stringValue: "gpt-5",
                   },
                 },
                 {
@@ -300,7 +300,7 @@ const openllmetryOpenAIRequest: DeepPartial<IExportTraceServiceRequest> = {
                 {
                   key: "gen_ai.response.model",
                   value: {
-                    stringValue: "gpt-4o-mini-2024-07-18",
+                    stringValue: "gpt-5",
                   },
                 },
                 {
@@ -956,7 +956,7 @@ const springAITrace: DeepPartial<IExportTraceServiceRequest> = {
               traceId: "755b1db22272958b92cb003f30058e74",
               spanId: "0dedf6826df097a9",
               parentSpanId: "8127960fb3f7c04d",
-              name: "chat gpt-4o-mini",
+              name: "chat gpt-5",
               kind: "SPAN_KIND_INTERNAL" as unknown as ESpanKind,
               startTimeUnixNano: "1748353030869334708",
               endTimeUnixNano: "1748353033397302125",
@@ -964,13 +964,13 @@ const springAITrace: DeepPartial<IExportTraceServiceRequest> = {
                 {
                   key: "gen_ai.request.model",
                   value: {
-                    stringValue: "gpt-4o-mini",
+                    stringValue: "gpt-5",
                   },
                 },
                 {
                   key: "gen_ai.response.model",
                   value: {
-                    stringValue: "gpt-4o-mini-2024-07-18",
+                    stringValue: "gpt-5",
                   },
                 },
                 {
@@ -1058,7 +1058,7 @@ describe("opentelemetry traces receiver", () => {
           trace_id: "03cb2eb84dd52ac9bc1496a99c733880",
           name: "ChatCompletion",
           type: "llm",
-          model: "gpt-4o-mini-2024-07-18",
+          model: "gpt-5",
           input: {
             type: "chat_messages",
             value: [
@@ -1083,7 +1083,7 @@ describe("opentelemetry traces receiver", () => {
             ],
           },
           params: {
-            model: "gpt-4o-mini",
+            model: "gpt-5",
             stream: true,
             scope: {
               name: "openinference.instrumentation.openai",
@@ -1139,7 +1139,7 @@ describe("opentelemetry traces receiver", () => {
           trace_id: "8615098c2c72e72330e800ef3ab1d8b8",
           name: "openai.chat",
           type: "llm",
-          model: "gpt-4o-mini-2024-07-18",
+          model: "gpt-5",
           input: {
             type: "chat_messages",
             value: [
@@ -1674,9 +1674,9 @@ describe("opentelemetry traces receiver", () => {
           span_id: "d1d79d7faf36e9d7f4f7b6bd",
           trace_id: "ef9e5bd5d6f6db6ef6f79f1bf7671bd34ddfdf4d39f1eef8",
           parent_id: "f35dbbf7ad1f6f77fb734e1d",
-          name: "chat gpt-4o-mini",
+          name: "chat gpt-5",
           type: "llm",
-          model: "gpt-4o-mini-2024-07-18",
+          model: "gpt-5",
           metrics: {
             prompt_tokens: 11,
             completion_tokens: 13,

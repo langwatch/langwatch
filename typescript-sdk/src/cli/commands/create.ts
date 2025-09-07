@@ -38,7 +38,7 @@ export const createCommand = async (name: string, options: CreateOptions): Promi
     }
 
     // Default prompt content
-    const defaultContent = `model: openai/gpt-4o-mini
+    const defaultContent = `model: openai/gpt-5
 modelParameters:
   temperature: 0.7
 messages:

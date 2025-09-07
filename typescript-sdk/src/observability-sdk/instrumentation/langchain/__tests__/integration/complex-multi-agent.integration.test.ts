@@ -89,7 +89,7 @@ describe("LangChain Multi-Agent Integration Tests", () => {
       { root: true },
       async () => {
         // Create simple research agent
-        const llm = new ChatOpenAI({ model: "gpt-4o-mini", temperature: 0 });
+        const llm = new ChatOpenAI({ model: "gpt-5", temperature: 0 });
         const tools = [
           new DynamicTool({
             name: "search",
@@ -140,7 +140,7 @@ describe("LangChain Multi-Agent Integration Tests", () => {
     expect(llmSpans.length).toBeGreaterThan(0);
 
     llmSpans.forEach((span) => {
-      expect(span.name).toContain("openai gpt-4o-mini");
+      expect(span.name).toContain("openai gpt-5");
       expect(span.attributes["langwatch.span.type"]).toBe("llm");
       expect(span.attributes["gen_ai.request.model"]).toBeDefined();
     });
@@ -163,7 +163,7 @@ describe("LangChain Multi-Agent Integration Tests", () => {
       { root: true },
       async () => {
         // Create agent with multiple tools for tool chaining
-        const llm = new ChatOpenAI({ model: "gpt-4o-mini", temperature: 0 });
+        const llm = new ChatOpenAI({ model: "gpt-5", temperature: 0 });
         const tools = [
           new DynamicTool({
             name: "data_collector",
@@ -260,7 +260,7 @@ describe("LangChain Multi-Agent Integration Tests", () => {
       { root: true },
       async () => {
         // Create conversational agent with context tools
-        const llm = new ChatOpenAI({ model: "gpt-4o-mini", temperature: 0 });
+        const llm = new ChatOpenAI({ model: "gpt-5", temperature: 0 });
         const tools = [
           new DynamicTool({
             name: "memory_store",
@@ -357,7 +357,7 @@ describe("LangChain Multi-Agent Integration Tests", () => {
       { root: true },
       async () => {
         // Create agent with failing and fallback tools
-        const llm = new ChatOpenAI({ model: "gpt-4o-mini", temperature: 0 });
+        const llm = new ChatOpenAI({ model: "gpt-5", temperature: 0 });
         const tools = [
           new DynamicTool({
             name: "primary_tool",
@@ -449,7 +449,7 @@ describe("LangChain Multi-Agent Integration Tests", () => {
       async () => {
         // Create two simple agents to run in parallel
         const createAgent = (name: string) => {
-          const llm = new ChatOpenAI({ model: "gpt-4o-mini", temperature: 0 });
+          const llm = new ChatOpenAI({ model: "gpt-5", temperature: 0 });
           const tools = [
             new DynamicTool({
               name: `${name}_analysis`,
@@ -537,7 +537,7 @@ describe("LangChain Multi-Agent Integration Tests", () => {
       { root: true },
       async () => {
         // Create a simple agent to test data capture
-        const llm = new ChatOpenAI({ model: "gpt-4o-mini", temperature: 0 });
+        const llm = new ChatOpenAI({ model: "gpt-5", temperature: 0 });
         const tools = [
           new DynamicTool({
             name: "test_tool",
