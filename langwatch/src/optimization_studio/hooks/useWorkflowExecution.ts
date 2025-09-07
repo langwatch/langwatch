@@ -24,7 +24,7 @@ export const useWorkflowExecution = () => {
   const socketAvailable = useCallback(() => {
     if (socketStatus !== "connected") {
       toaster.create({
-        title: "Studio is not connected",
+        title: "Studio is not connected yet",
         type: "error",
         duration: 5000,
         meta: {
