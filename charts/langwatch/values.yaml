@@ -888,16 +888,11 @@ opensearch:
       adminPasswordKey: "admin-password"
 
   # OpenSearch cluster configuration
-  fullnameOverride: langwatch-opensearch
-  masterService: langwatch-opensearch
-  clusterName: langwatch-opensearch
   replicas: 1
 
   # OpenSearch configuration file
   config:
     opensearch.yml: |
-      cluster.name: langwatch-opensearch
-      node.name: langwatch-opensearch
       network.host: 0.0.0.0
       discovery.type: single-node
       plugins.security.disabled: true
