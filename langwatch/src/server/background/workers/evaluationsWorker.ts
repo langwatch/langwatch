@@ -292,13 +292,6 @@ export const runEvaluation = async ({
 
   const startTime = performance.now();
 
-  console.log("evaluatorType", evaluatorType);
-  console.log("data", data);
-  console.log("settings", settings);
-  console.log("trace", trace);
-  console.log("retries", retries);
-  console.log("env", env.LANGEVALS_ENDPOINT);
-
   let response;
   try {
     response = await fetch(

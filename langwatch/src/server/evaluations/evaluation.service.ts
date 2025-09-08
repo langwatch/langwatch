@@ -15,12 +15,12 @@ import {
   type EvaluatorTypes,
   type SingleEvaluationResult,
 } from "./evaluators.generated";
-import { evaluatorsSchema, type singleEvaluationResultSchema } from "./evaluators.zod.generated";
-import { getEvaluatorDefaultSettings } from "./getEvaluator";
 import {
-  evaluationInputSchema,
-  type EvaluationRESTParams,
-} from "./types";
+  evaluatorsSchema,
+  type singleEvaluationResultSchema,
+} from "./evaluators.zod.generated";
+import { getEvaluatorDefaultSettings } from "./getEvaluator";
+import { evaluationInputSchema, type EvaluationRESTParams } from "./types";
 import {
   getEvaluatorDataForParams,
   getEvaluatorIncludingCustom,
@@ -36,16 +36,15 @@ export interface EvaluationServiceOptions {
   asGuardrail?: boolean;
 }
 
-
 export class EvaluationService {
-  constructor(
-    private readonly evaluationRepository: EvaluationRepository
-  ) {}
+  constructor(private readonly evaluationRepository: EvaluationRepository) {}
 
   /**
    * Run an evaluation with the given parameters
    */
-  async runEvaluation(options: EvaluationServiceOptions): Promise<z.infer<typeof singleEvaluationResultSchema>> {
+  async runEvaluation(
+    options: EvaluationServiceOptions
+  ): Promise<z.infer<typeof singleEvaluationResultSchema>> {
     const { projectId, evaluatorSlug, params, asGuardrail = false } = options;
 
     logger.info({ projectId, evaluatorSlug }, "Starting evaluation");
@@ -66,13 +65,18 @@ export class EvaluationService {
           validationError: validationError.message,
         },
       });
-      throw new Error(`Invalid evaluation parameters: ${validationError.message}`);
+      throw new Error(
+        `Invalid evaluation parameters: ${validationError.message}`
+      );
     }
 
     const isGuardrail = Boolean(asGuardrail || validatedParams.as_guardrail);
 
     // Get evaluator slug and check type
-    const checkType = await this.getEvaluatorCheckType(projectId, evaluatorSlug);
+    const checkType = await this.getEvaluatorCheckType(
+      projectId,
+      evaluatorSlug
+    );
 
     // Get evaluator definition
     const evaluatorDefinition = await getEvaluatorIncludingCustom(
@@ -84,7 +88,10 @@ export class EvaluationService {
     }
 
     // Get stored evaluator if it exists
-    const storedEvaluator = await this.getStoredEvaluator(projectId, evaluatorSlug);
+    const storedEvaluator = await this.getStoredEvaluator(
+      projectId,
+      evaluatorSlug
+    );
 
     // Check if guardrail is enabled
     if (storedEvaluator && !storedEvaluator.enabled && !!isGuardrail) {
@@ -110,13 +117,32 @@ export class EvaluationService {
     this.validateRequiredFields(data, evaluatorDefinition);
 
     // Run the evaluation
-    const result = await this.executeEvaluation(projectId, checkType, data, settings);
+    const result = await this.executeEvaluation(
+      projectId,
+      checkType,
+      data,
+      settings
+    );
 
     // Handle costs
-    const cost = await this.handleCosts(projectId, result, storedEvaluator, checkType, isGuardrail, validatedParams);
+    const cost = await this.handleCosts(
+      projectId,
+      result,
+      storedEvaluator,
+      checkType,
+      isGuardrail,
+      validatedParams
+    );
 
     // Update evaluation status in Elasticsearch
-    await this.updateEvaluationStatus(projectId, result, storedEvaluator, checkType, isGuardrail, validatedParams);
+    await this.updateEvaluationStatus(
+      projectId,
+      result,
+      storedEvaluator,
+      checkType,
+      isGuardrail,
+      validatedParams
+    );
 
     // Prepare final result
     const finalResult = this.prepareFinalResult(result, isGuardrail);
@@ -124,13 +150,22 @@ export class EvaluationService {
     return finalResult;
   }
 
-  private async getEvaluatorCheckType(projectId: string, evaluatorSlug: string): Promise<string> {
-    const storedEvaluator = await this.evaluationRepository.findStoredEvaluator(projectId, evaluatorSlug);
+  private async getEvaluatorCheckType(
+    projectId: string,
+    evaluatorSlug: string
+  ): Promise<string> {
+    const storedEvaluator = await this.evaluationRepository.findStoredEvaluator(
+      projectId,
+      evaluatorSlug
+    );
     return storedEvaluator?.checkType ?? evaluatorSlug;
   }
 
   private async getStoredEvaluator(projectId: string, evaluatorSlug: string) {
-    return await this.evaluationRepository.findStoredEvaluator(projectId, evaluatorSlug);
+    return await this.evaluationRepository.findStoredEvaluator(
+      projectId,
+      evaluatorSlug
+    );
   }
 
   private async prepareEvaluatorSettings(
@@ -143,8 +178,12 @@ export class EvaluationService {
       ? undefined
       : evaluatorsSchema.shape[checkType as EvaluatorTypes]?.shape.settings;
 
-    let settings: z.infer<NonNullable<typeof evaluatorSettingSchema>> | undefined =
-      (storedEvaluator?.parameters as z.infer<NonNullable<typeof evaluatorSettingSchema>>) ?? {};
+    let settings:
+      | z.infer<NonNullable<typeof evaluatorSettingSchema>>
+      | undefined =
+      (storedEvaluator?.parameters as z.infer<
+        NonNullable<typeof evaluatorSettingSchema>
+      >) ?? {};
 
     try {
       settings = evaluatorSettingSchema?.parse({
@@ -153,47 +192,67 @@ export class EvaluationService {
         ...(params.settings ? params.settings : {}),
       });
     } catch (error) {
-      logger.error({ error, params, checkType }, 'Invalid settings received for the evaluator');
-      const validationError = fromZodError(error as ZodError);
-      Sentry.captureException(error, {
-        extra: {
-          params,
-          validationError: validationError.message,
-        },
-      });
-      throw new Error(`Invalid settings for ${checkType} evaluator: ${validationError.message}`);
+      logger.error(
+        { error, params, checkType },
+        "Invalid settings received for the evaluator"
+      );
+      if (error instanceof ZodError) {
+        const validationError = fromZodError(error);
+        Sentry.captureException(error, {
+          extra: { params, validationError: validationError.message },
+        });
+        throw new Error(
+          `Invalid settings for ${checkType} evaluator: ${validationError.message}`
+        );
+      }
+      Sentry.captureException(error);
+      throw new Error(
+        error instanceof Error ? error.message : "Invalid evaluator settings"
+      );
     }
 
     return settings;
   }
 
-  private async prepareEvaluationData(checkType: string, params: EvaluationRESTParams): Promise<DataForEvaluation> {
+  private async prepareEvaluationData(
+    checkType: string,
+    params: EvaluationRESTParams
+  ): Promise<DataForEvaluation> {
     try {
       return getEvaluatorDataForParams(
         checkType,
         params.data as Record<string, any>
       );
     } catch (error) {
-        logger.error({ error, params }, "Invalid evaluation data received");
+      logger.error({ error, params }, "Invalid evaluation data received");
 
-        if (error instanceof ZodError) {
-          const validationError = fromZodError(error);
-          Sentry.captureException(error, { extra: { validationError: validationError.message } });
-          throw new Error(validationError.message);
-        }
-
-        Sentry.captureException(error);
-        throw new Error(error instanceof Error ? error.message : "Invalid evaluation data");
+      if (error instanceof ZodError) {
+        const validationError = fromZodError(error);
+        Sentry.captureException(error, {
+          extra: { validationError: validationError.message },
+        });
+        throw new Error(validationError.message);
       }
+
+      Sentry.captureException(error);
+      throw new Error(
+        error instanceof Error ? error.message : "Invalid evaluation data"
+      );
+    }
   }
 
-  private validateRequiredFields(data: DataForEvaluation, evaluatorDefinition: any) {
+  private validateRequiredFields(
+    data: DataForEvaluation,
+    evaluatorDefinition: any
+  ) {
     for (const requiredField of evaluatorDefinition.requiredFields) {
       if (
         data.data[requiredField] === undefined ||
         data.data[requiredField] === null
       ) {
-        throw new Error(`${requiredField} is required for ${evaluatorDefinition.name} evaluator`);
+        throw new Error(
+          `${requiredField} is required for ${evaluatorDefinition.name} evaluator`
+        );
       }
     }
   }
@@ -218,8 +277,9 @@ export class EvaluationService {
       // Retry once in case of timeout error
       if (
         result.status === "error" &&
-        (result.error_type === "TIMEOUT" || 
-         (typeof result.details === "string" && result.details.toLowerCase().includes("timed out")))
+        (result.error_type === "TIMEOUT" ||
+          (typeof result.details === "string" &&
+            result.details.toLowerCase().includes("timed out")))
       ) {
         result = await runEval();
       }
@@ -232,7 +292,7 @@ export class EvaluationService {
           checkType,
         },
       });
-      logger.error({ error, projectId, checkType }, 'Error running evaluation');
+      logger.error({ error, projectId, checkType }, "Error running evaluation");
       return {
         status: "error",
         error_type: "INTERNAL_ERROR",
@@ -312,16 +372,20 @@ export class EvaluationService {
               label: result.label,
             }
           : {}),
-        details: "details" in result ? result.details ?? "" : "",
+        details: "details" in result ? (result.details ?? "") : "",
       });
     }
   }
 
-  private prepareFinalResult(result: SingleEvaluationResult, isGuardrail: boolean): z.infer<typeof singleEvaluationResultSchema> {
+  private prepareFinalResult(
+    result: SingleEvaluationResult,
+    isGuardrail: boolean
+  ): z.infer<typeof singleEvaluationResultSchema> {
     if (result.status === "error") {
       return {
         status: "error",
-        error_type: "error_type" in result ? result.error_type : "EVALUATOR_ERROR",
+        error_type:
+          "error_type" in result ? result.error_type : "EVALUATOR_ERROR",
         details: result.details,
         traceback: result.traceback,
         // Don't set passed: true for error statuses to avoid confusion

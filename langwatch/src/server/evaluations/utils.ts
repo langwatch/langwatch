@@ -1,7 +1,6 @@
 import { type EvaluatorTypes } from "./evaluators.generated";
 import { type EvaluatorDefinition } from "./evaluators.generated";
 import { AVAILABLE_EVALUATORS } from "./evaluators.generated";
-import { evaluationInputSchema } from "./types";
 import { type DataForEvaluation } from "~/server/background/workers/evaluationsWorker";
 import { z } from "zod";
 

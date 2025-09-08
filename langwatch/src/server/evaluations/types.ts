@@ -1,9 +1,4 @@
 import { z } from "zod";
-import type {
-  EvaluationResult,
-  EvaluationResultError,
-  EvaluationResultSkipped,
-} from "./evaluators.generated";
 import type { batchEvaluationResultSchema, singleEvaluationResultSchema } from "./evaluators.zod.generated";
 
 export type CheckPreconditionFields = "input" | "output" | "metadata.labels";
