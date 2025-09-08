@@ -62,7 +62,7 @@ Only call 5 tools in parallel max.
 
 Current dataset:
 
-${JSON.stringify(dataset)}`,
+${dataset}`,
     }],
   } as UIMessage);
 
