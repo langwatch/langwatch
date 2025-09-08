@@ -1,41 +1,9 @@
 import { loadEnvConfig } from "@next/env";
 import { createLogger } from "./utils/logger";
-import { setupObservability } from "langwatch/observability/node";
-import {
-  BatchSpanProcessor,
-  SimpleSpanProcessor,
-} from "@opentelemetry/sdk-trace-node";
-import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-grpc";
 import { WorkersRestart } from "./server/background/errors";
-import { getNodeAutoInstrumentations } from "@opentelemetry/auto-instrumentations-node";
-
 loadEnvConfig(process.cwd());
 
 const logger = createLogger("langwatch:workers");
-
-if (process.env.OTEL_EXPORTER_OTLP_ENDPOINT) {
-  setupObservability({
-    attributes: {
-      "deployment.environment.name": process.env.NODE_ENV,
-      "service.name": "langwatch-workers",
-      "service.instance.id": process.env.INSTANCE_ID,
-    },
-    spanProcessors: [
-      process.env.NODE_ENV === "production"
-        ? new BatchSpanProcessor(
-          new OTLPTraceExporter({
-            url: `${process.env.OTEL_EXPORTER_OTLP_ENDPOINT}`,
-          })
-        )
-        : new SimpleSpanProcessor(
-          new OTLPTraceExporter({
-            url: `${process.env.OTEL_EXPORTER_OTLP_ENDPOINT}`,
-          })
-        ),
-    ],
-    instrumentations: [getNodeAutoInstrumentations()],
-  });
-}
 
 logger.info("starting");
 
