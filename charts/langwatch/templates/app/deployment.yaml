@@ -80,8 +80,9 @@ spec:
           command: ['sh', '-c']
           args:
             - |
-              echo "Waiting for OpenSearch service..."
-              until curl -s -f "http://{{ .Release.Name }}-opensearch:9200/_cluster/health" | grep -q '"status":"green"\|"status":"yellow"'; do
+              url="http://{{ .Release.Name }}-opensearch:9200/_cluster/health"
+              echo "Waiting for OpenSearch service at $url..."
+              until curl -s -f $url | grep -q '"status":"green"\|"status":"yellow"'; do
                 echo "OpenSearch not ready yet, waiting..."
                 sleep 5
               done
@@ -125,8 +126,19 @@ spec:
 
             # PostgreSQL connection string
             {{- if .Values.postgresql.chartManaged }}
+            - name: PGUSER
+              value: {{ default "postgres" .Values.postgresql.auth.username | quote }}
+            - name: PGPASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ if .Values.postgresql.auth.existingSecret }}{{ .Values.postgresql.auth.existingSecret }}{{ else }}{{ .Release.Name }}-postgresql{{ end }}
+                  key: {{ if .Values.postgresql.auth.existingSecret }}{{ if eq (default "postgres" .Values.postgresql.auth.username) "postgres" }}{{ .Values.postgresql.auth.secretKeys.adminPasswordKey | default "postgres-password" }}{{ else }}{{ .Values.postgresql.auth.secretKeys.passwordKey | default "password" }}{{ end }}{{ else }}{{ if eq (default "postgres" .Values.postgresql.auth.username) "postgres" }}postgres-password{{ else }}password{{ end }}{{ end }}
+            - name: PGHOST
+              value: "{{ .Release.Name }}-postgresql"
+            - name: PGDATABASE
+              value: {{ .Values.postgresql.auth.database | quote }}
             - name: DATABASE_URL
-              value: "(TODO)"
+              value: "postgresql://$(PGUSER):$(PGPASSWORD)@$(PGHOST):5432/$(PGDATABASE)"
             {{- else }}
             - name: DATABASE_URL
               {{- if .Values.postgresql.external.connectionString.value }}
@@ -141,8 +153,20 @@ spec:
 
             # Redis connection string
             {{- if .Values.redis.chartManaged }}
+            {{- if .Values.redis.auth.enabled }}
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ if .Values.redis.auth.existingSecret }}{{ .Values.redis.auth.existingSecret }}{{ else }}{{ .Release.Name }}-redis{{ end }}
+                  key: {{ if .Values.redis.auth.existingSecret }}{{ .Values.redis.auth.secretKeys.passwordKey | default "password" }}{{ else }}redis-password{{ end }}
+            - name: REDIS_HOST
+              value: "{{ .Release.Name }}-redis-master"
             - name: REDIS_URL
-              value: "(TODO)"
+              value: "redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):6379"
+            {{- else }}
+            - name: REDIS_URL
+              value: "redis://{{ .Release.Name }}-redis-master:6379"
+            {{- end }}
             {{- else }}
             {{- if eq .Values.redis.external.architecture "standalone" }}
             - name: REDIS_URL
@@ -161,6 +185,10 @@ spec:
 
             # ElasticSearch/OpenSearch/Quickwit connection string
             {{- if .Values.opensearch.chartManaged }}
+            - name: ELASTICSEARCH_NODE_URL
+              value: "http://{{ .Release.Name }}-opensearch:9200"
+            - name: IS_OPENSEARCH
+              value: "true"
             {{- else}}
             - name: ELASTICSEARCH_NODE_URL
               {{- if .Values.opensearch.external.nodeUrl.value }}
