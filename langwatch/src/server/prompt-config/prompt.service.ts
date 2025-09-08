@@ -344,7 +344,7 @@ export class PromptService {
               commitMessage: newVersionData.commitMessage ?? "Updated from API",
               configData: {
                 ...parsedLatestVersionData.configData,
-                ...newVersionData,
+                ...newVersionData.configData,
               } as any,
               schemaVersion: LATEST_SCHEMA_VERSION,
               version: latestVersion.version + 1,

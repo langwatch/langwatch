@@ -1,4 +1,3 @@
-import { nanoid } from "nanoid";
 import { useCallback, useEffect, useState } from "react";
 import type { StudioClientEvent } from "../types/events";
 import { useWorkflowStore } from "./useWorkflowStore";
