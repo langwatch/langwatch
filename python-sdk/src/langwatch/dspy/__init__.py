@@ -76,7 +76,7 @@ class SerializableAndPydanticEncoder(json.JSONEncoder):
             try:
                 return o.model_dump(exclude_unset=True)
             except Exception as e:
-                if 'MockValSer' in str(e):
+                if "MockValSer" in str(e):
                     return {
                         key: getattr(o, key)
                         for key in o.model_fields.keys()
@@ -196,7 +196,9 @@ class LangWatchDSPy:
         response.raise_for_status()
 
         if optimizer and evaluator:
-            raise ValueError("You can only provide an optimizer or an evaluator, not both.")
+            raise ValueError(
+                "You can only provide an optimizer or an evaluator, not both."
+            )
 
         self.experiment_slug = slug or experiment
         random.seed()  # MIPRO meses up the global seed, so we need to reset it to random to get a new run_id
@@ -223,7 +225,9 @@ class LangWatchDSPy:
 
     def patch_evaluator(self, evaluator: Evaluate):
         evaluator.__class__ = LangWatchTrackedEvaluate
-        print(f"\n[LangWatch] `dspy.evaluate.Evaluate` object detected and patched for live tracking.")
+        print(
+            f"\n[LangWatch] `dspy.evaluate.Evaluate` object detected and patched for live tracking."
+        )
 
     def patch_optimizer(self, optimizer: Teleprompter):
         METRIC_TRACKING_CLASSMAP = {
@@ -369,14 +373,64 @@ class LangWatchDSPy:
         data_list = json.loads(
             json.dumps(self.steps_buffer, cls=SerializableAndPydanticEncoder)
         )
-        data = [
-            truncate_object_recursively(
+
+        # Custom truncation for DSPy data to preserve structure while reducing size
+        def truncate_dspy_data(item):
+            # Only truncate strings, preserve list/dict structure
+            truncated = truncate_object_recursively(
                 item,
-                max_string_length=5000,
-                max_list_dict_length=-1,
+                max_string_length=1000,  # Aggressive string truncation for Japanese text
+                max_list_dict_length=-1,  # Don't truncate lists/dicts to preserve structure
             )
-            for item in data_list
-        ]
+
+            # If the item is still too large, limit array lengths manually
+            if isinstance(truncated, dict):
+                # Limit examples and llm_calls arrays specifically
+                if "examples" in truncated and isinstance(truncated["examples"], list):
+                    if len(truncated["examples"]) > 10:
+                        truncated["examples"] = truncated["examples"][:10]
+
+                if "llm_calls" in truncated and isinstance(
+                    truncated["llm_calls"], list
+                ):
+                    if len(truncated["llm_calls"]) > 20:
+                        truncated["llm_calls"] = truncated["llm_calls"][:20]
+
+            return truncated
+
+        data = [truncate_dspy_data(item) for item in data_list]
+
+        # Debug payload size after truncation
+        payload_json = json.dumps(data)
+        payload_size_mb = len(payload_json.encode("utf-8")) / (1024 * 1024)
+        print(f"[LangWatch DSPy] Sending payload: {payload_size_mb:.2f}MB")
+
+        # Emergency fallback if still too large (> 15MB)
+        if payload_size_mb > 15:
+            print(
+                f"[LangWatch DSPy] WARNING: Payload still too large ({payload_size_mb:.2f}MB), applying emergency truncation"
+            )
+            # Keep only the first item and limit it severely
+            if data:
+                emergency_data = [data[0]]  # Only keep first step
+                emergency_item = emergency_data[0]
+                if isinstance(emergency_item, dict):
+                    # Severely limit arrays
+                    if "examples" in emergency_item and isinstance(
+                        emergency_item["examples"], list
+                    ):
+                        emergency_item["examples"] = emergency_item["examples"][:3]
+                    if "llm_calls" in emergency_item and isinstance(
+                        emergency_item["llm_calls"], list
+                    ):
+                        emergency_item["llm_calls"] = emergency_item["llm_calls"][:5]
+                data = emergency_data
+                payload_json = json.dumps(data)
+                payload_size_mb = len(payload_json.encode("utf-8")) / (1024 * 1024)
+                print(
+                    f"[LangWatch DSPy] Emergency truncation complete: {payload_size_mb:.2f}MB"
+                )
+
         response = httpx.post(
             f"{langwatch.get_endpoint()}/api/dspy/log_steps",
             headers={
@@ -407,7 +461,12 @@ def init(
     evaluator: Optional[Evaluate] = None,
 ):
     langwatch_dspy.init(
-        experiment, optimizer, run_id, slug, workflow_id, workflow_version_id,
+        experiment,
+        optimizer,
+        run_id,
+        slug,
+        workflow_id,
+        workflow_version_id,
         evaluator=evaluator,
     )
 
@@ -697,12 +756,16 @@ class LangWatchTrackedMIPROv2(MIPROv2):
 
 class LangWatchTrackedEvaluate(Evaluate):
     @with_callbacks
-    def __call__(self, program: dspy.Module, metric: Optional[Callable] = None, **kwargs):
+    def __call__(
+        self, program: dspy.Module, metric: Optional[Callable] = None, **kwargs
+    ):
         lw_dspy = langwatch_dspy
 
         metric_to_use = metric if metric is not None else self.metric
         if not metric_to_use:
-            raise ValueError("Evaluation metric must be provided either during Evaluate initialization or during call.")
+            raise ValueError(
+                "Evaluation metric must be provided either during Evaluate initialization or during call."
+            )
 
         wrapped_metric = lw_dspy.track_metric(metric_to_use)
 
