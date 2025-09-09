@@ -47,7 +47,6 @@ import {
   searchTracesWithInternals,
 } from "~/server/elasticsearch/traces";
 import { prewarmTiktokenModels } from "./collector/cost";
-import { INTERNAL_PRESERVE_KEY } from "~/utils/constants";
 
 const logger = createLogger("langwatch:workers:collectorWorker");
 
@@ -314,25 +313,12 @@ const processCollectorJob_ = async (
     return acc;
   }, [] as Span[]);
 
-  const hasPreserveFlags = uniqueSpans.some(
-    (span) => span.params?.[INTERNAL_PRESERVE_KEY] === true
-  );
-
   // If there are preserve flags and we have an existing trace, preserve existing input/output
-  let input, output;
-  if (hasPreserveFlags && existingTrace?.inserted_at) {
-    // Don't recalculate input/output - let the Elasticsearch script handle preservation
-    input = { value: "" };
-    output = { value: "" };
-  } else {
-    [input, output] = await Promise.all([
-      { value: getFirstInputAsText(uniqueSpans) },
-      { value: getLastOutputAsText(uniqueSpans) },
-    ]);
-  }
-  
-  input = asNonEmptyIO(input);
-  output = asNonEmptyIO(output);
+  const [input, output] = await Promise.all([
+    { value: getFirstInputAsText(uniqueSpans) },
+    { value: getLastOutputAsText(uniqueSpans) },
+  ]);
+
   const error = getLastOutputError(uniqueSpans);
 
   const evaluations = mapEvaluations(data)?.concat(existingEvaluations);
@@ -375,8 +361,8 @@ const processCollectorJob_ = async (
       inserted_at: existingTrace?.inserted_at ?? Date.now(),
       updated_at: Date.now(),
     } as ElasticSearchTrace["timestamps"],
-    ...(input ? { input } : {}),
-    ...(output ? { output } : {}),
+    ...(input?.value ? { input } : {}),
+    ...(output?.value ? { output } : {}),
     ...(expectedOutput ? { expected_output: { value: expectedOutput } } : {}),
     metrics: computeTraceMetrics(uniqueSpans), // Use uniqueSpans for accurate total_cost calculation
     error,
@@ -486,51 +472,13 @@ const updateTrace = async (
           if (ctx._source == null) {
             ctx._source = params.trace;
           } else {
-            // Check if any new spans have preserve flags
-            boolean hasNewSpansWithPreserveFlag = false;
-            for (def newSpan : params.newSpans) {
-              if (newSpan.params != null && 
-                  newSpan.params.containsKey("__internal_langwatch_preserve_existing_io") && 
-                  newSpan.params["__internal_langwatch_preserve_existing_io"] == true) {
-                hasNewSpansWithPreserveFlag = true;
-                break;
-              }
-            }
-            
-            // Check if trace has preserve flag (new params + existing doc)
-            boolean traceHasPreserveFlag = params.trace.metadata != null && 
-              params.trace.metadata.custom != null && 
-              params.trace.metadata.custom.containsKey("__internal_langwatch_preserve_existing_io") && 
-              params.trace.metadata.custom["__internal_langwatch_preserve_existing_io"] == true;
-
-            // Merge trace data with input/output preservation
-            for (String key : params.trace.keySet()) {
-              // Special handling for input/output - preserve existing truthy values when trace or new spans have preserve flags
-              if ((key == "input" || key == "output") && (hasNewSpansWithPreserveFlag || traceHasPreserveFlag)) {
-                // Only update if existing value is missing/null/empty and new value is set
-                boolean existingValueIsEmpty = !ctx._source.containsKey(key) ||
-                  ctx._source[key] == null ||
-                  ctx._source[key] == "";
-                boolean newValueIsSet = params.trace[key] != null &&
-                  params.trace[key] != "";
-                
-                if (existingValueIsEmpty && newValueIsSet) {
-                  ctx._source[key] = params.trace[key];
-                }
-              } else {
-                // Normal merge for non-input/output fields or when no preserve flags
-                ctx._source[key] = params.trace[key];
-              }
-            }
-          }
-          
           // Ensure spans are properly initialized
           if (ctx._source.spans == null) {
             ctx._source.spans = [];
           }
-          
+
           def currentTime = System.currentTimeMillis();
-          
+
           // Handle spans - merge new spans with existing spans
           for (def newSpan : params.newSpans) {
             def existingSpanIndex = -1;
@@ -564,21 +512,26 @@ const updateTrace = async (
               
               // Deep merge spans with input/output preservation
               for (String key : newSpan.keySet()) {
-                // Check if new span has the preserve flag
-                boolean newSpanHasPreserveFlag = newSpan.params != null && 
-                  newSpan.params.containsKey("__internal_langwatch_preserve_existing_io") && 
-                  newSpan.params["__internal_langwatch_preserve_existing_io"] == true;
-                
-                // Check if existing span has the preserve flag
-                boolean existingSpanHasPreserveFlag = existingSpan.params != null && 
-                  existingSpan.params.containsKey("__internal_langwatch_preserve_existing_io") && 
-                  existingSpan.params["__internal_langwatch_preserve_existing_io"] == true;
-                
-                // Preserve input/output if either span has the preserve flag
-                if ((key == "input" || key == "output") && (newSpanHasPreserveFlag || existingSpanHasPreserveFlag)) {
-                  // Keep existing input/output values when preserve flag is set on either span
+                // Preserve existing non-empty input/output if new is empty or missing
+                if (key == "input" || key == "output") {
+                  def newVal = newSpan[key];
+                  def oldVal = existingSpan.containsKey(key) ? existingSpan[key] : null;
+                  boolean newHas = newVal != null && !(
+                    (newVal instanceof Map) && (
+                      !newVal.containsKey("value") || newVal["value"] == null || newVal["value"] == ""
+                    )
+                  );
+                  boolean oldHas = oldVal != null && !(
+                    (oldVal instanceof Map) && (
+                      !oldVal.containsKey("value") || oldVal["value"] == null || oldVal["value"] == ""
+                    )
+                  );
+                  if (newHas || !oldHas) {
+                    existingSpan[key] = newVal;
+                  }
                   continue;
                 }
+
                 if (newSpan[key] instanceof Map) {
                   if (!existingSpan.containsKey(key) || !(existingSpan[key] instanceof Map)) {
                     existingSpan[key] = new HashMap();
@@ -597,6 +550,7 @@ const updateTrace = async (
               ctx._source.spans.add(newSpan);
             }
           }
+
           // Note: Existing spans not in params.newSpans are automatically preserved (not deleted)
 
           // Limit the number of spans to 200
@@ -860,7 +814,7 @@ export const asNonEmptyIO = (
   io: { value: string } | null | undefined
 ): { value: string } | undefined => {
   if (!io?.value || io.value.trim() === "") {
-    return undefined;
+    return void 0;
   }
   return io;
 };

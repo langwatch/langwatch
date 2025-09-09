@@ -23,23 +23,8 @@ import { reservedTraceMetadataSchema } from "../tracer/types.generated";
 import type { Protections } from "./protections";
 import { createLogger } from "../../utils/logger";
 import { parsePythonInsideJson } from "../../utils/parsePythonInsideJson";
-import { INTERNAL_PRESERVE_KEY } from "../../utils/constants";
 
 const logger = createLogger("langwatch:elasticsearch:transformers");
-
-// Filter out internal keys from objects
-const filterInternalKeys = <T extends Record<string, any>>(obj: T): T => {
-  if (!obj || typeof obj !== "object") {
-    return obj;
-  }
-
-  const filtered = {
-    ...obj,
-    [INTERNAL_PRESERVE_KEY]: void 0,
-  } as T;
-
-  return filtered;
-};
 
 export const esSpansToDatasetSpans = (spans: Span[]): DatasetSpan[] => {
   try {
@@ -70,7 +55,7 @@ export const transformElasticSearchTraceToTrace = (
       ([key]) => key in reservedTraceMetadataSchema.shape
     )
   ) as ReservedTraceMetadata;
-  const customMetadata = filterInternalKeys(metadata.custom ?? {});
+  const customMetadata = metadata.custom ?? {};
 
   let transformedEvents: Event[] = [];
   let transformedEvaluations: Evaluation[] = [];
@@ -154,7 +139,7 @@ export const transformElasticSearchSpanToSpan =
     // Filter out internal keys from span params
     const filteredSpanFields = {
       ...spanFields,
-      params: filterInternalKeys(spanFields.params ?? {}),
+      params: spanFields.params ?? {},
     };
 
     let transformedInput: SpanInputOutput | null = null;
