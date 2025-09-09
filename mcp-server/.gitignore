@@ -3,3 +3,4 @@ tsconfig.tsbuildinfo
 dist
 !**/.gitkeep
 llms-full.txt
+tests/.mcp-config.json

@@ -1,21 +1,22 @@
-import { VStack, Text, Button, HStack } from "@chakra-ui/react";
+import { VStack, Button, HStack } from "@chakra-ui/react";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import type { ScenarioMessageSnapshotEvent } from "~/app/api/scenario-events/[[...route]]/types";
 import { CopilotKit, useCopilotChat } from "@copilotkit/react-core";
 import { useEffect } from "react";
 import {
-  ActionExecutionMessage,
-  ResultMessage,
+  type ActionExecutionMessage,
+  type ResultMessage,
   Role,
-  TextMessage,
+  type TextMessage,
 } from "@copilotkit/runtime-client-gql";
-import { CopilotChat, Markdown } from "@copilotkit/react-ui";
+import { CopilotChat } from "@copilotkit/react-ui";
 import { ToolResultMessage } from "./messages/ToolResultMessage";
 import { ToolCallMessage } from "./messages/ToolCallMessage";
 import { convertScenarioMessagesToCopilotKit } from "./utils/convert-scenario-messages";
 import { createLogger } from "~/utils/logger";
 import { LuListTree } from "react-icons/lu";
 import { useDrawer } from "../CurrentDrawer";
+import { Markdown } from "../Markdown";
 
 const logger = createLogger("CustomCopilotKitChat.tsx");
 
@@ -80,13 +81,7 @@ function CustomCopilotKitChatInner({
 
   return (
     <CopilotChat
-      RenderTextMessage={({
-        message,
-        isCurrentMessage,
-        AssistantMessage,
-        UserMessage,
-        inProgress,
-      }) => {
+      RenderTextMessage={({ message, AssistantMessage, UserMessage }) => {
         const message_ = message as TextMessage & { traceId?: string };
 
         return (
@@ -94,13 +89,7 @@ function CustomCopilotKitChatInner({
             align={message_.role === Role.Assistant ? "flex-start" : "flex-end"}
           >
             {AssistantMessage && message_.role === Role.Assistant && (
-              <AssistantMessage
-                message={message_.content}
-                rawData={message}
-                isCurrentMessage={isCurrentMessage}
-                isGenerating={inProgress}
-                isLoading={inProgress}
-              />
+              <Markdown className="markdown">{message_.content}</Markdown>
             )}
             {UserMessage && message_.role === Role.User && (
               <UserMessage message={message_.content} rawData={message} />
