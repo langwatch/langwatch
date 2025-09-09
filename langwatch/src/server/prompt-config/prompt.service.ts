@@ -8,6 +8,7 @@ import { type z } from "zod";
 
 import { SchemaVersion } from "./enums";
 import { NotFoundError, SystemPromptConflictError } from "./errors";
+import { PromptVersionService } from "./prompt-version.service";
 import {
   type CreateLlmConfigParams,
   type CreateLlmConfigVersionParams,
@@ -15,7 +16,7 @@ import {
   type LlmConfigWithLatestVersion,
 } from "./repositories";
 import {
-  getLatestConfigVersionSchema,
+  type getLatestConfigVersionSchema,
   LATEST_SCHEMA_VERSION,
   type LatestConfigVersionSchema,
 } from "./repositories/llm-config-version-schema";
@@ -68,9 +69,11 @@ export type VersionedPrompt = {
  */
 export class PromptService {
   readonly repository: LlmConfigRepository;
+  readonly versionService: PromptVersionService;
 
   constructor(private readonly prisma: PrismaClient) {
     this.repository = new LlmConfigRepository(prisma);
+    this.versionService = new PromptVersionService(prisma);
   }
 
   /**
@@ -214,7 +217,7 @@ export class PromptService {
     );
 
     shouldCreateVersion &&
-      this.assertNoSystemPromptConflict({
+      this.versionService.assertNoSystemPromptConflict({
         prompt: params.prompt,
         messages: params.messages,
       });
@@ -296,7 +299,7 @@ export class PromptService {
     const { idOrHandle, projectId, data } = params;
     const { handle, scope, ...newVersionData } = data;
 
-    this.assertNoSystemPromptConflict(newVersionData);
+    this.versionService.assertNoSystemPromptConflict(newVersionData);
 
     const messageSystemPrompt = newVersionData.messages?.find(
       (msg) => msg.role === "system"
@@ -332,20 +335,18 @@ export class PromptService {
           { tx }
         )) as LatestConfigVersionSchema;
 
-        const parsedLatestVersionData =
-          getLatestConfigVersionSchema().parse(latestVersion);
-
-        // Update the version
+        // Create the new version directly
         const updatedVersion: LlmPromptConfigVersion =
-          await tx.llmPromptConfigVersion.create({
+          await this.versionService.createVersion({
+            db: tx,
             data: {
               configId: updatedConfig.id,
               projectId,
               commitMessage: newVersionData.commitMessage ?? "Updated from API",
               configData: {
-                ...parsedLatestVersionData.configData,
+                ...latestVersion.configData,
                 ...newVersionData.configData,
-              } as any,
+              },
               schemaVersion: LATEST_SCHEMA_VERSION,
               version: latestVersion.version + 1,
             },
@@ -616,25 +617,6 @@ export class PromptService {
       demonstrations: config.latestVersion.configData.demonstrations,
       promptingTechnique: config.latestVersion.configData.prompting_technique,
     };
-  }
-
-  /**
-   * Validates that a prompt and system message are not set at the same time.
-   * @param params - The parameters object
-   * @param params.prompt - The prompt to validate
-   * @param params.messages - The messages to validate
-   * @throws SystemPromptConflictError if a prompt and system message are set at the same time
-   */
-  private assertNoSystemPromptConflict(params: {
-    prompt?: string;
-    messages?: z.infer<typeof messageSchema>[];
-  }): void {
-    if (
-      params.prompt &&
-      params.messages?.some((msg) => msg.role === "system")
-    ) {
-      throw new SystemPromptConflictError();
-    }
   }
 
   private async getOrganizationIdFromProjectId(
