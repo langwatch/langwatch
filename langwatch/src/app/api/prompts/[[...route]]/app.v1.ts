@@ -4,6 +4,7 @@ import { describeRoute } from "hono-openapi";
 import { validator as zValidator, resolver } from "hono-openapi/zod";
 import { z } from "zod";
 
+import { getLatestConfigVersionSchema } from "~/server/prompt-config/repositories/llm-config-version-schema";
 import {
   organizationMiddleware,
   type AuthMiddlewareVariables,
@@ -30,7 +31,6 @@ import {
   commitMessageSchema,
   versionSchema,
 } from "~/prompt-configs/schemas/field-schemas";
-import { getLatestConfigVersionSchema } from "~/server/prompt-config/repositories/llm-config-version-schema";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
 import { createLogger } from "~/utils/logger";
 
