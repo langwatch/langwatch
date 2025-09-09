@@ -96,7 +96,7 @@ export const openTelemetryLogsRequestToTracesForCollection = (
 					existingSpan = {
 						span_id: spanId,
 						trace_id: traceId,
-						name: identifier,
+						name: identifier.replace(":", ""),
 						type: "llm",
 						input: input,
 						output: output,

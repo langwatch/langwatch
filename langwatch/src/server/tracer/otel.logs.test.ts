@@ -260,6 +260,7 @@ describe("opentelemetry logs receiver", () => {
         {
           span_id: "0dedf6826df097a9",
           trace_id: "755b1db22272958b92cb003f30058e74",
+          name: "Chat Model Prompt Content",
           type: "llm",
           input: {
             type: "text",
@@ -308,6 +309,7 @@ describe("opentelemetry logs receiver", () => {
           span_id: "0dedf6826df097a9",
           trace_id: "755b1db22272958b92cb003f30058e74",
           type: "llm",
+          name: "Chat Model Prompt Content",
           input: {
             type: "text",
             value: "CHAT_MODEL_PROMPT_CONTENT",
@@ -352,6 +354,7 @@ describe("opentelemetry logs receiver", () => {
           span_id: "fedcba9876543210",
           trace_id: "abc123def456789012345678",
           type: "llm",
+          name: "Chat Model Completion",
           input: null,
           output: {
             type: "text",
@@ -395,8 +398,10 @@ describe("opentelemetry logs receiver", () => {
       (s) => s.span_id === "span1111111111111111"
     );
     expect(span1).toBeDefined();
+    expect(span1?.name).toEqual("Chat Model Prompt Content");
     expect(span1?.input?.value).toEqual("MULTI_SPAN_CHAT_MODEL_PROMPT_CONTENT_1");
     expect(span1?.output?.value).toEqual("MULTI_SPAN_CHAT_MODEL_COMPLETION_1");
+    expect(span1?.name).toEqual("Chat Model Prompt Content");
     expect(span1?.input?.type).toEqual("text");
     expect(span1?.output?.type).toEqual("text");
 
@@ -405,6 +410,7 @@ describe("opentelemetry logs receiver", () => {
       (s) => s.span_id === "span2222222222222222"
     );
     expect(span2).toBeDefined();
+    expect(span2?.name).toEqual("Chat Model Prompt Content");
     expect(span2?.input?.value).toEqual("MULTI_SPAN_CHAT_MODEL_PROMPT_CONTENT_2");
     expect(span2?.output?.value).toEqual("MULTI_SPAN_CHAT_MODEL_COMPLETION_2");
     expect(span2?.input?.type).toEqual("text");
