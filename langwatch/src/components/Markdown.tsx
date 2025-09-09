@@ -4,6 +4,7 @@ import remarkGfm from "remark-gfm";
 import { getProxiedImageUrl } from "./ExternalImage";
 import { stringifyIfObject } from "~/utils/stringifyIfObject";
 import { createLogger } from "~/utils/logger";
+import { RenderCode } from "./code/RenderCode";
 
 const logger = createLogger("langwatch:components:Markdown");
 
@@ -32,7 +33,22 @@ function MarkdownWithPluginsAndProxy({
   }
 
   return (
-    <ReactMarkdown remarkPlugins={[remarkGfm]} className={className}>
+    <ReactMarkdown
+      remarkPlugins={[remarkGfm]}
+      className={className}
+      components={{
+        code(props) {
+          const { children, className } = props;
+          const match = /language-(\w+)/.exec(className ?? "");
+          return (
+            <RenderCode
+              language={match ? match[1]! : ""}
+              code={String(children).replace(/\n$/, "")}
+            />
+          );
+        },
+      }}
+    >
       {proxyMarkdownImageUrls(stringifyIfObject(children))}
     </ReactMarkdown>
   );

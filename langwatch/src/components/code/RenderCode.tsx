@@ -7,6 +7,7 @@ import { toaster } from "../ui/toaster";
 (typeof global !== "undefined" ? global : window).Prism = Prism;
 require("prismjs/components/prism-bash");
 require("prismjs/components/prism-python");
+require("prismjs/components/prism-diff");
 
 export const RenderCode = ({
   code,
@@ -36,6 +37,7 @@ export const RenderCode = ({
     <Box position="relative" className="group">
       <IconButton
         aria-label="Copy code"
+        // eslint-disable-next-line react/no-children-prop
         children={<CopyIcon />}
         onClick={handleCopy}
         position="absolute"
