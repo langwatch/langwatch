@@ -257,6 +257,25 @@ span.setAttributes({
 });
 ```
 
+## Testing
+
+## Unit and Integration Testing
+
+This will run the unit and integration tests. You will need to make sure the values in the `.env` file are set correctly, but you can omit the `E2E_` prefixed variables for these tests.
+
+```bash
+pnpm test
+```
+
+## E2E Testing
+
+For E2E tests, you will need to set the `E2E_` prefixed variables in the `.env` file. You will also need to have run build before.
+
+```bash
+pnpm build
+pnpm test:e2e
+```
+
 ---
 
 ## Community & Support
