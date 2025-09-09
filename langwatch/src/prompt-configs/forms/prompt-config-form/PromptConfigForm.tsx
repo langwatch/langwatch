@@ -17,15 +17,16 @@ import { PromptField } from "../fields/PromptField";
 import { PromptMessagesField } from "../fields/PromptMessagesField";
 
 import { PromptHandleInfo } from "./components/PromptHandleInfo";
+import { VersionHistoryButton } from "./components/VersionHistoryButton";
+import { VersionSaveButton } from "./components/VersionSaveButton";
 
 import { toaster } from "~/components/ui/toaster";
 import { useGetPromptConfigByIdWithLatestVersionQuery } from "~/prompt-configs/hooks/useGetPromptConfigByIdWithLatestVersionQuery";
 import { usePromptConfig } from "~/prompt-configs/hooks/usePromptConfig";
 import type { PromptConfigFormValues } from "~/prompt-configs/hooks/usePromptConfigForm";
+import { llmConfigToPromptConfigFormValues } from "~/prompt-configs/llmPromptConfigUtils";
 import { usePromptConfigContext } from "~/prompt-configs/providers/PromptConfigProvider";
 import { createLogger } from "~/utils/logger";
-import { VersionHistoryButton } from "./components/VersionHistoryButton";
-import { VersionSaveButton } from "./components/VersionSaveButton";
 
 const logger = createLogger("PromptConfigForm");
 
@@ -43,7 +44,7 @@ function InnerPromptConfigForm(props: PromptConfigFormProps) {
   const { isLoading } = usePromptConfig();
   const { triggerSaveVersion } = usePromptConfigContext();
   const saveEnabled = methods.formState.isDirty;
-  const { data: savedConfig } =
+  const { data: savedConfig, refetch: refetchSavedConfig } =
     useGetPromptConfigByIdWithLatestVersionQuery(configId);
 
   /**
@@ -77,12 +78,31 @@ function InnerPromptConfigForm(props: PromptConfigFormProps) {
     });
   }, [savedConfig, methods, triggerSaveVersion]);
 
-  const hasDemonstrations =
+  const hasDemonstrations = Boolean(
     Object.values(
       savedConfig?.latestVersion.configData.demonstrations?.inline?.records ?? {
         dummy: [],
       }
-    )[0]?.length ?? 0 > 0;
+    )[0]?.length ?? 0 > 0
+  );
+
+  const handleRestore = useCallback(
+    (_versionId: string) => {
+      refetchSavedConfig()
+        .then(({ data: restoredConfig }) => {
+          if (!restoredConfig) throw new Error("Restored config is missing");
+          methods.reset(llmConfigToPromptConfigFormValues(restoredConfig));
+        })
+        .catch((error) => {
+          logger.error(error);
+          toaster.error({
+            title: "Failed to restore version",
+            description: error.message,
+          });
+        });
+    },
+    [refetchSavedConfig, methods]
+  );
 
   if (!savedConfig) return null;
 
@@ -117,7 +137,11 @@ function InnerPromptConfigForm(props: PromptConfigFormProps) {
           padding={3}
           boxShadow="0 0px 6px rgba(0, 0, 0, 0.1)"
         >
-          <VersionHistoryButton configId={configId} label="History" />
+          <VersionHistoryButton
+            configId={configId}
+            label="History"
+            onRestore={handleRestore}
+          />
           <Spacer />
           <VersionSaveButton
             disabled={!saveEnabled}
