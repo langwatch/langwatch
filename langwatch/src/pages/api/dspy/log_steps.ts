@@ -67,14 +67,30 @@ export default async function handler(
     return res.status(401).json({ message: "Invalid auth token." });
   }
 
-  getPayloadSizeHistogram("log_steps").observe(JSON.stringify(req.body).length);
+  const payloadSize = JSON.stringify(req.body).length;
+  const payloadSizeMB = payloadSize / (1024 * 1024);
+  getPayloadSizeHistogram("log_steps").observe(payloadSize);
+
+  logger.info(
+    {
+      payloadSize,
+      payloadSizeMB: payloadSizeMB.toFixed(2),
+      projectId: project.id,
+    },
+    "DSPy log_steps request received"
+  );
 
   let params: DSPyStepRESTParams[];
   try {
     params = z.array(dSPyStepRESTParamsSchema).parse(req.body);
   } catch (error) {
     logger.error(
-      { error, body: req.body, projectId: project.id },
+      {
+        error,
+        payloadSize,
+        payloadSizeMB: payloadSizeMB.toFixed(2),
+        projectId: project.id,
+      },
       "invalid log_steps data received"
     );
     // TODO: should it be a warning instead of exception on sentry? here and all over our APIs
@@ -100,13 +116,39 @@ export default async function handler(
     }
   }
 
+  logger.info(
+    { stepCount: params.length, projectId: project.id },
+    "Processing DSPy steps"
+  );
+
   for (const param of params) {
+    const stepPayloadSize = JSON.stringify(param).length;
+    const stepPayloadSizeMB = stepPayloadSize / (1024 * 1024);
+
+    logger.info(
+      {
+        stepId: param.index,
+        runId: param.run_id,
+        examplesCount: param.examples.length,
+        llmCallsCount: param.llm_calls.length,
+        stepPayloadSize,
+        stepPayloadSizeMB: stepPayloadSizeMB.toFixed(2),
+        projectId: project.id,
+      },
+      "Processing individual DSPy step"
+    );
+
     try {
       await processDSPyStep(project, param);
     } catch (error) {
       if (error instanceof z.ZodError) {
         logger.error(
-          { error, body: param, projectId: project.id },
+          {
+            error,
+            stepId: param.index,
+            runId: param.run_id,
+            projectId: project.id,
+          },
           "failed to validate data for DSPy step"
         );
         Sentry.captureException(error, {
@@ -117,7 +159,12 @@ export default async function handler(
         return res.status(400).json({ error: validationError.message });
       } else {
         logger.error(
-          { error, body: param, projectId: project.id },
+          {
+            error,
+            stepId: param.index,
+            runId: param.run_id,
+            projectId: project.id,
+          },
           "internal server error processing DSPy step"
         );
         Sentry.captureException(error, {
@@ -161,7 +208,7 @@ const processDSPyStep = async (project: Project, param: DSPyStepRESTParams) => {
       updated_at: new Date().getTime(),
     },
     examples: param.examples.map((example) => {
-      return {
+      const processedExample = {
         ...{
           ...example,
           trace: example.trace?.map((t) => {
@@ -173,6 +220,13 @@ const processDSPyStep = async (project: Project, param: DSPyStepRESTParams) => {
         },
         hash: generateHash(example),
       };
+      // Apply aggressive truncation for ES field limits
+      return safeTruncate(processedExample, 16 * 1024, [
+        8 * 1024,
+        4 * 1024,
+        2 * 1024,
+        1024,
+      ]);
     }),
     llm_calls: param.llm_calls
       .map((call) => ({
@@ -186,7 +240,13 @@ const processDSPyStep = async (project: Project, param: DSPyStepRESTParams) => {
         }
 
         if (llmCall.response) {
-          llmCall.response = safeTruncate(llmCall.response);
+          // More aggressive truncation for ES field limits
+          llmCall.response = safeTruncate(llmCall.response, 16 * 1024, [
+            8 * 1024,
+            4 * 1024,
+            2 * 1024,
+            1024,
+          ]);
           totalSize = JSON.stringify(llmCall).length;
 
           if (totalSize >= 256_000) {
@@ -247,16 +307,55 @@ const processDSPyStep = async (project: Project, param: DSPyStepRESTParams) => {
     },
   };
 
-  const client = await esClient({ projectId: project.id });
-  await client.update({
-    index: DSPY_STEPS_INDEX.alias,
-    id,
-    body: {
-      script,
-      upsert: validatedDspyStep,
+  const esPayloadSize = JSON.stringify({
+    script,
+    upsert: validatedDspyStep,
+  }).length;
+  const esPayloadSizeMB = esPayloadSize / (1024 * 1024);
+
+  logger.info(
+    {
+      stepId: param.index,
+      runId: param.run_id,
+      esPayloadSize,
+      esPayloadSizeMB: esPayloadSizeMB.toFixed(2),
+      examplesCount: validatedDspyStep.examples.length,
+      llmCallsCount: validatedDspyStep.llm_calls.length,
+      projectId: project.id,
     },
-    retry_on_conflict: 5,
-  });
+    "Sending DSPy step to Elasticsearch"
+  );
+
+  const client = await esClient({ projectId: project.id });
+  try {
+    await client.update({
+      index: DSPY_STEPS_INDEX.alias,
+      id,
+      body: {
+        script,
+        upsert: validatedDspyStep,
+      },
+      retry_on_conflict: 5,
+    });
+
+    logger.info(
+      { stepId: param.index, runId: param.run_id, projectId: project.id },
+      "Successfully stored DSPy step in Elasticsearch"
+    );
+  } catch (error) {
+    logger.error(
+      {
+        error,
+        stepId: param.index,
+        runId: param.run_id,
+        esPayloadSize,
+        esPayloadSizeMB: esPayloadSizeMB.toFixed(2),
+        projectId: project.id,
+      },
+      "Failed to store DSPy step in Elasticsearch"
+    );
+    throw error;
+  }
 };
 
 const generateHash = (data: object) => {
