@@ -329,6 +329,7 @@ export class PromptService {
         );
 
         // Get the latest version
+        // TODO: This should use the version service instead of accessing the repository directly
         const latestVersion = (await this.repository.versions.getLatestVersion(
           updatedConfig.id,
           projectId,
