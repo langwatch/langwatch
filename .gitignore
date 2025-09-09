@@ -17,3 +17,7 @@ langwatch_server/
 
 # Misc
 .local
+
+# # CLI Testing files
+# prompts-lock.json
+# prompts.json
