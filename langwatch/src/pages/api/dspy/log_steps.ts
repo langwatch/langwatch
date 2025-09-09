@@ -122,22 +122,6 @@ export default async function handler(
   );
 
   for (const param of params) {
-    const stepPayloadSize = JSON.stringify(param).length;
-    const stepPayloadSizeMB = stepPayloadSize / (1024 * 1024);
-
-    logger.info(
-      {
-        stepId: param.index,
-        runId: param.run_id,
-        examplesCount: param.examples.length,
-        llmCallsCount: param.llm_calls.length,
-        stepPayloadSize,
-        stepPayloadSizeMB: stepPayloadSizeMB.toFixed(2),
-        projectId: project.id,
-      },
-      "Processing individual DSPy step"
-    );
-
     try {
       await processDSPyStep(project, param);
     } catch (error) {
@@ -312,19 +296,6 @@ const processDSPyStep = async (project: Project, param: DSPyStepRESTParams) => {
     upsert: validatedDspyStep,
   }).length;
   const esPayloadSizeMB = esPayloadSize / (1024 * 1024);
-
-  logger.info(
-    {
-      stepId: param.index,
-      runId: param.run_id,
-      esPayloadSize,
-      esPayloadSizeMB: esPayloadSizeMB.toFixed(2),
-      examplesCount: validatedDspyStep.examples.length,
-      llmCallsCount: validatedDspyStep.llm_calls.length,
-      projectId: project.id,
-    },
-    "Sending DSPy step to Elasticsearch"
-  );
 
   const client = await esClient({ projectId: project.id });
   try {
