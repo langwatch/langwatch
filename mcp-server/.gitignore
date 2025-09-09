@@ -2,3 +2,4 @@
 tsconfig.tsbuildinfo
 dist
 !**/.gitkeep
+llms-full.txt

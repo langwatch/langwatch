@@ -20,7 +20,7 @@
   "scripts": {
     "start": "tsx src/index.ts",
     "build": "tsup && node build.js",
-    "prepublish": "npm run build",
+    "prepublish": "pnpm run build",
     "test": "echo \"no tests exist yet\""
   },
   "author": "",

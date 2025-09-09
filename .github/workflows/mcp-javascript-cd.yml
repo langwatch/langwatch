@@ -17,19 +17,23 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up Node.js
+      - uses: pnpm/action-setup@v2
+        with:
+          version: 10.12.1
+
+      - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: "20.x"
-          cache: "npm"
-          cache-dependency-path: "mcp-server/package-lock.json"
+          node-version: 20
+          cache: "pnpm"
+          cache-dependency-path: "mcp-server/pnpm-lock.yaml"
 
       - name: Install dependencies
-        working-directory: ./mcp-server
-        run: npm ci --prefer-offline --no-audit --no-fund --progress=false
+        working-directory: mcp-server
+        run: pnpm install --frozen-lockfile
 
       - name: Build and publish
-        working-directory: ./mcp-server
+        working-directory: mcp-server
         run: npm publish --provenance --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
