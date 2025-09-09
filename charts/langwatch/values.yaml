@@ -311,6 +311,9 @@ app:
   # Container security context (capabilities, readOnlyRootFilesystem, etc.)
   # See: https://kubespec.dev/v1/Pod#spec.containers.securityContext
   containerSecurityContext: {}
+  # PodDisruptionBudget pass-through (spec fields)
+  # See: https://kubespec.dev/kubernetes/policy/v1/PodDisruptionBudget
+  podDisruptionBudget: {}
   # Node selector for pod placement
   # See: https://kubespec.dev/v1/Pod#spec.nodeSelector
   nodeSelector: {}
@@ -402,6 +405,9 @@ langwatch_nlp:
   # Container security context (capabilities, readOnlyRootFilesystem, etc.)
   # See: https://kubespec.dev/v1/Pod#spec.containers.securityContext
   containerSecurityContext: {}
+  # PodDisruptionBudget pass-through (spec fields)
+  # See: https://kubespec.dev/kubernetes/policy/v1/PodDisruptionBudget
+  podDisruptionBudget: {}
   # Node selector for pod placement
   # See: https://kubespec.dev/v1/Pod#spec.nodeSelector
   nodeSelector: {}
@@ -490,6 +496,9 @@ langevals:
   # Container security context (capabilities, readOnlyRootFilesystem, etc.)
   # See: https://kubespec.dev/v1/Pod#spec.containers.securityContext
   containerSecurityContext: {}
+  # PodDisruptionBudget pass-through (spec fields)
+  # See: https://kubespec.dev/kubernetes/policy/v1/PodDisruptionBudget
+  podDisruptionBudget: {}
   # Node selector for pod placement
   # See: https://kubespec.dev/v1/Pod#spec.nodeSelector
   nodeSelector: {}
@@ -606,6 +615,9 @@ cronjobs:
   # Container security context (capabilities, readOnlyRootFilesystem, etc.)
   # See: https://kubespec.dev/v1/Pod#spec.containers.securityContext
   containerSecurityContext: {}
+  # PodDisruptionBudget pass-through (spec fields)
+  # See: https://kubespec.dev/kubernetes/policy/v1/PodDisruptionBudget
+  podDisruptionBudget: {}
   # Node selector for pod placement
   # See: https://kubespec.dev/v1/Pod#spec.nodeSelector
   nodeSelector: {}
@@ -805,7 +817,11 @@ postgresql:
   # Authentication and database configuration
   auth:
     username: postgres
-    password: "" # You must set this, it will not be auto-generated
+    # Setting the password directly here is NOT recommended, and should ONLY be done in
+    # local development environments. If running in a production environment, or just
+    # anywhere but local development, you should set the password via a secret manager
+    # via the `existingSecret` field.
+    password: ""
     database: mydb
     existingSecret: "" # See: https://kubespec.dev/v1/Secret
     secretKeys:
