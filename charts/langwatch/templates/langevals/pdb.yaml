@@ -1,0 +1,16 @@
+{{- with .Values.langevals.podDisruptionBudget }}
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ $.Release.Name }}-langevals-pdb
+  labels:
+    app.kubernetes.io/name: {{ $.Release.Name }}-langevals
+    app.kubernetes.io/instance: {{ $.Release.Name }}
+    {{- include "langwatch.labels" $ | nindent 4 }}
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ $.Release.Name }}-langevals
+      app.kubernetes.io/instance: {{ $.Release.Name }}
+  {{- toYaml . | nindent 2 }}
+{{- end }}
