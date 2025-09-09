@@ -4,6 +4,7 @@ from unittest.mock import patch, MagicMock
 from langwatch.telemetry import context as telemetry_context
 from langwatch.telemetry.span import LangWatchSpan
 from langwatch.telemetry.tracing import LangWatchTrace
+from langwatch.telemetry.context import main_thread_langwatch_trace
 
 
 class TestContext(unittest.TestCase):
@@ -11,10 +12,17 @@ class TestContext(unittest.TestCase):
         # Reset contextvars before each test
         self.trace_token = telemetry_context.stored_langwatch_trace.set(None)  # type: ignore
         self.span_token = telemetry_context.stored_langwatch_span.set(None)  # type: ignore
+        # Clear any global state that might interfere
+
+        main_thread_langwatch_trace.clear()
 
     def tearDown(self):
+        # Clean up context variables
         telemetry_context.stored_langwatch_trace.reset(self.trace_token)
         telemetry_context.stored_langwatch_span.reset(self.span_token)
+        # Clear global state
+
+        main_thread_langwatch_trace.clear()
 
     @patch("langwatch.telemetry.context.ensure_setup")
     def test_get_current_trace_exists(self, mock_ensure_setup: MagicMock):
@@ -55,9 +63,10 @@ class TestContext(unittest.TestCase):
         mock_warn: MagicMock,
     ):
         mock_trace_instance = MagicMock(spec=LangWatchTrace)
-        mock_lw_trace_constructor.return_value.__enter__.return_value = (
-            mock_trace_instance
-        )
+        # Set up the mock properly - the constructor should return the mock directly
+        mock_lw_trace_constructor.return_value = mock_trace_instance
+        mock_trace_instance.__enter__.return_value = mock_trace_instance
+        mock_trace_instance.__exit__.return_value = None
 
         trace = telemetry_context.get_current_trace(start_if_none=True)
 
@@ -89,12 +98,25 @@ class TestContext(unittest.TestCase):
         mock_lw_trace_constructor.assert_called_once()
 
     @patch("langwatch.telemetry.context.ensure_setup")
-    def test_get_current_span_exists_in_lw_context(self, mock_ensure_setup: MagicMock):
+    @patch("langwatch.telemetry.context.get_current_trace")
+    @patch("langwatch.telemetry.span.LangWatchSpan.wrap_otel_span")
+    def test_get_current_span_exists_in_lw_context(
+        self,
+        mock_wrap_otel_span: MagicMock,
+        mock_get_current_trace: MagicMock,
+        mock_ensure_setup: MagicMock,
+    ):
         mock_span = MagicMock(spec=LangWatchSpan)
-        telemetry_context.stored_langwatch_span.set(mock_span)
+        mock_trace = MagicMock(spec=LangWatchTrace)
+
+        # Setup mocks
+        mock_get_current_trace.return_value = mock_trace
+        mock_wrap_otel_span.return_value = mock_span
+
         span = telemetry_context.get_current_span()
         self.assertIs(span, mock_span)
         mock_ensure_setup.assert_called_once()
+        mock_wrap_otel_span.assert_called_once()
 
     @patch("langwatch.telemetry.context.trace_api.get_current_span")
     @patch("langwatch.telemetry.context.ensure_setup")
