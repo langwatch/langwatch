@@ -46,6 +46,8 @@ export type VersionedPrompt = {
   versionId: string;
   versionCreatedAt: Date;
   model: string;
+  temperature?: number;
+  max_tokens?: number;
   prompt: string;
   projectId: string;
   organizationId: string;
@@ -492,8 +494,9 @@ export class PromptService {
     const remoteVersion = existingPrompt.version;
     const remoteConfigData: LatestConfigVersionSchema["configData"] = {
       model: existingPrompt.model,
+      temperature: existingPrompt.temperature,
       prompt: existingPrompt.prompt,
-      messages: existingPrompt.messages,
+      messages: existingPrompt.messages.filter((msg) => msg.role !== "system"),
       inputs: existingPrompt.inputs,
       outputs: existingPrompt.outputs,
       response_format: existingPrompt.response_format,
@@ -506,10 +509,22 @@ export class PromptService {
         remoteConfigData
       );
 
+      console.log("comparison", comparison);
+
       if (comparison.isEqual) {
         // Content is the same - up to date
         return { action: "up_to_date", prompt: existingPrompt };
       } else {
+        console.log(
+          JSON.stringify(
+            {
+              localConfigData,
+              remoteConfigData,
+            },
+            null,
+            2
+          )
+        );
         // Content differs - create new version
         const updatedPrompt = await this.updatePrompt({
           idOrHandle: existingPrompt.id,
@@ -600,6 +615,8 @@ export class PromptService {
       versionId: config.latestVersion.id ?? "",
       versionCreatedAt: config.latestVersion.createdAt ?? new Date(),
       model: config.latestVersion.configData.model,
+      temperature: config.latestVersion.configData.temperature,
+      max_tokens: config.latestVersion.configData.max_tokens,
       prompt,
       projectId: config.projectId,
       organizationId: config.organizationId,

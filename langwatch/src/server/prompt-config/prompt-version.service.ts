@@ -39,7 +39,11 @@ export class PromptVersionService {
     authorId?: string;
     version: number;
   }): Prisma.LlmPromptConfigVersionUncheckedCreateInput {
-    const validator = getVersionValidator(params.schemaVersion);
+    const validator = getVersionValidator(params.schemaVersion).omit({
+      id: true,
+      createdAt: true,
+      version: true,
+    });
 
     const data = {
       configId: params.configId,

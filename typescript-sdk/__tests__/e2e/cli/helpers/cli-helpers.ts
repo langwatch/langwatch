@@ -28,7 +28,7 @@ export class CliHelpers {
    * @param testDir Absolute path to the test working directory.
    */
   constructor(private readonly config: { testDir: string }) {
-    this.logPath = path.join(this.config.testDir, "cli-test-run.log");
+    this.logPath = path.join(this.config.testDir, "..", "cli-test-run.log");
     this.log("=== CLI Helper initialized ===");
   }
 

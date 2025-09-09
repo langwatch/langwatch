@@ -5,6 +5,7 @@ import { validator as zValidator, resolver } from "hono-openapi/zod";
 import { z } from "zod";
 
 import { getLatestConfigVersionSchema } from "~/server/prompt-config/repositories/llm-config-version-schema";
+
 import {
   organizationMiddleware,
   type AuthMiddlewareVariables,
