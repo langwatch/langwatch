@@ -15,8 +15,9 @@ Check out [LangWatch integration guide](https://docs.langwatch.ai/integration/ov
 3. Set the "name" as "LangWatch"
 4. Set the "type" to `command`
 5. Set the "command" to `npx -y @langwatch/mcp-server --apiKey=sk-lw-...`
+
 - `--apiKey`: Your LangWatch API key. This is mandatory and must be provided.
-- `--endpoint`: *Optional* The endpoint for the LangWatch API. Defaults to `https://app.langwatch.ai` if not specified.
+- `--endpoint`: _Optional_ The endpoint for the LangWatch API. Defaults to `https://app.langwatch.ai` if not specified.
 
 > [!TIP]
 > To aid in securing your keys, the MCP will first look at the global system environment variables `LANGWATCH_API_KEY` and `LANGWATCH_ENDPOINT` to check if they have values as well as looking at arguments passed into the server on start.
@@ -30,6 +31,12 @@ Check out [LangWatch integration guide](https://docs.langwatch.ai/integration/ov
 ## Tools
 
 The MCP Server provides the following tools:
+
+### `fetch_langwatch_docs`
+
+- **Description:** Fetches the LangWatch docs for understanding how to implement LangWatch in your codebase.
+- **Parameters:**
+  - `url`: (Optional) The full url of the specific doc page. If not provided, the docs index will be fetched.
 
 ### `get_latest_traces`
 
@@ -49,12 +56,13 @@ The MCP Server provides the following tools:
 To use these tools within Cursor, follow these steps:
 
 1. **Open the Cursor Chat view:**
-    - `Cmd + I`
+
+   - `Cmd + I`
 
 2. **Ensure the MCP server is running:**
 
 3. **Interact with your Agent:**
-    - Ask a question like the following to test the tools are accessible: *Note: When the tool is detected, you'll need to run `Run tool` in the chat view for it to be called.
+   - Ask a question like the following to test the tools are accessible: \*Note: When the tool is detected, you'll need to run `Run tool` in the chat view for it to be called.
 
 > "I just ran into an issue while debugging, can you check the latest traces and fix it?"
 
@@ -63,7 +71,6 @@ To use these tools within Cursor, follow these steps:
 <source media="(prefers-color-scheme: light)" srcset="../assets/mcp-server/cursor-example.light.webp">
 <img alt="LangWatch Logo" src="../assets/mcp-server/cursor-example.light.webp" width="900">
 </picture>
-
 
 ## 🛟 Support
 

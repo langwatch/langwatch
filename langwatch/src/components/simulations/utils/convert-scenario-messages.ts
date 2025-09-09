@@ -2,7 +2,7 @@ import {
   TextMessage,
   Role,
   type MessageRole,
-  type Message,
+  Message,
   ActionExecutionMessage,
   ResultMessage,
   ImageMessage,
@@ -119,6 +119,23 @@ function convertMixedContent(
       if (imageMessage) {
         messages.push(imageMessage);
       }
+
+      // Anthropic tool use
+    } else if (item.type === "tool_use") {
+      messages.push(
+        new ActionExecutionMessage({
+          name: item.name,
+          arguments: item.arguments ?? item.input,
+        })
+      );
+    } else if (item.type === "tool_result") {
+      messages.push(
+        new ResultMessage({
+          actionExecutionId: item.tool_use_id,
+          actionName: item.name ?? "tool_result",
+          result: item.content,
+        })
+      );
     }
   });
 
