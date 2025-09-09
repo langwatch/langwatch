@@ -7,6 +7,8 @@ import type {
 import { nanoid } from "nanoid";
 import { describe, expect, it, beforeEach, afterEach } from "vitest";
 
+import { prisma } from "~/server/db";
+
 import { app } from "../[[...route]]/app";
 
 import { createHandle } from "./helpers";
@@ -16,7 +18,6 @@ import {
   llmPromptConfigVersionFactory,
 } from "~/factories/llm-config.factory";
 import { projectFactory } from "~/factories/project.factory";
-import { prisma } from "~/server/db";
 
 describe("Prompts API", () => {
   let mockConfig: LlmPromptConfig;
