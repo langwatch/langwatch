@@ -282,7 +282,7 @@ export class PromptService {
     data: Partial<
       Omit<
         CreateLlmConfigParams &
-          CreateLlmConfigVersionParams &
+          Omit<CreateLlmConfigVersionParams, "configData"> &
           CreateLlmConfigVersionParams["configData"],
         | "id"
         | "createdAt"
@@ -515,7 +515,7 @@ export class PromptService {
           data: {
             authorId,
             commitMessage: commitMessage ?? "Updated from local file",
-            configData: localConfigData,
+            ...localConfigData,
             schemaVersion: SchemaVersion.V1_0,
           },
         });
