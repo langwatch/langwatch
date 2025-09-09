@@ -93,6 +93,13 @@ export class PromptVersionService {
   }): Promise<LlmPromptConfigVersion> {
     const { data, db } = params;
     const prisma = db ?? this.prisma;
+
+    // Validate system prompt conflicts before creating version
+    this.assertNoSystemPromptConflict({
+      prompt: data.configData.prompt,
+      messages: data.configData.messages,
+    });
+
     const validatedData = this.createValidatedVersionCreateInput({
       ...data,
       schemaVersion: data.schemaVersion ?? LATEST_SCHEMA_VERSION,
