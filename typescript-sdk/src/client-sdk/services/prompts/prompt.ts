@@ -72,7 +72,7 @@ export class Prompt implements PromptResponse {
   public readonly inputs!: PromptResponse["inputs"];
   public readonly outputs!: PromptResponse["outputs"];
 
-  constructor(private readonly raw: PromptResponse) {
+  constructor(readonly raw: PromptResponse) {
     Object.assign(this, raw);
 
     // Return a proxy that wraps specific methods for tracing
