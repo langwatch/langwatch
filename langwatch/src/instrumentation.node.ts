@@ -11,6 +11,11 @@ import { getNodeAutoInstrumentations } from "@opentelemetry/auto-instrumentation
 import { OTLPTraceExporter as OTLPTraceExporterProto } from "@opentelemetry/exporter-trace-otlp-proto";
 import { detectResources } from "@opentelemetry/resources";
 import { awsEksDetector } from "@opentelemetry/resource-detector-aws";
+import {
+  CompositePropagator,
+  W3CTraceContextPropagator,
+  W3CBaggagePropagator,
+} from '@opentelemetry/core';
 
 if (process.env.OTEL_EXPORTER_OTLP_ENDPOINT) {
   const spanProcessors = [];
@@ -22,6 +27,7 @@ if (process.env.OTEL_EXPORTER_OTLP_ENDPOINT) {
   }
 
   setupObservability({
+    langwatch: 'disabled',
     attributes: {
       "process.runtime.env": process.env.NODE_ENV,
       "service.instance.id": process.env.INSTANCE_ID,
@@ -30,7 +36,17 @@ if (process.env.OTEL_EXPORTER_OTLP_ENDPOINT) {
       detectors: [awsEksDetector],
     }),
     spanProcessors: spanProcessors,
-    instrumentations: [getNodeAutoInstrumentations()],
+    textMapPropagator: new CompositePropagator({
+      propagators: [
+        new W3CTraceContextPropagator(),
+        new W3CBaggagePropagator(),
+      ],
+    }),  
+    instrumentations: [getNodeAutoInstrumentations({
+      '@opentelemetry/instrumentation-undici': {
+        enabled: false,
+      },
+    })],
   });
 }
 
