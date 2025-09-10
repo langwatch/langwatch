@@ -519,16 +519,6 @@ export class PromptService {
         // Content is the same - up to date
         return { action: "up_to_date", prompt: existingPrompt };
       } else {
-        console.log(
-          JSON.stringify(
-            {
-              localConfigData,
-              remoteConfigData,
-            },
-            null,
-            2
-          )
-        );
         // Content differs - create new version
         const updatedPrompt = await this.updatePrompt({
           idOrHandle: existingPrompt.id,
