@@ -27,7 +27,7 @@ async def on_chat_start():
         name="Math Tutor",
         instructions="You are a personal math tutor. Write and run code to answer math questions.",
         tools=[{"type": "code_interpreter"}],
-        model="gpt-5",
+        model="gpt-4o-mini",
     )
 
     thread = await client.beta.threads.create()
