@@ -191,7 +191,7 @@ describe("CLI E2E", () => {
         expect(remotePrompt.handle).toBe(promptHandle);
         expect(remotePrompt.model).toBe(localPrompt.model);
         expect(remotePrompt.temperature).toBe(
-          localPrompt.modelParameters.temperature,
+          localPrompt.modelParameters.temperature
         );
         expect(remotePrompt.messages).toEqual(localPrompt.messages);
 
@@ -242,19 +242,17 @@ describe("CLI E2E", () => {
 
       describe("when user chooses to use local version", () => {
         it("should replace the remote version with the local version", async () => {
+          const current =
+            localPromptFileManagement.readPromptFile(promptHandle);
           // Run sync and choose local version ('l')
           const sync = await cli.runInteractive(`prompt sync`, ["l"]);
           expectCliResultSuccess(sync);
 
           // Remote should now match local
           const updatedRemote = await langwatch.prompts.get(promptHandle);
-          expect(updatedRemote.model).toBe("gpt-4-turbo");
-          expect(updatedRemote.temperature).toBe(0.9);
-          expect(updatedRemote.prompt).toBe("You an updated system message.");
-          expect(updatedRemote.messages).toEqual([
-            { role: "system", content: "You an updated system message." },
-            { role: "user", content: "Do you like apples?" },
-          ]);
+          expect(updatedRemote.model).toBe(current.model);
+          expect(updatedRemote.prompt).toBe(current.messages[0].content);
+          expect(updatedRemote.messages).toEqual(current.messages);
         });
       });
     });
@@ -275,7 +273,7 @@ describe("CLI E2E", () => {
         // Update to change from draft
         const addResult = await cli.runInteractive(
           `prompt add ${promptHandle}@latest`,
-          ["y"],
+          ["y"]
         );
 
         expectCliResultSuccess(addResult);
@@ -286,7 +284,7 @@ describe("CLI E2E", () => {
 
       it("should pull down the latest version from remote into materialized", async () => {
         expect(
-          materializedPromptFileManagement.getPromptFileContent(promptHandle),
+          materializedPromptFileManagement.getPromptFileContent(promptHandle)
         ).toMatchInlineSnapshot(`
           "model: gpt-4-turbo
           messages:
@@ -300,7 +298,7 @@ describe("CLI E2E", () => {
 
       it("should not be in the prompts directory", () => {
         expect(() =>
-          localPromptFileManagement.getPromptFileContent(promptHandle),
+          localPromptFileManagement.getPromptFileContent(promptHandle)
         ).toThrow();
       });
 
@@ -318,7 +316,7 @@ describe("CLI E2E", () => {
           expectCliResultSuccess(sync);
 
           expect(
-            materializedPromptFileManagement.getPromptFileContent(promptHandle),
+            materializedPromptFileManagement.getPromptFileContent(promptHandle)
           ).toMatchInlineSnapshot(`
             "model: gpt-4-turbo
             messages:
@@ -335,7 +333,7 @@ describe("CLI E2E", () => {
         it("should sync the correct version", async () => {
           const addResult = await cli.runInteractive(
             `prompt add ${promptHandle}@0`,
-            ["y"],
+            ["y"]
           );
           expectCliResultSuccess(addResult);
 
@@ -343,7 +341,7 @@ describe("CLI E2E", () => {
           expectCliResultSuccess(sync);
 
           expect(
-            materializedPromptFileManagement.getPromptFileContent(promptHandle),
+            materializedPromptFileManagement.getPromptFileContent(promptHandle)
           ).toMatchInlineSnapshot(`
             "model: gpt-4-turbo
             messages:

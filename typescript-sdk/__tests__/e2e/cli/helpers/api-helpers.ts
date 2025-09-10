@@ -7,7 +7,7 @@ export class ApiHelpers {
   cleapUpTestPrompts = async () => {
     const prompts = await this.langwatch.prompts.getAll();
     const promises = prompts.map((prompt) => {
-      if (prompt.handle.startsWith(PROMPT_NAME_PREFIX)) {
+      if (prompt.handle?.startsWith(PROMPT_NAME_PREFIX)) {
         return this.langwatch.prompts.delete(prompt.handle);
       }
     });
