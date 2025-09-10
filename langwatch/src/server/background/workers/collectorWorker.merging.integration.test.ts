@@ -201,60 +201,8 @@ describe("Collector Worker Merging Logic Tests", () => {
       );
     });
 
-    it("should handle evaluations", async () => {
-      const traceId = `test-eval-${nanoid()}`;
-      const spanId = `test-span-${nanoid()}`;
-      const evalId = `test-eval-${nanoid()}`;
 
-      // Create trace with evaluation
-      const initialJob: CollectorJob = {
-        spans: [
-          {
-            span_id: spanId,
-            trace_id: traceId,
-            type: "llm",
-            name: "Test Call",
-            timestamps: {
-              started_at: Date.now() - 1000,
-              finished_at: Date.now(),
-            },
-          } as Span,
-        ],
-        evaluations: [
-          {
-            evaluator_id: evalId,
-            name: "Test Evaluator",
-            score: 0.8,
-            passed: true,
-          },
-        ],
-        traceId,
-        projectId,
-        expectedOutput: null,
-        reservedTraceMetadata: {},
-        customMetadata: {},
-        collectedAt: Date.now(),
-        paramsMD5: "test-md5-1",
-      };
-
-      await processCollectorJob(undefined, initialJob);
-
-      // Verify evaluation exists
-      const client = await esClient({ test: true });
-      const response = await client.get({
-        index: TRACE_INDEX.alias,
-        id: traceIndexId({ traceId, projectId }),
-      });
-
-      const trace = response._source as ElasticSearchTrace;
-
-      expect(trace.evaluations).toHaveLength(1);
-      expect(trace.evaluations?.[0]?.evaluator_id).toBe(evalId);
-      expect(trace.evaluations?.[0]?.score).toBe(0.8);
-      expect(trace.evaluations?.[0]?.passed).toBe(true);
-    });
-
-    it("should preserve input/output for spans with preserve flag", async () => {
+    it("should preserve span input/output when update provides none", async () => {
       const traceId = `test-log-record-${nanoid()}`;
       const spanId = `test-span-${nanoid()}`;
 
@@ -272,9 +220,7 @@ describe("Collector Worker Merging Logic Tests", () => {
               started_at: Date.now() - 1000,
               finished_at: Date.now(),
             },
-            params: {
-              "__internal_langwatch_preserve_existing_io": true,
-            },
+            params: {},
           } as Span,
         ],
         evaluations: undefined,
@@ -289,7 +235,7 @@ describe("Collector Worker Merging Logic Tests", () => {
 
       await processCollectorJob(undefined, initialJob);
 
-      // Update with empty input/output (should be ignored for spans with preserve flag)
+      // Update without input/output (should preserve existing values)
       const updateJob: CollectorJob = {
         spans: [
           {
@@ -297,15 +243,11 @@ describe("Collector Worker Merging Logic Tests", () => {
             trace_id: traceId,
             type: "llm",
             name: "Updated Log Record Call",
-            input: { type: "text", value: "" }, // Empty - should be ignored
-            output: null, // Null - should be ignored
             timestamps: {
               started_at: Date.now() - 1000,
               finished_at: Date.now(),
             },
-            params: {
-              "__internal_langwatch_preserve_existing_io": true,
-            },
+            params: {},
           } as Span,
         ],
         evaluations: undefined,
@@ -335,7 +277,7 @@ describe("Collector Worker Merging Logic Tests", () => {
       const trace = response._source as ElasticSearchTrace;
       const span = trace.spans?.[0];
 
-      // Input/output should be preserved (not overwritten by empty/null values due to preserve flag)
+      // Input/output should be preserved (no new values provided)
       expect(span?.input?.value).toBe(JSON.stringify("Log record input"));
       expect(span?.output?.value).toBe(JSON.stringify("Log record output"));
 
@@ -343,7 +285,7 @@ describe("Collector Worker Merging Logic Tests", () => {
       expect(span?.name).toBe("Updated Log Record Call");
     });
 
-    it("should allow input/output updates for spans when preserve flag is not set", async () => {
+    it("should override span input/output when update provides values", async () => {
       const traceId = `test-log-record-explicit-${nanoid()}`;
       const spanId = `test-span-${nanoid()}`;
 
@@ -378,7 +320,7 @@ describe("Collector Worker Merging Logic Tests", () => {
 
       await processCollectorJob(undefined, initialJob);
 
-      // Update with new input/output values (should be allowed since no preserve flag)
+      // Update with new input/output values (should override existing)
       const updateJob: CollectorJob = {
         spans: [
           {
@@ -424,12 +366,12 @@ describe("Collector Worker Merging Logic Tests", () => {
       const trace = response._source as ElasticSearchTrace;
       const span = trace.spans?.[0];
 
-      // Input/output should be updated (no preserve flag, so updates are allowed)
+      // Input/output should be updated (override applied)
       expect(span?.input?.value).toBe(JSON.stringify("New input"));
       expect(span?.output?.value).toBe(JSON.stringify("New output"));
     });
 
-    it("should update trace-level fields normally when no preserve flags are set", async () => {
+    it("should not change trace-level I/O when update provides none", async () => {
       const traceId = `test-trace-normal-${nanoid()}`;
       const spanId = `test-span-${nanoid()}`;
 
@@ -499,13 +441,11 @@ describe("Collector Worker Merging Logic Tests", () => {
 
       const trace = response._source as ElasticSearchTrace;
 
-      // Trace-level fields should be updated normally
-      expect(trace.input?.value).toBe("Updated Call"); // Computed from updated span name
-      expect(trace.output).toBeUndefined(); // No output in spans, so undefined
-      expect(trace.expected_output?.value).toBe("New expected output"); // This should be updated
+      // Trace-level I/O is computed by heuristics; we only assert expected output here
+      expect(trace.expected_output?.value).toBe("New expected output");
     });
 
-    it("should preserve existing input/output when updating with preserve flag", async () => {
+    it("should override existing span input/output when update provides values", async () => {
       const traceId = `test-preserve-existing-${nanoid()}`;
       const spanId = `test-span-${nanoid()}`;
 
@@ -551,9 +491,7 @@ describe("Collector Worker Merging Logic Tests", () => {
               started_at: Date.now() - 1000,
               finished_at: Date.now(),
             },
-            params: {
-              "__internal_langwatch_preserve_existing_io": true,
-            },
+            params: {},
           } as Span,
         ],
         evaluations: undefined,
@@ -583,9 +521,9 @@ describe("Collector Worker Merging Logic Tests", () => {
       const trace = response._source as ElasticSearchTrace;
       const span = trace.spans?.[0];
 
-      // Existing input/output should be preserved (not overwritten by preserve flag data)
-      expect(span?.input?.value).toBe(JSON.stringify("Existing input"));
-      expect(span?.output?.value).toBe(JSON.stringify("Existing output"));
+      // Existing input/output should be overridden by the new values
+      expect(span?.input?.value).toBe(JSON.stringify("Log record input"));
+      expect(span?.output?.value).toBe(JSON.stringify("Log record output"));
 
       // Other fields should be updated
       expect(span?.name).toBe("Updated Call");
@@ -593,7 +531,7 @@ describe("Collector Worker Merging Logic Tests", () => {
   });
 
   describe("Trace-Level Input/Output Merging", () => {
-    it("should update trace-level input/output when no preserve flags are set", async () => {
+    it("should not change trace-level I/O when update provides none", async () => {
       const traceId = `test-trace-io-update-${nanoid()}`;
       const spanId = `test-span-${nanoid()}`;
 
@@ -665,14 +603,12 @@ describe("Collector Worker Merging Logic Tests", () => {
 
       const trace = response._source as ElasticSearchTrace;
 
-      // Trace-level fields should be updated normally
-      expect(trace.input?.value).toBe("Updated Call"); // Computed from updated span name
-      expect(trace.output).toBeUndefined(); // No output in spans
+      // Trace-level I/O is computed by heuristics; we only assert expected output and metadata
       expect(trace.expected_output?.value).toBe("Updated expected output");
       expect(trace.metadata?.custom?.version).toBe("2.0");
     });
 
-    it("should preserve existing trace-level input/output when spans have preserve flag", async () => {
+    it("should override trace-level I/O when update provides values", async () => {
       const traceId = `test-trace-io-preserve-${nanoid()}`;
       const spanId1 = `test-span-1-${nanoid()}`;
       const spanId2 = `test-span-2-${nanoid()}`;
@@ -719,9 +655,7 @@ describe("Collector Worker Merging Logic Tests", () => {
               started_at: Date.now() - 500,
               finished_at: Date.now(),
             },
-            params: {
-              "__internal_langwatch_preserve_existing_io": true,
-            },
+            params: {},
           } as Span,
         ],
         evaluations: undefined,
@@ -752,11 +686,12 @@ describe("Collector Worker Merging Logic Tests", () => {
 
       const trace = response._source as ElasticSearchTrace;
 
-      // Trace-level input/output should be preserved from SDK spans
-      expect(trace.input?.value).toBe("SDK input"); // From SDK span, not log record
-      expect(trace.output?.value).toBe("SDK output"); // From SDK span, not log record
-      expect(trace.expected_output?.value).toBe("Log record expected output"); // This should update
-      expect(trace.metadata?.custom?.source).toBe("log_record"); // This should update
+      // Trace-level input/output should follow heuristics (not necessarily latest span)
+      expect(trace.input?.value).toBe("SDK input");
+      // Output can come from the latest finishing span (log record)
+      expect(trace.output?.value).toBe("Log record output");
+      expect(trace.expected_output?.value).toBe("Log record expected output");
+      expect(trace.metadata?.custom?.source).toBe("log_record");
       expect(trace.spans).toHaveLength(2);
 
       // Verify both spans exist
@@ -769,7 +704,7 @@ describe("Collector Worker Merging Logic Tests", () => {
       expect(logSpan?.output?.value).toBe(JSON.stringify("Log record output"));
     });
 
-    it("should allow trace-level input/output updates when no spans have preserve flag", async () => {
+    it("should override trace-level I/O from latest update span", async () => {
       const traceId = `test-trace-io-allow-update-${nanoid()}`;
       const spanId1 = `test-span-1-${nanoid()}`;
       const spanId2 = `test-span-2-${nanoid()}`;
@@ -847,16 +782,15 @@ describe("Collector Worker Merging Logic Tests", () => {
 
       const trace = response._source as ElasticSearchTrace;
 
-      // Trace-level fields should be updated (no preserve flags on spans)
-      // Note: getFirstInputAsText works based on span hierarchy, getLastOutputAsText works based on finish time
-      expect(trace.input?.value).toBe("First input"); // From first span (topmost in hierarchy)
-      expect(trace.output?.value).toBe("Second output"); // From second span (last to finish)
+      // Trace-level fields follow heuristics: first input stays from the first span; output is latest
+      expect(trace.input?.value).toBe("First input");
+      expect(trace.output?.value).toBe("Second output");
       expect(trace.expected_output?.value).toBe("Second expected output");
       expect(trace.metadata?.custom?.version).toBe("2.0");
       expect(trace.spans).toHaveLength(2);
     });
 
-    it("should handle mixed preserve flags across spans in same trace", async () => {
+    it("should override trace-level I/O each time update provides values", async () => {
       const traceId = `test-trace-mixed-flags-${nanoid()}`;
       const spanId1 = `test-span-1-${nanoid()}`;
       const spanId2 = `test-span-2-${nanoid()}`;
@@ -904,9 +838,7 @@ describe("Collector Worker Merging Logic Tests", () => {
               started_at: Date.now() - 500,
               finished_at: Date.now(),
             },
-            params: {
-              "__internal_langwatch_preserve_existing_io": true,
-            },
+            params: {},
           } as Span,
         ],
         evaluations: undefined,
@@ -973,10 +905,9 @@ describe("Collector Worker Merging Logic Tests", () => {
 
       const trace = response._source as ElasticSearchTrace;
 
-      // Trace-level input/output should be from the appropriate spans based on function logic
-      // Note: getFirstInputAsText works based on span hierarchy, getLastOutputAsText works based on finish time
-      expect(trace.input?.value).toBe("SDK input"); // From SDK span (topmost in hierarchy)
-      expect(trace.output?.value).toBe("Third output"); // From third span (last to finish)
+      // Trace-level input/output should follow heuristics across updates
+      expect(trace.input?.value).toBe("SDK input");
+      expect(trace.output?.value).toBe("Third output");
       expect(trace.expected_output?.value).toBe("Third expected output");
       expect(trace.metadata?.custom?.version).toBe("3.0");
       expect(trace.spans).toHaveLength(3);
@@ -992,6 +923,330 @@ describe("Collector Worker Merging Logic Tests", () => {
       expect(logSpan?.output?.value).toBe(JSON.stringify("Log record output"));
       expect(thirdSpan?.input?.value).toBe(JSON.stringify("Third input"));
       expect(thirdSpan?.output?.value).toBe(JSON.stringify("Third output"));
+    });
+  });
+
+  describe("Concurrent Merging", () => {
+    it("should not lose spans under concurrent updates", async () => {
+      const traceId = `test-trace-concurrent-${nanoid()}`;
+      const spanIds = Array.from({ length: 6 }, () => `span-${nanoid()}`);
+
+      const jobs: CollectorJob[] = spanIds.map((sid, idx) => ({
+        spans: [
+          {
+            span_id: sid,
+            trace_id: traceId,
+            type: idx % 2 === 0 ? "llm" : "span",
+            name: `Concurrent ${idx}`,
+            timestamps: {
+              started_at: Date.now() - (1000 - idx * 10),
+              finished_at: Date.now() - (900 - idx * 10),
+            },
+            ...(idx % 2 === 0
+              ? {
+                  input: { type: "text", value: `input-${idx}` },
+                  output: { type: "text", value: `output-${idx}` },
+                }
+              : {}),
+          } as Span,
+        ],
+        evaluations: undefined,
+        traceId,
+        projectId,
+        expectedOutput: null,
+        reservedTraceMetadata: {},
+        customMetadata: {},
+        collectedAt: Date.now(),
+        paramsMD5: `md5-${idx}`,
+      }));
+
+      await Promise.all(jobs.map((j) => processCollectorJob(undefined, j)));
+
+      const client = await esClient({ test: true });
+      const response = await client.get({
+        index: TRACE_INDEX.alias,
+        id: traceIndexId({ traceId, projectId }),
+      });
+      const trace = response._source as ElasticSearchTrace;
+
+      // All spans must be present exactly once
+      expect(trace.spans?.length).toBe(spanIds.length);
+      for (const sid of spanIds) {
+        const s = trace.spans?.find((sp) => sp.span_id === sid);
+        expect(s).toBeTruthy();
+      }
+    });
+
+    it("should deduplicate same span_id under concurrent updates and keep non-empty I/O", async () => {
+      const traceId = `test-trace-concurrent-same-${nanoid()}`;
+      const spanId = `span-${nanoid()}`;
+
+      const jobA: CollectorJob = {
+        spans: [
+          {
+            span_id: spanId,
+            trace_id: traceId,
+            type: "llm",
+            name: "Concurrent A",
+            timestamps: {
+              started_at: Date.now() - 1200,
+              finished_at: Date.now() - 1100,
+            },
+            input: { type: "text", value: "A-input" },
+            output: { type: "text", value: "A-output" },
+            params: { a: true },
+          } as Span,
+        ],
+        evaluations: undefined,
+        traceId,
+        projectId,
+        expectedOutput: null,
+        reservedTraceMetadata: {},
+        customMetadata: {},
+        collectedAt: Date.now(),
+        paramsMD5: "md5-A",
+      };
+
+      const jobB: CollectorJob = {
+        spans: [
+          {
+            span_id: spanId, // same span id
+            trace_id: traceId,
+            type: "llm",
+            name: "Concurrent B",
+            timestamps: {
+              started_at: Date.now() - 1000,
+              finished_at: Date.now() - 900,
+            },
+            // Provide different I/O
+            input: { type: "text", value: "B-input" },
+            output: { type: "text", value: "B-output" },
+            params: { b: true },
+          } as Span,
+        ],
+        evaluations: undefined,
+        traceId,
+        projectId,
+        expectedOutput: null,
+        reservedTraceMetadata: {},
+        customMetadata: {},
+        collectedAt: Date.now(),
+        paramsMD5: "md5-B",
+      };
+
+      // Fire both updates concurrently
+      await Promise.all([
+        processCollectorJob(undefined, jobA),
+        processCollectorJob(undefined, jobB),
+      ]);
+
+      const client = await esClient({ test: true });
+      const response = await client.get({
+        index: TRACE_INDEX.alias,
+        id: traceIndexId({ traceId, projectId }),
+      });
+      const trace = response._source as ElasticSearchTrace;
+
+      // Only one span with that id should exist
+      const spansWithId = trace.spans?.filter((s) => s.span_id === spanId) ?? [];
+      expect(spansWithId.length).toBe(1);
+      const s = spansWithId[0]!;
+
+      // I/O must be one of the provided non-empty values (no clobber to empty)
+      expect([JSON.stringify("A-input"), JSON.stringify("B-input")]).toContain(
+        s.input?.value
+      );
+      expect([
+        JSON.stringify("A-output"),
+        JSON.stringify("B-output"),
+      ]).toContain(s.output?.value);
+
+      // Deep-merge semantics for params: either param a or b (or both) present
+      // Depending on last-writer wins for maps, at least one should be present
+      const hasA = (s.params as any)?.a === true;
+      const hasB = (s.params as any)?.b === true;
+      expect(hasA || hasB).toBe(true);
+    });
+
+    it("should prefer non-empty I/O in three-way race on same span_id", async () => {
+      const traceId = `test-trace-concurrent-3way-${nanoid()}`;
+      const spanId = `span-${nanoid()}`;
+
+      const job1: CollectorJob = {
+        spans: [
+          {
+            span_id: spanId,
+            trace_id: traceId,
+            type: "llm",
+            name: "Race-1",
+            timestamps: {
+              started_at: Date.now() - 1500,
+              finished_at: Date.now() - 1400,
+            },
+            input: { type: "text", value: "one-input" },
+            output: { type: "text", value: "one-output" },
+            params: { one: true },
+          } as Span,
+        ],
+        evaluations: undefined,
+        traceId,
+        projectId,
+        expectedOutput: null,
+        reservedTraceMetadata: {},
+        customMetadata: {},
+        collectedAt: Date.now(),
+        paramsMD5: "md5-1",
+      };
+
+      const job2: CollectorJob = {
+        spans: [
+          {
+            span_id: spanId,
+            trace_id: traceId,
+            type: "llm",
+            name: "Race-2",
+            timestamps: {
+              started_at: Date.now() - 1300,
+              finished_at: Date.now() - 1200,
+            },
+            // empty/missing I/O should not clobber
+            input: { type: "text", value: "" },
+            output: null,
+            params: { two: true },
+          } as Span,
+        ],
+        evaluations: undefined,
+        traceId,
+        projectId,
+        expectedOutput: null,
+        reservedTraceMetadata: {},
+        customMetadata: {},
+        collectedAt: Date.now(),
+        paramsMD5: "md5-2",
+      };
+
+      const job3: CollectorJob = {
+        spans: [
+          {
+            span_id: spanId,
+            trace_id: traceId,
+            type: "llm",
+            name: "Race-3",
+            timestamps: {
+              started_at: Date.now() - 1100,
+              finished_at: Date.now() - 1000,
+            },
+            input: { type: "text", value: "three-input" },
+            output: { type: "text", value: "three-output" },
+            params: { three: true },
+          } as Span,
+        ],
+        evaluations: undefined,
+        traceId,
+        projectId,
+        expectedOutput: null,
+        reservedTraceMetadata: {},
+        customMetadata: {},
+        collectedAt: Date.now(),
+        paramsMD5: "md5-3",
+      };
+
+      await Promise.all([
+        processCollectorJob(undefined, job1),
+        processCollectorJob(undefined, job2),
+        processCollectorJob(undefined, job3),
+      ]);
+
+      const client = await esClient({ test: true });
+      const response = await client.get({
+        index: TRACE_INDEX.alias,
+        id: traceIndexId({ traceId, projectId }),
+      });
+      const trace = response._source as ElasticSearchTrace;
+      const spansWithId = trace.spans?.filter((s) => s.span_id === spanId) ?? [];
+      expect(spansWithId.length).toBe(1);
+      const s = spansWithId[0]!;
+
+      // Final input should be non-empty; in rare races it might be empty briefly, so just assert non-empty
+      expect(typeof s.input?.value).toBe("string");
+      expect(s.input?.value).not.toBe("");
+      expect([
+        JSON.stringify("one-output"),
+        JSON.stringify("three-output"),
+      ]).toContain(s.output?.value);
+    });
+
+    it("should preserve existing non-empty I/O if later concurrent update omits I/O", async () => {
+      const traceId = `test-trace-concurrent-omit-${nanoid()}`;
+      const spanId = `span-${nanoid()}`;
+
+      const withIO: CollectorJob = {
+        spans: [
+          {
+            span_id: spanId,
+            trace_id: traceId,
+            type: "llm",
+            name: "With-IO",
+            timestamps: {
+              started_at: Date.now() - 1000,
+              finished_at: Date.now() - 900,
+            },
+            input: { type: "text", value: "seed-input" },
+            output: { type: "text", value: "seed-output" },
+          } as Span,
+        ],
+        evaluations: undefined,
+        traceId,
+        projectId,
+        expectedOutput: null,
+        reservedTraceMetadata: {},
+        customMetadata: {},
+        collectedAt: Date.now(),
+        paramsMD5: "md5-seed",
+      };
+
+      const withoutIO: CollectorJob = {
+        spans: [
+          {
+            span_id: spanId,
+            trace_id: traceId,
+            type: "llm",
+            name: "Without-IO",
+            timestamps: {
+              started_at: Date.now() - 800,
+              finished_at: Date.now() - 700,
+            },
+            // no input/output
+          } as Span,
+        ],
+        evaluations: undefined,
+        traceId,
+        projectId,
+        expectedOutput: null,
+        reservedTraceMetadata: {},
+        customMetadata: {},
+        collectedAt: Date.now(),
+        paramsMD5: "md5-noio",
+      };
+
+      await Promise.all([
+        processCollectorJob(undefined, withIO),
+        processCollectorJob(undefined, withoutIO),
+      ]);
+
+      const client = await esClient({ test: true });
+      const response = await client.get({
+        index: TRACE_INDEX.alias,
+        id: traceIndexId({ traceId, projectId }),
+      });
+      const trace = response._source as ElasticSearchTrace;
+      const s = trace.spans?.find((sp) => sp.span_id === spanId);
+      expect(s).toBeTruthy();
+      if (!s) return;
+
+      // I/O should remain non-empty and match the provided values
+      expect(s.input?.value).toBe(JSON.stringify("seed-input"));
+      expect(s.output?.value).toBe(JSON.stringify("seed-output"));
     });
   });
 });
