@@ -37,9 +37,16 @@ if (process.env.OTEL_EXPORTER_OTLP_ENDPOINT) {
     }),
     spanProcessors: spanProcessors,
     textMapPropagator: new CompositePropagator({
-      propagators: [new W3CTraceContextPropagator(), new W3CBaggagePropagator()],
+      propagators: [
+        new W3CTraceContextPropagator(),
+        new W3CBaggagePropagator(),
+      ],
     }),  
-    instrumentations: [getNodeAutoInstrumentations()],
+    instrumentations: [getNodeAutoInstrumentations({
+      '@opentelemetry/instrumentation-undici': {
+        enabled: false,
+      },
+    })],
   });
 }
 
