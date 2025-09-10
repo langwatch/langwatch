@@ -2,8 +2,6 @@ import { Input, Button, Text, HStack, VStack, Spinner } from "@chakra-ui/react";
 import { LuSparkles, LuBot, LuChevronRight } from "react-icons/lu";
 import { toaster } from "../../../../ui/toaster";
 import { useChat } from "@ai-sdk/react";
-import { type deleteRowInputSchema, type updateRowInputSchema, type addRowInputSchema, type tools } from "../../../../../app/api/dataset/generate/tools";
-import type { z } from "zod";
 import { useEvaluationWizardStore } from "../../hooks/evaluation-wizard-store/useEvaluationWizardStore";
 import { useShallow } from "zustand/react/shallow";
 import { api } from "../../../../../utils/api";
@@ -89,15 +87,19 @@ export function DatasetGeneration() {
       }
 
       const toolExecutor: {
-        addRow: (args: z.infer<typeof addRowInputSchema>) => Promise<any>,
-        updateRow: (args: z.infer<typeof updateRowInputSchema>) => Promise<any>,
-        deleteRow: (args: z.infer<typeof deleteRowInputSchema>) => Promise<any>,
+        addRow: (args: { row: Record<string, string> }) => Promise<any>;
+        updateRow: (args: {
+          id: string;
+          row: Record<string, string>;
+        }) => Promise<any>;
+        deleteRow: (args: { id: string }) => Promise<any>;
       } = {
         addRow: async (args) => {
           const { row } = args;
-          
+
           // Get column types directly from database data to ensure we have the latest
-          const currentColumnTypes = databaseDataset.data?.columnTypes as DatasetColumns || [];
+          const currentColumnTypes =
+            (databaseDataset.data?.columnTypes as DatasetColumns) || [];
 
           // If database data is not available, try to get column names from grid API
           let columnNames = ["id"];
@@ -112,14 +114,16 @@ export function DatasetGeneration() {
                 const dataColumns = gridColumns
                   .filter((col: any) => {
                     // Skip internal columns like 'selected', row index columns, etc.
-                    return col.field && 
-                           col.field !== 'selected' && 
-                           !col.field.match(/^\d+$/) && // Skip numeric-only field names
-                           col.colId !== 'selected' &&
-                           col.colId !== '0';
+                    return (
+                      col.field &&
+                      col.field !== "selected" &&
+                      !col.field.match(/^\d+$/) && // Skip numeric-only field names
+                      col.colId !== "selected" &&
+                      col.colId !== "0"
+                    );
                   })
                   .map((col: any) => col.field || col.colId);
-                
+
                 columnNames = ["id", ...dataColumns];
               }
             } catch (error) {
@@ -135,7 +139,7 @@ export function DatasetGeneration() {
           }
 
           // If we still don't have column names, create generic ones based on row length
-          if (columnNames.length === 1 && row.length > 1) {
+          if (columnNames.length === 1 && Object.keys(row).length > 1) {
             toaster.create({
               title: "Error",
               description: "Failed to get grid columns",
@@ -147,11 +151,11 @@ export function DatasetGeneration() {
           }
 
           const rowData = Object.fromEntries(
-            columnNames.map((col, index) => [col, row[index]])
+            columnNames.map((col) => [col, row[col] ?? ""])
           );
-                      if (!rowData.id) {
-              rowData.id = nanoid();
-            }
+          if (!rowData.id) {
+            rowData.id = nanoid();
+          }
 
           gridApi.applyTransaction({
             add: [rowData],
@@ -163,8 +167,9 @@ export function DatasetGeneration() {
         updateRow: async (args) => {
           const { id, row } = args;
           // Get column types directly from database data to ensure we have the latest
-          const currentColumnTypes = databaseDataset.data?.columnTypes as DatasetColumns || [];
-          
+          const currentColumnTypes =
+            (databaseDataset.data?.columnTypes as DatasetColumns) || [];
+
           // If database data is not available, try to get column names from grid API
           let columnNames = ["id"];
           if (currentColumnTypes.length > 0) {
@@ -178,14 +183,16 @@ export function DatasetGeneration() {
                 const dataColumns = gridColumns
                   .filter((col: any) => {
                     // Skip internal columns like 'selected', row index columns, etc.
-                    return col.field && 
-                           col.field !== 'selected' && 
-                           !col.field.match(/^\d+$/) && // Skip numeric-only field names
-                           col.colId !== 'selected' &&
-                           col.colId !== '0';
+                    return (
+                      col.field &&
+                      col.field !== "selected" &&
+                      !col.field.match(/^\d+$/) && // Skip numeric-only field names
+                      col.colId !== "selected" &&
+                      col.colId !== "0"
+                    );
                   })
                   .map((col: any) => col.field || col.colId);
-                
+
                 columnNames = ["id", ...dataColumns];
               }
             } catch (error) {
@@ -200,9 +207,9 @@ export function DatasetGeneration() {
               return;
             }
           }
-          
+
           const rowData = Object.fromEntries(
-            columnNames.map((col, index) => [col, row[index]])
+            columnNames.map((col) => [col, row[col] ?? ""])
           );
           rowData.id = id;
 
@@ -224,7 +231,7 @@ export function DatasetGeneration() {
       };
 
       const tool =
-        toolExecutor[toolCall.toolName as keyof typeof tools];
+        toolExecutor[toolCall.toolName as "addRow" | "updateRow" | "deleteRow"];
 
       if (!tool) {
         toaster.create({
@@ -241,7 +248,11 @@ export function DatasetGeneration() {
 
       try {
         const result = await tool(toolCall.input as any);
-        void addToolResult({ tool: toolCall.toolName, toolCallId: toolCall.toolCallId, output: result });
+        void addToolResult({
+          tool: toolCall.toolName,
+          toolCallId: toolCall.toolCallId,
+          output: result,
+        });
       } catch (error) {
         console.error("Error executing tool", error);
         toaster.create({
@@ -266,7 +277,7 @@ export function DatasetGeneration() {
     ?.filter((part) => part.type !== "step-start")
     .at(-1);
 
-  const toolNames: Record<keyof typeof tools, string> = {
+  const toolNames = {
     addRow: "Adding Rows",
     updateRow: "Updating Rows",
     deleteRow: "Deleting Rows",
@@ -290,7 +301,8 @@ export function DatasetGeneration() {
   const isProcessing = useRef(false);
 
   const processQueue = useCallback(async () => {
-    if (isProcessing.current || updateQueue.current.length === 0 || !datasetId) return;
+    if (isProcessing.current || updateQueue.current.length === 0 || !datasetId)
+      return;
 
     isProcessing.current = true;
 
@@ -308,15 +320,18 @@ export function DatasetGeneration() {
               updatedRecord: update.record,
             },
             {
-              onSuccess: () => resolve(),
+              onSuccess: () => {
+                void databaseDataset.refetch();
+                resolve();
+              },
               onError: (error) => {
                 // Don't show error toast for unique constraint violations as they're expected
-                if (error?.message?.includes('Unique constraint failed')) {
-                  console.warn('Record already exists, skipping:', update.id);
+                if (error?.message?.includes("Unique constraint failed")) {
+                  console.warn("Record already exists, skipping:", update.id);
                   resolve();
                   return;
                 }
-                
+
                 toaster.create({
                   title: "Error updating record.",
                   description: "Changes will be reverted, please try again",
@@ -332,7 +347,7 @@ export function DatasetGeneration() {
         });
 
         // Small delay to prevent race conditions
-        await new Promise(resolve => setTimeout(resolve, 50));
+        await new Promise((resolve) => setTimeout(resolve, 50));
       } catch (error) {
         console.error("Error processing update queue:", error);
         break;
@@ -398,7 +413,7 @@ export function DatasetGeneration() {
   useEffect(() => {
     const queue = updateQueue.current;
     const processing = isProcessing.current;
-    
+
     return () => {
       if (queue?.length > 0 && !processing) {
         processQueue().catch((error) => {
@@ -417,7 +432,8 @@ export function DatasetGeneration() {
   useEffect(() => {
     if (updateQueue.current?.length > 0 && !isProcessing.current) {
       processQueue().catch((error) => {
-        console.error("Error processing queue during dataset change:", error);captureException(error, {
+        console.error("Error processing queue during dataset change:", error);
+        captureException(error, {
           tags: {
             datasetId: datasetId,
           },
@@ -431,12 +447,15 @@ export function DatasetGeneration() {
     if (status !== "ready") return;
 
     if (input.trim()) {
-      await sendMessage({ role: "user", parts: [{ type: "text", text: input }] }, {
-        body: {
-          dataset: datasetCsv,
-          projectId: project?.id,
-        },
-      });
+      await sendMessage(
+        { role: "user", parts: [{ type: "text", text: input }] },
+        {
+          body: {
+            dataset: datasetCsv,
+            projectId: project?.id,
+          },
+        }
+      );
       setInput("");
     }
   }
@@ -494,12 +513,18 @@ export function DatasetGeneration() {
           <HStack gap={1} _icon={{ marginTop: "1px", marginLeft: "-4px" }}>
             <LuChevronRight size={16} />
             <Text fontSize="14px" color="gray.500">
-              {lastUserMessage.parts[0]?.type === "text" ? lastUserMessage.parts[0].text : ""}
+              {lastUserMessage.parts[0]?.type === "text"
+                ? lastUserMessage.parts[0].text
+                : ""}
             </Text>
           </HStack>
         )}
         <Text fontSize="13px" color="gray.500">
-          <Markdown className="">{assistantMessage?.parts[0]?.type === "text" ? assistantMessage.parts[0].text : ""}</Markdown>
+          <Markdown className="">
+            {assistantMessage?.parts[0]?.type === "text"
+              ? assistantMessage.parts[0].text
+              : ""}
+          </Markdown>
         </Text>
         {!isReady && lastPart?.type?.startsWith("tool-") && (
           <HStack>
@@ -507,7 +532,10 @@ export function DatasetGeneration() {
             <Text fontSize="13px" color="gray.500">
               {
                 toolNames[
-                  (lastPart as any).toolName as keyof typeof tools
+                  (lastPart as any).toolName as
+                    | "addRow"
+                    | "updateRow"
+                    | "deleteRow"
                 ]
               }
             </Text>

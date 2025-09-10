@@ -10,6 +10,7 @@ import { prisma } from "../../../../server/db";
 import { getVercelAIModel } from "../../../../server/modelProviders/utils";
 import { createLogger } from "../../../../utils/logger";
 import { loggerMiddleware } from "../../middleware/logger";
+import type { OpenAIResponsesProviderOptions } from "@ai-sdk/openai";
 
 const logger = createLogger("langwatch:code-completion");
 
@@ -62,6 +63,12 @@ app.post("/code-completion", async (c) => {
         ],
         maxOutputTokens: 64,
         temperature: 0,
+        providerOptions: {
+          openai: {
+            reasoningEffort: "minimal",
+            reasoningSummary: null,
+          } satisfies OpenAIResponsesProviderOptions,
+        },
       });
 
       return { text };

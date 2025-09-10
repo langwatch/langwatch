@@ -1,46 +1,53 @@
 import { tool } from "ai";
 import { z } from "zod";
-import { datasetColumnTypeSchema } from "../../../../server/datasets/types";
+import Parse from "papaparse";
 
-export const addRowInputSchema = z.object({
-  row: z.array(z.string()),
-});
+export const tools = (dataset: string) => {
+  const parsedDataset = Parse.parse(dataset, { header: true });
+  const columnNames = parsedDataset.meta.fields?.filter(
+    (field) => field !== "id"
+  );
 
-export const updateRowInputSchema = z.object({
-  id: z.string(),
-  row: z.array(z.string()),
-});
+  const addRow = tool({
+    description:
+      "Adds a row to the dataset, each row is an array of values matching each column of the dataset EXCEPT the id column",
+    inputSchema: z.object({
+      row: z.object(
+        Object.fromEntries(
+          columnNames?.map((column) => [column, z.string()]) ?? []
+        )
+      ),
+    }),
+  });
 
-export const changeColumnsInputSchema = z.object({
-  columns: z.record(z.string(), datasetColumnTypeSchema),
-});
+  const updateRow = tool({
+    description:
+      "Updates a row in the dataset, each row is an array of values matching each column of the dataset EXCEPT the id column",
+    inputSchema: z.object({
+      id: z.string(),
+      row: z.object(
+        Object.fromEntries(
+          columnNames?.map((column) => [column, z.string()]) ?? []
+        )
+      ),
+    }),
+  });
 
-export const deleteRowInputSchema = z.object({
-  id: z.string(),
-});
+  // const changeColumns = tool({
+  //   description: "Changes the columns of the dataset",
+  //   inputSchema: z.record(z.string(), datasetColumnTypeSchema),
+  // });
 
-export const addRow = tool({
-  description: "Adds a row to the dataset, each row is an array of values matching each column of the dataset EXCEPT the id column",
-  inputSchema: addRowInputSchema,
-});
+  const deleteRow = tool({
+    description: "Deletes a row from the dataset by the id",
+    inputSchema: z.object({
+      id: z.string(),
+    }),
+  });
 
-export const updateRow = tool({
-  description: "Updates a row in the dataset, each row is an array of values matching each column of the dataset except the id column",
-  inputSchema: updateRowInputSchema,
-});
-
-export const changeColumns = tool({
-  description: "Changes the columns of the dataset",
-  inputSchema: changeColumnsInputSchema,
-});
-
-export const deleteRow = tool({
-  description: "Deletes a row from the dataset by the id",
-  inputSchema: deleteRowInputSchema,
-});
-
-export const tools = {
-  addRow,
-  updateRow,
-  deleteRow,
+  return {
+    addRow,
+    updateRow,
+    deleteRow,
+  };
 };
