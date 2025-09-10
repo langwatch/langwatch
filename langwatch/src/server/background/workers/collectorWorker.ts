@@ -642,9 +642,6 @@ const updateTrace = async (
           if (params.trace.containsKey('expected_output')) {
             ctx._source.expected_output = params.trace.expected_output;
           }
-          if (params.trace.containsKey('metadata')) {
-            ctx._source.metadata = params.trace.metadata;
-          }
           if (params.trace.containsKey('metrics')) {
             ctx._source.metrics = params.trace.metrics;
           }
