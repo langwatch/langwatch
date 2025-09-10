@@ -12,6 +12,9 @@ load_dotenv()
 os.environ["DSP_CACHEDIR"] = mkdtemp()
 os.environ["DSPY_CACHEDIR"] = mkdtemp()
 
+from langwatch_nlp.studio.utils import (
+    SerializableWithStringFallback,
+)
 import langwatch_nlp.error_tracking
 from fastapi import FastAPI
 

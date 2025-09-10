@@ -1,6 +1,6 @@
 import type { Prisma, PrismaClient, WorkflowVersion } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
-import { generateText } from "ai";
+import { generateText, tool } from "ai";
 import { createPatch } from "diff";
 import { nanoid } from "nanoid";
 import { type Session } from "next-auth";
@@ -19,6 +19,7 @@ import {
 } from "../../../optimization_studio/utils/dslUtils";
 import { TeamRoleGroup, checkUserPermissionForProject } from "../permission";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
+import type { OpenAIResponsesProviderOptions } from "@ai-sdk/openai";
 
 export const workflowRouter = createTRPCRouter({
   create: protectedProcedure
@@ -386,6 +387,12 @@ export const workflowRouter = createTRPCRouter({
 
       const commitMessage = await generateText({
         model: await getVercelAIModel(input.projectId),
+        providerOptions: {
+          openai: {
+            reasoningEffort: "minimal",
+            reasoningSummary: null,
+          } satisfies OpenAIResponsesProviderOptions,
+        },
         messages: [
           {
             role: "system",
@@ -418,12 +425,15 @@ ${diff}
           },
         ],
         tools: {
-          commitMessage: {
-            type: "function",
-            parameters: z.object({
+          commitMessage: tool({
+            inputSchema: z.object({
               message: z.string(),
             }),
-          },
+            outputSchema: z.string(),
+            execute: async ({ message }) => {
+              return message;
+            },
+          }),
         },
         toolChoice: {
           type: "tool",
@@ -431,7 +441,9 @@ ${diff}
         },
       });
 
-      const result = commitMessage.toolCalls[0]?.args.message;
+      const result = commitMessage.toolResults?.find(
+        (t) => t.toolName === "commitMessage"
+      )?.output;
 
       // TODO: save call costs to user account
 

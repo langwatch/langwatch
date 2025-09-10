@@ -5,6 +5,34 @@
 import * as Sentry from "@sentry/nextjs";
 import * as SentryNode from "@sentry/node";
 import { nodeProfilingIntegration } from "@sentry/profiling-node";
+import { setupObservability } from "langwatch/observability/node";
+import { BatchSpanProcessor, SimpleSpanProcessor } from "@opentelemetry/sdk-trace-node";
+import { getNodeAutoInstrumentations } from "@opentelemetry/auto-instrumentations-node";
+import { OTLPTraceExporter as OTLPTraceExporterProto } from "@opentelemetry/exporter-trace-otlp-proto";
+import { detectResources } from "@opentelemetry/resources";
+import { awsEksDetector } from "@opentelemetry/resource-detector-aws";
+
+if (process.env.OTEL_EXPORTER_OTLP_ENDPOINT) {
+  const spanProcessors = [];
+  if (process.env.NODE_ENV === "production") {
+    spanProcessors.push(new BatchSpanProcessor(new OTLPTraceExporterProto({ url: process.env.OTEL_EXPORTER_OTLP_ENDPOINT })));
+  } else {
+    spanProcessors.push(new SimpleSpanProcessor(new OTLPTraceExporterProto({ url: "http://0.0.0.0:4317/v1/traces" })));
+    spanProcessors.push(new SimpleSpanProcessor(new OTLPTraceExporterProto({ url: process.env.OTEL_EXPORTER_OTLP_ENDPOINT })));
+  }
+
+  setupObservability({
+    attributes: {
+      "process.runtime.env": process.env.NODE_ENV,
+      "service.instance.id": process.env.INSTANCE_ID,
+    },
+    resource: detectResources({
+      detectors: [awsEksDetector],
+    }),
+    spanProcessors: spanProcessors,
+    instrumentations: [getNodeAutoInstrumentations()],
+  });
+}
 
 Sentry.init({
   dsn: process.env.SENTRY_DSN,
