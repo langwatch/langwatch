@@ -4,6 +4,8 @@ import { setupTestTraceProvider } from "../../helpers/setup-test-trace-provider.
 import { type ReadableSpan } from "@opentelemetry/sdk-trace-node";
 import { LangWatch, attributes } from "../../../dist/index.js";
 import { promptResponseFactory } from "../../factories/prompt.factory.js";
+import { handles } from "./handlers.js";
+import { server } from "../setup/msw-setup.js";
 
 const { spanExporter, findFinishedSpanByName } = setupTestTraceProvider();
 
@@ -19,6 +21,7 @@ describe("Prompt tracing", () => {
   });
 
   beforeEach(() => {
+    server.use(...handles);
     spanExporter.reset();
     promptResponseFactory.rewindSequence();
   });
@@ -38,25 +41,25 @@ describe("Prompt tracing", () => {
 
     it("should set span type to 'prompt'", () => {
       expect(getSpan?.attributes[attributes.ATTR_LANGWATCH_SPAN_TYPE]).toBe(
-        "prompt"
+        "prompt",
       );
     });
 
     it("should set prompt metadata attributes", () => {
       expect(getSpan?.attributes[attributes.ATTR_LANGWATCH_PROMPT_ID]).toBe(
-        "prompt_123"
+        "prompt_123",
       );
       expect(
-        getSpan?.attributes[attributes.ATTR_LANGWATCH_PROMPT_VERSION_ID]
+        getSpan?.attributes[attributes.ATTR_LANGWATCH_PROMPT_VERSION_ID],
       ).toMatch(/^prompt_version_\d+$/);
       expect(
-        getSpan?.attributes[attributes.ATTR_LANGWATCH_PROMPT_VERSION_NUMBER]
+        getSpan?.attributes[attributes.ATTR_LANGWATCH_PROMPT_VERSION_NUMBER],
       ).toBeTypeOf("number");
     });
 
     it("should set output data", () => {
       expect(
-        getSpan?.attributes[attributes.ATTR_LANGWATCH_OUTPUT]
+        getSpan?.attributes[attributes.ATTR_LANGWATCH_OUTPUT],
       ).toBeDefined();
 
       const outputAttr = getSpan?.attributes[
@@ -93,26 +96,28 @@ describe("Prompt tracing", () => {
 
     it("should set span type to 'prompt'", () => {
       expect(compileSpan?.attributes[attributes.ATTR_LANGWATCH_SPAN_TYPE]).toBe(
-        "prompt"
+        "prompt",
       );
     });
 
     it("should set prompt metadata attributes", () => {
       expect(compileSpan?.attributes[attributes.ATTR_LANGWATCH_PROMPT_ID]).toBe(
-        "prompt_123"
+        "prompt_123",
       );
       expect(
-        compileSpan?.attributes[attributes.ATTR_LANGWATCH_PROMPT_VERSION_ID]
+        compileSpan?.attributes[attributes.ATTR_LANGWATCH_PROMPT_VERSION_ID],
       ).toMatch(/^prompt_version_\d+$/);
       expect(
-        compileSpan?.attributes[attributes.ATTR_LANGWATCH_PROMPT_VERSION_NUMBER]
+        compileSpan?.attributes[
+          attributes.ATTR_LANGWATCH_PROMPT_VERSION_NUMBER
+        ],
       ).toBeTypeOf("number");
     });
 
     it("should set output data", () => {
       // Check that output was set (it should be JSON stringified)
       expect(
-        compileSpan?.attributes[attributes.ATTR_LANGWATCH_OUTPUT]
+        compileSpan?.attributes[attributes.ATTR_LANGWATCH_OUTPUT],
       ).toBeDefined();
 
       const outputAttr = compileSpan?.attributes[
@@ -121,7 +126,7 @@ describe("Prompt tracing", () => {
       const output = JSON.parse(outputAttr);
 
       expect(output.value.prompt).toBe(
-        "Hello Alice, how is the weather today?"
+        "Hello Alice, how is the weather today?",
       );
       expect(output.value.messages[1].content).toBe("Tell me about weather");
     });
@@ -129,7 +134,7 @@ describe("Prompt tracing", () => {
     it("should set input variables", () => {
       // Check that input variables were captured
       expect(
-        compileSpan?.attributes[attributes.ATTR_LANGWATCH_PROMPT_VARIABLES]
+        compileSpan?.attributes[attributes.ATTR_LANGWATCH_PROMPT_VARIABLES],
       ).toBeDefined();
 
       const variablesAttr = compileSpan?.attributes[
