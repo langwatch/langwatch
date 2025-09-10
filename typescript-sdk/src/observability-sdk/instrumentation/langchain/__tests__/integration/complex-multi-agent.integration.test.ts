@@ -25,13 +25,17 @@ import { NoOpLogger } from "../../../../../logger";
  */
 
 function validateSpanDataIntegrity(spans: any[], expectedTypes: string[]) {
-  const spansByType = spans.reduce((acc, span) => {
-    const type = (span.attributes["langwatch.span.type"] as string) || "undefined";
-    acc[type] = (acc[type] || 0) + 1;
-    return acc;
-  }, {} as Record<string, number>);
+  const spansByType = spans.reduce(
+    (acc, span) => {
+      const type =
+        (span.attributes["langwatch.span.type"] as string) || "undefined";
+      acc[type] = (acc[type] || 0) + 1;
+      return acc;
+    },
+    {} as Record<string, number>,
+  );
 
-  expectedTypes.forEach(type => {
+  expectedTypes.forEach((type) => {
     expect(spansByType[type]).toBeGreaterThan(0);
     expect(spansByType[type]).toBeDefined();
   });
@@ -89,7 +93,7 @@ describe("LangChain Multi-Agent Integration Tests", () => {
       { root: true },
       async () => {
         // Create simple research agent
-        const llm = new ChatOpenAI({ model: "gpt-5", temperature: 0 });
+        const llm = new ChatOpenAI({ model: "gpt-4.1", temperature: 1 }); // gpt-4.1 takes too long to respond
         const tools = [
           new DynamicTool({
             name: "search",
@@ -105,7 +109,11 @@ describe("LangChain Multi-Agent Integration Tests", () => {
         ]);
 
         const agent = createToolCallingAgent({ llm, tools, prompt });
-        const executor = new AgentExecutor({ agent, tools });
+        const executor = new AgentExecutor({
+          agent,
+          tools,
+        });
+
         const tracingCallback = new LangWatchCallbackHandler();
 
         const result = await executor.invoke(
@@ -140,7 +148,7 @@ describe("LangChain Multi-Agent Integration Tests", () => {
     expect(llmSpans.length).toBeGreaterThan(0);
 
     llmSpans.forEach((span) => {
-      expect(span.name).toContain("openai gpt-5");
+      expect(span.name).toContain("openai gpt-4.1");
       expect(span.attributes["langwatch.span.type"]).toBe("llm");
       expect(span.attributes["gen_ai.request.model"]).toBeDefined();
     });
@@ -163,7 +171,7 @@ describe("LangChain Multi-Agent Integration Tests", () => {
       { root: true },
       async () => {
         // Create agent with multiple tools for tool chaining
-        const llm = new ChatOpenAI({ model: "gpt-5", temperature: 0 });
+        const llm = new ChatOpenAI({ model: "gpt-4.1", temperature: 1 });
         const tools = [
           new DynamicTool({
             name: "data_collector",
@@ -217,13 +225,13 @@ describe("LangChain Multi-Agent Integration Tests", () => {
     );
     expect(toolSpans.length).toBeGreaterThan(0);
 
-    const toolNames = toolSpans.map(span => span.name);
+    const toolNames = toolSpans.map((span) => span.name);
     expect(toolNames).toEqual(
       expect.arrayContaining([
         expect.stringContaining("data_collector"),
         expect.stringContaining("data_processor"),
         expect.stringContaining("report_generator"),
-      ])
+      ]),
     );
     toolSpans.forEach((span) => {
       expect(span.attributes["langwatch.span.type"]).toBe("tool");
@@ -260,7 +268,7 @@ describe("LangChain Multi-Agent Integration Tests", () => {
       { root: true },
       async () => {
         // Create conversational agent with context tools
-        const llm = new ChatOpenAI({ model: "gpt-5", temperature: 0 });
+        const llm = new ChatOpenAI({ model: "gpt-4.1", temperature: 1 });
         const tools = [
           new DynamicTool({
             name: "memory_store",
@@ -330,8 +338,8 @@ describe("LangChain Multi-Agent Integration Tests", () => {
         expect(input).toMatch(/working on|mentioned|recall/i);
       }
     });
-    const memorySpans = finishedSpans.filter(
-      (span) => span.name.includes("memory"),
+    const memorySpans = finishedSpans.filter((span) =>
+      span.name.includes("memory"),
     );
     expect(memorySpans.length).toBeGreaterThan(0);
 
@@ -357,7 +365,7 @@ describe("LangChain Multi-Agent Integration Tests", () => {
       { root: true },
       async () => {
         // Create agent with failing and fallback tools
-        const llm = new ChatOpenAI({ model: "gpt-5", temperature: 0 });
+        const llm = new ChatOpenAI({ model: "gpt-4.1", temperature: 1 });
         const tools = [
           new DynamicTool({
             name: "primary_tool",
@@ -411,11 +419,11 @@ describe("LangChain Multi-Agent Integration Tests", () => {
     );
     expect(toolSpans.length).toBeGreaterThan(0);
 
-    const primaryToolSpans = toolSpans.filter(span =>
-      span.name.includes("primary_tool")
+    const primaryToolSpans = toolSpans.filter((span) =>
+      span.name.includes("primary_tool"),
     );
-    const fallbackToolSpans = toolSpans.filter(span =>
-      span.name.includes("fallback_tool")
+    const fallbackToolSpans = toolSpans.filter((span) =>
+      span.name.includes("fallback_tool"),
     );
 
     expect(primaryToolSpans.length).toBeGreaterThanOrEqual(0);
@@ -449,7 +457,7 @@ describe("LangChain Multi-Agent Integration Tests", () => {
       async () => {
         // Create two simple agents to run in parallel
         const createAgent = (name: string) => {
-          const llm = new ChatOpenAI({ model: "gpt-5", temperature: 0 });
+          const llm = new ChatOpenAI({ model: "gpt-4.1", temperature: 1 });
           const tools = [
             new DynamicTool({
               name: `${name}_analysis`,
@@ -513,11 +521,13 @@ describe("LangChain Multi-Agent Integration Tests", () => {
     );
     expect(toolSpans.length).toBeGreaterThan(1);
 
-    const toolTypes = new Set(toolSpans.map(span => {
-      if (span.name.includes("data_analysis")) return "data";
-      if (span.name.includes("market_analysis")) return "market";
-      return "unknown";
-    }));
+    const toolTypes = new Set(
+      toolSpans.map((span) => {
+        if (span.name.includes("data_analysis")) return "data";
+        if (span.name.includes("market_analysis")) return "market";
+        return "unknown";
+      }),
+    );
     expect(toolTypes.size).toBeGreaterThan(1);
     toolSpans.forEach((span) => {
       expect(span.attributes["langwatch.span.type"]).toBe("tool");
@@ -537,7 +547,7 @@ describe("LangChain Multi-Agent Integration Tests", () => {
       { root: true },
       async () => {
         // Create a simple agent to test data capture
-        const llm = new ChatOpenAI({ model: "gpt-5", temperature: 0 });
+        const llm = new ChatOpenAI({ model: "gpt-4.1", temperature: 1 });
         const tools = [
           new DynamicTool({
             name: "test_tool",
@@ -572,7 +582,8 @@ describe("LangChain Multi-Agent Integration Tests", () => {
 
     const spanAnalysis = finishedSpans.map((span, index) => {
       const attributes = span.attributes;
-      const spanType = (attributes["langwatch.span.type"] as string) || "undefined";
+      const spanType =
+        (attributes["langwatch.span.type"] as string) || "undefined";
       return {
         index,
         name: span.name,
@@ -591,7 +602,7 @@ describe("LangChain Multi-Agent Integration Tests", () => {
     expect(finishedSpans.length).toBeGreaterThan(0);
 
     const spansByType: Record<string, number> = {};
-    spanAnalysis.forEach(span => {
+    spanAnalysis.forEach((span) => {
       spansByType[span.type] = (spansByType[span.type] || 0) + 1;
     });
 
@@ -599,11 +610,11 @@ describe("LangChain Multi-Agent Integration Tests", () => {
     expect(spansByType.llm).toBeGreaterThan(0);
     expect(spansByType.tool).toBeGreaterThan(0);
 
-    const uniqueTraceIds = new Set(spanAnalysis.map(s => s.traceId));
+    const uniqueTraceIds = new Set(spanAnalysis.map((s) => s.traceId));
     expect(uniqueTraceIds.size).toBe(1);
 
-    const llmSpans = spanAnalysis.filter(s => s.type === "llm");
-    llmSpans.forEach(span => {
+    const llmSpans = spanAnalysis.filter((s) => s.type === "llm");
+    llmSpans.forEach((span) => {
       expect(span.hasModel).toBe(true);
     });
   }, 30000);
