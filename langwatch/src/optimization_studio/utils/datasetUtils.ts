@@ -71,6 +71,7 @@ const columnTypeToFieldTypeMap: Record<DatasetColumnType, Field["type"]> = {
   chat_messages: "chat_messages",
   annotations: "dict",
   evaluations: "dict",
+  image: "str",
 };
 
 export function fieldsToDatasetColumns(fields: Field[]): DatasetColumns {
