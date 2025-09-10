@@ -63,7 +63,7 @@ describe("LangChain Integration Tests", () => {
       async () => {
         const llm = new ChatOpenAI({
           model: "gpt-5",
-          temperature: 0,
+          temperature: 1,
         });
 
         const result = await llm.invoke(
@@ -125,7 +125,7 @@ describe("LangChain Integration Tests", () => {
       async () => {
         const llm = new ChatOpenAI({
           model: "gpt-5",
-          temperature: 0,
+          temperature: 1,
         });
 
         const prompt = ChatPromptTemplate.fromMessages([
@@ -178,7 +178,7 @@ describe("LangChain Integration Tests", () => {
       async () => {
         const llm = new ChatOpenAI({
           model: "gpt-5",
-          temperature: 0,
+          temperature: 1,
         });
 
         const tracingCallback = new LangWatchCallbackHandler();
@@ -223,7 +223,7 @@ describe("LangChain Integration Tests", () => {
       async () => {
         const llm = new ChatOpenAI({
           model: "invalid-model",
-          temperature: 0,
+          temperature: 1,
           openAIApiKey: "invalid-key", // This will cause an error
         });
 
@@ -302,7 +302,7 @@ describe("LangChain Integration Tests", () => {
         async () => {
           const llm = new ChatOpenAI({
             model: "gpt-5",
-            temperature: 0,
+            temperature: 1,
           });
 
           const prompt = ChatPromptTemplate.fromMessages([
@@ -363,7 +363,7 @@ describe("LangChain Integration Tests", () => {
         async () => {
           const llm = new ChatOpenAI({
             model: "gpt-5",
-            temperature: 0,
+            temperature: 1,
           });
 
           const prompt = ChatPromptTemplate.fromMessages([
@@ -404,7 +404,7 @@ describe("LangChain Integration Tests", () => {
 
       // Verify agent naming pattern: "Agent: AgentExecutor" or similar
       const agentSpan = componentSpans.find((span) =>
-        span.name.includes("Agent:")
+        span.name.includes("Agent:"),
       );
       expect(agentSpan).toBeDefined();
     });
@@ -418,7 +418,7 @@ describe("LangChain Integration Tests", () => {
         async () => {
           const llm = new ChatOpenAI({
             model: "gpt-5",
-            temperature: 0,
+            temperature: 1,
           });
 
           // Create a simple chain
@@ -461,7 +461,7 @@ describe("LangChain Integration Tests", () => {
         async () => {
           const llm = new ChatOpenAI({
             model: "gpt-5",
-            temperature: 0,
+            temperature: 1,
           });
 
           const tracingCallback = new LangWatchCallbackHandler();
@@ -469,7 +469,7 @@ describe("LangChain Integration Tests", () => {
             [{ role: "user", content: "Hello" }],
             {
               callbacks: [tracingCallback],
-              metadata: { operation_name: "Custom LLM Call" }
+              metadata: { operation_name: "Custom LLM Call" },
             },
           );
 
@@ -498,7 +498,7 @@ describe("LangChain Integration Tests", () => {
         async () => {
           const llm = new ChatOpenAI({
             model: "gpt-5",
-            temperature: 0,
+            temperature: 1,
           });
 
           const result = await llm.invoke(
@@ -572,7 +572,7 @@ describe("LangChain Integration Tests", () => {
         async () => {
           const llm = new ChatOpenAI({
             model: "gpt-5",
-            temperature: 0,
+            temperature: 1,
           });
 
           const tools = [
@@ -615,13 +615,13 @@ describe("LangChain Integration Tests", () => {
 
       // Verify we have multiple span types
       const spanTypes = new Set(
-        finishedSpans.map((span) => span.attributes["langwatch.span.type"])
+        finishedSpans.map((span) => span.attributes["langwatch.span.type"]),
       );
       expect(spanTypes.size).toBeGreaterThan(1);
 
       // Verify all spans share the same trace
       const traceIds = new Set(
-        finishedSpans.map((span) => span.spanContext().traceId)
+        finishedSpans.map((span) => span.spanContext().traceId),
       );
       expect(traceIds.size).toBe(1);
 
