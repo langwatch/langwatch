@@ -92,6 +92,7 @@ class PostApiPromptsBody:
             schema_version = self.schema_version.value
 
         field_dict: dict[str, Any] = {}
+
         field_dict.update(
             {
                 "handle": handle,

@@ -324,6 +324,8 @@ export const runEvaluation = async ({
       }
     );
   } catch (error) {
+    logger.error({ error }, "error running evaluation");
+
     if (error instanceof Error && error.message.includes("fetch failed")) {
       throw new Error("Evaluator cannot be reached");
     }
