@@ -1,5 +1,5 @@
 import type { DeepPartial } from "~/utils/types";
-import type { TypedValueJson } from "./types";
+import type { SpanInputOutput } from "./types";
 import type { IExportLogsServiceRequest } from "@opentelemetry/otlp-transformer";
 import { createLogger } from "~/utils/logger";
 import type { TraceForCollection } from "./otel.traces";
@@ -31,7 +31,7 @@ export const openTelemetryLogsRequestToTracesForCollection = (
 			}
 
 			for (const logRecord of scopeLog.logRecords) {
-				if (!logRecord || !logRecord.traceId || !logRecord.spanId) {
+				if (!logRecord?.traceId || !logRecord.spanId) {
 					continue;
 				}
 				if (!logRecord.body?.stringValue) {
@@ -49,39 +49,29 @@ export const openTelemetryLogsRequestToTracesForCollection = (
 				}
 
 				const logString = logRecord.body.stringValue;
-				const [identifier, content] = logString.split("\n", 2);
+				const [identifier, ...contentParts] = logString.split("\n");
+				const content = contentParts.join("\n");
+				
 				if (!identifier || !content) {
 					logger.info("received log with no identifier or content, rejecting");
 					continue;
 				}
 
-				let jsonParsedContent: unknown;
-				try {
-					jsonParsedContent = JSON.parse(content);
-				} catch (error) {
-					logger.warn({
-						identifier,
-						error,
-					}, "failed to parse log content as json, falling back to just a string");
-
-					jsonParsedContent = [content];
-				}
-
-				let input: TypedValueJson | null = null;
-				let output: TypedValueJson | null = null;
+				let input: SpanInputOutput | null = null;
+				let output: SpanInputOutput | null = null;
 
 				switch (identifier) {
 					case "Chat Model Completion:":
 						output = {
-							type: "json",
-							value: jsonParsedContent as TypedValueJson["value"],
+							type: "text",
+							value: content,
 						};
 						break;
 					
 					case "Chat Model Prompt Content:":
 						input = {
-							type: "json",
-							value: jsonParsedContent as TypedValueJson["value"],
+							type: "text",
+							value: content,
 						};
 						break;
 					
@@ -106,22 +96,29 @@ export const openTelemetryLogsRequestToTracesForCollection = (
 					existingSpan = {
 						span_id: spanId,
 						trace_id: traceId,
+						name: identifier.replace(":", ""),
 						type: "llm",
 						input: input,
 						output: output,
+						params: {},
 						timestamps: {
 							ignore_timestamps_on_write: true,
 							started_at: convertFromUnixNano(logRecord.timeUnixNano),
-							finished_at: 0,
+							finished_at: convertFromUnixNano(logRecord.timeUnixNano),
 						},
 					};
 					trace.spans.push(existingSpan);
 				} else {
-					if (input) {
+					// For log record spans, preserve existing input/output if they exist
+					if (input && !existingSpan.input) {
 						existingSpan.input = input;
 					}
-					if (output) {
+					if (output && !existingSpan.output) {
 						existingSpan.output = output;
+					}
+					// Ensure the preserve flag is set
+					if (!existingSpan.params) {
+						existingSpan.params = {};
 					}
 				}
 			}
@@ -144,7 +141,7 @@ const decodeOpenTelemetryId = (id: unknown): string | null => {
 
 const convertFromUnixNano = (timeUnixNano: unknown): number => {
 	let unixNano: number;
-	
+
 	if (typeof timeUnixNano === "number") {
 		unixNano = timeUnixNano;
 	} else if (typeof timeUnixNano === "string") {
