@@ -47,7 +47,7 @@ export type VersionedPrompt = {
   versionCreatedAt: Date;
   model: string;
   temperature?: number;
-  max_tokens?: number;
+  maxTokens?: number;
   prompt: string;
   projectId: string;
   organizationId: string;
@@ -224,12 +224,18 @@ export class PromptService {
         messages: params.messages,
       });
 
+    // Get the system prompt from the messages
     const messageSystemPrompt = params.messages?.find(
       (msg) => msg.role === "system"
     )?.content;
 
-    // If the system prompt is provided in the messages, set the prompt to the system prompt
-    params.prompt ??= messageSystemPrompt;
+    // If the system prompt is provided in the messages,
+    // strip it from the messages
+    // and set the prompt to the system prompt
+    if (messageSystemPrompt) {
+      params.messages = params.messages?.filter((msg) => msg.role !== "system");
+      params.prompt ??= messageSystemPrompt;
+    }
 
     if (!messageSystemPrompt && !params.prompt) {
       throw new SystemPromptConflictError(
@@ -614,7 +620,7 @@ export class PromptService {
       versionCreatedAt: config.latestVersion.createdAt ?? new Date(),
       model: config.latestVersion.configData.model,
       temperature: config.latestVersion.configData.temperature,
-      max_tokens: config.latestVersion.configData.max_tokens,
+      maxTokens: config.latestVersion.configData.max_tokens,
       prompt,
       projectId: config.projectId,
       organizationId: config.organizationId,

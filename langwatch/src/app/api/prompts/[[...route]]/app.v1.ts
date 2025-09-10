@@ -220,14 +220,8 @@ app.post(
     try {
       const newConfig: ApiResponsePrompt = await service.createPrompt({
         projectId: project.id,
-        handle: data.handle,
         organizationId: organization.id,
-        scope: data.scope,
-        authorId: data.authorId,
-        prompt: data.prompt,
-        messages: data.messages,
-        inputs: data.inputs,
-        outputs: data.outputs,
+        ...data,
       });
 
       logger.info(

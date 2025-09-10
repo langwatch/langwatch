@@ -71,6 +71,7 @@ export class PromptVersionService {
     prompt?: string;
     messages?: z.infer<typeof messageSchema>[];
   }): void {
+    console.log("params", params);
     if (
       params.prompt &&
       params.messages?.some((msg) => msg.role === "system")

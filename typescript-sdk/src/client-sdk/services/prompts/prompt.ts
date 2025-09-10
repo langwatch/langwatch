@@ -33,37 +33,50 @@ const liquid = new Liquid({
   strictFilters: true,
 });
 
+/**
+ * The Prompt class provides a standardized interface for working with prompt objects
+ * within the SDK, ensuring consistent structure and behavior regardless of the underlying
+ * client implementation. This abstraction enables the SDK to maintain control over prompt
+ * handling, enforce type safety, and facilitate future enhancements without exposing
+ * internal details or requiring changes from client code.
+ */
 export class Prompt implements PromptResponse {
-  public readonly id!: string;
-  public readonly projectId!: string;
-  public readonly organizationId!: string;
-  public readonly handle!: string | null;
-  public readonly scope!: "ORGANIZATION" | "PROJECT";
-  public readonly name!: string;
-  public readonly updatedAt!: string;
-  public readonly version!: number;
-  public readonly versionId!: string;
-  public readonly model!: string;
-  public readonly prompt!: string;
+  // === Identification ===
+  public readonly id!: PromptResponse["id"];
+  public readonly handle!: PromptResponse["handle"];
+  public readonly name!: PromptResponse["name"];
+  public readonly scope!: PromptResponse["scope"];
+
+  // === Ownership & Organization ===
+  public readonly projectId!: PromptResponse["projectId"];
+  public readonly organizationId!: PromptResponse["organizationId"];
+  public readonly authorId: PromptResponse["authorId"];
+
+  // === Timestamps ===
+  public readonly createdAt!: PromptResponse["createdAt"];
+  public readonly updatedAt!: PromptResponse["updatedAt"];
+
+  // === Versioning ===
+  public readonly version!: PromptResponse["version"];
+  public readonly versionId!: PromptResponse["versionId"];
+
+  // === Model Configuration ===
+  public readonly model!: PromptResponse["model"];
+  public readonly temperature: PromptResponse["temperature"];
+  public readonly maxTokens: PromptResponse["maxTokens"];
+  public readonly responseFormat: PromptResponse["responseFormat"];
+
+  // === Prompt Content ===
+  public readonly prompt!: PromptResponse["prompt"];
   public readonly messages!: PromptResponse["messages"];
-  public readonly responseFormat!: PromptResponse["responseFormat"];
-  public readonly authorId!: string | null;
-  public readonly createdAt!: string;
   public readonly inputs!: PromptResponse["inputs"];
   public readonly outputs!: PromptResponse["outputs"];
 
-  constructor(private readonly promptData: PromptResponse) {
-    Object.assign(this, promptData);
+  constructor(private readonly raw: PromptResponse) {
+    Object.assign(this, raw);
 
     // Return a proxy that wraps specific methods for tracing
     return createTracingProxy(this as Prompt, tracer, PromptTracingDecorator);
-  }
-
-  /**
-   * Get the raw prompt data from the API
-   */
-  get raw(): PromptResponse {
-    return this.promptData;
   }
 
   /**

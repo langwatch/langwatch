@@ -1,6 +1,6 @@
 import * as path from "path";
 import * as fs from "fs";
-import { execSync } from "child_process";
+import { execSync, spawn } from "child_process";
 
 /**
  * Helper class for CLI E2E tests.
@@ -96,6 +96,114 @@ export class CliHelpers {
   };
 
   /**
+   * Runs a CLI command with interactive input in the test directory.
+   * @param command CLI command string (e.g., "prompt sync")
+   * @param inputs Array of input strings to send to stdin
+   * @returns { success: boolean, output: string, exitCode?: number }
+   */
+  runCliInteractive = (command: string, inputs: string[] = []) => {
+    this.log(`${command} (interactive with inputs: ${inputs.join(", ")})`);
+
+    return new Promise<{ success: boolean; output: string; exitCode?: number }>(
+      (resolve) => {
+        const child = spawn(
+          "node",
+          ["../../../../../dist/cli/index.js", ...command.split(" ")],
+          {
+            cwd: this.testDir,
+            stdio: ["pipe", "pipe", "pipe"],
+          },
+        );
+
+        let output = "";
+        let errorOutput = "";
+        let resolved = false;
+
+        const resolveOnce = (result: {
+          success: boolean;
+          output: string;
+          exitCode?: number;
+        }) => {
+          if (!resolved) {
+            resolved = true;
+            resolve(result);
+          }
+        };
+
+        child.stdout.on("data", (data) => {
+          output += data.toString();
+        });
+
+        child.stderr.on("data", (data) => {
+          errorOutput += data.toString();
+        });
+
+        child.on("close", (code) => {
+          const fullOutput = output + errorOutput;
+          this.log(fullOutput);
+
+          const result = {
+            success: code === 0,
+            output: fullOutput,
+            exitCode: code || undefined,
+          };
+
+          resolveOnce(result);
+        });
+
+        child.on("error", (error) => {
+          this.log("Process error", error);
+          resolveOnce({
+            success: false,
+            output: output + errorOutput + error.message,
+            exitCode: 1,
+          });
+        });
+
+        // Send inputs to stdin
+        if (inputs.length > 0) {
+          // Wait a bit for the process to start and show the prompt
+          setTimeout(() => {
+            inputs.forEach((input, index) => {
+              setTimeout(() => {
+                if (!child.killed) {
+                  child.stdin.write(input + "\n");
+                }
+              }, index * 100); // Small delay between inputs
+            });
+
+            // Close stdin after sending all inputs
+            setTimeout(
+              () => {
+                if (!child.killed) {
+                  child.stdin.end();
+                }
+              },
+              inputs.length * 100 + 1000,
+            );
+          }, 500);
+        } else {
+          // If no inputs, close stdin immediately
+          child.stdin.end();
+        }
+
+        // Add a timeout to prevent hanging
+        setTimeout(() => {
+          if (!resolved) {
+            this.log("Process timeout, killing process");
+            child.kill();
+            resolveOnce({
+              success: false,
+              output: output + errorOutput + "\n[Process timed out]",
+              exitCode: 1,
+            });
+          }
+        }, 10000); // 10 second timeout
+      },
+    );
+  };
+
+  /**
    * Creates a prompt YAML file in the prompts directory.
    * @param name Name of the prompt (used as filename)
    * @param content Object with model, temperature, systemMessage, userMessage
@@ -137,6 +245,14 @@ messages:
         `content: ${updates.systemMessage || "You are a helpful assistant."}`,
       );
     fs.writeFileSync(filePath, updated);
+  };
+
+  /**
+   * Get prompt file content
+   */
+  getPromptFileContent = (name: string) => {
+    const filePath = path.join(this.testDir, "prompts", `${name}.prompt.yaml`);
+    return fs.readFileSync(filePath, "utf8");
   };
 
   /**

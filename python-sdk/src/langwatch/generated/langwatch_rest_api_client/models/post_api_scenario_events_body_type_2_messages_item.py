@@ -1,54 +1,55 @@
 from collections.abc import Mapping
-from typing import Any, TypeVar
+from typing import Any, TypeVar, Union
 
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
 
-T = TypeVar("T", bound="PostApiScenarioEventsBodyType2MessagesItemType2ToolCallsItemFunction")
+from ..types import UNSET, Unset
+
+T = TypeVar("T", bound="PostApiScenarioEventsBodyType2MessagesItem")
 
 
 @_attrs_define
-class PostApiScenarioEventsBodyType2MessagesItemType2ToolCallsItemFunction:
+class PostApiScenarioEventsBodyType2MessagesItem:
     """
     Attributes:
-        name (str):
-        arguments (str):
+        id (Union[Unset, str]):
+        trace_id (Union[Unset, str]):
     """
 
-    name: str
-    arguments: str
+    id: Union[Unset, str] = UNSET
+    trace_id: Union[Unset, str] = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
-        name = self.name
+        id = self.id
 
-        arguments = self.arguments
+        trace_id = self.trace_id
 
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
-        field_dict.update(
-            {
-                "name": name,
-                "arguments": arguments,
-            }
-        )
+        field_dict.update({})
+        if id is not UNSET:
+            field_dict["id"] = id
+        if trace_id is not UNSET:
+            field_dict["trace_id"] = trace_id
 
         return field_dict
 
     @classmethod
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
         d = dict(src_dict)
-        name = d.pop("name")
+        id = d.pop("id", UNSET)
 
-        arguments = d.pop("arguments")
+        trace_id = d.pop("trace_id", UNSET)
 
-        post_api_scenario_events_body_type_2_messages_item_type_2_tool_calls_item_function = cls(
-            name=name,
-            arguments=arguments,
+        post_api_scenario_events_body_type_2_messages_item = cls(
+            id=id,
+            trace_id=trace_id,
         )
 
-        post_api_scenario_events_body_type_2_messages_item_type_2_tool_calls_item_function.additional_properties = d
-        return post_api_scenario_events_body_type_2_messages_item_type_2_tool_calls_item_function
+        post_api_scenario_events_body_type_2_messages_item.additional_properties = d
+        return post_api_scenario_events_body_type_2_messages_item
 
     @property
     def additional_keys(self) -> list[str]:
