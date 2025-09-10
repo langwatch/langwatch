@@ -14,21 +14,26 @@ interface AddOptions {
   localFile?: string;
 }
 
-const addLocalFile = async (name: string, localFilePath: string): Promise<void> => {
+const addLocalFile = async (
+  name: string,
+  localFilePath: string,
+): Promise<void> => {
   // Validate that the file exists and has the right extension
   if (!fs.existsSync(localFilePath)) {
     console.error(chalk.red(`Error: Local file not found: ${localFilePath}`));
     process.exit(1);
   }
 
-  if (!localFilePath.endsWith('.prompt.yaml')) {
-    console.error(chalk.red(`Error: Local file must have .prompt.yaml extension`));
+  if (!localFilePath.endsWith(".prompt.yaml")) {
+    console.error(
+      chalk.red(`Error: Local file must have .prompt.yaml extension`),
+    );
     process.exit(1);
   }
 
   // Load and validate the YAML file
   try {
-    const config = FileManager.loadLocalPrompt(localFilePath);
+    FileManager.loadLocalPrompt(localFilePath);
 
     // Ensure project is initialized
     await ensureProjectInitialized();
@@ -47,16 +52,26 @@ const addLocalFile = async (name: string, localFilePath: string): Promise<void> 
     };
     FileManager.savePromptsLock(lock);
 
-    console.log(chalk.green(`✓ Added local prompt: ${chalk.cyan(name)} → ${chalk.gray(localFilePath)}`));
-
+    console.log(
+      chalk.green(
+        `✓ Added local prompt: ${chalk.cyan(name)} → ${chalk.gray(
+          localFilePath,
+        )}`,
+      ),
+    );
   } catch (error) {
     console.error(chalk.red("Error loading local prompt file:"));
-    console.error(chalk.red(error instanceof Error ? error.message : String(error)));
+    console.error(
+      chalk.red(error instanceof Error ? error.message : String(error)),
+    );
     process.exit(1);
   }
 };
 
-export const addCommand = async (name: string, options: AddOptions): Promise<void> => {
+export const addCommand = async (
+  name: string,
+  options: AddOptions,
+): Promise<void> => {
   try {
     // Validate prompt name
     if (!name || name.trim() === "") {
@@ -76,8 +91,10 @@ export const addCommand = async (name: string, options: AddOptions): Promise<voi
     const langwatch = new LangWatch();
     const version = options.version ?? "latest";
 
-        // Fetch and materialize the prompt (like sync does for individual prompts)
-    const spinner = ora(`Adding ${chalk.cyan(`${name}@${version}`)}...`).start();
+    // Fetch and materialize the prompt (like sync does for individual prompts)
+    const spinner = ora(
+      `Adding ${chalk.cyan(`${name}@${version}`)}...`,
+    ).start();
 
     try {
       // Fetch the prompt from the API
@@ -100,7 +117,10 @@ export const addCommand = async (name: string, options: AddOptions): Promise<voi
 
       // Convert to MaterializedPrompt format and save
       const materializedPrompt = PromptConverter.fromApiToMaterialized(prompt);
-      const savedPath = FileManager.saveMaterializedPrompt(name, materializedPrompt);
+      const savedPath = FileManager.saveMaterializedPrompt(
+        name,
+        materializedPrompt,
+      );
       const relativePath = path.relative(process.cwd(), savedPath);
 
       // Load existing config and lock, add the new dependency
@@ -117,24 +137,42 @@ export const addCommand = async (name: string, options: AddOptions): Promise<voi
       spinner.succeed();
 
       // Show what was done (add ./ prefix for consistency)
-      const displayPath = relativePath.startsWith('./') ? relativePath : `./${relativePath}`;
-      console.log(chalk.green(`✓ Pulled ${chalk.cyan(`${name}@${version}`)} ${chalk.gray(`(version ${prompt.version})`)} → ${chalk.gray(displayPath)}`));
-
+      const displayPath = relativePath.startsWith("./")
+        ? relativePath
+        : `./${relativePath}`;
+      console.log(
+        chalk.green(
+          `✓ Pulled ${chalk.cyan(`${name}@${version}`)} ${chalk.gray(
+            `(version ${prompt.version})`,
+          )} → ${chalk.gray(displayPath)}`,
+        ),
+      );
     } catch (error) {
       spinner.fail();
       if (error instanceof PromptsError) {
         console.error(chalk.red(`Error: ${error.message}`));
       } else {
-        console.error(chalk.red(`Error adding prompt: ${error instanceof Error ? error.message : "Unknown error"}`));
+        console.error(
+          chalk.red(
+            `Error adding prompt: ${
+              error instanceof Error ? error.message : "Unknown error"
+            }`,
+          ),
+        );
       }
       process.exit(1);
     }
-
   } catch (error) {
     if (error instanceof PromptsError) {
       console.error(chalk.red(`Error: ${error.message}`));
     } else {
-      console.error(chalk.red(`Unexpected error: ${error instanceof Error ? error.message : "Unknown error"}`));
+      console.error(
+        chalk.red(
+          `Unexpected error: ${
+            error instanceof Error ? error.message : "Unknown error"
+          }`,
+        ),
+      );
     }
     process.exit(1);
   }

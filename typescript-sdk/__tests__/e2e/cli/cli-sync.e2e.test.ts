@@ -35,7 +35,8 @@ describe("CLI E2E", () => {
   let testDir: string;
   let originalCwd: string;
   let langwatch: LangWatch;
-  let promptFileManager: PromptFileManager;
+  let localPromptFileManagement: PromptFileManager;
+  let materializedPromptFileManagement: PromptFileManager;
   let lockFileManager: LockFileManager;
   let cli: CliRunner;
 
@@ -47,7 +48,11 @@ describe("CLI E2E", () => {
     originalCwd = process.cwd();
     process.chdir(testDir);
     cli = new CliRunner({ cwd: testDir });
-    promptFileManager = new PromptFileManager({ cwd: testDir });
+    localPromptFileManagement = new PromptFileManager({ cwd: testDir });
+    materializedPromptFileManagement = new PromptFileManager({
+      cwd: testDir,
+      materializedDir: true,
+    });
     lockFileManager = new LockFileManager({ cwd: testDir });
   });
 
@@ -75,7 +80,7 @@ describe("CLI E2E", () => {
         expectCliResultSuccess(createResult);
 
         // Verify prompt file content
-        expect(promptFileManager.getPromptFileContent(promptHandle))
+        expect(localPromptFileManagement.getPromptFileContent(promptHandle))
           .toMatchInlineSnapshot(`
           "model: openai/gpt-5
           modelParameters:
@@ -89,7 +94,8 @@ describe("CLI E2E", () => {
         `);
 
         // Add to config
-        const filePath = promptFileManager.getPromptFilePath(promptHandle);
+        const filePath =
+          localPromptFileManagement.getPromptFilePath(promptHandle);
         cli.run(`prompt add ${promptHandle} ${filePath}`);
 
         // First sync - should create on remote
@@ -112,7 +118,7 @@ describe("CLI E2E", () => {
         expect(lock1.prompts[promptHandle].version).toBe(0);
 
         // Modify local file
-        promptFileManager.updatePromptFile(promptHandle, {
+        localPromptFileManagement.updatePromptFile(promptHandle, {
           model: "gpt-4-turbo",
           modelParameters: { temperature: 0.9 },
           messages: [
@@ -120,7 +126,7 @@ describe("CLI E2E", () => {
             { role: "user", content: "You are an updated user message." },
           ],
         });
-        expect(promptFileManager.getPromptFileContent(promptHandle))
+        expect(localPromptFileManagement.getPromptFileContent(promptHandle))
           .toMatchInlineSnapshot(`
         "model: gpt-4-turbo
         modelParameters:
@@ -169,14 +175,16 @@ describe("CLI E2E", () => {
         promptHandle = createUniquePromptName();
         const createResult = cli.run(`prompt create ${promptHandle}`);
         expectCliResultSuccess(createResult);
-        const filePath = promptFileManager.getPromptFilePath(promptHandle);
+        const filePath =
+          localPromptFileManagement.getPromptFilePath(promptHandle);
         const addResult = cli.run(`prompt add ${promptHandle} ${filePath}`);
         expectCliResultSuccess(addResult);
 
         // First sync - should create on remote
         const sync1 = cli.run("prompt sync");
         expectCliResultSuccess(sync1);
-        const localPrompt = promptFileManager.readPromptFile(promptHandle);
+        const localPrompt =
+          localPromptFileManagement.readPromptFile(promptHandle);
 
         // Verify remote prompt
         const remotePrompt = await langwatch.prompts.get(promptHandle);
@@ -217,7 +225,7 @@ describe("CLI E2E", () => {
           expect(sync2.output).toContain(`• messages differ`);
           expect(sync2.output).toContain(`• temperature: 0.7 → 0.9`);
 
-          expect(promptFileManager.getPromptFileContent(promptHandle))
+          expect(localPromptFileManagement.getPromptFileContent(promptHandle))
             .toMatchInlineSnapshot(`
               "model: gpt-4-turbo
               modelParameters:
@@ -247,6 +255,104 @@ describe("CLI E2E", () => {
             { role: "system", content: "You an updated system message." },
             { role: "user", content: "Do you like apples?" },
           ]);
+        });
+      });
+    });
+
+    // Using latest is a special case. It should always pull down and never push up to remote
+    describe("@latest sync", () => {
+      let promptHandle: string;
+
+      beforeEach(async () => {
+        promptHandle = createUniquePromptName();
+        await langwatch.prompts.create({
+          handle: promptHandle,
+          model: "gpt-4-turbo",
+          temperature: 0.9,
+          prompt: "You are a helpful assistant.",
+        });
+
+        // Update to change from draft
+        const addResult = await cli.runInteractive(
+          `prompt add ${promptHandle}@latest`,
+          ["y"],
+        );
+
+        expectCliResultSuccess(addResult);
+
+        const sync = cli.run("prompt sync");
+        expectCliResultSuccess(sync);
+      });
+
+      it("should pull down the latest version from remote into materialized", async () => {
+        expect(
+          materializedPromptFileManagement.getPromptFileContent(promptHandle),
+        ).toMatchInlineSnapshot(`
+          "model: gpt-4-turbo
+          messages:
+            - role: system
+              content: You are a helpful assistant.
+          modelParameters:
+            temperature: 0.9
+          "
+        `);
+      });
+
+      it("should not be in the prompts directory", () => {
+        expect(() =>
+          localPromptFileManagement.getPromptFileContent(promptHandle),
+        ).toThrow();
+      });
+
+      describe("when remote is updated", () => {
+        it("should get the updated version", async () => {
+          await langwatch.prompts.update(promptHandle, {
+            temperature: 0.8,
+            model: "gpt-4-turbo",
+            messages: [
+              { role: "system", content: "I am an updated system message." },
+            ],
+          });
+
+          const sync = cli.run("prompt sync");
+          expectCliResultSuccess(sync);
+
+          expect(
+            materializedPromptFileManagement.getPromptFileContent(promptHandle),
+          ).toMatchInlineSnapshot(`
+            "model: gpt-4-turbo
+            messages:
+              - role: system
+                content: I am an updated system message.
+            modelParameters:
+              temperature: 0.8
+            "
+          `);
+        });
+      });
+
+      describe("when pegged to a version", () => {
+        it("should sync the correct version", async () => {
+          const addResult = await cli.runInteractive(
+            `prompt add ${promptHandle}@0`,
+            ["y"],
+          );
+          expectCliResultSuccess(addResult);
+
+          const sync = cli.run("prompt sync");
+          expectCliResultSuccess(sync);
+
+          expect(
+            materializedPromptFileManagement.getPromptFileContent(promptHandle),
+          ).toMatchInlineSnapshot(`
+            "model: gpt-4-turbo
+            messages:
+              - role: system
+                content: You are a helpful assistant.
+            modelParameters:
+              temperature: 0.9
+            "
+          `);
         });
       });
     });
