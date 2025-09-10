@@ -28,7 +28,6 @@ import {
   type Evaluation,
   type Span,
   type SpanInputOutput,
-  type SpanTimestamps,
 } from "../../tracer/types";
 import { COLLECTOR_QUEUE, collectorQueue } from "../queues/collectorQueue";
 import { getFirstInputAsText, getLastOutputAsText } from "./collector/common";
@@ -313,11 +312,12 @@ const processCollectorJob_ = async (
     return acc;
   }, [] as Span[]);
 
-  // If there are preserve flags and we have an existing trace, preserve existing input/output
-  const [input, output] = await Promise.all([
-    { value: getFirstInputAsText(uniqueSpans) },
-    { value: getLastOutputAsText(uniqueSpans) },
-  ]);
+  // Only set trace input/output when this batch provides real I/O.
+  // Avoid overriding with fallback-derived values (e.g., span names) if the batch has no I/O.
+  // When provided, compute from the full uniqueSpans so heuristics reflect the entire trace state.
+  const hasNewIO = (spans ?? []).some((s) => !!s.input?.value || !!s.output?.value);
+  const input = hasNewIO ? { value: getFirstInputAsText(uniqueSpans) } : void 0;
+  const output = hasNewIO ? { value: getLastOutputAsText(uniqueSpans) } : void 0;
 
   const error = getLastOutputError(uniqueSpans);
 
@@ -361,8 +361,8 @@ const processCollectorJob_ = async (
       inserted_at: existingTrace?.inserted_at ?? Date.now(),
       updated_at: Date.now(),
     } as ElasticSearchTrace["timestamps"],
-    ...(input?.value ? { input } : {}),
-    ...(output?.value ? { output } : {}),
+    ...(input ? { input } : {}),
+    ...(output ? { output } : {}),
     ...(expectedOutput ? { expected_output: { value: expectedOutput } } : {}),
     metrics: computeTraceMetrics(uniqueSpans), // Use uniqueSpans for accurate total_cost calculation
     error,
@@ -472,14 +472,50 @@ const updateTrace = async (
           if (ctx._source == null) {
             ctx._source = params.trace;
           } else {
-          // Ensure spans are properly initialized
-          if (ctx._source.spans == null) {
-            ctx._source.spans = [];
+            // Deep merge (with conditional input/output replacement)
+            for (String key : params.trace.keySet()) {
+              // Only replace input/output when a non-empty value is provided.
+              // If new is empty or missing, preserve existing.
+              if (key == "input" || key == "output") {
+                def newVal = params.trace[key];
+                def oldVal = ctx._source.containsKey(key) ? ctx._source[key] : null;
+                boolean newHas = newVal != null && !(
+                  (newVal instanceof Map) && (
+                    !newVal.containsKey("value") || newVal["value"] == null || newVal["value"] == ""
+                  )
+                );
+                boolean oldHas = oldVal != null && !(
+                  (oldVal instanceof Map) && (
+                    !oldVal.containsKey("value") || oldVal["value"] == null || oldVal["value"] == ""
+                  )
+                );
+                if (newHas || !oldHas) {
+                  ctx._source[key] = newVal;
+                }
+                continue;
+              }
+
+              if (params.trace[key] instanceof Map) {
+                if (!ctx._source.containsKey(key) || !(ctx._source[key] instanceof Map)) {
+                  ctx._source[key] = new HashMap();
+                }
+                Map nestedSource = ctx._source[key];
+                Map nestedUpdate = params.trace[key];
+                for (String nestedKey : nestedUpdate.keySet()) {
+                  nestedSource[nestedKey] = nestedUpdate[nestedKey];
+                }
+              } else {
+                ctx._source[key] = params.trace[key];
+              }
+            }
           }
 
           def currentTime = System.currentTimeMillis();
 
-          // Handle spans - merge new spans with existing spans
+          // Handle spans
+          if (ctx._source.spans == null) {
+            ctx._source.spans = [];
+          }
           for (def newSpan : params.newSpans) {
             def existingSpanIndex = -1;
             for (int i = 0; i < ctx._source.spans.size(); i++) {
@@ -489,7 +525,6 @@ const updateTrace = async (
               }
             }
             if (existingSpanIndex >= 0) {
-              // Span already exists - deep merge it
               def existingSpan = ctx._source.spans[existingSpanIndex];
               if (newSpan.timestamps == null) {
                 newSpan.timestamps = new HashMap();
@@ -510,9 +545,8 @@ const updateTrace = async (
               
               newSpan.timestamps.updated_at = currentTime;
               
-              // Deep merge spans with input/output preservation
+              // Deep merge spans (with conditional input/output replacement)
               for (String key : newSpan.keySet()) {
-                // Preserve existing non-empty input/output if new is empty or missing
                 if (key == "input" || key == "output") {
                   def newVal = newSpan[key];
                   def oldVal = existingSpan.containsKey(key) ? existingSpan[key] : null;
@@ -536,9 +570,10 @@ const updateTrace = async (
                   if (!existingSpan.containsKey(key) || !(existingSpan[key] instanceof Map)) {
                     existingSpan[key] = new HashMap();
                   }
-                  // Deep merge nested maps
-                  for (String nestedKey : newSpan[key].keySet()) {
-                    existingSpan[key][nestedKey] = newSpan[key][nestedKey];
+                  Map nestedSource = existingSpan[key];
+                  Map nestedUpdate = newSpan[key];
+                  for (String nestedKey : nestedUpdate.keySet()) {
+                    nestedSource[nestedKey] = nestedUpdate[nestedKey];
                   }
                 } else {
                   existingSpan[key] = newSpan[key];
@@ -546,12 +581,9 @@ const updateTrace = async (
               }
               ctx._source.spans[existingSpanIndex] = existingSpan;
             } else {
-              // Span doesn't exist - create it
               ctx._source.spans.add(newSpan);
             }
           }
-
-          // Note: Existing spans not in params.newSpans are automatically preserved (not deleted)
 
           // Limit the number of spans to 200
           if (ctx._source.spans != null && ctx._source.spans.size() > 200) {
@@ -571,7 +603,6 @@ const updateTrace = async (
               }
             }
             if (existingEvaluationIndex >= 0) {
-              // Evaluation already exists - kinda-merge it
               def existingEvaluation = ctx._source.evaluations[existingEvaluationIndex];
               if (newEvaluation.timestamps == null) {
                 newEvaluation.timestamps = new HashMap();
@@ -592,16 +623,11 @@ const updateTrace = async (
               }
               
               newEvaluation.timestamps.updated_at = currentTime;
-              
-              // Replace evaluation completely
               ctx._source.evaluations[existingEvaluationIndex] = newEvaluation;
             } else {
-              // Evaluation doesn't exist - create it
               ctx._source.evaluations.add(newEvaluation);
             }
           }
-
-          // Note: Existing evaluations not in params.newEvaluations are automatically preserved (not deleted)
 
           // Limit the number of evaluations to 50
           if (ctx._source.evaluations != null && ctx._source.evaluations.size() > 50) {
@@ -609,6 +635,31 @@ const updateTrace = async (
               ctx._source.evaluations.size() - 50,
               ctx._source.evaluations.size()
             );
+          }
+
+          // We want to update these specific fields, as the logic is a tiny bit different
+          // than the general deep merge logic.
+          if (params.trace.containsKey('expected_output')) {
+            ctx._source.expected_output = params.trace.expected_output;
+          }
+          if (params.trace.containsKey('metadata')) {
+            ctx._source.metadata = params.trace.metadata;
+          }
+          if (params.trace.containsKey('metrics')) {
+            ctx._source.metrics = params.trace.metrics;
+          }
+          if (params.trace.containsKey('error')) {
+            ctx._source.error = params.trace.error;
+          }
+          if (params.trace.containsKey('timestamps')) {
+            if (ctx._source.timestamps == null) { ctx._source.timestamps = new HashMap(); }
+            ctx._source.timestamps.updated_at = params.trace.timestamps.updated_at;
+            if (ctx._source.timestamps.inserted_at == null && params.trace.timestamps.inserted_at != null) {
+              ctx._source.timestamps.inserted_at = params.trace.timestamps.inserted_at;
+            }
+            if (ctx._source.timestamps.started_at == null && params.trace.timestamps.started_at != null) {
+              ctx._source.timestamps.started_at = params.trace.timestamps.started_at;
+            }
           }
         `,
           lang: "painless",
