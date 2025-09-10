@@ -509,8 +509,6 @@ export class PromptService {
         remoteConfigData
       );
 
-      console.log("comparison", comparison);
-
       if (comparison.isEqual) {
         // Content is the same - up to date
         return { action: "up_to_date", prompt: existingPrompt };

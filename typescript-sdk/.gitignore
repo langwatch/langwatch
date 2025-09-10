@@ -13,3 +13,4 @@ prompts-lock.json
 prompts.json
 
 tmp/
+prompts/.materialized
