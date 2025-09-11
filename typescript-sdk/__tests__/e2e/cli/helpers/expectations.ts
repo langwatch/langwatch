@@ -1,5 +1,5 @@
 import { expect } from "vitest";
-import { CliResult } from "./cli-runner";
+import { type CliResult } from "./cli-runner";
 
 export function expectCliResultSuccess(result: CliResult) {
   try {

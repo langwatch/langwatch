@@ -62,7 +62,7 @@ export class CliRunner {
       return { success: true, output: result };
     } catch (error: any) {
       console.error(error);
-      const output = error.stdout || error.stderr || "";
+      const output = error.stdout ?? error.stderr ?? "";
       this.log(`ERROR (exit ${error.status}): ${output}`);
 
       return {
@@ -125,7 +125,7 @@ export class CliRunner {
         resolveOnce({
           success: code === 0,
           output: fullOutput,
-          exitCode: code || undefined,
+          exitCode: code ?? undefined,
         });
       });
 

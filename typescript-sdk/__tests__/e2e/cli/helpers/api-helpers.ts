@@ -1,4 +1,4 @@
-import { LangWatch } from "../../../../dist";
+import { type LangWatch } from "../../../../dist";
 import { PROMPT_NAME_PREFIX } from "./constants";
 
 export class ApiHelpers {
