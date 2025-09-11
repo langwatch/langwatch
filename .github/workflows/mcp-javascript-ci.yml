@@ -33,6 +33,9 @@ jobs:
 
       - name: Run tests
         working-directory: mcp-server
+        env:
+          LANGWATCH_API_KEY: ${{ secrets.MCP_SERVER_LANGWATCH_API_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.MCP_SERVER_ANTHROPIC_API_KEY }}
         run: pnpm run test
 
   typecheck:

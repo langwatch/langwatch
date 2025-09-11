@@ -24,12 +24,7 @@ Thank you for your interest in contributing to the LangWatch MCP Server! This gu
    pnpm run build
    ```
 
-3. **Install Claude Code CLI (required for end-to-end tests):**
-   ```bash
-   npm install -g @anthropic-ai/claude-code
-   ```
-
-4. **Configure environment variables:**
+3. **Configure environment variables:**
    ```bash
    cp .env.example .env
    ```
@@ -38,7 +33,7 @@ Thank you for your interest in contributing to the LangWatch MCP Server! This gu
    - `LANGWATCH_API_KEY` - Your LangWatch project API key
    - `ANTHROPIC_API_KEY` - Your Anthropic API key for Claude Code integration
 
-5. **Install Python dependencies (for evaluation notebooks):**
+4. **Install Python dependencies (for evaluation notebooks):**
    ```bash
    uv sync
    ```
