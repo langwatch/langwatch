@@ -1,4 +1,8 @@
-import scenario, { type AgentAdapter, AgentRole } from "@langwatch/scenario";
+import scenario, {
+  type AgentAdapter,
+  AgentRole,
+  ScenarioExecutionStateLike,
+} from "@langwatch/scenario";
 import fs from "fs";
 import { execSync } from "child_process";
 import { describe, it, expect } from "vitest";
@@ -121,27 +125,14 @@ describe("OpenAI Implementation", () => {
           "please instrument my code with langwatch, short and sweet, no need to test the changes"
         ),
         scenario.agent(),
-        (state) => {
+        () => {
           const resultFile = fs.readFileSync(`${tempFolder}/main.py`, "utf8");
 
           expect(resultFile).toContain("@langwatch.trace(");
           expect(resultFile).toContain("autotrack_openai_calls(client)");
           // TODO: expect(resultFile).toContain('@langwatch.span(type="tool")');
-
-          // Fix for anthropic tool use format, that is not supported by vercel ai for the judge
-          state.messages.forEach((message) => {
-            if (Array.isArray(message.content)) {
-              message.content.forEach((content, index) => {
-                if (content.type !== "text") {
-                  (message.content as any)[index] = {
-                    type: "text",
-                    text: JSON.stringify(content),
-                  };
-                }
-              });
-            }
-          });
         },
+        toolCallFix,
         scenario.judge(),
       ],
     });
@@ -149,3 +140,19 @@ describe("OpenAI Implementation", () => {
     expect(result.success).toBe(true);
   });
 });
+
+function toolCallFix(state: ScenarioExecutionStateLike) {
+  // Fix for anthropic tool use format, that is not supported by vercel ai for the judge
+  state.messages.forEach((message) => {
+    if (Array.isArray(message.content)) {
+      message.content.forEach((content, index) => {
+        if (content.type !== "text") {
+          (message.content as any)[index] = {
+            type: "text",
+            text: JSON.stringify(content),
+          };
+        }
+      });
+    }
+  });
+}
