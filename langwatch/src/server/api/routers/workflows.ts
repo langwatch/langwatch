@@ -390,7 +390,6 @@ export const workflowRouter = createTRPCRouter({
         providerOptions: {
           openai: {
             reasoningEffort: "minimal",
-            reasoningSummary: null,
           } satisfies OpenAIResponsesProviderOptions,
         },
         messages: [

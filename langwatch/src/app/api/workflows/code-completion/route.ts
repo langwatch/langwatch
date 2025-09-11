@@ -66,7 +66,6 @@ app.post("/code-completion", async (c) => {
         providerOptions: {
           openai: {
             reasoningEffort: "minimal",
-            reasoningSummary: null,
           } satisfies OpenAIResponsesProviderOptions,
         },
       });
