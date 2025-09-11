@@ -50,9 +50,6 @@ export type MaterializedPrompt = {
   prompt: string;
   temperature?: number;
   maxTokens?: number;
-  inputs?: any;
-  outputs?: any;
-  updatedAt: string;
 };
 
 export type SyncResult = {

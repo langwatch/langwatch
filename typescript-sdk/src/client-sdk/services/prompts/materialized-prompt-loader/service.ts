@@ -1,6 +1,7 @@
 import { FileManager } from "@/cli/utils/fileManager";
 import { MaterializedPromptReader } from "@/shared/utils/materialized-prompt-reader";
 import type { MaterializedPrompt } from "@/cli/types";
+import { Prompt } from "../prompt";
 
 /**
  * Service responsible for loading all materialized prompts from the filesystem.
@@ -33,11 +34,20 @@ export class MaterializedPromptLoaderService {
    * @param name - The prompt name to retrieve
    * @returns MaterializedPrompt if found, null otherwise
    */
-  get(name: string): MaterializedPrompt | null {
+  get(name: string): Prompt | null {
     if (!this.isLoaded) {
       throw new Error("Materialized prompts not loaded. Call load() first.");
     }
 
-    return this.prompts.get(name) ?? null;
+    const materializedPrompt = this.prompts.get(name) ?? null;
+
+    if (!materializedPrompt) {
+      return null;
+    }
+
+    return new Prompt({
+      ...materializedPrompt,
+      handle: name,
+    });
   }
 }

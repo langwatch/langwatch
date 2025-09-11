@@ -1,6 +1,23 @@
 import type { Prompt } from "@/client-sdk/services/prompts/prompt";
 import type { LocalPromptConfig, MaterializedPrompt } from "../types";
 
+interface YamlContent {
+  model: string;
+  modelParameters?: {
+    temperature?: number;
+    maxTokens?: number;
+  };
+  messages: Array<{
+    role: "system" | "user" | "assistant";
+    content: string;
+  }>;
+  metadata?: {
+    id?: string;
+    version?: number;
+    versionId?: string;
+  }
+}
+
 /**
  * Converter utility for transforming between YAML prompt format and API service format.
  *
@@ -29,6 +46,7 @@ export class PromptConverter {
       inputs: prompt.inputs,
       outputs: prompt.outputs,
       updatedAt: prompt.updatedAt,
+      createdAt: prompt.createdAt,
     };
   }
 
@@ -36,17 +54,7 @@ export class PromptConverter {
    * Converts a MaterializedPrompt to the YAML content structure
    * for saving to .prompt.yaml files.
    */
-  static fromMaterializedToYaml(prompt: MaterializedPrompt): {
-    model: string;
-    modelParameters?: {
-      temperature?: number;
-      maxTokens?: number;
-    };
-    messages: Array<{
-      role: "system" | "user" | "assistant";
-      content: string;
-    }>;
-  } {
+  static fromMaterializedToYamlContentShape(prompt: MaterializedPrompt): YamlContent {
     const result: any = {
       model: prompt.model,
       messages: prompt.messages,
@@ -61,6 +69,18 @@ export class PromptConverter {
       if (prompt.maxTokens !== undefined) {
         result.modelParameters.maxTokens = prompt.maxTokens;
       }
+    }
+
+    if (prompt.id) {
+      result.metadata = {
+        id: prompt.id,
+      };
+    }
+    if (prompt.version) {
+      result.metadata.version = prompt.version;
+    }
+    if (prompt.versionId) {
+      result.metadata.versionId = prompt.versionId;
     }
 
     return result;

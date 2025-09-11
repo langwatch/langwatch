@@ -1,6 +1,7 @@
 import { describe, it, beforeEach, expect } from "vitest";
 import { MaterializedPromptLoaderService } from "../service";
 import { FileManager } from "@/cli/utils/fileManager";
+import { Prompt } from "../../prompt";
 
 describe("MaterializedPromptLoader", () => {
   let service: MaterializedPromptLoaderService;
@@ -50,23 +51,17 @@ describe("MaterializedPromptLoader", () => {
 
       describe("when the prompt is found", () => {
         it("returns the prompt", () => {
-          expect(service.get("test")).toEqual({
-            model: "openai/gpt-5",
-            messages: [],
-            modelParameters: {
-              temperature: 0,
-              maxTokens: 100,
-            },
-          });
+          expect(service.get("test")).toEqual(new Prompt({
+            ...prompt,
+            id: "1",
+            handle: "test",
+          }));
 
-          expect(service.get("test/nested")).toEqual({
-            model: "openai/gpt-5",
-            messages: [],
-            modelParameters: {
-              temperature: 0,
-              maxTokens: 100,
-            },
-          });
+          expect(service.get("test/nested")).toEqual(new Prompt({
+            ...prompt,
+            id: "1",
+            handle: "test",
+          }));
         });
       });
 

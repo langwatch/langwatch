@@ -268,7 +268,7 @@ export class FileManager {
     );
 
     // Convert to YAML format using the converter
-    const yamlContent = PromptConverter.fromMaterializedToYaml(prompt);
+    const yamlContent = PromptConverter.fromMaterializedToYamlContentShape(prompt);
 
     const yamlString = yaml.dump(yamlContent, {
       lineWidth: -1,

@@ -2,6 +2,7 @@ import { Liquid } from "liquidjs";
 import type { paths } from "@/internal/generated/openapi/api-client";
 import { PromptTracingDecorator, tracer } from "./tracing";
 import { createTracingProxy } from "@/client-sdk/tracing/create-tracing-proxy";
+import { z } from "zod";
 
 // Extract the prompt response type from OpenAPI schema
 export type PromptResponse = NonNullable<
@@ -33,6 +34,20 @@ const liquid = new Liquid({
   strictFilters: true,
 });
 
+interface IPromptInput {
+  id: PromptResponse["id"];
+  handle: PromptResponse["handle"];
+  prompt: PromptResponse["prompt"];
+  messages: PromptResponse["messages"];
+  model: PromptResponse["model"];
+  temperature?: PromptResponse["temperature"];
+  maxTokens?: PromptResponse["maxTokens"];
+  version: PromptResponse["version"];
+  versionId: PromptResponse["versionId"];
+}
+
+
+
 /**
  * The Prompt class provides a standardized interface for working with prompt objects
  * within the SDK, ensuring consistent structure and behavior regardless of the underlying
@@ -40,40 +55,36 @@ const liquid = new Liquid({
  * handling, enforce type safety, and facilitate future enhancements without exposing
  * internal details or requiring changes from client code.
  */
-export class Prompt implements PromptResponse {
+export class Prompt implements IPromptInput {
   // === Identification ===
-  public readonly id!: PromptResponse["id"];
-  public readonly handle!: PromptResponse["handle"];
-  public readonly name!: PromptResponse["name"];
-  public readonly scope!: PromptResponse["scope"];
-
-  // === Ownership & Organization ===
-  public readonly projectId!: PromptResponse["projectId"];
-  public readonly organizationId!: PromptResponse["organizationId"];
-  public readonly authorId: PromptResponse["authorId"];
-
-  // === Timestamps ===
-  public readonly createdAt!: PromptResponse["createdAt"];
-  public readonly updatedAt!: PromptResponse["updatedAt"];
+  public readonly id!: IPromptInput["id"];
+  public readonly handle!: IPromptInput["handle"];
 
   // === Versioning ===
-  public readonly version!: PromptResponse["version"];
-  public readonly versionId!: PromptResponse["versionId"];
+  public readonly version!: IPromptInput["version"];
+  public readonly versionId!: IPromptInput["versionId"];
 
   // === Model Configuration ===
-  public readonly model!: PromptResponse["model"];
-  public readonly temperature: PromptResponse["temperature"];
-  public readonly maxTokens: PromptResponse["maxTokens"];
-  public readonly responseFormat: PromptResponse["responseFormat"];
+  public readonly model!: IPromptInput["model"];
+  public readonly temperature: IPromptInput["temperature"];
+  public readonly maxTokens: IPromptInput["maxTokens"];
 
   // === Prompt Content ===
-  public readonly prompt!: PromptResponse["prompt"];
-  public readonly messages!: PromptResponse["messages"];
-  public readonly inputs!: PromptResponse["inputs"];
-  public readonly outputs!: PromptResponse["outputs"];
+  public readonly prompt!: IPromptInput["prompt"];
+  public readonly messages!: IPromptInput["messages"];
 
-  constructor(readonly raw: PromptResponse) {
-    Object.assign(this, raw);
+  constructor(readonly raw: IPromptInput) {
+    Object.assign(this, {
+      id: raw.id,
+      handle: raw.handle,
+      version: raw.version,
+      versionId: raw.versionId,
+      model: raw.model,
+      temperature: raw.temperature,
+      maxTokens: raw.maxTokens,
+      prompt: raw.prompt,
+      messages: raw.messages,
+    });
 
     // Return a proxy that wraps specific methods for tracing
     return createTracingProxy(this as Prompt, tracer, PromptTracingDecorator);
@@ -107,7 +118,7 @@ export class Prompt implements PromptResponse {
       }));
 
       // Create new prompt data with compiled content
-      const compiledData: PromptResponse = {
+      const compiledData: IPromptInput = {
         ...this,
         prompt: compiledPrompt,
         messages: compiledMessages,
@@ -145,7 +156,7 @@ export /**
  */
 class CompiledPrompt extends Prompt {
   constructor(
-    compiledData: PromptResponse,
+    compiledData: IPromptInput,
     public readonly original: Prompt,
   ) {
     super(compiledData);
