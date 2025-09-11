@@ -28,8 +28,8 @@ function validateSpanDataIntegrity(spans: any[], expectedTypes: string[]) {
   const spansByType = spans.reduce(
     (acc, span) => {
       const type =
-        (span.attributes["langwatch.span.type"] as string) || "undefined";
-      acc[type] = (acc[type] || 0) + 1;
+        (span.attributes["langwatch.span.type"] as string) ?? "undefined";
+      acc[type] = (acc[type] ?? 0) + 1;
       return acc;
     },
     {} as Record<string, number>,
@@ -583,7 +583,7 @@ describe("LangChain Multi-Agent Integration Tests", () => {
     const spanAnalysis = finishedSpans.map((span, index) => {
       const attributes = span.attributes;
       const spanType =
-        (attributes["langwatch.span.type"] as string) || "undefined";
+        (attributes["langwatch.span.type"] as string) ?? "undefined";
       return {
         index,
         name: span.name,
@@ -603,7 +603,7 @@ describe("LangChain Multi-Agent Integration Tests", () => {
 
     const spansByType: Record<string, number> = {};
     spanAnalysis.forEach((span) => {
-      spansByType[span.type] = (spansByType[span.type] || 0) + 1;
+      spansByType[span.type] = (spansByType[span.type] ?? 0) + 1;
     });
 
     expect(spansByType.chain).toBeGreaterThan(0);

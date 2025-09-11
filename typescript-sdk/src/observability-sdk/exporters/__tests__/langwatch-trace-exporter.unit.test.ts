@@ -27,7 +27,7 @@ describe("LangWatchExporter", () => {
     originalEnv = { ...process.env };
 
     // Mock console.warn to test deprecation warnings
-    consoleSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    consoleSpy = vi.spyOn(console, "warn").mockImplementation(() => undefined);
   });
 
     afterEach(() => {

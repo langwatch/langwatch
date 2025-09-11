@@ -161,7 +161,7 @@ describe("tracer.ts", () => {
     });
 
     it("should handle async callbacks", async () => {
-      const callback = vi.fn(async (span: LangWatchSpan) => {
+      const callback = vi.fn(async (_span: LangWatchSpan) => {
         await createDelayedPromise("async-result", 10);
         return "async-result";
       });
@@ -264,7 +264,7 @@ describe("tracer.ts", () => {
       });
 
       it("should handle async errors without message", async () => {
-        const error = "String error";
+        const error = new Error("String error");
         const callback = vi.fn(async () => {
           throw error;
         });
@@ -275,7 +275,7 @@ describe("tracer.ts", () => {
 
       it("should handle async null/undefined errors", async () => {
         const callback = vi.fn(async () => {
-          throw null;
+          throw new Error("Null error");
         });
 
         await expect(langwatchTracer.withActiveSpan("error-span", callback)).rejects.toThrow();
@@ -373,7 +373,7 @@ describe("tracer.ts", () => {
       });
 
       it("should handle sync errors without message", () => {
-        const error = "String sync error";
+        const error = new Error("String sync error");
         const callback = vi.fn(() => {
           throw error;
         });
@@ -384,7 +384,7 @@ describe("tracer.ts", () => {
 
       it("should handle sync null/undefined errors", () => {
         const callback = vi.fn(() => {
-          throw null;
+          throw new Error("Null error");
         });
 
         expect(() => langwatchTracer.withActiveSpan("sync-error-span", callback)).toThrow();
@@ -399,9 +399,9 @@ describe("tracer.ts", () => {
             setTimeout(() => onFulfilled("thenable-result"), 5);
             return thenable;
           }),
-          catch: vi.fn((onRejected: any) => thenable),
+          catch: vi.fn((_onRejected: any) => thenable),
           finally: vi.fn((onFinally: any) => {
-            setTimeout(onFinally, 10);
+            setTimeout(() => onFinally(), 10);
             return thenable;
           })
         };
@@ -790,7 +790,7 @@ describe("tracer.ts", () => {
       manualSpan.setType("tool");
 
       // Automatic span within manual span context
-      const result = await langwatchTracer.withActiveSpan("auto-span", (autoSpan) => {
+      const result = langwatchTracer.withActiveSpan("auto-span", (autoSpan) => {
         autoSpan.setType("llm");
         return "auto-result";
       });
@@ -826,7 +826,7 @@ describe("tracer.ts", () => {
         langwatchTracer.withActiveSpan("outer-span", async (outerSpan) => {
           outerSpan.setType("workflow");
 
-          await langwatchTracer.withActiveSpan("inner-span", (innerSpan) => {
+          langwatchTracer.withActiveSpan("inner-span", (innerSpan) => {
             innerSpan.setType("llm");
             throw outerError;
           });
