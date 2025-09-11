@@ -26,9 +26,9 @@ describe("Prompt management", () => {
   });
 
   it("update prompt", async () => {
-    const newName = "chunky-bacon";
+    const handle = "chunky-bacon";
     const prompt = await langwatch.prompts.update("handle", {
-      name: newName,
+      handle,
     });
     // Internally, update calls get again, so it
     // it doesn't make sense to check the name

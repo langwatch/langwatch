@@ -74,7 +74,7 @@ export class PromptConverter {
   static extractSystemPrompt(
     messages: Array<{ role: string; content: string }>,
   ): string {
-    return messages.find((m) => m.role === "system")?.content || "";
+    return messages.find((m) => m.role === "system")?.content ?? "";
   }
 
   /**

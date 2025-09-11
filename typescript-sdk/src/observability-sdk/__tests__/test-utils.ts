@@ -58,6 +58,7 @@ export class MockSpan implements Span {
       : "Error";
     const exceptionMessage = typeof exception === "object" && exception !== null && "message" in exception
       ? (exception as any).message
+      // eslint-disable-next-line @typescript-eslint/no-base-to-string
       : String(exception);
 
     this._events.push({
@@ -86,7 +87,7 @@ export class MockSpan implements Span {
       return;
     }
     this._ended = true;
-    this._endTime = endTime || Date.now();
+    this._endTime = endTime ?? Date.now();
   });
 
   public readonly addLink = vi.fn((link: Link) => {
@@ -281,7 +282,7 @@ export class MockTracerProvider implements TracerProvider {
   private _tracers = new Map<string, MockTracer>();
 
   public readonly getTracer = vi.fn((name: string, version?: string): MockTracer => {
-    const key = `${name}@${version || "latest"}`;
+    const key = `${name}@${version ?? "latest"}`;
     if (!this._tracers.has(key)) {
       this._tracers.set(key, new MockTracer());
     }
@@ -294,7 +295,7 @@ export class MockTracerProvider implements TracerProvider {
   }
 
   public getTracerByName(name: string, version?: string): MockTracer | undefined {
-    const key = `${name}@${version || "latest"}`;
+    const key = `${name}@${version ?? "latest"}`;
     return this._tracers.get(key);
   }
 
@@ -401,7 +402,7 @@ export const matchers = {
         pass: hasAttribute && actualValue === expectedValue,
         message: () =>
           hasAttribute
-            ? `Expected span to have attribute "${key}" with value "${expectedValue}", but got "${actualValue}"`
+            ? `Expected span to have attribute "${key}" with value "${String(expectedValue)}", but got "${String(actualValue)}"`
             : `Expected span to have attribute "${key}" but it was not found`,
       };
     }

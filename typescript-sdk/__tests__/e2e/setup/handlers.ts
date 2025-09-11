@@ -17,7 +17,6 @@ export const handles = [
     const body = await request.json();
     const prompt = promptResponseFactory.build({
       handle: body.handle,
-      name: body.name,
       scope: body.scope,
     });
     return response(200).json({
@@ -32,7 +31,7 @@ export const handles = [
     const body = await request.json();
     const prompt = promptResponseFactory.build({
       id: params.id,
-      name: body.name,
+      handle: body.handle,
     });
     return response(200).json(prompt);
   }),
