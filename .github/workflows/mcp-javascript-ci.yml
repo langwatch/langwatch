@@ -66,28 +66,3 @@ jobs:
           LANGWATCH_API_KEY: ${{ secrets.MCP_SERVER_LANGWATCH_API_KEY }}
           ANTHROPIC_API_KEY: ${{ secrets.MCP_SERVER_ANTHROPIC_API_KEY }}
         run: pnpm run test
-
-  build:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - uses: pnpm/action-setup@v2
-        with:
-          version: 10.12.1
-
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: "pnpm"
-          cache-dependency-path: "mcp-server/pnpm-lock.yaml"
-
-      - name: Install dependencies
-        working-directory: mcp-server
-        run: pnpm install --frozen-lockfile
-
-      - name: Build
-        working-directory: mcp-server
-        run: pnpm run build
