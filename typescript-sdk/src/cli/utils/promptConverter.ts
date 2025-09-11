@@ -24,6 +24,10 @@ export class PromptConverter {
       model: prompt.model,
       messages: prompt.messages,
       prompt: prompt.prompt,
+      temperature: prompt.temperature,
+      maxTokens: prompt.maxTokens,
+      inputs: prompt.inputs,
+      outputs: prompt.outputs,
       updatedAt: prompt.updatedAt,
     };
   }
@@ -34,15 +38,32 @@ export class PromptConverter {
    */
   static fromMaterializedToYaml(prompt: MaterializedPrompt): {
     model: string;
+    modelParameters?: {
+      temperature?: number;
+      maxTokens?: number;
+    };
     messages: Array<{
       role: "system" | "user" | "assistant";
       content: string;
     }>;
   } {
-    return {
+    const result: any = {
       model: prompt.model,
       messages: prompt.messages,
     };
+
+    // Add modelParameters if temperature or maxTokens exist
+    if (prompt.temperature !== undefined || prompt.maxTokens !== undefined) {
+      result.modelParameters = {};
+      if (prompt.temperature !== undefined) {
+        result.modelParameters.temperature = prompt.temperature;
+      }
+      if (prompt.maxTokens !== undefined) {
+        result.modelParameters.maxTokens = prompt.maxTokens;
+      }
+    }
+
+    return result;
   }
 
   /**

@@ -2,8 +2,8 @@ import { createOpenApiHttp } from "openapi-msw";
 import { type paths } from "../../../src/internal/generated/openapi/api-client";
 import { promptResponseFactory } from "../../factories/prompt.factory";
 
-const http = createOpenApiHttp<paths>({
-  baseUrl: "https://app.langwatch.test",
+export const http = createOpenApiHttp<paths>({
+  baseUrl: process.env.LANGWATCH_API_URL ?? "https://app.langwatch.test",
 });
 
 export const handles = [
@@ -30,12 +30,13 @@ export const handles = [
   http.put("/api/prompts/{id}", async ({ params, request, response }) => {
     const body = await request.json();
     const prompt = promptResponseFactory.build({
+      ...body,
       id: params.id,
       handle: body.handle,
     });
     return response(200).json(prompt);
   }),
-  http.delete("/api/prompts/{id}", async ({ params, response }) => {
+  http.delete("/api/prompts/{id}", async ({ response }) => {
     return response(200).json({ success: true });
   }),
 ];

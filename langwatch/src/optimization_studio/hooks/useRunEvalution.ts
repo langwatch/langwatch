@@ -1,14 +1,15 @@
-import { toaster } from "../../components/ui/toaster";
-import type { StudioClientEvent } from "../types/events";
 import { useCallback, useEffect, useState } from "react";
 import { nanoid } from "nanoid";
 import { usePostEvent } from "./usePostEvent";
 import { useShallow } from "zustand/react/shallow";
 import { api } from "../../utils/api";
 import { useForm } from "react-hook-form";
-import { useVersionState } from "../components/History";
+import { toaster } from "../../components/ui/toaster";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
+import { useVersionState } from "../components/History";
+import type { StudioClientEvent } from "../types/events";
 import { hasDSLChanged } from "../utils/dslUtils";
+
 import { useWorkflowStore } from "./useWorkflowStore";
 
 /**
@@ -127,7 +128,7 @@ export const useRunEvalution = () => {
                 prevDsl: previousVersion?.dsl,
                 newDsl: getWorkflow(),
               });
-            commitMessage = commitMessageResponse ?? "autosaved";
+            commitMessage = commitMessageResponse as string ?? "autosaved";
           } catch (error) {
             toaster.create({
               title: "Error auto-generating version description",

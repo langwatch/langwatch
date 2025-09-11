@@ -7,21 +7,7 @@ from attrs import field as _attrs_field
 from ..types import UNSET, Unset
 
 if TYPE_CHECKING:
-    from ..models.post_api_scenario_events_body_type_2_messages_item_type_0 import (
-        PostApiScenarioEventsBodyType2MessagesItemType0,
-    )
-    from ..models.post_api_scenario_events_body_type_2_messages_item_type_1 import (
-        PostApiScenarioEventsBodyType2MessagesItemType1,
-    )
-    from ..models.post_api_scenario_events_body_type_2_messages_item_type_2 import (
-        PostApiScenarioEventsBodyType2MessagesItemType2,
-    )
-    from ..models.post_api_scenario_events_body_type_2_messages_item_type_3 import (
-        PostApiScenarioEventsBodyType2MessagesItemType3,
-    )
-    from ..models.post_api_scenario_events_body_type_2_messages_item_type_4 import (
-        PostApiScenarioEventsBodyType2MessagesItemType4,
-    )
+    from ..models.post_api_scenario_events_body_type_2_messages_item import PostApiScenarioEventsBodyType2MessagesItem
 
 
 T = TypeVar("T", bound="PostApiScenarioEventsBodyType2")
@@ -33,9 +19,7 @@ class PostApiScenarioEventsBodyType2:
     Attributes:
         type_ (Literal['SCENARIO_MESSAGE_SNAPSHOT']):
         timestamp (float):
-        messages (list[Union['PostApiScenarioEventsBodyType2MessagesItemType0',
-            'PostApiScenarioEventsBodyType2MessagesItemType1', 'PostApiScenarioEventsBodyType2MessagesItemType2',
-            'PostApiScenarioEventsBodyType2MessagesItemType3', 'PostApiScenarioEventsBodyType2MessagesItemType4']]):
+        messages (list['PostApiScenarioEventsBodyType2MessagesItem']):
         batch_run_id (str):
         scenario_id (str):
         scenario_run_id (str):
@@ -45,15 +29,7 @@ class PostApiScenarioEventsBodyType2:
 
     type_: Literal["SCENARIO_MESSAGE_SNAPSHOT"]
     timestamp: float
-    messages: list[
-        Union[
-            "PostApiScenarioEventsBodyType2MessagesItemType0",
-            "PostApiScenarioEventsBodyType2MessagesItemType1",
-            "PostApiScenarioEventsBodyType2MessagesItemType2",
-            "PostApiScenarioEventsBodyType2MessagesItemType3",
-            "PostApiScenarioEventsBodyType2MessagesItemType4",
-        ]
-    ]
+    messages: list["PostApiScenarioEventsBodyType2MessagesItem"]
     batch_run_id: str
     scenario_id: str
     scenario_run_id: str
@@ -62,37 +38,13 @@ class PostApiScenarioEventsBodyType2:
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
-        from ..models.post_api_scenario_events_body_type_2_messages_item_type_0 import (
-            PostApiScenarioEventsBodyType2MessagesItemType0,
-        )
-        from ..models.post_api_scenario_events_body_type_2_messages_item_type_1 import (
-            PostApiScenarioEventsBodyType2MessagesItemType1,
-        )
-        from ..models.post_api_scenario_events_body_type_2_messages_item_type_2 import (
-            PostApiScenarioEventsBodyType2MessagesItemType2,
-        )
-        from ..models.post_api_scenario_events_body_type_2_messages_item_type_3 import (
-            PostApiScenarioEventsBodyType2MessagesItemType3,
-        )
-
         type_ = self.type_
 
         timestamp = self.timestamp
 
         messages = []
         for messages_item_data in self.messages:
-            messages_item: dict[str, Any]
-            if isinstance(messages_item_data, PostApiScenarioEventsBodyType2MessagesItemType0):
-                messages_item = messages_item_data.to_dict()
-            elif isinstance(messages_item_data, PostApiScenarioEventsBodyType2MessagesItemType1):
-                messages_item = messages_item_data.to_dict()
-            elif isinstance(messages_item_data, PostApiScenarioEventsBodyType2MessagesItemType2):
-                messages_item = messages_item_data.to_dict()
-            elif isinstance(messages_item_data, PostApiScenarioEventsBodyType2MessagesItemType3):
-                messages_item = messages_item_data.to_dict()
-            else:
-                messages_item = messages_item_data.to_dict()
-
+            messages_item = messages_item_data.to_dict()
             messages.append(messages_item)
 
         batch_run_id = self.batch_run_id
@@ -126,20 +78,8 @@ class PostApiScenarioEventsBodyType2:
 
     @classmethod
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
-        from ..models.post_api_scenario_events_body_type_2_messages_item_type_0 import (
-            PostApiScenarioEventsBodyType2MessagesItemType0,
-        )
-        from ..models.post_api_scenario_events_body_type_2_messages_item_type_1 import (
-            PostApiScenarioEventsBodyType2MessagesItemType1,
-        )
-        from ..models.post_api_scenario_events_body_type_2_messages_item_type_2 import (
-            PostApiScenarioEventsBodyType2MessagesItemType2,
-        )
-        from ..models.post_api_scenario_events_body_type_2_messages_item_type_3 import (
-            PostApiScenarioEventsBodyType2MessagesItemType3,
-        )
-        from ..models.post_api_scenario_events_body_type_2_messages_item_type_4 import (
-            PostApiScenarioEventsBodyType2MessagesItemType4,
+        from ..models.post_api_scenario_events_body_type_2_messages_item import (
+            PostApiScenarioEventsBodyType2MessagesItem,
         )
 
         d = dict(src_dict)
@@ -152,55 +92,7 @@ class PostApiScenarioEventsBodyType2:
         messages = []
         _messages = d.pop("messages")
         for messages_item_data in _messages:
-
-            def _parse_messages_item(
-                data: object,
-            ) -> Union[
-                "PostApiScenarioEventsBodyType2MessagesItemType0",
-                "PostApiScenarioEventsBodyType2MessagesItemType1",
-                "PostApiScenarioEventsBodyType2MessagesItemType2",
-                "PostApiScenarioEventsBodyType2MessagesItemType3",
-                "PostApiScenarioEventsBodyType2MessagesItemType4",
-            ]:
-                try:
-                    if not isinstance(data, dict):
-                        raise TypeError()
-                    messages_item_type_0 = PostApiScenarioEventsBodyType2MessagesItemType0.from_dict(data)
-
-                    return messages_item_type_0
-                except:  # noqa: E722
-                    pass
-                try:
-                    if not isinstance(data, dict):
-                        raise TypeError()
-                    messages_item_type_1 = PostApiScenarioEventsBodyType2MessagesItemType1.from_dict(data)
-
-                    return messages_item_type_1
-                except:  # noqa: E722
-                    pass
-                try:
-                    if not isinstance(data, dict):
-                        raise TypeError()
-                    messages_item_type_2 = PostApiScenarioEventsBodyType2MessagesItemType2.from_dict(data)
-
-                    return messages_item_type_2
-                except:  # noqa: E722
-                    pass
-                try:
-                    if not isinstance(data, dict):
-                        raise TypeError()
-                    messages_item_type_3 = PostApiScenarioEventsBodyType2MessagesItemType3.from_dict(data)
-
-                    return messages_item_type_3
-                except:  # noqa: E722
-                    pass
-                if not isinstance(data, dict):
-                    raise TypeError()
-                messages_item_type_4 = PostApiScenarioEventsBodyType2MessagesItemType4.from_dict(data)
-
-                return messages_item_type_4
-
-            messages_item = _parse_messages_item(messages_item_data)
+            messages_item = PostApiScenarioEventsBodyType2MessagesItem.from_dict(messages_item_data)
 
             messages.append(messages_item)
 

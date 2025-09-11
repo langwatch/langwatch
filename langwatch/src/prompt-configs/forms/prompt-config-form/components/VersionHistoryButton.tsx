@@ -1,7 +1,5 @@
-import { Button } from "@chakra-ui/react";
-
-import { VersionHistoryListPopover } from "../../../VersionHistoryListPopover";
 import { Tooltip } from "../../../../components/ui/tooltip";
+import { VersionHistoryListPopover } from "../../../VersionHistoryListPopover";
 
 export function VersionHistoryButton({
   configId,
