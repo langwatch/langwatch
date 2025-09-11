@@ -2,32 +2,63 @@ import * as fs from "fs";
 import * as path from "path";
 import * as yaml from "js-yaml";
 import chalk from "chalk";
-import type { PromptsConfig, LocalPromptConfig, MaterializedPrompt, PromptsLock } from "../types";
+import type {
+  PromptsConfig,
+  LocalPromptConfig,
+  MaterializedPrompt,
+  PromptsLock,
+} from "../types";
 import { localPromptConfigSchema } from "../types";
 import { PromptConverter } from "@/cli/utils/promptConverter";
 
+/**
+ * FileManager handles all file system operations for the LangWatch CLI.
+ * Manages prompts configuration, lock files, local prompts, and materialized prompts.
+ *
+ * Directory structure:
+ * - prompts.json: Main configuration file
+ * - prompts-lock.json: Lock file with resolved versions
+ * - prompts/: Directory containing local prompt files
+ * - prompts/.materialized/: Directory containing materialized prompt files
+ */
 export class FileManager {
   private static readonly PROMPTS_CONFIG_FILE = "prompts.json";
   private static readonly PROMPTS_LOCK_FILE = "prompts-lock.json";
   private static readonly PROMPTS_DIR = "prompts";
   private static readonly MATERIALIZED_DIR = ".materialized";
 
+  /**
+   * Gets the absolute path to the prompts configuration file (prompts.json)
+   */
   static getPromptsConfigPath(): string {
     return path.join(process.cwd(), this.PROMPTS_CONFIG_FILE);
   }
 
+  /**
+   * Gets the absolute path to the prompts lock file (prompts-lock.json)
+   */
   static getPromptsLockPath(): string {
     return path.join(process.cwd(), this.PROMPTS_LOCK_FILE);
   }
 
+  /**
+   * Gets the absolute path to the prompts directory
+   */
   static getPromptsDir(): string {
     return path.join(process.cwd(), this.PROMPTS_DIR);
   }
 
+  /**
+   * Gets the absolute path to the materialized prompts directory
+   */
   static getMaterializedDir(): string {
     return path.join(this.getPromptsDir(), this.MATERIALIZED_DIR);
   }
 
+  /**
+   * Ensures that the prompts and materialized directories exist.
+   * Creates them recursively if they don't exist.
+   */
   static ensureDirectories(): void {
     const promptsDir = this.getPromptsDir();
     const materializedDir = this.getMaterializedDir();
@@ -41,6 +72,12 @@ export class FileManager {
     }
   }
 
+  /**
+   * Loads the prompts configuration from prompts.json.
+   * Returns an empty configuration if the file doesn't exist.
+   *
+   * @throws {Error} If the file exists but cannot be parsed as valid JSON
+   */
   static loadPromptsConfig(): PromptsConfig {
     const configPath = this.getPromptsConfigPath();
 
@@ -52,15 +89,28 @@ export class FileManager {
       const content = fs.readFileSync(configPath, "utf-8");
       return JSON.parse(content) as PromptsConfig;
     } catch (error) {
-      throw new Error(`Failed to parse prompts.json: ${error instanceof Error ? error.message : "Unknown error"}`);
+      throw new Error(
+        `Failed to parse prompts.json: ${
+          error instanceof Error ? error.message : "Unknown error"
+        }`,
+      );
     }
   }
 
+  /**
+   * Saves the prompts configuration to prompts.json.
+   * Formats the JSON with 2-space indentation and adds a trailing newline.
+   */
   static savePromptsConfig(config: PromptsConfig): void {
     const configPath = this.getPromptsConfigPath();
     fs.writeFileSync(configPath, JSON.stringify(config, null, 2) + "\n");
   }
 
+  /**
+   * Initializes an empty prompts configuration file if it doesn't exist.
+   *
+   * @returns Object indicating whether the file was created and its path
+   */
   static initializePromptsConfig(): { created: boolean; path: string } {
     const configPath = this.getPromptsConfigPath();
     const existed = fs.existsSync(configPath);
@@ -74,13 +124,19 @@ export class FileManager {
     return { created: false, path: configPath };
   }
 
+  /**
+   * Loads the prompts lock file from prompts-lock.json.
+   * Returns a default lock structure if the file doesn't exist.
+   *
+   * @throws {Error} If the file exists but cannot be parsed as valid JSON
+   */
   static loadPromptsLock(): PromptsLock {
     const lockPath = this.getPromptsLockPath();
 
     if (!fs.existsSync(lockPath)) {
       return {
         lockfileVersion: 1,
-        prompts: {}
+        prompts: {},
       };
     }
 
@@ -88,15 +144,28 @@ export class FileManager {
       const content = fs.readFileSync(lockPath, "utf-8");
       return JSON.parse(content) as PromptsLock;
     } catch (error) {
-      throw new Error(`Failed to parse prompts-lock.json: ${error instanceof Error ? error.message : "Unknown error"}`);
+      throw new Error(
+        `Failed to parse prompts-lock.json: ${
+          error instanceof Error ? error.message : "Unknown error"
+        }`,
+      );
     }
   }
 
+  /**
+   * Saves the prompts lock file to prompts-lock.json.
+   * Formats the JSON with 2-space indentation and adds a trailing newline.
+   */
   static savePromptsLock(lock: PromptsLock): void {
     const lockPath = this.getPromptsLockPath();
     fs.writeFileSync(lockPath, JSON.stringify(lock, null, 2) + "\n");
   }
 
+  /**
+   * Initializes an empty prompts lock file if it doesn't exist.
+   *
+   * @returns Object indicating whether the file was created and its path
+   */
   static initializePromptsLock(): { created: boolean; path: string } {
     const lockPath = this.getPromptsLockPath();
     const existed = fs.existsSync(lockPath);
@@ -104,7 +173,7 @@ export class FileManager {
     if (!existed) {
       const emptyLock: PromptsLock = {
         lockfileVersion: 1,
-        prompts: {}
+        prompts: {},
       };
       this.savePromptsLock(emptyLock);
       return { created: true, path: lockPath };
@@ -113,6 +182,13 @@ export class FileManager {
     return { created: false, path: lockPath };
   }
 
+  /**
+   * Loads and validates a local prompt configuration from a YAML file.
+   *
+   * @param filePath - Path to the local prompt file
+   * @returns Validated local prompt configuration
+   * @throws {Error} If file doesn't exist, cannot be parsed, or fails validation
+   */
   static loadLocalPrompt(filePath: string): LocalPromptConfig {
     const fullPath = path.resolve(filePath);
 
@@ -127,27 +203,52 @@ export class FileManager {
       // Validate with zod and provide nice error messages
       const result = localPromptConfigSchema.safeParse(rawData);
 
-            if (!result.success) {
+      if (!result.success) {
         // Format zod errors nicely (manually since z.prettifyError might not be available)
         const prettyError = result.error.issues
-          .map(issue => `✖ ${issue.message}${issue.path.length > 0 ? `\n  → at ${issue.path.join('.')}` : ''}`)
-          .join('\n');
+          .map(
+            (issue) =>
+              `✖ ${issue.message}${
+                issue.path.length > 0 ? `\n  → at ${issue.path.join(".")}` : ""
+              }`,
+          )
+          .join("\n");
 
         throw new Error(
-          `Invalid prompt configuration in ${chalk.yellow(filePath)}:\n${prettyError}`
+          `Invalid prompt configuration in ${chalk.yellow(
+            filePath,
+          )}:\n${prettyError}`,
         );
       }
 
       return result.data;
     } catch (error) {
-      if (error instanceof Error && error.message.includes("Invalid prompt configuration")) {
+      if (
+        error instanceof Error &&
+        error.message.includes("Invalid prompt configuration")
+      ) {
         throw error; // Re-throw zod validation errors as-is
       }
-      throw new Error(`Failed to parse local prompt file ${filePath}: ${error instanceof Error ? error.message : "Unknown error"}`);
+      throw new Error(
+        `Failed to parse local prompt file ${filePath}: ${
+          error instanceof Error ? error.message : "Unknown error"
+        }`,
+      );
     }
   }
 
-    static saveMaterializedPrompt(name: string, prompt: MaterializedPrompt): string {
+  /**
+   * Saves a materialized prompt to the .materialized directory as a YAML file.
+   * Creates nested directories as needed based on the prompt name.
+   *
+   * @param name - The prompt name (can include slashes for nested structure)
+   * @param prompt - The materialized prompt data
+   * @returns The absolute path where the file was saved
+   */
+  static saveMaterializedPrompt(
+    name: string,
+    prompt: MaterializedPrompt,
+  ): string {
     const materializedDir = this.getMaterializedDir();
     const parts = name.split("/");
     const fileName = `${parts[parts.length - 1]}.prompt.yaml`;
@@ -160,7 +261,11 @@ export class FileManager {
       }
     }
 
-    const filePath = path.join(materializedDir, ...parts.slice(0, -1), fileName);
+    const filePath = path.join(
+      materializedDir,
+      ...parts.slice(0, -1),
+      fileName,
+    );
 
     // Convert to YAML format using the converter
     const yamlContent = PromptConverter.fromMaterializedToYaml(prompt);
@@ -168,13 +273,19 @@ export class FileManager {
     const yamlString = yaml.dump(yamlContent, {
       lineWidth: -1,
       noRefs: true,
-      sortKeys: false
+      sortKeys: false,
     });
 
     fs.writeFileSync(filePath, yamlString);
     return filePath;
   }
 
+  /**
+   * Recursively finds all local prompt files (.prompt.yaml) in the prompts directory.
+   * Excludes files in the .materialized directory.
+   *
+   * @returns Array of absolute paths to local prompt files
+   */
   static getLocalPromptFiles(): string[] {
     const promptsDir = this.getPromptsDir();
     const materializedDir = this.getMaterializedDir();
@@ -208,13 +319,42 @@ export class FileManager {
     return files;
   }
 
+  /**
+   * Extracts the prompt name from a file path by removing the prompts directory
+   * prefix and the .prompt.yaml suffix.
+   *
+   * @param filePath - Absolute path to a prompt file
+   * @returns The prompt name (preserving nested structure with slashes)
+   */
   static promptNameFromPath(filePath: string): string {
     const promptsDir = this.getPromptsDir();
     const relativePath = path.relative(promptsDir, filePath);
     return relativePath.replace(/\.prompt\.yaml$/, "");
   }
 
-  static cleanupOrphanedMaterializedFiles(currentDependencies: Set<string>): string[] {
+  /**
+   * Extracts the prompt name from a materialized prompt file path by removing the .materialized directory
+   * prefix and the .prompt.yaml suffix.
+   *
+   * @param filePath - Absolute path to a materialized prompt file
+   * @returns The prompt name (preserving nested structure with slashes)
+   */
+  static promptNameFromMaterializedPath(filePath: string): string {
+    const materializedDir = this.getMaterializedDir();
+    const relativePath = path.relative(materializedDir, filePath);
+    return relativePath.replace(/\.prompt\.yaml$/, "");
+  }
+
+  /**
+   * Removes materialized prompt files that are no longer referenced.
+   * Also removes empty directories after cleanup.
+   *
+   * @param currentDependencies - Set of prompt names that should be kept
+   * @returns Array of prompt names that were cleaned up
+   */
+  static cleanupOrphanedMaterializedFiles(
+    currentDependencies: Set<string>,
+  ): string[] {
     const materializedDir = this.getMaterializedDir();
 
     if (!fs.existsSync(materializedDir)) {
@@ -258,7 +398,20 @@ export class FileManager {
     return cleaned;
   }
 
-  static updateLockEntry(lock: PromptsLock, name: string, prompt: MaterializedPrompt, materializedPath: string): void {
+  /**
+   * Updates or adds an entry in the lock file for a specific prompt.
+   *
+   * @param lock - The lock file object to update
+   * @param name - The prompt name
+   * @param prompt - The materialized prompt data
+   * @param materializedPath - Absolute path to the materialized file
+   */
+  static updateLockEntry(
+    lock: PromptsLock,
+    name: string,
+    prompt: MaterializedPrompt,
+    materializedPath: string,
+  ): void {
     const relativePath = path.relative(process.cwd(), materializedPath);
 
     lock.prompts[name] = {
@@ -268,12 +421,57 @@ export class FileManager {
     };
   }
 
+  /**
+   * Removes multiple entries from the lock file.
+   *
+   * @param lock - The lock file object to update
+   * @param names - Array of prompt names to remove
+   */
   static removeFromLock(lock: PromptsLock, names: string[]): void {
     for (const name of names) {
       delete lock.prompts[name];
     }
   }
 
+  /**
+   * Recursively finds all materialized prompt files (.prompt.yaml) in the .materialized directory.
+   *
+   * @returns Array of absolute paths to materialized prompt files
+   */
+  static getMaterializedPromptFiles(): string[] {
+    const materializedDir = this.getMaterializedDir();
+
+    if (!fs.existsSync(materializedDir)) {
+      return [];
+    }
+
+    const files: string[] = [];
+
+    const walkDir = (dir: string): void => {
+      const entries = fs.readdirSync(dir, { withFileTypes: true });
+
+      for (const entry of entries) {
+        const fullPath = path.join(dir, entry.name);
+
+        if (entry.isDirectory()) {
+          walkDir(fullPath);
+        } else if (entry.isFile() && entry.name.endsWith(".prompt.yaml")) {
+          files.push(fullPath);
+        }
+      }
+    };
+
+    walkDir(materializedDir);
+    return files;
+  }
+
+  /**
+   * Adds an entry to the .gitignore file if it doesn't already exist.
+   * Creates the .gitignore file if it doesn't exist.
+   *
+   * @param entry - The entry to add to .gitignore
+   * @returns Object indicating whether the entry was added and if .gitignore existed
+   */
   static addToGitignore(entry: string): { added: boolean; existed: boolean } {
     const gitignorePath = path.join(process.cwd(), ".gitignore");
 
@@ -286,7 +484,7 @@ export class FileManager {
 
     // Read existing .gitignore
     const content = fs.readFileSync(gitignorePath, "utf-8");
-    const lines = content.split("\n").map(line => line.trim());
+    const lines = content.split("\n").map((line) => line.trim());
 
     // Check if entry already exists
     if (lines.includes(entry)) {
@@ -294,7 +492,9 @@ export class FileManager {
     }
 
     // Add entry to .gitignore
-    const newContent = content.endsWith("\n") ? `${content}${entry}\n` : `${content}\n${entry}\n`;
+    const newContent = content.endsWith("\n")
+      ? `${content}${entry}\n`
+      : `${content}\n${entry}\n`;
     fs.writeFileSync(gitignorePath, newContent);
 
     return { added: true, existed: false };
