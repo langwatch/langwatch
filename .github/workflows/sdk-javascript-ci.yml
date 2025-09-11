@@ -58,6 +58,10 @@ jobs:
           LANGWATCH_API_KEY: ${{ secrets.TYPESCRIPT_SDK_LANGWATCH_API_KEY }}
         run: pnpm test
 
+      - name: Build
+        # Compile TypeScript and build production artifacts
+        run: pnpm run build
+
       - name: Run e2e tests
         # Execute end-to-end integration tests
         env:
@@ -66,6 +70,3 @@ jobs:
           E2E_LANGWATCH_API_KEY: ${{ secrets.TYPESCRIPT_SDK_E2E_LANGWATCH_API_KEY }}
         run: pnpm test:e2e
 
-      - name: Build
-        # Compile TypeScript and build production artifacts
-        run: pnpm run build

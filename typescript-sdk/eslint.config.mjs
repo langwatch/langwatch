@@ -9,6 +9,7 @@ const config = tseslint.config(
             "coverage/**",
             "examples/**",
             "ts-to-zod.config.js",
+            "**/generated/**",
         ],
     },
     eslint.configs.recommended,

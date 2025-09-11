@@ -9,6 +9,9 @@ import {
 } from "../../../internal/constants.js";
 import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-http";
 
+const DEFAULT_ENDPOINT = process.env.LANGWATCH_ENDPOINT ?? "https://app.langwatch.ai";
+const DEFAULT_URL = `${DEFAULT_ENDPOINT}${TRACES_PATH}`;
+
 // Mock the OTLP exporter
 vi.mock("@opentelemetry/exporter-trace-otlp-http", () => ({
   OTLPTraceExporter: vi.fn().mockImplementation(function (this: any, config: any) {
@@ -48,7 +51,7 @@ describe("LangWatchExporter", () => {
       expect(exporter).toBeInstanceOf(LangWatchTraceExporter);
       // Access the config through the mock
       expect((exporter as any).config).toBeDefined();
-      expect((exporter as any).url).toBe("https://app.langwatch.ai/api/otel/v1/traces");
+      expect((exporter as any).url).toBe(DEFAULT_URL);
     });
 
     it("should use provided API key in options", () => {
@@ -215,7 +218,7 @@ describe("LangWatchExporter", () => {
     it("should construct URL correctly with default endpoint", () => {
       const exporter = new LangWatchTraceExporter();
 
-      expect((exporter as any).url).toBe("https://app.langwatch.ai/api/otel/v1/traces");
+      expect((exporter as any).url).toBe(DEFAULT_URL);
     });
 
     it("should construct URL correctly with custom endpoint", () => {
@@ -288,7 +291,7 @@ describe("LangWatchExporter", () => {
       });
 
       // Should fallback to environment variables or defaults
-      expect((exporter as any).url).toBe("https://app.langwatch.ai/api/otel/v1/traces");
+      expect((exporter as any).url).toBe(DEFAULT_URL);
     });
 
     it("should handle complex endpoint URLs", () => {

@@ -1,13 +1,10 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { SpanKind } from "@opentelemetry/api";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { createTracingProxy } from "../create-tracing-proxy";
 import { getLangWatchTracerFromProvider, type LangWatchTracer } from "../../../observability-sdk";
 import {
-  MockSpan,
   type MockTracer,
   MockTracerProvider,
   setupTestEnvironment,
-  flushPromises,
   createDelayedPromise,
 } from "../../../observability-sdk/__tests__/test-utils";
 
@@ -399,8 +396,9 @@ describe("createTracingProxy", () => {
             throw new Error("Error in try block");
           } finally {
             // This should still execute
-            // Note: return in finally is unsafe, so we'll just log
             console.log("Finally block executed");
+            // eslint-disable-next-line no-unsafe-finally
+            return "finally result";
           }
         }
       }
