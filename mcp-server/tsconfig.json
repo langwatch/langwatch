@@ -17,7 +17,6 @@
     "jsx": "preserve",
     "incremental": true,
     "noUncheckedIndexedAccess": true,
-    "baseUrl": ".",
     "tsBuildInfoFile": "./tsconfig.tsbuildinfo"
   },
   "include": [

@@ -1,4 +1,3 @@
-/** @type {import("eslint").Linter.BaseConfig} */
 const config = {
   parser: "@typescript-eslint/parser",
   parserOptions: {
