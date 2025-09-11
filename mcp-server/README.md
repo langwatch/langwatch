@@ -1,8 +1,8 @@
 # LangWatch 🏰 MCP Server
 
-The LangWatch MCP Server is a tool designed to aid finding, searching, and looking up LLM traces from the LangWatch platform via the [Model Context Protocol](https://modelcontextprotocol.io/introduction).
+The LangWatch MCP Server is a tool designed to automatically instrument your AI code with LangWatch monitoring via the [Model Context Protocol](https://modelcontextprotocol.io/introduction).
 
-This server facilitates LLM development by allowing the agent to search for traces, understand all the steps in between a problematic output and try to fix the issue.
+This server facilitates LLM development by helping AI coding assistants automatically add LangWatch instrumentation to your codebase, then use those traces to analyze and debug the very AI agents they're building.
 
 ## Setup in your Codebase
 
