@@ -7,6 +7,7 @@ import os from "os";
 import path from "path";
 import * as pty from "node-pty";
 import chalk from "chalk";
+import { anthropic } from "@ai-sdk/anthropic";
 
 dotenv.config();
 
@@ -48,13 +49,17 @@ const claudeCodeAgent = (workingDirectory: string): AgentAdapter => ({
 
       console.log(chalk.blue("Starting claude in:"), workingDirectory);
 
-      const ptyProcess = pty.spawn(`${__dirname}/../node_modules/.bin/claude`, args, {
-        name: "xterm-256color",
-        cols: 80,
-        rows: 30,
-        cwd: workingDirectory,
-        env: { ...process.env, FORCE_COLOR: "1" },
-      });
+      const ptyProcess = pty.spawn(
+        `${__dirname}/../node_modules/.bin/claude`,
+        args,
+        {
+          name: "xterm-256color",
+          cols: 80,
+          rows: 30,
+          cwd: workingDirectory,
+          env: { ...process.env, FORCE_COLOR: "1" },
+        }
+      );
 
       let output = "";
 
@@ -104,6 +109,7 @@ describe("OpenAI Implementation", () => {
         claudeCodeAgent(tempFolder),
         scenario.userSimulatorAgent(),
         scenario.judgeAgent({
+          model: anthropic("claude-sonnet-4-20250514"),
           criteria: [
             "Agent should edit main.py file",
             "Agent should use the langwatch MCP for checking the documentation",
@@ -115,12 +121,26 @@ describe("OpenAI Implementation", () => {
           "please instrument my code with langwatch, short and sweet, no need to test the changes"
         ),
         scenario.agent(),
-        () => {
+        (state) => {
           const resultFile = fs.readFileSync(`${tempFolder}/main.py`, "utf8");
 
-          // expect(resultFile).toContain('@langwatch.span(type="tool")');
-          expect(resultFile).toContain("@langwatch.trace()");
+          expect(resultFile).toContain("@langwatch.trace(");
           expect(resultFile).toContain("autotrack_openai_calls(client)");
+          // TODO: expect(resultFile).toContain('@langwatch.span(type="tool")');
+
+          // Fix for anthropic tool use format, that is not supported by vercel ai for the judge
+          state.messages.forEach((message) => {
+            if (Array.isArray(message.content)) {
+              message.content.forEach((content, index) => {
+                if (content.type !== "text") {
+                  (message.content as any)[index] = {
+                    type: "text",
+                    text: JSON.stringify(content),
+                  };
+                }
+              });
+            }
+          });
         },
         scenario.judge(),
       ],

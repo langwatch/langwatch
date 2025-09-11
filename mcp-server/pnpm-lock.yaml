@@ -10,7 +10,7 @@ importers:
     dependencies:
       '@langwatch/scenario':
         specifier: ^0.3.0
-        version: 0.3.0(ai@4.3.19(react@19.1.1)(zod@3.25.76))(vitest@3.2.4(@types/debug@4.1.12)(@types/node@16.18.126)(tsx@4.20.5))
+        version: 0.3.0(ai@5.0.40(zod@3.25.76))(vitest@3.2.4(@types/debug@4.1.12)(@types/node@16.18.126)(tsx@4.20.5))
       '@modelcontextprotocol/sdk':
         specifier: ^1.7.0
         version: 1.17.5
@@ -39,12 +39,15 @@ importers:
         specifier: ^17.7.2
         version: 17.7.2
       zod:
-        specifier: ^3.22.4
+        specifier: ^3.25.76
         version: 3.25.76
       zod-validation-error:
-        specifier: ^3.3.0
+        specifier: ^3.5.3
         version: 3.5.3(zod@3.25.76)
     devDependencies:
+      '@ai-sdk/anthropic':
+        specifier: ^2.0.15
+        version: 2.0.15(zod@3.25.76)
       '@anthropic-ai/claude-code':
         specifier: ^1.0.111
         version: 1.0.111
@@ -66,6 +69,9 @@ importers:
       '@typescript/native-preview':
         specifier: 7.0.0-dev.20250911.1
         version: 7.0.0-dev.20250911.1
+      ai:
+        specifier: ^5.0.40
+        version: 5.0.40(zod@3.25.76)
       dotenv:
         specifier: ^17.2.2
         version: 17.2.2
@@ -92,6 +98,18 @@ packages:
 
   '@ag-ui/core@0.0.28':
     resolution: {integrity: sha512-2Vjuxl0gE8E2RFjFccGZNczDw3Xqxve/EfoYRVAFNX3+rY7z64Mj0OWDw5p9L+X8UG0/+t0xYIquQpw7B4NdHA==}
+
+  '@ai-sdk/anthropic@2.0.15':
+    resolution: {integrity: sha512-MxNGoYvKyF7IqMU0k9gogyiJi0/ogwg6i2Baw862BMjM2KJuBcCPqh6/lrpwiDg6pqphGUc+LfjPd6PRFARnng==}
+    engines: {node: '>=18'}
+    peerDependencies:
+      zod: ^3.25.76 || ^4
+
+  '@ai-sdk/gateway@1.0.21':
+    resolution: {integrity: sha512-yQPrMb1v0P8GwmmpcCT2DGPfgJVRkJ9QaRRJGO0+Em+wI+Xv3lvHHIc3ImVR3jjVfJPih/cNWWALUgRERfQaxQ==}
+    engines: {node: '>=18'}
+    peerDependencies:
+      zod: ^3.25.76 || ^4
 
   '@ai-sdk/openai@2.0.27':
     resolution: {integrity: sha512-5fUFBlE9qGFgezVIVkzQk87qZYkxsn5PsedtCFPoGxHK6c2QVYHuD1UcrVIKt0elr043Vx17Xo/gS5oJAR5YEQ==}
@@ -1173,6 +1191,12 @@ packages:
     peerDependenciesMeta:
       react:
         optional: true
+
+  ai@5.0.40:
+    resolution: {integrity: sha512-AEKVjVQjnzomEz39f1axnCLtmNRU/BrP12Ou6ztinGhv5u1VxrrRk5qbXugVI0ijeaVwxKQ/SWs0dicUC0qLEA==}
+    engines: {node: '>=18'}
+    peerDependencies:
+      zod: ^3.25.76 || ^4
 
   ajv@6.12.6:
     resolution: {integrity: sha512-j3fVLgvTo527anyYyJOGTYJbG+vnnQYvE0m5mmkc1TK+nxAppkCLMIL0aZ4dblVCNoGShhm+kzE4ZUykBoMg4g==}
@@ -2637,6 +2661,18 @@ snapshots:
       rxjs: 7.8.1
       zod: 3.25.76
 
+  '@ai-sdk/anthropic@2.0.15(zod@3.25.76)':
+    dependencies:
+      '@ai-sdk/provider': 2.0.0
+      '@ai-sdk/provider-utils': 3.0.8(zod@3.25.76)
+      zod: 3.25.76
+
+  '@ai-sdk/gateway@1.0.21(zod@3.25.76)':
+    dependencies:
+      '@ai-sdk/provider': 2.0.0
+      '@ai-sdk/provider-utils': 3.0.8(zod@3.25.76)
+      zod: 3.25.76
+
   '@ai-sdk/openai@2.0.27(zod@3.25.76)':
     dependencies:
       '@ai-sdk/provider': 2.0.0
@@ -2971,11 +3007,11 @@ snapshots:
     transitivePeerDependencies:
       - openai
 
-  '@langwatch/scenario@0.3.0(ai@4.3.19(react@19.1.1)(zod@3.25.76))(vitest@3.2.4(@types/debug@4.1.12)(@types/node@16.18.126)(tsx@4.20.5))':
+  '@langwatch/scenario@0.3.0(ai@5.0.40(zod@3.25.76))(vitest@3.2.4(@types/debug@4.1.12)(@types/node@16.18.126)(tsx@4.20.5))':
     dependencies:
       '@ag-ui/core': 0.0.28
       '@ai-sdk/openai': 2.0.27(zod@3.25.76)
-      ai: 4.3.19(react@19.1.1)(zod@3.25.76)
+      ai: 5.0.40(zod@3.25.76)
       chalk: 5.6.2
       open: 10.2.0
       rxjs: 7.8.2
@@ -3634,6 +3670,14 @@ snapshots:
       zod: 3.25.76
     optionalDependencies:
       react: 19.1.1
+
+  ai@5.0.40(zod@3.25.76):
+    dependencies:
+      '@ai-sdk/gateway': 1.0.21(zod@3.25.76)
+      '@ai-sdk/provider': 2.0.0
+      '@ai-sdk/provider-utils': 3.0.8(zod@3.25.76)
+      '@opentelemetry/api': 1.9.0
+      zod: 3.25.76
 
   ajv@6.12.6:
     dependencies:

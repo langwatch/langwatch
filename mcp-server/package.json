@@ -29,6 +29,7 @@
     "node": ">=18.0.0"
   },
   "devDependencies": {
+    "@ai-sdk/anthropic": "^2.0.15",
     "@anthropic-ai/claude-code": "^1.0.111",
     "@eslint/js": "^9.4.0",
     "@types/debug": "^4.1.12",
@@ -36,6 +37,7 @@
     "@types/node": "^16.0.0",
     "@types/yargs": "^17.0.33",
     "@typescript/native-preview": "7.0.0-dev.20250911.1",
+    "ai": "^5.0.40",
     "dotenv": "^17.2.2",
     "esbuild": "^0.21.5",
     "eslint": "^8.57.0",
@@ -55,8 +57,8 @@
     "node-pty": "^1.0.0",
     "vitest": "^3.2.4",
     "yargs": "^17.7.2",
-    "zod": "^3.22.4",
-    "zod-validation-error": "^3.3.0"
+    "zod": "^3.25.76",
+    "zod-validation-error": "^3.5.3"
   },
   "bin": {
     "langwatch-mcp-server": "./dist/index.js"
