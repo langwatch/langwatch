@@ -1,7 +1,8 @@
 import * as fs from "fs/promises";
 import * as yaml from "js-yaml";
-import type { MaterializedPrompt } from "@/cli/types";
+import type { LocalPromptConfig, MaterializedPrompt } from "@/cli/types";
 import { FileManager } from "@/cli/utils/fileManager";
+import { PromptConverter } from "@/cli/utils/promptConverter";
 
 /**
  * Responsible for reading and parsing materialized prompt files from disk.
@@ -45,10 +46,16 @@ export class MaterializedPromptReader {
   static async readSinglePrompt(filePath: string): Promise<MaterializedPrompt> {
     try {
       const content = await fs.readFile(filePath, "utf-8");
-      const yamlData = yaml.load(content);
+      const yamlData = yaml.load(content) as LocalPromptConfig;
 
       // TODO: Add validation schema if needed
-      return yamlData as MaterializedPrompt;
+      return {
+        model: yamlData.model,
+        temperature: yamlData.modelParameters?.temperature,
+        maxTokens: yamlData.modelParameters?.max_tokens,
+        messages: yamlData.messages,
+        prompt: PromptConverter.extractSystemPrompt(yamlData.messages),
+      }
     } catch (error) {
       throw new Error(`Failed to parse materialized prompt file ${filePath}: ${error instanceof Error ? error.message : "Unknown error"}`);
     }

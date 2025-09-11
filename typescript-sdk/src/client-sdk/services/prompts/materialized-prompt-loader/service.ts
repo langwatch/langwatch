@@ -19,8 +19,18 @@ export class MaterializedPromptLoaderService {
    * @returns Promise resolving to array of all loaded MaterializedPrompt objects
    */
   async load(): Promise<Map<string, MaterializedPrompt>> {
-    const materializedFiles = FileManager.getMaterializedPromptFiles();
-    this.prompts = await MaterializedPromptReader.readMaterializedPrompts(materializedFiles);
+    const { prompts } = FileManager.loadPromptsLock();
+    this.prompts = await Promise.all(Object.entries(prompts).map(async ([name, prompt]) => {
+      const materializedPrompt = await MaterializedPromptReader.readSinglePrompt(prompt.materialized);
+      return {
+        [name]: new Prompt({
+          ...materializedPrompt,
+          handle: name,
+          version: prompt.version,
+          versionId: prompt.versionId,
+        }),
+      };
+    }));
 
     this.isLoaded = true;
 
