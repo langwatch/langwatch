@@ -7,28 +7,28 @@ on:
   pull_request:
     paths:
       - "typescript-sdk/**"
+      - "langwatch/**"  # Trigger when server changes
+      - ".github/workflows/sdk-javascript-ci.yml"
+      - ".github/workflows/reusable-e2e-infrastructure.yml"
   workflow_dispatch:
 
 jobs:
+  # Fast feedback: lint, typecheck, unit tests, build
   ci:
     runs-on: ubuntu-latest
-    # Run lint, typecheck, tests, and build for TypeScript SDK
     defaults:
       run:
         working-directory: typescript-sdk
     steps:
       - name: Checkout
-        # Checkout the repository code
         uses: actions/checkout@v4
 
       - name: Setup pnpm
-        # Install and configure pnpm package manager
         uses: pnpm/action-setup@v2
         with:
           version: 10.12.1
 
       - name: Setup Node
-        # Install Node.js and configure pnpm caching
         uses: actions/setup-node@v4
         with:
           node-version: 20
@@ -36,37 +36,37 @@ jobs:
           cache-dependency-path: "typescript-sdk/pnpm-lock.yaml"
 
       - name: Install dependencies
-        # Install all project dependencies from pnpm-lock.yaml
         run: pnpm install --frozen-lockfile
 
       - name: Install TypeScript Native Preview
-        # Install TypeScript Native Preview for enhanced type checking
         run: pnpm install -D @typescript/native-preview
 
       - name: Run lint check
-        # Check code style and catch potential errors with ESLint
         run: pnpm run lint
 
       - name: Run typecheck
-        # Validate TypeScript types without emitting files
         run: ./node_modules/.bin/tsgo --noEmit --project ./tsconfig.json
 
       - name: Run tests
-        # Execute unit tests with Vitest
         env:
           OPENAI_API_KEY: ${{ secrets.TYPESCRIPT_SDK_OPENAI_API_KEY }}
           LANGWATCH_API_KEY: ${{ secrets.TYPESCRIPT_SDK_LANGWATCH_API_KEY }}
         run: pnpm test
 
       - name: Build
-        # Compile TypeScript and build production artifacts
         run: pnpm run build
 
-      - name: Run e2e tests
-        # Execute end-to-end integration tests
-        env:
-          OPENAI_API_KEY: ${{ secrets.TYPESCRIPT_SDK_OPENAI_API_KEY }}
-          LANGWATCH_API_KEY: ${{ secrets.TYPESCRIPT_SDK_LANGWATCH_API_KEY }}
-          E2E_LANGWATCH_API_KEY: ${{ secrets.TYPESCRIPT_SDK_E2E_LANGWATCH_API_KEY }}
-        run: pnpm test:e2e
+  # E2E tests using reusable workflow (isolated infrastructure)
+  e2e:
+    needs: ci
+    uses: ./.github/workflows/reusable-e2e-infrastructure.yml
+    with:
+      working-directory: 'typescript-sdk'
+      setup-command: >
+        pnpm install --frozen-lockfile
+        pnpm run build
+      test-command: 'pnpm test:e2e'
+      node-version: '20'
+    secrets:
+      OPENAI_API_KEY: ${{ secrets.TYPESCRIPT_SDK_OPENAI_API_KEY }}
 

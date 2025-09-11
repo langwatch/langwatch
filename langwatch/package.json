@@ -2,6 +2,9 @@
   "name": "langwatch",
   "version": "0.1.0",
   "private": true,
+  "prisma": {
+    "seed": "tsx prisma/seed.ts"
+  },
   "scripts": {
     "build": "npm run start:prepare:files && BUILD_TIME=1 next build --no-lint",
     "lint": "next lint",
