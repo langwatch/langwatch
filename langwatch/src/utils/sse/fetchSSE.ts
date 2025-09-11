@@ -71,6 +71,7 @@ export async function fetchSSE<T>({
 
   try {
     await fetchEventSource(endpoint, {
+      openWhenHidden: true,
       method: "POST",
       headers: {
         "Content-Type": "application/json",
