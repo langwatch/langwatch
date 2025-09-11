@@ -134,7 +134,7 @@ describe("index.ts", () => {
       const mockProvider = {
         getTracer: () => ({
           startSpan: () => ({}),
-          startActiveSpan: () => {},
+          startActiveSpan: () => ({}),
         })
       } as any;
 
@@ -432,7 +432,7 @@ describe("index.ts", () => {
 
           throw new Error("Test error");
         });
-      } catch (error) {
+      } catch (_error) {
         // Error expected
       }
 

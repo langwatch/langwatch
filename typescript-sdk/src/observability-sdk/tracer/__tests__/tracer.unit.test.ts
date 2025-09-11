@@ -207,10 +207,10 @@ describe("tracer.ts", () => {
           expect(span.isRecording()).toBe(true);
 
           // Override the end method to track if it's called
-          const originalEnd = span.end;
+          const originalEnd = span.end.bind(span);
           span.end = vi.fn(() => {
             spanEnded = true;
-            originalEnd.call(span);
+            originalEnd();
           });
 
           return "async-done";
@@ -231,25 +231,25 @@ describe("tracer.ts", () => {
         const error = new Error("Test async error");
         const callback = vi.fn(async (span: LangWatchSpan) => {
           // Override methods to track if they're called
-          const originalEnd = span.end;
-          const originalSetStatus = span.setStatus;
-          const originalRecordException = span.recordException;
+          const originalEnd = span.end.bind(span);
+          const originalSetStatus = span.setStatus.bind(span);
+          const originalRecordException = span.recordException?.bind(span);
 
           span.end = vi.fn(() => {
             spanEnded = true;
-            originalEnd.call(span);
+            originalEnd();
           });
 
           span.setStatus = vi.fn((status) => {
             if (status.code === SpanStatusCode.ERROR) {
               statusSet = true;
             }
-            return originalSetStatus.call(span, status);
+            return originalSetStatus(status);
           });
 
           span.recordException = vi.fn((ex) => {
             exceptionRecorded = true;
-            return originalRecordException?.call(span, ex);
+            return originalRecordException?.(ex);
           });
 
           throw error;
@@ -316,10 +316,10 @@ describe("tracer.ts", () => {
           expect(span.isRecording()).toBe(true);
 
           // Override the end method to track if it's called
-          const originalEnd = span.end;
+          const originalEnd = span.end.bind(span);
           span.end = vi.fn(() => {
             spanEnded = true;
-            originalEnd.call(span);
+            originalEnd();
           });
 
           return "sync-done";
@@ -340,25 +340,25 @@ describe("tracer.ts", () => {
         const error = new Error("Test sync error");
         const callback = vi.fn((span: LangWatchSpan) => {
           // Override methods to track if they're called
-          const originalEnd = span.end;
-          const originalSetStatus = span.setStatus;
-          const originalRecordException = span.recordException;
+          const originalEnd = span.end.bind(span);
+          const originalSetStatus = span.setStatus.bind(span);
+          const originalRecordException = span.recordException?.bind(span);
 
           span.end = vi.fn(() => {
             spanEnded = true;
-            originalEnd.call(span);
+            originalEnd();
           });
 
           span.setStatus = vi.fn((status) => {
             if (status.code === SpanStatusCode.ERROR) {
               statusSet = true;
             }
-            return originalSetStatus.call(span, status);
+            return originalSetStatus(status);
           });
 
           span.recordException = vi.fn((ex) => {
             exceptionRecorded = true;
-            return originalRecordException?.call(span, ex);
+            return originalRecordException?.(ex);
           });
 
           throw error;
