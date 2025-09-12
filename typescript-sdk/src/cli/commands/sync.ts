@@ -303,7 +303,7 @@ export const syncCommand = async (): Promise<void> => {
               };
             } else {
               // User chose local - force push
-              const syncResult = await langwatch.prompts.update(promptName, {
+              const syncResult = await promptsApiClient.update(promptName, {
                 ...localConfig,
                 commitMessage: `Synced from local file: ${path.basename(
                   filePath

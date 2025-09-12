@@ -1,6 +1,6 @@
 import chalk from "chalk";
 import ora from "ora";
-import { PromptsError } from "@/client-sdk/services/prompts";
+import { PromptApiService, PromptsError } from "@/client-sdk/services/prompts";
 import { LangWatch } from "@/client-sdk";
 import { checkApiKey } from "../utils/apiKey";
 
@@ -93,12 +93,15 @@ export const listCommand = async (): Promise<void> => {
 
     // Get LangWatch client
     const langwatch = new LangWatch();
+    const promptsApiClient = new PromptApiService({
+      langwatchApiClient: langwatch.api,
+    });
 
     const spinner = ora("Fetching prompts from server...").start();
 
     try {
       // Fetch all prompts
-      const allPrompts = await langwatch.prompts.getAll();
+      const allPrompts = await promptsApiClient.getAll();
       const prompts = allPrompts.filter((prompt) => prompt.version);
       const draftPrompts = allPrompts.filter((prompt) => !prompt.version);
 

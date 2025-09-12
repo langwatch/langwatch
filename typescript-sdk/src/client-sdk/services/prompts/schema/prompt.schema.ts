@@ -47,4 +47,7 @@ export const promptMetadataSchema = z.object({
 /**
  * Combined schema for complete prompt data
  */
-export const promptDataSchema = corePromptDataSchema.extend(promptMetadataSchema);
+export const promptDataSchema = z.object({
+  ...corePromptDataSchema.shape,
+  ...promptMetadataSchema.shape,
+});
