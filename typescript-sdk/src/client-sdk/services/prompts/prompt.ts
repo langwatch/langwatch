@@ -2,7 +2,8 @@ import { Liquid } from "liquidjs";
 import type { paths } from "@/internal/generated/openapi/api-client";
 import { PromptTracingDecorator, tracer } from "./tracing";
 import { createTracingProxy } from "@/client-sdk/tracing/create-tracing-proxy";
-import { z } from "zod";
+import * as yaml from "js-yaml";
+import type { LocalPromptConfig } from "@/cli/types";
 
 // Extract the prompt response type from OpenAPI schema
 export type PromptResponse = NonNullable<
@@ -14,6 +15,24 @@ export type TemplateVariables = Record<
   string,
   string | number | boolean | object | null
 >;
+
+// Type for YAML content structure used in .prompt.yaml files
+interface YamlContent {
+  model: string;
+  modelParameters?: {
+    temperature?: number;
+    maxTokens?: number;
+  };
+  messages: Array<{
+    role: "system" | "user" | "assistant";
+    content: string;
+  }>;
+  metadata?: {
+    id?: string;
+    version?: number;
+    versionId?: string;
+  };
+}
 
 /**
  * Error class for template compilation issues
@@ -148,6 +167,109 @@ export class Prompt implements IPromptInput {
    */
   compileStrict(variables: TemplateVariables): CompiledPrompt {
     return this._compile(variables, true);
+  }
+
+  /**
+   * Converts this prompt to YAML format for file storage.
+   * @returns YamlContent object ready for YAML serialization
+   */
+  toYaml(): YamlContent {
+    const result: YamlContent = {
+      model: this.model,
+      messages: this.messages,
+    };
+
+    // Add modelParameters if temperature or maxTokens exist
+    if (this.temperature !== undefined || this.maxTokens !== undefined) {
+      result.modelParameters = {};
+      if (this.temperature !== undefined) {
+        result.modelParameters.temperature = this.temperature;
+      }
+      if (this.maxTokens !== undefined) {
+        result.modelParameters.maxTokens = this.maxTokens;
+      }
+    }
+
+    // Add metadata if available
+    if (this.id || this.version || this.versionId) {
+      result.metadata = {};
+      if (this.id) {
+        result.metadata.id = this.id;
+      }
+      if (this.version) {
+        result.metadata.version = this.version;
+      }
+      if (this.versionId) {
+        result.metadata.versionId = this.versionId;
+      }
+    }
+
+    return result;
+  }
+
+  /**
+   * Converts this prompt to a YAML string.
+   * @returns YAML string representation of the prompt
+   */
+  toYamlString(): string {
+    const yamlContent = this.toYaml();
+    return yaml.dump(yamlContent, {
+      lineWidth: -1,
+      noRefs: true,
+      sortKeys: false,
+    });
+  }
+
+  /**
+   * Creates a Prompt instance from YAML config.
+   * @param config LocalPromptConfig loaded from YAML
+   * @param options Optional metadata (handle, version info)
+   * @returns New Prompt instance
+   */
+  static fromYaml(
+    config: LocalPromptConfig,
+    options: {
+      handle?: string;
+      id?: string;
+      version?: number;
+      versionId?: string;
+    } = {}
+  ): Prompt {
+    // Extract system prompt from messages
+    const systemPrompt = config.messages.find(m => m.role === "system")?.content ?? "";
+
+    const promptData: IPromptInput = {
+      id: options.id ?? "local",
+      handle: options.handle ?? "local",
+      model: config.model,
+      temperature: config.modelParameters?.temperature,
+      maxTokens: config.modelParameters?.max_tokens,
+      messages: config.messages,
+      prompt: systemPrompt,
+      version: options.version ?? 0,
+      versionId: options.versionId ?? "local",
+    };
+
+    return new Prompt(promptData);
+  }
+
+  /**
+   * Creates a Prompt instance from a YAML string.
+   * @param yamlString YAML string to parse
+   * @param options Optional metadata (handle, version info)
+   * @returns New Prompt instance
+   */
+  static fromYamlString(
+    yamlString: string,
+    options: {
+      handle?: string;
+      id?: string;
+      version?: number;
+      versionId?: string;
+    } = {}
+  ): Prompt {
+    const config = yaml.load(yamlString) as LocalPromptConfig;
+    return this.fromYaml(config, options);
   }
 }
 

@@ -1,0 +1,12 @@
+model: openai/gpt-4-turbo
+messages:
+  - role: system
+    content: You are a helpful assistant.
+  - role: user
+    content: Tell me about {{topic}}
+modelParameters:
+  temperature: 0.9
+metadata:
+  id: prompt_4
+  version: 1
+  versionId: prompt_version_4

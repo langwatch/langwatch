@@ -1,7 +1,7 @@
 import { describe, it, expect, afterEach } from "vitest";
 import { InMemoryPromptLoader, DuplicatePromptFoundError } from "../in-memory-prompt-loader";
 import { Prompt } from "@/client-sdk/services/prompts/prompt";
-import { promptResponseFactory } from "../../../../__tests__/factories/prompt.factory";
+import { promptResponseFactory } from "../../../../__tests__/factories/prompt-response.factory";
 import { LocalPromptRepository } from "../local-prompt.repository";
 import * as expectations from "../../../__tests__/test-utils/expecations";
 
