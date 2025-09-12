@@ -2,6 +2,7 @@ import { PromptApiService, type SyncResult } from "./prompt-api.service";
 import { Prompt } from "./prompt";
 import type { CreatePromptBody, UpdatePromptBody } from "./types";
 import { type InternalConfig } from "@/client-sdk/types";
+import { LocalPromptRepository } from "@/shared/prompts/local-prompt.repository";
 
 /**
  * Facade for prompt operations in the LangWatch SDK.
@@ -9,9 +10,11 @@ import { type InternalConfig } from "@/client-sdk/types";
  */
 export class PromptsFacade {
   private readonly service: PromptApiService;
+  private readonly localPromptRepository: LocalPromptRepository;
 
   constructor(config: InternalConfig) {
     this.service = new PromptApiService(config);
+    this.localPromptRepository = new LocalPromptRepository();
   }
 
   /**
@@ -36,6 +39,8 @@ export class PromptsFacade {
     handleOrId: string,
     options?: { version?: string },
   ): Promise<Prompt | null> {
+    const localPrompt = await this.localPromptRepository.loadPrompt(handleOrId);
+    if (localPrompt) return new Prompt(localPrompt);
     const prompt = await this.service.get(handleOrId, options);
     if (!prompt) return null;
     return new Prompt(prompt);

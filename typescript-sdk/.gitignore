@@ -13,6 +13,6 @@ prompts-lock.json
 prompts.json
 
 tmp/
-prompts/
+prompts/*
 prompts-lock.json
 prompts.json
