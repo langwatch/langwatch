@@ -47,7 +47,7 @@ def get_current_trace(
     if start_if_none:
         otel_span = trace_api.get_current_span()
         otel_span_id = otel_span.get_span_context().span_id
-        trace.__enter__()
+        result = trace.__enter__()
 
         # Keep the previous span in the context if we are starting a new trace not at root level
         if otel_span_id != 0:
@@ -57,7 +57,7 @@ def get_current_trace(
 
         trace.__exit__(None, None, None)
 
-        return trace
+        return result  # Return the result of __enter__(), not the trace itself
     return trace
 
 
@@ -69,6 +69,11 @@ def get_current_span() -> "LangWatchSpan":
         A LangWatchSpan.
     """
     ensure_setup()
+
+    # First check if there's a LangWatch span in the context
+    lw_span = stored_langwatch_span.get(None)
+    if lw_span is not None:
+        return lw_span
 
     otel_span = trace_api.get_current_span()
     otel_span_id = otel_span.get_span_context().span_id
@@ -104,8 +109,11 @@ def _set_current_span(span: "LangWatchSpan"):
     if not _is_on_child_thread():
         main_thread_langwatch_span.append(span)
 
-    # Dummy token, just for the main thread span list
-    return "token"
+    try:
+        return stored_langwatch_span.set(span)
+    except Exception as e:
+        warnings.warn(f"Failed to set LangWatch span context: {e}")
+        return "token"  # fallback for main thread list management
 
 
 def _reset_current_trace(token: contextvars.Token):
