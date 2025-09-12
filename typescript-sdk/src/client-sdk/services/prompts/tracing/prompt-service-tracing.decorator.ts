@@ -1,4 +1,4 @@
-import { type PromptsService } from "../service";
+import { type PromptApiService } from "../prompt-api.service";
 import { type Prompt } from "../prompt";
 import type { LangWatchSpan } from "@/observability-sdk";
 import { shouldCaptureInput, shouldCaptureOutput } from "@/observability-sdk";
@@ -9,7 +9,7 @@ import type { CreatePromptBody, UpdatePromptBody } from "../types";
  * adding tracing to key methods.
  */
 export class PromptServiceTracingDecorator {
-  constructor(private readonly target: PromptsService) {}
+  constructor(private readonly target: PromptApiService) {}
 
   async get(
     span: LangWatchSpan,

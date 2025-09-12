@@ -49,7 +49,7 @@ export interface SyncResult {
  *
  * All methods return Prompt instances, which encapsulate prompt data and template logic.
  */
-export class PromptsService {
+export class PromptApiService {
   private config: InternalConfig;
 
   constructor(config: InternalConfig) {
@@ -59,7 +59,7 @@ export class PromptsService {
      * Wraps the service in a tracing proxy via the decorator.
      */
     return createTracingProxy(
-      this as PromptsService,
+      this as PromptApiService,
       tracer,
       PromptServiceTracingDecorator,
     );

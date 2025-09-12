@@ -1,4 +1,4 @@
-import { PromptsService, type SyncResult } from "./service";
+import { PromptApiService, type SyncResult } from "./prompt-api.service";
 import type { Prompt } from "./prompt";
 import type { CreatePromptBody, UpdatePromptBody } from "./types";
 import { type InternalConfig } from "@/client-sdk/types";
@@ -8,12 +8,12 @@ import { type InternalConfig } from "@/client-sdk/types";
  * Provides a simplified interface for common prompt management tasks.
  */
 export class PromptsFacade {
-  private readonly service: PromptsService;
+  private readonly service: PromptApiService;
   private readonly config: InternalConfig;
 
   constructor(config: InternalConfig) {
     this.config = config;
-    this.service = new PromptsService(config);
+    this.service = new PromptApiService(config);
   }
 
   /**
