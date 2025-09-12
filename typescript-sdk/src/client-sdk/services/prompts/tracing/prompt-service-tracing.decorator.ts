@@ -31,7 +31,7 @@ export class PromptServiceTracingDecorator {
     }
 
     if (result && shouldCaptureOutput()) {
-      span.setOutput("json", result.raw);
+      span.setOutput("json", result);
     }
 
     return result;
@@ -49,11 +49,13 @@ export class PromptServiceTracingDecorator {
 
     const result = await this.target.create(params);
 
-    span.setAttribute('langwatch.prompt.id', result.id);
-    span.setAttribute('langwatch.prompt.handle', result.handle ?? '');
-    span.setAttribute('langwatch.prompt.scope', result.scope);
-    span.setAttribute('langwatch.prompt.version.id', result.versionId);
-    span.setAttribute('langwatch.prompt.version.number', result.version);
+    span.setAttributes({
+      'langwatch.prompt.id': result.id,
+      'langwatch.prompt.handle': result.handle ?? undefined,
+      'langwatch.prompt.scope': result.scope,
+      'langwatch.prompt.version.id': result.versionId,
+      'langwatch.prompt.version.number': result.version,
+    });
 
     return result;
   }
@@ -71,11 +73,13 @@ export class PromptServiceTracingDecorator {
     const result = await this.target.update(id, params);
 
     span.setType("prompt");
-    span.setAttribute('langwatch.prompt.id', id);
-    span.setAttribute('langwatch.prompt.handle', result.handle ?? '');
-    span.setAttribute('langwatch.prompt.scope', result.scope);
-    span.setAttribute('langwatch.prompt.version.id', result.versionId);
-    span.setAttribute('langwatch.prompt.version.number', result.version);
+    span.setAttributes({
+      'langwatch.prompt.id': id,
+      'langwatch.prompt.handle': result.handle ?? undefined,
+      'langwatch.prompt.scope': result.scope,
+      'langwatch.prompt.version.id': result.versionId,
+      'langwatch.prompt.version.number': result.version,
+    });
 
     return result;
   }
@@ -105,11 +109,13 @@ export class PromptServiceTracingDecorator {
     const result = await this.target.upsert(handle, config);
 
     span.setType("prompt");
-    span.setAttribute('langwatch.prompt.handle', handle);
-    span.setAttribute('langwatch.prompt.created', result.created.toString());
-    span.setAttribute('langwatch.prompt.id', result.prompt.id);
-    span.setAttribute('langwatch.prompt.version.id', result.prompt.versionId);
-    span.setAttribute('langwatch.prompt.version.number', result.prompt.version);
+    span.setAttributes({
+      'langwatch.prompt.handle': handle,
+      'langwatch.prompt.created': result.created.toString(),
+      'langwatch.prompt.id': result.prompt.id,
+      'langwatch.prompt.version.id': result.prompt.versionId,
+      'langwatch.prompt.version.number': result.prompt.version,
+    });
 
     return result;
   }
@@ -129,9 +135,11 @@ export class PromptServiceTracingDecorator {
     span.setAttribute('langwatch.prompt.sync.action', result.action);
 
     if (result.conflictInfo) {
-      span.setAttribute('langwatch.prompt.sync.has_conflict', 'true');
-      span.setAttribute('langwatch.prompt.sync.local_version', result.conflictInfo.localVersion.toString());
-      span.setAttribute('langwatch.prompt.sync.remote_version', result.conflictInfo.remoteVersion.toString());
+      span.setAttributes({
+        'langwatch.prompt.sync.has_conflict': 'true',
+        'langwatch.prompt.sync.local_version': result.conflictInfo.localVersion.toString(),
+        'langwatch.prompt.sync.remote_version': result.conflictInfo.remoteVersion.toString(),
+      });
     }
 
     return result;

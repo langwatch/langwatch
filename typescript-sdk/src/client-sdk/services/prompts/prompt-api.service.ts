@@ -1,5 +1,6 @@
 import type { paths } from "@/internal/generated/openapi/api-client";
-import { Prompt, type PromptResponse } from "./prompt";
+import { Prompt } from "./prompt";
+import { type PromptResponse } from "./types";
 import { PromptConverter } from "@/cli/utils/promptConverter";
 import { PromptServiceTracingDecorator, tracer } from "./tracing";
 import { createTracingProxy } from "@/client-sdk/tracing/create-tracing-proxy";
@@ -254,7 +255,7 @@ export class PromptApiService {
         prompt,
       };
     } catch {
-      const prompt = await this.update(handle, payload as UpdatePromptBody);
+      const prompt = await this.update(handle, payload);
 
       return {
         created: false,

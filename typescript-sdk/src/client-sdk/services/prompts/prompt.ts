@@ -1,32 +1,16 @@
 import { Liquid } from "liquidjs";
-import type { paths } from "@/internal/generated/openapi/api-client";
 import { PromptTracingDecorator, tracer } from "./tracing";
 import { createTracingProxy } from "@/client-sdk/tracing/create-tracing-proxy";
+import { promptDataSchema } from "./schema";
+import { type TemplateVariables, type PromptData, type CorePromptData } from "./types";
+import { PromptCompilationError, PromptValidationError } from "./errors";
+import { CompiledPrompt } from "./compiled-prompt";
+import { type PromptScope } from "@prisma/client";
 
-// Extract the prompt response type from OpenAPI schema
-export type PromptResponse = NonNullable<
-  paths["/api/prompts/{id}"]["get"]["responses"]["200"]["content"]["application/json"]
->;
-
-// Type for template variables - supporting common data types
-export type TemplateVariables = Record<
-  string,
-  string | number | boolean | object | null
->;
-
-/**
- * Error class for template compilation issues
- */
-export class PromptCompilationError extends Error {
-  constructor(
-    message: string,
-    public readonly template: string,
-    public readonly originalError?: any,
-  ) {
-    super(message);
-    this.name = "PromptCompilationError";
-  }
-}
+// Re-export types and errors for convenience
+export type { TemplateVariables, PromptData, CorePromptData, PromptMetadata } from "./types";
+export { PromptCompilationError, PromptValidationError } from "./errors";
+export { CompiledPrompt } from "./compiled-prompt";
 
 // Global Liquid instance - shared across all prompts for efficiency
 const liquid = new Liquid({
@@ -35,48 +19,53 @@ const liquid = new Liquid({
 
 /**
  * The Prompt class provides a standardized interface for working with prompt objects
- * within the SDK, ensuring consistent structure and behavior regardless of the underlying
- * client implementation. This abstraction enables the SDK to maintain control over prompt
- * handling, enforce type safety, and facilitate future enhancements without exposing
- * internal details or requiring changes from client code.
+ * within the SDK, focusing on core functionality needed for template compilation and execution.
+ * Keeps only essential fields while maintaining compatibility with tracing and observability.
  */
-export class Prompt implements PromptResponse {
-  // === Identification ===
-  public readonly id!: PromptResponse["id"];
-  public readonly handle!: PromptResponse["handle"];
-  public readonly name!: PromptResponse["name"];
-  public readonly scope!: PromptResponse["scope"];
+export class Prompt {
+  // === Core functionality (required) ===
+  public readonly model!: string;
+  public readonly messages!: Array<{
+    role: "user" | "assistant" | "system";
+    content: string;
+  }>;
 
-  // === Ownership & Organization ===
-  public readonly projectId!: PromptResponse["projectId"];
-  public readonly organizationId!: PromptResponse["organizationId"];
-  public readonly authorId: PromptResponse["authorId"];
+  // === Optional core fields ===
+  public readonly prompt?: string;
+  public readonly temperature?: number;
+  public readonly maxTokens?: number;
+  public readonly responseFormat?: CorePromptData["responseFormat"];
 
-  // === Timestamps ===
-  public readonly createdAt!: PromptResponse["createdAt"];
-  public readonly updatedAt!: PromptResponse["updatedAt"];
+  // === Optional identification (for tracing) ===
+  public readonly id?: string;
+  public readonly handle?: string | null;
+  public readonly version?: number;
+  public readonly versionId?: string;
+  public readonly scope?: PromptScope;
 
-  // === Versioning ===
-  public readonly version!: PromptResponse["version"];
-  public readonly versionId!: PromptResponse["versionId"];
+  constructor(data: PromptData) {
+    // Validate input using Zod
+    const validationResult = promptDataSchema.safeParse(data);
 
-  // === Model Configuration ===
-  public readonly model!: PromptResponse["model"];
-  public readonly temperature: PromptResponse["temperature"];
-  public readonly maxTokens: PromptResponse["maxTokens"];
-  public readonly responseFormat: PromptResponse["responseFormat"];
+    if (!validationResult.success) {
+      throw new PromptValidationError(
+        "Invalid prompt data provided",
+        validationResult.error
+      );
+    }
 
-  // === Prompt Content ===
-  public readonly prompt!: PromptResponse["prompt"];
-  public readonly messages!: PromptResponse["messages"];
-  public readonly inputs!: PromptResponse["inputs"];
-  public readonly outputs!: PromptResponse["outputs"];
+    // Assign validated data
+    Object.assign(this, validationResult.data);
 
-  constructor(readonly raw: PromptResponse) {
-    Object.assign(this, raw);
+    // Set default for prompt if not provided
+    this.prompt ??= this.extractSystemPrompt();
 
     // Return a proxy that wraps specific methods for tracing
     return createTracingProxy(this as Prompt, tracer, PromptTracingDecorator);
+  }
+
+  private extractSystemPrompt(): string {
+    return this.messages.find(m => m.role === "system")?.content ?? "";
   }
 
   /**
@@ -107,7 +96,7 @@ export class Prompt implements PromptResponse {
       }));
 
       // Create new prompt data with compiled content
-      const compiledData: PromptResponse = {
+      const compiledData: PromptData = {
         ...this,
         prompt: compiledPrompt,
         messages: compiledMessages,
@@ -115,7 +104,7 @@ export class Prompt implements PromptResponse {
 
       return new CompiledPrompt(compiledData, this);
     } catch (error) {
-      const templateStr = this.prompt || JSON.stringify(this.messages);
+      const templateStr = this.prompt ?? JSON.stringify(this.messages);
       throw new PromptCompilationError(
         `Failed to compile prompt template: ${
           error instanceof Error ? error.message : "Unknown error"
@@ -140,14 +129,3 @@ export class Prompt implements PromptResponse {
   }
 }
 
-export /**
- * Represents a compiled prompt that extends Prompt with reference to the original template
- */
-class CompiledPrompt extends Prompt {
-  constructor(
-    compiledData: PromptResponse,
-    public readonly original: Prompt,
-  ) {
-    super(compiledData);
-  }
-}

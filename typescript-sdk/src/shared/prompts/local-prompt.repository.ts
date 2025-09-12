@@ -76,9 +76,7 @@ export class LocalPromptRepository {
 
     try {
       const yamlContent = await fs.readFile(filePath, "utf-8");
-      return PromptYamlSerializer.deserialize(yamlContent, {
-        handle: name,
-      });
+      return PromptYamlSerializer.deserialize(yamlContent);
     } catch {
       // File doesn't exist or can't be read
       return null;
