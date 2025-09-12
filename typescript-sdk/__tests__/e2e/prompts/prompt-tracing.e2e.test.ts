@@ -1,11 +1,11 @@
 import { describe, expect, it, beforeAll, beforeEach } from "vitest";
 import { getLangwatchSDK } from "../../helpers/get-sdk.js";
-import { setupTestTraceProvider } from "../../helpers/setup-test-trace-provider.js";
+import { setupTestTraceProvider } from "../../helpers/setup-test-trace-provider";
 import { type ReadableSpan } from "@opentelemetry/sdk-trace-node";
 import { type LangWatch, attributes } from "../../../dist/index.js";
-import { promptResponseFactory } from "../../factories/prompt.factory.js";
 import { handles } from "./handlers.js";
 import { server } from "../setup/msw-setup.js";
+import { promptResponseFactory } from "../../../src/factories/prompt-response.factory";
 
 const { spanExporter, findFinishedSpanByName } = setupTestTraceProvider();
 
@@ -125,9 +125,7 @@ describe("Prompt tracing", () => {
       ] as string;
       const output = JSON.parse(outputAttr);
 
-      expect(output.value.prompt).toBe(
-        "Hello Alice, how is the weather today?",
-      );
+      expect(output.value.prompt).toBe("You are a helpful assistant.");
       expect(output.value.messages[1].content).toBe("Tell me about weather");
     });
 

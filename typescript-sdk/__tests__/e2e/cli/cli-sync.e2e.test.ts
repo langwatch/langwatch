@@ -32,7 +32,7 @@ const createUniquePromptName = () => {
 };
 
 if (!process.env.CI) { // Skip for CI because we don't have a test server set up
-  describe.skip("CLI E2E", () => {
+  describe("CLI E2E", () => {
     let testDir: string;
     let originalCwd: string;
     let langwatch: LangWatch;
