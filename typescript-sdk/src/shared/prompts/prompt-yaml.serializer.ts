@@ -15,6 +15,7 @@ interface YamlContent {
     id?: string;
     version?: number;
     versionId?: string;
+    handle?: string;
   };
 }
 
@@ -41,15 +42,9 @@ export class PromptYamlSerializer {
    */
   static deserialize(
     yamlString: string,
-    options: {
-      handle?: string;
-      id?: string;
-      version?: number;
-      versionId?: string;
-    } = {}
   ): Prompt {
     const yamlContent = yaml.load(yamlString) as YamlContent;
-    return PromptYamlSerializer.fromYamlContent(yamlContent, options);
+    return PromptYamlSerializer.fromYamlContent(yamlContent);
   }
 
   /**
@@ -69,7 +64,7 @@ export class PromptYamlSerializer {
     }
 
     // Add metadata if present
-    if (prompt.id || prompt.version || prompt.versionId) {
+    if (prompt.id || prompt.version || prompt.versionId || prompt.handle) {
       result.metadata = {
         ...(prompt.id && { id: prompt.id }),
         ...(prompt.version && { version: prompt.version }),
@@ -85,22 +80,16 @@ export class PromptYamlSerializer {
    */
   private static fromYamlContent(
     yamlContent: YamlContent,
-    options: {
-      handle?: string;
-      id?: string;
-      version?: number;
-      versionId?: string;
-    } = {}
   ): Prompt {
     // Extract system prompt from messages for the prompt field
     const systemPrompt = this.extractSystemPrompt(yamlContent.messages);
 
     return new Prompt({
-      id: yamlContent.metadata?.id ?? options.id ?? "local",
-      handle: options.handle ?? "local",
+      id: yamlContent.metadata?.id,
+      handle: yamlContent.metadata?.handle,
       prompt: systemPrompt,
-      version: yamlContent.metadata?.version ?? options.version ?? 0,
-      versionId: yamlContent.metadata?.versionId ?? options.versionId ?? "local",
+      version: yamlContent.metadata?.version,
+      versionId: yamlContent.metadata?.versionId,
       model: yamlContent.model,
       temperature: yamlContent.modelParameters?.temperature,
       maxTokens: yamlContent.modelParameters?.maxTokens,
