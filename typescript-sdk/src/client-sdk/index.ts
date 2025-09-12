@@ -1,6 +1,6 @@
 import { PromptFacade as PromptsFacade } from "./services/prompts";
 import { type InternalConfig } from "./types";
-import { createLangWatchApiClient } from "../internal/api/client";
+import { createLangWatchApiClient, type LangwatchApiClient } from "../internal/api/client";
 import { type Logger, NoOpLogger } from "../logger";
 import { TracesFacade } from "./services/traces/facade";
 import { getLangWatchTracer, type LangWatchTracer } from "@/observability-sdk";
@@ -32,6 +32,10 @@ export class LangWatch {
 
     this.prompts = new PromptsFacade(this.config);
     this.traces = new TracesFacade(this.config);
+  }
+
+  get api(): LangwatchApiClient {
+    return this.config.langwatchApiClient;
   }
 
   #createInternalConfig({

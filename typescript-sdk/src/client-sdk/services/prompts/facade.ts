@@ -1,19 +1,20 @@
-import { PromptsService, type SyncResult } from "./service";
-import type { Prompt } from "./prompt";
+import { PromptApiService, type SyncResult } from "./prompt-api.service";
+import { Prompt } from "./prompt";
 import type { CreatePromptBody, UpdatePromptBody } from "./types";
 import { type InternalConfig } from "@/client-sdk/types";
+import { LocalPromptRepository } from "@/shared/prompts/local-prompt.repository";
 
 /**
  * Facade for prompt operations in the LangWatch SDK.
  * Provides a simplified interface for common prompt management tasks.
  */
 export class PromptsFacade {
-  private readonly service: PromptsService;
-  private readonly config: InternalConfig;
+  private readonly service: PromptApiService;
+  private readonly localPromptRepository: LocalPromptRepository;
 
   constructor(config: InternalConfig) {
-    this.config = config;
-    this.service = new PromptsService(config);
+    this.service = new PromptApiService(config);
+    this.localPromptRepository = new LocalPromptRepository();
   }
 
   /**
@@ -23,7 +24,8 @@ export class PromptsFacade {
    * @throws {PromptsError} If the API call fails.
    */
   async create(data: CreatePromptBody): Promise<Prompt> {
-    return this.service.create(data);
+    const prompt = await this.service.create(data);
+    return new Prompt(prompt);
   }
 
   /**
@@ -37,7 +39,11 @@ export class PromptsFacade {
     handleOrId: string,
     options?: { version?: string },
   ): Promise<Prompt | null> {
-    return this.service.get(handleOrId, options);
+    const localPrompt = await this.localPromptRepository.loadPrompt(handleOrId);
+    if (localPrompt) return new Prompt(localPrompt);
+    const prompt = await this.service.get(handleOrId, options);
+    if (!prompt) return null;
+    return new Prompt(prompt);
   }
 
   /**
@@ -46,7 +52,8 @@ export class PromptsFacade {
    * @throws {PromptsError} If the API call fails.
    */
   async getAll(): Promise<Prompt[]> {
-    return this.service.getAll();
+    const prompts = await this.service.getAll();
+    return prompts.map((prompt) => new Prompt(prompt));
   }
 
   /**
@@ -57,7 +64,8 @@ export class PromptsFacade {
    * @throws {PromptsError} If the API call fails.
    */
   async update(handleOrId: string, newData: UpdatePromptBody): Promise<Prompt> {
-    return this.service.update(handleOrId, newData);
+    const prompt = await this.service.update(handleOrId, newData);
+    return new Prompt(prompt);
   }
 
   /**
@@ -66,7 +74,8 @@ export class PromptsFacade {
    * @throws {PromptsError} If the API call fails.
    */
   async delete(handleOrId: string): Promise<{ success: boolean }> {
-    return this.service.delete(handleOrId);
+    const result = await this.service.delete(handleOrId);
+    return result;
   }
 
   /**
@@ -81,6 +90,7 @@ export class PromptsFacade {
     localVersion?: number;
     commitMessage?: string;
   }): Promise<SyncResult> {
-    return this.service.sync(params);
+    const result = await this.service.sync(params);
+    return result;
   }
 }
