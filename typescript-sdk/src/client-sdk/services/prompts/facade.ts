@@ -2,7 +2,6 @@ import { PromptsService, type SyncResult } from "./service";
 import type { Prompt } from "./prompt";
 import type { CreatePromptBody, UpdatePromptBody } from "./types";
 import { type InternalConfig } from "@/client-sdk/types";
-import { MaterializedPromptLoaderService } from "./materialized-prompt-loader/service";
 
 /**
  * Facade for prompt operations in the LangWatch SDK.
@@ -10,11 +9,11 @@ import { MaterializedPromptLoaderService } from "./materialized-prompt-loader/se
  */
 export class PromptsFacade {
   private readonly service: PromptsService;
-  private readonly materializedPromptLoader: MaterializedPromptLoaderService;
+  private readonly config: InternalConfig;
 
   constructor(config: InternalConfig) {
+    this.config = config;
     this.service = new PromptsService(config);
-    this.materializedPromptLoader = new MaterializedPromptLoaderService();
   }
 
   /**
@@ -38,11 +37,7 @@ export class PromptsFacade {
     handleOrId: string,
     options?: { version?: string },
   ): Promise<Prompt | null> {
-    const prompt =
-      this.materializedPromptLoader.get(handleOrId) ??
-      await this.service.get(handleOrId, options);
-
-    return prompt;
+    return this.service.get(handleOrId, options);
   }
 
   /**
