@@ -115,6 +115,7 @@ export class PromptApiService {
     if (error) {
       this.handleApiError(`fetch prompt with ID "${id}"`, error);
     }
+
     return new Prompt(data);
   }
 
