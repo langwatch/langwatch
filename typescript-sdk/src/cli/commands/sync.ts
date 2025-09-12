@@ -6,6 +6,8 @@ import * as yaml from "js-yaml";
 import { PromptConverter } from "@/cli/utils/promptConverter";
 import {
   type ConfigData,
+  Prompt,
+  PromptApiService,
   PromptsError,
   type SyncAction,
 } from "@/client-sdk/services/prompts";
@@ -15,6 +17,9 @@ import { FileManager } from "../utils/fileManager";
 import { ensureProjectInitialized } from "../utils/init";
 import { checkApiKey } from "../utils/apiKey";
 import readline from "node:readline";
+import { LocalPromptRepository } from "@/shared/prompts/local-prompt.repository";
+
+const localPromptRepository = new LocalPromptRepository();
 
 // Handle conflict resolution - show diff and ask user to choose
 const handleConflict = async (
@@ -78,6 +83,9 @@ export const syncCommand = async (): Promise<void> => {
 
     // Get LangWatch client
     const langwatch = new LangWatch();
+    const promptsApiClient = new PromptApiService({
+      langwatchApiClient: langwatch.api,
+    });
 
     // Ensure project is initialized (prompts.json, lock file, directories)
     await ensureProjectInitialized(false); // Don't prompt for .gitignore in sync
@@ -124,7 +132,7 @@ export const syncCommand = async (): Promise<void> => {
           const lockEntry = lock.prompts[name];
 
           // Fetch the prompt from the API to check current version
-          const prompt = await langwatch.prompts.get(name);
+          const prompt = await promptsApiClient.get(name);
 
           if (prompt) {
             // Check if we need to update (new version or not materialized)
@@ -135,14 +143,8 @@ export const syncCommand = async (): Promise<void> => {
               !fs.existsSync(path.resolve(lockEntry.materialized));
 
             if (needsUpdate) {
-              // Convert to MaterializedPrompt format using the converter
-              const materializedPrompt =
-                PromptConverter.fromApiToMaterialized(prompt);
+              const savedPath = await localPromptRepository.savePromptMaterialized(name, new Prompt(prompt));
 
-              const savedPath = FileManager.saveMaterializedPrompt(
-                name,
-                materializedPrompt
-              );
               const relativePath = path.relative(process.cwd(), savedPath);
               result.fetched.push({
                 name,
@@ -154,7 +156,10 @@ export const syncCommand = async (): Promise<void> => {
               FileManager.updateLockEntry(
                 lock,
                 name,
-                materializedPrompt,
+                {
+                  version: prompt.version,
+                  versionId: prompt.versionId,
+                },
                 savedPath
               );
 

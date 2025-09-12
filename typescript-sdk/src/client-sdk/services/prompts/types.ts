@@ -36,7 +36,7 @@ export type CreatePromptBody = NonNullable<
 
 export type UpdatePromptBody = NonNullable<
   paths["/api/prompts/{id}"]["put"]["requestBody"]
->["content"];
+>["content"]["application/json"];
 
 export type PromptResponse = NonNullable<
   paths["/api/prompts/{id}"]["get"]["responses"]["200"]["content"]["application/json"]

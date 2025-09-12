@@ -1,8 +1,7 @@
 import { type PromptApiService } from "../prompt-api.service";
-import { type Prompt } from "../prompt";
 import type { LangWatchSpan } from "@/observability-sdk";
 import { shouldCaptureInput, shouldCaptureOutput } from "@/observability-sdk";
-import type { CreatePromptBody, UpdatePromptBody } from "../types";
+import type { CreatePromptBody, UpdatePromptBody, PromptResponse } from "../types";
 
 /**
  * Class that decorates the target prompt service,
@@ -15,7 +14,7 @@ export class PromptServiceTracingDecorator {
     span: LangWatchSpan,
     id: string,
     options?: { version?: string }
-  ): Promise<Prompt> {
+  ): Promise<PromptResponse> {
     span.setType("prompt");
     span.setAttribute('langwatch.prompt.id', id);
 
@@ -40,7 +39,7 @@ export class PromptServiceTracingDecorator {
   async create(
     span: LangWatchSpan,
     params: CreatePromptBody
-  ): Promise<Prompt> {
+  ): Promise<PromptResponse> {
     span.setType("prompt");
 
     if (shouldCaptureInput()) {
@@ -64,7 +63,7 @@ export class PromptServiceTracingDecorator {
     span: LangWatchSpan,
     id: string,
     params: UpdatePromptBody
-  ): Promise<Prompt> {
+  ): Promise<PromptResponse> {
 
     if (shouldCaptureInput()) {
       span.setInput(params);
@@ -101,7 +100,7 @@ export class PromptServiceTracingDecorator {
     span: LangWatchSpan,
     handle: string,
     config: any
-  ): Promise<{ created: boolean; prompt: Prompt }> {
+  ): Promise<{ created: boolean; prompt: PromptResponse }> {
     if (shouldCaptureInput()) {
       span.setInput(config);
     }

@@ -29,8 +29,8 @@ export class LocalPromptRepository {
   /**
    * Save a materialized prompt to the .materialized/ directory
    */
-  async savePromptMaterialized(name: string, prompt: Prompt): Promise<void> {
-    await this._save(name, prompt, LocalPromptRepository.MATERIALIZED_DIR);
+  async savePromptMaterialized(name: string, prompt: Prompt): Promise<string> {
+    return await this._save(name, prompt, LocalPromptRepository.MATERIALIZED_DIR);
   }
 
   /**
@@ -57,7 +57,7 @@ export class LocalPromptRepository {
   /**
    * Shared save logic - serializes prompt and writes to specified directory
    */
-  private async _save(name: string, prompt: Prompt, directory: string): Promise<void> {
+  private async _save(name: string, prompt: Prompt, directory: string): Promise<string> {
     const filePath = this._getFilePath(name, directory);
 
     // Ensure directory exists
@@ -66,6 +66,7 @@ export class LocalPromptRepository {
     // Serialize and save
     const yamlContent = PromptYamlSerializer.serialize(prompt);
     await fs.writeFile(filePath, yamlContent, "utf-8");
+    return filePath;
   }
 
   /**

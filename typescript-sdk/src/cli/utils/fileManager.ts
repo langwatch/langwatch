@@ -258,7 +258,10 @@ export class FileManager {
     return cleaned;
   }
 
-  static updateLockEntry(lock: PromptsLock, name: string, prompt: MaterializedPrompt, materializedPath: string): void {
+  static updateLockEntry(lock: PromptsLock, name: string, prompt: {
+    version: number;
+    versionId: string;
+  }, materializedPath: string): void {
     const relativePath = path.relative(process.cwd(), materializedPath);
 
     lock.prompts[name] = {
