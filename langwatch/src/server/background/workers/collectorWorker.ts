@@ -335,8 +335,10 @@ const processCollectorJob_ = async (
       ...reservedTraceMetadata,
       ...(Object.keys(customMetadata).length > 0
         ? {
-            ...customExistingMetadata,
-            custom: safeTruncate(customMetadata),
+            custom: safeTruncate({
+              ...customExistingMetadata,
+              ...customMetadata,
+            }),
           }
         : {}),
       all_keys: Array.from(
