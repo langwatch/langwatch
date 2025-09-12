@@ -504,7 +504,30 @@ const updateTrace = async (
                 Map nestedSource = ctx._source[key];
                 Map nestedUpdate = params.trace[key];
                 for (String nestedKey : nestedUpdate.keySet()) {
-                  nestedSource[nestedKey] = nestedUpdate[nestedKey];
+                  // Second level of nesting for e.g. metadata.custom and metadata.all_keys
+                  if (nestedUpdate[nestedKey] instanceof Map) {
+                    if (!nestedSource.containsKey(nestedKey) || !(nestedSource[nestedKey] instanceof Map)) {
+                      nestedSource[nestedKey] = new HashMap();
+                    }
+                    Map deepNestedSource = nestedSource[nestedKey];
+                    Map deepNestedUpdate = nestedUpdate[nestedKey];
+                    for (String deepNestedKey : deepNestedUpdate.keySet()) {
+                      deepNestedSource[deepNestedKey] = deepNestedUpdate[deepNestedKey];
+                    }
+                  } else if (nestedUpdate[nestedKey] instanceof List) {
+                    if (!nestedSource.containsKey(nestedKey) || !(nestedSource[nestedKey] instanceof List)) {
+                      nestedSource[nestedKey] = [];
+                    }
+                    List existingList = nestedSource[nestedKey];
+                    List newList = nestedUpdate[nestedKey];
+                    for (def item : newList) {
+                      if (!existingList.contains(item)) {
+                        existingList.add(item);
+                      }
+                    }
+                  } else {
+                    nestedSource[nestedKey] = nestedUpdate[nestedKey];
+                  }
                 }
               } else {
                 ctx._source[key] = params.trace[key];
@@ -532,7 +555,7 @@ const updateTrace = async (
                 newSpan.timestamps = new HashMap();
                 newSpan.timestamps.inserted_at = currentTime;
               }
-              
+
               // If ignore_timestamps_on_write is set, preserve existing timestamps where possible
               if (newSpan.timestamps.ignore_timestamps_on_write == true && existingSpan.timestamps != null) {
                 newSpan.timestamps.started_at = existingSpan.timestamps.started_at;
@@ -544,9 +567,9 @@ const updateTrace = async (
                   newSpan.timestamps.finished_at = existingSpan.timestamps.finished_at;
                 }
               }
-              
+
               newSpan.timestamps.updated_at = currentTime;
-              
+
               // Deep merge spans (with conditional input/output replacement)
               for (String key : newSpan.keySet()) {
                 if (key == "input" || key == "output") {
@@ -610,7 +633,7 @@ const updateTrace = async (
                 newEvaluation.timestamps = new HashMap();
                 newEvaluation.timestamps.inserted_at = currentTime;
               }
-              
+
               // If ignore_timestamps_on_write is set, preserve existing timestamps where possible
               if (newEvaluation.timestamps.ignore_timestamps_on_write == true && existingEvaluation.timestamps != null) {
                 if (existingEvaluation.timestamps.started_at != null) {
@@ -623,7 +646,7 @@ const updateTrace = async (
                   newEvaluation.timestamps.finished_at = existingEvaluation.timestamps.finished_at;
                 }
               }
-              
+
               newEvaluation.timestamps.updated_at = currentTime;
               ctx._source.evaluations[existingEvaluationIndex] = newEvaluation;
             } else {
