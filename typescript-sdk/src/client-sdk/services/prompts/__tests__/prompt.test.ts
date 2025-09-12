@@ -1,10 +1,12 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { promptResponseFactory } from "../../../../../__tests__/factories/prompt.factory";
+import { promptResponseFactory } from "../../../../../__tests__/factories/prompt-response.factory";
 import { type CompiledPrompt, Prompt, PromptCompilationError } from "../prompt";
 
 describe("Prompt", () => {
   describe("#compile", () => {
-    const prompt = new Prompt(promptResponseFactory.build());
+    const prompt = new Prompt(promptResponseFactory.build({
+      prompt: "Hello {{ name }}, how is the weather today?",
+    }));
     let result: CompiledPrompt;
 
     beforeEach(async () => {
@@ -25,7 +27,9 @@ describe("Prompt", () => {
   });
 
   describe("#compileStrict", () => {
-    const prompt = new Prompt(promptResponseFactory.build());
+    const prompt = new Prompt(promptResponseFactory.build({
+      prompt: "Hello {{ name }}, how is the weather today?",
+    }));
     let result: CompiledPrompt;
 
     beforeEach(async () => {
