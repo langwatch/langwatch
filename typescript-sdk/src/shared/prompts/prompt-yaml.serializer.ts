@@ -69,6 +69,7 @@ export class PromptYamlSerializer {
         ...(prompt.id && { id: prompt.id }),
         ...(prompt.version && { version: prompt.version }),
         ...(prompt.versionId && { versionId: prompt.versionId }),
+        ...(prompt.handle && { handle: prompt.handle }),
       };
     }
 

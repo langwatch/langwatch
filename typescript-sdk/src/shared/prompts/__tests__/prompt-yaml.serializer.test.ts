@@ -22,6 +22,7 @@ describe("PromptYamlSerializer", () => {
           id: prompt_1
           version: 1
           versionId: prompt_version_1
+          handle: test-prompt-1
         "
       `);
     });
