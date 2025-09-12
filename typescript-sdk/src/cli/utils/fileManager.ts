@@ -2,9 +2,11 @@ import * as fs from "fs";
 import * as path from "path";
 import * as yaml from "js-yaml";
 import chalk from "chalk";
-import type { PromptsConfig, LocalPromptConfig, MaterializedPrompt, PromptsLock } from "../types";
+import type { PromptsConfig, LocalPromptConfig, PromptsLock } from "../types";
+import type { PromptResponse } from "@/client-sdk/services/prompts/types";
 import { localPromptConfigSchema } from "../types";
-import { PromptConverter } from "@/cli/utils/promptConverter";
+import { LocalPromptRepository } from "@/shared/prompts/local-prompt.repository";
+import { Prompt } from "@/client-sdk/services/prompts/prompt";
 
 export class FileManager {
   private static readonly PROMPTS_CONFIG_FILE = "prompts.json";
@@ -147,32 +149,10 @@ export class FileManager {
     }
   }
 
-    static saveMaterializedPrompt(name: string, prompt: MaterializedPrompt): string {
-    const materializedDir = this.getMaterializedDir();
-    const parts = name.split("/");
-    const fileName = `${parts[parts.length - 1]}.prompt.yaml`;
-
-    // Create nested directories if needed
-    if (parts.length > 1) {
-      const subDir = path.join(materializedDir, ...parts.slice(0, -1));
-      if (!fs.existsSync(subDir)) {
-        fs.mkdirSync(subDir, { recursive: true });
-      }
-    }
-
-    const filePath = path.join(materializedDir, ...parts.slice(0, -1), fileName);
-
-    // Convert to YAML format using the converter
-    const yamlContent = PromptConverter.fromMaterializedToYaml(prompt);
-
-    const yamlString = yaml.dump(yamlContent, {
-      lineWidth: -1,
-      noRefs: true,
-      sortKeys: false
-    });
-
-    fs.writeFileSync(filePath, yamlString);
-    return filePath;
+    static async saveMaterializedPrompt(name: string, prompt: PromptResponse): Promise<string> {
+    const repository = new LocalPromptRepository();
+    const promptInstance = new Prompt(prompt); // Convert PromptResponse to Prompt
+    return await repository.savePromptMaterialized(name, promptInstance);
   }
 
   static getLocalPromptFiles(): string[] {

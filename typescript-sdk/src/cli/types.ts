@@ -37,23 +37,6 @@ export const localPromptConfigSchema = z
 
 export type LocalPromptConfig = z.infer<typeof localPromptConfigSchema>;
 
-export type MaterializedPrompt = {
-  id: string;
-  name: string;
-  version: number;
-  versionId: string;
-  model: string;
-  messages: Array<{
-    role: "system" | "user" | "assistant";
-    content: string;
-  }>;
-  prompt: string;
-  temperature?: number;
-  maxTokens?: number;
-  inputs?: any;
-  outputs?: any;
-  updatedAt: string;
-};
 
 export type SyncResult = {
   fetched: Array<{ name: string; version: number; versionSpec: string }>;

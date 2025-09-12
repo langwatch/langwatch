@@ -1,5 +1,5 @@
-import type { Prompt } from "@/client-sdk/services/prompts/prompt";
-import type { LocalPromptConfig, MaterializedPrompt } from "../types";
+import type { LocalPromptConfig } from "../types";
+import type { PromptResponse } from "@/client-sdk/services/prompts/types";
 
 /**
  * Converter utility for transforming between YAML prompt format and API service format.
@@ -11,32 +11,12 @@ import type { LocalPromptConfig, MaterializedPrompt } from "../types";
  * while keeping the conversion logic centralized and well-tested.
  */
 export class PromptConverter {
-  /**
-   * Converts a Prompt instance from the API service to the MaterializedPrompt format
-   * used for saving to the .materialized directory.
-   */
-  static fromApiToMaterialized(prompt: Prompt): MaterializedPrompt {
-    return {
-      id: prompt.id,
-      name: prompt.name,
-      version: prompt.version,
-      versionId: prompt.versionId,
-      model: prompt.model,
-      messages: prompt.messages,
-      prompt: prompt.prompt,
-      temperature: prompt.temperature,
-      maxTokens: prompt.maxTokens,
-      inputs: prompt.inputs,
-      outputs: prompt.outputs,
-      updatedAt: prompt.updatedAt,
-    };
-  }
 
   /**
-   * Converts a MaterializedPrompt to the YAML content structure
+   * Converts a PromptResponse to the YAML content structure
    * for saving to .prompt.yaml files.
    */
-  static fromMaterializedToYaml(prompt: MaterializedPrompt): {
+  static fromPromptResponseToYaml(prompt: PromptResponse): {
     model: string;
     modelParameters?: {
       temperature?: number;

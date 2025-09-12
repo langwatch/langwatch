@@ -3,8 +3,7 @@ import * as path from "path";
 import chalk from "chalk";
 import ora from "ora";
 import { FileManager } from "../utils/fileManager";
-import { PromptsError } from "@/client-sdk/services/prompts";
-import { PromptConverter } from "../utils/promptConverter";
+import { PromptsError, PromptApiService } from "@/client-sdk/services/prompts";
 import { ensureProjectInitialized } from "../utils/init";
 import { checkApiKey } from "../utils/apiKey";
 import { LangWatch } from "@/client-sdk";
@@ -89,6 +88,9 @@ export const addCommand = async (
     checkApiKey();
 
     const langwatch = new LangWatch();
+    const promptsApiClient = new PromptApiService({
+      langwatchApiClient: langwatch.api,
+    });
     const version = options.version ?? "latest";
 
     // Fetch and materialize the prompt (like sync does for individual prompts)
@@ -98,7 +100,7 @@ export const addCommand = async (
 
     try {
       // Fetch the prompt from the API
-      const prompt = await langwatch.prompts.get(name);
+      const prompt = await promptsApiClient.get(name);
 
       if (!prompt) {
         spinner.fail();
@@ -115,11 +117,10 @@ export const addCommand = async (
       // Restart spinner for the actual work
       spinner.start(`Adding ${chalk.cyan(`${name}@${version}`)}...`);
 
-      // Convert to MaterializedPrompt format and save
-      const materializedPrompt = PromptConverter.fromApiToMaterialized(prompt);
-      const savedPath = FileManager.saveMaterializedPrompt(
+      // Save the prompt response directly
+      const savedPath = await FileManager.saveMaterializedPrompt(
         name,
-        materializedPrompt,
+        prompt,
       );
       const relativePath = path.relative(process.cwd(), savedPath);
 
@@ -128,7 +129,7 @@ export const addCommand = async (
       const lock = FileManager.loadPromptsLock();
 
       config.prompts[name] = version;
-      FileManager.updateLockEntry(lock, name, materializedPrompt, savedPath);
+      FileManager.updateLockEntry(lock, name, prompt, savedPath);
 
       // Save the updated config and lock
       FileManager.savePromptsConfig(config);
