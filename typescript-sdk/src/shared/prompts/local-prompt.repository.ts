@@ -41,6 +41,20 @@ export class LocalPromptRepository {
   }
 
   /**
+   * Delete a prompt from the prompts/ directory
+   */
+  async deletePrompt(name: string): Promise<void> {
+    await this._delete(name, LocalPromptRepository.PROMPTS_DIR);
+  }
+
+  /**
+   * Delete a materialized prompt from the .materialized/ directory
+   */
+  async deletePromptMaterialized(name: string): Promise<void> {
+    await this._delete(name, LocalPromptRepository.MATERIALIZED_DIR);
+  }
+
+  /**
    * Shared save logic - serializes prompt and writes to specified directory
    */
   private async _save(name: string, prompt: Prompt, directory: string): Promise<void> {
@@ -68,6 +82,19 @@ export class LocalPromptRepository {
     } catch {
       // File doesn't exist or can't be read
       return null;
+    }
+  }
+
+  /**
+   * Shared delete logic - removes file from specified directory
+   */
+  private async _delete(name: string, directory: string): Promise<void> {
+    const filePath = this._getFilePath(name, directory);
+
+    try {
+      await fs.unlink(filePath);
+    } catch {
+      // File doesn't exist - that's fine, deletion is idempotent
     }
   }
 
