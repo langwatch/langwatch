@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { PromptYamlSerializer } from "../prompt-yaml-serializer";
+import { PromptYamlSerializer } from "../prompt-yaml.serializer";
 import { promptResponseFactory } from "../../../../__tests__/factories/prompt.factory";
 import { Prompt } from "@/client-sdk/services/prompts/prompt";
 

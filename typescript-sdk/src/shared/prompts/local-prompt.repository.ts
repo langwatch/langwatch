@@ -1,5 +1,5 @@
 import { type Prompt } from "@/client-sdk/services/prompts/prompt";
-import { PromptYamlSerializer } from "./prompt-yaml-serializer";
+import { PromptYamlSerializer } from "./prompt-yaml.serializer";
 import * as fs from "fs/promises";
 import * as path from "path";
 

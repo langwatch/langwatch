@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { LocalPromptRepository } from "../local-prompt-repository";
+import { LocalPromptRepository } from "../local-prompt.repository";
 import { Prompt } from "@/client-sdk/services/prompts/prompt";
 import { promptResponseFactory } from "../../../../__tests__/factories/prompt.factory";
 import * as fs from "fs/promises";
