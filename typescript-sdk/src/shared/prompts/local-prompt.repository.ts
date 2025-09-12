@@ -10,7 +10,7 @@ import * as path from "path";
  */
 export class LocalPromptRepository {
   private static readonly PROMPTS_DIR = "prompts";
-  private static readonly MATERIALIZED_DIR = ".materialized";
+  private static readonly MATERIALIZED_DIR = `${LocalPromptRepository.PROMPTS_DIR}/.materialized`;
 
   /**
    * Save a prompt to the prompts/ directory

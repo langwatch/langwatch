@@ -131,7 +131,7 @@ export class Prompt {
 /**
  * Represents a compiled prompt that extends Prompt with reference to the original template
  */
-class CompiledPrompt extends Prompt {
+export class CompiledPrompt extends Prompt {
   constructor(
     compiledData: PromptData,
     public readonly original: Prompt,

@@ -8,13 +8,17 @@ import * as expectations from "../../../__tests__/test-utils/expecations";
 
 describe("LocalPromptRepository", () => {
   const repository = new LocalPromptRepository();
-  const testNames = ["my-prompt", "nested/my-prompt"].map(name => name + `-${Date.now()}`);
+  const testNames = ["my-prompt", "nested/my-prompt"].map(
+    (name) => name + `-${Date.now()}`,
+  ) as [string, string];
 
   afterEach(async () => {
-    await Promise.all(testNames.flatMap(async (name) => [
-      await repository.deletePrompt(name),
-      await repository.deletePromptMaterialized(name)
-    ])).catch();
+    await Promise.all(
+      testNames.flatMap(async (name) => [
+        await repository.deletePrompt(name),
+        await repository.deletePromptMaterialized(name),
+      ]),
+    ).catch();
   });
 
   it("returns null for non-existent prompt", async () => {
@@ -25,6 +29,7 @@ describe("LocalPromptRepository", () => {
   // Snapshot tests -- can't be run in a loop
   describe("savePrompt", () => {
     it(`saves a prompt to prompts/ directory for my-prompt`, async () => {
+      const name = testNames[0];
       const prompt = new Prompt(
         promptResponseFactory.build({
           model: "openai/gpt-4",
@@ -32,9 +37,9 @@ describe("LocalPromptRepository", () => {
         }),
       );
 
-      await repository.savePrompt("my-prompt", prompt);
+      await repository.savePrompt(name, prompt);
 
-      const filePath = path.join("prompts", `${"my-prompt"}.prompt.yaml`);
+      const filePath = path.join("prompts", `${name}.prompt.yaml`);
       const fileContent = await fs.readFile(filePath, "utf-8");
       expect(fileContent).toMatchInlineSnapshot(`
           "model: openai/gpt-4
@@ -53,12 +58,13 @@ describe("LocalPromptRepository", () => {
           "
         `);
 
-      await repository.deletePrompt("my-prompt");
+      await repository.deletePrompt(name);
     });
   });
 
   describe("savePromptMaterialized", () => {
     it(`saves a materialized prompt to .materialized/ directory for my-prompt`, async () => {
+      const name = testNames[0];
       const prompt = new Prompt(
         promptResponseFactory.build({
           model: "openai/gpt-3.5-turbo",
@@ -66,9 +72,9 @@ describe("LocalPromptRepository", () => {
         }),
       );
 
-      await repository.savePromptMaterialized("my-prompt", prompt);
+      await repository.savePromptMaterialized(name, prompt);
 
-      const filePath = path.join(".materialized", `${"my-prompt"}.prompt.yaml`);
+      const filePath = path.join("prompts", ".materialized", `${name}.prompt.yaml`);
       const fileContent = await fs.readFile(filePath, "utf-8");
       expect(fileContent).toMatchInlineSnapshot(`
           "model: openai/gpt-3.5-turbo
@@ -87,13 +93,14 @@ describe("LocalPromptRepository", () => {
           "
         `);
 
-      await repository.deletePromptMaterialized("my-prompt");
+      await repository.deletePromptMaterialized(name);
     });
   });
 
   testNames.forEach((name) => {
     describe("savePrompt", () => {
       it(`saves a prompt to prompts/ directory for ${name}`, async () => {
+        const name = testNames[0];
         const prompt = new Prompt(promptResponseFactory.build());
         await repository.savePrompt(name, prompt);
         const loaded = await repository.loadPrompt(name);
@@ -103,6 +110,7 @@ describe("LocalPromptRepository", () => {
 
     describe("savePromptMaterialized", () => {
       it(`saves a materialized prompt to .materialized/ directory for ${name}`, async () => {
+        const name = testNames[0];
         const prompt = new Prompt(promptResponseFactory.build());
         await repository.savePromptMaterialized(name, prompt);
         const loaded = await repository.loadPromptMaterialized(name);
