@@ -2,7 +2,6 @@ export { PromptsFacade as PromptFacade } from "./facade";
 export { PromptApiService } from "./prompt-api.service";
 export { type ConfigData, PromptsError, type SyncAction } from "./prompt-api.service";
 export {
-  CompiledPrompt,
   Prompt,
   PromptCompilationError,
   type TemplateVariables,

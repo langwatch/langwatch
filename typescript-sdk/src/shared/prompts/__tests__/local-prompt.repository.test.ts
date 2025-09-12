@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, afterEach } from "vitest";
 import { LocalPromptRepository } from "../local-prompt.repository";
 import { Prompt } from "@/client-sdk/services/prompts/prompt";
 import { promptResponseFactory } from "../../../factories/prompt-response.factory";
@@ -8,7 +8,14 @@ import * as expectations from "../../../__tests__/test-utils/expecations";
 
 describe("LocalPromptRepository", () => {
   const repository = new LocalPromptRepository();
-  const testNames = ["my-prompt", "nested/my-prompt"];
+  const testNames = ["my-prompt", "nested/my-prompt"].map(name => name + `-${Date.now()}`);
+
+  afterEach(async () => {
+    await Promise.all(testNames.flatMap(async (name) => [
+      await repository.deletePrompt(name),
+      await repository.deletePromptMaterialized(name)
+    ])).catch();
+  });
 
   it("returns null for non-existent prompt", async () => {
     const result = await repository.loadPrompt("does-not-exist");
@@ -42,8 +49,11 @@ describe("LocalPromptRepository", () => {
             id: prompt_1
             version: 1
             versionId: prompt_version_1
+            handle: test-prompt-1
           "
         `);
+
+      await repository.deletePrompt("my-prompt");
     });
   });
 
@@ -73,8 +83,11 @@ describe("LocalPromptRepository", () => {
             id: prompt_2
             version: 1
             versionId: prompt_version_2
+            handle: test-prompt-2
           "
         `);
+
+      await repository.deletePromptMaterialized("my-prompt");
     });
   });
 

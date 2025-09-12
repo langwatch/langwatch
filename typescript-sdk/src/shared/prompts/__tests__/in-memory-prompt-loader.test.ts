@@ -8,7 +8,14 @@ import * as expectations from "../../../__tests__/test-utils/expecations";
 describe("InMemoryPromptLoader", () => {
   const loader = new InMemoryPromptLoader();
   const repository = new LocalPromptRepository();
-  const testNames = ["my-prompt", "nested/my-prompt"];
+  const testNames = ["my-prompt", "nested/my-prompt"].map(name => name + `-${Date.now()}`);
+
+  afterEach(async () => {
+    await Promise.all([
+      await repository.deletePrompt("my-prompt"),
+      await repository.deletePromptMaterialized("my-prompt")
+    ]);
+  });
 
   describe("get", () => {
     testNames.forEach((name) => {
@@ -43,8 +50,6 @@ describe("InMemoryPromptLoader", () => {
 
         await repository.savePromptMaterialized(name, originalPrompt);
         const loaded = await loader.get(name);
-
-        console.log(loaded);
 
         expectations.toMatchPrompt(loaded, originalPrompt);
       });

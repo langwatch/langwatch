@@ -4,13 +4,11 @@ import { createTracingProxy } from "@/client-sdk/tracing/create-tracing-proxy";
 import { promptDataSchema } from "./schema";
 import { type TemplateVariables, type PromptData, type CorePromptData } from "./types";
 import { PromptCompilationError, PromptValidationError } from "./errors";
-import { CompiledPrompt } from "./compiled-prompt";
 import { type PromptScope } from "@prisma/client";
 
 // Re-export types and errors for convenience
 export type { TemplateVariables, PromptData, CorePromptData, PromptMetadata } from "./types";
 export { PromptCompilationError, PromptValidationError } from "./errors";
-export { CompiledPrompt } from "./compiled-prompt";
 
 // Global Liquid instance - shared across all prompts for efficiency
 const liquid = new Liquid({
@@ -129,3 +127,15 @@ export class Prompt {
   }
 }
 
+
+/**
+ * Represents a compiled prompt that extends Prompt with reference to the original template
+ */
+class CompiledPrompt extends Prompt {
+  constructor(
+    compiledData: PromptData,
+    public readonly original: Prompt,
+  ) {
+    super(compiledData);
+  }
+}
