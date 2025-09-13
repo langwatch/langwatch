@@ -821,7 +821,7 @@ const updateTraceWithAnnotation = async (
 ) => {
   const client = await esClient({ projectId });
   await client.update({
-    index: TRACE_INDEX.alias,
+    index: TRACE_INDEX.all,
     id: traceIndexId({
       traceId: traceId,
       projectId: projectId,
@@ -862,7 +862,7 @@ const updateTraceRemoveAnnotation = async (
 ) => {
   const client = await esClient({ projectId });
   await client.update({
-    index: TRACE_INDEX.alias,
+    index: TRACE_INDEX.all,
     id: traceIndexId({
       traceId: traceId,
       projectId: projectId,

@@ -20,7 +20,7 @@ export const feedbacks = protectedProcedure
 
     const client = await esClient({ projectId: input.projectId });
     const result = await client.search<ElasticSearchTrace>({
-      index: TRACE_INDEX.alias,
+      index: TRACE_INDEX.for(input.startDate),
       size: 100,
       body: {
         _source: ["events"],
