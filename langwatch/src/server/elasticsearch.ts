@@ -14,7 +14,7 @@ export type IndexSpec = {
 
 export const MIGRATION_INDEX = "search-elastic-migrations";
 
-export const COLD_STORAGE_AGE_DAYS = 90;
+export const COLD_STORAGE_AGE_DAYS = 32;
 
 export const TRACE_INDEX: IndexSpec & {
   all: string;
