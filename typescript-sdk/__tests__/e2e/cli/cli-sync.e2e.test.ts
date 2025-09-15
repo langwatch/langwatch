@@ -116,13 +116,11 @@ if (!process.env.CI) {
 
           // First sync - should create on remote
           const sync1 = cli.run("prompt sync");
-          console.log("sync1", sync1);
           expectCliResultSuccess(sync1);
           expect(sync1.output).toContain(`Pushed ${promptHandle}`);
 
           // Verify remote prompt
           const remotePrompt = await langwatch.prompts.get(promptHandle);
-          console.log("remotePrompt", remotePrompt);
           expect(remotePrompt.model).toBe("openai/gpt-5");
           expect(remotePrompt.temperature).toBe(0.7);
           expect(remotePrompt.messages).toEqual([
