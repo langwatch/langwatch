@@ -119,7 +119,7 @@ export type WorkflowStore = State & {
 };
 
 const DEFAULT_LLM_CONFIG: LLMConfig = {
-  model: "openai/gpt-4o-mini",
+  model: "openai/gpt-5",
   temperature: 0,
   max_tokens: 2048,
 };

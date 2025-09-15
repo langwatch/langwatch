@@ -36,7 +36,7 @@ test("Prompt Management from Workflow", async ({ page }) => {
     .fill("We will use this prompt in the other node");
   await page
     .getByRole("group")
-    .filter({ hasText: "Modelgpt-4o-mini" })
+    .filter({ hasText: "Modelgpt-5" })
     .getByRole("button")
     .click();
   await page.getByRole("combobox", { name: "Model" }).click();

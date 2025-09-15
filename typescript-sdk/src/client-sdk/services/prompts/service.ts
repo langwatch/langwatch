@@ -167,24 +167,13 @@ export class PromptsService {
    *   The API does not return the updated prompt directly, so this method fetches it after updating.
    */
   async update(id: string, params: UpdatePromptBody): Promise<Prompt> {
-    const { error } = await this.config.langwatchApiClient.PUT(
-      "/api/prompts/{id}",
-      {
+    const { error, data: updatedPrompt } =
+      await this.config.langwatchApiClient.PUT("/api/prompts/{id}", {
         params: { path: { id } },
         body: params,
-      },
-    );
+      });
     if (error) this.handleApiError(`update prompt with ID "${id}"`, error);
-    // TODO: This is a workaround to get the updated prompt. It would be better to return the updated prompt directly.
-    const updatedPrompt = await this.get(id);
-    if (!updatedPrompt) {
-      throw new PromptsError(
-        "Prompt not found after update",
-        "update prompt",
-        null,
-      );
-    }
-    return updatedPrompt;
+    return new Prompt(updatedPrompt);
   }
 
   /**

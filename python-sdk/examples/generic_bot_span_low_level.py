@@ -23,7 +23,7 @@ async def main(message: cl.Message):
             input=message.content,
         ) as span:
             with span.span(
-                type="llm", input=message.content, model="openai/gpt-4o-mini"
+                type="llm", input=message.content, model="openai/gpt-5"
             ) as nested_span:
                 time.sleep(1)  # generating the message...
                 generated_message = "Hello there! How can I help from low level?"

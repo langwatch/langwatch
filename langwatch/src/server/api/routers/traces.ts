@@ -135,6 +135,7 @@ export const tracesRouter = createTRPCRouter({
       const result = await aggregateTraces({
         connConfig: { projectId: input.projectId },
         search: {
+          index: TRACE_INDEX.for(input.startDate),
           query: {
             bool: {
               must: pivotIndexConditions,
@@ -218,6 +219,7 @@ export const tracesRouter = createTRPCRouter({
       const result = await aggregateTraces({
         connConfig: { projectId: input.projectId },
         search: {
+          index: TRACE_INDEX.for(input.startDate),
           query: {
             term: {
               project_id: input.projectId,
@@ -495,7 +497,7 @@ export const getAllTracesForProject = async ({
   } else {
     const client = await esClient({ projectId: input.projectId });
     tracesResult = await client.search<ElasticSearchTrace>({
-      index: TRACE_INDEX.alias,
+      index: TRACE_INDEX.for(input.startDate),
       from: downloadMode ? undefined : pageOffset,
       size: pageSize,
       scroll: downloadMode ? "1m" : undefined,
@@ -570,6 +572,7 @@ export const getAllTracesForProject = async ({
       const tracesFromThreadId = await searchTraces({
         connConfig: { projectId: input.projectId },
         search: {
+          index: TRACE_INDEX.all,
           size: 50,
           query: {
             bool: {
@@ -625,7 +628,7 @@ export const getTracesWithSpans = async (
     connConfig: { projectId },
     protections,
     search: {
-      index: TRACE_INDEX.alias,
+      index: TRACE_INDEX.all,
       size: 1000,
       query: {
         bool: {
@@ -724,7 +727,7 @@ export const getEvaluationsMultiple = async (input: {
   const traces = await searchTraces({
     connConfig: { projectId },
     search: {
-      index: TRACE_INDEX.alias,
+      index: TRACE_INDEX.all,
       size: Math.min(traceIds.length * 100, 10_000), // Assuming a maximum of 100 checks per trace
       _source: ["trace_id", "evaluations"],
       query: {

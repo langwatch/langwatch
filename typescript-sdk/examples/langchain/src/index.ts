@@ -24,7 +24,7 @@ async function main() {
   // Initialize LangChain chat model
   const chatModelBase = new ChatOpenAI({
     // use "model" in recent LC, not "modelName"
-    model: "gpt-4o-mini",
+    model: "gpt-5",
     temperature: 0.7,
   });
 

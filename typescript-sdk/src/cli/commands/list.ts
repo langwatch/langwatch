@@ -6,6 +6,7 @@ import { checkApiKey } from "../utils/apiKey";
 
 // Helper to strip ANSI codes for length calculation
 const stripAnsi = (str: string): string => {
+  // eslint-disable-next-line no-control-regex
   return str.replace(/\u001b\[[0-9;]*m/g, "");
 };
 

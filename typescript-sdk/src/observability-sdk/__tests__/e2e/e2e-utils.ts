@@ -120,7 +120,7 @@ export async function verifyOpenTelemetrySetup(): Promise<void> {
       console.log("✅ OpenTelemetry setup verification successful");
       resolve();
     } catch (error) {
-      reject(new Error(`OpenTelemetry setup verification failed: ${error}`));
+      reject(new Error(`OpenTelemetry setup verification failed: ${String(error)}`));
     } finally {
       span.end();
     }
@@ -399,7 +399,7 @@ export function expectSpanAttribute(span: NonNullable<GetTraceResponse["spans"]>
   }
 
   // If neither works, fail with a helpful message
-  const availableKeys = Object.keys(span.params || {}).join(', ');
+  const availableKeys = Object.keys(span.params ?? {}).join(', ');
   throw new Error(`Attribute '${attributePath}' (looking for: '${actualAttributePath}') not found in span params. Available keys: ${availableKeys}`);
 }
 

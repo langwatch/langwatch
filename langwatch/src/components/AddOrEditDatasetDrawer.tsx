@@ -269,6 +269,7 @@ export function AddOrEditDatasetDrawer(props: AddDatasetDrawerProps) {
                           <option value="date">date</option>
                           <option value="list">list</option>
                           <option value="json">json</option>
+                          <option value="image">image (URL)</option>
                           <option value="chat_messages">
                             json chat messages (OpenAI format)
                           </option>
@@ -375,6 +376,9 @@ export const tryToConvertRowsToAppropriateType = (
         if (dateAttempt.toString() !== "Invalid Date") {
           convertedRecord[key] = dateAttempt.toISOString().split("T")[0];
         }
+      } else if (type === "image") {
+        // Image type should be treated as a string (URL)
+        convertedRecord[key] = value;
       } else if (type !== "string") {
         try {
           convertedRecord[key] = JSON.parse(value);

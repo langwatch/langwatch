@@ -46,7 +46,7 @@ import (
 
 func main() {
 	ctx := context.Background()
-	
+
 	// 🔸 First - setup LangWatch tracing
 	setupLangWatch(ctx)
 
@@ -115,7 +115,7 @@ The same code works with multiple AI providers that support the OpenAI API speci
 
 | Provider | What to Change | Example Model |
 |----------|---------------|---------------|
-| **OpenAI** | Nothing! | `gpt-4o-mini` |
+| **OpenAI** | Nothing! | `gpt-5` |
 | **Anthropic** | Base URL + API key | `claude-3-5-sonnet-20241022` |
 | **Azure OpenAI** | Base URL + API key | `gpt-4` |
 | **OpenRouter** | Base URL + API key | `anthropic/claude-3.5-sonnet` |
@@ -319,7 +319,7 @@ The `LangWatchSpan` embeds the standard `go.opentelemetry.io/otel/trace.Span`, s
 ### Input/Output Recording
 
 - **`RecordInput(input any)`** - Records structured input (JSON-serialized)
-- **`RecordInputString(input string)`** - Records raw string input  
+- **`RecordInputString(input string)`** - Records raw string input
 - **`RecordOutput(output any)`** - Records structured output (JSON-serialized)
 - **`RecordOutputString(output string)`** - Records raw string output
 
@@ -357,11 +357,11 @@ client := openai.NewClient(
 		// Capture full input/output (be mindful of sensitive data)
 		otelopenai.WithCaptureInput(),
 		otelopenai.WithCaptureOutput(),
-		
+
 		// For OpenAI-compatible APIs (Azure, etc.)
 		// otelopenai.WithGenAISystem(semconv.GenAISystemKey.String("azure.openai")),
-		
-		// Custom tracer provider  
+
+		// Custom tracer provider
 		// otelopenai.WithTracerProvider(customProvider),
 	)),
 )
@@ -373,7 +373,7 @@ client := openai.NewClient(
 # Required for LangWatch
 export LANGWATCH_API_KEY="your-langwatch-api-key"
 
-# Required for OpenAI examples  
+# Required for OpenAI examples
 export OPENAI_API_KEY="your-openai-api-key"
 
 # For Anthropic (when using OpenAI-compatible API)

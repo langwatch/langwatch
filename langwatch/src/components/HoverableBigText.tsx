@@ -22,7 +22,7 @@ export function ExpandedTextDialog({
     <Dialog.Root
       open={open}
       onOpenChange={({ open }) => onOpenChange(open)}
-      size="lg"
+      size="5xl"
     >
       <Dialog.Backdrop />
       <Dialog.Content>
@@ -50,7 +50,7 @@ export function ExpandedTextDialog({
               <Markdown className="markdown">
                 {typeof textExpanded === "string"
                   ? textExpanded
-                      .replace(/\n(?![\n\-])/g, "\\\n")
+                      .replace(/\n(?![\n\-])/g, "\n")
                       .replace(/(\n+)\\(\n+)/g, "$1$2")
                   : JSON.stringify(textExpanded, null, 2)}
               </Markdown>

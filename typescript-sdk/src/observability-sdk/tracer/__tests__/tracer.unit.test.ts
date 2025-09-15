@@ -161,7 +161,7 @@ describe("tracer.ts", () => {
     });
 
     it("should handle async callbacks", async () => {
-      const callback = vi.fn(async (span: LangWatchSpan) => {
+      const callback = vi.fn(async (_span: LangWatchSpan) => {
         await createDelayedPromise("async-result", 10);
         return "async-result";
       });
@@ -207,10 +207,10 @@ describe("tracer.ts", () => {
           expect(span.isRecording()).toBe(true);
 
           // Override the end method to track if it's called
-          const originalEnd = span.end;
+          const originalEnd = span.end.bind(span);
           span.end = vi.fn(() => {
             spanEnded = true;
-            originalEnd.call(span);
+            originalEnd();
           });
 
           return "async-done";
@@ -231,25 +231,25 @@ describe("tracer.ts", () => {
         const error = new Error("Test async error");
         const callback = vi.fn(async (span: LangWatchSpan) => {
           // Override methods to track if they're called
-          const originalEnd = span.end;
-          const originalSetStatus = span.setStatus;
-          const originalRecordException = span.recordException;
+          const originalEnd = span.end.bind(span);
+          const originalSetStatus = span.setStatus.bind(span);
+          const originalRecordException = span.recordException?.bind(span);
 
           span.end = vi.fn(() => {
             spanEnded = true;
-            originalEnd.call(span);
+            originalEnd();
           });
 
           span.setStatus = vi.fn((status) => {
             if (status.code === SpanStatusCode.ERROR) {
               statusSet = true;
             }
-            return originalSetStatus.call(span, status);
+            return originalSetStatus(status);
           });
 
           span.recordException = vi.fn((ex) => {
             exceptionRecorded = true;
-            return originalRecordException?.call(span, ex);
+            return originalRecordException?.(ex);
           });
 
           throw error;
@@ -264,7 +264,7 @@ describe("tracer.ts", () => {
       });
 
       it("should handle async errors without message", async () => {
-        const error = "String error";
+        const error = new Error("String error");
         const callback = vi.fn(async () => {
           throw error;
         });
@@ -275,7 +275,7 @@ describe("tracer.ts", () => {
 
       it("should handle async null/undefined errors", async () => {
         const callback = vi.fn(async () => {
-          throw null;
+          throw new Error("Null error");
         });
 
         await expect(langwatchTracer.withActiveSpan("error-span", callback)).rejects.toThrow();
@@ -316,10 +316,10 @@ describe("tracer.ts", () => {
           expect(span.isRecording()).toBe(true);
 
           // Override the end method to track if it's called
-          const originalEnd = span.end;
+          const originalEnd = span.end.bind(span);
           span.end = vi.fn(() => {
             spanEnded = true;
-            originalEnd.call(span);
+            originalEnd();
           });
 
           return "sync-done";
@@ -340,25 +340,25 @@ describe("tracer.ts", () => {
         const error = new Error("Test sync error");
         const callback = vi.fn((span: LangWatchSpan) => {
           // Override methods to track if they're called
-          const originalEnd = span.end;
-          const originalSetStatus = span.setStatus;
-          const originalRecordException = span.recordException;
+          const originalEnd = span.end.bind(span);
+          const originalSetStatus = span.setStatus.bind(span);
+          const originalRecordException = span.recordException?.bind(span);
 
           span.end = vi.fn(() => {
             spanEnded = true;
-            originalEnd.call(span);
+            originalEnd();
           });
 
           span.setStatus = vi.fn((status) => {
             if (status.code === SpanStatusCode.ERROR) {
               statusSet = true;
             }
-            return originalSetStatus.call(span, status);
+            return originalSetStatus(status);
           });
 
           span.recordException = vi.fn((ex) => {
             exceptionRecorded = true;
-            return originalRecordException?.call(span, ex);
+            return originalRecordException?.(ex);
           });
 
           throw error;
@@ -373,7 +373,7 @@ describe("tracer.ts", () => {
       });
 
       it("should handle sync errors without message", () => {
-        const error = "String sync error";
+        const error = new Error("String sync error");
         const callback = vi.fn(() => {
           throw error;
         });
@@ -384,7 +384,7 @@ describe("tracer.ts", () => {
 
       it("should handle sync null/undefined errors", () => {
         const callback = vi.fn(() => {
-          throw null;
+          throw new Error("Null error");
         });
 
         expect(() => langwatchTracer.withActiveSpan("sync-error-span", callback)).toThrow();
@@ -399,9 +399,9 @@ describe("tracer.ts", () => {
             setTimeout(() => onFulfilled("thenable-result"), 5);
             return thenable;
           }),
-          catch: vi.fn((onRejected: any) => thenable),
+          catch: vi.fn((_onRejected: any) => thenable),
           finally: vi.fn((onFinally: any) => {
-            setTimeout(onFinally, 10);
+            setTimeout(() => onFinally(), 10);
             return thenable;
           })
         };
@@ -790,7 +790,7 @@ describe("tracer.ts", () => {
       manualSpan.setType("tool");
 
       // Automatic span within manual span context
-      const result = await langwatchTracer.withActiveSpan("auto-span", (autoSpan) => {
+      const result = langwatchTracer.withActiveSpan("auto-span", (autoSpan) => {
         autoSpan.setType("llm");
         return "auto-result";
       });
@@ -826,7 +826,7 @@ describe("tracer.ts", () => {
         langwatchTracer.withActiveSpan("outer-span", async (outerSpan) => {
           outerSpan.setType("workflow");
 
-          await langwatchTracer.withActiveSpan("inner-span", (innerSpan) => {
+          langwatchTracer.withActiveSpan("inner-span", (innerSpan) => {
             innerSpan.setType("llm");
             throw outerError;
           });

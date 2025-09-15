@@ -22,6 +22,7 @@ export const datasetColumnTypeSchema = z.union([
   z.literal("chat_messages"),
   z.literal("annotations"),
   z.literal("evaluations"),
+  z.literal("image"),
 ]);
 
 export type DatasetColumnType =
@@ -35,7 +36,8 @@ export type DatasetColumnType =
   | "rag_contexts"
   | "chat_messages"
   | "annotations"
-  | "evaluations";
+  | "evaluations"
+  | "image";
 
 export const DATASET_COLUMN_TYPES = [
   "string",
@@ -49,6 +51,7 @@ export const DATASET_COLUMN_TYPES = [
   "chat_messages",
   "annotations",
   "evaluations",
+  "image",
 ] as const;
 
 export type DatasetColumns = { name: string; type: DatasetColumnType }[];
@@ -138,6 +141,7 @@ export const datasetColumnTypeMapping: {
   chat_messages: z.array(chatMessageSchema).optional().nullable(),
   annotations: z.array(annotationScoreSchema).optional().nullable(),
   evaluations: z.array(evaluationsSchema).optional().nullable(),
+  image: z.string().url().optional().nullable(),
 };
 
 export const newDatasetEntriesSchema = z.object({

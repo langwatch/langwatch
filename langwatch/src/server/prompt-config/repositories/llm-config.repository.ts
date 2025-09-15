@@ -708,7 +708,7 @@ export class LlmConfigRepository {
   ): CreateLlmConfigVersionParams["configData"] {
     return {
       prompt: "You are a helpful assistant",
-      model: "openai/gpt-4o-mini",
+      model: "openai/gpt-5",
       messages: [
         {
           role: "user",

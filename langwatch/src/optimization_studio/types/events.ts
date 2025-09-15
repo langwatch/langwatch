@@ -10,7 +10,7 @@ export const studioClientEventSchema = z.discriminatedUnion("type", [
       trace_id: z.string(),
       workflow: workflowJsonSchema,
       node_id: z.string(),
-      inputs: z.record(z.string()),
+      inputs: z.record(z.string(), z.any()),
     }),
   }),
   z.object({
@@ -26,7 +26,7 @@ export const studioClientEventSchema = z.discriminatedUnion("type", [
       trace_id: z.string(),
       workflow: workflowJsonSchema,
       until_node_id: z.string().optional(),
-      inputs: z.array(z.record(z.string())).optional(),
+      inputs: z.array(z.record(z.string(), z.any())).optional(),
       manual_execution_mode: z.boolean().optional(),
       do_not_trace: z.boolean().optional(),
     }),

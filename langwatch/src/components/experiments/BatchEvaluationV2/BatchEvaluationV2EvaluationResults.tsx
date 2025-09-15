@@ -478,7 +478,7 @@ export const BatchEvaluationV2EvaluationResults = React.memo(
 
         {Object.entries(resultsByEvaluator).map(
           ([evaluator, results], index) => {
-            return (
+            return tabIndex === index ? (
               <Tabs.Content
                 key={evaluator}
                 value={evaluator}
@@ -487,21 +487,19 @@ export const BatchEvaluationV2EvaluationResults = React.memo(
                 minHeight="0"
                 overflow="auto"
               >
-                {tabIndex === index ? (
-                  <BatchEvaluationV2EvaluationResult
-                    evaluator={evaluator}
-                    results={results}
-                    datasetByIndex={datasetByIndex}
-                    datasetColumns={datasetColumns}
-                    predictedColumns={predictedColumns}
-                    isFinished={isFinished}
-                    size={size}
-                    hasScrolled={hasScrolled}
-                    workflowId={experiment.workflowId}
-                  />
-                ) : null}
+                <BatchEvaluationV2EvaluationResult
+                  evaluator={evaluator}
+                  results={results}
+                  datasetByIndex={datasetByIndex}
+                  datasetColumns={datasetColumns}
+                  predictedColumns={predictedColumns}
+                  isFinished={isFinished}
+                  size={size}
+                  hasScrolled={hasScrolled}
+                  workflowId={experiment.workflowId}
+                />
               </Tabs.Content>
-            );
+            ) : null;
           }
         )}
       </Tabs.Root>

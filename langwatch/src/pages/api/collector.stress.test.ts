@@ -68,7 +68,7 @@ describe("Collector API stress test", () => {
               finished_at: Date.now(),
             },
             vendor: "openai",
-            model: "gpt-4o-mini",
+            model: "gpt-5",
             params: {},
             metrics: {},
           },

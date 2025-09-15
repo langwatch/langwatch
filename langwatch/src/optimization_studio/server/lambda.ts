@@ -262,7 +262,7 @@ export const getProjectLambdaArn = async (
     } catch (error) {
       if (
         error instanceof Error &&
-        error.message.includes("Function already exists")
+        error.message.includes("already exist")
       ) {
         logger.info(
           { projectId },

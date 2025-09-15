@@ -1,4 +1,4 @@
-import { createOpenAI } from "@ai-sdk/openai";
+import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
 import { DEFAULT_MODEL } from "../../utils/constants";
 import {
   getProjectModelProviders,
@@ -7,11 +7,7 @@ import {
 import { prisma } from "../db";
 import { env } from "../../env.mjs";
 
-export const getVercelAIModel = async (
-  projectId: string,
-  model?: string,
-  settings?: any
-) => {
+export const getVercelAIModel = async (projectId: string, model?: string) => {
   const project = await prisma.project.findUnique({
     where: { id: projectId },
   });
@@ -44,13 +40,12 @@ export const getVercelAIModel = async (
     ])
   );
 
-  const vercelProvider = createOpenAI({
+  const vercelProvider = createOpenAICompatible({
+    name: `${providerKey}`,
     apiKey: litellmParams.api_key,
     baseURL: `${env.LANGWATCH_NLP_SERVICE}/proxy/v1`,
     headers,
   });
 
-  return vercelProvider(model_, {
-    ...settings,
-  });
+  return vercelProvider(model_);
 };

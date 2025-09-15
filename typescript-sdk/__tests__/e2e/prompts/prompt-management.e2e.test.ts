@@ -1,6 +1,8 @@
-import { describe, expect, it, beforeAll } from "vitest";
+import { describe, expect, it, beforeAll, beforeEach } from "vitest";
 import { getLangwatchSDK } from "../../helpers/get-sdk";
 import type { LangWatch } from "../../../dist/index.js";
+import { server } from "../setup/msw-setup";
+import { handles } from "./handlers.js";
 
 describe("Prompt management", () => {
   let langwatch: LangWatch;
@@ -9,8 +11,12 @@ describe("Prompt management", () => {
     const { LangWatch } = await getLangwatchSDK();
     langwatch = new LangWatch({
       apiKey: "test-key",
-      endpoint: "https://app.langwatch.test",
+      endpoint: process.env.LANGWATCH_API_URL ?? "https://app.langwatch.test",
     });
+  });
+
+  beforeEach(() => {
+    server.use(...handles);
   });
 
   it("get prompt", async () => {
@@ -26,13 +32,12 @@ describe("Prompt management", () => {
   });
 
   it("update prompt", async () => {
-    const newName = "chunky-bacon";
+    const systemPrompt = "test system prompt";
     const prompt = await langwatch.prompts.update("handle", {
-      name: newName,
+      prompt: systemPrompt,
     });
-    // Internally, update calls get again, so it
-    // it doesn't make sense to check the name
-    expect(prompt).toBeDefined();
+
+    expect(prompt.prompt).toBe(systemPrompt);
   });
 
   it("delete prompt", async () => {

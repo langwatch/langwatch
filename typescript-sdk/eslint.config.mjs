@@ -9,8 +9,8 @@ const config = tseslint.config(
             "coverage/**",
             "examples/**",
             "ts-to-zod.config.js",
-            "__tests__/e2e/**"
-        ]
+            "**/generated/**",
+        ],
     },
     eslint.configs.recommended,
     ...tseslint.configs.recommendedTypeChecked,
@@ -18,7 +18,7 @@ const config = tseslint.config(
     {
         languageOptions: {
             parserOptions: {
-                project: "./tsconfig.json",
+                project: "./tsconfig.eslint.json",
                 tsconfigRootDir: import.meta.dirname,
             },
         },
@@ -45,9 +45,12 @@ const config = tseslint.config(
                     fixStyle: "inline-type-imports",
                 },
             ],
-            "@typescript-eslint/no-unused-vars": ["warn", { argsIgnorePattern: "^_" }],
+            "@typescript-eslint/no-unused-vars": [
+                "warn",
+                { argsIgnorePattern: "^_" },
+            ],
         },
-    }
+    },
 );
 
 export default config;

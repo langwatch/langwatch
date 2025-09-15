@@ -487,6 +487,32 @@ export const projectRouter = createTRPCRouter({
         };
       }
     ),
+  archiveById: protectedProcedure
+    .input(z.object({ projectId: z.string(), projectToArchiveId: z.string() }))
+    .use(checkUserPermissionForProject(TeamRoleGroup.SETUP_PROJECT))
+    .mutation(async ({ input, ctx }) => {
+      const prisma = ctx.prisma;
+      if (input.projectToArchiveId === input.projectId) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "You cannot archive the current project",
+        });
+      }
+      const canDeleteTarget = await backendHasTeamProjectPermission(
+        ctx,
+        { projectId: input.projectToArchiveId },
+        TeamRoleGroup.SETUP_PROJECT
+      );
+      if (!canDeleteTarget) {
+        throw new TRPCError({ code: "UNAUTHORIZED" });
+      }
+
+      const result = await prisma.project.updateMany({
+        where: { id: input.projectToArchiveId, archivedAt: null },
+        data: { archivedAt: new Date() },
+      });
+      return { success: true, alreadyArchived: result.count === 0 };
+    }),
 });
 
 const generateApiKey = (): string => {

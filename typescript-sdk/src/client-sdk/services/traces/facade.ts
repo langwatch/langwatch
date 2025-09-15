@@ -3,11 +3,9 @@ import { TracesService } from "./service";
 import { type GetTraceParams, type GetTraceResponse } from "./types";
 
 export class TracesFacade {
-  readonly #config: InternalConfig;
   readonly #service: TracesService;
 
   constructor(config: InternalConfig) {
-    this.#config = config;
     this.#service = new TracesService(config);
   }
 

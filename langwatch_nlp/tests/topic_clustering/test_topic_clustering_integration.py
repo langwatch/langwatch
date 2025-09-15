@@ -49,7 +49,7 @@ class TestTopicClusteringIntegration:
             json={
                 "litellm_params": {
                     "api_base": os.environ["AZURE_OPENAI_ENDPOINT"],
-                    "model": "azure/gpt-4o-mini",
+                    "model": "azure/gpt-5",
                 },
                 "embeddings_litellm_params": {
                     "api_key": os.environ["OPENAI_API_KEY"],
@@ -72,7 +72,7 @@ class TestTopicClusteringIntegration:
             json={
                 "litellm_params": {
                     "api_base": os.environ["AZURE_OPENAI_ENDPOINT"],
-                    "model": "azure/gpt-4o-mini",
+                    "model": "azure/gpt-5",
                 },
                 "embeddings_litellm_params": {
                     "api_key": os.environ["OPENAI_API_KEY"],

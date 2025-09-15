@@ -8,6 +8,7 @@ import { type z } from "zod";
 
 import { SchemaVersion } from "./enums";
 import { NotFoundError, SystemPromptConflictError } from "./errors";
+import { PromptVersionService } from "./prompt-version.service";
 import {
   type CreateLlmConfigParams,
   type CreateLlmConfigVersionParams,
@@ -15,7 +16,7 @@ import {
   type LlmConfigWithLatestVersion,
 } from "./repositories";
 import {
-  getLatestConfigVersionSchema,
+  type getLatestConfigVersionSchema,
   LATEST_SCHEMA_VERSION,
   type LatestConfigVersionSchema,
 } from "./repositories/llm-config-version-schema";
@@ -45,6 +46,8 @@ export type VersionedPrompt = {
   versionId: string;
   versionCreatedAt: Date;
   model: string;
+  temperature?: number;
+  maxTokens?: number;
   prompt: string;
   projectId: string;
   organizationId: string;
@@ -68,9 +71,11 @@ export type VersionedPrompt = {
  */
 export class PromptService {
   readonly repository: LlmConfigRepository;
+  readonly versionService: PromptVersionService;
 
   constructor(private readonly prisma: PrismaClient) {
     this.repository = new LlmConfigRepository(prisma);
+    this.versionService = new PromptVersionService(prisma);
   }
 
   /**
@@ -214,17 +219,23 @@ export class PromptService {
     );
 
     shouldCreateVersion &&
-      this.assertNoSystemPromptConflict({
+      this.versionService.assertNoSystemPromptConflict({
         prompt: params.prompt,
         messages: params.messages,
       });
 
+    // Get the system prompt from the messages
     const messageSystemPrompt = params.messages?.find(
       (msg) => msg.role === "system"
     )?.content;
 
-    // If the system prompt is provided in the messages, set the prompt to the system prompt
-    params.prompt ??= messageSystemPrompt;
+    // If the system prompt is provided in the messages,
+    // strip it from the messages
+    // and set the prompt to the system prompt
+    if (messageSystemPrompt) {
+      params.messages = params.messages?.filter((msg) => msg.role !== "system");
+      params.prompt ??= messageSystemPrompt;
+    }
 
     if (!messageSystemPrompt && !params.prompt) {
       throw new SystemPromptConflictError(
@@ -282,7 +293,7 @@ export class PromptService {
     data: Partial<
       Omit<
         CreateLlmConfigParams &
-          CreateLlmConfigVersionParams &
+          Omit<CreateLlmConfigVersionParams, "configData"> &
           CreateLlmConfigVersionParams["configData"],
         | "id"
         | "createdAt"
@@ -296,7 +307,7 @@ export class PromptService {
     const { idOrHandle, projectId, data } = params;
     const { handle, scope, ...newVersionData } = data;
 
-    this.assertNoSystemPromptConflict(newVersionData);
+    this.versionService.assertNoSystemPromptConflict(newVersionData);
 
     const messageSystemPrompt = newVersionData.messages?.find(
       (msg) => msg.role === "system"
@@ -326,26 +337,25 @@ export class PromptService {
         );
 
         // Get the latest version
+        // TODO: This should use the version service instead of accessing the repository directly
         const latestVersion = (await this.repository.versions.getLatestVersion(
           updatedConfig.id,
           projectId,
           { tx }
         )) as LatestConfigVersionSchema;
 
-        const parsedLatestVersionData =
-          getLatestConfigVersionSchema().parse(latestVersion);
-
-        // Update the version
+        // Create the new version directly
         const updatedVersion: LlmPromptConfigVersion =
-          await tx.llmPromptConfigVersion.create({
+          await this.versionService.createVersion({
+            db: tx,
             data: {
               configId: updatedConfig.id,
               projectId,
               commitMessage: newVersionData.commitMessage ?? "Updated from API",
               configData: {
-                ...parsedLatestVersionData.configData,
+                ...latestVersion.configData,
                 ...newVersionData,
-              } as any,
+              },
               schemaVersion: LATEST_SCHEMA_VERSION,
               version: latestVersion.version + 1,
             },
@@ -490,8 +500,9 @@ export class PromptService {
     const remoteVersion = existingPrompt.version;
     const remoteConfigData: LatestConfigVersionSchema["configData"] = {
       model: existingPrompt.model,
+      temperature: existingPrompt.temperature,
       prompt: existingPrompt.prompt,
-      messages: existingPrompt.messages,
+      messages: existingPrompt.messages.filter((msg) => msg.role !== "system"),
       inputs: existingPrompt.inputs,
       outputs: existingPrompt.outputs,
       response_format: existingPrompt.response_format,
@@ -515,7 +526,7 @@ export class PromptService {
           data: {
             authorId,
             commitMessage: commitMessage ?? "Updated from local file",
-            configData: localConfigData,
+            ...localConfigData,
             schemaVersion: SchemaVersion.V1_0,
           },
         });
@@ -598,6 +609,8 @@ export class PromptService {
       versionId: config.latestVersion.id ?? "",
       versionCreatedAt: config.latestVersion.createdAt ?? new Date(),
       model: config.latestVersion.configData.model,
+      temperature: config.latestVersion.configData.temperature,
+      maxTokens: config.latestVersion.configData.max_tokens,
       prompt,
       projectId: config.projectId,
       organizationId: config.organizationId,
@@ -616,25 +629,6 @@ export class PromptService {
       demonstrations: config.latestVersion.configData.demonstrations,
       promptingTechnique: config.latestVersion.configData.prompting_technique,
     };
-  }
-
-  /**
-   * Validates that a prompt and system message are not set at the same time.
-   * @param params - The parameters object
-   * @param params.prompt - The prompt to validate
-   * @param params.messages - The messages to validate
-   * @throws SystemPromptConflictError if a prompt and system message are set at the same time
-   */
-  private assertNoSystemPromptConflict(params: {
-    prompt?: string;
-    messages?: z.infer<typeof messageSchema>[];
-  }): void {
-    if (
-      params.prompt &&
-      params.messages?.some((msg) => msg.role === "system")
-    ) {
-      throw new SystemPromptConflictError();
-    }
   }
 
   private async getOrganizationIdFromProjectId(

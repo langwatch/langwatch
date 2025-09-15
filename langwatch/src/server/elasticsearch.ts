@@ -6,6 +6,7 @@ import { patchForOpensearchCompatibility } from "./elasticsearch/patchOpensearch
 import { patchForQuickwitCompatibility } from "./elasticsearch/patchQuickwitCompatibility";
 import { prisma } from "./db";
 import { decrypt } from "../utils/encryption";
+
 export type IndexSpec = {
   alias: string;
   base: string;
@@ -13,9 +14,27 @@ export type IndexSpec = {
 
 export const MIGRATION_INDEX = "search-elastic-migrations";
 
-export const TRACE_INDEX: IndexSpec = {
+export const COLD_STORAGE_AGE_DAYS = 32;
+
+export const TRACE_INDEX: IndexSpec & {
+  all: string;
+  for: (startDate: number) => string;
+} = {
   base: "search-traces",
   alias: "search-traces-alias",
+  all: "search-traces-*",
+  for: (startDate) => {
+    const now = new Date().getTime();
+    if (startDate <= now - 1000 * 60 * 60 * 24 * (COLD_STORAGE_AGE_DAYS - 1)) {
+      return `search-traces-*`;
+    }
+    return `search-traces-alias`;
+  },
+};
+
+export const TRACE_COLD_INDEX: IndexSpec = {
+  base: "search-traces-cold",
+  alias: "search-traces-cold-alias",
 };
 
 export const DSPY_STEPS_INDEX: IndexSpec = {
@@ -35,7 +54,7 @@ export const SCENARIO_EVENTS_INDEX: IndexSpec = {
 
 const getOrgElasticsearchDetailsFromProject = async (projectId: string) => {
   const project = await prisma.project.findUnique({
-    where: { id: projectId },
+    where: { id: projectId, archivedAt: null },
     include: { team: { include: { organization: true } } },
   });
 

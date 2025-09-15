@@ -169,7 +169,7 @@ export function getLangWatchTracerFromProvider(
                     .catch((err: any) => {
                       wrappedSpan.setStatus({
                         code: SpanStatusCode.ERROR,
-                        message: err?.message || String(err),
+                        message: err?.message ?? String(err),
                       });
                       wrappedSpan.recordException?.(err);
                       throw err;
@@ -188,7 +188,7 @@ export function getLangWatchTracerFromProvider(
               } catch (err: any) {
                 wrappedSpan.setStatus({
                   code: SpanStatusCode.ERROR,
-                  message: err?.message || String(err),
+                  message: err?.message ?? String(err),
                 });
                 wrappedSpan.recordException?.(err);
                 wrappedSpan.end();

@@ -15,7 +15,7 @@ async def get_openai_chat_response(user_prompt: str):
 
     # All calls made with 'client' will now be automatically captured as spans
     response = client.chat.completions.create(
-        model="gpt-4o-mini",
+        model="gpt-5",
         messages=[{"role": "user", "content": user_prompt}],
     )
     completion = response.choices[0].message.content

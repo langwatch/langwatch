@@ -7,6 +7,8 @@ import type {
 import { nanoid } from "nanoid";
 import { describe, expect, it, beforeEach, afterEach } from "vitest";
 
+import { prisma } from "~/server/db";
+
 import { app } from "../[[...route]]/app";
 
 import { createHandle } from "./helpers";
@@ -16,7 +18,6 @@ import {
   llmPromptConfigVersionFactory,
 } from "~/factories/llm-config.factory";
 import { projectFactory } from "~/factories/project.factory";
-import { prisma } from "~/server/db";
 
 describe("Prompts API", () => {
   let mockConfig: LlmPromptConfig;
@@ -291,7 +292,7 @@ describe("Prompts API", () => {
             expect(body.length).toBe(1);
             expect(body[0].id).toBe(config.id);
             expect(body[0].projectId).toBe(testProjectId);
-            expect(body[0].model).toBe("openai/gpt-4o-mini");
+            expect(body[0].model).toBe("openai/gpt-5");
           });
         });
 

@@ -25,7 +25,7 @@ export const authMiddleware: MiddlewareHandler = async (c, next) => {
 
   try {
     const project = await prisma.project.findUnique({
-      where: { apiKey },
+      where: { apiKey, archivedAt: null },
     });
 
     if (!project) {

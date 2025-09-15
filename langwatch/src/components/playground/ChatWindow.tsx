@@ -11,7 +11,7 @@ import {
 } from "@chakra-ui/react";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { type Message } from "ai/react";
+import { type UIMessage } from "@ai-sdk/react";
 import React, { useEffect, useRef } from "react";
 import { ChevronDown, MinusCircle, PlusCircle, Send } from "react-feather";
 import { LuGripVertical } from "react-icons/lu";
@@ -61,7 +61,7 @@ export const ChatWindowWrapper = React.memo(function ChatWindowWrapper({
       addMessagesListener={chat.addMessagesListener}
       removeMessagesListener={chat.removeMessagesListener}
       error={chat.error}
-      isLoading={chat.isLoading}
+      isLoading={!["ready", "error"].includes(chat.status)}
       windowsCount={windowsCount}
     />
   );
@@ -81,9 +81,9 @@ const ChatWindow = React.memo(function ChatWindow({
   tabIndex: number;
   windowId: string;
   windowIndex: number;
-  chatRef: React.MutableRefObject<ChatRef>;
-  addMessagesListener: (listener: (messages: Message[]) => void) => void;
-  removeMessagesListener: (listener: (messages: Message[]) => void) => void;
+  chatRef: React.RefObject<ChatRef>;
+  addMessagesListener: (listener: (messages: UIMessage[]) => void) => void;
+  removeMessagesListener: (listener: (messages: UIMessage[]) => void) => void;
   error: Error | undefined;
   isLoading: boolean;
   windowsCount: number;
@@ -108,25 +108,19 @@ const ChatWindow = React.memo(function ChatWindow({
     };
   });
 
-  useEffect(() => {
-    const simulatedEvent = {
-      target: { value: chatWindowState.input },
-    } as React.ChangeEvent<HTMLInputElement>;
-
-    chatRef.current.handleInputChange(simulatedEvent);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [chatWindowState?.input]);
+  // Note: handleInputChange is not available in the ChatRef interface
+  // The input state is managed by the chat component internally
 
   useEffect(() => {
     if (!chatWindowState) return;
 
     if (chatWindowState.requestedSubmission) {
-      const simulatedSubmissionEvent = {
-        // eslint-disable-next-line @typescript-eslint/no-empty-function
-        preventDefault: () => {},
-      } as React.FormEvent<HTMLFormElement>;
-      chatRef.current.handleSubmit(simulatedSubmissionEvent);
-      onSubmit(windowId, false);
+      // handleSubmit expects a string message, not a FormEvent
+      // We need to pass the current input value
+      if (chatWindowState.input) {
+        void chatRef.current.handleSubmit(chatWindowState.input);
+        onSubmit(windowId, false);
+      }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [chatWindowState.requestedSubmission]);

@@ -1,5 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { deleteTracesRetentionPolicy } from "~/tasks/deleteTracesRetentionPolicy";
+import { migrateToColdStorage } from "../../../tasks/cold/moveTracesToColdStorage";
 
 export default async function handler(
   req: NextApiRequest,
@@ -16,11 +17,13 @@ export default async function handler(
 
   try {
     const projectId = req.query.projectId as string | undefined;
+    const movedToColdStorage = await migrateToColdStorage(projectId);
     const totalDeleted = await deleteTracesRetentionPolicy(projectId);
 
     res.status(200).json({
-      message: "Old traces deleted successfully",
+      message: "Traces retention period maintenance completed successfully",
       totalDeleted,
+      movedToColdStorage: movedToColdStorage?.migrated,
     });
   } catch (error: any) {
     res.status(500).json({

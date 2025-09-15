@@ -65,7 +65,7 @@ export const deleteTracesRetentionPolicy = async (projectId?: string) => {
 
     const client = await esClient({ projectId: projectId ?? "" });
     const response = await client.deleteByQuery({
-      index: TRACE_INDEX.alias,
+      index: TRACE_INDEX.all,
       refresh: true,
       body: { query },
     });
@@ -80,7 +80,7 @@ export const deleteTracesRetentionPolicy = async (projectId?: string) => {
   const query = buildRetentionQuery({ cutoff: defaultCutoff, projectId });
   const client = await esClient({ projectId: projectId ?? "" });
   const response = await client.deleteByQuery({
-    index: TRACE_INDEX.alias,
+    index: TRACE_INDEX.all,
     refresh: true,
     body: { query },
   });

@@ -2,103 +2,113 @@ import { addDays } from "date-fns";
 import type { LLMModeTrace } from "langwatch";
 
 interface SearchTrace {
-	traces: LLMModeTrace[];
+  traces: LLMModeTrace[];
 }
 
 interface GetLlmTraceByIdOptions {
-	endpoint: string;
+  endpoint: string;
 }
 
 interface ListLLmTracesOptions {
-	pageSize?: number;
-	pageOffset?: number;
-	timeTravelDays?: number;
-	endpoint: string;
+  pageSize?: number;
+  pageOffset?: number;
+  timeTravelDays?: number;
+  endpoint: string;
 }
 
 interface SearchTracesOptions {
-	pageSize?: number;
-	pageOffset?: number;
-	timeTravelDays?: number;
-	endpoint: string;
+  pageSize?: number;
+  pageOffset?: number;
+  timeTravelDays?: number;
+  endpoint: string;
 
-	filters: Record<string, string[] | Record<string, string[]>>;
+  filters: Record<string, string[] | Record<string, string[]>>;
 }
 
-export const getLlmTraceById = async (authToken: string, id: string, opts?: GetLlmTraceByIdOptions): Promise<LLMModeTrace> => {
-	const { endpoint } = opts ?? {};
+export const getLlmTraceById: (
+  authToken: string,
+  id: string,
+  opts?: GetLlmTraceByIdOptions
+) => Promise<LLMModeTrace> = async (authToken, id, opts) => {
+  const { endpoint } = opts ?? {};
 
-	const url = new URL(`${endpoint}/api/trace/${id}`);
-	url.searchParams.set("llmMode", "true");
+  const url = new URL(`${endpoint}/api/trace/${id}`);
+  url.searchParams.set("llmMode", "true");
 
-	const response = await fetch(url.toString(), {
-		method: "GET",
-		headers: {
-			"Content-Type": "application/json",
-			"X-Auth-Token": authToken,
-		},
-	});
+  const response = await fetch(url.toString(), {
+    method: "GET",
+    headers: {
+      "Content-Type": "application/json",
+      "X-Auth-Token": authToken,
+    },
+  });
 
-	if (!response.ok) {
-		if (response.status === 404) {
-			throw new Error("Trace not found");
-		}
+  if (!response.ok) {
+    if (response.status === 404) {
+      throw new Error("Trace not found");
+    }
 
-		throw new Error(`Failed to get trace: ${response.statusText}`);
-	}
+    throw new Error(`Failed to get trace: ${response.statusText}`);
+  }
 
-	return await response.json() as Promise<LLMModeTrace>;
+  return (await response.json()) as Promise<LLMModeTrace>;
 };
 
-export const listLlmTraces = async (authToken: string, opts?: ListLLmTracesOptions): Promise<SearchTrace> => {
-	const {
-		pageSize = 10,
-		pageOffset = 0,
-		timeTravelDays = 1,
-		endpoint,
-	} = opts ?? {};
+export const listLlmTraces = async (
+  authToken: string,
+  opts?: ListLLmTracesOptions
+): Promise<SearchTrace> => {
+  const {
+    pageSize = 10,
+    pageOffset = 0,
+    timeTravelDays = 1,
+    endpoint,
+  } = opts ?? {};
 
-	const response = await fetch(`${endpoint}/api/trace/search`, {
-		method: "POST",
-		headers: {
-			"Content-Type": "application/json",
-			"X-Auth-Token": authToken,
-		},
-		body: JSON.stringify({
-			startDate: addDays(new Date(), -timeTravelDays).toISOString(),
-			endDate: addDays(new Date(), 1).toISOString(),
-			llmMode: true,
-			pageOffset,
-			pageSize,
-		}),
-	});
+  const response = await fetch(`${endpoint}/api/trace/search`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "X-Auth-Token": authToken,
+    },
+    body: JSON.stringify({
+      startDate: addDays(new Date(), -timeTravelDays).toISOString(),
+      endDate: addDays(new Date(), 1).toISOString(),
+      llmMode: true,
+      pageOffset,
+      pageSize,
+    }),
+  });
 
-	return await response.json() as Promise<SearchTrace>;
-}
+  return (await response.json()) as Promise<SearchTrace>;
+};
 
-export const searchTraces = async (authToken: string, opts: SearchTracesOptions): Promise<SearchTrace> => {
-	const {
-		pageSize = 10,
-		pageOffset = 0,
-		timeTravelDays = 1,
-		endpoint,
-		filters,
-	} = opts;
+export const searchTraces = async (
+  authToken: string,
+  opts: SearchTracesOptions
+): Promise<SearchTrace> => {
+  const {
+    pageSize = 10,
+    pageOffset = 0,
+    timeTravelDays = 1,
+    endpoint,
+    filters,
+  } = opts;
 
-	const response = await fetch(`${endpoint}/api/trace/search`, {
-		method: "POST",
-		headers: {
-			"Content-Type": "application/json",
-			"X-Auth-Token": authToken,
-		},
-		body: JSON.stringify({
-			startDate: addDays(new Date(), -timeTravelDays).toISOString(),
-			endDate: addDays(new Date(), 1).toISOString(),
-			filters: filters,
-			pageOffset,
-			pageSize,
-		}),
-	});
+  const response = await fetch(`${endpoint}/api/trace/search`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "X-Auth-Token": authToken,
+    },
+    body: JSON.stringify({
+      startDate: addDays(new Date(), -timeTravelDays).toISOString(),
+      endDate: addDays(new Date(), 1).toISOString(),
+      filters: filters,
+      pageOffset,
+      pageSize,
+    }),
+  });
 
-	return await response.json() as Promise<SearchTrace>;
-}
+  return (await response.json()) as Promise<SearchTrace>;
+};

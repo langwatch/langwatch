@@ -1,11 +1,9 @@
 import { useDisclosure } from "@chakra-ui/react";
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { EvaluationWizard as EvaluationWizardComponent } from "../../../components/evaluations/wizard/EvaluationWizard";
 import { Dialog } from "../../../components/ui/dialog";
-import EvaluationsV2 from "../evaluations";
 import { useRouter } from "next/router";
 import { useOrganizationTeamProject } from "../../../hooks/useOrganizationTeamProject";
-import { api } from "../../../utils/api";
 import { isNotFound } from "../../../utils/trpcError";
 import ErrorPage from "next/error";
 import { useEvaluationWizardStore } from "../../../components/evaluations/wizard/hooks/evaluation-wizard-store/useEvaluationWizardStore";

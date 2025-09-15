@@ -3,7 +3,7 @@ import {
   InMemorySpanExporter,
   SimpleSpanProcessor,
   NodeTracerProvider,
-  ReadableSpan,
+  type ReadableSpan,
 } from "@opentelemetry/sdk-trace-node";
 
 export function setupTestTraceProvider() {

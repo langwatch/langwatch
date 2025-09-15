@@ -9,4 +9,5 @@ export const teamFactory = Factory.define<Team>(({ sequence }) => ({
   organizationId: nanoid(),
   createdAt: new Date(),
   updatedAt: new Date(),
+  archivedAt: null,
 }));

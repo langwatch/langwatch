@@ -21,7 +21,7 @@ const logger = createLogger("useSetRunHistorySidebarController");
  * @returns Object containing runs data, click handlers, pagination controls, and state flags
  */
 export const useSetRunHistorySidebarController = () => {
-  const { goToSimulationBatchRuns, scenarioSetId } = useSimulationRouter();
+  const { goToSimulationBatchRuns, scenarioSetId, batchRunId } = useSimulationRouter();
   const { project } = useOrganizationTeamProject();
 
   // Cursor-based pagination state
@@ -80,6 +80,15 @@ export const useSetRunHistorySidebarController = () => {
       setCursorHistory([]);
     }
   }, [totalCount, cursor]);
+
+  useEffect(() => {
+    if (scenarioSetId && !batchRunId && runData?.runs?.length) {
+      const lastRun = runData.runs[runData.runs.length - 1];
+      if (lastRun) {
+        goToSimulationBatchRuns(scenarioSetId, lastRun.batchRunId, { replace: true });
+      }
+    }
+  }, [scenarioSetId, batchRunId, runData?.runs, goToSimulationBatchRuns]);
 
   // Memoize the expensive data transformation to prevent unnecessary re-renders
   // This transforms raw API data into the UI-friendly Run format

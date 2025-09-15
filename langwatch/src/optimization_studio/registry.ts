@@ -196,6 +196,7 @@ const retrievers: Retriever[] = [
 ];
 
 const ALLOWED_EVALUATORS = [
+  "langevals/exact_match",
   "langevals/llm_answer_match",
   "ragas/factual_correctness",
   "lingua/language_detection",
@@ -222,20 +223,6 @@ const ALLOWED_EVALUATORS = [
 ];
 
 const evaluators: Evaluator[] = [
-  {
-    cls: "ExactMatchEvaluator",
-    name: "Exact Match",
-    description:
-      "Check if the generated output exactly matches the expected output (==)",
-    inputs: [
-      { identifier: "output", type: "str" },
-      { identifier: "expected_output", type: "str" },
-    ],
-    outputs: [
-      { identifier: "passed", type: "bool" },
-      { identifier: "score", type: "float" },
-    ],
-  },
   ...convertEvaluators(
     Object.fromEntries(
       Object.entries(AVAILABLE_EVALUATORS)

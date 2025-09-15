@@ -94,7 +94,15 @@ export const scenarioRunFinishedSchema = baseScenarioEventSchema.extend({
 export const scenarioMessageSnapshotSchema = MessagesSnapshotEventSchema.merge(
   baseScenarioEventSchema.extend({
     type: z.literal(ScenarioEventType.MESSAGE_SNAPSHOT),
-    messages: z.array(z.union([MessageSchema, chatMessageSchema])),
+    messages: z.array(
+      z.intersection(
+        z.union([MessageSchema, chatMessageSchema]),
+        z.object({
+          id: z.string().optional(),
+          trace_id: z.string().optional(),
+        })
+      )
+    ),
   })
 );
 

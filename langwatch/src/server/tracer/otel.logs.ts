@@ -1,162 +1,192 @@
 import type { DeepPartial } from "~/utils/types";
-import type { TypedValueJson } from "./types";
+import type { SpanInputOutput } from "./types";
 import type { IExportLogsServiceRequest } from "@opentelemetry/otlp-transformer";
 import { createLogger } from "~/utils/logger";
 import type { TraceForCollection } from "./otel.traces";
+import { getLangWatchTracer } from "langwatch";
+import { SpanKind, SpanStatusCode } from "@opentelemetry/api";
 
 const logger = createLogger("langwatch.tracer.otel.logs");
+const tracer = getLangWatchTracer("langwatch.tracer.otel.logs");
 
 const supportedScopeNames = [
-	"org.springframework.ai.chat.observation.ChatModelCompletionObservationHandler",
-	"org.springframework.ai.chat.observation.ChatModelPromptContentObservationHandler",
+  "org.springframework.ai.chat.observation.ChatModelCompletionObservationHandler",
+  "org.springframework.ai.chat.observation.ChatModelPromptContentObservationHandler",
 ];
 
-export const openTelemetryLogsRequestToTracesForCollection = (
-	otelLogs: DeepPartial<IExportLogsServiceRequest>
-): TraceForCollection[] => {
-	if (!otelLogs.resourceLogs) {
-		return [];
-	}
+export const openTelemetryLogsRequestToTracesForCollection = async (
+  otelLogs: DeepPartial<IExportLogsServiceRequest>
+): Promise<TraceForCollection[]> => {
+  return await tracer.withActiveSpan(
+    "openTelemetryLogsRequestToTracesForCollection",
+    { kind: SpanKind.INTERNAL },
+    async (span) => {
+      try {
+        if (!otelLogs.resourceLogs) {
+          span.setAttribute("resourceLogs.count", 0);
+          return [];
+        }
 
-	const traceMap: Record<string, TraceForCollection> = {};
+        span.setAttribute("resourceLogs.count", otelLogs.resourceLogs.length);
 
-	for (const resourceLog of otelLogs.resourceLogs) {
-		if (!resourceLog?.scopeLogs) {
-			continue;
-		}
+        const traceMap: Record<string, TraceForCollection> = {};
 
-		for (const scopeLog of resourceLog.scopeLogs) {
-			if (!scopeLog?.logRecords) {
-				continue;
-			}
+        for (const resourceLog of otelLogs.resourceLogs) {
+          if (!resourceLog?.scopeLogs) {
+            continue;
+          }
 
-			for (const logRecord of scopeLog.logRecords) {
-				if (!logRecord || !logRecord.traceId || !logRecord.spanId) {
-					continue;
-				}
-				if (!logRecord.body?.stringValue) {
-					continue;
-				}
-				if (!supportedScopeNames.includes(scopeLog.scope?.name ?? "")) {
-					continue;
-				}
+          for (const scopeLog of resourceLog.scopeLogs) {
+            if (!scopeLog?.logRecords) {
+              continue;
+            }
 
-				const traceId = decodeOpenTelemetryId(logRecord.traceId);
-				const spanId = decodeOpenTelemetryId(logRecord.spanId);
-				if (!traceId || !spanId) {
-					logger.info("received log with no span or trace id, rejecting");
-					continue;
-				}
+            for (const logRecord of scopeLog.logRecords) {
+              if (!logRecord?.traceId || !logRecord.spanId) {
+                continue;
+              }
+              if (!logRecord.body?.stringValue) {
+                continue;
+              }
+              if (!supportedScopeNames.includes(scopeLog.scope?.name ?? "")) {
+                continue;
+              }
 
-				const logString = logRecord.body.stringValue;
-				const [identifier, content] = logString.split("\n", 2);
-				if (!identifier || !content) {
-					logger.info("received log with no identifier or content, rejecting");
-					continue;
-				}
+              const traceId = decodeOpenTelemetryId(logRecord.traceId);
+              const spanId = decodeOpenTelemetryId(logRecord.spanId);
+              if (!traceId || !spanId) {
+                logger.info("received log with no span or trace id, rejecting");
+                continue;
+              }
 
-				let jsonParsedContent: unknown;
-				try {
-					jsonParsedContent = JSON.parse(content);
-				} catch (error) {
-					logger.warn({
-						identifier,
-						error,
-					}, "failed to parse log content as json, falling back to just a string");
+              const logString = logRecord.body.stringValue;
+              const [identifier, ...contentParts] = logString.split("\n");
+              const content = contentParts.join("\n");
 
-					jsonParsedContent = [content];
-				}
+              if (!identifier || !content) {
+                logger.info(
+                  "received log with no identifier or content, rejecting"
+                );
+                continue;
+              }
 
-				let input: TypedValueJson | null = null;
-				let output: TypedValueJson | null = null;
+              let input: SpanInputOutput | null = null;
+              let output: SpanInputOutput | null = null;
 
-				switch (identifier) {
-					case "Chat Model Completion:":
-						output = {
-							type: "json",
-							value: jsonParsedContent as TypedValueJson["value"],
-						};
-						break;
-					
-					case "Chat Model Prompt Content:":
-						input = {
-							type: "json",
-							value: jsonParsedContent as TypedValueJson["value"],
-						};
-						break;
-					
-					default:
-						continue;
-				}
+              switch (identifier) {
+                case "Chat Model Completion:":
+                  output = {
+                    type: "text",
+                    value: content,
+                  };
+                  break;
 
-				let trace = traceMap[traceId];
-				if (!trace) {
-					trace = {
-						traceId,
-						spans: [],
-						evaluations: [],
-						reservedTraceMetadata: {},
-						customMetadata: {},
-					} satisfies TraceForCollection;
-					traceMap[traceId] = trace;
-				}
+                case "Chat Model Prompt Content:":
+                  input = {
+                    type: "text",
+                    value: content,
+                  };
+                  break;
 
-				let existingSpan = trace.spans.find(span => span.span_id === spanId);
-				if (!existingSpan) {
-					existingSpan = {
-						span_id: spanId,
-						trace_id: traceId,
-						type: "llm",
-						input: input,
-						output: output,
-						timestamps: {
-							ignore_timestamps_on_write: true,
-							started_at: convertFromUnixNano(logRecord.timeUnixNano),
-							finished_at: 0,
-						},
-					};
-					trace.spans.push(existingSpan);
-				} else {
-					if (input) {
-						existingSpan.input = input;
-					}
-					if (output) {
-						existingSpan.output = output;
-					}
-				}
-			}
-		}
-	}
+                default:
+                  continue;
+              }
 
-	return Object.values(traceMap);
-}
+              let trace = traceMap[traceId];
+              if (!trace) {
+                trace = {
+                  traceId,
+                  spans: [],
+                  evaluations: [],
+                  reservedTraceMetadata: {},
+                  customMetadata: {},
+                } satisfies TraceForCollection;
+                traceMap[traceId] = trace;
+              }
+
+              let existingSpan = trace.spans.find(
+                (span) => span.span_id === spanId
+              );
+              if (!existingSpan) {
+                existingSpan = {
+                  span_id: spanId,
+                  trace_id: traceId,
+                  name: identifier.replace(":", ""),
+                  type: "llm",
+                  input: input,
+                  output: output,
+                  params: {},
+                  timestamps: {
+                    ignore_timestamps_on_write: true,
+                    started_at: convertFromUnixNano(logRecord.timeUnixNano),
+                    finished_at: convertFromUnixNano(logRecord.timeUnixNano),
+                  },
+                };
+                trace.spans.push(existingSpan);
+              } else {
+                // For log record spans, preserve existing input/output if they exist
+                if (input && !existingSpan.input) {
+                  existingSpan.input = input;
+                }
+                if (output && !existingSpan.output) {
+                  existingSpan.output = output;
+                }
+                // Ensure the preserve flag is set
+                if (!existingSpan.params) {
+                  existingSpan.params = {};
+                }
+              }
+            }
+          }
+        }
+        const result = Object.values(traceMap);
+        span.setAttribute("processed.traces.count", result.length);
+        return result;
+      } catch (error) {
+        span.setStatus({
+          code: SpanStatusCode.ERROR,
+          message: error instanceof Error ? error.message : "Unknown error",
+        });
+        span.recordException(
+          error instanceof Error ? error : new Error(String(error))
+        );
+        throw error;
+      }
+    }
+  );
+};
 
 const decodeOpenTelemetryId = (id: unknown): string | null => {
-	if (typeof id === "string") {
-		return id;
-	}
-	if (id && typeof id === "object" && id.constructor === Uint8Array) {
-		return Buffer.from(id as Uint8Array).toString("hex");
-	}
+  if (typeof id === "string") {
+    return id;
+  }
+  if (id && typeof id === "object" && id.constructor === Uint8Array) {
+    return Buffer.from(id as Uint8Array).toString("hex");
+  }
 
-	return null;
-}
+  return null;
+};
 
 const convertFromUnixNano = (timeUnixNano: unknown): number => {
-	let unixNano: number;
-	
-	if (typeof timeUnixNano === "number") {
-		unixNano = timeUnixNano;
-	} else if (typeof timeUnixNano === "string") {
-		const parsed = parseInt(timeUnixNano, 10);
-		unixNano = !isNaN(parsed) ? parsed : Date.now() * 1000000;
-	} else if (timeUnixNano && typeof timeUnixNano === "object" && "low" in timeUnixNano && "high" in timeUnixNano) {
-		const { low = 0, high = 0 } = timeUnixNano as any;
-		unixNano = high * 0x100000000 + low;
-	} else {
-		unixNano = Date.now() * 1000000;
-	}
-	
-	// Convert nanoseconds to milliseconds
-	return Math.round(unixNano / 1000000);
-}
+  let unixNano: number;
+
+  if (typeof timeUnixNano === "number") {
+    unixNano = timeUnixNano;
+  } else if (typeof timeUnixNano === "string") {
+    const parsed = parseInt(timeUnixNano, 10);
+    unixNano = !isNaN(parsed) ? parsed : Date.now() * 1000000;
+  } else if (
+    timeUnixNano &&
+    typeof timeUnixNano === "object" &&
+    "low" in timeUnixNano &&
+    "high" in timeUnixNano
+  ) {
+    const { low = 0, high = 0 } = timeUnixNano as any;
+    unixNano = high * 0x100000000 + low;
+  } else {
+    unixNano = Date.now() * 1000000;
+  }
+
+  // Convert nanoseconds to milliseconds
+  return Math.round(unixNano / 1000000);
+};

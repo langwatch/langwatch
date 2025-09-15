@@ -8,21 +8,22 @@ import {
   VStack,
   Box,
 } from "@chakra-ui/react";
-import NextLink from "next/link";
 import React from "react";
-import { Plus } from "react-feather";
+import { Menu } from "../../components/ui/menu";
+import { Archive, MoreVertical, Plus } from "react-feather";
 import SettingsLayout from "../../components/SettingsLayout";
 import { ProjectTechStackIcon } from "../../components/TechStack";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import type {
   FullyLoadedOrganization,
-  TeamWithProjects,
+  TeamWithProjectsAndMembers,
 } from "../../server/api/routers/organization";
 import { TeamRoleGroup } from "../../server/api/permission";
 import { api } from "../../utils/api";
 import { trackEvent } from "../../utils/tracking";
 import { Link } from "../../components/ui/link";
 import { Tooltip } from "../../components/ui/tooltip";
+import { toaster } from "../../components/ui/toaster";
 
 export default function Projects() {
   const { organization } = useOrganizationTeamProject();
@@ -72,7 +73,7 @@ function ProjectsList({
                   <Table.Header key={team.id}>
                     <Table.Row>
                       <Table.ColumnHeader>{team.name}</Table.ColumnHeader>
-                      <Table.Cell textAlign="right">
+                      <Table.ColumnHeader textAlign="right">
                         {hasTeamPermission(
                           TeamRoleGroup.TEAM_CREATE_NEW_PROJECTS,
                           team
@@ -122,7 +123,7 @@ function ProjectsList({
                               </Link>
                             </Tooltip>
                           ))}
-                      </Table.Cell>
+                      </Table.ColumnHeader>
                     </Table.Row>
                   </Table.Header>
                   <TeamProjectsList team={team} />
@@ -136,24 +137,76 @@ function ProjectsList({
   );
 }
 
-export function TeamProjectsList({ team }: { team: TeamWithProjects }) {
+export function TeamProjectsList({
+  team,
+}: {
+  team: TeamWithProjectsAndMembers;
+}) {
+  const queryClient = api.useContext();
+  const { project, hasTeamPermission } = useOrganizationTeamProject();
+  const archiveProject = api.project.archiveById.useMutation({
+    onSuccess: () => {
+      toaster.create({
+        title: "Project archived successfully",
+        type: "success",
+      });
+      void queryClient.organization.getAll.invalidate();
+    },
+  });
+
+  const onArchiveProject = (projectId: string) => {
+    if (!project) return;
+    if (
+      confirm(
+        "Are you sure you want to archive this project? This action cannot be undone."
+      )
+    ) {
+      archiveProject.mutate({
+        projectId: project.id,
+        projectToArchiveId: projectId,
+      });
+    }
+  };
+
   return (
     <Table.Body>
-      {team.projects.map((project) => (
-        <Table.Row key={project.id}>
-          <Table.Cell colSpan={2}>
+      {team.projects.map((teamProject) => (
+        <Table.Row key={teamProject.id}>
+          <Table.Cell>
             <Box as="div" cursor="pointer">
-              <HStack width="full" gap={2} data-project-id={project.id}>
-                <ProjectTechStackIcon project={project} />
-                <Link href={`/${project.slug}/messages`}>{project.name}</Link>
+              <HStack width="full" gap={2} data-project-id={teamProject.id}>
+                <ProjectTechStackIcon project={teamProject} />
+                <Link href={`/${teamProject.slug}/messages`}>
+                  {teamProject.name}
+                </Link>
               </HStack>
             </Box>
+          </Table.Cell>
+          <Table.Cell textAlign="right">
+            {teamProject.id !== project?.id &&
+              hasTeamPermission(TeamRoleGroup.ARCHIVE_PROJECT, team) && (
+                <Menu.Root>
+                  <Menu.Trigger className="js-inner-menu">
+                    <MoreVertical size={18} />
+                  </Menu.Trigger>
+                  <Menu.Content className="js-inner-menu">
+                    <Menu.Item
+                      value="delete"
+                      color="red.500"
+                      onClick={() => onArchiveProject(teamProject.id)}
+                    >
+                      <Archive size={14} />
+                      Archive
+                    </Menu.Item>
+                  </Menu.Content>
+                </Menu.Root>
+              )}
           </Table.Cell>
         </Table.Row>
       ))}
       {team.projects.length === 0 && (
         <Table.Row>
-          <Table.Cell>
+          <Table.Cell colSpan={2}>
             <Text>No projects on this team</Text>
           </Table.Cell>
         </Table.Row>

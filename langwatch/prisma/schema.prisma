@@ -130,6 +130,7 @@ model Team {
     projects       Project[]
     createdAt      DateTime     @default(now())
     updatedAt      DateTime     @default(now()) @updatedAt
+    archivedAt     DateTime?
 
     @@index([organizationId])
 }
@@ -221,6 +222,7 @@ model Project {
     s3Bucket                 String?
     llmPromptConfigs         LlmPromptConfig[]
     analytics                Analytics[]
+    archivedAt               DateTime?
 
     @@index([teamId])
 }
