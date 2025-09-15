@@ -26,6 +26,8 @@ import { Checkbox } from "../ui/checkbox";
 import { Minus } from "react-feather";
 import { useDebounce } from "use-debounce";
 
+import { ExternalImage, getImageUrl } from "../ExternalImage";
+
 ModuleRegistry.registerModules([ClientSideRowModelModule]);
 
 export const JSONCellRenderer = (props: { value: string | undefined }) => {
@@ -39,9 +41,6 @@ export const JSONCellRenderer = (props: { value: string | undefined }) => {
 };
 
 export const ImageCellRenderer = (props: { value: string | undefined }) => {
-  const [imageError, setImageError] = useState(false);
-  const [imageLoading, setImageLoading] = useState(true);
-
   if (!props.value) {
     return <Text color="gray.500">No image</Text>;
   }
@@ -87,72 +86,21 @@ export const ImageCellRenderer = (props: { value: string | undefined }) => {
     );
   }
 
-  if (imageError) {
+  const imageUrl = getImageUrl(props.value);
+  if (imageUrl) {
     return (
-      <Box
-        height="100px"
-        width="150px"
-        borderRadius="md"
-        bg="red.50"
-        display="flex"
-        alignItems="center"
-        justifyContent="center"
-        border="1px solid"
-        borderColor="red.200"
-      >
-        <VStack gap={1}>
-          <Text fontSize="xs" color="red.600" textAlign="center">
-            Failed to load
-          </Text>
-          <Text
-            fontSize="xs"
-            color="red.500"
-            textAlign="center"
-            maxWidth="140px"
-            lineClamp={2}
-          >
-            {props.value}
-          </Text>
-        </VStack>
-      </Box>
-    );
-  }
-
-  return (
-    <Box
-      height="100px"
-      width="150px"
-      borderRadius="md"
-      overflow="hidden"
-      display="flex"
-      alignItems="center"
-      justifyContent="center"
-    >
-      {imageLoading && (
-        <Text fontSize="xs" color="gray.500">
-          Loading...
-        </Text>
-      )}
-      <Image
-        src={props.value}
-        alt="Dataset image"
-        width={150}
-        height={100}
-        style={{
-          objectFit: "contain",
-          borderRadius: "6px",
-          display: imageLoading ? "none" : "block",
-        }}
-        onLoad={() => {
-          setImageLoading(false);
-        }}
-        onError={(e) => {
-          setImageError(true);
-          setImageLoading(false);
-        }}
+      <ExternalImage
+        src={imageUrl}
+        minWidth="24px"
+        minHeight="24px"
+        maxHeight="120px"
+        maxWidth="100%"
+        dontLinkify
       />
-    </Box>
-  );
+    );
+  } else {
+    return <Text color="gray.500">Invalid image URL</Text>;
+  }
 };
 
 export type DatasetColumnDef = ColDef & { type_: DatasetColumnType };
