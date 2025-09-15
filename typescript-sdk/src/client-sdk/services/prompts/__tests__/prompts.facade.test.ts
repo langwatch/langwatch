@@ -6,12 +6,12 @@ import { mock, type MockProxy } from "vitest-mock-extended";
 import { type LocalPromptsService } from "../local-prompts.service";
 import { promptResponseFactory } from "../../../../../__tests__/factories/prompt.factory";
 import { Prompt } from "../prompt";
-import { localPromptFactory } from "../../../../../__tests__/factories/local-prompt.factory";
+import { localPromptConfigFactory } from "../../../../../__tests__/factories/local-prompt-config.factory";
 
 describe("PromptsFacade.get", () => {
   const localHandle = "test-prompt-local";
   const serverHandle = "test-prompt-server";
-  const mockLocalPrompt = localPromptFactory.build({ handle: localHandle });
+  const mockLocalPrompt = localPromptConfigFactory.build({ handle: localHandle });
   const mockServerPrompt = promptResponseFactory.build({ handle: serverHandle });
 
   let facade: PromptsFacade;

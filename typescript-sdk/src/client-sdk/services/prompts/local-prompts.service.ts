@@ -116,7 +116,8 @@ export class LocalPromptsService {
   private convertToPromptData(config: LocalPromptConfig & { handle: string; }): PromptData {
     const { modelParameters, ...rest } = config;
     return {
-      ...modelParameters,
+      maxTokens: modelParameters?.max_tokens,
+      temperature: modelParameters?.temperature,
       ...rest,
     };
   }

@@ -5,7 +5,7 @@ import { type LocalPromptConfig } from "../../src/cli/types";
  * Factory for creating LocalPromptConfig objects (local configuration structure)
  * Used for testing local prompt configuration and manipulation
  */
-export const localPromptFactory = Factory.define<LocalPromptConfig>(
+export const localPromptConfigFactory = Factory.define<LocalPromptConfig>(
   () => ({
     model: "gpt-5",
     modelParameters: {
