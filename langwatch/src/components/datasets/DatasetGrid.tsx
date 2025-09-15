@@ -97,6 +97,8 @@ export const ImageCellRenderer = (props: { value: string | undefined }) => {
         maxWidth="100%"
       />
     );
+  } else {
+    return <Text color="gray.500">Invalid image URL</Text>;
   }
 };
 
