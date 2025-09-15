@@ -45,6 +45,20 @@ export const getImageUrl = (str: unknown): string | null => {
       return str_;
     }
 
+    // Check for encoded URLs that might contain image data (like base64 encoded URLs)
+    // These often have long base64-like strings after the domain
+    const pathname = url_.pathname;
+    if (pathname && pathname.length > 50) {
+      // Check if the path looks like base64 encoded data (contains alphanumeric chars, +, /, =)
+      const base64LikePattern = /^[A-Za-z0-9+/=]+$/;
+      const pathSegments = pathname.split("/");
+      const lastSegment = pathSegments[pathSegments.length - 1];
+
+      if (base64LikePattern.test(lastSegment) && lastSegment.length > 20) {
+        return str_;
+      }
+    }
+
     return null;
   } catch {
     return null;
