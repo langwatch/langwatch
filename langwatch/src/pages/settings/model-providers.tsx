@@ -382,6 +382,8 @@ function ModelProviderForm({
     provider,
   });
 
+  const KEY_CHECK = ["KEY", "GOOGLE_APPLICATION_CREDENTIALS"];
+
   return (
     <Box
       width="full"
@@ -466,7 +468,11 @@ function ModelProviderForm({
                           <GridItem>
                             <Input
                               {...register(`customKeys.${key}`)}
-                              type={key.endsWith("KEY") ? "password" : "text"}
+                              type={
+                                KEY_CHECK.some((k) => key.includes(k))
+                                  ? "password"
+                                  : "text"
+                              }
                               autoComplete="off"
                               placeholder={
                                 (providerKeys as any)[key]._def.typeName ===
