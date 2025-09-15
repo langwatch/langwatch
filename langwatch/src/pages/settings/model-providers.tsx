@@ -44,6 +44,7 @@ import {
   DEFAULT_EMBEDDINGS_MODEL,
   DEFAULT_TOPIC_CLUSTERING_MODEL,
   DEFAULT_MODEL,
+  KEY_CHECK,
 } from "../../utils/constants";
 import { dependencies } from "../../injection/dependencies.client";
 
@@ -74,7 +75,7 @@ const handleCreateMultipleOptions = (
 
 export default function ModelsPage() {
   const { project, organizations } = useOrganizationTeamProject();
-  const modelProviders = api.modelProvider.getAllForProject.useQuery(
+  const modelProviders = api.modelProvider.getAllForProjectForFrontend.useQuery(
     { projectId: project?.id ?? "" },
     { enabled: !!project }
   );
@@ -466,6 +467,11 @@ function ModelProviderForm({
                           <GridItem>
                             <Input
                               {...register(`customKeys.${key}`)}
+                              type={
+                                KEY_CHECK.some((k) => key.includes(k))
+                                  ? "password"
+                                  : "text"
+                              }
                               autoComplete="off"
                               placeholder={
                                 (providerKeys as any)[key]._def.typeName ===
