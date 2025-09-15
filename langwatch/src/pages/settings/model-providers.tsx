@@ -44,6 +44,7 @@ import {
   DEFAULT_EMBEDDINGS_MODEL,
   DEFAULT_TOPIC_CLUSTERING_MODEL,
   DEFAULT_MODEL,
+  KEY_CHECK,
 } from "../../utils/constants";
 import { dependencies } from "../../injection/dependencies.client";
 
@@ -381,8 +382,6 @@ function ModelProviderForm({
     organizationId: organization?.id ?? "",
     provider,
   });
-
-  const KEY_CHECK = ["KEY", "GOOGLE_APPLICATION_CREDENTIALS"];
 
   return (
     <Box

@@ -12,6 +12,7 @@ import {
 } from "../../modelProviders/registry";
 import { prisma } from "../../db";
 import { dependencies } from "../../../injection/dependencies.server";
+import { KEY_CHECK } from "../../../utils/constants";
 
 export const modelProviderRouter = createTRPCRouter({
   getAllForProject: protectedProcedure
@@ -230,8 +231,6 @@ export const getProjectModelProviders = async (
     ...savedModelProviders,
   };
 };
-
-const KEY_CHECK = ["KEY", "GOOGLE_APPLICATION_CREDENTIALS"];
 
 // Frontend-only function that masks API keys for security
 export const getProjectModelProvidersForFrontend = async (
