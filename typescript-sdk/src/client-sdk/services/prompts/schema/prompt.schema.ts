@@ -1,6 +1,6 @@
 // TODO: Move these to their own files
 import { z } from "zod";
-import { PromptScope } from "@prisma/client";
+import { PromptScope } from "../constants";
 
 /**
  * Zod schema for message objects in prompts

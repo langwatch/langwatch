@@ -41,3 +41,6 @@ export type UpdatePromptBody = NonNullable<
 export type PromptResponse = NonNullable<
   paths["/api/prompts/{id}"]["get"]["responses"]["200"]["content"]["application/json"]
 >;
+
+// Extract the PromptScope type from the API client
+export type PromptScope = paths["/api/prompts"]["post"]["responses"]["200"]["content"]["application/json"]["scope"];
