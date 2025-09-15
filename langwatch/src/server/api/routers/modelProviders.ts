@@ -231,6 +231,8 @@ export const getProjectModelProviders = async (
   };
 };
 
+const KEY_CHECK = ["KEY", "GOOGLE_APPLICATION_CREDENTIALS"];
+
 // Frontend-only function that masks API keys for security
 export const getProjectModelProvidersForFrontend = async (
   projectId: string,
@@ -252,7 +254,7 @@ export const getProjectModelProvidersForFrontend = async (
           Object.entries(config.customKeys).map(([key, value]) => [
             key,
             // Only mask values that look like API keys (contain "_KEY" pattern)
-            value?.toString().includes("_KEY") ? "HAS_KEY" : value,
+            KEY_CHECK.some((k) => key.includes(k)) ? "HAS_KEY" : value,
           ])
         ),
       };
