@@ -9,13 +9,14 @@ import { Prompt } from "../prompt";
 import { localPromptFactory } from "../../../../../__tests__/factories/local-prompt.factory";
 
 describe("PromptsFacade.get", () => {
-  let facade: PromptsFacade;
-  let localPromptsService: MockProxy<LocalPromptsService>;
-  let promptsApiService: MockProxy<PromptsApiService>;
   const localHandle = "test-prompt-local";
   const serverHandle = "test-prompt-server";
   const mockLocalPrompt = localPromptFactory.build({ handle: localHandle });
   const mockServerPrompt = promptResponseFactory.build({ handle: serverHandle });
+
+  let facade: PromptsFacade;
+  let localPromptsService: MockProxy<LocalPromptsService>;
+  let promptsApiService: MockProxy<PromptsApiService>;
 
   beforeEach(() => {
     localPromptsService = mock<LocalPromptsService>();

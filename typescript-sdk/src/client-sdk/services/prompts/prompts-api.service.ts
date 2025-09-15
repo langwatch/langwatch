@@ -102,7 +102,7 @@ export class PromptsApiService {
    * @returns Raw PromptResponse data.
    * @throws {PromptsError} If the API call fails.
    */
-  async get(id: string, options?: { version?: string }): Promise<PromptResponse> {
+  get = async (id: string, options?: { version?: string }): Promise<PromptResponse> => {
     const { data, error } = await this.apiClient.GET(
       "/api/prompts/{id}",
       {
