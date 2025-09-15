@@ -45,17 +45,38 @@ export const getImageUrl = (str: unknown): string | null => {
       return str_;
     }
 
-    // Check for encoded URLs that might contain image data (like base64 encoded URLs)
-    // These often have long base64-like strings after the domain
+    // Check for encoded URLs that might contain image data
     const pathname = url_.pathname;
-    if (pathname && pathname.length > 50) {
-      // Check if the path looks like base64 encoded data (contains alphanumeric chars, +, /, =)
-      const base64LikePattern = /^[A-Za-z0-9+/=]+$/;
-      const pathSegments = pathname.split("/");
-      const lastSegment = pathSegments[pathSegments.length - 1];
-
-      if (base64LikePattern.test(lastSegment) && lastSegment.length > 20) {
+    if (pathname && pathname.length > 30) {
+      // Check if the URL path contains image-related keywords
+      const imageKeywords = /image|img|photo|pic|picture|media|content|upload/i;
+      if (imageKeywords.test(pathname)) {
         return str_;
+      }
+
+      // Check for base64-encoded segments that might contain image metadata
+      const pathSegments = pathname.split("/");
+      for (const segment of pathSegments) {
+        if (segment.length > 30 && /^[A-Za-z0-9+/=]+$/.test(segment)) {
+          try {
+            // Try to decode the base64 and check if it contains image-related data
+            const decoded = atob(segment);
+            const imageIndicators =
+              /image|jpg|jpeg|png|gif|webp|bmp|svg|bucket|key|content/i;
+
+            if (imageIndicators.test(decoded)) {
+              return str_;
+            }
+          } catch {
+            // If decoding fails, check for base64 characteristics
+            const hasEqualSigns = segment.includes("=");
+            const hasSlashOrPlus = /[+/]/.test(segment);
+
+            if (hasEqualSigns || hasSlashOrPlus) {
+              return str_;
+            }
+          }
+        }
       }
     }
 
