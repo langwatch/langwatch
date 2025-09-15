@@ -1,6 +1,6 @@
 export { PromptsFacade as PromptFacade } from "./prompts.facade";
-export { PromptsService } from "./service";
-export { type ConfigData, PromptsError, type SyncAction } from "./service";
+export { PromptsApiService } from "./prompts-api.service";
+export { type ConfigData, PromptsError, type SyncAction } from "./prompts-api.service";
 export {
   CompiledPrompt,
   Prompt,

@@ -1,11 +1,11 @@
-import { PromptsService, type SyncResult } from "./service";
+import { PromptsApiService, type SyncResult } from "./prompts-api.service";
 import { Prompt } from "./prompt";
 import type { CreatePromptBody, UpdatePromptBody } from "./types";
 import { type InternalConfig } from "@/client-sdk/types";
 import { LocalPromptsService } from "./local-prompts.service";
 
 interface PromptsFacadeDependencies {
-  promptsService: PromptsService;
+  promptsService: PromptsApiService;
   localPromptsService: LocalPromptsService;
 }
 
@@ -14,11 +14,11 @@ interface PromptsFacadeDependencies {
  * Provides a simplified interface for common prompt management tasks.
  */
 export class PromptsFacade {
-  private readonly promptsService: PromptsService;
+  private readonly promptsService: PromptsApiService;
   private readonly localPromptsService: LocalPromptsService;
 
   constructor(config: InternalConfig & PromptsFacadeDependencies) {
-    this.promptsService = config.promptsService ?? new PromptsService(config);
+    this.promptsService = config.promptsService ?? new PromptsApiService(config);
     this.localPromptsService = config.localPromptsService ?? new LocalPromptsService();
   }
 

@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { PromptsFacade } from "../prompts.facade";
 import type { InternalConfig } from "@/client-sdk/types";
-import { type PromptsService } from "../service";
+import { type PromptsApiService } from "../prompts-api.service";
 import { mock, type MockProxy } from "vitest-mock-extended";
 import { type LocalPromptsService } from "../local-prompts.service";
 import { promptResponseFactory } from "../../../../../__tests__/factories/prompt.factory";
@@ -10,7 +10,7 @@ import { Prompt } from "../prompt";
 describe("PromptsFacade.get", () => {
   let facade: PromptsFacade;
   let localPromptsService: MockProxy<LocalPromptsService>;
-  let promptsService: MockProxy<PromptsService>;
+  let promptsService: MockProxy<PromptsApiService>;
   const localHandle = "test-prompt-local";
   const serverHandle = "test-prompt-server";
   const mockLocalPrompt = promptResponseFactory.build({ handle: localHandle });
@@ -18,7 +18,7 @@ describe("PromptsFacade.get", () => {
 
   beforeEach(() => {
     localPromptsService = mock<LocalPromptsService>();
-    promptsService = mock<PromptsService>();
+    promptsService = mock<PromptsApiService>();
     facade = new PromptsFacade({
       localPromptsService,
       promptsService,
