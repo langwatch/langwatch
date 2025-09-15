@@ -1,10 +1,12 @@
 import { PromptsService, type SyncResult } from "./service";
-import type { Prompt } from "./prompt";
+import { Prompt } from "./prompt";
 import type { CreatePromptBody, UpdatePromptBody } from "./types";
 import { type InternalConfig } from "@/client-sdk/types";
+import { LocalPromptsService } from "./local-prompts.service";
 
 interface PromptsFacadeDependencies {
   promptsService: PromptsService;
+  localPromptsService: LocalPromptsService;
 }
 
 /**
@@ -13,9 +15,11 @@ interface PromptsFacadeDependencies {
  */
 export class PromptsFacade {
   private readonly promptsService: PromptsService;
+  private readonly localPromptsService: LocalPromptsService;
 
   constructor(config: InternalConfig & PromptsFacadeDependencies) {
     this.promptsService = config.promptsService ?? new PromptsService(config);
+    this.localPromptsService = config.localPromptsService ?? new LocalPromptsService();
   }
 
   /**
@@ -39,6 +43,10 @@ export class PromptsFacade {
     handleOrId: string,
     options?: { version?: string },
   ): Promise<Prompt | null> {
+    const localPrompt = await this.localPromptsService.get(handleOrId);
+    if (localPrompt) {
+      return new Prompt(localPrompt);
+    }
     return this.promptsService.get(handleOrId, options);
   }
 

@@ -1,5 +1,5 @@
 import type { LocalPromptConfig } from "@/cli/types";
-import type { FileManager } from "@/cli/utils/fileManager";
+import { FileManager } from "@/cli/utils/fileManager";
 
 export interface LocalPromptsServiceConfig {
   fileManager: typeof FileManager;
@@ -16,7 +16,7 @@ export interface LocalPromptsServiceConfig {
 export class LocalPromptsService {
   private readonly fileManager: typeof FileManager;
 
-  constructor(config: LocalPromptsServiceConfig) {
+  constructor(config: LocalPromptsServiceConfig = { fileManager: FileManager }) {
     this.fileManager = config.fileManager;
   }
 
