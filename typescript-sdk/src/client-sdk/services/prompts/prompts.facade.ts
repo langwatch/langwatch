@@ -5,7 +5,7 @@ import { type InternalConfig } from "@/client-sdk/types";
 import { LocalPromptsService } from "./local-prompts.service";
 
 interface PromptsFacadeDependencies {
-  promptsService: PromptsApiService;
+  promptsApiService: PromptsApiService;
   localPromptsService: LocalPromptsService;
 }
 
@@ -14,11 +14,11 @@ interface PromptsFacadeDependencies {
  * Provides a simplified interface for common prompt management tasks.
  */
 export class PromptsFacade {
-  private readonly promptsService: PromptsApiService;
+  private readonly promptsApiService: PromptsApiService;
   private readonly localPromptsService: LocalPromptsService;
 
   constructor(config: InternalConfig & PromptsFacadeDependencies) {
-    this.promptsService = config.promptsService ?? new PromptsApiService(config);
+    this.promptsApiService = config.promptsApiService ?? new PromptsApiService(config);
     this.localPromptsService = config.localPromptsService ?? new LocalPromptsService();
   }
 
@@ -29,7 +29,7 @@ export class PromptsFacade {
    * @throws {PromptsError} If the API call fails.
    */
   async create(data: CreatePromptBody): Promise<Prompt> {
-    return this.promptsService.create(data);
+    return this.promptsApiService.create(data);
   }
 
   /**
@@ -47,7 +47,8 @@ export class PromptsFacade {
     if (localPrompt) {
       return new Prompt(localPrompt);
     }
-    return this.promptsService.get(handleOrId, options);
+    const serverPrompt = await this.promptsApiService.get(handleOrId, options);
+    return new Prompt(serverPrompt);
   }
 
   /**
@@ -56,7 +57,7 @@ export class PromptsFacade {
    * @throws {PromptsError} If the API call fails.
    */
   async getAll(): Promise<Prompt[]> {
-    return this.promptsService.getAll();
+    return this.promptsApiService.getAll();
   }
 
   /**
@@ -67,7 +68,7 @@ export class PromptsFacade {
    * @throws {PromptsError} If the API call fails.
    */
   async update(handleOrId: string, newData: UpdatePromptBody): Promise<Prompt> {
-    return this.promptsService.update(handleOrId, newData);
+    return this.promptsApiService.update(handleOrId, newData);
   }
 
   /**
@@ -76,7 +77,7 @@ export class PromptsFacade {
    * @throws {PromptsError} If the API call fails.
    */
   async delete(handleOrId: string): Promise<{ success: boolean }> {
-    return this.promptsService.delete(handleOrId);
+    return this.promptsApiService.delete(handleOrId);
   }
 
   /**
@@ -91,6 +92,6 @@ export class PromptsFacade {
     localVersion?: number;
     commitMessage?: string;
   }): Promise<SyncResult> {
-    return this.promptsService.sync(params);
+    return this.promptsApiService.sync(params);
   }
 }

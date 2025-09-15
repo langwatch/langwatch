@@ -1,8 +1,7 @@
 import { type PromptsApiService } from "../prompts-api.service";
-import { type Prompt } from "../prompt";
 import type { LangWatchSpan } from "@/observability-sdk";
 import { shouldCaptureInput, shouldCaptureOutput } from "@/observability-sdk";
-import type { CreatePromptBody, UpdatePromptBody } from "../types";
+import type { CreatePromptBody, UpdatePromptBody, PromptResponse } from "../types";
 
 /**
  * Class that decorates the target prompt service,
@@ -15,7 +14,7 @@ export class PromptServiceTracingDecorator {
     span: LangWatchSpan,
     id: string,
     options?: { version?: string }
-  ): Promise<Prompt> {
+  ): Promise<PromptResponse> {
     span.setType("prompt");
     span.setAttribute('langwatch.prompt.id', id);
 
@@ -31,7 +30,7 @@ export class PromptServiceTracingDecorator {
     }
 
     if (result && shouldCaptureOutput()) {
-      span.setOutput("json", result.raw);
+      span.setOutput("json", result);
     }
 
     return result;
@@ -40,7 +39,7 @@ export class PromptServiceTracingDecorator {
   async create(
     span: LangWatchSpan,
     params: CreatePromptBody
-  ): Promise<Prompt> {
+  ): Promise<PromptResponse> {
     span.setType("prompt");
 
     if (shouldCaptureInput()) {
@@ -49,11 +48,13 @@ export class PromptServiceTracingDecorator {
 
     const result = await this.target.create(params);
 
-    span.setAttribute('langwatch.prompt.id', result.id);
-    span.setAttribute('langwatch.prompt.handle', result.handle ?? '');
-    span.setAttribute('langwatch.prompt.scope', result.scope);
-    span.setAttribute('langwatch.prompt.version.id', result.versionId);
-    span.setAttribute('langwatch.prompt.version.number', result.version);
+    span.setAttributes({
+      'langwatch.prompt.id': result.id,
+      'langwatch.prompt.handle': result.handle ?? undefined,
+      'langwatch.prompt.scope': result.scope,
+      'langwatch.prompt.version.id': result.versionId,
+      'langwatch.prompt.version.number': result.version,
+    });
 
     return result;
   }
@@ -62,7 +63,7 @@ export class PromptServiceTracingDecorator {
     span: LangWatchSpan,
     id: string,
     params: UpdatePromptBody
-  ): Promise<Prompt> {
+  ): Promise<PromptResponse> {
 
     if (shouldCaptureInput()) {
       span.setInput(params);
@@ -71,11 +72,13 @@ export class PromptServiceTracingDecorator {
     const result = await this.target.update(id, params);
 
     span.setType("prompt");
-    span.setAttribute('langwatch.prompt.id', id);
-    span.setAttribute('langwatch.prompt.handle', result.handle ?? '');
-    span.setAttribute('langwatch.prompt.scope', result.scope);
-    span.setAttribute('langwatch.prompt.version.id', result.versionId);
-    span.setAttribute('langwatch.prompt.version.number', result.version);
+    span.setAttributes({
+      'langwatch.prompt.id': id,
+      'langwatch.prompt.handle': result.handle ?? undefined,
+      'langwatch.prompt.scope': result.scope,
+      'langwatch.prompt.version.id': result.versionId,
+      'langwatch.prompt.version.number': result.version,
+    });
 
     return result;
   }
@@ -97,7 +100,7 @@ export class PromptServiceTracingDecorator {
     span: LangWatchSpan,
     handle: string,
     config: any
-  ): Promise<{ created: boolean; prompt: Prompt }> {
+  ): Promise<{ created: boolean; prompt: PromptResponse }> {
     if (shouldCaptureInput()) {
       span.setInput(config);
     }
@@ -105,11 +108,13 @@ export class PromptServiceTracingDecorator {
     const result = await this.target.upsert(handle, config);
 
     span.setType("prompt");
-    span.setAttribute('langwatch.prompt.handle', handle);
-    span.setAttribute('langwatch.prompt.created', result.created.toString());
-    span.setAttribute('langwatch.prompt.id', result.prompt.id);
-    span.setAttribute('langwatch.prompt.version.id', result.prompt.versionId);
-    span.setAttribute('langwatch.prompt.version.number', result.prompt.version);
+    span.setAttributes({
+      'langwatch.prompt.handle': handle,
+      'langwatch.prompt.created': result.created.toString(),
+      'langwatch.prompt.id': result.prompt.id,
+      'langwatch.prompt.version.id': result.prompt.versionId,
+      'langwatch.prompt.version.number': result.prompt.version,
+    });
 
     return result;
   }
@@ -129,9 +134,11 @@ export class PromptServiceTracingDecorator {
     span.setAttribute('langwatch.prompt.sync.action', result.action);
 
     if (result.conflictInfo) {
-      span.setAttribute('langwatch.prompt.sync.has_conflict', 'true');
-      span.setAttribute('langwatch.prompt.sync.local_version', result.conflictInfo.localVersion.toString());
-      span.setAttribute('langwatch.prompt.sync.remote_version', result.conflictInfo.remoteVersion.toString());
+      span.setAttributes({
+        'langwatch.prompt.sync.has_conflict': 'true',
+        'langwatch.prompt.sync.local_version': result.conflictInfo.localVersion.toString(),
+        'langwatch.prompt.sync.remote_version': result.conflictInfo.remoteVersion.toString(),
+      });
     }
 
     return result;

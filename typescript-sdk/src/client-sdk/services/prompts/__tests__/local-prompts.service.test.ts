@@ -2,11 +2,11 @@ import { describe, it, expect, beforeEach } from "vitest";
 import { LocalPromptsService } from "../local-prompts.service";
 import { type FileManager } from "@/cli/utils/fileManager";
 import { mock, type MockProxy } from "vitest-mock-extended";
-import { promptResponseFactory } from "../../../../../__tests__/factories/prompt.factory";
+import { localPromptFactory } from "../../../../../__tests__/factories/local-prompt.factory";
 
 describe("LocalPromptsService", () => {
   const handle = "my-handle";
-  const mockPrompt = promptResponseFactory.build({ handle });
+  const mockPrompt = localPromptFactory.build({ handle });
   let service: LocalPromptsService;
   let mockFileManager: MockProxy<typeof FileManager>;
 

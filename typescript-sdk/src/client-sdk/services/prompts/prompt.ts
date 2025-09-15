@@ -43,7 +43,7 @@ export class Prompt {
 
   constructor(data: PromptData) {
     // Validate input using Zod
-    const validationResult = promptDataSchema.safeParse(data);
+    const validationResult = promptDataSchema.strip().safeParse(data);
 
     if (!validationResult.success) {
       throw new PromptValidationError(

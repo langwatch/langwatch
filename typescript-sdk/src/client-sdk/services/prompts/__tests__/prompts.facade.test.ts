@@ -6,22 +6,23 @@ import { mock, type MockProxy } from "vitest-mock-extended";
 import { type LocalPromptsService } from "../local-prompts.service";
 import { promptResponseFactory } from "../../../../../__tests__/factories/prompt.factory";
 import { Prompt } from "../prompt";
+import { localPromptFactory } from "../../../../../__tests__/factories/local-prompt.factory";
 
 describe("PromptsFacade.get", () => {
   let facade: PromptsFacade;
   let localPromptsService: MockProxy<LocalPromptsService>;
-  let promptsService: MockProxy<PromptsApiService>;
+  let promptsApiService: MockProxy<PromptsApiService>;
   const localHandle = "test-prompt-local";
   const serverHandle = "test-prompt-server";
-  const mockLocalPrompt = promptResponseFactory.build({ handle: localHandle });
+  const mockLocalPrompt = localPromptFactory.build({ handle: localHandle });
   const mockServerPrompt = promptResponseFactory.build({ handle: serverHandle });
 
   beforeEach(() => {
     localPromptsService = mock<LocalPromptsService>();
-    promptsService = mock<PromptsApiService>();
+    promptsApiService = mock<PromptsApiService>();
     facade = new PromptsFacade({
       localPromptsService,
-      promptsService,
+      promptsApiService,
       langwatchApiClient: {} as InternalConfig["langwatchApiClient"],
       logger: {} as InternalConfig["logger"],
     });
@@ -37,8 +38,8 @@ describe("PromptsFacade.get", () => {
       const result = await facade.get(localHandle);
 
       // Assert
-      expect(result).toEqual(mockLocalPrompt);
-      expect(promptsService.get).not.toHaveBeenCalled();
+      expect(result).toEqual(new Prompt(mockLocalPrompt));
+      expect(promptsApiService.get).not.toHaveBeenCalled();
     });
   });
 
@@ -46,13 +47,13 @@ describe("PromptsFacade.get", () => {
     it("should check server", async () => {
       // Arrange
       localPromptsService.get.mockResolvedValue(null);
-      promptsService.get.mockResolvedValue(new Prompt(mockServerPrompt));
+      promptsApiService.get.mockResolvedValue(mockServerPrompt);
 
       // Act
-      const result = await facade.get("test-prompt");
+      const result = await facade.get(serverHandle);
 
       // Assert
-      expect(result).toEqual(mockServerPrompt);
+      expect(result).toEqual(new Prompt(mockServerPrompt));
     });
   });
 });

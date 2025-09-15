@@ -1,5 +1,5 @@
 import type { paths } from "@/internal/generated/openapi/api-client";
-import { Prompt, type PromptResponse } from "./prompt";
+import { type PromptResponse } from "./types";
 import { PromptConverter } from "@/cli/utils/promptConverter";
 import { PromptServiceTracingDecorator, tracer } from "./tracing";
 import { createTracingProxy } from "@/client-sdk/tracing/create-tracing-proxy";
@@ -47,14 +47,10 @@ export interface SyncResult {
  * - Creating prompt versions
  * - Error handling with contextual information
  *
- * All methods return Prompt instances, which encapsulate prompt data and template logic.
+ * All methods return raw PromptResponse data from the API.
  */
 export class PromptsApiService {
-  private config: InternalConfig;
-
-  constructor(config: InternalConfig) {
-    this.config = config;
-
+  constructor(private readonly config: Pick<InternalConfig, "langwatchApiClient">) {
     /**
      * Wraps the service in a tracing proxy via the decorator.
      */
@@ -85,23 +81,23 @@ export class PromptsApiService {
 
   /**
    * Fetches all prompts from the API.
-   * @returns Array of Prompt instances.
+   * @returns Array of raw PromptResponse data.
    * @throws {PromptsError} If the API call fails.
    */
-  async getAll(): Promise<Prompt[]> {
+  async getAll(): Promise<PromptResponse[]> {
     const { data, error } =
       await this.config.langwatchApiClient.GET("/api/prompts");
     if (error) this.handleApiError("fetch all prompts", error);
-    return data.map((promptData) => new Prompt(promptData));
+    return data;
   }
 
   /**
    * Fetches a single prompt by its ID.
    * @param id The prompt's unique identifier.
-   * @returns The Prompt instance.
+   * @returns Raw PromptResponse data.
    * @throws {PromptsError} If the API call fails.
    */
-  get = async (id: string, options?: { version?: string }): Promise<Prompt> => {
+  async get(id: string, options?: { version?: string }): Promise<PromptResponse> {
     const { data, error } = await this.config.langwatchApiClient.GET(
       "/api/prompts/{id}",
       {
@@ -115,7 +111,8 @@ export class PromptsApiService {
     if (error) {
       this.handleApiError(`fetch prompt with ID "${id}"`, error);
     }
-    return new Prompt(data);
+
+    return data;
   }
 
   /**
@@ -143,10 +140,10 @@ export class PromptsApiService {
   /**
    * Creates a new prompt.
    * @param params The prompt creation payload, matching the OpenAPI schema.
-   * @returns The created Prompt instance.
+   * @returns Raw PromptResponse data of the created prompt.
    * @throws {PromptsError} If the API call fails.
    */
-  async create(params: CreatePromptBody): Promise<Prompt> {
+  async create(params: CreatePromptBody): Promise<PromptResponse> {
     const { data, error } = await this.config.langwatchApiClient.POST(
       "/api/prompts",
       {
@@ -154,26 +151,24 @@ export class PromptsApiService {
       },
     );
     if (error) this.handleApiError("create prompt", error);
-    return new Prompt(data);
+    return data;
   }
 
   /**
    * Updates an existing prompt.
    * @param id The prompt's unique identifier.
    * @param params The update payload, matching the OpenAPI schema.
-   * @returns The updated Prompt instance.
+   * @returns Raw PromptResponse data of the updated prompt.
    * @throws {PromptsError} If the API call fails.
-   * @remarks
-   *   The API does not return the updated prompt directly, so this method fetches it after updating.
    */
-  async update(id: string, params: UpdatePromptBody): Promise<Prompt> {
+  async update(id: string, params: UpdatePromptBody): Promise<PromptResponse> {
     const { error, data: updatedPrompt } =
       await this.config.langwatchApiClient.PUT("/api/prompts/{id}", {
         params: { path: { id } },
         body: params,
       });
     if (error) this.handleApiError(`update prompt with ID "${id}"`, error);
-    return new Prompt(updatedPrompt);
+    return updatedPrompt;
   }
 
   /**
@@ -196,9 +191,10 @@ export class PromptsApiService {
   /**
    * Fetches all versions for a given prompt.
    * @param id The prompt's unique identifier.
+   * @returns Array of raw PromptResponse data for each version.
    * @throws {PromptsError} If the API call fails.
    */
-  async getVersions(id: string): Promise<Prompt[]> {
+  async getVersions(id: string): Promise<PromptResponse[]> {
     const { data, error } = await this.config.langwatchApiClient.GET(
       "/api/prompts/{id}/versions",
       {
@@ -208,14 +204,14 @@ export class PromptsApiService {
     if (error)
       this.handleApiError(`fetch versions for prompt with ID "${id}"`, error);
 
-    return data.map((version) => new Prompt(version));
+    return data;
   }
 
   /**
    * Upserts a prompt with local configuration - creates if doesn't exist, updates version if exists.
    * @param handle The prompt's handle/identifier.
    * @param config Local prompt configuration.
-   * @returns Object with created flag and the prompt instance.
+   * @returns Object with created flag and raw PromptResponse data.
    * @throws {PromptsError} If the API call fails.
    */
   async upsert(
@@ -231,8 +227,8 @@ export class PromptsApiService {
         content: string;
       }>;
     },
-  ): Promise<{ created: boolean; prompt: Prompt }> {
-    const payload: CreatePromptBody = {
+  ): Promise<{ created: boolean; prompt: PromptResponse }> {
+    const payload = {
       handle,
       model: config.model,
       prompt: PromptConverter.extractSystemPrompt(config.messages),
@@ -242,7 +238,7 @@ export class PromptsApiService {
       inputs: [{ identifier: "input", type: "str" as const }],
       outputs: [{ identifier: "output", type: "str" as const }],
       commitMessage: `Updated via CLI sync`,
-      schemaVersion: "1.0",
+      schemaVersion: "1.0" as const,
     };
 
     // Creating a prompt with the same handle will fail, so we try to update instead
@@ -253,7 +249,7 @@ export class PromptsApiService {
         prompt,
       };
     } catch {
-      const prompt = await this.update(handle, payload as UpdatePromptBody);
+      const prompt = await this.update(handle, payload);
 
       return {
         created: false,
