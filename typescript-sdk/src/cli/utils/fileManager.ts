@@ -113,7 +113,7 @@ export class FileManager {
     return { created: false, path: lockPath };
   }
 
-  static loadLocalPrompt(filePath: string): LocalPromptConfig {
+  static loadLocalPrompt = (filePath: string): LocalPromptConfig => {
     const fullPath = path.resolve(filePath);
 
     if (!fs.existsSync(fullPath)) {

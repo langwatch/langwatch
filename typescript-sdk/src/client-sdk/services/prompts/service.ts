@@ -101,7 +101,7 @@ export class PromptsService {
    * @returns The Prompt instance.
    * @throws {PromptsError} If the API call fails.
    */
-  async get(id: string, options?: { version?: string }): Promise<Prompt> {
+  get = async (id: string, options?: { version?: string }): Promise<Prompt> => {
     const { data, error } = await this.config.langwatchApiClient.GET(
       "/api/prompts/{id}",
       {

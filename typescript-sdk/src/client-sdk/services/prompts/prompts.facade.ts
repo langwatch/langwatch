@@ -3,17 +3,19 @@ import type { Prompt } from "./prompt";
 import type { CreatePromptBody, UpdatePromptBody } from "./types";
 import { type InternalConfig } from "@/client-sdk/types";
 
+interface PromptsFacadeDependencies {
+  promptsService: PromptsService;
+}
+
 /**
  * Facade for prompt operations in the LangWatch SDK.
  * Provides a simplified interface for common prompt management tasks.
  */
 export class PromptsFacade {
-  private readonly service: PromptsService;
-  private readonly config: InternalConfig;
+  private readonly promptsService: PromptsService;
 
-  constructor(config: InternalConfig) {
-    this.config = config;
-    this.service = new PromptsService(config);
+  constructor(config: InternalConfig & PromptsFacadeDependencies) {
+    this.promptsService = config.promptsService ?? new PromptsService(config);
   }
 
   /**
@@ -23,7 +25,7 @@ export class PromptsFacade {
    * @throws {PromptsError} If the API call fails.
    */
   async create(data: CreatePromptBody): Promise<Prompt> {
-    return this.service.create(data);
+    return this.promptsService.create(data);
   }
 
   /**
@@ -37,7 +39,7 @@ export class PromptsFacade {
     handleOrId: string,
     options?: { version?: string },
   ): Promise<Prompt | null> {
-    return this.service.get(handleOrId, options);
+    return this.promptsService.get(handleOrId, options);
   }
 
   /**
@@ -46,7 +48,7 @@ export class PromptsFacade {
    * @throws {PromptsError} If the API call fails.
    */
   async getAll(): Promise<Prompt[]> {
-    return this.service.getAll();
+    return this.promptsService.getAll();
   }
 
   /**
@@ -57,7 +59,7 @@ export class PromptsFacade {
    * @throws {PromptsError} If the API call fails.
    */
   async update(handleOrId: string, newData: UpdatePromptBody): Promise<Prompt> {
-    return this.service.update(handleOrId, newData);
+    return this.promptsService.update(handleOrId, newData);
   }
 
   /**
@@ -66,7 +68,7 @@ export class PromptsFacade {
    * @throws {PromptsError} If the API call fails.
    */
   async delete(handleOrId: string): Promise<{ success: boolean }> {
-    return this.service.delete(handleOrId);
+    return this.promptsService.delete(handleOrId);
   }
 
   /**
@@ -81,6 +83,6 @@ export class PromptsFacade {
     localVersion?: number;
     commitMessage?: string;
   }): Promise<SyncResult> {
-    return this.service.sync(params);
+    return this.promptsService.sync(params);
   }
 }
