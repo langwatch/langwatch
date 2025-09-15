@@ -18,6 +18,7 @@
         "incremental": true,
         "noUncheckedIndexedAccess": true,
         "tsBuildInfoFile": "./tsconfig.tsbuildinfo",
+        "allowSyntheticDefaultImports": true,
         "paths": {
             "@/*": ["./src/*"]
         }

@@ -7,7 +7,7 @@
  * TODO: To run against the actual server locally, set CI=false
  */
 
-import { describe, expect, it, afterEach, beforeEach, afterAll } from "vitest";
+import { describe, expect, it, afterEach, beforeEach, afterAll, beforeAll } from "vitest";
 import * as fs from "fs";
 import * as path from "path";
 
@@ -39,6 +39,13 @@ describe("CLI E2E", () => {
   let materializedPromptFileManagement: PromptFileManager;
   let lockFileManager: LockFileManager;
   let cli: CliRunner;
+
+  beforeAll(() => {
+    // Clean up temporary directories before next run
+    if (fs.existsSync(TMP_BASE_DIR)) {
+      fs.rmSync(TMP_BASE_DIR, { recursive: true, force: true });
+    }
+  });
 
   beforeEach(() => {
     langwatch = new LangWatch();
@@ -182,6 +189,7 @@ describe("CLI E2E", () => {
 
         // First sync - should create on remote
         const sync1 = cli.run("prompt sync");
+        console.log(sync1);
         expectCliResultSuccess(sync1);
         const localPrompt =
           localPromptFileManagement.readPromptFile(promptHandle);

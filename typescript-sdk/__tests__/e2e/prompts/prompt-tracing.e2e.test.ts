@@ -35,6 +35,11 @@ describe("Prompt tracing", () => {
       getSpan = await findFinishedSpanByName("PromptsApiService.get");
     });
 
+    it('should create 1 span', () => {
+      const allSpans = spanExporter.getFinishedSpans();
+      expect(allSpans.length).toBe(1);
+    });
+
     it("should create a span with correct name", () => {
       expect(getSpan).toBeDefined();
     });

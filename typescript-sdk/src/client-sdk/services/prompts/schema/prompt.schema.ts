@@ -39,7 +39,7 @@ export const corePromptDataSchema = z.object({
 export const promptMetadataSchema = z.object({
   id: z.string().optional(),
   handle: z.string().nullable().optional(),
-  version: z.number().positive().optional(),
+  version: z.number().min(0).optional(),
   versionId: z.string().optional(),
   scope: z.enum(PromptScope).optional(),
 });
