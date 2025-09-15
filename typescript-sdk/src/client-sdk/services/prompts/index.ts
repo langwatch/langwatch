@@ -1,4 +1,4 @@
-export { PromptsFacade as PromptFacade } from "./facade";
+export { PromptsFacade as PromptFacade } from "./prompts.facade";
 export { PromptsService } from "./service";
 export { type ConfigData, PromptsError, type SyncAction } from "./service";
 export {
