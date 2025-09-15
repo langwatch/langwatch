@@ -47,9 +47,10 @@ jobs:
         # Check code style and catch potential errors with ESLint
         run: pnpm run lint
 
-      - name: Run typecheck
-        # Validate TypeScript types without emitting files
-        run: ./node_modules/.bin/tsgo --noEmit --project ./tsconfig.json
+      - name: Build
+        # Compile TypeScript and build production artifacts. When running this
+        # we don't need to also run the typecheck step.
+        run: pnpm run build
 
       - name: Run tests
         # Execute unit tests with Vitest
@@ -57,10 +58,6 @@ jobs:
           OPENAI_API_KEY: ${{ secrets.TYPESCRIPT_SDK_OPENAI_API_KEY }}
           LANGWATCH_API_KEY: ${{ secrets.TYPESCRIPT_SDK_LANGWATCH_API_KEY }}
         run: pnpm test
-
-      - name: Build
-        # Compile TypeScript and build production artifacts
-        run: pnpm run build
 
       - name: Run e2e tests
         # Execute end-to-end integration tests
