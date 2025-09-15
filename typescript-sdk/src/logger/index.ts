@@ -24,17 +24,17 @@ const logLevelOrder: Record<LogLevel, number> = {
 } as const;
 
 export interface Logger {
-  debug(message: string, ...args: unknown[]): void;
-  info(message: string, ...args: unknown[]): void;
-  warn(message: string, ...args: unknown[]): void;
-  error(message: string, ...args: unknown[]): void;
+  debug: (message: string, ...args: unknown[]) => void;
+  info: (message: string, ...args: unknown[]) => void;
+  warn: (message: string, ...args: unknown[]) => void;
+  error: (message: string, ...args: unknown[]) => void;
 }
 
 export class NoOpLogger implements Logger {
-  debug(): void { /* noop */ }
-  info(): void { /* noop */ }
-  warn(): void { /* noop */ }
-  error(): void { /* noop */ }
+  debug: () => void = () => { /* noop */ }
+  info: () => void = () => { /* noop */ }
+  warn: () => void = () => { /* noop */ }
+  error: () => void = () => { /* noop */ }
 }
 
 interface ConsoleLoggerOptions {
@@ -63,16 +63,16 @@ export class ConsoleLogger implements Logger {
     return this.prefix ? `[${this.prefix}] ${message}` : message;
   }
 
-  debug(message: string, ...args: unknown[]): void {
+  debug: (message: string, ...args: unknown[]) => void = (message: string, ...args: unknown[]): void => {
     if (this.shouldLog("debug")) console.debug(this.format(message), ...args);
-  }
-  info(message: string, ...args: unknown[]): void {
+  };
+  info: (message: string, ...args: unknown[]) => void = (message: string, ...args: unknown[]): void => {
     if (this.shouldLog("info")) console.info(this.format(message), ...args);
-  }
-  warn(message: string, ...args: unknown[]): void {
+  };
+  warn: (message: string, ...args: unknown[]) => void = (message: string, ...args: unknown[]): void => {
     if (this.shouldLog("warn")) console.warn(this.format(message), ...args);
   }
-  error(message: string, ...args: unknown[]): void {
+  error: (message: string, ...args: unknown[]) => void = (message: string, ...args: unknown[]): void => {
     if (this.shouldLog("error")) console.error(this.format(message), ...args);
   }
 }

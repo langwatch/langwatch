@@ -1,8 +1,10 @@
-import type { LocalPromptConfig } from "@/cli/types";
+import type { LocalPromptConfig, PromptDependency } from "@/cli/types";
 import { FileManager } from "@/cli/utils/fileManager";
+import { type Logger, NoOpLogger } from "@/logger";
 
 export interface LocalPromptsServiceConfig {
-  fileManager: typeof FileManager;
+  fileManager?: typeof FileManager;
+  logger?: Logger;
 }
 
 /**
@@ -15,9 +17,11 @@ export interface LocalPromptsServiceConfig {
  */
 export class LocalPromptsService {
   private readonly fileManager: typeof FileManager;
+  private readonly logger: Logger;
 
-  constructor(config: LocalPromptsServiceConfig = { fileManager: FileManager }) {
-    this.fileManager = config.fileManager;
+  constructor(config?: LocalPromptsServiceConfig) {
+    this.fileManager = config?.fileManager ?? FileManager;
+    this.logger = config?.logger ?? new NoOpLogger();
   }
 
   /**
@@ -26,12 +30,20 @@ export class LocalPromptsService {
    */
   async get(handleOrId: string): Promise<LocalPromptConfig | null> {
     try {
+      const dependency = await this.getDependencyFromConfig(handleOrId);
+
+      // If no dependency is found, it means it's not a local prompt
+      if (!dependency) {
+        return null;
+      }
+
       return (
-        (await this.getFromConfig(handleOrId)) ??
+        (await this.getFromConfig(dependency)) ??
         (await this.getFromLockFile(handleOrId)) ??
         (await this.getFromLocalFiles(handleOrId))
       );
-    } catch (_error) {
+    } catch (error) {
+      this.logger.warn(`Failed to get prompt "${handleOrId}": ${error instanceof Error ? error.message : String(error)}`);
       return null;
     }
   }
@@ -40,12 +52,9 @@ export class LocalPromptsService {
    * Searches for prompt using explicit file mapping in prompts.json.
    * Looks for dependencies with a 'file' property pointing to a specific path.
    */
-  private async getFromConfig(handleOrId: string): Promise<LocalPromptConfig | null> {
-    const config = this.fileManager.loadPromptsConfig();
-    const dependency = config.prompts[handleOrId];
-
-    if (dependency && typeof dependency === 'object' && dependency.file) {
-      return this.fileManager.loadLocalPrompt(dependency.file);
+  private async getFromConfig(dependency: PromptDependency): Promise<LocalPromptConfig | null> {
+    if (typeof dependency === 'string' && dependency.startsWith('file:')) {
+      return this.fileManager.loadLocalPrompt(dependency.slice(5));
     }
 
     return null;
@@ -82,5 +91,15 @@ export class LocalPromptsService {
     }
 
     return null;
+  }
+
+  /**
+   * Get dependency from config
+   */
+  private async getDependencyFromConfig(handleOrId: string): Promise<PromptDependency | null> {
+    const config = this.fileManager.loadPromptsConfig();
+    const dependency = config.prompts[handleOrId];
+
+    return dependency ?? null;
   }
 }

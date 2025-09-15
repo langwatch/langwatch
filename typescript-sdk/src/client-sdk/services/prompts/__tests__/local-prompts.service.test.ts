@@ -3,85 +3,182 @@ import { LocalPromptsService } from "../local-prompts.service";
 import { type FileManager } from "@/cli/utils/fileManager";
 import { mock, type MockProxy } from "vitest-mock-extended";
 import { localPromptFactory } from "../../../../../__tests__/factories/local-prompt.factory";
+import { type Logger } from "@/logger";
+import { type LocalPromptConfig } from "@/cli/types";
 
 describe("LocalPromptsService", () => {
   const handle = "my-handle";
   const mockPrompt = localPromptFactory.build({ handle });
   let service: LocalPromptsService;
   let mockFileManager: MockProxy<typeof FileManager>;
+  let mockLogger: MockProxy<Logger>;
 
   beforeEach(() => {
     mockFileManager = mock<typeof FileManager>();
-    const config = { fileManager: mockFileManager };
+    mockLogger = mock<Logger>();
+    const config = {
+      fileManager: mockFileManager,
+      logger: mockLogger,
+    };
     service = new LocalPromptsService(config);
   });
 
   describe("get", () => {
-    it("should return prompt from prompts config file mapping", async () => {
-      const filePath = "custom-path/my-prompt.prompt.yaml";
+    describe("when prompt has direct file path in config", () => {
+      it("should return prompt from the file", async () => {
+        const filePath = "custom-path/my-prompt.prompt.yaml";
 
-      mockFileManager.loadPromptsConfig.mockReturnValue({
-        prompts: {
-          [handle]: { file: filePath },
-        },
-      });
-
-      mockFileManager.loadLocalPrompt.mockReturnValue(mockPrompt);
-
-      // Act
-      const result = await service.get(handle);
-
-      // Assert
-      expect(result).toEqual(mockPrompt);
-      expect(mockFileManager.loadLocalPrompt).toHaveBeenCalledWith(
-        filePath,
-      );
-    });
-
-    it("should return prompt from lock file when not in config", async () => {
-      // Arrange
-      mockFileManager.loadPromptsConfig.mockReturnValue({ prompts: {} });
-      mockFileManager.loadPromptsLock.mockReturnValue({
-        lockfileVersion: 1,
-        prompts: {
-          [handle]: {
-            version: 1,
-            versionId: "abc123",
-            materialized: "prompts/.materialized/my-handle.prompt.yaml",
+        mockFileManager.loadPromptsConfig.mockReturnValue({
+          prompts: {
+            [handle]: `file:${filePath}`,
           },
-        },
+        });
+
+        mockFileManager.loadLocalPrompt.mockReturnValue(mockPrompt);
+
+        const result = await service.get(handle);
+
+        expect(result).toEqual(mockPrompt);
+        expect(mockFileManager.loadLocalPrompt).toHaveBeenCalledWith(filePath);
       });
-
-      mockFileManager.loadLocalPrompt.mockReturnValue(mockPrompt);
-
-      // Act
-      const result = await service.get("my-handle");
-
-      // Assert
-      expect(result).toEqual(mockPrompt);
-      expect(mockFileManager.loadLocalPrompt).toHaveBeenCalledWith(
-        "prompts/.materialized/my-handle.prompt.yaml",
-      );
     });
 
-    it("should scan local files when not found in config or lock", async () => {
-      // Arrange - fallback to file scanning
-      mockFileManager.loadPromptsConfig.mockReturnValue({ prompts: {} });
-      mockFileManager.loadPromptsLock.mockReturnValue({
-        lockfileVersion: 1,
-        prompts: {},
+    describe("when config has version reference", () => {
+      it("should return prompt from lock file materialized path", async () => {
+        mockFileManager.loadPromptsConfig.mockReturnValue({
+          prompts: {
+            [handle]: "1.2.3",
+          },
+        });
+        mockFileManager.loadPromptsLock.mockReturnValue({
+          lockfileVersion: 1,
+          prompts: {
+            [handle]: {
+              version: 1,
+              versionId: "abc123",
+              materialized: "prompts/.materialized/my-handle.prompt.yaml",
+            },
+          },
+        });
+
+        mockFileManager.loadLocalPrompt.mockReturnValue(mockPrompt);
+
+        const result = await service.get(handle);
+
+        expect(result).toEqual(mockPrompt);
+        expect(mockFileManager.loadLocalPrompt).toHaveBeenCalledWith(
+          "prompts/.materialized/my-handle.prompt.yaml",
+        );
       });
-      mockFileManager.getLocalPromptFiles.mockReturnValue([
-        "/prompts/my-handle.prompt.yaml",
-      ]);
-      mockFileManager.promptNameFromPath.mockReturnValue("my-handle");
-      mockFileManager.loadLocalPrompt.mockReturnValue(mockPrompt);
+    });
 
-      // Act
-      const result = await service.get("my-handle");
+    describe("when config has 'latest' reference", () => {
+      it("should return prompt from lock file materialized path", async () => {
+        mockFileManager.loadPromptsConfig.mockReturnValue({
+          prompts: {
+            [handle]: "latest",
+          },
+        });
+        mockFileManager.loadPromptsLock.mockReturnValue({
+          lockfileVersion: 1,
+          prompts: {
+            [handle]: {
+              version: 2,
+              versionId: "def456",
+              materialized: "prompts/.materialized/my-handle.prompt.yaml",
+            },
+          },
+        });
 
-      // Assert
-      expect(result).toEqual(mockPrompt);
+        mockFileManager.loadLocalPrompt.mockReturnValue(mockPrompt);
+
+        const result = await service.get(handle);
+
+        expect(result).toEqual(mockPrompt);
+        expect(mockFileManager.loadLocalPrompt).toHaveBeenCalledWith(
+          "prompts/.materialized/my-handle.prompt.yaml",
+        );
+      });
+    });
+
+    describe("when prompt is not referenced in config", () => {
+      it("should return null", async () => {
+        mockFileManager.loadPromptsConfig.mockReturnValue({ prompts: {} });
+
+        const result = await service.get(handle);
+
+        expect(result).toBeNull();
+        expect(mockFileManager.loadPromptsLock).not.toHaveBeenCalled();
+        expect(mockFileManager.getLocalPromptFiles).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("when explicitly referenced file fails to load", () => {
+      const filePath = "missing-file.prompt.yaml";
+      const errorMessage =
+        "Local prompt file not found: missing-file.prompt.yaml";
+      let result: LocalPromptConfig | null;
+
+      beforeEach(async () => {
+        mockFileManager.loadPromptsConfig.mockReturnValue({
+          prompts: {
+            [handle]: `file:${filePath}`,
+          },
+        });
+
+        mockFileManager.loadLocalPrompt.mockImplementation(() => {
+          throw new Error(errorMessage);
+        });
+        result = await service.get(handle);
+      });
+
+      it("should log warning", async () => {
+        expect(mockLogger.warn).toHaveBeenCalledWith(
+          `Failed to get prompt "${handle}": ${errorMessage}`,
+        );
+      });
+
+      it("should return null", async () => {
+        expect(result).toBeNull();
+      });
+    });
+
+    describe("when version reference fails to materialize", () => {
+      const errorMessage =
+        "Local prompt file not found: prompts/.materialized/my-handle.prompt.yaml";
+      let result: LocalPromptConfig | null;
+
+      beforeEach(async () => {
+        mockFileManager.loadPromptsConfig.mockReturnValue({
+          prompts: {
+            [handle]: "1.2.3",
+          },
+        });
+        mockFileManager.loadPromptsLock.mockReturnValue({
+          lockfileVersion: 1,
+          prompts: {
+            [handle]: {
+              version: 1,
+              versionId: "abc123",
+              materialized: "prompts/.materialized/my-handle.prompt.yaml",
+            },
+          },
+        });
+        mockFileManager.loadLocalPrompt.mockImplementation(() => {
+          throw new Error(errorMessage);
+        });
+        result = await service.get(handle);
+      });
+
+      it("should log warning", async () => {
+        expect(mockLogger.warn).toHaveBeenCalledWith(
+          `Failed to get prompt "${handle}": ${errorMessage}`,
+        );
+      });
+
+      it("should return null", async () => {
+        expect(result).toBeNull();
+      });
     });
   });
 });
