@@ -84,10 +84,12 @@ export const getProxiedImageUrl = (url: string): string => {
 export const ExternalImage = ({
   alt,
   src,
+  dontLinkify = false,
   ...props
 }: {
   alt?: string;
   src: string;
+  dontLinkify?: boolean;
   [key: string]: any;
 }) => {
   const [error, setError] = useState(false);
@@ -122,6 +124,17 @@ export const ExternalImage = ({
           />
         </Box>
       </Tooltip>
+    );
+  }
+
+  if (dontLinkify) {
+    return (
+      <Image
+        alt={alt}
+        onError={() => setError(true)}
+        src={proxiedSrc}
+        {...props}
+      />
     );
   }
 

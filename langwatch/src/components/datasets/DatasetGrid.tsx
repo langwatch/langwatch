@@ -95,6 +95,7 @@ export const ImageCellRenderer = (props: { value: string | undefined }) => {
         minHeight="24px"
         maxHeight="120px"
         maxWidth="100%"
+        dontLinkify
       />
     );
   } else {
