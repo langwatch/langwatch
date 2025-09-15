@@ -87,7 +87,6 @@ export const modelProviderRouter = createTRPCRouter({
         projectId,
         provider,
         enabled,
-        customKeys: validatedKeys as any,
         customModels,
         customEmbeddingsModels,
       };
@@ -102,14 +101,14 @@ export const modelProviderRouter = createTRPCRouter({
           });
 
       if (existingModelProvider) {
-        // Merge custom keys, preserving existing values when frontend sends "HAS_KEY"
-        let mergedCustomKeys = validatedKeys;
+        // Merge custom keys, preserving existing values when frontend sends "HAS_KEY" or dots
+        let mergedCustomKeys: Record<string, any> | null = validatedKeys;
         if (validatedKeys && existingModelProvider.customKeys) {
           mergedCustomKeys = {
             ...(existingModelProvider.customKeys as Record<string, any>),
             ...Object.fromEntries(
               Object.entries(validatedKeys).filter(
-                ([key, value]) => value !== "HAS_KEY"
+                ([_key, value]) => value !== "HAS_KEY••••••••••••••••••••••••"
               )
             ),
           };
@@ -267,7 +266,9 @@ export const getProjectModelProvidersForFrontend = async (
           Object.entries(config.customKeys).map(([key, value]) => [
             key,
             // Only mask values that look like API keys (contain "_KEY" pattern)
-            KEY_CHECK.some((k) => key.includes(k)) ? "HAS_KEY" : value,
+            KEY_CHECK.some((k) => key.includes(k))
+              ? "HAS_KEY••••••••••••••••••••••••"
+              : value,
           ])
         ),
       };
