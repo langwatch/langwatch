@@ -53,7 +53,6 @@
         "test": "vitest",
         "test:e2e": "vitest run -c ./vitest.e2e.config.mts",
         "prebuild": "pnpm i && pnpm run prepare",
-        "//build": "tsgo doesn't work here",
         "build": "tsc --noEmit && tsup",
         "typecheck": "tsgo --noEmit",
         "prepublish": "pnpm run build",

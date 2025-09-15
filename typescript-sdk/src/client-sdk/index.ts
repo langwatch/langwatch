@@ -4,8 +4,7 @@ import { type InternalConfig } from "./types";
 import { createLangWatchApiClient, type LangwatchApiClient } from "../internal/api/client";
 import { type Logger, NoOpLogger } from "../logger";
 import { TracesFacade } from "./services/traces/facade";
-import { getLangWatchTracer, type LangWatchTracer } from "@/observability-sdk";
-import { LANGWATCH_SDK_NAME_CLIENT, LANGWATCH_SDK_VERSION, DEFAULT_ENDPOINT } from "@/internal/constants";
+import { DEFAULT_ENDPOINT } from "@/internal/constants";
 
 export interface LangWatchConstructorOptions {
   apiKey?: string;
@@ -17,7 +16,6 @@ export interface LangWatchConstructorOptions {
 
 export class LangWatch {
   private readonly config: InternalConfig;
-  private readonly tracer: LangWatchTracer = getLangWatchTracer(LANGWATCH_SDK_NAME_CLIENT, LANGWATCH_SDK_VERSION);
 
   readonly prompts: PromptsFacade;
   readonly traces: TracesFacade;

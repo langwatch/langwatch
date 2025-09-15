@@ -230,10 +230,6 @@ export const syncCommand = async (): Promise<void> => {
             commitMessage: `Synced from local file: ${path.basename(filePath)}`,
           });
 
-          if (!syncResult.conflictInfo) {
-            throw new Error("Conflict info not found");
-          }
-
           const relativePath = path.relative(process.cwd(), filePath);
 
           let conflictResolution: "local" | "remote" | "abort" | null = null;
@@ -242,7 +238,7 @@ export const syncCommand = async (): Promise<void> => {
             pushSpinner.stop();
             conflictResolution = await handleConflict(
               promptName,
-              syncResult.conflictInfo
+              syncResult.conflictInfo!
             );
             if (conflictResolution === "abort") {
               result.errors.push({

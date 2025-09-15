@@ -12,16 +12,16 @@ import { DEFAULT_ENDPOINT } from "@/internal/constants";
 
 /**
  * Creates a new LangWatch API client.
- * @param apiKey - The API key to use for authentication.
- * @param endpoint - The endpoint to use for the API client.
+ * @param apiKey - The API key to use for authentication. Defaults to LANGWATCH_API_KEY environment variable.
+ * @param endpoint - The endpoint to use for the API client. Defaults to LANGWATCH_ENDPOINT environment variable or internal DEFAULT_ENDPOINT.
  * @returns A new LangWatch API client.
  */
 export const createLangWatchApiClient = (
-  apiKey?: string,
-  endpoint?: string
+  apiKey: string = process.env.LANGWATCH_API_KEY ?? "",
+  endpoint: string = process.env.LANGWATCH_ENDPOINT ?? DEFAULT_ENDPOINT,
 ) => {
   return openApiCreateClient<paths>({
-    baseUrl: endpoint ?? process.env.LANGWATCH_ENDPOINT ?? DEFAULT_ENDPOINT,
+    baseUrl: endpoint,
     headers: {
       ...(apiKey ? { authorization: `Bearer ${apiKey}`, 'x-auth-token': apiKey } : {}),
       "content-type": "application/json",

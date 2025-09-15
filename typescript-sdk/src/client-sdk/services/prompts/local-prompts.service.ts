@@ -1,6 +1,7 @@
 import type { LocalPromptConfig, PromptDependency } from "@/cli/types";
 import { FileManager } from "@/cli/utils/fileManager";
 import { type Logger, NoOpLogger } from "@/logger";
+import { type PromptData } from "./types";
 
 export interface LocalPromptsServiceConfig {
   fileManager?: typeof FileManager;
@@ -28,7 +29,7 @@ export class LocalPromptsService {
    * Retrieves a prompt using the configured search strategy.
    * Tries each source in priority order until found or all sources exhausted.
    */
-  async get(handleOrId: string): Promise<LocalPromptConfig | null> {
+  async get(handleOrId: string): Promise<PromptData | null> {
     try {
       const dependency = await this.getDependencyFromConfig(handleOrId);
 
@@ -37,16 +38,22 @@ export class LocalPromptsService {
         return null;
       }
 
-      return (
+      const localPromptConfig = (
         (await this.getFromConfig(dependency)) ??
         (await this.getFromLockFile(handleOrId)) ??
         (await this.getFromLocalFiles(handleOrId))
       );
+
+      return localPromptConfig ? this.convertToPromptData({
+        ...localPromptConfig,
+        handle: handleOrId,
+      }) : null;
     } catch (error) {
       this.logger.warn(`Failed to get prompt "${handleOrId}": ${error instanceof Error ? error.message : String(error)}`);
       return null;
     }
   }
+
 
   /**
    * Searches for prompt using explicit file mapping in prompts.json.
@@ -101,5 +108,16 @@ export class LocalPromptsService {
     const dependency = config.prompts[handleOrId];
 
     return dependency ?? null;
+  }
+
+  /**
+   * Converts LocalPromptConfig to PromptData format
+   */
+  private convertToPromptData(config: LocalPromptConfig & { handle: string; }): PromptData {
+    const { modelParameters, ...rest } = config;
+    return {
+      ...modelParameters,
+      ...rest,
+    };
   }
 }
