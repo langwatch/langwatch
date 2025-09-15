@@ -21,6 +21,28 @@
           "jsonpath": "$.version"
         }
       ]
+    },
+    "python-sdk": {
+      "release-type": "python",
+      "package-name": "langwatch",
+      "prerelease": true,
+      "component": "python-sdk",
+      "include-component-in-tag": true,
+      "tag-separator": "@",
+      "changelog-sections": [
+        {"type": "feat", "section": "Features"},
+        {"type": "fix", "section": "Bug Fixes"},
+        {"type": "chore", "section": "Miscellaneous", "hidden": false},
+        {"type": "docs", "section": "Documentation", "hidden": false},
+        {"type": "refactor", "section": "Code Refactoring", "hidden": false}
+      ],
+      "extra-files": [
+        {
+          "type": "generic",
+          "path": "src/langwatch/__version__.py",
+          "glob": true
+        }
+      ]
     }
   },
   "bootstrap-sha": "HEAD"
