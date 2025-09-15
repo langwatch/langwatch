@@ -102,10 +102,24 @@ export const modelProviderRouter = createTRPCRouter({
           });
 
       if (existingModelProvider) {
+        // Merge custom keys, preserving existing values when frontend sends "HAS_KEY"
+        let mergedCustomKeys = validatedKeys;
+        if (validatedKeys && existingModelProvider.customKeys) {
+          mergedCustomKeys = {
+            ...(existingModelProvider.customKeys as Record<string, any>),
+            ...Object.fromEntries(
+              Object.entries(validatedKeys).filter(
+                ([key, value]) => value !== "HAS_KEY"
+              )
+            ),
+          };
+        }
+
         return await ctx.prisma.modelProvider.update({
           where: { id: existingModelProvider.id, projectId },
           data: {
             ...data,
+            customKeys: mergedCustomKeys,
             customModels: customModels ? customModels : [],
             customEmbeddingsModels: customEmbeddingsModels
               ? customEmbeddingsModels
