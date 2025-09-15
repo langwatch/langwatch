@@ -29,7 +29,8 @@ export class PromptsFacade {
    * @throws {PromptsError} If the API call fails.
    */
   async create(data: CreatePromptBody): Promise<Prompt> {
-    return this.promptsApiService.create(data);
+    const serverPrompt = await this.promptsApiService.create(data);
+    return new Prompt(serverPrompt);
   }
 
   /**
@@ -57,7 +58,8 @@ export class PromptsFacade {
    * @throws {PromptsError} If the API call fails.
    */
   async getAll(): Promise<Prompt[]> {
-    return this.promptsApiService.getAll();
+    const serverPrompts = await this.promptsApiService.getAll();
+    return serverPrompts.map((prompt) => new Prompt(prompt));
   }
 
   /**
@@ -68,7 +70,8 @@ export class PromptsFacade {
    * @throws {PromptsError} If the API call fails.
    */
   async update(handleOrId: string, newData: UpdatePromptBody): Promise<Prompt> {
-    return this.promptsApiService.update(handleOrId, newData);
+    const serverPrompt = await this.promptsApiService.update(handleOrId, newData);
+    return new Prompt(serverPrompt);
   }
 
   /**
@@ -92,6 +95,7 @@ export class PromptsFacade {
     localVersion?: number;
     commitMessage?: string;
   }): Promise<SyncResult> {
-    return this.promptsApiService.sync(params);
+    const syncResult = await this.promptsApiService.sync(params);
+    return syncResult;
   }
 }

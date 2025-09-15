@@ -5,6 +5,7 @@ import { PromptServiceTracingDecorator, tracer } from "./tracing";
 import { createTracingProxy } from "@/client-sdk/tracing/create-tracing-proxy";
 import { type InternalConfig } from "@/client-sdk/types";
 import { type CreatePromptBody, type UpdatePromptBody } from "./types";
+import { createLangWatchApiClient, type LangwatchApiClient } from "@/internal/api/client";
 
 /**
  * Custom error class for Prompts API operations.
@@ -50,7 +51,11 @@ export interface SyncResult {
  * All methods return raw PromptResponse data from the API.
  */
 export class PromptsApiService {
-  constructor(private readonly config: Pick<InternalConfig, "langwatchApiClient">) {
+  private readonly apiClient: LangwatchApiClient;
+
+  constructor(config?: Pick<InternalConfig, "langwatchApiClient">) {
+    this.apiClient = config?.langwatchApiClient ?? createLangWatchApiClient();
+
     /**
      * Wraps the service in a tracing proxy via the decorator.
      */
@@ -86,7 +91,7 @@ export class PromptsApiService {
    */
   async getAll(): Promise<PromptResponse[]> {
     const { data, error } =
-      await this.config.langwatchApiClient.GET("/api/prompts");
+      await this.apiClient.GET("/api/prompts");
     if (error) this.handleApiError("fetch all prompts", error);
     return data;
   }
@@ -98,7 +103,7 @@ export class PromptsApiService {
    * @throws {PromptsError} If the API call fails.
    */
   async get(id: string, options?: { version?: string }): Promise<PromptResponse> {
-    const { data, error } = await this.config.langwatchApiClient.GET(
+    const { data, error } = await this.apiClient.GET(
       "/api/prompts/{id}",
       {
         params: { path: { id } },
@@ -144,7 +149,7 @@ export class PromptsApiService {
    * @throws {PromptsError} If the API call fails.
    */
   async create(params: CreatePromptBody): Promise<PromptResponse> {
-    const { data, error } = await this.config.langwatchApiClient.POST(
+    const { data, error } = await this.apiClient.POST(
       "/api/prompts",
       {
         body: params,
@@ -163,7 +168,7 @@ export class PromptsApiService {
    */
   async update(id: string, params: UpdatePromptBody): Promise<PromptResponse> {
     const { error, data: updatedPrompt } =
-      await this.config.langwatchApiClient.PUT("/api/prompts/{id}", {
+      await this.apiClient.PUT("/api/prompts/{id}", {
         params: { path: { id } },
         body: params,
       });
@@ -177,7 +182,7 @@ export class PromptsApiService {
    * @throws {PromptsError} If the API call fails.
    */
   async delete(id: string): Promise<{ success: boolean }> {
-    const { data, error } = await this.config.langwatchApiClient.DELETE(
+    const { data, error } = await this.apiClient.DELETE(
       "/api/prompts/{id}",
       {
         params: { path: { id } },
@@ -195,7 +200,7 @@ export class PromptsApiService {
    * @throws {PromptsError} If the API call fails.
    */
   async getVersions(id: string): Promise<PromptResponse[]> {
-    const { data, error } = await this.config.langwatchApiClient.GET(
+    const { data, error } = await this.apiClient.GET(
       "/api/prompts/{id}/versions",
       {
         params: { path: { id } },
@@ -268,7 +273,7 @@ export class PromptsApiService {
     commitMessage?: string;
   }): Promise<SyncResult> {
     try {
-      const response = await this.config.langwatchApiClient.POST(
+      const response = await this.apiClient.POST(
         "/api/prompts/{id}/sync",
         {
           params: { path: { id: params.name } },

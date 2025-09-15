@@ -1,4 +1,5 @@
-import { PromptFacade as PromptsFacade } from "./services/prompts";
+import { PromptsFacade, PromptsApiService } from "./services/prompts";
+import { LocalPromptsService } from "./services/prompts/local-prompts.service";
 import { type InternalConfig } from "./types";
 import { createLangWatchApiClient } from "../internal/api/client";
 import { type Logger, NoOpLogger } from "../logger";
@@ -30,8 +31,16 @@ export class LangWatch {
       options: options.options,
     });
 
-    this.prompts = new PromptsFacade(this.config);
+    this.prompts = new PromptsFacade({
+      promptsApiService: new PromptsApiService(this.config),
+      localPromptsService: new LocalPromptsService(),
+      ...this.config,
+    });
     this.traces = new TracesFacade(this.config);
+  }
+
+  get apiClient() {
+    return this.config.langwatchApiClient;
   }
 
   #createInternalConfig({
