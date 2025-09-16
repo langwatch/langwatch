@@ -110,11 +110,17 @@ export function EvaluatorPropertiesPanel({ node }: { node: Node<Evaluator> }) {
     void form.handleSubmit(onSubmit)();
   }, [form, onSubmit]);
 
-  const handleSubmitDebounced = useDebouncedCallback(handleSubmit_, 100);
+  const handleSubmitDebounced = useDebouncedCallback(handleSubmit_, 100, {
+    leading: true,
+    trailing: false,
+  });
+
   useEffect(() => {
-    form.watch(() => {
+    const subscription = form.watch(() => {
       handleSubmitDebounced();
     });
+
+    return () => subscription.unsubscribe();
   }, [form, handleSubmitDebounced]);
 
   const hasEvaluatorFields =
