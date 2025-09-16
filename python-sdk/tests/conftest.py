@@ -20,10 +20,10 @@ from fixtures import (
 __all__ = [
     "GetPromptResponseFactory",
     "cli_prompt_setup",
-    "empty_dir", 
+    "empty_dir",
     "clean_langwatch",
     "mock_config",
     "prompt_data",
-    "prompt", 
+    "prompt",
     "mock_api_response_for_tracing",
 ]

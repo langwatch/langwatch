@@ -20,7 +20,7 @@ fixtures/
 
 ### Core Prompt Fixtures (`prompts/prompt_fixtures.py`)
 - `mock_config` - Mock API response using factory
-- `prompt_data` - PromptData created from mock config  
+- `prompt_data` - PromptData created from mock config
 - `prompt` - Prompt instance created from PromptData
 - `mock_api_response_for_tracing` - Structured mock for tracing tests
 
@@ -31,7 +31,7 @@ fixtures/
 - `empty_dir` - Temporary empty directory
 - `clean_langwatch` - Clean LangWatch environment
 
-### CLI Fixtures (`prompts/cli.py`) 
+### CLI Fixtures (`prompts/cli.py`)
 - `cli_prompt_setup` - CLI environment setup
 
 ### Tracing Fixtures (`span_exporter.py`)

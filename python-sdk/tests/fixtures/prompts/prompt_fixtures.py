@@ -43,11 +43,11 @@ def mock_api_response_for_tracing():
     mock_response.temperature = 0.7
     mock_response.max_tokens = None
     mock_response.response_format = None
-    
+
     # Mock messages as an iterable
     mock_msg = Mock()
     mock_msg.role.value = "system"
     mock_msg.content = "You are helpful"
     mock_response.messages = [mock_msg]
-    
+
     return mock_response
