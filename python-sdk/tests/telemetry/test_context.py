@@ -55,9 +55,7 @@ class TestContext(unittest.TestCase):
         mock_warn: MagicMock,
     ):
         mock_trace_instance = MagicMock(spec=LangWatchTrace)
-        mock_lw_trace_constructor.return_value.__enter__.return_value = (
-            mock_trace_instance
-        )
+        mock_lw_trace_constructor.return_value = mock_trace_instance
 
         trace = telemetry_context.get_current_trace(start_if_none=True)
 
@@ -67,7 +65,8 @@ class TestContext(unittest.TestCase):
             "No trace in context when calling langwatch.get_current_trace(), perhaps you forgot to use @langwatch.trace()?",
         )
         mock_lw_trace_constructor.assert_called_once()
-        mock_lw_trace_constructor.return_value.__enter__.assert_called_once()
+        mock_trace_instance.__enter__.assert_called_once()
+        mock_trace_instance.__exit__.assert_called_once_with(None, None, None)
 
     @patch("langwatch.telemetry.context.warnings.warn")
     @patch("langwatch.telemetry.context.ensure_setup")

@@ -69,6 +69,11 @@ def get_current_span() -> "LangWatchSpan":
         A LangWatchSpan.
     """
     ensure_setup()
+    
+    # First check if there's a span in the LangWatch context
+    span = stored_langwatch_span.get(None)
+    if span is not None:
+        return span
 
     otel_span = trace_api.get_current_span()
     otel_span_id = otel_span.get_span_context().span_id
@@ -104,8 +109,11 @@ def _set_current_span(span: "LangWatchSpan"):
     if not _is_on_child_thread():
         main_thread_langwatch_span.append(span)
 
-    # Dummy token, just for the main thread span list
-    return "token"
+    try:
+        return stored_langwatch_span.set(span)
+    except Exception as e:
+        warnings.warn(f"Failed to set LangWatch span context: {e}")
+        return None
 
 
 def _reset_current_trace(token: contextvars.Token):
@@ -122,11 +130,19 @@ def _reset_current_trace(token: contextvars.Token):
             warnings.warn(f"Failed to reset LangWatch trace context: {e}")
 
 
-def _reset_current_span(_token: str):
+def _reset_current_span(token):
     global main_thread_langwatch_span
     if not _is_on_child_thread():
         if len(main_thread_langwatch_span) > 0:
             main_thread_langwatch_span.pop()
+
+    if token is not None:
+        try:
+            stored_langwatch_span.reset(token)
+        except Exception as e:
+            # Only warn if it's not a context error
+            if "different Context" not in str(e):
+                warnings.warn(f"Failed to reset LangWatch span context: {e}")
 
 
 def _is_on_child_thread() -> bool:
