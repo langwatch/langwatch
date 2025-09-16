@@ -21,7 +21,7 @@ from .local_loader import LocalPromptLoader
 from .types import MessageDict, InputDict, OutputDict
 
 
-class PromptService:
+class PromptsFacade:
     """
     Facade service for managing LangWatch prompts with guaranteed availability.
 
@@ -36,8 +36,8 @@ class PromptService:
         self._local_loader = LocalPromptLoader()
 
     @classmethod
-    def from_global(cls) -> "PromptService":
-        """Create a PromptService instance using the global LangWatch configuration."""
+    def from_global(cls) -> "PromptsFacade":
+        """Create a PromptsFacade instance using the global LangWatch configuration."""
         ensure_setup()
         instance = get_instance()
         if instance is None:

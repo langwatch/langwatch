@@ -1,5 +1,5 @@
 """
-Simple test for PromptService.get tracing functionality.
+Simple test for PromptsFacade.get tracing functionality.
 """
 
 import sys
