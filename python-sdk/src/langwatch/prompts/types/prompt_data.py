@@ -5,7 +5,20 @@ This module contains only the PromptData TypedDict with conversion methods,
 following the TypeScript PromptData interface structure.
 """
 
-from typing import TypedDict, Literal, Optional, Dict, Any, List
+from typing import TypedDict, Literal, Optional, List, TYPE_CHECKING, Union
+
+from langwatch.generated.langwatch_rest_api_client.models.get_api_prompts_by_id_response_200 import (
+    GetApiPromptsByIdResponse200,
+)
+from langwatch.generated.langwatch_rest_api_client.models.put_api_prompts_by_id_response_200 import (
+    PutApiPromptsByIdResponse200,
+)
+from langwatch.generated.langwatch_rest_api_client.models.post_api_prompts_response_200 import (
+    PostApiPromptsResponse200,
+)
+
+if TYPE_CHECKING:
+    from .structures import MessageDict, ResponseFormatDict
 
 
 class PromptData(TypedDict, total=False):
@@ -17,15 +30,13 @@ class PromptData(TypedDict, total=False):
 
     # === Core functionality (required) ===
     model: str
-    messages: List[Dict[str, Any]]  # Generic dict to avoid importing API types
+    messages: List[MessageDict]  # Use standardized message structure
 
     # === Optional core fields ===
     prompt: Optional[str]
     temperature: Optional[float]
     max_tokens: Optional[int]  # Note: using snake_case to match Python conventions
-    response_format: Optional[
-        Dict[str, Any]
-    ]  # Generic dict to avoid importing API types
+    response_format: Optional[ResponseFormatDict]  # Use standardized response format
 
     # === Optional identification (for tracing) ===
     id: Optional[str]
@@ -35,7 +46,13 @@ class PromptData(TypedDict, total=False):
     scope: Optional[Literal["PROJECT", "ORGANIZATION"]]
 
     @staticmethod
-    def from_api_response(response) -> "PromptData":
+    def from_api_response(
+        response: Union[
+            GetApiPromptsByIdResponse200,
+            PutApiPromptsByIdResponse200,
+            PostApiPromptsResponse200,
+        ],
+    ) -> "PromptData":
         """
         Create PromptData from API response object.
 
@@ -45,8 +62,8 @@ class PromptData(TypedDict, total=False):
         Returns:
             PromptData dictionary with converted fields
         """
-        # Import API types here to avoid circular imports
-        from .api import MessageDict, ResponseFormatDict
+        # Import standardized structures here to avoid circular imports
+        from .structures import MessageDict, ResponseFormatDict
 
         messages = []
         if response.messages:
@@ -74,50 +91,4 @@ class PromptData(TypedDict, total=False):
             version=response.version,
             version_id=response.version_id,
             scope=response.scope.value if response.scope else None,
-        )
-
-    @staticmethod
-    def from_local_file(
-        prompt_id: str, prompt_data: Dict[str, Any], prompt_info: Dict[str, Any]
-    ) -> "PromptData":
-        """
-        Create PromptData from local file data.
-
-        Args:
-            prompt_id: The prompt identifier
-            prompt_data: Raw prompt data from YAML file
-            prompt_info: Metadata from prompts-lock.json
-
-        Returns:
-            PromptData dictionary with converted fields
-        """
-        # Import API types here to avoid circular imports
-        from .api import MessageDict, ResponseFormatDict
-
-        messages = []
-        if "messages" in prompt_data:
-            messages = [
-                MessageDict(role=msg["role"], content=msg["content"])
-                for msg in prompt_data["messages"]
-            ]
-
-        # Convert response format if present
-        response_format = None
-        if "response_format" in prompt_data and prompt_data["response_format"]:
-            response_format = ResponseFormatDict(
-                type="json_schema", json_schema=prompt_data["response_format"]
-            )
-
-        return PromptData(
-            id=prompt_id,
-            handle=prompt_id,
-            model=prompt_data.get("model", "gpt-4"),
-            messages=messages,
-            prompt=prompt_data.get("prompt"),
-            temperature=prompt_data.get("temperature"),
-            max_tokens=prompt_data.get("max_tokens"),
-            response_format=response_format,
-            version=prompt_info.get("version", 0),
-            version_id=prompt_info.get("versionId", "local"),
-            scope="PROJECT",
         )

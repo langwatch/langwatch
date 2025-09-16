@@ -16,18 +16,7 @@ import warnings
 
 import yaml
 
-from langwatch.generated.langwatch_rest_api_client.models.get_api_prompts_by_id_response_200 import (
-    GetApiPromptsByIdResponse200,
-)
-from langwatch.generated.langwatch_rest_api_client.models.get_api_prompts_by_id_response_200_messages_item import (
-    GetApiPromptsByIdResponse200MessagesItem,
-)
-from langwatch.generated.langwatch_rest_api_client.models.get_api_prompts_by_id_response_200_messages_item_role import (
-    GetApiPromptsByIdResponse200MessagesItemRole,
-)
-from langwatch.generated.langwatch_rest_api_client.models.post_api_prompts_response_200_scope import (
-    PostApiPromptsResponse200Scope,
-)
+from .types import PromptData, MessageDict, ResponseFormatDict
 
 logger = logging.getLogger(__name__)
 
@@ -39,7 +28,7 @@ class LocalPromptLoader:
         """Initialize with base path (defaults to current working directory)."""
         self.base_path = base_path or Path.cwd()
 
-    def load_prompt(self, prompt_id: str) -> Optional[GetApiPromptsByIdResponse200]:
+    def load_prompt(self, prompt_id: str) -> Optional[PromptData]:
         """
         Load a prompt from local files.
 
@@ -138,11 +127,38 @@ class LocalPromptLoader:
                 )
                 return None
 
-            # Convert to API response format
+            # Build PromptData directly
             logger.info(
                 f"Successfully loaded prompt '{prompt_id}' from local file: {prompt_file_path}"
             )
-            return self._convert_to_api_response(prompt_id, prompt_data, prompt_info)
+
+            # Convert messages
+            messages = []
+            if "messages" in prompt_data:
+                messages = [
+                    MessageDict(role=msg["role"], content=msg["content"])
+                    for msg in prompt_data["messages"]
+                ]
+
+            # Convert response format if present
+            response_format = None
+            if "response_format" in prompt_data and prompt_data["response_format"]:
+                response_format = ResponseFormatDict(
+                    type="json_schema", json_schema=prompt_data["response_format"]
+                )
+
+            return PromptData(
+                handle=prompt_id,  # The prompt_id parameter is the handle
+                model=prompt_data["model"],  # Required field - let it fail if missing
+                messages=messages,
+                prompt=prompt_data.get("prompt"),
+                temperature=prompt_data.get("temperature"),
+                max_tokens=prompt_data.get("max_tokens"),
+                response_format=response_format,
+                version=prompt_info.get("version"),
+                version_id=prompt_info.get("versionId"),
+                # id and scope are not available in local files
+            )
 
         except Exception as e:
             # If any unexpected error occurs, warn and fall back to API
@@ -152,38 +168,3 @@ class LocalPromptLoader:
                 UserWarning,
             )
             return None
-
-    def _convert_to_api_response(
-        self, prompt_id: str, prompt_data: Dict[str, Any], prompt_info: Dict[str, Any]
-    ) -> GetApiPromptsByIdResponse200:
-        """Convert local prompt data to API response format."""
-
-        # Convert messages
-        messages = []
-        for msg in prompt_data.get("messages", []):
-            role_str = msg.get("role", "").lower()  # Use lowercase to match enum values
-            role = GetApiPromptsByIdResponse200MessagesItemRole(role_str)
-            messages.append(
-                GetApiPromptsByIdResponse200MessagesItem(
-                    role=role, content=msg.get("content", "")
-                )
-            )
-
-        # Create response object
-        return GetApiPromptsByIdResponse200(
-            id=prompt_id,
-            handle=prompt_id,
-            scope=PostApiPromptsResponse200Scope.PROJECT,
-            name=prompt_id,
-            updated_at="2023-01-01T00:00:00Z",
-            project_id="local",
-            organization_id="local",
-            version_id=prompt_info.get("versionId", "local"),
-            version=prompt_info.get("version", 0),
-            created_at="2023-01-01T00:00:00Z",
-            prompt=prompt_data.get("prompt", ""),
-            messages=messages,
-            inputs=[],
-            outputs=[],
-            model=prompt_data.get("model", "gpt-4"),
-        )

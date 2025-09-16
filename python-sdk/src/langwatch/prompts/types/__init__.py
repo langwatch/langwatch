@@ -8,8 +8,8 @@ organized by their purpose and scope.
 # Core prompt data structure
 from .prompt_data import PromptData
 
-# API-related types
-from .api import (
+# Standardized data structures
+from .structures import (
     MessageDict,
     InputDict,
     OutputDict,
