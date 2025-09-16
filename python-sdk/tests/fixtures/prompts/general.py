@@ -16,7 +16,7 @@ import langwatch
 def empty_dir():
     """
     Fixture that provides an empty temporary directory.
-    
+
     Useful for testing API fallback behavior when no local files exist.
     """
     with tempfile.TemporaryDirectory() as temp_dir:
@@ -27,7 +27,7 @@ def empty_dir():
 def clean_langwatch():
     """
     Fixture that ensures langwatch is properly initialized and cleaned up for each test.
-    
+
     This fixture:
     - Resets the global LangWatch instance before each test
     - Clears any cached prompts service

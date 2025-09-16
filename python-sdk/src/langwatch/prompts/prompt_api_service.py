@@ -83,7 +83,7 @@ class PromptApiService:
 
     Provides CRUD operations for prompts with proper error handling and response
     unwrapping. Uses TypedDict interfaces for clean, type-safe API.
-    
+
     This service handles only API operations and does not handle local file loading.
     """
 

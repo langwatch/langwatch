@@ -16,7 +16,7 @@ def cli_prompt_setup():
     """
     Fixture that creates a temporary directory with CLI-format prompt files.
     Returns the temp directory path and handles cleanup.
-    
+
     Creates the exact file structure that the TypeScript CLI generates:
     - prompts.json (configuration)
     - prompts-lock.json (materialized paths and versions)
