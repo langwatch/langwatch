@@ -58,13 +58,13 @@ messages:
 
     # Verify the result
     assert result is not None
-    assert result.id == "my-prompt"
-    assert result.model == "openai/gpt-4"
-    assert len(result.messages) == 2
-    assert result.messages[0].role.value == "system"  # Enum values are lowercase
-    assert result.messages[0].content == "You are a helpful assistant."
-    assert result.messages[1].role.value == "user"  # Enum values are lowercase
-    assert result.messages[1].content == "{{input}}"
+    assert result["handle"] == "my-prompt"  # Local files use handle, not id
+    assert result["model"] == "openai/gpt-4"
+    assert len(result["messages"]) == 2
+    assert result["messages"][0]["role"] == "system"
+    assert result["messages"][0]["content"] == "You are a helpful assistant."
+    assert result["messages"][1]["role"] == "user"
+    assert result["messages"][1]["content"] == "{{input}}"
 
 
 def test_load_prompt_returns_none_when_no_prompts_json():

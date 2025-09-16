@@ -10,23 +10,19 @@ from langwatch.attributes import AttributeKey
 from fixtures.span_exporter import MockSpanExporter, span_exporter
 
 
-def test_get_method_creates_trace_span(span_exporter: MockSpanExporter):
+def test_get_method_creates_trace_span(
+    span_exporter: MockSpanExporter, mock_api_response_for_tracing
+):
     """Test that PromptService.get creates a trace span"""
     # Setup mocks
     mock_client = Mock()
     service = PromptApiService(mock_client)
 
-    mock_config = Mock(
-        id="prompt_123",
-        version_id="prompt_version_3",
-        handle="prompt_123",
-    )
-
     with (
         patch("langwatch.prompts.prompt_api_service.get_api_prompts_by_id") as mock_api,
         patch(
             "langwatch.prompts.prompt_api_service.unwrap_response",
-            return_value=mock_config,
+            return_value=mock_api_response_for_tracing,
         ),
     ):
 

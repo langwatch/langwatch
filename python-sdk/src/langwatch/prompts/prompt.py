@@ -31,9 +31,10 @@ class Prompt:
     """
 
     def __init__(self, data: PromptData):
-        self._data = data
+        # Store raw data for backward compatibility
+        self._data = data.copy()
 
-        # Assign all data fields directly as instance attributes (like TypeScript Object.assign)
+        # Assign all fields directly as instance attributes
         for key, value in data.items():
             setattr(self, key, value)
 

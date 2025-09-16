@@ -5,7 +5,7 @@ This module contains only the PromptData TypedDict with conversion methods,
 following the TypeScript PromptData interface structure.
 """
 
-from typing import TypedDict, Literal, Optional, List, TYPE_CHECKING, Union
+from typing import TypedDict, Literal, Optional, List, Union
 
 from langwatch.generated.langwatch_rest_api_client.models.get_api_prompts_by_id_response_200 import (
     GetApiPromptsByIdResponse200,
@@ -17,8 +17,7 @@ from langwatch.generated.langwatch_rest_api_client.models.post_api_prompts_respo
     PostApiPromptsResponse200,
 )
 
-if TYPE_CHECKING:
-    from .structures import MessageDict, ResponseFormatDict
+from .structures import MessageDict, ResponseFormatDict
 
 
 class PromptData(TypedDict, total=False):

@@ -54,12 +54,13 @@ class PromptsFacade:
         You can optionally specify a version number to get a specific version of the prompt.
         """
         # Try to load from local files first
-        local_prompt = self._local_loader.load_prompt(prompt_id)
-        if local_prompt is not None:
-            return Prompt(local_prompt)
+        local_data = self._local_loader.load_prompt(prompt_id)
+        if local_data is not None:
+            return Prompt(local_data)
 
         # Fall back to API if not found locally
-        return self._api_service.get(prompt_id, version_number)
+        api_data = self._api_service.get(prompt_id, version_number)
+        return Prompt(api_data)
 
     def create(
         self,
@@ -86,7 +87,7 @@ class PromptsFacade:
         Returns:
             Prompt object containing the created prompt data
         """
-        return self._api_service.create(
+        data = self._api_service.create(
             handle=handle,
             author_id=author_id,
             scope=scope,
@@ -95,6 +96,7 @@ class PromptsFacade:
             inputs=inputs,
             outputs=outputs,
         )
+        return Prompt(data)
 
     def update(
         self,
@@ -121,7 +123,7 @@ class PromptsFacade:
         Returns:
             Prompt object containing the updated prompt data
         """
-        return self._api_service.update(
+        data = self._api_service.update(
             prompt_id_or_handle=prompt_id_or_handle,
             scope=scope,
             handle=handle,
@@ -130,6 +132,7 @@ class PromptsFacade:
             inputs=inputs,
             outputs=outputs,
         )
+        return Prompt(data)
 
     def delete(self, prompt_id: str) -> Dict[str, bool]:
         """Delete a prompt by its ID via API."""
