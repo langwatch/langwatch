@@ -101,6 +101,17 @@ class PromptService:
     @prompt_service_tracing.get
     def get(self, prompt_id: str, version_number: Optional[int] = None) -> Prompt:
         """Retrieve a prompt by its ID. You can optionally specify a version number to get a specific version of the prompt."""
+
+        # Try to load from local files first
+        from .local_loader import LocalPromptLoader
+
+        local_loader = LocalPromptLoader()
+        local_prompt = local_loader.load_prompt(prompt_id)
+
+        if local_prompt is not None:
+            return Prompt(local_prompt)
+
+        # Fall back to API if not found locally
         resp = get_api_prompts_by_id.sync_detailed(
             id=prompt_id,
             client=self._client,

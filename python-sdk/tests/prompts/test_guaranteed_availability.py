@@ -23,22 +23,13 @@ def test_prompts_get_checks_local_files_first(cli_prompt_setup: Path, clean_lang
         with patch("httpx.Client.request") as mock_request:
             mock_request.side_effect = httpx.ConnectError("Connection blocked for test")
 
-            try:
-                result = langwatch.prompts.get("my-prompt")
+            result = langwatch.prompts.get("my-prompt")
 
-                # If we get here, local file loading worked
-                assert result is not None
-                assert result.model == "openai/gpt-4"
-                # Verify no HTTP calls were made
-                mock_request.assert_not_called()
-
-            except httpx.ConnectError:
-                # Expected to fail until local file loading is implemented
-                import pytest
-
-                pytest.skip(
-                    "Local file loading not yet implemented - HTTP request attempted"
-                )
+            # If we get here, local file loading worked
+            assert result is not None
+            assert result.model == "openai/gpt-4"
+            # Verify no HTTP calls were made
+            mock_request.assert_not_called()
 
     finally:
         os.chdir(original_cwd)
