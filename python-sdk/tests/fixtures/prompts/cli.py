@@ -1,11 +1,14 @@
-# tests/fixtures/prompt_fixtures.py
+# tests/fixtures/prompts/cli.py
+"""
+CLI-specific fixtures for testing prompt functionality.
+
+These fixtures create temporary directories with CLI-format files exactly as
+the TypeScript CLI would generate them for guaranteed availability testing.
+"""
 import pytest
 import tempfile
 import json
-import os
 from pathlib import Path
-
-import langwatch
 
 
 @pytest.fixture
@@ -13,6 +16,11 @@ def cli_prompt_setup():
     """
     Fixture that creates a temporary directory with CLI-format prompt files.
     Returns the temp directory path and handles cleanup.
+    
+    Creates the exact file structure that the TypeScript CLI generates:
+    - prompts.json (configuration)
+    - prompts-lock.json (materialized paths and versions)
+    - prompts/my-prompt.prompt.yaml (actual prompt file)
     """
     with tempfile.TemporaryDirectory() as temp_dir:
         temp_path = Path(temp_dir)
@@ -52,35 +60,3 @@ messages:
         (prompts_dir / "my-prompt.prompt.yaml").write_text(prompt_content)
 
         yield temp_path
-
-
-@pytest.fixture
-def empty_dir():
-    """Fixture that provides an empty temporary directory."""
-    with tempfile.TemporaryDirectory() as temp_dir:
-        yield Path(temp_dir)
-
-
-@pytest.fixture
-def clean_langwatch():
-    """Fixture that ensures langwatch is properly initialized and cleaned up for each test."""
-    # Reset the global instance first
-    from langwatch.state import set_instance
-
-    set_instance(None)
-
-    # Clear any cached prompts before test
-    if "prompts" in langwatch.__dict__:
-        del langwatch.__dict__["prompts"]
-
-    # Setup langwatch client with test configuration
-    langwatch.setup(api_key="test-api-key", endpoint_url="http://localhost:3000")
-
-    yield
-
-    # Clean up after test
-    if "prompts" in langwatch.__dict__:
-        del langwatch.__dict__["prompts"]
-
-    # Reset the global instance
-    set_instance(None)
