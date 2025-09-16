@@ -6,10 +6,11 @@ import * as yaml from "js-yaml";
 import { PromptConverter } from "@/cli/utils/promptConverter";
 import {
   type ConfigData,
+  Prompt,
+  PromptsApiService,
   PromptsError,
   type SyncAction,
 } from "@/client-sdk/services/prompts";
-import { LangWatch } from "@/client-sdk";
 import type { SyncResult } from "../types";
 import { FileManager } from "../utils/fileManager";
 import { ensureProjectInitialized } from "../utils/init";
@@ -76,8 +77,8 @@ export const syncCommand = async (): Promise<void> => {
     // Check API key before doing anything else
     checkApiKey();
 
-    // Get LangWatch client
-    const langwatch = new LangWatch();
+    // Get prompts API service
+    const promptsApiService = new PromptsApiService();
 
     // Ensure project is initialized (prompts.json, lock file, directories)
     await ensureProjectInitialized(false); // Don't prompt for .gitignore in sync
@@ -124,7 +125,7 @@ export const syncCommand = async (): Promise<void> => {
           const lockEntry = lock.prompts[name];
 
           // Fetch the prompt from the API to check current version
-          const prompt = await langwatch.prompts.get(name);
+          const prompt = await promptsApiService.get(name);
 
           if (prompt) {
             // Check if we need to update (new version or not materialized)
@@ -222,7 +223,7 @@ export const syncCommand = async (): Promise<void> => {
           };
 
           // Use new sync API with conflict detection
-          const syncResult = await langwatch.prompts.sync({
+          const syncResult = await promptsApiService.sync({
             name: promptName,
             configData,
             localVersion: currentVersion,
@@ -298,7 +299,7 @@ export const syncCommand = async (): Promise<void> => {
               };
             } else {
               // User chose local - force push
-              const syncResult = await langwatch.prompts.update(promptName, {
+              const syncResult = await promptsApiService.update(promptName, {
                 ...localConfig,
                 commitMessage: `Synced from local file: ${path.basename(
                   filePath

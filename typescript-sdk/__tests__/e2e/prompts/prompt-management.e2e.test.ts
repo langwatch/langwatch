@@ -1,8 +1,22 @@
-import { describe, expect, it, beforeAll, beforeEach } from "vitest";
+import {
+  describe,
+  expect,
+  it,
+  beforeAll,
+  beforeEach,
+  afterEach,
+  vi,
+} from "vitest";
 import { getLangwatchSDK } from "../../helpers/get-sdk";
 import type { LangWatch } from "../../../dist/index.js";
 import { server } from "../setup/msw-setup";
-import { handles } from "./handlers.js";
+import { handles, http } from "./handlers.js";
+import { type CliRunner } from "../cli/helpers/cli-runner.js";
+import {
+  createLocalPromptFile,
+  setupCliRunner,
+  teardownCliRunner,
+} from "./helpers";
 
 describe("Prompt management", () => {
   let langwatch: LangWatch;
@@ -17,11 +31,6 @@ describe("Prompt management", () => {
 
   beforeEach(() => {
     server.use(...handles);
-  });
-
-  it("get prompt", async () => {
-    const prompt = await langwatch.prompts.get("123");
-    expect(prompt?.id).toBe("123");
   });
 
   it("create prompt", async () => {
@@ -43,5 +52,53 @@ describe("Prompt management", () => {
   it("delete prompt", async () => {
     const result = await langwatch.prompts.delete("handle");
     expect(result).toEqual({ success: true });
+  });
+
+  describe("get prompt", () => {
+    describe("when no local prompt file is present", () => {
+      it("gets the server prompt", async () => {
+        const prompt = await langwatch.prompts.get("123");
+        expect(prompt?.id).toBe("123");
+      });
+    });
+
+    describe("when local prompt file is present", () => {
+      const handle = "my-test-prompt";
+      let testDir: string;
+      let originalCwd: string;
+      let cli: CliRunner;
+
+      beforeEach(() => {
+        const setupResult = setupCliRunner();
+        cli = setupResult.cli;
+        testDir = setupResult.testDir;
+        createLocalPromptFile({ handle, cli, testDir });
+        originalCwd = setupResult.originalCwd;
+        cli = setupResult.cli;
+      });
+
+      afterEach(async () => {
+        teardownCliRunner({ testDir, originalCwd });
+      });
+
+      describe("gets the local prompt", () => {
+        let prompt: any;
+
+        beforeEach(async () => {
+          prompt = await langwatch.prompts.get(handle);
+        });
+
+        it("should return prompt", async () => {
+          expect(prompt?.handle).toBe(handle);
+        });
+
+        it("should not call the api", async () => {
+          const mock = vi.fn();
+          server.use(http.get("/api/prompts/{id}", mock));
+          expect(prompt?.handle).toBe(handle);
+          expect(mock).not.toHaveBeenCalled();
+        });
+      });
+    });
   });
 });

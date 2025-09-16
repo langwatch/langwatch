@@ -1,5 +1,5 @@
 import { Factory } from "fishery";
-import type { PromptResponse } from "../../src/client-sdk/services/prompts/prompt";
+import type { PromptResponse } from "../../src/client-sdk/services/prompts/types";
 
 /**
  * Factory for creating PromptResponse objects (API response structure)

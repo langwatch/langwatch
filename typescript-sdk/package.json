@@ -53,8 +53,8 @@
         "test": "vitest",
         "test:e2e": "vitest run -c ./vitest.e2e.config.mts",
         "prebuild": "pnpm i && pnpm run prepare",
-        "build": "tsgo --noEmit && tsup",
-        "typecheck": "tsgo --noEmit",
+        "build": "tsc --noEmit && tsup",
+        "typecheck": "tsc --noEmit",
         "prepublish": "pnpm run build",
         "generate:openapi-types": "npx openapi-typescript ../langwatch/src/app/api/openapiLangWatch.json -o ./src/internal/generated/openapi/api-client.ts",
         "generate:server-types": "./copy-types.sh"
@@ -82,6 +82,7 @@
         "typescript": "^5.9.2",
         "typescript-eslint": "^8.38.0",
         "vitest": "^3.2.4",
+        "vitest-mock-extended": "^3.1.0",
         "yaml": "^2.8.1"
     },
     "dependencies": {

@@ -32,7 +32,12 @@ describe("Prompt tracing", () => {
     beforeEach(async () => {
       // Test template compilation
       await langwatch.prompts.get("prompt_123");
-      getSpan = await findFinishedSpanByName("PromptsService.get");
+      getSpan = await findFinishedSpanByName("PromptsApiService.get");
+    });
+
+    it('should create 1 span', () => {
+      const allSpans = spanExporter.getFinishedSpans();
+      expect(allSpans.length).toBe(1);
     });
 
     it("should create a span with correct name", () => {
