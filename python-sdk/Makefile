@@ -1,7 +1,18 @@
-.PHONY: test install example
+.PHONY: test test-tracing install example
 
-test:
-	LANGWATCH_API_KEY="testkey" PYTHONPATH=$$PYTHONPATH:. uv run pytest -s -vv -m "not integration" -k "not test_example" $(filter-out $@,$(MAKECMDGOALS))
+test: test-tracing
+	LANGWATCH_API_KEY="testkey" PYTHONPATH=$$PYTHONPATH:. uv run pytest -s -vv -m "not integration" -k "not test_example and not test_prompt_service_tracing and not test_prompt_tracing and not test_context and not test_tracing" $(filter-out $@,$(MAKECMDGOALS))
+
+# Run tracing tests in isolation to avoid global OpenTelemetry state conflicts
+test-tracing:
+	@echo "Running prompt service tracing tests..."
+	@LANGWATCH_API_KEY="testkey" PYTHONPATH=$$PYTHONPATH:. uv run pytest -s -vv tests/prompts/test_prompt_service_tracing.py
+	@echo "Running prompt tracing tests..."
+	@LANGWATCH_API_KEY="testkey" PYTHONPATH=$$PYTHONPATH:. uv run pytest -s -vv tests/prompts/test_prompt_tracing.py
+	@echo "Running telemetry context tests..."
+	@LANGWATCH_API_KEY="testkey" PYTHONPATH=$$PYTHONPATH:. uv run pytest -s -vv tests/telemetry/test_context.py
+	@echo "Running telemetry tracing tests..."
+	@LANGWATCH_API_KEY="testkey" PYTHONPATH=$$PYTHONPATH:. uv run pytest -s -vv tests/telemetry/test_tracing.py
 
 # Call it with `make test-examples -- -k examples/openai_bot.py` to run a specific example
 test-examples:

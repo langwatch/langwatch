@@ -32,7 +32,7 @@ def test_get_method_creates_trace_span(
         service.get("prompt_123")
 
         # Verify span was created
-        span = span_exporter.find_span_by_name("PromptService.get")
+        span = span_exporter.find_span_by_name("PromptApiService.get")
         assert span is not None
 
         # Type assertion for linter

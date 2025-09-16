@@ -65,7 +65,7 @@ class PromptServiceTracing:
     @staticmethod
     def _create_span_name(span_name: str) -> str:
         """Create a span name for the prompt"""
-        return "PromptService" + "." + span_name
+        return "PromptApiService" + "." + span_name
 
 
 prompt_service_tracing = PromptServiceTracing()
