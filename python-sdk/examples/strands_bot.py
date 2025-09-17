@@ -31,7 +31,6 @@ langwatch.setup()  # The api key is set from the environment variable automatica
 # langwatch.setup(skip_open_telemetry_setup=True)
 
 
-
 @tool
 @langwatch.span(type="tool")
 def get_user_location() -> str:
@@ -41,21 +40,24 @@ def get_user_location() -> str:
     return "London, UK"
 
 
+model_id = "openai/gpt-5-mini"
+
+
 class KiteAgent:
     def __init__(self):
         self.model = LiteLLMModel(
             client_args={
                 "api_key": os.getenv("OPENAI_API_KEY"),
             },
-            model_id="openai/gpt-5-mini",
+            model_id=model_id,
         )
         self.agent = Agent(
-            name="kite-agent",
+            # name="kite-agent", // Name parameter is not supported
             model=self.model,
             system_prompt="Always use the get_user_location tool before answering any questions.",
             tools=[get_user_location],
             trace_attributes={
-                "custom.model_id": "openai/gpt-5-mini",
+                "custom.model_id": model_id,
                 "custom.example.attribute": "swift",
             },
         )

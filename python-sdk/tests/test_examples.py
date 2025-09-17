@@ -147,14 +147,42 @@ async def test_example(example_file: str):
                     main_func(mock_message)
         except Exception as e:
             if str(e) != "This exception will be captured by LangWatch automatically":
-                # Handle ColBERTv2 service errors gracefully
-                if "opentelemetry/openinference_dspy_bot.py" in example_file and (
-                    "'topk'" in str(e) or "KeyError" in str(e)
-                ):
-                    pytest.skip(f"ColBERTv2 service temporarily unavailable: {e!s}")
+                # Handle ColBERTv2 service errors gracefully - but first debug what's wrong
+                if (
+                    "opentelemetry/openinference_dspy_bot.py" in example_file
+                    or "dspy_bot.py" in example_file
+                ) and ("'topk'" in str(e) or "KeyError" in str(e)):
+                    # Debug: Let's see what the ColBERTv2 service is actually returning
+                    import requests
+
+                    try:
+                        test_response = requests.get(
+                            "http://20.102.90.50:2017/wiki17_abstracts",
+                            params={"query": "test", "k": 1},
+                            timeout=10,
+                        )
+                        print(
+                            f"ColBERTv2 service response status: {test_response.status_code}"
+                        )
+                        print(
+                            f"ColBERTv2 service response headers: {test_response.headers}"
+                        )
+                        print(f"ColBERTv2 service response body: {test_response.text}")
+                        try:
+                            response_json = test_response.json()
+                            print(
+                                f"ColBERTv2 service JSON keys: {list(response_json.keys()) if isinstance(response_json, dict) else 'Not a dict'}"
+                            )
+                        except Exception as json_err:
+                            print(f"ColBERTv2 service JSON parse error: {json_err}")
+                    except Exception as req_err:
+                        print(f"ColBERTv2 service request error: {req_err}")
+
+                    pytest.fail(
+                        f"ColBERTv2 service error in {example_file}: {e!s} - See debug output above"
+                    )
                 else:
                     pytest.fail(f"Error running main function in {example_file}: {e!s}")
-
         trace.send_spans()
         trace_urls[example_file] = trace.share()
         print(json.dumps(trace_urls, indent=2))
