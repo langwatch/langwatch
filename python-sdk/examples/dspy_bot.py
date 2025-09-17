@@ -10,7 +10,7 @@ import langwatch
 import dspy
 
 
-lm = dspy.LM("openai/gpt-5", api_key=os.environ["OPENAI_API_KEY"], temperature=1)
+lm = dspy.LM("openai/gpt-4o-mini", api_key=os.environ["OPENAI_API_KEY"])
 
 colbertv2_wiki17_abstracts = dspy.ColBERTv2(
     url="http://20.102.90.50:2017/wiki17_abstracts"
