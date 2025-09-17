@@ -1,5 +1,8 @@
-from typing import List, Any, Dict, Union, Optional, cast
-from openai.types.chat import ChatCompletionMessageParam
+from typing import List, Any, Dict, Union, Optional, cast, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from openai.types.chat import ChatCompletionMessageParam
+
 from liquid import Environment, StrictUndefined, Undefined
 from liquid.exceptions import UndefinedError
 from .decorators.prompt_tracing import prompt_tracing
@@ -170,14 +173,14 @@ class CompiledPrompt:
         # Properties are delegated via __getattr__ below
 
     @property
-    def messages(self) -> List[ChatCompletionMessageParam]:
+    def messages(self) -> List["ChatCompletionMessageParam"]:
         """
         Returns the compiled messages as a list of ChatCompletionMessageParam objects.
         This is a convenience method to make the messages accessible as a list of
         ChatCompletionMessageParam objects, which is the format expected by the OpenAI API.
         """
         messages = [
-            cast(ChatCompletionMessageParam, msg) for msg in self._compiled_messages
+            cast("ChatCompletionMessageParam", msg) for msg in self._compiled_messages
         ]
 
         return messages
