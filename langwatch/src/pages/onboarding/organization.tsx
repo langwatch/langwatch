@@ -55,6 +55,7 @@ import {
 } from "react-icons/lu";
 import { toaster } from "~/components/ui/toaster";
 import { trackEventOnce } from "~/utils/tracking";
+import { AddMembersForm } from "../../components/AddMembersForm";
 
 type OrganizationFormData = {
   organizationName: string;
@@ -140,7 +141,27 @@ export default function OrganizationOnboarding() {
   const initializeOrganization =
     api.onboarding.initializeOrganization.useMutation();
   const apiContext = api.useContext();
+  const createInvitesMutation = api.organization.createInvites.useMutation();
+
   const [activeStep, setActiveStep] = React.useState(0);
+
+  const [organizationId, setOrganizationId] = React.useState<string | null>(
+    null
+  );
+
+  type TeamOption = { name: string; id: string };
+  const [teamOption, setTeamOption] = React.useState<TeamOption | null>(null);
+
+  const onSubmitAddMembers: SubmitHandler<MembersForm> = (data) => {
+    createInvitesMutation.mutate({
+      organizationId: organizationId ?? "",
+      invites: data.invites.map((invite) => ({
+        email: invite.email.toLowerCase(),
+        role: invite.role!.value as OrganizationUserRole,
+        teamIds: [teamOption?.id],
+      })),
+    });
+  };
 
   const onSubmit: SubmitHandler<OrganizationFormData> = (
     data: OrganizationFormData
@@ -158,11 +179,20 @@ export default function OrganizationOnboarding() {
       },
       {
         onSuccess: (response) => {
+          console.log(response);
           trackEventOnce("organization_initialized", {
             category: "onboarding",
             label: "organization_onboarding_completed",
           });
-          window.location.href = `/${response.projectSlug}/messages`;
+          setOrganizationId(response.organizationId);
+          setTeamOption({
+            name: response.teamName,
+            id: response.teamId,
+          });
+
+          setActiveStep(2);
+
+          // window.location.href = `/${response.projectSlug}/messages`;
         },
         onError: () => {
           toaster.create({
@@ -269,6 +299,13 @@ export default function OrganizationOnboarding() {
     }
 
     return companySize && yourRole && featureUsage;
+  };
+
+  const checkThirdStep = () => {
+    if (!isSaaS) return;
+    if (myselfSelected) return;
+
+    return true;
   };
 
   return (
@@ -619,6 +656,19 @@ export default function OrganizationOnboarding() {
                 </React.Fragment>
               )}
           </Steps.Root>
+
+          {activeStep === 2 && (
+            <AddMembersForm
+              teamOptions={[teamOption].map((team) => ({
+                label: team?.name ?? "",
+                value: team?.id ?? "",
+              }))}
+              onSubmit={onSubmitAddMembers}
+              isLoading={createInvitesMutation.isLoading}
+              hasEmailProvider={false}
+              //onClose={() => {}}
+            />
+          )}
 
           {initializeOrganization.error && <p>Something went wrong!</p>}
         </VStack>
