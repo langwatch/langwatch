@@ -16,7 +16,7 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { zodResolver } from "@hookform/resolvers/zod";
-import React, { useCallback } from "react";
+import React, { useCallback, useState, useEffect } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { z } from "zod";
 import { ProjectSelector } from "../../components/DashboardLayout";
@@ -184,6 +184,14 @@ function ModelProviderForm({
 }) {
   const { project, organization } = useOrganizationTeamProject();
 
+  // State for Azure API Gateway toggle
+  const [useApiGateway, setUseApiGateway] = useState(() => {
+    if (provider.provider === "azure" && provider.customKeys) {
+      return !!(provider.customKeys as any).AZURE_API_GATEWAY_BASE_URL;
+    }
+    return false;
+  });
+
   const localUpdateMutation = api.modelProvider.update.useMutation();
   const deleteMutation = api.modelProvider.delete.useMutation();
 
@@ -191,6 +199,29 @@ function ModelProviderForm({
     modelProvidersRegistry[
       provider.provider as keyof typeof modelProvidersRegistry
     ]!;
+
+  // Get filtered keys based on API Gateway toggle for Azure
+  const getFilteredKeys = (keys: Record<string, unknown>) => {
+    if (provider.provider === "azure") {
+      if (useApiGateway) {
+        // Show only API Gateway keys
+        return {
+          AZURE_API_GATEWAY_BASE_URL: keys.AZURE_API_GATEWAY_BASE_URL || "",
+          AZURE_API_GATEWAY_VERSION: keys.AZURE_API_GATEWAY_VERSION || "",
+          AZURE_API_GATEWAY_HEADER_NAME:
+            keys.AZURE_API_GATEWAY_HEADER_NAME || "",
+          AZURE_API_GATEWAY_HEADER_KEY: keys.AZURE_API_GATEWAY_HEADER_KEY || "",
+        };
+      } else {
+        // Show only regular Azure OpenAI keys
+        return {
+          AZURE_OPENAI_API_KEY: keys.AZURE_OPENAI_API_KEY || "",
+          AZURE_OPENAI_ENDPOINT: keys.AZURE_OPENAI_ENDPOINT || "",
+        };
+      }
+    }
+    return keys;
+  };
 
   const getStoredModelOptions = (
     models: string[],
@@ -213,7 +244,11 @@ function ModelProviderForm({
       provider: provider.provider,
       enabled: provider.enabled,
       useCustomKeys: !!provider.customKeys,
-      customKeys: provider.customKeys as object | null,
+      customKeys: provider.customKeys
+        ? (getFilteredKeys(
+            provider.customKeys as Record<string, unknown>
+          ) as Record<string, unknown> | null)
+        : null,
       customModels: getStoredModelOptions(
         provider.models ?? [],
         provider.provider,
@@ -270,14 +305,45 @@ function ModelProviderForm({
   });
   const { register, handleSubmit, formState, watch, setValue, control } = form;
 
+  // Update form when API Gateway toggle changes
+  useEffect(() => {
+    if (provider.provider === "azure" && provider.customKeys) {
+      const filteredKeys = getFilteredKeys(
+        provider.customKeys as Record<string, unknown>
+      );
+      setValue("customKeys", filteredKeys as Record<string, unknown> | null);
+    }
+  }, [
+    useApiGateway,
+    provider.provider,
+    provider.customKeys,
+    setValue,
+    getFilteredKeys,
+  ]);
+
   const onSubmit = useCallback(
     async (data: ModelProviderForm) => {
+      // For Azure, merge the filtered keys with existing customKeys
+      let customKeys = data.useCustomKeys ? data.customKeys : null;
+      if (
+        provider.provider === "azure" &&
+        data.useCustomKeys &&
+        data.customKeys
+      ) {
+        const existingKeys =
+          (provider.customKeys as Record<string, unknown>) || {};
+        const filteredKeys = getFilteredKeys(
+          data.customKeys as Record<string, unknown>
+        );
+        customKeys = { ...existingKeys, ...filteredKeys };
+      }
+
       await localUpdateMutation.mutateAsync({
         id: provider.id,
         projectId: project?.id ?? "",
         provider: provider.provider,
         enabled: data.enabled,
-        customKeys: data.useCustomKeys ? data.customKeys : null,
+        customKeys,
         customModels: (data.customModels ?? []).map((m) => m.value),
         customEmbeddingsModels: (data.customEmbeddingsModels ?? []).map(
           (m) => m.value
@@ -293,7 +359,15 @@ function ModelProviderForm({
       });
       await refetch();
     },
-    [localUpdateMutation, provider.id, provider.provider, project?.id, refetch]
+    [
+      localUpdateMutation,
+      provider.id,
+      provider.provider,
+      project?.id,
+      refetch,
+      provider.customKeys,
+      getFilteredKeys,
+    ]
   );
 
   const enabledField = register("enabled");
@@ -371,10 +445,13 @@ function ModelProviderForm({
     [setValue, provider, deleteMutation, project?.id, refetch]
   );
 
-  const providerKeys =
+  const allProviderKeys =
     "shape" in providerDefinition.keysSchema
       ? providerDefinition.keysSchema.shape
       : providerDefinition.keysSchema._def.schema.shape;
+
+  // Use filtered keys for Azure based on API Gateway toggle
+  const providerKeys = getFilteredKeys(allProviderKeys);
   const useCustomKeys = watch("useCustomKeys");
 
   const ManagedModelProvider = dependencies.managedModelProviderComponent?.({
@@ -414,28 +491,40 @@ function ModelProviderForm({
           helper={""}
         >
           <VStack align="start" width="full" gap={4} paddingRight={4}>
-            <HStack gap={6}>
-              <Field.Root>
-                <Switch
-                  // eslint-disable-next-line @typescript-eslint/no-misused-promises
-                  onChange={onEnableDisable}
-                  checked={isEnabled}
-                >
-                  Enabled
-                </Switch>
-              </Field.Root>
-              <Field.Root>
-                <Checkbox
-                  // eslint-disable-next-line @typescript-eslint/no-misused-promises
-                  onChange={onUseCustomKeysChange}
-                  checked={isUseCustomKeys}
-                  flexShrink={0}
-                  whiteSpace="nowrap"
-                >
-                  Set your API keys
-                </Checkbox>
-              </Field.Root>
-            </HStack>
+            <VStack align="start" width="full" gap={4}>
+              <HStack gap={6}>
+                <Field.Root>
+                  <Switch
+                    // eslint-disable-next-line @typescript-eslint/no-misused-promises
+                    onChange={onEnableDisable}
+                    checked={isEnabled}
+                  >
+                    Enabled
+                  </Switch>
+                </Field.Root>
+                <Field.Root>
+                  <Checkbox
+                    // eslint-disable-next-line @typescript-eslint/no-misused-promises
+                    onChange={onUseCustomKeysChange}
+                    checked={isUseCustomKeys}
+                    flexShrink={0}
+                    whiteSpace="nowrap"
+                  >
+                    Set your API keys
+                  </Checkbox>
+                </Field.Root>
+              </HStack>
+              {provider.provider === "azure" && (
+                <Field.Root>
+                  <Switch
+                    onChange={(e) => setUseApiGateway(e.target.checked)}
+                    checked={useApiGateway}
+                  >
+                    Use API Gateway
+                  </Switch>
+                </Field.Root>
+              )}
+            </VStack>
 
             {useCustomKeys && (
               <>
