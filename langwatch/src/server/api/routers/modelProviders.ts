@@ -118,7 +118,7 @@ export const modelProviderRouter = createTRPCRouter({
           where: { id: existingModelProvider.id, projectId },
           data: {
             ...data,
-            customKeys: mergedCustomKeys,
+            customKeys: mergedCustomKeys as any,
             customModels: customModels ? customModels : [],
             customEmbeddingsModels: customEmbeddingsModels
               ? customEmbeddingsModels
@@ -379,6 +379,41 @@ export const prepareLitellmParams = async ({
       "invalid";
     params.aws_region_name =
       getModelOrDefaultEnvKey(modelProvider, "AWS_REGION_NAME") ?? "invalid";
+  }
+
+  // Handle Azure API Gateway configuration
+  if (modelProvider.provider === "azure") {
+    const gatewayBaseUrl = getModelOrDefaultEnvKey(
+      modelProvider,
+      "AZURE_API_GATEWAY_BASE_URL"
+    );
+    const gatewayVersion = getModelOrDefaultEnvKey(
+      modelProvider,
+      "AZURE_API_GATEWAY_VERSION"
+    );
+    const gatewayHeaderName = getModelOrDefaultEnvKey(
+      modelProvider,
+      "AZURE_API_GATEWAY_HEADER_NAME"
+    );
+    const gatewayHeaderKey = getModelOrDefaultEnvKey(
+      modelProvider,
+      "AZURE_API_GATEWAY_HEADER_KEY"
+    );
+
+    // If API Gateway is configured, use it instead of regular Azure OpenAI
+    if (gatewayBaseUrl) {
+      params.api_base = gatewayBaseUrl;
+      params.useAzureGateway = "true";
+      if (gatewayVersion) {
+        params.api_version = gatewayVersion;
+      }
+      // Set custom headers for API Gateway
+      if (gatewayHeaderName && gatewayHeaderKey) {
+        params.headers = JSON.stringify({
+          [gatewayHeaderName]: gatewayHeaderKey,
+        });
+      }
+    }
   }
 
   if (dependencies.managedModelProviderLitellmParams) {
