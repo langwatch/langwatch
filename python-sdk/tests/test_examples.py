@@ -56,6 +56,13 @@ def get_example_files():
 @pytest.mark.parametrize("example_file", get_example_files())
 @pytest.mark.asyncio
 async def test_example(example_file: str):
+    # FIXME: Reset LiteLLM global cache to prevent conflicts between tests
+    # When running tests as a group, LiteLLM's global cache state gets polluted
+    # causing "Cache.get_cache() got multiple values for argument 'self'" errors.
+    # This doesn't happen when running individual tests (fresh Python process).
+    # The cache reset prevents state pollution between different example tests.
+    litellm.cache = None
+
     example_file = example_file.replace("examples/", "")
     if example_file == "batch_evalutation.py":
         pytest.skip("batch_evalutation.py is not a runnable example")
@@ -174,6 +181,24 @@ async def test_example(example_file: str):
                 ):
                     pytest.skip(
                         f"Skipping {example_file} due to unreliable external ColBERTv2 service: {e}"
+                    )
+                # FIXME: Skip tests that fail due to transient external service issues
+                # OpenAI server errors, rate limiting, and other external API issues
+                # should not cause CI failures as they're not code bugs
+                elif any(
+                    error_indicator in str(e)
+                    for error_indicator in [
+                        "The server had an error processing your request. Sorry about that!",  # OpenAI
+                        # "Error code: 404",
+                        # "This is a chat model and not supported in the v1/completions endpoint",
+                        "Rate limit",
+                        "API Error",
+                        "Connection error",
+                        "Timeout",
+                    ]
+                ):
+                    pytest.skip(
+                        f"Skipping {example_file} due to external service issue: {e}"
                     )
                 else:
                     pytest.fail(f"Error running main function in {example_file}: {e!s}")
