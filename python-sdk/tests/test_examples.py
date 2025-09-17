@@ -64,6 +64,8 @@ async def test_example(example_file: str):
     litellm.cache = None
 
     example_file = example_file.replace("examples/", "")
+    if example_file.startswith("cli/"):
+        pytest.skip("CLI examples are tested separately via make cli-examples")
     if example_file == "batch_evalutation.py":
         pytest.skip("batch_evalutation.py is not a runnable example")
     if example_file == "opentelemetry/openllmetry_anthropic_bot.py":

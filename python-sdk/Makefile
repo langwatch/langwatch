@@ -14,9 +14,20 @@ test-tracing:
 	@echo "Running telemetry tracing tests..."
 	@LANGWATCH_API_KEY="testkey" PYTHONPATH=$$PYTHONPATH:. uv run pytest -s -vv tests/telemetry/test_tracing.py
 
-# Call it with `make test-examples -- -k examples/openai_bot.py` to run a specific example
-test-examples:
+# Test bot/chatbot examples (excludes CLI examples)
+test-examples: cli-examples
 	PYTHONPATH=$$PYTHONPATH:. uv run pytest tests/test_examples.py -p no:warnings -s -x $(filter-out $@,$(MAKECMDGOALS))
+
+# Test CLI examples separately (they don't need mock messages)
+cli-examples:
+	@echo "Running CLI examples..."
+	@for file in examples/cli/*.py; do \
+		if [ -f "$$file" ]; then \
+			echo "Running $$file..."; \
+			PYTHONPATH=$$PYTHONPATH:. uv run python "$$file" || exit 1; \
+		fi; \
+	done
+	@echo "All CLI examples completed successfully."
 
 install:
 	@if ! command -v uv &> /dev/null; then \

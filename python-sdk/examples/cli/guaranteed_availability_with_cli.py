@@ -50,7 +50,6 @@ def run_cli(command: list, cwd: Path):
         raise
 
 
-@langwatch.trace()
 def main():
     """Simple guaranteed availability demo."""
     print("🚀 Simple Local Prompts Example")
