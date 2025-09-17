@@ -67,6 +67,22 @@ helm upgrade langwatch ./charts/langwatch \
   -f my-values.yaml
 ```
 
+### Important: Migration from Pre-1.0.0 Helm Charts
+
+> If you're upgrading from a LangWatch Helm chart version before 1.0.0, you may need to preserve your existing PostgreSQL data.
+
+Preserve existing data by setting `postgresql.primary.persistence.existingClaim` in your values file:
+
+```yaml
+postgresql:
+  primary:
+    persistence:
+      existingClaim: "data-langwatch-postgres-0"
+      size: 20Gi
+```
+
+This will prevent data loss during the upgrade process.
+
 ### Uninstall
 
 ```bash
