@@ -118,7 +118,7 @@ export const modelProviderRouter = createTRPCRouter({
           where: { id: existingModelProvider.id, projectId },
           data: {
             ...data,
-            customKeys: mergedCustomKeys,
+            customKeys: mergedCustomKeys as any,
             customModels: customModels ? customModels : [],
             customEmbeddingsModels: customEmbeddingsModels
               ? customEmbeddingsModels
@@ -384,6 +384,43 @@ export const prepareLitellmParams = async ({
   if (modelProvider.provider === "atla") {
     params.model = model.replace("atla/", "openai/");
     params.api_base = "https://api.atla-ai.com/v1";
+  }
+
+  // Handle Azure API Gateway configuration
+  if (modelProvider.provider === "azure") {
+    const gatewayBaseUrl = getModelOrDefaultEnvKey(
+      modelProvider,
+      "AZURE_API_GATEWAY_BASE_URL"
+    );
+    const gatewayVersion = getModelOrDefaultEnvKey(
+      modelProvider,
+      "AZURE_API_GATEWAY_VERSION"
+    );
+    const gatewayHeaderName = getModelOrDefaultEnvKey(
+      modelProvider,
+      "AZURE_API_GATEWAY_HEADER_NAME"
+    );
+    const gatewayHeaderKey = getModelOrDefaultEnvKey(
+      modelProvider,
+      "AZURE_API_GATEWAY_HEADER_KEY"
+    );
+
+    // If API Gateway is configured, route through the gateway endpoint
+    if (gatewayBaseUrl) {
+      params.api_base = gatewayBaseUrl;
+      params.use_azure_gateway = "true";
+      if (gatewayVersion) {
+        params.api_version = gatewayVersion;
+      }
+      // Set custom header parameters for API Gateway
+      if (gatewayHeaderName && gatewayHeaderKey) {
+        params.azure_api_gateway_header_name = gatewayHeaderName;
+        params.azure_api_gateway_header_key = gatewayHeaderKey;
+      }
+
+      // Add debug print after setting gateway params
+      console.log("Updated params after gateway:", params);
+    }
   }
 
   if (dependencies.managedModelProviderLitellmParams) {
