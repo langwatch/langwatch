@@ -163,7 +163,7 @@ export default function OrganizationOnboarding() {
       },
       {
         onSuccess: () => {
-          if (projectSlug) void router.replace(`/${projectSlug}/messages`);
+          window.location.href = `/${projectSlug}/messages`;
         },
         onError: () => {
           toaster.create({
@@ -317,7 +317,7 @@ export default function OrganizationOnboarding() {
   };
 
   const skipForNow = () => {
-    if (projectSlug) void router.replace(`/${projectSlug}/messages`);
+    window.location.href = `/${projectSlug}/messages`;
   };
 
   return (
