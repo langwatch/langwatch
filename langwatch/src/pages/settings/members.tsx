@@ -19,6 +19,7 @@ import { Select as MultiSelect, chakraComponents } from "chakra-react-select";
 import { Lock, Mail, MoreVertical, Plus, Trash } from "react-feather";
 import { CopyInput } from "../../components/CopyInput";
 import { AddMembersForm } from "../../components/AddMembersForm";
+import type { MembersForm } from "../../components/AddMembersForm";
 
 import { useState, useMemo, useEffect } from "react";
 import { type SubmitHandler } from "react-hook-form";
@@ -37,18 +38,6 @@ import { type PlanInfo } from "../../server/subscriptionHandler";
 import { api } from "../../utils/api";
 import * as Sentry from "@sentry/nextjs";
 import { usePublicEnv } from "../../hooks/usePublicEnv";
-
-type Option = { label: string; value: string; description?: string };
-
-type InviteData = {
-  email: string;
-  teamOptions: Option[];
-  role?: Option;
-};
-
-type MembersForm = {
-  invites: InviteData[];
-};
 
 const selectOptions = [
   {

@@ -163,7 +163,15 @@ export default function OrganizationOnboarding() {
       },
       {
         onSuccess: () => {
-          window.location.href = `/${projectSlug}/messages`;
+          if (projectSlug) void router.replace(`/${projectSlug}/messages`);
+        },
+        onError: () => {
+          toaster.create({
+            title: "Failed to send invites",
+            description: "Please try that again",
+            type: "error",
+            placement: "top-end",
+          });
         },
       }
     );
@@ -309,7 +317,7 @@ export default function OrganizationOnboarding() {
   };
 
   const skipForNow = () => {
-    window.location.href = `/${projectSlug}/messages`;
+    if (projectSlug) void router.replace(`/${projectSlug}/messages`);
   };
 
   return (
@@ -679,26 +687,15 @@ export default function OrganizationOnboarding() {
                 }))}
                 onSubmit={onSubmitAddMembers}
                 isLoading={createInvitesMutation.isPending}
-                hasEmailProvider={false}
+                hasEmailProvider={Boolean(
+                  publicEnv.data?.HAS_EMAIL_PROVIDER_KEY
+                )}
                 onClose={skipForNow}
                 onCloseText="Skip for now"
               />
             )}
           </Steps.Content>
         </Steps.Root>
-
-        {/* {activeStep === 2 && (
-            <AddMembersForm
-              teamOptions={[teamOption].map((team) => ({
-                label: team?.name ?? "",
-                value: team?.id ?? "",
-              }))}
-              onSubmit={onSubmitAddMembers}
-              isLoading={createInvitesMutation.isLoading}
-              hasEmailProvider={false}
-              //onClose={() => {}}
-            />
-          )} */}
 
         {initializeOrganization.error && <p>Something went wrong!</p>}
       </VStack>

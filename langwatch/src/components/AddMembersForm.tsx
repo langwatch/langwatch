@@ -74,7 +74,6 @@ export function AddMembersForm({
     control,
     handleSubmit,
     formState: { errors },
-    reset: resetForm,
   } = useForm<MembersForm>({
     defaultValues: {
       invites: [{ email: "", teamOptions: teamOptions }],
