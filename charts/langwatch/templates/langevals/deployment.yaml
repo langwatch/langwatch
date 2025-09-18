@@ -100,7 +100,7 @@ spec:
           resources:
             {{- toYaml .Values.langevals.resources | nindent 12 }}
           volumeMounts:
-            {{- with .Values.langevals.extraLangvalsVolumeMounts}}
+            {{- with .Values.langevals.extraLangevalsVolumeMounts}}
             {{- toYaml . | nindent 12 }}
             {{- end }}
             - name: tmp-dir
