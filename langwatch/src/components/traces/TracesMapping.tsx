@@ -180,13 +180,6 @@ export const TracesMapping = ({
   const isInitializedRef = React.useRef(false);
 
   useEffect(() => {
-    if (
-      isInitializedRef.current &&
-      Object.keys(traceMappingState.mapping).length > 0
-    ) {
-      return;
-    }
-
     const traceMappingStateWithDefaults = {
       mapping: Object.fromEntries(
         targetFields.map((name) => [
@@ -277,7 +270,7 @@ export const TracesMapping = ({
     }
 
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [JSON.stringify(targetFields), dsl?.sourceOptions]);
+  }, [JSON.stringify(targetFields), dsl?.sourceOptions, currentMapping]);
 
   useEffect(() => {
     let index = 0;
