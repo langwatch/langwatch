@@ -827,11 +827,24 @@ const updateTraceInElasticsearch = async (
   updateScript: string
 ) => {
   const client = await esClient({ projectId });
-  const currentColdIndex = Object.keys(
-    await client.indices.getAlias({
-      name: TRACE_COLD_INDEX.alias,
-    })
-  )[0];
+  let currentColdIndex: string | undefined;
+  try {
+    currentColdIndex = Object.keys(
+      await client.indices.getAlias({
+        name: TRACE_COLD_INDEX.alias,
+      })
+    )[0];
+  } catch (error) {
+    if (
+      error instanceof Error &&
+      error.message.includes("alias") &&
+      error.message.includes("missing")
+    ) {
+      // no cold index found, that's fine
+    } else {
+      throw error;
+    }
+  }
 
   const traceIndexIdValue = traceIndexId({
     traceId: traceId,
