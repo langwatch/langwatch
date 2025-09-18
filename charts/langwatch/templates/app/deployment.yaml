@@ -122,7 +122,7 @@ spec:
             - name: LANGWATCH_NLP_SERVICE
               value: {{ .Values.app.upstreams.nlp.scheme | default "http" }}://{{ .Values.app.upstreams.nlp.name | default "langwatch-nlp" }}:{{ .Values.app.upstreams.nlp.port | default 5561 }}
             - name: LANGEVALS_ENDPOINT
-              value: {{ .Values.app.upstreams.langevals.schema | default "http" }}://{{ .Values.app.upstreams.langevals.name | default "langevals" }}:{{ .Values.app.upstreams.langevals.port | default 5562 }}
+              value: {{ .Values.app.upstreams.langevals.scheme | default "http" }}://{{ .Values.app.upstreams.langevals.name | default "langevals" }}:{{ .Values.app.upstreams.langevals.port | default 5562 }}
 
             # PostgreSQL connection string
             {{- if .Values.postgresql.chartManaged }}
