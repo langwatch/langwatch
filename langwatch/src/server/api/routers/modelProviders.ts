@@ -434,7 +434,5 @@ export const prepareLitellmParams = async ({
 
   // TODO: add azure deployment as params.model as azure/<deployment-name>
 
-  // Add final debug print
-  console.log("🎯 Final litellm_params for model", model, ":", params);
   return params;
 };
