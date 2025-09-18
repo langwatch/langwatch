@@ -26,7 +26,7 @@ type InviteData = {
   role?: Option;
 };
 
-type MembersForm = {
+export type MembersForm = {
   invites: InviteData[];
 };
 
@@ -36,6 +36,7 @@ interface AddMembersFormProps {
   isLoading?: boolean;
   hasEmailProvider?: boolean;
   onClose?: () => void;
+  onCloseText?: string;
 }
 
 const selectOptions = [
@@ -66,6 +67,7 @@ export function AddMembersForm({
   isLoading = false,
   hasEmailProvider = false,
   onClose,
+  onCloseText = "Cancel",
 }: AddMembersFormProps) {
   const {
     register,
@@ -224,7 +226,7 @@ export function AddMembersForm({
             onClick={onClose}
             disabled={isLoading}
           >
-            Cancel
+            {onCloseText}
           </Button>
           <Button
             colorPalette={isLoading ? "gray" : "orange"}
