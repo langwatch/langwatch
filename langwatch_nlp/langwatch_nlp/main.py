@@ -18,6 +18,8 @@ from langwatch_nlp.studio.utils import (
 import langwatch_nlp.error_tracking
 from fastapi import FastAPI
 
+from openai import OpenAI
+
 from langwatch_nlp.studio.app import app as studio_app, lifespan as studio_lifespan
 
 import langwatch_nlp.topic_clustering.batch_clustering as batch_clustering
@@ -63,6 +65,7 @@ async def health_check():
 
 
 async def proxy_startup():
+    print("=== proxy_startup called ===", flush=True)
     original_get_available_deployment = Router.async_get_available_deployment
 
     # Patch to be able to replace api_key and api_base on the fly from the parameters comming from langwatch according to user settings
@@ -75,6 +78,9 @@ async def proxy_startup():
         specific_deployment: Optional[bool] = False,
         **kwargs,
     ):
+        print("=== PATCHED FUNCTION CALLED ===", flush=True)
+        print(f"model: {model}", flush=True)
+        print(f"request_kwargs: {request_kwargs}", flush=True)
         self.cache.flush_cache()  # prevents litellm proxing from storing failures and mark the deployment as "unhealthy" for everyone in case a single user's API key is invalid for example
 
         deployment = await original_get_available_deployment(
@@ -88,7 +94,8 @@ async def proxy_startup():
         )
         deployment = deployment.copy()
 
-        print(f"deployment: {deployment}")
+        print(f"deployment: {deployment}", flush=True)
+
         print(f"model: {model}")
 
         if "litellm_params" not in deployment:
@@ -107,6 +114,20 @@ async def proxy_startup():
             deployment["litellm_params"]["api_version"] = os.environ[
                 "AZURE_API_VERSION"
             ]
+
+            if "use_azure_gateway" in deployment["litellm_params"]:
+                deployment["litellm_params"]["client"] = OpenAI(
+                    # api_key=deployment["litellm_params"]["api_key"],
+                    base_url=deployment["litellm_params"]["api_base"],
+                    default_query={
+                        "api-version": deployment["litellm_params"]["api_version"]
+                    },
+                    default_headers={
+                        deployment["litellm_params"][
+                            "azure_api_gateway_header_name"
+                        ]: deployment["litellm_params"]["azure_api_gateway_header_key"]
+                    },
+                )
 
         return deployment
 

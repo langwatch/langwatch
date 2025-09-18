@@ -400,19 +400,21 @@ export const prepareLitellmParams = async ({
       "AZURE_API_GATEWAY_HEADER_KEY"
     );
 
-    // If API Gateway is configured, use it instead of regular Azure OpenAI
+    // If API Gateway is configured, route through the gateway endpoint
     if (gatewayBaseUrl) {
       params.api_base = gatewayBaseUrl;
-      params.useAzureGateway = "true";
+      params.use_azure_gateway = "true";
       if (gatewayVersion) {
         params.api_version = gatewayVersion;
       }
-      // Set custom headers for API Gateway
+      // Set custom header parameters for API Gateway
       if (gatewayHeaderName && gatewayHeaderKey) {
-        params.headers = JSON.stringify({
-          [gatewayHeaderName]: gatewayHeaderKey,
-        });
+        params.azure_api_gateway_header_name = gatewayHeaderName;
+        params.azure_api_gateway_header_key = gatewayHeaderKey;
       }
+
+      // Add debug print after setting gateway params
+      console.log("Updated params after gateway:", params);
     }
   }
 
@@ -427,5 +429,7 @@ export const prepareLitellmParams = async ({
 
   // TODO: add azure deployment as params.model as azure/<deployment-name>
 
+  // Add final debug print
+  console.log("🎯 Final litellm_params for model", model, ":", params);
   return params;
 };
