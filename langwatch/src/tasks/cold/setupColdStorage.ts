@@ -98,7 +98,6 @@ const createColdStorageIndex = async (client: ElasticClient, clusterType: string
   await client.indices.putAlias({
     index: TRACE_COLD_INDEX.base,
     name: TRACE_COLD_INDEX.alias,
-    is_write_index: false, // Prevent accidental writes; updates still possible via direct index targeting
   });
   console.log(`✅ Set up cold storage alias: ${TRACE_COLD_INDEX.alias}`);
 };
