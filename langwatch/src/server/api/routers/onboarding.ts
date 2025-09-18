@@ -109,6 +109,9 @@ export const onboardingRouter = createTRPCRouter({
         return {
           success: true,
           teamSlug: orgResult.team.slug,
+          teamName: orgResult.team.name,
+          teamId: orgResult.team.id,
+          organizationId: orgResult.organization.id,
           projectSlug: projectResult.projectSlug,
         };
       } catch (error) {

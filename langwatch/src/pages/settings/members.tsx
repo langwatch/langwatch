@@ -2,11 +2,9 @@ import {
   Badge,
   Button,
   Card,
-  Field,
   Flex,
   HStack,
   Heading,
-  Input,
   LinkBox,
   Spacer,
   Spinner,
@@ -20,14 +18,11 @@ import { OrganizationUserRole } from "@prisma/client";
 import { Select as MultiSelect, chakraComponents } from "chakra-react-select";
 import { Lock, Mail, MoreVertical, Plus, Trash } from "react-feather";
 import { CopyInput } from "../../components/CopyInput";
+import { AddMembersForm } from "../../components/AddMembersForm";
+import type { MembersForm } from "../../components/AddMembersForm";
 
 import { useState, useMemo, useEffect } from "react";
-import {
-  Controller,
-  useFieldArray,
-  useForm,
-  type SubmitHandler,
-} from "react-hook-form";
+import { type SubmitHandler } from "react-hook-form";
 import SettingsLayout from "../../components/SettingsLayout";
 import { Dialog } from "../../components/ui/dialog";
 import { Menu } from "../../components/ui/menu";
@@ -44,17 +39,23 @@ import { api } from "../../utils/api";
 import * as Sentry from "@sentry/nextjs";
 import { usePublicEnv } from "../../hooks/usePublicEnv";
 
-type Option = { label: string; value: string; description?: string };
-
-type InviteData = {
-  email: string;
-  teamOptions: Option[];
-  role?: Option;
-};
-
-type MembersForm = {
-  invites: InviteData[];
-};
+const selectOptions = [
+  {
+    label: "Admin",
+    value: OrganizationUserRole.ADMIN,
+    description: "Can manage organization and add or remove members",
+  },
+  {
+    label: "Member",
+    value: OrganizationUserRole.MEMBER,
+    description: "Can manage their own projects and view other projects",
+  },
+  {
+    label: "External / Viewer",
+    value: OrganizationUserRole.EXTERNAL,
+    description: "Can only view projects they are invited to, cannot see costs",
+  },
+];
 
 export default function Members() {
   const { organization } = useOrganizationTeamProject();
@@ -116,21 +117,6 @@ function MembersList({
     onClose: onInviteLinkClose,
   } = useDisclosure();
 
-  const {
-    register,
-    control,
-    handleSubmit,
-    formState: { errors },
-    reset: resetForm,
-  } = useForm<MembersForm>({
-    defaultValues: {
-      invites: [{ email: "", teamOptions: teamOptions }],
-    },
-  });
-  const { fields, append, remove } = useFieldArray({
-    control,
-    name: "invites",
-  });
   const pendingInvites =
     api.organization.getOrganizationPendingInvites.useQuery(
       {
@@ -204,7 +190,6 @@ function MembersList({
             placement: "top-end",
           });
           onAddMembersClose();
-          resetForm();
           void pendingInvites.refetch();
         },
         onError: () => {
@@ -221,10 +206,6 @@ function MembersList({
         },
       }
     );
-  };
-
-  const onAddField = () => {
-    append({ email: "", teamOptions });
   };
 
   const onRoleChange = (userId: string, value: OrganizationUserRole) => {
@@ -632,159 +613,15 @@ function MembersList({
             <Dialog.Title>Add members</Dialog.Title>
           </Dialog.Header>
           <Dialog.CloseTrigger />
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              void handleSubmit(onSubmit)(e);
-            }}
-          >
-            <Dialog.Body>
-              <Table.Root variant="line" width="100%">
-                <Table.Header>
-                  <Table.Row>
-                    <Table.ColumnHeader paddingLeft={0} paddingTop={0}>
-                      Email
-                    </Table.ColumnHeader>
-                    <Table.ColumnHeader paddingLeft={0} paddingTop={0}>
-                      Role
-                    </Table.ColumnHeader>
-                    <Table.ColumnHeader paddingLeft={0} paddingTop={0}>
-                      Teams
-                    </Table.ColumnHeader>
-                    <Table.ColumnHeader
-                      paddingLeft={0}
-                      paddingRight={0}
-                      paddingTop={0}
-                    ></Table.ColumnHeader>
-                  </Table.Row>
-                </Table.Header>
-                <Table.Body>
-                  {fields.map((field, index) => (
-                    <Table.Row key={field.id}>
-                      <Table.Cell paddingLeft={0} paddingY={2}>
-                        <Field.Root>
-                          <Input
-                            placeholder="Enter email address"
-                            {...register(`invites.${index}.email`, {
-                              required: "Email is required",
-                            })}
-                          />
-                          <Field.ErrorText>
-                            {errors.invites?.[index]?.email &&
-                              "Email is required"}
-                          </Field.ErrorText>
-                        </Field.Root>
-                      </Table.Cell>
-                      <Table.Cell width="24%" paddingLeft={0} paddingY={2}>
-                        <Field.Root>
-                          <Controller
-                            control={control}
-                            name={`invites.${index}.role`}
-                            rules={{ required: "User role is required" }}
-                            render={({ field }) => (
-                              <MultiSelect
-                                {...field}
-                                options={selectOptions}
-                                hideSelectedOptions={false}
-                                isSearchable={false}
-                                components={{
-                                  Menu: ({ children, ...props }) => (
-                                    <chakraComponents.Menu
-                                      {...props}
-                                      innerProps={{
-                                        ...props.innerProps,
-                                        style: { width: "300px" },
-                                      }}
-                                    >
-                                      {children}
-                                    </chakraComponents.Menu>
-                                  ),
-                                  Option: ({ children, ...props }) => (
-                                    <chakraComponents.Option {...props}>
-                                      <VStack align="start">
-                                        <Text>{children}</Text>
-                                        <Text
-                                          color={
-                                            props.isSelected
-                                              ? "white"
-                                              : "gray.500"
-                                          }
-                                          fontSize="13px"
-                                        >
-                                          {props.data.description}
-                                        </Text>
-                                      </VStack>
-                                    </chakraComponents.Option>
-                                  ),
-                                }}
-                              />
-                            )}
-                          />
-                          <Field.ErrorText>
-                            {errors.invites?.[index]?.role &&
-                              "Role is required"}
-                          </Field.ErrorText>
-                        </Field.Root>
-                      </Table.Cell>
-                      <Table.Cell width="35%" paddingLeft={0} paddingY={2}>
-                        <Field.Root>
-                          <Controller
-                            control={control}
-                            name={`invites.${index}.teamOptions`}
-                            rules={{
-                              required: "At least one team is required",
-                            }}
-                            render={({ field }) => (
-                              <MultiSelect
-                                {...field}
-                                options={teamOptions}
-                                isMulti
-                                closeMenuOnSelect={false}
-                                selectedOptionStyle="check"
-                                hideSelectedOptions={false}
-                              />
-                            )}
-                          />
-                        </Field.Root>
-                      </Table.Cell>
-                      <Table.Cell paddingLeft={0} paddingRight={0} paddingY={2}>
-                        <Button
-                          type="button"
-                          colorPalette="red"
-                          onClick={() => remove(index)}
-                        >
-                          <Trash size={18} />
-                        </Button>
-                      </Table.Cell>
-                    </Table.Row>
-                  ))}
-                </Table.Body>
-              </Table.Root>
-              <Button type="button" onClick={onAddField} marginTop={2}>
-                + Add Another
-              </Button>
-            </Dialog.Body>
-            <Dialog.Footer>
-              <Button
-                colorPalette={
-                  createInvitesMutation.isLoading ? "gray" : "orange"
-                }
-                type="submit"
-                disabled={createInvitesMutation.isLoading}
-              >
-                <HStack>
-                  {createInvitesMutation.isLoading ? (
-                    <Spinner size="sm" />
-                  ) : (
-                    <Mail size={18} />
-                  )}
-                  <Text>
-                    {hasEmailProvider ? "Send invites" : "Create invites"}
-                  </Text>
-                </HStack>
-              </Button>
-            </Dialog.Footer>
-          </form>
+          <Dialog.Body>
+            <AddMembersForm
+              teamOptions={teamOptions}
+              onSubmit={onSubmit}
+              isLoading={createInvitesMutation.isLoading}
+              hasEmailProvider={hasEmailProvider ?? false}
+              onClose={onAddMembersClose}
+            />
+          </Dialog.Body>
         </Dialog.Content>
       </Dialog.Root>
     </SettingsLayout>
@@ -858,24 +695,6 @@ const TeamIdsDisplay = ({ teamIds, teams }: TeamIdsDisplayProps) => {
     </Flex>
   );
 };
-
-const selectOptions = [
-  {
-    label: "Admin",
-    value: OrganizationUserRole.ADMIN,
-    description: "Can manage organization and add or remove members",
-  },
-  {
-    label: "Member",
-    value: OrganizationUserRole.MEMBER,
-    description: "Can manage their own projects and view other projects",
-  },
-  {
-    label: "External / Viewer",
-    value: OrganizationUserRole.EXTERNAL,
-    description: "Can only view projects they are invited to, cannot see costs",
-  },
-];
 
 const OrganizationMemberSelect = ({
   defaultValue,
