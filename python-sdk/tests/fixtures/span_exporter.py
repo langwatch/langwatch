@@ -14,7 +14,7 @@ from opentelemetry import trace
 tracer_provider = trace_sdk.TracerProvider()
 
 # OpenTelemetry tracing test infrastructure
-# This module provides testing utilities for verifying that LangWatch PromptService operations
+# This module provides testing utilities for verifying that LangWatch prompt service operations
 # create proper OpenTelemetry spans with the correct attributes.
 
 
@@ -49,7 +49,7 @@ class MockSpanExporter(SpanExporter):
         Helper method to find a span by its operation name.
 
         Args:
-            name: The span name to search for (e.g., "PromptService.get")
+            name: The span name to search for (e.g., "PromptApiService.get")
 
         Returns:
             The first span with matching name, or None if not found

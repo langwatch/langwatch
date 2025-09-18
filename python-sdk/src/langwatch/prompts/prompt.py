@@ -1,13 +1,12 @@
-from typing import List, Any, Dict, Union, Optional, cast
-from openai.types.chat import ChatCompletionMessageParam
+from typing import List, Any, Dict, Union, Optional, cast, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from openai.types.chat import ChatCompletionMessageParam
+
 from liquid import Environment, StrictUndefined, Undefined
 from liquid.exceptions import UndefinedError
-from langwatch.generated.langwatch_rest_api_client.models.get_api_prompts_by_id_response_200 import (
-    GetApiPromptsByIdResponse200,
-)
-from .formatter import PromptFormatter
 from .decorators.prompt_tracing import prompt_tracing
-from .types import MessageDict
+from .types import PromptData, MessageDict
 
 
 class PromptCompilationError(Exception):
@@ -34,31 +33,30 @@ class Prompt:
     Handles formatting messages with variables using Liquid templating.
     """
 
-    def __init__(
-        self,
-        config: GetApiPromptsByIdResponse200,
-        formatter: PromptFormatter = PromptFormatter(),
-    ):
-        self._config = config
-        self._formatter = formatter
+    def __init__(self, data: PromptData):
+        # Store raw data for backward compatibility
+        self._data = data.copy()
 
-    def __getattr__(self, name: str) -> Any:
-        """Delegate attribute access to the underlying config object"""
-        if hasattr(self._config, name):
-            return getattr(self._config, name)
-        raise AttributeError(
-            f"'{self.__class__.__name__}' object has no attribute '{name}'"
-        )
+        # Assign all fields directly as instance attributes
+        for key, value in data.items():
+            setattr(self, key, value)
+
+        # Set prompt default only if not provided (like TypeScript)
+        if not hasattr(self, "prompt") or self.prompt is None:
+            self.prompt = self._extract_system_prompt()
 
     @property
-    def raw(self) -> Any:
-        """Get the raw prompt data from the API"""
-        return self._config
+    def raw(self) -> PromptData:
+        """Get the raw prompt data"""
+        return self._data
 
-    @property
-    def version_number(self) -> int:
-        """Returns the version number of the prompt."""
-        return int(self._config.version)
+    def _extract_system_prompt(self) -> str:
+        """Extract system prompt from messages, like TypeScript version."""
+        if hasattr(self, "messages") and self.messages:
+            for message in self.messages:
+                if message.get("role") == "system":
+                    return message.get("content", "")
+        return ""
 
     def _compile(self, variables: TemplateVariables, strict: bool) -> "CompiledPrompt":
         """
@@ -70,19 +68,19 @@ class Prompt:
 
             # Compile main prompt
             compiled_prompt = ""
-            if self._config.prompt:
-                template = env.from_string(self._config.prompt)
+            if hasattr(self, "prompt") and self.prompt:
+                template = env.from_string(self.prompt)
                 compiled_prompt = template.render(**variables)
 
             # Compile messages
             compiled_messages: List[MessageDict] = []
-            if self._config.messages:
-                for message in self._config.messages:
-                    content: str = message.content
+            if hasattr(self, "messages") and self.messages:
+                for message in self.messages:
+                    content: str = message["content"]
                     template = env.from_string(content)
                     compiled_content = template.render(**variables)
                     compiled_message = MessageDict(
-                        role=message.role.value,
+                        role=message["role"],
                         content=compiled_content,
                     )
                     compiled_messages.append(compiled_message)
@@ -96,12 +94,16 @@ class Prompt:
             )
 
         except UndefinedError as error:
-            template_str = self._config.prompt or str(self._config.messages or [])
+            template_str = getattr(self, "prompt", "") or str(
+                getattr(self, "messages", [])
+            )
             raise PromptCompilationError(
                 f"Failed to compile prompt template: {str(error)}", template_str, error
             )
         except Exception as error:
-            template_str = self._config.prompt or str(self._config.messages or [])
+            template_str = getattr(self, "prompt", "") or str(
+                getattr(self, "messages", [])
+            )
             raise PromptCompilationError(
                 f"Failed to compile prompt template: {str(error)}", template_str, error
             )
@@ -168,21 +170,17 @@ class CompiledPrompt:
         self.variables = variables  # Store the original compilation variables
         self._compiled_messages = compiled_messages
 
-        # Expose original prompt properties for convenience
-        self.id = original_prompt.id
-        self.version = original_prompt.version
-        self.version_id = original_prompt.version_id
-        # ... other properties as needed
+        # Properties are delegated via __getattr__ below
 
     @property
-    def messages(self) -> List[ChatCompletionMessageParam]:
+    def messages(self) -> List["ChatCompletionMessageParam"]:
         """
         Returns the compiled messages as a list of ChatCompletionMessageParam objects.
         This is a convenience method to make the messages accessible as a list of
         ChatCompletionMessageParam objects, which is the format expected by the OpenAI API.
         """
         messages = [
-            cast(ChatCompletionMessageParam, msg) for msg in self._compiled_messages
+            cast("ChatCompletionMessageParam", msg) for msg in self._compiled_messages
         ]
 
         return messages

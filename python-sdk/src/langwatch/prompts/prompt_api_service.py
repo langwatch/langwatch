@@ -1,12 +1,14 @@
-# src/langwatch/prompt/service.py
+# src/langwatch/prompts/prompt_api_service.py
 """
-Service layer for managing LangWatch prompts via REST API.
+API service layer for managing LangWatch prompts via REST API.
 
-This module provides a high-level interface for CRUD operations on prompts,
+This module provides a focused interface for CRUD operations on prompts via API only,
 handling API communication, error handling, and response unwrapping.
 Uses TypedDict for clean interfaces and from_dict methods for type safety.
+
+This service is responsible only for API operations and does not handle local file loading.
 """
-from typing import Dict, List, Literal, Optional, Any, TypedDict
+from typing import Dict, List, Literal, Optional, Any
 from langwatch.generated.langwatch_rest_api_client.types import UNSET
 from langwatch.generated.langwatch_rest_api_client.client import (
     Client as LangWatchRestApiClient,
@@ -60,36 +62,28 @@ from langwatch.generated.langwatch_rest_api_client.models.delete_api_prompts_by_
 
 from langwatch.utils.initialization import ensure_setup
 from langwatch.state import get_instance
-from .prompt import Prompt
 from .errors import unwrap_response
 from .decorators.prompt_service_tracing import prompt_service_tracing
-from .types import MessageDict, InputDict, OutputDict
+from .types import PromptData, MessageDict, InputDict, OutputDict
 
 
-def _convert_api_response_to_get_format(response: Any) -> GetApiPromptsByIdResponse200:
-    """Convert any API response to GetApiPromptsByIdResponse200 format using from_dict."""
-    if isinstance(response, GetApiPromptsByIdResponse200):
-        return response
-
-    # All response types have the same structure, so we can convert via dict
-    return GetApiPromptsByIdResponse200.from_dict(response.to_dict())
-
-
-class PromptService:
+class PromptApiService:
     """
-    Service for managing LangWatch prompts via REST API.
+    API service for managing LangWatch prompts via REST API only.
 
     Provides CRUD operations for prompts with proper error handling and response
     unwrapping. Uses TypedDict interfaces for clean, type-safe API.
+
+    This service handles only API operations and does not handle local file loading.
     """
 
     def __init__(self, rest_api_client: LangWatchRestApiClient):
-        """Initialize the prompt service with a REST API client."""
+        """Initialize the prompt API service with a REST API client."""
         self._client = rest_api_client
 
     @classmethod
-    def from_global(cls) -> "PromptService":
-        """Create a PromptService instance using the global LangWatch configuration."""
+    def from_global(cls) -> "PromptApiService":
+        """Create a PromptApiService instance using the global LangWatch configuration."""
         ensure_setup()
         instance = get_instance()
         if instance is None:
@@ -99,8 +93,8 @@ class PromptService:
         return cls(instance.rest_api_client)
 
     @prompt_service_tracing.get
-    def get(self, prompt_id: str, version_number: Optional[int] = None) -> Prompt:
-        """Retrieve a prompt by its ID. You can optionally specify a version number to get a specific version of the prompt."""
+    def get(self, prompt_id: str, version_number: Optional[int] = None) -> PromptData:
+        """Retrieve a prompt by its ID from the API. You can optionally specify a version number to get a specific version of the prompt."""
         resp = get_api_prompts_by_id.sync_detailed(
             id=prompt_id,
             client=self._client,
@@ -116,7 +110,7 @@ class PromptService:
             raise RuntimeError(
                 f"Failed to fetch prompt with handle_or_id={prompt_id} version={version_number if version_number is not None else 'latest'}"
             )
-        return Prompt(ok)
+        return PromptData.from_api_response(ok)
 
     def create(
         self,
@@ -127,7 +121,7 @@ class PromptService:
         messages: Optional[List[MessageDict]] = None,
         inputs: Optional[List[InputDict]] = None,
         outputs: Optional[List[OutputDict]] = None,
-    ) -> Prompt:
+    ) -> PromptData:
         """
         Create a new prompt with clean dictionary interfaces.
 
@@ -141,7 +135,7 @@ class PromptService:
             outputs: List of output dicts with 'identifier', 'type', and optional 'json_schema' keys
 
         Returns:
-            Prompt object containing the created prompt data
+            PromptData dictionary containing the created prompt data
         """
         # Convert dicts to API models using from_dict
         api_messages = UNSET
@@ -181,9 +175,7 @@ class PromptService:
         if ok is None:
             raise RuntimeError(f"Failed to create prompt with handle={handle}")
 
-        # Convert response to expected format for Prompt class
-        converted = _convert_api_response_to_get_format(ok)
-        return Prompt(converted)
+        return PromptData.from_api_response(ok)
 
     def update(
         self,
@@ -194,7 +186,7 @@ class PromptService:
         messages: Optional[List[MessageDict]] = None,
         inputs: Optional[List[InputDict]] = None,
         outputs: Optional[List[OutputDict]] = None,
-    ) -> Prompt:
+    ) -> PromptData:
         """
         Update an existing prompt with clean dictionary interfaces.
 
@@ -208,7 +200,7 @@ class PromptService:
             outputs: New list of output dicts
 
         Returns:
-            Prompt object containing the updated prompt data
+            PromptData dictionary containing the updated prompt data
         """
         # Convert dicts to API models using from_dict
         api_messages = UNSET
@@ -253,9 +245,7 @@ class PromptService:
         if ok is None:
             raise RuntimeError(f"Failed to update prompt with id={prompt_id_or_handle}")
 
-        # Convert response to expected format for Prompt class
-        converted = _convert_api_response_to_get_format(ok)
-        return Prompt(converted)
+        return PromptData.from_api_response(ok)
 
     def delete(self, prompt_id: str) -> Dict[str, bool]:
         """Delete a prompt by its ID."""
