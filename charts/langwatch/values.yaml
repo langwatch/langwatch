@@ -180,13 +180,12 @@ app:
   ## @param app.upstreams.nlp.scheme [string, default: http] Scheme for NLP upstream.
   ## @param app.upstreams.nlp.name [string, default: langwatch-nlp] Service name for NLP upstream.
   ## @param app.upstreams.nlp.port [default: 5561] Port for NLP upstream.
-  ## @param app.upstreams.langevals.schema [string, default: http] Scheme for Langevals upstream.
+  ## @param app.upstreams.langevals.scheme [string, default: http] Scheme for Langevals upstream.
   ## @param app.upstreams.langevals.name [string, default: langevals] Service name for Langevals upstream.
   ## @param app.upstreams.langevals.port [default: 5562] Port for Langevals upstream.
   upstreams:
     nlp:       { scheme: http, name: langwatch-nlp,  port: 5561 }
-    langevals: { schema: http, name: langevals,      port: 5562 }
-
+    langevals: { scheme: http, name: langevals,      port: 5562 }
   # AI model evaluator configurations
   # These enable integration with various AI providers for evaluation tasks
   ## @extra app.evaluators Evaluator providers configuration.
