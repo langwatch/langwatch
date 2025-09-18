@@ -18,7 +18,12 @@ import {
 import { getTracesWithSpans } from "./traces";
 import { getUserProtectionsForProject } from "../utils";
 import { createLogger } from "../../../utils/logger";
-import { TRACE_INDEX, esClient, traceIndexId } from "~/server/elasticsearch";
+import {
+  TRACE_COLD_INDEX,
+  TRACE_INDEX,
+  esClient,
+  traceIndexId,
+} from "~/server/elasticsearch";
 import type { Protections } from "../../elasticsearch/protections";
 import type { Session } from "next-auth";
 
@@ -820,8 +825,13 @@ const updateTraceWithAnnotation = async (
   projectId: string
 ) => {
   const client = await esClient({ projectId });
+  const currentColdIndex = Object.keys(
+    await client.indices.getAlias({
+      name: TRACE_COLD_INDEX.alias,
+    })
+  )[0];
   await client.update({
-    index: TRACE_INDEX.all,
+    index: [TRACE_INDEX.alias, currentColdIndex].filter(Boolean).join(","),
     id: traceIndexId({
       traceId: traceId,
       projectId: projectId,
@@ -861,8 +871,13 @@ const updateTraceRemoveAnnotation = async (
   projectId: string
 ) => {
   const client = await esClient({ projectId });
+  const currentColdIndex = Object.keys(
+    await client.indices.getAlias({
+      name: TRACE_COLD_INDEX.alias,
+    })
+  )[0];
   await client.update({
-    index: TRACE_INDEX.all,
+    index: [TRACE_INDEX.alias, currentColdIndex].filter(Boolean).join(","),
     id: traceIndexId({
       traceId: traceId,
       projectId: projectId,
