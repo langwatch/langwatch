@@ -820,9 +820,11 @@ export const annotationRouter = createTRPCRouter({
     }),
 });
 
-const updateTraceWithAnnotation = async (
+// Helper function to update trace with fallback strategy
+const updateTraceInElasticsearch = async (
   traceId: string,
-  projectId: string
+  projectId: string,
+  updateScript: string
 ) => {
   const client = await esClient({ projectId });
   const currentColdIndex = Object.keys(
@@ -830,80 +832,96 @@ const updateTraceWithAnnotation = async (
       name: TRACE_COLD_INDEX.alias,
     })
   )[0];
-  await client.update({
-    index: [TRACE_INDEX.alias, currentColdIndex].filter(Boolean).join(","),
-    id: traceIndexId({
-      traceId: traceId,
-      projectId: projectId,
-    }),
-    retry_on_conflict: 10,
-    body: {
-      script: {
-        source: `
-          try {
-            if (!ctx._source.containsKey('annotations')) {
-              ctx._source.annotations = [
-                'count': 1,
-                'hasAnnotation': true
-              ];
-            } else if (ctx._source.annotations.containsKey('count')) {
-              ctx._source.annotations.count += 1;
-            } else {
-              ctx._source.annotations.count = 1;
-            }
-            ctx._source.annotations.hasAnnotation = true;
-          } catch (Exception e) {
-            // If anything goes wrong, ensure we have a valid annotations object
-            ctx._source.annotations = [
-              'count': 1,
-              'hasAnnotation': true
-            ];
-          }
-        `,
-        lang: "painless",
-      },
-    },
+
+  const traceIndexIdValue = traceIndexId({
+    traceId: traceId,
+    projectId: projectId,
   });
+
+  // Try alias first
+  try {
+    await client.update({
+      index: TRACE_INDEX.alias,
+      id: traceIndexIdValue,
+      retry_on_conflict: 10,
+      body: {
+        script: {
+          source: updateScript,
+          lang: "painless",
+        },
+      },
+    });
+  } catch (error) {
+    // If alias fails, try cold index
+    if (currentColdIndex) {
+      await client.update({
+        index: currentColdIndex,
+        id: traceIndexIdValue,
+        retry_on_conflict: 10,
+        body: {
+          script: {
+            source: updateScript,
+            lang: "painless",
+          },
+        },
+      });
+    } else {
+      // Re-throw the original error if no cold index available
+      throw error;
+    }
+  }
+};
+
+const updateTraceWithAnnotation = async (
+  traceId: string,
+  projectId: string
+) => {
+  const updateScript = `
+    try {
+      if (!ctx._source.containsKey('annotations')) {
+        ctx._source.annotations = [
+          'count': 1,
+          'hasAnnotation': true
+        ];
+      } else if (ctx._source.annotations.containsKey('count')) {
+        ctx._source.annotations.count += 1;
+      } else {
+        ctx._source.annotations.count = 1;
+      }
+      ctx._source.annotations.hasAnnotation = true;
+    } catch (Exception e) {
+      // If anything goes wrong, ensure we have a valid annotations object
+      ctx._source.annotations = [
+        'count': 1,
+        'hasAnnotation': true
+      ];
+    }
+  `;
+
+  await updateTraceInElasticsearch(traceId, projectId, updateScript);
 };
 
 const updateTraceRemoveAnnotation = async (
   traceId: string,
   projectId: string
 ) => {
-  const client = await esClient({ projectId });
-  const currentColdIndex = Object.keys(
-    await client.indices.getAlias({
-      name: TRACE_COLD_INDEX.alias,
-    })
-  )[0];
-  await client.update({
-    index: [TRACE_INDEX.alias, currentColdIndex].filter(Boolean).join(","),
-    id: traceIndexId({
-      traceId: traceId,
-      projectId: projectId,
-    }),
-    retry_on_conflict: 10,
-    body: {
-      script: {
-        source: `
-          try {
-            if (ctx._source.containsKey('annotations') && ctx._source.annotations.containsKey('count')) {
-              ctx._source.annotations.count -= 1;
-              if (ctx._source.annotations.count <= 0) {
-                ctx._source.remove('annotations');
-              } else {
-                ctx._source.annotations.hasAnnotation = true;
-              }
-            }
-          } catch (Exception e) {
-            // If anything goes wrong, remove the annotations object
-            ctx._source.remove('annotations');
-          }
-        `,
-        lang: "painless",
-      },
-    },
-  });
+  const updateScript = `
+    try {
+      if (ctx._source.containsKey('annotations') && ctx._source.annotations.containsKey('count')) {
+        ctx._source.annotations.count -= 1;
+        if (ctx._source.annotations.count <= 0) {
+          ctx._source.remove('annotations');
+        } else {
+          ctx._source.annotations.hasAnnotation = true;
+        }
+      }
+    } catch (Exception e) {
+      // If anything goes wrong, remove the annotations object
+      ctx._source.remove('annotations');
+    }
+  `;
+
+  await updateTraceInElasticsearch(traceId, projectId, updateScript);
 };
 
 export async function createOrUpdateQueueItems({
