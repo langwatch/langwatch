@@ -7,8 +7,22 @@ metadata:
     app.kubernetes.io/name: {{ .Release.Name }}-app
     app.kubernetes.io/instance: {{ .Release.Name }}
     {{- include "langwatch.labels" . | nindent 4 }}
+    {{- if .Values.app.labels }}
+    {{- toYaml .Values.app.labels | nindent 4 }}
+    {{- end }}
+  annotations:
+    {{- if .Values.app.deployment.annotations }}
+    {{- toYaml .Values.app.deployment.annotations | nindent 4 }}
+    {{- end }}
 spec:
   replicas: {{ .Values.app.replicaCount }}
+  {{- if .Values.app.deployment.strategy }}
+  strategy: 
+    {{- toYaml .Values.app.deployment.strategy | nindent 8 }}
+  {{- end }}
+  {{- if .Values.app.deployment.revisionHistoryLimit }}
+  revisionHistoryLimit: {{ .Values.app.deployment.revisionHistoryLimit }}
+  {{- end }}
   selector:
     matchLabels:
       app.kubernetes.io/name: {{ .Release.Name }}-app
@@ -18,44 +32,69 @@ spec:
       labels:
         app.kubernetes.io/name: {{ .Release.Name }}-app
         app.kubernetes.io/instance: {{ .Release.Name }}
-      {{- if .Values.global.monitoring.enabled }}
+        {{- if .Values.app.pod.labels }}
+        {{- toYaml .Values.app.pod.labels | nindent 8 }}
+        {{- end }}
       annotations:
+        {{- if .Values.app.podAnnotations }}
+        {{- toYaml .Values.app.podAnnotations | nindent 8 }}
+        {{- else if .Values.global.podAnnotations }}
+        {{- toYaml .Values.global.podAnnotations | nindent 8 }}
+        {{- end }}
+        {{- if .Values.app.telemetry.metrics.enabled }}
         prometheus.io/scrape: "true"
         prometheus.io/port: "{{ .Values.app.service.port }}"
-      {{- end }}
+        {{- end }}
     spec:
-      # Pod security context
+      # Pod security context - https://kubespec.dev/v1/Pod#spec.securityContext
+      {{- with (coalesce .Values.app.podSecurityContext .Values.global.podSecurityContext)}}
       securityContext:
-        {{- toYaml .Values.global.podSecurityContext | nindent 8 }}
-      # Node selection
-      {{- with .Values.global.scheduling.nodeSelector }}
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+
+      # Node selection - https://kubespec.dev/v1/Pod#spec.nodeSelector
+      {{- with (coalesce .Values.app.nodeSelector .Values.global.scheduling.nodeSelector)}}
       nodeSelector:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-      {{- with .Values.global.scheduling.affinity }}
-      affinity:
-        {{- toYaml . | nindent 8 }}
-      {{- end }}
-      {{- with .Values.global.scheduling.tolerations }}
+
+      # Tolerations - https://kubespec.dev/v1/Pod#spec.tolerations
+      {{- with (coalesce .Values.app.tolerations .Values.global.scheduling.tolerations)}}
       tolerations:
         {{- toYaml . | nindent 8 }}
       {{- end }}
+
+      # Affinity - https://kubespec.dev/v1/Pod#spec.affinity
+      {{- with (coalesce .Values.app.affinity .Values.global.scheduling.affinity)}}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+
       initContainers:
-      - name: wait-for-opensearch
-        image: curlimages/curl:latest
-        command: ['sh', '-c']
-        args:
-          - |
-            echo "Waiting for OpenSearch service..."
-            until curl -s -f "http://{{ .Release.Name }}-opensearch:9200/_cluster/health" | grep -q '"status":"green"\|"status":"yellow"'; do
-              echo "OpenSearch not ready yet, waiting..."
-              sleep 5
-            done
-            echo "OpenSearch is ready!"
+        {{- with .Values.app.extraInitContainers}}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+        {{- if .Values.opensearch.chartManaged }}
+        - name: wait-for-opensearch
+          image: curlimages/curl:latest
+          command: ['sh', '-c']
+          args:
+            - |
+              url="http://{{ .Release.Name }}-opensearch:9200/_cluster/health"
+              echo "Waiting for OpenSearch service at $url..."
+              until curl -s -f $url | grep -q '"status":"green"\|"status":"yellow"'; do
+                echo "OpenSearch not ready yet, waiting..."
+                sleep 5
+              done
+              echo "OpenSearch is ready!"
+        {{- end }}
       containers:
-        - name: {{ .Chart.Name }}-app
+        {{- with .Values.app.extraContainers}}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+        - name: {{ .Release.Name }}-app
           securityContext:
-            {{- toYaml .Values.global.containerSecurityContext | nindent 12 }}
+            {{- toYaml (coalesce .Values.app.containerSecurityContext .Values.global.containerSecurityContext) | nindent 12 }}
           image: "{{ .Values.images.app.repository }}:{{ .Values.images.app.tag }}"
           imagePullPolicy: "{{ .Values.images.app.pullPolicy }}"
           ports:
@@ -63,59 +102,540 @@ spec:
               containerPort: {{ .Values.app.service.port }}
               protocol: TCP
           env:
-            {{- include "langwatch.postgresqlEnvSet" . | nindent 12 }}
-            {{- include "langwatch.redisEnvSet" . | nindent 12 }}
-            {{- include "langwatch.opensearchEnvSet" . | nindent 12 }}
+            - name: NODE_ENV
+              value: {{ .Values.app.nodeEnv | default .Values.global.env | default "production" }}
+
+            - name: BASE_HOST
+              value: {{ .Values.app.http.baseHost | default "http://localhost:5560" }}
+            - name: NEXTAUTH_URL
+              value: {{ .Values.app.http.publicUrl | default "http://localhost:5560" }}
 
             - name: SKIP_ENV_VALIDATION
-              value: "true"
+              value: {{ .Values.app.features.skipEnvValidation | default false | quote }}
             - name: DISABLE_PII_REDACTION
-              value: "true"
+              value: {{ .Values.app.features.disablePiiRedaction | default false | quote }}
+
+            # (TODO)
+            # - name: TOPIC_CLUSTERING_SERVICE
+            #   value: {{ .Values.app.features.topicClustering | default false | quote }}
+
+            - name: LANGWATCH_NLP_SERVICE
+              value: {{ .Values.app.upstreams.nlp.scheme | default "http" }}://{{ .Values.app.upstreams.nlp.name | default "langwatch-nlp" }}:{{ .Values.app.upstreams.nlp.port | default 5561 }}
+            - name: LANGEVALS_ENDPOINT
+              value: {{ .Values.app.upstreams.langevals.scheme | default "http" }}://{{ .Values.app.upstreams.langevals.name | default "langevals" }}:{{ .Values.app.upstreams.langevals.port | default 5562 }}
+
+            # PostgreSQL connection string
+            {{- if .Values.postgresql.chartManaged }}
+            - name: PGUSER
+              value: {{ default "postgres" .Values.postgresql.auth.username | quote }}
+            - name: PGPASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ if .Values.postgresql.auth.existingSecret }}{{ .Values.postgresql.auth.existingSecret }}{{ else }}{{ .Release.Name }}-postgresql{{ end }}
+                  key: {{ if .Values.postgresql.auth.existingSecret }}{{ if eq (default "postgres" .Values.postgresql.auth.username) "postgres" }}{{ .Values.postgresql.auth.secretKeys.adminPasswordKey | default "postgres-password" }}{{ else }}{{ .Values.postgresql.auth.secretKeys.passwordKey | default "password" }}{{ end }}{{ else }}{{ if eq (default "postgres" .Values.postgresql.auth.username) "postgres" }}postgres-password{{ else }}password{{ end }}{{ end }}
+            - name: PGHOST
+              value: "{{ .Release.Name }}-postgresql"
+            - name: PGDATABASE
+              value: {{ .Values.postgresql.auth.database | quote }}
+            - name: DATABASE_URL
+              value: "postgresql://$(PGUSER):$(PGPASSWORD)@$(PGHOST):5432/$(PGDATABASE)"
+            {{- else }}
+            - name: DATABASE_URL
+              {{- if .Values.postgresql.external.connectionString.value }}
+              value: {{ .Values.postgresql.external.connectionString.value | quote }}
+              {{- else }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.postgresql.external.connectionString.secretKeyRef.name }}
+                  key: {{ .Values.postgresql.external.connectionString.secretKeyRef.key }}
+              {{- end }}
+            {{- end }}
+
+            # Redis connection string
+            {{- if .Values.redis.chartManaged }}
+            {{- if .Values.redis.auth.enabled }}
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ if .Values.redis.auth.existingSecret }}{{ .Values.redis.auth.existingSecret }}{{ else }}{{ .Release.Name }}-redis{{ end }}
+                  key: {{ if .Values.redis.auth.existingSecret }}{{ .Values.redis.auth.secretKeys.passwordKey | default "password" }}{{ else }}redis-password{{ end }}
+            - name: REDIS_HOST
+              value: "{{ .Release.Name }}-redis-master"
+            - name: REDIS_URL
+              value: "redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):6379"
+            {{- else }}
+            - name: REDIS_URL
+              value: "redis://{{ .Release.Name }}-redis-master:6379"
+            {{- end }}
+            {{- else }}
+            {{- if eq .Values.redis.external.architecture "standalone" }}
+            - name: REDIS_URL
+            {{- else}}
+            - name: REDIS_CLUSTER_ENDPOINTS
+            {{- end }}
+            {{- if .Values.redis.external.connectionString.value }}
+              value: {{ .Values.redis.external.connectionString.value | quote }}
+            {{- else }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.redis.external.connectionString.secretKeyRef.name }}
+                  key: {{ .Values.redis.external.connectionString.secretKeyRef.key }}
+            {{- end }}
+            {{- end }}
+
+            # ElasticSearch/OpenSearch/Quickwit connection string
+            {{- if .Values.opensearch.chartManaged }}
+            - name: ELASTICSEARCH_NODE_URL
+              value: "http://{{ .Release.Name }}-opensearch:9200"
             - name: IS_OPENSEARCH
               value: "true"
+            {{- else}}
+            - name: ELASTICSEARCH_NODE_URL
+              {{- if .Values.opensearch.external.nodeUrl.value }}
+              value: {{ .Values.opensearch.external.nodeUrl.value | quote }}
+              {{- else }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.opensearch.external.nodeUrl.secretKeyRef.name }}
+                  key: {{ .Values.opensearch.external.nodeUrl.secretKeyRef.key }}
+              {{- end }}
+            - name: ELASTICSEARCH_API_KEY
+              {{- if .Values.opensearch.external.apiKey.value }}
+              value: {{ .Values.opensearch.external.apiKey.value | quote }}
+              {{- else }}
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.opensearch.external.apiKey.secretKeyRef.name }}
+                  key: {{ .Values.opensearch.external.apiKey.secretKeyRef.key }}
+              {{- end }}
+            {{- if eq .Values.opensearch.external.engine "opensearch" }}
+            - name: IS_OPENSEARCH
+              value: "true"
+            {{- else if eq .Values.opensearch.external.engine "quickwit" }}
+            - name: IS_QUICKWIT
+              value: "true"
+            {{- end }}
+            {{- end }}
 
-            # Computed internal service URLs
-            - name: LANGWATCH_NLP_SERVICE
-              value: "http://{{ .Release.Name }}-langwatch-nlp:5561"
-            - name: LANGEVALS_ENDPOINT
-              value: "http://{{ .Release.Name }}-langevals:5562"
-            - name: BASE_HOST
-              value: "http://localhost:5560"
-            - name: NEXTAUTH_URL
-              value: "http://localhost:5560"
-
-            # Secret-based environment variables
-            - name: API_TOKEN_JWT_SECRET
+            # Credentials encryption key
+            {{- if .Values.app.credentialsEncryptionKey.secretKeyRef.name }}
+            - name: CREDENTIALS_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.app.credentialsEncryptionKey.secretKeyRef.name }}
+                  key: {{ .Values.app.credentialsEncryptionKey.secretKeyRef.key }}
+            {{- else if .Values.secrets.existingSecret }}
+            - name: CREDENTIALS_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.existingSecret }}
+                  key: {{ .Values.secrets.secretKeys.credentialsEncryptionKey | default "credentialsEncryptionKey" }}
+            {{- else if .Values.autogen.enabled }}
+            - name: CREDENTIALS_SECRET
               valueFrom:
                 secretKeyRef:
                   name: {{ .Values.autogen.secretNames.app | default (printf "%s-app-secrets" .Release.Name) }}
-                  key: "API_TOKEN_JWT_SECRET"
+                  key: credentialsEncryptionKey
+            {{- end }}
+
+            # Cron API key
+            {{- if .Values.app.cronApiKey.secretKeyRef.name }}
+            - name: CRON_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.app.cronApiKey.secretKeyRef.name }}
+                  key: {{ .Values.app.cronApiKey.secretKeyRef.key }}
+            {{- else if .Values.secrets.existingSecret }}
+            - name: CRON_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.existingSecret }}
+                  key: {{ .Values.secrets.secretKeys.cronApiKey | default "cronApiKey" }}
+            {{- else if .Values.autogen.enabled }}
             - name: CRON_API_KEY
               valueFrom:
                 secretKeyRef:
                   name: {{ .Values.autogen.secretNames.app | default (printf "%s-app-secrets" .Release.Name) }}
-                  key: "CRON_API_KEY"
-            - name: METRICS_API_KEY
+                  key: cronApiKey
+            {{- end }}
+
+            # Evaluators - Azure OpenAI Integration
+            {{- if .Values.app.evaluators.azureOpenAI.enabled }}
+            {{- if .Values.app.evaluators.azureOpenAI.endpoint.secretKeyRef.name }}
+            - name: AZURE_OPENAI_ENDPOINT
               valueFrom:
                 secretKeyRef:
-                  name: {{ .Values.autogen.secretNames.app | default (printf "%s-app-secrets" .Release.Name) }}
-                  key: "METRICS_API_KEY"
+                  name: {{ .Values.app.evaluators.azureOpenAI.endpoint.secretKeyRef.name }}
+                  key: {{ .Values.app.evaluators.azureOpenAI.endpoint.secretKeyRef.key }}
+            {{- else if .Values.app.evaluators.azureOpenAI.endpoint.value }}
+            - name: AZURE_OPENAI_ENDPOINT
+              value: {{ .Values.app.evaluators.azureOpenAI.endpoint.value | quote }}
+            {{- end }}
+            {{- if .Values.app.evaluators.azureOpenAI.apiKey.secretKeyRef.name }}
+            - name: AZURE_OPENAI_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.app.evaluators.azureOpenAI.apiKey.secretKeyRef.name }}
+                  key: {{ .Values.app.evaluators.azureOpenAI.apiKey.secretKeyRef.key }}
+            {{- else if .Values.app.evaluators.azureOpenAI.apiKey.value }}
+            - name: AZURE_OPENAI_KEY
+              value: {{ .Values.app.evaluators.azureOpenAI.apiKey.value | quote }}
+            {{- end }}
+            {{- end }}
+
+            # Evaluators - Google AI Integration
+            {{- if .Values.app.evaluators.google.enabled }}
+            {{- if .Values.app.evaluators.google.credentials.secretKeyRef.name }}
+            - name: GOOGLE_APPLICATION_CREDENTIALS
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.app.evaluators.google.credentials.secretKeyRef.name }}
+                  key: {{ .Values.app.evaluators.google.credentials.secretKeyRef.key }}
+            {{- else if .Values.app.evaluators.google.credentials.value }}
+            - name: GOOGLE_APPLICATION_CREDENTIALS
+              value: {{ .Values.app.evaluators.google.credentials.value | quote }}
+            {{- end }}
+            {{- end }}
+
+            # Dataset Object Storage
+            {{- if .Values.app.datasetObjectStorage.enabled }}
+            - name: USE_S3_STORAGE
+              value: "true"
+            {{- if eq .Values.app.datasetObjectStorage.provider "awsS3" }}
+            {{- if .Values.app.datasetObjectStorage.providers.awsS3.endpoint.secretKeyRef.name }}
+            - name: S3_ENDPOINT
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.app.datasetObjectStorage.providers.awsS3.endpoint.secretKeyRef.name }}
+                  key: {{ .Values.app.datasetObjectStorage.providers.awsS3.endpoint.secretKeyRef.key }}
+            {{- else if .Values.app.datasetObjectStorage.providers.awsS3.endpoint.value }}
+            - name: S3_ENDPOINT
+              value: {{ .Values.app.datasetObjectStorage.providers.awsS3.endpoint.value | quote }}
+            {{- end }}
+            {{- if .Values.app.datasetObjectStorage.providers.awsS3.accessKeyId.secretKeyRef.name }}
+            - name: S3_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.app.datasetObjectStorage.providers.awsS3.accessKeyId.secretKeyRef.name }}
+                  key: {{ .Values.app.datasetObjectStorage.providers.awsS3.accessKeyId.secretKeyRef.key }}
+            {{- else if .Values.app.datasetObjectStorage.providers.awsS3.accessKeyId.value }}
+            - name: S3_ACCESS_KEY_ID
+              value: {{ .Values.app.datasetObjectStorage.providers.awsS3.accessKeyId.value | quote }}
+            {{- end }}
+            {{- if .Values.app.datasetObjectStorage.providers.awsS3.secretAccessKey.secretKeyRef.name }}
+            - name: S3_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.app.datasetObjectStorage.providers.awsS3.secretAccessKey.secretKeyRef.name }}
+                  key: {{ .Values.app.datasetObjectStorage.providers.awsS3.secretAccessKey.secretKeyRef.key }}
+            {{- else if .Values.app.datasetObjectStorage.providers.awsS3.secretAccessKey.value }}
+            - name: S3_SECRET_ACCESS_KEY
+              value: {{ .Values.app.datasetObjectStorage.providers.awsS3.secretAccessKey.value | quote }}
+            {{- end }}
+            {{- if .Values.app.datasetObjectStorage.providers.awsS3.keySalt.secretKeyRef.name }}
+            - name: S3_KEY_SALT
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.app.datasetObjectStorage.providers.awsS3.keySalt.secretKeyRef.name }}
+                  key: {{ .Values.app.datasetObjectStorage.providers.awsS3.keySalt.secretKeyRef.key }}
+            {{- else if .Values.app.datasetObjectStorage.providers.awsS3.keySalt.value }}
+            - name: S3_KEY_SALT
+              value: {{ .Values.app.datasetObjectStorage.providers.awsS3.keySalt.value | quote }}
+            {{- end }}
+            {{- end }}
+            {{- end }}
+
+            # Email configuration
+            {{- if .Values.app.email.enabled }}
+            - name: EMAIL_DEFAULT_FROM
+              value: {{ .Values.app.email.defaultFrom | quote }}
+            - name: EMAIL_PROVIDER
+              value: {{ .Values.app.email.provider | quote }}
+            {{- if eq .Values.app.email.provider "sendgrid" }}
+            {{- if .Values.app.email.providers.sendgrid.apiKey.secretKeyRef.name }}
+            - name: SENDGRID_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.app.email.providers.sendgrid.apiKey.secretKeyRef.name }}
+                  key: {{ .Values.app.email.providers.sendgrid.apiKey.secretKeyRef.key }}
+            {{- else if .Values.app.email.providers.sendgrid.apiKey.value }}
+            - name: SENDGRID_API_KEY
+              value: {{ .Values.app.email.providers.sendgrid.apiKey.value | quote }}
+            {{- end }}
+            {{- end }}
+            {{- end }}
+
+            # NextAuth configuration
+            - name: NEXTAUTH_PROVIDER
+              value: {{ .Values.app.nextAuth.provider | quote }}
+
+            # NextAuth secret
+            {{- if .Values.app.nextAuth.secret.secretKeyRef.name }}
+            - name: NEXTAUTH_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.app.nextAuth.secret.secretKeyRef.name }}
+                  key: {{ .Values.app.nextAuth.secret.secretKeyRef.key }}
+            {{- else if .Values.secrets.existingSecret }}
+            - name: NEXTAUTH_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.secrets.existingSecret }}
+                  key: {{ .Values.secrets.secretKeys.nextAuthSecret | default "nextAuthSecret" }}
+            {{- else if .Values.autogen.enabled }}
             - name: NEXTAUTH_SECRET
               valueFrom:
                 secretKeyRef:
                   name: {{ .Values.autogen.secretNames.app | default (printf "%s-app-secrets" .Release.Name) }}
-                  key: "NEXTAUTH_SECRET"
-
-            # Non-secret environment variables
-            {{- range $key, $value := .Values.app.env }}
-            - name: {{ $key }}
-              value: {{ tpl $value $ | quote }}
+                  key: nextAuthSecret
             {{- end }}
+
+            # NextAuth - SSO Auth0 OAuth provider
+            {{- if .Values.app.nextAuth.providers.auth0.clientId.secretKeyRef.name }}
+            - name: AUTH0_CLIENT_ID
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.app.nextAuth.providers.auth0.clientId.secretKeyRef.name }}
+                  key: {{ .Values.app.nextAuth.providers.auth0.clientId.secretKeyRef.key }}
+            {{- else if .Values.app.nextAuth.providers.auth0.clientId.value }}
+            - name: AUTH0_CLIENT_ID
+              value: {{ .Values.app.nextAuth.providers.auth0.clientId.value | quote }}
+            {{- end }}
+            {{- if .Values.app.nextAuth.providers.auth0.clientSecret.secretKeyRef.name }}
+            - name: AUTH0_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.app.nextAuth.providers.auth0.clientSecret.secretKeyRef.name }}
+                  key: {{ .Values.app.nextAuth.providers.auth0.clientSecret.secretKeyRef.key }}
+            {{- else if .Values.app.nextAuth.providers.auth0.clientSecret.value }}
+            - name: AUTH0_CLIENT_SECRET
+              value: {{ .Values.app.nextAuth.providers.auth0.clientSecret.value | quote }}
+            {{- end }}
+            {{- if .Values.app.nextAuth.providers.auth0.issuer.secretKeyRef.name }}
+            - name: AUTH0_ISSUER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.app.nextAuth.providers.auth0.issuer.secretKeyRef.name }}
+                  key: {{ .Values.app.nextAuth.providers.auth0.issuer.secretKeyRef.key }}
+            {{- else if .Values.app.nextAuth.providers.auth0.issuer.value }}
+            - name: AUTH0_ISSUER
+              value: {{ .Values.app.nextAuth.providers.auth0.issuer.value | quote }}
+            {{- end }}
+
+            # NextAuth - SSO Azure AD OAuth provider
+            {{- if .Values.app.nextAuth.providers.azureAd.clientId.secretKeyRef.name }}
+            - name: AZURE_AD_CLIENT_ID
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.app.nextAuth.providers.azureAd.clientId.secretKeyRef.name }}
+                  key: {{ .Values.app.nextAuth.providers.azureAd.clientId.secretKeyRef.key }}
+            {{- else if .Values.app.nextAuth.providers.azureAd.clientId.value }}
+            - name: AZURE_AD_CLIENT_ID
+              value: {{ .Values.app.nextAuth.providers.azureAd.clientId.value | quote }}
+            {{- end }}
+            {{- if .Values.app.nextAuth.providers.azureAd.clientSecret.secretKeyRef.name }}
+            - name: AZURE_AD_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.app.nextAuth.providers.azureAd.clientSecret.secretKeyRef.name }}
+                  key: {{ .Values.app.nextAuth.providers.azureAd.clientSecret.secretKeyRef.key }}
+            {{- else if .Values.app.nextAuth.providers.azureAd.clientSecret.value }}
+            - name: AZURE_AD_CLIENT_SECRET
+              value: {{ .Values.app.nextAuth.providers.azureAd.clientSecret.value | quote }}
+            {{- end }}
+            {{- if .Values.app.nextAuth.providers.azureAd.tenantId.secretKeyRef.name }}
+            - name: AZURE_AD_TENANT_ID
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.app.nextAuth.providers.azureAd.tenantId.secretKeyRef.name }}
+                  key: {{ .Values.app.nextAuth.providers.azureAd.tenantId.secretKeyRef.key }}
+            {{- else if .Values.app.nextAuth.providers.azureAd.tenantId.value }}
+            - name: AZURE_AD_TENANT_ID
+              value: {{ .Values.app.nextAuth.providers.azureAd.tenantId.value | quote }}
+            {{- end }}
+
+            # NextAuth - SSO AWS Cognito OAuth provider
+            {{- if .Values.app.nextAuth.providers.cognito.clientId.secretKeyRef.name }}
+            - name: COGNITO_CLIENT_ID
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.app.nextAuth.providers.cognito.clientId.secretKeyRef.name }}
+                  key: {{ .Values.app.nextAuth.providers.cognito.clientId.secretKeyRef.key }}
+            {{- else if .Values.app.nextAuth.providers.cognito.clientId.value }}
+            - name: COGNITO_CLIENT_ID
+              value: {{ .Values.app.nextAuth.providers.cognito.clientId.value | quote }}
+            {{- end }}
+            {{- if .Values.app.nextAuth.providers.cognito.clientSecret.secretKeyRef.name }}
+            - name: COGNITO_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.app.nextAuth.providers.cognito.clientSecret.secretKeyRef.name }}
+                  key: {{ .Values.app.nextAuth.providers.cognito.clientSecret.secretKeyRef.key }}
+            {{- else if .Values.app.nextAuth.providers.cognito.clientSecret.value }}
+            - name: COGNITO_CLIENT_SECRET
+              value: {{ .Values.app.nextAuth.providers.cognito.clientSecret.value | quote }}
+            {{- end }}
+            {{- if .Values.app.nextAuth.providers.cognito.issuer.secretKeyRef.name }}
+            - name: COGNITO_ISSUER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.app.nextAuth.providers.cognito.issuer.secretKeyRef.name }}
+                  key: {{ .Values.app.nextAuth.providers.cognito.issuer.secretKeyRef.key }}
+            {{- else if .Values.app.nextAuth.providers.cognito.issuer.value }}
+            - name: COGNITO_ISSUER
+              value: {{ .Values.app.nextAuth.providers.cognito.issuer.value | quote }}
+            {{- end }}
+
+            # NextAuth - SSO GitHub OAuth provider
+            {{- if .Values.app.nextAuth.providers.github.clientId.secretKeyRef.name }}
+            - name: GITHUB_CLIENT_ID
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.app.nextAuth.providers.github.clientId.secretKeyRef.name }}
+                  key: {{ .Values.app.nextAuth.providers.github.clientId.secretKeyRef.key }}
+            {{- else if .Values.app.nextAuth.providers.github.clientId.value }}
+            - name: GITHUB_CLIENT_ID
+              value: {{ .Values.app.nextAuth.providers.github.clientId.value | quote }}
+            {{- end }}
+            {{- if .Values.app.nextAuth.providers.github.clientSecret.secretKeyRef.name }}
+            - name: GITHUB_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.app.nextAuth.providers.github.clientSecret.secretKeyRef.name }}
+                  key: {{ .Values.app.nextAuth.providers.github.clientSecret.secretKeyRef.key }}
+            {{- else if .Values.app.nextAuth.providers.github.clientSecret.value }}
+            - name: GITHUB_CLIENT_SECRET
+              value: {{ .Values.app.nextAuth.providers.github.clientSecret.value | quote }}
+            {{- end }}
+
+            # NextAuth - SSO GitLab OAuth provider
+            {{- if .Values.app.nextAuth.providers.gitlab.clientId.secretKeyRef.name }}
+            - name: GITLAB_CLIENT_ID
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.app.nextAuth.providers.gitlab.clientId.secretKeyRef.name }}
+                  key: {{ .Values.app.nextAuth.providers.gitlab.clientId.secretKeyRef.key }}
+            {{- else if .Values.app.nextAuth.providers.gitlab.clientId.value }}
+            - name: GITLAB_CLIENT_ID
+              value: {{ .Values.app.nextAuth.providers.gitlab.clientId.value | quote }}
+            {{- end }}
+            {{- if .Values.app.nextAuth.providers.gitlab.clientSecret.secretKeyRef.name }}
+            - name: GITLAB_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.app.nextAuth.providers.gitlab.clientSecret.secretKeyRef.name }}
+                  key: {{ .Values.app.nextAuth.providers.gitlab.clientSecret.secretKeyRef.key }}
+            {{- else if .Values.app.nextAuth.providers.gitlab.clientSecret.value }}
+            - name: GITLAB_CLIENT_SECRET
+              value: {{ .Values.app.nextAuth.providers.gitlab.clientSecret.value | quote }}
+            {{- end }}
+
+            # NextAuth - SSO Google OAuth provider
+            {{- if .Values.app.nextAuth.providers.google.clientId.secretKeyRef.name }}
+            - name: GOOGLE_CLIENT_ID
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.app.nextAuth.providers.google.clientId.secretKeyRef.name }}
+                  key: {{ .Values.app.nextAuth.providers.google.clientId.secretKeyRef.key }}
+            {{- else if .Values.app.nextAuth.providers.google.clientId.value }}
+            - name: GOOGLE_CLIENT_ID
+              value: {{ .Values.app.nextAuth.providers.google.clientId.value | quote }}
+            {{- end }}
+            {{- if .Values.app.nextAuth.providers.google.clientSecret.secretKeyRef.name }}
+            - name: GOOGLE_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.app.nextAuth.providers.google.clientSecret.secretKeyRef.name }}
+                  key: {{ .Values.app.nextAuth.providers.google.clientSecret.secretKeyRef.key }}
+            {{- else if .Values.app.nextAuth.providers.google.clientSecret.value }}
+            - name: GOOGLE_CLIENT_SECRET
+              value: {{ .Values.app.nextAuth.providers.google.clientSecret.value | quote }}
+            {{- end }}
+
+            # NextAuth - SSO Okta OAuth provider
+            {{- if .Values.app.nextAuth.providers.okta.clientId.secretKeyRef.name }}
+            - name: OKTA_CLIENT_ID
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.app.nextAuth.providers.okta.clientId.secretKeyRef.name }}
+                  key: {{ .Values.app.nextAuth.providers.okta.clientId.secretKeyRef.key }}
+            {{- else if .Values.app.nextAuth.providers.okta.clientId.value }}
+            - name: OKTA_CLIENT_ID
+              value: {{ .Values.app.nextAuth.providers.okta.clientId.value | quote }}
+            {{- end }}
+            {{- if .Values.app.nextAuth.providers.okta.clientSecret.secretKeyRef.name }}
+            - name: OKTA_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.app.nextAuth.providers.okta.clientSecret.secretKeyRef.name }}
+                  key: {{ .Values.app.nextAuth.providers.okta.clientSecret.secretKeyRef.key }}
+            {{- else if .Values.app.nextAuth.providers.okta.clientSecret.value }}
+            - name: OKTA_CLIENT_SECRET
+              value: {{ .Values.app.nextAuth.providers.okta.clientSecret.value | quote }}
+            {{- end }}
+            {{- if .Values.app.nextAuth.providers.okta.issuer.secretKeyRef.name }}
+            - name: OKTA_ISSUER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.app.nextAuth.providers.okta.issuer.secretKeyRef.name }}
+                  key: {{ .Values.app.nextAuth.providers.okta.issuer.secretKeyRef.key }}
+            {{- else if .Values.app.nextAuth.providers.okta.issuer.value }}
+            - name: OKTA_ISSUER
+              value: {{ .Values.app.nextAuth.providers.okta.issuer.value | quote }}
+            {{- end }}
+
+            # Telemetry - Usage analytics collection
+            - name: DISABLE_USAGE_STATS
+              value: {{ (not (.Values.app.telemetry.usage.enabled | default true)) | quote }}
+            # Telemetry - Prometheus metrics collection
+            {{- if .Values.app.telemetry.metrics.enabled }}
+            {{- if .Values.app.telemetry.metrics.apiKey.secretKeyRef.name }}
+            - name: METRICS_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.app.telemetry.metrics.apiKey.secretKeyRef.name }}
+                  key: {{ .Values.app.telemetry.metrics.apiKey.secretKeyRef.key }}
+            {{- else if .Values.app.telemetry.metrics.apiKey.value }}
+            - name: METRICS_API_KEY
+              value: {{ .Values.app.telemetry.metrics.apiKey.value | quote }}
+            {{- end }}
+            {{- end }}
+            # Telemetry - Sentry error reporting integration
+            {{- if .Values.app.telemetry.sentry.enabled }}
+            {{- if .Values.app.telemetry.sentry.dsn.secretKeyRef.name }}
+            - name: SENTRY_DSN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.app.telemetry.sentry.dsn.secretKeyRef.name }}
+                  key: {{ .Values.app.telemetry.sentry.dsn.secretKeyRef.key }}
+            {{- else if .Values.app.telemetry.sentry.dsn.value }}
+            - name: SENTRY_DSN
+              value: {{ .Values.app.telemetry.sentry.dsn.value | quote }}
+            {{- end }}
+            {{- end }}
+
+            {{- with .Values.app.extraEnvs}}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+
+          {{- if .Values.app.extraAppLifecycle}}
+          lifecycle:
+            {{- with .Values.app.extraAppLifecycle}}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          {{- end }}
           resources:
             {{- toYaml .Values.app.resources | nindent 12 }}
           volumeMounts:
+            {{- with .Values.app.extraAppVolumeMounts}}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
             - name: tmp-dir
               mountPath: /tmp
+
       volumes:
+        {{- with .Values.app.extraVolumes}}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
         - name: tmp-dir
           emptyDir: {}

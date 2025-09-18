@@ -1,3 +1,4 @@
+{{- if .Values.app.telemetry.metrics.enabled }}
 {{- if .Values.prometheus.chartManaged }}
 ---
 apiVersion: v1
@@ -80,4 +81,5 @@ data:
             regex: (.+)
             target_label: __metrics_path__
             replacement: /api/v1/nodes/$1/proxy/metrics/cadvisor
+{{- end }}
 {{- end }}

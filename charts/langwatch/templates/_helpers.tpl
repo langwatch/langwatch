@@ -1,10 +1,10 @@
 {{/* Our Label */}}
-{{- define "langwatch.chart" -}}
-{{- printf "%s-%s" .Chart.Name .Chart.Version | replace "+" "_" | trunc 63 | trimSuffix "-" -}}
-{{- end -}}
+{{- define "langwatch.chart" }}
+{{- printf "%s-%s" .Chart.Name .Chart.Version | replace "+" "_" | trunc 63 | trimSuffix "-" }}
+{{- end }}
 
 {{/* Common label set */}}
-{{- define "langwatch.labels" -}}
+{{- define "langwatch.labels" }}
 helm.sh/chart: {{ include "langwatch.chart" . }}
 app.kubernetes.io/name: {{ .Chart.Name }}
 app.kubernetes.io/instance: {{ .Release.Name }}
@@ -13,318 +13,263 @@ app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
 {{- end }}
 app.kubernetes.io/managed-by: {{ .Release.Service }}
 app.kubernetes.io/part-of: langwatch
-{{- end -}}
+{{- end }}
 
 {{/* Selector labels (must match .spec.selector and pod labels) */}}
-{{- define "langwatch.selectorLabels" -}}
+{{- define "langwatch.selectorLabels" }}
 app.kubernetes.io/name: {{ .Chart.Name }}
 app.kubernetes.io/instance: {{ .Release.Name }}
-{{- end -}}
+{{- end }}
 
-{{/* ==== pgSQL region ==== */}}
+{{/* Secret validation function */}}
+{{- define "langwatch.validateSecrets" }}
+{{- $errors := list }}
+{{- $warnings := list }}
 
-{{/* Must get PostgreSQL hostname */}}
-{{- define "langwatch.postgresql.hostname" -}}
-{{- if .Values.postgresql.chartManaged -}}
-{{ printf "%s-postgresql" .Release.Name }}
-{{- else -}}
-{{- required "postgresql.external.host is required when postgresql.chartManaged != true" .Values.postgresql.external.host -}}
-{{- end -}}
-{{- end -}}
+{{/* Check if autogen is disabled but no existing secret is provided */}}
+{{- if not .Values.autogen.enabled }}
+  {{- if empty .Values.secrets.existingSecret }}
+    {{- $errors = append $errors "autogen is disabled but no existingSecret is provided. Either enable autogen or provide an existingSecret" }}
+  {{- end }}
+{{- end }}
 
-{{/* Get PostgreSQL port (or default) */}}
-{{- define "langwatch.postgresql.port" -}}
-{{- if .Values.postgresql.chartManaged -}}
-"5432"
-{{- else -}}
-{{ (.Values.postgresql.external.port | default 5432) | toString | quote }}
-{{- end -}}
-{{- end -}}
+{{/* Validate required secrets when using existingSecret */}}
+{{- if .Values.secrets.existingSecret }}
+  {{- if empty .Values.secrets.secretKeys.credentialsEncryptionKey }}
+    {{- $warnings = append $warnings "secrets.secretKeys.credentialsEncryptionKey not specified, using default key 'credentialsEncryptionKey'" }}
+  {{- end }}
+{{- end }}
 
-{{/* Create pgSQL env-var set */}}
-{{- define "langwatch.postgresqlEnvSet" -}}
-{{- /* choose key: postgres -> postgres-password; else password; allow override */ -}}
-{{- $builtInPassKey := ( default ( ternary "postgres-password" "password" ( eq (default "" .Values.postgresql.auth.username) "postgres" ) ) .Values.postgresql.auth.secretKeys.builtInUserPasswordKey ) -}}
+{{/* Validate app secrets configuration */}}
+{{- if .Values.app.credentialsEncryptionKey.secretKeyRef.name }}
+  {{- if empty .Values.app.credentialsEncryptionKey.secretKeyRef.key }}
+    {{- $errors = append $errors "app.credentialsEncryptionKey.secretKeyRef.name is set but key is empty" }}
+  {{- end }}
+{{- else if empty .Values.app.credentialsEncryptionKey.value }}
+  {{- if not .Values.autogen.enabled }}
+    {{- if empty .Values.secrets.existingSecret }}
+      {{- $errors = append $errors "app.credentialsEncryptionKey must have either value, secretKeyRef, or autogen must be enabled" }}
+    {{- end }}
+  {{- end }}
+{{- end }}
 
-- name: DATABASE_HOST
-  value: {{ include "langwatch.postgresql.hostname" . | quote }}
-- name: DATABASE_PORT
-  value: {{ include "langwatch.postgresql.port" . }}
-- name: DATABASE_USERNAME
-  {{- if .Values.postgresql.auth.existingSecret }}
-  valueFrom:
-    secretKeyRef:
-      name: {{ .Values.postgresql.auth.existingSecret | quote }}
-      key: {{ (.Values.postgresql.auth.secretKeys.usernameKey | default "username") | quote }}
-  {{- else if .Values.secrets.existingSecret }}
-  valueFrom:
-    secretKeyRef:
-      name: {{ .Values.secrets.existingSecret | quote }}
-      key: {{ (.Values.postgresql.auth.secretKeys.usernameKey | default "username") | quote }}
+{{- if .Values.app.cronApiKey.secretKeyRef.name }}
+  {{- if empty .Values.app.cronApiKey.secretKeyRef.key }}
+    {{- $errors = append $errors "app.cronApiKey.secretKeyRef.name is set but key is empty" }}
+  {{- end }}
+{{- else if empty .Values.app.cronApiKey.value }}
+  {{- if not .Values.autogen.enabled }}
+    {{- if empty .Values.secrets.existingSecret }}
+      {{- $errors = append $errors "app.cronApiKey must have either value, secretKeyRef, or autogen must be enabled" }}
+    {{- end }}
+  {{- end }}
+{{- end }}
+
+{{/* Validate NextAuth secret */}}
+{{- if .Values.app.nextAuth.secret.secretKeyRef.name }}
+  {{- if empty .Values.app.nextAuth.secret.secretKeyRef.key }}
+    {{- $errors = append $errors "app.nextAuth.secret.secretKeyRef.name is set but key is empty" }}
+  {{- end }}
+{{- else if empty .Values.app.nextAuth.secret.value }}
+  {{- if not .Values.autogen.enabled }}
+    {{- if empty .Values.secrets.existingSecret }}
+      {{- $errors = append $errors "app.nextAuth.secret must have either value, secretKeyRef, or autogen must be enabled" }}
+    {{- end }}
+  {{- end }}
+{{- end }}
+
+{{/* Validate evaluators secrets */}}
+{{- if .Values.app.evaluators.azureOpenAI.enabled }}
+  {{- if .Values.app.evaluators.azureOpenAI.endpoint.secretKeyRef.name }}
+    {{- if empty .Values.app.evaluators.azureOpenAI.endpoint.secretKeyRef.key }}
+      {{- $errors = append $errors "app.evaluators.azureOpenAI.endpoint.secretKeyRef.name is set but key is empty" }}
+    {{- end }}
+  {{- else if empty .Values.app.evaluators.azureOpenAI.endpoint.value }}
+    {{- $errors = append $errors "app.evaluators.azureOpenAI.enabled is true but endpoint is not configured" }}
+  {{- end }}
+  
+  {{- if .Values.app.evaluators.azureOpenAI.apiKey.secretKeyRef.name }}
+    {{- if empty .Values.app.evaluators.azureOpenAI.apiKey.secretKeyRef.key }}
+      {{- $errors = append $errors "app.evaluators.azureOpenAI.apiKey.secretKeyRef.name is set but key is empty" }}
+    {{- end }}
+  {{- else if empty .Values.app.evaluators.azureOpenAI.apiKey.value }}
+    {{- $errors = append $errors "app.evaluators.azureOpenAI.enabled is true but apiKey is not configured" }}
+  {{- end }}
+{{- end }}
+
+{{- if .Values.app.evaluators.google.enabled }}
+  {{- if .Values.app.evaluators.google.credentials.secretKeyRef.name }}
+    {{- if empty .Values.app.evaluators.google.credentials.secretKeyRef.key }}
+      {{- $errors = append $errors "app.evaluators.google.credentials.secretKeyRef.name is set but key is empty" }}
+    {{- end }}
+  {{- else if empty .Values.app.evaluators.google.credentials.value }}
+    {{- $errors = append $errors "app.evaluators.google.enabled is true but credentials is not configured" }}
+  {{- end }}
+{{- end }}
+
+{{/* Validate dataset storage secrets */}}
+{{- if .Values.app.datasetObjectStorage.enabled }}
+  {{- if eq .Values.app.datasetObjectStorage.provider "awsS3" }}
+    {{- if .Values.app.datasetObjectStorage.providers.awsS3.endpoint.secretKeyRef.name }}
+      {{- if empty .Values.app.datasetObjectStorage.providers.awsS3.endpoint.secretKeyRef.key }}
+        {{- $errors = append $errors "app.datasetObjectStorage.providers.awsS3.endpoint.secretKeyRef.name is set but key is empty" }}
+      {{- end }}
+    {{- end }}
+    
+    {{- if .Values.app.datasetObjectStorage.providers.awsS3.accessKeyId.secretKeyRef.name }}
+      {{- if empty .Values.app.datasetObjectStorage.providers.awsS3.accessKeyId.secretKeyRef.key }}
+        {{- $errors = append $errors "app.datasetObjectStorage.providers.awsS3.accessKeyId.secretKeyRef.name is set but key is empty" }}
+      {{- end }}
+    {{- end }}
+    
+    {{- if .Values.app.datasetObjectStorage.providers.awsS3.secretAccessKey.secretKeyRef.name }}
+      {{- if empty .Values.app.datasetObjectStorage.providers.awsS3.secretAccessKey.secretKeyRef.key }}
+        {{- $errors = append $errors "app.datasetObjectStorage.providers.awsS3.secretAccessKey.secretKeyRef.name is set but key is empty" }}
+      {{- end }}
+    {{- end }}
+    
+    {{- if .Values.app.datasetObjectStorage.providers.awsS3.keySalt.secretKeyRef.name }}
+      {{- if empty .Values.app.datasetObjectStorage.providers.awsS3.keySalt.secretKeyRef.key }}
+        {{- $errors = append $errors "app.datasetObjectStorage.providers.awsS3.keySalt.secretKeyRef.name is set but key is empty" }}
+      {{- end }}
+    {{- end }}
+  {{- end }}
+{{- end }}
+
+{{/* Validate email provider secrets */}}
+{{- if .Values.app.email.enabled }}
+  {{- if eq .Values.app.email.provider "sendgrid" }}
+    {{- if .Values.app.email.providers.sendgrid.apiKey.secretKeyRef.name }}
+      {{- if empty .Values.app.email.providers.sendgrid.apiKey.secretKeyRef.key }}
+        {{- $errors = append $errors "app.email.providers.sendgrid.apiKey.secretKeyRef.name is set but key is empty" }}
+      {{- end }}
+    {{- else if empty .Values.app.email.providers.sendgrid.apiKey.value }}
+      {{- $errors = append $errors "app.email.enabled is true with sendgrid provider but apiKey is not configured" }}
+    {{- end }}
+  {{- end }}
+{{- end }}
+
+{{/* Validate NextAuth OAuth provider secrets */}}
+{{- $oauthProviders := list "auth0" "azureAd" "cognito" "github" "gitlab" "google" "okta" }}
+{{- range $provider := $oauthProviders }}
+  {{- $providerConfig := index $.Values.app.nextAuth.providers $provider }}
+  {{- if $providerConfig }}
+    {{- if $providerConfig.clientId.secretKeyRef.name }}
+      {{- if not $providerConfig.clientId.secretKeyRef.key }}
+        {{- $errors = append $errors (printf "app.nextAuth.providers.%s.clientId.secretKeyRef.name is set but key is empty" $provider) }}
+      {{- end }}
+    {{- end }}
+    
+    {{- if $providerConfig.clientSecret.secretKeyRef.name }}
+      {{- if not $providerConfig.clientSecret.secretKeyRef.key }}
+        {{- $errors = append $errors (printf "app.nextAuth.providers.%s.clientSecret.secretKeyRef.name is set but key is empty" $provider) }}
+      {{- end }}
+    {{- end }}
+    
+    {{- if and (has $provider (list "auth0" "cognito" "okta")) $providerConfig.issuer }}
+      {{- if $providerConfig.issuer.secretKeyRef.name }}
+        {{- if not $providerConfig.issuer.secretKeyRef.key }}
+          {{- $errors = append $errors (printf "app.nextAuth.providers.%s.issuer.secretKeyRef.name is set but key is empty" $provider) }}
+        {{- end }}
+      {{- end }}
+    {{- end }}
+    
+    {{- if eq $provider "azureAd" }}
+      {{- if $providerConfig.tenantId.secretKeyRef.name }}
+        {{- if not $providerConfig.tenantId.secretKeyRef.key }}
+          {{- $errors = append $errors "app.nextAuth.providers.azureAd.tenantId.secretKeyRef.name is set but key is empty" }}
+        {{- end }}
+      {{- end }}
+    {{- end }}
+  {{- end }}
+{{- end }}
+
+{{/* Validate telemetry secrets */}}
+{{- if .Values.app.telemetry.metrics.enabled }}
+  {{- if .Values.app.telemetry.metrics.apiKey.secretKeyRef.name }}
+    {{- if empty .Values.app.telemetry.metrics.apiKey.secretKeyRef.key }}
+      {{- $errors = append $errors "app.telemetry.metrics.apiKey.secretKeyRef.name is set but key is empty" }}
+    {{- end }}
+  {{- else if empty .Values.app.telemetry.metrics.apiKey.value }}
+    {{- $errors = append $errors "app.telemetry.metrics.enabled is true but apiKey is not configured" }}
+  {{- end }}
+{{- end }}
+
+{{- if .Values.app.telemetry.sentry.enabled }}
+  {{- if .Values.app.telemetry.sentry.dsn.secretKeyRef.name }}
+    {{- if empty .Values.app.telemetry.sentry.dsn.secretKeyRef.key }}
+      {{- $errors = append $errors "app.telemetry.sentry.dsn.secretKeyRef.name is set but key is empty" }}
+    {{- end }}
+  {{- else if empty .Values.app.telemetry.sentry.dsn.value }}
+    {{- $errors = append $errors "app.telemetry.sentry.enabled is true but dsn is not configured" }}
+  {{- end }}
+{{- end }}
+
+{{/* Validate external service secrets */}}
+{{- if not .Values.opensearch.chartManaged }}
+  {{- if .Values.opensearch.external.nodeUrl.secretKeyRef.name }}
+    {{- if empty .Values.opensearch.external.nodeUrl.secretKeyRef.key }}
+      {{- $errors = append $errors "opensearch.external.nodeUrl.secretKeyRef.name is set but key is empty" }}
+    {{- end }}
+  {{- else if empty .Values.opensearch.external.nodeUrl.value }}
+    {{- $errors = append $errors "opensearch.chartManaged is false but nodeUrl is not configured" }}
+  {{- end }}
+  
+  {{- if .Values.opensearch.external.apiKey.secretKeyRef.name }}
+    {{- if empty .Values.opensearch.external.apiKey.secretKeyRef.key }}
+      {{- $errors = append $errors "opensearch.external.apiKey.secretKeyRef.name is set but key is empty" }}
+    {{- end }}
+  {{- else if empty .Values.opensearch.external.apiKey.value }}
+    {{- $errors = append $errors "opensearch.chartManaged is false but apiKey is not configured" }}
+  {{- end }}
+{{- end }}
+
+{{- if not .Values.redis.chartManaged }}
+  {{- if .Values.redis.external.connectionString.secretKeyRef.name }}
+    {{- if empty .Values.redis.external.connectionString.secretKeyRef.key }}
+      {{- $errors = append $errors "redis.external.connectionString.secretKeyRef.name is set but key is empty" }}
+    {{- end }}
+  {{- else if empty .Values.redis.external.connectionString.value }}
+    {{- $errors = append $errors "redis.chartManaged is false but connectionString is not configured" }}
+  {{- end }}
+{{- end }}
+
+{{- if not .Values.postgresql.chartManaged }}
+  {{- if .Values.postgresql.external.connectionString.secretKeyRef.name }}
+    {{- if empty .Values.postgresql.external.connectionString.secretKeyRef.key }}
+      {{- $errors = append $errors "postgresql.external.connectionString.secretKeyRef.name is set but key is empty" }}
+    {{- end }}
+  {{- else if empty .Values.postgresql.external.connectionString.value }}
+    {{- $errors = append $errors "postgresql.chartManaged is false but connectionString is not configured" }}
+  {{- end }}
+{{- else}}
+  {{- if and (empty .Values.postgresql.auth.password) (empty .Values.postgresql.auth.existingSecret) }}
+    {{- $errors = append $errors "neither postgresql.auth.password nor postgresql.auth.existingSecret is configured" }}
+  {{- end }}
+{{- end }}
+
+{{- if not .Values.prometheus.chartManaged }}
+  {{- if .Values.prometheus.external.existingSecret }}
+    {{- if empty .Values.prometheus.external.secretKeys.host }}
+      {{- $errors = append $errors "prometheus.external.existingSecret is set but secretKeys.host is not configured" }}
+    {{- end }}
+    {{- if empty .Values.prometheus.external.secretKeys.port }}
+      {{- $errors = append $errors "prometheus.external.existingSecret is set but secretKeys.port is not configured" }}
+    {{- end }}
   {{- else }}
-  value: {{ required "postgresql.auth.username is required if not using secrets" .Values.postgresql.auth.username | quote }}
+    {{- $errors = append $errors "prometheus.chartManaged is false but external.existingSecret is not configured" }}
   {{- end }}
-- name: DATABASE_NAME
-  {{- if .Values.postgresql.auth.existingSecret }}
-  valueFrom:
-    secretKeyRef:
-      name: {{ .Values.postgresql.auth.existingSecret | quote }}
-      key: {{ (.Values.postgresql.auth.secretKeys.databaseKey | default "database") | quote }}
-  {{- else if .Values.secrets.existingSecret }}
-  valueFrom:
-    secretKeyRef:
-      name: {{ .Values.secrets.existingSecret | quote }}
-      key: {{ (.Values.postgresql.auth.secretKeys.databaseKey | default "database") | quote }}
-  {{- else }}
-  value: {{ required "postgresql.auth.database is required if not using secrets" .Values.postgresql.auth.database | quote }}
-  {{- end }}
-- name: DATABASE_PASSWORD
-  {{- if .Values.postgresql.chartManaged }}
-  value: {{ .Values.postgresql.auth.password | quote }}
-  {{- else if .Values.postgresql.auth.existingSecret }}
-  valueFrom:
-    secretKeyRef:
-      name: {{ .Values.postgresql.auth.existingSecret | quote }}
-      key: {{ (.Values.postgresql.auth.secretKeys.userPasswordKey | default "password") | quote }}
-  {{- else if .Values.secrets.existingSecret }}
-  valueFrom:
-    secretKeyRef:
-      name: {{ .Values.secrets.existingSecret | quote }}
-      key: {{ (.Values.postgresql.auth.secretKeys.userPasswordKey | default "password") | quote }}
-  {{- else if .Values.postgresql.external.password }}
-  value: {{ .Values.postgresql.external.password | quote }}
-  {{- else }}
-  value: ""
-  {{- end }}
-- name: DATABASE_SSLMODE
-  value: {{ (ternary "disable" (.Values.postgresql.external.sslMode | default "prefer") .Values.postgresql.chartManaged) | quote }}
-- name: DATABASE_URL
-  value: "postgresql://$(DATABASE_USERNAME):$(DATABASE_PASSWORD)@$(DATABASE_HOST):$(DATABASE_PORT)/$(DATABASE_NAME)?sslmode=$(DATABASE_SSLMODE)&schema=$(DATABASE_NAME)"
-{{- end -}}
+{{- end }}
 
-{{/* ==== REDIS region ==== */}}
+{{/* Output errors and warnings */}}
+{{- if $errors }}
+{{- fail (printf "Secret validation failed:\n%s" (join "\n" $errors)) }}
+{{- end }}
 
-{{/* Must get Redis hostname */}}
-{{- define "langwatch.redis.hostname" -}}
-{{- if .Values.redis.chartManaged -}}
-{{ printf "%s-redis-master" .Release.Name }}
-{{- else -}}
-{{- required "redis.external.host is required when redis.chartManaged != true" .Values.redis.external.host -}}
-{{- end -}}
-{{- end -}}
+{{- if $warnings }}
+{{- range $warning := $warnings }}
+{{- printf "WARNING: %s\n" $warning }}
+{{- end }}
+{{- end }}
 
-{{/* Get Redis port (or default) */}}
-{{- define "langwatch.redis.port" -}}
-{{- if .Values.redis.chartManaged -}}
-"6379"
-{{- else -}}
-{{ (.Values.redis.external.port | default 6379) | toString | quote }}
-{{- end -}}
-{{- end -}}
-
-{{/* Create Redis env-var set */}}
-{{- define "langwatch.redisEnvSet" -}}
-- name: REDIS_HOST
-  value: {{ include "langwatch.redis.hostname" . | quote }}
-- name: REDIS_PORT
-  value: {{ include "langwatch.redis.port" . }}
-- name: REDIS_PASSWORD
-  {{- if and .Values.redis.chartManaged .Values.autogen.enabled }}
-  valueFrom:
-    secretKeyRef:
-      name: {{ printf "%s-redis" .Release.Name | quote }}
-      key: "redis-password"
-  {{- else if and .Values.secrets.existingSecret (.Values.redis.auth.secretKeys.passwordKey | default "password") }}
-  valueFrom:
-    secretKeyRef:
-      name: {{ .Values.secrets.existingSecret | quote }}
-      key: {{ (.Values.redis.auth.secretKeys.passwordKey | default "password") | quote }}
-  {{- else if .Values.redis.external.password }}
-  value: {{ .Values.redis.external.password | quote }}
-  {{- else }}
-  value: ""
-  {{- end }}
-- name: REDIS_URL
-  value: "redis://:$(REDIS_PASSWORD)@$(REDIS_HOST):$(REDIS_PORT)"
-{{- end -}}
-
-{{/* ==== OPENSEARCH region ==== */}}
-
-{{/* Must get OpenSearch hostname */}}
-{{- define "langwatch.opensearch.hostname" -}}
-{{- if .Values.opensearch.chartManaged -}}
-{{ printf "%s-opensearch" .Release.Name }}
-{{- else -}}
-{{- required "opensearch.external.host is required when opensearch.chartManaged != true" .Values.opensearch.external.host -}}
-{{- end -}}
-{{- end -}}
-
-{{/* Get OpenSearch port (or default) */}}
-{{- define "langwatch.opensearch.port" -}}
-{{- if .Values.opensearch.chartManaged -}}
-"9200"
-{{- else -}}
-{{ (.Values.opensearch.external.port | default 9200) | toString | quote }}
-{{- end -}}
-{{- end -}}
-
-{{/* Create OpenSearch env-var set */}}
-{{- define "langwatch.opensearchEnvSet" -}}
-- name: ELASTICSEARCH_NODE_HOST
-  value: {{ include "langwatch.opensearch.hostname" . | quote }}
-- name: ELASTICSEARCH_NODE_PORT
-  value: {{ include "langwatch.opensearch.port" . }}
-- name: ELASTICSEARCH_NODE_SCHEME
-  value: {{ (.Values.opensearch.chartManaged | ternary "http" "https") | quote }}
-- name: ELASTICSEARCH_NODE_USERNAME
-  {{- if and .Values.secrets.existingSecret .Values.opensearch.auth.secretKeys }}
-  valueFrom:
-    secretKeyRef:
-      name: {{ .Values.secrets.existingSecret | quote }}
-      key: {{ (.Values.opensearch.auth.secretKeys.usernameKey | default "opensearch-username") | quote }}
-  {{- else }}
-  value: {{ default "" .Values.opensearch.external.username | quote }}
-  {{- end }}
-- name: ELASTICSEARCH_NODE_PASSWORD
-  {{- if and .Values.secrets.existingSecret .Values.opensearch.auth.secretKeys }}
-  valueFrom:
-    secretKeyRef:
-      name: {{ .Values.secrets.existingSecret | quote }}
-      key: {{ (.Values.opensearch.auth.secretKeys.passwordKey | default "opensearch-password") | quote }}
-  {{- else }}
-  value: {{ default "" .Values.opensearch.external.password | quote }}
-  {{- end }}
-- name: ELASTICSEARCH_NODE_URL
-  value: "$(ELASTICSEARCH_NODE_SCHEME)://$(ELASTICSEARCH_NODE_HOST):$(ELASTICSEARCH_NODE_PORT)"
-{{- end -}}
-
-{{/* ==== PROMETHEUS region ==== */}}
-
-{{/* Must get Prometheus hostname */}}
-{{- define "langwatch.prometheus.hostname" -}}
-{{- if .Values.prometheus.chartManaged -}}
-{{ printf "%s-prometheus" .Release.Name }}
-{{- else -}}
-{{- required "prometheus.external.host is required when prometheus.chartManaged != true" .Values.prometheus.external.host -}}
-{{- end -}}
-{{- end -}}
-
-{{/* Get Prometheus port (or default) */}}
-{{- define "langwatch.prometheus.port" -}}
-{{- if .Values.prometheus.chartManaged -}}
-"9090"
-{{- else -}}
-{{ (.Values.prometheus.external.port | default 9090) | toString | quote }}
-{{- end -}}
-{{- end -}}
-
-{{/* Create Prometheus env-var set */}}
-{{- define "langwatch.prometheusEnv" -}}
-- name: PROMETHEUS_HOST
-  value: {{ include "langwatch.prometheus.hostname" . | quote }}
-- name: PROMETHEUS_PORT
-  value: {{ include "langwatch.prometheus.port" . }}
-- name: PROMETHEUS_URL
-  value: "http://$(PROMETHEUS_HOST):$(PROMETHEUS_PORT)"
-- name: PROMETHEUS_USERNAME
-  value: {{ default "" .Values.prometheus.external.username | quote }}
-- name: PROMETHEUS_PASSWORD
-  value: {{ default "" .Values.prometheus.external.password | quote }}
-{{- end -}}
-
-{{/* ==== SECRET region ==== */}}
-
-{{/* Must get the primary secret name to reference */}}
-{{- define "langwatch.secretName" -}}
-{{- if .Values.secrets.existingSecret -}}
-{{ .Values.secrets.existingSecret }}
-{{- else if .Values.autogen.enabled -}}
-{{ .Values.autogen.secretNames.service | default (printf "%s-service-secrets" .Release.Name) }}
-{{- else -}}
-{{ fail "No secret configuration found. Set secrets.existingSecret or autogen.enabled=true" }}
-{{- end -}}
-{{- end -}}
-
-{{/* Must get CRON_API_KEY for CronJobs (no mock value) */}}
-{{- define "langwatch.cronApiKey" -}}
-{{- if .Values.secrets.existingSecret -}}
-{{- $secret := lookup "v1" "Secret" .Release.Namespace .Values.secrets.existingSecret -}}
-{{- if $secret -}}
-{{- index $secret.data (.Values.secrets.secretKeys.CRON_API_KEY | default "CRON_API_KEY") | b64dec | quote -}}
-{{- else -}}
-{{- fail (printf "Secret %s not found in namespace %s" .Values.secrets.existingSecret .Release.Namespace) -}}
-{{- end -}}
-{{- else if .Values.autogen.enabled -}}
-""
-{{- else -}}
-{{- fail "Set secrets.existingSecret or enable autogen.enabled to provide CRON_API_KEY" -}}
-{{- end -}}
-{{- end -}}
-
-{{/* Must get METRICS_API_KEY for Prometheus scrape auth (no mock value) */}}
-{{- define "langwatch.metricsApiKey" -}}
-{{- if .Values.secrets.existingSecret -}}
-{{- $secret := lookup "v1" "Secret" .Release.Namespace .Values.secrets.existingSecret -}}
-{{- if $secret -}}
-{{- index $secret.data (.Values.secrets.secretKeys.METRICS_API_KEY | default "METRICS_API_KEY") | b64dec | quote -}}
-{{- else -}}
-{{- fail (printf "Secret %s not found in namespace %s" .Values.secrets.existingSecret .Release.Namespace) -}}
-{{- end -}}
-{{- else if .Values.autogen.enabled -}}
-""
-{{- else -}}
-{{- fail "Set secrets.existingSecret or enable autogen.enabled to provide METRICS_API_KEY" -}}
-{{- end -}}
-{{- end -}}
-
-{{/* ==== VALIDATION region ==== */}}
-
-{{/* Validate secrets configuration */}}
-{{- define "langwatch.validateSecrets" -}}
-{{- if .Values.autogen.enabled }}
-  {{- /* ok – built-ins or subcharts will provide credentials */ -}}
-{{- else if .Values.postgresql.auth.password }}
-  {{- /* ok – using fixed password for PostgreSQL */ -}}
-{{- else if .Values.secrets.existingSecret }}
-  {{- if not .Values.secrets.existingSecret }}
-    {{- fail "autogen.enabled=false: secrets.existingSecret is required and must include app, PostgreSQL, and Redis credentials." }}
-  {{- end }}
-  {{- $sec := lookup "v1" "Secret" .Release.Namespace .Values.secrets.existingSecret -}}
-  {{- if not $sec -}}
-    {{- fail (printf "Secret %s not found in namespace %s" .Values.secrets.existingSecret .Release.Namespace) -}}
-  {{- end -}}
-
-  {{- /* App-level required keys */ -}}
-  {{- $appKeys := list
-        (.Values.secrets.secretKeys.API_TOKEN_JWT_SECRET | default "API_TOKEN_JWT_SECRET")
-        (.Values.secrets.secretKeys.CRON_API_KEY | default "CRON_API_KEY")
-        (.Values.secrets.secretKeys.METRICS_API_KEY | default "METRICS_API_KEY")
-        (.Values.secrets.secretKeys.NEXTAUTH_SECRET | default "NEXTAUTH_SECRET")
-    -}}
-  {{- range $k := $appKeys -}}
-    {{- if not (hasKey $sec.data $k) -}}
-      {{- fail (printf "Secret %s must contain key %s" $.Values.secrets.existingSecret $k) -}}
-    {{- end -}}
-  {{- end -}}
-
-  {{- /* Database keys */ -}}
-  {{- $dbUserKey := (.Values.postgresql.auth.secretKeys.usernameKey | default "username") -}}
-  {{- $dbPassKey := (.Values.postgresql.auth.secretKeys.userPasswordKey | default "password") -}}
-  {{- $dbNameKey := (.Values.postgresql.auth.secretKeys.databaseKey | default "database") -}}
-  {{- range $k := (list $dbUserKey $dbPassKey $dbNameKey) -}}
-    {{- if not (hasKey $sec.data $k) -}}
-      {{- fail (printf "Secret %s must contain database key %s" $.Values.secrets.existingSecret $k) -}}
-    {{- end -}}
-  {{- end -}}
-
-  {{- /* Redis key (password optional but if configured, must exist) */ -}}
-  {{- $redisPassKey := (.Values.redis.auth.secretKeys.passwordKey | default "password") -}}
-  {{- if (hasKey .Values.redis "auth") -}}
-    {{- if not (hasKey $sec.data $redisPassKey) -}}
-      {{- fail (printf "Secret %s must contain Redis key %s" $.Values.secrets.existingSecret $redisPassKey) -}}
-    {{- end -}}
-  {{- end -}}
-{{- else }}
-  {{- fail "Must set either: autogen.enabled=true, postgresql.auth.password, or secrets.existingSecret" }}
-{{- end -}}
-{{- end -}}
+{{- end }}
