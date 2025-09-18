@@ -52,21 +52,6 @@ docker compose up -d --wait --build
 open http://localhost:5560
 ```
 
-#### ARM (aarch64) note
-
-- The default Compose config targets amd64 and no longer sets SVE-related JVM flags.
-- On ARM (aarch64), include the ARM override to disable SVE in the JVM:
-
-```bash
-# On amd64 (no special flag)
-docker compose up
-
-# On aarch64 (ARM), include the override
-docker compose -f compose.yml -f docker-compose.arm64.override.yml up
-```
-
-The override file `docker-compose.arm64.override.yml` lives at the repo root (next to `compose.yml`) and only adds `_JAVA_OPTIONS=-XX:UseSVE=0` for the `opensearch` service.
-
 You'll be launched right into our onboarding flow. Welcome aboard 🫡.
 
 ### Self-hosted ⚓️

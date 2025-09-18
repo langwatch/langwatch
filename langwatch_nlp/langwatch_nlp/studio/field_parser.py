@@ -18,7 +18,7 @@ def parse_fields(fields: List[Field], autoparse=True) -> Dict[str, Any]:
             autoparse_field_value(field, field.value) if autoparse else field.value
         )
         for field in fields
-        if field.value
+        if field.value is not None
     }
 
 

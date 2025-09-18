@@ -15,9 +15,8 @@ langwatch.setup(
 )
 
 llm = dspy.OpenAI(
-    model="gpt-5",
+    model="gpt-4o-mini",  # gpt-5 is not supported: his is a chat model and not supported in the v1/completions endpoint. Did you mean to use v1/chat/completions?
     max_tokens=2048,
-    temperature=0,
     api_key=os.environ["OPENAI_API_KEY"],
 )
 

@@ -7,13 +7,19 @@ import {
   LANGWATCH_SDK_RUNTIME,
   LANGWATCH_SDK_VERSION,
 } from "../constants";
+import { DEFAULT_ENDPOINT } from "@/internal/constants";
 
-export type LangwatchApiClient = ReturnType<typeof openApiCreateClient<paths>>;
 
-export function createLangWatchApiClient(
-  apiKey?: string,
-  endpoint?: string
-): LangwatchApiClient {
+/**
+ * Creates a new LangWatch API client.
+ * @param apiKey - The API key to use for authentication. Defaults to LANGWATCH_API_KEY environment variable.
+ * @param endpoint - The endpoint to use for the API client. Defaults to LANGWATCH_ENDPOINT environment variable or internal DEFAULT_ENDPOINT.
+ * @returns A new LangWatch API client.
+ */
+export const createLangWatchApiClient = (
+  apiKey: string = process.env.LANGWATCH_API_KEY ?? "",
+  endpoint: string = process.env.LANGWATCH_ENDPOINT ?? DEFAULT_ENDPOINT,
+) => {
   return openApiCreateClient<paths>({
     baseUrl: endpoint,
     headers: {
@@ -26,4 +32,7 @@ export function createLangWatchApiClient(
       "x-langwatch-sdk-platform": LANGWATCH_SDK_RUNTIME(),
     },
   });
-}
+};
+
+
+export type LangwatchApiClient = ReturnType<typeof createLangWatchApiClient>;

@@ -165,6 +165,9 @@ importers:
       vitest:
         specifier: ^3.2.4
         version: 3.2.4(@types/debug@4.1.12)(@types/node@24.2.0)(msw@2.10.4(@types/node@24.2.0)(typescript@5.9.2))(yaml@2.8.1)
+      vitest-mock-extended:
+        specifier: ^3.1.0
+        version: 3.1.0(typescript@5.9.2)(vitest@3.2.4(@types/debug@4.1.12)(@types/node@24.2.0)(msw@2.10.4(@types/node@24.2.0)(typescript@5.9.2))(yaml@2.8.1))
       yaml:
         specifier: ^2.8.1
         version: 2.8.1
@@ -2504,6 +2507,14 @@ packages:
     peerDependencies:
       typescript: '>=4.8.4'
 
+  ts-essentials@10.1.1:
+    resolution: {integrity: sha512-4aTB7KLHKmUvkjNj8V+EdnmuVTiECzn3K+zIbRthumvHu+j44x3w63xpfs0JL3NGIzGXqoQ7AV591xHO+XrOTw==}
+    peerDependencies:
+      typescript: '>=4.5.0'
+    peerDependenciesMeta:
+      typescript:
+        optional: true
+
   ts-interface-checker@0.1.13:
     resolution: {integrity: sha512-Y/arvbn+rrz3JCKl9C4kVNfTfSm2/mEp5FSz5EsZSANGPSlQrpRI5M4PKF+mJnE52jOO90PnPSc3Ur3bTQw0gA==}
 
@@ -2647,6 +2658,12 @@ packages:
         optional: true
       yaml:
         optional: true
+
+  vitest-mock-extended@3.1.0:
+    resolution: {integrity: sha512-vCM0VkuocOUBwwqwV7JB7YStw07pqeKvEIrZnR8l3PtwYi6rAAJAyJACeC1UYNfbQWi85nz7EdiXWBFI5hll2g==}
+    peerDependencies:
+      typescript: 3.x || 4.x || 5.x
+      vitest: '>=3.0.0'
 
   vitest@3.2.4:
     resolution: {integrity: sha512-LUCP5ev3GURDysTWiP47wRRUpLKMOfPh+yKTx3kVIEiu5KOMeqzpnYNsKyOoVrULivR8tLcks4+lga33Whn90A==}
@@ -5098,6 +5115,10 @@ snapshots:
     dependencies:
       typescript: 5.9.2
 
+  ts-essentials@10.1.1(typescript@5.9.2):
+    optionalDependencies:
+      typescript: 5.9.2
+
   ts-interface-checker@0.1.13: {}
 
   ts-to-zod@3.15.0:
@@ -5239,6 +5260,12 @@ snapshots:
       '@types/node': 24.2.0
       fsevents: 2.3.3
       yaml: 2.8.1
+
+  vitest-mock-extended@3.1.0(typescript@5.9.2)(vitest@3.2.4(@types/debug@4.1.12)(@types/node@24.2.0)(msw@2.10.4(@types/node@24.2.0)(typescript@5.9.2))(yaml@2.8.1)):
+    dependencies:
+      ts-essentials: 10.1.1(typescript@5.9.2)
+      typescript: 5.9.2
+      vitest: 3.2.4(@types/debug@4.1.12)(@types/node@24.2.0)(msw@2.10.4(@types/node@24.2.0)(typescript@5.9.2))(yaml@2.8.1)
 
   vitest@3.2.4(@types/debug@4.1.12)(@types/node@24.2.0)(msw@2.10.4(@types/node@24.2.0)(typescript@5.9.2))(yaml@2.8.1):
     dependencies:

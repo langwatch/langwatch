@@ -1,4 +1,4 @@
-name: Release Please - TypeScript SDK
+name: Release Please - SDKs
 
 on:
   push:
@@ -6,6 +6,7 @@ on:
       - main
     paths:
       - 'typescript-sdk/**'
+      - 'python-sdk/**'
   workflow_dispatch:
 
 permissions:

@@ -74,7 +74,7 @@ export class FileManager {
     return { created: false, path: configPath };
   }
 
-  static loadPromptsLock(): PromptsLock {
+  static loadPromptsLock = (): PromptsLock => {
     const lockPath = this.getPromptsLockPath();
 
     if (!fs.existsSync(lockPath)) {
@@ -113,7 +113,7 @@ export class FileManager {
     return { created: false, path: lockPath };
   }
 
-  static loadLocalPrompt(filePath: string): LocalPromptConfig {
+  static loadLocalPrompt = (filePath: string): LocalPromptConfig => {
     const fullPath = path.resolve(filePath);
 
     if (!fs.existsSync(fullPath)) {
@@ -175,7 +175,7 @@ export class FileManager {
     return filePath;
   }
 
-  static getLocalPromptFiles(): string[] {
+  static getLocalPromptFiles = (): string[] => {
     const promptsDir = this.getPromptsDir();
     const materializedDir = this.getMaterializedDir();
 
