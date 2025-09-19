@@ -63,10 +63,11 @@ export const PostEventProvider = ({
 export const usePostEvent = () => {
   const { project } = useOrganizationTeamProject();
   const workflowStore = useWorkflowStore();
-  const { socketStatus, setEvaluationState } = useWorkflowStore(
+  const { socketStatus, setEvaluationState, setComponentExecutionState } = useWorkflowStore(
     useShallow((state) => ({
       socketStatus: state.socketStatus,
       setEvaluationState: state.setEvaluationState,
+      setComponentExecutionState: state.setComponentExecutionState,
     }))
   );
 
@@ -83,7 +84,36 @@ export const usePostEvent = () => {
 
       setIsLoading(true);
 
-      void fetchSSE<StudioServerEvent>({
+      const onError = (error: Error) => {
+        // Show error to user
+        toaster.create({
+          title: "Failed to post message",
+          description: error.message || "Unknown error",
+          type: "error",
+          duration: 5000,
+          meta: { closable: true },
+        });
+
+        // Update evaluation state if relevant
+        if (event.type === "execute_evaluation") {
+          setEvaluationState({
+            status: "error",
+            run_id: undefined,
+            error: error.message,
+            timestamps: { finished_at: Date.now() },
+          });
+        }
+
+        if (event.type === "execute_component") {
+          setComponentExecutionState(event.payload.node_id, {
+            status: "error",
+            error: error.message,
+            timestamps: { finished_at: Date.now() },
+          });
+        }
+      };
+
+      fetchSSE<StudioServerEvent>({
         endpoint: "/api/workflows/post_event",
         payload: { projectId: project.id, event },
         timeout: 20000,
@@ -116,29 +146,12 @@ export const usePostEvent = () => {
         },
 
         // Handle stream errors
-        onError: (error) => {
-          // Show error to user
-          toaster.create({
-            title: "Failed to post message",
-            description: error.message || "Unknown error",
-            type: "error",
-            duration: 5000,
-            meta: { closable: true },
-          });
-
-          // Update evaluation state if relevant
-          if (event.type === "execute_evaluation") {
-            setEvaluationState({
-              status: "error",
-              run_id: undefined,
-              error: error.message,
-              timestamps: { finished_at: Date.now() },
-            });
-          }
-        },
-      }).finally(() => {
-        setIsLoading(false);
-      });
+        onError,
+      })
+        .catch(onError)
+        .finally(() => {
+          setIsLoading(false);
+        });
     },
     [handleServerMessage, project, setEvaluationState]
   );
