@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.1](https://github.com/langwatch/langwatch/compare/python-sdk@v0.3.0...python-sdk@v0.3.1) (2025-09-19)
+
+
+### Bug Fixes
+
+* missing attributes on trace ([#646](https://github.com/langwatch/langwatch/issues/646)) ([ac7ea8b](https://github.com/langwatch/langwatch/commit/ac7ea8b36ce903027fa5ea1970530f2420caec18))
+
 ## [0.3.0](https://github.com/langwatch/langwatch/compare/python-sdk@0.2.19...python-sdk@v0.3.0) (2025-09-18)
 
 
