@@ -87,6 +87,9 @@ spec:
 
           # Environment variables for the NLP service
           env:
+            - name: LANGWATCH_ENDPOINT
+              value: {{ .Values.langwatch_nlp.upstreams.langwatch.scheme | default "http" }}://{{ .Values.langwatch_nlp.upstreams.langwatch.name | default (printf "%s-app" .Release.Name) }}:{{ .Values.langwatch_nlp.upstreams.langwatch.port | default 5560 }}
+
             {{- with .Values.langwatch_nlp.extraEnvs}}
             {{- toYaml . | nindent 12 }}
             {{- end }}

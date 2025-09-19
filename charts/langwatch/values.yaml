@@ -577,7 +577,7 @@ langwatch_nlp:
   ## @param langwatch_nlp.upstreams.langwatch.name [string, default: langwatch-app] Service name for app.
   ## @param langwatch_nlp.upstreams.langwatch.port [default: 5560] Port to app.
   upstreams:
-    langwatch: { scheme: http, name: langwatch-app, port: 5560 }
+    langwatch: { scheme: http, port: 5560 }
 
   # =============================================================================
   # Kubernetes Pass-Through Configuration
