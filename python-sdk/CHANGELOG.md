@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.1](https://github.com/langwatch/langwatch/compare/python-sdk@v0.4.0...python-sdk@v0.4.1) (2025-09-19)
+
+
+### Bug Fixes
+
+* prompt tracing ([#653](https://github.com/langwatch/langwatch/issues/653)) ([9d39650](https://github.com/langwatch/langwatch/commit/9d39650435d6f32f040838935a89c037e47124f6))
+
 ## [0.4.0](https://github.com/langwatch/langwatch/compare/python-sdk@v0.3.2...python-sdk@v0.4.0) (2025-09-19)
 
 
