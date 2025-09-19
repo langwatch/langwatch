@@ -63,7 +63,7 @@ secrets:
   # If not specified, autogen secrets will be used (when autogen.enabled: true)
   ## @param secrets.existingSecret [string] Name of an existing secret containing required keys.
   existingSecret: ""
-  
+
   # Custom key mappings for existing secrets
   # These allow you to map LangWatch's expected keys to your existing secret keys
   secretKeys:
@@ -110,14 +110,14 @@ app:
   # See: https://kubespec.dev/apps/v1/Deployment#spec.replicas
   ## @param app.replicaCount [default: 1] Number of application replicas.
   replicaCount: 1
-  
+
   # Kubernetes service configuration
   # See: https://kubespec.dev/v1/Service
   ## @extra app.service Service configuration for the app.
   ## @param app.service.type [string, default: ClusterIP] Service type.
   ## @param app.service.port [default: 5560] Service port.
   service: { type: ClusterIP, port: 5560 }
-  
+
   # Resource requirements and limits for the application pods
   # See: https://kubespec.dev/v1/Pod#spec.containers.resources
   ## @extra app.resources Resource requests and limits for the app.
@@ -126,8 +126,8 @@ app:
   ## @param app.resources.limits.cpu [string, default: 1000m] CPU limit.
   ## @param app.resources.limits.memory [string, default: 4Gi] Memory limit.
   resources:
-    requests: { cpu: 250m,  memory: 2Gi }
-    limits:   { cpu: 1000m, memory: 4Gi }
+    requests: { cpu: 250m, memory: 2Gi }
+    limits: { cpu: 1000m, memory: 4Gi }
 
   # Node.js environment setting, if omitted the `global.env` will be used
   ## @param app.nodeEnv [string] Node.js environment override (falls back to global.env if empty).
@@ -178,14 +178,14 @@ app:
   # Define how the main app connects to other LangWatch services
   ## @extra app.upstreams Upstream connections from app to internal services.
   ## @param app.upstreams.nlp.scheme [string, default: http] Scheme for NLP upstream.
-  ## @param app.upstreams.nlp.name [string, default: langwatch-nlp] Service name for NLP upstream.
+  ## @param app.upstreams.nlp.name [string, default: ""] Service name for NLP upstream. If empty, defaults to {{ .Release.Name }}-langwatch-nlp.
   ## @param app.upstreams.nlp.port [default: 5561] Port for NLP upstream.
   ## @param app.upstreams.langevals.scheme [string, default: http] Scheme for Langevals upstream.
-  ## @param app.upstreams.langevals.name [string, default: langevals] Service name for Langevals upstream.
+  ## @param app.upstreams.langevals.name [string, default: ""] Service name for Langevals upstream. If empty, defaults to {{ .Release.Name }}-langevals.
   ## @param app.upstreams.langevals.port [default: 5562] Port for Langevals upstream.
   upstreams:
-    nlp:       { scheme: http, name: langwatch-nlp,  port: 5561 }
-    langevals: { scheme: http, name: langevals,      port: 5562 }
+    nlp: { scheme: http, port: 5561 }
+    langevals: { scheme: http, port: 5562 }
   # AI model evaluator configurations
   # These enable integration with various AI providers for evaluation tasks
   ## @extra app.evaluators Evaluator providers configuration.
@@ -552,14 +552,14 @@ langwatch_nlp:
   # See: https://kubespec.dev/apps/v1/Deployment#spec.replicas
   ## @param langwatch_nlp.replicaCount [default: 1] Number of NLP service replicas.
   replicaCount: 1
-  
+
   # Kubernetes service configuration
   # See: https://kubespec.dev/v1/Service
   ## @extra langwatch_nlp.service Service configuration for NLP.
   ## @param langwatch_nlp.service.type [string, default: ClusterIP] Service type.
   ## @param langwatch_nlp.service.port [default: 5561] Service port.
   service: { type: ClusterIP, port: 5561 }
-  
+
   # Resource requirements for NLP processing
   # See: https://kubespec.dev/v1/Pod#spec.containers.resources
   ## @extra langwatch_nlp.resources Resource requests and limits.
@@ -568,8 +568,8 @@ langwatch_nlp:
   ## @param langwatch_nlp.resources.limits.cpu [string, default: 2000m] CPU limit.
   ## @param langwatch_nlp.resources.limits.memory [string, default: 4Gi] Memory limit.
   resources:
-    requests: { cpu: 1000m,  memory: 2Gi }
-    limits:   { cpu: 2000m,  memory: 4Gi }
+    requests: { cpu: 1000m, memory: 2Gi }
+    limits: { cpu: 2000m, memory: 4Gi }
 
   # Connection to the main LangWatch application
   ## @extra langwatch_nlp.upstreams Upstream to app (callbacks, etc.).
@@ -577,7 +577,7 @@ langwatch_nlp:
   ## @param langwatch_nlp.upstreams.langwatch.name [string, default: langwatch-app] Service name for app.
   ## @param langwatch_nlp.upstreams.langwatch.port [default: 5560] Port to app.
   upstreams:
-    langwatch: { scheme: http, name: langwatch-app,  port: 5560 }
+    langwatch: { scheme: http, port: 5560 }
 
   # =============================================================================
   # Kubernetes Pass-Through Configuration
@@ -681,14 +681,14 @@ langevals:
   # See: https://kubespec.dev/apps/v1/Deployment#spec.replicas
   ## @param langevals.replicaCount [default: 1] Number of Langevals replicas.
   replicaCount: 1
-  
+
   # Kubernetes service configuration
   # See: https://kubespec.dev/v1/Service
   ## @extra langevals.service Service configuration for Langevals.
   ## @param langevals.service.type [string, default: ClusterIP] Service type.
   ## @param langevals.service.port [default: 5562] Service port.
   service: { type: ClusterIP, port: 5562 }
-  
+
   # Resource requirements for evaluation tasks
   # Higher memory requirements due to model loading and evaluation
   # See: https://kubespec.dev/v1/Pod#spec.containers.resources
@@ -698,7 +698,7 @@ langevals:
   ## @param langevals.resources.limits.cpu [string, default: 2000m] CPU limit.
   ## @param langevals.resources.limits.memory [string, default: 8Gi] Memory limit.
   resources:
-    requests: { cpu: 1000m,  memory: 6Gi }
+    requests: { cpu: 1000m, memory: 6Gi }
     limits: { cpu: 2000m, memory: 8Gi }
 
   # =============================================================================
@@ -802,7 +802,7 @@ cronjobs:
   # Enable or disable all cron jobs
   ## @param cronjobs.enabled [default: true] Enable all cron jobs.
   enabled: true
-  
+
   # Container image for the cron job pods
   # See: https://kubespec.dev/batch/v1/CronJob#spec.jobTemplate.spec.template.spec.containers.image
   ## @extra cronjobs.image Cron job image.
@@ -813,7 +813,7 @@ cronjobs:
     repository: curlimages/curl
     tag: latest
     pullPolicy: IfNotPresent
-  
+
   # Resource requirements for cron job pods
   # See: https://kubespec.dev/v1/Pod#spec.containers.resources
   ## @extra cronjobs.resources Resource requests and limits for jobs.
@@ -822,7 +822,7 @@ cronjobs:
   ## @param cronjobs.resources.limits.cpu [string, default: 100m] CPU limit.
   ## @param cronjobs.resources.limits.memory [string, default: 64Mi] Memory limit.
   resources:
-    requests: { cpu: 100m,  memory: 64Mi }
+    requests: { cpu: 100m, memory: 64Mi }
     limits: { cpu: 100m, memory: 64Mi }
 
   # Connection to the main LangWatch application
@@ -830,7 +830,7 @@ cronjobs:
   ## @param cronjobs.upstreams.langwatch.name [string, default: langwatch-app] App service name.
   ## @param cronjobs.upstreams.langwatch.port [default: 5560] App service port.
   upstreams:
-    langwatch: { name: langwatch-app,  port: 5560 }
+    langwatch: { name: langwatch-app, port: 5560 }
 
   # Individual cron job configurations
   ## @extra cronjobs.jobs Individual cron job endpoints and schedules.
@@ -968,17 +968,17 @@ ingress:
   # Enable or disable the ingress
   ## @param ingress.enabled [default: false] Enable ingress.
   enabled: false
-  
+
   # Ingress class name (e.g., nginx, traefik)
   # See: https://kubespec.dev/networking.k8s.io/v1/Ingress#spec.ingressClassName
   ## @param ingress.className [string] Ingress class name (e.g., nginx, traefik).
   className: ""
-  
+
   # Ingress annotations for specific behaviors
   # See: https://kubespec.dev/networking.k8s.io/v1/Ingress#metadata.annotations
   ## @param ingress.annotations [object] Additional ingress annotations.
   annotations: {}
-  
+
   # Host configurations for routing
   # See: https://kubespec.dev/networking.k8s.io/v1/Ingress#spec.rules
   ## @param ingress.hosts [array] Ingress hosts and paths.
@@ -993,7 +993,7 @@ ingress:
                 name: "langwatch-app"
                 port:
                   number: 5560
-  
+
   # TLS configuration for HTTPS
   # See: https://kubespec.dev/networking.k8s.io/v1/Ingress#spec.tls
   ## @param ingress.tls [array] TLS configuration for HTTPS.
@@ -1053,7 +1053,7 @@ prometheus:
     # See: https://kubespec.dev/apps/v1/Deployment#spec.replicas
     ## @param prometheus.server.replicaCount [default: 1] Number of Prometheus replicas.
     replicaCount: 1
-    
+
     # Global Prometheus configuration
     ## @extra prometheus.server.global Global scrape/evaluation intervals.
     ## @param prometheus.server.global.scrape_interval [string, default: 15s] Scrape interval.
@@ -1076,7 +1076,7 @@ prometheus:
     # Data retention period
     ## @param prometheus.server.retention [string, default: 60d] Data retention period.
     retention: 60d
-    
+
     # Resource requirements for Prometheus
     # See: https://kubespec.dev/v1/Pod#spec.containers.resources
     ## @extra prometheus.server.resources Resource requests and limits.
@@ -1288,8 +1288,8 @@ opensearch:
   ## @extra opensearch.extraEnvs Additional environment variables.
   ## @skip opensearch.extraEnvs Skip documenting example environment variable item.
   extraEnvs:
-  - name: cluster.initial_master_nodes
-    value: ""   # force empty so the setting is gone
+    - name: cluster.initial_master_nodes
+      value: "" # force empty so the setting is gone
 
   # Persistent storage configuration
   # See: https://kubespec.dev/v1/PersistentVolumeClaim
@@ -1373,7 +1373,7 @@ redis:
       enabled: true
       size: 10Gi
       storageClass: ""
-    
+
     # Resource requirements for Redis
     # See: https://kubespec.dev/v1/Pod#spec.containers.resources
     ## @extra redis.master.resources Resource requests and limits.
