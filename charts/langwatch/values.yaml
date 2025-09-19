@@ -178,10 +178,10 @@ app:
   # Define how the main app connects to other LangWatch services
   ## @extra app.upstreams Upstream connections from app to internal services.
   ## @param app.upstreams.nlp.scheme [string, default: http] Scheme for NLP upstream.
-  ## @param app.upstreams.nlp.name [string, default: langwatch-nlp] Service name for NLP upstream.
+  ## @param app.upstreams.nlp.name [string, default: ""] Service name for NLP upstream. If empty, defaults to {{ .Release.Name }}-langwatch-nlp.
   ## @param app.upstreams.nlp.port [default: 5561] Port for NLP upstream.
   ## @param app.upstreams.langevals.scheme [string, default: http] Scheme for Langevals upstream.
-  ## @param app.upstreams.langevals.name [string, default: langevals] Service name for Langevals upstream.
+  ## @param app.upstreams.langevals.name [string, default: ""] Service name for Langevals upstream. If empty, defaults to {{ .Release.Name }}-langevals.
   ## @param app.upstreams.langevals.port [default: 5562] Port for Langevals upstream.
   upstreams:
     nlp: { scheme: http, port: 5561 }
