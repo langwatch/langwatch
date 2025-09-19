@@ -260,7 +260,11 @@ export const getProjectLambdaArn = async (
     try {
       lambdaConfig = await createProjectLambda(lambda, functionName, config);
     } catch (error) {
-      if (error instanceof Error && error.message.includes("already exist")) {
+      if (
+        error instanceof Error &&
+        (error.message.includes("already exist") ||
+          error.message.includes("An update is in progress"))
+      ) {
         logger.info(
           { projectId },
           "Lambda function already exists, skipping creation"
