@@ -51,6 +51,8 @@ def run_cli(command: list, cwd: Path):
 
 
 def main():
+    langwatch.setup()
+
     """Simple guaranteed availability demo."""
     print("🚀 Simple Local Prompts Example")
 
@@ -145,6 +147,19 @@ def main():
             assert (
                 prompt.model == "openai/gpt-5"
             ), "Prompt model should be openai/gpt-4o-mini"
+
+            # 5. Test compile the prompt
+            print("\n5️⃣ Test compile the prompt")
+            compiled_prompt = prompt.compile(
+                input="quantum computing",
+            )
+
+            print("✅ Compiled prompt successfully!")
+            print(f"   Compiled messages: {compiled_prompt.messages}")
+
+            # Assert compilation worked
+            assert compiled_prompt.messages, "Compiled prompt should have messages"
+            assert len(compiled_prompt.messages) > 0, "Should have at least one message"
 
             print("\n🎉 Done! Guaranteed availability achieved.")
 
