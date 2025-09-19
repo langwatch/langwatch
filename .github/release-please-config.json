@@ -35,6 +35,13 @@
         { "type": "chore", "section": "Miscellaneous", "hidden": false },
         { "type": "docs", "section": "Documentation", "hidden": false },
         { "type": "refactor", "section": "Code Refactoring", "hidden": false }
+      ],
+      "extra-files": [
+        {
+          "type": "generic",
+          "path": "python-sdk/src/langwatch/__version__.py",
+          "glob": "__version__ = \"*\""
+        }
       ]
     },
     "mcp-server": {
