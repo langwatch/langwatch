@@ -95,8 +95,7 @@ examples = [
     "opentelemetry-instrumentation-langchain>=0.40.4",
     "openinference-instrumentation-litellm>=0.1.19",
     "pandas>=2.2.3",
-    "strands-agents[otel]>=1.0.0,<2.0.0",
+    "strands-agents[otel]>=1.9.0,<2.0.0",
     "unstructured[pdf]>=0.18.3",
-    "strands-agents>=1.6.0",
 ]
 tests = ["pytest-asyncio>=0.21.2"]

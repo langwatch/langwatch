@@ -17,7 +17,7 @@ dependencies = [
     "langchain-community>=0.0.28,<0.1",
     "langevals-core>=0.1.15,<0.2",
     "langwatch>=0.1.37,<0.2",
-    "litellm[proxy]>=1.77.0,<2",
+    "litellm[proxy]==1.76.0",
     "mangum>=0.17.0,<0.18",
     "nanoid>=2.0.0,<3",
     "numpy>=1.26.4,<2",
