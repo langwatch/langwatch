@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.2](https://github.com/langwatch/langwatch/compare/python-sdk@v0.3.1...python-sdk@v0.3.2) (2025-09-19)
+
+
+### Bug Fixes
+
+* add pyyaml as dep ([#648](https://github.com/langwatch/langwatch/issues/648)) ([083f7bd](https://github.com/langwatch/langwatch/commit/083f7bd8acdaffc1480c3b77c7afe9ec09b04389))
+
 ## [0.3.1](https://github.com/langwatch/langwatch/compare/python-sdk@v0.3.0...python-sdk@v0.3.1) (2025-09-19)
 
 
