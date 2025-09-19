@@ -21,7 +21,7 @@ class PromptTracing:
         """Internal method to create compile decorators with specified span name"""
 
         def decorator(
-            func: Callable[..., "CompiledPrompt"]
+            func: Callable[..., "CompiledPrompt"],
         ) -> Callable[..., "CompiledPrompt"]:
             @wraps(func)
             def wrapper(self: "Prompt", *args: Any, **kwargs: Any) -> "CompiledPrompt":
@@ -31,10 +31,16 @@ class PromptTracing:
                     # Set base prompt
                     span.set_attributes(
                         {
-                            AttributeKey.LangWatchPromptId: self.id,
-                            AttributeKey.LangWatchPromptHandle: self.handle,
-                            AttributeKey.LangWatchPromptVersionId: self.version_id,
-                            AttributeKey.LangWatchPromptVersionNumber: self.version,
+                            AttributeKey.LangWatchPromptId: getattr(self, "id", None),
+                            AttributeKey.LangWatchPromptHandle: getattr(
+                                self, "handle", None
+                            ),
+                            AttributeKey.LangWatchPromptVersionId: getattr(
+                                self, "version_id", None
+                            ),
+                            AttributeKey.LangWatchPromptVersionNumber: getattr(
+                                self, "version", None
+                            ),
                         }
                     )
 
@@ -67,14 +73,14 @@ class PromptTracing:
 
     @staticmethod
     def compile(
-        func: Callable[..., "CompiledPrompt"]
+        func: Callable[..., "CompiledPrompt"],
     ) -> Callable[..., "CompiledPrompt"]:
         """Decorator for Prompt.compile method with OpenTelemetry tracing"""
         return PromptTracing._create_compile_decorator("compile")(func)
 
     @staticmethod
     def compile_strict(
-        func: Callable[..., "CompiledPrompt"]
+        func: Callable[..., "CompiledPrompt"],
     ) -> Callable[..., "CompiledPrompt"]:
         """Decorator for Prompt.compile_strict method with OpenTelemetry tracing"""
         return PromptTracing._create_compile_decorator("compile_strict")(func)
