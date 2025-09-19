@@ -1046,7 +1046,7 @@ const addOpenTelemetrySpanAsSpan = (
           // Timestamps
           if (attributesMap.langwatch.timestamps) {
             try {
-              const timestamps = spanTimestampsSchema.parse(
+              const timestamps = spanTimestampsSchema.partial().parse(
                 attributesMap.langwatch.timestamps as any
               );
               if (timestamps.started_at) {
