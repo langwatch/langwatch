@@ -25,6 +25,7 @@ dependencies = [
     "pillow>=11.0.0,<12",
     "pydantic>=2.9.2,<3",
     "python-dotenv>=1.0.1,<2",
+    "python-liquid>=2.0.2",
     "scikit-learn>=1.5.2,<2",
     "scipy>=1.14.1,<2",
     "sentry-sdk[fastapi]>=1.45.1,<2",

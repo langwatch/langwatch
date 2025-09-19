@@ -385,13 +385,15 @@ export const invokeLambda = async (
     if (!response.ok) {
       let body = await response.text();
       try {
-        body = JSON.stringify(body, null, 2);
+        body = JSON.parse(body);
       } catch {}
       if (response.status === 422) {
         console.error(
           "Optimization Studio validation failed, some components might be outdated",
           "\n\n",
-          JSON.stringify(event, null, 2)
+          JSON.stringify(event, null, 2),
+          "\n\nValidation error:\n",
+          body
         );
         const error = new Error(
           `Optimization Studio validation failed, some components might be outdated`
