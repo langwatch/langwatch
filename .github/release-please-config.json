@@ -40,7 +40,10 @@
         {
           "type": "generic",
           "path": "python-sdk/src/langwatch/__version__.py",
-          "glob": "__version__ = \"*\""
+          "updater": {
+            "search": "__version__ = \".*\"",
+            "replace": "__version__ = \"${version}\""
+          }
         }
       ]
     },
