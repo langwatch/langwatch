@@ -87,10 +87,7 @@ export const studioBackendPostEvent = async ({
       }
     }
     if (events === 0) {
-      logger.error(
-        { chunksBuffer },
-        `Studio invalid response: ${chunksBuffer}`
-      );
+      throw new Error(`Studio invalid response: ${chunksBuffer}`);
     }
   } catch (error) {
     logger.error({ error }, "Error reading stream");
