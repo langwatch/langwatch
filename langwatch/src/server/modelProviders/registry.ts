@@ -47,7 +47,7 @@ export const getProviderModelOptions = (
 
 export const modelProviders = {
   custom: {
-    name: "Custom",
+    name: "Custom (OpenAI-compatible)",
     apiKey: "CUSTOM_API_KEY",
     endpointKey: "CUSTOM_BASE_URL",
     keysSchema: z.object({
@@ -56,7 +56,7 @@ export const modelProviders = {
     }),
     enabledSince: new Date("2023-01-01"),
     blurb:
-      "Bring your own model provider. Use this option for models that are OpenAI API–compatible.",
+      "Use this option for LiteLLM proxy, self-hosted vLLM or any other model providers that supports the /chat/completions endpoint.",
   },
   openai: {
     name: "OpenAI",
@@ -81,17 +81,6 @@ export const modelProviders = {
       }),
     enabledSince: new Date("2023-01-01"),
   },
-
-  azure: {
-    name: "Azure OpenAI",
-    apiKey: "AZURE_OPENAI_API_KEY",
-    endpointKey: "AZURE_OPENAI_ENDPOINT",
-    keysSchema: z.object({
-      AZURE_OPENAI_API_KEY: z.string().min(1),
-      AZURE_OPENAI_ENDPOINT: z.string().min(1),
-    }),
-    enabledSince: new Date("2023-01-01"),
-  },
   anthropic: {
     name: "Anthropic",
     apiKey: "ANTHROPIC_API_KEY",
@@ -102,15 +91,22 @@ export const modelProviders = {
     }),
     enabledSince: new Date("2023-01-01"),
   },
-
-  vertex_ai: {
-    name: "Vertex AI",
-    apiKey: "GOOGLE_APPLICATION_CREDENTIALS",
+  gemini: {
+    name: "Gemini",
+    apiKey: "GEMINI_API_KEY",
     endpointKey: undefined,
     keysSchema: z.object({
-      GOOGLE_APPLICATION_CREDENTIALS: z.string().min(1).refine(isValidJson),
-      VERTEXAI_PROJECT: z.string().min(1),
-      VERTEXAI_LOCATION: z.string().min(1),
+      GEMINI_API_KEY: z.string().min(1),
+    }),
+    enabledSince: new Date("2023-01-01"),
+  },
+  azure: {
+    name: "Azure OpenAI",
+    apiKey: "AZURE_OPENAI_API_KEY",
+    endpointKey: "AZURE_OPENAI_ENDPOINT",
+    keysSchema: z.object({
+      AZURE_OPENAI_API_KEY: z.string().min(1),
+      AZURE_OPENAI_ENDPOINT: z.string().min(1),
     }),
     enabledSince: new Date("2023-01-01"),
   },
@@ -125,12 +121,14 @@ export const modelProviders = {
     }),
     enabledSince: new Date("2023-01-01"),
   },
-  gemini: {
-    name: "Gemini",
-    apiKey: "GEMINI_API_KEY",
+  vertex_ai: {
+    name: "Vertex AI",
+    apiKey: "GOOGLE_APPLICATION_CREDENTIALS",
     endpointKey: undefined,
     keysSchema: z.object({
-      GEMINI_API_KEY: z.string().min(1),
+      GOOGLE_APPLICATION_CREDENTIALS: z.string().min(1).refine(isValidJson),
+      VERTEXAI_PROJECT: z.string().min(1),
+      VERTEXAI_LOCATION: z.string().min(1),
     }),
     enabledSince: new Date("2023-01-01"),
   },
