@@ -8,13 +8,13 @@ on:
 
 jobs:
   publish:
-    if: startsWith(github.event.release.tag_name, 'typescript-mcp-server@') || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main')
+    if: startsWith(github.event.release.tag_name, 'mcp-server@') || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main')
     runs-on: ubuntu-latest
     permissions:
       contents: read
       id-token: write
     steps:
-      - name: Checkout repository
+      - name: Checkout
         uses: actions/checkout@v4
 
       - uses: pnpm/action-setup@v2
@@ -25,8 +25,9 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: "pnpm"
+          cache: pnpm
           cache-dependency-path: "mcp-server/pnpm-lock.yaml"
+          registry-url: "https://registry.npmjs.org"
 
       - name: Install dependencies
         working-directory: mcp-server
@@ -34,6 +35,6 @@ jobs:
 
       - name: Build and publish
         working-directory: mcp-server
-        run: npm publish --provenance --access public
+        run: pnpm publish --provenance --access public --no-git-checks
         env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NODE_AUTH_TOKEN: ${{ secrets.MCP_SERVER_NPM_TOKEN }}
