@@ -34,6 +34,6 @@ jobs:
 
       - name: Build and publish
         working-directory: mcp-server
-        run: npm publish --provenance --access public
+        run: pnpm publish --provenance --access public --no-git-checks
         env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NODE_AUTH_TOKEN: ${{ secrets.MCP_SERVER_NPM_TOKEN }}
