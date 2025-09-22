@@ -5,7 +5,8 @@ import {
 } from "@opentelemetry/sdk-trace-base";
 import { trace } from "@opentelemetry/api";
 import { ChatOpenAI } from "@langchain/openai";
-import { DynamicTool } from "@langchain/core/tools";
+import { DynamicStructuredTool } from "@langchain/core/tools";
+import { z } from "zod";
 import { AgentExecutor, createToolCallingAgent } from "langchain/agents";
 import { ChatPromptTemplate } from "@langchain/core/prompts";
 import { LangWatchCallbackHandler } from "../..";
@@ -95,10 +96,13 @@ describe("LangChain Multi-Agent Integration Tests", () => {
         // Create simple research agent
         const llm = new ChatOpenAI({ model: "gpt-4.1", temperature: 1 }); // gpt-4.1 takes too long to respond
         const tools = [
-          new DynamicTool({
+          new DynamicStructuredTool({
             name: "search",
             description: "Search for information",
-            func: async (query: string) => `Found results for: ${query}`,
+            schema: z.object({
+              query: z.string().describe("The search query"),
+            }),
+            func: async ({ query }: { query: string }) => `Found results for: ${query}`,
           }),
         ];
 
@@ -173,20 +177,29 @@ describe("LangChain Multi-Agent Integration Tests", () => {
         // Create agent with multiple tools for tool chaining
         const llm = new ChatOpenAI({ model: "gpt-4.1", temperature: 1 });
         const tools = [
-          new DynamicTool({
+          new DynamicStructuredTool({
             name: "data_collector",
             description: "Collect data from various sources",
-            func: async (task: string) => `Data collected for: ${task}`,
+            schema: z.object({
+              task: z.string().describe("The task to collect data for"),
+            }),
+            func: async ({ task }: { task: string }) => `Data collected for: ${task}`,
           }),
-          new DynamicTool({
+          new DynamicStructuredTool({
             name: "data_processor",
             description: "Process and analyze collected data",
-            func: async (data: string) => `Processed: ${data}`,
+            schema: z.object({
+              data: z.string().describe("The data to process"),
+            }),
+            func: async ({ data }: { data: string }) => `Processed: ${data}`,
           }),
-          new DynamicTool({
+          new DynamicStructuredTool({
             name: "report_generator",
             description: "Generate reports from processed data",
-            func: async (analysis: string) => `Report: ${analysis}`,
+            schema: z.object({
+              analysis: z.string().describe("The analysis to generate report from"),
+            }),
+            func: async ({ analysis }: { analysis: string }) => `Report: ${analysis}`,
           }),
         ];
 
@@ -270,15 +283,21 @@ describe("LangChain Multi-Agent Integration Tests", () => {
         // Create conversational agent with context tools
         const llm = new ChatOpenAI({ model: "gpt-4.1", temperature: 1 });
         const tools = [
-          new DynamicTool({
+          new DynamicStructuredTool({
             name: "memory_store",
             description: "Store information for later recall",
-            func: async (info: string) => `Stored: ${info}`,
+            schema: z.object({
+              info: z.string().describe("Information to store"),
+            }),
+            func: async ({ info }: { info: string }) => `Stored: ${info}`,
           }),
-          new DynamicTool({
+          new DynamicStructuredTool({
             name: "memory_recall",
             description: "Recall stored information",
-            func: async (query: string) =>
+            schema: z.object({
+              query: z.string().describe("Query to recall information"),
+            }),
+            func: async ({ query }: { query: string }) =>
               `Recalled about ${query}: renewable energy project discussion`,
           }),
         ];
@@ -367,20 +386,26 @@ describe("LangChain Multi-Agent Integration Tests", () => {
         // Create agent with failing and fallback tools
         const llm = new ChatOpenAI({ model: "gpt-4.1", temperature: 1 });
         const tools = [
-          new DynamicTool({
+          new DynamicStructuredTool({
             name: "primary_tool",
             description: "Primary data source (may fail)",
-            func: async (input: string) => {
+            schema: z.object({
+              input: z.string().describe("Input for primary tool"),
+            }),
+            func: async ({ input }: { input: string }) => {
               if (input.includes("fail")) {
                 throw new Error("Primary tool failed");
               }
               return `Primary result for: ${input}`;
             },
           }),
-          new DynamicTool({
+          new DynamicStructuredTool({
             name: "fallback_tool",
             description: "Backup data source",
-            func: async (input: string) => `Fallback result for: ${input}`,
+            schema: z.object({
+              input: z.string().describe("Input for fallback tool"),
+            }),
+            func: async ({ input }: { input: string }) => `Fallback result for: ${input}`,
           }),
         ];
 
@@ -459,10 +484,13 @@ describe("LangChain Multi-Agent Integration Tests", () => {
         const createAgent = (name: string) => {
           const llm = new ChatOpenAI({ model: "gpt-4.1", temperature: 1 });
           const tools = [
-            new DynamicTool({
+            new DynamicStructuredTool({
               name: `${name}_analysis`,
               description: `Perform ${name} analysis`,
-              func: async (task: string) => `${name} analysis result: ${task}`,
+              schema: z.object({
+                task: z.string().describe("Task to analyze"),
+              }),
+              func: async ({ task }: { task: string }) => `${name} analysis result: ${task}`,
             }),
           ];
 
@@ -549,10 +577,13 @@ describe("LangChain Multi-Agent Integration Tests", () => {
         // Create a simple agent to test data capture
         const llm = new ChatOpenAI({ model: "gpt-4.1", temperature: 1 });
         const tools = [
-          new DynamicTool({
+          new DynamicStructuredTool({
             name: "test_tool",
             description: "Test tool for data validation",
-            func: async (input: string) => `Processed: ${input}`,
+            schema: z.object({
+              input: z.string().describe("Input to process"),
+            }),
+            func: async ({ input }: { input: string }) => `Processed: ${input}`,
           }),
         ];
 
