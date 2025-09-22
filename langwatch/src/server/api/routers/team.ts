@@ -51,6 +51,7 @@ export const teamRouter = createTRPCRouter({
       const teams = await prisma.team.findMany({
         where: {
           organizationId: input.organizationId,
+          archivedAt: null,
         },
         include: {
           members: {
@@ -58,7 +59,11 @@ export const teamRouter = createTRPCRouter({
               user: true,
             },
           },
-          projects: true,
+          projects: {
+            where: {
+              archivedAt: null,
+            },
+          },
         },
       });
 
@@ -246,5 +251,16 @@ export const teamRouter = createTRPCRouter({
       });
 
       return team;
+    }),
+  archiveById: protectedProcedure
+    .input(z.object({ teamId: z.string(), projectId: z.string() }))
+    .use(checkUserPermissionForTeam(TeamRoleGroup.TEAM_ARCHIVE))
+    .mutation(async ({ input, ctx }) => {
+      const prisma = ctx.prisma;
+      await prisma.team.update({
+        where: { id: input.teamId },
+        data: { archivedAt: new Date() },
+      });
+      return { success: true };
     }),
 });

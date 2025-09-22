@@ -11,6 +11,7 @@ from dspy.adapters.json_adapter import _get_structured_outputs_response_format
 from langwatch_nlp.studio.utils import SerializableWithStringFallback
 from pydantic import Field
 from dspy.signatures.signature import Signature
+import liquid
 
 
 class TemplateAdapter(dspy.JSONAdapter):
@@ -105,13 +106,6 @@ class TemplateAdapter(dspy.JSONAdapter):
         Format the template inputs filling the {{ input }} placeholders.
         """
 
-        class SafeDict(dict):
-            def __missing__(self, key):
-                return "{{" + key + "}}"
-
-        # Normalize template: shrink all {{   anything    }} to {{anything}}
-        template_clean = re.sub(r"{{\s*(.*?)\s*}}", r"{{\1}}", template)
-        template_fmt = template_clean.replace("{{", "{").replace("}}", "}")
         str_inputs: dict[str, str] = {}
         for k, v in inputs.items():
             str_inputs[k] = (
@@ -119,7 +113,8 @@ class TemplateAdapter(dspy.JSONAdapter):
                 if type(v) == str
                 else json.dumps(v, cls=SerializableWithStringFallback)
             )
-        return template_fmt.format_map(SafeDict(str_inputs))  # type: ignore
+
+        return liquid.render(template, **str_inputs)
 
     def parse(self, signature, completion):
         if getattr(signature, "_messages", None) is None:

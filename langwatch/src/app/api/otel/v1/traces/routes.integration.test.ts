@@ -104,7 +104,7 @@ describe("opentelemetry traces receiver", () => {
                     key: "input.value",
                     value: {
                       stringValue:
-                        '{"messages": [{"role": "system", "content": "You are a helpful assistant that only reply in short tweet-like responses, using lots of emojis."}, {"role": "user", "content": "hi"}], "model": "gpt-4o-mini", "stream": true}',
+                        '{"messages": [{"role": "system", "content": "You are a helpful assistant that only reply in short tweet-like responses, using lots of emojis."}, {"role": "user", "content": "hi"}], "model": "gpt-5", "stream": true}',
                     },
                   },
                   {
@@ -117,7 +117,7 @@ describe("opentelemetry traces receiver", () => {
                     key: "output.value",
                     value: {
                       stringValue:
-                        '{"choices": [{"message": {"content": "Hey there! 😊👋 What’s up? 🌟", "role": "assistant"}, "index": 0, "finish_reason": "stop"}], "id": "chatcmpl-9sdk9jAOO21SHl5mgTZSXVdCVJhDq", "created": 1722809513, "model": "gpt-4o-mini-2024-07-18", "object": "chat.completion.chunk", "system_fingerprint": "fp_611b667b19"}',
+                        '{"choices": [{"message": {"content": "Hey there! 😊👋 What’s up? 🌟", "role": "assistant"}, "index": 0, "finish_reason": "stop"}], "id": "chatcmpl-9sdk9jAOO21SHl5mgTZSXVdCVJhDq", "created": 1722809513, "model": "gpt-5", "object": "chat.completion.chunk", "system_fingerprint": "fp_611b667b19"}',
                     },
                   },
                   {
@@ -129,7 +129,7 @@ describe("opentelemetry traces receiver", () => {
                   {
                     key: "llm.invocation_parameters",
                     value: {
-                      stringValue: '{"model": "gpt-4o-mini", "stream": true}',
+                      stringValue: '{"model": "gpt-5", "stream": true}',
                     },
                   },
                   {
@@ -160,7 +160,7 @@ describe("opentelemetry traces receiver", () => {
                   {
                     key: "llm.model_name",
                     value: {
-                      stringValue: "gpt-4o-mini-2024-07-18",
+                      stringValue: "gpt-5",
                     },
                   },
                   {
@@ -275,7 +275,7 @@ describe("opentelemetry traces receiver", () => {
           trace_id: traceId,
           name: "ChatCompletion",
           type: "llm",
-          model: "gpt-4o-mini-2024-07-18",
+          model: "gpt-5",
           input: {
             type: "chat_messages",
             value: JSON.stringify([
@@ -306,7 +306,7 @@ describe("opentelemetry traces receiver", () => {
             tokens_estimated: true,
           },
           params: {
-            model: "gpt-4o-mini",
+            model: "gpt-5",
             stream: true,
             scope: {
               name: "openinference.instrumentation.openai",

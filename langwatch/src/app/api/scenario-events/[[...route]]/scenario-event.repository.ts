@@ -7,17 +7,19 @@ import type {
   ScenarioSetData,
   ScenarioRunStartedEvent,
 } from "./types";
-import { Client as ElasticClient } from "@elastic/elasticsearch";
+import { type Client as ElasticClient } from "@elastic/elasticsearch";
 import { z } from "zod";
-import { esClient } from "~/server/elasticsearch";
+import { esClient, SCENARIO_EVENTS_INDEX } from "~/server/elasticsearch";
 import {
   transformToElasticsearch,
   transformFromElasticsearch,
   ES_FIELDS,
 } from "./utils/elastic-search-transformers";
+import * as Sentry from "@sentry/nextjs";
+
+import { batchRunIdSchema, scenarioRunIdSchema } from "./schemas/event-schemas";
 
 const projectIdSchema = z.string();
-const scenarioRunIdSchema = z.string();
 const scenarioIdSchema = z.string();
 
 /**
@@ -32,7 +34,6 @@ const scenarioIdSchema = z.string();
  * Uses Elasticsearch for efficient querying and aggregation of event data.
  */
 export class ScenarioEventRepository {
-  private readonly indexName = "scenario-events";
   private client: ElasticClient | null = null;
 
   /**
@@ -60,7 +61,7 @@ export class ScenarioEventRepository {
     });
 
     await client.index({
-      index: this.indexName,
+      index: SCENARIO_EVENTS_INDEX.alias,
       body: elasticsearchEvent,
     });
   }
@@ -87,7 +88,7 @@ export class ScenarioEventRepository {
     const client = await this.getClient();
 
     const response = await client.search({
-      index: this.indexName,
+      index: SCENARIO_EVENTS_INDEX.alias,
       body: {
         query: {
           bool: {
@@ -134,7 +135,7 @@ export class ScenarioEventRepository {
     const client = await this.getClient();
 
     const response = await client.search({
-      index: this.indexName,
+      index: SCENARIO_EVENTS_INDEX.alias,
       body: {
         query: {
           bool: {
@@ -171,7 +172,7 @@ export class ScenarioEventRepository {
     const client = await this.getClient();
 
     await client.deleteByQuery({
-      index: this.indexName,
+      index: SCENARIO_EVENTS_INDEX.alias,
       body: {
         query: {
           term: { [ES_FIELDS.projectId]: validatedProjectId },
@@ -202,7 +203,7 @@ export class ScenarioEventRepository {
     const client = await this.getClient();
 
     const response = await client.search({
-      index: this.indexName,
+      index: SCENARIO_EVENTS_INDEX.alias,
       body: {
         query: {
           bool: {
@@ -268,7 +269,7 @@ export class ScenarioEventRepository {
     const client = await this.getClient();
 
     const response = await client.search({
-      index: this.indexName,
+      index: SCENARIO_EVENTS_INDEX.alias,
       body: {
         query: {
           bool: {
@@ -348,31 +349,197 @@ export class ScenarioEventRepository {
   }
 
   /**
-   * Retrieves all batch run IDs associated with a scenario set.
-   * Results are sorted by latest timestamp in descending order.
+   * Retrieves batch run IDs associated with a scenario set with cursor-based pagination.
+   * Results are sorted by latest timestamp in descending order (most recent first).
    *
    * @param projectId - The project identifier
    * @param scenarioSetId - The scenario set identifier
-   * @returns Array of batch run IDs, ordered by most recent first
+   * @param limit - Maximum number of batch run IDs to return
+   * @param cursor - Cursor for pagination (search_after value)
+   * @returns Object containing batch run IDs and pagination info
    * @throws {z.ZodError} If validation fails for projectId or scenarioSetId
    */
   async getBatchRunIdsForScenarioSet({
     projectId,
     scenarioSetId,
+    limit,
+    cursor,
   }: {
     projectId: string;
     scenarioSetId: string;
-  }): Promise<string[]> {
+    limit: number;
+    cursor?: string;
+  }): Promise<{
+    batchRunIds: string[];
+    nextCursor?: string;
+    hasMore: boolean;
+  }> {
+    const validatedProjectId = projectIdSchema.parse(projectId);
+    const validatedScenarioSetId = scenarioIdSchema.parse(scenarioSetId);
+    const client = await this.getClient();
+
+    // Validate and clamp the limit to prevent ES result window issues
+    const actualLimit = Math.min(limit, 20);
+
+    // Parse cursor to get search_after values
+    let searchAfter: any[] | undefined;
+    if (cursor) {
+      try {
+        // Try to decode base64 cursor first (new stable format)
+        const decodedCursor = Buffer.from(cursor, "base64").toString("utf-8");
+        const cursorData = JSON.parse(decodedCursor);
+
+        // Validate cursor shape - expected: sort values from search results
+        // These come from Elasticsearch's sort values for the documents
+        if (Array.isArray(cursorData) && cursorData.length > 0) {
+          searchAfter = cursorData;
+        }
+      } catch (e) {
+        Sentry.captureException({
+          message: "Malformed cursor",
+          cursor,
+          error: e,
+        });
+        throw new Error(`Malformed cursor: ${cursor}`);
+      }
+    }
+
+    // Request more items to account for potential deduplication
+    // We need to ensure we get enough unique batch runs after deduplication
+    const requestSize = Math.max(actualLimit * 5, 1000); // Request 5x the limit or at least 300
+
+    // Use search_after with manual deduplication for reliable pagination
+    // This approach is more reliable than collapse with search_after
+    const response = await client.search({
+      index: SCENARIO_EVENTS_INDEX.alias,
+      body: {
+        query: {
+          bool: {
+            filter: [
+              { term: { [ES_FIELDS.projectId]: validatedProjectId } },
+              { term: { [ES_FIELDS.scenarioSetId]: validatedScenarioSetId } },
+              { exists: { field: ES_FIELDS.batchRunId } },
+            ],
+          },
+        },
+        sort: [
+          { timestamp: { order: "desc" } },
+          { [ES_FIELDS.batchRunId]: { order: "asc" } }, // Tiebreaker for stable sorting
+        ],
+        size: requestSize,
+        ...(searchAfter && { search_after: searchAfter }),
+      },
+    });
+
+    const hits = response.hits?.hits ?? [];
+
+    // Manual deduplication by batch run ID, keeping the latest timestamp for each
+    const batchRunMap = new Map<
+      string,
+      { timestamp: number; sort: any[]; hit: any }
+    >();
+
+    for (const hit of hits) {
+      const source = hit._source as Record<string, any>;
+      const batchRunId = source?.batch_run_id as string;
+      const timestamp = source?.timestamp as number;
+
+      if (batchRunId && timestamp !== undefined) {
+        const existing = batchRunMap.get(batchRunId);
+        if (!existing || timestamp > existing.timestamp) {
+          // Ensure we have valid sort values for pagination
+          const sortValues = hit.sort;
+          if (Array.isArray(sortValues) && sortValues.length > 0) {
+            batchRunMap.set(batchRunId, {
+              timestamp,
+              sort: sortValues,
+              hit: hit,
+            });
+          }
+        }
+      }
+    }
+
+    // Convert to array and sort by timestamp descending, then by batch run ID
+    const sortedBatchRuns = Array.from(batchRunMap.entries()).sort(
+      ([keyA, a], [keyB, b]) => {
+        if (b.timestamp !== a.timestamp) {
+          return b.timestamp - a.timestamp;
+        }
+        return String(keyA) < String(keyB)
+          ? -1
+          : String(keyA) > String(keyB)
+          ? 1
+          : 0;
+      }
+    );
+
+    // Determine if there are more results
+    // We have more if we got the full requested size from the aggregation
+    // OR if we have more unique batch runs than requested
+    const hasMore =
+      hits.length >= requestSize || sortedBatchRuns.length > actualLimit;
+
+    let nextCursor: string | undefined;
+
+    if (hasMore && sortedBatchRuns.length > actualLimit) {
+      // Get the sort values from the extra item in the deduplicated results
+      const extraItem = sortedBatchRuns[actualLimit];
+      if (extraItem) {
+        // Use the sort values from the hit for search_after pagination
+        const searchAfterValues = extraItem[1].sort;
+
+        if (
+          Array.isArray(searchAfterValues) &&
+          searchAfterValues.length > 0 &&
+          searchAfterValues.every((val: any) => val !== undefined)
+        ) {
+          // Encode cursor as base64 for stability and compactness
+          nextCursor = Buffer.from(JSON.stringify(searchAfterValues)).toString(
+            "base64"
+          );
+        }
+      }
+    }
+
+    // Slice to actualLimit before returning
+    const batchRunIds = sortedBatchRuns
+      .slice(0, actualLimit)
+      .map((item: any) => item[0]); // item[0] is the batchRunId key from the Map entry
+
+    return {
+      batchRunIds,
+      nextCursor,
+      hasMore,
+    };
+  }
+
+  /**
+   * Gets the total count of batch runs for a scenario set.
+   * Used for pagination calculations.
+   *
+   * @param projectId - The project identifier
+   * @param scenarioSetId - The scenario set identifier
+   * @returns Total count of batch runs
+   * @throws {z.ZodError} If validation fails for projectId or scenarioSetId
+   */
+  async getBatchRunCountForScenarioSet({
+    projectId,
+    scenarioSetId,
+  }: {
+    projectId: string;
+    scenarioSetId: string;
+  }): Promise<number> {
     const validatedProjectId = projectIdSchema.parse(projectId);
     const validatedScenarioSetId = scenarioIdSchema.parse(scenarioSetId);
     const client = await this.getClient();
 
     const response = await client.search({
-      index: this.indexName,
+      index: SCENARIO_EVENTS_INDEX.alias,
       body: {
         query: {
           bool: {
-            must: [
+            filter: [
               { term: { [ES_FIELDS.projectId]: validatedProjectId } },
               { term: { [ES_FIELDS.scenarioSetId]: validatedScenarioSetId } },
               { exists: { field: ES_FIELDS.batchRunId } },
@@ -380,21 +547,9 @@ export class ScenarioEventRepository {
           },
         },
         aggs: {
-          unique_batch_runs: {
-            terms: {
+          unique_batch_run_count: {
+            cardinality: {
               field: ES_FIELDS.batchRunId,
-              size: 10000,
-              // Sort by latest timestamp to get most recent batch runs first
-              order: {
-                latest_timestamp: "desc",
-              },
-            },
-            aggs: {
-              latest_timestamp: {
-                max: {
-                  field: "timestamp",
-                },
-              },
             },
           },
         },
@@ -402,13 +557,59 @@ export class ScenarioEventRepository {
       },
     });
 
-    return (
-      (
-        response.aggregations?.unique_batch_runs as {
-          buckets: Array<{ key: string }>;
-        }
-      )?.buckets ?? []
-    ).map((bucket) => bucket.key);
+    const count =
+      (response.aggregations as any)?.unique_batch_run_count?.value ?? 0;
+    return count;
+  }
+
+  /**
+   * Retrieves all scenario run IDs associated with a specific batch run.
+   * Used to find all scenario runs that were part of a specific batch execution.
+   *
+   * @param projectId - The project identifier
+   * @param scenarioSetId - The scenario set identifier
+   * @param batchRunId - The specific batch run ID to search for
+   * @returns Array of scenario run IDs
+   * @throws {z.ZodError} If validation fails for projectId
+   */
+  async getScenarioRunIdsForBatchRun({
+    projectId,
+    scenarioSetId,
+    batchRunId,
+  }: {
+    projectId: string;
+    scenarioSetId: string;
+    batchRunId: string;
+  }): Promise<string[]> {
+    const validatedProjectId = projectIdSchema.parse(projectId);
+    const validatedScenarioSetId = scenarioIdSchema.parse(scenarioSetId);
+    const validatedBatchRunId = batchRunIdSchema.parse(batchRunId);
+    const client = await this.getClient();
+
+    const response = await client.search({
+      index: SCENARIO_EVENTS_INDEX.alias,
+      body: {
+        query: {
+          bool: {
+            filter: [
+              { term: { [ES_FIELDS.projectId]: validatedProjectId } },
+              { term: { [ES_FIELDS.scenarioSetId]: validatedScenarioSetId } },
+              { term: { [ES_FIELDS.batchRunId]: validatedBatchRunId } },
+            ],
+          },
+        },
+        size: 10000, // Large size to get all scenario runs for this batch
+        sort: [{ timestamp: { order: "desc" } }],
+      },
+    });
+
+    const hits = response.hits?.hits ?? [];
+    return hits
+      .map((hit) => {
+        const source = hit._source as Record<string, any>;
+        return source?.scenario_run_id as string;
+      })
+      .filter(Boolean);
   }
 
   /**
@@ -431,16 +632,31 @@ export class ScenarioEventRepository {
       return [];
     }
 
+    // Validate that all batchRunIds are valid strings
+    const validBatchRunIds = batchRunIds.filter(
+      (id) => typeof id === "string" && id.length > 0
+    );
+    if (validBatchRunIds.length !== batchRunIds.length) {
+      Sentry.captureException({
+        message: "Invalid batchRunIds",
+        batchRunIds,
+      });
+    }
+
+    if (validBatchRunIds.length === 0) {
+      return [];
+    }
+
     const client = await this.getClient();
 
     const response = await client.search({
-      index: this.indexName,
+      index: SCENARIO_EVENTS_INDEX.alias,
       body: {
         query: {
           bool: {
             must: [
               { term: { [ES_FIELDS.projectId]: projectId } },
-              { terms: { [ES_FIELDS.batchRunId]: batchRunIds } },
+              { terms: { [ES_FIELDS.batchRunId]: validBatchRunIds } },
               { exists: { field: ES_FIELDS.scenarioRunId } },
             ],
           },
@@ -488,7 +704,7 @@ export class ScenarioEventRepository {
     const client = await this.getClient();
 
     const response = await client.search({
-      index: this.indexName,
+      index: SCENARIO_EVENTS_INDEX.alias,
       body: {
         query: {
           bool: {
@@ -511,6 +727,246 @@ export class ScenarioEventRepository {
     return rawResult
       ? (transformFromElasticsearch(rawResult) as ScenarioRunStartedEvent)
       : undefined;
+  }
+
+  /**
+   * Retrieves run started events for multiple scenario runs in a single query.
+   * Eliminates N+1 query problem by batching multiple scenario run lookups.
+   *
+   * @param projectId - The project identifier
+   * @param scenarioRunIds - Array of scenario run identifiers
+   * @returns Map of scenario run ID to run started event
+   * @throws {z.ZodError} If validation fails for projectId or scenarioRunIds
+   */
+  async getRunStartedEventsByScenarioRunIds({
+    projectId,
+    scenarioRunIds,
+  }: {
+    projectId: string;
+    scenarioRunIds: string[];
+  }): Promise<Map<string, ScenarioRunStartedEvent>> {
+    if (scenarioRunIds.length === 0) {
+      return new Map();
+    }
+
+    const validatedProjectId = projectIdSchema.parse(projectId);
+    const validatedScenarioRunIds = Array.from(
+      new Set(scenarioRunIds.map((id) => scenarioRunIdSchema.parse(id)))
+    );
+
+    const client = await this.getClient();
+
+    const response = await client.search({
+      index: SCENARIO_EVENTS_INDEX.alias,
+      body: {
+        track_total_hits: false,
+        query: {
+          bool: {
+            filter: [
+              { term: { [ES_FIELDS.projectId]: validatedProjectId } },
+              { terms: { [ES_FIELDS.scenarioRunId]: validatedScenarioRunIds } },
+              { term: { type: ScenarioEventType.RUN_STARTED } },
+            ],
+          },
+        },
+        aggs: {
+          by_scenario_run: {
+            terms: {
+              field: ES_FIELDS.scenarioRunId,
+              size: 1000, // Limit to prevent timeouts
+            },
+            aggs: {
+              latest_event: {
+                top_hits: {
+                  size: 1,
+                  sort: [{ timestamp: "desc" }],
+                },
+              },
+            },
+          },
+        },
+        size: 0, // We only need aggregation results
+      },
+    });
+
+    const results = new Map<string, ScenarioRunStartedEvent>();
+
+    const buckets =
+      (response.aggregations as any)?.by_scenario_run?.buckets ?? [];
+    for (const bucket of buckets) {
+      const hit = bucket.latest_event.hits.hits[0];
+      if (hit) {
+        const rawResult = hit._source as Record<string, unknown>;
+        if (rawResult) {
+          const event = transformFromElasticsearch(
+            rawResult
+          ) as ScenarioRunStartedEvent;
+          const scenarioRunId = event.scenarioRunId;
+          results.set(scenarioRunId, event);
+        }
+      }
+    }
+    return results;
+  }
+
+  /**
+   * Retrieves latest message snapshot events for multiple scenario runs in a single query.
+   * Eliminates N+1 query problem by batching multiple scenario run lookups.
+   *
+   * @param projectId - The project identifier
+   * @param scenarioRunIds - Array of scenario run identifiers
+   * @returns Map of scenario run ID to latest message snapshot event
+   * @throws {z.ZodError} If validation fails for projectId or scenarioRunIds
+   */
+  async getLatestMessageSnapshotEventsByScenarioRunIds({
+    projectId,
+    scenarioRunIds,
+  }: {
+    projectId: string;
+    scenarioRunIds: string[];
+  }): Promise<Map<string, ScenarioMessageSnapshotEvent>> {
+    if (scenarioRunIds.length === 0) {
+      return new Map();
+    }
+
+    const validatedProjectId = projectIdSchema.parse(projectId);
+    const validatedScenarioRunIds = Array.from(
+      new Set(scenarioRunIds.map((id) => scenarioRunIdSchema.parse(id)))
+    );
+
+    const client = await this.getClient();
+
+    const response = await client.search({
+      index: SCENARIO_EVENTS_INDEX.alias,
+      body: {
+        track_total_hits: false,
+        query: {
+          bool: {
+            filter: [
+              { term: { [ES_FIELDS.projectId]: validatedProjectId } },
+              { terms: { [ES_FIELDS.scenarioRunId]: validatedScenarioRunIds } },
+              { term: { type: ScenarioEventType.MESSAGE_SNAPSHOT } },
+            ],
+          },
+        },
+        aggs: {
+          by_scenario_run: {
+            terms: {
+              field: ES_FIELDS.scenarioRunId,
+              size: 1000, // Limit to prevent timeouts
+            },
+            aggs: {
+              latest_event: {
+                top_hits: {
+                  size: 1,
+                  sort: [{ timestamp: "desc" }],
+                },
+              },
+            },
+          },
+        },
+        size: 0, // We only need aggregation results
+      },
+    });
+
+    const results = new Map<string, ScenarioMessageSnapshotEvent>();
+
+    const buckets =
+      (response.aggregations as any)?.by_scenario_run?.buckets ?? [];
+    for (const bucket of buckets) {
+      const hit = bucket.latest_event.hits.hits[0];
+      if (hit) {
+        const rawResult = hit._source as Record<string, unknown>;
+        if (rawResult) {
+          const event = transformFromElasticsearch(
+            rawResult
+          ) as ScenarioMessageSnapshotEvent;
+          const scenarioRunId = event.scenarioRunId;
+          results.set(scenarioRunId, event);
+        }
+      }
+    }
+    return results;
+  }
+
+  /**
+   * Retrieves latest run finished events for multiple scenario runs in a single query.
+   * Eliminates N+1 query problem by batching multiple scenario run lookups.
+   *
+   * @param projectId - The project identifier
+   * @param scenarioRunIds - Array of scenario run identifiers
+   * @returns Map of scenario run ID to latest run finished event
+   * @throws {z.ZodError} If validation fails for projectId or scenarioRunIds
+   */
+  async getLatestRunFinishedEventsByScenarioRunIds({
+    projectId,
+    scenarioRunIds,
+  }: {
+    projectId: string;
+    scenarioRunIds: string[];
+  }): Promise<Map<string, ScenarioRunFinishedEvent>> {
+    if (scenarioRunIds.length === 0) {
+      return new Map();
+    }
+
+    const validatedProjectId = projectIdSchema.parse(projectId);
+    const validatedScenarioRunIds = Array.from(
+      new Set(scenarioRunIds.map((id) => scenarioRunIdSchema.parse(id)))
+    );
+
+    const client = await this.getClient();
+
+    const response = await client.search({
+      index: SCENARIO_EVENTS_INDEX.alias,
+      body: {
+        track_total_hits: false,
+        query: {
+          bool: {
+            filter: [
+              { term: { [ES_FIELDS.projectId]: validatedProjectId } },
+              { terms: { [ES_FIELDS.scenarioRunId]: validatedScenarioRunIds } },
+              { term: { type: ScenarioEventType.RUN_FINISHED } },
+            ],
+          },
+        },
+        aggs: {
+          by_scenario_run: {
+            terms: {
+              field: ES_FIELDS.scenarioRunId,
+              size: 1000, // Limit to prevent timeouts
+            },
+            aggs: {
+              latest_event: {
+                top_hits: {
+                  size: 1,
+                  sort: [{ timestamp: "desc" }],
+                },
+              },
+            },
+          },
+        },
+        size: 0, // We only need aggregation results
+      },
+    });
+
+    const results = new Map<string, ScenarioRunFinishedEvent>();
+
+    const buckets =
+      (response.aggregations as any)?.by_scenario_run?.buckets ?? [];
+    for (const bucket of buckets) {
+      const hit = bucket.latest_event.hits.hits[0];
+      if (hit) {
+        const rawResult = hit._source as Record<string, unknown>;
+        if (rawResult) {
+          const event = transformFromElasticsearch(
+            rawResult
+          ) as ScenarioRunFinishedEvent;
+          const scenarioRunId = event.scenarioRunId;
+          results.set(scenarioRunId, event);
+        }
+      }
+    }
+    return results;
   }
 
   /**

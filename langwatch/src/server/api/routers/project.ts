@@ -28,6 +28,7 @@ import {
 } from "@prisma/client";
 import { encrypt } from "~/utils/encryption";
 import type { Session } from "next-auth";
+import { revokeAllTraceShares } from "./share";
 
 export const projectRouter = createTRPCRouter({
   publicGetById: publicProcedure
@@ -245,6 +246,7 @@ export const projectRouter = createTRPCRouter({
           capturedOutputVisibility: z
             .enum(["REDACTED_TO_ALL", "VISIBLE_TO_ADMIN", "VISIBLE_TO_ALL"])
             .optional(),
+          traceSharingEnabled: z.boolean().optional(),
           userLinkTemplate: z.string().optional(),
           s3Endpoint: z.string().optional(),
           s3AccessKeyId: z.string().optional(),
@@ -305,6 +307,8 @@ export const projectRouter = createTRPCRouter({
             input.capturedInputVisibility ?? project.capturedInputVisibility,
           capturedOutputVisibility:
             input.capturedOutputVisibility ?? project.capturedOutputVisibility,
+          traceSharingEnabled:
+            input.traceSharingEnabled ?? project.traceSharingEnabled,
           s3Endpoint: input.s3Endpoint ? encrypt(input.s3Endpoint) : null,
           s3AccessKeyId: input.s3AccessKeyId
             ? encrypt(input.s3AccessKeyId)
@@ -315,6 +319,14 @@ export const projectRouter = createTRPCRouter({
           s3Bucket: input.s3Bucket,
         },
       });
+
+      // If trace sharing was disabled, revoke all existing trace shares
+      if (
+        input.traceSharingEnabled === false &&
+        project.traceSharingEnabled === true
+      ) {
+        await revokeAllTraceShares(input.projectId);
+      }
 
       return { success: true, projectSlug: updatedProject.slug };
     }),
@@ -475,6 +487,32 @@ export const projectRouter = createTRPCRouter({
         };
       }
     ),
+  archiveById: protectedProcedure
+    .input(z.object({ projectId: z.string(), projectToArchiveId: z.string() }))
+    .use(checkUserPermissionForProject(TeamRoleGroup.SETUP_PROJECT))
+    .mutation(async ({ input, ctx }) => {
+      const prisma = ctx.prisma;
+      if (input.projectToArchiveId === input.projectId) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "You cannot archive the current project",
+        });
+      }
+      const canDeleteTarget = await backendHasTeamProjectPermission(
+        ctx,
+        { projectId: input.projectToArchiveId },
+        TeamRoleGroup.SETUP_PROJECT
+      );
+      if (!canDeleteTarget) {
+        throw new TRPCError({ code: "UNAUTHORIZED" });
+      }
+
+      const result = await prisma.project.updateMany({
+        where: { id: input.projectToArchiveId, archivedAt: null },
+        data: { archivedAt: new Date() },
+      });
+      return { success: true, alreadyArchived: result.count === 0 };
+    }),
 });
 
 const generateApiKey = (): string => {
@@ -494,12 +532,14 @@ async function checkCapturedDataVisibilityPermission({
     projectId: string;
     capturedInputVisibility?: string;
     capturedOutputVisibility?: string;
+    traceSharingEnabled?: boolean;
   };
   next: () => Promise<any>;
 }) {
   if (
     (input.capturedInputVisibility !== void 0 ||
-      input.capturedOutputVisibility !== void 0) &&
+      input.capturedOutputVisibility !== void 0 ||
+      input.traceSharingEnabled !== void 0) &&
     !(await backendHasTeamProjectPermission(
       ctx,
       { projectId: input.projectId },

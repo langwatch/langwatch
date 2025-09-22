@@ -11,6 +11,7 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
+import { type OrganizationUserRole } from "@prisma/client";
 import { useRouter } from "next/router";
 import React, { useEffect } from "react";
 import { Briefcase, Cloud, Server, User, Users } from "react-feather";
@@ -29,14 +30,16 @@ import {
 import "react-international-phone/style.css";
 import { SetupLayout } from "~/components/SetupLayout";
 import { api } from "~/utils/api";
+import { type MembersForm } from "../../components/AddMembersForm";
 import { LoadingScreen } from "../../components/LoadingScreen";
 import { Checkbox } from "../../components/ui/checkbox";
 import { Link } from "../../components/ui/link";
 import { RadioGroup } from "../../components/ui/radio";
+import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { usePublicEnv } from "../../hooks/usePublicEnv";
 import { useRequiredSession } from "../../hooks/useRequiredSession";
 import { titleCase } from "../../utils/stringCasing";
-import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
+
 import {
   LuBinoculars,
   LuCode,
@@ -55,6 +58,7 @@ import {
 } from "react-icons/lu";
 import { toaster } from "~/components/ui/toaster";
 import { trackEventOnce } from "~/utils/tracking";
+import { AddMembersForm } from "../../components/AddMembersForm";
 
 type OrganizationFormData = {
   organizationName: string;
@@ -129,18 +133,49 @@ export default function OrganizationOnboarding() {
     },
   });
   const router = useRouter();
-  const returnTo =
-    typeof router.query.return_to === "string"
-      ? router.query.return_to
-      : undefined;
 
   const publicEnv = usePublicEnv();
   const isSaaS = publicEnv.data?.IS_SAAS;
 
   const initializeOrganization =
     api.onboarding.initializeOrganization.useMutation();
-  const apiContext = api.useContext();
+  const createInvitesMutation = api.organization.createInvites.useMutation();
+
   const [activeStep, setActiveStep] = React.useState(0);
+
+  const [organizationId, setOrganizationId] = React.useState<string | null>(
+    null
+  );
+
+  type TeamOption = { name: string; id: string };
+  const [teamOption, setTeamOption] = React.useState<TeamOption | null>(null);
+  const [projectSlug, setProjectSlug] = React.useState<string | null>(null);
+
+  const onSubmitAddMembers: SubmitHandler<MembersForm> = (data) => {
+    createInvitesMutation.mutate(
+      {
+        organizationId: organizationId ?? "",
+        invites: data.invites.map((invite) => ({
+          email: invite.email.toLowerCase(),
+          role: invite.role?.value as OrganizationUserRole,
+          teamIds: teamOption?.id ?? "",
+        })),
+      },
+      {
+        onSuccess: () => {
+          window.location.href = `/${projectSlug}/messages`;
+        },
+        onError: () => {
+          toaster.create({
+            title: "Failed to send invites",
+            description: "Please try that again",
+            type: "error",
+            placement: "top-end",
+          });
+        },
+      }
+    );
+  };
 
   const onSubmit: SubmitHandler<OrganizationFormData> = (
     data: OrganizationFormData
@@ -149,7 +184,6 @@ export default function OrganizationOnboarding() {
       ...data,
       terms: Boolean(data.terms),
     };
-
     initializeOrganization.mutate(
       {
         orgName: formattedData.organizationName,
@@ -162,7 +196,18 @@ export default function OrganizationOnboarding() {
             category: "onboarding",
             label: "organization_onboarding_completed",
           });
-          window.location.href = `/${response.projectSlug}/messages`;
+          setOrganizationId(response.organizationId);
+          setTeamOption({
+            name: response.teamName,
+            id: response.teamId,
+          });
+
+          if (myselfSelected) {
+            window.location.href = `/${response.projectSlug}/messages`;
+          } else {
+            setProjectSlug(response.projectSlug);
+            setActiveStep(2);
+          }
         },
         onError: () => {
           toaster.create({
@@ -271,33 +316,43 @@ export default function OrganizationOnboarding() {
     return companySize && yourRole && featureUsage;
   };
 
+  const skipForNow = () => {
+    window.location.href = `/${projectSlug}/messages`;
+  };
+
   return (
     <SetupLayout>
-      <form onSubmit={handleSubmit(onSubmit)}>
-        <VStack gap={4} alignItems="left">
-          <Steps.Root
-            step={activeStep}
-            onStepChange={(e) => setActiveStep(e.step)}
-            count={steps}
-          >
-            {isSaaS && (
-              <Steps.List
-                margin={myselfSelected ? "0 auto" : ""}
-                marginBottom={2}
-              >
-                <Steps.Item index={0} title={"1"}>
-                  <Steps.Indicator />
-                  <Steps.Separator />
-                </Steps.Item>
-                {!myselfSelected && (
+      <VStack gap={4} alignItems="left">
+        <Steps.Root
+          step={activeStep}
+          onStepChange={(e) => setActiveStep(e.step)}
+          count={steps}
+        >
+          {isSaaS && (
+            <Steps.List
+              margin={myselfSelected ? "0 auto" : ""}
+              marginBottom={2}
+            >
+              <Steps.Item index={0} title={"1"}>
+                <Steps.Indicator />
+                <Steps.Separator />
+              </Steps.Item>
+              {!myselfSelected && (
+                <>
                   <Steps.Item index={1} title={"2"}>
                     <Steps.Indicator />
                     <Steps.Separator />
                   </Steps.Item>
-                )}
-              </Steps.List>
-            )}
-
+                  <Steps.Item index={2} title={"3"}>
+                    <Steps.Indicator />
+                    <Steps.Separator />
+                  </Steps.Item>
+                </>
+              )}
+            </Steps.List>
+          )}
+          {/* eslint-disable-next-line @typescript-eslint/no-misused-promises */}
+          <form onSubmit={handleSubmit(onSubmit)}>
             <Steps.Content index={0}>
               <Heading as="h1" fontSize="x-large">
                 Organization Details
@@ -618,11 +673,32 @@ export default function OrganizationOnboarding() {
                   </Steps.Content>
                 </React.Fragment>
               )}
-          </Steps.Root>
+          </form>
+          <Steps.Content index={2}>
+            <Heading as="h1">Team Members</Heading>
+            <Text paddingBottom={4} fontSize="14px">
+              Add team members to your organization
+            </Text>
+            {teamOption && (
+              <AddMembersForm
+                teamOptions={[teamOption].map((team) => ({
+                  label: team?.name ?? "",
+                  value: team?.id ?? "",
+                }))}
+                onSubmit={onSubmitAddMembers}
+                isLoading={createInvitesMutation.isPending}
+                hasEmailProvider={Boolean(
+                  publicEnv.data?.HAS_EMAIL_PROVIDER_KEY
+                )}
+                onClose={skipForNow}
+                onCloseText="Skip for now"
+              />
+            )}
+          </Steps.Content>
+        </Steps.Root>
 
-          {initializeOrganization.error && <p>Something went wrong!</p>}
-        </VStack>
-      </form>
+        {initializeOrganization.error && <p>Something went wrong!</p>}
+      </VStack>
     </SetupLayout>
   );
 }

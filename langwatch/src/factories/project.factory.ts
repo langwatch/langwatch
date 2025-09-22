@@ -22,6 +22,7 @@ export const projectFactory = Factory.define<Project>(({ sequence }) => ({
   piiRedactionLevel: PIIRedactionLevel.ESSENTIAL,
   capturedInputVisibility: ProjectSensitiveDataVisibilityLevel.VISIBLE_TO_ALL,
   capturedOutputVisibility: ProjectSensitiveDataVisibilityLevel.VISIBLE_TO_ALL,
+  traceSharingEnabled: true,
   defaultModel: null,
   topicClusteringModel: null,
   embeddingsModel: null,
@@ -29,4 +30,5 @@ export const projectFactory = Factory.define<Project>(({ sequence }) => ({
   s3AccessKeyId: null,
   s3SecretAccessKey: null,
   s3Bucket: null,
+  archivedAt: null,
 }));

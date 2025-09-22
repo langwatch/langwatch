@@ -71,6 +71,7 @@ export async function fetchSSE<T>({
 
   try {
     await fetchEventSource(endpoint, {
+      openWhenHidden: true,
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -92,12 +93,17 @@ export async function fetchSSE<T>({
           return;
         }
 
-        // All errors are treated the same - they'll be caught by the main try-catch
-        throw new Error(
+        const error = new Error(
           response.status >= 500
             ? `Server error: ${response.status} ${response.statusText}`
             : response.statusText
         );
+
+        if (onError) {
+          onError(error);
+        } else {
+          throw error;
+        }
       },
 
       onmessage(ev) {

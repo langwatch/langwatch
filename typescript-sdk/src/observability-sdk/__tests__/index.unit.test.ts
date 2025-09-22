@@ -103,17 +103,17 @@ describe("index.ts", () => {
   describe("functionality verification", () => {
     it("should provide working createLangWatchSpan function", () => {
       const mockSpan = {
-        setAttribute: () => {},
-        setAttributes: () => {},
-        addEvent: () => {},
-        recordException: () => {},
-        setStatus: () => {},
-        updateName: () => {},
-        end: () => {},
+        setAttribute: () => mockSpan,
+        setAttributes: () => mockSpan,
+        addEvent: () => mockSpan,
+        recordException: () => mockSpan,
+        setStatus: () => mockSpan,
+        updateName: () => mockSpan,
+        end: () => mockSpan,
         isRecording: () => true,
         spanContext: () => ({ traceId: "123", spanId: "456", traceFlags: 1 }),
-        addLink: () => {},
-        addLinks: () => {},
+        addLink: () => mockSpan,
+        addLinks: () => mockSpan,
       } as any;
 
       const langwatchSpan = indexModule.createLangWatchSpan(mockSpan);
@@ -134,7 +134,7 @@ describe("index.ts", () => {
       const mockProvider = {
         getTracer: () => ({
           startSpan: () => ({}),
-          startActiveSpan: () => {},
+          startActiveSpan: () => ({}),
         })
       } as any;
 
@@ -432,7 +432,7 @@ describe("index.ts", () => {
 
           throw new Error("Test error");
         });
-      } catch (error) {
+      } catch (_error) {
         // Error expected
       }
 

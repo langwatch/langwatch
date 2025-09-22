@@ -271,7 +271,7 @@ export const ComponentNode = forwardRef(function ComponentNode(
       align="start"
       color="gray.600"
       fontSize="11px"
-      minWidth={80 + 3 * getNodeDisplayName(props).length + "px"}
+      minWidth={120 + 6.5 * Math.min(getNodeDisplayName(props).length, 24) + "px"}
       boxShadow={`0px 0px 4px 0px rgba(0, 0, 0, ${isHovered ? "0.2" : "0.1"})`}
       border="none"
       outline={!!props.selected || isHovered ? "1.5px solid" : "none"}
@@ -340,10 +340,10 @@ export const ComponentNode = forwardRef(function ComponentNode(
           flexShrink={1}
           lineClamp={2}
           wordBreak="break-all"
+          width="full"
         >
           {getNodeDisplayName(props)}
         </Text>
-        <Spacer />
         {node && isExecutableComponent(node) && !isInsideWizard ? (
           <ComponentExecutionButton
             node={node}

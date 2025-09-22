@@ -5,7 +5,7 @@ import {
   type CustomCellEditorProps,
   type CustomCellRendererProps,
 } from "@ag-grid-community/react";
-import { Box, Field, Text } from "@chakra-ui/react";
+import { Box, Field, Text, Image, VStack } from "@chakra-ui/react";
 import { useEffect, useMemo, useState } from "react";
 import { MultilineCellEditor } from "./MultilineCellEditor";
 import type { ColDef } from "@ag-grid-community/core";
@@ -26,6 +26,8 @@ import { Checkbox } from "../ui/checkbox";
 import { Minus } from "react-feather";
 import { useDebounce } from "use-debounce";
 
+import { ExternalImage, getImageUrl } from "../ExternalImage";
+
 ModuleRegistry.registerModules([ClientSideRowModelModule]);
 
 export const JSONCellRenderer = (props: { value: string | undefined }) => {
@@ -36,6 +38,69 @@ export const JSONCellRenderer = (props: { value: string | undefined }) => {
       collapsed={(props.value?.toString().length ?? 0) > 1000}
     />
   );
+};
+
+export const ImageCellRenderer = (props: { value: string | undefined }) => {
+  if (!props.value) {
+    return <Text color="gray.500">No image</Text>;
+  }
+
+  // Check if it's a valid URL
+  const isValidUrl = (url: string) => {
+    try {
+      new URL(url);
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
+  if (!isValidUrl(props.value)) {
+    return (
+      <Box
+        height="100px"
+        width="150px"
+        borderRadius="md"
+        bg="red.50"
+        display="flex"
+        alignItems="center"
+        justifyContent="center"
+        border="1px solid"
+        borderColor="red.200"
+      >
+        <VStack gap={1}>
+          <Text fontSize="xs" color="red.600" textAlign="center">
+            Invalid URL
+          </Text>
+          <Text
+            fontSize="xs"
+            color="red.500"
+            textAlign="center"
+            maxWidth="140px"
+            lineClamp={2}
+          >
+            {props.value}
+          </Text>
+        </VStack>
+      </Box>
+    );
+  }
+
+  const imageUrl = getImageUrl(props.value);
+  if (imageUrl) {
+    return (
+      <ExternalImage
+        src={imageUrl}
+        minWidth="24px"
+        minHeight="24px"
+        maxHeight="120px"
+        maxWidth="100%"
+        dontLinkify
+      />
+    );
+  } else {
+    return <Text color="gray.500">Invalid image URL</Text>;
+  }
 };
 
 export type DatasetColumnDef = ColDef & { type_: DatasetColumnType };
@@ -64,7 +129,16 @@ export const DatasetGrid = React.memo(
       return (props.columnDefs as DatasetColumnDef[])?.map(
         (column: DatasetColumnDef) => {
           const basicTypes = ["string", "number", "boolean", "date"];
-          if (!basicTypes.includes(column.type_)) {
+          if (column.type_ === "image") {
+            return {
+              ...column,
+              cellDataType: "text",
+              cellRenderer: ImageCellRenderer,
+              cellEditor: (props: CustomCellEditorProps) => (
+                <MultilineCellEditor {...props} />
+              ),
+            };
+          } else if (!basicTypes.includes(column.type_)) {
             return {
               ...column,
               cellDataType: "object",

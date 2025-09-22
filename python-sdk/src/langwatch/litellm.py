@@ -14,7 +14,6 @@ from typing import (
 from langwatch.tracer import (
     ContextSpan,
     ContextTrace,
-    get_current_span,
     get_current_trace,
 )
 
@@ -122,10 +121,7 @@ class LiteLLMPatch:
         if not trace or trace not in self.tracked_traces:
             return await cast(Any, self.client)._original_acompletion(*args, **kwargs)
 
-        span = trace.span(
-            type="llm",
-            parent=get_current_span(),
-        ).__enter__()
+        span = trace.span(type="llm").__enter__()
 
         started_at = milliseconds_timestamp()
 

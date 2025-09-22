@@ -10,6 +10,8 @@ import {
 } from "../../../components/settings/TeamForm";
 import type { TeamWithProjectsAndMembersAndUsers } from "../../../server/api/routers/organization";
 import { api } from "../../../utils/api";
+import { toaster } from "../../../components/ui/toaster";
+
 import { teamRolesOptions } from "../../../components/settings/TeamUserRoleField";
 import { useOrganizationTeamProject } from "../../../hooks/useOrganizationTeamProject";
 
@@ -67,6 +69,14 @@ function EditTeam({ team }: { team: TeamWithProjectsAndMembersAndUsers }) {
         },
         {
           onSuccess: () => {
+            toaster.create({
+              title: "Team updated successfully",
+              type: "success",
+              duration: 2000,
+              meta: {
+                closable: true,
+              },
+            });
             void apiContext.organization.getAll.refetch();
           },
         }

@@ -21,6 +21,7 @@ import {
   collectorRESTParamsValidatorSchema,
   customMetadataSchema,
   reservedTraceMetadataSchema,
+  spanMetricsSchema,
   spanSchema,
   spanValidatorSchema,
 } from "../../server/tracer/types.generated";
@@ -77,7 +78,7 @@ async function handleCollectorRequest(
   }
 
   const project = await prisma.project.findUnique({
-    where: { apiKey: authToken as string },
+    where: { apiKey: authToken as string, archivedAt: null },
     include: {
       team: true,
     },
@@ -398,8 +399,24 @@ async function handleCollectorRequest(
   }
 
   for (const [index, span] of spans.entries()) {
+    // Move extrataneous metrics to params for retrocompatibility
+    if (span.metrics) {
+      const validMetrics = spanMetricsSchema.safeParse(span.metrics);
+      if (validMetrics.success) {
+        const extrataneousMetrics = Object.fromEntries(
+          Object.entries(span.metrics).filter(
+            ([key]) => !(key in validMetrics.data)
+          )
+        );
+        span.params = {
+          ...span.params,
+          ...extrataneousMetrics,
+        };
+        span.metrics = validMetrics.data;
+      }
+    }
     try {
-      spanValidatorSchema.parse(span);
+      spans[index] = spanValidatorSchema.parse(span);
     } catch (error) {
       Sentry.captureException(new Error("ZodError on parsing spans"), {
         extra: { projectId: project.id, span, zodError: error },

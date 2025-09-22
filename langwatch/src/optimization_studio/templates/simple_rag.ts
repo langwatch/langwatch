@@ -9,7 +9,7 @@ export const simpleRagTemplate: Workflow = {
     "Query transformation, vector database search and answer generation",
   version: "1.0",
   default_llm: {
-    model: "openai/gpt-4o-mini",
+    model: "openai/gpt-5",
     temperature: 0,
     max_tokens: 8192,
   },

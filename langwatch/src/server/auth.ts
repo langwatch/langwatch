@@ -119,7 +119,7 @@ export const authOptions = (
       }
 
       if (domain && account && orgWithSsoDomain && !existingUser) {
-        await createUserAndAddToOrganizationAndTeams(
+        await createUserAndAddToOrganization(
           user,
           orgWithSsoDomain,
           account as Account
@@ -293,7 +293,7 @@ export const authOptions = (
   },
 });
 
-const createUserAndAddToOrganizationAndTeams = async (
+const createUserAndAddToOrganization = async (
   user: User,
   organization: Organization,
   account: Account
@@ -328,22 +328,6 @@ const createUserAndAddToOrganizationAndTeams = async (
       role: "MEMBER",
     },
   });
-
-  const orgTeams = await prisma.team.findMany({
-    where: {
-      organizationId: organization.id,
-    },
-  });
-
-  for (const team of orgTeams) {
-    await prisma.teamUser.create({
-      data: {
-        userId: newUser.id,
-        teamId: team.id,
-        role: "MEMBER",
-      },
-    });
-  }
 
   return newUser;
 };

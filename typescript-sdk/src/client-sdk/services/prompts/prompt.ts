@@ -1,69 +1,68 @@
 import { Liquid } from "liquidjs";
-import type { paths } from "@/internal/generated/openapi/api-client";
 import { PromptTracingDecorator, tracer } from "./tracing";
 import { createTracingProxy } from "@/client-sdk/tracing/create-tracing-proxy";
+import { promptDataSchema } from "./schema";
+import { type TemplateVariables, type PromptData, type CorePromptData, type PromptScope } from "./types";
+import { PromptCompilationError, PromptValidationError } from "./errors";
 
-// Extract the prompt response type from OpenAPI schema
-export type PromptResponse = NonNullable<
-  paths["/api/prompts/{id}"]["get"]["responses"]["200"]["content"]["application/json"]
->;
-
-// Type for template variables - supporting common data types
-export type TemplateVariables = Record<
-  string,
-  string | number | boolean | object | null
->;
-
-/**
- * Error class for template compilation issues
- */
-export class PromptCompilationError extends Error {
-  constructor(
-    message: string,
-    public readonly template: string,
-    public readonly originalError?: any,
-  ) {
-    super(message);
-    this.name = "PromptCompilationError";
-  }
-}
+// Re-export types and errors for convenience
+export type { TemplateVariables, PromptData, CorePromptData, PromptMetadata } from "./types";
+export { PromptCompilationError, PromptValidationError } from "./errors";
 
 // Global Liquid instance - shared across all prompts for efficiency
 const liquid = new Liquid({
   strictFilters: true,
 });
 
-export class Prompt implements PromptResponse {
-  public readonly id!: string;
-  public readonly projectId!: string;
-  public readonly organizationId!: string;
-  public readonly handle!: string | null;
-  public readonly scope!: "ORGANIZATION" | "PROJECT";
-  public readonly name!: string;
-  public readonly updatedAt!: string;
-  public readonly version!: number;
-  public readonly versionId!: string;
+/**
+ * The Prompt class provides a standardized interface for working with prompt objects
+ * within the SDK, focusing on core functionality needed for template compilation and execution.
+ * Keeps only essential fields while maintaining compatibility with tracing and observability.
+ */
+export class Prompt {
+  // === Core functionality (required) ===
   public readonly model!: string;
-  public readonly prompt!: string;
-  public readonly messages!: PromptResponse["messages"];
-  public readonly responseFormat!: PromptResponse["responseFormat"];
-  public readonly authorId!: string | null;
-  public readonly createdAt!: string;
-  public readonly inputs!: PromptResponse["inputs"];
-  public readonly outputs!: PromptResponse["outputs"];
+  public readonly messages!: Array<{
+    role: "user" | "assistant" | "system";
+    content: string;
+  }>;
 
-  constructor(private readonly promptData: PromptResponse) {
-    Object.assign(this, promptData);
+  // === Optional core fields ===
+  public readonly prompt?: string;
+  public readonly temperature?: number;
+  public readonly maxTokens?: number;
+  public readonly responseFormat?: CorePromptData["responseFormat"];
+
+  // === Optional identification (for tracing) ===
+  public readonly id?: string;
+  public readonly handle?: string | null;
+  public readonly version?: number;
+  public readonly versionId?: string;
+  public readonly scope?: PromptScope;
+
+  constructor(data: PromptData) {
+    // Validate input using Zod
+    const validationResult = promptDataSchema.strip().safeParse(data);
+
+    if (!validationResult.success) {
+      throw new PromptValidationError(
+        "Invalid prompt data provided",
+        validationResult.error
+      );
+    }
+
+    // Assign validated data
+    Object.assign(this, validationResult.data);
+
+    // Set default for prompt if not provided
+    this.prompt ??= this.extractSystemPrompt();
 
     // Return a proxy that wraps specific methods for tracing
     return createTracingProxy(this as Prompt, tracer, PromptTracingDecorator);
   }
 
-  /**
-   * Get the raw prompt data from the API
-   */
-  get raw(): PromptResponse {
-    return this.promptData;
+  private extractSystemPrompt(): string {
+    return this.messages.find(m => m.role === "system")?.content ?? "";
   }
 
   /**
@@ -94,7 +93,7 @@ export class Prompt implements PromptResponse {
       }));
 
       // Create new prompt data with compiled content
-      const compiledData: PromptResponse = {
+      const compiledData: PromptData = {
         ...this,
         prompt: compiledPrompt,
         messages: compiledMessages,
@@ -102,7 +101,7 @@ export class Prompt implements PromptResponse {
 
       return new CompiledPrompt(compiledData, this);
     } catch (error) {
-      const templateStr = this.prompt || JSON.stringify(this.messages);
+      const templateStr = this.prompt ?? JSON.stringify(this.messages);
       throw new PromptCompilationError(
         `Failed to compile prompt template: ${
           error instanceof Error ? error.message : "Unknown error"
@@ -127,12 +126,13 @@ export class Prompt implements PromptResponse {
   }
 }
 
-export /**
+
+/**
  * Represents a compiled prompt that extends Prompt with reference to the original template
  */
-class CompiledPrompt extends Prompt {
+export class CompiledPrompt extends Prompt {
   constructor(
-    compiledData: PromptResponse,
+    compiledData: PromptData,
     public readonly original: Prompt,
   ) {
     super(compiledData);

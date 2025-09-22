@@ -28,7 +28,7 @@ describe("Real LLM Interactions E2E", () => {
     let traceId: string | undefined;
 
     const chatRequest = {
-      model: "gpt-4o-mini",
+      model: "gpt-5",
       messages: [
         { role: "system", content: "You are a helpful assistant." },
         { role: "user", content: "Hello, how are you?" }
@@ -102,7 +102,7 @@ describe("Real LLM Interactions E2E", () => {
     let traceId: string;
 
     const streamRequest = {
-      model: "gpt-4o-mini",
+      model: "gpt-5",
       messages: [{ role: "user", content: "Write a haiku about AI" }],
       stream: true
     };
@@ -157,7 +157,7 @@ describe("Real LLM Interactions E2E", () => {
     let traceId: string;
 
     const functionRequest = {
-      model: "gpt-4o-mini",
+      model: "gpt-5",
       messages: [{ role: "user", content: "What's the weather in Tokyo?" }],
       functions: [{ name: "get_weather", description: "Get weather" }],
     };
@@ -220,7 +220,7 @@ describe("Real LLM Interactions E2E", () => {
     let traceId: string;
 
     const errorRequest = {
-      model: "gpt-4o-mini",
+      model: "gpt-5",
       messages: [{ role: "user", content: "x".repeat(5000) }], // Too long
     };
 

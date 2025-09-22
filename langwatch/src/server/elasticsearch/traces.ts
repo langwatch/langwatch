@@ -166,7 +166,7 @@ export const getTraceById = async ({
   const traces = await searchTraces({
     connConfig,
     search: {
-      index: TRACE_INDEX.alias,
+      index: TRACE_INDEX.all,
       size: 1,
       _source: {
         excludes: [
@@ -214,6 +214,7 @@ export const getTracesGroupedByThreadId = async ({
   const traces = await searchTraces({
     connConfig,
     search: {
+      index: TRACE_INDEX.all,
       size: 1000,
       _source: {
         excludes: [

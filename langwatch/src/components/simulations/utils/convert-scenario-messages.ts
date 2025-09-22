@@ -2,7 +2,7 @@ import {
   TextMessage,
   Role,
   type MessageRole,
-  type Message,
+  Message,
   ActionExecutionMessage,
   ResultMessage,
   ImageMessage,
@@ -15,8 +15,8 @@ import { safeJsonParseOrStringFallback } from "./safe-json-parse-or-string-fallb
  */
 export function convertScenarioMessagesToCopilotKit(
   messages: ScenarioMessageSnapshotEvent["messages"]
-): Message[] {
-  const convertedMessages: Message[] = [];
+): (Message & { traceId?: string })[] {
+  const convertedMessages: (Message & { traceId?: string })[] = [];
 
   messages.forEach((message) => {
     if ([Role.User, Role.Assistant].includes(message.role as MessageRole)) {
@@ -40,21 +40,26 @@ export function convertScenarioMessagesToCopilotKit(
  */
 function extractToolCalls(
   message: ScenarioMessageSnapshotEvent["messages"][0]
-): ActionExecutionMessage[] {
+): (ActionExecutionMessage & { traceId?: string })[] {
   if (!("toolCalls" in message) || !message.toolCalls) {
     return [];
   }
 
-  return message.toolCalls.map(
-    (toolCall) =>
-      new ActionExecutionMessage({
-        id: `${message.id}-tool-${toolCall.function?.name}`,
-        name: toolCall.function?.name,
-        arguments: safeJsonParseOrStringFallback(
-          toolCall.function?.arguments ?? "{}"
-        ),
-      })
-  );
+  return message.toolCalls.map((toolCall) => {
+    const actionExecutionMessage: ActionExecutionMessage & {
+      traceId?: string;
+    } = new ActionExecutionMessage({
+      id: `${message.id}-tool-${toolCall.function?.name}`,
+      name: toolCall.function?.name,
+      arguments: safeJsonParseOrStringFallback(
+        toolCall.function?.arguments ?? "{}"
+      ),
+    });
+
+    actionExecutionMessage.traceId = message.trace_id;
+
+    return actionExecutionMessage;
+  });
 }
 
 /**
@@ -62,8 +67,12 @@ function extractToolCalls(
  */
 function convertMessageContent(
   message: ScenarioMessageSnapshotEvent["messages"][0]
-): Message[] {
-  const parsedContent = safeJsonParseOrStringFallback(message.content ?? "");
+): (Message & { traceId?: string })[] {
+  const content =
+    typeof message.content === "string"
+      ? message.content
+      : JSON.stringify(message.content ?? {});
+  const parsedContent = safeJsonParseOrStringFallback(content);
 
   if (Array.isArray(parsedContent)) {
     return convertMixedContent(parsedContent, message);
@@ -71,13 +80,13 @@ function convertMessageContent(
 
   // Handle simple text content
   if (message.content && message.content !== "None") {
-    return [
-      new TextMessage({
-        id: message.id,
-        role: message.role as MessageRole,
-        content: message.content,
-      }),
-    ];
+    const textMessage: TextMessage & { traceId?: string } = new TextMessage({
+      id: message.id,
+      role: message.role as MessageRole,
+      content: content,
+    });
+    textMessage.traceId = message.trace_id;
+    return [textMessage];
   }
 
   return [];
@@ -110,6 +119,23 @@ function convertMixedContent(
       if (imageMessage) {
         messages.push(imageMessage);
       }
+
+      // Anthropic tool use
+    } else if (item.type === "tool_use") {
+      messages.push(
+        new ActionExecutionMessage({
+          name: item.name,
+          arguments: item.arguments ?? item.input,
+        })
+      );
+    } else if (item.type === "tool_result") {
+      messages.push(
+        new ResultMessage({
+          actionExecutionId: item.tool_use_id,
+          actionName: item.name ?? "tool_result",
+          result: item.content,
+        })
+      );
     }
   });
 
@@ -151,11 +177,19 @@ function createImageMessage(
  */
 function createToolResultMessage(
   message: ScenarioMessageSnapshotEvent["messages"][0]
-): ResultMessage {
-  return new ResultMessage({
-    id: message.id,
-    actionExecutionId: message.id,
-    actionName: "tool",
-    result: safeJsonParseOrStringFallback(message.content ?? "{}"),
-  });
+): ResultMessage & { traceId?: string } {
+  const resultMessage: ResultMessage & { traceId?: string } = new ResultMessage(
+    {
+      id: message.id,
+      actionExecutionId: message.id ?? "",
+      actionName: "tool",
+      result: safeJsonParseOrStringFallback(
+        typeof message.content === "string"
+          ? message.content
+          : JSON.stringify(message.content ?? {})
+      ),
+    }
+  );
+  resultMessage.traceId = message.trace_id;
+  return resultMessage;
 }

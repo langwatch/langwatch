@@ -14,6 +14,7 @@ import { ScenarioEventService } from "./scenario-event.service";
 import { scenarioEventSchema, responseSchemas } from "./schemas";
 
 import { createLogger } from "~/utils/logger";
+import z from "zod";
 
 const logger = createLogger("langwatch:api:scenario-events");
 

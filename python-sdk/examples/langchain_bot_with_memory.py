@@ -34,7 +34,7 @@ async def on_chat_start():
             ("human", "{input}"),
         ]
     )
-    llm = ChatOpenAI(temperature=0.3, model="gpt-4o-mini", max_tokens=4096)
+    llm = ChatOpenAI(temperature=1, model="gpt-5", max_tokens=4096)
     runnable = ingress | prompt | llm
 
     cl.user_session.set("runnable", runnable)

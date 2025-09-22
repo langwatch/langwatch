@@ -6,8 +6,23 @@ metadata:
   labels:
     app.kubernetes.io/name: {{ .Release.Name }}-langwatch-nlp
     app.kubernetes.io/instance: {{ .Release.Name }}
+    {{- include "langwatch.labels" . | nindent 4 }}
+    {{- if .Values.langwatch_nlp.labels }}
+    {{- toYaml .Values.langwatch_nlp.labels | nindent 4 }}
+    {{- end }}
+  annotations:
+    {{- if .Values.langwatch_nlp.deployment.annotations }}
+    {{- toYaml .Values.langwatch_nlp.deployment.annotations | nindent 4 }}
+    {{- end }}
 spec:
   replicas: {{ .Values.langwatch_nlp.replicaCount }}
+  {{- if .Values.langwatch_nlp.deployment.strategy }}
+  strategy: 
+    {{- toYaml .Values.langwatch_nlp.deployment.strategy | nindent 8 }}
+  {{- end }}
+  {{- if .Values.langwatch_nlp.deployment.revisionHistoryLimit }}
+  revisionHistoryLimit: {{ .Values.langwatch_nlp.deployment.revisionHistoryLimit }}
+  {{- end }}
   selector:
     matchLabels:
       app.kubernetes.io/name: {{ .Release.Name }}-langwatch-nlp
@@ -17,34 +32,88 @@ spec:
       labels:
         app.kubernetes.io/name: {{ .Release.Name }}-langwatch-nlp
         app.kubernetes.io/instance: {{ .Release.Name }}
+        {{- if .Values.langwatch_nlp.pod.labels }}
+        {{- toYaml .Values.langwatch_nlp.pod.labels | nindent 8 }}
+        {{- end }}
+      annotations:
+        {{- if .Values.langwatch_nlp.podAnnotations }}
+        {{- toYaml .Values.langwatch_nlp.podAnnotations | nindent 8 }}
+        {{- else if .Values.global.podAnnotations }}
+        {{- toYaml .Values.global.podAnnotations | nindent 8 }}
+        {{- end }}
     spec:
-      # Pod security context
+      # Pod security context - https://kubespec.dev/v1/Pod#spec.securityContext
+      {{- with (coalesce .Values.langwatch_nlp.podSecurityContext .Values.global.podSecurityContext)}}
       securityContext:
-        {{- toYaml .Values.global.podSecurityContext | nindent 8 }}
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+
+      # Node selection - https://kubespec.dev/v1/Pod#spec.nodeSelector
+      {{- with (coalesce .Values.langwatch_nlp.nodeSelector .Values.global.scheduling.nodeSelector)}}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+
+      # Tolerations - https://kubespec.dev/v1/Pod#spec.tolerations
+      {{- with (coalesce .Values.langwatch_nlp.tolerations .Values.global.scheduling.tolerations)}}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+
+      # Affinity - https://kubespec.dev/v1/Pod#spec.affinity
+      {{- with (coalesce .Values.langwatch_nlp.affinity .Values.global.scheduling.affinity)}}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+
+      initContainers:
+        {{- with .Values.langwatch_nlp.extraInitContainers}}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+
       containers:
-        - name: {{ .Chart.Name }}-langwatch-nlp
+        {{- with .Values.langwatch_nlp.extraContainers}}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+        - name: {{ .Release.Name }}-app
           securityContext:
-            {{- toYaml .Values.global.containerSecurityContext | nindent 12 }}
+            {{- toYaml (coalesce .Values.langwatch_nlp.containerSecurityContext .Values.global.containerSecurityContext) | nindent 12 }}
           image: "{{ .Values.images.langwatch_nlp.repository }}:{{ .Values.images.langwatch_nlp.tag }}"
-          imagePullPolicy: {{ .Values.images.langwatch_nlp.pullPolicy }}
+          imagePullPolicy: "{{ .Values.images.langwatch_nlp.pullPolicy }}"
           ports:
             - name: http
               containerPort: {{ .Values.langwatch_nlp.service.port }}
               protocol: TCP
+
           # Environment variables for the NLP service
           env:
-            {{- range $key, $value := .Values.langwatch_nlp.env }}
-            - name: {{ $key }}
-              value: {{ tpl $value $ | quote }}
+            - name: LANGWATCH_ENDPOINT
+              value: {{ .Values.langwatch_nlp.upstreams.langwatch.scheme | default "http" }}://{{ .Values.langwatch_nlp.upstreams.langwatch.name | default (printf "%s-app" .Release.Name) }}:{{ .Values.langwatch_nlp.upstreams.langwatch.port | default 5560 }}
+
+            {{- with .Values.langwatch_nlp.extraEnvs}}
+            {{- toYaml . | nindent 12 }}
             {{- end }}
+
+          {{- if .Values.langwatch_nlp.extraNlpLifecycle}}
+          lifecycle:
+            {{- with .Values.langwatch_nlp.extraNlpLifecycle}}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          {{- end }}
           resources:
             {{- toYaml .Values.langwatch_nlp.resources | nindent 12 }}
           volumeMounts:
+            {{- with .Values.langwatch_nlp.extraNlpVolumeMounts}}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
             - name: tmp-dir
               mountPath: /tmp
             - name: log-dir
               mountPath: /var/log
       volumes:
+        {{- with .Values.langwatch_nlp.extraVolumes}}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
         - name: tmp-dir
           emptyDir: {}
         - name: log-dir

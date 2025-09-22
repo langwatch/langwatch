@@ -19,11 +19,11 @@ if TYPE_CHECKING:
     import langwatch.dataset as dataset
     import langwatch.dspy as dspy
     import langwatch.langchain as langchain
-    from .prompts.service import PromptService
+    from .prompts.prompt_facade import PromptsFacade
 
     # Type hint for the prompts service specifically
     # required to get the instance typing correct
-    prompts: PromptService
+    prompts: PromptsFacade
 
 
 @module_property
@@ -61,10 +61,10 @@ def __getattr__(name: str):
             globals()[name] = module
             return module
     elif name == "prompts":
-        # Special-case: expose a PromptService instance at langwatch.prompts
-        from .prompts.service import PromptService
+        # Special-case: expose a PromptsFacade instance at langwatch.prompts
+        from .prompts.prompt_facade import PromptsFacade
 
-        svc = PromptService.from_global()
+        svc = PromptsFacade.from_global()
         globals()[name] = svc  # Cache for subsequent access
         return svc
 

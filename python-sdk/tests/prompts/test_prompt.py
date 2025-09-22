@@ -17,51 +17,20 @@ from langwatch.generated.langwatch_rest_api_client.models.get_api_prompts_by_id_
 )
 
 
-@pytest.fixture
-def mock_config():
-    """Type-safe configuration object from actual API response types"""
-    return GetPromptResponseFactory(
-        id="prompt_123",
-        version=1.0,  # Use float instead of string for proper typing
-        prompt="Hello {{ name }}!",
-        messages=[
-            GetApiPromptsByIdResponse200MessagesItem(
-                role=GetApiPromptsByIdResponse200MessagesItemRole.USER,
-                content="Say {{ greeting }} to {{ name }}",
-            ),
-        ],
-    )
+# Fixtures are now centralized in tests/conftest.py
 
 
-@pytest.fixture
-def prompt(mock_config: GetApiPromptsByIdResponse200) -> Prompt:
-    """Create a Prompt instance with factory-generated config"""
-    return Prompt(mock_config)
+def test_prompt_delegates_config_attributes(prompt: Prompt, prompt_data):
+    """Test that Prompt has the expected attributes from PromptData"""
+    # Test that key attributes are accessible on the Prompt instance
+    assert prompt.id == prompt_data["id"]
+    assert prompt.model == prompt_data["model"]
+    assert prompt.version == prompt_data["version"]
+    assert prompt.handle == prompt_data["handle"]
+    assert prompt.messages == prompt_data["messages"]
 
-
-def test_prompt_delegates_config_attributes(
-    prompt: Prompt, mock_config: GetApiPromptsByIdResponse200
-):
-    """Test that Prompt delegates attribute access to config"""
-    # Test all config attributes are properly delegated
-    for attr in [
-        "id",
-        "scope",
-        "version",
-        "prompt",
-        "messages",
-        "name",
-        "updated_at",
-        "project_id",
-        "organization_id",
-        "version_id",
-        "version_created_at",
-        "model",
-        "response_format",
-        "handle",
-    ]:
-        if hasattr(mock_config, attr):
-            assert getattr(prompt, attr) == getattr(mock_config, attr)
+    # Test that the raw data is accessible
+    assert prompt.raw == prompt_data
 
 
 def test_compile_with_variables(prompt: Prompt):
@@ -72,10 +41,13 @@ def test_compile_with_variables(prompt: Prompt):
     assert compiled is not None
     assert hasattr(compiled, "original")
     assert compiled.original == prompt
-    assert compiled.prompt == "Hello World!"
-    assert len(compiled.messages) == 1
-    assert compiled.messages[0]["role"] == "user"
-    assert compiled.messages[0]["content"] == "Say Hello to World"
+    assert compiled.prompt == "Hello World!"  # Compiled with variables
+    assert len(compiled.messages) == 2  # Factory creates system + assistant messages
+    # Check message roles and that variables were compiled in the assistant message
+    assert compiled.messages[0]["role"] == "system"
+    assert compiled.messages[0]["content"] == "You are a helpful assistant"
+    assert compiled.messages[1]["role"] == "assistant"
+    assert compiled.messages[1]["content"] == "Hello, World!"
 
 
 def test_compile_without_variables(prompt: Prompt):
@@ -89,10 +61,10 @@ def test_compile_strict_with_valid_variables(prompt: Prompt):
     variables = {"name": "World", "greeting": "Hello"}
     compiled = prompt.compile_strict(variables)
     assert compiled is not None
-    assert compiled.prompt == "Hello World!"
-    assert len(compiled.messages) == 1
-    assert compiled.messages[0]["role"] == "user"
-    assert compiled.messages[0]["content"] == "Say Hello to World"
+    assert compiled.prompt == "Hello World!"  # Compiled with variables
+    assert len(compiled.messages) == 2  # Factory creates system + assistant messages
+    # Check that variables were compiled in the assistant message
+    assert compiled.messages[1]["content"] == "Hello, World!"
 
 
 def test_compile_strict_with_missing_variables(prompt: Prompt):

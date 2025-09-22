@@ -92,7 +92,7 @@ const getTraceCount = async () => {
   const client = await esClient();
 
   const result = await client.count({
-    index: TRACE_INDEX.alias,
+    index: TRACE_INDEX.all,
     body: {
       query: {
         match_all: {}, // Get all documents without any filter

@@ -1,13 +1,10 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { SpanKind } from "@opentelemetry/api";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { createTracingProxy } from "../create-tracing-proxy";
 import { getLangWatchTracerFromProvider, type LangWatchTracer } from "../../../observability-sdk";
 import {
-  MockSpan,
   type MockTracer,
   MockTracerProvider,
   setupTestEnvironment,
-  flushPromises,
   createDelayedPromise,
 } from "../../../observability-sdk/__tests__/test-utils";
 
@@ -56,9 +53,7 @@ describe("createTracingProxy", () => {
       return "private-result";
     }
 
-    public get getterMethod() {
-      return "getter-result";
-    }
+    public readonly getterMethod = "getter-result";
 
     public set setterMethod(value: string) {
       // Setter implementation
@@ -241,17 +236,17 @@ describe("createTracingProxy", () => {
       class ErrorTestClass {
         public async stringError() {
           await createDelayedPromise("work", 5);
-          throw "String error";
+          throw new Error("String error");
         }
 
         public async nullError() {
           await createDelayedPromise("work", 5);
-          throw null;
+          throw new Error("Null error");
         }
 
         public async undefinedError() {
           await createDelayedPromise("work", 5);
-          throw undefined;
+          throw new Error("Undefined error");
         }
 
         public async complexError() {
@@ -401,6 +396,8 @@ describe("createTracingProxy", () => {
             throw new Error("Error in try block");
           } finally {
             // This should still execute
+            console.log("Finally block executed");
+            // eslint-disable-next-line no-unsafe-finally
             return "finally result";
           }
         }

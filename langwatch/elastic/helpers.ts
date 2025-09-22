@@ -1,7 +1,7 @@
 import type { MappingProperty } from "@elastic/elasticsearch/lib/api/types";
 import type { IndexSpec } from "../src/server/elasticsearch";
-import { esClient } from "../src/server/elasticsearch";
-import { Client as ElasticClient } from "@elastic/elasticsearch";
+import { type Client as ElasticClient } from "@elastic/elasticsearch";
+
 export const recreateIndexAndMigrate = async ({
   indexSpec,
   migrationKey,
@@ -14,17 +14,38 @@ export const recreateIndexAndMigrate = async ({
   client: ElasticClient;
 }) => {
   const newIndex = `${indexSpec.base}-${migrationKey}`;
-  await createIndex({
-    index: newIndex,
-    mappings: mapping,
-    client,
-  });
+  // If new index already exists, continue with the interrupted migration
+  const indexExists = await client.indices.exists({ index: newIndex });
+  let previousIndex: string | undefined;
+  if (!indexExists) {
+    await createIndex({
+      index: newIndex,
+      mappings: mapping,
+      client,
+    });
 
-  const previousIndex = await getCurrentWriteIndex({
-    indexSpec,
-    newIndex,
-    client,
-  });
+    previousIndex = await getCurrentWriteIndex({
+      indexSpec,
+      newIndex,
+      client,
+    });
+  } else {
+    console.log(
+      `Index ${newIndex} already exists, continuing with interrupted migration`
+    );
+    const aliasInfo: Record<string, unknown> = await client.indices.getAlias({
+      name: indexSpec.alias,
+    });
+    previousIndex = Object.keys(aliasInfo).find(
+      (index) => !index.endsWith("-temp") && index !== newIndex
+    );
+    if (!previousIndex) {
+      throw new Error(
+        `No existing previous index found for alias ${indexSpec.alias}`
+      );
+    }
+  }
+
   await reindexWithAlias({
     indexSpec,
     previousIndex,
@@ -146,12 +167,6 @@ export const reindexWithAlias = async ({
         task_id: taskId.toString(),
       });
 
-      console.log(
-        `[${new Date().toISOString()}] Reindex task status: ${JSON.stringify(
-          task.task.status
-        )}`
-      );
-
       if (task.completed) {
         if (
           task.response &&
@@ -168,6 +183,66 @@ export const reindexWithAlias = async ({
           );
         }
       } else {
+        // For sliced tasks, we need to get progress from all child tasks
+        // since the parent task shows 0 progress
+        let totalCreated = 0;
+        let totalUpdated = 0;
+        let totalVersionConflicts = 0;
+        let totalProcessed = 0;
+        let hasChildTasks = false;
+
+        // Check if this is a sliced task by looking for child tasks
+        try {
+          const allTasksResponse = await client.tasks.list({
+            actions: "*reindex",
+            detailed: true,
+            parent_task_id: taskId.toString(),
+          });
+
+          if (
+            allTasksResponse.nodes &&
+            Object.keys(allTasksResponse.nodes).length > 0
+          ) {
+            hasChildTasks = true;
+
+            // Aggregate progress from all child tasks
+            for (const nodeId in allTasksResponse.nodes) {
+              const nodeTasks = allTasksResponse.nodes[nodeId]!.tasks;
+              for (const childTaskId in nodeTasks) {
+                const childTask = nodeTasks[childTaskId]!;
+                if (childTask.status) {
+                  totalCreated += childTask.status.created || 0;
+                  totalUpdated += childTask.status.updated || 0;
+                  totalVersionConflicts += childTask.status.version_conflicts || 0;
+                  totalProcessed +=
+                    (childTask.status.created || 0) +
+                    (childTask.status.updated || 0) +
+                    (childTask.status.version_conflicts || 0);
+                }
+              }
+            }
+          }
+        } catch (childTaskError) {
+          console.warn(
+            "⚠️ Could not fetch child task progress:",
+            (childTaskError as any).message
+          );
+        }
+
+        // Show progress
+        if (hasChildTasks && totalProcessed > 0) {
+          console.log(
+            `[${new Date().toISOString()}] Reindex progress: ${totalProcessed} processed [Created: ${totalCreated}, Updated: ${totalUpdated}, Version Conflicts: ${totalVersionConflicts}]`
+          );
+        } else {
+          // Fallback to parent task status if no child tasks found
+          console.log(
+            `[${new Date().toISOString()}] Reindex task status: ${JSON.stringify(
+              task.task.status
+            )}`
+          );
+        }
+
         await new Promise((resolve) => setTimeout(resolve, 10_000));
       }
     }

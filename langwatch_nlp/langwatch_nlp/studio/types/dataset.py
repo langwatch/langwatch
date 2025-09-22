@@ -14,6 +14,7 @@ class DatasetColumnType(str, Enum):
     chat_messages = "chat_messages"
     annotations = "annotations"
     evaluations = "evaluations"
+    image = "image"
 
 class DatasetColumn(BaseModel):
     name: str

@@ -18,7 +18,7 @@ def parse_fields(fields: List[Field], autoparse=True) -> Dict[str, Any]:
             autoparse_field_value(field, field.value) if autoparse else field.value
         )
         for field in fields
-        if field.value
+        if field.value is not None
     }
 
 
@@ -142,8 +142,9 @@ def with_autoparsing(module: type[T]) -> type[T]:
         forward = module.__forward_before_autoparsing__  # type: ignore
 
         try:
-            sig = inspect.signature(forward)
-            type_hints = get_type_hints(forward)
+            forward_sig = module._forward_signature if hasattr(module, "_forward_signature") else forward  # type: ignore
+            sig = inspect.signature(forward_sig)
+            type_hints = get_type_hints(forward_sig)
         except Exception:
             return forward(instance_self, *args, **kwargs)
 

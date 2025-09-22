@@ -50,7 +50,7 @@ async function main() {
 
   // Initialize LangChain components
   const chatModel = new ChatOpenAI({
-    modelName: "gpt-4o-mini",
+    modelName: "gpt-5",
     temperature: 0.3,
   });
 

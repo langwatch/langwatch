@@ -11,7 +11,6 @@ import {
   Text,
   VStack,
   Progress,
-  Link,
   type StackProps,
 } from "@chakra-ui/react";
 import { type Organization, type Project, type Team } from "@prisma/client";
@@ -46,6 +45,7 @@ import { ProjectTechStackIcon } from "./TechStack";
 import { ChecklistIcon } from "./icons/Checklist";
 import { useColorRawValue } from "./ui/color-mode";
 import { InputGroup } from "./ui/input-group";
+import { Link } from "./ui/link";
 import { Menu } from "./ui/menu";
 import { Popover } from "./ui/popover";
 import { Tooltip } from "./ui/tooltip";
@@ -159,21 +159,30 @@ export const ProjectSelector = React.memo(function ProjectSelector({
                         >
                           <Link
                             key={project_.id}
-                            href={
-                              currentRoute?.path.includes("[project]")
-                                ? currentRoute.path
-                                    .replace("[project]", project_.slug)
-                                    .replace(/\[.*?\]/g, "")
-                                    .replace(/\/\/+/g, "/")
-                                : window.location.pathname.includes(
-                                    project.slug
-                                  )
-                                ? window.location.pathname.replace(
-                                    project.slug,
-                                    project_.slug
-                                  )
-                                : `/${project_.slug}?return_to=${window.location.pathname}`
-                            }
+                            href={(() => {
+                              const currentPath = window.location.pathname;
+                              const hasProjectInRoute =
+                                currentRoute?.path.includes("[project]");
+                              const hasProjectInPath = currentPath.includes(
+                                project.slug
+                              );
+
+                              if (hasProjectInRoute) {
+                                return currentRoute?.path
+                                  .replace("[project]", project_.slug)
+                                  .replace(/\[.*?\]/g, "")
+                                  .replace(/\/\/+/g, "/");
+                              } else if (hasProjectInPath) {
+                                return currentPath.replace(
+                                  project.slug,
+                                  project_.slug
+                                );
+                              } else {
+                                return `/${
+                                  project_.slug
+                                }?return_to=${encodeURIComponent(currentPath)}`;
+                              }
+                            })()}
                             _hover={{
                               textDecoration: "none",
                             }}
@@ -311,6 +320,11 @@ export const DashboardLayout = ({
 
   const user = session?.user;
   const currentRoute = findCurrentRoute(router.pathname);
+  const isDemoProject = publicEnv.data?.DEMO_PROJECT_SLUG === project?.slug;
+  const userIsPartOfTeam =
+    publicPage ||
+    isDemoProject ||
+    team?.members.some((member) => member.userId === user?.id);
 
   return (
     <HStack
@@ -642,7 +656,24 @@ export const DashboardLayout = ({
             </HStack>
           )}
         <CurrentDrawer />
-        {children}
+        {userIsPartOfTeam ? (
+          children
+        ) : (
+          <Alert.Root
+            status="warning"
+            width="full"
+            borderBottom="1px solid"
+            borderBottomColor="yellow.300"
+          >
+            <Alert.Indicator />
+            <Alert.Content>
+              <Text>
+                You are not part of any team in this organization, please ask
+                your administrator to add you to a team.
+              </Text>
+            </Alert.Content>
+          </Alert.Root>
+        )}
       </VStack>
     </HStack>
   );

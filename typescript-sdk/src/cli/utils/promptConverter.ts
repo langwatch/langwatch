@@ -1,5 +1,5 @@
-import type { Prompt } from "@/client-sdk/services/prompts/prompt";
 import type { LocalPromptConfig, MaterializedPrompt } from "../types";
+import { type PromptResponse } from "@/client-sdk/services/prompts/types";
 
 /**
  * Converter utility for transforming between YAML prompt format and API service format.
@@ -15,7 +15,7 @@ export class PromptConverter {
    * Converts a Prompt instance from the API service to the MaterializedPrompt format
    * used for saving to the .materialized directory.
    */
-  static fromApiToMaterialized(prompt: Prompt): MaterializedPrompt {
+  static fromApiToMaterialized(prompt: PromptResponse): MaterializedPrompt {
     return {
       id: prompt.id,
       name: prompt.name,
@@ -24,6 +24,10 @@ export class PromptConverter {
       model: prompt.model,
       messages: prompt.messages,
       prompt: prompt.prompt,
+      temperature: prompt.temperature,
+      maxTokens: prompt.maxTokens,
+      inputs: prompt.inputs,
+      outputs: prompt.outputs,
       updatedAt: prompt.updatedAt,
     };
   }
@@ -34,15 +38,32 @@ export class PromptConverter {
    */
   static fromMaterializedToYaml(prompt: MaterializedPrompt): {
     model: string;
+    modelParameters?: {
+      temperature?: number;
+      maxTokens?: number;
+    };
     messages: Array<{
       role: "system" | "user" | "assistant";
       content: string;
     }>;
   } {
-    return {
+    const result: any = {
       model: prompt.model,
       messages: prompt.messages,
     };
+
+    // Add modelParameters if temperature or maxTokens exist
+    if (prompt.temperature !== undefined || prompt.maxTokens !== undefined) {
+      result.modelParameters = {};
+      if (prompt.temperature !== undefined) {
+        result.modelParameters.temperature = prompt.temperature;
+      }
+      if (prompt.maxTokens !== undefined) {
+        result.modelParameters.maxTokens = prompt.maxTokens;
+      }
+    }
+
+    return result;
   }
 
   /**
@@ -74,7 +95,7 @@ export class PromptConverter {
   static extractSystemPrompt(
     messages: Array<{ role: string; content: string }>,
   ): string {
-    return messages.find((m) => m.role === "system")?.content || "";
+    return messages.find((m) => m.role === "system")?.content ?? "";
   }
 
   /**

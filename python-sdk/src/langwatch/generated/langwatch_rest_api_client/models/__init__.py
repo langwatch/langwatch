@@ -486,17 +486,7 @@ from .post_api_scenario_events_body_type_1_results_type_0_verdict import (
 )
 from .post_api_scenario_events_body_type_1_status import PostApiScenarioEventsBodyType1Status
 from .post_api_scenario_events_body_type_2 import PostApiScenarioEventsBodyType2
-from .post_api_scenario_events_body_type_2_messages_item_type_0 import PostApiScenarioEventsBodyType2MessagesItemType0
-from .post_api_scenario_events_body_type_2_messages_item_type_1 import PostApiScenarioEventsBodyType2MessagesItemType1
-from .post_api_scenario_events_body_type_2_messages_item_type_2 import PostApiScenarioEventsBodyType2MessagesItemType2
-from .post_api_scenario_events_body_type_2_messages_item_type_2_tool_calls_item import (
-    PostApiScenarioEventsBodyType2MessagesItemType2ToolCallsItem,
-)
-from .post_api_scenario_events_body_type_2_messages_item_type_2_tool_calls_item_function import (
-    PostApiScenarioEventsBodyType2MessagesItemType2ToolCallsItemFunction,
-)
-from .post_api_scenario_events_body_type_2_messages_item_type_3 import PostApiScenarioEventsBodyType2MessagesItemType3
-from .post_api_scenario_events_body_type_2_messages_item_type_4 import PostApiScenarioEventsBodyType2MessagesItemType4
+from .post_api_scenario_events_body_type_2_messages_item import PostApiScenarioEventsBodyType2MessagesItem
 from .post_api_scenario_events_response_201 import PostApiScenarioEventsResponse201
 from .post_api_scenario_events_response_400 import PostApiScenarioEventsResponse400
 from .post_api_scenario_events_response_401 import PostApiScenarioEventsResponse401
@@ -853,13 +843,7 @@ __all__ = (
     "PostApiScenarioEventsBodyType1ResultsType0Verdict",
     "PostApiScenarioEventsBodyType1Status",
     "PostApiScenarioEventsBodyType2",
-    "PostApiScenarioEventsBodyType2MessagesItemType0",
-    "PostApiScenarioEventsBodyType2MessagesItemType1",
-    "PostApiScenarioEventsBodyType2MessagesItemType2",
-    "PostApiScenarioEventsBodyType2MessagesItemType2ToolCallsItem",
-    "PostApiScenarioEventsBodyType2MessagesItemType2ToolCallsItemFunction",
-    "PostApiScenarioEventsBodyType2MessagesItemType3",
-    "PostApiScenarioEventsBodyType2MessagesItemType4",
+    "PostApiScenarioEventsBodyType2MessagesItem",
     "PostApiScenarioEventsResponse201",
     "PostApiScenarioEventsResponse400",
     "PostApiScenarioEventsResponse401",

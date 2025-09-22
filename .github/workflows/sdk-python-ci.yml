@@ -7,6 +7,7 @@ on:
   pull_request:
     paths:
       - "python-sdk/**"
+      - "!python-sdk/src/langwatch/__version__.py"
   workflow_dispatch:
 
 jobs:
@@ -24,9 +25,15 @@ jobs:
 
       - name: Setup Python UV
         working-directory: python-sdk
-        run: uv sync --all-groups --all-extras && uv pip install strands-agents
+        run: uv sync --all-groups --all-extras
 
-      - name: Run tests
+      - name: Run unit tests
+        working-directory: python-sdk
+        env:
+          LANGWATCH_DEBUG: "true"
+        run: make test
+
+      - name: Run integration tests
         working-directory: python-sdk
         env:
           LANGWATCH_DEBUG: "true"
@@ -37,7 +44,8 @@ jobs:
           GEMINI_API_KEY: ${{ secrets.PYTHON_SDK_GEMINI_API_KEY }}
           GROQ_API_KEY: ${{ secrets.PYTHON_SDK_GROQ_API_KEY }}
           OPENAI_API_KEY: ${{ secrets.PYTHON_SDK_OPENAI_API_KEY }}
-        run: uv run pytest
+          CEREBRAS_API_KEY: ${{ secrets.PYTHON_SDK_CEREBRAS_API_KEY }}
+        run: make test-examples
 
   build:
     runs-on: ubuntu-latest
@@ -54,7 +62,7 @@ jobs:
 
       - name: Setup Python UV
         working-directory: python-sdk
-        run: uv sync --all-groups --all-extras && uv pip install strands-agents build
+        run: uv sync --all-groups --all-extras && uv pip install build
 
       - name: Build package
         working-directory: python-sdk

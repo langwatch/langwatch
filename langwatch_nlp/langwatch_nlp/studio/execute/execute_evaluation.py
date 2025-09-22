@@ -56,7 +56,7 @@ async def execute_evaluation(
             do_not_trace=True,
         ) as (Module, _):
             module = Module(run_evaluations=True)
-            module.prevent_crashes = True
+            module.prevent_crashes()
 
             langwatch.setup(workflow.api_key)
 

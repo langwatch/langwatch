@@ -6,10 +6,11 @@ import * as yaml from "js-yaml";
 import { PromptConverter } from "@/cli/utils/promptConverter";
 import {
   type ConfigData,
+  Prompt,
+  PromptsApiService,
   PromptsError,
   type SyncAction,
 } from "@/client-sdk/services/prompts";
-import { LangWatch } from "@/client-sdk";
 import type { SyncResult } from "../types";
 import { FileManager } from "../utils/fileManager";
 import { ensureProjectInitialized } from "../utils/init";
@@ -24,17 +25,15 @@ const handleConflict = async (
     remoteVersion: number;
     differences: string[];
     remoteConfigData: any;
-  },
+  }
 ): Promise<"local" | "remote" | "abort"> => {
   console.log(
-    chalk.yellow(
-      `\n⚠ Conflict detected for prompt: ${chalk.cyan(promptName)}`,
-    ),
+    chalk.yellow(`\n⚠ Conflict detected for prompt: ${chalk.cyan(promptName)}`)
   );
   console.log(
     chalk.gray(
-      `Local version: ${conflictInfo.localVersion}, Remote version: ${conflictInfo.remoteVersion}`,
-    ),
+      `Local version: ${conflictInfo.localVersion}, Remote version: ${conflictInfo.remoteVersion}`
+    )
   );
 
   if (conflictInfo.differences.length > 0) {
@@ -78,8 +77,8 @@ export const syncCommand = async (): Promise<void> => {
     // Check API key before doing anything else
     checkApiKey();
 
-    // Get LangWatch client
-    const langwatch = new LangWatch();
+    // Get prompts API service
+    const promptsApiService = new PromptsApiService();
 
     // Ensure project is initialized (prompts.json, lock file, directories)
     await ensureProjectInitialized(false); // Don't prompt for .gitignore in sync
@@ -107,12 +106,12 @@ export const syncCommand = async (): Promise<void> => {
           return false;
         }
         return true;
-      },
+      }
     );
 
     if (remoteDeps.length > 0) {
       const fetchSpinner = ora(
-        `Checking ${remoteDeps.length} remote prompts...`,
+        `Checking ${remoteDeps.length} remote prompts...`
       ).start();
 
       for (const [name, dependency] of remoteDeps) {
@@ -126,7 +125,7 @@ export const syncCommand = async (): Promise<void> => {
           const lockEntry = lock.prompts[name];
 
           // Fetch the prompt from the API to check current version
-          const prompt = await langwatch.prompts.get(name);
+          const prompt = await promptsApiService.get(name);
 
           if (prompt) {
             // Check if we need to update (new version or not materialized)
@@ -143,7 +142,7 @@ export const syncCommand = async (): Promise<void> => {
 
               const savedPath = FileManager.saveMaterializedPrompt(
                 name,
-                materializedPrompt,
+                materializedPrompt
               );
               const relativePath = path.relative(process.cwd(), savedPath);
               result.fetched.push({
@@ -157,13 +156,13 @@ export const syncCommand = async (): Promise<void> => {
                 lock,
                 name,
                 materializedPrompt,
-                savedPath,
+                savedPath
               );
 
               fetchSpinner.text = `Fetched ${chalk.cyan(
-                `${name}@${versionSpec}`,
+                `${name}@${versionSpec}`
               )} ${chalk.gray(`(version ${prompt.version})`)} → ${chalk.gray(
-                relativePath,
+                relativePath
               )}`;
             } else {
               // No change needed, track as unchanged
@@ -186,12 +185,12 @@ export const syncCommand = async (): Promise<void> => {
     const localFileRefs = Object.entries(config.prompts).filter(
       ([, dependency]) => {
         return typeof dependency === "string" && dependency.startsWith("file:");
-      },
+      }
     );
 
     if (localFileRefs.length > 0) {
       const pushSpinner = ora(
-        `Pushing ${localFileRefs.length} local prompts...`,
+        `Pushing ${localFileRefs.length} local prompts...`
       ).start();
 
       // Use the existing lock file instead of reloading it
@@ -212,7 +211,7 @@ export const syncCommand = async (): Promise<void> => {
             model: localConfig.model,
             prompt: PromptConverter.extractSystemPrompt(localConfig.messages),
             messages: PromptConverter.filterNonSystemMessages(
-              localConfig.messages,
+              localConfig.messages
             ) as Array<{
               role: "system" | "user" | "assistant";
               content: string;
@@ -224,7 +223,7 @@ export const syncCommand = async (): Promise<void> => {
           };
 
           // Use new sync API with conflict detection
-          const syncResult = await langwatch.prompts.sync({
+          const syncResult = await promptsApiService.sync({
             name: promptName,
             configData,
             localVersion: currentVersion,
@@ -239,7 +238,7 @@ export const syncCommand = async (): Promise<void> => {
             pushSpinner.stop();
             conflictResolution = await handleConflict(
               promptName,
-              syncResult.conflictInfo!,
+              syncResult.conflictInfo!
             );
             if (conflictResolution === "abort") {
               result.errors.push({
@@ -299,10 +298,16 @@ export const syncCommand = async (): Promise<void> => {
                 materialized: filePath,
               };
             } else {
-              // User chose local - create new version (remote + 1)
+              // User chose local - force push
+              const syncResult = await promptsApiService.update(promptName, {
+                ...localConfig,
+                commitMessage: `Synced from local file: ${path.basename(
+                  filePath
+                )}`,
+              });
               lock.prompts[promptName] = {
-                version: remoteVersion + 1,
-                versionId: "conflict_resolved", // Temporary until we get actual versionId
+                version: syncResult.version,
+                versionId: syncResult.versionId,
                 materialized: filePath,
               };
             }
@@ -344,15 +349,15 @@ export const syncCommand = async (): Promise<void> => {
           }
 
           pushSpinner.text = `${actionText} ${chalk.cyan(
-            promptName,
+            promptName
           )} ${chalk.gray(
             `(version ${
               syncResult.prompt?.version ??
               syncResult.conflictInfo?.remoteVersion ??
               "unknown"
-            })`,
+            })`
           )} ${conflictResolution === "remote" ? "to" : "from"} ${chalk.gray(
-            relativePath,
+            relativePath
           )}`;
         } catch (error) {
           const errorMessage =
@@ -379,8 +384,8 @@ export const syncCommand = async (): Promise<void> => {
         chalk.yellow(
           `\n⚠ Found ${orphanFiles.length} orphan prompt file${
             orphanFiles.length > 1 ? "s" : ""
-          }:`,
-        ),
+          }:`
+        )
       );
 
       for (const filePath of orphanFiles) {
@@ -390,15 +395,15 @@ export const syncCommand = async (): Promise<void> => {
         console.log(chalk.yellow(`  ${relativePath}`));
         console.log(
           chalk.gray(
-            `    Add to prompts.json: "${promptName}": "file:${relativePath}"`,
-          ),
+            `    Add to prompts.json: "${promptName}": "file:${relativePath}"`
+          )
         );
       }
 
       console.log(
         chalk.gray(
-          `\nTip: Add these to prompts.json to include them in sync operations.`,
-        ),
+          `\nTip: Add these to prompts.json to include them in sync operations.`
+        )
       );
     }
 
@@ -414,7 +419,7 @@ export const syncCommand = async (): Promise<void> => {
           return false;
         }
         return true;
-      }),
+      })
     );
 
     const cleanedFiles =
@@ -439,9 +444,9 @@ export const syncCommand = async (): Promise<void> => {
         console.log(
           chalk.green(
             `✓ Pulled ${chalk.cyan(`${name}@${versionSpec}`)} ${chalk.gray(
-              `(version ${version})`,
-            )} → ${chalk.gray(displayPath)}`,
-          ),
+              `(version ${version})`
+            )} → ${chalk.gray(displayPath)}`
+          )
         );
       }
     }
@@ -452,9 +457,9 @@ export const syncCommand = async (): Promise<void> => {
         console.log(
           chalk.green(
             `✓ Pushed ${chalk.cyan(name)} ${chalk.gray(
-              `(version ${version})`,
-            )} from ${chalk.gray(localPath)}`,
-          ),
+              `(version ${version})`
+            )} from ${chalk.gray(localPath)}`
+          )
         );
       }
     }
@@ -464,8 +469,8 @@ export const syncCommand = async (): Promise<void> => {
       for (const name of result.cleaned) {
         console.log(
           chalk.yellow(
-            `✓ Cleaned ${chalk.cyan(name)} (no longer in dependencies)`,
-          ),
+            `✓ Cleaned ${chalk.cyan(name)} (no longer in dependencies)`
+          )
         );
       }
     }
@@ -509,8 +514,8 @@ export const syncCommand = async (): Promise<void> => {
         chalk.red(
           `Unexpected error: ${
             error instanceof Error ? error.message : "Unknown error"
-          }`,
-        ),
+          }`
+        )
       );
     }
     process.exit(1);

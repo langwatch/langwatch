@@ -1,0 +1,16 @@
+{
+  "extends": "./tsconfig.json",
+  "include": [
+    "**/*.ts",
+    "vitest.config.mts",
+    "vitest.e2e.config.mts",
+    "eslint.config.mjs",
+    "__tests__/**/*.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "./dist/**/*",
+    "./examples/**/*",
+    "./coverage/**/*"
+  ]
+}

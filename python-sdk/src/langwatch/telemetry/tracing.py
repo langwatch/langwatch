@@ -12,6 +12,7 @@ from langwatch.utils.transformation import (
 )
 from opentelemetry import trace as trace_api
 from opentelemetry.sdk.trace import TracerProvider
+from opentelemetry.trace import Link
 from typing import (
     Dict,
     List,
@@ -71,6 +72,7 @@ class LangWatchTrace:
 
     def __init__(
         self,
+        *,
         trace_id: Optional[Union[str, UUID]] = None,
         metadata: Optional[TraceMetadata] = None,
         expected_output: Optional[str] = None,
@@ -213,6 +215,19 @@ class LangWatchTrace:
                     root_span_params["timestamps"], cls=SerializableWithStringFallback
                 )
 
+            # Check if we're creating this trace within an existing OpenTelemetry trace context
+            current_span = trace_api.get_current_span()
+            if current_span.get_span_context().is_valid:
+                # Add link to current span
+                links = root_span_params.get("links", [])
+                links.append(
+                    Link(
+                        current_span.get_span_context(),
+                        {"relationship": "parent_trace"},
+                    )
+                )
+                root_span_params["links"] = links
+
             self.root_span = LangWatchSpan(trace=self, **root_span_params)
             self.root_span.__enter__()
             context = self.root_span.get_span_context()
@@ -306,6 +321,7 @@ class LangWatchTrace:
 
     def update(
         self,
+        *,
         trace_id: Optional[Union[str, UUID]] = None,
         metadata: Optional[TraceMetadata] = None,
         expected_output: Optional[str] = None,
@@ -475,6 +491,7 @@ class LangWatchTrace:
 
             @functools.wraps(func)
             async def wrapper(*args: Any, **kwargs: Any) -> Any:
+                # Always create a new trace, but it will be nested if there's already a current trace
                 async with self._clone() as trace:
                     trace._set_callee_input_information(func, *args, **kwargs)
                     items = []
@@ -494,6 +511,7 @@ class LangWatchTrace:
 
             @functools.wraps(func)
             def wrapper(*args: Any, **kwargs: Any) -> Any:
+                # Always create a new trace, but it will be nested if there's already a current trace
                 with self._clone() as trace:
                     trace._set_callee_input_information(func, *args, **kwargs)
                     items = []
@@ -513,6 +531,7 @@ class LangWatchTrace:
 
             @functools.wraps(func)
             async def wrapper(*args: Any, **kwargs: Any) -> Any:
+                # Always create a new trace, but it will be nested if there's already a current trace
                 async with self._clone() as trace:
                     trace._set_callee_input_information(func, *args, **kwargs)
                     output = await func(*args, **kwargs)
@@ -524,6 +543,7 @@ class LangWatchTrace:
 
             @functools.wraps(func)
             def wrapper(*args: Any, **kwargs: Any) -> Any:
+                # Create new trace
                 with self._clone() as trace:
                     trace._set_callee_input_information(func, *args, **kwargs)
                     output = func(*args, **kwargs)

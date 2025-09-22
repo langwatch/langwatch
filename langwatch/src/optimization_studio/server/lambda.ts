@@ -262,7 +262,8 @@ export const getProjectLambdaArn = async (
     } catch (error) {
       if (
         error instanceof Error &&
-        error.message.includes("Function already exists")
+        (error.message.includes("already exist") ||
+          error.message.includes("An update is in progress"))
       ) {
         logger.info(
           { projectId },
@@ -351,8 +352,22 @@ export const invokeLambda = async (
     const webStream = new ReadableStream({
       async start(controller) {
         try {
+          let statusCode = 200;
+          let errorMessage = "";
+
           for await (const chunk of EventStream) {
             if (chunk.PayloadChunk?.Payload) {
+              const payloadText = new TextDecoder().decode(
+                chunk.PayloadChunk.Payload
+              );
+              if (statusCode < 200 || statusCode >= 300) {
+                errorMessage += payloadText;
+              }
+              if (payloadText.includes('{"statusCode":')) {
+                try {
+                  statusCode = parseInt(JSON.parse(payloadText).statusCode);
+                } catch {}
+              }
               controller.enqueue(chunk.PayloadChunk.Payload);
             }
             if (chunk.InvokeComplete?.ErrorCode) {
@@ -365,8 +380,32 @@ export const invokeLambda = async (
               throw error;
             }
           }
+
+          if (statusCode < 200 || statusCode >= 300) {
+            try {
+              errorMessage = JSON.parse(errorMessage.trim());
+            } catch {}
+            if (statusCode === 422) {
+              console.error(
+                "Optimization Studio validation failed, please contact support",
+                "\n\n",
+                JSON.stringify(event, null, 2),
+                "\n\nValidation error:\n",
+                errorMessage
+              );
+              const error = new Error(
+                `Optimization Studio validation failed, please contact support`
+              );
+              Sentry.captureException(error, { extra: { event } });
+              throw error;
+            }
+            throw new Error(
+              `Failed run workflow: ${statusCode}\n\n${errorMessage}`
+            );
+          }
           controller.close();
         } catch (error) {
+          console.log("error", error);
           controller.error(error);
         }
       },
@@ -385,16 +424,18 @@ export const invokeLambda = async (
     if (!response.ok) {
       let body = await response.text();
       try {
-        body = JSON.stringify(body, null, 2);
+        body = JSON.parse(body);
       } catch {}
       if (response.status === 422) {
         console.error(
-          "Optimization Studio validation failed, some components might be outdated",
+          "Optimization Studio validation failed, please contact support",
           "\n\n",
-          JSON.stringify(event, null, 2)
+          JSON.stringify(event, null, 2),
+          "\n\nValidation error:\n",
+          body
         );
         const error = new Error(
-          `Optimization Studio validation failed, some components might be outdated`
+          `Optimization Studio validation failed, please contact support`
         );
         Sentry.captureException(error, { extra: { event } });
         throw error;

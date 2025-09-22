@@ -180,11 +180,22 @@ def truncate_object_recursively(
         return obj
 
     def truncate_string(s: str):
-        return (
-            s[:max_string_length] + "... (truncated string)"
-            if len(s) > max_string_length
-            else s
-        )
+        # Always use errors='replace' to handle any malformed Unicode gracefully
+        if len(s.encode('utf-8', errors='replace')) <= max_string_length:
+            return s
+
+        # Binary search to find the right truncation point
+        left, right = 0, len(s)
+        while left < right:
+            mid = (left + right + 1) // 2
+            byte_length = len(s[:mid].encode('utf-8', errors='replace'))
+
+            if byte_length <= max_string_length - 25:  # Reserve space for suffix
+                left = mid
+            else:
+                right = mid - 1
+
+        return s[:left] + "... (truncated string)"
 
     def process_item(item: Any):
         if isinstance(item, str):

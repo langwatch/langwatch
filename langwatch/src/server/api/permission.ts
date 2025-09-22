@@ -9,6 +9,7 @@ import { env } from "~/env.mjs";
 
 export const teamRolePermissionMapping = {
   SETUP_PROJECT: [TeamUserRole.ADMIN, TeamUserRole.MEMBER],
+  ARCHIVE_PROJECT: [TeamUserRole.ADMIN],
   PROJECT_VIEW: [TeamUserRole.ADMIN, TeamUserRole.MEMBER, TeamUserRole.VIEWER],
   ANALYTICS_VIEW: [
     TeamUserRole.ADMIN,
@@ -51,8 +52,10 @@ export const teamRolePermissionMapping = {
   PROMPTS_VIEW: [TeamUserRole.ADMIN, TeamUserRole.MEMBER, TeamUserRole.VIEWER],
   PROMPTS_MANAGE: [TeamUserRole.ADMIN, TeamUserRole.MEMBER],
   TEAM_MEMBERS_MANAGE: [TeamUserRole.ADMIN],
+  TEAM_ARCHIVE: [TeamUserRole.ADMIN],
   TEAM_CREATE_NEW_PROJECTS: [TeamUserRole.ADMIN],
   PROJECT_CHANGE_CAPTURED_DATA_VISIBILITY: [TeamUserRole.ADMIN],
+
   SCENARIOS_VIEW: [
     TeamUserRole.ADMIN,
     TeamUserRole.MEMBER,

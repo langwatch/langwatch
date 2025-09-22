@@ -1,5 +1,5 @@
 """
-Simple test for PromptService.get tracing functionality.
+Simple test for PromptsFacade.get tracing functionality.
 """
 
 import sys
@@ -24,27 +24,7 @@ from langwatch.attributes import AttributeKey
 from fixtures.span_exporter import MockSpanExporter, span_exporter
 
 
-@pytest.fixture
-def mock_config() -> GetApiPromptsByIdResponse200:
-    """Type-safe configuration object from actual API response types"""
-    return GetPromptResponseFactory(
-        id="prompt_123",
-        version=1.0,  # Use float instead of string for proper typing
-        prompt="Hello {{ name }}!",
-        handle="prompt_123",
-        messages=[
-            GetApiPromptsByIdResponse200MessagesItem(
-                role=GetApiPromptsByIdResponse200MessagesItemRole.USER,
-                content="Say {{ greeting }} to {{ name }}",
-            ),
-        ],
-    )
-
-
-@pytest.fixture
-def prompt(mock_config: GetApiPromptsByIdResponse200) -> Prompt:
-    """Create a Prompt instance with factory-generated config"""
-    return Prompt(mock_config)
+# Fixtures are now centralized in tests/conftest.py
 
 
 def test_prompt_compile_creates_trace_span(

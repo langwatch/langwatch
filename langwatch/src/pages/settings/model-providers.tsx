@@ -44,12 +44,38 @@ import {
   DEFAULT_EMBEDDINGS_MODEL,
   DEFAULT_TOPIC_CLUSTERING_MODEL,
   DEFAULT_MODEL,
+  KEY_CHECK,
 } from "../../utils/constants";
 import { dependencies } from "../../injection/dependencies.client";
 
+/**
+ * Handles creating multiple options from comma-separated input
+ * Single Responsibility: Split comma-separated text and add as multiple options
+ */
+const handleCreateMultipleOptions = (
+  newValue: string,
+  currentValue: { label: string; value: string }[],
+  onChange: (value: { label: string; value: string }[]) => void
+) => {
+  // Split on comma and create multiple options
+  const tokens = newValue
+    .split(",")
+    .map((t) => t.trim())
+    .filter(Boolean);
+
+  const existing = new Set(currentValue.map((v) => v.value));
+  const toAdd = tokens
+    .filter((t) => !existing.has(t))
+    .map((t) => ({ label: t, value: t }));
+
+  if (toAdd.length > 0) {
+    onChange([...currentValue, ...toAdd]);
+  }
+};
+
 export default function ModelsPage() {
   const { project, organizations } = useOrganizationTeamProject();
-  const modelProviders = api.modelProvider.getAllForProject.useQuery(
+  const modelProviders = api.modelProvider.getAllForProjectForFrontend.useQuery(
     { projectId: project?.id ?? "" },
     { enabled: !!project }
   );
@@ -441,6 +467,11 @@ function ModelProviderForm({
                           <GridItem>
                             <Input
                               {...register(`customKeys.${key}`)}
+                              type={
+                                KEY_CHECK.some((k) => key.includes(k))
+                                  ? "password"
+                                  : "text"
+                              }
                               autoComplete="off"
                               placeholder={
                                 (providerKeys as any)[key]._def.typeName ===
@@ -468,6 +499,13 @@ function ModelProviderForm({
                       render={({ field }) => (
                         <CreatableSelect
                           {...field}
+                          onCreateOption={(newValue) => {
+                            handleCreateMultipleOptions(
+                              newValue,
+                              field.value ?? [],
+                              field.onChange
+                            );
+                          }}
                           isMulti
                           options={getProviderModelOptions(
                             provider.provider,
@@ -491,6 +529,13 @@ function ModelProviderForm({
                           render={({ field }) => (
                             <CreatableSelect
                               {...field}
+                              onCreateOption={(newValue) => {
+                                handleCreateMultipleOptions(
+                                  newValue,
+                                  field.value ?? [],
+                                  field.onChange
+                                );
+                              }}
                               isMulti
                               options={getProviderModelOptions(
                                 provider.provider,

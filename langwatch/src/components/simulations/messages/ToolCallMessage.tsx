@@ -35,7 +35,9 @@ export const ToolCallMessage = ({
           borderRadius="md"
           p={2}
         >
-          <RenderInputOutput value={message.arguments} />
+          <RenderInputOutput
+            value={message.arguments ?? (message as any).input}
+          />
         </Box>
       </Box>
     </VStack>

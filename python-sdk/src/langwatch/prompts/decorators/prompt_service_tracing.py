@@ -48,9 +48,11 @@ class PromptServiceTracing:
 
                     span.set_attributes(
                         {
-                            AttributeKey.LangWatchPromptId: result.id,
-                            AttributeKey.LangWatchPromptVersionId: result.version_id,
-                            AttributeKey.LangWatchPromptHandle: result.handle,
+                            AttributeKey.LangWatchPromptId: result.get("id"),
+                            AttributeKey.LangWatchPromptVersionId: result.get(
+                                "version_id"
+                            ),
+                            AttributeKey.LangWatchPromptHandle: result.get("handle"),
                         }
                     )
                     return result
@@ -63,7 +65,7 @@ class PromptServiceTracing:
     @staticmethod
     def _create_span_name(span_name: str) -> str:
         """Create a span name for the prompt"""
-        return "PromptService" + "." + span_name
+        return "PromptApiService" + "." + span_name
 
 
 prompt_service_tracing = PromptServiceTracing()

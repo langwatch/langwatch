@@ -79,6 +79,7 @@ class LangWatchSpan:
 
     def __init__(
         self,
+        *,
         trace: Optional["LangWatchTrace"] = None,
         span_id: Optional[Union[str, UUID]] = None,
         parent: Optional[Union[OtelSpan, "LangWatchSpan"]] = None,
@@ -339,6 +340,7 @@ class LangWatchSpan:
 
     def update(
         self,
+        *,
         span_id: Optional[Union[str, UUID]] = None,
         name: Optional[str] = None,
         type: Optional[SpanTypes] = None,

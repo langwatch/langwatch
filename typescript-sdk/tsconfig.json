@@ -18,11 +18,17 @@
         "incremental": true,
         "noUncheckedIndexedAccess": true,
         "tsBuildInfoFile": "./tsconfig.tsbuildinfo",
+        "allowSyntheticDefaultImports": true,
         "paths": {
-            "@/*": ["./src/*"],
+            "@/*": ["./src/*"]
         }
     },
-    "include": ["**/*.ts", "vitest.config.mts", "vitest.e2e.config.mts", "eslint.config.mjs"],
+    "include": [
+        "**/*.ts",
+        "vitest.config.mts",
+        "vitest.e2e.config.mts",
+        "eslint.config.mjs"
+    ],
     "exclude": [
         "node_modules",
         "./dist/**/*",

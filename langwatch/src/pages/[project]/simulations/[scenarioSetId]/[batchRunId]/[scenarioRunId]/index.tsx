@@ -19,9 +19,9 @@ import { api } from "~/utils/api";
 // Main component
 export default function IndividualScenarioRunPage() {
   const [showPreviousRuns, setShowPreviousRuns] = useState(false);
-  const { goToSimulationSet, scenarioRunId } = useSimulationRouter();
+  const { goToSimulationBatchRuns, scenarioRunId } = useSimulationRouter();
   const { project } = useOrganizationTeamProject();
-  const { scenarioSetId } = useSimulationRouter();
+  const { scenarioSetId, batchRunId } = useSimulationRouter();
   // Fetch scenario run data using the correct API
   const { data: scenarioState, isLoading: isScenarioStateLoading } =
     api.scenarios.getRunState.useQuery(
@@ -58,21 +58,21 @@ export default function IndividualScenarioRunPage() {
           {/* Header with Back Button and Title */}
           <Box borderBottom="1px" borderColor="gray.200" w="100%" mb={2}>
             <HStack justify="space-between" align="center">
-              <VStack>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  margin={0}
-                  onClick={() => {
-                    if (scenarioSetId) {
-                      goToSimulationSet(scenarioSetId);
-                    }
-                  }}
-                >
-                  <ArrowLeft size={14} />
-                  <Text>Back to Grid View</Text>
-                </Button>
-              </VStack>
+              {scenarioSetId && batchRunId && (
+                <VStack>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    margin={0}
+                    onClick={() => {
+                      goToSimulationBatchRuns(scenarioSetId, batchRunId);
+                    }}
+                  >
+                    <ArrowLeft size={14} />
+                    <Text>Back to Grid View</Text>
+                  </Button>
+                </VStack>
+              )}
 
               <Button
                 variant="outline"

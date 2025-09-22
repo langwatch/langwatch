@@ -17,7 +17,7 @@ export class PromptTracingDecorator {
     span.setType("prompt");
 
     if (shouldCaptureInput()) {
-      span.setInput(this.target.raw);
+      span.setInput(this.target);
 
       if (variables) {
         span.setAttribute(

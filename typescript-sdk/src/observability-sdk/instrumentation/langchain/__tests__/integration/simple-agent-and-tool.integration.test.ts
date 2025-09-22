@@ -62,8 +62,8 @@ describe("LangChain Integration Tests", () => {
       { root: true },
       async () => {
         const llm = new ChatOpenAI({
-          model: "gpt-4o-mini",
-          temperature: 0,
+          model: "gpt-5",
+          temperature: 1,
         });
 
         const result = await llm.invoke(
@@ -87,7 +87,7 @@ describe("LangChain Integration Tests", () => {
     );
     expect(llmSpan).toBeDefined();
     expect(llmSpan?.attributes["langwatch.span.type"]).toBe("llm");
-    expect(llmSpan?.attributes["gen_ai.request.model"]).toBe("gpt-4o-mini");
+    expect(llmSpan?.attributes["gen_ai.request.model"]).toBe("gpt-5");
 
     // New naming: should not be prefixed with "LLM:" anymore
     expect(llmSpan?.name.startsWith("LLM:")).toBe(false);
@@ -98,22 +98,12 @@ describe("LangChain Integration Tests", () => {
   });
 
   it("should trace tool calling and agent execution", async () => {
+    const date = new Date().toISOString();
     const tools = [
       new DynamicTool({
         name: "get_current_time",
         description: "Returns the current time in ISO-8601 format.",
-        func: async () => new Date().toISOString(),
-      }),
-      new DynamicTool({
-        name: "multiply",
-        description: 'Multiply two numbers, provide input like "a,b".',
-        func: async (input: string) => {
-          const [a, b] = input.split(",").map(Number);
-          if (a === undefined || b === undefined) {
-            throw new Error("Invalid input");
-          }
-          return String(a * b);
-        },
+        func: async () => date,
       }),
     ];
 
@@ -124,8 +114,8 @@ describe("LangChain Integration Tests", () => {
       { root: true },
       async () => {
         const llm = new ChatOpenAI({
-          model: "gpt-4o-mini",
-          temperature: 0,
+          model: "gpt-5",
+          temperature: 1,
         });
 
         const prompt = ChatPromptTemplate.fromMessages([
@@ -148,11 +138,11 @@ describe("LangChain Integration Tests", () => {
 
         const tracingCallback = new LangWatchCallbackHandler();
         const result = await agentExecutor.invoke(
-          { input: "What is 12 times 8?" },
+          { input: "What is the current time?" },
           { callbacks: [tracingCallback] },
         );
 
-        expect(result.output).toContain("96");
+        expect(result.output).toContain(date);
       },
     );
 
@@ -177,8 +167,8 @@ describe("LangChain Integration Tests", () => {
       { root: true },
       async () => {
         const llm = new ChatOpenAI({
-          model: "gpt-4o-mini",
-          temperature: 0,
+          model: "gpt-5",
+          temperature: 1,
         });
 
         const tracingCallback = new LangWatchCallbackHandler();
@@ -223,7 +213,7 @@ describe("LangChain Integration Tests", () => {
       async () => {
         const llm = new ChatOpenAI({
           model: "invalid-model",
-          temperature: 0,
+          temperature: 1,
           openAIApiKey: "invalid-key", // This will cause an error
         });
 
@@ -256,8 +246,8 @@ describe("LangChain Integration Tests", () => {
         { root: true },
         async () => {
           const llm = new ChatOpenAI({
-            model: "gpt-4o-mini",
-            temperature: 0.7,
+            model: "gpt-5",
+            temperature: 1,
           });
 
           const result = await llm.invoke(
@@ -277,19 +267,20 @@ describe("LangChain Integration Tests", () => {
       );
       expect(llmSpan).toBeDefined();
 
-      // Verify naming follows the new pattern: "openai gpt-4o-mini (temp 0.7)"
-      expect(llmSpan?.name).toMatch(/openai gpt-4o-mini \(temp 0\.7\)/);
-      expect(llmSpan?.attributes["gen_ai.request.model"]).toBe("gpt-4o-mini");
-      expect(llmSpan?.attributes["gen_ai.request.temperature"]).toBe(0.7);
+      // Verify naming follows the new pattern: "openai gpt-5 (temp 0.7)"
+      expect(llmSpan?.name).toMatch(/openai gpt-5 \(temp 1\)/);
+      expect(llmSpan?.attributes["gen_ai.request.model"]).toBe("gpt-5");
+      expect(llmSpan?.attributes["gen_ai.request.temperature"]).toBe(1);
     });
 
     it("should name tool spans with tool name and input preview", async () => {
+      const date = new Date().toISOString();
       const tools = [
         new DynamicTool({
-          name: "calculator",
-          description: "Perform mathematical calculations",
-          func: async (input: string) => {
-            return `Result: ${eval(input)}`;
+          name: "get_current_time",
+          description: "get the current time",
+          func: async () => {
+            return `Result: ${date}`;
           },
         }),
       ];
@@ -301,8 +292,8 @@ describe("LangChain Integration Tests", () => {
         { root: true },
         async () => {
           const llm = new ChatOpenAI({
-            model: "gpt-4o-mini",
-            temperature: 0,
+            model: "gpt-5",
+            temperature: 1,
           });
 
           const prompt = ChatPromptTemplate.fromMessages([
@@ -324,7 +315,7 @@ describe("LangChain Integration Tests", () => {
 
           const tracingCallback = new LangWatchCallbackHandler();
           const result = await agentExecutor.invoke(
-            { input: "Calculate 2 + 2" },
+            { input: "What is the current time?" },
             { callbacks: [tracingCallback] },
           );
 
@@ -342,7 +333,7 @@ describe("LangChain Integration Tests", () => {
 
       // Verify tool naming pattern: "calculator" (without Tool: prefix)
       const toolSpan = toolSpans[0];
-      expect(toolSpan?.name).toBe("calculator");
+      expect(toolSpan?.name).toBe("get_current_time");
       expect(toolSpan?.attributes["langwatch.span.type"]).toBe("tool");
     });
 
@@ -362,8 +353,8 @@ describe("LangChain Integration Tests", () => {
         { root: true },
         async () => {
           const llm = new ChatOpenAI({
-            model: "gpt-4o-mini",
-            temperature: 0,
+            model: "gpt-5",
+            temperature: 1,
           });
 
           const prompt = ChatPromptTemplate.fromMessages([
@@ -404,7 +395,7 @@ describe("LangChain Integration Tests", () => {
 
       // Verify agent naming pattern: "Agent: AgentExecutor" or similar
       const agentSpan = componentSpans.find((span) =>
-        span.name.includes("Agent:")
+        span.name.includes("Agent:"),
       );
       expect(agentSpan).toBeDefined();
     });
@@ -417,8 +408,8 @@ describe("LangChain Integration Tests", () => {
         { root: true },
         async () => {
           const llm = new ChatOpenAI({
-            model: "gpt-4o-mini",
-            temperature: 0,
+            model: "gpt-5",
+            temperature: 1,
           });
 
           // Create a simple chain
@@ -460,8 +451,8 @@ describe("LangChain Integration Tests", () => {
         { root: true },
         async () => {
           const llm = new ChatOpenAI({
-            model: "gpt-4o-mini",
-            temperature: 0,
+            model: "gpt-5",
+            temperature: 1,
           });
 
           const tracingCallback = new LangWatchCallbackHandler();
@@ -469,7 +460,7 @@ describe("LangChain Integration Tests", () => {
             [{ role: "user", content: "Hello" }],
             {
               callbacks: [tracingCallback],
-              metadata: { operation_name: "Custom LLM Call" }
+              metadata: { operation_name: "Custom LLM Call" },
             },
           );
 
@@ -497,8 +488,8 @@ describe("LangChain Integration Tests", () => {
         { root: true },
         async () => {
           const llm = new ChatOpenAI({
-            model: "gpt-4o-mini",
-            temperature: 0,
+            model: "gpt-5",
+            temperature: 1,
           });
 
           const result = await llm.invoke(
@@ -531,8 +522,8 @@ describe("LangChain Integration Tests", () => {
         { root: true },
         async () => {
           const llm = new ChatOpenAI({
-            model: "gpt-4o-mini",
-            temperature: 0.5,
+            model: "gpt-5",
+            temperature: 1,
           });
 
           const result = await llm.invoke(
@@ -554,8 +545,8 @@ describe("LangChain Integration Tests", () => {
 
       // Verify GenAI attributes are present
       expect(llmSpan?.attributes["gen_ai.system"]).toBe("openai");
-      expect(llmSpan?.attributes["gen_ai.request.model"]).toBe("gpt-4o-mini");
-      expect(llmSpan?.attributes["gen_ai.request.temperature"]).toBe(0.5);
+      expect(llmSpan?.attributes["gen_ai.request.model"]).toBe("gpt-5");
+      expect(llmSpan?.attributes["gen_ai.request.temperature"]).toBe(1);
 
       // Verify no deprecated llm.* attributes
       const attrKeys = Object.keys(llmSpan!.attributes as any);
@@ -571,8 +562,8 @@ describe("LangChain Integration Tests", () => {
         { root: true },
         async () => {
           const llm = new ChatOpenAI({
-            model: "gpt-4o-mini",
-            temperature: 0,
+            model: "gpt-5",
+            temperature: 1,
           });
 
           const tools = [
@@ -615,13 +606,13 @@ describe("LangChain Integration Tests", () => {
 
       // Verify we have multiple span types
       const spanTypes = new Set(
-        finishedSpans.map((span) => span.attributes["langwatch.span.type"])
+        finishedSpans.map((span) => span.attributes["langwatch.span.type"]),
       );
       expect(spanTypes.size).toBeGreaterThan(1);
 
       // Verify all spans share the same trace
       const traceIds = new Set(
-        finishedSpans.map((span) => span.spanContext().traceId)
+        finishedSpans.map((span) => span.spanContext().traceId),
       );
       expect(traceIds.size).toBe(1);
 

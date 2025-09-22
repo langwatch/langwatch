@@ -46,7 +46,10 @@ export const useOrganizationTeamProject = (
     { enabled: !!publicShare.data?.projectId && !!publicShare.data?.id }
   );
 
-  const isDemo = router.query.project === publicEnv.data?.DEMO_PROJECT_SLUG;
+  const isDemo = Boolean(
+    publicEnv.data?.DEMO_PROJECT_SLUG &&
+      router.query.project === publicEnv.data.DEMO_PROJECT_SLUG
+  );
 
   const organizations = api.organization.getAll.useQuery(
     { isDemo: isDemo },
@@ -211,7 +214,11 @@ export const useOrganizationTeamProject = (
       typeof router.query.project == "string" &&
       project.slug !== router.query.project
     ) {
-      void router.push(`/${project.slug}`);
+      const returnTo = router.query.return_to;
+      const returnToParam = returnTo
+        ? `?return_to=${encodeURIComponent(returnTo as string)}`
+        : "";
+      void router.push(`/${project.slug}${returnToParam}`);
     }
   }, [
     organization,

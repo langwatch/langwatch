@@ -1,6 +1,6 @@
 import os
 import langwatch
-import nanoid
+from pksuid import PKSUID
 
 from openai import OpenAI
 from dotenv import load_dotenv
@@ -34,13 +34,15 @@ langwatch.setup(
 )
 FastAPIInstrumentor.instrument_app(app)
 
+
 class Question(BaseModel):
     question: str
     user_id: str
 
+
 def stream_openai_response(question: str):
     response = client.chat.completions.create(
-        model="gpt-4o-mini",
+        model="gpt-5",
         messages=[{"role": "user", "content": question}],
         stream=True,
         stream_options={"include_usage": True},
@@ -52,23 +54,38 @@ def stream_openai_response(question: str):
             if content:
                 yield content
 
-@langwatch.trace(instrumenting_module_name="langwatch.examples.sanity.setup_example", attributes={"trace_attr": "test"})
+
+@langwatch.trace(
+    instrumenting_module_name="langwatch.examples.sanity.setup_example",
+    attributes={"trace_attr": "test"},
+)
 @app.post("/ask")
 async def ask(question: Question):
     return handle_ask(question.question, question.user_id)
 
-@langwatch.span(name="handle_ask", kind=SpanKind.SERVER, type=SpanType.LLM, attributes={"span_attr": "test", MetadataName.ThreadId: nanoid.generate() })
+
+@langwatch.span(
+    name="handle_ask",
+    kind=SpanKind.SERVER,
+    type=SpanType.LLM,
+    attributes={"span_attr": "test", MetadataName.ThreadId: str(PKSUID("thread"))},
+)
 def handle_ask(question: str, user_id: str):
-    get_current_span().set_attributes({
-        MetadataName.UserId: user_id,
-        "question": question,
-    })
+    get_current_span().set_attributes(
+        {
+            MetadataName.UserId: user_id,
+            "question": question,
+        }
+    )
 
     return StreamingResponse(stream_openai_response(question), media_type="text/plain")
 
+
 def main():
     import uvicorn
+
     uvicorn.run(app, host="0.0.0.0", port=8000)
+
 
 if __name__ == "__main__":
     main()

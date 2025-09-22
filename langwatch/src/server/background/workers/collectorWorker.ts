@@ -28,7 +28,6 @@ import {
   type Evaluation,
   type Span,
   type SpanInputOutput,
-  type SpanTimestamps,
 } from "../../tracer/types";
 import { COLLECTOR_QUEUE, collectorQueue } from "../queues/collectorQueue";
 import { getFirstInputAsText, getLastOutputAsText } from "./collector/common";
@@ -223,7 +222,7 @@ const processCollectorJob_ = async (
   } = data;
 
   const project = await prisma.project.findUniqueOrThrow({
-    where: { id: projectId },
+    where: { id: projectId, archivedAt: null },
   });
 
   spans = addGuardrailCosts(spans);
@@ -271,7 +270,9 @@ const processCollectorJob_ = async (
 
   const existingSpans: Span[] = [];
   const existingEvaluations: Evaluation[] = [];
-  const hasIgnoreTimestamps = false;
+  const hasIgnoreTimestamps = (spans ?? []).some(
+    (s) => s.timestamps?.ignore_timestamps_on_write === true
+  );
 
   if (existingTrace?.inserted_at) {
     // TODO: check for quickwit
@@ -311,10 +312,13 @@ const processCollectorJob_ = async (
     return acc;
   }, [] as Span[]);
 
-  const [input, output] = await Promise.all([
-    { value: getFirstInputAsText(uniqueSpans) },
-    { value: getLastOutputAsText(uniqueSpans) },
-  ]);
+  // Only set trace input/output when this batch provides real I/O.
+  // Avoid overriding with fallback-derived values (e.g., span names) if the batch has no I/O.
+  // When provided, compute from the full uniqueSpans so heuristics reflect the entire trace state.
+  const hasNewIO = (spans ?? []).some((s) => !!s.input?.value || !!s.output?.value);
+  const input = hasNewIO ? { value: getFirstInputAsText(uniqueSpans) } : void 0;
+  const output = hasNewIO ? { value: getLastOutputAsText(uniqueSpans) } : void 0;
+
   const error = getLastOutputError(uniqueSpans);
 
   const evaluations = mapEvaluations(data)?.concat(existingEvaluations);
@@ -331,8 +335,10 @@ const processCollectorJob_ = async (
       ...reservedTraceMetadata,
       ...(Object.keys(customMetadata).length > 0
         ? {
-            ...customExistingMetadata,
-            custom: safeTruncate(customMetadata),
+            custom: safeTruncate({
+              ...customExistingMetadata,
+              ...customMetadata,
+            }),
           }
         : {}),
       all_keys: Array.from(
@@ -357,8 +363,8 @@ const processCollectorJob_ = async (
       inserted_at: existingTrace?.inserted_at ?? Date.now(),
       updated_at: Date.now(),
     } as ElasticSearchTrace["timestamps"],
-    ...(input?.value ? { input } : {}),
-    ...(output?.value ? { output } : {}),
+    ...(input ? { input } : {}),
+    ...(output ? { output } : {}),
     ...(expectedOutput ? { expected_output: { value: expectedOutput } } : {}),
     metrics: computeTraceMetrics(uniqueSpans), // Use uniqueSpans for accurate total_cost calculation
     error,
@@ -468,8 +474,29 @@ const updateTrace = async (
           if (ctx._source == null) {
             ctx._source = params.trace;
           } else {
-            // Deep merge
+            // Deep merge (with conditional input/output replacement)
             for (String key : params.trace.keySet()) {
+              // Only replace input/output when a non-empty value is provided.
+              // If new is empty or missing, preserve existing.
+              if (key == "input" || key == "output") {
+                def newVal = params.trace[key];
+                def oldVal = ctx._source.containsKey(key) ? ctx._source[key] : null;
+                boolean newHas = newVal != null && !(
+                  (newVal instanceof Map) && (
+                    !newVal.containsKey("value") || newVal["value"] == null || newVal["value"] == ""
+                  )
+                );
+                boolean oldHas = oldVal != null && !(
+                  (oldVal instanceof Map) && (
+                    !oldVal.containsKey("value") || oldVal["value"] == null || oldVal["value"] == ""
+                  )
+                );
+                if (newHas || !oldHas) {
+                  ctx._source[key] = newVal;
+                }
+                continue;
+              }
+
               if (params.trace[key] instanceof Map) {
                 if (!ctx._source.containsKey(key) || !(ctx._source[key] instanceof Map)) {
                   ctx._source[key] = new HashMap();
@@ -477,7 +504,30 @@ const updateTrace = async (
                 Map nestedSource = ctx._source[key];
                 Map nestedUpdate = params.trace[key];
                 for (String nestedKey : nestedUpdate.keySet()) {
-                  nestedSource[nestedKey] = nestedUpdate[nestedKey];
+                  // Second level of nesting for e.g. metadata.custom and metadata.all_keys
+                  if (nestedUpdate[nestedKey] instanceof Map) {
+                    if (!nestedSource.containsKey(nestedKey) || !(nestedSource[nestedKey] instanceof Map)) {
+                      nestedSource[nestedKey] = new HashMap();
+                    }
+                    Map deepNestedSource = nestedSource[nestedKey];
+                    Map deepNestedUpdate = nestedUpdate[nestedKey];
+                    for (String deepNestedKey : deepNestedUpdate.keySet()) {
+                      deepNestedSource[deepNestedKey] = deepNestedUpdate[deepNestedKey];
+                    }
+                  } else if (nestedUpdate[nestedKey] instanceof List) {
+                    if (!nestedSource.containsKey(nestedKey) || !(nestedSource[nestedKey] instanceof List)) {
+                      nestedSource[nestedKey] = [];
+                    }
+                    List existingList = nestedSource[nestedKey];
+                    List newList = nestedUpdate[nestedKey];
+                    for (def item : newList) {
+                      if (!existingList.contains(item)) {
+                        existingList.add(item);
+                      }
+                    }
+                  } else {
+                    nestedSource[nestedKey] = nestedUpdate[nestedKey];
+                  }
                 }
               } else {
                 ctx._source[key] = params.trace[key];
@@ -505,7 +555,7 @@ const updateTrace = async (
                 newSpan.timestamps = new HashMap();
                 newSpan.timestamps.inserted_at = currentTime;
               }
-              
+
               // If ignore_timestamps_on_write is set, preserve existing timestamps where possible
               if (newSpan.timestamps.ignore_timestamps_on_write == true && existingSpan.timestamps != null) {
                 newSpan.timestamps.started_at = existingSpan.timestamps.started_at;
@@ -517,11 +567,30 @@ const updateTrace = async (
                   newSpan.timestamps.finished_at = existingSpan.timestamps.finished_at;
                 }
               }
-              
+
               newSpan.timestamps.updated_at = currentTime;
-              
-              // Deep merge spans
+
+              // Deep merge spans (with conditional input/output replacement)
               for (String key : newSpan.keySet()) {
+                if (key == "input" || key == "output") {
+                  def newVal = newSpan[key];
+                  def oldVal = existingSpan.containsKey(key) ? existingSpan[key] : null;
+                  boolean newHas = newVal != null && !(
+                    (newVal instanceof Map) && (
+                      !newVal.containsKey("value") || newVal["value"] == null || newVal["value"] == ""
+                    )
+                  );
+                  boolean oldHas = oldVal != null && !(
+                    (oldVal instanceof Map) && (
+                      !oldVal.containsKey("value") || oldVal["value"] == null || oldVal["value"] == ""
+                    )
+                  );
+                  if (newHas || !oldHas) {
+                    existingSpan[key] = newVal;
+                  }
+                  continue;
+                }
+
                 if (newSpan[key] instanceof Map) {
                   if (!existingSpan.containsKey(key) || !(existingSpan[key] instanceof Map)) {
                     existingSpan[key] = new HashMap();
@@ -564,7 +633,7 @@ const updateTrace = async (
                 newEvaluation.timestamps = new HashMap();
                 newEvaluation.timestamps.inserted_at = currentTime;
               }
-              
+
               // If ignore_timestamps_on_write is set, preserve existing timestamps where possible
               if (newEvaluation.timestamps.ignore_timestamps_on_write == true && existingEvaluation.timestamps != null) {
                 if (existingEvaluation.timestamps.started_at != null) {
@@ -577,7 +646,7 @@ const updateTrace = async (
                   newEvaluation.timestamps.finished_at = existingEvaluation.timestamps.finished_at;
                 }
               }
-              
+
               newEvaluation.timestamps.updated_at = currentTime;
               ctx._source.evaluations[existingEvaluationIndex] = newEvaluation;
             } else {
@@ -591,6 +660,28 @@ const updateTrace = async (
               ctx._source.evaluations.size() - 50,
               ctx._source.evaluations.size()
             );
+          }
+
+          // We want to update these specific fields, as the logic is a tiny bit different
+          // than the general deep merge logic.
+          if (params.trace.containsKey('expected_output')) {
+            ctx._source.expected_output = params.trace.expected_output;
+          }
+          if (params.trace.containsKey('metrics')) {
+            ctx._source.metrics = params.trace.metrics;
+          }
+          if (params.trace.containsKey('error')) {
+            ctx._source.error = params.trace.error;
+          }
+          if (params.trace.containsKey('timestamps')) {
+            if (ctx._source.timestamps == null) { ctx._source.timestamps = new HashMap(); }
+            ctx._source.timestamps.updated_at = params.trace.timestamps.updated_at;
+            if (ctx._source.timestamps.inserted_at == null && params.trace.timestamps.inserted_at != null) {
+              ctx._source.timestamps.inserted_at = params.trace.timestamps.inserted_at;
+            }
+            if (ctx._source.timestamps.started_at == null && params.trace.timestamps.started_at != null) {
+              ctx._source.timestamps.started_at = params.trace.timestamps.started_at;
+            }
           }
         `,
           lang: "painless",
@@ -690,10 +781,10 @@ export const processCollectorCheckAndAdjustJob = async (
     body: {
       script: {
         source: `
-          if (params.input != null) {
+          if (params.input != null && params.input.value != null && params.input.value != "") {
             ctx._source.input = params.input;
           }
-          if (params.output != null) {
+          if (params.output != null && params.output.value != null && params.output.value != "") {
             ctx._source.output = params.output;
           }
           if (params.error != null) {
@@ -790,6 +881,15 @@ const typedValueToElasticSearch = (
     type: typed.type,
     value: JSON.stringify(typed.value),
   };
+};
+
+export const asNonEmptyIO = (
+  io: { value: string } | null | undefined
+): { value: string } | undefined => {
+  if (!io?.value || io.value.trim() === "") {
+    return void 0;
+  }
+  return io;
 };
 
 // TODO: test, move to common, and fix this sorting on the TODO right below

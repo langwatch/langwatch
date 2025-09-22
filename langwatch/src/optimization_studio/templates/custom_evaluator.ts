@@ -135,7 +135,7 @@ export const customEvaluatorTemplate: Workflow = {
     "Create a custom evaluator to be used in real time evaluations, offline evaluations, or in other workflows",
   version: "1.0",
   default_llm: {
-    model: "openai/gpt-4o-mini",
+    model: "openai/gpt-5",
     temperature: 0,
     max_tokens: 8192,
   },

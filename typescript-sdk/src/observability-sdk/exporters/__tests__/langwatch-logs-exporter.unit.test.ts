@@ -9,6 +9,9 @@ import {
 } from "../../../internal/constants";
 import { OTLPLogExporter } from "@opentelemetry/exporter-logs-otlp-http";
 
+const DEFAULT_ENDPOINT = process.env.LANGWATCH_ENDPOINT ?? "https://app.langwatch.ai";
+const DEFAULT_URL = `${DEFAULT_ENDPOINT}${LOGS_PATH}`;
+
 // Mock the OTLP exporter
 vi.mock("@opentelemetry/exporter-logs-otlp-http", () => ({
   OTLPLogExporter: vi.fn().mockImplementation(function (this: any, config: any) {
@@ -41,7 +44,7 @@ describe("LangWatchLogsExporter", () => {
       expect(exporter).toBeInstanceOf(LangWatchLogsExporter);
       // Access the config through the mock
       expect((exporter as any).config).toBeDefined();
-      expect((exporter as any).url).toBe("https://app.langwatch.ai/api/otel/v1/logs");
+      expect((exporter as any).url).toBe(DEFAULT_URL);
     });
 
     it("should use provided API key in options", () => {
@@ -62,7 +65,7 @@ describe("LangWatchLogsExporter", () => {
       const endpoint = "https://custom.langwatch.com";
       const exporter = new LangWatchLogsExporter({ endpoint });
 
-      expect((exporter as any).url).toBe(`${endpoint}/api/otel/v1/logs`);
+      expect((exporter as any).url).toBe(`${endpoint}${LOGS_PATH}`);
     });
 
     it("should use both custom API key and endpoint", () => {
@@ -70,7 +73,7 @@ describe("LangWatchLogsExporter", () => {
       const endpoint = "https://custom.langwatch.com";
       const exporter = new LangWatchLogsExporter({ apiKey, endpoint });
 
-      expect((exporter as any).url).toBe(`${endpoint}/api/otel/v1/logs`);
+      expect((exporter as any).url).toBe(`${endpoint}${LOGS_PATH}`);
       const headers = (exporter as any).headers;
       expect(headers.authorization).toBe(`Bearer ${apiKey}`);
     });
@@ -93,7 +96,7 @@ describe("LangWatchLogsExporter", () => {
 
       const exporter = new LangWatchLogsExporter();
 
-      expect((exporter as any).url).toBe(`${endpoint}/api/otel/v1/logs`);
+      expect((exporter as any).url).toBe(`${endpoint}${LOGS_PATH}`);
     });
 
     it("should prioritize options over environment variables", () => {
@@ -108,7 +111,7 @@ describe("LangWatchLogsExporter", () => {
         endpoint: optionsEndpoint,
       });
 
-      expect((exporter as any).url).toBe(`${optionsEndpoint}/api/otel/v1/logs`);
+      expect((exporter as any).url).toBe(`${optionsEndpoint}${LOGS_PATH}`);
       const headers = (exporter as any).headers;
       expect(headers.authorization).toBe(`Bearer ${optionsKey}`);
     });
@@ -166,14 +169,14 @@ describe("LangWatchLogsExporter", () => {
     it("should construct URL correctly with default endpoint", () => {
       const exporter = new LangWatchLogsExporter();
 
-      expect((exporter as any).url).toBe("https://app.langwatch.ai/api/otel/v1/logs");
+      expect((exporter as any).url).toBe(DEFAULT_URL);
     });
 
     it("should construct URL correctly with custom endpoint", () => {
       const endpoint = "https://custom.example.com";
       const exporter = new LangWatchLogsExporter({ endpoint });
 
-      expect((exporter as any).url).toBe(`${endpoint}/api/otel/v1/logs`);
+      expect((exporter as any).url).toBe(`${endpoint}${LOGS_PATH}`);
     });
 
     it("should handle endpoint with trailing slash", () => {
@@ -212,7 +215,7 @@ describe("LangWatchLogsExporter", () => {
             "x-langwatch-sdk-version": LANGWATCH_SDK_VERSION,
             "x-langwatch-sdk-runtime": LANGWATCH_SDK_RUNTIME(),
           }),
-          url: expect.stringContaining("/api/otel/v1/logs"),
+          url: expect.stringContaining(LOGS_PATH),
         })
       );
     });
@@ -239,7 +242,7 @@ describe("LangWatchLogsExporter", () => {
       });
 
       // Should fallback to environment variables or defaults
-      expect((exporter as any).url).toBe("https://app.langwatch.ai/api/otel/v1/logs");
+      expect((exporter as any).url).toBe(DEFAULT_URL);
     });
 
     it("should handle complex endpoint URLs", () => {
@@ -248,7 +251,7 @@ describe("LangWatchLogsExporter", () => {
 
       // URL constructor behavior: new URL("/api/otel/v1/logs", "https://subdomain.example.com:8080/path")
       // results in "https://subdomain.example.com:8080/api/otel/v1/logs" (path gets replaced, not appended)
-      expect((exporter as any).url).toBe("https://subdomain.example.com:8080/api/otel/v1/logs");
+      expect((exporter as any).url).toBe(`https://subdomain.example.com:8080${LOGS_PATH}`);
     });
   });
 

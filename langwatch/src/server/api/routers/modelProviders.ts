@@ -12,6 +12,7 @@ import {
 } from "../../modelProviders/registry";
 import { prisma } from "../../db";
 import { dependencies } from "../../../injection/dependencies.server";
+import { KEY_CHECK } from "../../../utils/constants";
 
 export const modelProviderRouter = createTRPCRouter({
   getAllForProject: protectedProcedure
@@ -28,7 +29,21 @@ export const modelProviderRouter = createTRPCRouter({
 
       return await getProjectModelProviders(projectId, hasSetupPermission);
     }),
-
+  getAllForProjectForFrontend: protectedProcedure
+    .input(z.object({ projectId: z.string() }))
+    .use(checkUserPermissionForProject(TeamRoleGroup.PROJECT_VIEW))
+    .query(async ({ input, ctx }) => {
+      const { projectId } = input;
+      const hasSetupPermission = await backendHasTeamProjectPermission(
+        ctx,
+        { projectId },
+        TeamRoleGroup.SETUP_PROJECT
+      );
+      return await getProjectModelProvidersForFrontend(
+        projectId,
+        hasSetupPermission
+      );
+    }),
   update: protectedProcedure
     .input(
       z.object({
@@ -72,7 +87,6 @@ export const modelProviderRouter = createTRPCRouter({
         projectId,
         provider,
         enabled,
-        customKeys: validatedKeys as any,
         customModels,
         customEmbeddingsModels,
       };
@@ -87,10 +101,24 @@ export const modelProviderRouter = createTRPCRouter({
           });
 
       if (existingModelProvider) {
+        // Merge custom keys, preserving existing values when frontend sends "HAS_KEY" or dots
+        let mergedCustomKeys: Record<string, any> | null = validatedKeys;
+        if (validatedKeys && existingModelProvider.customKeys) {
+          mergedCustomKeys = {
+            ...(existingModelProvider.customKeys as Record<string, any>),
+            ...Object.fromEntries(
+              Object.entries(validatedKeys).filter(
+                ([_key, value]) => value !== "HAS_KEY••••••••••••••••••••••••"
+              )
+            ),
+          };
+        }
+
         return await ctx.prisma.modelProvider.update({
           where: { id: existingModelProvider.id, projectId },
           data: {
             ...data,
+            customKeys: mergedCustomKeys,
             customModels: customModels ? customModels : [],
             customEmbeddingsModels: customEmbeddingsModels
               ? customEmbeddingsModels
@@ -180,7 +208,7 @@ export const getProjectModelProviders = async (
   )
     .filter(
       (modelProvider) =>
-        modelProvider.customKeys ||
+        modelProvider.customKeys ??
         modelProvider.enabled !==
           defaultModelProviders[modelProvider.provider]?.enabled
     )
@@ -215,6 +243,39 @@ export const getProjectModelProviders = async (
     ...defaultModelProviders,
     ...savedModelProviders,
   };
+};
+
+// Frontend-only function that masks API keys for security
+export const getProjectModelProvidersForFrontend = async (
+  projectId: string,
+  includeKeys = true
+) => {
+  const modelProviders = await getProjectModelProviders(projectId, includeKeys);
+
+  if (!includeKeys) {
+    return modelProviders;
+  }
+
+  // Mask only API keys, keep URLs visible
+  const maskedProviders = { ...modelProviders };
+  for (const [provider, config] of Object.entries(maskedProviders)) {
+    if (config.customKeys) {
+      maskedProviders[provider] = {
+        ...config,
+        customKeys: Object.fromEntries(
+          Object.entries(config.customKeys).map(([key, value]) => [
+            key,
+            // Only mask values that look like API keys (contain "_KEY" pattern)
+            KEY_CHECK.some((k) => key.includes(k))
+              ? "HAS_KEY••••••••••••••••••••••••"
+              : value,
+          ])
+        ),
+      };
+    }
+  }
+
+  return maskedProviders;
 };
 
 const getModelOrDefaultEnvKey = (

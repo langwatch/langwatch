@@ -36,7 +36,7 @@ test("Test happy paths for prompt management", async ({ page }) => {
     .fill("Excellent Prompt For Testing - New Name");
   await page
     .getByRole("group")
-    .filter({ hasText: "Modelgpt-4o-mini" })
+    .filter({ hasText: "Modelgpt-5" })
     .getByRole("button")
     .click();
   await page.getByRole("combobox", { name: "Model" }).click();

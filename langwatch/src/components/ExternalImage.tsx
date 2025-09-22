@@ -45,6 +45,28 @@ export const getImageUrl = (str: unknown): string | null => {
       return str_;
     }
 
+    // Check for URLs that might be images without traditional extensions
+    const pathname = url_.pathname;
+    if (pathname && pathname.length > 30) {
+      // Check if the URL path contains image-related keywords
+      const imageKeywords = /image|img|photo|pic|picture|media|content|upload/i;
+      if (imageKeywords.test(pathname)) {
+        return str_;
+      }
+
+      // Check for long base64-like segments (likely encoded image data)
+      const pathSegments = pathname.split("/");
+      const lastSegment = pathSegments[pathSegments.length - 1];
+
+      if (
+        lastSegment &&
+        lastSegment.length > 50 &&
+        /^[A-Za-z0-9+/=]+$/.test(lastSegment)
+      ) {
+        return str_;
+      }
+    }
+
     return null;
   } catch {
     return null;
@@ -62,10 +84,12 @@ export const getProxiedImageUrl = (url: string): string => {
 export const ExternalImage = ({
   alt,
   src,
+  dontLinkify = false,
   ...props
 }: {
   alt?: string;
   src: string;
+  dontLinkify?: boolean;
   [key: string]: any;
 }) => {
   const [error, setError] = useState(false);
@@ -100,6 +124,17 @@ export const ExternalImage = ({
           />
         </Box>
       </Tooltip>
+    );
+  }
+
+  if (dontLinkify) {
+    return (
+      <Image
+        alt={alt}
+        onError={() => setError(true)}
+        src={proxiedSrc}
+        {...props}
+      />
     );
   }
 

@@ -164,6 +164,11 @@ function GridComponent({ scenarioRunIds }: GridProps) {
             height="400px"
             cursor="pointer"
             onClick={() => handleExpandToggle(scenarioRunId)}
+            overflow="auto"
+            style={{
+              minWidth: 0,
+              minHeight: 0,
+            }}
           >
             <SimulationChatViewer scenarioRunId={scenarioRunId} />
           </Box>

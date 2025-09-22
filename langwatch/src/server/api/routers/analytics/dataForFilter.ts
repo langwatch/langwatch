@@ -47,7 +47,7 @@ export const dataForFilter = protectedProcedure
 
     const client = await esClient({ projectId: input.projectId });
     const response = await client.search({
-      index: TRACE_INDEX.alias,
+      index: TRACE_INDEX.for(input.startDate),
       body: {
         size: 0,
         query: pivotIndexConditions,

@@ -1,5 +1,5 @@
-from .service import PromptService
+from .prompt_facade import PromptsFacade
 
 __all__ = [
-    "PromptService",
+    "PromptsFacade",
 ]

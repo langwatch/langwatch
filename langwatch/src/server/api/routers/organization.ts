@@ -218,6 +218,7 @@ export const organizationRouter = createTRPCRouter({
                     {
                       teams: {
                         some: {
+                          archivedAt: null,
                           projects: {
                             some: { id: demoProjectId },
                           },
@@ -239,9 +240,16 @@ export const organizationRouter = createTRPCRouter({
             members: true,
             features: true,
             teams: {
+              where: {
+                archivedAt: null,
+              },
               include: {
                 members: true,
-                projects: true,
+                projects: {
+                  where: {
+                    archivedAt: null,
+                  },
+                },
               },
             },
           },
@@ -450,9 +458,8 @@ export const organizationRouter = createTRPCRouter({
               user: {
                 include: {
                   teamMemberships: {
-                    include: {
-                      team: true,
-                    },
+                    where: { team: { archivedAt: null } },
+                    include: { team: true },
                   },
                 },
               },

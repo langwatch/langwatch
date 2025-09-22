@@ -16,17 +16,17 @@ export default function SimulationSetPage() {
   const { project } = useOrganizationTeamProject();
   const { batchRunId, goToSimulationBatchRuns } = useSimulationRouter();
 
-  const { data: scenarioSetData } =
-    api.scenarios.getScenarioSetRunData.useQuery(
-      {
-        projectId: project?.id ?? "",
-        scenarioSetId: scenarioSetId ?? "",
-      },
-      {
-        enabled: !!project?.id && !!scenarioSetId,
-        refetchInterval: 1000,
-      }
-    );
+  const { data: scenarioSetData } = api.scenarios.getBatchRunData.useQuery(
+    {
+      projectId: project?.id ?? "",
+      scenarioSetId: scenarioSetId ?? "",
+      batchRunId: batchRunId ?? "",
+    },
+    {
+      enabled: !!project?.id && !!scenarioSetId && !!batchRunId,
+      refetchInterval: 1000,
+    }
+  );
 
   const sortedScenarioSetData = useMemo(() => {
     return [...(scenarioSetData ?? [])].sort((a, b) => {
@@ -35,11 +35,8 @@ export default function SimulationSetPage() {
   }, [scenarioSetData]);
 
   const scenarioRunIds = useMemo(
-    () =>
-      sortedScenarioSetData
-        ?.filter((scenario) => scenario.batchRunId === batchRunId)
-        ?.map((scenario) => scenario.scenarioRunId),
-    [sortedScenarioSetData, batchRunId]
+    () => sortedScenarioSetData?.map((scenario) => scenario.scenarioRunId),
+    [sortedScenarioSetData]
   );
 
   useEffect(() => {

@@ -21,7 +21,6 @@ T = TypeVar("T", bound=dspy.Module)
 class LangWatchWorkflowModule(ReportingModule):
     cost: float = 0
     duration: int = 0
-    prevent_crashes: bool = False
 
     def __init__(self, run_evaluations: bool = False, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -36,9 +35,8 @@ class LangWatchWorkflowModule(ReportingModule):
             delattr(module, "__forward_before_autoparsing__")
             delattr(module, "__forward_before_reporting__")
             delattr(module, "__forward_before_metadata__")
-            delattr(module, "__forward_before_prevent_crashes__")
 
-        module = self.with_crash_prevention(self.with_reporting(with_autoparsing(module), node_id))
+        module = self.with_reporting(with_autoparsing(module), node_id)
         module.__forward_before_metadata__ = module.forward  # type: ignore
 
         def forward_with_metadata(instance_self, *args, **kwargs):
@@ -100,23 +98,21 @@ class LangWatchWorkflowModule(ReportingModule):
 
         return results
 
-    def with_crash_prevention(self, module: type[T]) -> type[T]:
+    def prevent_crashes(self):
         # If already patched, repatch so new config can be picked up
-        if hasattr(module, "__forward_before_crash_prevention__"):
-            module.forward = module.__forward_before_crash_prevention__  # type: ignore
-        module.__forward_before_prevent_crashes__ = module.forward  # type: ignore
+        if hasattr(self, "__forward_before_prevent_crashes__"):
+            self.forward = self.__forward_before_prevent_crashes__  # type: ignore
+        self.__forward_before_prevent_crashes__ = self.forward  # type: ignore
 
         def prevent_crashes_forward(*args, **kwargs):
             try:
-                return module.__forward_before_prevent_crashes__(*args, **kwargs)  # type: ignore
+                return self.__forward_before_prevent_crashes__(*args, **kwargs)  # type: ignore
             except Exception as e:
-                if not getattr(module, "prevent_crashes", False):
-                    raise e
                 return PredictionWithEvaluationAndMetadata(
                     duration=self.duration,
                     cost=self.cost,
                     error=e,
                 )
 
-        module.forward = prevent_crashes_forward  # type: ignore
-        return module
+        self.forward = prevent_crashes_forward  # type: ignore
+        return self

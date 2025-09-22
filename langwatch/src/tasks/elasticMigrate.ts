@@ -1,5 +1,3 @@
-import * as fs from "fs";
-import * as path from "path";
 import {
   BATCH_EVALUATION_INDEX,
   DSPY_STEPS_INDEX,
@@ -19,11 +17,11 @@ import type { MappingProperty } from "@elastic/elasticsearch/lib/api/types";
 import { env } from "../env.mjs";
 import { execSync } from "child_process";
 import { prisma } from "../server/db";
-import { Client as ElasticClient } from "@elastic/elasticsearch";
+import { type Client as ElasticClient } from "@elastic/elasticsearch";
 import { migrations as importedMigrations } from "../../elastic/migrations";
 import { eventMapping } from "../../elastic/mappings/scenario-events";
 
-const migrations: { [key: string]: any } = importedMigrations;
+const migrations: Record<string, any> = importedMigrations;
 
 export default async function execute() {
   if (env.IS_QUICKWIT) {

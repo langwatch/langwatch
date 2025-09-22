@@ -12,11 +12,12 @@ import {
   VStack,
   type BoxProps,
 } from "@chakra-ui/react";
-
 import type { Project } from "@prisma/client";
 import { useCallback, useEffect, useMemo } from "react";
 import { useForm, type UseFormReturn } from "react-hook-form";
 import { useDebounceCallback } from "usehooks-ts";
+
+import { AISparklesLoader } from "../../components/icons/AISparklesLoader";
 import { HistoryIcon } from "../../components/icons/History";
 import { SmallLabel } from "../../components/SmallLabel";
 import { InputGroup } from "../../components/ui/input-group";
@@ -28,7 +29,6 @@ import { api } from "../../utils/api";
 import { useWorkflowStore } from "../hooks/useWorkflowStore";
 import type { Workflow } from "../types/dsl";
 import { hasDSLChanged } from "../utils/dslUtils";
-import { AISparklesLoader } from "../../components/icons/AISparklesLoader";
 
 export function History() {
   const { open, onToggle, onClose, setOpen } = useDisclosure();
@@ -434,7 +434,7 @@ export function NewVersionFields({
         {
           onSuccess: (data) => {
             if (data) {
-              form.setValue("commitMessage", data);
+              form.setValue("commitMessage", data as string);
             }
           },
           onError: (e) => {

@@ -151,7 +151,7 @@ module.exports.startApp = async (dir = path.dirname(__dirname)) => {
     process.exit(1);
   });
 
-  server.listen(port, async () => {
+  server.listen(port, () => {
     logger.info(
       {
         hostname,
@@ -164,11 +164,9 @@ module.exports.startApp = async (dir = path.dirname(__dirname)) => {
     );
 
     // Initialize background workers
-    try {
-      await initializeBackgroundWorkers();
-    } catch (error) {
+    initializeBackgroundWorkers().catch((error) => {
       logger.error({ error }, "Failed to initialize background workers");
-    }
+    });
   });
 
   // Global error handlers for uncaught exceptions and unhandled promise rejections

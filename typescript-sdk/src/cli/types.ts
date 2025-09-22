@@ -48,6 +48,10 @@ export type MaterializedPrompt = {
     content: string;
   }>;
   prompt: string;
+  temperature?: number;
+  maxTokens?: number;
+  inputs?: any;
+  outputs?: any;
   updatedAt: string;
 };
 
