@@ -14,6 +14,7 @@ type ModelProviderDefinition = {
   endpointKey: string | undefined;
   keysSchema: z.ZodTypeAny;
   enabledSince: Date;
+  blurb?: string;
 };
 
 export type MaybeStoredModelProvider = Omit<
@@ -45,6 +46,18 @@ export const getProviderModelOptions = (
 };
 
 export const modelProviders = {
+  custom: {
+    name: "Custom",
+    apiKey: "CUSTOM_API_KEY",
+    endpointKey: "CUSTOM_BASE_URL",
+    keysSchema: z.object({
+      CUSTOM_API_KEY: z.string().nullable().optional(),
+      CUSTOM_BASE_URL: z.string().nullable().optional(),
+    }),
+    enabledSince: new Date("2023-01-01"),
+    blurb:
+      "Bring your own model provider. Use this option for models that are OpenAI API–compatible.",
+  },
   openai: {
     name: "OpenAI",
     apiKey: "OPENAI_API_KEY",
@@ -68,6 +81,7 @@ export const modelProviders = {
       }),
     enabledSince: new Date("2023-01-01"),
   },
+
   azure: {
     name: "Azure OpenAI",
     apiKey: "AZURE_OPENAI_API_KEY",
@@ -88,15 +102,7 @@ export const modelProviders = {
     }),
     enabledSince: new Date("2023-01-01"),
   },
-  gemini: {
-    name: "Gemini",
-    apiKey: "GEMINI_API_KEY",
-    endpointKey: undefined,
-    keysSchema: z.object({
-      GEMINI_API_KEY: z.string().min(1),
-    }),
-    enabledSince: new Date("2023-01-01"),
-  },
+
   vertex_ai: {
     name: "Vertex AI",
     apiKey: "GOOGLE_APPLICATION_CREDENTIALS",
@@ -119,12 +125,12 @@ export const modelProviders = {
     }),
     enabledSince: new Date("2023-01-01"),
   },
-  atla: {
-    name: "Atla",
-    apiKey: "ATLA_API_KEY",
+  gemini: {
+    name: "Gemini",
+    apiKey: "GEMINI_API_KEY",
     endpointKey: undefined,
     keysSchema: z.object({
-      ATLA_API_KEY: z.string().min(1),
+      GEMINI_API_KEY: z.string().min(1),
     }),
     enabledSince: new Date("2023-01-01"),
   },
@@ -143,26 +149,6 @@ export const modelProviders = {
     endpointKey: undefined,
     keysSchema: z.object({
       GROQ_API_KEY: z.string().min(1),
-    }),
-    enabledSince: new Date("2023-01-01"),
-  },
-  cloudflare: {
-    name: "Cloudflare",
-    apiKey: "CLOUDFLARE_API_KEY",
-    endpointKey: undefined,
-    keysSchema: z.object({
-      CLOUDFLARE_ACCOUNT_ID: z.string().min(1),
-      CLOUDFLARE_API_KEY: z.string().min(1),
-    }),
-    enabledSince: new Date("2023-01-01"),
-  },
-  custom: {
-    name: "Custom",
-    apiKey: "CUSTOM_API_KEY",
-    endpointKey: "CUSTOM_BASE_URL",
-    keysSchema: z.object({
-      CUSTOM_API_KEY: z.string().nullable().optional(),
-      CUSTOM_BASE_URL: z.string().nullable().optional(),
     }),
     enabledSince: new Date("2023-01-01"),
   },
@@ -227,7 +213,6 @@ export const allLitellmModels = (() => {
           ];
         })
     ),
-    "atla/atla-selene": { mode: "chat" },
   };
 
   // Remove dated models
