@@ -31,6 +31,9 @@ export function LLMConfigField({
   const { open, onClose, onToggle } = useDisclosure();
   const { model } = llmConfig;
 
+  // Check if the model is disabled (has line-through styling)
+  const isModelDisabled = modelOption?.isDisabled ?? false;
+
   return (
     <>
       <LLMConfigModal
@@ -69,7 +72,7 @@ export function LLMConfigField({
           </Box>
         </Button>
       </HStack>
-      {requiresCustomKey && (
+      {(requiresCustomKey || isModelDisabled) && (
         <AddModelProviderKey
           runWhat="run this component"
           nodeProvidersWithoutCustomKeys={[model.split("/")[0] ?? "unknown"]}
