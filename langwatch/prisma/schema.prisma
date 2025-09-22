@@ -158,11 +158,13 @@ model Organization {
     useCustomS3            Boolean              @default(false)
     sentPlanLimitAlert     DateTime?
     ssoDomain              String?
+    ssoProvider            String?
 
     promoCode String?
     features  OrganizationFeature[]
 
     @@index([ssoDomain])
+    @@index([ssoProvider])
 }
 
 enum PIIRedactionLevel {
