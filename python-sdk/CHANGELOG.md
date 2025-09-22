@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.4.2](https://github.com/langwatch/langwatch/compare/python-sdk@v0.4.1...python-sdk@v0.4.2) (2025-09-22)
+
+
+### Bug Fixes
+
+* downgrade litellm dependency due to https://github.com/BerriAI/litellm/issues/14145 preventing to build it on lambda ([066d97c](https://github.com/langwatch/langwatch/commit/066d97c26252c82f9143e36427782c7af19912a2))
+
 ## [0.4.1](https://github.com/langwatch/langwatch/compare/python-sdk@v0.4.0...python-sdk@v0.4.1) (2025-09-19)
 
 
