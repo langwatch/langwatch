@@ -1,7 +1,7 @@
 # LangWatch TypeScript SDK
 
 <p align="center">
-  <img src="https://app.langwatch.ai/logo.svg" alt="LangWatch Logo" width="120"/>
+  <img src="https://github.com/langwatch/langwatch/blob/main/assets/logo-header.webp?raw=true" alt="LangWatch Logo" />
 </p>
 
 <p align="center">
@@ -11,7 +11,7 @@
 
 <p align="center">
   <a href="https://www.npmjs.com/package/langwatch"><img src="https://img.shields.io/npm/v/langwatch.svg?style=flat-square" alt="npm version"></a>
-  <a href="https://opensource.org/licenses/Apache-2.0"><img src="https://img.shields.io/badge/license-Apache--2.0-blue.svg?style=flat-square" alt="License"></a>
+  <a href="https://opensource.org/licenses/MIT"><img src="https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square" alt="License"></a>
 </p>
 
 ---
