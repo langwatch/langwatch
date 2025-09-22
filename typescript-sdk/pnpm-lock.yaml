@@ -105,7 +105,7 @@ importers:
         specifier: ^9.32.0
         version: 9.36.0
       '@langchain/core':
-        specifier: '>=0.3.0 <1.0.0'
+        specifier: '>=0.3.68 <0.4.0'
         version: 0.3.77(@opentelemetry/api@1.9.0)(@opentelemetry/exporter-trace-otlp-proto@0.205.0(@opentelemetry/api@1.9.0))(@opentelemetry/sdk-trace-base@2.1.0(@opentelemetry/api@1.9.0))(openai@5.12.2(zod@4.1.11))
       '@langchain/langgraph':
         specifier: '>=0.4.0 <1.0.0'
