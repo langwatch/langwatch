@@ -5,7 +5,8 @@ import {
 } from "@opentelemetry/sdk-trace-base";
 import { SpanStatusCode, trace } from "@opentelemetry/api";
 import { ChatOpenAI } from "@langchain/openai";
-import { DynamicTool } from "@langchain/core/tools";
+import { DynamicStructuredTool } from "@langchain/core/tools";
+import { z } from "zod";
 import { AgentExecutor, createToolCallingAgent } from "langchain/agents";
 import { ChatPromptTemplate } from "@langchain/core/prompts";
 import { LangWatchCallbackHandler } from "../..";
@@ -100,9 +101,10 @@ describe("LangChain Integration Tests", () => {
   it("should trace tool calling and agent execution", async () => {
     const date = new Date().toISOString();
     const tools = [
-      new DynamicTool({
+      new DynamicStructuredTool({
         name: "get_current_time",
         description: "Returns the current time in ISO-8601 format.",
+        schema: z.object({}),
         func: async () => date,
       }),
     ];
@@ -276,9 +278,10 @@ describe("LangChain Integration Tests", () => {
     it("should name tool spans with tool name and input preview", async () => {
       const date = new Date().toISOString();
       const tools = [
-        new DynamicTool({
+        new DynamicStructuredTool({
           name: "get_current_time",
           description: "get the current time",
+          schema: z.object({}),
           func: async () => {
             return `Result: ${date}`;
           },
@@ -339,9 +342,10 @@ describe("LangChain Integration Tests", () => {
 
     it("should name agent spans as components", async () => {
       const tools = [
-        new DynamicTool({
+        new DynamicStructuredTool({
           name: "search",
           description: "Search for information",
+          schema: z.object({}),
           func: async () => "Search results",
         }),
       ];
@@ -567,9 +571,10 @@ describe("LangChain Integration Tests", () => {
           });
 
           const tools = [
-            new DynamicTool({
+            new DynamicStructuredTool({
               name: "test_tool",
               description: "A test tool",
+              schema: z.object({}),
               func: async () => "test result",
             }),
           ];

@@ -663,7 +663,7 @@ describe("tracer.ts", () => {
       const result = await langwatchTracer.withActiveSpan("parent", async (parentSpan) => {
         parentSpan.setType("workflow");
 
-        const childResults = await Promise.all([
+        const childResults = [
           langwatchTracer.withActiveSpan("child-1", (child) => {
             child.setType("llm");
             return "child-1-result";
@@ -672,7 +672,7 @@ describe("tracer.ts", () => {
             child.setType("tool");
             return "child-2-result";
           })
-        ]);
+        ];
 
         return { parent: "parent-result", children: childResults };
       });
