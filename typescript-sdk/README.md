@@ -47,11 +47,11 @@ npm install langwatch
 Here's the fastest way to get LangWatch working in your app:
 
 ```ts
-import { setupLangWatch } from "langwatch/node";
+import { setupObservability } from "langwatch/observability/node";
 import { getLangWatchTracer } from "langwatch";
 
 // 1. Initialize LangWatch (Node.js example)
-await setupLangWatch({ apiKey: "YOUR_API_KEY" }); // By default, this will read the LANGWATCH_API_KEY environment variable
+await setupObservability(); // By default this will read the LANGWATCH_API_KEY environment variable to set the API key.
 
 // 2. Create a tracer and span
 const tracer = getLangWatchTracer("my-app");
@@ -61,7 +61,7 @@ span.setOutput("Model response");
 span.end();
 ```
 
-> **Tip:** For use in the browser, use `import { setupLangWatch } from "langwatch/browser"` instead.
+> **Tip:** For use in the browser, use `import { setupObservability } from "langwatch/browser"` instead.
 
 ---
 
