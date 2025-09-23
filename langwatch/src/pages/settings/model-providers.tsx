@@ -79,6 +79,7 @@ export default function ModelsPage() {
     { projectId: project?.id ?? "" },
     { enabled: !!project }
   );
+
   const updateMutation = api.modelProvider.update.useMutation();
 
   return (
@@ -173,16 +174,21 @@ type ModelProviderForm = {
   customEmbeddingsModels?: { value: string; label: string }[] | null;
 };
 
-function ModelProviderForm({
+export function ModelProviderForm({
   provider,
   refetch,
   updateMutation,
+  projectId: overrideProjectId,
 }: {
   provider: MaybeStoredModelProvider;
   refetch: () => Promise<any>;
   updateMutation: ReturnType<typeof api.modelProvider.update.useMutation>;
+  projectId?: string; // Add optional projectId prop
 }) {
   const { project, organization } = useOrganizationTeamProject();
+
+  // Use overrideProjectId if provided, otherwise fall back to project?.id
+  const effectiveProjectId = overrideProjectId ?? project?.id ?? "";
 
   const localUpdateMutation = api.modelProvider.update.useMutation();
   const deleteMutation = api.modelProvider.delete.useMutation();
@@ -274,7 +280,7 @@ function ModelProviderForm({
     async (data: ModelProviderForm) => {
       await localUpdateMutation.mutateAsync({
         id: provider.id,
-        projectId: project?.id ?? "",
+        projectId: effectiveProjectId, // Use effectiveProjectId instead of project?.id
         provider: provider.provider,
         enabled: data.enabled,
         customKeys: data.useCustomKeys ? data.customKeys : null,
@@ -293,7 +299,13 @@ function ModelProviderForm({
       });
       await refetch();
     },
-    [localUpdateMutation, provider.id, provider.provider, project?.id, refetch]
+    [
+      localUpdateMutation,
+      provider.id,
+      provider.provider,
+      effectiveProjectId,
+      refetch,
+    ]
   );
 
   const enabledField = register("enabled");
@@ -304,7 +316,7 @@ function ModelProviderForm({
       setValue("enabled", e.target.checked);
       await updateMutation.mutateAsync({
         id: provider.id,
-        projectId: project?.id ?? "",
+        projectId: effectiveProjectId, // Use effectiveProjectId instead of project?.id
         provider: provider.provider,
         enabled: e.target.checked,
         customKeys: provider.customKeys as any,
@@ -326,7 +338,7 @@ function ModelProviderForm({
       provider.models,
       provider.embeddingsModels,
       provider.disabledByDefault,
-      project?.id,
+      effectiveProjectId, // Use effectiveProjectId instead of project?.id
       refetch,
       setValue,
     ]
@@ -378,7 +390,7 @@ function ModelProviderForm({
   const useCustomKeys = watch("useCustomKeys");
 
   const ManagedModelProvider = dependencies.managedModelProviderComponent?.({
-    projectId: project?.id ?? "",
+    projectId: effectiveProjectId,
     organizationId: organization?.id ?? "",
     provider,
   });

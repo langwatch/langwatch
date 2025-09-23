@@ -209,7 +209,7 @@ export const projectRouter = createTRPCRouter({
         },
       });
 
-      return { success: true, projectSlug: project.slug };
+      return { success: true, projectSlug: project.slug, id: project.id };
     }),
   getProjectAPIKey: protectedProcedure
     .input(z.object({ projectId: z.string() }))

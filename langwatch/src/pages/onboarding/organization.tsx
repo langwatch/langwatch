@@ -3,10 +3,12 @@ import {
   Button,
   Field,
   HStack,
+  Spacer,
   Heading,
   Input,
   SegmentGroup,
   Separator,
+  Skeleton,
   Steps,
   Text,
   VStack,
@@ -59,6 +61,13 @@ import {
 import { toaster } from "~/components/ui/toaster";
 import { trackEventOnce } from "~/utils/tracking";
 import { AddMembersForm } from "../../components/AddMembersForm";
+import { ModelProviderForm } from "../../pages/settings/model-providers";
+
+import {
+  getProviderModelOptions,
+  modelProviders as modelProvidersRegistry,
+  type MaybeStoredModelProvider,
+} from "../../server/modelProviders/registry";
 
 type OrganizationFormData = {
   organizationName: string;
@@ -163,7 +172,8 @@ export default function OrganizationOnboarding() {
       },
       {
         onSuccess: () => {
-          window.location.href = `/${projectSlug}/messages`;
+          setActiveStep(3);
+          //window.location.href = `/${projectSlug}/messages`;
         },
         onError: () => {
           toaster.create({
@@ -176,6 +186,8 @@ export default function OrganizationOnboarding() {
       }
     );
   };
+
+  const [projectId, setProjectId] = React.useState<string | null>(null);
 
   const onSubmit: SubmitHandler<OrganizationFormData> = (
     data: OrganizationFormData
@@ -192,11 +204,13 @@ export default function OrganizationOnboarding() {
       },
       {
         onSuccess: (response) => {
+          console.log("response", response);
           trackEventOnce("organization_initialized", {
             category: "onboarding",
             label: "organization_onboarding_completed",
           });
           setOrganizationId(response.organizationId);
+          setProjectId(response.projectId);
           setTeamOption({
             name: response.teamName,
             id: response.teamId,
@@ -317,9 +331,20 @@ export default function OrganizationOnboarding() {
   };
 
   const skipForNow = () => {
+    setActiveStep(3);
+    // window.location.href = `/${projectSlug}/messages`;
+  };
+  const skipForNow2 = () => {
+    //setActiveStep(3);
     window.location.href = `/${projectSlug}/messages`;
   };
 
+  const modelProviders = api.modelProvider.getAllForProjectForFrontend.useQuery(
+    { projectId: projectId ?? "" },
+    { enabled: !!projectId }
+  );
+  const updateMutation = api.modelProvider.update.useMutation();
+  console.log("asdasd", projectId);
   return (
     <SetupLayout>
       <VStack gap={4} alignItems="left">
@@ -344,6 +369,10 @@ export default function OrganizationOnboarding() {
                     <Steps.Separator />
                   </Steps.Item>
                   <Steps.Item index={2} title={"3"}>
+                    <Steps.Indicator />
+                    <Steps.Separator />
+                  </Steps.Item>
+                  <Steps.Item index={3} title={"4"}>
                     <Steps.Indicator />
                     <Steps.Separator />
                   </Steps.Item>
@@ -694,6 +723,55 @@ export default function OrganizationOnboarding() {
                 onCloseText="Skip for now"
               />
             )}
+          </Steps.Content>
+
+          <Steps.Content index={3}>
+            <Heading as="h1">Model Providers Keys</Heading>
+            <Text paddingBottom={4} fontSize="14px">
+              Define which models are allowed to be used on LangWatch for this
+              project. You can also use your own API keys.
+            </Text>
+
+            <Box overflow="auto" maxHeight="500px">
+              {modelProviders.isLoading &&
+                Array.from({
+                  length: Object.keys(modelProvidersRegistry).length,
+                }).map((_, index) => (
+                  <Box
+                    key={index}
+                    width="full"
+                    borderBottomWidth="1px"
+                    _last={{ border: "none" }}
+                    paddingY={6}
+                  >
+                    <Skeleton width="full" height="28px" />
+                  </Box>
+                ))}
+              {modelProviders.data &&
+                projectId &&
+                Object.values(modelProviders.data).map((provider, index) => (
+                  <ModelProviderForm
+                    key={index}
+                    provider={provider}
+                    refetch={modelProviders.refetch}
+                    updateMutation={updateMutation}
+                    projectId={projectId} // Pass the projectId from state
+                  />
+                ))}
+            </Box>
+            <HStack width="full">
+              <Spacer />
+              <Button colorPalette="orange" onClick={skipForNow2}>
+                Skip for now
+              </Button>
+              <Button
+                colorPalette="orange"
+                variant="outline"
+                onClick={skipForNow2}
+              >
+                Proceed
+              </Button>
+            </HStack>
           </Steps.Content>
         </Steps.Root>
 
