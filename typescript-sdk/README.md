@@ -47,11 +47,11 @@ npm install langwatch
 Here's the fastest way to get LangWatch working in your app:
 
 ```ts
-import { setupLangWatch } from "langwatch/node";
+import { setupObservability } from "langwatch/observability/node";
 import { getLangWatchTracer } from "langwatch";
 
 // 1. Initialize LangWatch (Node.js example)
-await setupLangWatch({ apiKey: "YOUR_API_KEY" }); // By default, this will read the LANGWATCH_API_KEY environment variable
+await setupObservability(); // By default this will read the LANGWATCH_API_KEY environment variable to set the API key.
 
 // 2. Create a tracer and span
 const tracer = getLangWatchTracer("my-app");
@@ -61,7 +61,7 @@ span.setOutput("Model response");
 span.end();
 ```
 
-> **Tip:** For use in the browser, use `import { setupLangWatch } from "langwatch/browser"` instead.
+> **Tip:** For use in the browser, use `import { setupObservability } from "langwatch/browser"` instead.
 
 ---
 
@@ -167,63 +167,6 @@ span.end();
     callbacks: [new LangWatchCallbackHandler()],
   });
   ```
-
----
-
-## API Reference
-
-### Setup
-- `setupLangWatch(options?)` → Initialize LangWatch (from `langwatch/node` or `langwatch/browser`)
-
-### Observability
-- `getLangWatchTracer(name, version?)` → `LangWatchTracer`
-- `LangWatchTracer` methods: `.startSpan()`, `.startActiveSpan()`, `.withActiveSpan()`
-- `LangWatchSpan` methods:
-  - `.setType()`, `.setInput()`, `.setOutput()`, `.setInputString()`, `.setOutputString()`
-  - `.recordEvaluation()`, `.setRequestModel()`, `.setResponseModel()`
-  - `.setRAGContexts()`, `.setRAGContext()`, `.setMetrics()`, `.setSelectedPrompt()`
-  - `.addGenAISystemMessageEvent()`, `.addGenAIUserMessageEvent()`, `.addGenAIAssistantMessageEvent()`, `.addGenAIToolMessageEvent()`, `.addGenAIChoiceEvent()`
-
-### Prompt
-- `getPrompt(promptId, variables?)` → fetches and formats a prompt (creates a span automatically)
-- `getPromptVersion(promptId, versionId, variables?)` → fetches specific prompt version
-
-### Evaluation
-- `runEvaluation(details)` → runs an evaluation and returns result (creates a span automatically)
-- `recordEvaluation(details, attributes?)` → records a custom evaluation span (creates a span automatically)
-
-### LangChain Integration
-- `LangWatchCallbackHandler` → LangChain callback handler for automatic instrumentation
-
-### Exporters & Processors
-- `LangWatchExporter` → Custom OpenTelemetry exporter
-- `FilterableBatchSpanProcessor` → Span processor with filtering capabilities
-
----
-
-## Types
-
-### Core Types
-- `LangWatchSpan` → Extended OpenTelemetry span with LangWatch methods
-- `LangWatchTracer` → Extended OpenTelemetry tracer with LangWatch methods
-- `SpanType` → Union of supported span types (`"llm"`, `"chain"`, `"tool"`, `"agent"`, etc.)
-
-### Evaluation Types
-- `EvaluationDetails` → Configuration for running evaluations
-- `SingleEvaluationResult` → Result from evaluation runs
-- `RecordedEvaluationDetails` → Configuration for recording custom evaluations
-
-### Prompt Types
-- `Prompt` → Prompt object with compilation capabilities
-- `CompiledPrompt` → Compiled prompt with variables interpolated
-- `TemplateVariables` → Variables for prompt compilation
-
-### RAG & Metrics Types
-- `LangWatchSpanRAGContext` → RAG context structure
-- `LangWatchSpanMetrics` → Metrics structure (tokens, cost)
-- `LangWatchSpanGenAI*EventBody` → GenAI message event structures
-
----
 
 ## Advanced
 
