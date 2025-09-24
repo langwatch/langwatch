@@ -49,8 +49,7 @@ export const EvaluatorSettingsAccordion = () => {
       : evaluatorType && availableEvaluators
       ? getEvaluatorDefaultSettings(
           availableEvaluators[evaluatorType as EvaluatorTypes],
-          project,
-          publicEnv.data?.IS_ATLA_DEFAULT_JUDGE
+          project
         )
       : undefined;
 
