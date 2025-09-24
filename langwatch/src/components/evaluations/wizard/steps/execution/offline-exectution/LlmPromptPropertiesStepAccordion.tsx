@@ -1,5 +1,6 @@
 import { useShallow } from "zustand/react/shallow";
-import { SignaturePropertiesPanel } from "../../../../../../optimization_studio/components/properties/llm-configs/SignaturePropertiesPanel";
+
+import { SignaturePropertiesPanel } from "../../../../../../optimization_studio/components/properties/llm-configs/signature-properties-panel/SignaturePropertiesPanel";
 import { ExecutionStepAccordion } from "../../../components/ExecutionStepAccordion";
 import { useEvaluationWizardStore } from "../../../hooks/evaluation-wizard-store/useEvaluationWizardStore";
 
