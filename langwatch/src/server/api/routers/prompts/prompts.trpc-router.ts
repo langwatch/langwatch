@@ -15,7 +15,7 @@ import { handleSchema } from "~/prompt-configs/schemas";
  * Currently only supports upsert operation
  * TODO: Add other operations as needed
  */
-export const promptRouter = createTRPCRouter({
+export const promptsRouter = createTRPCRouter({
   /**
    * Upsert a prompt - create if it doesn't exist, update if it does
    */
