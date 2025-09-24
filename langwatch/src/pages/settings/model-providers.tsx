@@ -178,8 +178,8 @@ export function ModelProviderForm({
   provider,
   refetch,
   updateMutation,
-  projectId: overrideProjectId,
-  organizationId: overrideOrganizationId,
+  projectId,
+  organizationId,
 }: {
   provider: MaybeStoredModelProvider;
   refetch: () => Promise<any>;
@@ -187,9 +187,6 @@ export function ModelProviderForm({
   projectId?: string; // Add optional projectId prop
   organizationId?: string; // Add optional organizationId prop
 }) {
-  // Use overrideProjectId directly since it's passed as a prop
-  const effectiveProjectId = overrideProjectId ?? "";
-
   const providerDefinition =
     modelProvidersRegistry[
       provider.provider as keyof typeof modelProvidersRegistry
@@ -299,7 +296,7 @@ export function ModelProviderForm({
     async (data: ModelProviderForm) => {
       await updateMutation.mutateAsync({
         id: providerData.id,
-        projectId: effectiveProjectId,
+        projectId: projectId ?? "",
         provider: providerData.provider,
         enabled: data.enabled,
         customKeys: data.customKeys,
@@ -318,7 +315,7 @@ export function ModelProviderForm({
       });
       await refetch();
     },
-    [updateMutation, providerData, effectiveProjectId, refetch]
+    [updateMutation, providerData, projectId, refetch]
   );
 
   const isEnabled = watch("enabled");
@@ -328,7 +325,7 @@ export function ModelProviderForm({
       setValue("enabled", e.target.checked);
       await updateMutation.mutateAsync({
         id: providerData.id,
-        projectId: effectiveProjectId,
+        projectId: projectId ?? "",
         provider: providerData.provider,
         enabled: e.target.checked,
         customKeys: providerData.customKeys as any,
@@ -338,7 +335,7 @@ export function ModelProviderForm({
 
       await refetch();
     },
-    [updateMutation, providerData, effectiveProjectId, refetch, setValue]
+    [updateMutation, providerData, projectId, refetch, setValue]
   );
 
   const providerKeys = providerDefinition?.keysSchema
@@ -348,8 +345,8 @@ export function ModelProviderForm({
     : {};
 
   const ManagedModelProvider = dependencies.managedModelProviderComponent?.({
-    projectId: effectiveProjectId,
-    organizationId: overrideOrganizationId ?? "",
+    projectId: projectId ?? "",
+    organizationId: organizationId ?? "",
     provider,
   });
 
