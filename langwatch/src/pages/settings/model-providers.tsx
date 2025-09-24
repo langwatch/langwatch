@@ -37,7 +37,6 @@ import {
 import { api } from "../../utils/api";
 
 import CreatableSelect from "react-select/creatable";
-import { Checkbox } from "../../components/ui/checkbox";
 import { Switch } from "../../components/ui/switch";
 import { toaster } from "../../components/ui/toaster";
 import {
@@ -168,7 +167,6 @@ type ModelProviderForm = {
   id?: string;
   provider: string;
   enabled: boolean;
-  useCustomKeys: boolean;
   customKeys?: Record<string, unknown> | null;
   customModels?: { value: string; label: string }[] | null;
   customEmbeddingsModels?: { value: string; label: string }[] | null;
@@ -191,12 +189,11 @@ export function ModelProviderForm({
   const effectiveProjectId = overrideProjectId ?? project?.id ?? "";
 
   const localUpdateMutation = api.modelProvider.update.useMutation();
-  const deleteMutation = api.modelProvider.delete.useMutation();
 
   const providerDefinition =
     modelProvidersRegistry[
       provider.provider as keyof typeof modelProvidersRegistry
-    ]!;
+    ];
 
   const getStoredModelOptions = (
     models: string[],
@@ -218,7 +215,6 @@ export function ModelProviderForm({
       id: provider.id,
       provider: provider.provider,
       enabled: provider.enabled,
-      useCustomKeys: !!provider.customKeys,
       customKeys: provider.customKeys as object | null,
       customModels: getStoredModelOptions(
         provider.models ?? [],
@@ -234,7 +230,7 @@ export function ModelProviderForm({
     resolver: (data, ...args) => {
       const data_ = {
         ...data,
-        customKeys: data.useCustomKeys ? data.customKeys : null,
+        customKeys: data.customKeys,
         customModels: data.customModels ?? [],
         customEmbeddingsModels: data.customEmbeddingsModels ?? [],
       };
@@ -244,14 +240,15 @@ export function ModelProviderForm({
           id: z.string().optional(),
           provider: z.enum(Object.keys(modelProvidersRegistry) as any),
           enabled: z.boolean(),
-          useCustomKeys: z.boolean(),
-          customKeys: z
-            .union([
-              providerDefinition.keysSchema,
-              z.object({ MANAGED: z.string() }),
-            ])
-            .optional()
-            .nullable(),
+          customKeys: providerDefinition?.keysSchema
+            ? z
+                .union([
+                  providerDefinition.keysSchema,
+                  z.object({ MANAGED: z.string() }),
+                ])
+                .optional()
+                .nullable()
+            : z.object({ MANAGED: z.string() }).optional().nullable(),
           customModels: z
             .array(
               z.object({
@@ -283,7 +280,7 @@ export function ModelProviderForm({
         projectId: effectiveProjectId, // Use effectiveProjectId instead of project?.id
         provider: provider.provider,
         enabled: data.enabled,
-        customKeys: data.useCustomKeys ? data.customKeys : null,
+        customKeys: data.customKeys,
         customModels: (data.customModels ?? []).map((m) => m.value),
         customEmbeddingsModels: (data.customEmbeddingsModels ?? []).map(
           (m) => m.value
@@ -308,7 +305,6 @@ export function ModelProviderForm({
     ]
   );
 
-  const enabledField = register("enabled");
   const isEnabled = watch("enabled");
 
   const onEnableDisable = useCallback(
@@ -323,10 +319,6 @@ export function ModelProviderForm({
         customModels: provider.models ?? [],
         customEmbeddingsModels: provider.embeddingsModels ?? [],
       });
-
-      if (e.target.checked && provider.disabledByDefault) {
-        setValue("useCustomKeys", true);
-      }
 
       await refetch();
     },
@@ -344,50 +336,11 @@ export function ModelProviderForm({
     ]
   );
 
-  const useCustomKeysField = register("useCustomKeys");
-  const isUseCustomKeys = watch("useCustomKeys");
-
-  const onUseCustomKeysChange = useCallback(
-    async (e: React.ChangeEvent<HTMLInputElement>) => {
-      console.log("e.target.checked", e.target.checked);
-      setValue("useCustomKeys", e.target.checked);
-      if (!e.target.checked) {
-        await deleteMutation.mutateAsync({
-          id: provider.id ?? "",
-          provider: provider.provider,
-          projectId: project?.id ?? "",
-        });
-
-        setValue("customKeys", null);
-        setValue("customModels", null);
-        setValue("customEmbeddingsModels", null);
-
-        if (provider.disabledByDefault) {
-          setValue("enabled", false);
-        }
-        await refetch();
-      }
-      setValue(
-        "customModels",
-        getStoredModelOptions(provider.models ?? [], provider.provider, "chat")
-      );
-      setValue(
-        "customEmbeddingsModels",
-        getStoredModelOptions(
-          provider.embeddingsModels ?? [],
-          provider.provider,
-          "embedding"
-        )
-      );
-    },
-    [setValue, provider, deleteMutation, project?.id, refetch]
-  );
-
-  const providerKeys =
-    "shape" in providerDefinition.keysSchema
+  const providerKeys = providerDefinition?.keysSchema
+    ? "shape" in providerDefinition.keysSchema
       ? providerDefinition.keysSchema.shape
-      : providerDefinition.keysSchema._def.schema.shape;
-  const useCustomKeys = watch("useCustomKeys");
+      : providerDefinition.keysSchema._def.schema.shape
+    : {};
 
   const ManagedModelProvider = dependencies.managedModelProviderComponent?.({
     projectId: effectiveProjectId,
@@ -406,7 +359,7 @@ export function ModelProviderForm({
       <form onSubmit={handleSubmit(onSubmit)} style={{ width: "100%" }}>
         <HorizontalFormControl
           label={
-            <HStack paddingLeft={4}>
+            <HStack paddingLeft={0} marginBottom={2}>
               <Box
                 width="24px"
                 height="24px"
@@ -420,10 +373,10 @@ export function ModelProviderForm({
                   ]
                 }
               </Box>
-              <Text>{providerDefinition.name}</Text>
+              <Text>{providerDefinition?.name || provider.provider}</Text>
             </HStack>
           }
-          helper={""}
+          helper={(providerDefinition as any)?.blurb ?? ""}
         >
           <VStack align="start" width="full" gap={4} paddingRight={4}>
             <HStack gap={6}>
@@ -436,20 +389,9 @@ export function ModelProviderForm({
                   Enabled
                 </Switch>
               </Field.Root>
-              <Field.Root>
-                <Checkbox
-                  // eslint-disable-next-line @typescript-eslint/no-misused-promises
-                  onChange={onUseCustomKeysChange}
-                  checked={isUseCustomKeys}
-                  flexShrink={0}
-                  whiteSpace="nowrap"
-                >
-                  Set your API keys
-                </Checkbox>
-              </Field.Root>
             </HStack>
 
-            {useCustomKeys && (
+            {isEnabled && (
               <>
                 {ManagedModelProvider ? (
                   <ManagedModelProvider provider={provider} form={form} />

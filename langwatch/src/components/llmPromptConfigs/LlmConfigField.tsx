@@ -1,5 +1,5 @@
 import { useDisclosure } from "@chakra-ui/react";
-import { HStack, Button, Spacer, Box } from "@chakra-ui/react";
+import { HStack, Button, Spacer, Box, Text } from "@chakra-ui/react";
 import { X } from "react-feather";
 
 import type { ModelOption } from "~/server/topicClustering/types";
@@ -31,6 +31,9 @@ export function LLMConfigField({
   const { open, onClose, onToggle } = useDisclosure();
   const { model } = llmConfig;
 
+  // Check if the model is disabled (has line-through styling)
+  const isModelDisabled = modelOption?.isDisabled ?? false;
+
   return (
     <>
       <LLMConfigModal
@@ -45,6 +48,7 @@ export function LLMConfigField({
         width="full"
         align="center"
         opacity={modelOption?.isDisabled ? 0.5 : 1}
+        marginBottom={1}
       >
         <LLMModelDisplay model={model} />
         {allowDefault && llmConfig != undefined ? (
@@ -65,11 +69,15 @@ export function LLMConfigField({
         <Spacer />
         <Button size="sm" variant="ghost" onClick={onToggle}>
           <Box minWidth="16px">
-            <Sliders2 size={16} />
+            <HStack gap={2} align="center">
+              <Sliders2 size={16} />
+
+              <Text>Switch Model</Text>
+            </HStack>
           </Box>
         </Button>
       </HStack>
-      {requiresCustomKey && (
+      {(requiresCustomKey || isModelDisabled) && (
         <AddModelProviderKey
           runWhat="run this component"
           nodeProvidersWithoutCustomKeys={[model.split("/")[0] ?? "unknown"]}
