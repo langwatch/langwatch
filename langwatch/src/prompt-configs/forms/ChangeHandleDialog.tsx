@@ -8,100 +8,40 @@ import {
   VStack,
   Text,
   HStack,
-  Portal,
 } from "@chakra-ui/react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { PromptScope } from "@prisma/client";
 import { useCallback, useEffect } from "react";
 import { Controller, useForm } from "react-hook-form";
-import { z } from "zod";
+import { LuBuilding, LuLock } from "react-icons/lu";
+
+import { Select } from "../../components/ui/select";
+import { usePromptHandleCheck } from "../../hooks/prompts/usePromptHandleCheck";
+
+import { createChangeHandleFormSchema, type ChangeHandleFormValues } from "./schemas/change-handle-form.schema";
 
 import { Dialog } from "~/components/ui/dialog";
-import { usePromptHandleCheck } from "../../hooks/prompts/usePromptHandleCheck";
-import { isValidHandle } from "../../server/prompt-config/repositories/llm-config-version-schema";
-import type { LlmConfigWithLatestVersion } from "../../server/prompt-config/repositories";
-import { LuBuilding, LuLock } from "react-icons/lu";
-import { Select } from "../../components/ui/select";
-
-const changeHandleFormSchema = z.object({
-  handle: z
-    .string()
-    .nonempty()
-    .refine(
-      (value) => {
-        if (!value || value.trim() === "") return true;
-        return isValidHandle(value);
-      },
-      {
-        message:
-          "Handle should be in the 'identifier' or 'namespace/identifier' format. Only lowercase letters, numbers, hyphens, underscores and up to one slash are allowed.",
-      }
-    ),
-  scope: z.nativeEnum(PromptScope).default("PROJECT"),
-});
-
-/**
- * Creates a prompt config schema with the handle field
- * that is validated against the server side uniqueness check.
- *
- * @param params - The parameters for the schema creation.
- * @returns The prompt config schema.
- */
-export const createPromptConfigSchemaWithValidators = (params: {
-  configId: string;
-  checkHandleUniqueness: (params: {
-    handle: string;
-    scope: PromptScope;
-    excludeId?: string;
-  }) => Promise<boolean>;
-}) => {
-  const { configId, checkHandleUniqueness } = params;
-
-  return changeHandleFormSchema.superRefine(async (data, ctx) => {
-    if (!data.handle || data.handle.trim() === "") return;
-    if (!isValidHandle(data.handle)) return;
-
-    const isUnique = await checkHandleUniqueness({
-      handle: data.handle,
-      scope: data.scope,
-      excludeId: configId,
-    });
-
-    if (!isUnique) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: `⚠ Prompt "${String(
-          data.handle
-        )}" already exists on the ${data.scope.toLowerCase()}.`,
-        path: ["handle"],
-      });
-    }
-  });
-};
-
-export type ChangeHandleDialogFormValues = {
-  handle: string;
-  scope: PromptScope;
-  commitMessage: string;
-  saveNewVersion: boolean;
-};
 
 export interface ChangeHandleDialogProps {
-  config: LlmConfigWithLatestVersion;
+  currentHandle?: string | null;
+  currentScope?: PromptScope;
   isOpen: boolean;
   onClose: () => void;
-  onSubmit: (data: ChangeHandleDialogFormValues) => Promise<void>;
-  firstTimeSave: boolean;
+  onSubmit: (data: ChangeHandleFormValues) => Promise<void>;
 }
 
 export function ChangeHandleDialog({
-  config,
+  currentHandle,
+  currentScope,
   isOpen,
   onClose,
   onSubmit,
-  firstTimeSave,
 }: ChangeHandleDialogProps) {
   const { checkHandleUniqueness } = usePromptHandleCheck();
+
+  // Determine the current values - use config if available, otherwise use direct props
+  const handle = currentHandle ?? "";
+  const scope = currentScope ?? PromptScope.PROJECT;
 
   const {
     register,
@@ -109,37 +49,38 @@ export function ChangeHandleDialog({
     formState: { errors, isSubmitting, isDirty },
     reset,
     control,
-  } = useForm<z.infer<typeof changeHandleFormSchema>>({
+  } = useForm<ChangeHandleFormValues>({
     defaultValues: {
-      handle: firstTimeSave ? "" : config.handle ?? "",
-      scope: config.scope ?? "PROJECT",
+      handle,
+      scope: scope,
     },
     resolver: zodResolver(
-      createPromptConfigSchemaWithValidators({
-        configId: config.id,
-        checkHandleUniqueness,
-      })
+      createChangeHandleFormSchema({ checkHandleUniqueness })
     ),
   });
 
+  /**
+   * Reset the form values when the component mounts.
+   */
   useEffect(() => {
     reset({
-      handle: firstTimeSave ? "" : config.handle ?? "",
-      scope: config.scope ?? "PROJECT",
+      handle,
+      scope: scope,
     });
-  }, [config, firstTimeSave, reset]);
+  }, [handle, scope, reset]);
 
+  /**
+   * Submit the form values when the form is submitted.
+   */
   const submitCallback = useCallback(
-    async (data: z.infer<typeof changeHandleFormSchema>) => {
+    async (data: ChangeHandleFormValues) => {
       await onSubmit({
         handle: data.handle,
         scope: data.scope,
-        commitMessage: `Created prompt ${data.handle}`,
-        saveNewVersion: firstTimeSave,
       });
       reset();
     },
-    [onSubmit, reset, firstTimeSave]
+    [onSubmit, reset]
   );
 
   const handleHandler = register("handle", {
@@ -152,8 +93,8 @@ export function ChangeHandleDialog({
     icon: React.ReactNode;
   }>({
     items: [
-      { label: "Project", value: "PROJECT", icon: <LuLock /> },
-      { label: "Organization", value: "ORGANIZATION", icon: <LuBuilding /> },
+      { label: "Project", value: PromptScope.PROJECT, icon: <LuLock /> },
+      { label: "Organization", value: PromptScope.ORGANIZATION, icon: <LuBuilding /> },
     ],
   });
 
@@ -162,7 +103,7 @@ export function ChangeHandleDialog({
 
     return (
       <Button px="2" variant="outline" size="sm" {...select.getTriggerProps()}>
-        {select.selectedItems[0]?.value === "PROJECT" ? (
+        {select.selectedItems[0]?.value === PromptScope.PROJECT ? (
           <LuLock />
         ) : (
           <LuBuilding />
@@ -193,13 +134,13 @@ export function ChangeHandleDialog({
         >
           <Dialog.Header>
             <Dialog.Title>
-              {firstTimeSave ? "Save Prompt" : "Change Prompt ID"}
+              {currentHandle ? "Save Prompt" : "Change Prompt ID"}
             </Dialog.Title>
           </Dialog.Header>
           <Dialog.CloseTrigger />
           <Dialog.Body>
             <VStack width="full" gap={4}>
-              {!firstTimeSave && (
+              {currentHandle && (
                 <Text
                   color="red.500"
                   fontSize="12px"
@@ -209,7 +150,7 @@ export function ChangeHandleDialog({
                   ⚠ Warning: Changing the prompt identifier or scope may break
                   any existing integrations, API calls, or workflows that use
                   &quot;
-                  {config.handle}
+                  {currentHandle}
                   &quot;. Make sure to update all references in your codebase
                   and documentation.
                 </Text>
@@ -264,7 +205,7 @@ export function ChangeHandleDialog({
                     {scopesCollection.items.map((scope) => (
                       <Select.Item item={scope} key={scope.value}>
                         <HStack gap={2}>
-                          {scope.value === "PROJECT" ? (
+                          {scope.value === PromptScope.PROJECT ? (
                             <LuLock />
                           ) : (
                             <LuBuilding />

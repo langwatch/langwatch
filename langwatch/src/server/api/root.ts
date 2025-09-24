@@ -22,18 +22,20 @@ import { optimizationRouter } from "./routers/optimization";
 import { organizationRouter } from "./routers/organization";
 import { planRouter } from "./routers/plan";
 import { projectRouter } from "./routers/project";
+import { promptsRouter } from "./routers/prompts";
+import { llmConfigsRouter } from "./routers/prompts/llm-prompt-configs/llmConfigs";
+import { publicEnvRouter } from "./routers/publicEnv";
+import { scenarioRouter } from "./routers/scenario";
+import { shareRouter } from "./routers/share";
 import { spansRouter } from "./routers/spans";
 import { teamRouter } from "./routers/team";
-import { tracesRouter } from "./routers/traces";
 import { topicsRouter } from "./routers/topics";
+import { tracesRouter } from "./routers/traces";
 import { translateRouter } from "./routers/translate";
 import { triggerRouter } from "./routers/triggers";
 import { userRouter } from "./routers/user";
-import { publicEnvRouter } from "./routers/publicEnv";
-import { shareRouter } from "./routers/share";
 import { workflowRouter } from "./routers/workflows";
-import { llmConfigsRouter } from "./routers/prompts/llm-prompt-configs/llmConfigs";
-import { scenarioRouter } from "./routers/scenario";
+
 /**
  * This is the primary router for your server.
  *
@@ -72,6 +74,7 @@ export const appRouter = createTRPCRouter({
   onboarding: onboardingRouter,
   llmConfigs: llmConfigsRouter,
   scenarios: scenarioRouter,
+  prompts: promptsRouter,
   ...(dependencies.extraTRPCRoutes?.() ?? {}),
 });
 
