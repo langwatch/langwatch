@@ -203,7 +203,6 @@ export default function OrganizationOnboarding() {
       },
       {
         onSuccess: (response) => {
-          console.log("response", response);
           trackEventOnce("organization_initialized", {
             category: "onboarding",
             label: "organization_onboarding_completed",
@@ -341,7 +340,6 @@ export default function OrganizationOnboarding() {
     { enabled: !!projectId }
   );
   const updateMutation = api.modelProvider.update.useMutation();
-  console.log("asdasd", projectId);
   return (
     <SetupLayout>
       <VStack gap={4} alignItems="left">
