@@ -3,10 +3,10 @@ import { z } from "zod";
 
 import { getLatestConfigVersionSchema } from "~/server/prompt-config/repositories/llm-config-version-schema";
 
-import { LlmConfigRepository } from "../../../prompt-config/repositories/llm-config.repository";
-import { TeamRoleGroup } from "../../permission";
-import { checkUserPermissionForProject } from "../../permission";
-import { createTRPCRouter, protectedProcedure } from "../../trpc";
+import { LlmConfigRepository } from "../../../../prompt-config/repositories/llm-config.repository";
+import { TeamRoleGroup } from "../../../permission";
+import { checkUserPermissionForProject } from "../../../permission";
+import { createTRPCRouter, protectedProcedure } from "../../../trpc";
 
 import { getOrganizationIdForProject } from "./llmConfigs";
 

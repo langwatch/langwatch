@@ -378,7 +378,6 @@ export class PromptService {
    * @param params - The parameters object
    * @param params.idOrHandle - The ID or handle of the prompt (if updating)
    * @param params.projectId - The project ID for authorization and context
-   * @param params.organizationId - The organization ID for authorization and context
    * @param params.handle - The handle for the prompt (required for create, optional for update)
    * @param params.scope - The scope of the prompt (defaults to "PROJECT")
    * @param params.authorId - Optional author ID for the version
@@ -389,7 +388,6 @@ export class PromptService {
   async upsertPrompt(params: {
     idOrHandle?: string;
     projectId: string;
-    organizationId: string;
     handle: string;
     scope?: PromptScope;
     authorId?: string;
@@ -405,7 +403,10 @@ export class PromptService {
       prompting_technique?: z.infer<typeof promptingTechniqueSchema>;
     };
   }): Promise<VersionedPrompt> {
-    const { idOrHandle, projectId, organizationId, handle, scope, authorId, commitMessage, versionData } = params;
+    const { idOrHandle, projectId, handle, scope, authorId, commitMessage, versionData } = params;
+
+    // Get organization ID from project ID
+    const organizationId = await this.getOrganizationIdFromProjectId(projectId);
 
     // Check if prompt exists
     const existingPrompt = idOrHandle ? await this.getPromptByIdOrHandle({
