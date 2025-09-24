@@ -1,6 +1,5 @@
 import { HStack, Spacer, Text } from "@chakra-ui/react";
 import type { Node } from "@xyflow/react";
-import { nanoid } from "nanoid";
 import { useMemo } from "react";
 import { useFormContext } from "react-hook-form";
 
@@ -26,7 +25,6 @@ import {
 } from "~/prompt-configs/llmPromptConfigUtils";
 import { api } from "~/utils/api";
 import { createLogger } from "~/utils/logger";
-import { snakeCase } from "~/utils/stringCasing";
 
 const logger = createLogger(
   "langwatch:optimization_studio:prompt_source_header"
@@ -72,40 +70,41 @@ export function PromptSourceHeader({
 
   // TODO: Move this outside of the component
   const handleSaveVersion = async () => {
-    // If no saved config, we will need to create a new one
-    if (!savedConfig) {
-      // Handles are now required, so this is a fallback for having to "pre-create" a config
-      const handle = snakeCase(node.data.name ?? `prompt-${nanoid(5)}`);
-      // Reset the node name
-      node.data.name = handle;
+    console.log("HANDLE SAVE VERSION", savedConfig);
+    // // If no saved config, we will need to create a new one
+    // if (!savedConfig) {
+    //   // Handles are now required, so this is a fallback for having to "pre-create" a config
+    //   const handle = snakeCase(node.data.name ?? `prompt-${nanoid(5)}`);
+    //   // Reset the node name
+    //   node.data.name = handle;
 
-      try {
-        const newConfig = await createConfig({
-          projectId,
-          handle,
-        });
+    //   try {
+    //     const newConfig = await createConfig({
+    //       projectId,
+    //       handle,
+    //     });
 
-        // Update the node data with the new config ID
-        setNode({
-          ...node,
-          data: {
-            ...node.data,
-            configId: newConfig.id,
-          },
-        });
+    //     // Update the node data with the new config ID
+    //     setNode({
+    //       ...node,
+    //       data: {
+    //         ...node.data,
+    //         configId: newConfig.id,
+    //       },
+    //     });
 
-        // Trigger the save version mutation for the new config
-        triggerSaveVersion(newConfig, values);
-      } catch (error) {
-        console.error(error);
-        toaster.error({
-          title: "Failed to save prompt version",
-          description: "Please try again.",
-        });
-      }
-    } else {
-      triggerSaveVersion(savedConfig, values);
-    }
+    //     // Trigger the save version mutation for the new config
+    //     triggerSaveVersion(newConfig, values);
+    //   } catch (error) {
+    //     console.error(error);
+    //     toaster.error({
+    //       title: "Failed to save prompt version",
+    //       description: "Please try again.",
+    //     });
+    //   }
+    // } else {
+    triggerSaveVersion(savedConfig, values);
+    // }
   };
 
   // TODO: Move this outside of the component
