@@ -4,18 +4,20 @@ import { motion } from "framer-motion";
 import { useEffect, useRef } from "react";
 import { useWindowSize } from "usehooks-ts";
 import { useShallow } from "zustand/react/shallow";
+
 import { useWorkflowStore } from "../../hooks/useWorkflowStore";
-import type { Component, ComponentType, Signature } from "../../types/dsl";
+import type { Component, ComponentType } from "../../types/dsl";
 import { InputPanel } from "../component_execution/InputPanel";
 import { OutputPanel } from "../component_execution/OutputPanel";
+
 import { BasePropertiesPanel } from "./BasePropertiesPanel";
-import { EndPropertiesPanel } from "./EndPropertiesPanel";
 import { CustomPropertiesPanel } from "./CustomPropertiesPanel";
+import { EndPropertiesPanel } from "./EndPropertiesPanel";
 import { EntryPointPropertiesPanel } from "./EntryPointPropertiesPanel";
 import { EvaluatorPropertiesPanel } from "./EvaluatorPropertiesPanel";
+import { SignaturePropertiesPanel } from "./llm-configs/signature-properties-panel/SignaturePropertiesPanel";
 import { PromptingTechniquePropertiesPanel } from "./PromptingTechniquePropertiesPanel";
 import { RetrievePropertiesPanel } from "./RetrievePropertiesPanel";
-import { SignaturePropertiesPanel } from "./llm-configs/SignaturePropertiesPanel";
 import { WorkflowPropertiesPanel } from "./WorkflowPropertiesPanel";
 
 export function PropertiesPanel() {
