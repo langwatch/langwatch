@@ -358,6 +358,7 @@ export class LlmConfigRepository {
    * because it ensures that the config and version are created in the same
    * transaction, which is important for maintaining data integrity,
    * and because all configs should have an initial version.
+   * @deprecated This is a bad pattern. We should only create drafts via the UI/API/Clients.
    */
   async createConfigWithInitialVersion(params: {
     configData: CreateLlmConfigParams;
