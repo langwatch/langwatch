@@ -263,7 +263,7 @@ export default function OrganizationOnboarding() {
   const myselfSelected =
     watch("usage") === "For myself" && Boolean(watch("usage"));
 
-  const steps = isSaaS && !myselfSelected ? 3 : 1;
+  const steps = isSaaS && !myselfSelected ? 4 : 1;
 
   const checkFirstStep = async () => {
     const organizationName = getValues("organizationName");
