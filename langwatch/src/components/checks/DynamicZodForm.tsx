@@ -27,13 +27,58 @@ import type {
 import { getEvaluatorDefinitions } from "../../server/evaluations/getEvaluator";
 import { camelCaseToTitleCase, titleCase } from "../../utils/stringCasing";
 import { HorizontalFormControl } from "../HorizontalFormControl";
-import { allModelOptions, ModelSelector } from "../ModelSelector";
+import {
+  allModelOptions,
+  ModelSelector,
+  useModelSelectionOptions,
+} from "../ModelSelector";
 import { SmallLabel } from "../SmallLabel";
 import { Tooltip } from "../ui/tooltip";
 import { Switch } from "../ui/switch";
 import type { CheckConfigFormData } from "./CheckConfigForm";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { DEFAULT_EMBEDDINGS_MODEL, DEFAULT_MODEL } from "../../utils/constants";
+import { AddModelProviderKey } from "../../optimization_studio/components/AddModelProviderKey";
+
+// Simple component to handle model disabled check
+const ModelSelectorWithWarning = ({
+  selectorOptions,
+  field,
+  fieldName,
+  variant,
+}: {
+  selectorOptions: string[];
+  field: any;
+  fieldName: string;
+  variant: string;
+}) => {
+  const { modelOption } = useModelSelectionOptions(
+    selectorOptions,
+    field.value,
+    fieldName === "model" ? "chat" : "embedding"
+  );
+  const isModelDisabled = modelOption?.isDisabled ?? false;
+
+  return (
+    <VStack align="start" width="full">
+      <ModelSelector
+        options={selectorOptions}
+        model={field.value}
+        onChange={(model) => field.onChange(model)}
+        mode={fieldName === "model" ? "chat" : "embedding"}
+        size={variant === "studio" ? "sm" : "md"}
+      />
+      {isModelDisabled && (
+        <AddModelProviderKey
+          runWhat="run this evaluation"
+          nodeProvidersWithoutCustomKeys={[
+            field.value.split("/")[0] ?? "unknown",
+          ]}
+        />
+      )}
+    </VStack>
+  );
+};
 
 // Separate component for array fields to handle useFieldArray hook
 const ArrayField = <T extends EvaluatorTypes>({
@@ -157,7 +202,7 @@ const DynamicZodForm = ({
   onlyFields?: string[];
   skipFields?: string[];
 }) => {
-  const { control, register } = useFormContext();
+  const { control, register, watch } = useFormContext();
   const { project } = useOrganizationTeamProject();
 
   const renderField = <T extends EvaluatorTypes>(
@@ -255,17 +300,16 @@ const DynamicZodForm = ({
           <Controller
             name={fullPath}
             control={control}
-            render={({ field }) => (
-              <>
-                <ModelSelector
-                  options={selectorOptions}
-                  model={field.value}
-                  onChange={(model) => field.onChange(model)}
-                  mode={fieldName === "model" ? "chat" : "embedding"}
-                  size={variant === "studio" ? "sm" : "md"}
+            render={({ field }) => {
+              return (
+                <ModelSelectorWithWarning
+                  selectorOptions={selectorOptions}
+                  field={field}
+                  fieldName={fieldName}
+                  variant={variant}
                 />
-              </>
-            )}
+              );
+            }}
           />
         );
       }
