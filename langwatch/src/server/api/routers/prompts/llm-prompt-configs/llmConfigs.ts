@@ -4,11 +4,11 @@ import { z } from "zod";
 
 import { PromptService } from "~/server/prompt-config";
 
-import { prisma } from "../../../db";
-import { LlmConfigRepository } from "../../../prompt-config/repositories/llm-config.repository";
-import { TeamRoleGroup } from "../../permission";
-import { checkUserPermissionForProject } from "../../permission";
-import { createTRPCRouter, protectedProcedure } from "../../trpc";
+import { prisma } from "../../../../db";
+import { LlmConfigRepository } from "../../../../prompt-config/repositories/llm-config.repository";
+import { TeamRoleGroup } from "../../../permission";
+import { checkUserPermissionForProject } from "../../../permission";
+import { createTRPCRouter, protectedProcedure } from "../../../trpc";
 
 import { llmConfigVersionsRouter } from "./llmPromptConfigVersions";
 
