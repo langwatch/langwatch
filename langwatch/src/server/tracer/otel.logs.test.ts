@@ -235,6 +235,432 @@ const emptyLogsRequest: DeepPartial<IExportLogsServiceRequest> = {
   resourceLogs: [],
 };
 
+const claudeCodeLogsRequest: DeepPartial<IExportLogsServiceRequest> = {
+  resourceLogs: [
+    {
+      resource: {
+        attributes: [
+          {
+            key: "host.arch",
+            value: {
+              stringValue: "arm64",
+            },
+          },
+          {
+            key: "os.type",
+            value: {
+              stringValue: "darwin",
+            },
+          },
+          {
+            key: "os.version",
+            value: {
+              stringValue: "25.0.0",
+            },
+          },
+          {
+            key: "service.name",
+            value: {
+              stringValue: "claude-code",
+            },
+          },
+          {
+            key: "service.version",
+            value: {
+              stringValue: "1.0.123",
+            },
+          },
+        ],
+        droppedAttributesCount: 0,
+      },
+      scopeLogs: [
+        {
+          scope: {
+            name: "com.anthropic.claude_code.events",
+            version: "1.0.123",
+          },
+          logRecords: [
+            {
+              timeUnixNano: "1758733528124000000",
+              observedTimeUnixNano: "1758733528124000000",
+              body: {
+                stringValue: "claude_code.user_prompt",
+              },
+              attributes: [
+                {
+                  key: "user.id",
+                  value: {
+                    stringValue:
+                      "75104894e1c1be882bc30ece7070666d230f0ddb29725a612476947e4830c6b6",
+                  },
+                },
+                {
+                  key: "session.id",
+                  value: {
+                    stringValue: "fc91cef4-6d21-4829-adf5-9c1b955d06ff",
+                  },
+                },
+                {
+                  key: "organization.id",
+                  value: {
+                    stringValue: "6e82f9eb-36fc-4f74-a5ed-0a2e09f132ad",
+                  },
+                },
+                {
+                  key: "user.email",
+                  value: {
+                    stringValue: "rogerio@langwatch.ai",
+                  },
+                },
+                {
+                  key: "user.account_uuid",
+                  value: {
+                    stringValue: "c5742110-e420-4f5e-900a-9a11e0f738a1",
+                  },
+                },
+                {
+                  key: "terminal.type",
+                  value: {
+                    stringValue: "WarpTerminal",
+                  },
+                },
+                {
+                  key: "event.name",
+                  value: {
+                    stringValue: "user_prompt",
+                  },
+                },
+                {
+                  key: "event.timestamp",
+                  value: {
+                    stringValue: "2025-09-24T17:05:28.124Z",
+                  },
+                },
+                {
+                  key: "prompt_length",
+                  value: {
+                    stringValue: "4",
+                  },
+                },
+                {
+                  key: "prompt",
+                  value: {
+                    stringValue: "hiii",
+                  },
+                },
+              ],
+              droppedAttributesCount: 0,
+            },
+            {
+              timeUnixNano: "1758733529180000000",
+              observedTimeUnixNano: "1758733529180000000",
+              body: {
+                stringValue: "claude_code.api_request",
+              },
+              attributes: [
+                {
+                  key: "user.id",
+                  value: {
+                    stringValue:
+                      "75104894e1c1be882bc30ece7070666d230f0ddb29725a612476947e4830c6b6",
+                  },
+                },
+                {
+                  key: "session.id",
+                  value: {
+                    stringValue: "fc91cef4-6d21-4829-adf5-9c1b955d06ff",
+                  },
+                },
+                {
+                  key: "organization.id",
+                  value: {
+                    stringValue: "6e82f9eb-36fc-4f74-a5ed-0a2e09f132ad",
+                  },
+                },
+                {
+                  key: "user.email",
+                  value: {
+                    stringValue: "rogerio@langwatch.ai",
+                  },
+                },
+                {
+                  key: "user.account_uuid",
+                  value: {
+                    stringValue: "c5742110-e420-4f5e-900a-9a11e0f738a1",
+                  },
+                },
+                {
+                  key: "terminal.type",
+                  value: {
+                    stringValue: "WarpTerminal",
+                  },
+                },
+                {
+                  key: "event.name",
+                  value: {
+                    stringValue: "api_request",
+                  },
+                },
+                {
+                  key: "event.timestamp",
+                  value: {
+                    stringValue: "2025-09-24T17:05:29.180Z",
+                  },
+                },
+                {
+                  key: "model",
+                  value: {
+                    stringValue: "claude-3-5-haiku-20241022",
+                  },
+                },
+                {
+                  key: "input_tokens",
+                  value: {
+                    stringValue: "87",
+                  },
+                },
+                {
+                  key: "output_tokens",
+                  value: {
+                    stringValue: "26",
+                  },
+                },
+                {
+                  key: "cache_read_tokens",
+                  value: {
+                    stringValue: "0",
+                  },
+                },
+                {
+                  key: "cache_creation_tokens",
+                  value: {
+                    stringValue: "0",
+                  },
+                },
+                {
+                  key: "cost_usd",
+                  value: {
+                    stringValue: "0.0001736",
+                  },
+                },
+                {
+                  key: "duration_ms",
+                  value: {
+                    stringValue: "1033",
+                  },
+                },
+              ],
+              droppedAttributesCount: 0,
+            },
+            {
+              timeUnixNano: "1758733529251000000",
+              observedTimeUnixNano: "1758733529251000000",
+              body: {
+                stringValue: "claude_code.api_request",
+              },
+              attributes: [
+                {
+                  key: "user.id",
+                  value: {
+                    stringValue:
+                      "75104894e1c1be882bc30ece7070666d230f0ddb29725a612476947e4830c6b6",
+                  },
+                },
+                {
+                  key: "session.id",
+                  value: {
+                    stringValue: "fc91cef4-6d21-4829-adf5-9c1b955d06ff",
+                  },
+                },
+                {
+                  key: "organization.id",
+                  value: {
+                    stringValue: "6e82f9eb-36fc-4f74-a5ed-0a2e09f132ad",
+                  },
+                },
+                {
+                  key: "user.email",
+                  value: {
+                    stringValue: "rogerio@langwatch.ai",
+                  },
+                },
+                {
+                  key: "user.account_uuid",
+                  value: {
+                    stringValue: "c5742110-e420-4f5e-900a-9a11e0f738a1",
+                  },
+                },
+                {
+                  key: "terminal.type",
+                  value: {
+                    stringValue: "WarpTerminal",
+                  },
+                },
+                {
+                  key: "event.name",
+                  value: {
+                    stringValue: "api_request",
+                  },
+                },
+                {
+                  key: "event.timestamp",
+                  value: {
+                    stringValue: "2025-09-24T17:05:29.251Z",
+                  },
+                },
+                {
+                  key: "model",
+                  value: {
+                    stringValue: "claude-3-5-haiku-20241022",
+                  },
+                },
+                {
+                  key: "input_tokens",
+                  value: {
+                    stringValue: "109",
+                  },
+                },
+                {
+                  key: "output_tokens",
+                  value: {
+                    stringValue: "44",
+                  },
+                },
+                {
+                  key: "cache_read_tokens",
+                  value: {
+                    stringValue: "0",
+                  },
+                },
+                {
+                  key: "cache_creation_tokens",
+                  value: {
+                    stringValue: "0",
+                  },
+                },
+                {
+                  key: "cost_usd",
+                  value: {
+                    stringValue: "0.0002632",
+                  },
+                },
+                {
+                  key: "duration_ms",
+                  value: {
+                    stringValue: "1651",
+                  },
+                },
+              ],
+              droppedAttributesCount: 0,
+            },
+            {
+              timeUnixNano: "1758733531844000000",
+              observedTimeUnixNano: "1758733531844000000",
+              body: {
+                stringValue: "claude_code.api_request",
+              },
+              attributes: [
+                {
+                  key: "user.id",
+                  value: {
+                    stringValue:
+                      "75104894e1c1be882bc30ece7070666d230f0ddb29725a612476947e4830c6b6",
+                  },
+                },
+                {
+                  key: "session.id",
+                  value: {
+                    stringValue: "fc91cef4-6d21-4829-adf5-9c1b955d06ff",
+                  },
+                },
+                {
+                  key: "organization.id",
+                  value: {
+                    stringValue: "6e82f9eb-36fc-4f74-a5ed-0a2e09f132ad",
+                  },
+                },
+                {
+                  key: "user.email",
+                  value: {
+                    stringValue: "rogerio@langwatch.ai",
+                  },
+                },
+                {
+                  key: "user.account_uuid",
+                  value: {
+                    stringValue: "c5742110-e420-4f5e-900a-9a11e0f738a1",
+                  },
+                },
+                {
+                  key: "terminal.type",
+                  value: {
+                    stringValue: "WarpTerminal",
+                  },
+                },
+                {
+                  key: "event.name",
+                  value: {
+                    stringValue: "api_request",
+                  },
+                },
+                {
+                  key: "event.timestamp",
+                  value: {
+                    stringValue: "2025-09-24T17:05:31.844Z",
+                  },
+                },
+                {
+                  key: "model",
+                  value: {
+                    stringValue: "claude-sonnet-4-20250514",
+                  },
+                },
+                {
+                  key: "input_tokens",
+                  value: {
+                    stringValue: "3",
+                  },
+                },
+                {
+                  key: "output_tokens",
+                  value: {
+                    stringValue: "15",
+                  },
+                },
+                {
+                  key: "cache_read_tokens",
+                  value: {
+                    stringValue: "4804",
+                  },
+                },
+                {
+                  key: "cache_creation_tokens",
+                  value: {
+                    stringValue: "10301",
+                  },
+                },
+                {
+                  key: "cost_usd",
+                  value: {
+                    stringValue: "0.04030395",
+                  },
+                },
+                {
+                  key: "duration_ms",
+                  value: {
+                    stringValue: "3547",
+                  },
+                },
+              ],
+              droppedAttributesCount: 0,
+            },
+          ],
+        },
+      ],
+    },
+  ],
+};
+
 describe("opentelemetry logs receiver", () => {
   it("receives a complete Spring AI chat interaction (prompt + completion)", async () => {
     const traces = await openTelemetryLogsRequestToTracesForCollection(
@@ -379,9 +805,8 @@ describe("opentelemetry logs receiver", () => {
   });
 
   it("receives multiple spans in the same trace", async () => {
-    const traces = await openTelemetryLogsRequestToTracesForCollection(
-      multipleSpansRequest
-    );
+    const traces =
+      await openTelemetryLogsRequestToTracesForCollection(multipleSpansRequest);
 
     expect(traces).toHaveLength(1);
 
@@ -402,35 +827,35 @@ describe("opentelemetry logs receiver", () => {
     expect(trace.spans).toHaveLength(2);
 
     // Check first span
-    const span1 = trace.spans.find(
-      (s) => s.span_id === "span1111111111111111"
-    );
+    const span1 = trace.spans.find((s) => s.span_id === "span1111111111111111");
     expect(span1).toBeDefined();
     expect(span1?.name).toEqual("Chat Model Prompt Content");
-    expect(span1?.input?.value).toEqual("MULTI_SPAN_CHAT_MODEL_PROMPT_CONTENT_1");
+    expect(span1?.input?.value).toEqual(
+      "MULTI_SPAN_CHAT_MODEL_PROMPT_CONTENT_1"
+    );
     expect(span1?.output?.value).toEqual("MULTI_SPAN_CHAT_MODEL_COMPLETION_1");
     expect(span1?.name).toEqual("Chat Model Prompt Content");
     expect(span1?.input?.type).toEqual("text");
     expect(span1?.output?.type).toEqual("text");
 
     // Check second span
-    const span2 = trace.spans.find(
-      (s) => s.span_id === "span2222222222222222"
-    );
+    const span2 = trace.spans.find((s) => s.span_id === "span2222222222222222");
     expect(span2).toBeDefined();
     expect(span2?.name).toEqual("Chat Model Prompt Content");
-    expect(span2?.input?.value).toEqual("MULTI_SPAN_CHAT_MODEL_PROMPT_CONTENT_2");
+    expect(span2?.input?.value).toEqual(
+      "MULTI_SPAN_CHAT_MODEL_PROMPT_CONTENT_2"
+    );
     expect(span2?.output?.value).toEqual("MULTI_SPAN_CHAT_MODEL_COMPLETION_2");
     expect(span2?.input?.type).toEqual("text");
     expect(span2?.output?.type).toEqual("text");
   });
 
-  it("ignores logs with unsupported scope names", async () => {
+  it("includes logs with unsupported scope names", async () => {
     const traces = await openTelemetryLogsRequestToTracesForCollection(
       unsupportedScopeRequest
     );
 
-    expect(traces).toHaveLength(0);
+    expect(traces).toHaveLength(1);
   });
 
   it("handles empty logs request", async () => {
@@ -469,7 +894,7 @@ IGNORED_CONTENT`,
     const traces =
       await openTelemetryLogsRequestToTracesForCollection(invalidIdsRequest);
 
-    expect(traces).toHaveLength(0);
+    expect(traces).toHaveLength(1);
   });
 
   it("handles logs without body content", async () => {
@@ -496,7 +921,8 @@ IGNORED_CONTENT`,
       ],
     };
 
-    const traces = await openTelemetryLogsRequestToTracesForCollection(noBodyRequest);
+    const traces =
+      await openTelemetryLogsRequestToTracesForCollection(noBodyRequest);
 
     expect(traces).toHaveLength(0);
   });
@@ -531,5 +957,36 @@ IGNORED_CONTENT`,
       await openTelemetryLogsRequestToTracesForCollection(malformedRequest);
 
     expect(traces).toHaveLength(0);
+  });
+
+  it("handles claude code logs, getting the params", async () => {
+    const traces = await openTelemetryLogsRequestToTracesForCollection(
+      claudeCodeLogsRequest
+    );
+
+    expect(traces).toHaveLength(1);
+    expect(traces[0]?.spans).toHaveLength(4);
+    expect(traces[0]?.spans[0]?.params).toEqual({
+      event: {
+        name: "user_prompt",
+        timestamp: "2025-09-24T17:05:28.124Z",
+      },
+      organization: {
+        id: "6e82f9eb-36fc-4f74-a5ed-0a2e09f132ad",
+      },
+      prompt: "hiii",
+      prompt_length: "4",
+      session: {
+        id: "fc91cef4-6d21-4829-adf5-9c1b955d06ff",
+      },
+      terminal: {
+        type: "WarpTerminal",
+      },
+      user: {
+        account_uuid: "c5742110-e420-4f5e-900a-9a11e0f738a1",
+        email: "rogerio@langwatch.ai",
+        id: "75104894e1c1be882bc30ece7070666d230f0ddb29725a612476947e4830c6b6",
+      },
+    });
   });
 });

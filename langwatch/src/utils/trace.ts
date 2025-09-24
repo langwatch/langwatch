@@ -10,3 +10,7 @@ export const getSpanNameOrModel = (span: Span) => {
 export const generateOtelTraceId = (): string => {
   return new RandomIdGenerator().generateTraceId();
 };
+
+export const generateOtelSpanId = (): string => {
+  return new RandomIdGenerator().generateSpanId();
+};

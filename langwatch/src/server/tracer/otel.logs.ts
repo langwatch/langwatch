@@ -2,17 +2,19 @@ import type { DeepPartial } from "~/utils/types";
 import type { SpanInputOutput } from "./types";
 import type { IExportLogsServiceRequest } from "@opentelemetry/otlp-transformer";
 import { createLogger } from "~/utils/logger";
-import type { TraceForCollection } from "./otel.traces";
+import { otelAttributesToNestedAttributes, type TraceForCollection } from "./otel.traces";
 import { getLangWatchTracer } from "langwatch";
 import { SpanKind, SpanStatusCode } from "@opentelemetry/api";
+import { generateOtelSpanId, generateOtelTraceId } from "../../utils/trace";
 
 const logger = createLogger("langwatch.tracer.otel.logs");
 const tracer = getLangWatchTracer("langwatch.tracer.otel.logs");
 
-const supportedScopeNames = [
+const springAIScopeNames = [
   "org.springframework.ai.chat.observation.ChatModelCompletionObservationHandler",
   "org.springframework.ai.chat.observation.ChatModelPromptContentObservationHandler",
 ];
+const claudeCodeScopeNames = ["com.anthropic.claude_code.events"];
 
 export const openTelemetryLogsRequestToTracesForCollection = async (
   otelLogs: DeepPartial<IExportLogsServiceRequest>
@@ -30,6 +32,7 @@ export const openTelemetryLogsRequestToTracesForCollection = async (
         span.setAttribute("resourceLogs.count", otelLogs.resourceLogs.length);
 
         const traceMap: Record<string, TraceForCollection> = {};
+        const generatedTraceId = generateOtelTraceId(); // Use this if no traceId is provided so we can still capture and group the logs together
 
         for (const resourceLog of otelLogs.resourceLogs) {
           if (!resourceLog?.scopeLogs) {
@@ -42,54 +45,72 @@ export const openTelemetryLogsRequestToTracesForCollection = async (
             }
 
             for (const logRecord of scopeLog.logRecords) {
-              if (!logRecord?.traceId || !logRecord.spanId) {
+              if (!logRecord) {
                 continue;
               }
               if (!logRecord.body?.stringValue) {
                 continue;
               }
-              if (!supportedScopeNames.includes(scopeLog.scope?.name ?? "")) {
-                continue;
-              }
 
-              const traceId = decodeOpenTelemetryId(logRecord.traceId);
-              const spanId = decodeOpenTelemetryId(logRecord.spanId);
+              const traceId = logRecord.traceId
+                ? decodeOpenTelemetryId(logRecord.traceId)
+                : generatedTraceId;
+              const spanId = logRecord.spanId
+                ? decodeOpenTelemetryId(logRecord.spanId)
+                : generateOtelSpanId();
               if (!traceId || !spanId) {
                 logger.info("received log with no span or trace id, rejecting");
                 continue;
               }
 
-              const logString = logRecord.body.stringValue;
-              const [identifier, ...contentParts] = logString.split("\n");
-              const content = contentParts.join("\n");
-
-              if (!identifier || !content) {
-                logger.info(
-                  "received log with no identifier or content, rejecting"
-                );
-                continue;
-              }
-
+              let identifier = logRecord.body.stringValue;
               let input: SpanInputOutput | null = null;
               let output: SpanInputOutput | null = null;
 
-              switch (identifier) {
-                case "Chat Model Completion:":
-                  output = {
-                    type: "text",
-                    value: content,
-                  };
-                  break;
+              if (springAIScopeNames.includes(scopeLog.scope?.name ?? "")) {
+                const logString = logRecord.body.stringValue;
+                const [springIdentifier, ...contentParts] =
+                  logString.split("\n");
+                identifier = springIdentifier ?? identifier;
+                const content = contentParts.join("\n");
 
-                case "Chat Model Prompt Content:":
+                if (!identifier || !content) {
+                  logger.info(
+                    "received log with no identifier or content, rejecting"
+                  );
+                  continue;
+                }
+
+                switch (identifier) {
+                  case "Chat Model Completion:":
+                    output = {
+                      type: "text",
+                      value: content,
+                    };
+                    break;
+
+                  case "Chat Model Prompt Content:":
+                    input = {
+                      type: "text",
+                      value: content,
+                    };
+                    break;
+
+                  default:
+                    continue;
+                }
+              }
+
+              if (claudeCodeScopeNames.includes(scopeLog.scope?.name ?? "")) {
+                const promptAttribute = logRecord.attributes?.find(
+                  (attribute) => attribute?.key === "prompt"
+                );
+                if (promptAttribute) {
                   input = {
                     type: "text",
-                    value: content,
+                    value: promptAttribute.value?.stringValue ?? "",
                   };
-                  break;
-
-                default:
-                  continue;
+                }
               }
 
               let trace = traceMap[traceId];
@@ -115,7 +136,7 @@ export const openTelemetryLogsRequestToTracesForCollection = async (
                   type: "llm",
                   input: input,
                   output: output,
-                  params: {},
+                  params: otelAttributesToNestedAttributes(logRecord.attributes ?? []),
                   timestamps: {
                     ignore_timestamps_on_write: true,
                     started_at: convertFromUnixNano(logRecord.timeUnixNano),
