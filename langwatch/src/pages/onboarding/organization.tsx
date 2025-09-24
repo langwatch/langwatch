@@ -332,10 +332,8 @@ export default function OrganizationOnboarding() {
 
   const skipForNow = () => {
     setActiveStep(3);
-    // window.location.href = `/${projectSlug}/messages`;
   };
   const skipForNow2 = () => {
-    //setActiveStep(3);
     window.location.href = `/${projectSlug}/messages`;
   };
 
