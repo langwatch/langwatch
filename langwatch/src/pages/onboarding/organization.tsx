@@ -15,7 +15,7 @@ import {
 } from "@chakra-ui/react";
 import { type OrganizationUserRole } from "@prisma/client";
 import { useRouter } from "next/router";
-import React, { useEffect } from "react";
+import React, { useEffect, useMemo } from "react";
 import { Briefcase, Cloud, Server, User, Users } from "react-feather";
 import {
   Controller,
@@ -160,6 +160,17 @@ export default function OrganizationOnboarding() {
   const [teamOption, setTeamOption] = React.useState<TeamOption | null>(null);
   const [projectSlug, setProjectSlug] = React.useState<string | null>(null);
 
+  // Memoize teamOptions to prevent infinite re-rendering in step 2
+  const teamOptionsForForm = useMemo(() => {
+    if (!teamOption) return [];
+    return [
+      {
+        label: teamOption.name ?? "",
+        value: teamOption.id ?? "",
+      },
+    ];
+  }, [teamOption]);
+
   const onSubmitAddMembers: SubmitHandler<MembersForm> = (data) => {
     createInvitesMutation.mutate(
       {
@@ -238,18 +249,11 @@ export default function OrganizationOnboarding() {
   };
 
   useEffect(() => {
+    // Only redirect if user just landed on the page and hasn't started onboarding
     if (organization && !initializeOrganization.isSuccess) {
       void router.push(`/`);
     }
   }, [organization, router, initializeOrganization.isSuccess]);
-
-  if (
-    !session ||
-    (!initializeOrganization.isSuccess &&
-      (!!organization || organizationIsLoading))
-  ) {
-    return <LoadingScreen />;
-  }
 
   const phoneNumber = register("phoneNumber");
   const selectedValueUsage = watch("usage");
@@ -331,7 +335,10 @@ export default function OrganizationOnboarding() {
   const skipForNow = () => {
     setActiveStep(3);
   };
+
+  const [isRedirecting, setIsRedirecting] = React.useState(false);
   const proceedToMessages = () => {
+    setIsRedirecting(true);
     window.location.href = `/${projectSlug}/messages`;
   };
 
@@ -340,6 +347,21 @@ export default function OrganizationOnboarding() {
     { enabled: !!projectId }
   );
   const updateMutation = api.modelProvider.update.useMutation();
+
+  // Memoize model providers list to prevent re-rendering in step 3
+  const modelProvidersList = useMemo(() => {
+    if (!modelProviders.data) return [];
+    return Object.values(modelProviders.data);
+  }, [modelProviders.data]);
+
+  if (
+    !session ||
+    (!initializeOrganization.isSuccess &&
+      (!!organization || organizationIsLoading))
+  ) {
+    return <LoadingScreen />;
+  }
+
   return (
     <SetupLayout>
       <VStack gap={4} alignItems="left">
@@ -705,10 +727,7 @@ export default function OrganizationOnboarding() {
             </Text>
             {teamOption && (
               <AddMembersForm
-                teamOptions={[teamOption].map((team) => ({
-                  label: team?.name ?? "",
-                  value: team?.id ?? "",
-                }))}
+                teamOptions={teamOptionsForForm}
                 onSubmit={onSubmitAddMembers}
                 isLoading={createInvitesMutation.isPending}
                 hasEmailProvider={Boolean(
@@ -742,27 +761,34 @@ export default function OrganizationOnboarding() {
                     <Skeleton width="full" height="28px" />
                   </Box>
                 ))}
-              {modelProviders.data &&
-                projectId &&
-                Object.values(modelProviders.data).map((provider, index) => (
+              {projectId &&
+                modelProvidersList.map((provider) => (
                   <ModelProviderForm
-                    key={index}
+                    key={provider.id}
                     provider={provider}
                     refetch={modelProviders.refetch}
                     updateMutation={updateMutation}
                     projectId={projectId} // Pass the projectId from state
+                    organizationId={organizationId ?? organization?.id} // Use organizationId from state or existing organization
                   />
                 ))}
             </Box>
             <HStack width="full">
               <Spacer />
-              <Button colorPalette="orange" onClick={proceedToMessages}>
+              <Button
+                colorPalette="orange"
+                onClick={proceedToMessages}
+                disabled={isRedirecting}
+                loading={isRedirecting}
+              >
                 Skip for now
               </Button>
               <Button
                 colorPalette="orange"
                 variant="outline"
                 onClick={proceedToMessages}
+                disabled={isRedirecting}
+                loading={isRedirecting}
               >
                 Proceed
               </Button>

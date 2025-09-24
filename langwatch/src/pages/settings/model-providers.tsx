@@ -16,7 +16,7 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { zodResolver } from "@hookform/resolvers/zod";
-import React, { useCallback } from "react";
+import React, { useCallback, useMemo } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { z } from "zod";
 import { ProjectSelector } from "../../components/DashboardLayout";
@@ -73,7 +73,7 @@ const handleCreateMultipleOptions = (
 };
 
 export default function ModelsPage() {
-  const { project, organizations } = useOrganizationTeamProject();
+  const { project, organization, organizations } = useOrganizationTeamProject();
   const modelProviders = api.modelProvider.getAllForProjectForFrontend.useQuery(
     { projectId: project?.id ?? "" },
     { enabled: !!project }
@@ -132,6 +132,8 @@ export default function ModelsPage() {
                     provider={provider}
                     refetch={modelProviders.refetch}
                     updateMutation={updateMutation}
+                    projectId={project?.id}
+                    organizationId={organization?.id}
                   />
                 ))}
             </VStack>
@@ -177,41 +179,38 @@ export function ModelProviderForm({
   refetch,
   updateMutation,
   projectId: overrideProjectId,
+  organizationId: overrideOrganizationId,
 }: {
   provider: MaybeStoredModelProvider;
   refetch: () => Promise<any>;
   updateMutation: ReturnType<typeof api.modelProvider.update.useMutation>;
   projectId?: string; // Add optional projectId prop
+  organizationId?: string; // Add optional organizationId prop
 }) {
-  const { project, organization } = useOrganizationTeamProject();
-
-  // Use overrideProjectId if provided, otherwise fall back to project?.id
-  const effectiveProjectId = overrideProjectId ?? project?.id ?? "";
-
-  const localUpdateMutation = api.modelProvider.update.useMutation();
+  // Use overrideProjectId directly since it's passed as a prop
+  const effectiveProjectId = overrideProjectId ?? "";
 
   const providerDefinition =
     modelProvidersRegistry[
       provider.provider as keyof typeof modelProvidersRegistry
     ];
 
-  const getStoredModelOptions = (
-    models: string[],
-    provider: string,
-    mode: "chat" | "embedding"
-  ) => {
-    if (!models || models.length === 0) {
-      const options = getProviderModelOptions(provider, mode);
-      return options;
-    }
-    return models.map((model) => ({
-      value: model,
-      label: model,
-    }));
-  };
+  const getStoredModelOptions = useCallback(
+    (models: string[], provider: string, mode: "chat" | "embedding") => {
+      if (!models || models.length === 0) {
+        const options = getProviderModelOptions(provider, mode);
+        return options;
+      }
+      return models.map((model) => ({
+        value: model,
+        label: model,
+      }));
+    },
+    []
+  );
 
-  const form = useForm<ModelProviderForm>({
-    defaultValues: {
+  const defaultValues = useMemo(
+    () => ({
       id: provider.id,
       provider: provider.provider,
       enabled: provider.enabled,
@@ -226,7 +225,12 @@ export function ModelProviderForm({
         provider.provider,
         "embedding"
       ),
-    },
+    }),
+    [provider, getStoredModelOptions]
+  );
+
+  const form = useForm<ModelProviderForm>({
+    defaultValues,
     resolver: (data, ...args) => {
       const data_ = {
         ...data,
@@ -273,12 +277,30 @@ export function ModelProviderForm({
   });
   const { register, handleSubmit, formState, watch, setValue, control } = form;
 
+  // Memoize provider data to avoid dependency changes
+  const providerData = useMemo(
+    () => ({
+      id: provider.id,
+      provider: provider.provider,
+      customKeys: provider.customKeys,
+      models: provider.models,
+      embeddingsModels: provider.embeddingsModels,
+    }),
+    [
+      provider.id,
+      provider.provider,
+      provider.customKeys,
+      provider.models,
+      provider.embeddingsModels,
+    ]
+  );
+
   const onSubmit = useCallback(
     async (data: ModelProviderForm) => {
-      await localUpdateMutation.mutateAsync({
-        id: provider.id,
-        projectId: effectiveProjectId, // Use effectiveProjectId instead of project?.id
-        provider: provider.provider,
+      await updateMutation.mutateAsync({
+        id: providerData.id,
+        projectId: effectiveProjectId,
+        provider: providerData.provider,
         enabled: data.enabled,
         customKeys: data.customKeys,
         customModels: (data.customModels ?? []).map((m) => m.value),
@@ -296,13 +318,7 @@ export function ModelProviderForm({
       });
       await refetch();
     },
-    [
-      localUpdateMutation,
-      provider.id,
-      provider.provider,
-      effectiveProjectId,
-      refetch,
-    ]
+    [updateMutation, providerData, effectiveProjectId, refetch]
   );
 
   const isEnabled = watch("enabled");
@@ -311,29 +327,18 @@ export function ModelProviderForm({
     async (e: React.ChangeEvent<HTMLInputElement>) => {
       setValue("enabled", e.target.checked);
       await updateMutation.mutateAsync({
-        id: provider.id,
-        projectId: effectiveProjectId, // Use effectiveProjectId instead of project?.id
-        provider: provider.provider,
+        id: providerData.id,
+        projectId: effectiveProjectId,
+        provider: providerData.provider,
         enabled: e.target.checked,
-        customKeys: provider.customKeys as any,
-        customModels: provider.models ?? [],
-        customEmbeddingsModels: provider.embeddingsModels ?? [],
+        customKeys: providerData.customKeys as any,
+        customModels: providerData.models ?? [],
+        customEmbeddingsModels: providerData.embeddingsModels ?? [],
       });
 
       await refetch();
     },
-    [
-      updateMutation,
-      provider.id,
-      provider.provider,
-      provider.customKeys,
-      provider.models,
-      provider.embeddingsModels,
-      provider.disabledByDefault,
-      effectiveProjectId, // Use effectiveProjectId instead of project?.id
-      refetch,
-      setValue,
-    ]
+    [updateMutation, providerData, effectiveProjectId, refetch, setValue]
   );
 
   const providerKeys = providerDefinition?.keysSchema
@@ -344,7 +349,7 @@ export function ModelProviderForm({
 
   const ManagedModelProvider = dependencies.managedModelProviderComponent?.({
     projectId: effectiveProjectId,
-    organizationId: organization?.id ?? "",
+    organizationId: overrideOrganizationId ?? "",
     provider,
   });
 
@@ -510,7 +515,7 @@ export function ModelProviderForm({
                     type="submit"
                     size="sm"
                     colorPalette="orange"
-                    loading={localUpdateMutation.isLoading}
+                    loading={updateMutation.isLoading}
                   >
                     Save
                   </Button>
