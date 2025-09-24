@@ -22,7 +22,7 @@ export function useInvokePrompt(
     Error,
     {
       projectId: string;
-      data: Node<LlmPromptConfigComponent>["data"];
+      data: Node<Omit<LlmPromptConfigComponent, "configId" | "name">>["data"];
     }
   >({
     ...options,
@@ -31,7 +31,7 @@ export function useInvokePrompt(
       data,
     }: {
       projectId: string;
-      data: Node<LlmPromptConfigComponent>["data"];
+      data: Node<Omit<LlmPromptConfigComponent, "configId" | "name">>["data"];
     }) => {
       return invokeLLM({ projectId, data });
     },

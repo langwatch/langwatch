@@ -1,14 +1,15 @@
 import type { Node } from "@xyflow/react";
 import { nanoid } from "nanoid";
+
 import { LlmSignatureNodeFactory } from "~/components/evaluations/wizard/hooks/evaluation-wizard-store/slices/factories/llm-signature-node.factory";
 import type {
   LlmPromptConfigComponent,
   Workflow,
   ExecutionState,
 } from "~/optimization_studio/types/dsl";
+import type { StudioServerEvent } from "~/optimization_studio/types/events";
 import { createLogger } from "~/utils/logger";
 import { fetchSSE } from "~/utils/sse/fetchSSE";
-import type { StudioServerEvent } from "~/optimization_studio/types/events";
 
 const logger = createLogger("invokeLLM");
 
@@ -27,7 +28,7 @@ export async function invokeLLM({
   data,
 }: {
   projectId: string;
-  data: Node<LlmPromptConfigComponent>["data"];
+  data: Node<Omit<LlmPromptConfigComponent, "configId" | "name">>["data"];
 }): Promise<PromptExecutionResult> {
   try {
     // Generate unique IDs for tracing and node identification
@@ -123,7 +124,7 @@ export async function invokeLLM({
 function createWorkflow(
   workflowId: string,
   nodeId: string,
-  data: Node<LlmPromptConfigComponent>["data"]
+  data: Node<Omit<LlmPromptConfigComponent, "configId" | "name">>["data"]
 ): Workflow {
   return {
     spec_version: "1.4",
@@ -155,7 +156,7 @@ function createWorkflow(
  * Extracts input values from the prompt configuration data
  */
 function extractInputs(
-  data: Node<LlmPromptConfigComponent>["data"]
+  data: Node<Pick<LlmPromptConfigComponent, "inputs">>["data"]
 ): Record<string, string> {
   return (
     data.inputs?.reduce(

@@ -89,38 +89,31 @@ export function SignaturePropertiesPanelInner({
 
   const { isInsideWizard } = useWizardContext();
 
-  const { data: llmConfig } = api.llmConfigs.getByIdWithLatestVersion.useQuery(
-    {
-      id: configId,
-      projectId: project?.id ?? "",
-    },
-    { enabled: !!project?.id && !!configId }
-  );
-
   /**
    * Converts form values to node data and updates the workflow store.
    * This ensures the node's data stays in sync with the form state.
+   * 
+   * We use useMemo to create the debounced function to prevent unnecessary re-renders.
    *
    * @param formValues - The current form values to sync with node data
    */
   const syncNodeDataWithFormValues = useMemo(
     () =>
       debounce((formValues: PromptConfigFormValues) => {
-        if (!llmConfig) {
-          return;
-        }
-
-        const newNodeData = promptConfigFormValuesToOptimizationStudioNodeData(
-          llmConfig,
+        const updatedNodeData = promptConfigFormValuesToOptimizationStudioNodeData(
           formValues
         );
 
         setNode({
           id: node.id,
-          data: newNodeData,
+          data: {
+            configId: node.data.configId,
+            name: node.data.name,
+            ...updatedNodeData,
+          },
         });
       }, 200),
-    [llmConfig, node.id, setNode]
+    [node.id, setNode, node.data.configId, node.data.name]
   );
 
   // Initialize form with values from node data
