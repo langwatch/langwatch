@@ -173,7 +173,6 @@ export default function OrganizationOnboarding() {
       {
         onSuccess: () => {
           setActiveStep(3);
-          //window.location.href = `/${projectSlug}/messages`;
         },
         onError: () => {
           toaster.create({
@@ -333,7 +332,7 @@ export default function OrganizationOnboarding() {
   const skipForNow = () => {
     setActiveStep(3);
   };
-  const skipForNow2 = () => {
+  const proceedToMessages = () => {
     window.location.href = `/${projectSlug}/messages`;
   };
 
@@ -759,13 +758,13 @@ export default function OrganizationOnboarding() {
             </Box>
             <HStack width="full">
               <Spacer />
-              <Button colorPalette="orange" onClick={skipForNow2}>
+              <Button colorPalette="orange" onClick={proceedToMessages}>
                 Skip for now
               </Button>
               <Button
                 colorPalette="orange"
                 variant="outline"
-                onClick={skipForNow2}
+                onClick={proceedToMessages}
               >
                 Proceed
               </Button>
