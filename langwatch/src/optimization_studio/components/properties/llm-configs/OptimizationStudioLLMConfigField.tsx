@@ -16,6 +16,7 @@ export function OptimizationStudioLLMConfigField({
   llmConfig,
   defaultLLMConfig = undefined,
   onChange,
+  showProviderKeyMessage = true,
 }:
   | {
       allowDefault: true;
@@ -54,6 +55,7 @@ export function OptimizationStudioLLMConfigField({
       onChange={onChange}
       modelOption={modelOption}
       requiresCustomKey={requiresCustomKey}
+      showProviderKeyMessage={showProviderKeyMessage}
     />
   );
 }
