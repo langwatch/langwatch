@@ -7,6 +7,7 @@ import {
   type ForwardedRef,
   type SetStateAction,
 } from "react";
+import { LuBuilding } from "react-icons/lu";
 import { useDebouncedCallback } from "use-debounce";
 
 import { PanelHeader } from "./components/ui/PanelHeader";
@@ -14,7 +15,6 @@ import { PromptConfigForm } from "./forms/prompt-config-form/PromptConfigForm";
 import { useInvokePrompt } from "./hooks/useInvokePrompt";
 import { usePromptConfigForm } from "./hooks/usePromptConfigForm";
 
-import { LuBuilding } from "react-icons/lu";
 import {
   ExecutionInputPanel,
   type ExecuteData,
@@ -24,13 +24,13 @@ import {
   InputOutputExecutablePanel,
   PANEL_ANIMATION_DURATION,
 } from "~/components/executable-panel/InputOutputExecutablePanel";
+import { Tooltip } from "~/components/ui/tooltip";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import {
   llmConfigToPromptConfigFormValues,
   promptConfigFormValuesToOptimizationStudioNodeData,
 } from "~/prompt-configs/llmPromptConfigUtils";
 import { api } from "~/utils/api";
-import { Tooltip } from "../components/ui/tooltip";
 
 /**
  * Panel for configuring and testing LLM prompts
@@ -94,7 +94,8 @@ export const PromptConfigPanel = forwardRef(function PromptConfigPanel(
   const initialConfigValues = useMemo(
     () =>
       llmConfig ? llmConfigToPromptConfigFormValues(llmConfig) : undefined,
-    [configId, projectId, !!llmConfig]
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [Boolean(llmConfig)]
   );
 
   // Setup form with the config values
@@ -138,7 +139,6 @@ export const PromptConfigPanel = forwardRef(function PromptConfigPanel(
     invokeLLM({
       projectId,
       data: promptConfigFormValuesToOptimizationStudioNodeData(
-        llmConfig,
         formData
       ),
     });
