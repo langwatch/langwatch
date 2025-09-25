@@ -288,6 +288,7 @@ export function versionedPromptToLlmPromptConfigComponentNodeData(
 ): Node<LlmPromptConfigComponent>["data"] {
   return {
     configId: prompt.id,
+    handle: prompt.handle,
     name: prompt.name,
     inputs: prompt.inputs,
     outputs: prompt.outputs,
@@ -374,4 +375,64 @@ export function versionedPromptToPromptConfigFormValues(
       },
     },
   };
+}
+
+export function versionedPromptToOptimizationStudioNodeData(
+  prompt: VersionedPrompt
+): Node<LlmPromptConfigComponent>["data"] {
+  return {
+    configId: prompt.id,
+    handle: prompt.handle,
+    name: prompt.name,
+    inputs: prompt.inputs,
+    outputs: prompt.outputs,
+    parameters: [
+      {
+        identifier: "llm",
+        type: "llm",
+        value: {
+          model: prompt.model,
+        },
+      },
+      {
+        identifier: "instructions",
+        type: "str",
+        value: prompt.prompt,
+      },
+      {
+        identifier: "demonstrations",
+        type: "dataset",
+        value: prompt.demonstrations,
+      },
+      {
+        identifier: "messages",
+        type: "chat_messages",
+        value: prompt.messages,
+      },
+      {
+        identifier: "prompting_technique",
+        type: "prompting_technique",
+        value: prompt.promptingTechnique,
+      },
+    ],  
+  };
+}
+
+/**
+ * Converts the node data to a JSON string for comparison.
+ * We do not compare all fields, only the ones that are relevant for the prompt.
+ * @param nodeData 
+ * @returns JSON string
+ */
+function nodeDataToJson(nodeData: Node<LlmPromptConfigComponent>["data"]): string {
+  return JSON.stringify({
+    handle: nodeData.handle,
+    inputs: nodeData.inputs,
+    outputs: nodeData.outputs,
+    parameters: nodeData.parameters,
+  });
+}
+
+export function isNodeDataEqual(nodeData1: Node<LlmPromptConfigComponent>["data"], nodeData2: Node<LlmPromptConfigComponent>["data"]): boolean {
+  return nodeDataToJson(nodeData1) === nodeDataToJson(nodeData2);
 }
