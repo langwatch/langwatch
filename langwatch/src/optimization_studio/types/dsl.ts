@@ -124,7 +124,7 @@ type PromptingTechniqueParameter = StronglyTypedFieldBase & {
 /**
  * Parameter specific to Demonstrations
  */
-type DemonstrationsParameter = StronglyTypedFieldBase & {
+export type DemonstrationsParameter = StronglyTypedFieldBase & {
   type: "dataset";
   identifier: "demonstrations";
   value: NodeDataset | undefined;
