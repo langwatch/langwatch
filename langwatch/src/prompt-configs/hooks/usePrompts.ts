@@ -7,8 +7,6 @@ import { api } from "~/utils/api";
  */
 export const usePrompts = () => {
   const trpc = api.useContext();
-  const { project } = useOrganizationTeamProject();
-  const projectId = project?.id ?? "";
   const upsertPrompt = api.prompts.upsert.useMutation();
   const updatePrompt = api.prompts.update.useMutation();
 
@@ -20,30 +18,28 @@ export const usePrompts = () => {
     await trpc.llmConfigs.getByIdWithLatestVersion.invalidate()
   ]);
 
-  const wrappedUpsertPrompt: typeof upsertPrompt.mutateAsync = async (promptData)=> {
-    const prompt = await upsertPrompt.mutateAsync({
-      projectId,
-      handle: promptData.handle,
-      data: promptData.data,
-    });
-
+  const wrappedUpsertPrompt: typeof upsertPrompt.mutateAsync = async (params)=> {
+    const prompt = await upsertPrompt.mutateAsync(params);
     await invalidateAll();
     return prompt;
   };
 
-  const wrappedUpdatePrompt: typeof updatePrompt.mutateAsync = async (promptData)=> {
-    const prompt = await updatePrompt.mutateAsync({
-      projectId,
-      handle: promptData.handle,
-      data: promptData.data,
-    });
-
+  const wrappedUpdatePrompt: typeof updatePrompt.mutateAsync = async (params)=> {
+    const prompt = await updatePrompt.mutateAsync(params);
     await invalidateAll();
     return prompt;
   };
+
+  const wrappedGetPromptByHandle: typeof trpc.prompts.getByHandle.fetch = async (params) => {
+    const prompt = await trpc.prompts.getByHandle.fetch(params);
+    await invalidateAll();
+    return prompt;
+  };
+
 
   return {
     upsertPrompt: wrappedUpsertPrompt,
     updatePrompt: wrappedUpdatePrompt,
+    getPromptByHandle: wrappedGetPromptByHandle,
   };
 };
