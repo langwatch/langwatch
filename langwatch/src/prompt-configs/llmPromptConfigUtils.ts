@@ -118,7 +118,7 @@ export function safeOptimizationStudioNodeDataToPromptConfigFormInitialValues(
   const outputs = safeOutputs(nodeData.outputs);
 
   return {
-    handle: nodeData.handle,
+    handle: (nodeData as LlmPromptConfigComponent).handle,
     version: {
       configData: {
         inputs,
@@ -431,20 +431,30 @@ export function versionedPromptToOptimizationStudioNodeData(
  * @param nodeData
  * @returns JSON string
  */
-function nodeDataToJson(
+function standardizeNodeData(
   nodeData: Node<LlmPromptConfigComponent>["data"]
 ): string {
   return JSON.stringify({
     handle: nodeData.handle,
-    inputs: nodeData.inputs,
-    outputs: nodeData.outputs,
-    parameters: nodeData.parameters,
-  }, null, 2);
+    inputs: nodeData.inputs?.map(input => ({
+      identifier: input.identifier,
+      type: input.type,
+    })),
+    outputs: nodeData.outputs?.map(output => ({
+      identifier: output.identifier,
+      type: output.type,
+    })),
+    parameters: nodeData.parameters?.map(param => ({
+      identifier: param.identifier,
+      type: param.type,
+      ...(param.value !== undefined && { value: param.value }),
+    })),
+  });
 }
 
 export function isNodeDataEqual(
   nodeData1: Node<LlmPromptConfigComponent>["data"],
   nodeData2: Node<LlmPromptConfigComponent>["data"]
 ): boolean {
-  return nodeDataToJson(nodeData1) === nodeDataToJson(nodeData2);
+  return standardizeNodeData(nodeData1) === standardizeNodeData(nodeData2);
 }

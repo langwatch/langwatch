@@ -204,7 +204,7 @@ export class PromptService {
     temperature?: number;
     max_tokens?: number;
     prompting_technique?: z.infer<typeof promptingTechniqueSchema>;
-    commitMessage?: string;
+    commitMessage?: string | null;
   }): Promise<VersionedPrompt> {
     // If any of the version data is provided,
     // we should create a version from that data
@@ -408,6 +408,7 @@ export class PromptService {
         | "deletedAt"
         | "configId"
         | "projectId"
+        | "handle"
       >
     >;
   }): Promise<VersionedPrompt> {
@@ -433,10 +434,10 @@ export class PromptService {
     } else {
       // Create new prompt
       return this.createPrompt({
+        ...data,
         projectId,
         organizationId,
         handle,
-        ...data,
       });
     }
   }

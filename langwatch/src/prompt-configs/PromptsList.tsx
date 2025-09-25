@@ -7,7 +7,7 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { CopyIcon, UnplugIcon } from "lucide-react";
+import { UnplugIcon } from "lucide-react";
 import { Edit, MoreVertical, Trash2 } from "react-feather";
 
 import type { LlmConfigWithLatestVersion } from "~/server/prompt-config/repositories/llm-config.repository";
@@ -16,12 +16,10 @@ import { GeneratePromptApiSnippetDialog } from "./components/GeneratePromptApiSn
 
 import { Menu } from "~/components/ui/menu";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import { toaster } from "../components/ui/toaster";
 import { formatTimeAgo } from "../utils/formatTimeAgo";
 import { CopyButton } from "../components/CopyButton";
 import { GenerateApiSnippetButton } from "../components/GenerateApiSnippetButton";
 import { LLMModelDisplay } from "../components/llmPromptConfigs/LLMModelDisplay";
-import { titleCase } from "../utils/stringCasing";
 import { Tooltip } from "../components/ui/tooltip";
 import { LuBuilding } from "react-icons/lu";
 
@@ -164,7 +162,7 @@ export function PromptsList({
                     >
                       <Menu.Item
                         value="edit"
-                        onClick={(event) => {
+                        onClick={(_event) => {
                           void onEdit(config);
                         }}
                       >
@@ -181,7 +179,7 @@ export function PromptsList({
                       <Menu.Item
                         value="delete"
                         color="red.600"
-                        onClick={(event) => {
+                        onClick={(_event) => {
                           void onDelete(config);
                         }}
                       >
@@ -245,7 +243,7 @@ export function PromptsList({
 
                 <HStack gap={2}>
                   <GeneratePromptApiSnippetDialog.Trigger>
-                    <GenerateApiSnippetButton config={config} />
+                    <GenerateApiSnippetButton hasHandle={!!config.handle} />
                   </GeneratePromptApiSnippetDialog.Trigger>
                 </HStack>
               </HStack>

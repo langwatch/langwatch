@@ -21,7 +21,6 @@ import { VersionHistoryButton } from "./components/VersionHistoryButton";
 import { VersionSaveButton } from "./components/VersionSaveButton";
 
 import { toaster } from "~/components/ui/toaster";
-import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useGetPromptConfigByIdWithLatestVersionQuery } from "~/prompt-configs/hooks/useGetPromptConfigByIdWithLatestVersionQuery";
 import { usePromptConfig } from "~/prompt-configs/hooks/usePromptConfig";
 import type { PromptConfigFormValues } from "~/prompt-configs";
@@ -45,7 +44,6 @@ function InnerPromptConfigForm(props: PromptConfigFormProps) {
   const { isLoading } = usePromptConfig();
   const { triggerSaveVersion } = usePromptConfigContext();
   const saveEnabled = methods.formState.isDirty;
-  const { projectId = "" } = useOrganizationTeamProject();
   const { refetch: refetchSavedConfig } =
     useGetPromptConfigByIdWithLatestVersionQuery(configId);
 
@@ -70,7 +68,6 @@ function InnerPromptConfigForm(props: PromptConfigFormProps) {
       data: {
         handle: values.handle,
         scope: values.scope,
-        projectId,
         prompt: values.version.configData.prompt,
         messages: values.version.configData.messages,
         inputs: values.version.configData.inputs,
@@ -79,9 +76,10 @@ function InnerPromptConfigForm(props: PromptConfigFormProps) {
         temperature: values.version.configData.llm.temperature,
         maxTokens: values.version.configData.llm.max_tokens,
         promptingTechnique: values.version.configData.prompting_technique,
+        demonstrations: values.version.configData.demonstrations,
       },
     })
-  }, [methods, triggerSaveVersion, projectId]);
+  }, [methods, triggerSaveVersion]);
 
   const demonstrations = methods.watch("version.configData.demonstrations");
   const hasDemonstrations = Boolean(
