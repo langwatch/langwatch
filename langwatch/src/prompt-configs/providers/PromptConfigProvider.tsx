@@ -109,7 +109,7 @@ export function PromptConfigProvider({
 
   const setSaveClosure = useCallback(
     (
-      data: TriggerSaveVersionParams,
+      data: TriggerSaveVersionParams & { commitMessage?: string },
       onError?: (error: Error) => void,
       onSuccess?: (prompt: VersionedPrompt) => void
     ) => {

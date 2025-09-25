@@ -325,14 +325,24 @@ export function versionedPromptToLlmPromptConfigComponentNodeData(
   };
 }
 
+/**
+ * Converts the form values to the trigger save version params.
+ * It will also filter out the system prompt from the messages array.
+ * If both the prompt and system message is set, the prompt will be used.
+ * @param formValues 
+ * @returns 
+ */
 export function formValuesToTriggerSaveVersionParams(
   formValues: PromptConfigFormValues
 ): Omit<TriggerSaveVersionParams, "projectId"> {
+  const systemPrompt = formValues.version.configData.prompt ?? formValues.version.configData.messages?.find(msg => msg.role === "system")?.content;
+  const messages = formValues.version.configData.messages?.filter(msg => msg.role !== "system");
+
   return {
     handle: formValues.handle,
     scope: formValues.scope,
-    prompt: formValues.version.configData.prompt,
-    messages: formValues.version.configData.messages,
+    prompt: systemPrompt,
+    messages: messages,
     inputs: formValues.version.configData.inputs,
     outputs: formValues.version.configData.outputs,
     model: formValues.version.configData.llm.model,
