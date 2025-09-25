@@ -40,6 +40,7 @@ import { SpanTree } from "./SpanTree";
 import { TraceSummary } from "./Summary";
 import { Menu } from "../ui/menu";
 import { ChevronDownIcon } from "lucide-react";
+import { SequenceDiagramContainer } from "./SequenceDiagram";
 
 export function TraceDetails(props: {
   traceId: string;
@@ -92,6 +93,7 @@ export function TraceDetails(props: {
   const availableTabs = [
     ...(canViewMessages ? ["messages"] : []),
     "traceDetails",
+    "sequenceDiagram",
     ...(anyGuardrails ? ["guardrails"] : []),
     "evaluations",
     "events",
@@ -359,6 +361,7 @@ export function TraceDetails(props: {
               <Tabs.Trigger value="messages">Thread</Tabs.Trigger>
             )}
             <Tabs.Trigger value="traceDetails">Trace Details</Tabs.Trigger>
+            <Tabs.Trigger value="sequenceDiagram">Sequence</Tabs.Trigger>
             {anyGuardrails && (
               <Tabs.Trigger value="guardrails">
                 Guardrails
@@ -417,6 +420,11 @@ export function TraceDetails(props: {
               <TraceSummary traceId={props.traceId} />
               <SpanTree traceId={props.traceId} />
             </VStack>
+          )}
+        </Tabs.Content>
+        <Tabs.Content value="sequenceDiagram" paddingX={6} paddingY={4}>
+          {selectedTab === "sequenceDiagram" && (
+            <SequenceDiagramContainer traceId={props.traceId} />
           )}
         </Tabs.Content>
         {anyGuardrails && (
