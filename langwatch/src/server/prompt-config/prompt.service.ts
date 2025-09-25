@@ -379,54 +379,54 @@ export class PromptService {
    * @param params.idOrHandle - The ID or handle of the prompt (if updating)
    * @param params.projectId - The project ID for authorization and context
    * @param params.handle - The handle for the prompt (required for create, optional for update)
-   * @param params.scope - The scope of the prompt (defaults to "PROJECT")
-   * @param params.authorId - Optional author ID for the version
-   * @param params.commitMessage - Optional commit message for the version
-   * @param params.versionData - The version data to save
+   * @param params.data - The data to upsert the prompt with
+   * @param params.data.scope - The scope of the prompt (defaults to "PROJECT")
+   * @param params.data.authorId - Optional author ID for the version
+   * @param params.data.commitMessage - Optional commit message for the version
+   * @param params.data.versionData - The version data to save
+   * @param params.data.prompt - Optional prompt for the version
+   * @param params.data.messages - Optional messages for the version
+   * @param params.data.inputs - Optional inputs for the version
+   * @param params.data.outputs - Optional outputs for the version
+   * @param params.data.model - Optional model for the version
+   * @param params.data.temperature - Optional temperature for the version
    * @returns The upserted prompt configuration with its latest version
    */
   async upsertPrompt(params: {
-    idOrHandle?: string;
-    projectId: string;
     handle: string;
-    scope?: PromptScope;
-    authorId?: string;
-    commitMessage?: string;
-    versionData: {
+    projectId: string;
+    data: {
+      scope?: PromptScope;
+      authorId?: string;
+      commitMessage?: string;
       prompt?: string;
       messages?: z.infer<typeof messageSchema>[];
       inputs?: z.infer<typeof inputsSchema>[];
       outputs?: z.infer<typeof outputsSchema>[];
       model?: string;
       temperature?: number;
-      max_tokens?: number;
-      prompting_technique?: z.infer<typeof promptingTechniqueSchema>;
+      maxTokens?: number;
+      promptingTechnique?: z.infer<typeof promptingTechniqueSchema>;
     };
   }): Promise<VersionedPrompt> {
-    const { idOrHandle, projectId, handle, scope, authorId, commitMessage, versionData } = params;
+    const { handle, projectId, data } = params;
 
     // Get organization ID from project ID
     const organizationId = await this.getOrganizationIdFromProjectId(projectId);
 
     // Check if prompt exists
-    const existingPrompt = idOrHandle ? await this.getPromptByIdOrHandle({
-      idOrHandle,
+    const existingPrompt = await this.getPromptByIdOrHandle({
+      idOrHandle: handle,
       projectId,
       organizationId,
-    }) : null;
+    });
 
     if (existingPrompt) {
       // Update existing prompt
       return this.updatePrompt({
         idOrHandle: existingPrompt.id,
         projectId,
-        data: {
-          handle,
-          scope,
-          authorId,
-          commitMessage,
-          ...versionData,
-        },
+        data,
       });
     } else {
       // Create new prompt
@@ -434,10 +434,7 @@ export class PromptService {
         projectId,
         organizationId,
         handle,
-        scope: scope ?? "PROJECT",
-        authorId,
-        commitMessage,
-        ...versionData,
+        ...data,
       });
     }
   }

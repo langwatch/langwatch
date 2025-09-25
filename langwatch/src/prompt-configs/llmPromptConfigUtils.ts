@@ -2,6 +2,7 @@ import type { Node } from "@xyflow/react";
 import type { DeepPartial } from "react-hook-form";
 
 import type { DatasetColumnType } from "~/server/datasets/types";
+import type { VersionedPrompt } from "~/server/prompt-config";
 import {
   parseLlmConfigVersion,
   type LatestConfigVersionSchema,
@@ -16,7 +17,7 @@ import type {
   Signature,
 } from "../optimization_studio/types/dsl";
 
-import type { PromptConfigFormValues } from "~/prompt-configs/hooks/usePromptConfigForm";
+import type { PromptConfigFormValues } from "~/prompt-configs/schemas";
 import {
   LlmConfigInputTypes,
   LlmConfigOutputTypes,
@@ -240,6 +241,8 @@ export function llmConfigToPromptConfigFormValues(
   llmConfig: LlmConfigWithLatestVersion
 ): PromptConfigFormValues {
   return {
+    handle: llmConfig.handle,
+    scope: llmConfig.scope,
     version: {
       configData: {
         ...llmConfig.latestVersion.configData,
@@ -277,4 +280,46 @@ export function createNewOptimizationStudioPromptName(
   );
 
   return promptName;
+}
+
+export function versionedPromptToLlmPromptConfigComponentNodeData(
+  prompt: VersionedPrompt
+): Node<LlmPromptConfigComponent>["data"] {
+  return {
+    configId: prompt.id,
+    name: prompt.name,
+    inputs: prompt.inputs,
+    outputs: prompt.outputs,
+    parameters: [
+      {
+        identifier: "llm",
+        type: "llm",
+        value: {
+          model: prompt.model,
+          temperature: prompt.temperature,
+          max_tokens: prompt.maxTokens,
+        },
+      },
+      {
+        identifier: "instructions",
+        type: "str",
+        value: prompt.prompt,
+      },
+      {
+        identifier: "demonstrations",
+        type: "dataset",
+        value: prompt.demonstrations,
+      },
+      {
+        identifier: "messages",
+        type: "chat_messages",
+        value: prompt.messages ?? [],
+      },
+      {
+        identifier: "prompting_technique",
+        type: "prompting_technique",
+        value: prompt.promptingTechnique,
+      },
+    ],
+  };
 }

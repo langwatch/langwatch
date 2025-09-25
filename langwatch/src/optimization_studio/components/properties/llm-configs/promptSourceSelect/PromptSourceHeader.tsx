@@ -4,7 +4,6 @@ import { useMemo } from "react";
 import { useFormContext } from "react-hook-form";
 
 import { parseLlmConfigVersion } from "~/server/prompt-config/repositories/llm-config-version-schema";
-import type { LlmConfigWithLatestVersion } from "~/server/prompt-config/repositories/llm-config.repository";
 
 import { PromptSource } from "./PromptSource";
 
@@ -22,7 +21,9 @@ import { type PromptConfigFormValues } from "~/prompt-configs/hooks/usePromptCon
 import {
   llmConfigToOptimizationStudioNodeData,
   llmConfigToPromptConfigFormValues,
+  versionedPromptToLlmPromptConfigComponentNodeData,
 } from "~/prompt-configs/llmPromptConfigUtils";
+import { usePromptConfigContext } from "~/prompt-configs/providers/PromptConfigProvider";
 import { api } from "~/utils/api";
 import { createLogger } from "~/utils/logger";
 
@@ -33,15 +34,10 @@ const logger = createLogger(
 export function PromptSourceHeader({
   node,
   onPromptSourceSelect,
-  triggerSaveVersion,
   values,
 }: {
   node: Node<LlmPromptConfigComponent>;
   onPromptSourceSelect: (config: { id: string; name: string }) => void;
-  triggerSaveVersion: (
-    config: LlmConfigWithLatestVersion,
-    formValues: PromptConfigFormValues
-  ) => void;
   values: PromptConfigFormValues;
 }) {
   const trpc = api.useContext();
@@ -50,13 +46,11 @@ export function PromptSourceHeader({
   const configId = node.data.configId;
   const setNode = useSmartSetNode();
   const formProps = useFormContext<PromptConfigFormValues>();
+  const { triggerSaveVersion } = usePromptConfigContext();
 
   // Fetch the saved configuration to compare with current node data
   const { data: savedConfig } =
     useGetPromptConfigByIdWithLatestVersionQuery(configId);
-
-  const { mutateAsync: createConfig } =
-    api.llmConfigs.createConfigWithInitialVersion.useMutation();
 
   /**
    * Determines if the current node data has changed from the saved configuration
@@ -68,43 +62,22 @@ export function PromptSourceHeader({
     return !isEqual(node.data, savedConfigData);
   }, [node.data, savedConfig]);
 
-  // TODO: Move this outside of the component
-  const handleSaveVersion = async () => {
-    console.log("HANDLE SAVE VERSION", savedConfig);
-    // // If no saved config, we will need to create a new one
-    // if (!savedConfig) {
-    //   // Handles are now required, so this is a fallback for having to "pre-create" a config
-    //   const handle = snakeCase(node.data.name ?? `prompt-${nanoid(5)}`);
-    //   // Reset the node name
-    //   node.data.name = handle;
-
-    //   try {
-    //     const newConfig = await createConfig({
-    //       projectId,
-    //       handle,
-    //     });
-
-    //     // Update the node data with the new config ID
-    //     setNode({
-    //       ...node,
-    //       data: {
-    //         ...node.data,
-    //         configId: newConfig.id,
-    //       },
-    //     });
-
-    //     // Trigger the save version mutation for the new config
-    //     triggerSaveVersion(newConfig, values);
-    //   } catch (error) {
-    //     console.error(error);
-    //     toaster.error({
-    //       title: "Failed to save prompt version",
-    //       description: "Please try again.",
-    //     });
-    //   }
-    // } else {
-    triggerSaveVersion(savedConfig, values);
-    // }
+  const handleSaveVersion = () => {
+      triggerSaveVersion({
+        data: {
+          projectId,
+          handle: savedConfig?.handle ?? "",
+          scope: savedConfig?.scope ?? "PROJECT",
+          commitMessage: "Saved from optimization studio",
+          ...values,
+        },
+        onSuccess: (prompt) => {
+          setNode({
+            ...node,
+            data: versionedPromptToLlmPromptConfigComponentNodeData(prompt)
+          });
+        },
+      });
   };
 
   // TODO: Move this outside of the component

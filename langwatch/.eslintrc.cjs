@@ -89,7 +89,9 @@ const config = deepmerge(
       ],
     },
   },
-  localConfig
+  {}
+  // This is too heavy
+  // localConfig
 );
 
 module.exports = config;

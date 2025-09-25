@@ -1,34 +1,46 @@
-import { Box, Button, HStack, Text } from "@chakra-ui/react";
-
-import { type LlmConfigWithLatestVersion } from "~/server/prompt-config/repositories/llm-config.repository";
-
-import { GeneratePromptApiSnippetDialog } from "../../../components/GeneratePromptApiSnippetDialog";
-import { GenerateApiSnippetButton } from "../../../../components/GenerateApiSnippetButton";
-import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import { CopyButton } from "../../../../components/CopyButton";
-import { usePromptConfigContext } from "../../../providers/PromptConfigProvider";
+import { Box, Button, HStack, Text, useDisclosure } from "@chakra-ui/react";
 import { useCallback } from "react";
-import type { UseFormReturn } from "react-hook-form";
-import type { PromptConfigFormValues } from "../../../hooks/usePromptConfigForm";
+import { useFormContext } from "react-hook-form";
 import { LuPencil } from "react-icons/lu";
 
-interface ConfigHeaderProps {
-  config: LlmConfigWithLatestVersion;
-  methods: UseFormReturn<PromptConfigFormValues>;
-}
+import { CopyButton } from "../../../../components/CopyButton";
+import { GenerateApiSnippetButton } from "../../../../components/GenerateApiSnippetButton";
+import { GeneratePromptApiSnippetDialog } from "../../../components/GeneratePromptApiSnippetDialog";
+import { ChangeHandleDialog } from "../../../forms/ChangeHandleDialog";
+import { type ChangeHandleFormValues } from "../../../forms/schemas/change-handle-form.schema";
+import type { PromptConfigFormValues } from "../../../hooks/usePromptConfigForm";
 
-export function PromptHandleInfo({ methods, config }: ConfigHeaderProps) {
+import { toaster } from "~/components/ui/toaster";
+import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+
+
+
+export function PromptHandleInfo({ configId }: { configId: string }) {
   const { project } = useOrganizationTeamProject();
-  const { triggerSaveVersion } = usePromptConfigContext();
+  const { open, onOpen, onClose } = useDisclosure();
+  const form = useFormContext<PromptConfigFormValues>();
 
-  const handleEditClick = useCallback(() => {
-    void triggerSaveVersion({
-      config,
-      form: methods,
-      updateConfigValues: methods.getValues(),
-      editingHandleOrScope: true,
-    });
-  }, [config, methods, triggerSaveVersion]);
+  const handle = form.watch("handle");
+  const scope = form.watch("scope");
+
+  const handleChangeHandleSubmit = useCallback(
+    async (data: ChangeHandleFormValues) => {
+      try {
+
+      await Promise.all([
+        form.setValue("handle", data.handle),
+        form.setValue("scope", data.scope),
+      ]);
+      } catch (error) {
+        toaster.create({
+          title: "Error",
+          description: "Failed to change handle",
+          type: "error",
+        });
+      }
+    },
+    [form]
+  );
 
   return (
     <Box
@@ -41,18 +53,18 @@ export function PromptHandleInfo({ methods, config }: ConfigHeaderProps) {
     >
       <HStack justifyContent="space-between" width="full">
         <HStack paddingX={1} gap={1} className="group">
-          {config.handle ? (
+          {handle ? (
             <Text fontSize="sm" fontWeight="500" fontFamily="mono">
-              {config.handle}
+              {handle}
             </Text>
           ) : (
             <Text color="gray.500">Draft</Text>
           )}
-          {config.handle && (
+          {handle && (
             <Button
               // Do not remove this id, it is used to trigger the edit dialog
               id="js-edit-prompt-handle"
-              onClick={handleEditClick}
+              onClick={onOpen}
               variant="ghost"
               _hover={{
                 backgroundColor: "gray.100",
@@ -69,19 +81,26 @@ export function PromptHandleInfo({ methods, config }: ConfigHeaderProps) {
         </HStack>
 
         <HStack gap={2} alignSelf="flex-end">
-          {config.handle && (
-            <CopyButton value={config.handle} label="Prompt ID" />
+          {handle && (
+            <CopyButton value={handle} label="Prompt ID" />
           )}
           <GeneratePromptApiSnippetDialog
-            configId={config.id}
+            configId={configId}
             apiKey={project?.apiKey}
           >
             <GeneratePromptApiSnippetDialog.Trigger>
-              <GenerateApiSnippetButton config={config} />
+              <GenerateApiSnippetButton hasHandle={!!handle} />
             </GeneratePromptApiSnippetDialog.Trigger>
           </GeneratePromptApiSnippetDialog>
         </HStack>
       </HStack>
+      <ChangeHandleDialog
+        currentHandle={handle}
+        currentScope={scope}
+        isOpen={open}
+        onClose={onClose}
+        onSubmit={handleChangeHandleSubmit}
+      />
     </Box>
   );
 }

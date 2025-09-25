@@ -27,4 +27,5 @@ export const organizationFactory = Factory.define<
   sentPlanLimitAlert: null,
   promoCode: null,
   ssoDomain: null,
+  ssoProvider: null,
 }));
