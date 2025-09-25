@@ -11,15 +11,14 @@ import {
   Alert,
   Badge,
 } from "@chakra-ui/react";
-import { PIIRedactionLevel, ProjectSensitiveDataVisibilityLevel, type Project } from "@prisma/client";
+import {
+  PIIRedactionLevel,
+  ProjectSensitiveDataVisibilityLevel,
+  type Project,
+} from "@prisma/client";
 import isEqual from "lodash-es/isEqual";
 import { useState } from "react";
-import {
-  useForm,
-  useWatch,
-  type SubmitHandler,
-  Controller,
-} from "react-hook-form";
+import { useForm, type SubmitHandler, Controller } from "react-hook-form";
 import { HorizontalFormControl } from "~/components/HorizontalFormControl";
 import { ProjectSelector } from "../components/DashboardLayout";
 import SettingsLayout from "../components/SettingsLayout";
@@ -76,10 +75,9 @@ function SettingsForm({
     elasticsearchApiKey: organization.elasticsearchApiKey ?? "",
     s3Bucket: organization.s3Bucket ?? "",
   });
-  const { register, handleSubmit, control, getFieldState } = useForm({
+  const { register, handleSubmit, getFieldState } = useForm({
     defaultValues,
   });
-  const formWatch = useWatch({ control });
   const updateOrganization = api.organization.update.useMutation();
   const apiContext = api.useContext();
 
@@ -380,7 +378,9 @@ function ProjectSettingsForm({ project }: { project: Project }) {
   const { hasTeamPermission } = useOrganizationTeamProject({
     redirectToOnboarding: false,
   });
-  const userIsAdmin = hasTeamPermission(TeamRoleGroup.PROJECT_CHANGE_CAPTURED_DATA_VISIBILITY);
+  const userIsAdmin = hasTeamPermission(
+    TeamRoleGroup.PROJECT_CHANGE_CAPTURED_DATA_VISIBILITY
+  );
 
   const defaultValues = {
     name: project.name,
@@ -402,12 +402,10 @@ function ProjectSettingsForm({ project }: { project: Project }) {
     defaultValues,
   });
   const { register, handleSubmit, control, formState } = form;
-  const formWatch = useWatch({ control });
   const updateProject = api.project.update.useMutation();
   const apiContext = api.useContext();
   const [changeLanguageFramework, setChangeLanguageFramework] = useState(false);
   const [showTraceSharingDialog, setShowTraceSharingDialog] = useState(false);
-  const [pendingTraceSharingValue, setPendingTraceSharingValue] = useState<boolean | null>(null);
 
   const handleTraceSharingChange = (newValue: boolean) => {
     // Directly update the form value
@@ -417,7 +415,7 @@ function ProjectSettingsForm({ project }: { project: Project }) {
   const confirmDisableTraceSharing = () => {
     setShowTraceSharingDialog(false);
     // Proceed with the form submission
-    handleSubmit(onSubmit)();
+    void handleSubmit(onSubmit)();
   };
 
   const cancelDisableTraceSharing = () => {
@@ -428,7 +426,10 @@ function ProjectSettingsForm({ project }: { project: Project }) {
     if (isEqual(data, previousValues)) return;
 
     // Check if trace sharing is being disabled
-    if (data.traceSharingEnabled === false && project.traceSharingEnabled === true) {
+    if (
+      data.traceSharingEnabled === false &&
+      project.traceSharingEnabled === true
+    ) {
       // Show confirmation dialog before proceeding
       setShowTraceSharingDialog(true);
       return;
@@ -447,8 +448,12 @@ function ProjectSettingsForm({ project }: { project: Project }) {
         s3Bucket: data.s3Bucket ?? "",
 
         // Only admins can change the visibility settings, this is enforced in the backend
-        capturedInputVisibility: userIsAdmin ? data.capturedInputVisibility : void 0,
-        capturedOutputVisibility: userIsAdmin ? data.capturedOutputVisibility : void 0,
+        capturedInputVisibility: userIsAdmin
+          ? data.capturedInputVisibility
+          : void 0,
+        capturedOutputVisibility: userIsAdmin
+          ? data.capturedOutputVisibility
+          : void 0,
         traceSharingEnabled: userIsAdmin ? data.traceSharingEnabled : void 0,
       },
       {
@@ -599,7 +604,11 @@ function ProjectSettingsForm({ project }: { project: Project }) {
               <Controller
                 control={control}
                 name="capturedInputVisibility"
-                rules={{ required: userIsAdmin ? "Captured input visibility is required" : undefined }}
+                rules={{
+                  required: userIsAdmin
+                    ? "Captured input visibility is required"
+                    : undefined,
+                }}
                 render={({ field }) => (
                   <Select.Root
                     collection={capturedInputVisibilityCollection}
@@ -634,7 +643,9 @@ function ProjectSettingsForm({ project }: { project: Project }) {
               label="Show Captured Output Data"
               helper={
                 <VStack align="start" gap={1}>
-                  <Text>Manage who can see output data on traces and spans</Text>
+                  <Text>
+                    Manage who can see output data on traces and spans
+                  </Text>
                   {!userIsAdmin && (
                     <Badge colorPalette="blue" variant="surface" size={"xs"}>
                       <Tooltip content="Contact your admin to change this setting">
@@ -652,7 +663,11 @@ function ProjectSettingsForm({ project }: { project: Project }) {
               <Controller
                 control={control}
                 name="capturedOutputVisibility"
-                rules={{ required: userIsAdmin ? "Captured output visibility is required" : undefined }}
+                rules={{
+                  required: userIsAdmin
+                    ? "Captured output visibility is required"
+                    : undefined,
+                }}
                 render={({ field }) => (
                   <Select.Root
                     collection={capturedOutputVisibilityCollection}
@@ -668,16 +683,18 @@ function ProjectSettingsForm({ project }: { project: Project }) {
                       <Select.ValueText placeholder="Select captured output visibility" />
                     </Select.Trigger>
                     <Select.Content width="300px">
-                      {capturedOutputVisibilityCollection.items.map((option) => (
-                        <Select.Item key={option.value} item={option}>
-                          <VStack align="start" gap={0}>
-                            <Text>{option.label}</Text>
-                            <Text fontSize="13px" color="gray.500">
-                              {option.description}
-                            </Text>
-                          </VStack>
-                        </Select.Item>
-                      ))}
+                      {capturedOutputVisibilityCollection.items.map(
+                        (option) => (
+                          <Select.Item key={option.value} item={option}>
+                            <VStack align="start" gap={0}>
+                              <Text>{option.label}</Text>
+                              <Text fontSize="13px" color="gray.500">
+                                {option.description}
+                              </Text>
+                            </VStack>
+                          </Select.Item>
+                        )
+                      )}
                     </Select.Content>
                   </Select.Root>
                 )}
@@ -762,8 +779,14 @@ function ProjectSettingsForm({ project }: { project: Project }) {
         </Card.Body>
       </Card.Root>
 
+      {/* Topic Clustering Manual Trigger */}
+      <TopicClusteringCard project={project} />
+
       {/* Trace Sharing Disable Confirmation Dialog */}
-      <Dialog.Root open={showTraceSharingDialog} onOpenChange={({ open }) => setShowTraceSharingDialog(open)}>
+      <Dialog.Root
+        open={showTraceSharingDialog}
+        onOpenChange={({ open }) => setShowTraceSharingDialog(open)}
+      >
         <Dialog.Backdrop />
         <Dialog.Content>
           <Dialog.Header>
@@ -772,15 +795,16 @@ function ProjectSettingsForm({ project }: { project: Project }) {
           <Dialog.Body>
             <VStack align="start" gap={4}>
               <Text>
-                Are you sure you want to save these changes and disable trace sharing for this project?
+                Are you sure you want to save these changes and disable trace
+                sharing for this project?
               </Text>
-              <VStack 
-                align="start" 
-                gap={2} 
-                padding={4} 
-                backgroundColor="orange.50" 
-                borderWidth="1px" 
-                borderColor="orange.200" 
+              <VStack
+                align="start"
+                gap={2}
+                padding={4}
+                backgroundColor="orange.50"
+                borderWidth="1px"
+                borderColor="orange.200"
                 borderRadius="md"
               >
                 <HStack gap={2}>
@@ -789,24 +813,19 @@ function ProjectSettingsForm({ project }: { project: Project }) {
                   </Text>
                 </HStack>
                 <Text fontSize="sm" color="orange.700">
-                  This action will <b>immediately revoke</b> all existing shared trace links. 
-                  Anyone with previously shared trace URLs will <b>no longer be able to access them</b>.
+                  This action will <b>immediately revoke</b> all existing shared
+                  trace links. Anyone with previously shared trace URLs will{" "}
+                  <b>no longer be able to access them</b>.
                 </Text>
               </VStack>
             </VStack>
           </Dialog.Body>
           <Dialog.Footer>
             <HStack gap={2}>
-              <Button
-                variant="outline"
-                onClick={cancelDisableTraceSharing}
-              >
+              <Button variant="outline" onClick={cancelDisableTraceSharing}>
                 Cancel
               </Button>
-              <Button
-                colorPalette="red"
-                onClick={confirmDisableTraceSharing}
-              >
+              <Button colorPalette="red" onClick={confirmDisableTraceSharing}>
                 Save & Disable Trace Sharing
               </Button>
             </HStack>
@@ -814,5 +833,70 @@ function ProjectSettingsForm({ project }: { project: Project }) {
         </Dialog.Content>
       </Dialog.Root>
     </>
+  );
+}
+
+function TopicClusteringCard({ project }: { project: Project }) {
+  const { hasTeamPermission } = useOrganizationTeamProject({
+    redirectToOnboarding: false,
+  });
+  const triggerClustering = api.project.triggerTopicClustering.useMutation({
+    onSuccess: () => {
+      toaster.create({
+        title: "Topic clustering started",
+        description:
+          "The topic clustering job has been queued and will run shortly.",
+        type: "success",
+        placement: "top-end",
+      });
+    },
+    onError: (error) => {
+      toaster.create({
+        title: "Failed to trigger topic clustering",
+        description: error.message,
+        type: "error",
+        placement: "top-end",
+      });
+    },
+  });
+
+  // Only show to users with setup permissions
+  if (!hasTeamPermission(TeamRoleGroup.SETUP_PROJECT)) {
+    return null;
+  }
+
+  return (
+    <Card.Root>
+      <Card.Header>
+        <Heading size="md">Topic Clustering</Heading>
+      </Card.Header>
+      <Card.Body>
+        <VStack align="start" gap={4}>
+          <Text>
+            Manually trigger topic clustering to organize your traces into
+            topics and subtopics. This will analyze your recent traces and group
+            them by similar patterns.
+          </Text>
+
+          <Alert.Root>
+            <Alert.Indicator />
+            <Alert.Content>
+              <Alert.Description>
+                Topic clustering requires at least 10 traces to run effectively.
+                The process may take several minutes depending on the number of
+                traces.
+              </Alert.Description>
+            </Alert.Content>
+          </Alert.Root>
+          <Button
+            colorPalette="blue"
+            onClick={() => triggerClustering.mutate({ projectId: project.id })}
+            loading={triggerClustering.isLoading}
+          >
+            Run Topic Clustering
+          </Button>
+        </VStack>
+      </Card.Body>
+    </Card.Root>
   );
 }

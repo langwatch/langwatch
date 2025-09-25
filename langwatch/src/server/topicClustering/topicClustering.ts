@@ -61,6 +61,77 @@ export const clusterTopicsForProject = async (
   }
 
   const client = await esClient({ projectId });
+
+  // Debug: Check total traces for this project
+  const totalTracesCount = await client.count({
+    index: TRACE_INDEX.alias,
+    body: {
+      query: {
+        term: {
+          project_id: projectId,
+        },
+      },
+    },
+  });
+
+  // Debug: Check traces with input
+  const tracesWithInputCount = await client.count({
+    index: TRACE_INDEX.alias,
+    body: {
+      query: {
+        bool: {
+          must: [
+            {
+              term: {
+                project_id: projectId,
+              },
+            },
+            {
+              exists: {
+                field: "input.value",
+              },
+            },
+          ],
+        } as QueryDslBoolQuery,
+      },
+    },
+  });
+
+  // Debug: Check recent traces (last 30 days)
+  const recentTracesCount = await client.count({
+    index: TRACE_INDEX.alias,
+    body: {
+      query: {
+        bool: {
+          must: [
+            {
+              term: {
+                project_id: projectId,
+              },
+            },
+            {
+              range: {
+                "timestamps.started_at": {
+                  gte: "now-30d",
+                },
+              },
+            },
+          ],
+        } as QueryDslBoolQuery,
+      },
+    },
+  });
+
+  logger.info(
+    {
+      projectId,
+      totalTraces: totalTracesCount.count,
+      tracesWithInput: tracesWithInputCount.count,
+      recentTraces: recentTracesCount.count,
+    },
+    "Debug: Project trace counts"
+  );
+
   const assignedTracesCount = await client.count({
     index: TRACE_INDEX.alias,
     body: {
@@ -172,6 +243,18 @@ export const clusterTopicsForProject = async (
 
   // Fetch last 2000 traces that were not classified in sorted and paginated, with only id, input fields and their current topics
 
+  logger.info(
+    {
+      projectId,
+      isIncrementalProcessing,
+      topicIds: topicIds.length,
+      subtopicIds: subtopicIds.length,
+      assignedTracesCount: assignedTracesCount.count,
+      searchAfter,
+    },
+    "Starting trace search for topic clustering"
+  );
+
   const result = await client.search<Trace>({
     index: TRACE_INDEX.alias,
     body: {
@@ -190,6 +273,7 @@ export const clusterTopicsForProject = async (
         "input",
         "metadata.topic_id",
         "metadata.subtopic_id",
+        "timestamps.started_at",
       ],
       sort: [{ "timestamps.started_at": "desc" }, { trace_id: "asc" }],
       ...(searchAfter ? { search_after: searchAfter } : {}),
@@ -197,24 +281,96 @@ export const clusterTopicsForProject = async (
     },
   });
 
-  const traces: TopicClusteringTrace[] = result.hits.hits
-    .map((hit) => hit._source!)
-    .filter((trace) => !!trace?.input?.value)
-    .map((trace) => ({
-      trace_id: trace.trace_id,
-      input: trace.input?.value.slice(0, 8192) ?? "",
-      topic_id:
-        trace.metadata?.topic_id && topicIds.includes(trace.metadata.topic_id)
-          ? trace.metadata.topic_id
-          : null,
-      subtopic_id:
-        trace.metadata?.subtopic_id &&
-        subtopicIds.includes(trace.metadata.subtopic_id)
-          ? trace.metadata.subtopic_id
-          : null,
-    }));
+  logger.info(
+    {
+      projectId,
+      totalHits: result.hits.total,
+      returnedHits: result.hits.hits.length,
+    },
+    "Elasticsearch search results"
+  );
+
+  const rawTraces = result.hits.hits.map((hit) => hit._source!);
+
+  // Helper function to extract text content from various input formats
+  const extractInputText = (trace: Trace): string => {
+    if (!trace?.input?.value) return "";
+
+    // Handle string inputs
+    if (typeof trace.input.value === "string") {
+      return trace.input.value;
+    }
+
+    // Handle chat_messages format (strands-agents, etc.)
+    if (Array.isArray(trace.input.value)) {
+      return (trace.input.value as any[])
+        .map((msg: any) => {
+          if (typeof msg === "string") return msg;
+          if (msg?.content) {
+            if (typeof msg.content === "string") return msg.content;
+            if (typeof msg.content === "object")
+              return JSON.stringify(msg.content);
+          }
+          return JSON.stringify(msg);
+        })
+        .join(" ");
+    }
+
+    // Handle object inputs
+    if (typeof trace.input.value === "object") {
+      return JSON.stringify(trace.input.value);
+    }
+
+    return String(trace.input.value);
+  };
+
+  const tracesWithInput = rawTraces.filter((trace) => {
+    const inputText = extractInputText(trace);
+    return inputText.length > 0;
+  });
+
+  logger.info(
+    {
+      projectId,
+      rawTracesCount: rawTraces.length,
+      tracesWithInputCount: tracesWithInput.length,
+      sampleTraces: tracesWithInput.slice(0, 3).map((t) => ({
+        trace_id: t.trace_id,
+        has_input: !!t?.input?.value,
+        input_type: typeof t?.input?.value,
+        input_is_array: Array.isArray(t?.input?.value),
+        input_preview: extractInputText(t).slice(0, 100),
+        started_at: t?.timestamps?.started_at,
+      })),
+    },
+    "Trace filtering debug info"
+  );
+
+  const traces: TopicClusteringTrace[] = tracesWithInput.map((trace) => ({
+    trace_id: trace.trace_id,
+    input: extractInputText(trace).slice(0, 8192),
+    topic_id:
+      trace.metadata?.topic_id && topicIds.includes(trace.metadata.topic_id)
+        ? trace.metadata.topic_id
+        : null,
+    subtopic_id:
+      trace.metadata?.subtopic_id &&
+      subtopicIds.includes(trace.metadata.subtopic_id)
+        ? trace.metadata.subtopic_id
+        : null,
+  }));
 
   const minimumTraces = isIncrementalProcessing ? 1 : 10;
+
+  logger.info(
+    {
+      projectId,
+      finalTracesCount: traces.length,
+      minimumTraces,
+      isIncrementalProcessing,
+    },
+    "Final trace count for clustering"
+  );
 
   if (traces.length < minimumTraces) {
     logger.info(
