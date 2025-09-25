@@ -75,4 +75,24 @@ export const promptsRouter = createTRPCRouter({
         data: input.data,
       });
     }),
+
+  /**
+   * Get a prompt by handle
+   */
+  getByHandle: protectedProcedure
+    .input(z.object({
+      handle: handleSchema,
+      projectId: z.string(),
+      version: z.number().optional(),
+      versionId: z.string().optional(),
+    }))
+    .use(checkUserPermissionForProject(TeamRoleGroup.PROMPTS_VIEW))
+    .query(async ({ ctx, input }) => {
+      const service = new PromptService(ctx.prisma);
+      const { handle, ...rest } = input;
+      return await service.getPromptByIdOrHandle({
+        idOrHandle: handle,
+        ...rest,
+      });
+    }),
 });

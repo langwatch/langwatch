@@ -108,17 +108,19 @@ export class PromptService {
   async getPromptByIdOrHandle(params: {
     idOrHandle: string;
     projectId: string;
-    organizationId: string;
     version?: number;
+    organizationId?: string;
+    versionId?: string;
   }): Promise<VersionedPrompt | null> {
-    const { idOrHandle, projectId, organizationId } = params;
-
+    const { idOrHandle, projectId } = params;
+    const organizationId = params.organizationId ?? await this.getOrganizationIdFromProjectId(projectId);
     const config = await this.repository.getConfigByIdOrHandleWithLatestVersion(
       {
         idOrHandle,
         projectId,
         organizationId,
         version: params.version,
+        versionId: params.versionId,
       }
     );
 
