@@ -25,6 +25,7 @@ import {
   type LlmConfigOutputType,
 } from "~/types";
 import { kebabCase } from "~/utils/stringCasing";
+import { type TriggerSaveVersionParams } from "~/prompt-configs/providers/PromptConfigProvider";
 
 export function llmConfigToOptimizationStudioNodeData(
   config: LlmConfigWithLatestVersion
@@ -321,5 +322,46 @@ export function versionedPromptToLlmPromptConfigComponentNodeData(
         value: prompt.promptingTechnique,
       },
     ],
+  };
+}
+
+export function formValuesToTriggerSaveVersionParams(
+  formValues: PromptConfigFormValues
+): TriggerSaveVersionParams {
+  return {
+    handle: formValues.handle,
+    scope: formValues.scope,
+    prompt: formValues.version.configData.prompt,
+    messages: formValues.version.configData.messages,
+    inputs: formValues.version.configData.inputs,
+    outputs: formValues.version.configData.outputs,
+    model: formValues.version.configData.llm.model,
+    temperature: formValues.version.configData.llm.temperature,
+    maxTokens: formValues.version.configData.llm.max_tokens,
+    promptingTechnique: formValues.version.configData.prompting_technique,
+  };
+}
+
+export function versionedPromptToPromptConfigFormValues(
+  prompt: VersionedPrompt
+): PromptConfigFormValues {
+  return {
+    handle: prompt.handle,
+    scope: prompt.scope,
+    version: {
+      configData: {
+        prompt: prompt.prompt,
+        messages: prompt.messages,
+        inputs: prompt.inputs,
+        outputs: prompt.outputs,
+        demonstrations: prompt.demonstrations,
+        prompting_technique: prompt.promptingTechnique,
+        llm: {
+          model: prompt.model,
+          temperature: prompt.temperature,
+          max_tokens: prompt.maxTokens,
+        },
+      },
+    },
   };
 }

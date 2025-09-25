@@ -1,9 +1,6 @@
 import { HStack, Spacer, Text } from "@chakra-ui/react";
 import type { Node } from "@xyflow/react";
-import { useMemo } from "react";
 import { useFormContext } from "react-hook-form";
-
-import { parseLlmConfigVersion } from "~/server/prompt-config/repositories/llm-config-version-schema";
 
 import { PromptSource } from "./PromptSource";
 
@@ -16,12 +13,11 @@ import type { LlmPromptConfigComponent } from "~/optimization_studio/types/dsl";
 import { GeneratePromptApiSnippetDialog } from "~/prompt-configs/components/GeneratePromptApiSnippetDialog";
 import { VersionHistoryButton } from "~/prompt-configs/forms/prompt-config-form/components/VersionHistoryButton";
 import { VersionSaveButton } from "~/prompt-configs/forms/prompt-config-form/components/VersionSaveButton";
-import { useGetPromptConfigByIdWithLatestVersionQuery } from "~/prompt-configs/hooks/useGetPromptConfigByIdWithLatestVersionQuery";
-import { type PromptConfigFormValues } from "~/prompt-configs";
+import { usePrompts, type PromptConfigFormValues } from "~/prompt-configs";
 import {
-  llmConfigToOptimizationStudioNodeData,
-  llmConfigToPromptConfigFormValues,
+  formValuesToTriggerSaveVersionParams,
   versionedPromptToLlmPromptConfigComponentNodeData,
+  versionedPromptToPromptConfigFormValues,
 } from "~/prompt-configs/llmPromptConfigUtils";
 import { usePromptConfigContext } from "~/prompt-configs/providers/PromptConfigProvider";
 import { api } from "~/utils/api";
@@ -31,47 +27,43 @@ const logger = createLogger(
   "langwatch:optimization_studio:prompt_source_header"
 );
 
+/**
+ * Header for the prompt source select in the optimization studio
+ * @param param0 
+ * @returns 
+ */
 export function PromptSourceHeader({
   node,
   onPromptSourceSelect,
-  values,
 }: {
-  node: Node<LlmPromptConfigComponent>;
+  node: {
+    id: string;
+    data: Pick<Node<LlmPromptConfigComponent>["data"], "configId">;
+  },
   onPromptSourceSelect: (config: { id: string; name: string }) => void;
-  values: PromptConfigFormValues;
 }) {
   const trpc = api.useContext();
-  const { project } = useOrganizationTeamProject();
-  const projectId = project?.id ?? "";
+  const { projectId = "" } = useOrganizationTeamProject();
   const configId = node.data.configId;
   const setNode = useSmartSetNode();
   const formProps = useFormContext<PromptConfigFormValues>();
   const { triggerSaveVersion } = usePromptConfigContext();
-
-  // Fetch the saved configuration to compare with current node data
-  const { data: savedConfig } =
-    useGetPromptConfigByIdWithLatestVersionQuery(configId);
-
-  /**
-   * Determines if the current node data has changed from the saved configuration
-   * Used to enable/disable the save button
-   */
-  const hasDrifted = useMemo(() => {
-    if (!savedConfig) return false;
-    const savedConfigData = llmConfigToOptimizationStudioNodeData(savedConfig);
-    return !isEqual(node.data, savedConfigData);
-  }, [node.data, savedConfig]);
-
+  const isDirty = formProps.formState.isDirty;
+  const { getPromptByHandle } = usePrompts();
+  const { project } = useOrganizationTeamProject();
+  
   const handleSaveVersion = () => {
+    const values = formProps.getValues();
+      /**
+       * Save new data to the database
+       */
       triggerSaveVersion({
         data: {
+          ...formValuesToTriggerSaveVersionParams(values),
           projectId,
-          handle: savedConfig?.handle ?? "",
-          scope: savedConfig?.scope ?? "PROJECT",
-          commitMessage: "Saved from optimization studio",
-          ...values,
         },
         onSuccess: (prompt) => {
+          // Update the node data with the new prompt
           setNode({
             ...node,
             data: versionedPromptToLlmPromptConfigComponentNodeData(prompt)
@@ -80,38 +72,35 @@ export function PromptSourceHeader({
       });
   };
 
+
   // TODO: Move this outside of the component
   const handleRestore = (versionId: string) => {
+    const handle = formProps.getValues().handle;
     void (async () => {
-      if (!savedConfig) {
+      if (!handle) {
         // This should never happen
-        logger.error({ versionId, projectId }, "Missing llm prompt config");
+        logger.error({ versionId, projectId, handle }, "Prompt handle not set");
         toaster.error({
           title: "Failed to restore prompt version",
-          description: "Missing prompt",
+          description: "Missing prompt handle",
         });
         return;
       }
 
       try {
-        // Get the saved version by id
-        const savedVersion = await trpc.llmConfigs.versions.getById.fetch({
+        const prompt = await getPromptByHandle({
+          handle,
           versionId,
           projectId,
         });
 
-        // Convert the saved version to a form values object
-        const newFormValues = llmConfigToPromptConfigFormValues({
-          ...savedConfig,
-          latestVersion: parseLlmConfigVersion(savedVersion),
-        });
+        if (!prompt) {
+          throw new Error("Prompt not found");
+        }
 
-        // Update the form values
-        const currentFormValues = formProps.getValues();
-        formProps.reset({
-          ...currentFormValues,
-          version: newFormValues.version,
-        });
+        // Convert the saved version to a form values object
+        const newFormValues = versionedPromptToPromptConfigFormValues(prompt);
+        formProps.reset(newFormValues);
       } catch (error) {
         logger.error({ error, versionId }, "Failed to restore prompt version");
         toaster.error({
@@ -122,6 +111,7 @@ export function PromptSourceHeader({
     })();
   };
 
+  const handle = formProps.watch("handle");
   return (
     <VerticalFormControl
       label="Versioned Prompt"
@@ -138,25 +128,23 @@ export function PromptSourceHeader({
         background="gray.50"
       >
         <HStack paddingX={1} gap={1}>
-          {savedConfig?.handle ? (
+          {handle ? (
             <Text fontSize="sm" fontWeight="500" fontFamily="mono">
-              {savedConfig.handle}
+              {handle}
             </Text>
           ) : (
             <Text color="gray.500">Draft</Text>
           )}
         </HStack>
         <Spacer />
-        {savedConfig && (
           <GeneratePromptApiSnippetDialog
             configId={configId}
             apiKey={project?.apiKey}
           >
             <GeneratePromptApiSnippetDialog.Trigger>
-              <GenerateApiSnippetButton config={savedConfig} />
+              <GenerateApiSnippetButton hasHandle={!!handle} />
             </GeneratePromptApiSnippetDialog.Trigger>
           </GeneratePromptApiSnippetDialog>
-        )}
         <PromptSource configId={configId} onSelect={onPromptSourceSelect} />
         {node.data.configId && (
           <VersionHistoryButton
@@ -165,7 +153,7 @@ export function PromptSourceHeader({
           />
         )}
         <VersionSaveButton
-          disabled={savedConfig && !hasDrifted}
+          disabled={!isDirty}
           onClick={() => void handleSaveVersion()}
           hideLabel={true}
         />
