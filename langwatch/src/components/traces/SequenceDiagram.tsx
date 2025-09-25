@@ -5,6 +5,7 @@ import {
   VStack,
   createListCollection,
 } from "@chakra-ui/react";
+import { intervalToDuration } from "date-fns";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { useTraceDetailsState } from "../../hooks/useTraceDetailsState";
@@ -114,6 +115,41 @@ const getParticipantDisplayName = (span: Span): string | null => {
 };
 
 /**
+ * Format duration in a human-readable way
+ * Single Responsibility: Convert millisecond duration to readable format
+ */
+const formatDuration = (durationMs: number): string => {
+  if (durationMs < 1000) return ""; // Don't show durations less than 1s
+
+  // Round to nearest second first, then use intervalToDuration for clean formatting
+  const roundedMs = Math.round(durationMs / 1000) * 1000;
+  const duration = intervalToDuration({ start: 0, end: roundedMs });
+
+  if ((duration.minutes ?? 0) === 0) {
+    // Less than 1 minute, show in seconds
+    return ` (${duration.seconds ?? 0}s)`;
+  } else {
+    // 1 minute or more, show in minutes and seconds
+    if ((duration.seconds ?? 0) === 0) {
+      return ` (${duration.minutes}min)`;
+    } else {
+      return ` (${duration.minutes}min ${duration.seconds}s)`;
+    }
+  }
+};
+
+/**
+ * Calculate span duration from timestamps
+ * Single Responsibility: Get duration in milliseconds from span timestamps
+ */
+const getSpanDuration = (span: Span): number => {
+  if (!span.timestamps?.started_at || !span.timestamps?.finished_at) {
+    return 0;
+  }
+  return span.timestamps.finished_at - span.timestamps.started_at;
+};
+
+/**
  * Generate Mermaid sequence diagram syntax from spans
  * Single Responsibility: Convert span tree into Mermaid sequence diagram syntax
  */
@@ -171,6 +207,26 @@ export const generateMermaidSyntax = (
     }
   });
 
+  // Helper function to recursively check if a span has any included descendants
+  const hasIncludedDescendants = (span: SpanWithChildren): boolean => {
+    if (!span.children || span.children.length === 0) {
+      return false;
+    }
+
+    // Check if any direct children are included
+    for (const child of span.children) {
+      if (typesToInclude.includes(child.type)) {
+        return true;
+      }
+      // Recursively check grandchildren
+      if (hasIncludedDescendants(child)) {
+        return true;
+      }
+    }
+
+    return false;
+  };
+
   // Generate interactions with bridging logic for filtered spans
   const processedSpans = new Set<string>();
 
@@ -198,23 +254,30 @@ export const generateMermaidSyntax = (
       }
 
       // If this span has a participant and a parent participant, create an interaction
-      if (
-        currentParticipant &&
-        parentParticipant &&
-        currentParticipant !== parentParticipant
-      ) {
-        let label = (span.name ?? span.type).slice(0, 50);
+        if (
+          currentParticipant &&
+          parentParticipant &&
+          currentParticipant !== parentParticipant
+        ) {
+          let label = (span.name ?? span.type).slice(0, 50);
 
-        // Special handling for different span types
-        if (span.type === "llm") {
-          label = "LLM call";
-        } else if (span.type === "agent") {
-          if (participantTypes.get(parentParticipant) === "agent") {
-            label = "handover";
-          } else {
-            label = "call";
+          // Special handling for different span types
+          if (span.type === "llm") {
+            label = "LLM call";
+          } else if (span.type === "agent") {
+            if (participantTypes.get(parentParticipant) === "agent") {
+              label = "handover";
+            } else {
+              label = "call";
+            }
           }
-        }
+
+          // Add duration if significant (>1s) and it's an effective leaf node (no included descendants)
+          const duration = getSpanDuration(span);
+          const isEffectiveLeafNode = !hasIncludedDescendants(span);
+          if (isEffectiveLeafNode) {
+            label += formatDuration(duration);
+          }
 
         // Add error indicator if span has error
         if (span.error) {
