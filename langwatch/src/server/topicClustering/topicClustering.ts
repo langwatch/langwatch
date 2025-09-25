@@ -329,23 +329,6 @@ export const clusterTopicsForProject = async (
     return inputText.length > 0;
   });
 
-  logger.info(
-    {
-      projectId,
-      rawTracesCount: rawTraces.length,
-      tracesWithInputCount: tracesWithInput.length,
-      sampleTraces: tracesWithInput.slice(0, 3).map((t) => ({
-        trace_id: t.trace_id,
-        has_input: !!t?.input?.value,
-        input_type: typeof t?.input?.value,
-        input_is_array: Array.isArray(t?.input?.value),
-        input_preview: extractInputText(t).slice(0, 100),
-        started_at: t?.timestamps?.started_at,
-      })),
-    },
-    "Trace filtering debug info"
-  );
-
   const traces: TopicClusteringTrace[] = tracesWithInput.map((trace) => ({
     trace_id: trace.trace_id,
     input: extractInputText(trace).slice(0, 8192),
