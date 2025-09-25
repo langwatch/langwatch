@@ -8,7 +8,7 @@ import { GenerateApiSnippetButton } from "../../../../components/GenerateApiSnip
 import { GeneratePromptApiSnippetDialog } from "../../../components/GeneratePromptApiSnippetDialog";
 import { ChangeHandleDialog } from "../../../forms/ChangeHandleDialog";
 import { type ChangeHandleFormValues } from "../../../forms/schemas/change-handle-form.schema";
-import type { PromptConfigFormValues } from "../../../hooks/usePromptConfigForm";
+import type { PromptConfigFormValues } from "~/prompt-configs";
 
 import { toaster } from "~/components/ui/toaster";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";

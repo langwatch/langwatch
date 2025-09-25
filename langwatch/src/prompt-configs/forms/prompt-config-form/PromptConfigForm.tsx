@@ -24,7 +24,7 @@ import { toaster } from "~/components/ui/toaster";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useGetPromptConfigByIdWithLatestVersionQuery } from "~/prompt-configs/hooks/useGetPromptConfigByIdWithLatestVersionQuery";
 import { usePromptConfig } from "~/prompt-configs/hooks/usePromptConfig";
-import type { PromptConfigFormValues } from "~/prompt-configs/hooks/usePromptConfigForm";
+import type { PromptConfigFormValues } from "~/prompt-configs";
 import { llmConfigToPromptConfigFormValues } from "~/prompt-configs/llmPromptConfigUtils";
 import { usePromptConfigContext } from "~/prompt-configs/providers/PromptConfigProvider";
 import { createLogger } from "~/utils/logger";

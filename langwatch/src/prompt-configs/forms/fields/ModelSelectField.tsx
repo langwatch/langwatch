@@ -1,6 +1,6 @@
 import { useFormContext, Controller } from "react-hook-form";
 
-import type { PromptConfigFormValues } from "../../hooks/usePromptConfigForm";
+import type { PromptConfigFormValues } from "~/prompt-configs";
 
 import { LLMConfigField } from "~/components/llmPromptConfigs/LlmConfigField";
 import { VerticalFormControl } from "~/components/VerticalFormControl";

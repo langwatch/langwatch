@@ -5,7 +5,7 @@ import { useForm, type DeepPartial } from "react-hook-form";
 
 import { inputsAndOutputsToDemostrationColumns } from "../llmPromptConfigUtils";
 
-import { formSchema, type PromptConfigFormValues } from "~/prompt-configs/schemas";
+import { formSchema, type PromptConfigFormValues } from "~/prompt-configs";
 
 interface UsePromptConfigFormProps {
   configId: string;

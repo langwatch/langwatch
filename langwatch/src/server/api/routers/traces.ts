@@ -209,6 +209,7 @@ export const tracesRouter = createTRPCRouter({
     .input(
       z.object({
         projectId: z.string(),
+        startDate: z.number(),
       })
     )
     .use(checkUserPermissionForProject(TeamRoleGroup.MESSAGES_VIEW))
