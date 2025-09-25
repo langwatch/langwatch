@@ -75,3 +75,22 @@ export const scheduleTopicClusteringNextPage = async (
     }
   );
 };
+
+export const scheduleTopicClusteringForProject = async (
+  projectId: string,
+  isManualTrigger = false
+) => {
+  const timestamp = Date.now();
+  const jobIdSuffix = isManualTrigger
+    ? `manual_${timestamp}`
+    : new Date().toISOString().split("T")[0];
+
+  await topicClusteringQueue.add(
+    "topic_clustering",
+    { project_id: projectId },
+    {
+      jobId: `topic_clustering_${projectId}_${jobIdSuffix}`,
+      delay: 0, // Run immediately for manual triggers
+    }
+  );
+};
