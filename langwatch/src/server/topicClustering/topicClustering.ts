@@ -35,6 +35,8 @@ import {
   OPENAI_EMBEDDING_DIMENSION,
 } from "../../utils/constants";
 
+import { getExtractedInput } from "../../components/messages/MessageCard";
+
 const logger = createLogger("langwatch:topicClustering");
 
 export const clusterTopicsForProject = async (
@@ -292,36 +294,9 @@ export const clusterTopicsForProject = async (
 
   const rawTraces = result.hits.hits.map((hit) => hit._source!);
 
-  // Helper function to extract text content from various input formats
   const extractInputText = (trace: Trace): string => {
-    if (!trace?.input?.value) return "";
-
-    // Handle string inputs
-    if (typeof trace.input.value === "string") {
-      return trace.input.value;
-    }
-
-    // Handle chat_messages format (strands-agents, etc.)
-    if (Array.isArray(trace.input.value)) {
-      return (trace.input.value as any[])
-        .map((msg: any) => {
-          if (typeof msg === "string") return msg;
-          if (msg?.content) {
-            if (typeof msg.content === "string") return msg.content;
-            if (typeof msg.content === "object")
-              return JSON.stringify(msg.content);
-          }
-          return JSON.stringify(msg);
-        })
-        .join(" ");
-    }
-
-    // Handle object inputs
-    if (typeof trace.input.value === "object") {
-      return JSON.stringify(trace.input.value);
-    }
-
-    return String(trace.input.value);
+    const extracted = getExtractedInput(trace);
+    return extracted === "<empty>" ? "" : extracted;
   };
 
   const tracesWithInput = rawTraces.filter((trace) => {
