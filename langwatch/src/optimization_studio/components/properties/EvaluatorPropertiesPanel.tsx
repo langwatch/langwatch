@@ -77,11 +77,7 @@ export function EvaluatorPropertiesPanel({ node }: { node: Node<Evaluator> }) {
     };
 
     setDefaultSettings(
-      getEvaluatorDefaultSettings(
-        evaluatorDefinition,
-        project,
-        publicEnv.data?.IS_ATLA_DEFAULT_JUDGE
-      ),
+      getEvaluatorDefaultSettings(evaluatorDefinition, project),
       "settings"
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps
