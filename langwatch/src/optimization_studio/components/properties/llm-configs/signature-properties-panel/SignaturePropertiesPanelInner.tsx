@@ -8,7 +8,6 @@ import { useShallow } from "zustand/react/shallow";
 
 import { useWizardContext } from "../../../../../components/evaluations/wizard/hooks/useWizardContext";
 import { PromptMessagesField } from "../../../../../prompt-configs/forms/fields/PromptMessagesField";
-import type { LlmConfigWithLatestVersion } from "../../../../../server/prompt-config/repositories/llm-config.repository";
 import { useWorkflowStore } from "../../../../hooks/useWorkflowStore";
 import type {
   LlmPromptConfigComponent,
@@ -38,7 +37,6 @@ import {
   safeOptimizationStudioNodeDataToPromptConfigFormInitialValues,
   promptConfigFormValuesToOptimizationStudioNodeData,
 } from "~/prompt-configs/llmPromptConfigUtils";
-import { usePromptConfigContext } from "~/prompt-configs/providers/PromptConfigProvider";
 import { api } from "~/utils/api";
 
 
@@ -64,7 +62,6 @@ export function SignaturePropertiesPanelInner({
 }) {
   const trpc = api.useContext();
   const { project } = useOrganizationTeamProject();
-  const { triggerSaveVersion } = usePromptConfigContext();
   const configId = node.data.configId;
   const setNode = useSmartSetNode();
 
@@ -170,24 +167,6 @@ export function SignaturePropertiesPanelInner({
         description: "Please try again.",
       });
     }
-  };
-
-  const handleTriggerSaveVersion = (
-    config: LlmConfigWithLatestVersion,
-    saveFormValues: PromptConfigFormValues
-  ) => {
-    void (async () => {
-      // Check form value validity
-      const isValid = await formProps.methods.trigger();
-      if (!isValid) return;
-
-      await triggerSaveVersion({
-        config,
-        form: formProps.methods,
-        updateConfigValues: saveFormValues,
-        editingHandleOrScope: false,
-      });
-    })();
   };
 
   /**
@@ -322,7 +301,6 @@ export function SignaturePropertiesPanelInner({
                 onPromptSourceSelect={(config) =>
                   void handlePromptSourceSelect(config)
                 }
-                triggerSaveVersion={handleTriggerSaveVersion}
                 values={formProps.methods.getValues()}
               />
               <WrappedOptimizationStudioLLMConfigField />

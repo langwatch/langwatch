@@ -21,6 +21,7 @@ import { VersionHistoryButton } from "./components/VersionHistoryButton";
 import { VersionSaveButton } from "./components/VersionSaveButton";
 
 import { toaster } from "~/components/ui/toaster";
+import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useGetPromptConfigByIdWithLatestVersionQuery } from "~/prompt-configs/hooks/useGetPromptConfigByIdWithLatestVersionQuery";
 import { usePromptConfig } from "~/prompt-configs/hooks/usePromptConfig";
 import type { PromptConfigFormValues } from "~/prompt-configs/hooks/usePromptConfigForm";
@@ -44,7 +45,8 @@ function InnerPromptConfigForm(props: PromptConfigFormProps) {
   const { isLoading } = usePromptConfig();
   const { triggerSaveVersion } = usePromptConfigContext();
   const saveEnabled = methods.formState.isDirty;
-  const { data: savedConfig, refetch: refetchSavedConfig } =
+  const { projectId = "" } = useOrganizationTeamProject();
+  const { refetch: refetchSavedConfig } =
     useGetPromptConfigByIdWithLatestVersionQuery(configId);
 
   /**
@@ -63,29 +65,34 @@ function InnerPromptConfigForm(props: PromptConfigFormProps) {
   ).map((input) => input.identifier);
 
   const handleSaveClick = useCallback(() => {
-    if (!savedConfig) return;
-    void triggerSaveVersion({
-      config: savedConfig,
-      form: methods,
-      updateConfigValues: methods.getValues(),
-      editingHandleOrScope: false,
-    }).catch((error) => {
-      logger.error(error);
-      toaster.error({
-        title: "Failed to save version",
-        description: error.message,
-      });
-    });
-  }, [savedConfig, methods, triggerSaveVersion]);
+    const values = methods.getValues();
+    triggerSaveVersion({
+      data: {
+        handle: values.handle,
+        scope: values.scope,
+        projectId,
+        prompt: values.version.configData.prompt,
+        messages: values.version.configData.messages,
+        inputs: values.version.configData.inputs,
+        outputs: values.version.configData.outputs,
+        model: values.version.configData.llm.model,
+        temperature: values.version.configData.llm.temperature,
+        maxTokens: values.version.configData.llm.max_tokens,
+        promptingTechnique: values.version.configData.prompting_technique,
+      },
+    })
+  }, [methods, triggerSaveVersion, projectId]);
 
+  const demonstrations = methods.watch("version.configData.demonstrations");
   const hasDemonstrations = Boolean(
     Object.values(
-      savedConfig?.latestVersion.configData.demonstrations?.inline?.records ?? {
+      demonstrations?.inline?.records ?? {
         dummy: [],
       }
     )[0]?.length ?? 0 > 0
   );
 
+  // TODO: I think this doesn't need to be called here.
   const handleRestore = useCallback(
     (_versionId: string) => {
       refetchSavedConfig()
@@ -104,13 +111,11 @@ function InnerPromptConfigForm(props: PromptConfigFormProps) {
     [refetchSavedConfig, methods]
   );
 
-  if (!savedConfig) return null;
-
   return (
     <form style={{ width: "100%", height: "100%" }}>
       <VStack width="full" height="full" gap={6} mb={6}>
         <VStack width="full" gap={6} mb={6} paddingBottom="70px">
-          <PromptHandleInfo config={savedConfig} methods={methods} />
+          <PromptHandleInfo configId={configId} />
           <ModelSelectField />
           <PromptField
             templateAdapter="default"
