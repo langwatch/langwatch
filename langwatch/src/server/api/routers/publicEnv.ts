@@ -19,7 +19,6 @@ export const publicEnvRouter = publicProcedure
       HAS_EMAIL_PROVIDER_KEY:
         !!env.SENDGRID_API_KEY || !!(env.USE_AWS_SES && env.AWS_REGION),
       IS_SAAS: env.IS_SAAS,
-      IS_ATLA_DEFAULT_JUDGE: shouldUseAtlaModelForJudges(),
       POSTHOG_KEY: env.POSTHOG_KEY,
       POSTHOG_HOST: env.POSTHOG_HOST,
       HAS_LANGWATCH_NLP_SERVICE:
@@ -29,7 +28,3 @@ export const publicEnvRouter = publicProcedure
 
     return publicEnvVars;
   });
-
-const shouldUseAtlaModelForJudges = () => {
-  return !!process.env.ATLA_API_KEY && new Date() < new Date("2025-07-01");
-};

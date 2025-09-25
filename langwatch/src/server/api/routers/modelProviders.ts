@@ -381,11 +381,6 @@ export const prepareLitellmParams = async ({
       getModelOrDefaultEnvKey(modelProvider, "AWS_REGION_NAME") ?? "invalid";
   }
 
-  if (modelProvider.provider === "atla") {
-    params.model = model.replace("atla/", "openai/");
-    params.api_base = "https://api.atla-ai.com/v1";
-  }
-
   if (dependencies.managedModelProviderLitellmParams) {
     return await dependencies.managedModelProviderLitellmParams({
       params,

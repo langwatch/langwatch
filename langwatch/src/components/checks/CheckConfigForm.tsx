@@ -216,11 +216,7 @@ export default function CheckConfigForm({
     };
 
     setDefaultSettings(
-      getEvaluatorDefaultSettings(
-        availableEvaluators[checkType],
-        undefined,
-        publicEnv.data?.IS_ATLA_DEFAULT_JUDGE
-      ),
+      getEvaluatorDefaultSettings(availableEvaluators[checkType], undefined),
       "settings"
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps
