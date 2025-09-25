@@ -35,7 +35,7 @@ import {
   OPENAI_EMBEDDING_DIMENSION,
 } from "../../utils/constants";
 
-import { getExtractedInput } from "../../components/messages/MessageCard";
+import { getExtractedInput } from "../../utils/traceExtraction";
 
 const logger = createLogger("langwatch:topicClustering");
 

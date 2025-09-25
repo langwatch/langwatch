@@ -7,7 +7,7 @@ import { api } from "../../utils/api";
 import { TextCursorInput, Bug } from "lucide-react";
 
 import { Edit, Italic, Search } from "react-feather";
-import { getExtractedInput } from "../../components/messages/MessageCard";
+import { getExtractedInput } from "../../utils/traceExtraction";
 
 import { useDrawer } from "../../components/CurrentDrawer";
 import { useAnnotationCommentStore } from "../../hooks/useAnnotationCommentStore";
