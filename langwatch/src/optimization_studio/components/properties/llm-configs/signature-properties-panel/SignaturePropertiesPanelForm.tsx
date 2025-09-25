@@ -32,6 +32,7 @@ import {
   safeOptimizationStudioNodeDataToPromptConfigFormInitialValues,
 } from "~/prompt-configs/llmPromptConfigUtils";
 import { api } from "~/utils/api";
+import { PromptDriftWarning } from "./PromptDriftWarning";
 
 /**
  * Properties panel for the Signature node in the optimization studio.
@@ -48,7 +49,7 @@ import { api } from "~/utils/api";
  * - Demonstrations (few-shot examples)
  * - Advanced prompting techniques
  */
-export function SignaturePropertiesPanelInner({
+export function SignaturePropertiesPanelForm({
   node,
   onFormValuesChange,
 }: {
