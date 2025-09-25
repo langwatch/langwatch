@@ -17,7 +17,7 @@ import { limitsRouter } from "./routers/limits";
 import { llmModelCostsRouter } from "./routers/llmModelCosts";
 import { modelProviderRouter } from "./routers/modelProviders";
 import { monitorsRouter } from "./routers/monitors";
-import { onboardingRouter } from "./routers/onboarding";
+import { onboardingRouter } from "./routers/onboarding/onboarding.router";
 import { optimizationRouter } from "./routers/optimization";
 import { organizationRouter } from "./routers/organization";
 import { planRouter } from "./routers/plan";
