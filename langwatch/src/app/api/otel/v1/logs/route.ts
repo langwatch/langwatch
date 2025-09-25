@@ -118,9 +118,14 @@ async function handleLogsRequest(req: NextRequest) {
           );
         }
       }
+      console.log("logRequest", JSON.stringify(logRequest, undefined, 2));
 
       const tracesGeneratedFromLogs =
         await openTelemetryLogsRequestToTracesForCollection(logRequest);
+      console.log(
+        "tracesGeneratedFromLogs",
+        JSON.stringify(tracesGeneratedFromLogs, undefined, 2)
+      );
 
       const promises = await tracer.withActiveSpan(
         "check which traces have already been collected",

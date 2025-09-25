@@ -158,4 +158,6 @@ export const Select = {
   Indicator: ChakraSelect.Indicator,
   HiddenSelect: ChakraSelect.HiddenSelect,
   Control: ChakraSelect.Control,
+  IndicatorGroup: ChakraSelect.IndicatorGroup,
+  ItemIndicator: ChakraSelect.ItemIndicator,
 };
