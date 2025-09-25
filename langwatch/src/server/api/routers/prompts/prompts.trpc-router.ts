@@ -2,13 +2,12 @@ import { PromptScope } from "@prisma/client";
 import { z } from "zod";
 
 import { PromptService } from "~/server/prompt-config";
-import { getLatestConfigVersionSchema } from "~/server/prompt-config/repositories/llm-config-version-schema";
 
 import { TeamRoleGroup } from "../../permission";
 import { checkUserPermissionForProject } from "../../permission";
 import { createTRPCRouter, protectedProcedure } from "../../trpc";
 
-import { handleSchema } from "~/prompt-configs/schemas";
+import { handleSchema, inputsSchema, messageSchema, outputsSchema, promptingTechniqueSchema } from "~/prompt-configs/schemas";
 
 /**
  * Router for handling prompts - the business-facing interface
@@ -23,11 +22,20 @@ export const promptsRouter = createTRPCRouter({
     .input(
       z.object({
         projectId: z.string(),
-        promptId: z.string().optional(),
         handle: handleSchema,
-        scope: z.nativeEnum(PromptScope).optional(),
-        commitMessage: z.string().optional(),
-        versionData: getLatestConfigVersionSchema().shape.configData.partial(),
+        data: z.object({
+          scope: z.nativeEnum(PromptScope).optional(),
+          authorId: z.string().optional(),
+          commitMessage: z.string().optional(),
+          prompt: z.string().optional(),
+          messages: z.array(messageSchema).optional(),
+          inputs: z.array(inputsSchema).optional(),
+          outputs: z.array(outputsSchema).optional(),
+          model: z.string().optional(),
+          temperature: z.number().optional(),
+          maxTokens: z.number().optional(),
+          promptingTechnique: promptingTechniqueSchema.optional(),
+        }),
       })
     )
     .use(checkUserPermissionForProject(TeamRoleGroup.PROMPTS_MANAGE))
@@ -36,13 +44,35 @@ export const promptsRouter = createTRPCRouter({
       const authorId = ctx.session?.user?.id;
 
       return await service.upsertPrompt({
-        idOrHandle: input.promptId,
-        projectId: input.projectId,
         handle: input.handle,
-        scope: input.scope,
-        authorId,
-        commitMessage: input.commitMessage,
-        versionData: input.versionData,
+        projectId: input.projectId,
+        data: {
+          ...input.data,
+          authorId,
+        }
+      });
+    }),
+
+
+  /**
+   * Update a prompt
+   */
+  update: protectedProcedure
+    .input(z.object({
+      projectId: z.string(),
+      handle: handleSchema,
+      data: z.object({
+        scope: z.nativeEnum(PromptScope).optional(),
+        commitMessage: z.string().optional(),
+      })
+    }))
+    .use(checkUserPermissionForProject(TeamRoleGroup.PROMPTS_MANAGE))
+    .mutation(async ({ ctx, input }) => {
+      const service = new PromptService(ctx.prisma);
+      return await service.updatePrompt({
+        idOrHandle: input.handle,
+        projectId: input.projectId,
+        data: input.data,
       });
     }),
 });

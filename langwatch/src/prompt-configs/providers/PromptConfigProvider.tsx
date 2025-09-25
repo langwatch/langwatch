@@ -6,33 +6,50 @@ import {
   useRef,
   useState,
 } from "react";
-import { type UseFormReturn } from "react-hook-form";
+import { type z } from "zod";
 
-import type { LlmConfigWithLatestVersion } from "../../server/prompt-config/repositories";
+import type { VersionedPrompt } from "~/server/prompt-config";
+
 import { ChangeHandleDialog } from "../forms/ChangeHandleDialog";
 import {
   SaveVersionDialog,
   type SaveDialogFormValues,
 } from "../forms/SaveVersionDialog";
 import type { ChangeHandleFormValues } from "../forms/schemas/change-handle-form.schema";
-import type { PromptConfigFormValues } from "../hooks/usePromptConfigForm";
 import { usePrompts } from "../hooks/usePrompts";
+import type {
+  inputsSchema,
+  messageSchema,
+  promptingTechniqueSchema,
+  outputsSchema,
+} from "../schemas";
 
 import { toaster } from "~/components/ui/toaster";
-import { promptConfigFormValuesVersionToLlmConfigVersionConfigData } from "~/prompt-configs/llmPromptConfigUtils";
+
+interface TriggerSaveVersionParams {
+    projectId: string;
+    handle: string; // Required if editingHandleOrScope is 
+    scope?: PromptScope;
+    prompt?: string
+    messages?: z.infer<typeof messageSchema>[];
+    inputs?: z.infer<typeof inputsSchema>[];
+    outputs?: z.infer<typeof outputsSchema>[];
+    model?: string;
+    temperature?: number;
+    maxTokens?: number;
+    promptingTechnique?: z.infer<typeof promptingTechniqueSchema>;
+}
 
 interface PromptConfigContextType {
   triggerSaveVersion: ({
-    config,
-    form,
-    updateConfigValues,
-    editingHandleOrScope,
+    data,
+    onError,
+    onSuccess,
   }: {
-    config: LlmConfigWithLatestVersion;
-    form: UseFormReturn<PromptConfigFormValues>;
-    updateConfigValues: PromptConfigFormValues;
-    editingHandleOrScope: boolean;
-  }) => Promise<void>;
+    data: TriggerSaveVersionParams;
+    onError?: (error: Error) => void;
+    onSuccess?: (prompt: VersionedPrompt) => void;
+  }) => void;
 }
 
 const PromptConfigContext = createContext<PromptConfigContextType>({
@@ -82,35 +99,27 @@ export function PromptConfigProvider({
     setSaveDialogData(null);
   }, []);
 
-  const triggerSaveVersion = useCallback(
-    async ({
-      config,
-      form,
-      updateConfigValues,
-    }: {
-      config?: LlmConfigWithLatestVersion;
-      form: UseFormReturn<PromptConfigFormValues>;
-      updateConfigValues: PromptConfigFormValues;
-      editingHandleOrScope: boolean;
+  const triggerSaveVersion: PromptConfigContextType["triggerSaveVersion"] = useCallback(
+    ({
+      data,
+      onError,
+      onSuccess,
     }) => {
-      if (!config) return;
-      setSaveDialogData({ handle: config.handle, scope: config.scope });
-
-      const isValid = await form.trigger();
-      if (!isValid) return;
+      if (!data) return;
+      const projectId = data.projectId;
+      setSaveDialogData({ handle: data.handle, scope: data.scope });
 
       // Create the closure with all the save parameters
       saveClosureRef.current = async ({ handle, scope, commitMessage }) => {
         try {
           const prompt = await upsertPrompt({
             handle,
-            scope: config.scope ?? scope,
-            commitMessage,
-            versionData:
-              promptConfigFormValuesVersionToLlmConfigVersionConfigData(
-                updateConfigValues.version
-              ),
-            projectId: config.projectId,
+            projectId,
+            data: {
+              ...data,
+              scope: data.scope ?? scope,
+              commitMessage,
+            },
           });
 
           if (prompt.version === 1) {
@@ -129,6 +138,7 @@ export function PromptConfigProvider({
           }
 
           closeDialog();
+          onSuccess?.(prompt);
         } catch (error) {
           toaster.create({
             title: "Failed to save",
@@ -136,6 +146,7 @@ export function PromptConfigProvider({
               error instanceof Error ? error.message : "Please try again.",
             type: "error",
           });
+          onError?.(error as Error);
         }
       };
     },

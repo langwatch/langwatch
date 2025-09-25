@@ -10,6 +10,7 @@ export const usePrompts = () => {
   const { project } = useOrganizationTeamProject();
   const projectId = project?.id ?? "";
   const upsertPrompt = api.prompts.upsert.useMutation();
+  const updatePrompt = api.prompts.update.useMutation();
 
   const invalidateAll = async () => Promise.all([
     await trpc.llmConfigs.getPromptConfigs.invalidate(),
@@ -22,11 +23,19 @@ export const usePrompts = () => {
   const wrappedUpsertPrompt: typeof upsertPrompt.mutateAsync = async (promptData)=> {
     const prompt = await upsertPrompt.mutateAsync({
       projectId,
-      promptId: promptData.promptId,
       handle: promptData.handle,
-      scope: promptData.scope,
-      commitMessage: promptData.commitMessage,
-      versionData: promptData.versionData,
+      data: promptData.data,
+    });
+
+    await invalidateAll();
+    return prompt;
+  };
+
+  const wrappedUpdatePrompt: typeof updatePrompt.mutateAsync = async (promptData)=> {
+    const prompt = await updatePrompt.mutateAsync({
+      projectId,
+      handle: promptData.handle,
+      data: promptData.data,
     });
 
     await invalidateAll();
@@ -35,5 +44,6 @@ export const usePrompts = () => {
 
   return {
     upsertPrompt: wrappedUpsertPrompt,
+    updatePrompt: wrappedUpdatePrompt,
   };
 };
