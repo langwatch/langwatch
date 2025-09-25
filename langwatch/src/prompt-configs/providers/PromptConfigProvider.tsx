@@ -166,7 +166,7 @@ export function PromptConfigProvider({
         setSaveDialogData({
           handle: data.handle,
           scope: data.scope,
-          needsHandleChange: !!data.handle,
+          needsHandleChange: !data.handle,
         });
         setSaveClosure(data, onError, onSuccess);
       },

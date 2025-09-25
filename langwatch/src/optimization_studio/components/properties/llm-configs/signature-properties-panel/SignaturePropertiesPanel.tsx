@@ -12,7 +12,7 @@ import type {
 } from "../../../../types/dsl";
 
 import { useLegacyNodeMigration } from "./hooks/use-legacy-node-migration.hook";
-import { SignaturePropertiesPanelInner } from "./SignaturePropertiesPanelInner";
+import { SignaturePropertiesPanelForm } from "./SignaturePropertiesPanelForm";
 import { SignaturePropertiesPanelLoadingState } from "./SignaturePropertiesPanelLoadingState";
 
 import { PromptConfigProvider } from "~/prompt-configs/providers/PromptConfigProvider";
@@ -95,7 +95,7 @@ export function SignaturePropertiesPanel({
     >
       <PromptConfigProvider>
         <VStack width="full" gap={4}>
-          <SignaturePropertiesPanelInner
+          <SignaturePropertiesPanelForm
             node={node as Node<LlmPromptConfigComponent>}
             onFormValuesChange={syncNodeDataWithFormValues}
           />
