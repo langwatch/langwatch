@@ -21,6 +21,7 @@ import { usePromptHandleCheck } from "../../hooks/prompts/usePromptHandleCheck";
 import { createChangeHandleFormSchema, type ChangeHandleFormValues } from "./schemas/change-handle-form.schema";
 
 import { Dialog } from "~/components/ui/dialog";
+import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 
 export interface ChangeHandleDialogProps {
   currentHandle?: string | null;
@@ -134,7 +135,7 @@ export function ChangeHandleDialog({
         >
           <Dialog.Header>
             <Dialog.Title>
-              {currentHandle ? "Save Prompt" : "Change Prompt ID"}
+              {currentHandle ? "Save Prompt" : "Change Prompt Handle"}
             </Dialog.Title>
           </Dialog.Header>
           <Dialog.CloseTrigger />

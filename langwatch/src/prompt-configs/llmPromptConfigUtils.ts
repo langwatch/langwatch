@@ -327,7 +327,7 @@ export function versionedPromptToLlmPromptConfigComponentNodeData(
 
 export function formValuesToTriggerSaveVersionParams(
   formValues: PromptConfigFormValues
-): TriggerSaveVersionParams {
+): Omit<TriggerSaveVersionParams, "projectId"> {
   return {
     handle: formValues.handle,
     scope: formValues.scope,
