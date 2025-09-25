@@ -30,6 +30,3 @@ export const formSchema = z.object({
     }),
   }),
 });
-
-
-export type PromptConfigFormValues = z.infer<typeof formSchema>;

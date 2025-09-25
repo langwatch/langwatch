@@ -17,7 +17,7 @@ import type {
   Signature,
 } from "../optimization_studio/types/dsl";
 
-import type { PromptConfigFormValues } from "~/prompt-configs/schemas";
+import type { PromptConfigFormValues } from "~/prompt-configs";
 import {
   LlmConfigInputTypes,
   LlmConfigOutputTypes,

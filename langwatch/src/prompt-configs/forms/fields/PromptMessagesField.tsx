@@ -20,7 +20,7 @@ import {
   PromptTextArea,
   type PromptTextAreaOnAddMention,
 } from "../../components/ui/PromptTextArea";
-import type { PromptConfigFormValues } from "../../hooks/usePromptConfigForm";
+import type { PromptConfigFormValues } from "~/prompt-configs";
 
 import { VerticalFormControl } from "~/components/VerticalFormControl";
 

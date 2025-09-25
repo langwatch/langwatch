@@ -31,7 +31,7 @@ import { PromptField } from "~/prompt-configs/forms/fields/PromptField";
 import {
   usePromptConfigForm,
   type PromptConfigFormValues,
-} from "~/prompt-configs/hooks/usePromptConfigForm";
+} from "~/prompt-configs";
 import {
   llmConfigToOptimizationStudioNodeData,
   safeOptimizationStudioNodeDataToPromptConfigFormInitialValues,
