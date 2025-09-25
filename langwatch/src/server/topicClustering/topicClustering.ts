@@ -294,19 +294,14 @@ export const clusterTopicsForProject = async (
 
   const rawTraces = result.hits.hits.map((hit) => hit._source!);
 
-  const extractInputText = (trace: Trace): string => {
-    const extracted = getExtractedInput(trace);
-    return extracted === "<empty>" ? "" : extracted;
-  };
-
   const tracesWithInput = rawTraces.filter((trace) => {
-    const inputText = extractInputText(trace);
-    return inputText.length > 0;
+    const inputText = getExtractedInput(trace);
+    return inputText !== "<empty>" && inputText.length > 0;
   });
 
   const traces: TopicClusteringTrace[] = tracesWithInput.map((trace) => ({
     trace_id: trace.trace_id,
-    input: extractInputText(trace).slice(0, 8192),
+    input: getExtractedInput(trace).slice(0, 8192),
     topic_id:
       trace.metadata?.topic_id && topicIds.includes(trace.metadata.topic_id)
         ? trace.metadata.topic_id
