@@ -779,9 +779,6 @@ function ProjectSettingsForm({ project }: { project: Project }) {
         </Card.Body>
       </Card.Root>
 
-      {/* Topic Clustering Manual Trigger */}
-      <TopicClusteringCard project={project} />
-
       {/* Trace Sharing Disable Confirmation Dialog */}
       <Dialog.Root
         open={showTraceSharingDialog}
@@ -833,70 +830,5 @@ function ProjectSettingsForm({ project }: { project: Project }) {
         </Dialog.Content>
       </Dialog.Root>
     </>
-  );
-}
-
-function TopicClusteringCard({ project }: { project: Project }) {
-  const { hasTeamPermission } = useOrganizationTeamProject({
-    redirectToOnboarding: false,
-  });
-  const triggerClustering = api.project.triggerTopicClustering.useMutation({
-    onSuccess: () => {
-      toaster.create({
-        title: "Topic clustering started",
-        description:
-          "The topic clustering job has been queued and will run shortly.",
-        type: "success",
-        placement: "top-end",
-      });
-    },
-    onError: (error) => {
-      toaster.create({
-        title: "Failed to trigger topic clustering",
-        description: error.message,
-        type: "error",
-        placement: "top-end",
-      });
-    },
-  });
-
-  // Only show to users with setup permissions
-  if (!hasTeamPermission(TeamRoleGroup.SETUP_PROJECT)) {
-    return null;
-  }
-
-  return (
-    <Card.Root>
-      <Card.Header>
-        <Heading size="md">Topic Clustering</Heading>
-      </Card.Header>
-      <Card.Body>
-        <VStack align="start" gap={4}>
-          <Text>
-            Manually trigger topic clustering to organize your traces into
-            topics and subtopics. This will analyze your recent traces and group
-            them by similar patterns.
-          </Text>
-
-          <Alert.Root>
-            <Alert.Indicator />
-            <Alert.Content>
-              <Alert.Description>
-                Topic clustering requires at least 10 traces to run effectively.
-                The process may take several minutes depending on the number of
-                traces.
-              </Alert.Description>
-            </Alert.Content>
-          </Alert.Root>
-          <Button
-            colorPalette="blue"
-            onClick={() => triggerClustering.mutate({ projectId: project.id })}
-            loading={triggerClustering.isLoading}
-          >
-            Run Topic Clustering
-          </Button>
-        </VStack>
-      </Card.Body>
-    </Card.Root>
   );
 }
