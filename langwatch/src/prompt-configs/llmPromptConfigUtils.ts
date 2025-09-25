@@ -118,6 +118,7 @@ export function safeOptimizationStudioNodeDataToPromptConfigFormInitialValues(
   const outputs = safeOutputs(nodeData.outputs);
 
   return {
+    handle: nodeData.handle,
     version: {
       configData: {
         inputs,
@@ -330,14 +331,19 @@ export function versionedPromptToLlmPromptConfigComponentNodeData(
  * Converts the form values to the trigger save version params.
  * It will also filter out the system prompt from the messages array.
  * If both the prompt and system message is set, the prompt will be used.
- * @param formValues 
- * @returns 
+ * @param formValues
+ * @returns
  */
 export function formValuesToTriggerSaveVersionParams(
   formValues: PromptConfigFormValues
 ): Omit<TriggerSaveVersionParams, "projectId"> {
-  const systemPrompt = formValues.version.configData.prompt ?? formValues.version.configData.messages?.find(msg => msg.role === "system")?.content;
-  const messages = formValues.version.configData.messages?.filter(msg => msg.role !== "system");
+  const systemPrompt =
+    formValues.version.configData.prompt ??
+    formValues.version.configData.messages?.find((msg) => msg.role === "system")
+      ?.content;
+  const messages = formValues.version.configData.messages?.filter(
+    (msg) => msg.role !== "system"
+  );
 
   return {
     handle: formValues.handle,
@@ -350,6 +356,7 @@ export function formValuesToTriggerSaveVersionParams(
     temperature: formValues.version.configData.llm.temperature,
     maxTokens: formValues.version.configData.llm.max_tokens,
     promptingTechnique: formValues.version.configData.prompting_technique,
+    demonstrations: formValues.version.configData.demonstrations
   };
 }
 
@@ -362,7 +369,7 @@ export function versionedPromptToPromptConfigFormValues(
     version: {
       configData: {
         prompt: prompt.prompt,
-        messages: prompt.messages,
+        messages: prompt.messages.filter((msg) => msg.role !== "system"),
         inputs: prompt.inputs,
         outputs: prompt.outputs,
         demonstrations: prompt.demonstrations,
@@ -402,37 +409,42 @@ export function versionedPromptToOptimizationStudioNodeData(
       {
         identifier: "demonstrations",
         type: "dataset",
-        value: prompt.demonstrations,
+        value: prompt.demonstrations
       },
       {
         identifier: "messages",
         type: "chat_messages",
-        value: prompt.messages,
+        value: prompt.messages.filter((msg) => msg.role !== "system"),
       },
       {
         identifier: "prompting_technique",
         type: "prompting_technique",
         value: prompt.promptingTechnique,
       },
-    ],  
+    ],
   };
 }
 
 /**
  * Converts the node data to a JSON string for comparison.
  * We do not compare all fields, only the ones that are relevant for the prompt.
- * @param nodeData 
+ * @param nodeData
  * @returns JSON string
  */
-function nodeDataToJson(nodeData: Node<LlmPromptConfigComponent>["data"]): string {
+function nodeDataToJson(
+  nodeData: Node<LlmPromptConfigComponent>["data"]
+): string {
   return JSON.stringify({
     handle: nodeData.handle,
     inputs: nodeData.inputs,
     outputs: nodeData.outputs,
     parameters: nodeData.parameters,
-  });
+  }, null, 2);
 }
 
-export function isNodeDataEqual(nodeData1: Node<LlmPromptConfigComponent>["data"], nodeData2: Node<LlmPromptConfigComponent>["data"]): boolean {
+export function isNodeDataEqual(
+  nodeData1: Node<LlmPromptConfigComponent>["data"],
+  nodeData2: Node<LlmPromptConfigComponent>["data"]
+): boolean {
   return nodeDataToJson(nodeData1) === nodeDataToJson(nodeData2);
 }

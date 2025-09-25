@@ -20,6 +20,7 @@ import {
 import { usePromptConfigContext } from "~/prompt-configs/providers/PromptConfigProvider";
 import { createLogger } from "~/utils/logger";
 import { PromptDriftWarning } from "../signature-properties-panel/PromptDriftWarning";
+import { useNodeDrift } from "../signature-properties-panel/hooks/use-node-drift";
 
 const logger = createLogger(
   "langwatch:optimization_studio:prompt_source_header"
@@ -44,6 +45,7 @@ export function PromptSourceHeader({
   const isDirty = formProps.formState.isDirty;
   const { getPromptByHandle } = usePrompts();
   const { project } = useOrganizationTeamProject();
+  const { hasDrift } = useNodeDrift(node);
 
   const handleSaveVersion = () => {
     const values = formProps.getValues();
@@ -99,6 +101,8 @@ export function PromptSourceHeader({
   };
 
   const handle = formProps.watch("handle");
+
+  console.log({ handle, hasDrift });
   return (
     <VStack width="full" gap={0}>
       <VerticalFormControl
@@ -116,7 +120,7 @@ export function PromptSourceHeader({
           background="gray.50"
         >
           <HStack paddingX={1} gap={1}>
-            {handle ? (
+            {handle && !hasDrift ? (
               <Text fontSize="sm" fontWeight="500" fontFamily="mono">
                 {handle}
               </Text>
@@ -141,7 +145,7 @@ export function PromptSourceHeader({
             />
           )}
           <VersionSaveButton
-            disabled={!isDirty}
+            disabled={!isDirty && !hasDrift}
             onClick={() => void handleSaveVersion()}
             hideLabel={true}
           />
