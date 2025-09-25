@@ -102,7 +102,6 @@ export function PromptSourceHeader({
 
   const handle = formProps.watch("handle");
 
-  console.log({ handle, hasDrift });
   return (
     <VStack width="full" gap={0}>
       <VerticalFormControl
