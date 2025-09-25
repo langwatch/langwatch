@@ -4,7 +4,7 @@ import {
   useFormContext,
   type UseFieldArrayReturn,
 } from "react-hook-form";
-import type { PromptConfigFormValues } from "../../hooks/usePromptConfigForm";
+import type { PromptConfigFormValues } from "~/prompt-configs";
 import { VerticalFormControl } from "~/components/VerticalFormControl";
 import { PropertySectionTitle } from "../../../optimization_studio/components/properties/BasePropertiesPanel";
 import { AddRemoveMessageFieldButton } from "./PromptMessagesField";

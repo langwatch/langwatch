@@ -1,3 +1,6 @@
+import { type z } from "zod";
+import { type formSchema } from "./schemas";
+
 /**
  * Represents a code snippet for API usage
  */
@@ -44,3 +47,5 @@ const AVAILABLE_TARGETS = [
 ] as const;
 
 export type Target = (typeof AVAILABLE_TARGETS)[number];
+
+export type PromptConfigFormValues = z.infer<typeof formSchema>;

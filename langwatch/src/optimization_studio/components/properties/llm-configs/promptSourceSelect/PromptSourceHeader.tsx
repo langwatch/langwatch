@@ -17,7 +17,7 @@ import { GeneratePromptApiSnippetDialog } from "~/prompt-configs/components/Gene
 import { VersionHistoryButton } from "~/prompt-configs/forms/prompt-config-form/components/VersionHistoryButton";
 import { VersionSaveButton } from "~/prompt-configs/forms/prompt-config-form/components/VersionSaveButton";
 import { useGetPromptConfigByIdWithLatestVersionQuery } from "~/prompt-configs/hooks/useGetPromptConfigByIdWithLatestVersionQuery";
-import { type PromptConfigFormValues } from "~/prompt-configs/hooks/usePromptConfigForm";
+import { type PromptConfigFormValues } from "~/prompt-configs";
 import {
   llmConfigToOptimizationStudioNodeData,
   llmConfigToPromptConfigFormValues,

@@ -15,7 +15,7 @@ import type {
   Signature,
 } from "~/optimization_studio/types/dsl";
 import { usePromptConfig } from "~/prompt-configs/hooks/usePromptConfig";
-import { type PromptConfigFormValues } from "~/prompt-configs/hooks/usePromptConfigForm";
+import { type PromptConfigFormValues } from "~/prompt-configs";
 import {
   createNewOptimizationStudioPromptName,
   llmConfigToOptimizationStudioNodeData,

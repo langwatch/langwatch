@@ -4,7 +4,7 @@ import { OptimizationStudioLLMConfigField } from "./OptimizationStudioLLMConfigF
 
 import { VerticalFormControl } from "~/components/VerticalFormControl";
 import type { LLMConfig } from "~/optimization_studio/types/dsl";
-import type { PromptConfigFormValues } from "~/prompt-configs/hooks/usePromptConfigForm";
+import type { PromptConfigFormValues } from "~/prompt-configs";
 
 /**
  * Wrapped OptimizationStudioLLMConfigField that works with
