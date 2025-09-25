@@ -1,5 +1,4 @@
 import { Anthropic } from "../../components/icons/Anthropic";
-import { Atla } from "../../components/icons/Atla";
 import { AWS } from "../../components/icons/AWS";
 import { Azure } from "../../components/icons/Azure";
 import { Cloudflare } from "../../components/icons/Cloudflare";
@@ -24,6 +23,5 @@ export const modelProviderIcons: Record<
   cloudflare: <Cloudflare />,
   bedrock: <AWS />,
   deepseek: <DeepSeek />,
-  atla: <Atla />,
   custom: <Custom />,
 };
