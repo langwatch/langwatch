@@ -8,6 +8,7 @@ import { checkUserPermissionForProject } from "../../permission";
 import { createTRPCRouter, protectedProcedure } from "../../trpc";
 
 import { handleSchema, inputsSchema, messageSchema, outputsSchema, promptingTechniqueSchema } from "~/prompt-configs/schemas";
+import { nodeDatasetSchema } from "~/optimization_studio/types/dsl";
 
 /**
  * Router for handling prompts - the business-facing interface
@@ -35,6 +36,7 @@ export const promptsRouter = createTRPCRouter({
           temperature: z.number().optional(),
           maxTokens: z.number().optional(),
           promptingTechnique: promptingTechniqueSchema.optional(),
+          demonstrations: nodeDatasetSchema.optional(),
         }),
       })
     )

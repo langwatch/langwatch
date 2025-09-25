@@ -397,19 +397,19 @@ export class PromptService {
   async upsertPrompt(params: {
     handle: string;
     projectId: string;
-    data: {
-      scope?: PromptScope;
-      authorId?: string;
-      commitMessage?: string;
-      prompt?: string;
-      messages?: z.infer<typeof messageSchema>[];
-      inputs?: z.infer<typeof inputsSchema>[];
-      outputs?: z.infer<typeof outputsSchema>[];
-      model?: string;
-      temperature?: number;
-      maxTokens?: number;
-      promptingTechnique?: z.infer<typeof promptingTechniqueSchema>;
-    };
+    data: Partial<
+      Omit<
+        CreateLlmConfigParams &
+          Omit<CreateLlmConfigVersionParams, "configData"> &
+          CreateLlmConfigVersionParams["configData"],
+        | "id"
+        | "createdAt"
+        | "updatedAt"
+        | "deletedAt"
+        | "configId"
+        | "projectId"
+      >
+    >;
   }): Promise<VersionedPrompt> {
     const { handle, projectId, data } = params;
 

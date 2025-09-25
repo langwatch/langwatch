@@ -6,7 +6,6 @@ import {
   useRef,
   useState,
 } from "react";
-import { type z } from "zod";
 
 import type { VersionedPrompt } from "~/server/prompt-config";
 
@@ -17,28 +16,13 @@ import {
 } from "../forms/SaveVersionDialog";
 import type { ChangeHandleFormValues } from "../forms/schemas/change-handle-form.schema";
 import { usePrompts } from "../hooks/usePrompts";
-import type {
-  inputsSchema,
-  messageSchema,
-  promptingTechniqueSchema,
-  outputsSchema,
-} from "../schemas";
-
 import { toaster } from "~/components/ui/toaster";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { type RouterInputs } from "~/utils/api";
 
-export interface TriggerSaveVersionParams {
-  handle: string | null; // Required if editingHandleOrScope is
-  scope?: PromptScope;
-  prompt?: string;
-  messages?: z.infer<typeof messageSchema>[];
-  inputs?: z.infer<typeof inputsSchema>[];
-  outputs?: z.infer<typeof outputsSchema>[];
-  model?: string;
-  temperature?: number;
-  maxTokens?: number;
-  promptingTechnique?: z.infer<typeof promptingTechniqueSchema>;
-}
+export type TriggerSaveVersionParams = RouterInputs["prompts"]["upsert"]['data'] & {
+  handle: string | null;
+};
 
 type TrigggerSaveVersionFunction = ({
   data,
@@ -109,7 +93,7 @@ export function PromptConfigProvider({
 
   const setSaveClosure = useCallback(
     (
-      data: TriggerSaveVersionParams & { commitMessage?: string },
+      data: TriggerSaveVersionParams,
       onError?: (error: Error) => void,
       onSuccess?: (prompt: VersionedPrompt) => void
     ) => {

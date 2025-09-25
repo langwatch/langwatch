@@ -183,7 +183,7 @@ export const nodeDatasetSchema = z.object({
     .object({
       records: z.record(z.array(z.string())),
       columnTypes: z.array(
-        z.object({ name: z.string(), type: datasetColumnTypeSchema })
+        z.object({ id: z.string().optional(), name: z.string(), type: datasetColumnTypeSchema })
       ),
     })
     .optional(),
