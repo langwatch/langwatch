@@ -32,7 +32,6 @@ import {
   safeOptimizationStudioNodeDataToPromptConfigFormInitialValues,
 } from "~/prompt-configs/llmPromptConfigUtils";
 import { api } from "~/utils/api";
-import { PromptDriftWarning } from "./PromptDriftWarning";
 
 /**
  * Properties panel for the Signature node in the optimization studio.
