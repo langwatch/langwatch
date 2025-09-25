@@ -9,6 +9,8 @@ import { Gemini } from "../../components/icons/Gemini";
 import { GoogleCloud } from "../../components/icons/GoogleCloud";
 import { Groq } from "../../components/icons/Groq";
 import { OpenAI } from "../../components/icons/OpenAI";
+import { Xai } from "../../components/icons/Xai";
+import { Cerebras } from "../../components/icons/Cerebras";
 import { type modelProviders } from "./registry";
 
 export const modelProviderIcons: Record<
@@ -26,4 +28,6 @@ export const modelProviderIcons: Record<
   deepseek: <DeepSeek />,
   atla: <Atla />,
   custom: <Custom />,
+  xai: <Xai />,
+  cerebras: <Cerebras />,
 };
