@@ -1,18 +1,13 @@
 import { VStack } from "@chakra-ui/react";
 import { useUpdateNodeInternals, type Node } from "@xyflow/react";
-import debounce from "lodash-es/debounce";
 import { useMemo } from "react";
 import { FormProvider, useFieldArray } from "react-hook-form";
 import { useShallow } from "zustand/react/shallow";
 
-
 import { useWizardContext } from "../../../../../components/evaluations/wizard/hooks/useWizardContext";
 import { PromptMessagesField } from "../../../../../prompt-configs/forms/fields/PromptMessagesField";
 import { useWorkflowStore } from "../../../../hooks/useWorkflowStore";
-import type {
-  LlmPromptConfigComponent,
-} from "../../../../types/dsl";
-import { BasePropertiesPanel } from "../../BasePropertiesPanel";
+import type { LlmPromptConfigComponent } from "../../../../types/dsl";
 import { PromptSourceHeader } from "../promptSourceSelect/PromptSourceHeader";
 import { WrappedOptimizationStudioLLMConfigField } from "../WrappedOptimizationStudioLLMConfigField";
 
@@ -35,10 +30,8 @@ import {
 import {
   llmConfigToOptimizationStudioNodeData,
   safeOptimizationStudioNodeDataToPromptConfigFormInitialValues,
-  promptConfigFormValuesToOptimizationStudioNodeData,
 } from "~/prompt-configs/llmPromptConfigUtils";
 import { api } from "~/utils/api";
-
 
 /**
  * Properties panel for the Signature node in the optimization studio.
@@ -57,8 +50,10 @@ import { api } from "~/utils/api";
  */
 export function SignaturePropertiesPanelInner({
   node,
+  onFormValuesChange,
 }: {
   node: Node<LlmPromptConfigComponent>;
+  onFormValuesChange?: (formValues: PromptConfigFormValues) => void;
 }) {
   const trpc = api.useContext();
   const { project } = useOrganizationTeamProject();
@@ -86,33 +81,6 @@ export function SignaturePropertiesPanelInner({
 
   const { isInsideWizard } = useWizardContext();
 
-  /**
-   * Converts form values to node data and updates the workflow store.
-   * This ensures the node's data stays in sync with the form state.
-   * 
-   * We use useMemo to create the debounced function to prevent unnecessary re-renders.
-   *
-   * @param formValues - The current form values to sync with node data
-   */
-  const syncNodeDataWithFormValues = useMemo(
-    () =>
-      debounce((formValues: PromptConfigFormValues) => {
-        const updatedNodeData = promptConfigFormValuesToOptimizationStudioNodeData(
-          formValues
-        );
-
-        setNode({
-          id: node.id,
-          data: {
-            configId: node.data.configId,
-            name: node.data.name,
-            ...updatedNodeData,
-          },
-        });
-      }, 200),
-    [node.id, setNode, node.data.configId, node.data.name]
-  );
-
   // Initialize form with values from node data
   const initialConfigValues = useMemo(
     () =>
@@ -128,7 +96,7 @@ export function SignaturePropertiesPanelInner({
 
       // Only update node data if form values have actually changed
       if (shouldUpdate) {
-        syncNodeDataWithFormValues(formValues);
+        onFormValuesChange?.(formValues);
       }
     },
   });
@@ -180,6 +148,8 @@ export function SignaturePropertiesPanelInner({
     name: "version.configData.messages",
   });
 
+  // TODO: Refactor so that all of the node call back methods are in the parent,
+  // not here in the form logic
   const availableFields = useMemo(() => {
     return node.data.inputs.map((input) => input.identifier);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -276,57 +246,38 @@ export function SignaturePropertiesPanelInner({
     });
   };
 
-  // TODO: Consider refactoring the BasePropertiesPanel so that we don't need to hide everything like this
   return (
-    <BasePropertiesPanel
-      node={node}
-      hideParameters
-      hideInputs
-      hideOutputs
-      hideDescription
-      {...(isInsideWizard && {
-        hideHeader: true,
-        width: "full",
-        maxWidth: "full",
-        paddingX: "0",
-      })}
-    >
-      <VStack width="full" gap={4}>
-        {/* Prompt Configuration Form */}
-        <FormProvider {...formProps.methods}>
-          <form style={{ width: "100%" }}>
-            <VStack width="full" gap={4}>
-              <PromptSourceHeader
-                node={node}
-                onPromptSourceSelect={(config) =>
-                  void handlePromptSourceSelect(config)
-                }
-                values={formProps.methods.getValues()}
-              />
-              <WrappedOptimizationStudioLLMConfigField />
-              <PromptField
-                messageFields={messageFields}
-                templateAdapter={templateAdapter}
-                availableFields={availableFields}
-                otherNodesFields={otherNodesFields}
-                onAddEdge={onAddPromptEdge}
-                isTemplateSupported={templateAdapter === "default"}
-              />
-              {templateAdapter === "default" && (
-                <PromptMessagesField
-                  messageFields={messageFields}
-                  availableFields={availableFields}
-                  otherNodesFields={otherNodesFields}
-                  onAddEdge={onAddMessageEdge}
-                />
-              )}
-              <InputsFieldGroup />
-              <OutputsFieldGroup />
-              {!isInsideWizard && <DemonstrationsField />}
-            </VStack>
-          </form>
-        </FormProvider>
-      </VStack>
-    </BasePropertiesPanel>
+    <FormProvider {...formProps.methods}>
+      <form style={{ width: "100%" }}>
+        <VStack width="full" gap={4}>
+          <PromptSourceHeader
+            node={node}
+            onPromptSourceSelect={(config) =>
+              void handlePromptSourceSelect(config)
+            }
+          />
+          <WrappedOptimizationStudioLLMConfigField />
+          <PromptField
+            messageFields={messageFields}
+            templateAdapter={templateAdapter}
+            availableFields={availableFields}
+            otherNodesFields={otherNodesFields}
+            onAddEdge={onAddPromptEdge}
+            isTemplateSupported={templateAdapter === "default"}
+          />
+          {templateAdapter === "default" && (
+            <PromptMessagesField
+              messageFields={messageFields}
+              availableFields={availableFields}
+              otherNodesFields={otherNodesFields}
+              onAddEdge={onAddMessageEdge}
+            />
+          )}
+          <InputsFieldGroup />
+          <OutputsFieldGroup />
+          {!isInsideWizard && <DemonstrationsField />}
+        </VStack>
+      </form>
+    </FormProvider>
   );
 }

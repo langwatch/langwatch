@@ -88,6 +88,7 @@ export function PromptSourceHeader({
       }
 
       try {
+        // Get the versioned prompt
         const prompt = await getPromptByHandle({
           handle,
           versionId,
@@ -98,7 +99,7 @@ export function PromptSourceHeader({
           throw new Error("Prompt not found");
         }
 
-        // Convert the saved version to a form values object
+        // Update the form with the new values
         const newFormValues = versionedPromptToPromptConfigFormValues(prompt);
         formProps.reset(newFormValues);
       } catch (error) {

@@ -704,15 +704,19 @@ export class PromptService {
   private async getOrganizationIdFromProjectId(
     projectId: string
   ): Promise<string> {
-    const team = await this.prisma.team.findUnique({
+    const project = await this.prisma.project.findUnique({
       where: { id: projectId },
-      include: { organization: true },
+      include: { 
+        team: { 
+          include: { organization: true } 
+        } 
+      },
     });
 
-    if (!team?.organizationId) {
-      throw new Error("Organization not found");
+    if (!project?.team?.organizationId) {
+      throw new Error(`Organization not found for project ${projectId}`);
     }
 
-    return team.organizationId;
+    return project.team.organizationId;
   }
 }
