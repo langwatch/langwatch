@@ -19,10 +19,10 @@ import { Annotations } from "../../components/Annotations";
 import { useDrawer } from "../../components/CurrentDrawer";
 import { EventsCounter } from "../../components/messages/EventsCounter";
 import {
-  getExtractedInput,
   getSlicedExpectedOutput,
   MessageCardJsonOutput,
 } from "../../components/messages/MessageCard";
+import { getExtractedInput } from "../../utils/traceExtraction";
 import { formatTimeAgo } from "../../utils/formatTimeAgo";
 import { isJson } from "../../utils/isJson";
 import { isPythonRepr } from "../../utils/parsePythonInsideJson";

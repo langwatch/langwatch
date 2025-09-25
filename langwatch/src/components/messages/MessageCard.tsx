@@ -47,6 +47,7 @@ import { Markdown } from "../Markdown";
 import { RedactedField } from "../ui/RedactedField";
 import { stringifyIfObject } from "../../utils/stringifyIfObject";
 import { OverflownTextWithTooltip } from "../OverflownText";
+import { getExtractedInput } from "../../utils/traceExtraction";
 
 export type TraceWithGuardrail = Trace & {
   lastGuardrail: (EvaluationResult & { name?: string }) | undefined;
@@ -525,24 +526,6 @@ export function MessageCard({
     </VStack>
   );
 }
-
-export const getExtractedInput = (trace: Trace): string => {
-  const input = trace.input;
-
-  let value = input?.value ? stringifyIfObject(input.value) : "";
-
-  try {
-    const json: any = JSON.parse(value);
-
-    if (typeof json?.input === "string" && json.input.length > 0) {
-      value = json.input;
-    }
-  } catch {
-    // ignore
-  }
-
-  return value ?? "<empty>";
-};
 
 const getSlicedOutput = (trace: Trace) => {
   const value = stringifyIfObject(trace.output?.value).slice(0, 600);

@@ -608,7 +608,7 @@ type EmbeddingsModelForm = {
   embeddingsModel: string;
 };
 
-function TopicClusteringModel() {
+export function TopicClusteringModel() {
   const { project } = useOrganizationTeamProject();
   const updateTopicClusteringModel =
     api.project.updateTopicClusteringModel.useMutation();
@@ -675,7 +675,7 @@ function TopicClusteringModel() {
   );
 }
 
-function EmbeddingsModel() {
+export function EmbeddingsModel() {
   const { project } = useOrganizationTeamProject();
   const updateEmbeddingsModel = api.project.updateEmbeddingsModel.useMutation();
 

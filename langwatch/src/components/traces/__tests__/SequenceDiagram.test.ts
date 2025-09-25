@@ -442,7 +442,7 @@ describe("generateMermaidSyntax", () => {
     deactivate CustomerExplorerAgent
     gpt_4o_mini-->>BankCustomerSupportAgent: ${INVISIBLE_RETURN}
     deactivate gpt_4o_mini
-    BankCustomerSupportAgent->>gpt_4o_mini: LLM call
+    BankCustomerSupportAgent->>gpt_4o_mini: LLM call (2s)
     activate gpt_4o_mini
     gpt_4o_mini-->>BankCustomerSupportAgent: ${INVISIBLE_RETURN}
     deactivate gpt_4o_mini
@@ -630,5 +630,121 @@ describe("generateMermaidSyntax", () => {
 `;
 
     expect(fullResult).toBe(expectedFull);
+  });
+
+  it("should format durations correctly for different time ranges", () => {
+    const mockSpans: Span[] = [
+      // Agent with no significant duration (<1s)
+      {
+        span_id: "agent-fast",
+        parent_id: null,
+        trace_id: "trace-123",
+        type: "agent",
+        name: "FastAgent",
+        timestamps: { started_at: 1000, finished_at: 1500 }, // 500ms
+      },
+      // LLM with seconds duration
+      {
+        span_id: "llm-seconds",
+        parent_id: "agent-fast",
+        trace_id: "trace-123",
+        type: "llm",
+        model: "gpt-4",
+        timestamps: { started_at: 2000, finished_at: 5000 }, // 3s
+      },
+      // Agent with minutes duration
+      {
+        span_id: "agent-minutes",
+        parent_id: "llm-seconds",
+        trace_id: "trace-123",
+        type: "agent",
+        name: "SlowAgent",
+        timestamps: { started_at: 6000, finished_at: 96000 }, // 1min 30s
+      },
+      // LLM with exact minute duration
+      {
+        span_id: "llm-exact-minute",
+        parent_id: "agent-minutes",
+        trace_id: "trace-123",
+        type: "llm",
+        model: "claude-3",
+        timestamps: { started_at: 100000, finished_at: 160000 }, // 1min exactly
+      },
+    ];
+
+    const result = generateMermaidSyntax(mockSpans);
+
+    // Only leaf nodes show duration: FastAgent->LLM has no children so no duration shown,
+    // LLM->SlowAgent has children so no duration, SlowAgent->LLM is leaf so shows duration
+    expect(result.includes("FastAgent->>gpt_4: LLM call")).toBe(true);
+    expect(result.includes("gpt_4->>SlowAgent: call")).toBe(true);
+    expect(result.includes("SlowAgent->>claude_3: LLM call (1min)")).toBe(true);
+  });
+
+  it("should handle recursive filtering for effective leaf nodes", () => {
+    const mockSpans: Span[] = [
+      // Agent A
+      {
+        span_id: "agent-a",
+        parent_id: null,
+        trace_id: "trace-123",
+        type: "agent",
+        name: "AgentA",
+        timestamps: { started_at: 1000, finished_at: 10000 }, // 9s
+      },
+      // Filtered span (generic span type)
+      {
+        span_id: "filtered-span",
+        parent_id: "agent-a",
+        trace_id: "trace-123",
+        type: "span",
+        name: "some_operation",
+        timestamps: { started_at: 2000, finished_at: 9000 }, // 7s
+      },
+      // LLM grandchild (should prevent AgentA from being effective leaf)
+      {
+        span_id: "llm-grandchild",
+        parent_id: "filtered-span",
+        trace_id: "trace-123",
+        type: "llm",
+        model: "gpt-4",
+        timestamps: { started_at: 3000, finished_at: 8000 }, // 5s
+      },
+      // Another agent with no included descendants
+      {
+        span_id: "agent-b",
+        parent_id: null,
+        trace_id: "trace-123",
+        type: "agent",
+        name: "AgentB",
+        timestamps: { started_at: 11000, finished_at: 14000 }, // 3s
+      },
+      // Only filtered children for AgentB
+      {
+        span_id: "filtered-child",
+        parent_id: "agent-b",
+        trace_id: "trace-123",
+        type: "span",
+        name: "filtered_operation",
+        timestamps: { started_at: 12000, finished_at: 13000 }, // 1s
+      },
+    ];
+
+    // Filter out 'span' type, include agent and llm
+    const result = generateMermaidSyntax(mockSpans, ["agent", "llm"]);
+
+    // AgentA should NOT show duration because it has an included descendant (LLM grandchild)
+    // The LLM should show duration because it's the actual leaf node
+    expect(result.includes("AgentA->>gpt_4: LLM call")).toBe(true); // No duration on AgentA call
+    expect(result.includes("gpt_4: LLM call (5s)")).toBe(true); // Duration on LLM (leaf node)
+    expect(result.includes("AgentB")).toBe(true); // AgentB appears as participant
+
+    // Test with only agents included (LLMs filtered out)
+    const agentOnlyResult = generateMermaidSyntax(mockSpans, ["agent"]);
+
+    // Now AgentA should show duration because its LLM descendant is filtered out
+    // AgentB should also be included but with no interactions since it's isolated
+    expect(agentOnlyResult.includes("AgentA")).toBe(true);
+    expect(agentOnlyResult.includes("AgentB")).toBe(true);
   });
 });

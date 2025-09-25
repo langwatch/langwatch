@@ -35,6 +35,8 @@ import {
   OPENAI_EMBEDDING_DIMENSION,
 } from "../../utils/constants";
 
+import { getExtractedInput } from "../../utils/traceExtraction";
+
 const logger = createLogger("langwatch:topicClustering");
 
 export const clusterTopicsForProject = async (
@@ -61,6 +63,77 @@ export const clusterTopicsForProject = async (
   }
 
   const client = await esClient({ projectId });
+
+  // Debug: Check total traces for this project
+  const totalTracesCount = await client.count({
+    index: TRACE_INDEX.alias,
+    body: {
+      query: {
+        term: {
+          project_id: projectId,
+        },
+      },
+    },
+  });
+
+  // Debug: Check traces with input
+  const tracesWithInputCount = await client.count({
+    index: TRACE_INDEX.alias,
+    body: {
+      query: {
+        bool: {
+          must: [
+            {
+              term: {
+                project_id: projectId,
+              },
+            },
+            {
+              exists: {
+                field: "input.value",
+              },
+            },
+          ],
+        } as QueryDslBoolQuery,
+      },
+    },
+  });
+
+  // Debug: Check recent traces (last 30 days)
+  const recentTracesCount = await client.count({
+    index: TRACE_INDEX.alias,
+    body: {
+      query: {
+        bool: {
+          must: [
+            {
+              term: {
+                project_id: projectId,
+              },
+            },
+            {
+              range: {
+                "timestamps.started_at": {
+                  gte: "now-30d",
+                },
+              },
+            },
+          ],
+        } as QueryDslBoolQuery,
+      },
+    },
+  });
+
+  logger.info(
+    {
+      projectId,
+      totalTraces: totalTracesCount.count,
+      tracesWithInput: tracesWithInputCount.count,
+      recentTraces: recentTracesCount.count,
+    },
+    "Debug: Project trace counts"
+  );
+
   const assignedTracesCount = await client.count({
     index: TRACE_INDEX.alias,
     body: {
@@ -172,6 +245,18 @@ export const clusterTopicsForProject = async (
 
   // Fetch last 2000 traces that were not classified in sorted and paginated, with only id, input fields and their current topics
 
+  logger.info(
+    {
+      projectId,
+      isIncrementalProcessing,
+      topicIds: topicIds.length,
+      subtopicIds: subtopicIds.length,
+      assignedTracesCount: assignedTracesCount.count,
+      searchAfter,
+    },
+    "Starting trace search for topic clustering"
+  );
+
   const result = await client.search<Trace>({
     index: TRACE_INDEX.alias,
     body: {
@@ -190,6 +275,7 @@ export const clusterTopicsForProject = async (
         "input",
         "metadata.topic_id",
         "metadata.subtopic_id",
+        "timestamps.started_at",
       ],
       sort: [{ "timestamps.started_at": "desc" }, { trace_id: "asc" }],
       ...(searchAfter ? { search_after: searchAfter } : {}),
@@ -197,24 +283,47 @@ export const clusterTopicsForProject = async (
     },
   });
 
-  const traces: TopicClusteringTrace[] = result.hits.hits
-    .map((hit) => hit._source!)
-    .filter((trace) => !!trace?.input?.value)
-    .map((trace) => ({
-      trace_id: trace.trace_id,
-      input: trace.input?.value.slice(0, 8192) ?? "",
-      topic_id:
-        trace.metadata?.topic_id && topicIds.includes(trace.metadata.topic_id)
-          ? trace.metadata.topic_id
-          : null,
-      subtopic_id:
-        trace.metadata?.subtopic_id &&
-        subtopicIds.includes(trace.metadata.subtopic_id)
-          ? trace.metadata.subtopic_id
-          : null,
-    }));
+  logger.info(
+    {
+      projectId,
+      totalHits: result.hits.total,
+      returnedHits: result.hits.hits.length,
+    },
+    "Elasticsearch search results"
+  );
+
+  const rawTraces = result.hits.hits.map((hit) => hit._source!);
+
+  const tracesWithInput = rawTraces.filter((trace) => {
+    const inputText = getExtractedInput(trace);
+    return inputText !== "<empty>" && inputText.length > 0;
+  });
+
+  const traces: TopicClusteringTrace[] = tracesWithInput.map((trace) => ({
+    trace_id: trace.trace_id,
+    input: getExtractedInput(trace).slice(0, 8192),
+    topic_id:
+      trace.metadata?.topic_id && topicIds.includes(trace.metadata.topic_id)
+        ? trace.metadata.topic_id
+        : null,
+    subtopic_id:
+      trace.metadata?.subtopic_id &&
+      subtopicIds.includes(trace.metadata.subtopic_id)
+        ? trace.metadata.subtopic_id
+        : null,
+  }));
 
   const minimumTraces = isIncrementalProcessing ? 1 : 10;
+
+  logger.info(
+    {
+      projectId,
+      finalTracesCount: traces.length,
+      minimumTraces,
+      isIncrementalProcessing,
+    },
+    "Final trace count for clustering"
+  );
 
   if (traces.length < minimumTraces) {
     logger.info(
