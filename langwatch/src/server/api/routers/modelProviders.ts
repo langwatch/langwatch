@@ -177,16 +177,13 @@ export const getProjectModelProviders = async (
         .filter(([_providerKey, modelProvider]) => {
           return modelProvider.enabledSince;
         })
-        .map(([providerKey, modelProvider]) => {
-          const enabled =
-            modelProvider.enabledSince < project.createdAt &&
-            !!process.env[modelProvider.apiKey] &&
-            (providerKey !== "vertex_ai" || !!process.env.VERTEXAI_PROJECT);
+        .map(([providerKey]) => {
+          const enabled = false;
 
           const modelProvider_: MaybeStoredModelProvider = {
             provider: providerKey,
             enabled,
-            disabledByDefault: !enabled,
+            disabledByDefault: true,
             customKeys: null,
             models: getProviderModelOptions(providerKey, "chat").map(
               (m) => m.value

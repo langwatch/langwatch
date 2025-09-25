@@ -16,7 +16,7 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { zodResolver } from "@hookform/resolvers/zod";
-import React, { useCallback } from "react";
+import React, { useCallback, useMemo } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { z } from "zod";
 import { ProjectSelector } from "../../components/DashboardLayout";
@@ -73,11 +73,12 @@ const handleCreateMultipleOptions = (
 };
 
 export default function ModelsPage() {
-  const { project, organizations } = useOrganizationTeamProject();
+  const { project, organization, organizations } = useOrganizationTeamProject();
   const modelProviders = api.modelProvider.getAllForProjectForFrontend.useQuery(
     { projectId: project?.id ?? "" },
     { enabled: !!project }
   );
+
   const updateMutation = api.modelProvider.update.useMutation();
 
   return (
@@ -131,6 +132,8 @@ export default function ModelsPage() {
                     provider={provider}
                     refetch={modelProviders.refetch}
                     updateMutation={updateMutation}
+                    projectId={project?.id}
+                    organizationId={organization?.id}
                   />
                 ))}
             </VStack>
@@ -171,41 +174,40 @@ type ModelProviderForm = {
   customEmbeddingsModels?: { value: string; label: string }[] | null;
 };
 
-function ModelProviderForm({
+export function ModelProviderForm({
   provider,
   refetch,
   updateMutation,
+  projectId,
+  organizationId,
 }: {
   provider: MaybeStoredModelProvider;
   refetch: () => Promise<any>;
   updateMutation: ReturnType<typeof api.modelProvider.update.useMutation>;
+  projectId?: string; // Add optional projectId prop
+  organizationId?: string; // Add optional organizationId prop
 }) {
-  const { project, organization } = useOrganizationTeamProject();
-
-  const localUpdateMutation = api.modelProvider.update.useMutation();
-
   const providerDefinition =
     modelProvidersRegistry[
       provider.provider as keyof typeof modelProvidersRegistry
     ];
 
-  const getStoredModelOptions = (
-    models: string[],
-    provider: string,
-    mode: "chat" | "embedding"
-  ) => {
-    if (!models || models.length === 0) {
-      const options = getProviderModelOptions(provider, mode);
-      return options;
-    }
-    return models.map((model) => ({
-      value: model,
-      label: model,
-    }));
-  };
+  const getStoredModelOptions = useCallback(
+    (models: string[], provider: string, mode: "chat" | "embedding") => {
+      if (!models || models.length === 0) {
+        const options = getProviderModelOptions(provider, mode);
+        return options;
+      }
+      return models.map((model) => ({
+        value: model,
+        label: model,
+      }));
+    },
+    []
+  );
 
-  const form = useForm<ModelProviderForm>({
-    defaultValues: {
+  const defaultValues = useMemo(
+    () => ({
       id: provider.id,
       provider: provider.provider,
       enabled: provider.enabled,
@@ -220,7 +222,12 @@ function ModelProviderForm({
         provider.provider,
         "embedding"
       ),
-    },
+    }),
+    [provider, getStoredModelOptions]
+  );
+
+  const form = useForm<ModelProviderForm>({
+    defaultValues,
     resolver: (data, ...args) => {
       const data_ = {
         ...data,
@@ -267,12 +274,30 @@ function ModelProviderForm({
   });
   const { register, handleSubmit, formState, watch, setValue, control } = form;
 
+  // Memoize provider data to avoid dependency changes
+  const providerData = useMemo(
+    () => ({
+      id: provider.id,
+      provider: provider.provider,
+      customKeys: provider.customKeys,
+      models: provider.models,
+      embeddingsModels: provider.embeddingsModels,
+    }),
+    [
+      provider.id,
+      provider.provider,
+      provider.customKeys,
+      provider.models,
+      provider.embeddingsModels,
+    ]
+  );
+
   const onSubmit = useCallback(
     async (data: ModelProviderForm) => {
-      await localUpdateMutation.mutateAsync({
-        id: provider.id,
-        projectId: project?.id ?? "",
-        provider: provider.provider,
+      await updateMutation.mutateAsync({
+        id: providerData.id,
+        projectId: projectId ?? "",
+        provider: providerData.provider,
         enabled: data.enabled,
         customKeys: data.customKeys,
         customModels: (data.customModels ?? []).map((m) => m.value),
@@ -290,7 +315,7 @@ function ModelProviderForm({
       });
       await refetch();
     },
-    [localUpdateMutation, provider.id, provider.provider, project?.id, refetch]
+    [updateMutation, providerData, projectId, refetch]
   );
 
   const isEnabled = watch("enabled");
@@ -299,28 +324,18 @@ function ModelProviderForm({
     async (e: React.ChangeEvent<HTMLInputElement>) => {
       setValue("enabled", e.target.checked);
       await updateMutation.mutateAsync({
-        id: provider.id,
-        projectId: project?.id ?? "",
-        provider: provider.provider,
+        id: providerData.id,
+        projectId: projectId ?? "",
+        provider: providerData.provider,
         enabled: e.target.checked,
-        customKeys: provider.customKeys as any,
-        customModels: provider.models ?? [],
-        customEmbeddingsModels: provider.embeddingsModels ?? [],
+        customKeys: providerData.customKeys as any,
+        customModels: providerData.models ?? [],
+        customEmbeddingsModels: providerData.embeddingsModels ?? [],
       });
 
       await refetch();
     },
-    [
-      updateMutation,
-      provider.id,
-      provider.provider,
-      provider.customKeys,
-      provider.models,
-      provider.embeddingsModels,
-      project?.id,
-      refetch,
-      setValue,
-    ]
+    [updateMutation, providerData, projectId, refetch, setValue]
   );
 
   const providerKeys = providerDefinition?.keysSchema
@@ -330,8 +345,8 @@ function ModelProviderForm({
     : {};
 
   const ManagedModelProvider = dependencies.managedModelProviderComponent?.({
-    projectId: project?.id ?? "",
-    organizationId: organization?.id ?? "",
+    projectId: projectId ?? "",
+    organizationId: organizationId ?? "",
     provider,
   });
 
@@ -497,7 +512,7 @@ function ModelProviderForm({
                     type="submit"
                     size="sm"
                     colorPalette="orange"
-                    loading={localUpdateMutation.isLoading}
+                    loading={updateMutation.isLoading}
                   >
                     Save
                   </Button>
