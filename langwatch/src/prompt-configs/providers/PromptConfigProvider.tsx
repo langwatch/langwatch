@@ -25,36 +25,42 @@ import type {
 } from "../schemas";
 
 import { toaster } from "~/components/ui/toaster";
+import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 
-interface TriggerSaveVersionParams {
-    projectId: string;
-    handle: string; // Required if editingHandleOrScope is 
-    scope?: PromptScope;
-    prompt?: string
-    messages?: z.infer<typeof messageSchema>[];
-    inputs?: z.infer<typeof inputsSchema>[];
-    outputs?: z.infer<typeof outputsSchema>[];
-    model?: string;
-    temperature?: number;
-    maxTokens?: number;
-    promptingTechnique?: z.infer<typeof promptingTechniqueSchema>;
+export interface TriggerSaveVersionParams {
+  handle: string | null; // Required if editingHandleOrScope is
+  scope?: PromptScope;
+  prompt?: string;
+  messages?: z.infer<typeof messageSchema>[];
+  inputs?: z.infer<typeof inputsSchema>[];
+  outputs?: z.infer<typeof outputsSchema>[];
+  model?: string;
+  temperature?: number;
+  maxTokens?: number;
+  promptingTechnique?: z.infer<typeof promptingTechniqueSchema>;
 }
 
+type TrigggerSaveVersionFunction = ({
+  data,
+  onError,
+  onSuccess,
+}: {
+  data: TriggerSaveVersionParams;
+  onError?: (error: Error) => void;
+  onSuccess?: (prompt: VersionedPrompt) => void;
+}) => void;
+
 interface PromptConfigContextType {
-  triggerSaveVersion: ({
-    data,
-    onError,
-    onSuccess,
-  }: {
-    data: TriggerSaveVersionParams;
-    onError?: (error: Error) => void;
-    onSuccess?: (prompt: VersionedPrompt) => void;
-  }) => void;
+  triggerSaveVersion: TrigggerSaveVersionFunction;
+  triggerChangeHandle: TrigggerSaveVersionFunction;
 }
 
 const PromptConfigContext = createContext<PromptConfigContextType>({
   triggerSaveVersion: () => {
     throw new Error("No triggerSaveVersion function provided");
+  },
+  triggerChangeHandle: () => {
+    throw new Error("No triggerChangeHandle function provided");
   },
 });
 
@@ -71,6 +77,7 @@ export const usePromptConfigContext = () => {
 interface SaveDialogData {
   handle?: string | null;
   scope?: PromptScope;
+  needsHandleChange?: boolean;
 }
 
 /**
@@ -82,6 +89,7 @@ export function PromptConfigProvider({
 }: {
   children: React.ReactNode;
 }) {
+  const { projectId } = useOrganizationTeamProject();
   const [saveDialogData, setSaveDialogData] = useState<SaveDialogData | null>(
     null
   );
@@ -99,15 +107,13 @@ export function PromptConfigProvider({
     setSaveDialogData(null);
   }, []);
 
-  const triggerSaveVersion: PromptConfigContextType["triggerSaveVersion"] = useCallback(
-    ({
-      data,
-      onError,
-      onSuccess,
-    }) => {
-      if (!data) return;
-      const projectId = data.projectId;
-      setSaveDialogData({ handle: data.handle, scope: data.scope });
+  const setSaveClosure = useCallback(
+    (
+      data: TriggerSaveVersionParams,
+      onError?: (error: Error) => void,
+      onSuccess?: (prompt: VersionedPrompt) => void
+    ) => {
+      if (!projectId) throw new Error("Project ID is required");
 
       // Create the closure with all the save parameters
       saveClosureRef.current = async ({ handle, scope, commitMessage }) => {
@@ -150,14 +156,49 @@ export function PromptConfigProvider({
         }
       };
     },
-    [closeDialog, upsertPrompt]
+    [closeDialog, upsertPrompt, projectId]
   );
 
-  const isChangeHandleDialogOpen = !!saveDialogData && !saveDialogData.handle;
-  const isSaveDialogOpen = !!saveDialogData && !!saveDialogData.handle;
+  const triggerSaveVersion: PromptConfigContextType["triggerSaveVersion"] =
+    useCallback(
+      ({ data, onError, onSuccess }) => {
+        if (!data) return;
+        setSaveDialogData({
+          handle: data.handle,
+          scope: data.scope,
+          needsHandleChange: !!data.handle,
+        });
+        setSaveClosure(data, onError, onSuccess);
+      },
+      [setSaveClosure]
+    );
+
+  const triggerChangeHandle: PromptConfigContextType["triggerSaveVersion"] =
+    useCallback(
+      ({ data, onError, onSuccess }) => {
+        if (!data) return;
+        setSaveDialogData({
+          handle: data.handle,
+          scope: data.scope,
+          needsHandleChange: true,
+        });
+        setSaveClosure({
+          ...data,
+          commitMessage: `Handle changed to ${data.handle}`,
+        }, onError, onSuccess);
+      },
+      [setSaveClosure]
+    );
+
+  const isChangeHandleDialogOpen =
+    !!saveDialogData && saveDialogData.needsHandleChange;
+  const isSaveDialogOpen =
+    !!saveDialogData && !saveDialogData.needsHandleChange;
 
   return (
-    <PromptConfigContext.Provider value={{ triggerSaveVersion }}>
+    <PromptConfigContext.Provider
+      value={{ triggerSaveVersion, triggerChangeHandle }}
+    >
       {children}
       {isChangeHandleDialogOpen && (
         <ChangeHandleDialog
