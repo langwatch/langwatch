@@ -29,6 +29,11 @@ import { api } from "../../utils/api";
 import { useWorkflowStore } from "../hooks/useWorkflowStore";
 import type { Workflow } from "../types/dsl";
 import { hasDSLChanged } from "../utils/dslUtils";
+import {
+  allModelOptions,
+  useModelSelectionOptions,
+} from "../../components/ModelSelector";
+import { DEFAULT_MODEL } from "../../utils/constants";
 
 export function History() {
   const { open, onToggle, onClose, setOpen } = useDisclosure();
@@ -420,11 +425,25 @@ export function NewVersionFields({
     getWorkflow,
   }));
 
+  // Check if the default model is enabled
+  const defaultModel = project?.defaultModel ?? DEFAULT_MODEL;
+  const { modelOption } = useModelSelectionOptions(
+    allModelOptions,
+    defaultModel,
+    "chat"
+  );
+  const isDefaultModelDisabled = modelOption?.isDisabled ?? false;
+
   const generateCommitMessage =
     api.workflow.generateCommitMessage.useMutation();
 
   const generateCommitMessageCallback = useCallback(
     (prevDsl: Workflow, newDsl: Workflow) => {
+      // Skip generation if model is not available
+      if (isDefaultModelDisabled) {
+        return;
+      }
+
       generateCommitMessage.mutate(
         {
           projectId: project?.id ?? "",
@@ -450,7 +469,7 @@ export function NewVersionFields({
         }
       );
     },
-    [form, generateCommitMessage, project?.id]
+    [form, generateCommitMessage, project?.id, isDefaultModelDisabled]
   );
 
   const debouncedGenerateCommitMessage = useDebounceCallback(
