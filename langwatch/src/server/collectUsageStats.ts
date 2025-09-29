@@ -101,7 +101,10 @@ const getTraceCount = async () => {
   });
 
   return {
-    totalTraces: (result as any).body?.count ?? result.count ?? 0,
+    totalTraces:
+      (result as { body?: { count?: number } }).body?.count ??
+      result.count ??
+      0,
   };
 };
 
@@ -118,6 +121,9 @@ const getScenariosCount = async () => {
   });
 
   return {
-    totalScenarioEvents: (result as any).body?.count ?? result.count ?? 0,
+    totalScenarioEvents:
+      (result as { body?: { count?: number } }).body?.count ??
+      result.count ??
+      0,
   };
 };
