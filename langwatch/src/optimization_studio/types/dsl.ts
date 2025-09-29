@@ -149,7 +149,7 @@ type MessagesParameter = StronglyTypedFieldBase & {
 };
 
 export type LlmPromptConfigComponent = Signature & {
-  configId: string;
+  configId?: string;
   handle?: string | null;
   inputs: (Omit<Field, "type"> & { type: LlmConfigInputType })[];
   outputs: (Omit<Field, "type"> & { type: LlmConfigOutputType })[];

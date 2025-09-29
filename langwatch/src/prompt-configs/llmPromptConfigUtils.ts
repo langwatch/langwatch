@@ -4,7 +4,6 @@ import type { DeepPartial } from "react-hook-form";
 import type { DatasetColumnType } from "~/server/datasets/types";
 import type { VersionedPrompt } from "~/server/prompt-config";
 import {
-  parseLlmConfigVersion,
   type LatestConfigVersionSchema,
 } from "~/server/prompt-config/repositories/llm-config-version-schema";
 import type { LlmConfigWithLatestVersion } from "~/server/prompt-config/repositories/llm-config.repository";
@@ -29,7 +28,7 @@ import { type TriggerSaveVersionParams } from "~/prompt-configs/providers/Prompt
 
 export function promptConfigFormValuesToOptimizationStudioNodeData(
   formValues: PromptConfigFormValues
-): Node<Omit<LlmPromptConfigComponent, "configId">>["data"] {
+): Node<LlmPromptConfigComponent>["data"] {
   return {
     name: formValues.handle?.replace("/", " ") ?? "Anonymous", // REQUIRED FOR INVOKING LLM
     inputs: formValues.version?.configData?.inputs,
