@@ -74,13 +74,6 @@ export const PromptConfigPanel = forwardRef(function PromptConfigPanel(
     mutationKey: ["prompt-config", configId],
   });
 
-  useEffect(() => {
-    const shouldReset = !isOpen || !isExpanded || !configId;
-    if (shouldReset) {
-      reset();
-    }
-  }, [isOpen, isExpanded, configId, reset]);
-
   // Fetch the LLM configuration
   const { data: prompt, isLoading: isLoadingConfig } =
     api.prompts.getById.useQuery(
@@ -103,13 +96,13 @@ export const PromptConfigPanel = forwardRef(function PromptConfigPanel(
       // If prompt is found, use the prompt values
       return prompt
         ? versionedPromptToPromptConfigFormValues(prompt)
-        // If default model is set, use the default model merged with the default values
-        : typeof defaultModel === "string"
+        : // If default model is set, use the default model merged with the default values
+        typeof defaultModel === "string"
         ? buildDefaultFormValues({
             version: { configData: { llm: { model: defaultModel } } },
           })
-        // If no default model is set, use the default values
-        : buildDefaultFormValues({});
+        : // If no default model is set, use the default values
+          buildDefaultFormValues({});
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [Boolean(prompt), defaultModel]
@@ -121,16 +114,24 @@ export const PromptConfigPanel = forwardRef(function PromptConfigPanel(
     initialConfigValues,
   });
 
-  // Get input fields from the form
-  const inputFields = formProps.methods.getValues("version.configData.inputs");
+  // Reset inputs when panel is closed
+  useEffect(() => {
+    const shouldResetInputs = !isOpen || !isExpanded || !configId;
+    if (shouldResetInputs) {
+      reset();
+    }
+  }, [isOpen, isExpanded, configId, reset]);
 
-  // ---- Effects and handlers ----
   // Reset form when config changes
   useEffect(() => {
-    if (initialConfigValues) {
+    const shouldResetForm = !configId;
+    if (shouldResetForm) {
       formProps.methods.reset(initialConfigValues);
     }
-  }, [formProps.methods, initialConfigValues]);
+  }, [configId, formProps.methods, initialConfigValues]);
+
+  // Get input fields from the form
+  const inputFields = formProps.methods.getValues("version.configData.inputs");
 
   const handleClose = () => {
     if (isExpanded) {

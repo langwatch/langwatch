@@ -40,70 +40,72 @@ import type { VersionedPrompt } from "~/server/prompt-config/prompt.service";
  */
 function usePromptConfigManagement(projectId: string | undefined) {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
-  const [configToDelete, setConfigToDelete] =
-    useState<{id: string} | null>(null);
+  const [configToDelete, setConfigToDelete] = useState<{ id: string } | null>(
+    null
+  );
   const { deletePrompt } = usePrompts();
 
   // Fetch all prompt configs for the current project.
-  const {
-    data: promptConfigs,
-    isLoading,
-  } = api.prompts.getAllPromptsForProject.useQuery(
-    {
-      projectId: projectId ?? "",
-    },
-    {
-      enabled: !!projectId,
-      onError: (error) => {
-        // Show error toast if fetching fails
-        toaster.create({
-          title: "Error loading prompt configs",
-          description: error.message,
-          type: "error",
-        });
+  const { data: promptConfigs, isLoading } =
+    api.prompts.getAllPromptsForProject.useQuery(
+      {
+        projectId: projectId ?? "",
       },
-    }
-  );
+      {
+        enabled: !!projectId,
+        onError: (error) => {
+          // Show error toast if fetching fails
+          toaster.create({
+            title: "Error loading prompt configs",
+            description: error.message,
+            type: "error",
+          });
+        },
+      }
+    );
 
   // Mutation for deleting a prompt config.
-  const deleteConfigMutation = useCallback(async ({ id }: { id: string }) => {
-    if (!projectId) {
-      toaster.create({
-        title: "Error deleting prompt config",
-        description: "Project ID is required",
-        type: "error",
-      });
+  const deleteConfigMutation = useCallback(
+    async ({ id }: { id: string }) => {
+      if (!projectId) {
+        toaster.create({
+          title: "Error deleting prompt config",
+          description: "Project ID is required",
+          type: "error",
+        });
 
-      return;
-    }
+        return;
+      }
 
-    try {
-      await deletePrompt({
-        idOrHandle: id,
-        projectId,
-      });
-      toaster.create({
-        title: "Prompt config deleted",
-        type: "success",
-        meta: {
-          closable: true,
-        },
-      });
-    } catch (error) {
-      toaster.create({
-        title: "Error deleting prompt config",
-        description: error instanceof Error ? error.message : "Unknown error",
-        type: "error",
-      });
-    }
-  }, [deletePrompt, projectId]);
+      try {
+        await deletePrompt({
+          idOrHandle: id,
+          projectId,
+        });
+        toaster.create({
+          title: "Prompt config deleted",
+          type: "success",
+          meta: {
+            closable: true,
+          },
+        });
+      } catch (error) {
+        toaster.create({
+          title: "Error deleting prompt config",
+          description: error instanceof Error ? error.message : "Unknown error",
+          type: "error",
+        });
+      }
+    },
+    [deletePrompt, projectId]
+  );
 
   /**
    * Open the delete confirmation dialog for a given config.
    * @param config The config to delete.
    */
   const handleDeleteConfig = useCallback(
-    (config: {id: string}) => {
+    (config: { id: string }) => {
       setConfigToDelete(config);
       setIsDeleteDialogOpen(true);
     },
@@ -220,7 +222,6 @@ export default function PromptConfigsPage() {
         return;
       }
 
-      // Create a new prompt config with default handle.
       setSelectedPromptId("draft");
     } catch (error) {
       toaster.create({
@@ -235,7 +236,7 @@ export default function PromptConfigsPage() {
    * Handler for editing a prompt config.
    * Opens the config in the side panel.
    */
-  const handleEditConfig = async (config: {id: string}) => {
+  const handleEditConfig = async (config: { id: string }) => {
     setSelectedPromptId(config.id);
     setIsPaneExpanded(true);
   };
@@ -258,7 +259,6 @@ export default function PromptConfigsPage() {
     panelRef.current?.querySelector(
       `#${CENTER_CONTENT_BOX_ID}`
     ) as HTMLDivElement | null;
-
 
   return (
     <DashboardLayout position="relative">
