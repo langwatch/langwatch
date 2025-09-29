@@ -17,13 +17,14 @@ const logger = createLogger("langwatch:optimization_studio:use-node-drift");
 
 export function useNodeDrift(node: Node<LlmPromptConfigComponent>) {
   const { project } = useOrganizationTeamProject();
-  const configId = node.data.configId;
+  const { configId, handle } = node.data;
+  const idOrHandle = configId ?? handle ?? "";
   const { data: latestPrompt, isLoading: isLoadingPrompt } =
-    api.prompts.getById.useQuery({
-      id: configId ?? "",
+    api.prompts.getByIdOrHandle.useQuery({
+      idOrHandle,
       projectId: project?.id ?? "",
     }, {
-      enabled: !!configId && !!project?.id,
+      enabled: !!idOrHandle && !!project?.id,
     });
   const formProps = useFormContext<PromptConfigFormValues>();
   /**
@@ -53,14 +54,14 @@ export function useNodeDrift(node: Node<LlmPromptConfigComponent>) {
         type: "success",
       });
     } catch (error) {
-      logger.error({ error, configId }, "Failed to load latest version");
+      logger.error({ error, configId, handle }, "Failed to load latest version");
       toaster.create({
         title: "Failed to load latest version",
         description: "Please try again",
         type: "error",
       });
     }
-  }, [latestPrompt, formProps, configId]);
+  }, [latestPrompt, formProps, configId, handle]);
 
   return {
     hasDrift,
