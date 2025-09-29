@@ -30,7 +30,6 @@ export function promptConfigFormValuesToOptimizationStudioNodeData(
   formValues: PromptConfigFormValues
 ): Node<LlmPromptConfigComponent>["data"] {
   return {
-    name: formValues.handle?.replace("/", " ") ?? "Anonymous", // REQUIRED FOR INVOKING LLM
     inputs: formValues.version?.configData?.inputs,
     outputs: formValues.version?.configData?.outputs,
     parameters: [

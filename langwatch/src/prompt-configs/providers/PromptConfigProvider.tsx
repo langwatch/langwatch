@@ -61,6 +61,9 @@ export const usePromptConfigContext = () => {
 interface SaveDialogData {
   handle?: string | null;
   scope?: PromptScope;
+  // The user will need to change the handle if they are creating a new prompt
+  // because the handle is required and must be unique
+  // or if they are updating the handle of an existing prompt
   needsHandleChange?: boolean;
 }
 
