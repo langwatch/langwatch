@@ -15,6 +15,12 @@ import { Markdown } from "../../../../Markdown";
 import { nanoid } from "nanoid";
 import { DefaultChatTransport } from "ai";
 import * as Sentry from "@sentry/nextjs";
+import {
+  allModelOptions,
+  useModelSelectionOptions,
+} from "../../../../ModelSelector";
+import { DEFAULT_MODEL } from "../../../../../utils/constants";
+import { AddModelProviderKey } from "../../../../../optimization_studio/components/AddModelProviderKey";
 
 export function DatasetGeneration() {
   const { project } = useOrganizationTeamProject();
@@ -24,6 +30,15 @@ export function DatasetGeneration() {
       datasetGridRef: state.datasetGridRef,
     }))
   );
+
+  // Check if the default model is enabled
+  const defaultModel = project?.defaultModel ?? DEFAULT_MODEL;
+  const { modelOption } = useModelSelectionOptions(
+    allModelOptions,
+    defaultModel,
+    "chat"
+  );
+  const isDefaultModelDisabled = modelOption?.isDisabled ?? false;
 
   const databaseDataset = api.datasetRecord.getAll.useQuery(
     { projectId: project?.id ?? "", datasetId: datasetId ?? "" },
@@ -446,6 +461,20 @@ export function DatasetGeneration() {
   async function generate() {
     if (status !== "ready") return;
 
+    // Check if model is available before generating
+    if (isDefaultModelDisabled) {
+      toaster.create({
+        title: "Model not available",
+        description: "Please configure the model provider to generate data",
+        type: "error",
+        duration: 5000,
+        meta: {
+          closable: true,
+        },
+      });
+      return;
+    }
+
     if (input.trim()) {
       await sendMessage(
         { role: "user", parts: [{ type: "text", text: input }] },
@@ -478,6 +507,17 @@ export function DatasetGeneration() {
         Describe the sample data you need for running the evaluation or ask for
         modifications to the dataset.
       </Text>
+
+      {/* Add warning if model is disabled */}
+      {isDefaultModelDisabled && (
+        <AddModelProviderKey
+          runWhat="generate dataset data"
+          nodeProvidersWithoutCustomKeys={[
+            defaultModel.split("/")[0] ?? "unknown",
+          ]}
+        />
+      )}
+
       <VStack gap={2} width="full" align="start">
         <Input
           placeholder="e.g. Add 10 customer support examples"
@@ -486,7 +526,7 @@ export function DatasetGeneration() {
           borderRadius="md"
           padding={2}
           value={input}
-          disabled={status !== "ready"}
+          disabled={status !== "ready" || isDefaultModelDisabled}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={(e) => {
             if (e.key === "Enter") {
@@ -498,7 +538,7 @@ export function DatasetGeneration() {
         <Button
           colorPalette="blue"
           onClick={() => void generate()}
-          disabled={status !== "ready"}
+          disabled={status !== "ready" || isDefaultModelDisabled}
         >
           {status === "submitted" || status === "streaming" ? (
             <AISparklesLoader color="white" />

@@ -141,6 +141,24 @@ export const modelProviders = {
     }),
     enabledSince: new Date("2023-01-01"),
   },
+  xai: {
+    name: "xAI",
+    apiKey: "XAI_API_KEY",
+    endpointKey: undefined,
+    keysSchema: z.object({
+      XAI_API_KEY: z.string().min(1),
+    }),
+    enabledSince: new Date("2024-11-01"),
+  },
+  cerebras: {
+    name: "Cerebras",
+    apiKey: "CEREBRAS_API_KEY",
+    endpointKey: undefined,
+    keysSchema: z.object({
+      CEREBRAS_API_KEY: z.string().min(1),
+    }),
+    enabledSince: new Date("2024-06-01"),
+  },
   groq: {
     name: "Groq",
     apiKey: "GROQ_API_KEY",
