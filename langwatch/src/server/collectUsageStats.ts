@@ -71,8 +71,8 @@ export async function collectUsageStats(instanceId: string) {
   const { totalScenarioEvents } = await getScenariosCount();
 
   return {
-    totalTraces,
-    totalScenarioEvents,
+    totalTraces: totalTraces,
+    totalScenarioEvents: totalScenarioEvents,
     annotations: annotationCount,
     annotationQueues: annotationQueueCount,
     annotationQueueItems: annotationQueueItemCount,
@@ -89,7 +89,7 @@ export async function collectUsageStats(instanceId: string) {
 }
 
 const getTraceCount = async () => {
-  const client = await esClient();
+  const client = await esClient({ test: true });
 
   const result = await client.count({
     index: TRACE_INDEX.all,
@@ -101,12 +101,12 @@ const getTraceCount = async () => {
   });
 
   return {
-    totalTraces: result.count,
+    totalTraces: (result as any).body?.count ?? result.count ?? 0,
   };
 };
 
 const getScenariosCount = async () => {
-  const client = await esClient();
+  const client = await esClient({ test: true });
 
   const result = await client.count({
     index: SCENARIO_EVENTS_INDEX.alias,
@@ -118,6 +118,6 @@ const getScenariosCount = async () => {
   });
 
   return {
-    totalScenarioEvents: result.count,
+    totalScenarioEvents: (result as any).body?.count ?? result.count ?? 0,
   };
 };
