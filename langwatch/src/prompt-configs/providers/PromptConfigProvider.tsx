@@ -184,11 +184,10 @@ export function PromptConfigProvider({
       value={{ triggerSaveVersion, triggerChangeHandle }}
     >
       {children}
-      {isChangeHandleDialogOpen && (
         <ChangeHandleDialog
           currentHandle={saveDialogData?.handle}
           currentScope={saveDialogData?.scope}
-          isOpen={true}
+          isOpen={Boolean(isChangeHandleDialogOpen)}
           onClose={closeDialog}
           onSubmit={async (formValues: ChangeHandleFormValues) => {
             if (!saveClosureRef.current) return;
@@ -199,10 +198,8 @@ export function PromptConfigProvider({
             });
           }}
         />
-      )}
-      {isSaveDialogOpen && (
         <SaveVersionDialog
-          isOpen={true}
+          isOpen={isSaveDialogOpen}
           onClose={closeDialog}
           onSubmit={async (formValues: SaveDialogFormValues) => {
             if (!saveClosureRef.current) return;
@@ -213,7 +210,6 @@ export function PromptConfigProvider({
             });
           }}
         />
-      )}
     </PromptConfigContext.Provider>
   );
 }

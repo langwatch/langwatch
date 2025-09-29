@@ -101,7 +101,8 @@ export function PromptSourceHeader({
   };
 
   const handle = formProps.watch("handle");
-  const isDraft = !(Boolean(handle) && !hasDrift) || isDirty;
+  const isDraft = !Boolean(handle);
+  const canSave = isDraft || hasDrift || isDirty;
 
   return (
     <VStack width="full" gap={0}>
@@ -123,7 +124,12 @@ export function PromptSourceHeader({
             {isDraft ? (
               <Text color="gray.500">Draft</Text>
             ) : (
-              <Text fontSize="sm" fontWeight="500" fontFamily="mono">
+              <Text
+                fontSize="sm"
+                fontWeight="500"
+                fontFamily="mono"
+                fontStyle={canSave ? "italic" : "normal"}
+              >
                 {handle}
               </Text>
             )}
@@ -145,7 +151,7 @@ export function PromptSourceHeader({
             />
           )}
           <VersionSaveButton
-            disabled={!isDraft}
+            disabled={!canSave}
             onClick={() => void handleSaveVersion()}
             hideLabel={true}
           />
@@ -154,12 +160,4 @@ export function PromptSourceHeader({
       <PromptDriftWarning node={node} />
     </VStack>
   );
-}
-
-/**
- * Utility function to compare objects for equality
- * Used to determine if form values have changed
- */
-function isEqual(a: any, b: any) {
-  return JSON.stringify(a, null, 2) === JSON.stringify(b, null, 2);
 }
