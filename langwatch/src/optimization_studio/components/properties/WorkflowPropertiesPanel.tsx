@@ -1,8 +1,8 @@
+import { useCallback } from "react";
 import {
   Box,
   HStack,
   Input,
-  List,
   Spacer,
   Text,
   Textarea,
@@ -50,16 +50,7 @@ export const WorkflowPropertiesPanel = () => {
     setWorkflow({ workflow_type: workflowType });
   };
 
-  useEffect(() => {
-    if (
-      workflow.workflow_type &&
-      workflow.workflow_type !== (isEvaluator ? "evaluator" : "workflow")
-    ) {
-      updateNode(workflow.workflow_type);
-    }
-  }, [workflow.workflow_type, isEvaluator]);
-
-  const updateNode = (workflowType: WorkflowTypes) => {
+  const updateNode = useCallback((workflowType: WorkflowTypes) => {
     if (!endNode) return;
 
     if (workflowType === "evaluator") {
@@ -86,7 +77,17 @@ export const WorkflowPropertiesPanel = () => {
       updateNodeInternals(endNode.id);
       setIsEvaluator(false);
     }
-  };
+  }, [endNode, setNode, updateNodeInternals]);
+
+  useEffect(() => {
+    if (
+      workflow.workflow_type &&
+      workflow.workflow_type !== (isEvaluator ? "evaluator" : "workflow")
+    ) {
+      updateNode(workflow.workflow_type);
+    }
+  }, [workflow.workflow_type, isEvaluator, updateNode]);
+
 
   return (
     <BasePropertiesPanel
