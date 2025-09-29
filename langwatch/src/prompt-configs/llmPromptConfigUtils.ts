@@ -27,50 +27,6 @@ import {
 import { kebabCase } from "~/utils/stringCasing";
 import { type TriggerSaveVersionParams } from "~/prompt-configs/providers/PromptConfigProvider";
 
-export function llmConfigToOptimizationStudioNodeData(
-  config: LlmConfigWithLatestVersion
-): Node<LlmPromptConfigComponent>["data"] {
-  const { latestVersion } = config;
-  const version = parseLlmConfigVersion(latestVersion);
-
-  return {
-    // We need this to be able to update the config
-    configId: config.id,
-    name: config.name,
-    inputs: version.configData.inputs,
-    outputs: version.configData.outputs,
-    parameters: [
-      {
-        identifier: "llm",
-        type: "llm",
-        value: {
-          model: version.configData.model,
-        },
-      },
-      {
-        identifier: "instructions",
-        type: "str",
-        value: version.configData.prompt,
-      },
-      {
-        identifier: "demonstrations",
-        type: "dataset",
-        value: version.configData.demonstrations,
-      },
-      {
-        identifier: "messages",
-        type: "chat_messages",
-        value: version.configData.messages ?? [],
-      },
-      {
-        identifier: "prompting_technique",
-        type: "prompting_technique",
-        value: version.configData.prompting_technique,
-      },
-    ],
-  };
-}
-
 export function promptConfigFormValuesToOptimizationStudioNodeData(
   formValues: PromptConfigFormValues
 ): Node<Omit<LlmPromptConfigComponent, "configId" | "name">>["data"] {
