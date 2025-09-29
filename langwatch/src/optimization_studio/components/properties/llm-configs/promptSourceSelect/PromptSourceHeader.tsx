@@ -5,26 +5,22 @@ import { useFormContext } from "react-hook-form";
 import { PromptSource } from "./PromptSource";
 
 import { GenerateApiSnippetButton } from "~/components/GenerateApiSnippetButton";
-import { toaster } from "~/components/ui/toaster";
 import { VerticalFormControl } from "~/components/VerticalFormControl";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import type { LlmPromptConfigComponent } from "~/optimization_studio/types/dsl";
+import type {
+  LlmPromptConfigComponent,
+} from "~/optimization_studio/types/dsl";
 import { GeneratePromptApiSnippetDialog } from "~/prompt-configs/components/GeneratePromptApiSnippetDialog";
 import { VersionHistoryButton } from "~/prompt-configs/forms/prompt-config-form/components/VersionHistoryButton";
 import { VersionSaveButton } from "~/prompt-configs/forms/prompt-config-form/components/VersionSaveButton";
-import { usePrompts, type PromptConfigFormValues } from "~/prompt-configs";
+import { type PromptConfigFormValues } from "~/prompt-configs";
 import {
-  formValuesToTriggerSaveVersionParams,
   versionedPromptToPromptConfigFormValues,
 } from "~/prompt-configs/llmPromptConfigUtils";
 import { usePromptConfigContext } from "~/prompt-configs/providers/PromptConfigProvider";
-import { createLogger } from "~/utils/logger";
 import { PromptDriftWarning } from "../signature-properties-panel/PromptDriftWarning";
 import { useNodeDrift } from "../signature-properties-panel/hooks/use-node-drift";
-
-const logger = createLogger(
-  "langwatch:optimization_studio:prompt_source_header"
-);
+import type { VersionedPrompt } from "~/server/prompt-config";
 
 /**
  * Header for the prompt source select in the optimization studio
@@ -38,22 +34,21 @@ export function PromptSourceHeader({
   node: Node<LlmPromptConfigComponent>;
   onPromptSourceSelect: (config: { id: string; name: string }) => void;
 }) {
-  const { projectId = "" } = useOrganizationTeamProject();
   const configId = node.data.configId;
   const formProps = useFormContext<PromptConfigFormValues>();
   const { triggerSaveVersion } = usePromptConfigContext();
   const isDirty = formProps.formState.isDirty;
-  const { getPromptById } = usePrompts();
   const { project } = useOrganizationTeamProject();
   const { hasDrift } = useNodeDrift(node);
 
   const handleSaveVersion = () => {
     const values = formProps.getValues();
+    
     /**
      * Save new data to the database
      */
     triggerSaveVersion({
-      data: formValuesToTriggerSaveVersionParams(values),
+      data: values,
       onSuccess: (prompt) => {
         // Update the node data with the new prompt
         formProps.reset(versionedPromptToPromptConfigFormValues(prompt));
@@ -65,33 +60,10 @@ export function PromptSourceHeader({
    * Assumption: After restoring a version, the latest version config should
    * match the restored version config.
    */
-  const handleOnRestore = async (params: {
-    versionId: string;
-    configId: string;
-  }) => {
-    const { versionId, configId } = params;
-
-    try {
-      // Get the latest versioned prompt
-      const prompt = await getPromptById({
-        id: configId,
-        projectId,
-      });
-
-      if (!prompt) {
-        throw new Error("Prompt not found");
-      }
-
-      // Update the form with the new values
-      const newFormValues = versionedPromptToPromptConfigFormValues(prompt);
-      formProps.reset(newFormValues);
-    } catch (error) {
-      logger.error({ error, versionId }, "Failed to restore prompt version");
-      toaster.error({
-        title: "Failed to restore prompt version",
-        description: "Please try again.",
-      });
-    }
+  const handleOnRestore = async (params: VersionedPrompt) => {
+    // Update the form with the new values
+    const newFormValues = versionedPromptToPromptConfigFormValues(params);
+    formProps.reset(newFormValues);
   };
 
   const handle = formProps.watch("handle");
@@ -137,7 +109,10 @@ export function PromptSourceHeader({
               <GenerateApiSnippetButton hasHandle={!!handle} />
             </GeneratePromptApiSnippetDialog.Trigger>
           </GeneratePromptApiSnippetDialog>
-          <PromptSource selectedPromptId={configId} onSelect={onPromptSourceSelect} />
+          <PromptSource
+            selectedPromptId={configId}
+            onSelect={onPromptSourceSelect}
+          />
           {node.data.configId && (
             <VersionHistoryButton
               configId={node.data.configId}
