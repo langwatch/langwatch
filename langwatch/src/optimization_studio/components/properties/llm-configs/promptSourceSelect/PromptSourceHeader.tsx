@@ -4,12 +4,9 @@ import { useFormContext } from "react-hook-form";
 
 import { PromptSource } from "./PromptSource";
 
-import { GenerateApiSnippetButton } from "~/components/GenerateApiSnippetButton";
 import { VerticalFormControl } from "~/components/VerticalFormControl";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import type {
-  LlmPromptConfigComponent,
-} from "~/optimization_studio/types/dsl";
+import type { LlmPromptConfigComponent } from "~/optimization_studio/types/dsl";
 import { GeneratePromptApiSnippetDialog } from "~/prompt-configs/components/GeneratePromptApiSnippetDialog";
 import { VersionHistoryButton } from "~/prompt-configs/forms/prompt-config-form/components/VersionHistoryButton";
 import { VersionSaveButton } from "~/prompt-configs/forms/prompt-config-form/components/VersionSaveButton";
@@ -22,6 +19,7 @@ import { usePromptConfigContext } from "~/prompt-configs/providers/PromptConfigP
 import { PromptDriftWarning } from "../signature-properties-panel/PromptDriftWarning";
 import { useNodeDrift } from "../signature-properties-panel/hooks/useNodeDrift";
 import type { VersionedPrompt } from "~/server/prompt-config";
+import { EditablePromptHandleField } from "~/prompt-configs/forms/fields/EditablePromptHandleField";
 
 /**
  * Header for the prompt source select in the optimization studio
@@ -44,7 +42,7 @@ export function PromptSourceHeader({
 
   const handleSaveVersion = () => {
     const values = formProps.getValues();
-    
+
     /**
      * Save new data to the database
      */
@@ -87,29 +85,13 @@ export function PromptSourceHeader({
           padding={2}
           background="gray.50"
         >
-          <HStack paddingX={1} gap={1}>
-            {isDraft ? (
-              <Text color="gray.500">Draft</Text>
-            ) : (
-              <Text
-                fontSize="sm"
-                fontWeight="500"
-                fontFamily="mono"
-                fontStyle={canSave ? "italic" : "normal"}
-              >
-                {handle}
-              </Text>
-            )}
-          </HStack>
+          <EditablePromptHandleField />
           <Spacer />
           <GeneratePromptApiSnippetDialog
             configId={configId}
             apiKey={project?.apiKey}
-          >
-            <GeneratePromptApiSnippetDialog.Trigger>
-              <GenerateApiSnippetButton hasHandle={!!handle} />
-            </GeneratePromptApiSnippetDialog.Trigger>
-          </GeneratePromptApiSnippetDialog>
+            hasHandle={!!handle}
+          />
           <PromptSource
             selectedPromptId={configId}
             onSelect={onPromptSourceSelect}

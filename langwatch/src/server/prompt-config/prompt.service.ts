@@ -439,7 +439,6 @@ export class PromptService {
         | "deletedAt"
         | "configId"
         | "projectId"
-        | "handle"
       >
     >;
   }): Promise<VersionedPrompt> {

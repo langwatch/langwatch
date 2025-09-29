@@ -25,10 +25,12 @@ export type TriggerSaveVersionParams = RouterInputs["prompts"]["upsert"]['data']
 };
 
 type TrigggerSaveVersionFunction = ({
+  handle,
   data,
   onError,
   onSuccess,
 }: {
+  handle: string;
   data: TriggerSaveVersionParams;
   onError?: (error: Error) => void;
   onSuccess?: (prompt: VersionedPrompt) => void;
@@ -166,8 +168,8 @@ export function PromptConfigProvider({
         if (!data) return;
         setSaveDialogData({
           handle: data.handle,
-          scope: data.scope,
           needsHandleChange: true,
+          data
         });
         setSaveClosure({
           ...data,

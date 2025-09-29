@@ -84,7 +84,7 @@ export function PromptsList({
   return (
     <VStack gap={4} align="stretch">
       {prompts.map((config) => (
-        <GeneratePromptApiSnippetDialog
+        <GeneratePromptApiSnippetDialog.Root
           key={config.id}
           configId={config.id}
           apiKey={project?.apiKey}
@@ -268,7 +268,7 @@ export function PromptsList({
               </HStack>
             </Card.Body>
           </Card.Root>
-        </GeneratePromptApiSnippetDialog>
+        </GeneratePromptApiSnippetDialog.Root>
       ))}
     </VStack>
   );

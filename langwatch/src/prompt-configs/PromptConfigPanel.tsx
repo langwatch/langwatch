@@ -104,8 +104,12 @@ export const PromptConfigPanel = forwardRef(function PromptConfigPanel(
         : // If no default model is set, use the default values
           buildDefaultFormValues({});
     },
+    /**
+     * We only reset the initial config values when configId changes
+     * or specifically when the prompt is not found (configId is null => default values)
+     */
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [Boolean(prompt), defaultModel]
+    [Boolean(prompt), defaultModel, configId]
   );
 
   // Setup form with the config values
@@ -124,10 +128,7 @@ export const PromptConfigPanel = forwardRef(function PromptConfigPanel(
 
   // Reset form when config changes
   useEffect(() => {
-    const shouldResetForm = !configId;
-    if (shouldResetForm) {
-      formProps.methods.reset(initialConfigValues);
-    }
+    formProps.methods.reset(initialConfigValues);
   }, [configId, formProps.methods, initialConfigValues]);
 
   // Get input fields from the form

@@ -4,6 +4,7 @@ import React from "react";
 import { getGetPromptSnippets } from "../utils/snippets/getGetPromptSnippets";
 
 import { GenerateApiSnippetDialog } from "~/components/GenerateApiSnippetDialog";
+import { GenerateApiSnippetButton } from "~/components/GenerateApiSnippetButton";
 import { Link } from "~/components/ui/link";
 
 interface GeneratePromptApiSnippetButtonProps {
@@ -21,7 +22,7 @@ interface GeneratePromptApiSnippetButtonProps {
  * Single Responsibility: This component specifically handles prompt API snippet generation
  * and documentation display for the Get Prompt endpoint.
  */
-export function GeneratePromptApiSnippetDialog({
+function GeneratePromptApiSnippetDialogRoot({
   configId,
   apiKey,
   children,
@@ -66,5 +67,24 @@ export function GeneratePromptApiSnippetDialog({
   );
 }
 
+export function GeneratePromptApiSnippetDialog({
+  configId,
+  apiKey,
+  hasHandle,
+}: {
+  configId?: string;
+  apiKey?: string;
+  hasHandle: boolean;
+}) {
+  return (
+    <GeneratePromptApiSnippetDialog.Root configId={configId} apiKey={apiKey}>
+      <GeneratePromptApiSnippetDialog.Trigger>
+        <GenerateApiSnippetButton hasHandle={hasHandle} />
+      </GeneratePromptApiSnippetDialog.Trigger>
+    </GeneratePromptApiSnippetDialog.Root>
+  );
+}
+
 // Re-export the Trigger subcomponent for composability
 GeneratePromptApiSnippetDialog.Trigger = GenerateApiSnippetDialog.Trigger;
+GeneratePromptApiSnippetDialog.Root = GeneratePromptApiSnippetDialogRoot;

@@ -47,6 +47,7 @@ export const promptsRouter = createTRPCRouter({
     .input(
       z.object({
         projectId: z.string(),
+        // Handle for find
         handle: handleSchema,
         data: z.object({
           scope: z.nativeEnum(PromptScope).optional(),
@@ -61,6 +62,8 @@ export const promptsRouter = createTRPCRouter({
           maxTokens: z.number().optional(),
           promptingTechnique: promptingTechniqueSchema.optional(),
           demonstrations: nodeDatasetSchema.optional(),
+          // Optional handle for upsert
+          handle: handleSchema.optional(),
         }),
       })
     )
