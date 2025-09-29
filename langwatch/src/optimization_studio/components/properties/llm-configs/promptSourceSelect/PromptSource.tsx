@@ -9,7 +9,7 @@ import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 
 interface PromptSourceProps {
-  selectedPromptId: string;
+  selectedPromptId?: string;
   onSelect: (config: { id: string; name: string }) => void;
 }
 
