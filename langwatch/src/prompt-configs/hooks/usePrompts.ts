@@ -10,12 +10,8 @@ export const usePrompts = () => {
   const updatePrompt = api.prompts.update.useMutation();
 
   const invalidateAll = async () => Promise.all([
-    await trpc.llmConfigs.getPromptConfigs.invalidate(),
-    await trpc.llmConfigs.getByIdWithLatestVersion.invalidate(),
-    await trpc.llmConfigs.getPromptConfigs.invalidate(),
-    await trpc.llmConfigs.versions.getVersionsForConfigById.invalidate(),
-    await trpc.llmConfigs.getByIdWithLatestVersion.invalidate(),
-    await trpc.prompts.getById.invalidate(),
+    await trpc.llmConfigs.invalidate(),
+    await trpc.prompts.invalidate(),
   ]);
 
   const wrappedUpsertPrompt: typeof upsertPrompt.mutateAsync = async (params)=> {
