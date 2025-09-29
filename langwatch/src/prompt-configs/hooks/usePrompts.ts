@@ -26,8 +26,8 @@ export const usePrompts = () => {
     return prompt;
   };
 
-  const wrappedGetPromptByHandle: typeof trpc.prompts.getByHandle.fetch = async (params) => {
-    const prompt = await trpc.prompts.getByHandle.fetch(params);
+  const wrappedGetPromptById: typeof trpc.prompts.getById.fetch = async (params) => {
+    const prompt = await trpc.prompts.getById.fetch(params);
     await invalidateAll();
     return prompt;
   };
@@ -35,6 +35,6 @@ export const usePrompts = () => {
   return {
     upsertPrompt: wrappedUpsertPrompt,
     updatePrompt: wrappedUpdatePrompt,
-    getPromptByHandle: wrappedGetPromptByHandle,
+    getPromptById: wrappedGetPromptById,
   };
 };
