@@ -1,6 +1,6 @@
 import { VStack } from "@chakra-ui/react";
 import { useUpdateNodeInternals, type Node } from "@xyflow/react";
-import { useMemo } from "react";
+import { useCallback, useMemo } from "react";
 import { FormProvider, useFieldArray } from "react-hook-form";
 import { useShallow } from "zustand/react/shallow";
 
@@ -29,6 +29,8 @@ import {
 } from "~/prompt-configs";
 import {
   llmConfigToOptimizationStudioNodeData,
+  promptConfigFormValuesToOptimizationStudioNodeData,
+  versionedPromptToPromptConfigFormValues,
   safeOptimizationStudioNodeDataToPromptConfigFormInitialValues,
 } from "~/prompt-configs/llmPromptConfigUtils";
 import { api } from "~/utils/api";
@@ -88,16 +90,22 @@ export function SignaturePropertiesPanelForm({
     [node.data]
   );
 
+  /**
+   * Sync the node data with the updated form values
+   */
+  const syncNodeDataWithFormValues = useCallback((values: PromptConfigFormValues) => {
+    const newNodeData = promptConfigFormValuesToOptimizationStudioNodeData(values);
+    setNode({
+      ...node,
+      data: newNodeData,
+    });
+  }, [setNode, node.data, node]);
+
   const formProps = usePromptConfigForm({
     configId,
     initialConfigValues,
     onChange: (formValues) => {
-      const shouldUpdate = !isEqual(formValues, initialConfigValues);
-
-      // Only update node data if form values have actually changed
-      if (shouldUpdate) {
-        onFormValuesChange?.(formValues);
-      }
+      syncNodeDataWithFormValues(formValues);
     },
   });
 
@@ -109,25 +117,17 @@ export function SignaturePropertiesPanelForm({
     name: string;
   }) => {
     try {
-      const config = await trpc.llmConfigs.getByIdWithLatestVersion.fetch({
+      const config = await trpc.prompts.getById.fetch({
         id: selectedConfig.id,
         projectId: project?.id ?? "",
       });
 
-      const newNodeData = llmConfigToOptimizationStudioNodeData(config);
-
-      // Update the node data with the new config
-      setNode({
-        ...node,
-        data: newNodeData,
-      });
+      if (!config) {
+        throw new Error("Prompt not found");
+      }
 
       // Reset the form with the updated node data
-      formProps.methods.reset(
-        safeOptimizationStudioNodeDataToPromptConfigFormInitialValues(
-          newNodeData
-        )
-      );
+      formProps.methods.reset( versionedPromptToPromptConfigFormValues( config));
     } catch (error) {
       console.error(error);
       toaster.error({
