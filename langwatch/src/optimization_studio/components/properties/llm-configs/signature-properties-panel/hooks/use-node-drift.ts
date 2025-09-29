@@ -20,7 +20,7 @@ export function useNodeDrift(node: Node<LlmPromptConfigComponent>) {
   const configId = node.data.configId;
   const { data: latestPrompt, isLoading: isLoadingPrompt } =
     api.prompts.getById.useQuery({
-      id: configId,
+      id: configId ?? "",
       projectId: project?.id ?? "",
     }, {
       enabled: !!configId && !!project?.id,
