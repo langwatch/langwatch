@@ -29,8 +29,9 @@ import { type TriggerSaveVersionParams } from "~/prompt-configs/providers/Prompt
 
 export function promptConfigFormValuesToOptimizationStudioNodeData(
   formValues: PromptConfigFormValues
-): Node<Omit<LlmPromptConfigComponent, "configId" | "name">>["data"] {
+): Node<Omit<LlmPromptConfigComponent, "configId">>["data"] {
   return {
+    name: formValues.handle?.replace("/", " ") ?? "Anonymous", // REQUIRED FOR INVOKING LLM
     inputs: formValues.version?.configData?.inputs,
     outputs: formValues.version?.configData?.outputs,
     parameters: [
