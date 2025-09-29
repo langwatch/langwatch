@@ -101,14 +101,6 @@ const collectConditions = (
     const conditions: QueryDslQueryContainer[] = [];
     const filter = availableFilters[field];
 
-    // Add defensive check here
-    if (!filter) {
-      console.warn(
-        `Filter field '${field}' not found in availableFilters registry`
-      );
-      return [];
-    }
-
     const andConditions: QueryDslQueryContainer[] = [];
     if (filter.requiresKey && key) {
       andConditions.push(
