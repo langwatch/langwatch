@@ -35,7 +35,6 @@ export const usePrompts = () => {
     return prompt;
   };
 
-
   return {
     upsertPrompt: wrappedUpsertPrompt,
     updatePrompt: wrappedUpdatePrompt,

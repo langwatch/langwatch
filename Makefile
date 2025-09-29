@@ -25,7 +25,7 @@ quickstart:
 	@echo "Starting Langwatch..."
 	@docker compose up redis postgres opensearch -d
 	make install
-	make start
+	DISABLE_USAGE_STATS=true make start
 	open http://localhost:5560
 
 sync-all-openapi:
