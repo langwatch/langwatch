@@ -89,6 +89,7 @@ export const env = createEnv({
     POSTHOG_KEY: z.string().optional(),
     POSTHOG_HOST: z.string().optional(),
     DISABLE_USAGE_STATS: z.boolean().optional(),
+    ENABLE_CRON_TASKS: z.boolean().optional(),
     LANGWATCH_NLP_LAMBDA_CONFIG: z.string().optional(),
 
     // Observability
@@ -185,6 +186,9 @@ export const env = createEnv({
     OKTA_CLIENT_SECRET: process.env.OKTA_CLIENT_SECRET,
     OKTA_ISSUER: process.env.OKTA_ISSUER,
     OTEL_EXPORTER_OTLP_ENDPOINT: process.env.OTEL_EXPORTER_OTLP_ENDPOINT,
+    ENABLE_CRON_TASKS:
+      process.env.DISABLE_CRON_TASKS === "1" ||
+      process.env.DISABLE_CRON_TASKS?.toLowerCase() === "true",
   },
   /**
    * Run `build` or `dev` with `SKIP_ENV_VALIDATION` to skip env validation.
