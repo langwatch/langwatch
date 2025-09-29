@@ -37,7 +37,7 @@ const signature: Signature = {
     {
       identifier: "instructions",
       type: "str",
-      value: undefined,
+      value: "You are a helpful assistant.",
     },
     {
       identifier: "messages",

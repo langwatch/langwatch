@@ -134,7 +134,7 @@ export function ChangeHandleDialog({
         >
           <Dialog.Header>
             <Dialog.Title>
-              {currentHandle ? "Save Prompt" : "Change Prompt Handle"}
+              {currentHandle ? "Change Prompt Handle" : "Save Prompt"}
             </Dialog.Title>
           </Dialog.Header>
           <Dialog.CloseTrigger />
