@@ -21,7 +21,6 @@ import { usePromptHandleCheck } from "../../hooks/prompts/usePromptHandleCheck";
 import { createChangeHandleFormSchema, type ChangeHandleFormValues } from "./schemas/change-handle-form.schema";
 
 import { Dialog } from "~/components/ui/dialog";
-import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 
 export interface ChangeHandleDialogProps {
   currentHandle?: string | null;

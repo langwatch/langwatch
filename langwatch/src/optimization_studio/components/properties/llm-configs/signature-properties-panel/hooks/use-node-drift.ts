@@ -22,6 +22,8 @@ export function useNodeDrift(node: Node<LlmPromptConfigComponent>) {
     api.prompts.getById.useQuery({
       id: configId,
       projectId: project?.id ?? "",
+    }, {
+      enabled: !!configId && !!project?.id,
     });
   const formProps = useFormContext<PromptConfigFormValues>();
   /**
