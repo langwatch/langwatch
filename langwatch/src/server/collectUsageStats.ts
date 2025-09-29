@@ -71,8 +71,8 @@ export async function collectUsageStats(instanceId: string) {
   const { totalScenarioEvents } = await getScenariosCount();
 
   return {
-    totalTraces: totalTraces,
-    totalScenarioEvents: totalScenarioEvents,
+    totalTraces,
+    totalScenarioEvents,
     annotations: annotationCount,
     annotationQueues: annotationQueueCount,
     annotationQueueItems: annotationQueueItemCount,
