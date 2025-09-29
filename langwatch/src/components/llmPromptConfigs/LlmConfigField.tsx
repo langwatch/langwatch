@@ -35,7 +35,7 @@ export function LLMConfigField({
   showProviderKeyMessage = true,
 }: LLMConfigFieldProps) {
   const { open, onClose, onToggle } = useDisclosure();
-  const { model } = llmConfig;
+  const { model } = llmConfig ?? {};
 
   // Check if the model is disabled (has line-through styling)
   const isModelDisabled = modelOption?.isDisabled ?? false;

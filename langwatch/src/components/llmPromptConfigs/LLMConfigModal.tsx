@@ -43,7 +43,7 @@ export function LLMConfigModal({
       >
         <HStack width="full" gap={2}>
           <ModelSelector
-            model={values.model ?? ""}
+            model={values?.model ?? ""}
             options={allModelOptions}
             onChange={(model) => onChange({ ...values, model })}
             mode="chat"
@@ -68,7 +68,7 @@ export function LLMConfigModal({
         inputWidth="55%"
       >
         <Input
-          value={values.temperature}
+          value={values?.temperature}
           type="number"
           step={0.1}
           min={0}
@@ -84,7 +84,7 @@ export function LLMConfigModal({
         inputWidth="55%"
       >
         <Input
-          value={values.max_tokens}
+          value={values?.max_tokens}
           type="number"
           step={64}
           min={256}
