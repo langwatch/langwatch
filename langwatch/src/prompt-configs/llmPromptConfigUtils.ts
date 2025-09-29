@@ -456,5 +456,10 @@ export function isNodeDataEqual(
   nodeData1: Node<LlmPromptConfigComponent>["data"],
   nodeData2: Node<LlmPromptConfigComponent>["data"]
 ): boolean {
-  return standardizeNodeData(nodeData1) === standardizeNodeData(nodeData2);
+  const isit = standardizeNodeData(nodeData1) === standardizeNodeData(nodeData2);
+  if (!isit) {
+    console.log("nodeData1", JSON.parse(standardizeNodeData(nodeData1)));
+    console.log("nodeData2", JSON.parse(standardizeNodeData(nodeData2)));
+  }
+  return isit;
 }
