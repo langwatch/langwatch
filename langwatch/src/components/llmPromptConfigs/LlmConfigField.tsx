@@ -12,8 +12,6 @@ import { LLMModelDisplay } from "./LLMModelDisplay";
 import { LLMConfigModal } from "~/components/llmPromptConfigs/LLMConfigModal";
 import { AddModelProviderKey } from "~/optimization_studio/components/AddModelProviderKey";
 import type { LLMConfig } from "~/optimization_studio/types/dsl";
-import { useFormContext } from "react-hook-form";
-import { type PromptConfigFormValues } from "~/prompt-configs";
 
 interface LLMConfigFieldProps {
   llmConfig: LLMConfig;
@@ -24,15 +22,20 @@ interface LLMConfigFieldProps {
   showProviderKeyMessage?: boolean;
 }
 
+/**
+ * LLM Config field
+ * Can be used outside of the form context (does not use react-hook-form)
+ */
 export function LLMConfigField({
   allowDefault,
+  llmConfig,
+  onChange,
   modelOption,
   requiresCustomKey,
   showProviderKeyMessage = true,
 }: LLMConfigFieldProps) {
   const { open, onClose, onToggle } = useDisclosure();
-  const form = useFormContext<PromptConfigFormValues>();
-  const model = form.watch("version.configData.llm.model");
+  const { model } = llmConfig;
 
   // Check if the model is disabled (has line-through styling)
   const isModelDisabled = modelOption?.isDisabled ?? false;
@@ -42,6 +45,8 @@ export function LLMConfigField({
       <LLMConfigModal
         open={open}
         onClose={onClose}
+        values={llmConfig}
+        onChange={onChange}
       />
       <HStack
         gap={2}
@@ -52,7 +57,7 @@ export function LLMConfigField({
         marginBottom={1}
       >
         <LLMModelDisplay model={model} />
-        {allowDefault && model != undefined ? (
+        {allowDefault && llmConfig != undefined ? (
           <Tooltip
             content="Overriding default LLM, click to reset"
             positioning={{ placement: "top" }}
@@ -61,8 +66,7 @@ export function LLMConfigField({
             <Button
               size="sm"
               variant="ghost"
-              // TODO: I don't think this is correct? But the behavior before was confusing
-              onClick={() => form.setValue("version.configData.llm.model", undefined as any)}
+              onClick={() => onChange(undefined as any)}
             >
               <X size={16} />
             </Button>

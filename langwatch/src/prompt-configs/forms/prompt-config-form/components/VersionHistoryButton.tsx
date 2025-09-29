@@ -1,3 +1,4 @@
+import type { VersionedPrompt } from "~/server/prompt-config";
 import { Tooltip } from "../../../../components/ui/tooltip";
 import { VersionHistoryListPopover } from "../../../VersionHistoryListPopover";
 
@@ -7,7 +8,7 @@ export function VersionHistoryButton({
   label,
 }: {
   configId: string;
-  onRestoreSuccess?: (params: { versionId: string; configId: string }) => Promise<void>;
+  onRestoreSuccess?: (prompt: VersionedPrompt) => Promise<void>;
   label?: string;
 }) {
   return (

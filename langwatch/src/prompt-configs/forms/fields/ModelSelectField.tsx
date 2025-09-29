@@ -43,6 +43,8 @@ export function ModelSelectField() {
           render={({ field }) => {
             return (
               <LLMConfigField
+                llmConfig={field.value}
+                onChange={field.onChange}
                 requiresCustomKey={false}
               />
             );

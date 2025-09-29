@@ -19,6 +19,7 @@ import { Tooltip } from "~/components/ui/tooltip";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 import { usePrompts } from "./hooks";
+import type { VersionedPrompt } from "~/server/prompt-config";
 
 /**
  * Minimal interface for version history display
@@ -258,7 +259,7 @@ export function VersionHistoryListPopover({
   label,
 }: {
   configId: string;
-  onRestoreSuccess?: (params: { versionId: string; configId: string }) => Promise<void>;
+  onRestoreSuccess?: (prompt: VersionedPrompt) => Promise<void>;
   label?: string;
 }) {
   const { open, setOpen, onClose } = useDisclosure();
@@ -281,12 +282,12 @@ export function VersionHistoryListPopover({
   const handleRestore = async (params: { versionId: string; configId: string }) => {
     const { versionId } = params;
     try {
-      await restoreVersion({
+      const prompt = await restoreVersion({
         versionId,
         projectId: project?.id ?? "",
       });
       await refetch();
-      await onRestoreSuccess?.(params);
+      await onRestoreSuccess?.(prompt);
       onClose();
       toaster.success({
         title: "Version restored successfully",
