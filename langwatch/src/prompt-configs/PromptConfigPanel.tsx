@@ -76,9 +76,9 @@ export const PromptConfigPanel = forwardRef(function PromptConfigPanel(
 
   // Fetch the LLM configuration
   const { data: prompt, isLoading: isLoadingConfig } =
-    api.prompts.getById.useQuery(
+    api.prompts.getByIdOrHandle.useQuery(
       {
-        id: configId,
+        idOrHandle: configId,
         projectId,
       },
       {

@@ -119,8 +119,8 @@ export function SignaturePropertiesPanelForm({
     name: string;
   }) => {
     try {
-      const config = await trpc.prompts.getById.fetch({
-        id: selectedConfig.id,
+      const config = await trpc.prompts.getByIdOrHandle.fetch({
+        idOrHandle: selectedConfig.id,
         projectId: project?.id ?? "",
       });
 

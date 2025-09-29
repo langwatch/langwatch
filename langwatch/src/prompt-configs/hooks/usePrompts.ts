@@ -27,8 +27,8 @@ export const usePrompts = () => {
     return prompt;
   };
 
-  const wrappedGetPromptById: typeof trpc.prompts.getById.fetch = async (params) => {
-    const prompt = await trpc.prompts.getById.fetch(params);
+  const wrappedGetPromptById: typeof trpc.prompts.getByIdOrHandle.fetch = async (params) => {
+    const prompt = await trpc.prompts.getByIdOrHandle.fetch(params);
     await invalidateAll();
     return prompt;
   };

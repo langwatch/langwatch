@@ -25,6 +25,7 @@ import {
 } from "~/types";
 import { kebabCase } from "~/utils/stringCasing";
 import { type TriggerSaveVersionParams } from "~/prompt-configs/providers/PromptConfigProvider";
+import { isEqual } from "lodash-es";
 
 export function promptConfigFormValuesToOptimizationStudioNodeData(
   formValues: PromptConfigFormValues
@@ -354,6 +355,8 @@ export function versionedPromptToOptimizationStudioNodeData(
         type: "llm",
         value: {
           model: prompt.model,
+          temperature: prompt.temperature,
+          max_tokens: prompt.maxTokens,
         },
       },
       {
@@ -388,8 +391,8 @@ export function versionedPromptToOptimizationStudioNodeData(
  */
 function standardizeNodeData(
   nodeData: Node<LlmPromptConfigComponent>["data"]
-): string {
-  return JSON.stringify({
+) {
+  return {
     handle: nodeData.handle,
     inputs: nodeData.inputs?.map(input => ({
       identifier: input.identifier,
@@ -404,17 +407,13 @@ function standardizeNodeData(
       type: param.type,
       ...(param.value !== undefined && { value: param.value }),
     })),
-  });
+  };
 }
 
 export function isNodeDataEqual(
   nodeData1: Node<LlmPromptConfigComponent>["data"],
   nodeData2: Node<LlmPromptConfigComponent>["data"]
 ): boolean {
-  const isit = standardizeNodeData(nodeData1) === standardizeNodeData(nodeData2);
-  if (!isit) {
-    console.log("nodeData1", JSON.parse(standardizeNodeData(nodeData1)));
-    console.log("nodeData2", JSON.parse(standardizeNodeData(nodeData2)));
-  }
-  return isit;
+  const nodesAreEqual = isEqual(standardizeNodeData(nodeData1), standardizeNodeData(nodeData2));
+  return nodesAreEqual;
 }
