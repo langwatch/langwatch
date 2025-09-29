@@ -23,7 +23,6 @@ import { organizationRouter } from "./routers/organization";
 import { planRouter } from "./routers/plan";
 import { projectRouter } from "./routers/project";
 import { promptsRouter } from "./routers/prompts";
-import { llmConfigsRouter } from "./routers/prompts/llm-prompt-configs/llmConfigs";
 import { publicEnvRouter } from "./routers/publicEnv";
 import { scenarioRouter } from "./routers/scenario";
 import { shareRouter } from "./routers/share";
@@ -72,7 +71,6 @@ export const appRouter = createTRPCRouter({
   optimization: optimizationRouter,
   integrationsChecks: integrationsChecksRouter,
   onboarding: onboardingRouter,
-  llmConfigs: llmConfigsRouter,
   scenarios: scenarioRouter,
   prompts: promptsRouter,
   ...(dependencies.extraTRPCRoutes?.() ?? {}),

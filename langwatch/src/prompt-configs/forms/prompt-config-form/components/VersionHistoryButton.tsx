@@ -3,11 +3,11 @@ import { VersionHistoryListPopover } from "../../../VersionHistoryListPopover";
 
 export function VersionHistoryButton({
   configId,
-  onRestore,
+  onRestoreSuccess,
   label,
 }: {
   configId: string;
-  onRestore?: (versionId: string) => void;
+  onRestoreSuccess?: (params: { versionId: string; configId: string }) => Promise<void>;
   label?: string;
 }) {
   return (
@@ -19,7 +19,7 @@ export function VersionHistoryButton({
     >
       <VersionHistoryListPopover
         configId={configId}
-        onRestore={onRestore}
+        onRestoreSuccess={onRestoreSuccess}
         label={label}
       />
     </Tooltip>

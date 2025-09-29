@@ -132,6 +132,30 @@ export class PromptService {
   }
 
   /**
+   * Gets a prompt by version ID directly.
+   * Single Responsibility: Retrieve a specific prompt version using only the version ID.
+   *
+   * @param params - The parameters object
+   * @param params.versionId - The version ID of the prompt
+   * @param params.projectId - The project ID for authorization and context
+   * @returns The versioned prompt configuration
+   */
+  async getPromptByVersionId(params: {
+    versionId: string;
+    projectId: string;
+  }): Promise<VersionedPrompt | null> {
+      const { config } = await this.repository.versions.getVersionById({
+        versionId: params.versionId,
+        projectId: params.projectId,
+      });
+
+      return await this.getPromptByIdOrHandle({
+        idOrHandle: config.id,
+        projectId: params.projectId,
+      });
+  }
+
+  /**
    * Get all versions for a prompt
    */
   async getAllVersions(params: {

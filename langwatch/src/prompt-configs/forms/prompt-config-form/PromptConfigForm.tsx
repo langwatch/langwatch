@@ -90,10 +90,9 @@ function InnerPromptConfigForm(props: PromptConfigFormProps) {
     )[0]?.length ?? 0 > 0
   );
 
-  // TODO: I think this doesn't need to be called here.
   const handleRestore = useCallback(
-    (_versionId: string) => {
-      refetchSavedConfig()
+    async () => {
+      await refetchSavedConfig()
         .then(({ data: restoredConfig }) => {
           if (!restoredConfig) throw new Error("Restored config is missing");
           methods.reset(llmConfigToPromptConfigFormValues(restoredConfig));
@@ -143,7 +142,7 @@ function InnerPromptConfigForm(props: PromptConfigFormProps) {
           <VersionHistoryButton
             configId={configId}
             label="History"
-            onRestore={handleRestore}
+            onRestoreSuccess={handleRestore}
           />
           <Spacer />
           <VersionSaveButton
