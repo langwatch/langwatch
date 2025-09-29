@@ -118,7 +118,7 @@ export const modelProviderRouter = createTRPCRouter({
           where: { id: existingModelProvider.id, projectId },
           data: {
             ...data,
-            customKeys: mergedCustomKeys,
+            customKeys: mergedCustomKeys as any,
             customModels: customModels ? customModels : [],
             customEmbeddingsModels: customEmbeddingsModels
               ? customEmbeddingsModels
@@ -379,6 +379,38 @@ export const prepareLitellmParams = async ({
       "invalid";
     params.aws_region_name =
       getModelOrDefaultEnvKey(modelProvider, "AWS_REGION_NAME") ?? "invalid";
+  }
+
+  // Handle Azure API Gateway configuration
+  if (modelProvider.provider === "azure") {
+    const gatewayBaseUrl = getModelOrDefaultEnvKey(
+      modelProvider,
+      "AZURE_API_GATEWAY_BASE_URL"
+    );
+    const gatewayVersion = getModelOrDefaultEnvKey(
+      modelProvider,
+      "AZURE_API_GATEWAY_VERSION"
+    ) ?? "2024-05-01-preview";
+    const gatewayHeaderName = getModelOrDefaultEnvKey(
+      modelProvider,
+      "AZURE_API_GATEWAY_HEADER_NAME"
+    );
+    const gatewayHeaderKey = getModelOrDefaultEnvKey(
+      modelProvider,
+      "AZURE_API_GATEWAY_HEADER_KEY"
+    );
+
+    // If API Gateway is configured, route through the gateway endpoint
+    if (gatewayBaseUrl) {
+      params.api_base = gatewayBaseUrl;
+      params.use_azure_gateway = "true";
+      params.api_version = gatewayVersion;
+      // Set custom header parameters for API Gateway
+      if (gatewayHeaderName && gatewayHeaderKey) {
+        params.azure_api_gateway_header_name = gatewayHeaderName;
+        params.azure_api_gateway_header_key = gatewayHeaderKey;
+      }
+    }
   }
 
   if (dependencies.managedModelProviderLitellmParams) {

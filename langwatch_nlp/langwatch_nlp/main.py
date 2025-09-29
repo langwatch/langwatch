@@ -18,6 +18,8 @@ from langwatch_nlp.studio.utils import (
 import langwatch_nlp.error_tracking
 from fastapi import FastAPI
 
+from openai import OpenAI
+
 from langwatch_nlp.studio.app import app as studio_app, lifespan as studio_lifespan
 
 import langwatch_nlp.topic_clustering.batch_clustering as batch_clustering
@@ -63,6 +65,7 @@ async def health_check():
 
 
 async def proxy_startup():
+    print("=== proxy_startup called ===", flush=True)
     original_get_available_deployment = Router.async_get_available_deployment
 
     # Patch to be able to replace api_key and api_base on the fly from the parameters comming from langwatch according to user settings
@@ -89,6 +92,7 @@ async def proxy_startup():
         deployment = deployment.copy()
 
         print(f"deployment: {deployment}")
+
         print(f"model: {model}")
 
         if "litellm_params" not in deployment:
@@ -103,7 +107,12 @@ async def proxy_startup():
                 key = key.replace("-", "_")
 
                 deployment["litellm_params"][key] = value
-        if "azure/" in model:
+
+        if (
+            "azure/" in model
+            and "api_version" not in deployment["litellm_params"]
+            and "use_azure_gateway" not in deployment["litellm_params"]
+        ):
             deployment["litellm_params"]["api_version"] = os.environ[
                 "AZURE_API_VERSION"
             ]
