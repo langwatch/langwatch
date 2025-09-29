@@ -17,6 +17,16 @@ import { nodeDatasetSchema } from "~/optimization_studio/types/dsl";
  */
 export const promptsRouter = createTRPCRouter({
   /**
+   * Get all prompts for project
+   */
+  getAllPromptsForProject: protectedProcedure
+    .input(z.object({ projectId: z.string() }))
+    .use(checkUserPermissionForProject(TeamRoleGroup.PROMPTS_VIEW))
+    .query(async ({ ctx, input }) => {
+      const service = new PromptService(ctx.prisma);
+      return await service.getAllPrompts(input);
+    }),
+  /**
    * Upsert a prompt - create if it doesn't exist, update if it does
    */
   upsert: protectedProcedure
@@ -112,4 +122,20 @@ export const promptsRouter = createTRPCRouter({
         projectId: input.projectId,
       });
     }),
+
+    /**
+     * Check if a handle is unique for a project
+     */
+  checkHandleUniqueness: protectedProcedure
+    .input(z.object({
+      handle: handleSchema,
+      projectId: z.string(),
+      scope: z.nativeEnum(PromptScope),
+    }))
+    .use(checkUserPermissionForProject(TeamRoleGroup.PROMPTS_VIEW))
+    .query(async ({ ctx, input }) => {
+      const service = new PromptService(ctx.prisma);
+      return await service.checkHandleUniqueness(input);
+    }),
 });
+

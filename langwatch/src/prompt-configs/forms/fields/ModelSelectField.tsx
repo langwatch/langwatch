@@ -43,8 +43,6 @@ export function ModelSelectField() {
           render={({ field }) => {
             return (
               <LLMConfigField
-                llmConfig={field.value ?? {}} // Prevent a runtime error if the value is undefined
-                onChange={field.onChange}
                 requiresCustomKey={false}
               />
             );

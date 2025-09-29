@@ -10,10 +10,8 @@ import { MODULES } from "~/optimization_studio/registry";
 import type { Component } from "~/optimization_studio/types/dsl";
 import {
   createNewOptimizationStudioPromptName,
-  llmConfigToOptimizationStudioNodeData,
 } from "~/prompt-configs/llmPromptConfigUtils";
 import type { NodeWithOptionalPosition } from "~/types";
-import { api } from "~/utils/api";
 import { createLogger } from "~/utils/logger";
 import { snakeCase } from "~/utils/stringCasing";
 
@@ -27,9 +25,6 @@ export function LlmSignatureNodeDraggable() {
   const { getWorkflow } = useWorkflowStore((state) => ({
     getWorkflow: state.getWorkflow,
   }));
-
-  const createConfigWithInitialVersion =
-    api.llmConfigs.createConfigWithInitialVersion.useMutation();
 
   /**
    * When the node is dropped, we want to create
@@ -62,14 +57,9 @@ export function LlmSignatureNodeDraggable() {
         });
 
         try {
-          const config = await createConfigWithInitialVersion.mutateAsync({
-            handle,
-            projectId: project.id,
-          });
-
           setNode({
             id: item.node.id,
-            data: llmConfigToOptimizationStudioNodeData(config),
+            data: MODULES.signature
           });
         } catch (error) {
           logger.error("Error creating new prompt", {
@@ -86,7 +76,7 @@ export function LlmSignatureNodeDraggable() {
         }
       })();
     },
-    [getWorkflow, createConfigWithInitialVersion, setNode, project?.id]
+    [getWorkflow, setNode, project?.id]
   );
 
   return (

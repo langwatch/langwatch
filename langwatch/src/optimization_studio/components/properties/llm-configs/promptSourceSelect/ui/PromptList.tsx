@@ -5,28 +5,22 @@ import { formatTimeAgo } from "../../../../../../utils/formatTimeAgo";
 // Prompt List Component
 interface PromptListProps {
   isLoading: boolean;
-  promptConfigs: {
-    id: string;
-    name: string;
-    latestVersion: {
-      version: number;
-      commitMessage: string;
-    };
-    updatedAt: Date;
-  }[];
+  prompts: PromptListItemProps['prompt'][];
+  selectedPromptId: string;
   onSelect: (promptId: string) => void;
 }
 
 export function PromptList({
   isLoading,
-  promptConfigs,
+  prompts,
+  selectedPromptId,
   onSelect,
 }: PromptListProps) {
   if (isLoading) {
     return <Text>Loading prompts...</Text>;
   }
 
-  if (!promptConfigs || promptConfigs.length === 0) {
+  if (!prompts || prompts.length === 0) {
     return (
       <Text>No prompts found. Create one in the prompt library first.</Text>
     );
@@ -34,8 +28,8 @@ export function PromptList({
 
   return (
     <VStack align="stretch" gap={1}>
-      {promptConfigs.map((prompt) => (
-        <PromptListItem key={prompt.id} prompt={prompt} onSelect={onSelect} />
+      {prompts.map((prompt) => (
+        <PromptListItem key={prompt.id} prompt={prompt} onSelect={onSelect} isSelected={selectedPromptId === prompt.id} />
       ))}
     </VStack>
   );
@@ -43,18 +37,17 @@ export function PromptList({
 
 // Prompt List Item Component
 interface PromptListItemProps {
+  isSelected: boolean;
   prompt: {
     id: string;
     name: string;
-    latestVersion: {
-      version: number;
-    };
+    version: number;
     updatedAt: Date;
   };
   onSelect: (promptId: string) => void;
 }
 
-function PromptListItem({ prompt, onSelect }: PromptListItemProps) {
+function PromptListItem({ prompt, onSelect, isSelected }: PromptListItemProps) {
   return (
     <Button
       key={prompt.id}
@@ -64,6 +57,7 @@ function PromptListItem({ prompt, onSelect }: PromptListItemProps) {
       height="auto"
       py={2}
       width="full"
+      bg={isSelected ? "gray.100" : "transparent"}
     >
       <HStack gap={3} width="full">
         <Book size={16} />
@@ -76,7 +70,7 @@ function PromptListItem({ prompt, onSelect }: PromptListItemProps) {
               Updated: {formatTimeAgo(prompt.updatedAt.getTime())}
             </Text>
             <Text fontSize="xs" fontWeight="medium" color="gray.600">
-              (v{prompt.latestVersion.version})
+              (v{prompt.version})
             </Text>
           </HStack>
         </VStack>

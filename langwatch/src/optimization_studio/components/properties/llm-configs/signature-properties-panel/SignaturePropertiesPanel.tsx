@@ -36,11 +36,7 @@ export function SignaturePropertiesPanel({
 }) {
   const { isInsideWizard } = useWizardContext();
   const configId = (node.data as LlmPromptConfigComponent).configId;
-  const nodeHasConfigId = "configId" in node.data;
   const setNode = useSmartSetNode();
-
-  // Handle legacy node migration (only outside wizard)
-  useLegacyNodeMigration(node, { skip: isInsideWizard });
 
   /**
    * Converts form values to node data and updates the workflow store.
@@ -68,16 +64,6 @@ export function SignaturePropertiesPanel({
       }, 200),
     [node.id, setNode, configId, node.data.name]
   );
-
-  // Render loading state for while migrating legacy nodes (only outside wizard)
-  if (!nodeHasConfigId && !isInsideWizard) {
-    return (
-      <SignaturePropertiesPanelLoadingState
-        node={node}
-        isInsideWizard={isInsideWizard}
-      />
-    );
-  }
 
   // Render the main panel
   return (

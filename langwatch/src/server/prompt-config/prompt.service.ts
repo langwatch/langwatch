@@ -61,6 +61,7 @@ export type VersionedPrompt = {
   response_format: LatestConfigVersionSchema["configData"]["response_format"];
   demonstrations: LatestConfigVersionSchema["configData"]["demonstrations"];
   promptingTechnique: LatestConfigVersionSchema["configData"]["prompting_technique"];
+  commitMessage?: string;
   updatedAt: Date;
   createdAt: Date;
 };
@@ -83,10 +84,12 @@ export class PromptService {
    */
   async getAllPrompts(params: {
     projectId: string;
-    organizationId: string;
+    organizationId?: string;
     version?: "latest" | "all";
   }): Promise<VersionedPrompt[]> {
-    const { projectId, organizationId } = params;
+    const { projectId } = params;
+
+    const organizationId = params.organizationId ?? await this.getOrganizationIdFromProjectId(projectId);
 
     const configs = await this.repository.getAllWithLatestVersion({
       projectId,
@@ -478,10 +481,11 @@ export class PromptService {
   async checkHandleUniqueness(params: {
     handle: string;
     projectId: string;
-    organizationId: string;
+    organizationId?: string;
     scope: PromptScope;
     excludeId?: string;
   }): Promise<boolean> {
+    const organizationId = params.organizationId ?? await this.getOrganizationIdFromProjectId(params.projectId);
     // Check if handle exists (excluding current config if editing)
     const existingConfig = await this.prisma.llmPromptConfig.findUnique({
       where: {
@@ -490,7 +494,7 @@ export class PromptService {
           handle: params.handle,
           scope: params.scope,
           projectId: params.projectId,
-          organizationId: params.organizationId,
+          organizationId
         }),
         // Double check just to make sure the prompt belongs to the project or organization the user is from
         OR: [
@@ -723,6 +727,7 @@ export class PromptService {
       createdAt: config.createdAt,
       demonstrations: config.latestVersion.configData.demonstrations,
       promptingTechnique: config.latestVersion.configData.prompting_technique,
+      commitMessage: config.latestVersion.commitMessage,
     };
   }
 
