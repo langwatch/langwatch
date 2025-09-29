@@ -89,7 +89,7 @@ export async function collectUsageStats(instanceId: string) {
 }
 
 const getTraceCount = async () => {
-  const client = await esClient({ test: true });
+  const client = await esClient();
 
   const result = await client.count({
     index: TRACE_INDEX.all,
@@ -106,7 +106,7 @@ const getTraceCount = async () => {
 };
 
 const getScenariosCount = async () => {
-  const client = await esClient({ test: true });
+  const client = await esClient();
 
   const result = await client.count({
     index: SCENARIO_EVENTS_INDEX.alias,
