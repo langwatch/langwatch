@@ -48,7 +48,7 @@ const cronJobs = [
 
 // Simple cron scheduler using setInterval
 function scheduleCronJob(job: (typeof cronJobs)[0]) {
-  const [minute, hour, day, month, weekday] = job.schedule.split(" ");
+  const [minute, hour] = job.schedule.split(" ");
 
   // Convert cron schedule to milliseconds
   // This is a simplified implementation - for production you'd want a proper cron parser
@@ -79,7 +79,7 @@ function scheduleCronJob(job: (typeof cronJobs)[0]) {
     {
       job: job.name,
       schedule: job.schedule,
-      intervalMs: intervalMs / 1000 / 60,
+      intervalMs: intervalMs / 60000,
     },
     "Scheduling cron job"
   );
@@ -98,7 +98,7 @@ function scheduleCronJob(job: (typeof cronJobs)[0]) {
 
   // Run immediately if it's the right time, otherwise schedule it
   const now = new Date();
-  const [currentMinute, currentHour] = [now.getMinutes(), now.getHours()];
+  const [currentHour] = [now.getMinutes(), now.getHours()];
 
   if (minute === "0" && hour !== "*" && parseInt(hour ?? "0") === currentHour) {
     // Run now if it's the scheduled hour
