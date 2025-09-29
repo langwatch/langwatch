@@ -76,7 +76,7 @@ export const PromptConfigPanel = forwardRef(function PromptConfigPanel(
 
   // Fetch the LLM configuration
   const { data: llmConfig, isLoading: isLoadingConfig } =
-    api.llmConfigs.getByIdWithLatestVersion.useQuery(
+    api.prompts.getById.useQuery(
       {
         id: configId,
         projectId,
@@ -91,9 +91,16 @@ export const PromptConfigPanel = forwardRef(function PromptConfigPanel(
 
   // ---- Form setup and configuration ----
   // Transform the LLM config into form values
-  const initialConfigValues = useMemo(
-    () =>
-      llmConfig ? llmConfigToPromptConfigFormValues(llmConfig) : undefined,
+  const initialConfigValues: PromptConfigFormValues = useMemo(
+    (): PromptConfigFormValues =>
+      llmConfig ? llmConfigToPromptConfigFormValues(llmConfig) : {
+        llm: {
+          model: "gpt-4o",
+        },
+        messages: [
+          { role: "system", content: "You are a helpful assistant." },
+        ],
+      },
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [Boolean(llmConfig)]
   );
