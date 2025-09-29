@@ -6,7 +6,7 @@ import { formatTimeAgo } from "../../../../../../utils/formatTimeAgo";
 interface PromptListProps {
   isLoading: boolean;
   prompts: PromptListItemProps['prompt'][];
-  selectedPromptId: string;
+  selectedPromptId?: string;
   onSelect: (promptId: string) => void;
 }
 
