@@ -2,23 +2,25 @@ import { Button, HStack, Input } from "@chakra-ui/react";
 import { Settings } from "react-feather";
 
 import { ConfigModal } from "../../optimization_studio/components/properties/modals/ConfigModal";
-import type { LLMConfig } from "../../optimization_studio/types/dsl";
 import { HorizontalFormControl } from "../HorizontalFormControl";
 import { allModelOptions, ModelSelector } from "../ModelSelector";
 import { Link } from "../ui/link";
 import { Tooltip } from "../ui/tooltip";
+import { useFormContext } from "react-hook-form";
+import { type PromptConfigFormValues } from "~/prompt-configs";
 
 export function LLMConfigModal({
   open,
   onClose,
-  llmConfig,
-  onChange,
 }: {
   open: boolean;
   onClose: () => void;
-  llmConfig: LLMConfig;
-  onChange: (llmConfig: LLMConfig) => void;
 }) {
+  const form = useFormContext<PromptConfigFormValues>();
+  const model = form.watch("version.configData.llm.model");
+  const temperature = form.watch("version.configData.llm.temperature");
+  const maxTokens = form.watch("version.configData.llm.max_tokens");
+
   return (
     <ConfigModal open={open} onClose={onClose} title="LLM Config">
       <HorizontalFormControl
@@ -28,9 +30,9 @@ export function LLMConfigModal({
       >
         <HStack width="full" gap={2}>
           <ModelSelector
-            model={llmConfig.model ?? ""}
+            model={model ?? ""}
             options={allModelOptions}
-            onChange={(model) => onChange({ ...llmConfig, model })}
+            onChange={(model) => form.setValue("version.configData.llm.model", model)}
             mode="chat"
             size="full"
           />
@@ -53,13 +55,13 @@ export function LLMConfigModal({
         inputWidth="55%"
       >
         <Input
-          value={llmConfig.temperature}
+          value={temperature}
           type="number"
           step={0.1}
           min={0}
           max={2}
           onChange={(e) =>
-            onChange({ ...llmConfig, temperature: Number(e.target.value) })
+            form.setValue("version.configData.llm.temperature", Number(e.target.value))
           }
         />
       </HorizontalFormControl>
@@ -69,17 +71,18 @@ export function LLMConfigModal({
         inputWidth="55%"
       >
         <Input
-          value={llmConfig.max_tokens}
+          value={maxTokens}
           type="number"
           step={64}
           min={256}
           max={1048576}
           onChange={(e) =>
-            onChange({ ...llmConfig, max_tokens: Number(e.target.value) })
+            form.setValue("version.configData.llm.max_tokens", Number(e.target.value))
           }
           onBlur={() => {
-            if (llmConfig.max_tokens === 0) {
-              onChange({ ...llmConfig, max_tokens: 2048 });
+            // TODO: This shouldn't happen here
+            if (maxTokens === 0) {
+              form.setValue("version.configData.llm.max_tokens", 2048);
             }
           }}
         />

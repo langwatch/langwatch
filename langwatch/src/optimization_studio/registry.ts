@@ -23,7 +23,11 @@ const signature: Signature = {
     {
       identifier: "llm",
       type: "llm",
-      value: undefined,
+      value: {
+        model: "openai/gpt-4o",
+        temperature: 0,
+        max_tokens: 2048,
+      }
     },
     {
       identifier: "prompting_technique",

@@ -1,7 +1,7 @@
 import { api } from "~/utils/api";
 
 /**
- * Custom hook to abstract the logic of prompts operations.
+ * Custom hook to abstract the logic of prompts operations that require refreshes.
  * Enforces refresh of queries when mutations are successful.
  */
 export const usePrompts = () => {
@@ -10,7 +10,6 @@ export const usePrompts = () => {
   const updatePrompt = api.prompts.update.useMutation();
 
   const invalidateAll = async () => Promise.all([
-    await trpc.llmConfigs.invalidate(),
     await trpc.prompts.invalidate(),
   ]);
 

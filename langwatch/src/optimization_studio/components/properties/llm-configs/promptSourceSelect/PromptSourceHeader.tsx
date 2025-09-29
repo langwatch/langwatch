@@ -137,7 +137,7 @@ export function PromptSourceHeader({
               <GenerateApiSnippetButton hasHandle={!!handle} />
             </GeneratePromptApiSnippetDialog.Trigger>
           </GeneratePromptApiSnippetDialog>
-          <PromptSource configId={configId} onSelect={onPromptSourceSelect} />
+          <PromptSource selectedPromptId={configId} onSelect={onPromptSourceSelect} />
           {node.data.configId && (
             <VersionHistoryButton
               configId={node.data.configId}

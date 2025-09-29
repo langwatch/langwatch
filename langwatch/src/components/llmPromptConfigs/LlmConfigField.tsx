@@ -12,6 +12,8 @@ import { LLMModelDisplay } from "./LLMModelDisplay";
 import { LLMConfigModal } from "~/components/llmPromptConfigs/LLMConfigModal";
 import { AddModelProviderKey } from "~/optimization_studio/components/AddModelProviderKey";
 import type { LLMConfig } from "~/optimization_studio/types/dsl";
+import { useFormContext } from "react-hook-form";
+import { type PromptConfigFormValues } from "~/prompt-configs";
 
 interface LLMConfigFieldProps {
   llmConfig: LLMConfig;
@@ -24,14 +26,13 @@ interface LLMConfigFieldProps {
 
 export function LLMConfigField({
   allowDefault,
-  llmConfig,
-  onChange,
   modelOption,
   requiresCustomKey,
   showProviderKeyMessage = true,
 }: LLMConfigFieldProps) {
   const { open, onClose, onToggle } = useDisclosure();
-  const { model } = llmConfig;
+  const form = useFormContext<PromptConfigFormValues>();
+  const model = form.watch("version.configData.llm.model");
 
   // Check if the model is disabled (has line-through styling)
   const isModelDisabled = modelOption?.isDisabled ?? false;
@@ -41,8 +42,6 @@ export function LLMConfigField({
       <LLMConfigModal
         open={open}
         onClose={onClose}
-        llmConfig={llmConfig}
-        onChange={onChange}
       />
       <HStack
         gap={2}
@@ -53,7 +52,7 @@ export function LLMConfigField({
         marginBottom={1}
       >
         <LLMModelDisplay model={model} />
-        {allowDefault && llmConfig != undefined ? (
+        {allowDefault && model != undefined ? (
           <Tooltip
             content="Overriding default LLM, click to reset"
             positioning={{ placement: "top" }}
@@ -62,7 +61,8 @@ export function LLMConfigField({
             <Button
               size="sm"
               variant="ghost"
-              onClick={() => onChange(undefined as any)}
+              // TODO: I don't think this is correct? But the behavior before was confusing
+              onClick={() => form.setValue("version.configData.llm.model", undefined as any)}
             >
               <X size={16} />
             </Button>

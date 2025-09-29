@@ -12,7 +12,7 @@ export const usePromptHandleCheck = () => {
     handle: string;
     scope: PromptScope;
   }) => {
-    const isValid = await trpc.llmConfigs.checkHandleUniqueness.fetch({
+    const isValid = await trpc.prompts.checkHandleUniqueness.fetch({
       projectId: project?.id ?? "",
       scope: params.scope,
       handle: params.handle,
