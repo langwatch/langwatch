@@ -149,7 +149,7 @@ function VersionHistoryList({
         <VersionHistoryItem
           key={version.id}
           version={version}
-          onRestore={() => onRestore(version.id)}
+          onRestore={() => void onRestore(version.id)}
           isCurrent={index === 0}
           isLoading={isLoading}
         />
@@ -249,11 +249,11 @@ function VersionHistoryPopover({
  */
 export function VersionHistoryListPopover({
   configId,
-  onRestore,
+  onRestoreSuccess,
   label,
 }: {
   configId: string;
-  onRestore?: (versionId: string) => void;
+  onRestoreSuccess?: (params: { versionId: string; configId: string }) => Promise<void>;
   label?: string;
 }) {
   const { open, setOpen, onClose } = useDisclosure();
@@ -282,7 +282,8 @@ export function VersionHistoryListPopover({
   const { mutateAsync: restoreVersion } =
     api.llmConfigs.versions.restore.useMutation();
 
-  const handleRestore = async (versionId: string) => {
+  const handleRestore = async (params: { versionId: string; configId: string }) => {
+    const { versionId } = params;
     try {
       await restoreVersion({
         id: versionId,
@@ -291,7 +292,7 @@ export function VersionHistoryListPopover({
       await refetch();
       await refetchPromptConfig();
       onClose();
-      onRestore?.(versionId);
+      await onRestoreSuccess?.(params);
       toaster.success({
         title: "Version restored successfully",
       });
@@ -312,8 +313,7 @@ export function VersionHistoryListPopover({
           void refetch();
         }
       }}
-      // eslint-disable-next-line @typescript-eslint/no-misused-promises
-      onRestore={handleRestore}
+      onRestore={(versionId) => void handleRestore({ versionId, configId })}
       versions={versions ?? []}
       isLoading={isLoading}
       label={label}

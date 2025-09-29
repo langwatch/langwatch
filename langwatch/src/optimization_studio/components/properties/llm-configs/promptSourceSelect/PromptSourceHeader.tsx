@@ -43,7 +43,7 @@ export function PromptSourceHeader({
   const formProps = useFormContext<PromptConfigFormValues>();
   const { triggerSaveVersion } = usePromptConfigContext();
   const isDirty = formProps.formState.isDirty;
-  const { getPromptByHandle } = usePrompts();
+  const { getPromptById } = usePrompts();
   const { project } = useOrganizationTeamProject();
   const { hasDrift } = useNodeDrift(node);
 
@@ -61,55 +61,42 @@ export function PromptSourceHeader({
     });
   };
 
-  // TODO: Move this outside of the component
-  const handleRestore = (versionId: string) => {
-    const handle = formProps.getValues().handle;
-    void (async () => {
-      if (!handle) {
-        // This should never happen
-        logger.error({ versionId, projectId, handle }, "Prompt handle not set");
-        toaster.error({
-          title: "Failed to restore prompt version",
-          description: "Missing prompt handle",
-        });
-        return;
+  /**
+   * Assumption: After restoring a version, the latest version config should
+   * match the restored version config.
+   */
+  const handleOnRestore = async (params: {
+    versionId: string;
+    configId: string;
+  }) => {
+    const { versionId, configId } = params;
+
+    try {
+      // Get the latest versioned prompt
+      const prompt = await getPromptById({
+        id: configId,
+        projectId,
+      });
+
+      if (!prompt) {
+        throw new Error("Prompt not found");
       }
 
-      try {
-        // Get the versioned prompt
-        const prompt = await getPromptByHandle({
-          handle,
-          versionId,
-          projectId,
-        });
-
-        if (!prompt) {
-          throw new Error("Prompt not found");
-        }
-
-        // Update the form with the new values
-        const newFormValues = versionedPromptToPromptConfigFormValues(prompt);
-        formProps.reset(newFormValues);
-      } catch (error) {
-        logger.error({ error, versionId }, "Failed to restore prompt version");
-        toaster.error({
-          title: "Failed to restore prompt version",
-          description: "Please try again.",
-        });
-      }
-    })();
+      // Update the form with the new values
+      const newFormValues = versionedPromptToPromptConfigFormValues(prompt);
+      formProps.reset(newFormValues);
+    } catch (error) {
+      logger.error({ error, versionId }, "Failed to restore prompt version");
+      toaster.error({
+        title: "Failed to restore prompt version",
+        description: "Please try again.",
+      });
+    }
   };
 
   const handle = formProps.watch("handle");
   const isDraft = !Boolean(handle);
   const canSave = isDraft || hasDrift || isDirty;
-
-  console.log('canSave', {
-    isDraft,
-    hasDrift,
-    isDirty,
-    canSave,
-  });
 
   return (
     <VStack width="full" gap={0}>
@@ -154,7 +141,7 @@ export function PromptSourceHeader({
           {node.data.configId && (
             <VersionHistoryButton
               configId={node.data.configId}
-              onRestore={handleRestore}
+              onRestoreSuccess={(params) => handleOnRestore(params)}
             />
           )}
           <VersionSaveButton
