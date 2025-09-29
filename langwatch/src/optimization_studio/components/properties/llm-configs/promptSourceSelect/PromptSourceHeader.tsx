@@ -101,6 +101,7 @@ export function PromptSourceHeader({
   };
 
   const handle = formProps.watch("handle");
+  const isDraft = !(Boolean(handle) && !hasDrift) || isDirty;
 
   return (
     <VStack width="full" gap={0}>
@@ -119,12 +120,12 @@ export function PromptSourceHeader({
           background="gray.50"
         >
           <HStack paddingX={1} gap={1}>
-            {handle && !hasDrift ? (
+            {isDraft ? (
+              <Text color="gray.500">Draft</Text>
+            ) : (
               <Text fontSize="sm" fontWeight="500" fontFamily="mono">
                 {handle}
               </Text>
-            ) : (
-              <Text color="gray.500">Draft</Text>
             )}
           </HStack>
           <Spacer />
@@ -144,7 +145,7 @@ export function PromptSourceHeader({
             />
           )}
           <VersionSaveButton
-            disabled={!isDirty && !hasDrift}
+            disabled={!isDraft}
             onClick={() => void handleSaveVersion()}
             hideLabel={true}
           />
