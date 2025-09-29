@@ -152,7 +152,10 @@ export const PromptConfigPanel = forwardRef(function PromptConfigPanel(
 
     invokeLLM({
       projectId,
-      data: promptConfigFormValuesToOptimizationStudioNodeData(formData),
+      data: {
+        name: formData.handle ?? "Anonymous", // REQUIRED FOR INVOKING LLM
+        ...promptConfigFormValuesToOptimizationStudioNodeData(formData),
+      },
     });
   };
 

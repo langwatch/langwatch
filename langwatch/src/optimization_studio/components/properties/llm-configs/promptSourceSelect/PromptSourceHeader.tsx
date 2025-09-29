@@ -15,6 +15,7 @@ import { VersionHistoryButton } from "~/prompt-configs/forms/prompt-config-form/
 import { VersionSaveButton } from "~/prompt-configs/forms/prompt-config-form/components/VersionSaveButton";
 import { type PromptConfigFormValues } from "~/prompt-configs";
 import {
+  formValuesToTriggerSaveVersionParams,
   versionedPromptToPromptConfigFormValues,
 } from "~/prompt-configs/llmPromptConfigUtils";
 import { usePromptConfigContext } from "~/prompt-configs/providers/PromptConfigProvider";
@@ -48,7 +49,7 @@ export function PromptSourceHeader({
      * Save new data to the database
      */
     triggerSaveVersion({
-      data: values,
+      data: formValuesToTriggerSaveVersionParams(values),
       onSuccess: (prompt) => {
         // Update the node data with the new prompt
         formProps.reset(versionedPromptToPromptConfigFormValues(prompt));
