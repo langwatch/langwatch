@@ -14,7 +14,7 @@ import {
   versionedPromptToPromptConfigFormValues,
 } from "~/prompt-configs/llmPromptConfigUtils";
 
-export function PromptHandleInfo({ configId }: { configId: string }) {
+export function PromptHandleInfo({ configId }: { configId?: string }) {
   const { project } = useOrganizationTeamProject();
   const { apiKey } = project ?? {};
   const form = useFormContext<PromptConfigFormValues>();

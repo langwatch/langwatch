@@ -8,7 +8,7 @@ import { inputsAndOutputsToDemostrationColumns } from "../llmPromptConfigUtils";
 import { formSchema, type PromptConfigFormValues } from "~/prompt-configs";
 
 interface UsePromptConfigFormProps {
-  configId: string;
+  configId?: string;
   initialConfigValues?: DeepPartial<PromptConfigFormValues>;
   onChange?: (formValues: PromptConfigFormValues) => void;
 }

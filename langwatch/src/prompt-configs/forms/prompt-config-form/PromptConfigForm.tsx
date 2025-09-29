@@ -26,7 +26,7 @@ import { versionedPromptToPromptConfigFormValues } from "~/prompt-configs/llmPro
 import { usePromptConfigContext } from "~/prompt-configs/providers/PromptConfigProvider";
 
 interface PromptConfigFormProps {
-  configId: string;
+  configId?: string;
   methods: UseFormReturn<PromptConfigFormValues>;
 }
 
@@ -134,11 +134,13 @@ function InnerPromptConfigForm(props: PromptConfigFormProps) {
           padding={3}
           boxShadow="0 0px 6px rgba(0, 0, 0, 0.1)"
         >
-          <VersionHistoryButton
-            configId={configId}
-            label="History"
-            onRestoreSuccess={handleRestore}
-          />
+          {configId && (
+            <VersionHistoryButton
+              configId={configId}
+              label="History"
+              onRestoreSuccess={handleRestore}
+            />
+          )}
           <Spacer />
           <VersionSaveButton
             disabled={!saveEnabled}
