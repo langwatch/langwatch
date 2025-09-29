@@ -1,6 +1,6 @@
 import { VStack } from "@chakra-ui/react";
 import { useUpdateNodeInternals, type Node } from "@xyflow/react";
-import { useCallback, useMemo } from "react";
+import { useMemo } from "react";
 import { FormProvider, useFieldArray } from "react-hook-form";
 import { useShallow } from "zustand/react/shallow";
 
@@ -10,9 +10,6 @@ import { useWorkflowStore } from "../../../../hooks/useWorkflowStore";
 import type { LlmPromptConfigComponent } from "../../../../types/dsl";
 import { PromptSourceHeader } from "../promptSourceSelect/PromptSourceHeader";
 import { WrappedOptimizationStudioLLMConfigField } from "../WrappedOptimizationStudioLLMConfigField";
-
-import { isEqual } from "./utils/is-equal";
-
 import { toaster } from "~/components/ui/toaster";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useSmartSetNode } from "~/optimization_studio/hooks/useSmartSetNode";
@@ -28,34 +25,23 @@ import {
   type PromptConfigFormValues,
 } from "~/prompt-configs";
 import {
-  llmConfigToOptimizationStudioNodeData,
   promptConfigFormValuesToOptimizationStudioNodeData,
   versionedPromptToPromptConfigFormValues,
   safeOptimizationStudioNodeDataToPromptConfigFormInitialValues,
 } from "~/prompt-configs/llmPromptConfigUtils";
 import { api } from "~/utils/api";
+import debounce from "lodash/debounce";
 
 /**
  * Properties panel for the Signature node in the optimization studio.
  *
  * A Signature node represents an LLM calling component in the workflow
  * that can be connected with other nodes to build complex LLM-powered applications.
- * It is based on the DSPy concept, which defines an interface for LLM interactions.
- *
- * This panel allows users to configure:
- * - Prompt source selection and version history
- * - The LLM model to use
- * - Prompt template with input variables
- * - Output schema definition
- * - Demonstrations (few-shot examples)
- * - Advanced prompting techniques
  */
 export function SignaturePropertiesPanelForm({
   node,
-  onFormValuesChange,
 }: {
   node: Node<LlmPromptConfigComponent>;
-  onFormValuesChange?: (formValues: PromptConfigFormValues) => void;
 }) {
   const trpc = api.useContext();
   const { project } = useOrganizationTeamProject();
@@ -91,15 +77,31 @@ export function SignaturePropertiesPanelForm({
   );
 
   /**
-   * Sync the node data with the updated form values
+   * Converts form values to node data and updates the workflow store.
+   * This ensures the node's data stays in sync with the form state.
+   *
+   * We use useMemo to create the debounced function to prevent unnecessary re-renders.
+   *
+   * @param formValues - The current form values to sync with node data
    */
-  const syncNodeDataWithFormValues = useCallback((values: PromptConfigFormValues) => {
-    const newNodeData = promptConfigFormValuesToOptimizationStudioNodeData(values);
-    setNode({
-      ...node,
-      data: newNodeData,
-    });
-  }, [setNode, node.data, node]);
+  const syncNodeDataWithFormValues = useMemo(
+    () =>
+      debounce((formValues: PromptConfigFormValues) => {
+        const updatedNodeData =
+          promptConfigFormValuesToOptimizationStudioNodeData(formValues);
+
+        setNode({
+          id: node.id,
+          data: {
+            handle: formValues.handle,
+            name: formValues.handle ?? node.data.name ?? "",
+            configId,
+            ...updatedNodeData,
+          },
+        });
+      }, 200),
+    [node.id, setNode, configId, node.data.name]
+  );
 
   const formProps = usePromptConfigForm({
     configId,

@@ -8,6 +8,8 @@ export const usePrompts = () => {
   const trpc = api.useContext();
   const upsertPrompt = api.prompts.upsert.useMutation();
   const updatePrompt = api.prompts.update.useMutation();
+  const restoreVersion = api.prompts.restoreVersion.useMutation();
+  const deletePrompt = api.prompts.delete.useMutation();
 
   const invalidateAll = async () => Promise.all([
     await trpc.prompts.invalidate(),
@@ -31,9 +33,23 @@ export const usePrompts = () => {
     return prompt;
   };
 
+  const wrappedRestoreVersion: typeof restoreVersion.mutateAsync = async (params) => {
+    const prompt = await restoreVersion.mutateAsync(params);
+    await invalidateAll();
+    return prompt;
+  };
+
+  const wrappedDeletePrompt: typeof deletePrompt.mutateAsync = async (params) => {
+    const prompt = await deletePrompt.mutateAsync(params);
+    await invalidateAll();
+    return prompt;
+  };
+
   return {
     upsertPrompt: wrappedUpsertPrompt,
     updatePrompt: wrappedUpdatePrompt,
     getPromptById: wrappedGetPromptById,
+    restoreVersion: wrappedRestoreVersion,
+    deletePrompt: wrappedDeletePrompt,
   };
 };

@@ -56,6 +56,10 @@ export type VersionedPrompt = {
     content: string;
   }>;
   authorId: string | null;
+  author?: {
+    id: string,
+    name: string,
+  } | null;
   inputs: LatestConfigVersionSchema["configData"]["inputs"];
   outputs: LatestConfigVersionSchema["configData"]["outputs"];
   response_format: LatestConfigVersionSchema["configData"]["response_format"];
@@ -470,6 +474,38 @@ export class PromptService {
   }
 
   /**
+   * Restore a prompt version
+   * Creates a new version with the same config data as the restored version
+   */
+  async restoreVersion(params: {
+    versionId: string;
+    projectId: string;
+    authorId?: string | null;
+    organizationId?: string;
+  }): Promise<VersionedPrompt> {
+    const organizationId = params.organizationId ?? await this.getOrganizationIdFromProjectId(params.projectId);
+
+    await this.repository.versions.restoreVersion({
+      id: params.versionId,
+      authorId: params.authorId ?? null,
+      projectId: params.projectId,
+      organizationId,
+    });
+
+    const newPrompt = await this.getPromptByIdOrHandle({
+      idOrHandle: params.versionId,
+      projectId: params.projectId,
+      organizationId,
+    });
+
+    if (!newPrompt) {
+      throw new Error("Failed to restore version");
+    }
+
+    return newPrompt;
+  }
+
+  /**
    * Checks if a handle is unique for a project.
    * @param params - The parameters object
    * @param params.handle - The handle to check
@@ -692,6 +728,19 @@ export class PromptService {
   }
 
   /**
+   * Delete a prompt
+   */
+  async deletePrompt(params: {
+    idOrHandle: string;
+    projectId: string;
+    organizationId?: string;
+  }): Promise<{success: boolean}> {
+    const organizationId = params.organizationId ?? await this.getOrganizationIdFromProjectId(params.projectId);
+    const result = await this.repository.deleteConfig(params.idOrHandle, params.projectId, organizationId);
+    return result;
+  }
+
+  /**
    * Transforms a LlmConfigWithLatestVersion to the versioned prompt shape.
    */
   private transformToVersionedPrompt(
@@ -723,6 +772,10 @@ export class PromptService {
       outputs: config.latestVersion.configData.outputs,
       response_format: config.latestVersion.configData.response_format,
       authorId: config.latestVersion.authorId ?? null,
+      author: config.latestVersion.author ? {
+        id: config.latestVersion.author.id,
+        name: config.latestVersion.author.name,
+      } : null,
       updatedAt: config.updatedAt,
       createdAt: config.createdAt,
       demonstrations: config.latestVersion.configData.demonstrations,

@@ -226,12 +226,14 @@ export class LlmConfigVersionsRepository {
   /**
    * Restore a version by creating a new version with the same config data
    */
-  async restoreVersion(
+  async restoreVersion(params: {
     id: string,
     projectId: string,
     organizationId: string,
     authorId: string | null
-  ): Promise<LlmPromptConfigVersion> {
+  }): Promise<LlmPromptConfigVersion> {
+    const { id, projectId, organizationId, authorId } = params;
+
     // Find the version to restore
     const version = await this.prisma.llmPromptConfigVersion.findUnique({
       where: { id, projectId },

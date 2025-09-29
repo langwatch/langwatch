@@ -10,8 +10,6 @@ import {
 import { UnplugIcon } from "lucide-react";
 import { Edit, MoreVertical, Trash2 } from "react-feather";
 
-import type { LlmConfigWithLatestVersion } from "~/server/prompt-config/repositories/llm-config.repository";
-
 import { GeneratePromptApiSnippetDialog } from "./components/GeneratePromptApiSnippetDialog";
 
 import { Menu } from "~/components/ui/menu";
@@ -23,26 +21,49 @@ import { LLMModelDisplay } from "../components/llmPromptConfigs/LLMModelDisplay"
 import { Tooltip } from "../components/ui/tooltip";
 import { LuBuilding } from "react-icons/lu";
 
-export interface PromptConfigTableProps {
-  configs: LlmConfigWithLatestVersion[];
-  isLoading?: boolean;
-  onDelete: (config: LlmConfigWithLatestVersion) => Promise<void>;
-  onEdit: (config: LlmConfigWithLatestVersion) => Promise<void>;
+/**
+ * Flat interface for prompt list items
+ */
+interface PromptListItem {
+  id: string;
+  name: string | null;
+  handle: string | null;
+  scope: 'ORGANIZATION' | 'PROJECT';
+  updatedAt: Date;
+  version: number;
+  prompt: string;
+  model: string | null;
+  author?: {
+    name: string;
+  } | null;
 }
 
+/**
+ * Props for the PromptsList component
+ */
+interface PromptsListProps {
+  prompts: PromptListItem[];
+  isLoading?: boolean;
+  onDelete: (config: PromptListItem) => Promise<void>;
+  onEdit: (config: PromptListItem) => Promise<void>;
+}
+
+/**
+ * Component for displaying a list of prompt
+ */
 export function PromptsList({
-  configs,
+  prompts,
   isLoading,
   onDelete,
   onEdit,
-}: PromptConfigTableProps) {
+}: PromptsListProps) {
   const { project } = useOrganizationTeamProject();
 
   if (!project || isLoading) {
     return <Text>Loading prompts...</Text>;
   }
 
-  if (configs.length === 0) {
+  if (prompts.length === 0) {
     return (
       <Box
         textAlign="center"
@@ -62,7 +83,7 @@ export function PromptsList({
 
   return (
     <VStack gap={4} align="stretch">
-      {configs.map((config) => (
+      {prompts.map((config) => (
         <GeneratePromptApiSnippetDialog
           key={config.id}
           configId={config.id}
@@ -117,7 +138,7 @@ export function PromptsList({
                           border="1px solid"
                           borderColor="green.200"
                         >
-                          v{config.latestVersion.version}
+                          v{config.version}
                         </Badge>
                         {config.scope === "ORGANIZATION" && (
                           <Tooltip content="This prompt is available to all projects in the organization">
@@ -129,11 +150,9 @@ export function PromptsList({
                             </Badge>
                           </Tooltip>
                         )}
-                        {config.latestVersion.configData.model && (
+                        {config.model && (
                           <HStack gap={2} align="center">
-                            <LLMModelDisplay
-                              model={config.latestVersion.configData.model}
-                            />
+                            <LLMModelDisplay model={config.model} />
                           </HStack>
                         )}
                       </HStack>
@@ -209,9 +228,9 @@ export function PromptsList({
                   color="gray.700"
                   _dark={{ color: "gray.300" }}
                 >
-                  {config.latestVersion.configData.prompt.trim() === ""
+                  {config.prompt.trim() === ""
                     ? "<empty>"
-                    : config.latestVersion.configData.prompt}
+                    : config.prompt}
                 </Text>
               </Box>
 
@@ -237,7 +256,7 @@ export function PromptsList({
                   )}{" "}
                   by{" "}
                   <Text as="span" fontWeight="medium">
-                    {config.latestVersion.author?.name}
+                    {config.author?.name}
                   </Text>
                 </Text>
 

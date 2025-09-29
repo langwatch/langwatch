@@ -2,7 +2,6 @@ import { PromptScope } from "@prisma/client";
 import { z } from "zod";
 
 import { PromptService } from "~/server/prompt-config";
-
 import { TeamRoleGroup } from "../../permission";
 import { checkUserPermissionForProject } from "../../permission";
 import { createTRPCRouter, protectedProcedure } from "../../trpc";
@@ -26,6 +25,21 @@ export const promptsRouter = createTRPCRouter({
       const service = new PromptService(ctx.prisma);
       return await service.getAllPrompts(input);
     }),
+
+  /**
+   * Restore a prompt version
+   */
+  restoreVersion: protectedProcedure
+    .input(z.object({
+      versionId: z.string(),
+      projectId: z.string(),
+    }))
+    .use(checkUserPermissionForProject(TeamRoleGroup.PROMPTS_MANAGE))
+    .mutation(async ({ ctx, input }) => {
+      const service = new PromptService(ctx.prisma);
+      return await service.restoreVersion(input);
+    }),
+
   /**
    * Upsert a prompt - create if it doesn't exist, update if it does
    */
@@ -136,6 +150,35 @@ export const promptsRouter = createTRPCRouter({
     .query(async ({ ctx, input }) => {
       const service = new PromptService(ctx.prisma);
       return await service.checkHandleUniqueness(input);
+    }),
+
+
+  /**
+   * Get all versions for a prompt
+   */
+  getAllVersionsForPrompt: protectedProcedure
+    .input(z.object({
+      idOrHandle: z.string(),
+      projectId: z.string(),
+    }))
+    .use(checkUserPermissionForProject(TeamRoleGroup.PROMPTS_VIEW))
+    .query(async ({ ctx, input }) => {
+      const service = new PromptService(ctx.prisma);
+      return await service.getAllVersions(input);
+    }),
+
+  /**
+   * Delete a prompt
+   */
+  delete: protectedProcedure
+    .input(z.object({
+      idOrHandle: z.string(),
+      projectId: z.string(),
+    }))
+    .use(checkUserPermissionForProject(TeamRoleGroup.PROMPTS_MANAGE))
+    .mutation(async ({ ctx, input }) => {
+      const service = new PromptService(ctx.prisma);
+      return await service.deletePrompt(input);
     }),
 });
 
