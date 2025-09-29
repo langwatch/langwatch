@@ -104,6 +104,13 @@ export function PromptSourceHeader({
   const isDraft = !Boolean(handle);
   const canSave = isDraft || hasDrift || isDirty;
 
+  console.log('canSave', {
+    isDraft,
+    hasDrift,
+    isDirty,
+    canSave,
+  });
+
   return (
     <VStack width="full" gap={0}>
       <VerticalFormControl

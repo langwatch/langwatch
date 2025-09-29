@@ -14,7 +14,8 @@ export const usePrompts = () => {
     await trpc.llmConfigs.getByIdWithLatestVersion.invalidate(),
     await trpc.llmConfigs.getPromptConfigs.invalidate(),
     await trpc.llmConfigs.versions.getVersionsForConfigById.invalidate(),
-    await trpc.llmConfigs.getByIdWithLatestVersion.invalidate()
+    await trpc.llmConfigs.getByIdWithLatestVersion.invalidate(),
+    await trpc.prompts.getById.invalidate(),
   ]);
 
   const wrappedUpsertPrompt: typeof upsertPrompt.mutateAsync = async (params)=> {

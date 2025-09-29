@@ -59,6 +59,7 @@ export function SignaturePropertiesPanel({
         setNode({
           id: node.id,
           data: {
+            handle: formValues.handle,
             name: formValues.handle ?? node.data.name ?? "",
             configId,
             ...updatedNodeData,
