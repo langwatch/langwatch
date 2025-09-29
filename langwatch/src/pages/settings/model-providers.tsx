@@ -395,11 +395,13 @@ function ModelProviderForm({
     ]
   );
 
-  const providerKeys = providerDefinition?.keysSchema
-    ? "shape" in providerDefinition.keysSchema
-      ? providerDefinition.keysSchema.shape
-      : providerDefinition.keysSchema._def.schema.shape
-    : {};
+  const providerKeys = getFilteredKeys(
+    providerDefinition?.keysSchema
+      ? "shape" in providerDefinition.keysSchema
+        ? providerDefinition.keysSchema.shape
+        : providerDefinition.keysSchema._def.schema.shape
+      : {}
+  );
 
   const ManagedModelProvider = dependencies.managedModelProviderComponent?.({
     projectId: project?.id ?? "",
@@ -438,7 +440,7 @@ function ModelProviderForm({
           helper={(providerDefinition as any)?.blurb ?? ""}
         >
           <VStack align="start" width="full" gap={4} paddingRight={4}>
-            <VStack align="start" width="full" gap={4}>
+            <HStack align="start" width="full" gap={4}>
               <HStack gap={6}>
                 <Field.Root>
                   <Switch
@@ -450,7 +452,7 @@ function ModelProviderForm({
                   </Switch>
                 </Field.Root>
               </HStack>
-              {provider.provider === "azure" && (
+              {provider.provider === "azure" && isEnabled && (
                 <Field.Root>
                   <Switch
                     onChange={(e) => setUseApiGateway(e.target.checked)}
@@ -460,7 +462,7 @@ function ModelProviderForm({
                   </Switch>
                 </Field.Root>
               )}
-            </VStack>
+            </HStack>
 
             {isEnabled && (
               <>

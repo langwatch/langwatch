@@ -390,7 +390,7 @@ export const prepareLitellmParams = async ({
     const gatewayVersion = getModelOrDefaultEnvKey(
       modelProvider,
       "AZURE_API_GATEWAY_VERSION"
-    );
+    ) ?? "2024-05-01-preview";
     const gatewayHeaderName = getModelOrDefaultEnvKey(
       modelProvider,
       "AZURE_API_GATEWAY_HEADER_NAME"
@@ -404,17 +404,12 @@ export const prepareLitellmParams = async ({
     if (gatewayBaseUrl) {
       params.api_base = gatewayBaseUrl;
       params.use_azure_gateway = "true";
-      if (gatewayVersion) {
-        params.api_version = gatewayVersion;
-      }
+      params.api_version = gatewayVersion;
       // Set custom header parameters for API Gateway
       if (gatewayHeaderName && gatewayHeaderKey) {
         params.azure_api_gateway_header_name = gatewayHeaderName;
         params.azure_api_gateway_header_key = gatewayHeaderKey;
       }
-
-      // Add debug print after setting gateway params
-      console.log("Updated params after gateway:", params);
     }
   }
 

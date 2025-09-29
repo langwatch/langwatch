@@ -78,9 +78,6 @@ async def proxy_startup():
         specific_deployment: Optional[bool] = False,
         **kwargs,
     ):
-        print("=== PATCHED FUNCTION CALLED ===", flush=True)
-        print(f"model: {model}", flush=True)
-        print(f"request_kwargs: {request_kwargs}", flush=True)
         self.cache.flush_cache()  # prevents litellm proxing from storing failures and mark the deployment as "unhealthy" for everyone in case a single user's API key is invalid for example
 
         deployment = await original_get_available_deployment(
@@ -94,7 +91,7 @@ async def proxy_startup():
         )
         deployment = deployment.copy()
 
-        print(f"deployment: {deployment}", flush=True)
+        print(f"deployment: {deployment}")
 
         print(f"model: {model}")
 
@@ -110,24 +107,15 @@ async def proxy_startup():
                 key = key.replace("-", "_")
 
                 deployment["litellm_params"][key] = value
-        if "azure/" in model:
+
+        if (
+            "azure/" in model
+            and "api_version" not in deployment["litellm_params"]
+            and "use_azure_gateway" not in deployment["litellm_params"]
+        ):
             deployment["litellm_params"]["api_version"] = os.environ[
                 "AZURE_API_VERSION"
             ]
-
-            if "use_azure_gateway" in deployment["litellm_params"]:
-                deployment["litellm_params"]["client"] = OpenAI(
-                    # api_key=deployment["litellm_params"]["api_key"],
-                    base_url=deployment["litellm_params"]["api_base"],
-                    default_query={
-                        "api-version": deployment["litellm_params"]["api_version"]
-                    },
-                    default_headers={
-                        deployment["litellm_params"][
-                            "azure_api_gateway_header_name"
-                        ]: deployment["litellm_params"]["azure_api_gateway_header_key"]
-                    },
-                )
 
         return deployment
 

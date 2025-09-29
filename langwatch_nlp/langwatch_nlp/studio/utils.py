@@ -169,7 +169,7 @@ def node_llm_config_to_dspy_lm(llm_config: LLMConfig) -> dspy.LM:
     llm_params: dict[str, Any] = llm_config.litellm_params or {
         "model": llm_config.model
     }
-    if "azure/" in (llm_params["model"] or ""):
+    if "azure/" in (llm_params["model"] or "") and "api_version" not in llm_params and "use_azure_gateway" not in llm_params:
         llm_params["api_version"] = os.environ["AZURE_API_VERSION"]
     llm_params["drop_params"] = True
     llm_params["model_type"] = "chat"
