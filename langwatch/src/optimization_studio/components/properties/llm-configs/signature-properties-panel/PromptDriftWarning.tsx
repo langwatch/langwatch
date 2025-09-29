@@ -2,7 +2,7 @@ import { Button, Alert, HStack, Text } from "@chakra-ui/react";
 import { RefreshCw } from "react-feather";
 import type { Node } from "@xyflow/react";
 import type { LlmPromptConfigComponent } from "~/optimization_studio/types/dsl";
-import { useNodeDrift } from "./hooks/use-node-drift";
+import { useNodeDrift } from "./hooks/useNodeDrift";
 
 /**
  * Detects drift between optimization studio node data and database version.
@@ -13,10 +13,9 @@ export function PromptDriftWarning({
 }: {
   node: Node<LlmPromptConfigComponent>;
 }) {
-  const configId = node.data.configId;
   const { hasDrift, loadLatestVersion, isLoadingPrompt } = useNodeDrift(node);
 
-  if (hasDrift && !isLoadingPrompt && configId) {
+  if (hasDrift && !isLoadingPrompt) {
     return (
       <Alert.Root
         size="sm"

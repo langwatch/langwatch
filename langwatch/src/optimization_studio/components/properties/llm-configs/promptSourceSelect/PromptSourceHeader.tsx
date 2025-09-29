@@ -20,7 +20,7 @@ import {
 } from "~/prompt-configs/llmPromptConfigUtils";
 import { usePromptConfigContext } from "~/prompt-configs/providers/PromptConfigProvider";
 import { PromptDriftWarning } from "../signature-properties-panel/PromptDriftWarning";
-import { useNodeDrift } from "../signature-properties-panel/hooks/use-node-drift";
+import { useNodeDrift } from "../signature-properties-panel/hooks/useNodeDrift";
 import type { VersionedPrompt } from "~/server/prompt-config";
 
 /**
