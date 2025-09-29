@@ -393,6 +393,7 @@ export function OptimizeModalContent({
                     <OptimizationStudioLLMConfigField
                       allowDefault={true}
                       defaultLLMConfig={default_llm}
+                      showProviderKeyMessage={false}
                       llmConfig={llmConfig ?? undefined}
                       onChange={(llmConfig) => {
                         field.onChange(llmConfig);
