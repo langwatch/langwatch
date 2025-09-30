@@ -6,7 +6,7 @@ import { api } from "~/utils/api";
  */
 export const usePrompts = () => {
   const trpc = api.useContext();
-  const upsertPrompt = api.prompts.upsert.useMutation();
+  const createPrompt = api.prompts.create.useMutation();
   const updatePrompt = api.prompts.update.useMutation();
   const restoreVersion = api.prompts.restoreVersion.useMutation();
   const deletePrompt = api.prompts.delete.useMutation();
@@ -15,8 +15,8 @@ export const usePrompts = () => {
     await trpc.prompts.invalidate(),
   ]);
 
-  const wrappedUpsertPrompt: typeof upsertPrompt.mutateAsync = async (params)=> {
-    const prompt = await upsertPrompt.mutateAsync(params);
+  const wrappedCreatePrompt: typeof createPrompt.mutateAsync = async (params)=> {
+    const prompt = await createPrompt.mutateAsync(params);
     await invalidateAll();
     return prompt;
   };
@@ -46,7 +46,7 @@ export const usePrompts = () => {
   };
 
   return {
-    upsertPrompt: wrappedUpsertPrompt,
+    createPrompt: wrappedCreatePrompt,
     updatePrompt: wrappedUpdatePrompt,
     getPromptById: wrappedGetPromptById,
     restoreVersion: wrappedRestoreVersion,

@@ -37,17 +37,20 @@ export const promptsRouter = createTRPCRouter({
     .use(checkUserPermissionForProject(TeamRoleGroup.PROMPTS_MANAGE))
     .mutation(async ({ ctx, input }) => {
       const service = new PromptService(ctx.prisma);
-      return await service.restoreVersion(input);
+      const authorId = ctx.session?.user?.id;
+      return await service.restoreVersion({
+        ...input,
+        authorId,
+      });
     }),
 
   /**
-   * Upsert a prompt - create if it doesn't exist, update if it does
+   * Create a new prompt
    */
-  upsert: protectedProcedure
+  create: protectedProcedure
     .input(
       z.object({
         projectId: z.string(),
-        handle: handleSchema,
         data: z.object({
           scope: z.nativeEnum(PromptScope).optional(),
           authorId: z.string().optional(),
@@ -61,6 +64,7 @@ export const promptsRouter = createTRPCRouter({
           maxTokens: z.number().optional(),
           promptingTechnique: promptingTechniqueSchema.optional(),
           demonstrations: nodeDatasetSchema.optional(),
+          handle: handleSchema
         }),
       })
     )
@@ -69,13 +73,10 @@ export const promptsRouter = createTRPCRouter({
       const service = new PromptService(ctx.prisma);
       const authorId = ctx.session?.user?.id;
 
-      return await service.upsertPrompt({
-        handle: input.handle,
+      return await service.createPrompt({
+        ...input.data,
         projectId: input.projectId,
-        data: {
-          ...input.data,
-          authorId,
-        }
+        authorId,
       });
     }),
 
@@ -95,10 +96,15 @@ export const promptsRouter = createTRPCRouter({
     .use(checkUserPermissionForProject(TeamRoleGroup.PROMPTS_MANAGE))
     .mutation(async ({ ctx, input }) => {
       const service = new PromptService(ctx.prisma);
+      const authorId = ctx.session?.user?.id;
+      
       return await service.updatePrompt({
         idOrHandle: input.handle,
         projectId: input.projectId,
-        data: input.data,
+        data: {
+          ...input.data,
+          authorId,
+        },
       });
     }),
 
