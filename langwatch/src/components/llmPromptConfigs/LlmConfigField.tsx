@@ -19,8 +19,13 @@ interface LLMConfigFieldProps {
   allowDefault?: boolean;
   requiresCustomKey: boolean;
   onChange: (llmConfig: LLMConfig) => void;
+  showProviderKeyMessage?: boolean;
 }
 
+/**
+ * LLM Config field
+ * Can be used outside of the form context (does not use react-hook-form)
+ */
 export function LLMConfigField({
   allowDefault,
   llmConfig,
@@ -30,7 +35,7 @@ export function LLMConfigField({
   showProviderKeyMessage = true,
 }: LLMConfigFieldProps) {
   const { open, onClose, onToggle } = useDisclosure();
-  const { model } = llmConfig;
+  const { model } = llmConfig ?? {};
 
   // Check if the model is disabled (has line-through styling)
   const isModelDisabled = modelOption?.isDisabled ?? false;
@@ -40,7 +45,7 @@ export function LLMConfigField({
       <LLMConfigModal
         open={open}
         onClose={onClose}
-        llmConfig={llmConfig}
+        values={llmConfig}
         onChange={onChange}
       />
       <HStack

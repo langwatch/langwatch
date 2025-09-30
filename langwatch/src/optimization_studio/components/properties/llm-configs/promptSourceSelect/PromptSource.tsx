@@ -1,5 +1,4 @@
 import { useDisclosure } from "@chakra-ui/react";
-import { useMemo } from "react";
 
 import { PromptList } from "./ui/PromptList";
 import { PromptSelectionButton } from "./ui/PromptSelectButton";
@@ -10,20 +9,20 @@ import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 
 interface PromptSourceProps {
-  configId?: string; // Selected prompt ID
+  selectedPromptId?: string;
   onSelect: (config: { id: string; name: string }) => void;
 }
 
 const usePrompSourceController = ({
-  configId,
   onSelect,
+  selectedPromptId,
 }: PromptSourceProps) => {
   const { open, onOpen, onClose } = useDisclosure();
   const { project } = useOrganizationTeamProject();
 
   // Fetch all prompt configs
-  const { data: promptConfigs, isLoading } =
-    api.llmConfigs.getPromptConfigs.useQuery(
+  const { data: prompts = [], isLoading } =
+    api.prompts.getAllPromptsForProject.useQuery(
       {
         projectId: project?.id ?? "",
       },
@@ -39,27 +38,9 @@ const usePrompSourceController = ({
       }
     );
 
-  const promptConfigsWithName = useMemo(
-    () =>
-      (promptConfigs ?? [])
-        .filter((p) => p.handle)
-        .map((p) => ({
-          id: p.id,
-          name: (p.handle == p.id ? p.name : p.handle) ?? "",
-          latestVersion: p.latestVersion,
-          updatedAt: p.updatedAt,
-        })),
-    [promptConfigs]
-  );
-
-  const selectedConfig = useMemo(
-    () => promptConfigsWithName.find((p) => p.id === configId),
-    [promptConfigsWithName, configId]
-  );
-
   // Handle prompt selection
   const handleSelectPrompt = (promptId: string) => {
-    const selectedPrompt = promptConfigs?.find((p) => p.id === promptId);
+    const selectedPrompt = prompts?.find((p) => p.id === promptId);
 
     if (!selectedPrompt || !project?.id) return;
 
@@ -74,41 +55,42 @@ const usePrompSourceController = ({
   return {
     isLoading,
     handleSelectPrompt,
-    promptConfigs: promptConfigsWithName,
-    selectedConfig,
+    prompts,
     open,
     onOpen,
     onClose,
+    selectedPromptId,
   };
 };
 
 export function PromptSourceSelect({
   isLoading,
-  promptConfigs,
+  prompts,
   handleSelectPrompt,
-  selectedConfig,
   open,
   onOpen,
   onClose,
+  selectedPromptId,
 }: ReturnType<typeof usePrompSourceController>) {
   return (
     <>
-      <PromptSelectionButton onClick={onOpen} selectedConfig={selectedConfig} />
+      <PromptSelectionButton onClick={onOpen} />
 
       <PromptSourceDialog open={open} onOpen={onOpen} onClose={onClose}>
         <PromptList
           isLoading={isLoading}
-          promptConfigs={promptConfigs}
+          prompts={prompts}
           onSelect={handleSelectPrompt}
+          selectedPromptId={selectedPromptId}
         />
       </PromptSourceDialog>
     </>
   );
 }
 
-export function PromptSource({ configId, onSelect }: PromptSourceProps) {
+export function PromptSource({ selectedPromptId, onSelect }: PromptSourceProps) {
   const controller = usePrompSourceController({
-    configId,
+    selectedPromptId,
     onSelect,
   });
 

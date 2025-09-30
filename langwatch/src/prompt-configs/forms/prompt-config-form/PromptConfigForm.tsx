@@ -1,5 +1,5 @@
 import { HStack, Spacer, VStack } from "@chakra-ui/react";
-import { useCallback } from "react";
+import { useCallback, useState } from "react";
 import {
   FormProvider,
   useFieldArray,
@@ -20,18 +20,13 @@ import { PromptHandleInfo } from "./components/PromptHandleInfo";
 import { VersionHistoryButton } from "./components/VersionHistoryButton";
 import { VersionSaveButton } from "./components/VersionSaveButton";
 
-import { toaster } from "~/components/ui/toaster";
-import { useGetPromptConfigByIdWithLatestVersionQuery } from "~/prompt-configs/hooks/useGetPromptConfigByIdWithLatestVersionQuery";
-import { usePromptConfig } from "~/prompt-configs/hooks/usePromptConfig";
-import type { PromptConfigFormValues } from "~/prompt-configs/hooks/usePromptConfigForm";
-import { llmConfigToPromptConfigFormValues } from "~/prompt-configs/llmPromptConfigUtils";
+import type { VersionedPrompt } from "~/server/prompt-config";
+import type { PromptConfigFormValues } from "~/prompt-configs";
+import { versionedPromptToPromptConfigFormValues } from "~/prompt-configs/llmPromptConfigUtils";
 import { usePromptConfigContext } from "~/prompt-configs/providers/PromptConfigProvider";
-import { createLogger } from "~/utils/logger";
-
-const logger = createLogger("PromptConfigForm");
 
 interface PromptConfigFormProps {
-  configId: string;
+  configId?: string;
   methods: UseFormReturn<PromptConfigFormValues>;
 }
 
@@ -41,11 +36,9 @@ interface PromptConfigFormProps {
  */
 function InnerPromptConfigForm(props: PromptConfigFormProps) {
   const { methods, configId } = props;
-  const { isLoading } = usePromptConfig();
   const { triggerSaveVersion } = usePromptConfigContext();
-  const saveEnabled = methods.formState.isDirty;
-  const { data: savedConfig, refetch: refetchSavedConfig } =
-    useGetPromptConfigByIdWithLatestVersionQuery(configId);
+  const [isSaving, setIsSaving] = useState(false);
+  const saveEnabled = methods.formState.isDirty && !isSaving;
 
   /**
    * It is a known limitation of react-hook-form useFieldArray that we cannot
@@ -63,54 +56,58 @@ function InnerPromptConfigForm(props: PromptConfigFormProps) {
   ).map((input) => input.identifier);
 
   const handleSaveClick = useCallback(() => {
-    if (!savedConfig) return;
-    void triggerSaveVersion({
-      config: savedConfig,
-      form: methods,
-      updateConfigValues: methods.getValues(),
-      editingHandleOrScope: false,
-    }).catch((error) => {
-      logger.error(error);
-      toaster.error({
-        title: "Failed to save version",
-        description: error.message,
-      });
+    setIsSaving(true);
+    const values = methods.getValues();
+    triggerSaveVersion({
+      data: {
+        handle: values.handle,
+        scope: values.scope,
+        prompt: values.version.configData.prompt,
+        messages: values.version.configData.messages,
+        inputs: values.version.configData.inputs,
+        outputs: values.version.configData.outputs,
+        model: values.version.configData.llm.model,
+        temperature: values.version.configData.llm.temperature,
+        maxTokens: values.version.configData.llm.max_tokens,
+        promptingTechnique: values.version.configData.prompting_technique,
+        demonstrations: values.version.configData.demonstrations,
+      },
+      onSuccess: (prompt) => {
+        methods.reset(versionedPromptToPromptConfigFormValues(prompt));
+        setIsSaving(false);
+      },
+      onError: () => {
+        setIsSaving(false);
+      },
     });
-  }, [savedConfig, methods, triggerSaveVersion]);
+  }, [methods, triggerSaveVersion]);
 
+  /**
+   * We want discourage the user from using demonstrations
+   * but need to display the field if there are demonstrations already
+   * in the prompt configuration (via the studio).
+   */
+  const demonstrations = methods.watch("version.configData.demonstrations");
   const hasDemonstrations = Boolean(
     Object.values(
-      savedConfig?.latestVersion.configData.demonstrations?.inline?.records ?? {
+      demonstrations?.inline?.records ?? {
         dummy: [],
       }
     )[0]?.length ?? 0 > 0
   );
 
   const handleRestore = useCallback(
-    (_versionId: string) => {
-      refetchSavedConfig()
-        .then(({ data: restoredConfig }) => {
-          if (!restoredConfig) throw new Error("Restored config is missing");
-          methods.reset(llmConfigToPromptConfigFormValues(restoredConfig));
-        })
-        .catch((error) => {
-          logger.error(error);
-          toaster.error({
-            title: "Failed to restore version",
-            description: error.message,
-          });
-        });
+    async (prompt: VersionedPrompt) => {
+      methods.reset(versionedPromptToPromptConfigFormValues(prompt));
     },
-    [refetchSavedConfig, methods]
+    [methods]
   );
-
-  if (!savedConfig) return null;
 
   return (
     <form style={{ width: "100%", height: "100%" }}>
       <VStack width="full" height="full" gap={6} mb={6}>
         <VStack width="full" gap={6} mb={6} paddingBottom="70px">
-          <PromptHandleInfo config={savedConfig} methods={methods} />
+          <PromptHandleInfo configId={configId} />
           <ModelSelectField />
           <PromptField
             templateAdapter="default"
@@ -137,16 +134,18 @@ function InnerPromptConfigForm(props: PromptConfigFormProps) {
           padding={3}
           boxShadow="0 0px 6px rgba(0, 0, 0, 0.1)"
         >
-          <VersionHistoryButton
-            configId={configId}
-            label="History"
-            onRestore={handleRestore}
-          />
+          {configId && (
+            <VersionHistoryButton
+              configId={configId}
+              label="History"
+              onRestoreSuccess={handleRestore}
+            />
+          )}
           <Spacer />
           <VersionSaveButton
             disabled={!saveEnabled}
             onClick={handleSaveClick}
-            isSaving={isLoading}
+            isSaving={isSaving}
           />
         </HStack>
       </VStack>

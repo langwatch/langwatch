@@ -2,8 +2,8 @@ import type { Node } from "@xyflow/react";
 import type { DeepPartial } from "react-hook-form";
 
 import type { DatasetColumnType } from "~/server/datasets/types";
+import type { VersionedPrompt } from "~/server/prompt-config";
 import {
-  parseLlmConfigVersion,
   type LatestConfigVersionSchema,
 } from "~/server/prompt-config/repositories/llm-config-version-schema";
 import type { LlmConfigWithLatestVersion } from "~/server/prompt-config/repositories/llm-config.repository";
@@ -16,7 +16,7 @@ import type {
   Signature,
 } from "../optimization_studio/types/dsl";
 
-import type { PromptConfigFormValues } from "~/prompt-configs/hooks/usePromptConfigForm";
+import type { PromptConfigFormValues } from "~/prompt-configs";
 import {
   LlmConfigInputTypes,
   LlmConfigOutputTypes,
@@ -24,58 +24,13 @@ import {
   type LlmConfigOutputType,
 } from "~/types";
 import { kebabCase } from "~/utils/stringCasing";
-
-export function llmConfigToOptimizationStudioNodeData(
-  config: LlmConfigWithLatestVersion
-): Node<LlmPromptConfigComponent>["data"] {
-  const { latestVersion } = config;
-  const version = parseLlmConfigVersion(latestVersion);
-
-  return {
-    // We need this to be able to update the config
-    configId: config.id,
-    name: config.name,
-    inputs: version.configData.inputs,
-    outputs: version.configData.outputs,
-    parameters: [
-      {
-        identifier: "llm",
-        type: "llm",
-        value: {
-          model: version.configData.model,
-        },
-      },
-      {
-        identifier: "instructions",
-        type: "str",
-        value: version.configData.prompt,
-      },
-      {
-        identifier: "demonstrations",
-        type: "dataset",
-        value: version.configData.demonstrations,
-      },
-      {
-        identifier: "messages",
-        type: "chat_messages",
-        value: version.configData.messages ?? [],
-      },
-      {
-        identifier: "prompting_technique",
-        type: "prompting_technique",
-        value: version.configData.prompting_technique,
-      },
-    ],
-  };
-}
+import { type TriggerSaveVersionParams } from "~/prompt-configs/providers/PromptConfigProvider";
+import { isEqual } from "lodash-es";
 
 export function promptConfigFormValuesToOptimizationStudioNodeData(
-  llmConfig: LlmConfigWithLatestVersion,
   formValues: PromptConfigFormValues
 ): Node<LlmPromptConfigComponent>["data"] {
   return {
-    configId: llmConfig.id,
-    name: llmConfig.handle?.replace("/", " ") || llmConfig.name || "Anonymous",
     inputs: formValues.version?.configData?.inputs,
     outputs: formValues.version?.configData?.outputs,
     parameters: [
@@ -119,6 +74,7 @@ export function safeOptimizationStudioNodeDataToPromptConfigFormInitialValues(
   const outputs = safeOutputs(nodeData.outputs);
 
   return {
+    handle: (nodeData as LlmPromptConfigComponent).handle,
     version: {
       configData: {
         inputs,
@@ -243,6 +199,8 @@ export function llmConfigToPromptConfigFormValues(
   llmConfig: LlmConfigWithLatestVersion
 ): PromptConfigFormValues {
   return {
+    handle: llmConfig.handle,
+    scope: llmConfig.scope,
     version: {
       configData: {
         ...llmConfig.latestVersion.configData,
@@ -280,4 +238,191 @@ export function createNewOptimizationStudioPromptName(
   );
 
   return promptName;
+}
+
+export function versionedPromptToLlmPromptConfigComponentNodeData(
+  prompt: VersionedPrompt
+): Node<LlmPromptConfigComponent>["data"] {
+  return {
+    configId: prompt.id,
+    handle: prompt.handle,
+    name: prompt.name,
+    inputs: prompt.inputs,
+    outputs: prompt.outputs,
+    parameters: [
+      {
+        identifier: "llm",
+        type: "llm",
+        value: {
+          model: prompt.model,
+          temperature: prompt.temperature,
+          max_tokens: prompt.maxTokens,
+        },
+      },
+      {
+        identifier: "instructions",
+        type: "str",
+        value: prompt.prompt,
+      },
+      {
+        identifier: "demonstrations",
+        type: "dataset",
+        value: prompt.demonstrations,
+      },
+      {
+        identifier: "messages",
+        type: "chat_messages",
+        value: prompt.messages ?? [],
+      },
+      {
+        identifier: "prompting_technique",
+        type: "prompting_technique",
+        value: prompt.promptingTechnique,
+      },
+    ],
+  };
+}
+
+/**
+ * Converts the form values to the trigger save version params.
+ * It will also filter out the system prompt from the messages array.
+ * If both the prompt and system message is set, the prompt will be used.
+ * @param formValues
+ * @returns
+ */
+export function formValuesToTriggerSaveVersionParams(
+  formValues: PromptConfigFormValues
+): Omit<TriggerSaveVersionParams, "projectId"> {
+  const systemPrompt =
+    formValues.version.configData.prompt ??
+    formValues.version.configData.messages?.find((msg) => msg.role === "system")
+      ?.content;
+  const messages = formValues.version.configData.messages?.filter(
+    (msg) => msg.role !== "system"
+  );
+
+  return {
+    handle: formValues.handle,
+    scope: formValues.scope,
+    prompt: systemPrompt,
+    messages: messages,
+    inputs: formValues.version.configData.inputs,
+    outputs: formValues.version.configData.outputs,
+    model: formValues.version.configData.llm.model,
+    temperature: formValues.version.configData.llm.temperature,
+    maxTokens: formValues.version.configData.llm.max_tokens,
+    promptingTechnique: formValues.version.configData.prompting_technique,
+    demonstrations: formValues.version.configData.demonstrations
+  };
+}
+
+export function versionedPromptToPromptConfigFormValues(
+  prompt: VersionedPrompt
+): PromptConfigFormValues {
+  return {
+    handle: prompt.handle,
+    scope: prompt.scope,
+    version: {
+      configData: {
+        prompt: prompt.prompt,
+        messages: prompt.messages.filter((msg) => msg.role !== "system"),
+        inputs: prompt.inputs,
+        outputs: prompt.outputs,
+        demonstrations: prompt.demonstrations,
+        prompting_technique: prompt.promptingTechnique,
+        llm: {
+          model: prompt.model,
+          temperature: prompt.temperature,
+          max_tokens: prompt.maxTokens,
+        },
+      },
+    },
+  };
+}
+
+export function versionedPromptToOptimizationStudioNodeData(
+  prompt: VersionedPrompt
+): Node<LlmPromptConfigComponent>["data"] {
+  return {
+    configId: prompt.id,
+    handle: prompt.handle,
+    name: prompt.name,
+    inputs: prompt.inputs,
+    outputs: prompt.outputs,
+    parameters: [
+      {
+        identifier: "llm",
+        type: "llm",
+        value: {
+          model: prompt.model,
+          temperature: prompt.temperature,
+          max_tokens: prompt.maxTokens,
+        },
+      },
+      {
+        identifier: "instructions",
+        type: "str",
+        value: prompt.prompt,
+      },
+      {
+        identifier: "demonstrations",
+        type: "dataset",
+        value: prompt.demonstrations
+      },
+      {
+        identifier: "messages",
+        type: "chat_messages",
+        value: prompt.messages.filter((msg) => msg.role !== "system"),
+      },
+      {
+        identifier: "prompting_technique",
+        type: "prompting_technique",
+        value: prompt.promptingTechnique,
+      },
+    ],
+  };
+}
+
+/**
+ * Converts the node data to a JSON string for comparison.
+ * We do not compare all fields, only the ones that are relevant for the prompt.
+ * It aggressively standardizes the node data to avoid false drift detection.
+ * FIXME: We ignore the demonstrations parameter because it's not required to be created
+ * when using the prompt manager, and this creates a false drift detection that 
+ * the sync will not resolve. 
+ */
+function standardizeNodeData(
+  nodeData: Node<LlmPromptConfigComponent>["data"]
+) {
+  return JSON.parse(JSON.stringify({
+    handle: nodeData.handle,
+    inputs: nodeData.inputs?.map(input => ({
+      identifier: input.identifier,
+      type: input.type,
+    })),
+    outputs: nodeData.outputs?.map(output => ({
+      identifier: output.identifier,
+      type: output.type,
+    })),
+    parameters: [...nodeData.parameters].filter(param => param.identifier !== "demonstrations").map(param => ({
+      identifier: param.identifier,
+      type: param.type,
+      value: param.value,
+    })).sort((a, b) => a.identifier.localeCompare(b.identifier)),
+  }));
+}
+
+/**
+ * Compares two node data objects for equality.
+ * Special handling for demonstrations to ignore columnType IDs.
+ * @param nodeData1 
+ * @param nodeData2 
+ * @returns 
+ */
+export function isNodeDataEqual(
+  nodeData1: Node<LlmPromptConfigComponent>["data"],
+  nodeData2: Node<LlmPromptConfigComponent>["data"]
+): boolean {
+  const nodesAreEqual = isEqual(standardizeNodeData(nodeData1), standardizeNodeData(nodeData2));
+  return nodesAreEqual;
 }

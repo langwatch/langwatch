@@ -7,6 +7,7 @@ import {
   type ForwardedRef,
   type SetStateAction,
 } from "react";
+import { LuBuilding } from "react-icons/lu";
 import { useDebouncedCallback } from "use-debounce";
 
 import { PanelHeader } from "./components/ui/PanelHeader";
@@ -14,7 +15,6 @@ import { PromptConfigForm } from "./forms/prompt-config-form/PromptConfigForm";
 import { useInvokePrompt } from "./hooks/useInvokePrompt";
 import { usePromptConfigForm } from "./hooks/usePromptConfigForm";
 
-import { LuBuilding } from "react-icons/lu";
 import {
   ExecutionInputPanel,
   type ExecuteData,
@@ -24,13 +24,15 @@ import {
   InputOutputExecutablePanel,
   PANEL_ANIMATION_DURATION,
 } from "~/components/executable-panel/InputOutputExecutablePanel";
+import { Tooltip } from "~/components/ui/tooltip";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import {
-  llmConfigToPromptConfigFormValues,
   promptConfigFormValuesToOptimizationStudioNodeData,
+  versionedPromptToPromptConfigFormValues,
 } from "~/prompt-configs/llmPromptConfigUtils";
 import { api } from "~/utils/api";
-import { Tooltip } from "../components/ui/tooltip";
+import type { PromptConfigFormValues } from "./types";
+import { buildDefaultFormValues } from "./utils/buildDefaultFormValues";
 
 /**
  * Panel for configuring and testing LLM prompts
@@ -43,6 +45,10 @@ interface PromptConfigPanelProps {
   setIsPaneExpanded: Dispatch<SetStateAction<boolean>>;
 }
 
+/**
+ * Panel for configuring and testing LLM prompts
+ * When the prompt is not found, it will show the default values
+ */
 export const PromptConfigPanel = forwardRef(function PromptConfigPanel(
   {
     isOpen,
@@ -56,6 +62,7 @@ export const PromptConfigPanel = forwardRef(function PromptConfigPanel(
   // ---- State and hooks ----
   const { project } = useOrganizationTeamProject();
   const projectId = project?.id ?? "";
+  const defaultModel = project?.defaultModel;
 
   // ---- API calls and data fetching ----
   const {
@@ -67,18 +74,11 @@ export const PromptConfigPanel = forwardRef(function PromptConfigPanel(
     mutationKey: ["prompt-config", configId],
   });
 
-  useEffect(() => {
-    const shouldReset = !isOpen || !isExpanded || !configId;
-    if (shouldReset) {
-      reset();
-    }
-  }, [isOpen, isExpanded, configId, reset]);
-
   // Fetch the LLM configuration
-  const { data: llmConfig, isLoading: isLoadingConfig } =
-    api.llmConfigs.getByIdWithLatestVersion.useQuery(
+  const { data: prompt, isLoading: isLoadingConfig } =
+    api.prompts.getByIdOrHandle.useQuery(
       {
-        id: configId,
+        idOrHandle: configId,
         projectId,
       },
       {
@@ -91,10 +91,25 @@ export const PromptConfigPanel = forwardRef(function PromptConfigPanel(
 
   // ---- Form setup and configuration ----
   // Transform the LLM config into form values
-  const initialConfigValues = useMemo(
-    () =>
-      llmConfig ? llmConfigToPromptConfigFormValues(llmConfig) : undefined,
-    [configId, projectId, !!llmConfig]
+  const initialConfigValues: PromptConfigFormValues = useMemo(
+    () => {
+      // If prompt is found, use the prompt values
+      return prompt
+        ? versionedPromptToPromptConfigFormValues(prompt)
+        : // If default model is set, use the default model merged with the default values
+        typeof defaultModel === "string"
+        ? buildDefaultFormValues({
+            version: { configData: { llm: { model: defaultModel } } },
+          })
+        : // If no default model is set, use the default values
+          buildDefaultFormValues({});
+    },
+    /**
+     * We only reset the initial config values when configId changes
+     * or specifically when the prompt is not found (configId is null => default values)
+     */
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [Boolean(prompt), defaultModel, configId]
   );
 
   // Setup form with the config values
@@ -103,16 +118,21 @@ export const PromptConfigPanel = forwardRef(function PromptConfigPanel(
     initialConfigValues,
   });
 
-  // Get input fields from the form
-  const inputFields = formProps.methods.getValues("version.configData.inputs");
+  // Reset inputs when panel is closed
+  useEffect(() => {
+    const shouldResetInputs = !isOpen || !isExpanded || !configId;
+    if (shouldResetInputs) {
+      reset();
+    }
+  }, [isOpen, isExpanded, configId, reset]);
 
-  // ---- Effects and handlers ----
   // Reset form when config changes
   useEffect(() => {
-    if (initialConfigValues) {
-      formProps.methods.reset(initialConfigValues);
-    }
-  }, [formProps.methods, initialConfigValues]);
+    formProps.methods.reset(initialConfigValues);
+  }, [configId, formProps.methods, initialConfigValues]);
+
+  // Get input fields from the form
+  const inputFields = formProps.methods.getValues("version.configData.inputs");
 
   const handleClose = () => {
     if (isExpanded) {
@@ -124,10 +144,6 @@ export const PromptConfigPanel = forwardRef(function PromptConfigPanel(
 
   // Handle prompt execution with current form data and inputs
   const handleExecute = (inputData: ExecuteData) => {
-    if (!llmConfig) {
-      return;
-    }
-
     const formData = formProps.methods.getValues();
     // Update inputs with values from the input panel
     formData.version.configData.inputs = inputFields?.map((input) => ({
@@ -137,10 +153,10 @@ export const PromptConfigPanel = forwardRef(function PromptConfigPanel(
 
     invokeLLM({
       projectId,
-      data: promptConfigFormValuesToOptimizationStudioNodeData(
-        llmConfig,
-        formData
-      ),
+      data: {
+        name: formData.handle ?? "Anonymous", // REQUIRED FOR INVOKING LLM
+        ...promptConfigFormValuesToOptimizationStudioNodeData(formData),
+      },
     });
   };
 
@@ -179,16 +195,16 @@ export const PromptConfigPanel = forwardRef(function PromptConfigPanel(
             title={
               <HStack>
                 <Text whiteSpace="nowrap">Prompt Configuration</Text>
-                {llmConfig?.latestVersion && llmConfig.handle && (
+                {prompt?.version && prompt.handle && (
                   <Badge
                     colorPalette="green"
                     border="1px solid"
                     borderColor="green.200"
                   >
-                    v{llmConfig?.latestVersion.version}
+                    v{prompt?.version}
                   </Badge>
                 )}
-                {llmConfig?.scope === "ORGANIZATION" && (
+                {prompt?.scope === "ORGANIZATION" && (
                   <Tooltip content="This prompt is available to all projects in the organization">
                     <Button
                       onClick={() => {
@@ -222,7 +238,7 @@ export const PromptConfigPanel = forwardRef(function PromptConfigPanel(
           {isLoadingConfig ? (
             <Spinner size="md" />
           ) : (
-            llmConfig && <PromptConfigForm {...formProps} />
+            <PromptConfigForm {...formProps} />
           )}
         </VStack>
       </InputOutputExecutablePanel.CenterContent>

@@ -2,9 +2,13 @@ import { z } from "zod";
 
 import { getLatestConfigVersionSchema } from "~/server/prompt-config/repositories/llm-config-version-schema";
 
+import { handleSchema, scopeSchema } from "./field-schemas";
+
 const latestConfigVersionSchema = getLatestConfigVersionSchema();
 
 export const formSchema = z.object({
+  handle: handleSchema.nullable(),
+  scope: scopeSchema,
   version: z.object({
     configData: z.object({
       prompt: latestConfigVersionSchema.shape.configData.shape.prompt,
@@ -26,4 +30,3 @@ export const formSchema = z.object({
     }),
   }),
 });
-

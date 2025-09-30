@@ -9,6 +9,15 @@ import { createLogger } from "~/utils/logger";
 const logger = createLogger("useInvokePrompt");
 
 /**
+ * Options for the useInvokePrompt hook
+ */
+export interface InvokeParams {
+  projectId: string;
+  data: Node<LlmPromptConfigComponent>["data"];
+}
+
+
+/**
  * Hook for executing a prompt using TanStack Query
  *
  * This hook wraps the invokeLLM utility function in a mutation,
@@ -20,19 +29,13 @@ export function useInvokePrompt(
   return useMutation<
     PromptExecutionResult,
     Error,
-    {
-      projectId: string;
-      data: Node<LlmPromptConfigComponent>["data"];
-    }
+    InvokeParams
   >({
     ...options,
     mutationFn: async ({
       projectId,
       data,
-    }: {
-      projectId: string;
-      data: Node<LlmPromptConfigComponent>["data"];
-    }) => {
+    }: InvokeParams) => {
       return invokeLLM({ projectId, data });
     },
     onError: (error) => {
