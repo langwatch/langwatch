@@ -7,6 +7,7 @@ import { handleSchema, scopeSchema } from "./field-schemas";
 const latestConfigVersionSchema = getLatestConfigVersionSchema();
 
 export const formSchema = z.object({
+  id: z.string().optional().describe("ID of the prompt config"),
   handle: handleSchema.nullable(),
   scope: scopeSchema,
   version: z.object({

@@ -221,7 +221,7 @@ export class PromptService {
   async createPrompt(params: {
     // Config data
     projectId: string;
-    organizationId: string;
+    organizationId?: string;
     handle: string;
     scope?: PromptScope;
     name?: string;
@@ -237,6 +237,7 @@ export class PromptService {
     prompting_technique?: z.infer<typeof promptingTechniqueSchema>;
     commitMessage?: string | null;
   }): Promise<VersionedPrompt> {
+    const organizationId = params.organizationId ?? await this.getOrganizationIdFromProjectId(params.projectId);
     // If any of the version data is provided,
     // we should create a version from that data
     // and it's not consideered a draft
@@ -281,7 +282,7 @@ export class PromptService {
         name: params.name ?? params.handle,
         handle: params.handle ?? null,
         projectId: params.projectId,
-        organizationId: params.organizationId,
+        organizationId,
         scope: params.scope ?? "PROJECT",
         authorId: params.authorId,
       },
