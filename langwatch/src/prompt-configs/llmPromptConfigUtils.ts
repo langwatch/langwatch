@@ -31,6 +31,7 @@ export function promptConfigFormValuesToOptimizationStudioNodeData(
   formValues: PromptConfigFormValues
 ): Node<LlmPromptConfigComponent>["data"] {
   return {
+    configId: formValues.id,
     inputs: formValues.version?.configData?.inputs,
     outputs: formValues.version?.configData?.outputs,
     parameters: [
@@ -74,6 +75,7 @@ export function safeOptimizationStudioNodeDataToPromptConfigFormInitialValues(
   const outputs = safeOutputs(nodeData.outputs);
 
   return {
+    id: (nodeData as LlmPromptConfigComponent).configId,
     handle: (nodeData as LlmPromptConfigComponent).handle,
     version: {
       configData: {

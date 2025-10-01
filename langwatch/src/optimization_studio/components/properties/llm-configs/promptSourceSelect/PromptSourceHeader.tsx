@@ -24,6 +24,7 @@ import { useNodeDrift } from "../signature-properties-panel/hooks/useNodeDrift";
 import type { VersionedPrompt } from "~/server/prompt-config";
 import { toaster } from "~/components/ui/toaster";
 import { useCallback } from "react";
+import { EditablePromptHandleField } from "~/prompt-configs/forms/fields/EditablePromptHandleField";
 
 /**
  * Header for the prompt source select in the optimization studio
@@ -47,6 +48,11 @@ export function PromptSourceHeader({
   const handleSaveVersion = useCallback(() => {
     const values = formProps.getValues();
     const newValues = formValuesToTriggerSaveVersionParams(values);
+
+    console.log({
+      node,
+      values
+    })
 
     if (!configId) {
       throw new Error("Config ID is required");
@@ -101,20 +107,7 @@ export function PromptSourceHeader({
           padding={2}
           background="gray.50"
         >
-          <HStack paddingX={1} gap={1}>
-            {isDraft ? (
-              <Text color="gray.500">Draft</Text>
-            ) : (
-              <Text
-                fontSize="sm"
-                fontWeight="500"
-                fontFamily="mono"
-                fontStyle={canSave ? "italic" : "normal"}
-              >
-                {handle}
-              </Text>
-            )}
-          </HStack>
+          <EditablePromptHandleField />
           <Spacer />
           <GeneratePromptApiSnippetDialog
             configId={configId}
