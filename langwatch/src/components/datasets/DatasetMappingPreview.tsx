@@ -1,10 +1,12 @@
 import {
+  Badge,
   Box,
   Button,
   Center,
   Field,
   HStack,
   Spacer,
+  Spinner,
   Text,
   VStack,
 } from "@chakra-ui/react";
@@ -62,6 +64,37 @@ export function DatasetMappingPreview({
   const [isThreadMapping, setIsThreadMapping] = useState(false);
   const [threadMappingState, setThreadMappingState] =
     useState<ThreadMappingState>();
+
+  const { project } = useOrganizationTeamProject();
+
+  // Extract thread_ids from traces
+  const threadIds = useMemo(() => {
+    const ids = traces
+      .map((trace) => trace.metadata?.thread_id)
+      .filter((id): id is string => !!id);
+    return Array.from(new Set(ids));
+  }, [traces]);
+
+  // Fetch all traces with matching thread_ids when thread mapping is enabled
+  const threadTraces = api.traces.getTracesWithSpansByThreadIds.useQuery(
+    {
+      projectId: project?.id ?? "",
+      threadIds: threadIds,
+    },
+    {
+      enabled: !!project && isThreadMapping && threadIds.length > 0,
+      refetchOnWindowFocus: false,
+    }
+  );
+
+  // Use thread traces when thread mapping is enabled, otherwise use provided traces
+  const tracesToUse = useMemo(() => {
+    if (isThreadMapping && threadTraces.data) {
+      return threadTraces.data;
+    }
+    return traces;
+  }, [isThreadMapping, threadTraces.data, traces]);
+
   const columnDefs = useMemo(() => {
     if (!selectedDataset) {
       return [];
@@ -106,8 +139,6 @@ export function DatasetMappingPreview({
     return headers;
   }, [selectedDataset]);
 
-  const { project } = useOrganizationTeamProject();
-
   const trpc = api.useContext();
   const updateStoredMapping_ = api.dataset.updateMapping.useMutation();
   const updateStoredMapping = useCallback(
@@ -119,6 +150,26 @@ export function DatasetMappingPreview({
           mapping: {
             mapping: mappingState.mapping,
             expansions: Array.from(mappingState.expansions),
+          },
+        },
+        {
+          onSuccess: () => {
+            void trpc.dataset.getAll.invalidate();
+          },
+        }
+      );
+    },
+    [selectedDataset.id, project?.id, trpc.dataset.getAll, updateStoredMapping_]
+  );
+
+  const updateStoredThreadMapping = useCallback(
+    (threadMapping: ThreadMappingState) => {
+      updateStoredMapping_.mutate(
+        {
+          projectId: project?.id ?? "",
+          datasetId: selectedDataset.id,
+          threadMapping: {
+            mapping: threadMapping.mapping,
           },
         },
         {
@@ -144,7 +195,20 @@ export function DatasetMappingPreview({
               checked={isThreadMapping}
               onCheckedChange={(e) => setIsThreadMapping(e.checked)}
             />
-            <Text fontSize="sm">Threads</Text>
+            <HStack gap={1}>
+              <Text fontSize="sm">Threads</Text>
+              {isThreadMapping && (
+                <>
+                  {threadTraces.isLoading ? (
+                    <Spinner size="xs" />
+                  ) : threadTraces.data ? (
+                    <Badge colorPalette="blue" size="sm">
+                      {threadTraces.data.length} traces
+                    </Badge>
+                  ) : null}
+                </>
+              )}
+            </HStack>
           </HStack>
           <Field.HelperText margin={0} fontSize="13px" marginBottom={2}>
             {isThreadMapping
@@ -154,16 +218,25 @@ export function DatasetMappingPreview({
 
           {isThreadMapping ? (
             <ThreadMapping
-              traces={traces}
-              threadMapping={threadMappingState}
+              traces={tracesToUse}
+              threadMapping={
+                (selectedDataset.mapping as any)?.threadMapping ??
+                threadMappingState
+              }
               targetFields={columnTypes.map(({ name }) => name)}
               setDatasetEntries={onRowDataChange}
-              setThreadMapping={setThreadMappingState}
+              setThreadMapping={(newThreadMapping) => {
+                setThreadMappingState(newThreadMapping);
+                updateStoredThreadMapping(newThreadMapping);
+              }}
             />
           ) : (
             <TracesMapping
-              traceMapping={selectedDataset.mapping as MappingState | undefined}
-              traces={traces}
+              traceMapping={
+                (selectedDataset.mapping as any)?.traceMapping ??
+                (selectedDataset.mapping as MappingState | undefined)
+              }
+              traces={tracesToUse}
               targetFields={columnTypes.map(({ name }) => name)}
               setDatasetEntries={onRowDataChange}
               setTraceMapping={(newMappingState) => {
