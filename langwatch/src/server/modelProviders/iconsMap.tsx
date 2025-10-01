@@ -1,7 +1,6 @@
 import { Anthropic } from "../../components/icons/Anthropic";
 import { AWS } from "../../components/icons/AWS";
 import { Azure } from "../../components/icons/Azure";
-import { Cloudflare } from "../../components/icons/Cloudflare";
 import { Custom } from "../../components/icons/Custom";
 import { DeepSeek } from "../../components/icons/DeepSeek";
 import { Gemini } from "../../components/icons/Gemini";
@@ -22,7 +21,6 @@ export const modelProviderIcons: Record<
   groq: <Groq />,
   vertex_ai: <GoogleCloud />,
   gemini: <Gemini />,
-  cloudflare: <Cloudflare />,
   bedrock: <AWS />,
   deepseek: <DeepSeek />,
   custom: <Custom />,

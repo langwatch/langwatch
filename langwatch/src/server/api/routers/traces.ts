@@ -206,11 +206,7 @@ export const tracesRouter = createTRPCRouter({
       return { topicCounts, subtopicCounts };
     }),
   getCustomersAndLabels: protectedProcedure
-    .input(
-      z.object({
-        projectId: z.string(),
-      })
-    )
+    .input(tracesFilterInput)
     .use(checkUserPermissionForProject(TeamRoleGroup.MESSAGES_VIEW))
     .query(async ({ input, ctx }) => {
       const protections = await getUserProtectionsForProject(ctx, {
