@@ -1,25 +1,23 @@
-import { Link } from "../../../components/ui/link";
 import {
+  Alert,
   Box,
   Button,
   Card,
   Grid,
   GridItem,
   HStack,
-  Heading,
   Skeleton,
   Spacer,
   Text,
   VStack,
-  Alert,
 } from "@chakra-ui/react";
 import {
   BarChart2,
+  Edit,
+  Filter,
   MoreVertical,
   Plus,
-  Edit,
   Trash2,
-  Filter,
 } from "react-feather";
 import {
   CustomGraph,
@@ -27,17 +25,133 @@ import {
 } from "~/components/analytics/CustomGraph";
 import { useFilterToggle } from "~/components/filters/FilterToggle";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import { api } from "~/utils/api";
 import type { FilterField } from "~/server/filters/types";
+import { api } from "~/utils/api";
+import { Link } from "../../../components/ui/link";
 
+import { useRouter } from "next/router";
+import { useMemo } from "react";
 import GraphsLayout from "~/components/GraphsLayout";
 import { FilterSidebar } from "~/components/filters/FilterSidebar";
-import { AnalyticsHeader } from "../../../components/analytics/AnalyticsHeader";
-import { useRouter } from "next/router";
-import { toaster } from "~/components/ui/toaster";
-import { Menu } from "~/components/ui/menu";
-import { Tooltip } from "~/components/ui/tooltip";
 import { FilterDisplay } from "~/components/triggers/FilterDisplay";
+import { Menu } from "~/components/ui/menu";
+import { toaster } from "~/components/ui/toaster";
+import { Tooltip } from "~/components/ui/tooltip";
+import { AnalyticsHeader } from "../../../components/analytics/AnalyticsHeader";
+
+interface GraphCardProps {
+  graph: {
+    id: string;
+    name: string;
+    graph: unknown;
+    filters: unknown;
+  };
+  projectSlug: string;
+  onDelete: () => void;
+  isDeleting: boolean;
+}
+
+/**
+ * Single Responsibility: Renders a single graph card with filters and actions
+ */
+function GraphCard({
+  graph,
+  projectSlug,
+  onDelete,
+  isDeleting,
+}: GraphCardProps) {
+  const router = useRouter();
+
+  const hasFilters = useMemo(
+    () =>
+      !!(
+        graph.filters &&
+        typeof graph.filters === "object" &&
+        Object.keys(graph.filters).length > 0
+      ),
+    [graph.filters]
+  );
+
+  return (
+    <GridItem key={graph.id} display={"inline-grid"}>
+      <Card.Root>
+        <Card.Body>
+          <HStack align={"top"} marginBottom={4}>
+            <BarChart2 color="orange" />
+            <Text
+              marginLeft={2}
+              fontSize="md"
+              fontWeight="bold"
+              marginBottom={2}
+            >
+              {graph.name}
+            </Text>
+            <Spacer />
+            {hasFilters && (
+              <Tooltip
+                content={
+                  <VStack
+                    align="start"
+                    backgroundColor="black"
+                    color="white"
+                    height="100%"
+                    textWrap="wrap"
+                  >
+                    <FilterDisplay
+                      filters={
+                        graph.filters as Record<
+                          FilterField,
+                          string[] | Record<string, string[]>
+                        >
+                      }
+                    />
+                  </VStack>
+                }
+                positioning={{ placement: "top" }}
+                showArrow
+              >
+                <Box padding={1}>
+                  <Filter width={16} style={{ minWidth: 16 }} />
+                </Box>
+              </Tooltip>
+            )}
+            <Menu.Root>
+              <Menu.Trigger asChild>
+                <Button variant="ghost" loading={isDeleting}>
+                  <MoreVertical />
+                </Button>
+              </Menu.Trigger>
+              <Menu.Content>
+                <Menu.Item
+                  value="edit"
+                  onClick={() => {
+                    void router.push(
+                      `/${projectSlug}/analytics/custom/${graph.id}`
+                    );
+                  }}
+                >
+                  <Edit /> Edit Graph
+                </Menu.Item>
+                <Menu.Item value="delete" color="red.600" onClick={onDelete}>
+                  <Trash2 /> Delete Graph
+                </Menu.Item>
+              </Menu.Content>
+            </Menu.Root>
+          </HStack>
+          <CustomGraph
+            key={graph.id}
+            input={graph.graph as CustomGraphInput}
+            filters={
+              graph.filters as
+                | Record<FilterField, string[] | Record<string, string[]>>
+                | undefined
+            }
+          />
+        </Card.Body>
+      </Card.Root>
+    </GridItem>
+  );
+}
 
 export default function Reports() {
   const { project } = useOrganizationTeamProject();
@@ -45,8 +159,6 @@ export default function Reports() {
 
   const graphs = api.graphs.getAll.useQuery({ projectId: project?.id ?? "" });
   const deleteGraphs = api.graphs.delete.useMutation();
-
-  const router = useRouter();
 
   const deleteGraph = (id: string) => () => {
     deleteGraphs.mutate(
@@ -103,97 +215,16 @@ export default function Reports() {
         <Grid templateColumns="repeat(2, 1fr)" gap={5} width={"100%"}>
           {graphs.data ? (
             graphs.data.map((graph) => (
-              <GridItem key={graph.id} display={"inline-grid"}>
-                <Card.Root>
-                  <Card.Body>
-                    <HStack align={"top"} marginBottom={4}>
-                      <BarChart2 color="orange" />
-                      <Text
-                        marginLeft={2}
-                        fontSize="md"
-                        fontWeight="bold"
-                        marginBottom={2}
-                      >
-                        {graph.name}
-                      </Text>
-                      <Spacer />
-                      {graph.filters &&
-                        Object.keys(graph.filters).length > 0 && (
-                          <Tooltip
-                            content={
-                              <VStack
-                                align="start"
-                                backgroundColor="black"
-                                color="white"
-                                height="100%"
-                                textWrap="wrap"
-                              >
-                                <FilterDisplay
-                                  filters={
-                                    graph.filters as Record<
-                                      FilterField,
-                                      string[] | Record<string, string[]>
-                                    >
-                                  }
-                                />
-                              </VStack>
-                            }
-                            positioning={{ placement: "top" }}
-                            showArrow
-                          >
-                            <Box padding={1}>
-                              <Filter width={16} style={{ minWidth: 16 }} />
-                            </Box>
-                          </Tooltip>
-                        )}
-                      <Menu.Root>
-                        <Menu.Trigger asChild>
-                          <Button
-                            variant="ghost"
-                            loading={
-                              deleteGraphs.isLoading &&
-                              deleteGraphs.variables?.id === graph.id
-                            }
-                          >
-                            <MoreVertical />
-                          </Button>
-                        </Menu.Trigger>
-                        <Menu.Content>
-                          <Menu.Item
-                            value="edit"
-                            onClick={() => {
-                              void router.push(
-                                `/${project?.slug}/analytics/custom/${graph.id}`
-                              );
-                            }}
-                          >
-                            <Edit /> Edit Graph
-                          </Menu.Item>
-                          <Menu.Item
-                            value="delete"
-                            color="red.600"
-                            onClick={deleteGraph(graph.id)}
-                          >
-                            <Trash2 /> Delete Graph
-                          </Menu.Item>
-                        </Menu.Content>
-                      </Menu.Root>
-                    </HStack>
-                    <CustomGraph
-                      key={graph.id}
-                      input={graph.graph as CustomGraphInput}
-                      filters={
-                        graph.filters as
-                          | Record<
-                              FilterField,
-                              string[] | Record<string, string[]>
-                            >
-                          | undefined
-                      }
-                    />
-                  </Card.Body>
-                </Card.Root>
-              </GridItem>
+              <GraphCard
+                key={graph.id}
+                graph={graph}
+                projectSlug={project?.slug ?? ""}
+                onDelete={deleteGraph(graph.id)}
+                isDeleting={
+                  deleteGraphs.isLoading &&
+                  deleteGraphs.variables?.id === graph.id
+                }
+              />
             ))
           ) : (
             <Skeleton height="20px" />
