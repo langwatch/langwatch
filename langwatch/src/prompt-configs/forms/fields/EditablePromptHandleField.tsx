@@ -44,34 +44,64 @@ export function EditablePromptHandleField() {
   const handle = form.watch("handle");
 
   return (
-    <HStack paddingX={1} gap={1} className="group" width="full">
+    <HStack
+      paddingX={1}
+      gap={1}
+      className="group"
+      width="full"
+      position="relative"
+      minWidth={0}
+      _hover={{
+        "& .handle-text": {
+          opacity: 0.4,
+        },
+        "& .handle-actions": {
+          opacity: 1,
+        },
+      }}
+    >
       {handle ? (
-        <Text fontSize="sm" fontWeight="500" fontFamily="mono">
+        <Text
+          className="handle-text"
+          fontSize="sm"
+          fontWeight="500"
+          fontFamily="mono"
+          textWrap="wrap"
+          minWidth={0}
+          overflow="hidden"
+          transition="opacity 0.2s"
+        >
           {handle}
         </Text>
       ) : (
         <Text color="gray.500">Draft</Text>
       )}
       {handle && (
-        <Button
-          // Do not remove this id, it is used to trigger the edit dialog
-          id="js-edit-prompt-handle"
-          onClick={() => void handleTriggerChangeHandle()}
-          variant="ghost"
-          _hover={{
-            backgroundColor: "gray.100",
-          }}
-          textTransform="uppercase"
-          visibility="hidden"
-          _groupHover={{
-            visibility: "visible",
-          }}
-          marginRight={"auto"}
+        <HStack
+          className="handle-actions"
+          position="absolute"
+          right={1}
+          opacity={0}
+          transition="opacity 0.2s"
+          gap={1}
+          background="gray.50"
+          paddingX={1}
         >
-          <LuPencil />
-        </Button>
+          <Button
+            id="js-edit-prompt-handle"
+            onClick={() => void handleTriggerChangeHandle()}
+            variant="ghost"
+            _hover={{
+              backgroundColor: "gray.100",
+            }}
+            textTransform="uppercase"
+            size="xs"
+          >
+            <LuPencil />
+          </Button>
+          <CopyButton value={handle} label="Prompt ID" />
+        </HStack>
       )}
-      {handle && <CopyButton value={handle} label="Prompt ID" />}
     </HStack>
   );
 }
