@@ -35,9 +35,10 @@ import {
   type ThreadMappingState,
 } from "../traces/ThreadMapping";
 import { ErrorBoundary } from "react-error-boundary";
-
+import type { Trace } from "~/server/tracer/types";
+import { useDebouncedCallback } from "use-debounce";
 interface DatasetMappingPreviewProps {
-  traces: any[]; // Replace 'any' with your trace type
+  traces: Trace[]; // Replace 'any' with your trace type
   columnTypes: DatasetColumns;
   rowData: DatasetRecordEntry[];
   selectedDataset: Dataset;
@@ -182,6 +183,14 @@ export function DatasetMappingPreview({
     [selectedDataset.id, project?.id, trpc.dataset.getAll, updateStoredMapping_]
   );
 
+  const debouncedUpdateThreadMapping = useDebouncedCallback(
+    (newThreadMapping: ThreadMappingState) => {
+      setThreadMappingState(newThreadMapping);
+      updateStoredThreadMapping(newThreadMapping);
+    },
+    400
+  );
+
   return (
     <Field.Root width="full" paddingY={4}>
       <HStack width="full" gap="64px" align="start">
@@ -225,10 +234,7 @@ export function DatasetMappingPreview({
               }
               targetFields={columnTypes.map(({ name }) => name)}
               setDatasetEntries={onRowDataChange}
-              setThreadMapping={(newThreadMapping) => {
-                setThreadMappingState(newThreadMapping);
-                updateStoredThreadMapping(newThreadMapping);
-              }}
+              setThreadMapping={debouncedUpdateThreadMapping}
             />
           ) : (
             <TracesMapping
