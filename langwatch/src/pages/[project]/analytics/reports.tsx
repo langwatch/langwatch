@@ -117,34 +117,35 @@ export default function Reports() {
                         {graph.name}
                       </Text>
                       <Spacer />
-                      {graph.filters && (
-                        <Tooltip
-                          content={
-                            <VStack
-                              align="start"
-                              backgroundColor="black"
-                              color="white"
-                              height="100%"
-                              textWrap="wrap"
-                            >
-                              <FilterDisplay
-                                filters={
-                                  graph.filters as Record<
-                                    FilterField,
-                                    string[] | Record<string, string[]>
-                                  >
-                                }
-                              />
-                            </VStack>
-                          }
-                          positioning={{ placement: "top" }}
-                          showArrow
-                        >
-                          <Box padding={1}>
-                            <Filter width={16} style={{ minWidth: 16 }} />
-                          </Box>
-                        </Tooltip>
-                      )}
+                      {graph.filters &&
+                        Object.keys(graph.filters).length > 0 && (
+                          <Tooltip
+                            content={
+                              <VStack
+                                align="start"
+                                backgroundColor="black"
+                                color="white"
+                                height="100%"
+                                textWrap="wrap"
+                              >
+                                <FilterDisplay
+                                  filters={
+                                    graph.filters as Record<
+                                      FilterField,
+                                      string[] | Record<string, string[]>
+                                    >
+                                  }
+                                />
+                              </VStack>
+                            }
+                            positioning={{ placement: "top" }}
+                            showArrow
+                          >
+                            <Box padding={1}>
+                              <Filter width={16} style={{ minWidth: 16 }} />
+                            </Box>
+                          </Tooltip>
+                        )}
                       <Menu.Root>
                         <Menu.Trigger asChild>
                           <Button

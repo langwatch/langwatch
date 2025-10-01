@@ -7,6 +7,8 @@ import {
   Input,
   Skeleton,
   Spacer,
+  Grid,
+  GridItem,
   Text,
   useDisclosure,
   VStack,
@@ -369,7 +371,7 @@ export function OptimizeModalContent({
             />
           </VStack>
         </VStack>
-        <HStack width="full">
+        <VStack width="full" align="start">
           {"llm" in optimizer.params && (
             <VStack align="start" width="full" gap={2}>
               <HStack>
@@ -404,59 +406,67 @@ export function OptimizeModalContent({
               />
             </VStack>
           )}
-          {"num_candidates" in optimizer.params && (
-            <VStack align="start" width="full" gap={2}>
-              <HStack>
-                <SmallLabel color="gray.600">
-                  Number of Candidate Prompts
-                </SmallLabel>
-                <Tooltip content="Each candidate and demonstrations combination will be evaluated against the optimization set.">
-                  <Info size={16} />
-                </Tooltip>
-              </HStack>
-              <Input
-                {...form.register("params.num_candidates")}
-                type="number"
-                min={1}
-                max={100}
-              />
-            </VStack>
-          )}
-        </HStack>
-        <HStack width="full">
-          {"max_bootstrapped_demos" in optimizer.params && (
-            <VStack align="start" width="full" gap={2}>
-              <HStack>
-                <SmallLabel color="gray.600">Max Bootstrapped Demos</SmallLabel>
-                <Tooltip content="Maximum number of few shot demonstrations generated on the fly by the optimizer">
-                  <Info size={16} />
-                </Tooltip>
-              </HStack>
-              <Input
-                {...form.register("params.max_bootstrapped_demos")}
-                type="number"
-                min={1}
-                max={100}
-              />
-            </VStack>
-          )}
-          {"max_labeled_demos" in optimizer.params && (
-            <VStack align="start" width="full" gap={2}>
-              <HStack>
-                <SmallLabel color="gray.600">Max Labeled Demos</SmallLabel>
-                <Tooltip content="Maximum number of few shot demonstrations coming from the original dataset. Caveat: the output field of the LLM node must have exactly the same name as the dataset column.">
-                  <Info size={16} />
-                </Tooltip>
-              </HStack>
-              <Input
-                {...form.register("params.max_labeled_demos")}
-                type="number"
-                min={1}
-                max={100}
-              />
-            </VStack>
-          )}
-        </HStack>
+        </VStack>
+        <Grid templateColumns="repeat(2, 1fr)" gap={5}>
+          <GridItem>
+            {"num_candidates" in optimizer.params && (
+              <VStack align="start" gap={2}>
+                <HStack>
+                  <SmallLabel color="gray.600">
+                    Number of Candidate Prompts
+                  </SmallLabel>
+                  <Tooltip content="Each candidate and demonstrations combination will be evaluated against the optimization set.">
+                    <Info size={16} />
+                  </Tooltip>
+                </HStack>
+                <Input
+                  {...form.register("params.num_candidates")}
+                  type="number"
+                  min={1}
+                  max={100}
+                />
+              </VStack>
+            )}
+          </GridItem>
+          <GridItem>
+            {"max_bootstrapped_demos" in optimizer.params && (
+              <VStack align="start" width="full" gap={2}>
+                <HStack>
+                  <SmallLabel color="gray.600">
+                    Max Bootstrapped Demos
+                  </SmallLabel>
+                  <Tooltip content="Maximum number of few shot demonstrations generated on the fly by the optimizer">
+                    <Info size={16} />
+                  </Tooltip>
+                </HStack>
+                <Input
+                  {...form.register("params.max_bootstrapped_demos")}
+                  type="number"
+                  min={1}
+                  max={100}
+                />
+              </VStack>
+            )}
+          </GridItem>
+          <GridItem>
+            {"max_labeled_demos" in optimizer.params && (
+              <VStack align="start" width="full" gap={2}>
+                <HStack>
+                  <SmallLabel color="gray.600">Max Labeled Demos</SmallLabel>
+                  <Tooltip content="Maximum number of few shot demonstrations coming from the original dataset. Caveat: the output field of the LLM node must have exactly the same name as the dataset column.">
+                    <Info size={16} />
+                  </Tooltip>
+                </HStack>
+                <Input
+                  {...form.register("params.max_labeled_demos")}
+                  type="number"
+                  min={1}
+                  max={100}
+                />
+              </VStack>
+            )}
+          </GridItem>
+        </Grid>
         {/* {"max_rounds" in optimizer.params && (
           <VStack align="start" width="full" gap={2}>
             <SmallLabel color="gray.600">Max Rounds</SmallLabel>
