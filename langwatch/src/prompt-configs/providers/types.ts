@@ -2,29 +2,31 @@ import { type RouterInputs } from "~/utils/api";
 import { type VersionedPrompt } from "~/server/prompt-config";
 
 /**
- * Base parameters for prompt operation callbacks
- */
-interface PromptOperationCallbacks {
-  onError?: (error: Error) => void;
-  onSuccess?: (prompt: VersionedPrompt) => void;
-}
-
-/**
  * Parameters for creating a new prompt configuration
  */
-export type CreatePromptParams = Omit<RouterInputs["prompts"]["create"], "projectId"> & PromptOperationCallbacks;
+export type CreatePromptParams = {
+  data: RouterInputs["prompts"]["create"]["data"];
+};
 
 /**
  * Parameters for updating an existing prompt configuration
+ * We only need the id to trigger the dialog, and we look up the prompt by id in the provider
  */
-export type UpdatePromptParams = Omit<RouterInputs["prompts"]["update"], "projectId"> & PromptOperationCallbacks;
+export type ChangeHandleParams = { id: string };
+
+/**
+ * Parameters for saving a version of a prompt configuration
+ */
+export type SaveVersionParams = Omit<RouterInputs["prompts"]["update"], "projectId">;
 
 /**
  * Context interface for prompt configuration operations
  */
 export interface PromptConfigContextType {
   /** Creates a new prompt configuration with version */
-  triggerSaveVersion: (params: CreatePromptParams) => Promise<VersionedPrompt>;
+  triggerSaveVersion: (params: SaveVersionParams) => Promise<VersionedPrompt>;
   /** Updates an existing prompt's handle and metadata */
-  triggerChangeHandle: (params: UpdatePromptParams) => Promise<VersionedPrompt>;
+  triggerChangeHandle: (params: ChangeHandleParams) => Promise<VersionedPrompt>;
+  /** Creates a new prompt configuration */
+  triggerCreatePrompt: (params: CreatePromptParams) => Promise<VersionedPrompt>;
 }

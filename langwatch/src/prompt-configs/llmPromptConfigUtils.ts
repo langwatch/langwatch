@@ -24,7 +24,7 @@ import {
   type LlmConfigOutputType,
 } from "~/types";
 import { kebabCase } from "~/utils/stringCasing";
-import { type TriggerSaveVersionParams } from "~/prompt-configs/providers/PromptConfigProvider";
+import { type SaveVersionParams } from "~/prompt-configs/providers/types";
 import { isEqual } from "lodash-es";
 
 export function promptConfigFormValuesToOptimizationStudioNodeData(
@@ -292,7 +292,7 @@ export function versionedPromptToLlmPromptConfigComponentNodeData(
  */
 export function formValuesToTriggerSaveVersionParams(
   formValues: PromptConfigFormValues
-): Omit<TriggerSaveVersionParams, "projectId"> {
+): Omit<SaveVersionParams, "projectId">['data'] {
   const systemPrompt =
     formValues.version.configData.prompt ??
     formValues.version.configData.messages?.find((msg) => msg.role === "system")
@@ -320,6 +320,7 @@ export function versionedPromptToPromptConfigFormValues(
   prompt: VersionedPrompt
 ): PromptConfigFormValues {
   return {
+    id: prompt.id,
     handle: prompt.handle,
     scope: prompt.scope,
     version: {

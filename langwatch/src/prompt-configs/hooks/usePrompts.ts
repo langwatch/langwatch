@@ -27,8 +27,11 @@ export const usePrompts = () => {
     return prompt;
   };
 
-  const wrappedGetPromptById: typeof trpc.prompts.getByIdOrHandle.fetch = async (params) => {
-    const prompt = await trpc.prompts.getByIdOrHandle.fetch(params);
+  const wrappedGetPromptById = async ({ id, projectId }: { id: string, projectId: string }) => {
+    const prompt = await trpc.prompts.getByIdOrHandle.fetch({
+      idOrHandle: id,
+      projectId,
+    });
     await invalidateAll();
     return prompt;
   };

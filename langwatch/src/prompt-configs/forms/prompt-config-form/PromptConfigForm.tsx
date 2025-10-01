@@ -3,6 +3,7 @@ import { useCallback, useState } from "react";
 import {
   FormProvider,
   useFieldArray,
+  useFormContext,
   type UseFormReturn,
 } from "react-hook-form";
 
@@ -22,11 +23,14 @@ import { VersionSaveButton } from "./components/VersionSaveButton";
 
 import type { VersionedPrompt } from "~/server/prompt-config";
 import type { PromptConfigFormValues } from "~/prompt-configs";
-import { versionedPromptToPromptConfigFormValues } from "~/prompt-configs/llmPromptConfigUtils";
+import {
+  formValuesToTriggerSaveVersionParams,
+  versionedPromptToPromptConfigFormValues,
+} from "~/prompt-configs/llmPromptConfigUtils";
 import { usePromptConfigContext } from "~/prompt-configs/providers/PromptConfigProvider";
+import { toaster } from "~/components/ui/toaster";
 
 interface PromptConfigFormProps {
-  configId?: string;
   methods: UseFormReturn<PromptConfigFormValues>;
 }
 
@@ -34,11 +38,12 @@ interface PromptConfigFormProps {
  * Form component for prompt configuration
  * Handles rendering the form fields and save dialog
  */
-function InnerPromptConfigForm(props: PromptConfigFormProps) {
-  const { methods, configId } = props;
-  const { triggerSaveVersion } = usePromptConfigContext();
+function InnerPromptConfigForm() {
+  const { triggerSaveVersion, triggerCreatePrompt } = usePromptConfigContext();
+  const methods = useFormContext<PromptConfigFormValues>();
   const [isSaving, setIsSaving] = useState(false);
   const saveEnabled = methods.formState.isDirty && !isSaving;
+  const configId = methods.watch("id");
 
   /**
    * It is a known limitation of react-hook-form useFieldArray that we cannot
@@ -55,32 +60,41 @@ function InnerPromptConfigForm(props: PromptConfigFormProps) {
     methods.watch("version.configData.inputs") ?? []
   ).map((input) => input.identifier);
 
-  const handleSaveClick = useCallback(() => {
+  const handleSaveClick = useCallback(async () => {
     setIsSaving(true);
-    const values = methods.getValues();
-    triggerSaveVersion({
-      data: {
-        handle: values.handle,
-        scope: values.scope,
-        prompt: values.version.configData.prompt,
-        messages: values.version.configData.messages,
-        inputs: values.version.configData.inputs,
-        outputs: values.version.configData.outputs,
-        model: values.version.configData.llm.model,
-        temperature: values.version.configData.llm.temperature,
-        maxTokens: values.version.configData.llm.max_tokens,
-        promptingTechnique: values.version.configData.prompting_technique,
-        demonstrations: values.version.configData.demonstrations,
-      },
-      onSuccess: (prompt) => {
-        methods.reset(versionedPromptToPromptConfigFormValues(prompt));
-        setIsSaving(false);
-      },
-      onError: () => {
-        setIsSaving(false);
-      },
-    });
-  }, [methods, triggerSaveVersion]);
+
+    try {
+      const values = methods.getValues();
+      const data = formValuesToTriggerSaveVersionParams(values);
+      let prompt: VersionedPrompt;
+
+      if (configId) {
+        prompt = await triggerSaveVersion({ id: configId, data });
+      } else {
+        if (!data.handle) {
+          throw new Error("Handle is required to create a new prompt");
+        }
+        prompt = await triggerCreatePrompt({
+          data: {
+            ...data,
+            handle: data.handle,
+          },
+        });
+      }
+
+      methods.reset(versionedPromptToPromptConfigFormValues(prompt));
+      setIsSaving(false);
+    } catch (error) {
+      console.error(error);
+      toaster.create({
+        title: "Error saving version",
+        description: "Failed to save version",
+        type: "error",
+      });
+    } finally {
+      setIsSaving(false);
+    }
+  }, [methods, triggerSaveVersion, triggerCreatePrompt, configId]);
 
   /**
    * We want discourage the user from using demonstrations
@@ -144,7 +158,7 @@ function InnerPromptConfigForm(props: PromptConfigFormProps) {
           <Spacer />
           <VersionSaveButton
             disabled={!saveEnabled}
-            onClick={handleSaveClick}
+            onClick={() => void handleSaveClick()}
             isSaving={isSaving}
           />
         </HStack>
@@ -157,7 +171,7 @@ export function PromptConfigForm(props: PromptConfigFormProps) {
   return (
     <FormProvider {...props.methods}>
       <PromptConfigProvider>
-        <InnerPromptConfigForm {...props} />
+        <InnerPromptConfigForm />
       </PromptConfigProvider>
     </FormProvider>
   );
