@@ -46,7 +46,6 @@ export function ModelSelectField() {
                 llmConfig={field.value ?? {}} // Prevent a runtime error if the value is undefined
                 onChange={field.onChange}
                 requiresCustomKey={false}
-                showProviderKeyMessage={true}
               />
             );
           }}

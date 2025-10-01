@@ -19,7 +19,7 @@ interface LLMConfigFieldProps {
   allowDefault?: boolean;
   requiresCustomKey: boolean;
   onChange: (llmConfig: LLMConfig) => void;
-  showProviderKeyMessage: boolean;
+  showProviderKeyMessage?: boolean;
 }
 
 export function LLMConfigField({
