@@ -83,8 +83,11 @@ export const PromptConfigPanel = forwardRef(function PromptConfigPanel(
       },
       {
         enabled: !!projectId && !!configId,
+        // This prevents the form from being reset when the user navigates away from the page
         refetchOnWindowFocus: false,
-        refetchOnMount: true,
+        // This prevents the form from being reset when the user navigates to the page
+        refetchOnMount: false,
+        // This prevents the form from being reset when the user reconnects to the page
         refetchOnReconnect: false,
       }
     );
@@ -105,8 +108,9 @@ export const PromptConfigPanel = forwardRef(function PromptConfigPanel(
           buildDefaultFormValues({});
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [Boolean(prompt), defaultModel]
+    [Boolean(prompt), defaultModel, configId]
   );
+
 
   // Setup form with the config values
   const formProps = usePromptConfigForm({
@@ -124,11 +128,8 @@ export const PromptConfigPanel = forwardRef(function PromptConfigPanel(
 
   // Reset form when config changes
   useEffect(() => {
-    const shouldResetForm = !configId;
-    if (shouldResetForm) {
-      formProps.methods.reset(initialConfigValues);
-    }
-  }, [configId, formProps.methods, initialConfigValues]);
+    formProps.methods.reset(initialConfigValues);
+  }, [initialConfigValues, formProps.methods]);
 
   // Get input fields from the form
   const inputFields = formProps.methods.getValues("version.configData.inputs");

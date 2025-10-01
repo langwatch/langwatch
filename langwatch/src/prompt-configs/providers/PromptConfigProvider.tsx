@@ -3,7 +3,6 @@ import {
   createContext,
   useCallback,
   useContext,
-  useRef,
   useState,
 } from "react";
 
@@ -16,18 +15,18 @@ import {
 } from "../forms/SaveVersionDialog";
 import type { ChangeHandleFormValues } from "../forms/schemas/change-handle-form.schema";
 import { usePrompts } from "../hooks/usePrompts";
-import { toaster } from "~/components/ui/toaster";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import type {
-  CreatePromptParams,
-  PromptConfigContextType,
-  UpdatePromptParams,
-} from "./types";
+import type { PromptConfigContextType, } from "./types";
 
 /**
  * Creates a default context value that throws descriptive errors
  */
 const createDefaultContextValue = (): PromptConfigContextType => ({
+  triggerCreatePrompt: () => {
+    throw new Error(
+      "triggerCreatePrompt must be called within PromptConfigProvider"
+    );
+  },
   triggerSaveVersion: () => {
     throw new Error(
       "triggerSaveVersion must be called within PromptConfigProvider"
@@ -54,33 +53,11 @@ export const usePromptConfigContext = () => {
   return context;
 };
 
-interface SaveDialogData {
-  handle?: string | null;
-  scope?: PromptScope;
-  // The user will need to change the handle if they are creating a new prompt
-  // because the handle is required and must be unique
-  // or if they are updating the handle of an existing prompt
-  needsHandleChange?: boolean;
-}
 
-enum DialogType {
-  SAVE,
-  CHANGE_HANDLE,
-}
-
-interface ClosureParams {
-  handle: string;
-  scope: PromptScope;
-  commitMessage: string;
-}
-
-interface SaveClosureParams {
-  closure: (params: ClosureParams) => Promise<void>;
-}
 
 /**
  * Provider for prompt configuration operations.
- * Single Responsibility: Manages the save flow for prompt configurations.
+ * Single Responsibility: Manages dialog-based prompt operations with closures.
  */
 export function PromptConfigProvider({
   children,
@@ -88,83 +65,126 @@ export function PromptConfigProvider({
   children: React.ReactNode;
 }) {
   const { projectId = "" } = useOrganizationTeamProject();
-  const closureRef = useRef<((params: ClosureParams) => Promise<VersionedPrompt>) | null>(
-    null
-  );
-  const { createPrompt, updatePrompt } = usePrompts();
-  const [dialogType, setDialogType] = useState<DialogType | null>(null);
+  const [activeDialog, setActiveDialog] = useState<React.ReactNode | null>(null);
+  const { createPrompt, updatePrompt, getPromptById } = usePrompts();
 
-  const closeDialog = useCallback(() => {
-    closureRef.current = null;
-  }, []);
-
-  const triggerSaveVersion: PromptConfigContextType["triggerSaveVersion"] =
+  const triggerCreatePrompt: PromptConfigContextType["triggerCreatePrompt"] =
     useCallback(
-      async ({ data, onError, onSuccess }) => {
-        const promise = new Promise<VersionedPrompt>((resolve, reject) => {
-        
-          closureRef.current = async ({ handle, scope }) => {
+      async ({ data }) => {
+        return new Promise<VersionedPrompt>((resolve, reject) => {
+          const createPromptClosure = async (formValues: ChangeHandleFormValues) => {
             try {
               const prompt = await createPrompt({
                 projectId,
                 data: {
                   ...data,
-                  handle,
-                  scope,
+                  handle: formValues.handle,
+                  scope: formValues.scope,
                   commitMessage: "Initial version",
                 }
               });
-              onSuccess?.(prompt);
               resolve(prompt);
-              return prompt; // Add this line
             } catch (error) {
-                onError?.(error as Error);
-                reject(error);
-                throw error; // Add this to maintain error propagation
+              reject(error);
             } finally {
-                closeDialog();
+              setActiveDialog(null);
             }
           };
+
+          setActiveDialog(
+            <ChangeHandleDialog
+              isOpen={true}
+              onClose={() => setActiveDialog(null)}
+              onSubmit={createPromptClosure}
+            />
+          );
         });
-
-        setDialogType(DialogType.SAVE);
-
-        return promise;
       },
-      [createPrompt, projectId, closeDialog]
+      [createPrompt, projectId]
+    );
+
+  const triggerSaveVersion: PromptConfigContextType["triggerSaveVersion"] =
+    useCallback(
+      async ({ id, data }) => {
+        return new Promise<VersionedPrompt>((resolve, reject) => {
+          const saveVersionClosure = async (formValues: SaveDialogFormValues) => {
+            try {
+              const prompt = await updatePrompt({
+                projectId,
+                id,
+                data: {
+                  ...data,
+                  commitMessage: formValues.commitMessage,
+                }
+              });
+              resolve(prompt);
+            } catch (error) {
+              reject(error);
+            } finally {
+              setActiveDialog(null);
+            }
+          };
+
+          setActiveDialog(
+            <SaveVersionDialog
+              isOpen={true}
+              onClose={() => setActiveDialog(null)}
+              onSubmit={saveVersionClosure}
+            />
+          );
+        });
+      },
+      [updatePrompt, projectId]
+    );
+
+  const triggerChangeHandle: PromptConfigContextType["triggerChangeHandle"] =
+    useCallback(
+      async ({ id }) => {
+        const prompt = await getPromptById({ id, projectId });
+
+        if (!prompt) {
+          throw new Error("Prompt not found");
+        }
+        
+        return new Promise<VersionedPrompt>((resolve, reject) => {
+          const handleChangeClosure = async (formValues: ChangeHandleFormValues) => {
+            try {
+              const updatedPrompt = await updatePrompt({
+                projectId,
+                id,
+                data: {
+                  ...formValues,
+                  commitMessage: `Changed handle to "${formValues.handle}"`,
+                },
+              });
+              resolve(updatedPrompt);
+            } catch (error) {
+              reject(error);
+            } finally {
+              setActiveDialog(null);
+            }
+          };
+
+          setActiveDialog(
+            <ChangeHandleDialog
+              currentHandle={prompt.handle}
+              currentScope={prompt.scope}
+              isOpen={true}
+              onClose={() => setActiveDialog(null)}
+              onSubmit={handleChangeClosure}
+            />
+          );
+        });
+      },
+      [updatePrompt, getPromptById, projectId]
     );
 
   return (
     <PromptConfigContext.Provider
-      value={{ triggerSaveVersion, triggerChangeHandle }}
+      value={{ triggerCreatePrompt, triggerSaveVersion, triggerChangeHandle }}
     >
       {children}
-      <ChangeHandleDialog
-        currentHandle={saveDialogData?.handle}
-        currentScope={saveDialogData?.scope}
-        isOpen={Boolean(isChangeHandleDialogOpen)}
-        onClose={closeDialog}
-        onSubmit={async (formValues: ChangeHandleFormValues) => {
-          if (!saveClosureRef.current) return;
-          await saveClosureRef.current({
-            handle: formValues.handle,
-            scope: formValues.scope,
-            commitMessage: "Initial version",
-          });
-        }}
-      />
-      <SaveVersionDialog
-        isOpen={isSaveDialogOpen}
-        onClose={closeDialog}
-        onSubmit={async (formValues: SaveDialogFormValues) => {
-          if (!saveClosureRef.current) return;
-          if (!saveDialogData?.handle) throw new Error("Handle is required"); // should never happen
-          await saveClosureRef.current({
-            handle: saveDialogData?.handle,
-            commitMessage: formValues.commitMessage,
-          });
-        }}
-      />
+      {activeDialog}
     </PromptConfigContext.Provider>
   );
 }

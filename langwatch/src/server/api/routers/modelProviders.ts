@@ -118,11 +118,7 @@ export const modelProviderRouter = createTRPCRouter({
           where: { id: existingModelProvider.id, projectId },
           data: {
             ...data,
-<<<<<<< HEAD
             customKeys: mergedCustomKeys as any,
-=======
-            customKeys: mergedCustomKeys ?? undefined,
->>>>>>> e7948829 (fix drift)
             customModels: customModels ? customModels : [],
             customEmbeddingsModels: customEmbeddingsModels
               ? customEmbeddingsModels

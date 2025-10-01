@@ -22,6 +22,8 @@ import { usePromptConfigContext } from "~/prompt-configs/providers/PromptConfigP
 import { PromptDriftWarning } from "../signature-properties-panel/PromptDriftWarning";
 import { useNodeDrift } from "../signature-properties-panel/hooks/useNodeDrift";
 import type { VersionedPrompt } from "~/server/prompt-config";
+import { toaster } from "~/components/ui/toaster";
+import { useCallback } from "react";
 
 /**
  * Header for the prompt source select in the optimization studio
@@ -35,27 +37,39 @@ export function PromptSourceHeader({
   node: Node<LlmPromptConfigComponent>;
   onPromptSourceSelect: (config: { id: string; name: string }) => void;
 }) {
-  const configId = node.data.configId;
   const formProps = useFormContext<PromptConfigFormValues>();
   const { triggerSaveVersion } = usePromptConfigContext();
   const isDirty = formProps.formState.isDirty;
   const { project } = useOrganizationTeamProject();
   const { hasDrift } = useNodeDrift(node);
+  const configId = node.data.configId;
 
-  const handleSaveVersion = () => {
+  const handleSaveVersion = useCallback(() => {
     const values = formProps.getValues();
-    
-    /**
-     * Save new data to the database
-     */
-    triggerSaveVersion({
-      data: formValuesToTriggerSaveVersionParams(values),
-      onSuccess: (prompt) => {
-        // Update the node data with the new prompt
+    const newValues = formValuesToTriggerSaveVersionParams(values);
+
+    if (!configId) {
+      throw new Error("Config ID is required");
+    }
+
+    void triggerSaveVersion({
+      id: configId,
+      data: newValues,
+    }).then((prompt) => {
+        toaster.create({
+          title: "Version saved",
+          description: "Version has been saved",
+          type: "success",
+        });
         formProps.reset(versionedPromptToPromptConfigFormValues(prompt));
-      },
+    }).catch(() => {
+      toaster.create({
+        title: "Error saving version",
+        description: "Failed to save version",
+        type: "error",
+      });
     });
-  };
+  }, [triggerSaveVersion, formProps, configId]);
 
   /**
    * Assumption: After restoring a version, the latest version config should
