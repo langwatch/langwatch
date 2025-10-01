@@ -5,7 +5,7 @@ import { type VersionedPrompt } from "~/server/prompt-config";
  * Parameters for creating a new prompt configuration
  */
 export type CreatePromptParams = {
-  data: RouterInputs["prompts"]["create"]["data"];
+  data: Omit<RouterInputs["prompts"]["create"]["data"], "handle">;
 };
 
 /**

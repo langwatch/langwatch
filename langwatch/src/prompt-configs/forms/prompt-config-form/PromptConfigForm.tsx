@@ -42,8 +42,9 @@ function InnerPromptConfigForm() {
   const { triggerSaveVersion, triggerCreatePrompt } = usePromptConfigContext();
   const methods = useFormContext<PromptConfigFormValues>();
   const [isSaving, setIsSaving] = useState(false);
-  const saveEnabled = methods.formState.isDirty && !isSaving;
   const configId = methods.watch("id");
+  const isDraft = !Boolean(methods.watch("handle"));
+  const saveEnabled = (methods.formState.isDirty || isDraft) && !isSaving;
 
   /**
    * It is a known limitation of react-hook-form useFieldArray that we cannot
@@ -66,21 +67,9 @@ function InnerPromptConfigForm() {
     try {
       const values = methods.getValues();
       const data = formValuesToTriggerSaveVersionParams(values);
-      let prompt: VersionedPrompt;
-
-      if (configId) {
-        prompt = await triggerSaveVersion({ id: configId, data });
-      } else {
-        if (!data.handle) {
-          throw new Error("Handle is required to create a new prompt");
-        }
-        prompt = await triggerCreatePrompt({
-          data: {
-            ...data,
-            handle: data.handle,
-          },
-        });
-      }
+      const prompt = configId
+        ? await triggerSaveVersion({ id: configId, data })
+        : await triggerCreatePrompt({ data });
 
       methods.reset(versionedPromptToPromptConfigFormValues(prompt));
       setIsSaving(false);
