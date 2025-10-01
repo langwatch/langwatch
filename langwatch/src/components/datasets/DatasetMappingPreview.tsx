@@ -5,6 +5,7 @@ import {
   Field,
   HStack,
   Spacer,
+  Text,
   VStack,
 } from "@chakra-ui/react";
 import { Edit2 } from "react-feather";
@@ -20,12 +21,17 @@ import {
 
 import type { CustomCellRendererProps } from "@ag-grid-community/react";
 import type { Dataset } from "@prisma/client";
-import { useCallback, useMemo } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { Checkbox } from "../../components/ui/checkbox";
+import { Switch } from "../../components/ui/switch";
 import { api } from "../../utils/api";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import type { MappingState } from "../../server/tracer/tracesMapping";
 import { TracesMapping } from "../traces/TracesMapping";
+import {
+  ThreadMapping,
+  type ThreadMappingState,
+} from "../traces/ThreadMapping";
 import { ErrorBoundary } from "react-error-boundary";
 
 interface DatasetMappingPreviewProps {
@@ -39,6 +45,10 @@ interface DatasetMappingPreviewProps {
   setDatasetTriggerMapping?: (mapping: MappingState) => void;
 }
 
+/**
+ * DatasetMappingPreview component for configuring dataset mappings
+ * Single Responsibility: Provide interface for mapping trace or thread data to dataset columns
+ */
 export function DatasetMappingPreview({
   traces,
   columnTypes,
@@ -49,6 +59,9 @@ export function DatasetMappingPreview({
   selectedDataset,
   setDatasetTriggerMapping,
 }: DatasetMappingPreviewProps) {
+  const [isThreadMapping, setIsThreadMapping] = useState(false);
+  const [threadMappingState, setThreadMappingState] =
+    useState<ThreadMappingState>();
   const columnDefs = useMemo(() => {
     if (!selectedDataset) {
       return [];
@@ -121,22 +134,44 @@ export function DatasetMappingPreview({
   return (
     <Field.Root width="full" paddingY={4}>
       <HStack width="full" gap="64px" align="start">
-        <VStack align="start" maxWidth="50%">
-          <Field.Label margin={0}>Mapping</Field.Label>
+        <VStack align="start" maxWidth="50%" gap={4}>
+          <HStack width="full" align="center" justify="space-between">
+            <Field.Label margin={0}>Mapping</Field.Label>
+          </HStack>
+          <HStack gap={2}>
+            <Text fontSize="sm">Traces</Text>
+            <Switch
+              checked={isThreadMapping}
+              onCheckedChange={(e) => setIsThreadMapping(e.checked)}
+            />
+            <Text fontSize="sm">Threads</Text>
+          </HStack>
           <Field.HelperText margin={0} fontSize="13px" marginBottom={2}>
-            Map the trace data to the dataset columns
+            {isThreadMapping
+              ? "Map the thread data to the dataset columns (groups traces by thread_id)"
+              : "Map the trace data to the dataset columns"}
           </Field.HelperText>
 
-          <TracesMapping
-            traceMapping={selectedDataset.mapping as MappingState | undefined}
-            traces={traces}
-            targetFields={columnTypes.map(({ name }) => name)}
-            setDatasetEntries={onRowDataChange}
-            setTraceMapping={(newMappingState) => {
-              setDatasetTriggerMapping?.(newMappingState);
-              updateStoredMapping(newMappingState);
-            }}
-          />
+          {isThreadMapping ? (
+            <ThreadMapping
+              traces={traces}
+              threadMapping={threadMappingState}
+              targetFields={columnTypes.map(({ name }) => name)}
+              setDatasetEntries={onRowDataChange}
+              setThreadMapping={setThreadMappingState}
+            />
+          ) : (
+            <TracesMapping
+              traceMapping={selectedDataset.mapping as MappingState | undefined}
+              traces={traces}
+              targetFields={columnTypes.map(({ name }) => name)}
+              setDatasetEntries={onRowDataChange}
+              setTraceMapping={(newMappingState) => {
+                setDatasetTriggerMapping?.(newMappingState);
+                updateStoredMapping(newMappingState);
+              }}
+            />
+          )}
         </VStack>
         <VStack align="start" width="full" height="full">
           <HStack width="full" align="end">
