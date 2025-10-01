@@ -23,7 +23,7 @@ import {
 
 import type { CustomCellRendererProps } from "@ag-grid-community/react";
 import type { Dataset } from "@prisma/client";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Checkbox } from "../../components/ui/checkbox";
 import { Switch } from "../../components/ui/switch";
 import { api } from "../../utils/api";
@@ -191,6 +191,19 @@ export function DatasetMappingPreview({
     400
   );
 
+  // Clear thread mapping state and cancel pending updates when dataset changes
+  useEffect(() => {
+    setThreadMappingState(undefined);
+    debouncedUpdateThreadMapping.cancel();
+  }, [selectedDataset.id, debouncedUpdateThreadMapping]);
+
+  // Get the current dataset's thread mapping
+  const currentThreadMapping = useMemo(() => {
+    return (selectedDataset.mapping as any)?.threadMapping as
+      | ThreadMappingState
+      | undefined;
+  }, [selectedDataset.mapping]);
+
   return (
     <Field.Root width="full" paddingY={4}>
       <HStack width="full" gap="64px" align="start">
@@ -228,10 +241,7 @@ export function DatasetMappingPreview({
           {isThreadMapping ? (
             <ThreadMapping
               traces={tracesToUse}
-              threadMapping={
-                (selectedDataset.mapping as any)?.threadMapping ??
-                threadMappingState
-              }
+              threadMapping={currentThreadMapping}
               targetFields={columnTypes.map(({ name }) => name)}
               setDatasetEntries={onRowDataChange}
               setThreadMapping={debouncedUpdateThreadMapping}
