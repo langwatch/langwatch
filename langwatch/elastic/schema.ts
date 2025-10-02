@@ -132,6 +132,7 @@ const evaluationsMapping: ElasticSearchMappingFrom<ElasticSearchEvaluation> = {
   name: { type: "keyword" },
   type: { type: "keyword" },
   is_guardrail: { type: "boolean" },
+  evaluation_thread_id: { type: "keyword" },
   status: { type: "keyword" },
   passed: { type: "boolean" },
   score: { type: "float" },

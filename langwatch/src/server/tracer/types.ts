@@ -359,6 +359,7 @@ export type Evaluation = {
   name: string;
   type?: string | null;
   is_guardrail?: boolean | null;
+  evaluation_thread_id?: string | null; // Thread ID used for thread-based evaluation data
   status: EvaluationStatus;
   passed?: boolean | null;
   score?: number | null;

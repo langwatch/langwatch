@@ -103,6 +103,7 @@ export const updateEvaluationStatusInES = async ({
   details,
   retries,
   is_guardrail,
+  evaluation_thread_id,
 }: {
   check: EvaluationJob["check"];
   trace: EvaluationJob["trace"];
@@ -114,6 +115,7 @@ export const updateEvaluationStatusInES = async ({
   details?: string;
   retries?: number;
   is_guardrail?: boolean;
+  evaluation_thread_id?: string;
 }) => {
   const evaluation: ElasticSearchEvaluation = {
     evaluation_id: check.evaluation_id ?? (check as any).id,
@@ -126,6 +128,7 @@ export const updateEvaluationStatusInES = async ({
     status,
     ...(check.name && { name: check.name }),
     ...(is_guardrail !== undefined && { is_guardrail }),
+    ...(evaluation_thread_id && { evaluation_thread_id }),
     ...(score !== undefined && { score }),
     ...(passed !== undefined && { passed }),
     ...(label !== undefined && { label }),

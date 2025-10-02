@@ -405,6 +405,21 @@ export const TRACE_EXPANSIONS = {
   }
 >;
 
+/**
+ * Thread mappings for grouping traces by thread_id
+ * Single Responsibility: Define available mapping options for thread data structure
+ */
+export const THREAD_MAPPINGS = {
+  thread_id: {
+    mapping: (thread: { thread_id: string; traces: TraceWithAnnotations[] }) =>
+      thread.thread_id,
+  },
+  traces: {
+    mapping: (thread: { thread_id: string; traces: TraceWithAnnotations[] }) =>
+      thread.traces,
+  },
+} as const;
+
 export type TraceMapping = Record<
   string,
   {
@@ -417,13 +432,31 @@ export type TraceMapping = Record<
 export const mappingStateSchema = z.object({
   mapping: z.record(
     z.string(),
-    z.object({
-      source: z.enum(
-        Object.keys(TRACE_MAPPINGS) as [keyof typeof TRACE_MAPPINGS | ""]
-      ),
-      key: z.string().optional(),
-      subkey: z.string().optional(),
-    })
+    z.union([
+      z
+        .object({
+          source: z.enum(
+            Object.keys(TRACE_MAPPINGS) as [keyof typeof TRACE_MAPPINGS | ""]
+          ),
+          key: z.string().optional(),
+          subkey: z.string().optional(),
+        })
+        .extend({
+          type: z.literal("trace").optional(),
+        }),
+      z
+        .object({
+          source: z.enum(
+            Object.keys(THREAD_MAPPINGS) as [keyof typeof THREAD_MAPPINGS | ""]
+          ),
+          key: z.string().optional(),
+          subkey: z.string().optional(),
+          selectedFields: z.array(z.string()).optional(),
+        })
+        .extend({
+          type: z.literal("thread"),
+        }),
+    ])
   ),
   expansions: z.array(
     z.enum(Object.keys(TRACE_EXPANSIONS) as [keyof typeof TRACE_EXPANSIONS])
@@ -431,6 +464,74 @@ export const mappingStateSchema = z.object({
 });
 
 export type MappingState = z.infer<typeof mappingStateSchema>;
+
+/**
+ * Thread mapping type used in the wizard UI
+ * Single Responsibility: Type definition for thread mapping configuration in the UI
+ */
+export type ThreadMappingState = {
+  mapping: Record<
+    string,
+    {
+      source: keyof typeof THREAD_MAPPINGS | "";
+      selectedFields?: string[];
+    }
+  >;
+};
+
+/**
+ * Convert thread mappings to unified MappingState format
+ * Single Responsibility: Transform thread mappings from wizard format to the unified mapping format
+ */
+export function convertThreadMappingsToUnified(
+  threadMapping: ThreadMappingState
+): MappingState {
+  const unifiedMapping: MappingState["mapping"] = {};
+
+  for (const [targetField, { source, selectedFields }] of Object.entries(
+    threadMapping.mapping
+  )) {
+    if (source) {
+      unifiedMapping[targetField] = {
+        type: "thread" as const,
+        source,
+        selectedFields: selectedFields ?? [],
+        key: "", // Will be populated dynamically
+        subkey: "", // Will be populated dynamically
+      };
+    }
+  }
+
+  return {
+    mapping: unifiedMapping,
+    expansions: [],
+  };
+}
+
+/**
+ * Merge thread and trace mappings into a single MappingState
+ * Single Responsibility: Combine thread and trace mappings, with thread mappings taking precedence
+ */
+export function mergeThreadAndTraceMappings(
+  traceMapping: MappingState | undefined,
+  threadMapping: ThreadMappingState | undefined,
+  isThreadMapping: boolean
+): MappingState {
+  if (!isThreadMapping || !threadMapping) {
+    return traceMapping ?? { mapping: {}, expansions: [] };
+  }
+
+  const threadMappingConverted = convertThreadMappingsToUnified(threadMapping);
+
+  // Thread mappings take precedence
+  return {
+    mapping: {
+      ...traceMapping?.mapping,
+      ...threadMappingConverted.mapping,
+    },
+    expansions: traceMapping?.expansions ?? [],
+  };
+}
 
 const esSpansToDatasetSpans = (spans: Span[]): DatasetSpan[] => {
   try {
