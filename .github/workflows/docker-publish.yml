@@ -8,8 +8,7 @@ on:
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
-    # Only run for langwatch component releases
-    if: startsWith(github.event.release.tag_name, 'langwatch@')
+    if: startsWith(github.event.release.tag_name, 'langwatch@') || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main')
 
     steps:
       - name: Checkout code
