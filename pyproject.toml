@@ -1,6 +1,6 @@
 [project]
 name = "langwatch-server"
-version = "1.0.0"
+version = "0.2.0"
 description = "LangWatch Server - Observability for LLM Applications"
 readme = "README.md"
 requires-python = ">=3.11"
