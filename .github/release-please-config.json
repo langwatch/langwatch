@@ -68,6 +68,28 @@
           "jsonpath": "$.version"
         }
       ]
+    },
+    ".": {
+      "release-type": "simple",
+      "package-name": "langwatch",
+      "prerelease": true,
+      "component": "langwatch",
+      "include-component-in-tag": true,
+      "tag-separator": "@",
+      "changelog-sections": [
+        { "type": "feat", "section": "Features" },
+        { "type": "fix", "section": "Bug Fixes" },
+        { "type": "chore", "section": "Miscellaneous", "hidden": false },
+        { "type": "docs", "section": "Documentation", "hidden": false },
+        { "type": "refactor", "section": "Code Refactoring", "hidden": false }
+      ],
+      "extra-files": [
+        {
+          "type": "toml",
+          "path": "pyproject.toml",
+          "jsonpath": "$.project.version"
+        }
+      ]
     }
   },
   "bootstrap-sha": "HEAD"
