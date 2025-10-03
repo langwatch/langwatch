@@ -28,7 +28,7 @@ interface PromptListItem {
   id: string;
   name: string | null;
   handle: string | null;
-  scope: 'ORGANIZATION' | 'PROJECT';
+  scope: "ORGANIZATION" | "PROJECT";
   updatedAt: Date;
   version: number;
   prompt: string;
@@ -228,9 +228,7 @@ export function PromptsList({
                   color="gray.700"
                   _dark={{ color: "gray.300" }}
                 >
-                  {config.prompt.trim() === ""
-                    ? "<empty>"
-                    : config.prompt}
+                  {config.prompt.trim() === "" ? "<empty>" : config.prompt}
                 </Text>
               </Box>
 
@@ -243,22 +241,10 @@ export function PromptsList({
                 borderColor="gray.100"
                 _dark={{ borderColor: "gray.700" }}
               >
-                <Text
-                  fontSize="xs"
-                  color="gray.500"
-                  _dark={{ color: "gray.400" }}
-                >
-                  updated{" "}
-                  {formatTimeAgo(
-                    config.updatedAt.getTime(),
-                    "dd/MMM HH:mm",
-                    24 * 30
-                  )}{" "}
-                  by{" "}
-                  <Text as="span" fontWeight="medium">
-                    {config.author?.name}
-                  </Text>
-                </Text>
+                <UpdatedInfo
+                  author={config.author}
+                  updatedAt={config.updatedAt}
+                />
 
                 <HStack gap={2}>
                   <GeneratePromptApiSnippetDialog.Trigger>
@@ -271,5 +257,22 @@ export function PromptsList({
         </GeneratePromptApiSnippetDialog>
       ))}
     </VStack>
+  );
+}
+
+function UpdatedInfo({
+  author,
+  updatedAt,
+}: {
+  author?: { name: string } | null;
+  updatedAt: Date;
+}) {
+  return (
+    <Text fontSize="xs" color="gray.500" _dark={{ color: "gray.400" }}>
+      updated {formatTimeAgo(updatedAt.getTime(), "dd/MMM HH:mm", 24 * 30)} by{" "}
+      <Text as="span" fontWeight="medium">
+        {author?.name ?? "Anonymous User"}
+      </Text>
+    </Text>
   );
 }
