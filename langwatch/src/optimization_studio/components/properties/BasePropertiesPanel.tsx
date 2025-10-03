@@ -344,7 +344,6 @@ export function FieldsForm({
               allowDefault={true}
               defaultLLMConfig={default_llm}
               llmConfig={node.data.parameters?.[index]?.value as LLMConfig}
-              showProviderKeyMessage={false}
               onChange={(llmConfig) => {
                 setNode({
                   id: node.id,

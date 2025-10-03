@@ -111,7 +111,6 @@ export const PromptConfigPanel = forwardRef(function PromptConfigPanel(
     [Boolean(prompt), defaultModel, configId]
   );
 
-
   // Setup form with the config values
   const formProps = usePromptConfigForm({
     configId,
@@ -195,7 +194,7 @@ export const PromptConfigPanel = forwardRef(function PromptConfigPanel(
             title={
               <HStack>
                 <Text whiteSpace="nowrap">Prompt Configuration</Text>
-                {prompt?.version && prompt.handle && (
+                {Boolean(prompt?.version && prompt.handle) && (
                   <Badge
                     colorPalette="green"
                     border="1px solid"
