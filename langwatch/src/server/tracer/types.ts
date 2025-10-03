@@ -365,6 +365,7 @@ export type Evaluation = {
   score?: number | null;
   label?: string | null;
   details?: string | null;
+  inputs?: Record<string, any> | null;
   error?: ErrorCapture | null;
   retries?: number | null;
   timestamps: {

@@ -249,6 +249,7 @@ export type DataForEvaluation =
 
 export type EvaluationResultWithThreadId = SingleEvaluationResult & {
   evaluation_thread_id?: string;
+  inputs?: Record<string, any>;
 };
 
 const buildDataForEvaluation = async (
@@ -384,6 +385,7 @@ export const runEvaluationForTrace = async ({
   return {
     ...result,
     evaluation_thread_id,
+    inputs: data.data,
   };
 };
 
@@ -642,6 +644,7 @@ export const startEvaluationsWorker = (
           ...(result.evaluation_thread_id && {
             evaluation_thread_id: result.evaluation_thread_id,
           }),
+          ...(result.inputs && { inputs: result.inputs }),
           ...(result.status === "error"
             ? {
                 error: {
