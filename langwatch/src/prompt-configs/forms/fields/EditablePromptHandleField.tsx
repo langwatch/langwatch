@@ -6,39 +6,39 @@ import { CopyButton } from "../../../components/CopyButton";
 import type { PromptConfigFormValues } from "~/prompt-configs";
 
 import { usePromptConfigContext } from "~/prompt-configs/providers/PromptConfigProvider";
-import {
-  versionedPromptToPromptConfigFormValues,
-} from "~/prompt-configs/llmPromptConfigUtils";
+import { versionedPromptToPromptConfigFormValues } from "~/prompt-configs/llmPromptConfigUtils";
 import { toaster } from "~/components/ui/toaster";
+import type { VersionedPrompt } from "~/server/prompt-config";
 
 export function EditablePromptHandleField() {
   const form = useFormContext<PromptConfigFormValues>();
   const { triggerChangeHandle } = usePromptConfigContext();
 
-  const handleTriggerChangeHandle = async () => {
-    try {
-      const id = form.watch("id");
-      if (!id) {
-        throw new Error("Config ID is required");
-      }
+  const handleTriggerChangeHandle = () => {
+    const id = form.watch("id");
+    if (!id) {
+      throw new Error("Config ID is required");
+    }
 
-      const prompt = await triggerChangeHandle({
-        id,
-      });
+    const onSuccess = (prompt: VersionedPrompt) => {
       form.reset(versionedPromptToPromptConfigFormValues(prompt));
       toaster.create({
         title: "Prompt handle changed",
         description: `Prompt handle has been changed to ${prompt.handle}`,
         type: "success",
       });
-    } catch (error) {
+    };
+
+    const onError = (error: Error) => {
       console.error(error);
       toaster.create({
         title: "Error changing prompt handle",
         description: "Failed to change prompt handle",
         type: "error",
       });
-    }
+    };
+
+    triggerChangeHandle({ id, onSuccess, onError });
   };
 
   const handle = form.watch("handle");
@@ -89,7 +89,7 @@ export function EditablePromptHandleField() {
         >
           <Button
             id="js-edit-prompt-handle"
-            onClick={() => void handleTriggerChangeHandle()}
+            onClick={handleTriggerChangeHandle}
             variant="ghost"
             _hover={{
               backgroundColor: "gray.100",

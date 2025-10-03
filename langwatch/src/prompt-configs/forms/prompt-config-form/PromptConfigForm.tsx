@@ -61,27 +61,31 @@ function InnerPromptConfigForm() {
     methods.watch("version.configData.inputs") ?? []
   ).map((input) => input.identifier);
 
-  const handleSaveClick = useCallback(async () => {
+  const handleSaveClick = useCallback(() => {
     setIsSaving(true);
 
-    try {
-      const values = methods.getValues();
-      const data = formValuesToTriggerSaveVersionParams(values);
-      const prompt = configId
-        ? await triggerSaveVersion({ id: configId, data })
-        : await triggerCreatePrompt({ data });
+    const values = methods.getValues();
+    const data = formValuesToTriggerSaveVersionParams(values);
 
+    const onSuccess = (prompt: VersionedPrompt) => {
       methods.reset(versionedPromptToPromptConfigFormValues(prompt));
       setIsSaving(false);
-    } catch (error) {
+    };
+
+    const onError = (error: Error) => {
       console.error(error);
       toaster.create({
         title: "Error saving version",
         description: "Failed to save version",
         type: "error",
       });
-    } finally {
       setIsSaving(false);
+    };
+
+    if (configId) {
+      triggerSaveVersion({ id: configId, data, onSuccess, onError });
+    } else {
+      triggerCreatePrompt({ data, onSuccess, onError });
     }
   }, [methods, triggerSaveVersion, triggerCreatePrompt, configId]);
 
