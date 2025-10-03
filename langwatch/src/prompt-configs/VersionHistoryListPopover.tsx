@@ -262,19 +262,16 @@ export function VersionHistoryListPopover({
   const { open, setOpen, onClose } = useDisclosure();
   const { project } = useOrganizationTeamProject();
   const { restoreVersion } = usePrompts();
-  const {
-    data: prompts,
-    isLoading,
-    refetch,
-  } = api.prompts.getAllVersionsForPrompt.useQuery(
-    {
-      idOrHandle: configId,
-      projectId: project?.id ?? "",
-    },
-    {
-      enabled: !!project?.id && !!configId,
-    }
-  );
+  const { data: prompts, isLoading } =
+    api.prompts.getAllVersionsForPrompt.useQuery(
+      {
+        idOrHandle: configId,
+        projectId: project?.id ?? "",
+      },
+      {
+        enabled: !!project?.id && !!configId,
+      }
+    );
 
   const handleRestore = async (params: {
     versionId: string;
@@ -286,7 +283,6 @@ export function VersionHistoryListPopover({
         versionId,
         projectId: project?.id ?? "",
       });
-      await refetch();
       await onRestoreSuccess?.(prompt);
       onClose();
       toaster.success({
