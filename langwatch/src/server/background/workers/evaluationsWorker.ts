@@ -170,7 +170,6 @@ const buildThreadData = async (
           targetField,
           selectedFields,
           traceCount: extractedData.length,
-          sampleData: JSON.stringify(extractedData[0], null, 2),
         });
       }
     } else {
@@ -279,10 +278,6 @@ const buildDataForEvaluation = async (
       threadId: trace.metadata?.thread_id,
     });
     data = await buildThreadData(projectId, trace, mappings, protections);
-    logger.info("Thread data extracted", {
-      dataKeys: Object.keys(data),
-      threadDataSample: JSON.stringify(data, null, 2).substring(0, 500) + "...",
-    });
   } else {
     // Use regular trace-based mapping
     logger.info("Using regular trace-based mapping", {

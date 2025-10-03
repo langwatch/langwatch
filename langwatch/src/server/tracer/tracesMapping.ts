@@ -435,9 +435,12 @@ export const mappingStateSchema = z.object({
     z.union([
       z
         .object({
-          source: z.enum(
-            Object.keys(TRACE_MAPPINGS) as [keyof typeof TRACE_MAPPINGS | ""]
-          ),
+          source: z.union([
+            z.enum(
+              Object.keys(TRACE_MAPPINGS) as [keyof typeof TRACE_MAPPINGS]
+            ),
+            z.literal(""),
+          ]),
           key: z.string().optional(),
           subkey: z.string().optional(),
         })
@@ -446,9 +449,12 @@ export const mappingStateSchema = z.object({
         }),
       z
         .object({
-          source: z.enum(
-            Object.keys(THREAD_MAPPINGS) as [keyof typeof THREAD_MAPPINGS | ""]
-          ),
+          source: z.union([
+            z.enum(
+              Object.keys(THREAD_MAPPINGS) as [keyof typeof THREAD_MAPPINGS]
+            ),
+            z.literal(""),
+          ]),
           key: z.string().optional(),
           subkey: z.string().optional(),
           selectedFields: z.array(z.string()).optional(),
