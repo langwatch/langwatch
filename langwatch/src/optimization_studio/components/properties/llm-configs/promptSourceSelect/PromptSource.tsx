@@ -42,7 +42,14 @@ const usePrompSourceController = ({
   const handleSelectPrompt = (promptId: string) => {
     const selectedPrompt = prompts?.find((p) => p.id === promptId);
 
-    if (!selectedPrompt || !project?.id) return;
+    if (!selectedPrompt || !project?.id) {
+      toaster.create({
+        title: "Error loading prompt configs",
+        description: "Please try again.",
+        type: "error",
+      });
+      return;
+    }
 
     onSelect({
       id: selectedPrompt.id,
@@ -75,7 +82,6 @@ export function PromptSourceSelect({
   return (
     <>
       <PromptSelectionButton onClick={onOpen} />
-
       <PromptSourceDialog open={open} onOpen={onOpen} onClose={onClose}>
         <PromptList
           isLoading={isLoading}
@@ -88,7 +94,10 @@ export function PromptSourceSelect({
   );
 }
 
-export function PromptSource({ selectedPromptId, onSelect }: PromptSourceProps) {
+export function PromptSource({
+  selectedPromptId,
+  onSelect,
+}: PromptSourceProps) {
   const controller = usePrompSourceController({
     selectedPromptId,
     onSelect,

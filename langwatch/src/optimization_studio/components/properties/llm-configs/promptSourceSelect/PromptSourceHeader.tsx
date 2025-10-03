@@ -7,9 +7,7 @@ import { PromptSource } from "./PromptSource";
 import { GenerateApiSnippetButton } from "~/components/GenerateApiSnippetButton";
 import { VerticalFormControl } from "~/components/VerticalFormControl";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import type {
-  LlmPromptConfigComponent,
-} from "~/optimization_studio/types/dsl";
+import type { LlmPromptConfigComponent } from "~/optimization_studio/types/dsl";
 import { GeneratePromptApiSnippetDialog } from "~/prompt-configs/components/GeneratePromptApiSnippetDialog";
 import { VersionHistoryButton } from "~/prompt-configs/forms/prompt-config-form/components/VersionHistoryButton";
 import { VersionSaveButton } from "~/prompt-configs/forms/prompt-config-form/components/VersionSaveButton";
@@ -49,11 +47,6 @@ export function PromptSourceHeader({
     const values = formProps.getValues();
     const newValues = formValuesToTriggerSaveVersionParams(values);
 
-    console.log({
-      node,
-      values
-    })
-
     if (!configId) {
       throw new Error("Config ID is required");
     }
@@ -61,20 +54,22 @@ export function PromptSourceHeader({
     void triggerSaveVersion({
       id: configId,
       data: newValues,
-    }).then((prompt) => {
+    })
+      .then((prompt) => {
         toaster.create({
           title: "Version saved",
           description: "Version has been saved",
           type: "success",
         });
         formProps.reset(versionedPromptToPromptConfigFormValues(prompt));
-    }).catch(() => {
-      toaster.create({
-        title: "Error saving version",
-        description: "Failed to save version",
-        type: "error",
+      })
+      .catch(() => {
+        toaster.create({
+          title: "Error saving version",
+          description: "Failed to save version",
+          type: "error",
+        });
       });
-    });
   }, [triggerSaveVersion, formProps, configId]);
 
   /**

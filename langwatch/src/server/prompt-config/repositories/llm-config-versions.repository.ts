@@ -23,7 +23,7 @@ export type LlmConfigVersionDTO = Omit<LatestConfigVersionSchema, "version">;
 
 export type CreateLlmConfigVersionParams = Omit<
   LlmPromptConfigVersion,
-  "id" | "author" | "config" | "createdAt" | "configData"
+  "id" | "author" | "config" | "createdAt" | "configData" | "name"
 > & {
   configData: LatestConfigVersionSchema["configData"];
 };
@@ -227,10 +227,10 @@ export class LlmConfigVersionsRepository {
    * Restore a version by creating a new version with the same config data
    */
   async restoreVersion(params: {
-    id: string,
-    projectId: string,
-    organizationId: string,
-    authorId: string | null
+    id: string;
+    projectId: string;
+    organizationId: string;
+    authorId: string | null;
   }): Promise<LlmPromptConfigVersion> {
     const { id, projectId, organizationId, authorId } = params;
 

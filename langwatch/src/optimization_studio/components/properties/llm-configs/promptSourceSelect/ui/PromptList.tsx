@@ -5,7 +5,7 @@ import { formatTimeAgo } from "../../../../../../utils/formatTimeAgo";
 // Prompt List Component
 interface PromptListProps {
   isLoading: boolean;
-  prompts: PromptListItemProps['prompt'][];
+  prompts: PromptListItemProps["prompt"][];
   selectedPromptId?: string;
   onSelect: (promptId: string) => void;
 }
@@ -29,7 +29,12 @@ export function PromptList({
   return (
     <VStack align="stretch" gap={1}>
       {prompts.map((prompt) => (
-        <PromptListItem key={prompt.id} prompt={prompt} onSelect={onSelect} isSelected={selectedPromptId === prompt.id} />
+        <PromptListItem
+          key={prompt.id}
+          prompt={prompt}
+          onSelect={onSelect}
+          isSelected={selectedPromptId === prompt.id}
+        />
       ))}
     </VStack>
   );
@@ -40,6 +45,10 @@ interface PromptListItemProps {
   isSelected: boolean;
   prompt: {
     id: string;
+    handle: string | null;
+    /**
+     * @deprecated Use handle instead
+     */
     name: string;
     version: number;
     updatedAt: Date;
@@ -63,7 +72,7 @@ function PromptListItem({ prompt, onSelect, isSelected }: PromptListItemProps) {
         <Book size={16} />
         <VStack align="start" gap={0} width="full">
           <Text fontWeight="medium" lineClamp={1}>
-            {prompt.name}
+            {prompt.handle ?? prompt.name}
           </Text>
           <HStack width="full">
             <Text fontSize="xs" color="gray.500">

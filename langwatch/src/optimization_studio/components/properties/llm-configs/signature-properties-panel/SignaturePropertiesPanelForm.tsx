@@ -129,7 +129,7 @@ export function SignaturePropertiesPanelForm({
       }
 
       // Reset the form with the updated node data
-      formProps.methods.reset( versionedPromptToPromptConfigFormValues( config));
+      formProps.methods.reset(versionedPromptToPromptConfigFormValues(config));
     } catch (error) {
       console.error(error);
       toaster.error({

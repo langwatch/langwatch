@@ -39,6 +39,9 @@ type ConfigData = z.infer<
  */
 export type VersionedPrompt = {
   id: string;
+  /**
+   * @deprecated Use handle instead
+   */
   name: string;
   handle: string | null;
   scope: PromptScope;
@@ -57,8 +60,8 @@ export type VersionedPrompt = {
   }>;
   authorId: string | null;
   author?: {
-    id: string,
-    name: string,
+    id: string;
+    name: string;
   } | null;
   inputs: LatestConfigVersionSchema["configData"]["inputs"];
   outputs: LatestConfigVersionSchema["configData"]["outputs"];
@@ -93,7 +96,9 @@ export class PromptService {
   }): Promise<VersionedPrompt[]> {
     const { projectId } = params;
 
-    const organizationId = params.organizationId ?? await this.getOrganizationIdFromProjectId(projectId);
+    const organizationId =
+      params.organizationId ??
+      (await this.getOrganizationIdFromProjectId(projectId));
 
     const configs = await this.repository.getAllWithLatestVersion({
       projectId,
@@ -120,7 +125,9 @@ export class PromptService {
     versionId?: string;
   }): Promise<VersionedPrompt | null> {
     const { idOrHandle, projectId } = params;
-    const organizationId = params.organizationId ?? await this.getOrganizationIdFromProjectId(projectId);
+    const organizationId =
+      params.organizationId ??
+      (await this.getOrganizationIdFromProjectId(projectId));
     const config = await this.repository.getConfigByIdOrHandleWithLatestVersion(
       {
         idOrHandle,
@@ -151,15 +158,15 @@ export class PromptService {
     versionId: string;
     projectId: string;
   }): Promise<VersionedPrompt | null> {
-      const { config } = await this.repository.versions.getVersionById({
-        versionId: params.versionId,
-        projectId: params.projectId,
-      });
+    const { config } = await this.repository.versions.getVersionById({
+      versionId: params.versionId,
+      projectId: params.projectId,
+    });
 
-      return await this.getPromptByIdOrHandle({
-        idOrHandle: config.id,
-        projectId: params.projectId,
-      });
+    return await this.getPromptByIdOrHandle({
+      idOrHandle: config.id,
+      projectId: params.projectId,
+    });
   }
 
   /**
@@ -224,7 +231,6 @@ export class PromptService {
     organizationId?: string;
     handle: string;
     scope?: PromptScope;
-    name?: string;
     // Version data
     authorId?: string;
     prompt?: string;
@@ -237,7 +243,9 @@ export class PromptService {
     prompting_technique?: z.infer<typeof promptingTechniqueSchema>;
     commitMessage?: string | null;
   }): Promise<VersionedPrompt> {
-    const organizationId = params.organizationId ?? await this.getOrganizationIdFromProjectId(params.projectId);
+    const organizationId =
+      params.organizationId ??
+      (await this.getOrganizationIdFromProjectId(params.projectId));
     // If any of the version data is provided,
     // we should create a version from that data
     // and it's not consideered a draft
@@ -279,7 +287,7 @@ export class PromptService {
 
     const config = await this.repository.createConfigWithInitialVersion({
       configData: {
-        name: params.name ?? params.handle,
+        name: params.handle,
         handle: params.handle ?? null,
         projectId: params.projectId,
         organizationId,
@@ -335,6 +343,7 @@ export class PromptService {
         | "deletedAt"
         | "configId"
         | "projectId"
+        | "name"
       >
     >;
   }): Promise<VersionedPrompt> {
@@ -484,7 +493,9 @@ export class PromptService {
     authorId?: string | null;
     organizationId?: string;
   }): Promise<VersionedPrompt> {
-    const organizationId = params.organizationId ?? await this.getOrganizationIdFromProjectId(params.projectId);
+    const organizationId =
+      params.organizationId ??
+      (await this.getOrganizationIdFromProjectId(params.projectId));
 
     await this.repository.versions.restoreVersion({
       id: params.versionId,
@@ -522,7 +533,9 @@ export class PromptService {
     scope: PromptScope;
     excludeId?: string;
   }): Promise<boolean> {
-    const organizationId = params.organizationId ?? await this.getOrganizationIdFromProjectId(params.projectId);
+    const organizationId =
+      params.organizationId ??
+      (await this.getOrganizationIdFromProjectId(params.projectId));
     // Check if handle exists (excluding current config if editing)
     const existingConfig = await this.prisma.llmPromptConfig.findUnique({
       where: {
@@ -531,7 +544,7 @@ export class PromptService {
           handle: params.handle,
           scope: params.scope,
           projectId: params.projectId,
-          organizationId
+          organizationId,
         }),
         // Double check just to make sure the prompt belongs to the project or organization the user is from
         OR: [
@@ -604,7 +617,6 @@ export class PromptService {
     // Case 1: Prompt doesn't exist on server - create new
     if (!existingPrompt) {
       const createdPrompt = await this.createPrompt({
-        name: idOrHandle,
         handle: idOrHandle,
         projectId,
         organizationId,
@@ -735,9 +747,15 @@ export class PromptService {
     idOrHandle: string;
     projectId: string;
     organizationId?: string;
-  }): Promise<{success: boolean}> {
-    const organizationId = params.organizationId ?? await this.getOrganizationIdFromProjectId(params.projectId);
-    const result = await this.repository.deleteConfig(params.idOrHandle, params.projectId, organizationId);
+  }): Promise<{ success: boolean }> {
+    const organizationId =
+      params.organizationId ??
+      (await this.getOrganizationIdFromProjectId(params.projectId));
+    const result = await this.repository.deleteConfig(
+      params.idOrHandle,
+      params.projectId,
+      organizationId
+    );
     return result;
   }
 
@@ -773,10 +791,12 @@ export class PromptService {
       outputs: config.latestVersion.configData.outputs,
       response_format: config.latestVersion.configData.response_format,
       authorId: config.latestVersion.authorId ?? null,
-      author: config.latestVersion.author ? {
-        id: config.latestVersion.author.id,
-        name: config.latestVersion.author.name,
-      } : null,
+      author: config.latestVersion.author
+        ? {
+            id: config.latestVersion.author.id,
+            name: config.latestVersion.author.name,
+          }
+        : null,
       updatedAt: config.updatedAt,
       createdAt: config.createdAt,
       demonstrations: config.latestVersion.configData.demonstrations,
@@ -790,10 +810,10 @@ export class PromptService {
   ): Promise<string> {
     const project = await this.prisma.project.findUnique({
       where: { id: projectId },
-      include: { 
-        team: { 
-          include: { organization: true } 
-        } 
+      include: {
+        team: {
+          include: { organization: true },
+        },
       },
     });
 
