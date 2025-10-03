@@ -1,16 +1,19 @@
-import { api } from "~/utils/api";
 import type { Node } from "@xyflow/react";
-import type { LlmPromptConfigComponent } from "~/optimization_studio/types/dsl";
+import { useMemo, useCallback } from "react";
+
+import { toaster } from "~/components/ui/toaster";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import { useMemo, useCallback, useEffect } from "react";
+import type { LlmPromptConfigComponent } from "~/optimization_studio/types/dsl";
+
+import type { PromptConfigFormValues } from "~/prompt-configs";
 import {
   isNodeDataEqual,
   versionedPromptToOptimizationStudioNodeData,
 } from "~/prompt-configs/llmPromptConfigUtils";
 import { versionedPromptToPromptConfigFormValues } from "~/prompt-configs/llmPromptConfigUtils";
-import { toaster } from "~/components/ui/toaster";
+import { api } from "~/utils/api";
 import { createLogger } from "~/utils/logger";
-import type { PromptConfigFormValues } from "~/prompt-configs";
+
 import { useFormContext } from "react-hook-form";
 
 const logger = createLogger("langwatch:optimization_studio:use-node-drift");
@@ -50,9 +53,9 @@ export function useNodeDrift(node: Node<LlmPromptConfigComponent>) {
    * Reload the latest version into the form (which should update the node data)
    */
   const loadLatestVersion = useCallback(async () => {
-    if (!latestPrompt) throw new Error("Latest prompt not found");
-
     try {
+      if (!latestPrompt) throw new Error("Latest prompt not found");
+
       formProps.reset(versionedPromptToPromptConfigFormValues(latestPrompt));
 
       toaster.create({

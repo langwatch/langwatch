@@ -1,7 +1,10 @@
-import { merge } from "lodash-es";
-import type { PromptConfigFormValues } from "../types";
 import { PromptScope } from "@prisma/client";
+import { merge } from "lodash-es";
+
+import { DEFAULT_MODEL } from "~/utils/constants";
 import type { DeepPartial } from "~/utils/types";
+
+import type { PromptConfigFormValues } from "../types";
 
 const DEFAULT_FORM_VALUES: PromptConfigFormValues = {
   handle: null,
@@ -10,7 +13,7 @@ const DEFAULT_FORM_VALUES: PromptConfigFormValues = {
     configData: {
       prompt: "You are a helpful assistant.",
       llm: {
-        model: "openai/gpt-5",
+        model: DEFAULT_MODEL,
         temperature: 0.5,
         max_tokens: 1000,
       },
@@ -21,13 +24,15 @@ const DEFAULT_FORM_VALUES: PromptConfigFormValues = {
   },
 };
 
-
 /**
  * Builds the default form values with overrides.
- * Useful since the default model comes from the project settings.
+ * Useful since a default model comes from the project settings
+ * which should then be passed in as an override if applicable.
  * @param overrides - Overrides to the default form values
  * @returns The default form values with overrides
  */
-export const buildDefaultFormValues = (overrides?: DeepPartial<PromptConfigFormValues>): PromptConfigFormValues => {
+export const buildDefaultFormValues = (
+  overrides?: DeepPartial<PromptConfigFormValues>
+): PromptConfigFormValues => {
   return merge(DEFAULT_FORM_VALUES, overrides ?? {});
 };

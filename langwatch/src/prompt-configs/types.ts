@@ -1,4 +1,5 @@
 import { type z } from "zod";
+
 import { type formSchema } from "./schemas";
 
 /**
@@ -48,4 +49,19 @@ const AVAILABLE_TARGETS = [
 
 export type Target = (typeof AVAILABLE_TARGETS)[number];
 
+/**
+ * Form values for prompt configuration management, inferred from formSchema.
+ *
+ * Represents the complete shape of a prompt config form including:
+ * - handle, scope, and version metadata
+ * - prompt/messages content
+ * - inputs/outputs definitions
+ * - LLM settings (model, temperature, max_tokens, litellm_params)
+ * - demonstrations and prompting_technique
+ *
+ * Used throughout the prompt-configs module for form handling, validation,
+ * and state management in usePromptConfigForm, PromptConfigForm, and related components.
+ *
+ * @see formSchema - Source schema definition
+ */
 export type PromptConfigFormValues = z.infer<typeof formSchema>;
