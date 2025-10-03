@@ -138,40 +138,26 @@ const buildThreadData = async (
     if ("type" in mappingConfig && mappingConfig.type === "thread") {
       const source = mappingConfig.source;
 
-      switch (source) {
-        case "thread_id":
-          result[targetField] = threadId;
-          logger.info("Mapped thread_id", {
-            targetField,
-            value: threadId,
-          });
-          break;
-
-        case "traces": {
-          // Use THREAD_MAPPINGS to extract selected fields from all traces
-          const selectedFields = mappingConfig.selectedFields ?? [];
-          const extractedData = THREAD_MAPPINGS.traces.mapping(
-            { thread_id: threadId, traces: threadTraces },
-            selectedFields as (keyof typeof TRACE_MAPPINGS)[]
-          );
-          result[targetField] = extractedData;
-          logger.info("Mapped thread traces", {
-            targetField,
-            selectedFields,
-            traceCount: extractedData.length,
-          });
-          break;
-        }
-
-        case "":
-          // Empty source, skip
-          break;
-
-        default:
-          source satisfies never;
-          // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
-          throw new Error(`Unknown thread mapping source: ${source}`);
+      // Skip empty source
+      if (!source) {
+        continue;
       }
+
+      // Use the mapping function from THREAD_MAPPINGS dynamically
+      const selectedFields = mappingConfig.selectedFields ?? [];
+      result[targetField] = THREAD_MAPPINGS[source].mapping(
+        { thread_id: threadId, traces: threadTraces },
+        selectedFields as (keyof typeof TRACE_MAPPINGS)[]
+      );
+
+      logger.info("Mapped thread field", {
+        targetField,
+        source,
+        ...(selectedFields.length > 0 && { selectedFields }),
+        ...(source === "traces" && {
+          traceCount: (result[targetField] as any[]).length,
+        }),
+      });
     } else {
       // Regular trace mapping - use current trace
       // Type guard ensures mappingConfig.source is from TRACE_MAPPINGS
