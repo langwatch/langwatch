@@ -154,14 +154,16 @@ export const TracesMapping = ({
     const result = new Set(
       Object.values(mapping)
         .map((mapping) => {
-          const source = mapping.source && TRACE_MAPPINGS[mapping.source];
+          const source =
+            mapping.source && mapping.source in TRACE_MAPPINGS
+              ? TRACE_MAPPINGS[mapping.source as keyof typeof TRACE_MAPPINGS]
+              : undefined;
           if (source && "expandable_by" in source && source.expandable_by) {
             return source.expandable_by;
           }
-          return;
+          return undefined;
         })
-        .filter(Boolean)
-        .map((x) => x!)
+        .filter((x): x is keyof typeof TRACE_EXPANSIONS => x !== undefined)
     );
 
     return result;
@@ -347,9 +349,10 @@ export const TracesMapping = ({
       ))}
       {Object.entries(mapping).map(
         ([targetField, { source, key, subkey }], index) => {
-          const traceMappingDefinition = source
-            ? TRACE_MAPPINGS[source]
-            : undefined;
+          const traceMappingDefinition =
+            source && source in TRACE_MAPPINGS
+              ? TRACE_MAPPINGS[source as keyof typeof TRACE_MAPPINGS]
+              : undefined;
 
           const subkeys =
             traceMappingDefinition && "subkeys" in traceMappingDefinition
@@ -516,11 +519,19 @@ export const TracesMapping = ({
                                 <option value=""></option>
                                 {traceMappingDefinition
                                   .keys(traces_)
-                                  .map(({ key, label }) => (
-                                    <option key={key} value={key}>
-                                      {label}
-                                    </option>
-                                  ))}
+                                  .map(
+                                    ({
+                                      key,
+                                      label,
+                                    }: {
+                                      key: string;
+                                      label: string;
+                                    }) => (
+                                      <option key={key} value={key}>
+                                        {label}
+                                      </option>
+                                    )
+                                  )}
                               </NativeSelect.Field>
                               <NativeSelect.Indicator />
                             </NativeSelect.Root>
@@ -556,11 +567,19 @@ export const TracesMapping = ({
                               value={subkey}
                             >
                               <option value=""></option>
-                              {subkeys.map(({ key, label }) => (
-                                <option key={key} value={key}>
-                                  {label}
-                                </option>
-                              ))}
+                              {subkeys.map(
+                                ({
+                                  key,
+                                  label,
+                                }: {
+                                  key: string;
+                                  label: string;
+                                }) => (
+                                  <option key={key} value={key}>
+                                    {label}
+                                  </option>
+                                )
+                              )}
                             </NativeSelect.Field>
                             <NativeSelect.Indicator />
                           </NativeSelect.Root>
@@ -606,13 +625,14 @@ export const TracesMapping = ({
                     const isChecked = event.checked;
 
                     setTraceMappingState((prev) => {
-                      const newExpansions = isChecked
-                        ? new Set([...prev.expansions, expansion])
-                        : new Set(
-                            Array.from(prev.expansions).filter(
-                              (x) => x !== expansion
-                            )
-                          );
+                      const newExpansions: Set<keyof typeof TRACE_EXPANSIONS> =
+                        isChecked
+                          ? new Set([...prev.expansions, expansion])
+                          : new Set(
+                              Array.from(prev.expansions).filter(
+                                (x) => x !== expansion
+                              )
+                            );
 
                       return {
                         ...prev,

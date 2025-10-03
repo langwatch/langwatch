@@ -21,7 +21,7 @@ export function StepAccordion({
   ...props
 }: StepAccordionProps) {
   return (
-    <Accordion.Item value={value} width="full" {...props}>
+    <Accordion.Item value={value} width="full" overflow="visible" {...props}>
       {showTrigger && (
         <Accordion.ItemTrigger
           width="full"
@@ -41,7 +41,7 @@ export function StepAccordion({
           </HStack>
         </Accordion.ItemTrigger>
       )}
-      <Accordion.ItemContent paddingTop={2} paddingX="1px">
+      <Accordion.ItemContent paddingTop={2} paddingX="1px" overflow="visible">
         {children}
       </Accordion.ItemContent>
     </Accordion.Item>

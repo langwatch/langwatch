@@ -100,6 +100,17 @@ export const wizardStateSchema = z.object({
   workspaceTab: z
     .enum(["dataset", "workflow", "results", "code-implementation"])
     .optional(),
+  isThreadMapping: z.boolean().optional(),
+  realTimeThreadMappings: z
+    .object({
+      mapping: z.record(
+        z.object({
+          source: z.enum(["", "thread_id", "traces"]),
+          selectedFields: z.array(z.string()).optional(),
+        })
+      ),
+    })
+    .optional(),
 });
 
 export type WizardState = z.infer<typeof wizardStateSchema>;
