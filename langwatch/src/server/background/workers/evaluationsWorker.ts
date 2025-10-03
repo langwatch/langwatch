@@ -290,12 +290,6 @@ const buildDataForEvaluation = async (
     data = mappedData;
   }
 
-  logger.info("Final data being passed to evaluator", {
-    evaluatorType,
-    dataKeys: Object.keys(data),
-    dataSample: JSON.stringify(data, null, 2).substring(0, 1000) + "...",
-  });
-
   if (evaluatorType.startsWith("custom/")) {
     return {
       type: "custom",
@@ -307,12 +301,6 @@ const buildDataForEvaluation = async (
     const data_ = Object.fromEntries(
       fields.map((field) => [field, data[field] ?? ""])
     );
-
-    logger.info("Data formatted for default evaluator", {
-      evaluatorType,
-      fields,
-      formattedDataKeys: Object.keys(data_),
-    });
 
     return {
       type: "default",
