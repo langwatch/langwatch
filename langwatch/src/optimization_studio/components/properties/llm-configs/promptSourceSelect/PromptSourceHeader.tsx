@@ -1,4 +1,4 @@
-import { HStack, Spacer, Text, VStack } from "@chakra-ui/react";
+import { HStack, Spacer, VStack } from "@chakra-ui/react";
 import type { Node } from "@xyflow/react";
 import { useFormContext } from "react-hook-form";
 
@@ -21,7 +21,7 @@ import { PromptDriftWarning } from "../signature-properties-panel/PromptDriftWar
 import { useNodeDrift } from "../signature-properties-panel/hooks/useNodeDrift";
 import type { VersionedPrompt } from "~/server/prompt-config";
 import { toaster } from "~/components/ui/toaster";
-import { useCallback } from "react";
+import { useCallback, useState } from "react";
 import { EditablePromptHandleField } from "~/prompt-configs/forms/fields/EditablePromptHandleField";
 
 /**
@@ -42,8 +42,10 @@ export function PromptSourceHeader({
   const { project } = useOrganizationTeamProject();
   const { hasDrift } = useNodeDrift(node);
   const configId = node.data.configId;
+  const [isSaving, setIsSaving] = useState(false);
 
   const handleSaveVersion = useCallback(() => {
+    setIsSaving(true);
     const values = formProps.getValues();
     const newValues = formValuesToTriggerSaveVersionParams(values);
 
@@ -51,25 +53,31 @@ export function PromptSourceHeader({
       throw new Error("Config ID is required");
     }
 
-    void triggerSaveVersion({
+    const onSuccess = (prompt: VersionedPrompt) => {
+      toaster.create({
+        title: "Version saved",
+        description: "Version has been saved",
+        type: "success",
+      });
+      formProps.reset(versionedPromptToPromptConfigFormValues(prompt));
+      setIsSaving(false);
+    };
+
+    const onError = () => {
+      toaster.create({
+        title: "Error saving version",
+        description: "Failed to save version",
+        type: "error",
+      });
+      setIsSaving(false);
+    };
+
+    triggerSaveVersion({
       id: configId,
       data: newValues,
-    })
-      .then((prompt) => {
-        toaster.create({
-          title: "Version saved",
-          description: "Version has been saved",
-          type: "success",
-        });
-        formProps.reset(versionedPromptToPromptConfigFormValues(prompt));
-      })
-      .catch(() => {
-        toaster.create({
-          title: "Error saving version",
-          description: "Failed to save version",
-          type: "error",
-        });
-      });
+      onSuccess,
+      onError,
+    });
   }, [triggerSaveVersion, formProps, configId]);
 
   /**
@@ -126,6 +134,7 @@ export function PromptSourceHeader({
             disabled={!canSave}
             onClick={() => void handleSaveVersion()}
             hideLabel={true}
+            isSaving={isSaving}
           />
         </HStack>
       </VerticalFormControl>
