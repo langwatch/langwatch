@@ -27,12 +27,6 @@ export function useNodeDrift(node: Node<LlmPromptConfigComponent>) {
       },
       {
         enabled: !!idOrHandle && !!project?.id,
-        // Check for changes every second to prevent user from accidentally overwriting changes
-        // Disable refetching otherwise to prevent affecting other caches
-        refetchInterval: 1000,
-        refetchOnWindowFocus: false,
-        refetchOnMount: false,
-        refetchOnReconnect: false,
       }
     );
   const formProps = useFormContext<PromptConfigFormValues>();

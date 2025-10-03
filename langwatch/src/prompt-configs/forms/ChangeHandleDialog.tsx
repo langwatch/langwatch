@@ -18,7 +18,10 @@ import { LuBuilding, LuLock } from "react-icons/lu";
 import { Select } from "../../components/ui/select";
 import { usePromptHandleCheck } from "../../hooks/prompts/usePromptHandleCheck";
 
-import { createChangeHandleFormSchema, type ChangeHandleFormValues } from "./schemas/change-handle-form.schema";
+import {
+  createChangeHandleFormSchema,
+  type ChangeHandleFormValues,
+} from "./schemas/change-handle-form.schema";
 
 import { Dialog } from "~/components/ui/dialog";
 
@@ -94,7 +97,11 @@ export function ChangeHandleDialog({
   }>({
     items: [
       { label: "Project", value: PromptScope.PROJECT, icon: <LuLock /> },
-      { label: "Organization", value: PromptScope.ORGANIZATION, icon: <LuBuilding /> },
+      {
+        label: "Organization",
+        value: PromptScope.ORGANIZATION,
+        icon: <LuBuilding />,
+      },
     ],
   });
 
