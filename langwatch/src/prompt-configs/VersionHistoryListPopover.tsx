@@ -313,9 +313,6 @@ export function VersionHistoryListPopover({
       isOpen={open}
       onOpenChange={(open) => {
         setOpen(open);
-        if (!open) {
-          void refetch();
-        }
       }}
       onRestore={(params) => void handleRestore({ ...params, configId })}
       versions={versions}

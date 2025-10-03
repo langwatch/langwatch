@@ -16,6 +16,7 @@ import { Controller, useForm } from "react-hook-form";
 import { LuBuilding, LuLock } from "react-icons/lu";
 
 import { Select } from "../../components/ui/select";
+import { Select as ChakraSelect } from "@chakra-ui/react";
 import { usePromptHandleCheck } from "../../hooks/prompts/usePromptHandleCheck";
 
 import {
@@ -199,6 +200,7 @@ export function ChangeHandleDialog({
                   collection={scopesCollection}
                   width="100px"
                   {...field}
+                  position="relative"
                   value={[field.value]}
                   onValueChange={(change) => {
                     field.onChange(change.value[0]);
@@ -208,7 +210,19 @@ export function ChangeHandleDialog({
                   <Select.Control>
                     <ScopeSelectTrigger />
                   </Select.Control>
-                  <Select.Content width="160px" zIndex="popover">
+                  {/**
+                   * Our Select component uses portals which is both
+                   * not necessary here and causes issues with positioning
+                   * when used in Dialogs (nested?).
+                   */}
+                  <ChakraSelect.Content
+                    width="160px"
+                    zIndex="popover"
+                    position="absolute"
+                    marginTop={2}
+                    top="100%"
+                    left="0"
+                  >
                     {scopesCollection.items.map((scope) => (
                       <Select.Item item={scope} key={scope.value}>
                         <HStack gap={2}>
@@ -221,7 +235,7 @@ export function ChangeHandleDialog({
                         </HStack>
                       </Select.Item>
                     ))}
-                  </Select.Content>
+                  </ChakraSelect.Content>
                 </Select.Root>
               )}
             />
