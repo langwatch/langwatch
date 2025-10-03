@@ -406,6 +406,26 @@ export const TRACE_EXPANSIONS = {
 >;
 
 /**
+ * Extract selected fields from traces based on trace mapping configuration
+ * Single Responsibility: Transform traces array into field values based on selectedFields
+ */
+export const extractTracesFields = (
+  traces: TraceWithAnnotations[],
+  selectedFields: (keyof typeof TRACE_MAPPINGS)[]
+): Record<string, any>[] => {
+  return traces.map((trace) => {
+    const result: Record<string, any> = {};
+    for (const field of selectedFields) {
+      const traceMapping = TRACE_MAPPINGS[field];
+      if (traceMapping) {
+        result[field] = traceMapping.mapping(trace as any, "", "", {});
+      }
+    }
+    return result;
+  });
+};
+
+/**
  * Thread mappings for grouping traces by thread_id
  * Single Responsibility: Define available mapping options for thread data structure
  */
@@ -415,8 +435,10 @@ export const THREAD_MAPPINGS = {
       thread.thread_id,
   },
   traces: {
-    mapping: (thread: { thread_id: string; traces: TraceWithAnnotations[] }) =>
-      thread.traces,
+    mapping: (
+      thread: { thread_id: string; traces: TraceWithAnnotations[] },
+      selectedFields: (keyof typeof TRACE_MAPPINGS)[] = []
+    ) => extractTracesFields(thread.traces, selectedFields),
   },
 } as const;
 

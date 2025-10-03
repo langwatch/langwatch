@@ -41,7 +41,8 @@ import {
   mapTraceToDatasetEntry,
   tryAndConvertTo,
   type MappingState,
-  TRACE_MAPPINGS,
+  type TRACE_MAPPINGS,
+  THREAD_MAPPINGS,
 } from "../../tracer/tracesMapping";
 import { runEvaluationWorkflow } from "../../workflows/runWorkflow";
 import type { Protections } from "~/server/elasticsearch/protections";
@@ -92,26 +93,6 @@ const hasThreadMappings = (mappingState: MappingState): boolean => {
 };
 
 /**
- * Extract selected fields from traces based on thread mapping configuration
- * Single Responsibility: Transform traces array into field values based on selectedFields
- */
-const extractThreadFields = (
-  traces: Trace[],
-  selectedFields: string[]
-): Record<string, any>[] => {
-  return traces.map((trace) => {
-    const result: Record<string, any> = {};
-    for (const field of selectedFields) {
-      const traceMapping = TRACE_MAPPINGS[field as keyof typeof TRACE_MAPPINGS];
-      if (traceMapping) {
-        result[field] = traceMapping.mapping(trace as any, "", "", {});
-      }
-    }
-    return result;
-  });
-};
-
-/**
  * Build thread-based data for evaluation
  * Single Responsibility: Extract and format thread data according to thread mappings
  */
@@ -155,22 +136,41 @@ const buildThreadData = async (
     mappingState.mapping
   )) {
     if ("type" in mappingConfig && mappingConfig.type === "thread") {
-      if (mappingConfig.source === "thread_id") {
-        result[targetField] = threadId;
-        logger.info("Mapped thread_id", {
-          targetField,
-          value: threadId,
-        });
-      } else if (mappingConfig.source === "traces") {
-        // Extract selected fields from all traces
-        const selectedFields = mappingConfig.selectedFields ?? [];
-        const extractedData = extractThreadFields(threadTraces, selectedFields);
-        result[targetField] = extractedData;
-        logger.info("Mapped thread traces", {
-          targetField,
-          selectedFields,
-          traceCount: extractedData.length,
-        });
+      const source = mappingConfig.source;
+
+      switch (source) {
+        case "thread_id":
+          result[targetField] = threadId;
+          logger.info("Mapped thread_id", {
+            targetField,
+            value: threadId,
+          });
+          break;
+
+        case "traces": {
+          // Use THREAD_MAPPINGS to extract selected fields from all traces
+          const selectedFields = mappingConfig.selectedFields ?? [];
+          const extractedData = THREAD_MAPPINGS.traces.mapping(
+            { thread_id: threadId, traces: threadTraces },
+            selectedFields as (keyof typeof TRACE_MAPPINGS)[]
+          );
+          result[targetField] = extractedData;
+          logger.info("Mapped thread traces", {
+            targetField,
+            selectedFields,
+            traceCount: extractedData.length,
+          });
+          break;
+        }
+
+        case "":
+          // Empty source, skip
+          break;
+
+        default:
+          source satisfies never;
+          // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
+          throw new Error(`Unknown thread mapping source: ${source}`);
       }
     } else {
       // Regular trace mapping - use current trace
@@ -218,19 +218,17 @@ const switchMapping = (
     ? mapping_
     : migrateLegacyMappings(mapping_ as any);
 
-  // Filter out thread mappings - only pass trace mappings to mapTraceToDatasetEntry
-  const traceMappingsOnly = Object.fromEntries(
-    Object.entries(mapping.mapping).filter(
-      ([_, config]) => !("type" in config) || config.type !== "thread"
-    )
-  ) as Record<
-    string,
-    { source: keyof typeof TRACE_MAPPINGS | ""; key?: string; subkey?: string }
-  >;
-
+  // No need to filter - switchMapping is only called when hasThreadMappings is false
   return mapTraceToDatasetEntry(
     trace,
-    traceMappingsOnly,
+    mapping.mapping as Record<
+      string,
+      {
+        source: keyof typeof TRACE_MAPPINGS | "";
+        key?: string;
+        subkey?: string;
+      }
+    >,
     new Set(),
     undefined
   )[0];
