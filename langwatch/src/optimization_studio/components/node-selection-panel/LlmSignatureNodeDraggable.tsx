@@ -1,7 +1,9 @@
-import { useWorkflowStore } from "~/optimization_studio/hooks/useWorkflowStore";
-import { NodeDraggable } from "./NodeDraggable";
-import { MODULES } from "~/optimization_studio/registry";
 import { merge } from "lodash-es";
+
+import { useWorkflowStore } from "~/optimization_studio/hooks/useWorkflowStore";
+import { MODULES } from "~/optimization_studio/registry";
+
+import { NodeDraggable } from "./NodeDraggable";
 
 export function LlmSignatureNodeDraggable() {
   const { getWorkflow } = useWorkflowStore((state) => ({
@@ -12,7 +14,7 @@ export function LlmSignatureNodeDraggable() {
 
   return (
     <NodeDraggable
-      component={merge(MODULES.signature, {
+      component={merge({}, MODULES.signature, {
         parameters: [
           {
             identifier: "llm",
