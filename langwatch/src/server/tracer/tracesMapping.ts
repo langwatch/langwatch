@@ -246,7 +246,7 @@ export const TRACE_MAPPINGS = {
                 )?.name ?? key,
                 score,
               ])
-              .filter(([_, scoreValue]) => (scoreValue as any)?.value !== null)
+              .filter(([_, scoreValue]) => scoreValue?.value !== null)
           );
         const keyMap = {
           comment: () => annotation.comment,
@@ -543,11 +543,11 @@ const esSpansToDatasetSpans = (spans: Span[]): DatasetSpan[] => {
 
 export const mapTraceToDatasetEntry = (
   trace: TraceWithAnnotations,
-  mapping: TraceMapping,
+  mapping: MappingState["mapping"],
   expansions: Set<keyof typeof TRACE_EXPANSIONS>,
   annotationScoreOptions?: AnnotationScore[]
 ): Record<string, string | number>[] => {
-  let expandedTraces: TraceWithAnnotations[] = [trace as TraceWithAnnotations];
+  let expandedTraces: TraceWithAnnotations[] = [trace];
 
   for (const expansion of expansions) {
     const expanded = expandedTraces.flatMap((trace) =>
@@ -560,7 +560,10 @@ export const mapTraceToDatasetEntry = (
   return expandedTraces.map((trace) =>
     Object.fromEntries(
       Object.entries(mapping).map(([column, { source, key, subkey }]) => {
-        const source_ = source ? TRACE_MAPPINGS[source] : undefined;
+        const source_ =
+          source && source in TRACE_MAPPINGS
+            ? TRACE_MAPPINGS[source as keyof typeof TRACE_MAPPINGS]
+            : undefined;
 
         let value = source_?.mapping(trace, key!, subkey!, {
           annotationScoreOptions,
