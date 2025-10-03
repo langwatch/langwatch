@@ -113,6 +113,7 @@ export const onboardingRouter = createTRPCRouter({
           teamId: orgResult.team.id,
           organizationId: orgResult.organization.id,
           projectSlug: projectResult.projectSlug,
+          projectId: projectResult.id,
         };
       } catch (error) {
         Sentry.captureException(error);

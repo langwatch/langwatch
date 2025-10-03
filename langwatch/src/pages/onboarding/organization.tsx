@@ -3,17 +3,19 @@ import {
   Button,
   Field,
   HStack,
+  Spacer,
   Heading,
   Input,
   SegmentGroup,
   Separator,
+  Skeleton,
   Steps,
   Text,
   VStack,
 } from "@chakra-ui/react";
 import { type OrganizationUserRole } from "@prisma/client";
 import { useRouter } from "next/router";
-import React, { useEffect } from "react";
+import React, { useEffect, useMemo } from "react";
 import { Briefcase, Cloud, Server, User, Users } from "react-feather";
 import {
   Controller,
@@ -59,6 +61,13 @@ import {
 import { toaster } from "~/components/ui/toaster";
 import { trackEventOnce } from "~/utils/tracking";
 import { AddMembersForm } from "../../components/AddMembersForm";
+import { ModelProviderForm } from "../../pages/settings/model-providers";
+
+import {
+  getProviderModelOptions,
+  modelProviders as modelProvidersRegistry,
+  type MaybeStoredModelProvider,
+} from "../../server/modelProviders/registry";
 
 type OrganizationFormData = {
   organizationName: string;
@@ -151,6 +160,17 @@ export default function OrganizationOnboarding() {
   const [teamOption, setTeamOption] = React.useState<TeamOption | null>(null);
   const [projectSlug, setProjectSlug] = React.useState<string | null>(null);
 
+  // Memoize teamOptions to prevent infinite re-rendering in step 2
+  const teamOptionsForForm = useMemo(() => {
+    if (!teamOption) return [];
+    return [
+      {
+        label: teamOption.name ?? "",
+        value: teamOption.id ?? "",
+      },
+    ];
+  }, [teamOption]);
+
   const onSubmitAddMembers: SubmitHandler<MembersForm> = (data) => {
     createInvitesMutation.mutate(
       {
@@ -163,7 +183,7 @@ export default function OrganizationOnboarding() {
       },
       {
         onSuccess: () => {
-          window.location.href = `/${projectSlug}/messages`;
+          setActiveStep(3);
         },
         onError: () => {
           toaster.create({
@@ -176,6 +196,8 @@ export default function OrganizationOnboarding() {
       }
     );
   };
+
+  const [projectId, setProjectId] = React.useState<string | null>(null);
 
   const onSubmit: SubmitHandler<OrganizationFormData> = (
     data: OrganizationFormData
@@ -197,6 +219,7 @@ export default function OrganizationOnboarding() {
             label: "organization_onboarding_completed",
           });
           setOrganizationId(response.organizationId);
+          setProjectId(response.projectId);
           setTeamOption({
             name: response.teamName,
             id: response.teamId,
@@ -226,18 +249,11 @@ export default function OrganizationOnboarding() {
   };
 
   useEffect(() => {
+    // Only redirect if user just landed on the page and hasn't started onboarding
     if (organization && !initializeOrganization.isSuccess) {
       void router.push(`/`);
     }
   }, [organization, router, initializeOrganization.isSuccess]);
-
-  if (
-    !session ||
-    (!initializeOrganization.isSuccess &&
-      (!!organization || organizationIsLoading))
-  ) {
-    return <LoadingScreen />;
-  }
 
   const phoneNumber = register("phoneNumber");
   const selectedValueUsage = watch("usage");
@@ -247,7 +263,7 @@ export default function OrganizationOnboarding() {
   const myselfSelected =
     watch("usage") === "For myself" && Boolean(watch("usage"));
 
-  const steps = isSaaS && !myselfSelected ? 3 : 1;
+  const steps = isSaaS && !myselfSelected ? 4 : 1;
 
   const checkFirstStep = async () => {
     const organizationName = getValues("organizationName");
@@ -317,8 +333,34 @@ export default function OrganizationOnboarding() {
   };
 
   const skipForNow = () => {
+    setActiveStep(3);
+  };
+
+  const [isRedirecting, setIsRedirecting] = React.useState(false);
+  const proceedToMessages = () => {
+    setIsRedirecting(true);
     window.location.href = `/${projectSlug}/messages`;
   };
+
+  const modelProviders = api.modelProvider.getAllForProjectForFrontend.useQuery(
+    { projectId: projectId ?? "" },
+    { enabled: !!projectId }
+  );
+  const updateMutation = api.modelProvider.update.useMutation();
+
+  // Memoize model providers list to prevent re-rendering in step 3
+  const modelProvidersList = useMemo(() => {
+    if (!modelProviders.data) return [];
+    return Object.values(modelProviders.data);
+  }, [modelProviders.data]);
+
+  if (
+    !session ||
+    (!initializeOrganization.isSuccess &&
+      (!!organization || organizationIsLoading))
+  ) {
+    return <LoadingScreen />;
+  }
 
   return (
     <SetupLayout>
@@ -344,6 +386,10 @@ export default function OrganizationOnboarding() {
                     <Steps.Separator />
                   </Steps.Item>
                   <Steps.Item index={2} title={"3"}>
+                    <Steps.Indicator />
+                    <Steps.Separator />
+                  </Steps.Item>
+                  <Steps.Item index={3} title={"4"}>
                     <Steps.Indicator />
                     <Steps.Separator />
                   </Steps.Item>
@@ -681,10 +727,7 @@ export default function OrganizationOnboarding() {
             </Text>
             {teamOption && (
               <AddMembersForm
-                teamOptions={[teamOption].map((team) => ({
-                  label: team?.name ?? "",
-                  value: team?.id ?? "",
-                }))}
+                teamOptions={teamOptionsForForm}
                 onSubmit={onSubmitAddMembers}
                 isLoading={createInvitesMutation.isPending}
                 hasEmailProvider={Boolean(
@@ -694,6 +737,62 @@ export default function OrganizationOnboarding() {
                 onCloseText="Skip for now"
               />
             )}
+          </Steps.Content>
+
+          <Steps.Content index={3}>
+            <Heading as="h1">Model Providers Keys</Heading>
+            <Text paddingBottom={4} fontSize="14px">
+              Define which models are allowed to be used on LangWatch for this
+              project. You can also use your own API keys.
+            </Text>
+
+            <Box overflow="auto" maxHeight="500px">
+              {modelProviders.isLoading &&
+                Array.from({
+                  length: Object.keys(modelProvidersRegistry).length,
+                }).map((_, index) => (
+                  <Box
+                    key={index}
+                    width="full"
+                    borderBottomWidth="1px"
+                    _last={{ border: "none" }}
+                    paddingY={6}
+                  >
+                    <Skeleton width="full" height="28px" />
+                  </Box>
+                ))}
+              {projectId &&
+                modelProvidersList.map((provider) => (
+                  <ModelProviderForm
+                    key={provider.id}
+                    provider={provider}
+                    refetch={modelProviders.refetch}
+                    updateMutation={updateMutation}
+                    projectId={projectId} // Pass the projectId from state
+                    organizationId={organizationId ?? organization?.id} // Use organizationId from state or existing organization
+                  />
+                ))}
+            </Box>
+            <HStack width="full">
+              <Spacer />
+              <Button
+                colorPalette="orange"
+                onClick={proceedToMessages}
+                disabled={isRedirecting}
+                loading={isRedirecting}
+              >
+                Skip for now
+              </Button>
+              <Button
+                colorPalette="orange"
+                variant="outline"
+                onClick={proceedToMessages}
+                disabled={isRedirecting}
+                loading={isRedirecting}
+              >
+                Proceed
+              </Button>
+            </HStack>
           </Steps.Content>
         </Steps.Root>
 
