@@ -27,6 +27,7 @@ import type { VersionedPrompt } from "~/server/prompt-config";
  */
 interface VersionHistoryItemData {
   id: string;
+  versionId: string;
   version: number;
   commitMessage?: string;
   author?: {
@@ -42,7 +43,7 @@ const VersionNumberBox = ({
   children,
   ...props
 }: {
-  version?: Pick<VersionHistoryItemData, 'version'>;
+  version?: Pick<VersionHistoryItemData, "version">;
 } & BoxProps) => {
   return (
     <Box
@@ -140,7 +141,7 @@ function VersionHistoryList({
   isLoading,
 }: {
   versions: VersionHistoryItemData[];
-  onRestore: (versionId: string) => void;
+  onRestore: (params: { versionId: string }) => void;
   isLoading: boolean;
 }) {
   return (
@@ -153,9 +154,9 @@ function VersionHistoryList({
     >
       {versions.map((version, index) => (
         <VersionHistoryItem
-          key={version.id}
+          key={version.versionId}
           data={version}
-          onRestore={() => void onRestore(version.id)}
+          onRestore={() => void onRestore({ versionId: version.versionId })}
           isCurrent={index === 0}
           isLoading={isLoading}
         />
@@ -176,11 +177,7 @@ function VersionHistoryTrigger({
 }) {
   return (
     <Popover.Trigger asChild onClick={onClick}>
-      <Button
-        variant="ghost"
-        color="gray.500"
-        minWidth={0}
-      >
+      <Button variant="ghost" color="gray.500" minWidth={0}>
         <HistoryIcon size={16} />
         {label && <Text>{label}</Text>}
       </Button>
@@ -196,7 +193,7 @@ function VersionHistoryContent({
   versions,
   isLoading,
 }: {
-  onRestore: (versionId: string) => void;
+  onRestore: (params: { versionId: string }) => void;
   versions: VersionHistoryItemData[];
   isLoading: boolean;
 }) {
@@ -231,7 +228,7 @@ function VersionHistoryPopover({
 }: {
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
-  onRestore: (versionId: string) => void;
+  onRestore: (params: { versionId: string }) => void;
   versions: VersionHistoryItemData[];
   isLoading: boolean;
   label?: string;
@@ -271,7 +268,7 @@ export function VersionHistoryListPopover({
     refetch,
   } = api.prompts.getAllVersionsForPrompt.useQuery(
     {
-      idOrHandle:configId,
+      idOrHandle: configId,
       projectId: project?.id ?? "",
     },
     {
@@ -279,7 +276,10 @@ export function VersionHistoryListPopover({
     }
   );
 
-  const handleRestore = async (params: { versionId: string; configId: string }) => {
+  const handleRestore = async (params: {
+    versionId: string;
+    configId: string;
+  }) => {
     const { versionId } = params;
     try {
       const prompt = await restoreVersion({
@@ -300,12 +300,17 @@ export function VersionHistoryListPopover({
     }
   };
 
-  const versions = useMemo(() => prompts?.map((prompt) => ({
-    id: prompt.id,
-    version: prompt.version,
-    commitMessage: prompt.commitMessage,
-    author: prompt.author
-  })) ?? [], [prompts]);
+  const versions = useMemo(
+    () =>
+      prompts?.map((prompt) => ({
+        id: prompt.id,
+        versionId: prompt.versionId,
+        version: prompt.version,
+        commitMessage: prompt.commitMessage,
+        author: prompt.author,
+      })) ?? [],
+    [prompts]
+  );
 
   return (
     <VersionHistoryPopover
@@ -316,7 +321,7 @@ export function VersionHistoryListPopover({
           void refetch();
         }
       }}
-      onRestore={(versionId) => void handleRestore({ versionId, configId })}
+      onRestore={(params) => void handleRestore({ ...params, configId })}
       versions={versions}
       isLoading={isLoading}
       label={label}

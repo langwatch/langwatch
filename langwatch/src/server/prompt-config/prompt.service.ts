@@ -497,7 +497,7 @@ export class PromptService {
       params.organizationId ??
       (await this.getOrganizationIdFromProjectId(params.projectId));
 
-    await this.repository.versions.restoreVersion({
+    const newVersion = await this.repository.versions.restoreVersion({
       id: params.versionId,
       authorId: params.authorId ?? null,
       projectId: params.projectId,
@@ -505,7 +505,7 @@ export class PromptService {
     });
 
     const newPrompt = await this.getPromptByIdOrHandle({
-      idOrHandle: params.versionId,
+      idOrHandle: newVersion.configId,
       projectId: params.projectId,
       organizationId,
     });
