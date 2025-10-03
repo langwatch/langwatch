@@ -18,8 +18,8 @@ jobs:
         id: extract_version
         run: |
           if [ "${{ github.event_name }}" = "release" ]; then
-            # Extract version from release tag (e.g., langwatch@1.0.0 -> 1.0.0)
-            VERSION=${GITHUB_REF#refs/tags/langwatch@}
+            # Extract version from release tag (e.g., langwatch@v1.0.0 -> 1.0.0)
+            VERSION=${GITHUB_REF#refs/tags/langwatch@v}
           else
             # Extract version from manifest file for manual dispatch
             VERSION=$(cat .github/.release-please-manifest.json | grep -o '"\.":\s*"[^"]*"' | grep -o '[0-9][^"]*')
@@ -55,3 +55,12 @@ jobs:
           tags: |
             langwatch/langwatch_nlp:latest
             langwatch/langwatch_nlp:${{ steps.extract_version.outputs.version }}
+
+      - name: Notify Slack
+        env:
+          SLACK_RELEASE_NOTIFICATION_WEBHOOK_URL: ${{ secrets.SLACK_RELEASE_NOTIFICATION_WEBHOOK_URL }}
+        run: |
+          bash .github/scripts/notify-slack-release.sh \
+            CHANGELOG.md \
+            "LangWatch" \
+            "${{ steps.extract_version.outputs.version }}"
