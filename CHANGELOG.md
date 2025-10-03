@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.0](https://github.com/langwatch/langwatch/compare/langwatch@v1.0.0...langwatch@v1.1.0) (2025-10-03)
+
+
+### Features
+
+* add thread evals ([#677](https://github.com/langwatch/langwatch/issues/677)) ([e89700b](https://github.com/langwatch/langwatch/commit/e89700b71dda46e29c13f03a5fae88add852c9fb))
+
 ## [0.2.0](https://github.com/langwatch/langwatch/compare/langwatch@v0.1.34...langwatch@v0.2.0) (2025-10-02)
 
 
