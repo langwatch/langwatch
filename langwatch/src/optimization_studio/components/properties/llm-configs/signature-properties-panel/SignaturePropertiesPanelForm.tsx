@@ -99,7 +99,7 @@ export function SignaturePropertiesPanelForm({
             ...updatedNodeData,
           },
         });
-      }, 200),
+      }, 1000), // Lower than this slows down the UI significantly, since this will trigger a workspace/experiment save
     [node.id, setNode, configId, node.data.name]
   );
 

@@ -1,4 +1,10 @@
-import { createContext, useCallback, useContext, useState } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useState,
+  type ComponentProps,
+} from "react";
 import { ChangeHandleDialog } from "../forms/ChangeHandleDialog";
 import {
   SaveVersionDialog,
@@ -54,17 +60,53 @@ export function PromptConfigProvider({
   children: React.ReactNode;
 }) {
   const { projectId = "" } = useOrganizationTeamProject();
-  const [activeDialog, setActiveDialog] = useState<React.ReactNode | null>(
-    null
-  );
+
+  // Each state contains all props needed for the respective dialog
+  const [saveVersionDialogProps, setSaveVersionDialogProps] =
+    useState<ComponentProps<typeof SaveVersionDialog> | null>(null);
+
+  const [createPromptDialogProps, setCreatePromptDialogProps] =
+    useState<ComponentProps<typeof ChangeHandleDialog> | null>(null);
+
+  const [changeHandleDialogProps, setChangeHandleDialogProps] =
+    useState<ComponentProps<typeof ChangeHandleDialog> | null>(null);
+
   const { createPrompt, updatePrompt, getPromptById } = usePrompts();
+
+  const triggerSaveVersion: PromptConfigContextType["triggerSaveVersion"] =
+    useCallback(
+      ({ id, data, onSuccess, onError }) => {
+        const onSubmit = async (formValues: SaveDialogFormValues) => {
+          try {
+            const prompt = await updatePrompt({
+              projectId,
+              id,
+              data: {
+                ...data,
+                commitMessage: formValues.commitMessage,
+              },
+            });
+            onSuccess?.(prompt);
+          } catch (error) {
+            onError?.(error as Error);
+          } finally {
+            setSaveVersionDialogProps(null);
+          }
+        };
+
+        setSaveVersionDialogProps({
+          isOpen: true,
+          onClose: () => setSaveVersionDialogProps(null),
+          onSubmit,
+        });
+      },
+      [updatePrompt, projectId]
+    );
 
   const triggerCreatePrompt: PromptConfigContextType["triggerCreatePrompt"] =
     useCallback(
       ({ data, onSuccess, onError }) => {
-        const createPromptClosure = async (
-          formValues: ChangeHandleFormValues
-        ) => {
+        const onSubmit = async (formValues: ChangeHandleFormValues) => {
           try {
             const prompt = await createPrompt({
               projectId,
@@ -79,51 +121,17 @@ export function PromptConfigProvider({
           } catch (error) {
             onError?.(error as Error);
           } finally {
-            setActiveDialog(null);
+            setCreatePromptDialogProps(null);
           }
         };
 
-        setActiveDialog(
-          <ChangeHandleDialog
-            isOpen={true}
-            onClose={() => setActiveDialog(null)}
-            onSubmit={createPromptClosure}
-          />
-        );
+        setCreatePromptDialogProps({
+          isOpen: true,
+          onClose: () => setCreatePromptDialogProps(null),
+          onSubmit,
+        });
       },
       [createPrompt, projectId]
-    );
-
-  const triggerSaveVersion: PromptConfigContextType["triggerSaveVersion"] =
-    useCallback(
-      ({ id, data, onSuccess, onError }) => {
-        const saveVersionClosure = async (formValues: SaveDialogFormValues) => {
-          try {
-            const prompt = await updatePrompt({
-              projectId,
-              id,
-              data: {
-                ...data,
-                commitMessage: formValues.commitMessage,
-              },
-            });
-            onSuccess?.(prompt);
-          } catch (error) {
-            onError?.(error as Error);
-          } finally {
-            setActiveDialog(null);
-          }
-        };
-
-        setActiveDialog(
-          <SaveVersionDialog
-            isOpen={true}
-            onClose={() => setActiveDialog(null)}
-            onSubmit={saveVersionClosure}
-          />
-        );
-      },
-      [updatePrompt, projectId]
     );
 
   const triggerChangeHandle: PromptConfigContextType["triggerChangeHandle"] =
@@ -137,9 +145,7 @@ export function PromptConfigProvider({
               throw new Error("Prompt not found");
             }
 
-            const handleChangeClosure = async (
-              formValues: ChangeHandleFormValues
-            ) => {
+            const onSubmit = async (formValues: ChangeHandleFormValues) => {
               try {
                 const updatedPrompt = await updatePrompt({
                   projectId,
@@ -153,19 +159,17 @@ export function PromptConfigProvider({
               } catch (error) {
                 onError?.(error as Error);
               } finally {
-                setActiveDialog(null);
+                setChangeHandleDialogProps(null);
               }
             };
 
-            setActiveDialog(
-              <ChangeHandleDialog
-                currentHandle={prompt.handle}
-                currentScope={prompt.scope}
-                isOpen={true}
-                onClose={() => setActiveDialog(null)}
-                onSubmit={handleChangeClosure}
-              />
-            );
+            setChangeHandleDialogProps({
+              isOpen: true,
+              onClose: () => setChangeHandleDialogProps(null),
+              currentHandle: prompt.handle,
+              currentScope: prompt.scope,
+              onSubmit,
+            });
           } catch (error) {
             onError?.(error as Error);
           }
@@ -179,7 +183,31 @@ export function PromptConfigProvider({
       value={{ triggerCreatePrompt, triggerSaveVersion, triggerChangeHandle }}
     >
       {children}
-      {activeDialog}
+
+      {/* 
+      We cannot render the dialogs conditionally - doing so will break the state machine of chakra dialogs
+      ie: index.mjs:321 [@zag-js/core > transition] Cannot transition a stopped machine
+       */}
+      <SaveVersionDialog
+        isOpen={false}
+        onClose={() => void 0}
+        onSubmit={() => Promise.resolve()}
+        {...saveVersionDialogProps}
+      />
+
+      <ChangeHandleDialog
+        isOpen={false}
+        onClose={() => void 0}
+        onSubmit={() => Promise.resolve()}
+        {...createPromptDialogProps}
+      />
+
+      <ChangeHandleDialog
+        isOpen={false}
+        onClose={() => void 0}
+        onSubmit={() => Promise.resolve()}
+        {...changeHandleDialogProps}
+      />
     </PromptConfigContext.Provider>
   );
 }
