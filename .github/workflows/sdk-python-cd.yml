@@ -42,3 +42,22 @@ jobs:
           packages_dir: python-sdk/dist/
           user: __token__
           password: ${{ secrets.PYPI_API_TOKEN }}
+
+      - name: Get version from tag or manifest
+        id: get_version
+        run: |
+          if [ "${{ github.event_name }}" = "release" ]; then
+            VERSION=${GITHUB_REF#refs/tags/python-sdk@v}
+          else
+            VERSION=$(cat .github/.release-please-manifest.json | jq -r '."python-sdk"')
+          fi
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+
+      - name: Notify Slack
+        env:
+          SLACK_RELEASE_NOTIFICATION_WEBHOOK_URL: ${{ secrets.SLACK_RELEASE_NOTIFICATION_WEBHOOK_URL }}
+        run: |
+          bash .github/scripts/notify-slack-release.sh \
+            python-sdk/CHANGELOG.md \
+            "Python SDK" \
+            "${{ steps.get_version.outputs.version }}"

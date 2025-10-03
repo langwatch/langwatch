@@ -180,29 +180,37 @@ export const TracesMapping = ({
   const isInitializedRef = React.useRef(false);
 
   useEffect(() => {
-    if (
-      isInitializedRef.current &&
-      Object.keys(traceMappingState.mapping).length > 0
-    ) {
-      return;
-    }
-
+    // Build the default mapping state with targetFields
     const traceMappingStateWithDefaults = {
       mapping: Object.fromEntries(
         targetFields.map((name) => [
           name,
-          currentMapping.mapping[name] ?? {
-            source: (DATASET_INFERRED_MAPPINGS_BY_NAME[name] ??
-              "") as keyof typeof TRACE_MAPPINGS,
-          },
+          // Prefer existing mapping from traceMappingState, then currentMapping, then default
+          traceMappingState.mapping[name] ??
+            currentMapping.mapping[name] ?? {
+              source: (DATASET_INFERRED_MAPPINGS_BY_NAME[name] ??
+                "") as keyof typeof TRACE_MAPPINGS,
+            },
         ]) ?? []
       ),
-      expansions: new Set(currentMapping.expansions),
+      expansions:
+        traceMappingState.expansions.size > 0
+          ? traceMappingState.expansions
+          : new Set(currentMapping.expansions),
     };
 
+    // Check if we need to update (new columns added, columns removed, or initial setup)
+    const currentFieldsSet = new Set(Object.keys(traceMappingState.mapping));
+    const targetFieldsSet = new Set(targetFields);
+    const fieldsChanged =
+      currentFieldsSet.size !== targetFieldsSet.size ||
+      !Array.from(targetFieldsSet).every((f) => currentFieldsSet.has(f));
+
     if (
+      !isInitializedRef.current ||
+      fieldsChanged ||
       JSON.stringify(traceMappingState) !==
-      JSON.stringify(traceMappingStateWithDefaults)
+        JSON.stringify(traceMappingStateWithDefaults)
     ) {
       setTraceMappingState_(traceMappingStateWithDefaults);
       setTraceMapping?.({
@@ -277,7 +285,11 @@ export const TracesMapping = ({
     }
 
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [JSON.stringify(targetFields), dsl?.sourceOptions]);
+  }, [
+    JSON.stringify(targetFields),
+    dsl?.sourceOptions,
+    JSON.stringify(currentMapping),
+  ]);
 
   useEffect(() => {
     let index = 0;

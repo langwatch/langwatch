@@ -1,24 +1,30 @@
 name: Build and Push Docker Images
 
 on:
-  schedule:
-    - cron: '0 10 * * 1'  # Runs at 10:00 on Monday
-  push:
-    branches:
-      - main
-    paths-ignore:
-      - '**.md'
-      - 'docs/**'
-    # Only run on commits containing "fix" in the message
-    if: "contains(github.event.head_commit.message, 'fix')"
+  release:
+    types: [published]
+  workflow_dispatch:
 
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
+    if: startsWith(github.event.release.tag_name, 'langwatch@') || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main')
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+
+      - name: Extract version
+        id: extract_version
+        run: |
+          if [ "${{ github.event_name }}" = "release" ]; then
+            # Extract version from release tag (e.g., langwatch@v1.0.0 -> 1.0.0)
+            VERSION=${GITHUB_REF#refs/tags/langwatch@v}
+          else
+            # Extract version from manifest file for manual dispatch
+            VERSION=$(cat .github/.release-please-manifest.json | grep -o '"\.":\s*"[^"]*"' | grep -o '[0-9][^"]*')
+          fi
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -35,7 +41,9 @@ jobs:
           context: .
           push: true
           platforms: linux/amd64,linux/arm64/v8
-          tags: langwatch/langwatch:latest
+          tags: |
+            langwatch/langwatch:latest
+            langwatch/langwatch:${{ steps.extract_version.outputs.version }}
 
       - name: Build and push LangWatch NLP Docker image
         uses: docker/build-push-action@v6
@@ -44,4 +52,15 @@ jobs:
           file: Dockerfile.langwatch_nlp
           push: true
           platforms: linux/amd64,linux/arm64/v8
-          tags: langwatch/langwatch_nlp:latest
+          tags: |
+            langwatch/langwatch_nlp:latest
+            langwatch/langwatch_nlp:${{ steps.extract_version.outputs.version }}
+
+      - name: Notify Slack
+        env:
+          SLACK_RELEASE_NOTIFICATION_WEBHOOK_URL: ${{ secrets.SLACK_RELEASE_NOTIFICATION_WEBHOOK_URL }}
+        run: |
+          bash .github/scripts/notify-slack-release.sh \
+            CHANGELOG.md \
+            "LangWatch" \
+            "${{ steps.extract_version.outputs.version }}"

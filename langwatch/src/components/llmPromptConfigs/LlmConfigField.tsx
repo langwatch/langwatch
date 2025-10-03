@@ -19,6 +19,7 @@ interface LLMConfigFieldProps {
   allowDefault?: boolean;
   requiresCustomKey: boolean;
   onChange: (llmConfig: LLMConfig) => void;
+  showProviderKeyMessage?: boolean;
 }
 
 export function LLMConfigField({
@@ -27,6 +28,7 @@ export function LLMConfigField({
   onChange,
   modelOption,
   requiresCustomKey,
+  showProviderKeyMessage = true,
 }: LLMConfigFieldProps) {
   const { open, onClose, onToggle } = useDisclosure();
   const { model } = llmConfig;
@@ -77,7 +79,7 @@ export function LLMConfigField({
           </Box>
         </Button>
       </HStack>
-      {(requiresCustomKey || isModelDisabled) && (
+      {(requiresCustomKey || isModelDisabled) && showProviderKeyMessage && (
         <AddModelProviderKey
           runWhat="run this component"
           nodeProvidersWithoutCustomKeys={[model.split("/")[0] ?? "unknown"]}

@@ -38,3 +38,22 @@ jobs:
         run: pnpm publish --provenance --access public --no-git-checks
         env:
           NODE_AUTH_TOKEN: ${{ secrets.MCP_SERVER_NPM_TOKEN }}
+
+      - name: Get version from tag or manifest
+        id: get_version
+        run: |
+          if [ "${{ github.event_name }}" = "release" ]; then
+            VERSION=${GITHUB_REF#refs/tags/mcp-server@v}
+          else
+            VERSION=$(cat .github/.release-please-manifest.json | jq -r '."mcp-server"')
+          fi
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+
+      - name: Notify Slack
+        env:
+          SLACK_RELEASE_NOTIFICATION_WEBHOOK_URL: ${{ secrets.SLACK_RELEASE_NOTIFICATION_WEBHOOK_URL }}
+        run: |
+          bash .github/scripts/notify-slack-release.sh \
+            mcp-server/CHANGELOG.md \
+            "MCP Server" \
+            "${{ steps.get_version.outputs.version }}"

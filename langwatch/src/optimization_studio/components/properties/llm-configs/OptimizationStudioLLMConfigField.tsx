@@ -16,18 +16,21 @@ export function OptimizationStudioLLMConfigField({
   llmConfig,
   defaultLLMConfig = undefined,
   onChange,
+  showProviderKeyMessage = true,
 }:
   | {
       allowDefault: true;
       llmConfig?: LLMConfig | undefined;
       defaultLLMConfig: LLMConfig;
       onChange: (llmConfig: LLMConfig | undefined) => void;
+      showProviderKeyMessage?: boolean;
     }
   | {
       allowDefault?: undefined;
       llmConfig: LLMConfig;
       defaultLLMConfig?: undefined;
       onChange: (llmConfig: LLMConfig) => void;
+      showProviderKeyMessage?: boolean;
     }) {
   const model = llmConfig?.model ?? defaultLLMConfig?.model ?? "";
   const { modelOption } = useModelSelectionOptions(
@@ -54,6 +57,7 @@ export function OptimizationStudioLLMConfigField({
       onChange={onChange}
       modelOption={modelOption}
       requiresCustomKey={requiresCustomKey}
+      showProviderKeyMessage={showProviderKeyMessage}
     />
   );
 }

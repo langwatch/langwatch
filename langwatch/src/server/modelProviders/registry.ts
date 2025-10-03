@@ -105,8 +105,12 @@ export const modelProviders = {
     apiKey: "AZURE_OPENAI_API_KEY",
     endpointKey: "AZURE_OPENAI_ENDPOINT",
     keysSchema: z.object({
-      AZURE_OPENAI_API_KEY: z.string().min(1),
-      AZURE_OPENAI_ENDPOINT: z.string().min(1),
+      AZURE_OPENAI_API_KEY: z.string().nullable().optional(),
+      AZURE_OPENAI_ENDPOINT: z.string().nullable().optional(),
+      AZURE_API_GATEWAY_BASE_URL: z.string().nullable().optional(),
+      AZURE_API_GATEWAY_VERSION: z.string().nullable().optional(),
+      AZURE_API_GATEWAY_HEADER_NAME: z.string().nullable().optional(),
+      AZURE_API_GATEWAY_HEADER_KEY: z.string().nullable().optional(),
     }),
     enabledSince: new Date("2023-01-01"),
   },
@@ -140,6 +144,24 @@ export const modelProviders = {
       DEEPSEEK_API_KEY: z.string().min(1),
     }),
     enabledSince: new Date("2023-01-01"),
+  },
+  xai: {
+    name: "xAI",
+    apiKey: "XAI_API_KEY",
+    endpointKey: undefined,
+    keysSchema: z.object({
+      XAI_API_KEY: z.string().min(1),
+    }),
+    enabledSince: new Date("2024-11-01"),
+  },
+  cerebras: {
+    name: "Cerebras",
+    apiKey: "CEREBRAS_API_KEY",
+    endpointKey: undefined,
+    keysSchema: z.object({
+      CEREBRAS_API_KEY: z.string().min(1),
+    }),
+    enabledSince: new Date("2024-06-01"),
   },
   groq: {
     name: "Groq",

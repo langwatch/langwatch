@@ -1,6 +1,8 @@
 import type { NextApiRequest, NextApiResponse } from "next";
 import { deleteTracesRetentionPolicy } from "~/tasks/deleteTracesRetentionPolicy";
 import { migrateToColdStorage } from "../../../tasks/cold/moveTracesToColdStorage";
+import { prisma } from "../../../server/db";
+import { COLD_STORAGE_AGE_DAYS } from "../../../server/elasticsearch";
 
 export default async function handler(
   req: NextApiRequest,
@@ -17,7 +19,26 @@ export default async function handler(
 
   try {
     const projectId = req.query.projectId as string | undefined;
-    const movedToColdStorage = await migrateToColdStorage(projectId);
+    const organizationId = projectId
+      ? (
+          await prisma.project.findUnique({
+            where: {
+              id: projectId,
+            },
+            select: {
+              team: {
+                select: {
+                  organizationId: true,
+                },
+              },
+            },
+          })
+        )?.team?.organizationId
+      : undefined;
+    const movedToColdStorage = await migrateToColdStorage(
+      COLD_STORAGE_AGE_DAYS,
+      organizationId
+    );
     const totalDeleted = await deleteTracesRetentionPolicy(projectId);
 
     res.status(200).json({

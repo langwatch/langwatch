@@ -1,10 +1,13 @@
 import {
+  Badge,
   Box,
   Button,
   Center,
   Field,
   HStack,
   Spacer,
+  Spinner,
+  Text,
   VStack,
 } from "@chakra-ui/react";
 import { Edit2 } from "react-feather";
@@ -20,16 +23,22 @@ import {
 
 import type { CustomCellRendererProps } from "@ag-grid-community/react";
 import type { Dataset } from "@prisma/client";
-import { useCallback, useMemo } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Checkbox } from "../../components/ui/checkbox";
+import { Switch } from "../../components/ui/switch";
 import { api } from "../../utils/api";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import type { MappingState } from "../../server/tracer/tracesMapping";
 import { TracesMapping } from "../traces/TracesMapping";
+import {
+  ThreadMapping,
+  type ThreadMappingState,
+} from "../traces/ThreadMapping";
 import { ErrorBoundary } from "react-error-boundary";
-
+import type { Trace } from "~/server/tracer/types";
+import { useDebouncedCallback } from "use-debounce";
 interface DatasetMappingPreviewProps {
-  traces: any[]; // Replace 'any' with your trace type
+  traces: Trace[]; // Replace 'any' with your trace type
   columnTypes: DatasetColumns;
   rowData: DatasetRecordEntry[];
   selectedDataset: Dataset;
@@ -39,6 +48,10 @@ interface DatasetMappingPreviewProps {
   setDatasetTriggerMapping?: (mapping: MappingState) => void;
 }
 
+/**
+ * DatasetMappingPreview component for configuring dataset mappings
+ * Single Responsibility: Provide interface for mapping trace or thread data to dataset columns
+ */
 export function DatasetMappingPreview({
   traces,
   columnTypes,
@@ -49,6 +62,40 @@ export function DatasetMappingPreview({
   selectedDataset,
   setDatasetTriggerMapping,
 }: DatasetMappingPreviewProps) {
+  const [isThreadMapping, setIsThreadMapping] = useState(false);
+  const [threadMappingState, setThreadMappingState] =
+    useState<ThreadMappingState>();
+
+  const { project } = useOrganizationTeamProject();
+
+  // Extract thread_ids from traces
+  const threadIds = useMemo(() => {
+    const ids = traces
+      .map((trace) => trace.metadata?.thread_id)
+      .filter((id): id is string => !!id);
+    return Array.from(new Set(ids));
+  }, [traces]);
+
+  // Fetch all traces with matching thread_ids when thread mapping is enabled
+  const threadTraces = api.traces.getTracesWithSpansByThreadIds.useQuery(
+    {
+      projectId: project?.id ?? "",
+      threadIds: threadIds,
+    },
+    {
+      enabled: !!project && isThreadMapping && threadIds.length > 0,
+      refetchOnWindowFocus: false,
+    }
+  );
+
+  // Use thread traces when thread mapping is enabled, otherwise use provided traces
+  const tracesToUse = useMemo(() => {
+    if (isThreadMapping && threadTraces.data) {
+      return threadTraces.data;
+    }
+    return traces;
+  }, [isThreadMapping, threadTraces.data, traces]);
+
   const columnDefs = useMemo(() => {
     if (!selectedDataset) {
       return [];
@@ -93,8 +140,6 @@ export function DatasetMappingPreview({
     return headers;
   }, [selectedDataset]);
 
-  const { project } = useOrganizationTeamProject();
-
   const trpc = api.useContext();
   const updateStoredMapping_ = api.dataset.updateMapping.useMutation();
   const updateStoredMapping = useCallback(
@@ -118,25 +163,104 @@ export function DatasetMappingPreview({
     [selectedDataset.id, project?.id, trpc.dataset.getAll, updateStoredMapping_]
   );
 
+  const updateStoredThreadMapping = useCallback(
+    (threadMapping: ThreadMappingState) => {
+      updateStoredMapping_.mutate(
+        {
+          projectId: project?.id ?? "",
+          datasetId: selectedDataset.id,
+          threadMapping: {
+            mapping: threadMapping.mapping,
+          },
+        },
+        {
+          onSuccess: () => {
+            void trpc.dataset.getAll.invalidate();
+          },
+        }
+      );
+    },
+    [selectedDataset.id, project?.id, trpc.dataset.getAll, updateStoredMapping_]
+  );
+
+  const debouncedUpdateThreadMapping = useDebouncedCallback(
+    (newThreadMapping: ThreadMappingState) => {
+      setThreadMappingState(newThreadMapping);
+      updateStoredThreadMapping(newThreadMapping);
+    },
+    400
+  );
+
+  // Clear thread mapping state and cancel pending updates when dataset changes
+  useEffect(() => {
+    setThreadMappingState(undefined);
+    debouncedUpdateThreadMapping.cancel();
+  }, [selectedDataset.id, debouncedUpdateThreadMapping]);
+
+  // Get the current dataset's thread mapping
+  const currentThreadMapping = useMemo(() => {
+    return (selectedDataset.mapping as any)?.threadMapping as
+      | ThreadMappingState
+      | undefined;
+  }, [selectedDataset.mapping]);
+
   return (
     <Field.Root width="full" paddingY={4}>
       <HStack width="full" gap="64px" align="start">
-        <VStack align="start" maxWidth="50%">
-          <Field.Label margin={0}>Mapping</Field.Label>
+        <VStack align="start" maxWidth="50%" gap={4}>
+          <HStack width="full" align="center" justify="space-between">
+            <Field.Label margin={0}>Mapping</Field.Label>
+          </HStack>
+          <HStack gap={2}>
+            <Text fontSize="sm">Traces</Text>
+            <Switch
+              checked={isThreadMapping}
+              onCheckedChange={(e) => setIsThreadMapping(e.checked)}
+            />
+            <HStack gap={1}>
+              <Text fontSize="sm">Threads</Text>
+              {isThreadMapping && (
+                <>
+                  {threadTraces.isLoading ? (
+                    <Spinner size="xs" />
+                  ) : threadTraces.data ? (
+                    <Badge colorPalette="blue" size="sm">
+                      {threadTraces.data.length} traces
+                    </Badge>
+                  ) : null}
+                </>
+              )}
+            </HStack>
+          </HStack>
           <Field.HelperText margin={0} fontSize="13px" marginBottom={2}>
-            Map the trace data to the dataset columns
+            {isThreadMapping
+              ? "Map the thread data to the dataset columns (groups traces by thread_id)"
+              : "Map the trace data to the dataset columns"}
           </Field.HelperText>
 
-          <TracesMapping
-            traceMapping={selectedDataset.mapping as MappingState | undefined}
-            traces={traces}
-            targetFields={columnTypes.map(({ name }) => name)}
-            setDatasetEntries={onRowDataChange}
-            setTraceMapping={(newMappingState) => {
-              setDatasetTriggerMapping?.(newMappingState);
-              updateStoredMapping(newMappingState);
-            }}
-          />
+          {isThreadMapping ? (
+            <ThreadMapping
+              traces={tracesToUse}
+              threadMapping={currentThreadMapping}
+              targetFields={columnTypes.map(({ name }) => name)}
+              setDatasetEntries={onRowDataChange}
+              setThreadMapping={debouncedUpdateThreadMapping}
+            />
+          ) : (
+            <TracesMapping
+              traceMapping={
+                (selectedDataset.mapping as any)?.traceMapping ??
+                (selectedDataset.mapping as MappingState | undefined)
+              }
+              traces={tracesToUse}
+              targetFields={columnTypes.map(({ name }) => name)}
+              setDatasetEntries={onRowDataChange}
+              setTraceMapping={(newMappingState) => {
+                setDatasetTriggerMapping?.(newMappingState);
+                updateStoredMapping(newMappingState);
+              }}
+            />
+          )}
         </VStack>
         <VStack align="start" width="full" height="full">
           <HStack width="full" align="end">

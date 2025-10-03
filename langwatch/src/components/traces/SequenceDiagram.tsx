@@ -254,30 +254,30 @@ export const generateMermaidSyntax = (
       }
 
       // If this span has a participant and a parent participant, create an interaction
-        if (
-          currentParticipant &&
-          parentParticipant &&
-          currentParticipant !== parentParticipant
-        ) {
-          let label = (span.name ?? span.type).slice(0, 50);
+      if (
+        currentParticipant &&
+        parentParticipant &&
+        currentParticipant !== parentParticipant
+      ) {
+        let label = (span.name ?? span.type).slice(0, 50);
 
-          // Special handling for different span types
-          if (span.type === "llm") {
-            label = "LLM call";
-          } else if (span.type === "agent") {
-            if (participantTypes.get(parentParticipant) === "agent") {
-              label = "handover";
-            } else {
-              label = "call";
-            }
+        // Special handling for different span types
+        if (span.type === "llm") {
+          label = "LLM call";
+        } else if (span.type === "agent") {
+          if (participantTypes.get(parentParticipant) === "agent") {
+            label = "handover";
+          } else {
+            label = "call";
           }
+        }
 
-          // Add duration if significant (>1s) and it's an effective leaf node (no included descendants)
-          const duration = getSpanDuration(span);
-          const isEffectiveLeafNode = !hasIncludedDescendants(span);
-          if (isEffectiveLeafNode) {
-            label += formatDuration(duration);
-          }
+        // Add duration if significant (>1s) and it's an effective leaf node (no included descendants)
+        const duration = getSpanDuration(span);
+        const isEffectiveLeafNode = !hasIncludedDescendants(span);
+        if (isEffectiveLeafNode) {
+          label += formatDuration(duration);
+        }
 
         // Add error indicator if span has error
         if (span.error) {
@@ -490,24 +490,21 @@ const SequenceDiagram = ({
     <VStack align="start" width="full" gap={4}>
       <MermaidRenderer syntax={mermaidSyntax} />
 
-      {/* Debug info - remove in production */}
-      {process.env.NODE_ENV === "development" && (
-        <Box as="details" width="full">
-          <Box as="summary" cursor="pointer" color="gray.500" fontSize="sm">
-            Show Mermaid Syntax
-          </Box>
-          <Box
-            as="pre"
-            fontSize="xs"
-            background="gray.50"
-            padding={4}
-            borderRadius="md"
-            overflow="auto"
-          >
-            {mermaidSyntax}
-          </Box>
+      <Box as="details" width="full">
+        <Box as="summary" cursor="pointer" color="gray.500" fontSize="sm">
+          Show Mermaid Syntax
         </Box>
-      )}
+        <Box
+          as="pre"
+          fontSize="xs"
+          background="gray.50"
+          padding={4}
+          borderRadius="md"
+          overflow="auto"
+        >
+          {mermaidSyntax}
+        </Box>
+      </Box>
     </VStack>
   );
 };

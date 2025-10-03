@@ -226,18 +226,41 @@ export const datasetRouter = createTRPCRouter({
       z.object({
         projectId: z.string(),
         datasetId: z.string(),
-        mapping: z.object({
-          mapping: z.record(z.string(), z.any()),
-          expansions: z.array(z.string()),
-        }),
+        mapping: z
+          .object({
+            mapping: z.record(z.string(), z.any()),
+            expansions: z.array(z.string()),
+          })
+          .optional(),
+        threadMapping: z
+          .object({
+            mapping: z.record(z.string(), z.any()),
+          })
+          .optional(),
       })
     )
     .use(checkUserPermissionForProject(TeamRoleGroup.DATASETS_MANAGE))
     .mutation(async ({ ctx, input }) => {
-      const { projectId, datasetId, mapping } = input;
+      const { projectId, datasetId, mapping, threadMapping } = input;
+
+      // Get existing dataset to preserve existing mappings
+      const existingDataset = await ctx.prisma.dataset.findUnique({
+        where: { id: datasetId, projectId },
+        select: { mapping: true },
+      });
+
+      const existingMapping = (existingDataset?.mapping as any) || {};
+
+      // Merge with existing mappings
+      const updatedMapping = {
+        ...existingMapping,
+        ...(mapping ? { traceMapping: mapping } : {}),
+        ...(threadMapping ? { threadMapping } : {}),
+      };
+
       return await ctx.prisma.dataset.update({
         where: { id: datasetId, projectId },
-        data: { mapping },
+        data: { mapping: updatedMapping },
       });
     }),
   /**
