@@ -1,37 +1,40 @@
 import { createTRPCRouter } from "~/server/api/trpc";
-import { organizationRouter } from "./routers/organization";
-import { projectRouter } from "./routers/project";
-import { teamRouter } from "./routers/team";
-import { tracesRouter } from "./routers/traces";
-import { spansRouter } from "./routers/spans";
+
+import { dependencies } from "../../injection/dependencies.server";
+
 import { analyticsRouter } from "./routers/analytics";
-import { monitorsRouter } from "./routers/monitors";
+import { annotationRouter } from "./routers/annotation";
+import { annotationScoreRouter } from "./routers/annotationScore";
+import { batchRecordRouter } from "./routers/batchRecord";
 import { costsRouter } from "./routers/costs";
-import { planRouter } from "./routers/plan";
-import { topicsRouter } from "./routers/topics";
 import { datasetRouter } from "./routers/dataset";
 import { datasetRecordRouter } from "./routers/datasetRecord";
-import { graphsRouter } from "./routers/graphs";
 import { evaluationsRouter } from "./routers/evaluations";
-import { batchRecordRouter } from "./routers/batchRecord";
-import { limitsRouter } from "./routers/limits";
-import { dependencies } from "../../injection/dependencies.server";
-import { triggerRouter } from "./routers/triggers";
 import { experimentsRouter } from "./routers/experiments";
-import { annotationRouter } from "./routers/annotation";
-import { modelProviderRouter } from "./routers/modelProviders";
-import { userRouter } from "./routers/user";
-import { annotationScoreRouter } from "./routers/annotationScore";
-import { publicEnvRouter } from "./routers/publicEnv";
-import { shareRouter } from "./routers/share";
-import { llmModelCostsRouter } from "./routers/llmModelCosts";
-import { translateRouter } from "./routers/translate";
-import { workflowRouter } from "./routers/workflows";
-import { optimizationRouter } from "./routers/optimization";
+import { graphsRouter } from "./routers/graphs";
 import { integrationsChecksRouter } from "./routers/integrationsChecks";
-import { onboardingRouter } from "./routers/onboarding";
-import { llmConfigsRouter } from "./routers/llm-prompt-configs/llmConfigs";
+import { limitsRouter } from "./routers/limits";
+import { llmModelCostsRouter } from "./routers/llmModelCosts";
+import { modelProviderRouter } from "./routers/modelProviders";
+import { monitorsRouter } from "./routers/monitors";
+import { onboardingRouter } from "./routers/onboarding/onboarding.router";
+import { optimizationRouter } from "./routers/optimization";
+import { organizationRouter } from "./routers/organization";
+import { planRouter } from "./routers/plan";
+import { projectRouter } from "./routers/project";
+import { promptsRouter } from "./routers/prompts";
+import { publicEnvRouter } from "./routers/publicEnv";
 import { scenarioRouter } from "./routers/scenario";
+import { shareRouter } from "./routers/share";
+import { spansRouter } from "./routers/spans";
+import { teamRouter } from "./routers/team";
+import { topicsRouter } from "./routers/topics";
+import { tracesRouter } from "./routers/traces";
+import { translateRouter } from "./routers/translate";
+import { triggerRouter } from "./routers/triggers";
+import { userRouter } from "./routers/user";
+import { workflowRouter } from "./routers/workflows";
+
 /**
  * This is the primary router for your server.
  *
@@ -68,8 +71,8 @@ export const appRouter = createTRPCRouter({
   optimization: optimizationRouter,
   integrationsChecks: integrationsChecksRouter,
   onboarding: onboardingRouter,
-  llmConfigs: llmConfigsRouter,
   scenarios: scenarioRouter,
+  prompts: promptsRouter,
   ...(dependencies.extraTRPCRoutes?.() ?? {}),
 });
 

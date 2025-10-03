@@ -175,8 +175,23 @@ export class LlmConfigRepository {
     projectId: string;
     organizationId: string;
     version?: number;
+    versionId?: string;
   }): Promise<LlmConfigWithLatestVersion | null> {
     const { idOrHandle, projectId, organizationId } = params;
+    const where: Prisma.LlmPromptConfigVersionWhereInput = {};
+
+    if (params.version) {
+      where.version = params.version;
+    }
+
+    if (params.versionId) {
+      where.id = params.versionId;
+    }
+
+    if (params.version && params.versionId) {
+      throw new Error("Cannot specify both version and versionId");
+    }
+
     const config = await this.prisma.llmPromptConfig.findFirst({
       where: {
         OR: [
@@ -212,7 +227,7 @@ export class LlmConfigRepository {
       include: {
         versions: {
           orderBy: { createdAt: "desc" },
-          where: "version" in params ? { version: params.version } : undefined,
+          where,
           take: 1,
         },
       },
@@ -358,6 +373,7 @@ export class LlmConfigRepository {
    * because it ensures that the config and version are created in the same
    * transaction, which is important for maintaining data integrity,
    * and because all configs should have an initial version.
+   * @deprecated This is a bad pattern. We should only create drafts via the UI/API/Clients.
    */
   async createConfigWithInitialVersion(params: {
     configData: CreateLlmConfigParams;

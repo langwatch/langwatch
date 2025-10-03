@@ -135,7 +135,7 @@ export function HistoryPopover({ onClose }: { onClose: () => void }) {
     );
   };
 
-  const onRestore = useCallback(
+  const onRestoreSuccess = useCallback(
     async (versionId: string) => {
       if (!project || !workflowId) return;
 
@@ -268,7 +268,7 @@ export function HistoryPopover({ onClose }: { onClose: () => void }) {
                   >
                     <Button
                       variant="ghost"
-                      onClick={() => void onRestore(version.id)}
+                      onClick={() => void onRestoreSuccess(version.id)}
                       loading={restoreVersion.isLoading}
                     >
                       <HistoryIcon size={24} />

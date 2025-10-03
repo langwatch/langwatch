@@ -39,6 +39,9 @@ type ConfigData = z.infer<
  */
 export type VersionedPrompt = {
   id: string;
+  /**
+   * @deprecated Use handle instead
+   */
   name: string;
   handle: string | null;
   scope: PromptScope;
@@ -56,11 +59,16 @@ export type VersionedPrompt = {
     content: string;
   }>;
   authorId: string | null;
+  author?: {
+    id: string;
+    name: string;
+  } | null;
   inputs: LatestConfigVersionSchema["configData"]["inputs"];
   outputs: LatestConfigVersionSchema["configData"]["outputs"];
   response_format: LatestConfigVersionSchema["configData"]["response_format"];
   demonstrations: LatestConfigVersionSchema["configData"]["demonstrations"];
   promptingTechnique: LatestConfigVersionSchema["configData"]["prompting_technique"];
+  commitMessage?: string;
   updatedAt: Date;
   createdAt: Date;
 };
@@ -83,10 +91,14 @@ export class PromptService {
    */
   async getAllPrompts(params: {
     projectId: string;
-    organizationId: string;
+    organizationId?: string;
     version?: "latest" | "all";
   }): Promise<VersionedPrompt[]> {
-    const { projectId, organizationId } = params;
+    const { projectId } = params;
+
+    const organizationId =
+      params.organizationId ??
+      (await this.getOrganizationIdFromProjectId(projectId));
 
     const configs = await this.repository.getAllWithLatestVersion({
       projectId,
@@ -108,17 +120,21 @@ export class PromptService {
   async getPromptByIdOrHandle(params: {
     idOrHandle: string;
     projectId: string;
-    organizationId: string;
     version?: number;
+    organizationId?: string;
+    versionId?: string;
   }): Promise<VersionedPrompt | null> {
-    const { idOrHandle, projectId, organizationId } = params;
-
+    const { idOrHandle, projectId } = params;
+    const organizationId =
+      params.organizationId ??
+      (await this.getOrganizationIdFromProjectId(projectId));
     const config = await this.repository.getConfigByIdOrHandleWithLatestVersion(
       {
         idOrHandle,
         projectId,
         organizationId,
         version: params.version,
+        versionId: params.versionId,
       }
     );
 
@@ -127,6 +143,30 @@ export class PromptService {
     }
 
     return this.transformToVersionedPrompt(config);
+  }
+
+  /**
+   * Gets a prompt by version ID directly.
+   * Single Responsibility: Retrieve a specific prompt version using only the version ID.
+   *
+   * @param params - The parameters object
+   * @param params.versionId - The version ID of the prompt
+   * @param params.projectId - The project ID for authorization and context
+   * @returns The versioned prompt configuration
+   */
+  async getPromptByVersionId(params: {
+    versionId: string;
+    projectId: string;
+  }): Promise<VersionedPrompt | null> {
+    const { config } = await this.repository.versions.getVersionById({
+      versionId: params.versionId,
+      projectId: params.projectId,
+    });
+
+    return await this.getPromptByIdOrHandle({
+      idOrHandle: config.id,
+      projectId: params.projectId,
+    });
   }
 
   /**
@@ -188,10 +228,9 @@ export class PromptService {
   async createPrompt(params: {
     // Config data
     projectId: string;
-    organizationId: string;
+    organizationId?: string;
     handle: string;
     scope?: PromptScope;
-    name?: string;
     // Version data
     authorId?: string;
     prompt?: string;
@@ -202,8 +241,11 @@ export class PromptService {
     temperature?: number;
     max_tokens?: number;
     prompting_technique?: z.infer<typeof promptingTechniqueSchema>;
-    commitMessage?: string;
+    commitMessage?: string | null;
   }): Promise<VersionedPrompt> {
+    const organizationId =
+      params.organizationId ??
+      (await this.getOrganizationIdFromProjectId(params.projectId));
     // If any of the version data is provided,
     // we should create a version from that data
     // and it's not consideered a draft
@@ -245,10 +287,10 @@ export class PromptService {
 
     const config = await this.repository.createConfigWithInitialVersion({
       configData: {
-        name: params.name ?? params.handle,
+        name: params.handle,
         handle: params.handle ?? null,
         projectId: params.projectId,
-        organizationId: params.organizationId,
+        organizationId,
         scope: params.scope ?? "PROJECT",
         authorId: params.authorId,
       },
@@ -301,6 +343,7 @@ export class PromptService {
         | "deletedAt"
         | "configId"
         | "projectId"
+        | "name"
       >
     >;
   }): Promise<VersionedPrompt> {
@@ -372,6 +415,109 @@ export class PromptService {
   }
 
   /**
+   * Upsert a prompt configuration - create if it doesn't exist, update if it does.
+   * This method handles both the config metadata and version data in a single operation.
+   *
+   * @param params - The parameters object
+   * @param params.idOrHandle - The ID or handle of the prompt (if updating)
+   * @param params.projectId - The project ID for authorization and context
+   * @param params.handle - The handle for the prompt (required for create, optional for update)
+   * @param params.data - The data to upsert the prompt with
+   * @param params.data.scope - The scope of the prompt (defaults to "PROJECT")
+   * @param params.data.authorId - Optional author ID for the version
+   * @param params.data.commitMessage - Optional commit message for the version
+   * @param params.data.versionData - The version data to save
+   * @param params.data.prompt - Optional prompt for the version
+   * @param params.data.messages - Optional messages for the version
+   * @param params.data.inputs - Optional inputs for the version
+   * @param params.data.outputs - Optional outputs for the version
+   * @param params.data.model - Optional model for the version
+   * @param params.data.temperature - Optional temperature for the version
+   * @returns The upserted prompt configuration with its latest version
+   */
+  async upsertPrompt(params: {
+    handle: string;
+    projectId: string;
+    data: Partial<
+      Omit<
+        CreateLlmConfigParams &
+          Omit<CreateLlmConfigVersionParams, "configData"> &
+          CreateLlmConfigVersionParams["configData"],
+        | "id"
+        | "createdAt"
+        | "updatedAt"
+        | "deletedAt"
+        | "configId"
+        | "projectId"
+        | "handle"
+      >
+    >;
+  }): Promise<VersionedPrompt> {
+    const { handle, projectId, data } = params;
+
+    // Get organization ID from project ID
+    const organizationId = await this.getOrganizationIdFromProjectId(projectId);
+
+    // Check if prompt exists
+    const existingPrompt = await this.getPromptByIdOrHandle({
+      idOrHandle: handle,
+      projectId,
+      organizationId,
+    });
+
+    if (existingPrompt) {
+      // Update existing prompt
+      return this.updatePrompt({
+        idOrHandle: existingPrompt.id,
+        projectId,
+        data,
+      });
+    } else {
+      // Create new prompt
+      return this.createPrompt({
+        ...data,
+        projectId,
+        organizationId,
+        handle,
+      });
+    }
+  }
+
+  /**
+   * Restore a prompt version
+   * Creates a new version with the same config data as the restored version
+   */
+  async restoreVersion(params: {
+    versionId: string;
+    projectId: string;
+    authorId?: string | null;
+    organizationId?: string;
+  }): Promise<VersionedPrompt> {
+    const organizationId =
+      params.organizationId ??
+      (await this.getOrganizationIdFromProjectId(params.projectId));
+
+    const newVersion = await this.repository.versions.restoreVersion({
+      id: params.versionId,
+      authorId: params.authorId ?? null,
+      projectId: params.projectId,
+      organizationId,
+    });
+
+    const newPrompt = await this.getPromptByIdOrHandle({
+      idOrHandle: newVersion.configId,
+      projectId: params.projectId,
+      organizationId,
+    });
+
+    if (!newPrompt) {
+      throw new Error("Failed to restore version");
+    }
+
+    return newPrompt;
+  }
+
+  /**
    * Checks if a handle is unique for a project.
    * @param params - The parameters object
    * @param params.handle - The handle to check
@@ -383,10 +529,13 @@ export class PromptService {
   async checkHandleUniqueness(params: {
     handle: string;
     projectId: string;
-    organizationId: string;
+    organizationId?: string;
     scope: PromptScope;
     excludeId?: string;
   }): Promise<boolean> {
+    const organizationId =
+      params.organizationId ??
+      (await this.getOrganizationIdFromProjectId(params.projectId));
     // Check if handle exists (excluding current config if editing)
     const existingConfig = await this.prisma.llmPromptConfig.findUnique({
       where: {
@@ -395,7 +544,7 @@ export class PromptService {
           handle: params.handle,
           scope: params.scope,
           projectId: params.projectId,
-          organizationId: params.organizationId,
+          organizationId,
         }),
         // Double check just to make sure the prompt belongs to the project or organization the user is from
         OR: [
@@ -468,7 +617,6 @@ export class PromptService {
     // Case 1: Prompt doesn't exist on server - create new
     if (!existingPrompt) {
       const createdPrompt = await this.createPrompt({
-        name: idOrHandle,
         handle: idOrHandle,
         projectId,
         organizationId,
@@ -593,6 +741,25 @@ export class PromptService {
   }
 
   /**
+   * Delete a prompt
+   */
+  async deletePrompt(params: {
+    idOrHandle: string;
+    projectId: string;
+    organizationId?: string;
+  }): Promise<{ success: boolean }> {
+    const organizationId =
+      params.organizationId ??
+      (await this.getOrganizationIdFromProjectId(params.projectId));
+    const result = await this.repository.deleteConfig(
+      params.idOrHandle,
+      params.projectId,
+      organizationId
+    );
+    return result;
+  }
+
+  /**
    * Transforms a LlmConfigWithLatestVersion to the versioned prompt shape.
    */
   private transformToVersionedPrompt(
@@ -624,25 +791,36 @@ export class PromptService {
       outputs: config.latestVersion.configData.outputs,
       response_format: config.latestVersion.configData.response_format,
       authorId: config.latestVersion.authorId ?? null,
+      author: config.latestVersion.author
+        ? {
+            id: config.latestVersion.author.id,
+            name: config.latestVersion.author.name,
+          }
+        : null,
       updatedAt: config.updatedAt,
       createdAt: config.createdAt,
       demonstrations: config.latestVersion.configData.demonstrations,
       promptingTechnique: config.latestVersion.configData.prompting_technique,
+      commitMessage: config.latestVersion.commitMessage,
     };
   }
 
   private async getOrganizationIdFromProjectId(
     projectId: string
   ): Promise<string> {
-    const team = await this.prisma.team.findUnique({
+    const project = await this.prisma.project.findUnique({
       where: { id: projectId },
-      include: { organization: true },
+      include: {
+        team: {
+          include: { organization: true },
+        },
+      },
     });
 
-    if (!team?.organizationId) {
-      throw new Error("Organization not found");
+    if (!project?.team?.organizationId) {
+      throw new Error(`Organization not found for project ${projectId}`);
     }
 
-    return team.organizationId;
+    return project.team.organizationId;
   }
 }

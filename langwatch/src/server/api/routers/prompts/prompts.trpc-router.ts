@@ -1,0 +1,215 @@
+import { PromptScope } from "@prisma/client";
+import { z } from "zod";
+
+import { PromptService } from "~/server/prompt-config";
+import { TeamRoleGroup } from "../../permission";
+import { checkUserPermissionForProject } from "../../permission";
+import { createTRPCRouter, protectedProcedure } from "../../trpc";
+
+import {
+  handleSchema,
+  inputsSchema,
+  messageSchema,
+  outputsSchema,
+  promptingTechniqueSchema,
+} from "~/prompt-configs/schemas";
+import { nodeDatasetSchema } from "~/optimization_studio/types/dsl";
+
+/**
+ * Router for handling prompts - the business-facing interface
+ * Currently only supports upsert operation
+ * TODO: Add other operations as needed
+ */
+export const promptsRouter = createTRPCRouter({
+  /**
+   * Get all prompts for project
+   */
+  getAllPromptsForProject: protectedProcedure
+    .input(z.object({ projectId: z.string() }))
+    .use(checkUserPermissionForProject(TeamRoleGroup.PROMPTS_VIEW))
+    .query(async ({ ctx, input }) => {
+      const service = new PromptService(ctx.prisma);
+      return await service.getAllPrompts(input);
+    }),
+
+  /**
+   * Restore a prompt version
+   */
+  restoreVersion: protectedProcedure
+    .input(
+      z.object({
+        versionId: z.string(),
+        projectId: z.string(),
+      })
+    )
+    .use(checkUserPermissionForProject(TeamRoleGroup.PROMPTS_MANAGE))
+    .mutation(async ({ ctx, input }) => {
+      const service = new PromptService(ctx.prisma);
+      const authorId = ctx.session?.user?.id;
+      return await service.restoreVersion({
+        ...input,
+        authorId,
+      });
+    }),
+
+  /**
+   * Create a new prompt
+   */
+  create: protectedProcedure
+    .input(
+      z.object({
+        projectId: z.string(),
+        data: z.object({
+          scope: z.nativeEnum(PromptScope).optional(),
+          authorId: z.string().optional(),
+          commitMessage: z.string().optional(),
+          prompt: z.string().optional(),
+          messages: z.array(messageSchema).optional(),
+          inputs: z.array(inputsSchema).optional(),
+          outputs: z.array(outputsSchema).optional(),
+          model: z.string().optional(),
+          temperature: z.number().optional(),
+          maxTokens: z.number().optional(),
+          promptingTechnique: promptingTechniqueSchema.optional(),
+          demonstrations: nodeDatasetSchema.optional(),
+          handle: handleSchema,
+        }),
+      })
+    )
+    .use(checkUserPermissionForProject(TeamRoleGroup.PROMPTS_MANAGE))
+    .mutation(async ({ ctx, input }) => {
+      const service = new PromptService(ctx.prisma);
+      const authorId = ctx.session?.user?.id;
+
+      return await service.createPrompt({
+        ...input.data,
+        projectId: input.projectId,
+        authorId,
+      });
+    }),
+
+  /**
+   * Update a prompt
+   */
+  update: protectedProcedure
+    .input(
+      z.object({
+        projectId: z.string(),
+        id: z.string(),
+        data: z.object({
+          scope: z.nativeEnum(PromptScope).optional(),
+          authorId: z.string().optional(),
+          commitMessage: z.string().optional(),
+          prompt: z.string().optional(),
+          messages: z.array(messageSchema).optional(),
+          inputs: z.array(inputsSchema).optional(),
+          outputs: z.array(outputsSchema).optional(),
+          model: z.string().optional(),
+          temperature: z.number().optional(),
+          maxTokens: z.number().optional(),
+          promptingTechnique: promptingTechniqueSchema.optional(),
+          demonstrations: nodeDatasetSchema.optional(),
+          handle: handleSchema.optional().nullable(),
+        }),
+      })
+    )
+    .use(checkUserPermissionForProject(TeamRoleGroup.PROMPTS_MANAGE))
+    .mutation(async ({ ctx, input }) => {
+      const service = new PromptService(ctx.prisma);
+      const authorId = ctx.session?.user?.id;
+
+      return await service.updatePrompt({
+        idOrHandle: input.id,
+        projectId: input.projectId,
+        data: {
+          ...input.data,
+          authorId,
+        },
+      });
+    }),
+
+  /**
+   * Get a prompt by version id
+   */
+  getByVersionId: protectedProcedure
+    .input(
+      z.object({
+        versionId: z.string(),
+        projectId: z.string(),
+      })
+    )
+    .use(checkUserPermissionForProject(TeamRoleGroup.PROMPTS_VIEW))
+    .query(async ({ ctx, input }) => {
+      const service = new PromptService(ctx.prisma);
+      const { versionId, ...rest } = input;
+      return await service.getPromptByVersionId({
+        versionId,
+        ...rest,
+      });
+    }),
+
+  /**
+   * Get a prompt by id
+   */
+  getByIdOrHandle: protectedProcedure
+    .input(
+      z.object({
+        idOrHandle: z.string(),
+        projectId: z.string(),
+      })
+    )
+    .use(checkUserPermissionForProject(TeamRoleGroup.PROMPTS_VIEW))
+    .query(async ({ ctx, input }) => {
+      const service = new PromptService(ctx.prisma);
+      return await service.getPromptByIdOrHandle(input);
+    }),
+
+  /**
+   * Check if a handle is unique for a project
+   */
+  checkHandleUniqueness: protectedProcedure
+    .input(
+      z.object({
+        handle: handleSchema,
+        projectId: z.string(),
+        scope: z.nativeEnum(PromptScope),
+      })
+    )
+    .use(checkUserPermissionForProject(TeamRoleGroup.PROMPTS_VIEW))
+    .query(async ({ ctx, input }) => {
+      const service = new PromptService(ctx.prisma);
+      return await service.checkHandleUniqueness(input);
+    }),
+
+  /**
+   * Get all versions for a prompt
+   */
+  getAllVersionsForPrompt: protectedProcedure
+    .input(
+      z.object({
+        idOrHandle: z.string(),
+        projectId: z.string(),
+      })
+    )
+    .use(checkUserPermissionForProject(TeamRoleGroup.PROMPTS_VIEW))
+    .query(async ({ ctx, input }) => {
+      const service = new PromptService(ctx.prisma);
+      return await service.getAllVersions(input);
+    }),
+
+  /**
+   * Delete a prompt
+   */
+  delete: protectedProcedure
+    .input(
+      z.object({
+        idOrHandle: z.string(),
+        projectId: z.string(),
+      })
+    )
+    .use(checkUserPermissionForProject(TeamRoleGroup.PROMPTS_MANAGE))
+    .mutation(async ({ ctx, input }) => {
+      const service = new PromptService(ctx.prisma);
+      return await service.deletePrompt(input);
+    }),
+});

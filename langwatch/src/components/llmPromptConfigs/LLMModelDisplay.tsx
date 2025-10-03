@@ -3,6 +3,10 @@ import { Box } from "@chakra-ui/react";
 import { allModelOptions, useModelSelectionOptions } from "../ModelSelector";
 import { OverflownTextWithTooltip } from "../OverflownText";
 
+/**
+ * LLM Model Display
+ * Can be used outside of the form context (does not use react-hook-form)
+ */
 export function LLMModelDisplay({
   model,
   fontSize = "14px",

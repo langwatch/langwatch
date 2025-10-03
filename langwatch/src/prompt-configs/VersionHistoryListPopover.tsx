@@ -10,7 +10,7 @@ import {
   useDisclosure,
 } from "@chakra-ui/react";
 import { Avatar } from "@chakra-ui/react";
-import type { LlmPromptConfigVersion } from "@prisma/client";
+import { useMemo } from "react";
 
 import { HistoryIcon } from "~/components/icons/History";
 import { Popover } from "~/components/ui/popover";
@@ -18,15 +18,22 @@ import { toaster } from "~/components/ui/toaster";
 import { Tooltip } from "~/components/ui/tooltip";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
+import { usePrompts } from "./hooks";
+import type { VersionedPrompt } from "~/server/prompt-config";
 
-type AuthorUser = {
+/**
+ * Minimal interface for version history display
+ * Contains only the fields actually used by the UI components
+ */
+interface VersionHistoryItemData {
   id: string;
-  name: string | null;
-  email: string | null;
-  image: string | null;
-};
-
-type PromptVersion = LlmPromptConfigVersion & { author: AuthorUser | null };
+  versionId: string;
+  version: number;
+  commitMessage?: string;
+  author?: {
+    name: string | null;
+  } | null;
+}
 
 /**
  * Displays a version number in a styled box
@@ -36,7 +43,7 @@ const VersionNumberBox = ({
   children,
   ...props
 }: {
-  version?: LlmPromptConfigVersion;
+  version?: Pick<VersionHistoryItemData, "version">;
 } & BoxProps) => {
   return (
     <Box
@@ -63,12 +70,12 @@ const VersionNumberBox = ({
  * Individual version history item showing commit message, author and restore button
  */
 function VersionHistoryItem({
-  version,
+  data,
   onRestore,
   isLoading,
   isCurrent,
 }: {
-  version: PromptVersion;
+  data: VersionHistoryItemData;
   onRestore: () => void;
   isLoading: boolean;
   isCurrent: boolean;
@@ -77,11 +84,11 @@ function VersionHistoryItem({
     <VStack width="full" align="start" paddingBottom={2}>
       <Separator marginBottom={2} />
       <HStack width="full" gap={3}>
-        <VersionNumberBox version={version} minWidth="48px" />
+        <VersionNumberBox version={data} minWidth="48px" />
         <VStack align="start" width="full" gap={1}>
           <HStack width="full" justify="space-between">
             <Text fontWeight={600} fontSize="13px" lineClamp={1}>
-              {version.commitMessage}
+              {data.commitMessage}
             </Text>
             {isCurrent && (
               <Tag.Root colorPalette="green" size="sm" paddingX={2}>
@@ -98,11 +105,11 @@ function VersionHistoryItem({
               height="16px"
             >
               <Avatar.Fallback
-                name={version.author?.name ?? ""}
+                name={data.author?.name ?? ""}
                 fontSize="6.4px"
               />
             </Avatar.Root>
-            {version.author?.name}
+            {data.author?.name}
           </HStack>
         </VStack>
         {!isCurrent && (
@@ -111,7 +118,7 @@ function VersionHistoryItem({
             positioning={{ placement: "top" }}
           >
             <Button
-              data-testid={`restore-version-button-${version.version}`}
+              data-testid={`restore-version-button-${data.version}`}
               variant="ghost"
               onClick={onRestore}
               loading={isLoading}
@@ -133,8 +140,8 @@ function VersionHistoryList({
   onRestore,
   isLoading,
 }: {
-  versions: PromptVersion[];
-  onRestore: (versionId: string) => void;
+  versions: VersionHistoryItemData[];
+  onRestore: (params: { versionId: string }) => void;
   isLoading: boolean;
 }) {
   return (
@@ -147,9 +154,9 @@ function VersionHistoryList({
     >
       {versions.map((version, index) => (
         <VersionHistoryItem
-          key={version.id}
-          version={version}
-          onRestore={() => onRestore(version.id)}
+          key={version.versionId}
+          data={version}
+          onRestore={() => void onRestore({ versionId: version.versionId })}
           isCurrent={index === 0}
           isLoading={isLoading}
         />
@@ -170,11 +177,7 @@ function VersionHistoryTrigger({
 }) {
   return (
     <Popover.Trigger asChild onClick={onClick}>
-      <Button
-        variant="ghost"
-        color="gray.500"
-        minWidth={0}
-      >
+      <Button variant="ghost" color="gray.500" minWidth={0}>
         <HistoryIcon size={16} />
         {label && <Text>{label}</Text>}
       </Button>
@@ -190,8 +193,8 @@ function VersionHistoryContent({
   versions,
   isLoading,
 }: {
-  onRestore: (versionId: string) => void;
-  versions: PromptVersion[];
+  onRestore: (params: { versionId: string }) => void;
+  versions: VersionHistoryItemData[];
   isLoading: boolean;
 }) {
   return (
@@ -225,8 +228,8 @@ function VersionHistoryPopover({
 }: {
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
-  onRestore: (versionId: string) => void;
-  versions: PromptVersion[];
+  onRestore: (params: { versionId: string }) => void;
+  versions: VersionHistoryItemData[];
   isLoading: boolean;
   label?: string;
 }) {
@@ -249,49 +252,39 @@ function VersionHistoryPopover({
  */
 export function VersionHistoryListPopover({
   configId,
-  onRestore,
+  onRestoreSuccess,
   label,
 }: {
   configId: string;
-  onRestore?: (versionId: string) => void;
+  onRestoreSuccess?: (prompt: VersionedPrompt) => Promise<void>;
   label?: string;
 }) {
   const { open, setOpen, onClose } = useDisclosure();
   const { project } = useOrganizationTeamProject();
-  const {
-    data: versions,
-    isLoading,
-    refetch,
-  } = api.llmConfigs.versions.getVersionsForConfigById.useQuery(
-    {
-      configId,
-      projectId: project?.id ?? "",
-    },
-    {
-      enabled: !!project?.id,
-    }
-  );
-  const { refetch: refetchPromptConfig } =
-    api.llmConfigs.getByIdWithLatestVersion.useQuery(
+  const { restoreVersion } = usePrompts();
+  const { data: prompts, isLoading } =
+    api.prompts.getAllVersionsForPrompt.useQuery(
       {
-        id: configId,
+        idOrHandle: configId,
         projectId: project?.id ?? "",
       },
-      { enabled: !!project?.id }
+      {
+        enabled: !!project?.id && !!configId,
+      }
     );
-  const { mutateAsync: restoreVersion } =
-    api.llmConfigs.versions.restore.useMutation();
 
-  const handleRestore = async (versionId: string) => {
+  const handleRestore = async (params: {
+    versionId: string;
+    configId: string;
+  }) => {
+    const { versionId } = params;
     try {
-      await restoreVersion({
-        id: versionId,
+      const prompt = await restoreVersion({
+        versionId,
         projectId: project?.id ?? "",
       });
-      await refetch();
-      await refetchPromptConfig();
+      await onRestoreSuccess?.(prompt);
       onClose();
-      onRestore?.(versionId);
       toaster.success({
         title: "Version restored successfully",
       });
@@ -303,18 +296,26 @@ export function VersionHistoryListPopover({
     }
   };
 
+  const versions = useMemo(
+    () =>
+      prompts?.map((prompt) => ({
+        id: prompt.id,
+        versionId: prompt.versionId,
+        version: prompt.version,
+        commitMessage: prompt.commitMessage,
+        author: prompt.author,
+      })) ?? [],
+    [prompts]
+  );
+
   return (
     <VersionHistoryPopover
       isOpen={open}
       onOpenChange={(open) => {
         setOpen(open);
-        if (!open) {
-          void refetch();
-        }
       }}
-      // eslint-disable-next-line @typescript-eslint/no-misused-promises
-      onRestore={handleRestore}
-      versions={versions ?? []}
+      onRestore={(params) => void handleRestore({ ...params, configId })}
+      versions={versions}
       isLoading={isLoading}
       label={label}
     />

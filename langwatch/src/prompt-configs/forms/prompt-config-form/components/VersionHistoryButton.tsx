@@ -1,13 +1,14 @@
+import type { VersionedPrompt } from "~/server/prompt-config";
 import { Tooltip } from "../../../../components/ui/tooltip";
 import { VersionHistoryListPopover } from "../../../VersionHistoryListPopover";
 
 export function VersionHistoryButton({
   configId,
-  onRestore,
+  onRestoreSuccess,
   label,
 }: {
   configId: string;
-  onRestore?: (versionId: string) => void;
+  onRestoreSuccess?: (prompt: VersionedPrompt) => Promise<void>;
   label?: string;
 }) {
   return (
@@ -19,7 +20,7 @@ export function VersionHistoryButton({
     >
       <VersionHistoryListPopover
         configId={configId}
-        onRestore={onRestore}
+        onRestoreSuccess={onRestoreSuccess}
         label={label}
       />
     </Tooltip>

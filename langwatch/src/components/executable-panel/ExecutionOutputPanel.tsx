@@ -53,7 +53,7 @@ export const ExecutionOutputPanel = ({
           Outputs
         </Heading>
         <Spacer />
-        {executionState &&
+        {
           executionState?.timestamps &&
           isExecutionComplete && (
             <ExecutionMetadata

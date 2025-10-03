@@ -52,21 +52,6 @@ curl --request GET \\
       path: "/api/prompts/{id}",
       method: "GET",
     },
-
-    {
-      content: `
-const options = {method: 'GET', headers: {'X-Auth-Token': '${apiKey}'}};
-
-fetch('https://app.langwatch.ai/api/prompts/${promptId}', options)
-  .then(response => response.json())
-  .then(response => console.log(response))
-  .catch(err => console.error(err));
-`,
-      target: "node_native",
-      title: "Get Prompts (HTTP)",
-      path: "/api/prompts/{id}",
-      method: "GET",
-    },
     {
       content: `
 import { LangWatch } from 'langwatch';

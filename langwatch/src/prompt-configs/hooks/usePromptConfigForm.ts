@@ -2,16 +2,13 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import isEqual from "lodash-es/isEqual";
 import { useEffect } from "react";
 import { useForm, type DeepPartial } from "react-hook-form";
-import { type z } from "zod";
 
 import { inputsAndOutputsToDemostrationColumns } from "../llmPromptConfigUtils";
 
-import { formSchema } from "~/prompt-configs/schemas";
-
-export type PromptConfigFormValues = z.infer<typeof formSchema>;
+import { formSchema, type PromptConfigFormValues } from "~/prompt-configs";
 
 interface UsePromptConfigFormProps {
-  configId: string;
+  configId?: string;
   initialConfigValues?: DeepPartial<PromptConfigFormValues>;
   onChange?: (formValues: PromptConfigFormValues) => void;
 }

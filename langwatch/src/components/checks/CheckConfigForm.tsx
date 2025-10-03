@@ -219,7 +219,6 @@ export default function CheckConfigForm({
       getEvaluatorDefaultSettings(availableEvaluators[checkType], undefined),
       "settings"
     );
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [checkType, defaultValues?.checkType, defaultValues?.settings]);
 
   const accordionIndex = checkType?.startsWith("custom/") ? 0 : undefined;

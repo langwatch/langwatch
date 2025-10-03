@@ -124,7 +124,7 @@ type PromptingTechniqueParameter = StronglyTypedFieldBase & {
 /**
  * Parameter specific to Demonstrations
  */
-type DemonstrationsParameter = StronglyTypedFieldBase & {
+export type DemonstrationsParameter = StronglyTypedFieldBase & {
   type: "dataset";
   identifier: "demonstrations";
   value: NodeDataset | undefined;
@@ -149,7 +149,8 @@ type MessagesParameter = StronglyTypedFieldBase & {
 };
 
 export type LlmPromptConfigComponent = Signature & {
-  configId: string;
+  configId?: string;
+  handle?: string | null;
   inputs: (Omit<Field, "type"> & { type: LlmConfigInputType })[];
   outputs: (Omit<Field, "type"> & { type: LlmConfigOutputType })[];
   parameters: (
@@ -182,7 +183,7 @@ export const nodeDatasetSchema = z.object({
     .object({
       records: z.record(z.array(z.string())),
       columnTypes: z.array(
-        z.object({ name: z.string(), type: datasetColumnTypeSchema })
+        z.object({ id: z.string().optional(), name: z.string(), type: datasetColumnTypeSchema })
       ),
     })
     .optional(),
