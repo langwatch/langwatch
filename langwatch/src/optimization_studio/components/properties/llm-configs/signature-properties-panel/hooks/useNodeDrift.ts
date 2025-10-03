@@ -20,12 +20,17 @@ export function useNodeDrift(node: Node<LlmPromptConfigComponent>) {
   const { configId, handle } = node.data;
   const idOrHandle = configId ?? handle ?? "";
   const { data: latestPrompt, isLoading: isLoadingPrompt } =
-    api.prompts.getByIdOrHandle.useQuery({
-      idOrHandle,
-      projectId: project?.id ?? "",
-    }, {
-      enabled: !!idOrHandle && !!project?.id,
-    });
+    api.prompts.getByIdOrHandle.useQuery(
+      {
+        idOrHandle,
+        projectId: project?.id ?? "",
+      },
+      {
+        enabled: !!idOrHandle && !!project?.id,
+        // Check for changes every second to prevent user from accidentally overwriting changes
+        refetchInterval: 1000,
+      }
+    );
   const formProps = useFormContext<PromptConfigFormValues>();
   /**
    * If the node data (saved in the studio node array) is different from the latest prompt in the database,
@@ -54,7 +59,10 @@ export function useNodeDrift(node: Node<LlmPromptConfigComponent>) {
         type: "success",
       });
     } catch (error) {
-      logger.error({ error, configId, handle }, "Failed to load latest version");
+      logger.error(
+        { error, configId, handle },
+        "Failed to load latest version"
+      );
       toaster.create({
         title: "Failed to load latest version",
         description: "Please try again",
