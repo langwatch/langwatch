@@ -59,7 +59,7 @@ export function promptConfigFormValuesToOptimizationStudioNodeData(
       {
         identifier: "prompting_technique",
         type: "prompting_technique",
-        value: formValues.version?.configData?.prompting_technique,
+        value: formValues.version?.configData?.promptingTechnique,
       },
     ],
   };
@@ -100,8 +100,10 @@ export function safeOptimizationStudioNodeDataToPromptConfigFormInitialValues(
                 ?.records ?? {},
           },
         },
-        prompting_technique: parametersMap.prompting_technique
-          ?.value as PromptConfigFormValues["version"]["configData"]["prompting_technique"],
+        promptingTechnique: parametersMap.prompting_technique
+          ?.value as PromptConfigFormValues["version"]["configData"]["promptingTechnique"],
+        responseFormat: parametersMap.response_format
+          ?.value as PromptConfigFormValues["version"]["configData"]["responseFormat"],
       },
     },
   };
@@ -200,36 +202,6 @@ function inputOutputTypeToDatasetColumnType(
   }
 }
 
-export function llmConfigToPromptConfigFormValues(
-  llmConfig: LlmConfigWithLatestVersion
-): PromptConfigFormValues {
-  return {
-    handle: llmConfig.handle,
-    scope: llmConfig.scope,
-    version: {
-      configData: {
-        ...llmConfig.latestVersion.configData,
-        llm: {
-          model: llmConfig.latestVersion.configData.model,
-          temperature: llmConfig.latestVersion.configData.temperature,
-          max_tokens: llmConfig.latestVersion.configData.max_tokens,
-        },
-      },
-    },
-  };
-}
-
-export function promptConfigFormValuesVersionToLlmConfigVersionConfigData(
-  versionValues: PromptConfigFormValues["version"]
-): LatestConfigVersionSchema["configData"] {
-  return {
-    ...versionValues.configData,
-    model: versionValues.configData.llm.model,
-    temperature: versionValues.configData.llm.temperature,
-    max_tokens: versionValues.configData.llm.max_tokens,
-  };
-}
-
 export function createNewOptimizationStudioPromptName(
   workflowName: string,
   nodes: Node<Component>[]
@@ -307,17 +279,17 @@ export function formValuesToTriggerSaveVersionParams(
   );
 
   return {
-    handle: formValues.handle,
-    scope: formValues.scope,
+    commitMessage: formValues.commitMessage,
     prompt: systemPrompt,
     messages: messages,
     inputs: formValues.version.configData.inputs,
     outputs: formValues.version.configData.outputs,
     model: formValues.version.configData.llm.model,
     temperature: formValues.version.configData.llm.temperature,
-    maxTokens: formValues.version.configData.llm.max_tokens,
-    promptingTechnique: formValues.version.configData.prompting_technique,
+    maxTokens: formValues.version.configData.llm.maxTokens,
+    promptingTechnique: formValues.version.configData.promptingTechnique,
     demonstrations: formValues.version.configData.demonstrations,
+    responseFormat: formValues.version.configData.responseFormat,
   };
 }
 
@@ -340,11 +312,12 @@ export function versionedPromptToPromptConfigFormValues(
         inputs: prompt.inputs,
         outputs: prompt.outputs,
         demonstrations: prompt.demonstrations,
-        prompting_technique: prompt.promptingTechnique,
+        promptingTechnique: prompt.promptingTechnique,
+        responseFormat: prompt.responseFormat,
         llm: {
           model: prompt.model,
           temperature: prompt.temperature,
-          max_tokens: prompt.maxTokens,
+          maxTokens: prompt.maxTokens,
         },
       },
     },
@@ -353,11 +326,22 @@ export function versionedPromptToPromptConfigFormValues(
 
 export function versionedPromptToOptimizationStudioNodeData(
   prompt: VersionedPrompt
-): Required<Node<LlmPromptConfigComponent>["data"]> {
+): Required<
+  Omit<
+    LlmPromptConfigComponent,
+    | "_library_ref"
+    | "cls"
+    | "isCustom"
+    | "behave_as"
+    | "execution_state"
+    | "id"
+    | "description"
+  >
+> {
   return {
     configId: prompt.id,
     handle: prompt.handle,
-    name: prompt.name,
+    name: prompt.handle ?? prompt.name,
     versionMetadata: versionMetadataToNodeFormat({
       versionId: prompt.versionId,
       versionNumber: prompt.version,

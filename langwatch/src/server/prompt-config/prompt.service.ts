@@ -36,6 +36,7 @@ type ConfigData = z.infer<
 /**
  * Full prompt shape that combines prompt config with version data.
  * This is the complete shape that should be returned to API consumers.
+ * Uses camelCase for professional external API.
  */
 export type VersionedPrompt = {
   id: string;
@@ -65,9 +66,9 @@ export type VersionedPrompt = {
   } | null;
   inputs: LatestConfigVersionSchema["configData"]["inputs"];
   outputs: LatestConfigVersionSchema["configData"]["outputs"];
-  response_format: LatestConfigVersionSchema["configData"]["response_format"];
-  demonstrations: LatestConfigVersionSchema["configData"]["demonstrations"];
-  promptingTechnique: LatestConfigVersionSchema["configData"]["prompting_technique"];
+  responseFormat?: LatestConfigVersionSchema["configData"]["response_format"];
+  demonstrations?: LatestConfigVersionSchema["configData"]["demonstrations"];
+  promptingTechnique?: LatestConfigVersionSchema["configData"]["prompting_technique"];
   commitMessage?: string;
   updatedAt: Date;
   createdAt: Date;
@@ -215,8 +216,10 @@ export class PromptService {
     outputs?: z.infer<typeof outputsSchema>[];
     model?: string;
     temperature?: number;
-    max_tokens?: number;
-    prompting_technique?: z.infer<typeof promptingTechniqueSchema>;
+    maxTokens?: number;
+    promptingTechnique?: z.infer<typeof promptingTechniqueSchema>;
+    demonstrations?: LatestConfigVersionSchema["configData"]["demonstrations"];
+    responseFormat?: LatestConfigVersionSchema["configData"]["response_format"];
     commitMessage?: string | null;
   }): Promise<VersionedPrompt> {
     const organizationId =
@@ -232,8 +235,10 @@ export class PromptService {
         params.outputs !== undefined ||
         params.model !== undefined ||
         params.temperature !== undefined ||
-        params.max_tokens !== undefined ||
-        params.prompting_technique !== undefined
+        params.maxTokens !== undefined ||
+        params.promptingTechnique !== undefined ||
+        params.demonstrations !== undefined ||
+        params.responseFormat !== undefined
     );
 
     shouldCreateVersion &&
@@ -281,8 +286,10 @@ export class PromptService {
               ],
               model: params.model,
               temperature: params.temperature,
-              max_tokens: params.max_tokens,
-              prompting_technique: params.prompting_technique,
+              max_tokens: params.maxTokens,
+              prompting_technique: params.promptingTechnique,
+              demonstrations: params.demonstrations,
+              response_format: params.responseFormat,
             } as LatestConfigVersionSchema["configData"],
             schemaVersion: LATEST_SCHEMA_VERSION,
             commitMessage: params.commitMessage ?? "Initial version",
@@ -398,6 +405,24 @@ export class PromptService {
           { tx }
         )) as LatestConfigVersionSchema;
 
+        // Transform camelCase service params to snake_case for repository
+        const {
+          maxTokens,
+          promptingTechnique,
+          responseFormat,
+          ...restVersionData
+        } = newVersionData as any;
+        const transformedVersionData = {
+          ...restVersionData,
+          ...(maxTokens !== undefined && { max_tokens: maxTokens }),
+          ...(promptingTechnique !== undefined && {
+            prompting_technique: promptingTechnique,
+          }),
+          ...(responseFormat !== undefined && {
+            response_format: responseFormat,
+          }),
+        };
+
         // Create the new version directly
         const updatedVersion: LlmPromptConfigVersion =
           await this.versionService.createVersion({
@@ -408,7 +433,7 @@ export class PromptService {
               commitMessage: newVersionData.commitMessage,
               configData: {
                 ...latestVersion.configData,
-                ...newVersionData,
+                ...transformedVersionData,
               },
               schemaVersion: LATEST_SCHEMA_VERSION,
               version: latestVersion.version + 1,
@@ -556,6 +581,22 @@ export class PromptService {
       organizationId,
     });
 
+    // Transform snake_case local config data to camelCase for service layer
+    const {
+      max_tokens,
+      prompting_technique,
+      response_format,
+      ...restLocalData
+    } = localConfigData as any;
+    const camelCaseData = {
+      ...restLocalData,
+      ...(max_tokens !== undefined && { maxTokens: max_tokens }),
+      ...(prompting_technique !== undefined && {
+        promptingTechnique: prompting_technique,
+      }),
+      ...(response_format !== undefined && { responseFormat: response_format }),
+    };
+
     // Case 1: Prompt doesn't exist on server - create new
     if (!existingPrompt) {
       const createdPrompt = await this.createPrompt({
@@ -565,7 +606,7 @@ export class PromptService {
         scope: "PROJECT" as PromptScope,
         authorId,
         commitMessage: commitMessage ?? "Synced from local file",
-        ...localConfigData,
+        ...camelCaseData,
       });
 
       return {
@@ -616,7 +657,7 @@ export class PromptService {
           data: {
             authorId,
             commitMessage: commitMessage ?? "Updated from local file",
-            ...localConfigData,
+            ...camelCaseData,
             schemaVersion: SchemaVersion.V1_0,
           },
         });
@@ -731,7 +772,7 @@ export class PromptService {
       ],
       inputs: config.latestVersion.configData.inputs,
       outputs: config.latestVersion.configData.outputs,
-      response_format: config.latestVersion.configData.response_format,
+      responseFormat: config.latestVersion.configData.response_format,
       authorId: config.latestVersion.authorId ?? null,
       author: config.latestVersion.author
         ? {

@@ -27,14 +27,16 @@ export const formSchema = z.object({
         model: latestConfigVersionSchema.shape.configData.shape.model,
         temperature:
           latestConfigVersionSchema.shape.configData.shape.temperature,
-        max_tokens: latestConfigVersionSchema.shape.configData.shape.max_tokens,
+        maxTokens: latestConfigVersionSchema.shape.configData.shape.max_tokens,
         // Additional params attached to the LLM config
-        litellm_params: z.record(z.string()).optional(),
+        litellmParams: z.record(z.string()).optional(),
       }),
       demonstrations:
         latestConfigVersionSchema.shape.configData.shape.demonstrations,
-      prompting_technique:
+      promptingTechnique:
         latestConfigVersionSchema.shape.configData.shape.prompting_technique,
+      responseFormat:
+        latestConfigVersionSchema.shape.configData.shape.response_format,
     }),
   }),
 });

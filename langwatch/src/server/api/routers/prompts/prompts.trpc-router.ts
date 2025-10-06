@@ -12,6 +12,7 @@ import {
   messageSchema,
   outputsSchema,
   promptingTechniqueSchema,
+  responseFormatSchema,
 } from "~/prompt-configs/schemas";
 import { nodeDatasetSchema } from "~/optimization_studio/types/dsl";
 
@@ -71,6 +72,7 @@ export const promptsRouter = createTRPCRouter({
           temperature: z.number().optional(),
           maxTokens: z.number().optional(),
           promptingTechnique: promptingTechniqueSchema.optional(),
+          responseFormat: responseFormatSchema.optional(),
           demonstrations: nodeDatasetSchema.optional(),
           handle: handleSchema,
         }),
@@ -109,6 +111,7 @@ export const promptsRouter = createTRPCRouter({
           temperature: z.number().optional(),
           maxTokens: z.number().optional(),
           promptingTechnique: promptingTechniqueSchema.optional(),
+          responseFormat: responseFormatSchema.optional(),
           demonstrations: nodeDatasetSchema.optional(),
         }),
       })
