@@ -277,7 +277,7 @@ export class PromptService {
       },
       versionData: shouldCreateVersion
         ? {
-            configData: {
+            configData: this.transformToDbFormat({
               prompt: params.prompt,
               messages: params.messages,
               inputs: params.inputs ?? [{ identifier: "input", type: "str" }],
@@ -286,11 +286,11 @@ export class PromptService {
               ],
               model: params.model,
               temperature: params.temperature,
-              max_tokens: params.maxTokens,
-              prompting_technique: params.promptingTechnique,
+              maxTokens: params.maxTokens,
+              promptingTechnique: params.promptingTechnique,
               demonstrations: params.demonstrations,
-              response_format: params.responseFormat,
-            } as LatestConfigVersionSchema["configData"],
+              responseFormat: params.responseFormat,
+            }) as LatestConfigVersionSchema["configData"],
             schemaVersion: LATEST_SCHEMA_VERSION,
             commitMessage: params.commitMessage ?? "Initial version",
             authorId: params.authorId ?? null,
@@ -405,24 +405,6 @@ export class PromptService {
           { tx }
         )) as LatestConfigVersionSchema;
 
-        // Transform camelCase service params to snake_case for repository
-        const {
-          maxTokens,
-          promptingTechnique,
-          responseFormat,
-          ...restVersionData
-        } = newVersionData as any;
-        const transformedVersionData = {
-          ...restVersionData,
-          ...(maxTokens !== undefined && { max_tokens: maxTokens }),
-          ...(promptingTechnique !== undefined && {
-            prompting_technique: promptingTechnique,
-          }),
-          ...(responseFormat !== undefined && {
-            response_format: responseFormat,
-          }),
-        };
-
         // Create the new version directly
         const updatedVersion: LlmPromptConfigVersion =
           await this.versionService.createVersion({
@@ -431,10 +413,10 @@ export class PromptService {
               configId: updatedConfig.id,
               projectId,
               commitMessage: newVersionData.commitMessage,
-              configData: {
+              configData: this.transformToDbFormat({
                 ...latestVersion.configData,
-                ...transformedVersionData,
-              },
+                ...newVersionData,
+              }) as LatestConfigVersionSchema["configData"],
               schemaVersion: LATEST_SCHEMA_VERSION,
               version: latestVersion.version + 1,
             },
@@ -491,50 +473,31 @@ export class PromptService {
    * @param params.projectId - The project ID to check
    * @param params.organizationId - The organization ID to check
    * @param params.excludeId - The ID of the config to exclude from the check
-   * @returns True if the handle is unique, false otherwise
+   * @returns boolean
    */
   async checkHandleUniqueness(params: {
     handle: string;
     projectId: string;
-    organizationId?: string;
-    scope: PromptScope;
+    scope?: PromptScope;
     excludeId?: string;
+    organizationId?: string;
   }): Promise<boolean> {
     const organizationId =
       params.organizationId ??
       (await this.getOrganizationIdFromProjectId(params.projectId));
-    // Check if handle exists (excluding current config if editing)
-    const existingConfig = await this.prisma.llmPromptConfig.findUnique({
-      where: {
-        scope: params.scope,
-        handle: this.repository.createHandle({
-          handle: params.handle,
-          scope: params.scope,
-          projectId: params.projectId,
-          organizationId,
-        }),
-        // Double check just to make sure the prompt belongs to the project or organization the user is from
-        OR: [
-          {
-            projectId: params.projectId,
-          },
-          {
-            organizationId: params.organizationId,
-            scope: "ORGANIZATION",
-          },
-        ],
-      },
-    });
 
-    // Return true if unique (no existing config or it's the same config being edited)
-    return !existingConfig || existingConfig.id === params.excludeId;
+    return await this.repository.isHandleUnique({
+      handle: params.handle,
+      projectId: params.projectId,
+      organizationId,
+      scope: params.scope,
+      excludeId: params.excludeId,
+    });
   }
 
   /**
-   * Sync/upsert a prompt from local content with conflict resolution
-   *
-   * If the prompt doesn't exist on the server, it will be created.
-   * If the prompt exists on the server, it will be updated.
+   * Syncs a prompt from local source.
+   * If the local version is the same as the remote version, it will be skipped.
    * If the local version is newer than the remote version, it will be updated.
    * If the local version is older than the remote version, it will be conflict.
    *
@@ -581,22 +544,6 @@ export class PromptService {
       organizationId,
     });
 
-    // Transform snake_case local config data to camelCase for service layer
-    const {
-      max_tokens,
-      prompting_technique,
-      response_format,
-      ...restLocalData
-    } = localConfigData as any;
-    const camelCaseData = {
-      ...restLocalData,
-      ...(max_tokens !== undefined && { maxTokens: max_tokens }),
-      ...(prompting_technique !== undefined && {
-        promptingTechnique: prompting_technique,
-      }),
-      ...(response_format !== undefined && { responseFormat: response_format }),
-    };
-
     // Case 1: Prompt doesn't exist on server - create new
     if (!existingPrompt) {
       const createdPrompt = await this.createPrompt({
@@ -606,7 +553,7 @@ export class PromptService {
         scope: "PROJECT" as PromptScope,
         authorId,
         commitMessage: commitMessage ?? "Synced from local file",
-        ...camelCaseData,
+        ...this.transformToDbFormat(localConfigData),
       });
 
       return {
@@ -636,7 +583,7 @@ export class PromptService {
       messages: existingPrompt.messages.filter((msg) => msg.role !== "system"),
       inputs: existingPrompt.inputs,
       outputs: existingPrompt.outputs,
-      response_format: existingPrompt.response_format,
+      response_format: existingPrompt.responseFormat,
     };
 
     // Case 2: Same version - check content
@@ -657,7 +604,7 @@ export class PromptService {
           data: {
             authorId,
             commitMessage: commitMessage ?? "Updated from local file",
-            ...camelCaseData,
+            ...this.transformToDbFormat(localConfigData),
             schemaVersion: SchemaVersion.V1_0,
           },
         });
@@ -743,7 +690,8 @@ export class PromptService {
   }
 
   /**
-   * Transforms a LlmConfigWithLatestVersion to the versioned prompt shape.
+   * Transforms a config from repository format to the VersionedPrompt shape
+   * expected by the API and service layer.
    */
   private transformToVersionedPrompt(
     config: Omit<LlmConfigWithLatestVersion, "deletedAt">
@@ -805,5 +753,24 @@ export class PromptService {
     }
 
     return project.team.organizationId;
+  }
+
+  /**
+   * Transforms camelCase service params to snake_case for repository/database
+   * Single Responsibility: Handle naming convention conversion at data boundary
+   *
+   * TODO: Move to repository layer - the repository should handle this transformation
+   * to properly isolate database schema concerns from service business logic.
+   */
+  private transformToDbFormat(data: any): any {
+    const { maxTokens, promptingTechnique, responseFormat, ...rest } = data;
+    return {
+      ...rest,
+      ...(maxTokens !== undefined && { max_tokens: maxTokens }),
+      ...(promptingTechnique !== undefined && {
+        prompting_technique: promptingTechnique,
+      }),
+      ...(responseFormat !== undefined && { response_format: responseFormat }),
+    };
   }
 }

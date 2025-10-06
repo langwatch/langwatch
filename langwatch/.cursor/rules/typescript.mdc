@@ -33,6 +33,13 @@ function ExampleComponent() {
    - Keep related code together
    - Maintain clear boundaries between concerns
 
+4. Class Organization
+   - Place public methods first
+   - Place private methods at the bottom of the class
+   - Group related methods together
+   - Use clear method names that describe their purpose
+
+
 /**
  * Testing Guidelines
  * - Use Vite's built-in test runner (vitest)
