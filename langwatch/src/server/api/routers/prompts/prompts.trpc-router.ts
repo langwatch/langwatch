@@ -90,6 +90,8 @@ export const promptsRouter = createTRPCRouter({
 
   /**
    * Update a prompt (creates a new version, requires commitMessage)
+   * Scope and handle should not be updated here since they do not create a new version/require a commit message.
+   * Use the updateHandle method instead for those.
    */
   update: protectedProcedure
     .input(
@@ -98,7 +100,6 @@ export const promptsRouter = createTRPCRouter({
         id: z.string(),
         data: z.object({
           commitMessage: z.string(),
-          scope: z.nativeEnum(PromptScope).optional(),
           authorId: z.string().optional(),
           prompt: z.string().optional(),
           messages: z.array(messageSchema).optional(),
@@ -109,7 +110,6 @@ export const promptsRouter = createTRPCRouter({
           maxTokens: z.number().optional(),
           promptingTechnique: promptingTechniqueSchema.optional(),
           demonstrations: nodeDatasetSchema.optional(),
-          handle: handleSchema.optional().nullable(),
         }),
       })
     )

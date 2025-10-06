@@ -24,11 +24,10 @@ import { useNodeDrift } from "../signature-properties-panel/hooks/useNodeDrift";
 
 import { PromptSource } from "./PromptSource";
 import { VersionedPromptLabel } from "./VersionedPromptLabel";
+import { useSyncPromptHandle } from "../signature-properties-panel/hooks/useSyncPromptHandle";
 
 /**
  * Header for the prompt source select in the optimization studio
- * @param param0
- * @returns
  */
 export function PromptSourceHeader({
   node,
@@ -37,6 +36,7 @@ export function PromptSourceHeader({
   node: Node<LlmPromptConfigComponent>;
   onPromptSourceSelect: (config: { id: string; name: string }) => void;
 }) {
+  useSyncPromptHandle(node.data);
   const formProps = useFormContext<PromptConfigFormValues>();
   const { triggerSaveVersion } = usePromptConfigContext();
   const isDirty = formProps.formState.isDirty;
