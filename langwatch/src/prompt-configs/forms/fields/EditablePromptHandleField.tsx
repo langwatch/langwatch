@@ -2,22 +2,32 @@ import { Button, HStack, Text } from "@chakra-ui/react";
 import { useFormContext } from "react-hook-form";
 import { LuPencil } from "react-icons/lu";
 
-import { CopyButton } from "../../../components/CopyButton";
-import type { PromptConfigFormValues } from "~/prompt-configs";
-
-import { usePromptConfigContext } from "~/prompt-configs/providers/PromptConfigProvider";
-import { versionedPromptToPromptConfigFormValues } from "~/prompt-configs/llmPromptConfigUtils";
 import { toaster } from "~/components/ui/toaster";
+import type { PromptConfigFormValues } from "~/prompt-configs";
+import { versionedPromptToPromptConfigFormValues } from "~/prompt-configs/utils/llmPromptConfigUtils";
+import { usePromptConfigContext } from "~/prompt-configs/providers/PromptConfigProvider";
 import type { VersionedPrompt } from "~/server/prompt-config";
+import { createLogger } from "~/utils/logger";
+import { CopyButton } from "../../../components/CopyButton";
+
+const logger = createLogger(
+  "langwatch:prompt-configs:editable-prompt-handle-field"
+);
 
 export function EditablePromptHandleField() {
   const form = useFormContext<PromptConfigFormValues>();
   const { triggerChangeHandle } = usePromptConfigContext();
 
   const handleTriggerChangeHandle = () => {
-    const id = form.watch("id");
+    const id = form.watch("configId");
     if (!id) {
-      throw new Error("Config ID is required");
+      logger.error({ id }, "Config ID is required");
+      toaster.create({
+        title: "Error changing prompt handle",
+        description: "Failed to change prompt handle",
+        type: "error",
+      });
+      return;
     }
 
     const onSuccess = (prompt: VersionedPrompt) => {

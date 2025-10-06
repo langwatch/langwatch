@@ -3,9 +3,9 @@ import isEqual from "lodash-es/isEqual";
 import { useEffect } from "react";
 import { useForm, type DeepPartial } from "react-hook-form";
 
-import { inputsAndOutputsToDemostrationColumns } from "../llmPromptConfigUtils";
-
 import { formSchema, type PromptConfigFormValues } from "~/prompt-configs";
+
+import { inputsAndOutputsToDemostrationColumns } from "../utils/llmPromptConfigUtils";
 
 interface UsePromptConfigFormProps {
   configId?: string;

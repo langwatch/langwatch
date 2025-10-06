@@ -1,18 +1,17 @@
 import { VStack } from "@chakra-ui/react";
 import { useUpdateNodeInternals, type Node } from "@xyflow/react";
+import debounce from "lodash/debounce";
 import { useMemo } from "react";
 import { FormProvider, useFieldArray } from "react-hook-form";
 import { useShallow } from "zustand/react/shallow";
 
-import { useWizardContext } from "../../../../../components/evaluations/wizard/hooks/useWizardContext";
-import { PromptMessagesField } from "../../../../../prompt-configs/forms/fields/PromptMessagesField";
-import { useWorkflowStore } from "../../../../hooks/useWorkflowStore";
-import type { LlmPromptConfigComponent } from "../../../../types/dsl";
-import { PromptSourceHeader } from "../promptSourceSelect/PromptSourceHeader";
-import { WrappedOptimizationStudioLLMConfigField } from "../WrappedOptimizationStudioLLMConfigField";
 import { toaster } from "~/components/ui/toaster";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useSmartSetNode } from "~/optimization_studio/hooks/useSmartSetNode";
+import {
+  usePromptConfigForm,
+  type PromptConfigFormValues,
+} from "~/prompt-configs";
 import type { PromptTextAreaOnAddMention } from "~/prompt-configs/components/ui/PromptTextArea";
 import { DemonstrationsField } from "~/prompt-configs/forms/fields/DemonstrationsField";
 import {
@@ -21,16 +20,18 @@ import {
 } from "~/prompt-configs/forms/fields/PromptConfigVersionFieldGroup";
 import { PromptField } from "~/prompt-configs/forms/fields/PromptField";
 import {
-  usePromptConfigForm,
-  type PromptConfigFormValues,
-} from "~/prompt-configs";
-import {
   promptConfigFormValuesToOptimizationStudioNodeData,
   versionedPromptToPromptConfigFormValues,
   safeOptimizationStudioNodeDataToPromptConfigFormInitialValues,
-} from "~/prompt-configs/llmPromptConfigUtils";
+} from "~/prompt-configs/utils/llmPromptConfigUtils";
 import { api } from "~/utils/api";
-import debounce from "lodash/debounce";
+
+import { useWizardContext } from "../../../../../components/evaluations/wizard/hooks/useWizardContext";
+import { PromptMessagesField } from "../../../../../prompt-configs/forms/fields/PromptMessagesField";
+import { useWorkflowStore } from "../../../../hooks/useWorkflowStore";
+import type { LlmPromptConfigComponent } from "../../../../types/dsl";
+import { PromptSourceHeader } from "../promptSourceSelect/PromptSourceHeader";
+import { WrappedOptimizationStudioLLMConfigField } from "../WrappedOptimizationStudioLLMConfigField";
 
 /**
  * Properties panel for the Signature node in the optimization studio.
@@ -45,7 +46,7 @@ export function SignaturePropertiesPanelForm({
 }) {
   const trpc = api.useContext();
   const { project } = useOrganizationTeamProject();
-  const configId = node.data.configId;
+  const configId = node.data.versionMetadata?.configId;
   const setNode = useSmartSetNode();
 
   const {
@@ -95,12 +96,11 @@ export function SignaturePropertiesPanelForm({
           data: {
             handle: formValues.handle,
             name: formValues.handle ?? node.data.name ?? "",
-            configId,
             ...updatedNodeData,
           },
         });
       }, 1000), // Lower than this slows down the UI significantly, since this will trigger a workspace/experiment save
-    [node.id, setNode, configId, node.data.name]
+    [node.id, setNode, node.data.name]
   );
 
   const formProps = usePromptConfigForm({

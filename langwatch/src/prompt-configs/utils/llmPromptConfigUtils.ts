@@ -1,12 +1,6 @@
 import type { Node } from "@xyflow/react";
+import { isEqual } from "lodash-es";
 import type { DeepPartial } from "react-hook-form";
-
-import type { DatasetColumnType } from "~/server/datasets/types";
-import type { VersionedPrompt } from "~/server/prompt-config";
-import {
-  type LatestConfigVersionSchema,
-} from "~/server/prompt-config/repositories/llm-config-version-schema";
-import type { LlmConfigWithLatestVersion } from "~/server/prompt-config/repositories/llm-config.repository";
 
 import type {
   Component,
@@ -14,10 +8,17 @@ import type {
   LlmPromptConfigComponent,
   NodeDataset,
   Signature,
-} from "../optimization_studio/types/dsl";
-
+} from "~/optimization_studio/types/dsl";
 import type { PromptConfigFormValues } from "~/prompt-configs";
 import { type SaveVersionParams } from "~/prompt-configs/providers/types";
+import {
+  versionMetadataToFormFormat,
+  versionMetadataToNodeFormat,
+} from "~/prompt-configs/schemas/version-metadata-schema";
+import type { DatasetColumnType } from "~/server/datasets/types";
+import type { VersionedPrompt } from "~/server/prompt-config";
+import { type LatestConfigVersionSchema } from "~/server/prompt-config/repositories/llm-config-version-schema";
+import type { LlmConfigWithLatestVersion } from "~/server/prompt-config/repositories/llm-config.repository";
 import {
   LlmConfigInputTypes,
   LlmConfigOutputTypes,
@@ -30,7 +31,9 @@ export function promptConfigFormValuesToOptimizationStudioNodeData(
   formValues: PromptConfigFormValues
 ): Node<LlmPromptConfigComponent>["data"] {
   return {
-    configId: formValues.id,
+    configId: formValues.configId,
+    handle: formValues.handle,
+    versionMetadata: versionMetadataToNodeFormat(formValues.versionMetadata),
     inputs: formValues.version?.configData?.inputs,
     outputs: formValues.version?.configData?.outputs,
     parameters: [
@@ -64,7 +67,7 @@ export function promptConfigFormValuesToOptimizationStudioNodeData(
 }
 
 export function safeOptimizationStudioNodeDataToPromptConfigFormInitialValues(
-  nodeData: Omit<Node<Signature | LlmPromptConfigComponent>["data"], "configId">
+  nodeData: Node<Signature | LlmPromptConfigComponent>["data"]
 ): DeepPartial<PromptConfigFormValues> {
   const parametersMap = nodeData.parameters
     ? Object.fromEntries(nodeData.parameters.map((p) => [p.identifier, p]))
@@ -72,10 +75,12 @@ export function safeOptimizationStudioNodeDataToPromptConfigFormInitialValues(
   const llmParameter = parametersMap.llm as LlmConfigParameter | undefined;
   const inputs = safeInputs(nodeData.inputs);
   const outputs = safeOutputs(nodeData.outputs);
+  const llmNode = nodeData as LlmPromptConfigComponent;
 
   return {
-    id: (nodeData as LlmPromptConfigComponent).configId,
-    handle: (nodeData as LlmPromptConfigComponent).handle,
+    configId: llmNode.configId,
+    versionMetadata: versionMetadataToFormFormat(llmNode.versionMetadata),
+    handle: llmNode.handle,
     version: {
       configData: {
         inputs,
@@ -293,7 +298,7 @@ export function versionedPromptToLlmPromptConfigComponentNodeData(
  */
 export function formValuesToTriggerSaveVersionParams(
   formValues: PromptConfigFormValues
-): Omit<SaveVersionParams, "projectId">['data'] {
+): Omit<SaveVersionParams, "projectId">["data"] {
   const systemPrompt =
     formValues.version.configData.prompt ??
     formValues.version.configData.messages?.find((msg) => msg.role === "system")
@@ -313,7 +318,7 @@ export function formValuesToTriggerSaveVersionParams(
     temperature: formValues.version.configData.llm.temperature,
     maxTokens: formValues.version.configData.llm.max_tokens,
     promptingTechnique: formValues.version.configData.prompting_technique,
-    demonstrations: formValues.version.configData.demonstrations
+    demonstrations: formValues.version.configData.demonstrations,
   };
 }
 
@@ -321,7 +326,12 @@ export function versionedPromptToPromptConfigFormValues(
   prompt: VersionedPrompt
 ): PromptConfigFormValues {
   return {
-    id: prompt.id,
+    configId: prompt.id,
+    versionMetadata: {
+      versionId: prompt.versionId,
+      versionNumber: prompt.version,
+      versionCreatedAt: prompt.versionCreatedAt,
+    },
     handle: prompt.handle,
     scope: prompt.scope,
     version: {
@@ -344,11 +354,16 @@ export function versionedPromptToPromptConfigFormValues(
 
 export function versionedPromptToOptimizationStudioNodeData(
   prompt: VersionedPrompt
-): Node<LlmPromptConfigComponent>["data"] {
+): Required<Node<LlmPromptConfigComponent>["data"]> {
   return {
     configId: prompt.id,
     handle: prompt.handle,
     name: prompt.name,
+    versionMetadata: versionMetadataToNodeFormat({
+      versionId: prompt.versionId,
+      versionNumber: prompt.version,
+      versionCreatedAt: prompt.versionCreatedAt,
+    })!,
     inputs: prompt.inputs,
     outputs: prompt.outputs,
     parameters: [
@@ -369,7 +384,7 @@ export function versionedPromptToOptimizationStudioNodeData(
       {
         identifier: "demonstrations",
         type: "dataset",
-        value: prompt.demonstrations
+        value: prompt.demonstrations,
       },
       {
         identifier: "messages",
@@ -383,4 +398,54 @@ export function versionedPromptToOptimizationStudioNodeData(
       },
     ],
   };
+}
+
+/**
+ * Converts the node data to a JSON string for comparison.
+ * We do not compare all fields, only the ones that are relevant for the prompt.
+ * It aggressively standardizes the node data to avoid false drift detection.
+ * FIXME: We ignore the demonstrations parameter because it's not required to be created
+ * when using the prompt manager, and this creates a false drift detection that
+ * the sync will not resolve.
+ */
+function standardizeNodeData(nodeData: Node<LlmPromptConfigComponent>["data"]) {
+  return JSON.parse(
+    JSON.stringify({
+      handle: nodeData.handle,
+      inputs: nodeData.inputs?.map((input) => ({
+        identifier: input.identifier,
+        type: input.type,
+      })),
+      outputs: nodeData.outputs?.map((output) => ({
+        identifier: output.identifier,
+        type: output.type,
+      })),
+      parameters: [...nodeData.parameters]
+        .filter((param) => param.identifier !== "demonstrations")
+        .map((param) => ({
+          identifier: param.identifier,
+          type: param.type,
+          value: param.value,
+        }))
+        .sort((a, b) => a.identifier.localeCompare(b.identifier)),
+    })
+  );
+}
+
+/**
+ * Compares two node data objects for equality.
+ * Special handling for demonstrations to ignore columnType IDs.
+ * @param nodeData1
+ * @param nodeData2
+ * @returns
+ */
+export function isNodeDataEqual(
+  nodeData1: Node<LlmPromptConfigComponent>["data"],
+  nodeData2: Node<LlmPromptConfigComponent>["data"]
+): boolean {
+  const nodesAreEqual = isEqual(
+    standardizeNodeData(nodeData1),
+    standardizeNodeData(nodeData2)
+  );
+  return nodesAreEqual;
 }

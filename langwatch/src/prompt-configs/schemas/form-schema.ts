@@ -3,11 +3,18 @@ import { z } from "zod";
 import { getLatestConfigVersionSchema } from "~/server/prompt-config/repositories/llm-config-version-schema";
 
 import { handleSchema, scopeSchema } from "./field-schemas";
+import { versionMetadataSchema } from "./version-metadata-schema";
 
 const latestConfigVersionSchema = getLatestConfigVersionSchema();
 
 export const formSchema = z.object({
-  id: z.string().optional().describe("ID of the prompt config"),
+  // Config ID (separate from version metadata)
+  configId: z.string().optional(),
+
+  // Version metadata (only present when loaded from database)
+  versionMetadata: versionMetadataSchema.optional(),
+
+  // Visible fields
   handle: handleSchema.nullable(),
   scope: scopeSchema,
   version: z.object({

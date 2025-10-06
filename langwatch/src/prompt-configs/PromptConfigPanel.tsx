@@ -10,8 +10,6 @@ import {
 import { LuBuilding } from "react-icons/lu";
 import { useDebouncedCallback } from "use-debounce";
 
-import { PanelHeader } from "./components/ui/PanelHeader";
-import { PromptConfigForm } from "./forms/prompt-config-form/PromptConfigForm";
 import { useInvokePrompt } from "./hooks/useInvokePrompt";
 import { usePromptConfigForm } from "./hooks/usePromptConfigForm";
 
@@ -29,8 +27,10 @@ import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import {
   promptConfigFormValuesToOptimizationStudioNodeData,
   versionedPromptToPromptConfigFormValues,
-} from "~/prompt-configs/llmPromptConfigUtils";
+} from "~/prompt-configs/utils/llmPromptConfigUtils";
 import { api } from "~/utils/api";
+import { PanelHeader } from "./components/ui/PanelHeader";
+import { PromptConfigForm } from "./forms/prompt-config-form/PromptConfigForm";
 import type { PromptConfigFormValues } from "./types";
 import { buildDefaultFormValues } from "./utils/buildDefaultFormValues";
 

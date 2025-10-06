@@ -7,6 +7,8 @@ import {
   type UseFormReturn,
 } from "react-hook-form";
 
+import type { PromptConfigFormValues } from "~/prompt-configs";
+import type { VersionedPrompt } from "~/server/prompt-config";
 import { PromptConfigProvider } from "../../providers/PromptConfigProvider";
 import { DemonstrationsField } from "../fields/DemonstrationsField";
 import { ModelSelectField } from "../fields/ModelSelectField";
@@ -21,12 +23,10 @@ import { PromptHandleInfo } from "./components/PromptHandleInfo";
 import { VersionHistoryButton } from "./components/VersionHistoryButton";
 import { VersionSaveButton } from "./components/VersionSaveButton";
 
-import type { VersionedPrompt } from "~/server/prompt-config";
-import type { PromptConfigFormValues } from "~/prompt-configs";
 import {
   formValuesToTriggerSaveVersionParams,
   versionedPromptToPromptConfigFormValues,
-} from "~/prompt-configs/llmPromptConfigUtils";
+} from "~/prompt-configs/utils/llmPromptConfigUtils";
 import { usePromptConfigContext } from "~/prompt-configs/providers/PromptConfigProvider";
 import { toaster } from "~/components/ui/toaster";
 
@@ -42,7 +42,7 @@ function InnerPromptConfigForm() {
   const { triggerSaveVersion, triggerCreatePrompt } = usePromptConfigContext();
   const methods = useFormContext<PromptConfigFormValues>();
   const [isSaving, setIsSaving] = useState(false);
-  const configId = methods.watch("id");
+  const configId = methods.watch("configId");
   const isDraft = !Boolean(methods.watch("handle"));
   const saveEnabled = (methods.formState.isDirty || isDraft) && !isSaving;
 

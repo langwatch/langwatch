@@ -1,14 +1,15 @@
-import { type Node } from "@xyflow/react";
 import { VStack } from "@chakra-ui/react";
-import { BasePropertiesPanel } from "../../BasePropertiesPanel";
+import { type Node } from "@xyflow/react";
+
+import { PromptConfigProvider } from "~/prompt-configs/providers/PromptConfigProvider";
 import { useWizardContext } from "../../../../../components/evaluations/wizard/hooks/useWizardContext";
+import { BasePropertiesPanel } from "../../BasePropertiesPanel";
 import type {
   LlmPromptConfigComponent,
   Signature,
 } from "../../../../types/dsl";
 
 import { SignaturePropertiesPanelForm } from "./SignaturePropertiesPanelForm";
-import { PromptConfigProvider } from "~/prompt-configs/providers/PromptConfigProvider";
 
 /**
  * Panel for the Signature node in the optimization studio.

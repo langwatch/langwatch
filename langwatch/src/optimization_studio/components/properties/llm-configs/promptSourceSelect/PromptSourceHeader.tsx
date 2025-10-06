@@ -1,28 +1,29 @@
 import { HStack, Spacer, VStack } from "@chakra-ui/react";
 import type { Node } from "@xyflow/react";
+import { useCallback, useState } from "react";
 import { useFormContext } from "react-hook-form";
 
-import { PromptSource } from "./PromptSource";
-
 import { GenerateApiSnippetButton } from "~/components/GenerateApiSnippetButton";
+import { toaster } from "~/components/ui/toaster";
 import { VerticalFormControl } from "~/components/VerticalFormControl";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import type { LlmPromptConfigComponent } from "~/optimization_studio/types/dsl";
+import { type PromptConfigFormValues } from "~/prompt-configs";
 import { GeneratePromptApiSnippetDialog } from "~/prompt-configs/components/GeneratePromptApiSnippetDialog";
+import { EditablePromptHandleField } from "~/prompt-configs/forms/fields/EditablePromptHandleField";
 import { VersionHistoryButton } from "~/prompt-configs/forms/prompt-config-form/components/VersionHistoryButton";
 import { VersionSaveButton } from "~/prompt-configs/forms/prompt-config-form/components/VersionSaveButton";
-import { type PromptConfigFormValues } from "~/prompt-configs";
+import { usePromptConfigContext } from "~/prompt-configs/providers/PromptConfigProvider";
 import {
   formValuesToTriggerSaveVersionParams,
   versionedPromptToPromptConfigFormValues,
-} from "~/prompt-configs/llmPromptConfigUtils";
-import { usePromptConfigContext } from "~/prompt-configs/providers/PromptConfigProvider";
-import { PromptDriftWarning } from "../signature-properties-panel/PromptDriftWarning";
-import { useNodeDrift } from "../signature-properties-panel/hooks/useNodeDrift";
+} from "~/prompt-configs/utils/llmPromptConfigUtils";
 import type { VersionedPrompt } from "~/server/prompt-config";
-import { toaster } from "~/components/ui/toaster";
-import { useCallback, useState } from "react";
-import { EditablePromptHandleField } from "~/prompt-configs/forms/fields/EditablePromptHandleField";
+
+import { useNodeDrift } from "../signature-properties-panel/hooks/useNodeDrift";
+
+import { PromptSource } from "./PromptSource";
+import { VersionedPromptLabel } from "./VersionedPromptLabel";
 
 /**
  * Header for the prompt source select in the optimization studio
@@ -97,7 +98,7 @@ export function PromptSourceHeader({
   return (
     <VStack width="full" gap={0}>
       <VerticalFormControl
-        label="Versioned Prompt"
+        label={<VersionedPromptLabel node={node} />}
         width="full"
         size="sm"
         paddingBottom={4}
@@ -124,9 +125,9 @@ export function PromptSourceHeader({
             selectedPromptId={configId}
             onSelect={onPromptSourceSelect}
           />
-          {node.data.configId && (
+          {configId && (
             <VersionHistoryButton
-              configId={node.data.configId}
+              configId={configId}
               onRestoreSuccess={(params) => handleOnRestore(params)}
             />
           )}
@@ -138,7 +139,6 @@ export function PromptSourceHeader({
           />
         </HStack>
       </VerticalFormControl>
-      <PromptDriftWarning node={node} />
     </VStack>
   );
 }

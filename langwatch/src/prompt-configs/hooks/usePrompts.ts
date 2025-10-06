@@ -1,3 +1,4 @@
+import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 
 /**
@@ -10,6 +11,8 @@ export const usePrompts = () => {
   const updatePrompt = api.prompts.update.useMutation();
   const restoreVersion = api.prompts.restoreVersion.useMutation();
   const deletePrompt = api.prompts.delete.useMutation();
+  const { project } = useOrganizationTeamProject();
+  const projectId = project?.id ?? "";
 
   const invalidateAll = async () =>
     Promise.all([await trpc.prompts.invalidate()]);
@@ -30,16 +33,13 @@ export const usePrompts = () => {
     return prompt;
   };
 
-  const wrappedGetPromptById = async ({
-    id,
-    projectId,
-  }: {
+  const wrappedGetPromptById = async (params: {
     id: string;
-    projectId: string;
+    projectId?: string;
   }) => {
     const prompt = await trpc.prompts.getByIdOrHandle.fetch({
-      idOrHandle: id,
-      projectId,
+      idOrHandle: params.id,
+      projectId: params.projectId ?? projectId,
     });
     await invalidateAll();
     return prompt;
