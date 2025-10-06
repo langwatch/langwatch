@@ -126,3 +126,62 @@ export const elasticSearchEventToEvent = (event: ElasticSearchEvent): Event => {
     ),
   };
 };
+
+export const decodeOpenTelemetryId = (id: unknown): string | null => {
+  if (typeof id === "string") {
+    return id;
+  }
+  if (id && typeof id === "object" && id.constructor === Uint8Array) {
+    return Buffer.from(id as Uint8Array).toString("hex");
+  }
+
+  return null;
+};
+
+export const decodeBase64OpenTelemetryId = (id: unknown): string | null => {
+  if (typeof id === "string") {
+    // Detect if it's a base64 string by checking for base64-specific characters
+    // Base64 encoding uses +, /, and = for padding which are never in hex strings or plain strings
+    // Only decode if we're confident it's base64
+    const looksLikeBase64 = /[+/=]/.test(id);
+
+    if (looksLikeBase64) {
+      try {
+        return Buffer.from(id, "base64").toString("hex");
+      } catch {
+        // If base64 decode fails, return as-is
+        return id;
+      }
+    }
+
+    // Already a hex string or plain string ID, return as-is
+    return id;
+  }
+
+  // For Uint8Array, use the standard decoder
+  return decodeOpenTelemetryId(id);
+};
+
+export const convertFromUnixNano = (timeUnixNano: unknown): number => {
+  let unixNano: number;
+
+  if (typeof timeUnixNano === "number") {
+    unixNano = timeUnixNano;
+  } else if (typeof timeUnixNano === "string") {
+    const parsed = parseInt(timeUnixNano, 10);
+    unixNano = !isNaN(parsed) ? parsed : Date.now() * 1000000;
+  } else if (
+    timeUnixNano &&
+    typeof timeUnixNano === "object" &&
+    "low" in timeUnixNano &&
+    "high" in timeUnixNano
+  ) {
+    const { low = 0, high = 0 } = timeUnixNano as any;
+    unixNano = high * 0x100000000 + low;
+  } else {
+    unixNano = Date.now() * 1000000;
+  }
+
+  // Convert nanoseconds to milliseconds
+  return Math.round(unixNano / 1000000);
+};
