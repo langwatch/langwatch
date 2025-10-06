@@ -46,7 +46,7 @@ export function SignaturePropertiesPanelForm({
 }) {
   const trpc = api.useContext();
   const { project } = useOrganizationTeamProject();
-  const configId = node.data.versionMetadata?.configId;
+  const configId = node.data.configId;
   const setNode = useSmartSetNode();
 
   const {
