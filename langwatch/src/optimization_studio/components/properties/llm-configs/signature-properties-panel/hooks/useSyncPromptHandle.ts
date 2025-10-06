@@ -1,5 +1,5 @@
 import type { Node } from "@xyflow/react";
-import { useEffect } from "react";
+import { useEffect, useCallback } from "react";
 import { useFormContext } from "react-hook-form";
 
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
@@ -12,10 +12,7 @@ import { api } from "~/utils/api";
  * useSyncPromptHandle hook syncs the latest prompt handle and scope via the provided node's config ID
  * Only syncs if the form is not dirty to prevent syncs while editing
  */
-export function useSyncPromptHandle(nodeData?: {
-  configId?: string;
-  handle: string;
-}) {
+export function useSyncPromptHandle(nodeData?: { configId?: string | null }) {
   const { project } = useOrganizationTeamProject();
   const { configId } = nodeData ?? {};
   const formProps = useFormContext<PromptConfigFormValues>();
@@ -36,9 +33,26 @@ export function useSyncPromptHandle(nodeData?: {
   );
 
   const isLoading = isLoadingLatestPrompt || isFetchingLatestPrompt;
+  const shouldSync = !isLoading || !isDirty || configId;
+
+  /**
+   * Sets the value of the form without triggering a change event
+   * Blocks null values from being set
+   */
+  const setNicely = useCallback(
+    (key: keyof PromptConfigFormValues, value: string | null) => {
+      if (!value) return;
+      formProps.setValue(key, value, {
+        shouldDirty: false,
+        shouldTouch: false,
+        shouldValidate: false,
+      });
+    },
+    [formProps]
+  );
 
   useEffect(() => {
-    if (!latestPrompt || !configId || isLoading || isDirty) return;
+    if (!shouldSync || !latestPrompt) return;
 
     const currentHandle = formProps.getValues("handle");
     const currentScope = formProps.getValues("scope");
@@ -47,12 +61,12 @@ export function useSyncPromptHandle(nodeData?: {
 
     // Selective reset of handle and scope depending on the current and latest values
     if (currentHandle !== latestHandle && latestScope !== currentScope) {
-      formProps.setValue("handle", latestHandle);
-      formProps.setValue("scope", latestScope);
+      setNicely("handle", latestHandle);
+      setNicely("scope", latestScope);
     } else if (currentScope !== latestScope) {
-      formProps.setValue("scope", latestScope);
+      setNicely("scope", latestScope);
     } else if (currentHandle !== latestHandle) {
-      formProps.setValue("handle", latestHandle);
+      setNicely("handle", latestHandle);
     }
-  }, [latestPrompt, configId, formProps, isLoading, isDirty]);
+  }, [latestPrompt, configId, formProps, shouldSync, setNicely]);
 }

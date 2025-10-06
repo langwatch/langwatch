@@ -269,7 +269,7 @@ export function versionedPromptToLlmPromptConfigComponentNodeData(
  */
 export function formValuesToTriggerSaveVersionParams(
   formValues: PromptConfigFormValues
-): Omit<SaveVersionParams, "projectId">["data"] {
+): Omit<Omit<SaveVersionParams, "projectId">["data"], "commitMessage"> {
   const systemPrompt =
     formValues.version.configData.prompt ??
     formValues.version.configData.messages?.find((msg) => msg.role === "system")
@@ -279,7 +279,6 @@ export function formValuesToTriggerSaveVersionParams(
   );
 
   return {
-    commitMessage: formValues.commitMessage,
     prompt: systemPrompt,
     messages: messages,
     inputs: formValues.version.configData.inputs,

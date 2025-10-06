@@ -15,7 +15,7 @@ const DEFAULT_FORM_VALUES: PromptConfigFormValues = {
       llm: {
         model: DEFAULT_MODEL,
         temperature: 0.5,
-        max_tokens: 1000,
+        maxTokens: 1000,
       },
       messages: [{ role: "user" as const, content: "{{input}}" }],
       inputs: [{ identifier: "input", type: "str" as const }],

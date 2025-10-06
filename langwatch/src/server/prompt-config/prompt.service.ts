@@ -473,26 +473,43 @@ export class PromptService {
    * @param params.projectId - The project ID to check
    * @param params.organizationId - The organization ID to check
    * @param params.excludeId - The ID of the config to exclude from the check
-   * @returns boolean
+   * @returns True if the handle is unique, false otherwise
    */
   async checkHandleUniqueness(params: {
     handle: string;
     projectId: string;
-    scope?: PromptScope;
-    excludeId?: string;
     organizationId?: string;
+    scope: PromptScope;
+    excludeId?: string;
   }): Promise<boolean> {
     const organizationId =
       params.organizationId ??
       (await this.getOrganizationIdFromProjectId(params.projectId));
-
-    return await this.repository.isHandleUnique({
-      handle: params.handle,
-      projectId: params.projectId,
-      organizationId,
-      scope: params.scope,
-      excludeId: params.excludeId,
+    // Check if handle exists (excluding current config if editing)
+    const existingConfig = await this.prisma.llmPromptConfig.findUnique({
+      where: {
+        scope: params.scope,
+        handle: this.repository.createHandle({
+          handle: params.handle,
+          scope: params.scope,
+          projectId: params.projectId,
+          organizationId,
+        }),
+        // Double check just to make sure the prompt belongs to the project or organization the user is from
+        OR: [
+          {
+            projectId: params.projectId,
+          },
+          {
+            organizationId: params.organizationId,
+            scope: "ORGANIZATION",
+          },
+        ],
+      },
     });
+
+    // Return true if unique (no existing config or it's the same config being edited)
+    return !existingConfig || existingConfig.id === params.excludeId;
   }
 
   /**
