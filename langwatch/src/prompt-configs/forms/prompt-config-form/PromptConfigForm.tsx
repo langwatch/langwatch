@@ -95,13 +95,10 @@ function InnerPromptConfigForm() {
    * in the prompt configuration (via the studio).
    */
   const demonstrations = methods.watch("version.configData.demonstrations");
-  const hasDemonstrations = Boolean(
-    Object.values(
-      demonstrations?.inline?.records ?? {
-        dummy: [],
-      }
-    )[0]?.length ?? 0 > 0
-  );
+  const demonstrationRecordsLength =
+    Object.values(demonstrations?.inline?.records ?? { dummy: [] })[0]
+      ?.length ?? 0;
+  const hasDemonstrations = demonstrationRecordsLength > 0;
 
   const handleRestore = useCallback(
     async (prompt: VersionedPrompt) => {

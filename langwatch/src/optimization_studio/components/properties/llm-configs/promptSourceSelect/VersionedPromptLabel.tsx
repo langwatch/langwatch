@@ -5,6 +5,9 @@ import type { LlmPromptConfigComponent } from "~/optimization_studio/types/dsl";
 
 import { VersionBadge } from "./VersionBadge";
 
+/**
+ * Label for the versioned prompt in the optimization studio
+ */
 export function VersionedPromptLabel({
   node,
 }: {
