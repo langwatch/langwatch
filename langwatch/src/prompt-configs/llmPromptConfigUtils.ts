@@ -17,6 +17,7 @@ import type {
 } from "../optimization_studio/types/dsl";
 
 import type { PromptConfigFormValues } from "~/prompt-configs";
+import { type SaveVersionParams } from "~/prompt-configs/providers/types";
 import {
   LlmConfigInputTypes,
   LlmConfigOutputTypes,
@@ -24,8 +25,6 @@ import {
   type LlmConfigOutputType,
 } from "~/types";
 import { kebabCase } from "~/utils/stringCasing";
-import { type SaveVersionParams } from "~/prompt-configs/providers/types";
-import { isEqual } from "lodash-es";
 
 export function promptConfigFormValuesToOptimizationStudioNodeData(
   formValues: PromptConfigFormValues
@@ -384,48 +383,4 @@ export function versionedPromptToOptimizationStudioNodeData(
       },
     ],
   };
-}
-
-/**
- * Converts the node data to a JSON string for comparison.
- * We do not compare all fields, only the ones that are relevant for the prompt.
- * It aggressively standardizes the node data to avoid false drift detection.
- * FIXME: We ignore the demonstrations parameter because it's not required to be created
- * when using the prompt manager, and this creates a false drift detection that 
- * the sync will not resolve. 
- */
-function standardizeNodeData(
-  nodeData: Node<LlmPromptConfigComponent>["data"]
-) {
-  return JSON.parse(JSON.stringify({
-    handle: nodeData.handle,
-    inputs: nodeData.inputs?.map(input => ({
-      identifier: input.identifier,
-      type: input.type,
-    })),
-    outputs: nodeData.outputs?.map(output => ({
-      identifier: output.identifier,
-      type: output.type,
-    })),
-    parameters: [...nodeData.parameters].filter(param => param.identifier !== "demonstrations").map(param => ({
-      identifier: param.identifier,
-      type: param.type,
-      value: param.value,
-    })).sort((a, b) => a.identifier.localeCompare(b.identifier)),
-  }));
-}
-
-/**
- * Compares two node data objects for equality.
- * Special handling for demonstrations to ignore columnType IDs.
- * @param nodeData1 
- * @param nodeData2 
- * @returns 
- */
-export function isNodeDataEqual(
-  nodeData1: Node<LlmPromptConfigComponent>["data"],
-  nodeData2: Node<LlmPromptConfigComponent>["data"]
-): boolean {
-  const nodesAreEqual = isEqual(standardizeNodeData(nodeData1), standardizeNodeData(nodeData2));
-  return nodesAreEqual;
 }

@@ -1,23 +1,21 @@
 import type { Node } from "@xyflow/react";
 import { useMemo, useCallback } from "react";
+import { useFormContext } from "react-hook-form";
 
 import { toaster } from "~/components/ui/toaster";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import type { LlmPromptConfigComponent } from "~/optimization_studio/types/dsl";
-
 import type { PromptConfigFormValues } from "~/prompt-configs";
-import {
-  isNodeDataEqual,
-  versionedPromptToOptimizationStudioNodeData,
-} from "~/prompt-configs/llmPromptConfigUtils";
 import { versionedPromptToPromptConfigFormValues } from "~/prompt-configs/llmPromptConfigUtils";
 import { api } from "~/utils/api";
 import { createLogger } from "~/utils/logger";
 
-import { useFormContext } from "react-hook-form";
 
 const logger = createLogger("langwatch:optimization_studio:use-node-drift");
 
+/**
+ * Detects drift between optimization studio node data and database version.
+ */
 export function useNodeDrift(node: Node<LlmPromptConfigComponent>) {
   const { project } = useOrganizationTeamProject();
   const { configId, handle } = node.data;
@@ -37,16 +35,13 @@ export function useNodeDrift(node: Node<LlmPromptConfigComponent>) {
   );
   const formProps = useFormContext<PromptConfigFormValues>();
   /**
-   * If the node data (saved in the studio node array) is different from the latest prompt in the database,
-   * show a warning and provide a button to reload the latest version into the form (which should update the node data)
+   * If the node data version is less than the latest prompt version,
+   * we want to prompt the user to update the node data to the latest version.
    */
   const hasDrift = useMemo(() => {
     if (!latestPrompt || isFetchingLatestPrompt || isLoadingPrompt)
       return false;
-    return !isNodeDataEqual(
-      node.data,
-      versionedPromptToOptimizationStudioNodeData(latestPrompt)
-    );
+    return latestPrompt.version > (node.data.versionNumber ?? 0);
   }, [latestPrompt, node.data, isFetchingLatestPrompt, isLoadingPrompt]);
 
   /**

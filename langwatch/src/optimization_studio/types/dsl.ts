@@ -5,10 +5,11 @@ import type { EvaluatorTypes } from "~/server/evaluations/evaluators.generated";
 
 import {
   datasetColumnTypeSchema,
-  type DatasetColumns,
 } from "../../server/datasets/types";
+mport type { ChatMessage } from "../../server/tracer/types";
+
+
 import type { LlmConfigInputType, LlmConfigOutputType } from "~/types";
-import type { ChatMessage } from "../../server/tracer/types";
 
 export const FIELD_TYPES = [
   "str",
@@ -150,6 +151,9 @@ type MessagesParameter = StronglyTypedFieldBase & {
 
 export type LlmPromptConfigComponent = Signature & {
   configId?: string;
+  versionId?: string;
+  versionNumber?: number;
+  versionCreatedAt?: string; // ISO string
   handle?: string | null;
   inputs: (Omit<Field, "type"> & { type: LlmConfigInputType })[];
   outputs: (Omit<Field, "type"> & { type: LlmConfigOutputType })[];
