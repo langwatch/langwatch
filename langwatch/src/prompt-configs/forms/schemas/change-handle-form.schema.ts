@@ -6,17 +6,12 @@ import { isValidHandle } from "../../../server/prompt-config/repositories/llm-co
 export const changeHandleFormSchema = z.object({
   handle: z
     .string()
+    .trim()
     .nonempty()
-    .refine(
-      (value) => {
-        if (!value || value.trim() === "") return true;
-        return isValidHandle(value);
-      },
-      {
-        message:
-          "Handle should be in the 'identifier' or 'namespace/identifier' format. Only lowercase letters, numbers, hyphens, underscores and up to one slash are allowed.",
-      }
-    ),
+    .refine((value) => isValidHandle(value), {
+      message:
+        "Handle should be in the 'identifier' or 'namespace/identifier' format. Only lowercase letters, numbers, hyphens, underscores and up to one slash are allowed.",
+    }),
   scope: z.nativeEnum(PromptScope).default("PROJECT"),
 });
 
