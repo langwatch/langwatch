@@ -23,10 +23,9 @@ export type ChangeHandleParams = {
 /**
  * Parameters for saving a version of a prompt configuration
  */
-export type SaveVersionParams = Omit<
-  RouterInputs["prompts"]["update"],
-  "projectId"
-> & {
+export type SaveVersionParams = {
+  id: RouterInputs["prompts"]["update"]["id"];
+  data: Omit<RouterInputs["prompts"]["update"]["data"], "commitMessage">;
   onSuccess?: (prompt: VersionedPrompt) => void;
   onError?: (error: Error) => void;
 };
