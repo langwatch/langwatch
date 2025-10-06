@@ -32,6 +32,7 @@ import { integrationsChecksRouter } from "./routers/integrationsChecks";
 import { onboardingRouter } from "./routers/onboarding";
 import { llmConfigsRouter } from "./routers/llm-prompt-configs/llmConfigs";
 import { scenarioRouter } from "./routers/scenario";
+import { roleRouter } from "./routers/role";
 /**
  * This is the primary router for your server.
  *
@@ -70,6 +71,7 @@ export const appRouter = createTRPCRouter({
   onboarding: onboardingRouter,
   llmConfigs: llmConfigsRouter,
   scenarios: scenarioRouter,
+  role: roleRouter,
   ...(dependencies.extraTRPCRoutes?.() ?? {}),
 });
 

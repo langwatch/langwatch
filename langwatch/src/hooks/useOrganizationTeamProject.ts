@@ -9,8 +9,13 @@ import {
   type TeamRoleGroup,
   teamRolePermissionMapping,
 } from "../server/api/permission";
-import type { OrganizationUserRole, TeamUserRole } from "@prisma/client";
+import type { OrganizationUserRole } from "@prisma/client";
 import { usePublicEnv } from "./usePublicEnv";
+import {
+  teamRoleHasPermission,
+  organizationRoleHasPermission,
+  type Permission,
+} from "../server/api/rbac";
 
 export const useOrganizationTeamProject = (
   {
@@ -236,8 +241,12 @@ export const useOrganizationTeamProject = (
     return {
       isLoading: true,
       project: publicShareProject.data,
+      // Legacy API
       hasTeamPermission: () => false,
       hasOrganizationPermission: () => false,
+      // New RBAC API
+      hasPermission: () => false,
+      hasOrgPermission: () => false,
       isPublicRoute,
       isOrganizationFeatureEnabled: () => false,
     };
@@ -248,7 +257,7 @@ export const useOrganizationTeamProject = (
   const hasOrganizationPermission = (
     roleGroup: keyof typeof OrganizationRoleGroup
   ) => {
-    return (
+    return !!(
       organizationRole &&
       (
         organizationRolePermissionMapping[roleGroup] as OrganizationUserRole[]
@@ -261,12 +270,8 @@ export const useOrganizationTeamProject = (
     team_ = team
   ) => {
     const teamRole = team_?.members[0]?.role;
-    return (
-      teamRole &&
-      (teamRolePermissionMapping[roleGroup] as TeamUserRole[]).includes(
-        teamRole
-      )
-    );
+    const allowedRoles = teamRolePermissionMapping[roleGroup];
+    return !!(teamRole && allowedRoles && allowedRoles.includes(teamRole));
   };
 
   const isOrganizationFeatureEnabled = (feature: string): boolean => {
@@ -280,6 +285,30 @@ export const useOrganizationTeamProject = (
     return new Date(trialFeature.trialEndDate) > new Date();
   };
 
+  // ============================================================================
+  // NEW RBAC SYSTEM - Preferred API going forward
+  // ============================================================================
+
+  /**
+   * Check if the user has a specific permission (new RBAC system)
+   * @example hasPermission("analytics:view")
+   * @example hasPermission("datasets:manage")
+   */
+  const hasPermission = (permission: Permission, team_ = team) => {
+    const teamRole = team_?.members[0]?.role;
+    if (!teamRole) return false;
+    return teamRoleHasPermission(teamRole, permission);
+  };
+
+  /**
+   * Check if the user has an organization permission (new RBAC system)
+   * @example hasOrgPermission("organization:manage")
+   */
+  const hasOrgPermission = (permission: Permission) => {
+    if (!organizationRole) return false;
+    return organizationRoleHasPermission(organizationRole, permission);
+  };
+
   return {
     isLoading: false,
     isRefetching: organizations.isRefetching,
@@ -287,8 +316,12 @@ export const useOrganizationTeamProject = (
     organization,
     team,
     project: publicShareProject.data ?? project,
+    // Legacy permission API (still supported)
     hasOrganizationPermission,
     hasTeamPermission,
+    // New RBAC permission API (preferred)
+    hasPermission,
+    hasOrgPermission,
     isPublicRoute,
     modelProviders: modelProviders.data,
     isOrganizationFeatureEnabled,

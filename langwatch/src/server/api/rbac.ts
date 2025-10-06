@@ -1,0 +1,590 @@
+import {
+  OrganizationUserRole,
+  TeamUserRole,
+  type PrismaClient,
+} from "@prisma/client";
+import { TRPCError } from "@trpc/server";
+import type { Session } from "next-auth";
+import { env } from "~/env.mjs";
+
+// ============================================================================
+// PERMISSION DEFINITIONS
+// ============================================================================
+
+/**
+ * Core actions that can be performed on resources
+ */
+export const Actions = {
+  VIEW: "view",
+  CREATE: "create",
+  UPDATE: "update",
+  DELETE: "delete",
+  MANAGE: "manage", // Full CRUD + settings
+  SHARE: "share",
+  EXECUTE: "execute",
+  DEBUG: "debug",
+} as const;
+
+export type Action = (typeof Actions)[keyof typeof Actions];
+
+/**
+ * Resources in the system that can have permissions
+ */
+export const Resources = {
+  PROJECT: "project",
+  ANALYTICS: "analytics",
+  COST: "cost",
+  MESSAGES: "messages",
+  ANNOTATIONS: "annotations",
+  SPANS: "spans",
+  GUARDRAILS: "guardrails",
+  EXPERIMENTS: "experiments",
+  DATASETS: "datasets",
+  TRIGGERS: "triggers",
+  PLAYGROUND: "playground",
+  WORKFLOWS: "workflows",
+  PROMPTS: "prompts",
+  SCENARIOS: "scenarios",
+  TEAM: "team",
+  ORGANIZATION: "organization",
+} as const;
+
+export type Resource = (typeof Resources)[keyof typeof Resources];
+
+/**
+ * Permission is a combination of resource and action
+ * Format: "resource:action" (e.g., "analytics:view", "datasets:manage")
+ */
+export type Permission = `${Resource}:${Action}`;
+
+// ============================================================================
+// ROLE DEFINITIONS
+// ============================================================================
+
+/**
+ * Define what permissions each team role has
+ * This is the single source of truth for team permissions
+ */
+const TEAM_ROLE_PERMISSIONS: Record<TeamUserRole, Permission[]> = {
+  [TeamUserRole.ADMIN]: [
+    // Projects
+    "project:view",
+    "project:create",
+    "project:update",
+    "project:delete",
+    "project:manage",
+    // Analytics
+    "analytics:view",
+    "analytics:manage",
+    // Cost
+    "cost:view",
+    // Messages
+    "messages:view",
+    "messages:share",
+    // Annotations
+    "annotations:view",
+    "annotations:manage",
+    // Spans
+    "spans:view",
+    "spans:debug",
+    // Guardrails
+    "guardrails:view",
+    "guardrails:manage",
+    // Experiments
+    "experiments:view",
+    "experiments:manage",
+    // Datasets
+    "datasets:view",
+    "datasets:manage",
+    // Triggers
+    "triggers:view",
+    "triggers:manage",
+    // Playground
+    "playground:view",
+    "playground:execute",
+    // Workflows
+    "workflows:view",
+    "workflows:manage",
+    // Prompts
+    "prompts:view",
+    "prompts:manage",
+    // Scenarios
+    "scenarios:view",
+    "scenarios:manage",
+    // Team
+    "team:view",
+    "team:manage",
+  ],
+  [TeamUserRole.MEMBER]: [
+    // Projects
+    "project:view",
+    "project:update",
+    // Analytics
+    "analytics:view",
+    "analytics:manage",
+    // Cost
+    "cost:view",
+    // Messages
+    "messages:view",
+    "messages:share",
+    // Annotations
+    "annotations:view",
+    "annotations:manage",
+    // Spans
+    "spans:view",
+    "spans:debug",
+    // Guardrails
+    "guardrails:view",
+    "guardrails:manage",
+    // Experiments
+    "experiments:view",
+    "experiments:manage",
+    // Datasets
+    "datasets:view",
+    "datasets:manage",
+    // Triggers
+    "triggers:view",
+    "triggers:manage",
+    // Playground
+    "playground:view",
+    "playground:execute",
+    // Workflows
+    "workflows:view",
+    "workflows:manage",
+    // Prompts
+    "prompts:view",
+    "prompts:manage",
+    // Scenarios
+    "scenarios:view",
+    "scenarios:manage",
+    // Team
+    "team:view",
+  ],
+  [TeamUserRole.VIEWER]: [
+    // Projects
+    "project:view",
+    // Analytics
+    "analytics:view",
+    // Messages
+    "messages:view",
+    // Annotations
+    "annotations:view",
+    // Spans
+    "spans:view",
+    // Guardrails
+    "guardrails:view",
+    // Experiments
+    "experiments:view",
+    // Datasets
+    "datasets:view",
+    // Workflows
+    "workflows:view",
+    // Prompts
+    "prompts:view",
+    // Scenarios
+    "scenarios:view",
+    // Team
+    "team:view",
+  ],
+};
+
+/**
+ * Define what permissions each organization role has
+ */
+const ORGANIZATION_ROLE_PERMISSIONS: Record<
+  OrganizationUserRole,
+  Permission[]
+> = {
+  [OrganizationUserRole.ADMIN]: [
+    "organization:view",
+    "organization:manage",
+    "organization:delete",
+  ],
+  [OrganizationUserRole.MEMBER]: ["organization:view"],
+  [OrganizationUserRole.EXTERNAL]: ["organization:view"], // Limited view for external users
+};
+
+// ============================================================================
+// PERMISSION CHECKING
+// ============================================================================
+
+/**
+ * Check if a team role has a specific permission
+ */
+export function teamRoleHasPermission(
+  role: TeamUserRole,
+  permission: Permission
+): boolean {
+  return TEAM_ROLE_PERMISSIONS[role].includes(permission);
+}
+
+/**
+ * Check if an organization role has a specific permission
+ */
+export function organizationRoleHasPermission(
+  role: OrganizationUserRole,
+  permission: Permission
+): boolean {
+  return ORGANIZATION_ROLE_PERMISSIONS[role].includes(permission);
+}
+
+/**
+ * Get all permissions for a team role
+ */
+export function getTeamRolePermissions(role: TeamUserRole): Permission[] {
+  return TEAM_ROLE_PERMISSIONS[role];
+}
+
+/**
+ * Get all permissions for an organization role
+ */
+export function getOrganizationRolePermissions(
+  role: OrganizationUserRole
+): Permission[] {
+  return ORGANIZATION_ROLE_PERMISSIONS[role];
+}
+
+// ============================================================================
+// HELPER FUNCTIONS FOR COMMON PERMISSION CHECKS
+// ============================================================================
+
+/**
+ * Check if user can view a resource
+ */
+export function canView(role: TeamUserRole, resource: Resource): boolean {
+  return teamRoleHasPermission(role, `${resource}:view` as Permission);
+}
+
+/**
+ * Check if user can manage a resource (full CRUD)
+ */
+export function canManage(role: TeamUserRole, resource: Resource): boolean {
+  return teamRoleHasPermission(role, `${resource}:manage` as Permission);
+}
+
+/**
+ * Check if user can create a resource
+ */
+export function canCreate(role: TeamUserRole, resource: Resource): boolean {
+  return teamRoleHasPermission(role, `${resource}:create` as Permission);
+}
+
+/**
+ * Check if user can update a resource
+ */
+export function canUpdate(role: TeamUserRole, resource: Resource): boolean {
+  return teamRoleHasPermission(role, `${resource}:update` as Permission);
+}
+
+/**
+ * Check if user can delete a resource
+ */
+export function canDelete(role: TeamUserRole, resource: Resource): boolean {
+  return teamRoleHasPermission(role, `${resource}:delete` as Permission);
+}
+
+// ============================================================================
+// MIDDLEWARE & CONTEXT HELPERS
+// ============================================================================
+
+type PermissionMiddlewareParams<InputType> = {
+  ctx: {
+    prisma: PrismaClient;
+    session: Session;
+    permissionChecked: boolean;
+    publiclyShared: boolean;
+  };
+  input: InputType;
+  next: () => any;
+};
+
+export type PermissionMiddleware<InputType> = (
+  params: PermissionMiddlewareParams<InputType>
+) => Promise<any>;
+
+/**
+ * Check if user has permission for a project
+ */
+export const checkProjectPermission =
+  (permission: Permission) =>
+  async ({
+    ctx,
+    input,
+    next,
+  }: PermissionMiddlewareParams<{ projectId: string }>) => {
+    if (!(await hasProjectPermission(ctx, input.projectId, permission))) {
+      throw new TRPCError({ code: "UNAUTHORIZED" });
+    }
+
+    ctx.permissionChecked = true;
+    return next();
+  };
+
+/**
+ * Check if user has permission for a team
+ */
+export const checkTeamPermission =
+  (permission: Permission) =>
+  async ({
+    ctx,
+    input,
+    next,
+  }: PermissionMiddlewareParams<{ teamId: string }>) => {
+    if (!(await hasTeamPermission(ctx, input.teamId, permission))) {
+      throw new TRPCError({ code: "UNAUTHORIZED" });
+    }
+
+    ctx.permissionChecked = true;
+    return next();
+  };
+
+/**
+ * Check if user has permission for an organization
+ */
+export const checkOrganizationPermission =
+  (permission: Permission) =>
+  async ({
+    ctx,
+    input,
+    next,
+  }: PermissionMiddlewareParams<{ organizationId: string }>) => {
+    if (
+      !(await hasOrganizationPermission(ctx, input.organizationId, permission))
+    ) {
+      throw new TRPCError({ code: "UNAUTHORIZED" });
+    }
+
+    ctx.permissionChecked = true;
+    return next();
+  };
+
+// ============================================================================
+// BACKEND PERMISSION CHECKS
+// ============================================================================
+
+/**
+ * Check if user has a specific permission for a project
+ */
+export async function hasProjectPermission(
+  ctx: { prisma: PrismaClient; session: Session | null },
+  projectId: string,
+  permission: Permission
+): Promise<boolean> {
+  if (!ctx.session?.user) {
+    return false;
+  }
+
+  // Check demo project access
+  if (isDemoProject(projectId, permission)) {
+    return true;
+  }
+
+  const projectTeam = await ctx.prisma.project.findUnique({
+    where: { id: projectId },
+    select: {
+      team: {
+        select: { members: { where: { userId: ctx.session.user.id } } },
+      },
+    },
+  });
+
+  const teamMember = projectTeam?.team.members.find(
+    (member) => member.userId === ctx.session?.user.id
+  );
+
+  if (!teamMember) {
+    return false;
+  }
+
+  return teamRoleHasPermission(teamMember.role, permission);
+}
+
+/**
+ * Check if user has a specific permission for a team
+ */
+export async function hasTeamPermission(
+  ctx: { prisma: PrismaClient; session: Session },
+  teamId: string,
+  permission: Permission
+): Promise<boolean> {
+  if (!ctx.session?.user) {
+    return false;
+  }
+
+  const team = await ctx.prisma.team.findUnique({
+    where: { id: teamId },
+  });
+
+  if (!team?.organizationId) {
+    return false;
+  }
+
+  // Check organization admin override
+  const organizationUser = await ctx.prisma.organizationUser.findFirst({
+    where: {
+      userId: ctx.session.user.id,
+      organizationId: team.organizationId,
+    },
+  });
+
+  // Organization ADMINs can do anything on all teams
+  if (organizationUser?.role === OrganizationUserRole.ADMIN) {
+    return true;
+  }
+
+  // Check team membership
+  const teamUser = await ctx.prisma.teamUser.findFirst({
+    where: {
+      userId: ctx.session.user.id,
+      teamId: teamId,
+    },
+  });
+
+  if (!teamUser) {
+    return false;
+  }
+
+  return teamRoleHasPermission(teamUser.role, permission);
+}
+
+/**
+ * Check if user has a specific permission for an organization
+ */
+export async function hasOrganizationPermission(
+  ctx: { prisma: PrismaClient; session: Session },
+  organizationId: string,
+  permission: Permission
+): Promise<boolean> {
+  if (!ctx.session?.user) {
+    return false;
+  }
+
+  const organizationUser = await ctx.prisma.organizationUser.findFirst({
+    where: {
+      userId: ctx.session.user.id,
+      organizationId: organizationId,
+    },
+  });
+
+  if (!organizationUser) {
+    return false;
+  }
+
+  return organizationRoleHasPermission(organizationUser.role, permission);
+}
+
+// ============================================================================
+// DEMO PROJECT HANDLING
+// ============================================================================
+
+const DEMO_VIEW_PERMISSIONS: Permission[] = [
+  "project:view",
+  "analytics:view",
+  "cost:view",
+  "messages:view",
+  "annotations:view",
+  "spans:view",
+  "spans:debug",
+  "guardrails:view",
+  "experiments:view",
+  "datasets:view",
+  "workflows:view",
+  "prompts:view",
+  "scenarios:view",
+  "playground:view",
+];
+
+export function isDemoProject(
+  projectId: string,
+  permission: Permission
+): boolean {
+  if (projectId !== env.DEMO_PROJECT_ID) {
+    return false;
+  }
+
+  return DEMO_VIEW_PERMISSIONS.includes(permission);
+}
+
+// ============================================================================
+// SKIP PERMISSION CHECK (for public/special routes)
+// ============================================================================
+
+export const skipPermissionCheck = ({
+  ctx,
+  next,
+  input,
+}: PermissionMiddlewareParams<object>) => {
+  ctx.permissionChecked = true;
+
+  const SENSITIVE_KEYS = ["organizationId", "teamId", "projectId"];
+
+  for (const key of SENSITIVE_KEYS) {
+    if (key in input) {
+      throw new Error(
+        `${key} is not allowed to be used without permission check`
+      );
+    }
+  }
+
+  return next();
+};
+
+export const skipPermissionCheckProjectCreation = ({
+  ctx,
+  next,
+}: PermissionMiddlewareParams<object>) => {
+  ctx.permissionChecked = true;
+  return next();
+};
+
+// ============================================================================
+// PUBLIC SHARE HANDLING
+// ============================================================================
+
+type PublicResourceTypes = "TRACE" | "THREAD";
+
+export const checkPermissionOrPubliclyShared =
+  <
+    Key extends keyof InputType,
+    InputType extends { [key in Key]: string } & { projectId: string },
+  >(
+    permissionCheck: PermissionMiddleware<InputType>,
+    {
+      resourceType,
+      resourceParam,
+    }: {
+      resourceType: PublicResourceTypes | ((input: any) => PublicResourceTypes);
+      resourceParam: Key;
+    }
+  ) =>
+  async ({ ctx, input, next }: PermissionMiddlewareParams<InputType>) => {
+    let allowed;
+    try {
+      allowed = await permissionCheck({ ctx, input, next });
+    } catch (e) {
+      if (e instanceof TRPCError && e.code === "UNAUTHORIZED") {
+        allowed = false;
+      }
+    }
+
+    if (!allowed) {
+      const sharedResource = await ctx.prisma.publicShare.findFirst({
+        where: {
+          resourceType:
+            typeof resourceType === "function"
+              ? resourceType(input)
+              : resourceType,
+          resourceId: input[resourceParam],
+        },
+      });
+      if (!sharedResource) {
+        throw new TRPCError({ code: "UNAUTHORIZED" });
+      }
+      ctx.publiclyShared = true;
+    }
+
+    ctx.permissionChecked = true;
+    return next();
+  };
+
+

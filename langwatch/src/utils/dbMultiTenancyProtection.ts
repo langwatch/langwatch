@@ -18,6 +18,11 @@ const EXEMPT_MODELS = [
    * Because prompts can be accessed at either the project or org level
    */
   "LlmPromptConfig",
+  /**
+   * Custom roles are organization-level, not project-level
+   */
+  "CustomRole",
+  "TeamUserCustomRole",
 ];
 
 const _guardProjectId = ({ params }: { params: Prisma.MiddlewareParams }) => {
