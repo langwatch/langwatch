@@ -45,7 +45,7 @@ export const updatePromptInputSchema = createPromptInputSchema
     handle: true,
   })
   .merge(
-    z.object({
+    z.strictObject({
       // commitMessage is required for updates (creates new version)
       commitMessage: commitMessageSchema,
       // Scope is optional, but on the update we don't want to set the default

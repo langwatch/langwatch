@@ -789,6 +789,7 @@ describe("Prompts API", () => {
 
       const invalidData = {
         thisDoesntExist: "test",
+        commitMessage: "test", // << required, otherwise will throw 400
       };
 
       const res = await app.request(`/api/prompts/${prompt.id}`, {
@@ -801,7 +802,7 @@ describe("Prompts API", () => {
       });
 
       const body = await res.json();
-      expect(res.status).toBe(422); // Changed from 400 to 422
+      expect(res.status).toBe(400); // Changed from 400 to 422
       expect(body).toHaveProperty("error");
     });
 
