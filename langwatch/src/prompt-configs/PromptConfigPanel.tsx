@@ -83,11 +83,8 @@ export const PromptConfigPanel = forwardRef(function PromptConfigPanel(
       },
       {
         enabled: !!projectId && !!configId,
-        // This prevents the form from being reset when the user navigates away from the page
         refetchOnWindowFocus: false,
-        // This prevents the form from being reset when the user navigates to the page
         refetchOnMount: false,
-        // This prevents the form from being reset when the user reconnects to the page
         refetchOnReconnect: false,
       }
     );

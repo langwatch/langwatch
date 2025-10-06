@@ -89,7 +89,7 @@ export const promptsRouter = createTRPCRouter({
     }),
 
   /**
-   * Update a prompt
+   * Update a prompt (creates a new version, requires commitMessage)
    */
   update: protectedProcedure
     .input(
@@ -97,9 +97,9 @@ export const promptsRouter = createTRPCRouter({
         projectId: z.string(),
         id: z.string(),
         data: z.object({
+          commitMessage: z.string(),
           scope: z.nativeEnum(PromptScope).optional(),
           authorId: z.string().optional(),
-          commitMessage: z.string().optional(),
           prompt: z.string().optional(),
           messages: z.array(messageSchema).optional(),
           inputs: z.array(inputsSchema).optional(),
@@ -129,22 +129,26 @@ export const promptsRouter = createTRPCRouter({
     }),
 
   /**
-   * Get a prompt by version id
+   * Update only the handle and scope without creating a new version
    */
-  getByVersionId: protectedProcedure
+  updateHandle: protectedProcedure
     .input(
       z.object({
-        versionId: z.string(),
         projectId: z.string(),
+        id: z.string(),
+        data: z.object({
+          handle: handleSchema,
+          scope: z.nativeEnum(PromptScope),
+        }),
       })
     )
-    .use(checkUserPermissionForProject(TeamRoleGroup.PROMPTS_VIEW))
-    .query(async ({ ctx, input }) => {
+    .use(checkUserPermissionForProject(TeamRoleGroup.PROMPTS_MANAGE))
+    .mutation(async ({ ctx, input }) => {
       const service = new PromptService(ctx.prisma);
-      const { versionId, ...rest } = input;
-      return await service.getPromptByVersionId({
-        versionId,
-        ...rest,
+      return await service.updateHandle({
+        idOrHandle: input.id,
+        projectId: input.projectId,
+        data: input.data,
       });
     }),
 

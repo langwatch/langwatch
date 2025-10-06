@@ -419,6 +419,7 @@ describe("Prompts API", () => {
 
           // Update the prompt with a handle
           const updateRes = await helpers.api.put(`/api/prompts/${prompt.id}`, {
+            commitMessage: "Updated handle",
             handle: "my-custom-ref-updated",
           });
 
@@ -455,6 +456,7 @@ describe("Prompts API", () => {
           const updateRes = await helpers.api.put(
             `/api/prompts/${prompt1.id}`,
             {
+              commitMessage: "Updated handle",
               handle: "second-ref",
             }
           );
@@ -522,6 +524,7 @@ describe("Prompts API", () => {
         const updateRes = await helpers.api.put(
           `/api/prompts/${createdPrompt.id}`,
           {
+            commitMessage: "Updated all fields",
             handle: "updated-all-fields-test",
             scope: "ORGANIZATION",
             prompt: "Updated prompt text with {{new_variable}}",
@@ -584,6 +587,7 @@ describe("Prompts API", () => {
         const updateRes = await helpers.api.put(
           `/api/prompts/${createdPrompt.id}`,
           {
+            commitMessage: "Testing conflict",
             prompt: "This is a prompt text",
             messages: [
               { role: "system", content: "This is a system message" },
@@ -610,6 +614,7 @@ describe("Prompts API", () => {
         const updateRes = await helpers.api.put(
           `/api/prompts/${createdPrompt.id}`,
           {
+            commitMessage: "Updated with system message",
             messages: [
               { role: "system", content: "New system message" },
               { role: "user", content: "User message" },
@@ -650,6 +655,7 @@ describe("Prompts API", () => {
         const updateRes = await helpers.api.put(
           `/api/prompts/${createdPrompt.id}`,
           {
+            commitMessage: "Updated prompt text",
             prompt: "New prompt text with {{variable}}",
           }
         );
@@ -809,24 +815,23 @@ describe("Prompts API", () => {
       const prompt = await promptRes.json();
       expect(promptRes.status).toBe(200);
 
-      // Test with empty data (should fail with "At least one field is required")
+      // Test with empty data (should fail validation - missing commitMessage)
       const emptyData = {};
 
       const res = await helpers.api.put(`/api/prompts/${prompt.id}`, emptyData);
 
-      expect(res.status).toBe(422); // Changed from 400 to 422
+      expect(res.status).toBe(400); // Validation error
       const body = await res.json();
       expect(body).toHaveProperty("error");
-      expect(body.error).toContain("At least one field is required");
     });
 
-    it("should return 422 if no fields are provided", async () => {
-      // Changed description and status
+    it("should return 400 if no fields are provided", async () => {
+      // Should fail validation (missing commitMessage)
       const res = await app.request(`/api/prompts/${mockConfig.id}`, {
         method: "PUT",
         headers: { "X-Auth-Token": testApiKey },
       });
-      expect(res.status).toBe(422); // Changed from 400 to 422
+      expect(res.status).toBe(400); // Validation error
     });
   });
 });

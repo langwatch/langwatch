@@ -71,7 +71,8 @@ export function PromptConfigProvider({
   const [changeHandleDialogProps, setChangeHandleDialogProps] =
     useState<ComponentProps<typeof ChangeHandleDialog> | null>(null);
 
-  const { createPrompt, updatePrompt, getPromptById } = usePrompts();
+  const { createPrompt, updatePrompt, updateHandle, getPromptById } =
+    usePrompts();
 
   const triggerSaveVersion: PromptConfigContextType["triggerSaveVersion"] =
     useCallback(
@@ -147,13 +148,10 @@ export function PromptConfigProvider({
 
             const onSubmit = async (formValues: ChangeHandleFormValues) => {
               try {
-                const updatedPrompt = await updatePrompt({
+                const updatedPrompt = await updateHandle({
                   projectId,
                   id,
-                  data: {
-                    ...formValues,
-                    commitMessage: `Changed handle to "${formValues.handle}"`,
-                  },
+                  data: formValues,
                 });
                 onSuccess?.(updatedPrompt);
               } catch (error) {
@@ -175,7 +173,7 @@ export function PromptConfigProvider({
           }
         })();
       },
-      [updatePrompt, getPromptById, projectId]
+      [updateHandle, getPromptById, projectId]
     );
 
   return (

@@ -146,30 +146,6 @@ export class PromptService {
   }
 
   /**
-   * Gets a prompt by version ID directly.
-   * Single Responsibility: Retrieve a specific prompt version using only the version ID.
-   *
-   * @param params - The parameters object
-   * @param params.versionId - The version ID of the prompt
-   * @param params.projectId - The project ID for authorization and context
-   * @returns The versioned prompt configuration
-   */
-  async getPromptByVersionId(params: {
-    versionId: string;
-    projectId: string;
-  }): Promise<VersionedPrompt | null> {
-    const { config } = await this.repository.versions.getVersionById({
-      versionId: params.versionId,
-      projectId: params.projectId,
-    });
-
-    return await this.getPromptByIdOrHandle({
-      idOrHandle: config.id,
-      projectId: params.projectId,
-    });
-  }
-
-  /**
    * Get all versions for a prompt
    */
   async getAllVersions(params: {
@@ -320,19 +296,53 @@ export class PromptService {
   }
 
   /**
+   * Updates only the prompt's handle and scope without creating a new version.
+   * Single Responsibility: Update the prompt's handle and scope.
+   */
+  async updateHandle(params: {
+    idOrHandle: string;
+    projectId: string;
+    data: {
+      handle?: string;
+      scope?: PromptScope;
+    };
+  }): Promise<VersionedPrompt> {
+    const { idOrHandle, projectId, data } = params;
+
+    const updatedConfig = await this.repository.updateConfig(
+      idOrHandle,
+      projectId,
+      data
+    );
+
+    // Get the latest version to return complete prompt
+    const latestVersion = (await this.repository.versions.getLatestVersion(
+      updatedConfig.id,
+      projectId
+    )) as LatestConfigVersionSchema;
+
+    return this.transformToVersionedPrompt({
+      ...updatedConfig,
+      latestVersion,
+    } as LlmConfigWithLatestVersion);
+  }
+
+  /**
    * Updates a prompt configuration with the provided data.
-   * If a handle is provided, it will be formatted with the organization and project context.
+   * Creates a new version. Requires a commit message.
    *
    * @param params - The parameters object
    * @param params.idOrHandle - The prompt configuration ID or handle
    * @param params.projectId - The project ID for authorization and context
-   * @param params.data - The update data containing name and optional handle
+   * @param params.data - The update data (must include commitMessage)
    * @returns The updated prompt configuration
    */
   async updatePrompt(params: {
     idOrHandle: string;
     projectId: string;
-    data: Partial<
+    data: {
+      commitMessage: string;
+    } & Partial<
       Omit<
         CreateLlmConfigParams &
           Omit<CreateLlmConfigVersionParams, "configData"> &
@@ -344,6 +354,7 @@ export class PromptService {
         | "configId"
         | "projectId"
         | "name"
+        | "commitMessage"
       >
     >;
   }): Promise<VersionedPrompt> {
@@ -394,7 +405,7 @@ export class PromptService {
             data: {
               configId: updatedConfig.id,
               projectId,
-              commitMessage: newVersionData.commitMessage ?? "Updated from API",
+              commitMessage: newVersionData.commitMessage,
               configData: {
                 ...latestVersion.configData,
                 ...newVersionData,

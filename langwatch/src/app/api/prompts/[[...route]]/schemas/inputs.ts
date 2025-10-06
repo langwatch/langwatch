@@ -42,11 +42,19 @@ export const createPromptInputSchema = z.strictObject({
 export const updatePromptInputSchema = createPromptInputSchema
   .omit({
     scope: true,
+    handle: true,
   })
   .merge(
     z.object({
+      // commitMessage is required for updates (creates new version)
+      commitMessage: commitMessageSchema,
       // Scope is optional, but on the update we don't want to set the default
       scope: scopeSchema.optional(),
       handle: handleSchema.optional(),
     })
   );
+
+export const updateHandleInputSchema = z.strictObject({
+  handle: handleSchema,
+  scope: scopeSchema,
+});

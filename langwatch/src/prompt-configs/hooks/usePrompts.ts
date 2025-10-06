@@ -9,6 +9,7 @@ export const usePrompts = () => {
   const trpc = api.useContext();
   const createPrompt = api.prompts.create.useMutation();
   const updatePrompt = api.prompts.update.useMutation();
+  const updateHandle = api.prompts.updateHandle.useMutation();
   const restoreVersion = api.prompts.restoreVersion.useMutation();
   const deletePrompt = api.prompts.delete.useMutation();
   const { project } = useOrganizationTeamProject();
@@ -29,6 +30,14 @@ export const usePrompts = () => {
     params
   ) => {
     const prompt = await updatePrompt.mutateAsync(params);
+    await invalidateAll();
+    return prompt;
+  };
+
+  const wrappedUpdateHandle: typeof updateHandle.mutateAsync = async (
+    params
+  ) => {
+    const prompt = await updateHandle.mutateAsync(params);
     await invalidateAll();
     return prompt;
   };
@@ -64,6 +73,7 @@ export const usePrompts = () => {
   return {
     createPrompt: wrappedCreatePrompt,
     updatePrompt: wrappedUpdatePrompt,
+    updateHandle: wrappedUpdateHandle,
     getPromptById: wrappedGetPromptById,
     restoreVersion: wrappedRestoreVersion,
     deletePrompt: wrappedDeletePrompt,
