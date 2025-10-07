@@ -310,7 +310,6 @@ export const openTelemetryMetricsRequestToTracesForCollection = async (
         }
 
         const result = Object.values(traceMap);
-        console.log("traceMap", JSON.stringify(traceMap, undefined, 2));
         span.setAttribute("processed.traces.count", result.length);
         return result;
       } catch (error) {
