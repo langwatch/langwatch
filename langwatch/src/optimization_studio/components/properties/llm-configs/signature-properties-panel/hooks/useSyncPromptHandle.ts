@@ -1,11 +1,8 @@
-import type { Node } from "@xyflow/react";
 import { useEffect, useCallback } from "react";
 import { useFormContext } from "react-hook-form";
 
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import type { LlmPromptConfigComponent } from "~/optimization_studio/types/dsl";
 import type { PromptConfigFormValues } from "~/prompt-configs";
-import { versionedPromptToPromptConfigFormValues } from "~/prompt-configs/utils/llmPromptConfigUtils";
 import { api } from "~/utils/api";
 
 /**
@@ -33,7 +30,7 @@ export function useSyncPromptHandle(nodeData?: { configId?: string | null }) {
   );
 
   const isLoading = isLoadingLatestPrompt || isFetchingLatestPrompt;
-  const shouldSync = !isLoading || !isDirty || configId;
+  const shouldSync = !isLoading && !isDirty && !!configId;
 
   /**
    * Sets the value of the form without triggering a change event
