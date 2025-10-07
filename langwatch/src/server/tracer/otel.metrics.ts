@@ -5,7 +5,7 @@ import {
   otelAttributesToNestedAttributes,
   type TraceForCollection,
 } from "./otel.traces";
-import { decodeBase64OpenTelemetryId, convertFromUnixNano } from "./utils";
+import { decodeBase64OpenTelemetryId, convertFromUnixNano, setNestedProperty } from "./utils";
 import { getLangWatchTracer } from "langwatch";
 import { SpanKind, SpanStatusCode } from "@opentelemetry/api";
 
@@ -136,17 +136,19 @@ export const openTelemetryMetricsRequestToTracesForCollection = async (
                         existingSpan.params.metrics = {};
                       }
 
-                      const metricKey = metric.name ?? "unknown";
-                      (existingSpan.params.metrics as Record<string, any>)[
-                        metricKey
-                      ] = {
-                        ...otelAttributesToNestedAttributes(
-                          dataPoint.attributes
-                        ),
-                        value: exemplar.asDouble ?? exemplar.asInt,
-                        unit: metric.unit,
-                        timestamp: exemplarTime,
-                      };
+                      const metricName = metric.name ?? "unknown";
+                      setNestedProperty(
+                        existingSpan.params.metrics as Record<string, any>,
+                        metricName,
+                        {
+                          ...otelAttributesToNestedAttributes(
+                            dataPoint.attributes
+                          ),
+                          value: exemplar.asDouble ?? exemplar.asInt,
+                          unit: metric.unit,
+                          timestamp: exemplarTime,
+                        }
+                      );
                     }
                   }
                 }
@@ -214,17 +216,19 @@ export const openTelemetryMetricsRequestToTracesForCollection = async (
                       existingSpan.params.metrics = {};
                     }
 
-                    const metricKey = metric.name ?? "unknown";
-                    (existingSpan.params.metrics as Record<string, any>)[
-                      metricKey
-                    ] = {
-                      ...(dataPoint.attributes
-                        ? otelAttributesToNestedAttributes(dataPoint.attributes)
-                        : {}),
-                      value: exemplar.asDouble ?? exemplar.asInt,
-                      unit: metric.unit,
-                      timestamp: exemplarTime,
-                    };
+                    const metricName = metric.name ?? "unknown";
+                    setNestedProperty(
+                      existingSpan.params.metrics as Record<string, any>,
+                      metricName,
+                      {
+                        ...(dataPoint.attributes
+                          ? otelAttributesToNestedAttributes(dataPoint.attributes)
+                          : {}),
+                        value: exemplar.asDouble ?? exemplar.asInt,
+                        unit: metric.unit,
+                        timestamp: exemplarTime,
+                      }
+                    );
                   }
                 }
               }
@@ -291,17 +295,19 @@ export const openTelemetryMetricsRequestToTracesForCollection = async (
                       existingSpan.params.metrics = {};
                     }
 
-                    const metricKey = metric.name ?? "unknown";
-                    (existingSpan.params.metrics as Record<string, any>)[
-                      metricKey
-                    ] = {
-                      ...(dataPoint.attributes
-                        ? otelAttributesToNestedAttributes(dataPoint.attributes)
-                        : {}),
-                      value: exemplar.asDouble ?? exemplar.asInt,
-                      unit: metric.unit,
-                      timestamp: exemplarTime,
-                    };
+                    const metricName = metric.name ?? "unknown";
+                    setNestedProperty(
+                      existingSpan.params.metrics as Record<string, any>,
+                      metricName,
+                      {
+                        ...(dataPoint.attributes
+                          ? otelAttributesToNestedAttributes(dataPoint.attributes)
+                          : {}),
+                        value: exemplar.asDouble ?? exemplar.asInt,
+                        unit: metric.unit,
+                        timestamp: exemplarTime,
+                      }
+                    );
                   }
                 }
               }

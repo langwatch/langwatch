@@ -185,3 +185,23 @@ export const convertFromUnixNano = (timeUnixNano: unknown): number => {
   // Convert nanoseconds to milliseconds
   return Math.round(unixNano / 1000000);
 };
+
+export const setNestedProperty = (
+  obj: Record<string, any>,
+  path: string,
+  value: any
+): void => {
+  const keys = path.split(".");
+  let current = obj;
+
+  for (let i = 0; i < keys.length - 1; i++) {
+    const key = keys[i]!;
+    if (!(key in current) || typeof current[key] !== "object") {
+      current[key] = {};
+    }
+    current = current[key];
+  }
+
+  const lastKey = keys[keys.length - 1]!;
+  current[lastKey] = value;
+};

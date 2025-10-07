@@ -410,7 +410,7 @@ describe("opentelemetry metrics receiver", () => {
     expect(trace?.spans[0]?.type).toEqual("llm");
     expect(trace?.spans[0]?.timestamps?.first_token_at).toEqual(1759757017682);
     expect(
-      trace?.spans[0]?.params?.metrics?.["gen_ai.server.time_to_first_token"]
+      trace?.spans[0]?.params?.metrics?.gen_ai?.server?.time_to_first_token
     ).toEqual({
       model: "gpt-5",
       request: {
@@ -520,12 +520,12 @@ describe("opentelemetry metrics receiver", () => {
     expect(span?.params?.metrics).toBeDefined();
     // Check that the metric was stored
     const metrics = span?.params?.metrics;
-    expect(metrics?.["gen_ai.server.active_requests"]).toBeDefined();
-    expect(metrics?.["gen_ai.server.active_requests"]?.endpoint).toEqual(
+    expect(metrics?.gen_ai?.server?.active_requests).toBeDefined();
+    expect(metrics?.gen_ai?.server?.active_requests?.endpoint).toEqual(
       "/api/chat"
     );
-    expect(metrics?.["gen_ai.server.active_requests"]?.value).toEqual(5);
-    expect(metrics?.["gen_ai.server.active_requests"]?.unit).toEqual("count");
+    expect(metrics?.gen_ai?.server?.active_requests?.value).toEqual(5);
+    expect(metrics?.gen_ai?.server?.active_requests?.unit).toEqual("count");
   });
 
   it("handles sum metrics with exemplars", async () => {
@@ -552,10 +552,10 @@ describe("opentelemetry metrics receiver", () => {
     const span = trace.spans[0];
     expect(span?.params?.metrics).toBeDefined();
     const metrics = span?.params?.metrics;
-    expect(metrics?.["gen_ai.server.request.duration"]).toBeDefined();
-    expect(metrics?.["gen_ai.server.request.duration"]?.model).toEqual("gpt-4");
-    expect(metrics?.["gen_ai.server.request.duration"]?.value).toEqual(12.5);
-    expect(metrics?.["gen_ai.server.request.duration"]?.unit).toEqual("s");
+    expect(metrics?.gen_ai?.server?.request?.duration).toBeDefined();
+    expect(metrics?.gen_ai?.server?.request?.duration?.model).toEqual("gpt-4");
+    expect(metrics?.gen_ai?.server?.request?.duration?.value).toEqual(12.5);
+    expect(metrics?.gen_ai?.server?.request?.duration?.unit).toEqual("s");
   });
 
   it("handles empty metrics request", async () => {
