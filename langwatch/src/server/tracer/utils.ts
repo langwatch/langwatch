@@ -15,6 +15,7 @@ import {
   type Evaluation,
   type RAGChunk,
 } from "./types";
+import { unflatten } from "flat";
 
 export const getRAGChunks = (
   spans: (ElasticSearchSpan | Span)[]
@@ -191,17 +192,21 @@ export const setNestedProperty = (
   path: string,
   value: any
 ): void => {
-  const keys = path.split(".");
-  let current = obj;
+  // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
+  const unflattened = unflatten({ [path]: value }) as Record<string, any>;
 
-  for (let i = 0; i < keys.length - 1; i++) {
-    const key = keys[i]!;
-    if (!(key in current) || typeof current[key] !== "object") {
-      current[key] = {};
+  // Merge the unflattened object into the target object
+  const keys = Object.keys(unflattened);
+  for (const key of keys) {
+    if (!(key in obj)) {
+      obj[key] = unflattened[key];
+    } else {
+      // Deep merge if both are objects
+      if (typeof obj[key] === "object" && typeof unflattened[key] === "object") {
+        obj[key] = { ...obj[key], ...unflattened[key] };
+      } else {
+        obj[key] = unflattened[key];
+      }
     }
-    current = current[key];
   }
-
-  const lastKey = keys[keys.length - 1]!;
-  current[lastKey] = value;
 };
