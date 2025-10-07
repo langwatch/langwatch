@@ -6,7 +6,7 @@ import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import { api } from "~/utils/api";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import ScenarioInfoCard from "~/components/simulations/ScenarioInfoCard";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 
 export default function SimulationsPage() {
   const router = useRouter();
@@ -39,6 +39,14 @@ export default function SimulationsPage() {
     }
   );
 
+  const sortedScenarioSetsData = useMemo(() => {
+    if (!scenarioSetsData) {
+      return undefined;
+    }
+
+    return [...scenarioSetsData].sort((a, b) => b.lastRunAt - a.lastRunAt);
+  }, [scenarioSetsData]);
+
   const handleSetClick = (scenarioSetId: string) => {
     // Navigate to the specific set page using the catch-all route
     void router.push(`${router.asPath}/${scenarioSetId}`);
@@ -52,7 +60,9 @@ export default function SimulationsPage() {
         marginTop={8}
       >
         <PageLayout.Header>
-          {!isLoading && scenarioSetsData && scenarioSetsData.length > 0 && (
+          {!isLoading &&
+            sortedScenarioSetsData &&
+            sortedScenarioSetsData.length > 0 && (
             <HStack justify="space-between" align="center" w="full">
               <PageLayout.Heading>Simulation Sets</PageLayout.Heading>
             </HStack>
@@ -84,13 +94,13 @@ export default function SimulationsPage() {
           )}
 
         {/* Render based on view mode */}
-        {scenarioSetsData && scenarioSetsData.length > 0 && (
+        {sortedScenarioSetsData && sortedScenarioSetsData.length > 0 && (
           <Grid
             templateColumns="repeat(auto-fit, minmax(300px, 1fr))"
             gap={6}
             width="full"
           >
-            {scenarioSetsData.map((setData) => (
+            {sortedScenarioSetsData.map((setData) => (
               <SetCard
                 {...setData}
                 key={setData.scenarioSetId}

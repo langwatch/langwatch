@@ -3,6 +3,7 @@ import type { SpanInputOutput } from "./types";
 import type { IExportLogsServiceRequest } from "@opentelemetry/otlp-transformer";
 import { createLogger } from "~/utils/logger";
 import { otelAttributesToNestedAttributes, type TraceForCollection } from "./otel.traces";
+import { decodeOpenTelemetryId, convertFromUnixNano } from "./utils";
 import { getLangWatchTracer } from "langwatch";
 import { SpanKind, SpanStatusCode } from "@opentelemetry/api";
 import { generateOtelSpanId, generateOtelTraceId } from "../../utils/trace";
@@ -177,37 +178,3 @@ export const openTelemetryLogsRequestToTracesForCollection = async (
   );
 };
 
-const decodeOpenTelemetryId = (id: unknown): string | null => {
-  if (typeof id === "string") {
-    return id;
-  }
-  if (id && typeof id === "object" && id.constructor === Uint8Array) {
-    return Buffer.from(id as Uint8Array).toString("hex");
-  }
-
-  return null;
-};
-
-const convertFromUnixNano = (timeUnixNano: unknown): number => {
-  let unixNano: number;
-
-  if (typeof timeUnixNano === "number") {
-    unixNano = timeUnixNano;
-  } else if (typeof timeUnixNano === "string") {
-    const parsed = parseInt(timeUnixNano, 10);
-    unixNano = !isNaN(parsed) ? parsed : Date.now() * 1000000;
-  } else if (
-    timeUnixNano &&
-    typeof timeUnixNano === "object" &&
-    "low" in timeUnixNano &&
-    "high" in timeUnixNano
-  ) {
-    const { low = 0, high = 0 } = timeUnixNano as any;
-    unixNano = high * 0x100000000 + low;
-  } else {
-    unixNano = Date.now() * 1000000;
-  }
-
-  // Convert nanoseconds to milliseconds
-  return Math.round(unixNano / 1000000);
-};

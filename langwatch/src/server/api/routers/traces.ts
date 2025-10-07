@@ -206,11 +206,7 @@ export const tracesRouter = createTRPCRouter({
       return { topicCounts, subtopicCounts };
     }),
   getCustomersAndLabels: protectedProcedure
-    .input(
-      z.object({
-        projectId: z.string(),
-      })
-    )
+    .input(tracesFilterInput)
     .use(checkUserPermissionForProject(TeamRoleGroup.MESSAGES_VIEW))
     .query(async ({ input, ctx }) => {
       const protections = await getUserProtectionsForProject(ctx, {
@@ -311,6 +307,54 @@ export const tracesRouter = createTRPCRouter({
       });
 
       return getTracesWithSpans(projectId, traceIds, protections);
+    }),
+
+  getTracesWithSpansByThreadIds: protectedProcedure
+    .input(z.object({ projectId: z.string(), threadIds: z.array(z.string()) }))
+    .use(checkUserPermissionForProject(TeamRoleGroup.MESSAGES_VIEW))
+    .query(async ({ input, ctx }) => {
+      const { projectId, threadIds } = input;
+      const protections = await getUserProtectionsForProject(ctx, {
+        projectId: input.projectId,
+      });
+
+      // Fetch all traces with the given thread_ids
+      const traces = await searchTraces({
+        connConfig: { projectId },
+        protections,
+        search: {
+          index: TRACE_INDEX.all,
+          size: 1000,
+          query: {
+            bool: {
+              filter: [
+                { term: { project_id: projectId } },
+                { terms: { "metadata.thread_id": threadIds } },
+              ],
+              should: void 0,
+              must_not: void 0,
+            },
+          },
+          sort: [
+            {
+              "timestamps.started_at": {
+                order: "asc",
+              },
+            },
+          ],
+          // Remove embeddings to reduce payload size
+          _source: {
+            excludes: [
+              "input.embeddings",
+              "input.embeddings.embeddings",
+              "output.embeddings",
+              "output.embeddings.embeddings",
+            ],
+          },
+        },
+      });
+
+      return traces;
     }),
 
   getSampleTracesDataset: protectedProcedure

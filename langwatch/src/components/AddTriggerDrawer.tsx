@@ -39,11 +39,7 @@ import { DatasetSelector } from "./datasets/DatasetSelector";
 
 import { CheckSquare } from "react-feather";
 import { AddAnnotationQueueDrawer } from "./AddAnnotationQueueDrawer";
-import type {
-  MappingState,
-  TraceMapping,
-  TRACE_EXPANSIONS,
-} from "../server/tracer/tracesMapping";
+import type { MappingState } from "../server/tracer/tracesMapping";
 
 export function TriggerDrawer() {
   const { project, organization, team } = useOrganizationTeamProject();
@@ -163,12 +159,7 @@ export function TriggerDrawer() {
     slackWebhook?: string;
     datasetId?: string;
     annotators?: { id: string; name: string }[];
-    datasetMapping?:
-      | {
-          mapping: TraceMapping;
-          expansions: (keyof typeof TRACE_EXPANSIONS)[];
-        }
-      | undefined;
+    datasetMapping?: MappingState | undefined;
   };
 
   const onSubmit = (data: Trigger) => {

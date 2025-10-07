@@ -1,19 +1,29 @@
-import { Field, Text, VStack } from "@chakra-ui/react";
-import { useMemo } from "react";
+import { Field, HStack, Text, VStack } from "@chakra-ui/react";
+import { useEffect, useMemo } from "react";
 import { useShallow } from "zustand/react/shallow";
 import { useEvaluationWizardStore } from "~/components/evaluations/wizard/hooks/evaluation-wizard-store/useEvaluationWizardStore";
 import type { Entry } from "../../../../../optimization_studio/types/dsl";
 import { EvaluatorTracesMapping } from "../../../EvaluatorTracesMapping";
 import { StepAccordion } from "../../components/StepAccordion";
 import { useAvailableEvaluators } from "../../../../../hooks/useAvailableEvaluators";
+import { Switch } from "../../../../ui/switch";
+import { ThreadMapping } from "../../../../traces/ThreadMapping";
+import { useOrganizationTeamProject } from "../../../../../hooks/useOrganizationTeamProject";
+import { api } from "../../../../../utils/api";
+import { useFilterParams } from "../../../../../hooks/useFilterParams";
+import { mergeThreadAndTraceMappings } from "../../../../../server/tracer/tracesMapping";
 
 export const EvaluatorMappingAccordion = ({
   selected,
 }: {
   selected: boolean;
 }) => {
+  const { project } = useOrganizationTeamProject();
+
   const {
     realTimeTraceMappings,
+    realTimeThreadMappings,
+    isThreadMapping,
     task,
     dataSource,
     evaluatorCategory,
@@ -35,6 +45,8 @@ export const EvaluatorMappingAccordion = ({
         getFirstExecutorNode,
       }) => ({
         realTimeTraceMappings: wizardState.realTimeTraceMappings,
+        realTimeThreadMappings: wizardState.realTimeThreadMappings,
+        isThreadMapping: wizardState.isThreadMapping ?? false,
         task: wizardState.task,
         dataSource: wizardState.dataSource,
         evaluatorCategory: wizardState.evaluatorCategory,
@@ -56,7 +68,9 @@ export const EvaluatorMappingAccordion = ({
   const evaluatorType = evaluator?.data.evaluator;
   const availableEvaluators = useAvailableEvaluators();
   const evaluatorDefinition = useMemo(() => {
-    return evaluatorType && availableEvaluators && evaluatorType in availableEvaluators
+    return evaluatorType &&
+      availableEvaluators &&
+      evaluatorType in availableEvaluators
       ? availableEvaluators[evaluatorType]
       : undefined;
   }, [availableEvaluators, evaluatorType]);
@@ -64,6 +78,10 @@ export const EvaluatorMappingAccordion = ({
   const traceMappings = realTimeTraceMappings ?? {
     mapping: {},
     expansions: [],
+  };
+
+  const threadMappings = realTimeThreadMappings ?? {
+    mapping: {},
   };
 
   const targetFields = useMemo(() => {
@@ -103,6 +121,73 @@ export const EvaluatorMappingAccordion = ({
     JSON.stringify(executorFields),
   ]);
 
+  // Fetch sample traces
+  const { filterParams, queryOpts } = useFilterParams();
+  const recentTraces = api.traces.getSampleTracesDataset.useQuery(
+    filterParams,
+    queryOpts
+  );
+
+  // Extract thread_ids from traces
+  const threadIds = useMemo(() => {
+    const ids = (recentTraces.data ?? [])
+      .map((trace) => trace.metadata?.thread_id)
+      .filter((id): id is string => !!id);
+    return Array.from(new Set(ids));
+  }, [recentTraces.data]);
+
+  // Fetch all traces with matching thread_ids when thread mapping is enabled
+  const threadTraces = api.traces.getTracesWithSpansByThreadIds.useQuery(
+    {
+      projectId: project?.id ?? "",
+      threadIds: threadIds,
+    },
+    {
+      enabled: !!project && isThreadMapping && threadIds.length > 0,
+      refetchOnWindowFocus: false,
+    }
+  );
+
+  // Use thread traces when thread mapping is enabled, otherwise use provided traces
+  const tracesToUse = useMemo(() => {
+    if (isThreadMapping && threadTraces.data) {
+      return threadTraces.data;
+    }
+    return recentTraces.data ?? [];
+  }, [isThreadMapping, threadTraces.data, recentTraces.data]);
+
+  // Automatically merge thread and trace mappings when they change
+  useEffect(() => {
+    if (!isThreadMapping) {
+      // When thread mapping is disabled, ensure we're using trace mappings
+      return;
+    }
+
+    // Merge thread mappings into trace mappings
+    const merged = mergeThreadAndTraceMappings(
+      traceMappings,
+      threadMappings,
+      isThreadMapping
+    );
+
+    // Only update if there's a meaningful change
+    if (
+      isThreadMapping &&
+      threadMappings &&
+      Object.keys(threadMappings.mapping).length > 0 &&
+      JSON.stringify(merged) !== JSON.stringify(traceMappings)
+    ) {
+      setWizardState({
+        realTimeTraceMappings: merged,
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    isThreadMapping,
+    JSON.stringify(threadMappings),
+    JSON.stringify(traceMappings),
+  ]);
+
   return (
     <StepAccordion
       value="mappings"
@@ -111,59 +196,109 @@ export const EvaluatorMappingAccordion = ({
       title="Data Mapping"
       showTrigger={!!evaluatorCategory}
     >
-      <VStack align="start" padding={2} paddingBottom={5} width="full" gap={8}>
+      <VStack
+        align="start"
+        padding={2}
+        paddingBottom={5}
+        width="full"
+        gap={8}
+        overflow="visible"
+      >
         {evaluatorDefinition ? (
           <>
-            <Text>
-              {task == "real_time" && dataSource !== "from_production"
-                ? "From the dataset you chose, what columns are equivalent to the real time trace data which will be used for evaluation during monitoring?"
-                : task == "real_time"
-                ? "What data from the real time traces will be used for evaluation?"
-                : "What data from the dataset will be used for evaluation?"}
-            </Text>
-            <Field.Root>
-              <VStack align="start" gap={4} width="full">
-                {selected && (
-                  <EvaluatorTracesMapping
-                    skipSettingDefaultEdges={true}
-                    titles={
-                      task == "real_time" && dataSource !== "from_production"
-                        ? ["Dataset", "Trace", "Evaluator"]
-                        : task == "real_time"
-                        ? ["Trace", "Evaluator"]
-                        : ["Data", "Evaluator"]
-                    }
-                    targetFields={targetFields}
-                    traceMapping={
-                      task == "real_time" ? traceMappings : undefined
-                    }
-                    dsl={
-                      evaluator?.id
-                        ? {
-                            sourceOptions,
-                            targetId: evaluator?.id ?? "",
-                            targetEdges: evaluatorEdges ?? [],
-                            /**
-                             * This was confusing for me when I first saw it,
-                             * but basically it's just setting a callback to update the evaluator edges
-                             * whenever the dsl edges change.
-                             *
-                             * However, if there are no edges, it will use defaults hidden in the logic:
-                             * The defaults will come from the dataset inferred mappings,
-                             * which is what we want for realtime evals, but not for offline evals
-                             */
-                            setTargetEdges: (mapping) => {
-                              setFirstEvaluatorEdges(mapping);
-                            },
-                          }
-                        : undefined
-                    }
-                    setTraceMapping={(mapping) => {
+            <VStack align="start" width="full" gap={4}>
+              <Text>
+                {task == "real_time" && dataSource !== "from_production"
+                  ? "From the dataset you chose, what columns are equivalent to the real time trace data which will be used for evaluation during monitoring?"
+                  : task == "real_time"
+                  ? "What data from the real time traces will be used for evaluation?"
+                  : "What data from the dataset will be used for evaluation?"}
+              </Text>
+
+              {task == "real_time" && (
+                <HStack width="full" justify="space-between" paddingY={2}>
+                  <Text fontSize="sm" fontWeight="medium">
+                    Use thread-based mapping
+                  </Text>
+                  <Switch
+                    checked={isThreadMapping}
+                    onCheckedChange={(e) => {
                       setWizardState({
-                        realTimeTraceMappings: mapping,
+                        isThreadMapping: e.checked,
                       });
                     }}
                   />
+                </HStack>
+              )}
+            </VStack>
+
+            <Field.Root width="full" overflow="visible">
+              <VStack align="start" gap={4} width="full" overflow="visible">
+                {selected && (
+                  <>
+                    {isThreadMapping ? (
+                      <ThreadMapping
+                        titles={
+                          dataSource !== "from_production"
+                            ? ["Dataset", "Thread", "Evaluator"]
+                            : ["Thread", "Evaluator"]
+                        }
+                        traces={tracesToUse}
+                        threadMapping={threadMappings}
+                        targetFields={targetFields}
+                        dsl={
+                          evaluator?.id
+                            ? {
+                                sourceOptions,
+                                targetId: evaluator?.id ?? "",
+                                targetEdges: evaluatorEdges ?? [],
+                                setTargetEdges: (mapping) => {
+                                  setFirstEvaluatorEdges(mapping);
+                                },
+                              }
+                            : undefined
+                        }
+                        setThreadMapping={(mapping) => {
+                          setWizardState({
+                            realTimeThreadMappings: mapping,
+                          });
+                        }}
+                      />
+                    ) : (
+                      <EvaluatorTracesMapping
+                        skipSettingDefaultEdges={true}
+                        titles={
+                          task == "real_time" &&
+                          dataSource !== "from_production"
+                            ? ["Dataset", "Trace", "Evaluator"]
+                            : task == "real_time"
+                            ? ["Trace", "Evaluator"]
+                            : ["Data", "Evaluator"]
+                        }
+                        targetFields={targetFields}
+                        traceMapping={
+                          task == "real_time" ? traceMappings : undefined
+                        }
+                        dsl={
+                          evaluator?.id
+                            ? {
+                                sourceOptions,
+                                targetId: evaluator?.id ?? "",
+                                targetEdges: evaluatorEdges ?? [],
+                                setTargetEdges: (mapping) => {
+                                  setFirstEvaluatorEdges(mapping);
+                                },
+                              }
+                            : undefined
+                        }
+                        setTraceMapping={(mapping) => {
+                          setWizardState({
+                            realTimeTraceMappings: mapping,
+                          });
+                        }}
+                      />
+                    )}
+                  </>
                 )}
               </VStack>
             </Field.Root>

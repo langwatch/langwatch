@@ -1,6 +1,6 @@
 import { CostReferenceType, CostType } from "@prisma/client";
 import * as Sentry from "@sentry/nextjs";
-import { trace, Worker, type Job } from "bullmq";
+import { Worker, type Job } from "bullmq";
 import { nanoid } from "nanoid";
 import type { EvaluationJob } from "~/server/background/types";
 import type { Trace } from "~/server/tracer/types";
@@ -41,10 +41,15 @@ import {
   mapTraceToDatasetEntry,
   tryAndConvertTo,
   type MappingState,
+  type TRACE_MAPPINGS,
+  THREAD_MAPPINGS,
 } from "../../tracer/tracesMapping";
 import { runEvaluationWorkflow } from "../../workflows/runWorkflow";
 import type { Protections } from "~/server/elasticsearch/protections";
-import { getTraceById } from "~/server/elasticsearch/traces";
+import {
+  getTraceById,
+  getTracesGroupedByThreadId,
+} from "~/server/elasticsearch/traces";
 import { getProtectionsForProject } from "~/server/api/utils";
 import { createLogger } from "../../../utils/logger";
 
@@ -52,7 +57,7 @@ const logger = createLogger("langwatch:workers:evaluationsWorker");
 
 export async function runEvaluationJob(
   job: Job<EvaluationJob, any, string>
-): Promise<SingleEvaluationResult> {
+): Promise<EvaluationResultWithThreadId> {
   const check = await prisma.monitor.findUnique({
     where: {
       id: job.data.check.evaluator_id,
@@ -77,6 +82,118 @@ export async function runEvaluationJob(
   });
 }
 
+/**
+ * Check if any mapping has type "thread"
+ * Single Responsibility: Detect if thread-based mappings are present
+ */
+const hasThreadMappings = (mappingState: MappingState): boolean => {
+  return Object.values(mappingState.mapping).some(
+    (mapping) => "type" in mapping && mapping.type === "thread"
+  );
+};
+
+/**
+ * Build thread-based data for evaluation
+ * Single Responsibility: Extract and format thread data according to thread mappings
+ */
+const buildThreadData = async (
+  projectId: string,
+  trace: Trace,
+  mappingState: MappingState,
+  protections: Protections
+): Promise<Record<string, any>> => {
+  const threadId = trace.metadata?.thread_id;
+  if (!threadId) {
+    throw new Error(
+      "Trace does not have a thread_id for thread-based evaluation"
+    );
+  }
+
+  logger.info("Fetching thread traces", {
+    threadId,
+    traceId: trace.trace_id,
+    projectId,
+  });
+
+  // Fetch all traces in the thread
+  const threadTraces = await getTracesGroupedByThreadId({
+    connConfig: { projectId },
+    threadId,
+    protections,
+    includeSpans: true,
+  });
+
+  logger.info("Thread traces fetched", {
+    threadId,
+    traceCount: threadTraces.length,
+    traceIds: threadTraces.map((t) => t.trace_id),
+  });
+
+  const result: Record<string, any> = {};
+
+  // Process each mapping
+  for (const [targetField, mappingConfig] of Object.entries(
+    mappingState.mapping
+  )) {
+    if ("type" in mappingConfig && mappingConfig.type === "thread") {
+      const source = mappingConfig.source;
+
+      // Skip empty source
+      if (!source) {
+        continue;
+      }
+
+      // Use the mapping function from THREAD_MAPPINGS dynamically
+      const selectedFields = mappingConfig.selectedFields ?? [];
+      result[targetField] = THREAD_MAPPINGS[source].mapping(
+        { thread_id: threadId, traces: threadTraces },
+        selectedFields as (keyof typeof TRACE_MAPPINGS)[]
+      );
+
+      logger.info("Mapped thread field", {
+        targetField,
+        source,
+        ...(selectedFields.length > 0 && { selectedFields }),
+        ...(source === "traces" && {
+          traceCount: (result[targetField] as any[]).length,
+        }),
+      });
+    } else {
+      // Regular trace mapping - use current trace
+      // Type guard ensures mappingConfig.source is from TRACE_MAPPINGS
+      if ("source" in mappingConfig) {
+        const traceMappingConfig = {
+          source: mappingConfig.source,
+          key: mappingConfig.key,
+          subkey: mappingConfig.subkey,
+        };
+        const mapped = mapTraceToDatasetEntry(
+          trace,
+          { [targetField]: traceMappingConfig as any },
+          new Set(),
+          undefined
+        )[0];
+        result[targetField] = mapped?.[targetField];
+        logger.info("Mapped trace field", {
+          targetField,
+          source: mappingConfig.source,
+          value:
+            typeof result[targetField] === "string"
+              ? result[targetField].substring(0, 100) + "..."
+              : result[targetField],
+        });
+      }
+    }
+  }
+
+  logger.info("Thread data build complete", {
+    threadId,
+    resultKeys: Object.keys(result),
+  });
+
+  return result;
+};
+
 const switchMapping = (
   trace: Trace,
   mapping_: MappingState
@@ -87,9 +204,17 @@ const switchMapping = (
     ? mapping_
     : migrateLegacyMappings(mapping_ as any);
 
+  // No need to filter - switchMapping is only called when hasThreadMappings is false
   return mapTraceToDatasetEntry(
     trace,
-    mapping.mapping,
+    mapping.mapping as Record<
+      string,
+      {
+        source: keyof typeof TRACE_MAPPINGS | "";
+        key?: string;
+        subkey?: string;
+      }
+    >,
     new Set(),
     undefined
   )[0];
@@ -105,14 +230,48 @@ export type DataForEvaluation =
       data: Record<string, any>;
     };
 
+export type EvaluationResultWithThreadId = SingleEvaluationResult & {
+  evaluation_thread_id?: string;
+  inputs?: Record<string, any>;
+};
+
 const buildDataForEvaluation = async (
   evaluatorType: EvaluatorTypes,
   trace: Trace,
-  mappings: MappingState
+  mappings: MappingState,
+  projectId: string,
+  protections: Protections
 ): Promise<DataForEvaluation> => {
-  const data = switchMapping(trace, mappings);
-  if (!data) {
-    throw new Error("No mapped data found to run evaluator");
+  let data: Record<string, any>;
+
+  // Check if we have thread mappings
+  const hasThread = hasThreadMappings(mappings);
+
+  logger.info("Building data for evaluation", {
+    evaluatorType,
+    traceId: trace.trace_id,
+    threadId: trace.metadata?.thread_id,
+    hasThreadMappings: hasThread,
+    mappingKeys: Object.keys(mappings.mapping),
+  });
+
+  if (hasThread) {
+    // Use thread-based data extraction
+    logger.info("Using thread-based data extraction", {
+      traceId: trace.trace_id,
+      threadId: trace.metadata?.thread_id,
+    });
+    data = await buildThreadData(projectId, trace, mappings, protections);
+  } else {
+    // Use regular trace-based mapping
+    logger.info("Using regular trace-based mapping", {
+      traceId: trace.trace_id,
+    });
+    const mappedData = switchMapping(trace, mappings);
+    if (!mappedData) {
+      throw new Error("No mapped data found to run evaluator");
+    }
+    data = mappedData;
   }
 
   if (evaluatorType.startsWith("custom/")) {
@@ -148,7 +307,7 @@ export const runEvaluationForTrace = async ({
   settings: Record<string, any> | string | number | boolean | null;
   mappings: MappingState;
   protections: Protections;
-}): Promise<SingleEvaluationResult> => {
+}): Promise<EvaluationResultWithThreadId> => {
   const trace = await getTraceById({
     connConfig: { projectId },
     traceId,
@@ -167,7 +326,20 @@ export const runEvaluationForTrace = async ({
     };
   }
 
-  const data = await buildDataForEvaluation(evaluatorType, trace, mappings);
+  // Check if thread mappings are used and track the thread_id
+  const hasThread = hasThreadMappings(mappings);
+  const evaluation_thread_id =
+    hasThread && trace.metadata?.thread_id
+      ? trace.metadata.thread_id
+      : undefined;
+
+  const data = await buildDataForEvaluation(
+    evaluatorType,
+    trace,
+    mappings,
+    projectId,
+    protections
+  );
 
   const result = await runEvaluation({
     projectId,
@@ -177,7 +349,11 @@ export const runEvaluationForTrace = async ({
     trace,
   });
 
-  return result;
+  return {
+    ...result,
+    evaluation_thread_id,
+    inputs: data.data,
+  };
 };
 
 export const runEvaluation = async ({
@@ -367,7 +543,7 @@ export const runEvaluation = async ({
 export const startEvaluationsWorker = (
   processFn: (
     job: Job<EvaluationJob, any, EvaluatorTypes>
-  ) => Promise<SingleEvaluationResult>
+  ) => Promise<EvaluationResultWithThreadId>
 ) => {
   if (!connection) {
     logger.info("no redis connection, skipping trace checks worker");
@@ -407,7 +583,7 @@ export const startEvaluationsWorker = (
         const result = (await Promise.race([
           processFn(job),
           timeout,
-        ])) as SingleEvaluationResult;
+        ])) as EvaluationResultWithThreadId;
         processed = true;
 
         if ("cost" in result && result.cost) {
@@ -432,6 +608,10 @@ export const startEvaluationsWorker = (
           check: job.data.check,
           trace: job.data.trace,
           status: result.status,
+          ...(result.evaluation_thread_id && {
+            evaluation_thread_id: result.evaluation_thread_id,
+          }),
+          ...(result.inputs && { inputs: result.inputs }),
           ...(result.status === "error"
             ? {
                 error: {

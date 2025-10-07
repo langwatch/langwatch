@@ -132,11 +132,15 @@ const evaluationsMapping: ElasticSearchMappingFrom<ElasticSearchEvaluation> = {
   name: { type: "keyword" },
   type: { type: "keyword" },
   is_guardrail: { type: "boolean" },
+  evaluation_thread_id: { type: "keyword" },
   status: { type: "keyword" },
   passed: { type: "boolean" },
   score: { type: "float" },
   details: { type: "text" },
   label: { type: "keyword" },
+  inputs: {
+    type: FLATENNED_TYPE,
+  } as any,
   error: {
     properties: {
       has_error: { type: "boolean" }, // workaround to make has_error available on pivot index since text fields are not

@@ -5,6 +5,10 @@ import { esClient } from "./elasticsearch";
 export async function collectUsageStats(instanceId: string) {
   const organizationId = instanceId.split("__")[1];
 
+  if (!organizationId) {
+    throw new Error("Invalid instance ID");
+  }
+
   const projectIds = await prisma.project
     .findMany({
       where: {
@@ -13,10 +17,6 @@ export async function collectUsageStats(instanceId: string) {
       select: { id: true },
     })
     .then((projects) => projects.map((project) => project.id));
-
-  if (!organizationId) {
-    throw new Error("Invalid instance ID");
-  }
 
   // Get total counts for each table that has projectId
   const [
@@ -101,7 +101,10 @@ const getTraceCount = async () => {
   });
 
   return {
-    totalTraces: result.count,
+    totalTraces:
+      (result as { body?: { count?: number } }).body?.count ??
+      result.count ??
+      0,
   };
 };
 
@@ -118,6 +121,9 @@ const getScenariosCount = async () => {
   });
 
   return {
-    totalScenarioEvents: result.count,
+    totalScenarioEvents:
+      (result as { body?: { count?: number } }).body?.count ??
+      result.count ??
+      0,
   };
 };
