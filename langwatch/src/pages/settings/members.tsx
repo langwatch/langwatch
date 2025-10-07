@@ -162,7 +162,7 @@ function MembersList({
             (acc, invite) => {
               if (invite?.invite && invite.noEmailProvider) {
                 acc.push({
-                  inviteCode: invite.invite.id,
+                  inviteCode: invite.invite.inviteCode,
                   email: invite.invite.email,
                 });
               }
