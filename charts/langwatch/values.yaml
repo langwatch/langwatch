@@ -35,6 +35,11 @@ global:
     nodeSelector: {}
     affinity: {}
     tolerations: []
+  ## @extra global.security Security settings for all pods.
+  ## @param global.security.allowInsecureImages [boolean] Allow insecure images.
+  security:
+    # Allow insecure images to deal with Bitnami's overall product deprecation
+    allowInsecureImages: true
 
 # =============================================================================
 # Auto-Generation Mode (Development Only)
@@ -1035,6 +1040,12 @@ prometheus:
       ## @param prometheus.external.secretKeys.connectionString [string] Secret key for connection string.
       connectionString: "connection-string"
 
+  image:
+    # Use the legacy image to deal with Bitnami's overall product deprecation
+    repository: bitnamilegacy/prometheus
+
+  version: 2.1.23
+
   # Alertmanager configuration for alert routing
   # See: https://kubespec.dev/v1/ConfigMap
   ## @param prometheus.alertmanager.enabled [default: false] Enable Alertmanager.
@@ -1145,6 +1156,10 @@ postgresql:
       value: ""
       ## @param postgresql.external.connectionString.secretKeyRef [object] Secret ref for connection string.
       secretKeyRef: { name: "", key: "" }
+
+  image:
+    # Use the legacy image to deal with Bitnami's overall product deprecation
+    repository: bitnamilegacy/postgresql
 
   # Authentication and database configuration
   auth:
@@ -1341,6 +1356,10 @@ redis:
       # See: https://kubespec.dev/v1/Secret
       ## @param redis.external.connectionString.secretKeyRef [object] Secret ref for connection string.
       secretKeyRef: { name: "", key: "" }
+
+  image:
+    # Use the legacy image to deal with Bitnami's overall product deprecation
+    repository: bitnamilegacy/redis
 
   # Authentication configuration
   auth:
