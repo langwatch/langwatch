@@ -1,6 +1,7 @@
 import { createLogger } from "../../utils/logger";
 import { startUsageStatsWorker } from "./workers/usageStatsWorker";
 import { scheduleUsageStats } from "./queues/usageStatsQueue";
+import { startCronWorker } from "./workers/cronWorker";
 import { env } from "~/env.mjs";
 
 const logger = createLogger("langwatch:background:init");
@@ -20,6 +21,9 @@ export const initializeBackgroundWorkers = async () => {
         });
       }
     }
+
+    // Initialize cron worker
+    startCronWorker();
 
     // Add other background worker initializations here as needed
   } catch (error) {
