@@ -11,7 +11,7 @@ import {
 import { SkipForward } from "lucide-react";
 
 interface OnboardingNavigationProps {
-  currentScreen: number;
+  currentScreenIndex: number;
   totalScreens: number;
   onPrev: () => void;
   onNext: () => void;
@@ -21,7 +21,7 @@ interface OnboardingNavigationProps {
 }
 
 export const OnboardingNavigation: React.FC<OnboardingNavigationProps> = ({
-  currentScreen,
+  currentScreenIndex,
   totalScreens,
   onPrev,
   onNext,
@@ -29,13 +29,14 @@ export const OnboardingNavigation: React.FC<OnboardingNavigationProps> = ({
   canProceed,
   isSkippable,
 }) => {
-  const isFirstScreen = currentScreen === 0;
-  const isLastScreen = currentScreen === totalScreens - 1;
+  const isFirstScreen = currentScreenIndex === 0;
+  const isLastScreen = currentScreenIndex === totalScreens - 1;
   const buttonText = isLastScreen ? "Finish" : "Next";
 
   return (
-    <HStack justify="space-between" w="full" mt={4}>
+    <HStack justify="space-between" w="full">
       <Button
+        visibility={isFirstScreen ? "hidden" : "visible"}
         variant="outline"
         onClick={onPrev}
         disabled={isFirstScreen}

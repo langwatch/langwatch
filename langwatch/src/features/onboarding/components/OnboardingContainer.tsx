@@ -18,8 +18,8 @@ export const OrganizationOnboardingContainer: React.FC<
   OnboardingContainerProps
 > = ({ children, loading, title, subTitle }) => {
   return (
-    <Box w="dvw" h="dvh" pt={"12vh"} background="bg.subtle">
-      <Center>
+    <Box w="dvw" h="dvh" background="bg.subtle">
+      <Center pt={"10vh"} pb={"5vh"}>
         <FullLogo width={175} />
       </Center>
 
