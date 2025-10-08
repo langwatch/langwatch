@@ -15,9 +15,8 @@ export const ONBOARDING_SCREENS = {
   FIRST: OnboardingScreenIndex.ORGANIZATION,
   LAST: OnboardingScreenIndex.ROLE,
 } as const;
-
-export const usageStyles = ["myself", "clients", "company"] as const;
-export const companySizes = [
+export const USAGE_STYLES = ["myself", "clients", "company"] as const;
+export const COMPANY_SIZES = [
   "starting_out",
   "2_to_10",
   "11_to_50",
@@ -25,8 +24,8 @@ export const companySizes = [
   "201_to_1000",
   "1000_plus",
 ] as const;
-export const solutionTypes = ["cloud", "on_premise"] as const;
-export const desires = [
+export const SOLUTION_TYPES = ["cloud", "on_premise"] as const;
+export const DESIRE_TYPES = [
   "everything",
   "evaluation",
   "model_experimentation",
@@ -36,7 +35,7 @@ export const desires = [
   "annotation",
   "just_exploring",
 ] as const;
-export const roles = [
+export const ROLE_TYPES = [
   "product_manager",
   "software_engineer",
   "ai_engineer",
@@ -47,11 +46,11 @@ export const roles = [
   "other",
 ] as const;
 
-export type UsageStyle = (typeof usageStyles)[number];
-export type CompanySize = (typeof companySizes)[number];
-export type SolutionType = (typeof solutionTypes)[number];
-export type Desire = (typeof desires)[number];
-export type Role = (typeof roles)[number];
+export type UsageStyle = (typeof USAGE_STYLES)[number];
+export type CompanySize = (typeof COMPANY_SIZES)[number];
+export type SolutionType = (typeof SOLUTION_TYPES)[number];
+export type Desire = (typeof DESIRE_TYPES)[number];
+export type Role = (typeof ROLE_TYPES)[number];
 
 export interface OnboardingFormData {
   organizationName?: string;
