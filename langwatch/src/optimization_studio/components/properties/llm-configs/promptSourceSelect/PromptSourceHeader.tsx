@@ -38,7 +38,7 @@ export function PromptSourceHeader({
 }) {
   useSyncPromptHandle(node.data);
   const formProps = useFormContext<PromptConfigFormValues>();
-  const { triggerSaveVersion } = usePromptConfigContext();
+  const { triggerSaveVersion, triggerCreatePrompt } = usePromptConfigContext();
   const isDirty = formProps.formState.isDirty;
   const { project } = useOrganizationTeamProject();
   const { hasDrift } = useNodeDrift(node);
@@ -50,14 +50,10 @@ export function PromptSourceHeader({
     const values = formProps.getValues();
     const newValues = formValuesToTriggerSaveVersionParams(values);
 
-    if (!configId) {
-      throw new Error("Config ID is required");
-    }
-
     const onSuccess = (prompt: VersionedPrompt) => {
       toaster.create({
-        title: "Version saved",
-        description: "Version has been saved",
+        title: "Prompt saved",
+        description: `Prompt ${prompt.handle} has been saved`,
         type: "success",
       });
       formProps.reset(versionedPromptToPromptConfigFormValues(prompt));
@@ -73,13 +69,21 @@ export function PromptSourceHeader({
       setIsSaving(false);
     };
 
-    triggerSaveVersion({
-      id: configId,
-      data: newValues,
-      onSuccess,
-      onError,
-    });
-  }, [triggerSaveVersion, formProps, configId]);
+    if (configId) {
+      triggerSaveVersion({
+        id: configId,
+        data: newValues,
+        onSuccess,
+        onError,
+      });
+    } else {
+      triggerCreatePrompt({
+        data: newValues,
+        onSuccess,
+        onError,
+      });
+    }
+  }, [triggerSaveVersion, triggerCreatePrompt, formProps, configId]);
 
   /**
    * Assumption: After restoring a version, the latest version config should
