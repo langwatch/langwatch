@@ -1,7 +1,16 @@
-import { VStack, Field, Input, SegmentGroup, NativeSelect } from "@chakra-ui/react";
+import {
+  VStack,
+  Field,
+  Input,
+  SegmentGroup,
+  NativeSelect,
+} from "@chakra-ui/react";
 import { AnimatePresence, motion } from "motion/react";
 import { useRef, useEffect } from "react";
-import { companySizeItems, solutionTypeItems } from "../constants/onboarding-data";
+import {
+  companySizeItems,
+  solutionTypeItems,
+} from "../constants/onboarding-data";
 import type { CompanySize, SolutionType, UsageStyle } from "../types/types";
 import { IconRadioCardGroup } from "./IconRadioCardGroup";
 
@@ -15,7 +24,9 @@ interface BasicInfoConditionalFieldsProps {
   setSolutionType: (value: SolutionType | undefined) => void;
 }
 
-export const BasicInfoConditionalFields: React.FC<BasicInfoConditionalFieldsProps> = ({
+export const BasicInfoConditionalFields: React.FC<
+  BasicInfoConditionalFieldsProps
+> = ({
   usageStyle,
   phoneNumber,
   setPhoneNumber,
@@ -33,12 +44,14 @@ export const BasicInfoConditionalFields: React.FC<BasicInfoConditionalFieldsProp
   setSolutionType: (value: SolutionType | undefined) => void;
 }) => {
   const showFields = usageStyle !== void 0 && usageStyle !== "myself";
+
   // Track previous visibility to decide if we should animate on first reveal
   const prevShowFieldsRef = useRef<boolean>(showFields);
   useEffect(() => {
     prevShowFieldsRef.current = showFields;
   }, [showFields]);
-  const shouldAnimateEnter = prevShowFieldsRef.current === false && showFields === true;
+  const shouldAnimateEnter =
+    prevShowFieldsRef.current === false && showFields === true;
 
   return (
     <AnimatePresence mode="wait">
