@@ -1,19 +1,19 @@
 import { Button } from "@chakra-ui/react";
-import { Tooltip } from "./ui/tooltip";
 import { UnplugIcon } from "lucide-react";
-import type { LlmConfigWithLatestVersion } from "../server/prompt-config/repositories/llm-config.repository";
+
+import { Tooltip } from "./ui/tooltip";
 
 export function GenerateApiSnippetButton({
-  config,
+  hasHandle,
   onClick,
 }: {
-  config: LlmConfigWithLatestVersion;
+  hasHandle: boolean;
   onClick?: (e: React.MouseEvent<HTMLButtonElement>) => void;
 }) {
   return (
     <Tooltip
       content={
-        config.handle
+        hasHandle
           ? "Show API code snippet"
           : "Save the prompt to call it from the API"
       }
@@ -23,7 +23,7 @@ export function GenerateApiSnippetButton({
     >
       <Button
         aria-label="Show API code snippet"
-        disabled={!config.handle}
+        disabled={!hasHandle}
         size="sm"
         variant="outline"
         backgroundColor="white"

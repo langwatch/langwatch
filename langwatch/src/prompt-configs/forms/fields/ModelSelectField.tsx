@@ -1,6 +1,6 @@
 import { useFormContext, Controller } from "react-hook-form";
 
-import type { PromptConfigFormValues } from "../../hooks/usePromptConfigForm";
+import type { PromptConfigFormValues } from "~/prompt-configs";
 
 import { LLMConfigField } from "~/components/llmPromptConfigs/LlmConfigField";
 import { VerticalFormControl } from "~/components/VerticalFormControl";
@@ -43,7 +43,7 @@ export function ModelSelectField() {
           render={({ field }) => {
             return (
               <LLMConfigField
-                llmConfig={field.value ?? {}} // Prevent a runtime error if the value is undefined
+                llmConfig={field.value}
                 onChange={field.onChange}
                 requiresCustomKey={false}
               />
