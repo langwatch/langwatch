@@ -1,88 +1,78 @@
-import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { useOrganizationTeamProject } from "../../../hooks/useOrganizationTeamProject";
 import { OrganizationOnboardingContainer } from "./OnboardingContainer";
-import {
-  VStack,
-  Field,
-  Input,
-  Button,
-  Icon,
-  /* eslint-disable no-restricted-imports */
-  Checkbox,
-  /* eslint-enable no-restricted-imports */
-} from "@chakra-ui/react";
-import { Link } from "../../../components/ui/link";
-import { useState } from "react";
-import { ExternalLink } from "lucide-react";
-import { useRouter } from "next/router";
+import { OnboardingNavigation } from "./OnboardingNavigation";
+import { useOnboardingFlow } from "../hooks/use-onboarding-flow";
+import { createScreens } from "../screens/manager";
+import { slideVariants, transition } from "../constants/onboarding-data";
+import { VStack } from "@chakra-ui/react";
+import { motion, AnimatePresence } from "motion/react";
+import React from "react";
 
 export const WelcomePage: React.FC = () => {
-  const { replace } = useRouter();
   const { isLoading: organizationIsLoading } = useOrganizationTeamProject({
     redirectToProjectOnboarding: false,
   });
 
-  const [organizationName, setOrganizationName] = useState("");
-  const [agreement, setAgreement] = useState(false);
+  const {
+    setOrganizationName,
+    setAgreement,
+    setUsageStyle,
+    setPhoneNumber,
+    setCompanySize,
+    setSolutionType,
+    setDesires,
+    setRole,
+    currentScreenIndex,
+    direction,
+    navigation,
+    getFormData,
+  } = useOnboardingFlow();
 
-  const handleProceed = async () => {
-    await replace(`/onboarding/intro`);
-  };
+  const screens = createScreens({
+    formData: getFormData(),
+    handlers: {
+      setOrganizationName,
+      setAgreement,
+      setUsageStyle,
+      setPhoneNumber,
+      setCompanySize,
+      setSolutionType,
+      setDesires,
+      setRole,
+    },
+  });
 
   return (
-    <OrganizationOnboardingContainer
+    <OrganizationOnboardingContainer 
       loading={organizationIsLoading}
-      title="Welcome Aboard 👋"
-      subTitle="Let's kick off by creating your organization"
+      title={screens[currentScreenIndex]?.heading ?? "Welcome Aboard 👋"}
+      subTitle={screens[currentScreenIndex]?.subHeading}
     >
-      <VStack gap={4} align="stretch">
-        <Field.Root colorPalette="orange">
-          <Input
-            autoFocus
-            variant="outline"
-            placeholder={"My Laundry Startup"}
-            value={organizationName}
-            onChange={(e) => setOrganizationName(e.target.value)}
-          />
-          <Field.HelperText>
-            {"If you're using LangWatch for yourself, you can use your own name."}
-          </Field.HelperText>
-          <Field.ErrorText />
-        </Field.Root>
+        <VStack gap={4} align="stretch" position="relative" minH="400px">
+          <AnimatePresence initial={false} custom={direction} mode="popLayout">
+            <motion.div
+              key={currentScreenIndex}
+              custom={direction}
+              variants={slideVariants}
+              initial="enter"
+              animate="center"
+              exit="exit"
+              transition={transition}
+              style={{ width: "100%" }}
+            >
+              {screens[currentScreenIndex]?.component}
+            </motion.div>
+          </AnimatePresence>
 
-        <Field.Root colorPalette="orange">
-          <Checkbox.Root
-            size="sm"
-            variant="outline"
-            checked={agreement}
-            onCheckedChange={(details) =>
-              setAgreement(details.checked === true)
-            }
-          >
-            <Checkbox.HiddenInput />
-            <Checkbox.Control>
-              <Checkbox.Indicator />
-            </Checkbox.Control>
-            <Checkbox.Label fontWeight={"normal"}>
-              {"I agree to the LangWatch "}
-              <Link href="#" fontWeight={"bold"} variant="underline">
-                {"Terms of Service"}
-                <Icon size="xs">
-                  <ExternalLink />
-                </Icon>
-              </Link>
-            </Checkbox.Label>
-          </Checkbox.Root>
-        </Field.Root>
-
-        <Button
-          w={"fit-content"}
-          colorPalette="orange"
-          variant="solid"
-          onClick={() => void handleProceed()}
-          disabled={!organizationName.trim() || !agreement}
-        >
-          {"Create"}
-        </Button>
+        <OnboardingNavigation
+          currentScreenIndex={currentScreenIndex}
+          totalScreens={screens.length}
+          onPrev={navigation.prevScreen}
+          onNext={navigation.nextScreen}
+          onSkip={navigation.skipScreen}
+          canProceed={navigation.canProceed()}
+          isSkippable={!screens[currentScreenIndex]?.required}
+        />
       </VStack>
     </OrganizationOnboardingContainer>
   );

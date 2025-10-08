@@ -1,3 +1,21 @@
+export enum OnboardingScreenIndex {
+  ORGANIZATION = 0,
+  BASIC_INFO = 1,
+  DESIRES = 2,
+  ROLE = 3,
+}
+
+export enum OnboardingFlowDirection {
+  FORWARD = 1,
+  BACKWARD = -1,
+}
+
+export const ONBOARDING_SCREENS = {
+  TOTAL: 4,
+  FIRST: OnboardingScreenIndex.ORGANIZATION,
+  LAST: OnboardingScreenIndex.ROLE,
+} as const;
+
 export const usageStyles = ["myself", "clients", "company"] as const;
 export const companySizes = [
   "starting_out",
@@ -36,6 +54,8 @@ export type Desire = (typeof desires)[number];
 export type Role = (typeof roles)[number];
 
 export interface OnboardingFormData {
+  organizationName?: string;
+  agreement?: boolean;
   usageStyle?: UsageStyle;
   phoneNumber?: string;
   companySize?: CompanySize;
@@ -48,6 +68,8 @@ export interface OnboardingScreen {
   id: string;
   required: boolean;
   component: React.ReactNode;
+  heading: string;
+  subHeading?: string;
 }
 
 export interface FormItem {
@@ -60,7 +82,7 @@ export interface IconFormItem extends FormItem {
 }
 
 export interface OnboardingFlowState {
-  currentScreen: number;
+  currentScreenIndex: number;
   direction: number;
 }
 

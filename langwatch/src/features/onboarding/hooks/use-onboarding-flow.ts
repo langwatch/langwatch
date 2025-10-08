@@ -1,17 +1,22 @@
 import { useState } from "react";
-import type {
-  OnboardingFormData,
-  OnboardingFlowState,
-  OnboardingNavigation,
-  UsageStyle,
-  CompanySize,
-  SolutionType,
-  Desire,
-  Role,
+import {
+  type OnboardingFormData,
+  type OnboardingFlowState,
+  type OnboardingNavigation,
+  type UsageStyle,
+  type CompanySize,
+  type SolutionType,
+  type Desire,
+  type Role,
+  ONBOARDING_SCREENS,
+  OnboardingScreenIndex,
+  OnboardingFlowDirection,
 } from "../types/types";
 
 export const useOnboardingFlow = () => {
   // Form state
+  const [organizationName, setOrganizationName] = useState<string | undefined>(void 0);
+  const [agreement, setAgreement] = useState<boolean>(false);
   const [usageStyle, setUsageStyle] = useState<UsageStyle | undefined>(void 0);
   const [phoneNumber, setPhoneNumber] = useState<string | undefined>(void 0);
   const [companySize, setCompanySize] = useState<CompanySize | undefined>(void 0);
@@ -20,41 +25,43 @@ export const useOnboardingFlow = () => {
   const [role, setRole] = useState<Role | undefined>(void 0);
 
   // Flow state
-  const [currentScreen, setCurrentScreen] = useState(0);
-  const [direction, setDirection] = useState(0);
+  const [currentScreenIndex, setCurrentScreenIndex] = useState<OnboardingScreenIndex>(ONBOARDING_SCREENS.FIRST);
+  const [direction, setDirection] = useState<OnboardingFlowDirection>(OnboardingFlowDirection.FORWARD);
 
   // Navigation functions
-  const navigateTo = (newDirection: number) => {
+  const navigateTo = (newDirection: OnboardingFlowDirection) => {
     setDirection(newDirection);
-    setCurrentScreen(prev => prev + newDirection);
+    setCurrentScreenIndex(prev => prev + newDirection);
   };
 
   const nextScreen = () => {
-    if (currentScreen < 2) { // 3 screens total (0, 1, 2)
-      navigateTo(1);
+    if (currentScreenIndex < ONBOARDING_SCREENS.LAST) {
+      navigateTo(OnboardingFlowDirection.FORWARD);
     }
   };
 
   const prevScreen = () => {
-    if (currentScreen > 0) {
-      navigateTo(-1);
+    if (currentScreenIndex > ONBOARDING_SCREENS.FIRST) {
+      navigateTo(OnboardingFlowDirection.BACKWARD);
     }
   };
 
   const skipScreen = () => {
-    if (currentScreen < 2) {
-      navigateTo(1);
+    if (currentScreenIndex < ONBOARDING_SCREENS.LAST) {
+      navigateTo(OnboardingFlowDirection.FORWARD);
     }
   };
 
   // Validation logic
   const canProceed = () => {
-    switch (currentScreen) {
-      case 0: // basic-info
+    switch (currentScreenIndex) {
+      case OnboardingScreenIndex.ORGANIZATION:
+        return Boolean(organizationName?.trim() && agreement);
+      case OnboardingScreenIndex.BASIC_INFO:
         return usageStyle !== void 0;
-      case 1: // desires (optional)
+      case OnboardingScreenIndex.DESIRES:
         return true;
-      case 2: // role (optional)
+      case OnboardingScreenIndex.ROLE:
         return true;
       default:
         return true;
@@ -63,6 +70,8 @@ export const useOnboardingFlow = () => {
 
   // Form data getter
   const getFormData = (): OnboardingFormData => ({
+    organizationName,
+    agreement,
     usageStyle,
     phoneNumber,
     companySize,
@@ -73,7 +82,7 @@ export const useOnboardingFlow = () => {
 
   // Flow state getter
   const getFlowState = (): OnboardingFlowState => ({
-    currentScreen,
+    currentScreenIndex,
     direction,
   });
 
@@ -87,6 +96,10 @@ export const useOnboardingFlow = () => {
 
   return {
     // Form state
+    organizationName,
+    setOrganizationName,
+    agreement,
+    setAgreement,
     usageStyle,
     setUsageStyle,
     phoneNumber,
@@ -101,7 +114,7 @@ export const useOnboardingFlow = () => {
     setRole,
     
     // Flow state
-    currentScreen,
+    currentScreenIndex,
     direction,
     
     // Navigation
