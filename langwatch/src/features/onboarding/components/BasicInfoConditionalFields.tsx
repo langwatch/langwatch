@@ -32,17 +32,13 @@ export const BasicInfoConditionalFields: React.FC<BasicInfoConditionalFieldsProp
   solutionType: SolutionType | undefined;
   setSolutionType: (value: SolutionType | undefined) => void;
 }) => {
-  const prevUsageStyle = useRef<UsageStyle | undefined>(usageStyle);
-  const shouldAnimate = useRef(false);
-
-  useEffect(() => {
-    if (prevUsageStyle.current !== usageStyle) {
-      shouldAnimate.current = true;
-      prevUsageStyle.current = usageStyle;
-    }
-  }, [usageStyle]);
-
   const showFields = usageStyle !== void 0 && usageStyle !== "myself";
+  // Track previous visibility to decide if we should animate on first reveal
+  const prevShowFieldsRef = useRef<boolean>(showFields);
+  useEffect(() => {
+    prevShowFieldsRef.current = showFields;
+  }, [showFields]);
+  const shouldAnimateEnter = prevShowFieldsRef.current === false && showFields === true;
 
   return (
     <AnimatePresence mode="wait">
@@ -50,7 +46,7 @@ export const BasicInfoConditionalFields: React.FC<BasicInfoConditionalFieldsProp
         <motion.div
           layout
           layoutId="conditional-fields"
-          initial={shouldAnimate.current ? { opacity: 0, height: 0 } : false}
+          initial={shouldAnimateEnter ? { opacity: 0, height: 0 } : false}
           animate={{ opacity: 1, height: "auto" }}
           exit={{ opacity: 0, height: 0 }}
           transition={{
@@ -62,7 +58,7 @@ export const BasicInfoConditionalFields: React.FC<BasicInfoConditionalFieldsProp
           <VStack gap={4} align="stretch">
             {/* Phone number */}
             <motion.div
-              initial={shouldAnimate.current ? { opacity: 0, y: -10 } : false}
+              initial={shouldAnimateEnter ? { opacity: 0, y: -10 } : false}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.3, delay: 0.1 }}
             >
@@ -79,7 +75,7 @@ export const BasicInfoConditionalFields: React.FC<BasicInfoConditionalFieldsProp
 
             {/* Company size */}
             <motion.div
-              initial={shouldAnimate.current ? { opacity: 0, y: -10 } : false}
+              initial={shouldAnimateEnter ? { opacity: 0, y: -10 } : false}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.3, delay: 0.2 }}
             >
@@ -128,7 +124,7 @@ export const BasicInfoConditionalFields: React.FC<BasicInfoConditionalFieldsProp
 
             {/* Solution type */}
             <motion.div
-              initial={shouldAnimate.current ? { opacity: 0, y: -10 } : false}
+              initial={shouldAnimateEnter ? { opacity: 0, y: -10 } : false}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.3, delay: 0.3 }}
             >
