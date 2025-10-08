@@ -1,18 +1,14 @@
-/**
- * Navigation component for onboarding flow
- * Single Responsibility: Renders navigation buttons with proper state management
- */
-
 import React from "react";
 import {
   HStack,
   Button,
+  Icon,
 } from "@chakra-ui/react";
 import { SkipForward } from "lucide-react";
+import { ONBOARDING_SCREENS, type OnboardingScreenIndex } from "../types/types";
 
 interface OnboardingNavigationProps {
-  currentScreenIndex: number;
-  totalScreens: number;
+  currentScreenIndex: OnboardingScreenIndex;
   onPrev: () => void;
   onNext: () => void;
   onSkip: () => void;
@@ -22,15 +18,14 @@ interface OnboardingNavigationProps {
 
 export const OnboardingNavigation: React.FC<OnboardingNavigationProps> = ({
   currentScreenIndex,
-  totalScreens,
   onPrev,
   onNext,
   onSkip,
   canProceed,
   isSkippable,
 }) => {
-  const isFirstScreen = currentScreenIndex === 0;
-  const isLastScreen = currentScreenIndex === totalScreens - 1;
+  const isFirstScreen = currentScreenIndex === ONBOARDING_SCREENS.FIRST;
+  const isLastScreen = currentScreenIndex === ONBOARDING_SCREENS.LAST;
   const buttonText = isLastScreen ? "Finish" : "Next";
 
   return (
@@ -47,11 +42,13 @@ export const OnboardingNavigation: React.FC<OnboardingNavigationProps> = ({
       <HStack>
         {isSkippable && (
           <Button
-            variant="ghost"
+            variant="outline"
             onClick={onSkip}
           >
-            <SkipForward size={16} />
             Skip
+            <Icon size="sm">
+              <SkipForward />
+            </Icon>
           </Button>
         )}
         

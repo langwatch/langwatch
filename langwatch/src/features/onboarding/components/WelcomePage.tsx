@@ -66,7 +66,6 @@ export const WelcomePage: React.FC = () => {
 
         <OnboardingNavigation
           currentScreenIndex={currentScreenIndex}
-          totalScreens={screens.length}
           onPrev={navigation.prevScreen}
           onNext={navigation.nextScreen}
           onSkip={navigation.skipScreen}
