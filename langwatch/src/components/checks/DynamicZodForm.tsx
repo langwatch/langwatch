@@ -84,12 +84,14 @@ const ModelSelectorWithWarning = ({
 const ArrayField = <T extends EvaluatorTypes>({
   fieldSchema,
   fieldName,
+  prefix,
   evaluator,
   variant = "default",
   renderField,
 }: {
   fieldSchema: ZodType;
   fieldName: string;
+  prefix: string;
   evaluator: EvaluatorDefinition<T> | undefined;
   variant?: "default" | "studio";
   renderField: <T extends EvaluatorTypes>(
@@ -99,7 +101,7 @@ const ArrayField = <T extends EvaluatorTypes>({
   ) => React.JSX.Element | null;
 }) => {
   const { control } = useFormContext();
-  const fullPath = fieldName;
+  const fullPath = prefix ? `${prefix}.${fieldName}` : fieldName;
 
   const { fields, append, remove } = useFieldArray({
     control,
@@ -372,7 +374,8 @@ const DynamicZodForm = ({
       return (
         <ArrayField
           fieldSchema={fieldSchema_}
-          fieldName={fullPath}
+          fieldName={fieldName}
+          prefix={prefix}
           evaluator={evaluator}
           variant={variant}
           renderField={renderField}
