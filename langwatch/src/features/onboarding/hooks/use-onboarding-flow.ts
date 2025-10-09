@@ -8,12 +8,18 @@ import {
   type SolutionType,
   type Desire,
   type Role,
-  ONBOARDING_SCREENS,
   OnboardingScreenIndex,
   OnboardingFlowDirection,
 } from "../types/types";
+import { usePublicEnv } from "~/hooks/usePublicEnv";
+import { getOnboardingFlowConfig } from "../constants/onboarding-flow";
+
+
 
 export const useOnboardingFlow = () => {
+  const publicEnv = usePublicEnv();
+  const isSaaS = publicEnv.data?.IS_SAAS;
+
   // Form state
   const [organizationName, setOrganizationName] = useState<string | undefined>(void 0);
   const [agreement, setAgreement] = useState<boolean>(false);
@@ -25,7 +31,8 @@ export const useOnboardingFlow = () => {
   const [role, setRole] = useState<Role | undefined>(void 0);
 
   // Flow state
-  const [currentScreenIndex, setCurrentScreenIndex] = useState<OnboardingScreenIndex>(ONBOARDING_SCREENS.FIRST);
+  const flow = getOnboardingFlowConfig(Boolean(isSaaS));
+  const [currentScreenIndex, setCurrentScreenIndex] = useState<OnboardingScreenIndex>(flow.first);
   const [direction, setDirection] = useState<OnboardingFlowDirection>(OnboardingFlowDirection.FORWARD);
 
   // Navigation functions
@@ -35,19 +42,19 @@ export const useOnboardingFlow = () => {
   };
 
   const nextScreen = () => {
-    if (currentScreenIndex < ONBOARDING_SCREENS.LAST) {
+    if (currentScreenIndex < flow.last) {
       navigateTo(OnboardingFlowDirection.FORWARD);
     }
   };
 
   const prevScreen = () => {
-    if (currentScreenIndex > ONBOARDING_SCREENS.FIRST) {
+    if (currentScreenIndex > flow.first) {
       navigateTo(OnboardingFlowDirection.BACKWARD);
     }
   };
 
   const skipScreen = () => {
-    if (currentScreenIndex < ONBOARDING_SCREENS.LAST) {
+    if (currentScreenIndex < flow.last) {
       navigateTo(OnboardingFlowDirection.FORWARD);
     }
   };
@@ -119,6 +126,7 @@ export const useOnboardingFlow = () => {
     // Flow state
     currentScreenIndex,
     direction,
+    flow,
 
     // Navigation
     navigation,

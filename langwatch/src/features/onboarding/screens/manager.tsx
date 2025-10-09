@@ -17,19 +17,22 @@ import {
   desireItems,
   roleItems,
 } from "../constants/onboarding-data";
-import type {
-  OnboardingFormData,
-  OnboardingScreen,
-  UsageStyle,
-  CompanySize,
-  SolutionType,
-  Desire,
-  Role,
+import {
+  type OnboardingFormData,
+  type OnboardingScreen,
+  type UsageStyle,
+  type CompanySize,
+  type SolutionType,
+  type Desire,
+  type Role,
+  OnboardingScreenIndex,
+  type OnboardingFlowConfig,
 } from "../types/types";
 import { BasicInfoConditionalFields } from "../components/BasicInfoConditionalFields";
 
 interface IntroScreensProps {
   formData: OnboardingFormData;
+  flow: OnboardingFlowConfig;
   handlers: {
     setOrganizationName: (value: string) => void;
     setAgreement: (value: boolean) => void;
@@ -42,8 +45,9 @@ interface IntroScreensProps {
   };
 }
 
-export const createScreens = ({
+export const useCreateScreens = ({
   formData,
+  flow,
   handlers,
 }: IntroScreensProps): OnboardingScreen[] => {
   const {
@@ -68,8 +72,8 @@ export const createScreens = ({
     setRole,
   } = handlers;
 
-  return [
-    {
+  const screens: Record<OnboardingScreenIndex, OnboardingScreen> = {
+    [OnboardingScreenIndex.ORGANIZATION]: {
       id: "organization",
       required: true,
       heading: "Welcome Aboard 👋",
@@ -107,7 +111,7 @@ export const createScreens = ({
               </Checkbox.Control>
               <Checkbox.Label fontWeight={"normal"}>
                 {"I agree to the LangWatch "}
-                <Link href="#" fontWeight={"bold"} variant="underline">
+                <Link href="https://langwatch.ai/legal/terms-conditions" fontWeight={"bold"} variant="underline">
                   {"Terms of Service"}
                   <Icon size="xs">
                     <ExternalLink />
@@ -119,7 +123,7 @@ export const createScreens = ({
         </VStack>
       ),
     },
-    {
+    [OnboardingScreenIndex.BASIC_INFO]: {
       id: "basic-info",
       required: true,
       heading: "Let's tailor your experience",
@@ -151,7 +155,7 @@ export const createScreens = ({
         </VStack>
       ),
     },
-    {
+    [OnboardingScreenIndex.DESIRES]: {
       id: "desires",
       required: false,
       heading: "Let's tailor your experience",
@@ -164,7 +168,7 @@ export const createScreens = ({
         />
       ),
     },
-    {
+    [OnboardingScreenIndex.ROLE]: {
       id: "role",
       required: false,
       heading: "Let's tailor your experience",
@@ -183,5 +187,7 @@ export const createScreens = ({
         </Field.Root>
       ),
     },
-  ];
+  };
+
+  return flow.visibleScreens.map((idx) => screens[idx]);
 };

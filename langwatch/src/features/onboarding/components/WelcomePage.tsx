@@ -2,7 +2,7 @@ import { useOrganizationTeamProject } from "../../../hooks/useOrganizationTeamPr
 import { OrganizationOnboardingContainer } from "./OnboardingContainer";
 import { OnboardingNavigation } from "./OnboardingNavigation";
 import { useOnboardingFlow } from "../hooks/use-onboarding-flow";
-import { createScreens } from "../screens/manager";
+import { useCreateScreens } from "../screens/manager";
 import { slideVariants, transition } from "../constants/onboarding-data";
 import { VStack } from "@chakra-ui/react";
 import { motion, AnimatePresence } from "motion/react";
@@ -26,12 +26,14 @@ export const WelcomePage: React.FC = () => {
     setRole,
     currentScreenIndex,
     direction,
+    flow,
     navigation,
     getFormData,
   } = useOnboardingFlow();
 
-  const screens = createScreens({
+  const screens = useCreateScreens({
     formData: getFormData(),
+    flow,
     handlers: {
       setOrganizationName,
       setAgreement,

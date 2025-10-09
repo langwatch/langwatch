@@ -10,11 +10,6 @@ export enum OnboardingFlowDirection {
   BACKWARD = -1,
 }
 
-export const ONBOARDING_SCREENS = {
-  TOTAL: 4,
-  FIRST: OnboardingScreenIndex.ORGANIZATION,
-  LAST: OnboardingScreenIndex.ROLE,
-} as const;
 export const USAGE_STYLES = ["myself", "clients", "company"] as const;
 export const COMPANY_SIZES = [
   "starting_out",
@@ -91,4 +86,14 @@ export interface OnboardingNavigation {
   prevScreen: () => void;
   skipScreen: () => void;
   canProceed: () => boolean;
+}
+
+export type OnboardingFlowVariant = "full" | "self_hosted";
+
+export interface OnboardingFlowConfig {
+  variant: OnboardingFlowVariant;
+  visibleScreens: OnboardingScreenIndex[];
+  first: OnboardingScreenIndex;
+  last: OnboardingScreenIndex;
+  total: number;
 }
