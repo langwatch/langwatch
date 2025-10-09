@@ -30,11 +30,6 @@ export const WelcomePage: React.FC = () => {
     getFormData,
   } = useOnboardingFlow();
 
-  const utmCampaign =
-    typeof window !== "undefined"
-      ? window.sessionStorage.getItem("utm_campaign")
-      : null;
-
   const screens = createScreens({
     formData: getFormData(),
     handlers: {
@@ -64,7 +59,7 @@ export const WelcomePage: React.FC = () => {
           companySize: form.companySize,
           yourRole: form.role,
           featureUsage: form.selectedDesires.join(", "),
-          utmCampaign,
+          utmCampaign: form.utmCampaign,
         },
       },
       {

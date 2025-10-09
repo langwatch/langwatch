@@ -61,6 +61,7 @@ export interface OnboardingFormData {
   solutionType?: SolutionType;
   selectedDesires: Desire[];
   role?: Role;
+  utmCampaign?: string | null;
 }
 
 export interface OnboardingScreen {

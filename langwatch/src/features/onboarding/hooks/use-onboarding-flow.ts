@@ -78,6 +78,9 @@ export const useOnboardingFlow = () => {
     solutionType,
     selectedDesires,
     role,
+    utmCampaign: typeof window !== "undefined"
+      ? window.sessionStorage.getItem("utm_campaign")
+      : null,
   });
 
   // Flow state getter
@@ -112,14 +115,14 @@ export const useOnboardingFlow = () => {
     setDesires,
     role,
     setRole,
-    
+
     // Flow state
     currentScreenIndex,
     direction,
-    
+
     // Navigation
     navigation,
-    
+
     // Getters
     getFormData,
     getFlowState,
