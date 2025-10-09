@@ -327,7 +327,7 @@ export const TracesMapping = ({
     now,
   ]);
 
-  const isThreeColumns = task === "real_time";
+  const isThreeColumns = task === "real_time" && !!dsl;
 
   return (
     <Grid
