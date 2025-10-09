@@ -5,7 +5,9 @@ import {
   Icon,
 } from "@chakra-ui/react";
 import { SkipForward } from "lucide-react";
-import { ONBOARDING_SCREENS, type OnboardingScreenIndex } from "../types/types";
+import { type OnboardingScreenIndex } from "../types/types";
+import { usePublicEnv } from "~/hooks/usePublicEnv";
+import { getOnboardingFlowConfig } from "../constants/onboarding-flow";
 
 interface OnboardingNavigationProps {
   currentScreenIndex: OnboardingScreenIndex;
@@ -28,8 +30,10 @@ export const OnboardingNavigation: React.FC<OnboardingNavigationProps> = ({
   isSubmitting = false,
   onFinish,
 }) => {
-  const isFirstScreen = currentScreenIndex === ONBOARDING_SCREENS.FIRST;
-  const isLastScreen = currentScreenIndex === ONBOARDING_SCREENS.LAST;
+  const publicEnv = usePublicEnv();
+  const flow = getOnboardingFlowConfig(Boolean(publicEnv.data?.IS_SAAS));
+  const isFirstScreen = currentScreenIndex === flow.first;
+  const isLastScreen = currentScreenIndex === flow.last;
   const buttonText = isLastScreen ? "Finish" : "Next";
 
   return (
