@@ -83,8 +83,9 @@ export function DatasetMappingPreview({
       threadIds: threadIds,
     },
     {
-      enabled: !!project && isThreadMapping && threadIds.length > 0,
+      enabled: !!project?.id && isThreadMapping && threadIds.length > 0,
       refetchOnWindowFocus: false,
+      retry: 1,
     }
   );
 
@@ -221,8 +222,16 @@ export function DatasetMappingPreview({
               <Text fontSize="sm">Threads</Text>
               {isThreadMapping && (
                 <>
-                  {threadTraces.isLoading ? (
+                  {threadIds.length === 0 ? (
+                    <Badge colorPalette="gray" size="sm">
+                      No threads found
+                    </Badge>
+                  ) : threadTraces.isLoading || threadTraces.isFetching ? (
                     <Spinner size="xs" />
+                  ) : threadTraces.isError ? (
+                    <Badge colorPalette="red" size="sm">
+                      Error loading traces
+                    </Badge>
                   ) : threadTraces.data ? (
                     <Badge colorPalette="blue" size="sm">
                       {threadTraces.data.length} traces
