@@ -156,14 +156,12 @@ export const createScreens = ({
       required: false,
       heading: "Let's tailor your experience",
       component: (
-        <Field.Root colorPalette="orange" w="full">
-          <Field.Label>{"What brings you to LangWatch?"}</Field.Label>
-          <IconCheckboxCardGroup<Desire>
-            items={desireItems}
-            value={selectedDesires}
-            onChange={setDesires}
-          />
-        </Field.Root>
+        <IconCheckboxCardGroup<Desire>
+          label={"What brings you to LangWatch?"}
+          items={desireItems}
+          value={selectedDesires}
+          onChange={setDesires}
+        />
       ),
     },
     {
