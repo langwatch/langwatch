@@ -25,6 +25,8 @@ export const useOnboardingFlow = () => {
   const [agreement, setAgreement] = useState<boolean>(false);
   const [usageStyle, setUsageStyle] = useState<UsageStyle | undefined>(void 0);
   const [phoneNumber, setPhoneNumber] = useState<string | undefined>(void 0);
+  const [phoneHasValue, setPhoneHasValue] = useState<boolean>(false);
+  const [phoneIsValid, setPhoneIsValid] = useState<boolean>(true);
   const [companySize, setCompanySize] = useState<CompanySize | undefined>(void 0);
   const [solutionType, setSolutionType] = useState<SolutionType | undefined>(void 0);
   const [selectedDesires, setDesires] = useState<Desire[]>([]);
@@ -65,7 +67,10 @@ export const useOnboardingFlow = () => {
       case OnboardingScreenIndex.ORGANIZATION:
         return Boolean(organizationName?.trim() && agreement);
       case OnboardingScreenIndex.BASIC_INFO:
-        return usageStyle !== void 0;
+        if (usageStyle === void 0) return false;
+        const showFields = usageStyle !== "myself";
+        if (!showFields) return true;
+        return !(phoneHasValue && !phoneIsValid);
       case OnboardingScreenIndex.DESIRES:
         return true;
       case OnboardingScreenIndex.ROLE:
@@ -114,6 +119,8 @@ export const useOnboardingFlow = () => {
     setUsageStyle,
     phoneNumber,
     setPhoneNumber,
+    setPhoneHasValue,
+    setPhoneIsValid,
     companySize,
     setCompanySize,
     solutionType,
