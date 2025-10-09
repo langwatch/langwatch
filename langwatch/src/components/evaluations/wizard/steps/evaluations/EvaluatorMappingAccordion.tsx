@@ -239,7 +239,8 @@ export const EvaluatorMappingAccordion = ({
                     {isThreadMapping ? (
                       <ThreadMapping
                         titles={
-                          dataSource !== "from_production"
+                          dataSource !== "from_production" &&
+                          datasetFields.length > 0
                             ? ["Dataset", "Thread", "Evaluator"]
                             : ["Thread", "Evaluator"]
                         }
@@ -247,7 +248,9 @@ export const EvaluatorMappingAccordion = ({
                         threadMapping={threadMappings}
                         targetFields={targetFields}
                         dsl={
-                          evaluator?.id
+                          evaluator?.id &&
+                          dataSource !== "from_production" &&
+                          datasetFields.length > 0
                             ? {
                                 sourceOptions,
                                 targetId: evaluator?.id ?? "",
@@ -269,7 +272,8 @@ export const EvaluatorMappingAccordion = ({
                         skipSettingDefaultEdges={true}
                         titles={
                           task == "real_time" &&
-                          dataSource !== "from_production"
+                          dataSource !== "from_production" &&
+                          datasetFields.length > 0
                             ? ["Dataset", "Trace", "Evaluator"]
                             : task == "real_time"
                             ? ["Trace", "Evaluator"]
@@ -280,7 +284,10 @@ export const EvaluatorMappingAccordion = ({
                           task == "real_time" ? traceMappings : undefined
                         }
                         dsl={
-                          evaluator?.id
+                          evaluator?.id &&
+                          task == "real_time" &&
+                          dataSource !== "from_production" &&
+                          datasetFields.length > 0
                             ? {
                                 sourceOptions,
                                 targetId: evaluator?.id ?? "",
