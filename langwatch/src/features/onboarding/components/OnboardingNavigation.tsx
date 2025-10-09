@@ -14,6 +14,8 @@ interface OnboardingNavigationProps {
   onSkip: () => void;
   canProceed: boolean;
   isSkippable: boolean;
+  isSubmitting?: boolean;
+  onFinish: () => void;
 }
 
 export const OnboardingNavigation: React.FC<OnboardingNavigationProps> = ({
@@ -23,6 +25,8 @@ export const OnboardingNavigation: React.FC<OnboardingNavigationProps> = ({
   onSkip,
   canProceed,
   isSkippable,
+  isSubmitting = false,
+  onFinish,
 }) => {
   const isFirstScreen = currentScreenIndex === ONBOARDING_SCREENS.FIRST;
   const isLastScreen = currentScreenIndex === ONBOARDING_SCREENS.LAST;
@@ -43,7 +47,8 @@ export const OnboardingNavigation: React.FC<OnboardingNavigationProps> = ({
         {isSkippable && (
           <Button
             variant="outline"
-            onClick={onSkip}
+            onClick={isLastScreen ? onFinish : onSkip}
+            disabled={isSubmitting}
           >
             Skip
             <Icon size="sm">
@@ -51,12 +56,13 @@ export const OnboardingNavigation: React.FC<OnboardingNavigationProps> = ({
             </Icon>
           </Button>
         )}
-        
+
         <Button
           colorPalette="orange"
           variant="solid"
-          onClick={onNext}
-          disabled={!canProceed || isLastScreen}
+          onClick={isLastScreen ? onFinish : onNext}
+          disabled={!canProceed && !isLastScreen}
+          loading={isSubmitting}
         >
           {buttonText}
         </Button>
