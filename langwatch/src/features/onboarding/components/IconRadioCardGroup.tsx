@@ -40,7 +40,7 @@ export const IconRadioCardGroup = <T extends string = string>({
             <RadioCard.ItemContent>
               <HStack align="center" justify="space-between" w="full">
                 <HStack align="center" justify="center">
-                  <Icon size="md" color="fg.muted">
+                  <Icon size="sm" color="fg.muted">
                     <item.icon />
                   </Icon>
                   <RadioCard.ItemText>
