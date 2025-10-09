@@ -87,11 +87,6 @@ export const desireItems: IconFormItem[] = [
     icon: Gavel,
   },
   {
-    title: "Model Experimentation",
-    value: "model_experimentation",
-    icon: TestTubeDiagonal,
-  },
-  {
     title: "Prompt Management/Optimization",
     value: "prompt_management_optimization",
     icon: GraduationCap,
@@ -100,6 +95,11 @@ export const desireItems: IconFormItem[] = [
     title: "Observability",
     value: "observability",
     icon: Telescope,
+  },
+  {
+    title: "Model Experimentation",
+    value: "model_experimentation",
+    icon: TestTubeDiagonal,
   },
   {
     title: "Safety/Compliance",
@@ -125,11 +125,6 @@ export const desireItems: IconFormItem[] = [
 
 export const roleItems: IconFormItem[] = [
   {
-    title: "Product Manager",
-    value: "product_manager",
-    icon: Presentation,
-  },
-  {
     title: "Software Engineer",
     value: "software_engineer",
     icon: Code,
@@ -140,11 +135,6 @@ export const roleItems: IconFormItem[] = [
     icon: WandSparkles,
   },
   {
-    title: "Engineering Manager",
-    value: "engineering_manager",
-    icon: PencilRuler,
-  },
-  {
     title: "Data Scientist",
     value: "data_scientist",
     icon: ChevronsLeftRightEllipsis,
@@ -153,6 +143,16 @@ export const roleItems: IconFormItem[] = [
     title: "AI Researcher",
     value: "ai_researcher",
     icon: BrainCircuit,
+  },
+  {
+    title: "Product Manager",
+    value: "product_manager",
+    icon: Presentation,
+  },
+  {
+    title: "Engineering Manager",
+    value: "engineering_manager",
+    icon: PencilRuler,
   },
   {
     title: "CTO/Founder",
