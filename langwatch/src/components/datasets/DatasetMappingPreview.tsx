@@ -83,9 +83,8 @@ export function DatasetMappingPreview({
       threadIds: threadIds,
     },
     {
-      enabled: !!project?.id && isThreadMapping && threadIds.length > 0,
+      enabled: !!project && isThreadMapping && threadIds.length > 0,
       refetchOnWindowFocus: false,
-      retry: 1,
     }
   );
 
