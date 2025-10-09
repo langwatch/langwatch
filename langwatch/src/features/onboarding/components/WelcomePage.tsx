@@ -7,6 +7,8 @@ import { slideVariants, transition } from "../constants/onboarding-data";
 import { VStack } from "@chakra-ui/react";
 import { motion, AnimatePresence } from "motion/react";
 import React from "react";
+import { api } from "~/utils/api";
+import { toaster } from "~/components/ui/toaster";
 
 export const WelcomePage: React.FC = () => {
   const { isLoading: organizationIsLoading } = useOrganizationTeamProject({
@@ -28,6 +30,11 @@ export const WelcomePage: React.FC = () => {
     getFormData,
   } = useOnboardingFlow();
 
+  const utmCampaign =
+    typeof window !== "undefined"
+      ? window.sessionStorage.getItem("utm_campaign")
+      : null;
+
   const screens = createScreens({
     formData: getFormData(),
     handlers: {
@@ -42,8 +49,42 @@ export const WelcomePage: React.FC = () => {
     },
   });
 
+  const initializeOrganization = api.onboarding.initializeOrganization.useMutation();
+
+  function handleFinalizeSubmit() {
+    const form = getFormData();
+    initializeOrganization.mutate(
+      {
+        orgName: form.organizationName ?? "",
+        phoneNumber: form.phoneNumber ?? "",
+        signUpData: {
+          usage: form.usageStyle,
+          solution: form.solutionType,
+          terms: form.agreement,
+          companySize: form.companySize,
+          yourRole: form.role,
+          featureUsage: form.selectedDesires.join(", "),
+          utmCampaign,
+        },
+      },
+      {
+        onSuccess: (response) => {
+          // window.location.href = `/${response.projectSlug}/messages`;
+        },
+        onError: () => {
+          toaster.create({
+            title: "Failed to proceed with onboarding",
+            description: "Please try again or contact support",
+            type: "error",
+            meta: { closable: true },
+          });
+        },
+      }
+    );
+  }
+
   return (
-    <OrganizationOnboardingContainer 
+    <OrganizationOnboardingContainer
       loading={organizationIsLoading}
       title={screens[currentScreenIndex]?.heading ?? "Welcome Aboard 👋"}
       subTitle={screens[currentScreenIndex]?.subHeading}
@@ -59,8 +100,10 @@ export const WelcomePage: React.FC = () => {
               exit="exit"
               transition={transition}
               style={{ width: "100%" }}
-            >
+          >
+            <fieldset disabled={initializeOrganization.isPending}>
               {screens[currentScreenIndex]?.component}
+            </fieldset>
             </motion.div>
           </AnimatePresence>
 
@@ -71,6 +114,8 @@ export const WelcomePage: React.FC = () => {
           onSkip={navigation.skipScreen}
           canProceed={navigation.canProceed()}
           isSkippable={!screens[currentScreenIndex]?.required}
+          isSubmitting={initializeOrganization.isPending}
+          onFinish={handleFinalizeSubmit}
         />
       </VStack>
     </OrganizationOnboardingContainer>
