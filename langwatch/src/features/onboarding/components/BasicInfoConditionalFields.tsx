@@ -1,23 +1,20 @@
-import {
-  VStack,
-  Field,
-  Input,
-  SegmentGroup,
-  NativeSelect,
-} from "@chakra-ui/react";
+import { VStack, Field, SegmentGroup, NativeSelect } from "@chakra-ui/react";
 import { AnimatePresence, motion } from "motion/react";
-import { useRef, useEffect } from "react";
+import { useRef, useEffect, useState } from "react";
 import {
   companySizeItems,
   solutionTypeItems,
 } from "../constants/onboarding-data";
 import type { CompanySize, SolutionType, UsageStyle } from "../types/types";
 import { IconRadioCardGroup } from "./IconRadioCardGroup";
+import { PhoneNumberInput } from "../../../components/inputs/PhoneNumberInput";
 
 interface BasicInfoConditionalFieldsProps {
   usageStyle: UsageStyle | undefined;
   phoneNumber: string | undefined;
   setPhoneNumber: (value: string) => void;
+  setPhoneHasValue: (value: boolean) => void;
+  setPhoneIsValid: (value: boolean) => void;
   companySize: CompanySize | undefined;
   setCompanySize: (value: CompanySize) => void;
   solutionType: SolutionType | undefined;
@@ -30,6 +27,8 @@ export const BasicInfoConditionalFields: React.FC<
   usageStyle,
   phoneNumber,
   setPhoneNumber,
+  setPhoneHasValue,
+  setPhoneIsValid,
   companySize,
   setCompanySize,
   solutionType,
@@ -38,12 +37,18 @@ export const BasicInfoConditionalFields: React.FC<
   usageStyle: UsageStyle | undefined;
   phoneNumber: string | undefined;
   setPhoneNumber: (value: string) => void;
+  setPhoneHasValue: (value: boolean) => void;
+  setPhoneIsValid: (value: boolean) => void;
   companySize: CompanySize | undefined;
   setCompanySize: (value: CompanySize) => void;
   solutionType: SolutionType | undefined;
   setSolutionType: (value: SolutionType | undefined) => void;
 }) => {
   const showFields = usageStyle !== void 0 && usageStyle !== "myself";
+
+  const [phoneTouched, setPhoneTouched] = useState<boolean>(false);
+  const [phoneHasValue, setLocalPhoneHasValue] = useState<boolean>(Boolean(phoneNumber));
+  const [phoneIsValid, setLocalPhoneIsValid] = useState<boolean>(true);
 
   // Track previous visibility to decide if we should animate on first reveal
   const prevShowFieldsRef = useRef<boolean>(showFields);
@@ -75,14 +80,26 @@ export const BasicInfoConditionalFields: React.FC<
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.3, delay: 0.1 }}
             >
-              <Field.Root colorPalette="orange" w="full">
+              <Field.Root
+                colorPalette="orange"
+                w="full"
+                invalid={phoneTouched && phoneHasValue && !phoneIsValid}
+              >
                 <Field.Label>{"What is your phone number?"}</Field.Label>
-                <Input
-                  size="sm"
-                  colorPalette="orange"
+                <PhoneNumberInput
                   value={phoneNumber}
-                  onChange={(e) => setPhoneNumber(e.target.value)}
+                  onChange={(e164, meta) => {
+                    setPhoneNumber(e164 ?? "");
+
+                    const hasValue = meta.national.trim().length > 0;
+
+                    setLocalPhoneHasValue(hasValue);
+                    setLocalPhoneIsValid(Boolean(meta.isValid));
+                    setPhoneHasValue(hasValue);
+                    setPhoneIsValid(Boolean(meta.isValid));
+                  }}
                 />
+                <Field.ErrorText>Enter a valid phone number</Field.ErrorText>
               </Field.Root>
             </motion.div>
 

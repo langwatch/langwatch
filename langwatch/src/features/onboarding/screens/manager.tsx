@@ -38,6 +38,8 @@ interface IntroScreensProps {
     setAgreement: (value: boolean) => void;
     setUsageStyle: (value: UsageStyle | undefined) => void;
     setPhoneNumber: (value: string) => void;
+    setPhoneHasValue: (value: boolean) => void;
+    setPhoneIsValid: (value: boolean) => void;
     setCompanySize: (value: CompanySize) => void;
     setSolutionType: (value: SolutionType | undefined) => void;
     setDesires: (value: Desire[]) => void;
@@ -66,6 +68,8 @@ export const useCreateScreens = ({
     setAgreement,
     setUsageStyle,
     setPhoneNumber,
+    setPhoneHasValue,
+    setPhoneIsValid,
     setCompanySize,
     setSolutionType,
     setDesires,
@@ -147,6 +151,8 @@ export const useCreateScreens = ({
             usageStyle={usageStyle}
             phoneNumber={phoneNumber}
             setPhoneNumber={setPhoneNumber}
+            setPhoneHasValue={setPhoneHasValue}
+            setPhoneIsValid={setPhoneIsValid}
             companySize={companySize}
             setCompanySize={setCompanySize}
             solutionType={solutionType}
