@@ -86,7 +86,7 @@ export function PromptsList({
       {prompts.map((config) => (
         <GeneratePromptApiSnippetDialog
           key={config.id}
-          configId={config.id}
+          promptHandle={config.handle}
           apiKey={project?.apiKey}
         >
           <Card.Root

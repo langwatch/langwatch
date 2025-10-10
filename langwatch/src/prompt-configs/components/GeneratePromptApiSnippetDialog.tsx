@@ -7,7 +7,7 @@ import { GenerateApiSnippetDialog } from "~/components/GenerateApiSnippetDialog"
 import { Link } from "~/components/ui/link";
 
 interface GeneratePromptApiSnippetButtonProps {
-  configId?: string;
+  promptHandle?: string | null;
   apiKey?: string;
   children?: React.ReactNode;
 }
@@ -22,12 +22,12 @@ interface GeneratePromptApiSnippetButtonProps {
  * and documentation display for the Get Prompt endpoint.
  */
 export function GeneratePromptApiSnippetDialog({
-  configId,
+  promptHandle,
   apiKey,
   children,
 }: GeneratePromptApiSnippetButtonProps) {
   const snippets = getGetPromptSnippets({
-    promptId: configId,
+    promptHandle: promptHandle ?? undefined,
     apiKey,
   });
 
