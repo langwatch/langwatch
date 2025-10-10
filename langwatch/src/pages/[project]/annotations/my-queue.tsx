@@ -1,14 +1,13 @@
-import { Box, Button, Spacer, Text, VStack, HStack } from "@chakra-ui/react";
+import { Box, Button, HStack, Spacer, Text, VStack } from "@chakra-ui/react";
 import { useRouter } from "next/router";
-import { DashboardLayout } from "../../../components/DashboardLayout";
 
 import { type AnnotationQueueItem } from "@prisma/client";
+import { useEffect, useMemo, useState } from "react";
 import { Check, ChevronLeft, ChevronRight } from "react-feather";
 import AnnotationsLayout from "~/components/AnnotationsLayout";
 import { useAnnotationQueues } from "~/hooks/useAnnotationQueues";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
-import { useEffect, useMemo, useState } from "react";
 import { TasksDone } from "../../../components/icons/TasksDone";
 import { Conversation } from "../../../components/messages/Conversation";
 
@@ -90,32 +89,34 @@ export default function TraceAnnotations() {
   }
 
   return (
-    <DashboardLayout>
-      <VStack height="100%" width="full" padding={4}>
-        <Conversation
-          threadId={threadId ?? ""}
-          traceId={currentQueueItem?.trace?.trace_id ?? ""}
-        />
-        <Spacer />
-      </VStack>
-      {currentQueueItem?.trace && (
-        <Box
-          position="sticky"
-          bottom={0}
-          left={0}
-          right={0}
-          width="100%"
-          backgroundColor="white"
-        >
-          <AnnotationQueuePicker
-            key={queueItemsKey}
-            queueItems={allQueueItems}
-            currentQueueItem={currentQueueItem}
-            refetchQueueItems={refetchQueueItems}
+    <AnnotationsLayout>
+      <VStack width="full" height="full">
+        <VStack height="100%" width="full" padding={4}>
+          <Conversation
+            threadId={threadId ?? ""}
+            traceId={currentQueueItem?.trace?.trace_id ?? ""}
           />
-        </Box>
-      )}
-    </DashboardLayout>
+          <Spacer />
+        </VStack>
+        {currentQueueItem?.trace && (
+          <Box
+            position="sticky"
+            bottom={0}
+            left={0}
+            right={0}
+            width="100%"
+            backgroundColor="white"
+          >
+            <AnnotationQueuePicker
+              key={queueItemsKey}
+              queueItems={allQueueItems}
+              currentQueueItem={currentQueueItem}
+              refetchQueueItems={refetchQueueItems}
+            />
+          </Box>
+        )}
+      </VStack>
+    </AnnotationsLayout>
   );
 }
 
