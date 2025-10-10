@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.0](https://github.com/langwatch/langwatch/compare/python-sdk@v0.4.2...python-sdk@v0.5.0) (2025-10-10)
+
+
+### Features
+
+* add support for otel /metrics endpoint for genai metrics ([#680](https://github.com/langwatch/langwatch/issues/680)) ([14bec0d](https://github.com/langwatch/langwatch/commit/14bec0d70d4c645d409b2b18a8f6219515563aed))
+
 ## [0.4.2](https://github.com/langwatch/langwatch/compare/python-sdk@v0.4.1...python-sdk@v0.4.2) (2025-09-22)
 
 
