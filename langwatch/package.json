@@ -121,6 +121,7 @@
     "ioredis": "^5.3.2",
     "jsonwebtoken": "^9.0.2",
     "langwatch": "^0.4.2",
+    "libphonenumber-js": "^1.12.23",
     "lodash-es": "^4.17.21",
     "lodash.clonedeep": "^4.5.0",
     "lodash.debounce": "^4.0.8",
