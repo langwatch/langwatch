@@ -584,6 +584,7 @@ export function DatasetTable({
             {datasetId && !isEmbedded && !insideWizard && (
               <Button
                 colorPalette="blue"
+                disabled={!project?.slug}
                 onClick={() => {
                   void router.push(
                     `/${project?.slug}/evaluations/wizard?datasetId=${datasetId}`
