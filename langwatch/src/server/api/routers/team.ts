@@ -59,6 +59,12 @@ export const teamRouter = createTRPCRouter({
               user: true,
             },
           },
+          customRoleMembers: {
+            include: {
+              customRole: true,
+              user: true,
+            },
+          },
           projects: {
             where: {
               archivedAt: null,
@@ -90,6 +96,13 @@ export const teamRouter = createTRPCRouter({
               user: true,
             },
           },
+          customRoleMembers: {
+            include: {
+              customRole: true,
+              user: true,
+            },
+          },
+          defaultCustomRole: true,
           projects: true,
         },
       });
@@ -112,10 +125,13 @@ export const teamRouter = createTRPCRouter({
       z.object({
         teamId: z.string(),
         name: z.string(),
+        defaultRole: z.string().optional(), // Can be TeamUserRole or "custom:{roleId}"
+        defaultCustomRoleId: z.string().optional(),
         members: z.array(
           z.object({
             userId: z.string(),
-            role: z.nativeEnum(TeamUserRole),
+            role: z.string(),
+            customRoleId: z.string().optional(),
           })
         ),
       })
@@ -125,12 +141,21 @@ export const teamRouter = createTRPCRouter({
       const prisma = ctx.prisma;
 
       return await prisma.$transaction(async (tx) => {
+        // Determine if it's a custom role or built-in role
+        const isCustomRole = input.defaultRole?.startsWith("custom:");
+
         await tx.team.update({
           where: {
             id: input.teamId,
           },
           data: {
             name: input.name,
+            defaultRole: isCustomRole
+              ? null
+              : (input.defaultRole as TeamUserRole | null),
+            defaultCustomRoleId: isCustomRole
+              ? input.defaultCustomRoleId
+              : null,
           },
         });
 
@@ -176,19 +201,45 @@ export const teamRouter = createTRPCRouter({
                 },
               },
             });
-          }
-
-          if (membersToAdd.length > 0) {
-            await tx.teamUser.createMany({
-              data: membersToAdd.map((member) => ({
-                userId: member.userId,
+            // Also remove custom role assignments
+            await tx.teamUserCustomRole.deleteMany({
+              where: {
                 teamId: input.teamId,
-                role: member.role,
-              })),
+                userId: {
+                  in: membersToRemove,
+                },
+              },
             });
           }
 
+          if (membersToAdd.length > 0) {
+            for (const member of membersToAdd) {
+              const isCustomRole = member.role.startsWith("custom:");
+              await tx.teamUser.create({
+                data: {
+                  userId: member.userId,
+                  teamId: input.teamId,
+                  role: isCustomRole
+                    ? TeamUserRole.VIEWER
+                    : (member.role as TeamUserRole),
+                },
+              });
+
+              if (isCustomRole && member.customRoleId) {
+                await tx.teamUserCustomRole.create({
+                  data: {
+                    userId: member.userId,
+                    teamId: input.teamId,
+                    customRoleId: member.customRoleId,
+                  },
+                });
+              }
+            }
+          }
+
           for (const member of membersToUpdate) {
+            const isCustomRole = member.role.startsWith("custom:");
+
             await tx.teamUser.update({
               where: {
                 userId_teamId: {
@@ -197,9 +248,30 @@ export const teamRouter = createTRPCRouter({
                 },
               },
               data: {
-                role: member.role,
+                role: isCustomRole
+                  ? TeamUserRole.VIEWER
+                  : (member.role as TeamUserRole),
               },
             });
+
+            // Remove existing custom roles
+            await tx.teamUserCustomRole.deleteMany({
+              where: {
+                userId: member.userId,
+                teamId: input.teamId,
+              },
+            });
+
+            // Add new custom role if applicable
+            if (isCustomRole && member.customRoleId) {
+              await tx.teamUserCustomRole.create({
+                data: {
+                  userId: member.userId,
+                  teamId: input.teamId,
+                  customRoleId: member.customRoleId,
+                },
+              });
+            }
           }
         }
 
@@ -211,10 +283,13 @@ export const teamRouter = createTRPCRouter({
       z.object({
         organizationId: z.string(),
         name: z.string(),
+        defaultRole: z.string().optional(),
+        defaultCustomRoleId: z.string().optional(),
         members: z.array(
           z.object({
             userId: z.string(),
-            role: z.nativeEnum(TeamUserRole),
+            role: z.string(),
+            customRoleId: z.string().optional(),
           })
         ),
       })
@@ -233,24 +308,50 @@ export const teamRouter = createTRPCRouter({
         "-" +
         teamNanoId.substring(0, 6);
 
-      const team = await prisma.team.create({
-        data: {
-          id: teamId,
-          name: input.name,
-          slug: teamSlug,
-          organizationId: input.organizationId,
-        },
-      });
+      return await prisma.$transaction(async (tx) => {
+        const isCustomRole = input.defaultRole?.startsWith("custom:");
 
-      await prisma.teamUser.createMany({
-        data: input.members.map((member) => ({
-          userId: member.userId,
-          teamId: team.id,
-          role: member.role,
-        })),
-      });
+        const team = await tx.team.create({
+          data: {
+            id: teamId,
+            name: input.name,
+            slug: teamSlug,
+            organizationId: input.organizationId,
+            defaultRole: isCustomRole
+              ? null
+              : (input.defaultRole as TeamUserRole | null),
+            defaultCustomRoleId: isCustomRole
+              ? input.defaultCustomRoleId
+              : null,
+          },
+        });
 
-      return team;
+        for (const member of input.members) {
+          const isCustomRole = member.role.startsWith("custom:");
+
+          await tx.teamUser.create({
+            data: {
+              userId: member.userId,
+              teamId: team.id,
+              role: isCustomRole
+                ? TeamUserRole.VIEWER
+                : (member.role as TeamUserRole),
+            },
+          });
+
+          if (isCustomRole && member.customRoleId) {
+            await tx.teamUserCustomRole.create({
+              data: {
+                userId: member.userId,
+                teamId: team.id,
+                customRoleId: member.customRoleId,
+              },
+            });
+          }
+        }
+
+        return team;
+      });
     }),
   archiveById: protectedProcedure
     .input(z.object({ teamId: z.string(), projectId: z.string() }))

@@ -21,8 +21,6 @@ export const Actions = {
   DELETE: "delete",
   MANAGE: "manage", // Full CRUD + settings
   SHARE: "share",
-  EXECUTE: "execute",
-  DEBUG: "debug",
 } as const;
 
 export type Action = (typeof Actions)[keyof typeof Actions];
@@ -86,7 +84,6 @@ const TEAM_ROLE_PERMISSIONS: Record<TeamUserRole, Permission[]> = {
     "annotations:manage",
     // Spans
     "spans:view",
-    "spans:debug",
     // Guardrails
     "guardrails:view",
     "guardrails:manage",
@@ -101,7 +98,6 @@ const TEAM_ROLE_PERMISSIONS: Record<TeamUserRole, Permission[]> = {
     "triggers:manage",
     // Playground
     "playground:view",
-    "playground:execute",
     // Workflows
     "workflows:view",
     "workflows:manage",
@@ -132,7 +128,6 @@ const TEAM_ROLE_PERMISSIONS: Record<TeamUserRole, Permission[]> = {
     "annotations:manage",
     // Spans
     "spans:view",
-    "spans:debug",
     // Guardrails
     "guardrails:view",
     "guardrails:manage",
@@ -147,7 +142,6 @@ const TEAM_ROLE_PERMISSIONS: Record<TeamUserRole, Permission[]> = {
     "triggers:manage",
     // Playground
     "playground:view",
-    "playground:execute",
     // Workflows
     "workflows:view",
     "workflows:manage",
@@ -383,7 +377,11 @@ export async function hasProjectPermission(
     where: { id: projectId },
     select: {
       team: {
-        select: { members: { where: { userId: ctx.session.user.id } } },
+        select: {
+          id: true,
+          members: { where: { userId: ctx.session.user.id } },
+          defaultCustomRole: true,
+        },
       },
     },
   });
@@ -396,6 +394,41 @@ export async function hasProjectPermission(
     return false;
   }
 
+  // Check team baseline permissions (from team's role - either built-in or custom)
+  const teamData = projectTeam?.team as any;
+  if (teamData?.defaultRole) {
+    // Team has a built-in role
+    if (teamRoleHasPermission(teamData.defaultRole, permission)) {
+      return true;
+    }
+  } else if (teamData?.defaultCustomRole) {
+    // Team has a custom role
+    const teamPermissions = teamData.defaultCustomRole.permissions as string[];
+    if (teamPermissions.includes(permission)) {
+      return true;
+    }
+  }
+
+  // Check user's individual permissions (custom role or built-in role)
+  const customRoleAssignment = await ctx.prisma.teamUserCustomRole.findFirst({
+    where: {
+      userId: ctx.session.user.id,
+      teamId: projectTeam?.team.id,
+    },
+    include: {
+      customRole: true,
+    },
+  });
+
+  if (customRoleAssignment) {
+    const userPermissions = customRoleAssignment.customRole
+      .permissions as string[];
+    if (userPermissions.includes(permission)) {
+      return true;
+    }
+  }
+
+  // Fall back to built-in role permissions
   return teamRoleHasPermission(teamMember.role, permission);
 }
 
@@ -413,6 +446,9 @@ export async function hasTeamPermission(
 
   const team = await ctx.prisma.team.findUnique({
     where: { id: teamId },
+    include: {
+      defaultCustomRole: true,
+    },
   });
 
   if (!team?.organizationId) {
@@ -444,6 +480,41 @@ export async function hasTeamPermission(
     return false;
   }
 
+  // Check team baseline permissions (from team's role - either built-in or custom)
+  const teamData = team as any;
+  if (teamData.defaultRole) {
+    // Team has a built-in role
+    if (teamRoleHasPermission(teamData.defaultRole, permission)) {
+      return true;
+    }
+  } else if (teamData.defaultCustomRole) {
+    // Team has a custom role
+    const teamPermissions = teamData.defaultCustomRole.permissions as string[];
+    if (teamPermissions.includes(permission)) {
+      return true;
+    }
+  }
+
+  // Check user's individual permissions (custom role or built-in role)
+  const customRoleAssignment = await ctx.prisma.teamUserCustomRole.findFirst({
+    where: {
+      userId: ctx.session.user.id,
+      teamId: teamId,
+    },
+    include: {
+      customRole: true,
+    },
+  });
+
+  if (customRoleAssignment) {
+    const userPermissions = customRoleAssignment.customRole
+      .permissions as string[];
+    if (userPermissions.includes(permission)) {
+      return true;
+    }
+  }
+
+  // Fall back to built-in role permissions
   return teamRoleHasPermission(teamUser.role, permission);
 }
 
@@ -484,7 +555,6 @@ const DEMO_VIEW_PERMISSIONS: Permission[] = [
   "messages:view",
   "annotations:view",
   "spans:view",
-  "spans:debug",
   "guardrails:view",
   "experiments:view",
   "datasets:view",
@@ -586,5 +656,3 @@ export const checkPermissionOrPubliclyShared =
     ctx.permissionChecked = true;
     return next();
   };
-
-

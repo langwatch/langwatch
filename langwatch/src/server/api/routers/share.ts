@@ -35,7 +35,10 @@ export const shareRouter = createTRPCRouter({
       });
 
       // If this is a trace share and trace sharing is disabled, return null
-      if (share?.resourceType === "TRACE" && !share.project.traceSharingEnabled) {
+      if (
+        share?.resourceType === "TRACE" &&
+        !share.project.traceSharingEnabled
+      ) {
         return null;
       }
 
@@ -128,7 +131,11 @@ export const shareRouter = createTRPCRouter({
         projectId: z.string(),
       })
     )
-    .use(checkUserPermissionForProject(TeamRoleGroup.PROJECT_CHANGE_CAPTURED_DATA_VISIBILITY))
+    .use(
+      checkUserPermissionForProject(
+        TeamRoleGroup.PROJECT_CHANGE_CAPTURED_DATA_VISIBILITY
+      )
+    )
     .mutation(async ({ input }) => {
       const { projectId } = input;
 

@@ -737,24 +737,71 @@ export const organizationRouter = createTRPCRouter({
       z.object({
         teamId: z.string(),
         userId: z.string(),
-        role: z.nativeEnum(TeamUserRole),
+        role: z.string(), // Can be TeamUserRole or "custom:{roleId}"
+        customRoleId: z.string().optional(),
       })
     )
     .use(checkUserPermissionForTeam(TeamRoleGroup.TEAM_MEMBERS_MANAGE))
     .mutation(async ({ input, ctx }) => {
       const prisma = ctx.prisma;
 
-      await prisma.teamUser.update({
-        where: {
-          userId_teamId: {
-            userId: input.userId,
-            teamId: input.teamId,
-          },
-        },
-        data: {
-          role: input.role,
-        },
-      });
+      // Check if this is a custom role
+      const isCustomRole = input.role.startsWith("custom:");
+
+      if (isCustomRole && input.customRoleId) {
+        const customRoleId = input.customRoleId; // Store in a const for TypeScript
+        // Assign custom role and set built-in role to VIEWER
+        await prisma.$transaction([
+          prisma.teamUser.update({
+            where: {
+              userId_teamId: {
+                userId: input.userId,
+                teamId: input.teamId,
+              },
+            },
+            data: {
+              role: TeamUserRole.VIEWER, // Default to VIEWER for custom roles
+            },
+          }),
+          // Remove any existing custom roles for this user on this team
+          prisma.teamUserCustomRole.deleteMany({
+            where: {
+              userId: input.userId,
+              teamId: input.teamId,
+            },
+          }),
+          // Assign the new custom role
+          prisma.teamUserCustomRole.create({
+            data: {
+              userId: input.userId,
+              teamId: input.teamId,
+              customRoleId: customRoleId,
+            },
+          }),
+        ]);
+      } else {
+        // It's a built-in role - update it and remove any custom roles
+        await prisma.$transaction([
+          prisma.teamUser.update({
+            where: {
+              userId_teamId: {
+                userId: input.userId,
+                teamId: input.teamId,
+              },
+            },
+            data: {
+              role: input.role as TeamUserRole,
+            },
+          }),
+          // Remove any custom roles when switching to built-in role
+          prisma.teamUserCustomRole.deleteMany({
+            where: {
+              userId: input.userId,
+              teamId: input.teamId,
+            },
+          }),
+        ]);
+      }
 
       return { success: true };
     }),

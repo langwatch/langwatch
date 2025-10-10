@@ -417,6 +417,29 @@ function PermissionSelector({
     );
   });
 
+  // Define which actions are valid for each resource
+  const getValidActionsForResource = (resource: Resource): Action[] => {
+    // Share is only available for messages
+    if (resource === Resources.MESSAGES) {
+      return [
+        Actions.VIEW,
+        Actions.CREATE,
+        Actions.UPDATE,
+        Actions.DELETE,
+        Actions.MANAGE,
+        Actions.SHARE,
+      ];
+    }
+    // Most other resources don't have share
+    return [
+      Actions.VIEW,
+      Actions.CREATE,
+      Actions.UPDATE,
+      Actions.DELETE,
+      Actions.MANAGE,
+    ];
+  };
+
   const togglePermission = (permission: Permission) => {
     if (selectedPermissions.includes(permission)) {
       onChange(selectedPermissions.filter((p) => p !== permission));
@@ -455,6 +478,8 @@ function PermissionSelector({
           permissions.some((p) => selectedPermissions.includes(p)) &&
           !allSelected;
 
+        const validActions = getValidActionsForResource(resource);
+
         return (
           <Box key={resource} width="full">
             <Fieldset.Root>
@@ -478,7 +503,7 @@ function PermissionSelector({
               </Fieldset.Legend>
               <Fieldset.Content>
                 <HStack gap={4} flexWrap="wrap" paddingLeft={6}>
-                  {Object.values(Actions).map((action) => {
+                  {validActions.map((action) => {
                     const permission: Permission = `${resource}:${action}`;
                     return (
                       <Checkbox

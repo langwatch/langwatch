@@ -14,7 +14,7 @@ export const spansRouter = createTRPCRouter({
     .input(z.object({ projectId: z.string(), traceId: z.string() }))
     .use(
       checkPermissionOrPubliclyShared(
-        checkUserPermissionForProject(TeamRoleGroup.SPANS_DEBUG),
+        checkUserPermissionForProject(TeamRoleGroup.MESSAGES_VIEW),
         {
           resourceType: PublicShareResourceTypes.TRACE,
           resourceParam: "traceId",

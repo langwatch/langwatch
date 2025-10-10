@@ -36,6 +36,7 @@ import {
 
 export type TeamFormData = {
   name: string;
+  defaultRole?: TeamUserRoleForm["role"];
   members: {
     userId?: { label: string; value: string };
     role: TeamUserRoleForm["role"];
@@ -117,6 +118,23 @@ export const TeamForm = ({
                   helper="The unique ID of your team"
                 >
                   <Input width="full" disabled type="text" value={team.slug} />
+                </HorizontalFormControl>
+              )}
+              {team && (
+                <HorizontalFormControl
+                  label="Team Role"
+                  helper="The role/permission level assigned to this team"
+                >
+                  <Controller
+                    control={control}
+                    name="defaultRole"
+                    render={({ field }) => (
+                      <TeamRoleSelect
+                        organizationId={organizationId}
+                        field={field}
+                      />
+                    )}
+                  />
                 </HorizontalFormControl>
               )}
             </VStack>
@@ -211,7 +229,12 @@ export const TeamForm = ({
                         control={control}
                         name={`members.${index}.role`}
                         rules={{ required: "User role is required" }}
-                        render={({ field }) => <TeamRoleSelect field={field} />}
+                        render={({ field }) => (
+                          <TeamRoleSelect
+                            organizationId={organizationId}
+                            field={field}
+                          />
+                        )}
                       />
                     </Table.Cell>
                     <Table.Cell paddingLeft={0} paddingRight={0} paddingY={2}>

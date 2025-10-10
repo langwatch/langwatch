@@ -38,9 +38,6 @@ const teamPermissions: Record<string, Record<string, TeamUserRole[]>> = {
     view: [TeamUserRole.ADMIN, TeamUserRole.MEMBER, TeamUserRole.VIEWER],
     manage: [TeamUserRole.ADMIN, TeamUserRole.MEMBER],
   },
-  spans: {
-    debug: [TeamUserRole.ADMIN, TeamUserRole.MEMBER],
-  },
   guardrails: {
     view: [TeamUserRole.ADMIN, TeamUserRole.MEMBER, TeamUserRole.VIEWER],
     manage: [TeamUserRole.ADMIN, TeamUserRole.MEMBER],
@@ -102,9 +99,6 @@ export const teamRolePermissionMapping: Record<string, TeamUserRole[]> = {
   // Annotations permissions
   ANNOTATIONS_VIEW: teamPermissions.annotations!.view!,
   ANNOTATIONS_MANAGE: teamPermissions.annotations!.manage!,
-
-  // Spans permissions
-  SPANS_DEBUG: teamPermissions.spans!.debug!,
 
   // Guardrails permissions
   GUARDRAILS_VIEW: teamPermissions.guardrails!.view!,
@@ -176,7 +170,6 @@ export const isDemoProject = (
       roleGroup === TeamRoleGroup.DATASETS_VIEW ||
       roleGroup === TeamRoleGroup.ANALYTICS_VIEW ||
       roleGroup === TeamRoleGroup.COST_VIEW ||
-      roleGroup === TeamRoleGroup.SPANS_DEBUG ||
       roleGroup === TeamRoleGroup.GUARDRAILS_VIEW ||
       roleGroup === TeamRoleGroup.ANNOTATIONS_VIEW ||
       roleGroup === TeamRoleGroup.PLAYGROUND ||
@@ -449,7 +442,6 @@ export const LEGACY_TO_RBAC_MAPPING: Partial<
   MESSAGES_SHARE: "messages:share",
   ANNOTATIONS_VIEW: "annotations:view",
   ANNOTATIONS_MANAGE: "annotations:manage",
-  SPANS_DEBUG: "spans:debug",
   GUARDRAILS_VIEW: "guardrails:view",
   GUARDRAILS_MANAGE: "guardrails:manage",
   EXPERIMENTS_VIEW: "experiments:view",
@@ -457,7 +449,7 @@ export const LEGACY_TO_RBAC_MAPPING: Partial<
   DATASETS_VIEW: "datasets:view",
   DATASETS_MANAGE: "datasets:manage",
   TRIGGERS_MANAGE: "triggers:manage",
-  PLAYGROUND: "playground:execute",
+  PLAYGROUND: "playground:view",
   WORKFLOWS_VIEW: "workflows:view",
   WORKFLOWS_MANAGE: "workflows:manage",
   PROMPTS_VIEW: "prompts:view",

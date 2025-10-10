@@ -3,6 +3,7 @@ import { useRouter } from "next/router";
 import { useEffect, useState } from "react";
 import { useForm, useWatch, type SubmitHandler } from "react-hook-form";
 import { useDebouncedCallback } from "use-debounce";
+import { TeamUserRole } from "@prisma/client";
 import SettingsLayout from "../../../components/SettingsLayout";
 import {
   TeamForm,
@@ -12,7 +13,10 @@ import type { TeamWithProjectsAndMembersAndUsers } from "../../../server/api/rou
 import { api } from "../../../utils/api";
 import { toaster } from "../../../components/ui/toaster";
 
-import { teamRolesOptions } from "../../../components/settings/TeamUserRoleField";
+import {
+  teamRolesOptions,
+  type RoleOption,
+} from "../../../components/settings/TeamUserRoleField";
 import { useOrganizationTeamProject } from "../../../hooks/useOrganizationTeamProject";
 
 export default function EditTeamPage() {
@@ -33,20 +37,80 @@ export default function EditTeamPage() {
 }
 
 function EditTeam({ team }: { team: TeamWithProjectsAndMembersAndUsers }) {
-  const [defaultValues, setDefaultValues] = useState<TeamFormData>({
+  // Get team's default role if it exists (either built-in or custom)
+  const teamDefaultCustomRole = (team as any).defaultCustomRole;
+  const teamBuiltInRole = (team as any).defaultRole;
+
+  const teamDefaultRole = teamDefaultCustomRole
+    ? ({
+        label: teamDefaultCustomRole.name,
+        value: `custom:${teamDefaultCustomRole.id}`,
+        description:
+          teamDefaultCustomRole.description ||
+          `${
+            (teamDefaultCustomRole.permissions as string[]).length
+          } permissions`,
+        isCustom: true,
+        customRoleId: teamDefaultCustomRole.id,
+      } as RoleOption)
+    : teamBuiltInRole
+    ? teamRolesOptions[teamBuiltInRole as TeamUserRole]
+    : undefined;
+
+  const getInitialValues = (): TeamFormData => ({
     name: team.name,
-    members: team.members.map((member) => ({
-      userId: {
-        label: `${member.user.name} (${member.user.email})`,
-        value: member.user.id,
-      },
-      role: teamRolesOptions[member.role],
-      saved: true,
-    })),
+    defaultRole: teamDefaultRole,
+    members: team.members.map((member) => {
+      // Check if this user has a custom role assigned
+      const customRoleAssignment = (team as any).customRoleMembers?.find(
+        (crm: any) =>
+          crm.userId === member.userId && crm.teamId === member.teamId
+      );
+
+      const role = customRoleAssignment
+        ? {
+            label: customRoleAssignment.customRole.name,
+            value: `custom:${customRoleAssignment.customRole.id}`,
+            description:
+              customRoleAssignment.customRole.description ||
+              `${
+                (customRoleAssignment.customRole.permissions as string[]).length
+              } permissions`,
+            isCustom: true,
+            customRoleId: customRoleAssignment.customRole.id,
+          }
+        : teamRolesOptions[member.role];
+
+      return {
+        userId: {
+          label: `${member.user.name} (${member.user.email})`,
+          value: member.user.id,
+        },
+        role,
+        saved: true,
+      };
+    }),
   });
+
+  const [defaultValues, setDefaultValues] = useState<TeamFormData>(
+    getInitialValues()
+  );
+
   const form = useForm({
     defaultValues,
   });
+
+  // Reset form when team data changes (e.g., on refresh/reload)
+  useEffect(() => {
+    const newValues = getInitialValues();
+    setDefaultValues(newValues);
+    form.reset(newValues);
+  }, [
+    team.id,
+    team.name,
+    (team as any).defaultCustomRole?.id,
+    (team as any).defaultRole,
+  ]);
   const { handleSubmit, control } = form;
   const formWatch = useWatch({ control });
   const updateTeam = api.team.update.useMutation();
@@ -62,9 +126,12 @@ function EditTeam({ team }: { team: TeamWithProjectsAndMembersAndUsers }) {
         {
           teamId: team.id,
           name: data.name,
+          defaultRole: data.defaultRole?.value,
+          defaultCustomRoleId: data.defaultRole?.customRoleId,
           members: data.members.map((member) => ({
             userId: member.userId?.value ?? "",
             role: member.role.value,
+            customRoleId: member.role.customRoleId,
           })),
         },
         {
