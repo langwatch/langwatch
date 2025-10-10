@@ -346,8 +346,11 @@ export const DashboardLayout = ({
       <VStack
         width={`calc(100vw - ${MENU_WIDTH})`}
         maxWidth={`calc(100vw - ${MENU_WIDTH})`}
+        height="100vh"
         gap={0}
         background="gray.100"
+        overflowY="auto"
+        overflowX="hidden"
         {...props}
       >
         {publicEnv.data &&

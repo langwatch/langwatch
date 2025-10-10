@@ -1,7 +1,6 @@
-import { Button, Field, HStack, NativeSelect, Text } from "@chakra-ui/react";
 import { useRouter } from "next/router";
 import { useEffect, useState } from "react";
-import { ChevronLeft, ChevronRight } from "react-feather";
+import { PaginationFooter } from "../ui/PaginationFooter";
 
 import type { TRPCClientErrorLike } from "@trpc/client";
 import type { UseTRPCQueryResult } from "@trpc/react-query/shared";
@@ -49,12 +48,15 @@ export const useMessagesNavigationFooter = () => {
     >
   ) => {
     useEffect(() => {
-      if (traceGroups.isFetched) {
-        const totalHits: number = traceGroups.data?.totalHits ?? 0;
+      if (traceGroups.isFetched && traceGroups.data?.totalHits !== undefined) {
+        const newTotalHits: number = traceGroups.data.totalHits;
 
-        setTotalHits(totalHits);
+        // Only update if the value actually changed to prevent unnecessary re-renders
+        if (newTotalHits !== totalHits) {
+          setTotalHits(newTotalHits);
+        }
       }
-    }, [traceGroups.data?.totalHits, traceGroups.isFetched]);
+    }, [traceGroups.data?.totalHits, traceGroups.isFetched, totalHits]);
   };
 
   useEffect(() => {
@@ -62,7 +64,7 @@ export const useMessagesNavigationFooter = () => {
       pathname: router.pathname,
       query: { ...router.query, pageOffset: "0", pageSize: "25" },
     });
-  }, [router.query.query]);
+  }, [router.query.query, router.pathname, router.query]);
 
   return {
     totalHits,
@@ -72,6 +74,8 @@ export const useMessagesNavigationFooter = () => {
     prevPage,
     changePageSize,
     useUpdateTotalHits,
+    // Add a flag to indicate if we have stable data
+    hasStableData: totalHits > 0,
   };
 };
 
@@ -91,60 +95,16 @@ export function MessagesNavigationFooter({
   changePageSize: (size: number) => void;
 }) {
   return (
-    <HStack padding={6} gap={2}>
-      <Field.Root>
-        <HStack gap={3}>
-          <Field.Label flexShrink={0}>Items per page </Field.Label>
-
-          <NativeSelect.Root size="sm">
-            <NativeSelect.Field
-              defaultValue="25"
-              onChange={(e) => changePageSize(parseInt(e.target.value))}
-              borderColor="black"
-              borderRadius="lg"
-              value={pageSize.toString()}
-            >
-              <option value="10">10</option>
-              <option value="25">25</option>
-              <option value="50">50</option>
-              <option value="100">100</option>
-              <option value="250">250</option>
-            </NativeSelect.Field>
-            <NativeSelect.Indicator />
-          </NativeSelect.Root>
-        </HStack>
-      </Field.Root>
-
-      <HStack gap={3}>
-        <Text flexShrink={0}>
-          {" "}
-          {`${pageOffset + 1}`} -{" "}
-          {`${
-            pageOffset + pageSize > totalHits
-              ? totalHits
-              : pageOffset + pageSize
-          }`}{" "}
-          of {`${totalHits}`} items
-        </Text>
-        <HStack gap={0}>
-          <Button
-            variant="ghost"
-            padding={0}
-            onClick={prevPage}
-            disabled={pageOffset === 0}
-          >
-            <ChevronLeft />
-          </Button>
-          <Button
-            variant="ghost"
-            padding={0}
-            disabled={pageOffset + pageSize >= totalHits}
-            onClick={nextPage}
-          >
-            <ChevronRight />
-          </Button>
-        </HStack>
-      </HStack>
-    </HStack>
+    <PaginationFooter
+      totalCount={totalHits}
+      pageOffset={pageOffset}
+      pageSize={pageSize}
+      nextPage={nextPage}
+      prevPage={prevPage}
+      changePageSize={changePageSize}
+      padding={6}
+      pageSizeOptions={[10, 25, 50, 100, 250]}
+      label="Items per page "
+    />
   );
 }

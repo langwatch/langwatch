@@ -986,7 +986,7 @@ export function MessagesTable({
 
   return (
     <>
-      <Container maxWidth="calc(100vw - 50px)" padding={6}>
+      <Container maxWidth="calc(100vw - 50px)" padding={6} flex="1">
         <HStack width="full" align="top" paddingBottom={6}>
           <HStack align="center" gap={6}>
             <Heading as="h1" size="lg" paddingTop={1}>
@@ -1120,22 +1120,26 @@ export function MessagesTable({
                     showFilters ? "calc(100vw - 450px)" : "calc(100vw - 130px)"
                   }
                 >
-                  {downloadProgress > 0 && (
-                    <Progress.Root
-                      colorPalette="orange"
-                      value={downloadProgress}
-                      size="xs"
-                      width="full"
-                      boxShadow="none"
-                    >
-                      <Progress.Track boxShadow="none" background="none">
-                        <Progress.Range />
-                      </Progress.Track>
-                    </Progress.Root>
-                  )}
-                  {checkedHeaderColumnsEntries.length === 0 && (
-                    <Text>No columns selected</Text>
-                  )}
+                  <Box minHeight="4px">
+                    {downloadProgress > 0 && (
+                      <Progress.Root
+                        colorPalette="orange"
+                        value={downloadProgress}
+                        size="xs"
+                        width="full"
+                        boxShadow="none"
+                      >
+                        <Progress.Track boxShadow="none" background="none">
+                          <Progress.Range />
+                        </Progress.Track>
+                      </Progress.Root>
+                    )}
+                  </Box>
+                  <Box minHeight="20px">
+                    {checkedHeaderColumnsEntries.length === 0 && (
+                      <Text>No columns selected</Text>
+                    )}
+                  </Box>
                   <Table.ScrollArea
                     ref={scrollRef}
                     onScroll={() => {
@@ -1244,108 +1248,111 @@ export function MessagesTable({
                   </Table.ScrollArea>
                 </Card.Body>
               </Card.Root>
-              <MessagesNavigationFooter {...navigationFooter} />
+              <Box minHeight="80px">
+                <MessagesNavigationFooter {...navigationFooter} />
+              </Box>
             </VStack>
           </Box>
 
           <FilterSidebar />
         </HStack>
       </Container>
-      {selectedTraceIds.length > 0 && (
-        <Box
-          position="fixed"
-          bottom={10}
-          left="50%"
-          transform="translateX(-50%)"
-          backgroundColor="#ffffff"
-          padding="8px"
-          paddingX="16px"
-          border="1px solid #ccc"
-          boxShadow="0 0 15px rgba(0, 0, 0, 0.2)"
-          borderRadius="md"
-        >
-          <HStack gap={3}>
-            <Text whiteSpace="nowrap">
-              {selectedTraceIds.length}{" "}
-              {selectedTraceIds.length === 1 ? "trace" : "traces"} selected
-            </Text>
-            {!hideExport && (
-              <>
-                <Button
-                  colorPalette="black"
-                  minWidth="fit-content"
-                  variant="outline"
-                  onClick={() => void downloadCSV(true)}
-                >
-                  Export <Download size={16} style={{ marginLeft: 8 }} />
-                </Button>
-                <Text>or</Text>
-              </>
-            )}
-
-            <Button
-              colorPalette="black"
-              type="submit"
-              variant="outline"
-              minWidth="fit-content"
-              onClick={() => {
-                openDrawer("addDatasetRecord", {
-                  selectedTraceIds,
-                });
-              }}
-            >
-              Add to Dataset
-            </Button>
-            {!hideAddToQueue && (
-              <Dialog.Root
-                open={dialog.open}
-                onOpenChange={(e) =>
-                  e.open ? dialog.onOpen() : dialog.onClose()
-                }
+      <Box
+        position="fixed"
+        bottom={10}
+        left="50%"
+        transform="translateX(-50%)"
+        backgroundColor="#ffffff"
+        padding="8px"
+        paddingX="16px"
+        border="1px solid #ccc"
+        boxShadow="0 0 15px rgba(0, 0, 0, 0.2)"
+        borderRadius="md"
+        opacity={selectedTraceIds.length > 0 ? 1 : 0}
+        visibility={selectedTraceIds.length > 0 ? "visible" : "hidden"}
+        transition="opacity 0.2s ease-in-out"
+      >
+        <HStack gap={3}>
+          <Text whiteSpace="nowrap">
+            {selectedTraceIds.length}{" "}
+            {selectedTraceIds.length === 1 ? "trace" : "traces"} selected
+          </Text>
+          {!hideExport && (
+            <>
+              <Button
+                colorPalette="black"
+                minWidth="fit-content"
+                variant="outline"
+                onClick={() => void downloadCSV(true)}
               >
-                <Dialog.Trigger asChild>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => dialog.onOpen()}
-                  >
-                    Add to Queue
-                  </Button>
-                </Dialog.Trigger>
-                <Portal>
-                  <Dialog.Backdrop />
+                Export <Download size={16} style={{ marginLeft: 8 }} />
+              </Button>
+              <Text>or</Text>
+            </>
+          )}
 
-                  <Dialog.Content>
-                    <Dialog.Header>
-                      <Dialog.Title>Add to Queue</Dialog.Title>
-                    </Dialog.Header>
-                    <Dialog.Body>
-                      <Dialog.Description mb="4">
-                        Add selected traces to an annotation queue
-                      </Dialog.Description>
-                      <AddParticipants
-                        annotators={annotators}
-                        setAnnotators={setAnnotators}
-                        queueDrawerOpen={queueDrawerOpen}
-                        sendToQueue={sendToQueue}
-                        isLoading={queueItem.isLoading}
-                      />
-                    </Dialog.Body>
+          <Button
+            colorPalette="black"
+            type="submit"
+            variant="outline"
+            minWidth="fit-content"
+            onClick={() => {
+              openDrawer("addDatasetRecord", {
+                selectedTraceIds,
+              });
+            }}
+          >
+            Add to Dataset
+          </Button>
+          {!hideAddToQueue && (
+            <Dialog.Root
+              open={dialog.open}
+              onOpenChange={(e) =>
+                e.open ? dialog.onOpen() : dialog.onClose()
+              }
+            >
+              <Dialog.Trigger asChild>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => dialog.onOpen()}
+                >
+                  Add to Queue
+                </Button>
+              </Dialog.Trigger>
+              <Portal>
+                <Dialog.Backdrop />
 
-                    <Dialog.CloseTrigger asChild>
-                      <CloseButton size="sm" onClick={() => dialog.onClose()} />
-                    </Dialog.CloseTrigger>
-                  </Dialog.Content>
-                  <AddAnnotationQueueDrawer
-                    open={queueDrawerOpen.open}
-                    onClose={queueDrawerOpen.onClose}
-                  />
-                </Portal>
-              </Dialog.Root>
-            )}
-          </HStack>
-        </Box>
-      )}
+                <Dialog.Content>
+                  <Dialog.Header>
+                    <Dialog.Title>Add to Queue</Dialog.Title>
+                  </Dialog.Header>
+                  <Dialog.Body>
+                    <Dialog.Description mb="4">
+                      Add selected traces to an annotation queue
+                    </Dialog.Description>
+                    <AddParticipants
+                      annotators={annotators}
+                      setAnnotators={setAnnotators}
+                      queueDrawerOpen={queueDrawerOpen}
+                      sendToQueue={sendToQueue}
+                      isLoading={queueItem.isLoading}
+                    />
+                  </Dialog.Body>
+
+                  <Dialog.CloseTrigger asChild>
+                    <CloseButton size="sm" onClick={() => dialog.onClose()} />
+                  </Dialog.CloseTrigger>
+                </Dialog.Content>
+                <AddAnnotationQueueDrawer
+                  open={queueDrawerOpen.open}
+                  onClose={queueDrawerOpen.onClose}
+                />
+              </Portal>
+            </Dialog.Root>
+          )}
+        </HStack>
+      </Box>
     </>
   );
 }
