@@ -10,7 +10,7 @@ export const tools = (dataset: string) => {
 
   const addRow = tool({
     description:
-      "Adds a row to the dataset, each row is an array of values matching each column of the dataset EXCEPT the id column",
+      "Adds a SINGLE row to the dataset. To add multiple rows, call this tool multiple times. The row is an object with values for each column (excluding the id column which is auto-generated).",
     inputSchema: z.object({
       row: z.object(
         Object.fromEntries(
