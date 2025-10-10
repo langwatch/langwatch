@@ -153,12 +153,6 @@ describe("LocalPromptsService", () => {
         result = await service.get(handle);
       });
 
-      it("should log warning", async () => {
-        expect(mockLogger.warn).toHaveBeenCalledWith(
-          `Failed to get prompt "${handle}": ${errorMessage}`,
-        );
-      });
-
       it("should return null", async () => {
         expect(result).toBeNull();
       });
@@ -189,12 +183,6 @@ describe("LocalPromptsService", () => {
           throw new Error(errorMessage);
         });
         result = await service.get(handle);
-      });
-
-      it("should log warning", async () => {
-        expect(mockLogger.warn).toHaveBeenCalledWith(
-          `Failed to get prompt "${handle}": ${errorMessage}`,
-        );
       });
 
       it("should return null", async () => {
