@@ -2,15 +2,15 @@ import type { Snippet } from "../../types";
 
 /**
  * Returns code snippets for getting prompts from the LangWatch API
- * @param promptId - The ID of the prompt to retrieve (defaults to "{id}")
+ * @param handle - The handle of the prompt to retrieve (defaults to "{handle}")
  * @param apiKey - The API key to use for authentication (defaults to "YOUR_API_KEY")
  * @returns Array of code snippets for getting prompts
  */
 export function getGetPromptSnippets(params?: {
-  promptId?: string;
+  handle?: string | null;
   apiKey?: string;
 }): Snippet[] {
-  const { promptId = "{id}", apiKey = "YOUR_API_KEY" } = params ?? {};
+  const { handle = "{handle}", apiKey = "YOUR_API_KEY" } = params ?? {};
 
   return [
     {
@@ -20,13 +20,13 @@ import langwatch
 # Setup LangWatch (ensure LANGWATCH_API_KEY is set in environment)
 langwatch.setup(api_key="${apiKey}")
 
-# Fetch prompt
-prompt = langwatch.prompts.get("${promptId}")
+# Fetch prompt by handle
+prompt = langwatch.prompts.get("${handle}")
 
 # Access prompt properties
-print(f"Prompt Name: {prompt.name}")
+print(f"Prompt Handle: {prompt.handle}")
 print(f"Model: {prompt.model}")
-print(f"Version: {prompt.version_number}")
+print(f"Version: {prompt.version}")
 
 # Compile with variables (preferred)
 compiled = prompt.compile(
@@ -38,18 +38,18 @@ print(f"Compiled messages: {compiled.messages}")
 `,
       target: "python_python3",
       title: "Get Prompts (Python SDK)",
-      path: "/api/prompts/{id}",
+      path: "/api/prompts/{handle}",
       method: "GET",
     },
     {
       content: `
 curl --request GET \\
-  --url https://app.langwatch.ai/api/prompts/${promptId} \\
+  --url https://app.langwatch.ai/api/prompts/${handle} \\
   --header 'X-Auth-Token: ${apiKey}'
 `,
       target: "shell_curl",
       title: "Get Prompts (cURL)",
-      path: "/api/prompts/{id}",
+      path: "/api/prompts/{handle}",
       method: "GET",
     },
     {
@@ -61,11 +61,11 @@ const langwatch = new LangWatch({
   apiKey: '${apiKey}'
 });
 
-// Fetch prompt
-const prompt = await langwatch.prompts.get('${promptId}');
+// Fetch prompt by handle
+const prompt = await langwatch.prompts.get('${handle}');
 
 // Access prompt properties
-console.log(\`Prompt Name: \${prompt.name}\`);
+console.log(\`Prompt Handle: \${prompt.handle}\`);
 console.log(\`Model: \${prompt.model}\`);
 console.log(\`Version: \${prompt.version}\`);
 
@@ -80,7 +80,7 @@ console.log(\`Compiled messages: \${compiled.messages}\`);
 `,
       target: "node_native",
       title: "Get Prompts (TypeScript SDK)",
-      path: "/api/prompts/{id}",
+      path: "/api/prompts/{handle}",
       method: "GET",
     },
     {
@@ -90,7 +90,7 @@ console.log(\`Compiled messages: \${compiled.messages}\`);
 $curl = curl_init();
 
 curl_setopt_array($curl, [
-  CURLOPT_URL => "https://app.langwatch.ai/api/prompts/${promptId}",
+  CURLOPT_URL => "https://app.langwatch.ai/api/prompts/${handle}",
   CURLOPT_RETURNTRANSFER => true,
   CURLOPT_ENCODING => "",
   CURLOPT_MAXREDIRS => 10,
@@ -115,7 +115,7 @@ if ($err) {
 `,
       target: "php_curl",
       title: "Get Prompts (PHP cURL)",
-      path: "/api/prompts/{id}",
+      path: "/api/prompts/{handle}",
       method: "GET",
     },
     {
@@ -129,7 +129,7 @@ import (
 )
 
 func main() {
-	url := "https://app.langwatch.ai/api/prompts/${promptId}"
+	url := "https://app.langwatch.ai/api/prompts/${handle}"
 
 	req, _ := http.NewRequest("GET", url, nil)
 	req.Header.Add("X-Auth-Token", "${apiKey}")
@@ -145,7 +145,7 @@ func main() {
 `,
       target: "go_native",
       title: "Get Prompts (Go)",
-      path: "/api/prompts/{id}",
+      path: "/api/prompts/{handle}",
       method: "GET",
     },
     {
@@ -157,7 +157,7 @@ import com.mashape.unirest.http.exceptions.UnirestException;
 public class GetPrompt {
     public static void main(String[] args) {
         try {
-            HttpResponse<String> response = Unirest.get("https://app.langwatch.ai/api/prompts/${promptId}")
+            HttpResponse<String> response = Unirest.get("https://app.langwatch.ai/api/prompts/${handle}")
                 .header("X-Auth-Token", "${apiKey}")
                 .asString();
             
@@ -170,7 +170,7 @@ public class GetPrompt {
 `,
       target: "java_unirest",
       title: "Get Prompts (Java)",
-      path: "/api/prompts/{id}",
+      path: "/api/prompts/{handle}",
       method: "GET",
     },
   ];
