@@ -56,15 +56,25 @@ export const useMessagesNavigationFooter = () => {
           setTotalHits(newTotalHits);
         }
       }
-    }, [traceGroups.data?.totalHits, traceGroups.isFetched, totalHits]);
+    }, [traceGroups.data?.totalHits, traceGroups.isFetched]);
   };
 
   useEffect(() => {
-    void router.push({
-      pathname: router.pathname,
-      query: { ...router.query, pageOffset: "0", pageSize: "25" },
-    });
-  }, [router.query.query, router.pathname, router.query]);
+    const hasPageOffset = router.query.pageOffset !== undefined;
+    const hasPageSize = router.query.pageSize !== undefined;
+
+    if (!hasPageOffset || !hasPageSize) {
+      void router.replace(
+        {
+          pathname: router.pathname,
+          query: { ...router.query, pageOffset: "0", pageSize: "25" },
+        },
+        undefined,
+        { shallow: true }
+      );
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [router.pathname, router.query.query]);
 
   return {
     totalHits,

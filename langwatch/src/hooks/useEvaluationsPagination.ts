@@ -1,5 +1,6 @@
 import { useRouter } from "next/router";
 import { useEffect, useState } from "react";
+import * as Sentry from "@sentry/nextjs";
 
 export const useEvaluationsPagination = () => {
   const router = useRouter();
@@ -11,27 +12,48 @@ export const useEvaluationsPagination = () => {
 
   const nextPage = () => {
     const newOffset = pageOffset + pageSize;
-    void router.push({
-      pathname: router.pathname,
-      query: { ...router.query, pageOffset: newOffset.toString() },
-    });
+    router
+      .push({
+        pathname: router.pathname,
+        query: { ...router.query, pageOffset: newOffset.toString() },
+      })
+      .catch((error) => {
+        Sentry.captureException(error, {
+          tags: { component: "useEvaluationsPagination", action: "nextPage" },
+        });
+      });
   };
 
   const prevPage = () => {
     if (pageOffset > 0) {
       const newOffset = pageOffset - pageSize;
-      void router.push({
-        pathname: router.pathname,
-        query: { ...router.query, pageOffset: newOffset.toString() },
-      });
+      router
+        .push({
+          pathname: router.pathname,
+          query: { ...router.query, pageOffset: newOffset.toString() },
+        })
+        .catch((error) => {
+          Sentry.captureException(error, {
+            tags: { component: "useEvaluationsPagination", action: "prevPage" },
+          });
+        });
     }
   };
 
   const changePageSize = (size: number) => {
-    void router.push({
-      pathname: router.pathname,
-      query: { ...router.query, pageSize: size.toString(), pageOffset: "0" },
-    });
+    router
+      .push({
+        pathname: router.pathname,
+        query: { ...router.query, pageSize: size.toString(), pageOffset: "0" },
+      })
+      .catch((error) => {
+        Sentry.captureException(error, {
+          tags: {
+            component: "useEvaluationsPagination",
+            action: "changePageSize",
+          },
+        });
+      });
   };
 
   const updateTotalCount = (count: number) => {
