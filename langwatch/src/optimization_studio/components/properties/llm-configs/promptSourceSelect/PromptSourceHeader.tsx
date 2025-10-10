@@ -115,7 +115,7 @@ export function PromptSourceHeader({
           <EditablePromptHandleField />
           <Spacer />
           <GeneratePromptApiSnippetDialog
-            configId={configId}
+            promptHandle={handle}
             apiKey={project?.apiKey}
           >
             <GeneratePromptApiSnippetDialog.Trigger>
