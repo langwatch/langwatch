@@ -90,32 +90,34 @@ export default function TraceAnnotations() {
   }
 
   return (
-    <DashboardLayout>
-      <VStack height="100%" width="full" padding={4}>
-        <Conversation
-          threadId={threadId ?? ""}
-          traceId={currentQueueItem?.trace?.trace_id ?? ""}
-        />
-        <Spacer />
-      </VStack>
-      {currentQueueItem?.trace && (
-        <Box
-          position="sticky"
-          bottom={0}
-          left={0}
-          right={0}
-          width="100%"
-          backgroundColor="white"
-        >
-          <AnnotationQueuePicker
-            key={queueItemsKey}
-            queueItems={allQueueItems}
-            currentQueueItem={currentQueueItem}
-            refetchQueueItems={refetchQueueItems}
+    <AnnotationsLayout>
+      <VStack width="full" height="full">
+        <VStack height="100%" width="full" padding={4}>
+          <Conversation
+            threadId={threadId ?? ""}
+            traceId={currentQueueItem?.trace?.trace_id ?? ""}
           />
-        </Box>
-      )}
-    </DashboardLayout>
+          <Spacer />
+        </VStack>
+        {currentQueueItem?.trace && (
+          <Box
+            position="sticky"
+            bottom={0}
+            left={0}
+            right={0}
+            width="100%"
+            backgroundColor="white"
+          >
+            <AnnotationQueuePicker
+              key={queueItemsKey}
+              queueItems={allQueueItems}
+              currentQueueItem={currentQueueItem}
+              refetchQueueItems={refetchQueueItems}
+            />
+          </Box>
+        )}
+      </VStack>
+    </AnnotationsLayout>
   );
 }
 
