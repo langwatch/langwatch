@@ -142,15 +142,6 @@ export default function Datasets() {
         <PageLayout.Header>
           <PageLayout.Heading>Datasets</PageLayout.Heading>
           <Spacer />
-          <PageLayout.HeaderButton
-            onClick={() => {
-              openDrawer("batchEvaluation", {
-                selectDataset: true,
-              });
-            }}
-          >
-            <Play height={16} /> Batch Evaluation
-          </PageLayout.HeaderButton>
           <PageLayout.HeaderButton onClick={() => uploadCSVModal.onOpen()}>
             <Upload height={17} width={17} strokeWidth={2.5} /> Upload or Create
             Dataset

@@ -27,6 +27,7 @@ import {
   Plus,
   Upload,
 } from "react-feather";
+import { useRouter } from "next/router";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { api } from "../../utils/api";
 import { useDrawer } from "../CurrentDrawer";
@@ -91,6 +92,7 @@ export function DatasetTable({
   canEditDatasetRecord?: boolean;
 }) {
   const { project } = useOrganizationTeamProject();
+  const router = useRouter();
 
   const { openDrawer } = useDrawer();
   const addRowsFromCSVModal = useDisclosure();
@@ -582,15 +584,16 @@ export function DatasetTable({
             {datasetId && !isEmbedded && !insideWizard && (
               <Button
                 colorPalette="blue"
+                disabled={!project?.slug}
                 onClick={() => {
-                  openDrawer("batchEvaluation", {
-                    datasetSlug: databaseDataset.data?.slug,
-                  });
+                  void router.push(
+                    `/${project?.slug}/evaluations/wizard?datasetId=${datasetId}`
+                  );
                 }}
                 minWidth="fit-content"
               >
                 <Play height={16} />
-                Batch Evaluation
+                Run Evaluation
               </Button>
             )}
           </>
