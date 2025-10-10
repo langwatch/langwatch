@@ -1,5 +1,5 @@
 import { Box, VStack, mergeRefs } from "@chakra-ui/react";
-import { motion } from "framer-motion";
+import { motion } from "motion/react";
 import React, {
   forwardRef,
   useCallback,

@@ -1,0 +1,99 @@
+export enum OnboardingScreenIndex {
+  ORGANIZATION = 0,
+  BASIC_INFO = 1,
+  DESIRES = 2,
+  ROLE = 3,
+}
+
+export enum OnboardingFlowDirection {
+  FORWARD = 1,
+  BACKWARD = -1,
+}
+
+export const USAGE_STYLES = ["myself", "clients", "company"] as const;
+export const COMPANY_SIZES = [
+  "starting_out",
+  "2_to_10",
+  "11_to_50",
+  "51_to_200",
+  "201_to_1000",
+  "1000_plus",
+] as const;
+export const SOLUTION_TYPES = ["cloud", "on_premise"] as const;
+export const DESIRE_TYPES = [
+  "everything",
+  "evaluation",
+  "model_experimentation",
+  "prompt_management_optimization",
+  "observability",
+  "safety_compliance",
+  "annotation",
+  "just_exploring",
+] as const;
+export const ROLE_TYPES = [
+  "product_manager",
+  "software_engineer",
+  "ai_engineer",
+  "engineering_manager",
+  "data_scientist",
+  "ai_researcher",
+  "cto_founder",
+  "other",
+] as const;
+
+export type UsageStyle = (typeof USAGE_STYLES)[number];
+export type CompanySize = (typeof COMPANY_SIZES)[number];
+export type SolutionType = (typeof SOLUTION_TYPES)[number];
+export type Desire = (typeof DESIRE_TYPES)[number];
+export type Role = (typeof ROLE_TYPES)[number];
+
+export interface OnboardingFormData {
+  organizationName?: string;
+  agreement?: boolean;
+  usageStyle?: UsageStyle;
+  phoneNumber?: string;
+  companySize?: CompanySize;
+  solutionType?: SolutionType;
+  selectedDesires: Desire[];
+  role?: Role;
+  utmCampaign?: string | null;
+}
+
+export interface OnboardingScreen {
+  id: string;
+  required: boolean;
+  component: React.ReactNode;
+  heading: string;
+  subHeading?: string;
+}
+
+export interface FormItem {
+  title: string;
+  value: string;
+}
+
+export interface IconFormItem extends FormItem {
+  icon: React.ComponentType;
+}
+
+export interface OnboardingFlowState {
+  currentScreenIndex: number;
+  direction: number;
+}
+
+export interface OnboardingNavigation {
+  nextScreen: () => void;
+  prevScreen: () => void;
+  skipScreen: () => void;
+  canProceed: () => boolean;
+}
+
+export type OnboardingFlowVariant = "full" | "self_hosted";
+
+export interface OnboardingFlowConfig {
+  variant: OnboardingFlowVariant;
+  visibleScreens: OnboardingScreenIndex[];
+  first: OnboardingScreenIndex;
+  last: OnboardingScreenIndex;
+  total: number;
+}
