@@ -468,6 +468,75 @@ const addOpenTelemetrySpanAsSpan = (
           }
         }
 
+        if (!input && attributesMap.gen_ai?.prompt) {
+          const prompt = attributesMap.gen_ai?.prompt;
+
+          switch (true) {
+            case typeof prompt === "string":
+              input = {
+                type: "text",
+                value: prompt,
+              };
+              break;
+            case Array.isArray(prompt):
+              input = {
+                type: "json",
+                value: prompt,
+              };
+              break;
+            case typeof prompt === "object":
+              if (prompt.messages) {
+                input = {
+                  type: "chat_messages",
+                  value: prompt.messages,
+                };
+                break;
+              }
+            // fallthrough
+            default:
+              input = {
+                type: "json",
+                value: prompt,
+              };
+              break;
+          }
+        }
+
+        if (!output && attributesMap.gen_ai?.completion) {
+          const completion = attributesMap.gen_ai?.completion;
+
+          switch (true) {
+            case typeof completion === "string":
+              output = {
+                type: "text",
+                value: completion,
+              };
+              break;
+            case Array.isArray(completion):
+              output = {
+                type: "chat_messages",
+                value: completion as ChatMessage[],
+              };
+              break;
+            case typeof completion === "object":
+              if (completion.text) {
+                output = {
+                  type: "text",
+                  value: completion.text,
+                };
+                break;
+              }
+            // fallthrough
+
+            default:
+              output = {
+                type: "json",
+                value: completion,
+              };
+              break;
+          }
+        }
+
         if (
           !input &&
           attributesMap.gen_ai?.prompt &&
