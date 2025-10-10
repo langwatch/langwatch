@@ -46,7 +46,6 @@ export const BasicInfoConditionalFields: React.FC<
 }) => {
   const showFields = usageStyle !== void 0 && usageStyle !== "myself";
 
-  const [phoneTouched, setPhoneTouched] = useState<boolean>(false);
   const [phoneHasValue, setLocalPhoneHasValue] = useState<boolean>(Boolean(phoneNumber));
   const [phoneIsValid, setLocalPhoneIsValid] = useState<boolean>(true);
 
@@ -83,7 +82,7 @@ export const BasicInfoConditionalFields: React.FC<
               <Field.Root
                 colorPalette="orange"
                 w="full"
-                invalid={phoneTouched && phoneHasValue && !phoneIsValid}
+                invalid={phoneHasValue && !phoneIsValid}
               >
                 <Field.Label>{"What is your phone number?"}</Field.Label>
                 <PhoneNumberInput
@@ -99,7 +98,6 @@ export const BasicInfoConditionalFields: React.FC<
                     setPhoneIsValid(Boolean(meta.isValid));
                   }}
                 />
-                <Field.ErrorText>Enter a valid phone number</Field.ErrorText>
               </Field.Root>
             </motion.div>
 
