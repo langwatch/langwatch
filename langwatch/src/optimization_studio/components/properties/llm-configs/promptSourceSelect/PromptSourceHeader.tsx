@@ -43,10 +43,8 @@ export function PromptSourceHeader({
   const { project } = useOrganizationTeamProject();
   const { hasDrift } = useNodeDrift(node);
   const configId = node.data.configId;
-  const [isSaving, setIsSaving] = useState(false);
 
   const handleSaveVersion = useCallback(() => {
-    setIsSaving(true);
     const values = formProps.getValues();
     const newValues = formValuesToTriggerSaveVersionParams(values);
 
@@ -55,9 +53,9 @@ export function PromptSourceHeader({
         title: "Prompt saved",
         description: `Prompt ${prompt.handle} has been saved`,
         type: "success",
+        duration: 2000,
       });
       formProps.reset(versionedPromptToPromptConfigFormValues(prompt));
-      setIsSaving(false);
     };
 
     const onError = () => {
@@ -66,11 +64,10 @@ export function PromptSourceHeader({
         description: "Failed to save version",
         type: "error",
       });
-      setIsSaving(false);
     };
 
     if (configId) {
-      triggerSaveVersion({
+      void triggerSaveVersion({
         id: configId,
         data: newValues,
         onSuccess,
@@ -139,7 +136,6 @@ export function PromptSourceHeader({
             disabled={!canSave}
             onClick={() => void handleSaveVersion()}
             hideLabel={true}
-            isSaving={isSaving}
           />
         </HStack>
       </VerticalFormControl>
