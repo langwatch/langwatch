@@ -54,6 +54,7 @@
         "test:e2e": "vitest run -c ./vitest.e2e.config.mts",
         "prebuild": "pnpm i && pnpm run prepare",
         "build": "tsc --noEmit && tsup",
+        "tarball": "pnpm build && pnpm pack",
         "typecheck": "tsc --noEmit",
         "prepublish": "pnpm run build",
         "generate:openapi-types": "npx openapi-typescript ../langwatch/src/app/api/openapiLangWatch.json -o ./src/internal/generated/openapi/api-client.ts",
