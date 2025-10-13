@@ -75,8 +75,16 @@ def test_metrics_update_with_root_span():
         # Update metrics while span is active
         trace.update(metrics={"first_token_ms": 150, "prompt_tokens": 100})
 
+        # Verify metrics were set on the root span
+        assert trace.root_span is not None
+        assert trace.root_span.metrics is not None
+        assert trace.root_span.metrics["first_token_ms"] == 150
+        assert trace.root_span.metrics["prompt_tokens"] == 100
+
         # Update again with different values
         trace.update(metrics={"first_token_ms": 200, "completion_tokens": 50})
 
-        # Verify the updates succeeded (no exceptions raised)
-        assert True
+        # Verify the metrics were updated (merged, not replaced)
+        assert trace.root_span.metrics["first_token_ms"] == 200  # Updated
+        assert trace.root_span.metrics["prompt_tokens"] == 100  # Preserved
+        assert trace.root_span.metrics["completion_tokens"] == 50  # Added
