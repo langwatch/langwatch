@@ -10,7 +10,7 @@ import { CheckboxGroup } from "../../../components/ui/checkbox";
 import type { IconFormItem } from "../types/types";
 
 interface IconCheckboxCardGroupProps<T extends string = string> {
-  items: IconFormItem[];
+  items: IconFormItem<T>[];
   value: T[];
   onChange: (value: T[]) => void;
   size?: "sm" | "md" | "lg";

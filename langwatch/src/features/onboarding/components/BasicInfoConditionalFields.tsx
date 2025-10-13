@@ -44,7 +44,7 @@ export const BasicInfoConditionalFields: React.FC<
   solutionType: SolutionType | undefined;
   setSolutionType: (value: SolutionType | undefined) => void;
 }) => {
-  const showFields = usageStyle !== void 0 && usageStyle !== "myself";
+  const showFields = usageStyle !== void 0 && usageStyle !== "For myself";
 
   const [phoneHasValue, setLocalPhoneHasValue] = useState<boolean>(Boolean(phoneNumber));
   const [phoneIsValid, setLocalPhoneIsValid] = useState<boolean>(true);

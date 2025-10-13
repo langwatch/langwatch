@@ -22,7 +22,6 @@ export const ONBOARDING_FLOW_SELF_HOSTED: OnboardingFlowConfig = {
 };
 
 export function getOnboardingFlowConfig(isSaaS: boolean): OnboardingFlowConfig {
-  console.log("isSaaS", isSaaS);
   return isSaaS ? ONBOARDING_FLOW_FULL : ONBOARDING_FLOW_SELF_HOSTED;
 }
 

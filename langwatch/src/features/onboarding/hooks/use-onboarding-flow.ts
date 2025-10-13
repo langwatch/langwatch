@@ -66,11 +66,16 @@ export const useOnboardingFlow = () => {
     switch (currentScreenIndex) {
       case OnboardingScreenIndex.ORGANIZATION:
         return Boolean(organizationName?.trim() && agreement);
-      case OnboardingScreenIndex.BASIC_INFO:
+
+      case OnboardingScreenIndex.BASIC_INFO: {
         if (usageStyle === void 0) return false;
-        const showFields = usageStyle !== "myself";
+
+        const showFields = usageStyle !== "For myself";
         if (!showFields) return true;
+
         return !(phoneHasValue && !phoneIsValid);
+      }
+
       case OnboardingScreenIndex.DESIRES:
         return true;
       case OnboardingScreenIndex.ROLE:
