@@ -331,7 +331,7 @@ export const BatchEvaluationV2EvaluationResults = React.memo(
       isFinished,
     });
 
-    const [hasScrolled, setHasScrolled] = useState(false);
+    
 
     const { downloadCSV, isDownloadCSVEnabled } = useBatchEvaluationDownloadCSV(
       {
@@ -377,7 +377,6 @@ export const BatchEvaluationV2EvaluationResults = React.memo(
               minWidth="full"
               minHeight="0"
               overflowY="auto"
-              onScroll={() => setHasScrolled(true)}
             >
               {/* @ts-ignore */}
               <Table.Root size={size === "sm" ? "xs" : "sm"} variant="grid">
@@ -533,7 +532,6 @@ export const BatchEvaluationV2EvaluationResults = React.memo(
                   predictedColumns={predictedColumns}
                   isFinished={isFinished}
                   size={size}
-                  hasScrolled={hasScrolled}
                   workflowId={experiment.workflowId}
                 />
               </Tabs.Content>

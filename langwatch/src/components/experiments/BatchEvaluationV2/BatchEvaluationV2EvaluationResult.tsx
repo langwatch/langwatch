@@ -41,7 +41,6 @@ export function BatchEvaluationV2EvaluationResult({
   predictedColumns,
   isFinished: _isFinished,
   size = "md",
-  hasScrolled,
   workflowId: _workflowId,
 }: {
   evaluator: string;
@@ -51,12 +50,13 @@ export function BatchEvaluationV2EvaluationResult({
   predictedColumns: Record<string, Set<string>>;
   isFinished: boolean;
   size?: "sm" | "md";
-  hasScrolled: boolean;
   workflowId: string | null;
 }) {
   const evaluatorHeaders = getEvaluationColumns(results);
   const containerRef = useRef<HTMLDivElement>(null);
   const gridApiRef = useRef<GridApi | null>(null);
+  const isPinnedToBottomRef = useRef(true);
+  const detachViewportScrollListenerRef = useRef<(() => void) | null>(null);
   const { openDrawer } = useDrawer();
   const [expandedText, setExpandedText] = useState<string | undefined>(void 0);
 
@@ -412,6 +412,44 @@ export function BatchEvaluationV2EvaluationResult({
 
   const columnDefs = useMemo(() => buildColumnDefs(), [buildColumnDefs]);
 
+  // Attach scroll listener to grid viewport to detect if user is near the bottom
+  useEffect(() => {
+    const attachViewportScrollListener = () => {
+      const container = containerRef.current;
+      if (!container) return;
+      const viewportEl = container.querySelector(".ag-body-viewport");
+      if (!viewportEl || !(viewportEl instanceof HTMLElement)) return;
+
+      // Clean up previous listener if any
+      detachViewportScrollListenerRef.current?.();
+
+      const onScroll = () => {
+        const atBottom =
+          viewportEl.scrollTop + viewportEl.clientHeight >=
+          viewportEl.scrollHeight - 24;
+        isPinnedToBottomRef.current = atBottom;
+      };
+
+      // Initialize current state
+      onScroll();
+
+      viewportEl.addEventListener("scroll", onScroll, { passive: true });
+      detachViewportScrollListenerRef.current = () =>
+        viewportEl.removeEventListener("scroll", onScroll);
+    };
+
+    // Try attaching immediately (in case grid already rendered)
+    attachViewportScrollListener();
+
+    // Also attempt after a brief delay to catch grid mount
+    const t = setTimeout(attachViewportScrollListener, 100);
+
+    return () => {
+      clearTimeout(t);
+      detachViewportScrollListenerRef.current?.();
+    };
+  }, []);
+
   // Handle cell click to show expanded text dialog
   const handleCellClicked = useCallback(
     (event: CellClickedEvent) => {
@@ -429,9 +467,9 @@ export function BatchEvaluationV2EvaluationResult({
     []
   );
 
-  // Auto-scroll to bottom only if user hasn't manually scrolled
+  // Auto-scroll to bottom only if user is pinned to bottom
   useEffect(() => {
-    if (hasScrolled || !gridApiRef.current) return;
+    if (!gridApiRef.current || !isPinnedToBottomRef.current) return;
 
     const lastIndex = totalRows - 1;
     setTimeout(
@@ -442,7 +480,7 @@ export function BatchEvaluationV2EvaluationResult({
       () => gridApiRef.current?.ensureIndexVisible(lastIndex, "bottom"),
       1000
     );
-  }, [totalRows, hasScrolled]);
+  }, [totalRows]);
 
   return (
     <Box ref={containerRef}>
@@ -494,7 +532,20 @@ export function BatchEvaluationV2EvaluationResult({
           rowHeight={size === "sm" ? 28 : 34}
           rowBuffer={10}
           suppressAnimationFrame={false}
-          onGridReady={(p) => (gridApiRef.current = p.api)}
+          onGridReady={(p) => {
+            gridApiRef.current = p.api;
+            // When grid is ready, re-evaluate bottom state soon after render
+            setTimeout(() => {
+              const container = containerRef.current;
+              const viewportEl = container?.querySelector(".ag-body-viewport");
+              if (viewportEl instanceof HTMLElement) {
+                const atBottom =
+                  viewportEl.scrollTop + viewportEl.clientHeight >=
+                  viewportEl.scrollHeight - 24;
+                isPinnedToBottomRef.current = atBottom;
+              }
+            }, 50);
+          }}
           onCellClicked={handleCellClicked}
         />
       </div>
