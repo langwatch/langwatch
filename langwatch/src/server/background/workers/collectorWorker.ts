@@ -18,6 +18,8 @@ import {
   collectorIndexDelayHistogram,
   getJobProcessingCounter,
   getJobProcessingDurationHistogram,
+  getPayloadSizeHistogram,
+  traceSpanCountHistogram,
 } from "../../metrics";
 import { connection } from "../../redis";
 import {
@@ -53,6 +55,11 @@ export const scheduleTraceCollectionWithFallback = async (
   collectorJob: CollectorJob,
   forceSync = false
 ) => {
+  traceSpanCountHistogram.observe(collectorJob.spans?.length ?? 0);
+  getPayloadSizeHistogram("collector").observe(
+    JSON.stringify(collectorJob).length
+  );
+
   if (forceSync || !collectorQueue) {
     logger.debug("force sync enabled, processing job synchronously");
     await processCollectorJob(undefined, collectorJob);
@@ -315,9 +322,13 @@ const processCollectorJob_ = async (
   // Only set trace input/output when this batch provides real I/O.
   // Avoid overriding with fallback-derived values (e.g., span names) if the batch has no I/O.
   // When provided, compute from the full uniqueSpans so heuristics reflect the entire trace state.
-  const hasNewIO = (spans ?? []).some((s) => !!s.input?.value || !!s.output?.value);
+  const hasNewIO = (spans ?? []).some(
+    (s) => !!s.input?.value || !!s.output?.value
+  );
   const input = hasNewIO ? { value: getFirstInputAsText(uniqueSpans) } : void 0;
-  const output = hasNewIO ? { value: getLastOutputAsText(uniqueSpans) } : void 0;
+  const output = hasNewIO
+    ? { value: getLastOutputAsText(uniqueSpans) }
+    : void 0;
 
   const error = getLastOutputError(uniqueSpans);
 
