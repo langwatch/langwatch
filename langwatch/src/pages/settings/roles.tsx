@@ -14,16 +14,16 @@ import {
   VStack,
   useDisclosure,
 } from "@chakra-ui/react";
-import { Plus, Shield, Trash2 } from "react-feather";
+import { Edit, Eye, Plus, Shield, Trash2 } from "react-feather";
 import { useForm } from "react-hook-form";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Checkbox } from "../../components/ui/checkbox";
 import { Dialog } from "../../components/ui/dialog";
 import { toaster } from "../../components/ui/toaster";
 import SettingsLayout from "../../components/SettingsLayout";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { api } from "../../utils/api";
-import type { Permission, Resource } from "../../server/api/rbac";
+import type { Permission, Resource, Action } from "../../server/api/rbac";
 import { Resources, Actions } from "../../server/api/rbac";
 
 /**
@@ -60,6 +60,28 @@ type RoleFormData = {
 
 function RolesManagement({ organizationId }: { organizationId: string }) {
   const { open, onOpen, onClose } = useDisclosure();
+  const {
+    open: editOpen,
+    onOpen: onEditOpen,
+    onClose: onEditClose,
+  } = useDisclosure();
+  const {
+    open: viewOpen,
+    onOpen: onViewOpen,
+    onClose: onViewClose,
+  } = useDisclosure();
+  const [editingRole, setEditingRole] = useState<{
+    id: string;
+    name: string;
+    description: string;
+    permissions: Permission[];
+  } | null>(null);
+  const [viewingRole, setViewingRole] = useState<{
+    id: string;
+    name: string;
+    description: string;
+    permissions: Permission[];
+  } | null>(null);
   const apiContext = api.useContext();
   // Fetch custom roles
   const roles = api.role.getAll.useQuery({ organizationId });
@@ -100,6 +122,63 @@ function RolesManagement({ organizationId }: { organizationId: string }) {
     },
   });
 
+  const updateRole = api.role.update.useMutation({
+    onSuccess: () => {
+      void apiContext.role.getAll.invalidate();
+      toaster.create({
+        title: "Role updated successfully",
+        type: "success",
+      });
+      onEditClose();
+      setEditingRole(null);
+    },
+    onError: (error) => {
+      toaster.create({
+        title: "Failed to update role",
+        description: error.message,
+        type: "error",
+      });
+    },
+  });
+
+  const handleEditRole = async (roleId: string) => {
+    try {
+      const role = await apiContext.role.getById.fetch({ roleId });
+      setEditingRole({
+        id: role.id,
+        name: role.name,
+        description: role.description ?? "",
+        permissions: role.permissions as Permission[],
+      });
+      onEditOpen();
+    } catch (error) {
+      toaster.create({
+        title: "Failed to load role",
+        description: "Could not load role details for editing",
+        type: "error",
+      });
+    }
+  };
+
+  const handleViewPermissions = async (roleId: string) => {
+    try {
+      const role = await apiContext.role.getById.fetch({ roleId });
+      setViewingRole({
+        id: role.id,
+        name: role.name,
+        description: role.description ?? "",
+        permissions: role.permissions as Permission[],
+      });
+      onViewOpen();
+    } catch (error) {
+      toaster.create({
+        title: "Failed to load role",
+        description: "Could not load role details for viewing",
+        type: "error",
+      });
+    }
+  };
+
   const {
     register,
     handleSubmit,
@@ -115,7 +194,23 @@ function RolesManagement({ organizationId }: { organizationId: string }) {
     },
   });
 
+  const {
+    register: registerEdit,
+    handleSubmit: handleEditSubmit,
+    reset: resetEdit,
+    formState: { errors: editErrors, isSubmitting: isEditSubmitting },
+    setValue: setEditValue,
+    watch: watchEdit,
+  } = useForm<RoleFormData>({
+    defaultValues: {
+      name: "",
+      description: "",
+      permissions: [],
+    },
+  });
+
   const selectedPermissions = watch("permissions") || [];
+  const selectedEditPermissions = watchEdit("permissions") || [];
 
   const onSubmit = handleSubmit(async (data) => {
     await createRole.mutateAsync({
@@ -126,6 +221,26 @@ function RolesManagement({ organizationId }: { organizationId: string }) {
     });
     reset();
   });
+
+  const onEditSubmit = handleEditSubmit(async (data) => {
+    if (!editingRole) return;
+    await updateRole.mutateAsync({
+      roleId: editingRole.id,
+      name: data.name,
+      description: data.description,
+      permissions: data.permissions,
+    });
+    resetEdit();
+  });
+
+  // Update edit form when editingRole changes
+  useEffect(() => {
+    if (editingRole) {
+      setEditValue("name", editingRole.name);
+      setEditValue("description", editingRole.description);
+      setEditValue("permissions", editingRole.permissions);
+    }
+  }, [editingRole, setEditValue]);
 
   return (
     <VStack align="start" width="full" padding={8} gap={6}>
@@ -219,6 +334,12 @@ function RolesManagement({ organizationId }: { organizationId: string }) {
                   deleteRole.mutate({ roleId: role.id });
                 }
               }}
+              onEdit={() => {
+                void handleEditRole(role.id);
+              }}
+              onViewPermissions={() => {
+                void handleViewPermissions(role.id);
+              }}
             />
           ))}
         </HStack>
@@ -303,6 +424,134 @@ function RolesManagement({ organizationId }: { organizationId: string }) {
           <Dialog.CloseTrigger />
         </Dialog.Content>
       </Dialog.Root>
+
+      {/* Edit Role Dialog */}
+      <Dialog.Root
+        open={editOpen}
+        onOpenChange={({ open }) => !open && onEditClose()}
+      >
+        <Dialog.Backdrop />
+        <Dialog.Content maxWidth="900px" maxHeight="90vh" overflowY="auto">
+          <Dialog.Header>
+            <Dialog.Title>Edit Role</Dialog.Title>
+          </Dialog.Header>
+          <Dialog.Body>
+            <form
+              id="edit-role-form"
+              onSubmit={(e) => {
+                void onEditSubmit(e);
+              }}
+            >
+              <VStack gap={6} align="start">
+                <Field.Root invalid={!!editErrors.name}>
+                  <Field.Label>
+                    Role Name{" "}
+                    <Text as="span" color="red.500">
+                      *
+                    </Text>
+                  </Field.Label>
+                  <Input
+                    {...registerEdit("name", {
+                      required: "Role name is required",
+                    })}
+                    placeholder="e.g., Data Analyst"
+                  />
+                  {editErrors.name && (
+                    <Field.ErrorText>{editErrors.name.message}</Field.ErrorText>
+                  )}
+                </Field.Root>
+
+                <Field.Root>
+                  <Field.Label>Description</Field.Label>
+                  <Field.HelperText>
+                    Describe what this role is for
+                  </Field.HelperText>
+                  <Textarea
+                    {...registerEdit("description")}
+                    placeholder="e.g., Can view and analyze data but cannot modify settings"
+                    rows={3}
+                  />
+                </Field.Root>
+
+                <Separator />
+
+                <VStack align="start" width="full" gap={4}>
+                  <Heading size="sm">Permissions</Heading>
+                  <Text fontSize="sm" color="gray.600">
+                    Select the permissions this role should have
+                  </Text>
+
+                  <PermissionSelector
+                    selectedPermissions={selectedEditPermissions}
+                    onChange={(permissions) =>
+                      setEditValue("permissions", permissions)
+                    }
+                  />
+                </VStack>
+              </VStack>
+            </form>
+          </Dialog.Body>
+          <Dialog.Footer>
+            <Button variant="outline" onClick={onEditClose}>
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              form="edit-role-form"
+              colorPalette="orange"
+              loading={isEditSubmitting}
+            >
+              Update Role
+            </Button>
+          </Dialog.Footer>
+          <Dialog.CloseTrigger />
+        </Dialog.Content>
+      </Dialog.Root>
+
+      {/* View Permissions Dialog */}
+      <Dialog.Root
+        open={viewOpen}
+        onOpenChange={({ open }) => !open && onViewClose()}
+      >
+        <Dialog.Backdrop />
+        <Dialog.Content maxWidth="600px" maxHeight="80vh" overflowY="auto">
+          <Dialog.Header>
+            <Dialog.Title>View Permissions - {viewingRole?.name}</Dialog.Title>
+          </Dialog.Header>
+          <Dialog.Body>
+            {viewingRole && (
+              <VStack gap={4} align="start">
+                <VStack align="start" gap={2} width="full">
+                  <Text fontWeight="semibold">Description:</Text>
+                  <Text color="gray.600">
+                    {viewingRole.description || "No description provided"}
+                  </Text>
+                </VStack>
+
+                <Separator />
+
+                <VStack align="start" gap={3} width="full">
+                  <Text fontWeight="semibold">
+                    Permissions ({viewingRole.permissions.length}):
+                  </Text>
+                  {/* Add console log to see what's being passed */}
+                  {console.log(
+                    "Viewing role permissions:",
+                    viewingRole.permissions
+                  )}
+                  <PermissionViewer permissions={viewingRole.permissions} />
+                </VStack>
+              </VStack>
+            )}
+          </Dialog.Body>
+          <Dialog.Footer>
+            <Button variant="outline" onClick={onViewClose}>
+              Close
+            </Button>
+          </Dialog.Footer>
+          <Dialog.CloseTrigger />
+        </Dialog.Content>
+      </Dialog.Root>
     </VStack>
   );
 }
@@ -313,12 +562,16 @@ function RoleCard({
   permissionCount,
   isDefault = false,
   onDelete,
+  onEdit,
+  onViewPermissions,
 }: {
   name: string;
   description: string;
   permissionCount: string;
   isDefault?: boolean;
   onDelete?: () => void;
+  onEdit?: () => void;
+  onViewPermissions?: () => void;
 }) {
   return (
     <Card.Root
@@ -341,15 +594,39 @@ function RoleCard({
               </Text>
             )}
           </VStack>
-          {!isDefault && onDelete && (
-            <Button
-              size="sm"
-              variant="ghost"
-              colorPalette="red"
-              onClick={onDelete}
-            >
-              <Trash2 size={14} />
-            </Button>
+          {!isDefault && (
+            <HStack gap={1}>
+              {onViewPermissions && (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  colorPalette="blue"
+                  onClick={onViewPermissions}
+                >
+                  <Eye size={14} />
+                </Button>
+              )}
+              {onEdit && (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  colorPalette="orange"
+                  onClick={onEdit}
+                >
+                  <Edit size={14} />
+                </Button>
+              )}
+              {onDelete && (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  colorPalette="red"
+                  onClick={onDelete}
+                >
+                  <Trash2 size={14} />
+                </Button>
+              )}
+            </HStack>
           )}
         </HStack>
       </Card.Header>
@@ -410,13 +687,6 @@ function PermissionSelector({
     Permission[]
   >;
 
-  // Group permissions by resource
-  Object.values(Resources).forEach((resource) => {
-    groupedPermissions[resource] = Object.values(Actions).map(
-      (action) => `${resource}:${action}` as Permission
-    );
-  });
-
   // Define which actions are valid for each resource
   const getValidActionsForResource = (resource: Resource): Action[] => {
     // Share is only available for messages
@@ -439,6 +709,14 @@ function PermissionSelector({
       Actions.MANAGE,
     ];
   };
+
+  // Group permissions by resource using the correct valid actions
+  Object.values(Resources).forEach((resource) => {
+    const validActions = getValidActionsForResource(resource);
+    groupedPermissions[resource] = validActions.map(
+      (action) => `${resource}:${action}` as Permission
+    );
+  });
 
   const togglePermission = (permission: Permission) => {
     if (selectedPermissions.includes(permission)) {
@@ -504,7 +782,7 @@ function PermissionSelector({
               <Fieldset.Content>
                 <HStack gap={4} flexWrap="wrap" paddingLeft={6}>
                   {validActions.map((action) => {
-                    const permission: Permission = `${resource}:${action}`;
+                    const permission = `${resource}:${action}`;
                     return (
                       <Checkbox
                         key={permission}
@@ -521,6 +799,105 @@ function PermissionSelector({
               </Fieldset.Content>
             </Fieldset.Root>
             <Separator marginY={3} />
+          </Box>
+        );
+      })}
+    </VStack>
+  );
+}
+
+/**
+ * PermissionViewer component
+ *
+ * Single Responsibility: Displays permissions in a read-only, organized format
+ */
+function PermissionViewer({ permissions }: { permissions: Permission[] }) {
+  // Add console log to see what permissions are being passed in
+  console.log("PermissionViewer received permissions:", permissions);
+  console.log("PermissionViewer permissions count:", permissions.length);
+
+  const groupedPermissions: Record<Resource, Permission[]> = {} as Record<
+    Resource,
+    Permission[]
+  >;
+
+  // Group permissions by resource
+  Object.values(Resources).forEach((resource) => {
+    groupedPermissions[resource] = Object.values(Actions).map(
+      (action) => `${resource}:${action}` as Permission
+    );
+  });
+
+  // Define which actions are valid for each resource
+  const getValidActionsForResource = (resource: Resource): Action[] => {
+    // Share is only available for messages
+    if (resource === Resources.MESSAGES) {
+      return [
+        Actions.VIEW,
+        Actions.CREATE,
+        Actions.UPDATE,
+        Actions.DELETE,
+        Actions.MANAGE,
+        Actions.SHARE,
+      ];
+    }
+    // Most other resources don't have share
+    return [
+      Actions.VIEW,
+      Actions.CREATE,
+      Actions.UPDATE,
+      Actions.DELETE,
+      Actions.MANAGE,
+    ];
+  };
+
+  return (
+    <VStack align="start" width="full" gap={3}>
+      {(Object.keys(groupedPermissions) as Resource[]).map((resource) => {
+        const validActions = getValidActionsForResource(resource);
+        const hasAnyPermission = validActions.some((action) =>
+          permissions.includes(`${resource}:${action}`)
+        );
+
+        if (!hasAnyPermission) return null;
+
+        // Add console log for each resource to see what's being processed
+        console.log(`Processing resource: ${resource}`);
+        console.log(`Valid actions for ${resource}:`, validActions);
+
+        const resourcePermissions = validActions.filter((action) =>
+          permissions.includes(`${resource}:${action}`)
+        );
+        console.log(`Found permissions for ${resource}:`, resourcePermissions);
+
+        return (
+          <Box key={resource} width="full">
+            <VStack align="start" gap={2} width="full">
+              <Text fontWeight="semibold" textTransform="capitalize">
+                {resource}
+              </Text>
+              <HStack gap={3} flexWrap="wrap" paddingLeft={4}>
+                {validActions.map((action) => {
+                  const permission = `${resource}:${action}` as Permission;
+                  const hasPermission = permissions.includes(permission);
+
+                  if (!hasPermission) return null;
+
+                  return (
+                    <Text
+                      key={permission}
+                      fontSize="sm"
+                      textTransform="capitalize"
+                      color="green.600"
+                      fontWeight="medium"
+                    >
+                      {action}
+                    </Text>
+                  );
+                })}
+              </HStack>
+            </VStack>
+            <Separator marginY={2} />
           </Box>
         );
       })}
