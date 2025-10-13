@@ -58,35 +58,10 @@ export function BatchEvaluationV2EvaluationResult({
   const containerRef = useRef<HTMLDivElement>(null);
   const gridApiRef = useRef<GridApi | null>(null);
   const { openDrawer } = useDrawer();
-  const [expandedText, setExpandedText] = useState<string | undefined>(
-    void 0
-  );
+  const [expandedText, setExpandedText] = useState<string | undefined>(void 0);
 
   const totalRows = Math.max(
     ...Object.values(datasetByIndex).map((d) => d.index + 1)
-  );
-
-  const stringify = useCallback(
-    (value: any) =>
-      typeof value === "object" ? JSON.stringify(value) : `${value}`,
-    []
-  );
-
-  const titleCase = useCallback(
-    (text: string) =>
-      text
-        .replace(/[_-]+/g, " ")
-        .replace(/\s+/g, " ")
-        .trim()
-        .replace(/\b\w/g, (c) => c.toUpperCase()),
-    []
-  );
-
-  const getRowData = (p: any) => p.data as EvaluationRowData;
-
-  const formatValue = useCallback(
-    (val: any) => (val !== void 0 && val !== null ? stringify(val) : "-"),
-    [stringify]
   );
 
   // Row data
@@ -149,7 +124,7 @@ export function BatchEvaluationV2EvaluationResult({
 
         return {
           colId: `dataset_${column}`,
-          headerName: titleCase(column),
+          headerName: `Dataset Input (${column})`,
           minWidth: 150,
           ...(mightHaveImages
             ? {
@@ -227,8 +202,10 @@ export function BatchEvaluationV2EvaluationResult({
         cellClass: "cell-with-overflow",
         valueGetter: (p: any) => {
           const { datasetEntry, evaluationsForEntry } = getRowData(p);
+
           if (datasetEntry?.error) return "Error";
           const value = evaluationsForEntry[evaluator]?.inputs?.[column];
+
           return evaluationsForEntry[evaluator] ? stringify(value ?? "-") : "-";
         },
         tooltipValueGetter: (p: any) => {
@@ -430,10 +407,7 @@ export function BatchEvaluationV2EvaluationResult({
     evaluatorHeaders,
     evaluator,
     openDrawer,
-    stringify,
-    titleCase,
     datasetByIndex,
-    formatValue,
   ]);
 
   const columnDefs = useMemo(() => buildColumnDefs(), [buildColumnDefs]);
@@ -452,7 +426,7 @@ export function BatchEvaluationV2EvaluationResult({
       // Show the expanded text dialog
       setExpandedText(stringify(value));
     },
-    [stringify]
+    []
   );
 
   // Auto-scroll to bottom only if user hasn't manually scrolled
@@ -531,4 +505,24 @@ export function BatchEvaluationV2EvaluationResult({
       />
     </Box>
   );
+}
+
+function stringify(value: any) {
+  return typeof value === "object" ? JSON.stringify(value) : `${value}`;
+}
+
+function titleCase(text: string) {
+  return text
+    .replace(/[_-]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+function getRowData(p: any) {
+  return p.data as EvaluationRowData;
+}
+
+function formatValue(val: any) {
+  return val !== void 0 && val !== null ? stringify(val) : "-";
 }
