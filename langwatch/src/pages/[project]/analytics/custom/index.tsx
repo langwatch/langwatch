@@ -137,6 +137,7 @@ export interface CustomGraphFormData {
       aggregation: PipelineAggregationTypes;
     };
     filters?: Record<FilterField, FilterParam>;
+    asPercent?: boolean;
   }[];
   groupBy?: FlattenAnalyticsGroupsEnum | "";
   includePrevious: boolean;
@@ -239,6 +240,7 @@ const defaultValues: CustomGraphFormData = {
         aggregation: "avg",
       },
       filters: {} as Record<FilterField, FilterParam>,
+      asPercent: false,
     },
   ],
   groupBy: undefined,
@@ -465,6 +467,7 @@ const customGraphInputToFormData = (
               aggregation: "avg",
             },
       filters: filterOutEmptyFilters(series.filters),
+      asPercent: series.asPercent,
     })),
     groupBy: graphInput.groupBy ?? "",
     includePrevious: graphInput.includePrevious ?? true,
@@ -507,6 +510,7 @@ const customGraphFormToCustomGraphInput = (
         key: series.key,
         subkey: series.subkey,
         filters: series.filters,
+        asPercent: series.asPercent,
       };
     }),
     groupBy: formData.groupBy === "" ? undefined : formData.groupBy,
@@ -551,6 +555,7 @@ const customAPIinput = (
         key: series.key,
         subkey: series.subkey,
         filters: series.filters,
+        asPercent: series.asPercent,
       };
     }) as CustomAPICallData["series"],
     groupBy: formData.groupBy === "" ? undefined : formData.groupBy,
@@ -1003,6 +1008,8 @@ function SeriesField({
   const pipelineAggregation = form.watch(
     `series.${index}.pipeline.aggregation`
   );
+  const filters = form.watch(`series.${index}.filters`);
+  const nonEmptyFilters = filterOutEmptyFilters(filters);
 
   const metricField = form.control.register(`series.${index}.metric`);
   const metric_ = metric ? getMetric(metric) : undefined;
@@ -1167,39 +1174,63 @@ function SeriesField({
           </NativeSelect.Root>
         </Field.Root>
       )}
-      <Field.Root>
-        <Controller
-          control={form.control}
-          name={`series.${index}.filters`}
-          render={({ field }) => {
-            const nonEmptyFilters = filterOutEmptyFilters(
-              field.value ?? ({} as Record<FilterField, FilterParam>)
-            );
-
-            return (
-              <FilterToggleButton
-                toggled={false}
-                filters={
-                  field.value ?? ({} as Record<FilterField, FilterParam>)
-                }
-                onClick={() =>
-                  openDrawer("seriesFilters", {
-                    filters:
-                      field.value ?? ({} as Record<FilterField, FilterParam>),
-                    onChange: ({ filters }) => {
-                      form.setValue(`series.${index}.filters`, filters);
-                    },
-                  })
-                }
-              >
-                {Object.keys(nonEmptyFilters).length > 0
-                  ? "Edit Filters"
-                  : "Add Filters"}
-              </FilterToggleButton>
-            );
-          }}
-        />
-      </Field.Root>
+      <HStack gap={4}>
+        <Field.Root flexShrink={1} maxWidth="fit-content">
+          <Controller
+            control={form.control}
+            name={`series.${index}.filters`}
+            render={({ field }) => {
+              return (
+                <FilterToggleButton
+                  toggled={false}
+                  filters={
+                    field.value ?? ({} as Record<FilterField, FilterParam>)
+                  }
+                  onClick={() =>
+                    openDrawer("seriesFilters", {
+                      filters:
+                        field.value ?? ({} as Record<FilterField, FilterParam>),
+                      onChange: ({ filters }) => {
+                        form.setValue(`series.${index}.filters`, filters);
+                      },
+                    })
+                  }
+                >
+                  {Object.keys(nonEmptyFilters).length > 0
+                    ? "Edit Filters"
+                    : "Add Filters"}
+                </FilterToggleButton>
+              );
+            }}
+          />
+        </Field.Root>
+        {Object.keys(nonEmptyFilters).length > 0 && (
+          <Field.Root
+            display="flex"
+            flexDirection="row"
+            alignItems="center"
+            gap={2}
+          >
+            <Controller
+              control={form.control}
+              name={`series.${index}.asPercent`}
+              render={({ field }) => (
+                <>
+                  <Switch
+                    {...field}
+                    checked={!!field.value}
+                    value="on"
+                    onChange={(e) => field.onChange(e.target.checked)}
+                  />
+                  <Field.Label flexShrink={0}>
+                    Show in percentage (%)
+                  </Field.Label>
+                </>
+              )}
+            />
+          </Field.Root>
+        )}
+      </HStack>
     </VStack>
   );
 }

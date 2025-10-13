@@ -10,24 +10,24 @@ import {
   percentileToPercent,
   type TimeseriesInputType,
 } from "~/server/analytics/registry";
+import { env } from "../../env.mjs";
+import {
+  currentVsPreviousDates,
+  generateFilterConditions,
+  generateTracesPivotQueryConditions,
+} from "../api/routers/analytics/common";
+import { prisma } from "../db";
+import { esClient, TRACE_INDEX } from "../elasticsearch";
 import {
   analyticsPipelines,
   pipelineAggregationsToElasticSearch,
   type FlattenAnalyticsGroupsEnum,
   type SeriesInputType,
 } from "./registry";
-import { prisma } from "../db";
-import { esClient, TRACE_INDEX } from "../elasticsearch";
-import {
-  currentVsPreviousDates,
-  generateFilterConditions,
-  generateTracesPivotQueryConditions,
-} from "../api/routers/analytics/common";
 import {
   percentileAggregationTypes,
   type PercentileAggregationTypes,
 } from "./types";
-import { env } from "../../env.mjs";
 import { filterOutEmptyFilters } from "./utils";
 
 const labelsMapping: Partial<
@@ -63,7 +63,7 @@ export const timeseries = async (input: TimeseriesInputType) => {
     }));
   }
 
-  const { previousPeriodStartDate, startDate, endDate, daysDifference } =
+  const { previousPeriodStartDate, startDate, endDate } =
     currentVsPreviousDates(
       input,
       typeof input.timeScale === "number" ? input.timeScale : undefined
@@ -92,6 +92,7 @@ export const timeseries = async (input: TimeseriesInputType) => {
           key,
           subkey,
           filters,
+          asPercent,
         }: SeriesInputType,
         index: number
       ) => {
@@ -160,6 +161,8 @@ export const timeseries = async (input: TimeseriesInputType) => {
           const wrapperKey = pipelinePath_
             ? `${pipelinePath_}__filters`
             : `${Object.keys(aggregationQuery)[0]}__filters`;
+
+          const previousAggregationQuery = { ...aggregationQuery };
           aggregationQuery = {
             [wrapperKey]: {
               filter: {
@@ -170,6 +173,46 @@ export const timeseries = async (input: TimeseriesInputType) => {
               aggs: aggregationQuery,
             },
           } as Record<string, AggregationsAggregationContainer>;
+
+          if (asPercent) {
+            const previousAggregationQueryEntries = Object.entries(
+              previousAggregationQuery
+            );
+            aggregationQuery = Object.fromEntries(
+              Object.entries(aggregationQuery).flatMap(
+                ([key_, value], index) => {
+                  const previousKey =
+                    previousAggregationQueryEntries[index]?.[0];
+                  const extractionPath = getMetric(metric).extractionPath(
+                    index,
+                    aggregation,
+                    key,
+                    subkey
+                  );
+
+                  return [
+                    [key_, value],
+                    [previousKey, previousAggregationQueryEntries[index]?.[1]],
+                    [
+                      `${previousKey}__percent`,
+                      {
+                        bucket_script: {
+                          buckets_path: {
+                            filtered: `${key_}>${extractionPath}`,
+                            all: extractionPath,
+                          },
+                          script: {
+                            source:
+                              "params.all > 0 ? (params.filtered / params.all) * 100 : 0",
+                          },
+                        },
+                      },
+                    ],
+                  ];
+                }
+              )
+            );
+          }
         }
 
         return Object.entries(aggregationQuery);
@@ -363,7 +406,15 @@ const extractResultForBucket = (
 };
 
 const extractResult = (
-  { metric, aggregation, pipeline, key, subkey, filters }: SeriesInputType,
+  {
+    metric,
+    aggregation,
+    pipeline,
+    key,
+    subkey,
+    filters,
+    asPercent,
+  }: SeriesInputType,
   index: number,
   pathsAfterBuckets: string | undefined,
   result: any
@@ -384,7 +435,7 @@ const extractResult = (
     key,
     subkey
   );
-  const paths = extractionPath.split(">");
+  let paths = extractionPath.split(">");
   if (pipeline) {
     const pipelinePath_ = pipelinePath(index, metric, aggregation, pipeline);
     if (Object.keys(filterOutEmptyFilters(filters)).length > 0) {
@@ -398,6 +449,10 @@ const extractResult = (
   if (Object.keys(filterOutEmptyFilters(filters)).length > 0) {
     const firstPath = paths[0];
     paths.unshift(`${firstPath}__filters`);
+
+    if (asPercent) {
+      paths = [`${firstPath}__percent`];
+    }
   }
 
   for (const path of paths) {
