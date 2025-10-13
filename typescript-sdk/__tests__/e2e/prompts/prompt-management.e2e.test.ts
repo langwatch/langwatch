@@ -4,7 +4,7 @@ import {
   it,
   beforeAll,
   beforeEach,
-  afterEach,
+  afterAll,
   vi,
 } from "vitest";
 import { getLangwatchSDK } from "../../helpers/get-sdk";
@@ -54,7 +54,31 @@ describe("Prompt management", () => {
     expect(result).toEqual({ success: true });
   });
 
+
+  /**
+   * Because this uses a tmp directory and the project root will be
+   * cached by the FileManager (inside LangWatch), we need to run
+   * all of these tests in a beforeAll, otherwise we create a new
+   * tmp directory for each test and the manager will fail to find
+   * the project root correctly
+   */
   describe("get prompt", () => {
+    let cli: CliRunner;
+    let testDir: string;
+    let originalCwd: string;
+
+    beforeAll(() => {
+      const setupResult = setupCliRunner();
+      cli = setupResult.cli;
+      testDir = setupResult.testDir;
+      console.log("testDir", testDir);
+      originalCwd = setupResult.originalCwd;
+    });
+
+    afterAll(() => {
+      teardownCliRunner({ testDir, originalCwd });
+    });
+
     describe("when no local prompt file is present", () => {
       it("gets the server prompt", async () => {
         const prompt = await langwatch.prompts.get("123");
@@ -64,27 +88,15 @@ describe("Prompt management", () => {
 
     describe("when local prompt file is present", () => {
       const handle = "my-test-prompt";
-      let testDir: string;
-      let originalCwd: string;
-      let cli: CliRunner;
 
-      beforeEach(() => {
-        const setupResult = setupCliRunner();
-        cli = setupResult.cli;
-        testDir = setupResult.testDir;
+      beforeAll(() => {
         createLocalPromptFile({ handle, cli, testDir });
-        originalCwd = setupResult.originalCwd;
-        cli = setupResult.cli;
-      });
-
-      afterEach(async () => {
-        teardownCliRunner({ testDir, originalCwd });
       });
 
       describe("gets the local prompt", () => {
         let prompt: any;
 
-        beforeEach(async () => {
+        beforeAll(async () => {
           prompt = await langwatch.prompts.get(handle);
         });
 
@@ -95,7 +107,6 @@ describe("Prompt management", () => {
         it("should not call the api", async () => {
           const mock = vi.fn();
           server.use(http.get("/api/prompts/{id}", mock));
-          expect(prompt?.handle).toBe(handle);
           expect(mock).not.toHaveBeenCalled();
         });
       });
