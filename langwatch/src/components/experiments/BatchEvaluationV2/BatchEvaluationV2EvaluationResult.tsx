@@ -1,18 +1,20 @@
 import { Box, Button } from "@chakra-ui/react";
 import numeral from "numeral";
-import { useCallback, useEffect, useMemo, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ESBatchEvaluation } from "../../../server/experiments/types";
 import { formatMilliseconds } from "../../../utils/formatMilliseconds";
 import { formatMoney } from "../../../utils/formatMoney";
 import { useDrawer } from "../../CurrentDrawer";
 import { ExternalImage, getImageUrl } from "../../ExternalImage";
 import { HoverableBigText } from "../../HoverableBigText";
+import { ExpandedTextDialog } from "../../HoverableBigText";
 import { AgGridReact } from "@ag-grid-community/react";
 import type {
   ColDef,
   ColGroupDef,
   GridApi,
   GridOptions,
+  CellClickedEvent,
 } from "@ag-grid-community/core";
 import { ClientSideRowModelModule } from "@ag-grid-community/client-side-row-model";
 import { ModuleRegistry } from "@ag-grid-community/core";
@@ -56,6 +58,9 @@ export function BatchEvaluationV2EvaluationResult({
   const containerRef = useRef<HTMLDivElement>(null);
   const gridApiRef = useRef<GridApi | null>(null);
   const { openDrawer } = useDrawer();
+  const [expandedText, setExpandedText] = useState<string | undefined>(
+    void 0
+  );
 
   const totalRows = Math.max(
     ...Object.values(datasetByIndex).map((d) => d.index + 1)
@@ -105,14 +110,14 @@ export function BatchEvaluationV2EvaluationResult({
         String((params.data as EvaluationRowData).rowNumber),
       suppressRowClickSelection: true,
       reactiveCustomComponents: true,
+      ensureDomOrder: true,
     }),
     []
   );
 
   const defaultColDef: ColDef = useMemo(
     () => ({
-      flex: 1,
-      minWidth: 10,
+      initialWidth: 160,
       resizable: true,
       sortable: false,
       suppressMenu: true,
@@ -127,6 +132,7 @@ export function BatchEvaluationV2EvaluationResult({
 
     // Row number
     colDefs.push({
+      colId: "rowNumber",
       headerName: "",
       width: 60,
       valueGetter: (p: any) =>
@@ -143,6 +149,7 @@ export function BatchEvaluationV2EvaluationResult({
           getImageUrl(firstEntry.entry[column]);
 
         return {
+          colId: `dataset_${column}`,
           headerName: titleCase(column),
           minWidth: 150,
           ...(mightHaveImages
@@ -166,19 +173,23 @@ export function BatchEvaluationV2EvaluationResult({
             : {
                 valueGetter: (p: any) =>
                   formatValue(getRowData(p).datasetEntry?.entry?.[column]),
+                cellClass: "cell-with-overflow",
               }),
           tooltipValueGetter: (p: any) =>
             stringify(getRowData(p).datasetEntry?.entry?.[column] ?? "-"),
         };
       });
-      colDefs.push({ headerName: "Dataset", children });
+      // Flatten dataset group to avoid any group layout issues
+      colDefs.push(...children);
     }
 
     // Predicted columns
     Object.entries(predictedColumns ?? {}).forEach(([node, columns]) => {
       const children: ColDef[] = Array.from(columns).map((column) => ({
+        colId: `predicted_${node}_${column}`,
         headerName: titleCase(column),
         minWidth: 150,
+        cellClass: "cell-with-overflow",
         valueGetter: (p: any) => {
           const entry = getRowData(p).datasetEntry;
           if (entry?.error) return "Error";
@@ -199,7 +210,8 @@ export function BatchEvaluationV2EvaluationResult({
           "cell-error": (p: any) => !!getRowData(p).datasetEntry?.error,
         },
       }));
-      colDefs.push({ headerName: titleCase(node), children });
+      // Flatten predicted group as well to avoid misalignment
+      colDefs.push(...children);
     });
 
     // Evaluation inputs
@@ -210,8 +222,10 @@ export function BatchEvaluationV2EvaluationResult({
       const children: ColDef[] = Array.from(
         evaluatorHeaders.evaluationInputsColumns
       ).map((column) => ({
+        colId: `eval_input_${column}`,
         headerName: titleCase(column),
         minWidth: 150,
+        cellClass: "cell-with-overflow",
         valueGetter: (p: any) => {
           const { datasetEntry, evaluationsForEntry } = getRowData(p);
           if (datasetEntry?.error) return "Error";
@@ -229,13 +243,16 @@ export function BatchEvaluationV2EvaluationResult({
           "cell-error": (p: any) => !!getRowData(p).datasetEntry?.error,
         },
       }));
-      colDefs.push({ headerName: "Evaluation Data", children });
+      // Flatten evaluation inputs group to avoid misalignment
+      colDefs.push(...children);
     }
 
-    // Cost column
+    // Cost column (standalone after groups)
     colDefs.push({
+      colId: "cost",
       headerName: "Cost",
       minWidth: 120,
+      cellClass: "cell-with-overflow",
       valueGetter: (p: any) => {
         const { datasetEntry, evaluationsForEntry } = getRowData(p);
         const total =
@@ -261,10 +278,12 @@ export function BatchEvaluationV2EvaluationResult({
       },
     });
 
-    // Duration column
+    // Duration column (standalone after cost)
     colDefs.push({
+      colId: "duration",
       headerName: "Duration",
       minWidth: 120,
+      cellClass: "cell-with-overflow",
       valueGetter: (p: any) => {
         const { datasetEntry, evaluationsForEntry } = getRowData(p);
         const total =
@@ -286,8 +305,18 @@ export function BatchEvaluationV2EvaluationResult({
       },
     });
 
-    // Evaluation result columns
-    Array.from(evaluatorHeaders.evaluationResultsColumns).forEach((column) => {
+    // Evaluation result columns (stable order)
+    const evalResultPreferredOrder = [
+      "score",
+      "passed",
+      "label",
+      "details",
+    ] as const;
+    const evaluationResultsColumnsOrdered = evalResultPreferredOrder.filter(
+      (c) => evaluatorHeaders.evaluationResultsColumns.has(c)
+    );
+
+    evaluationResultsColumnsOrdered.forEach((column) => {
       const isDetails = column === "details";
       const formatEvalValue = (value: any) => {
         if (value === false) return "false";
@@ -298,6 +327,7 @@ export function BatchEvaluationV2EvaluationResult({
       };
 
       colDefs.push({
+        colId: `eval_result_${column}`,
         headerName: titleCase(column),
         minWidth: isDetails ? 240 : 120,
         ...(isDetails
@@ -318,6 +348,7 @@ export function BatchEvaluationV2EvaluationResult({
               },
             }
           : {
+              cellClass: "cell-with-overflow",
               valueGetter: (p: any) => {
                 const evaluation = getRowData(p).evaluationsForEntry[
                   evaluator
@@ -366,6 +397,7 @@ export function BatchEvaluationV2EvaluationResult({
     );
     if (hasAnyTraceId) {
       colDefs.push({
+        colId: "trace",
         headerName: "Trace",
         minWidth: 90,
         cellRenderer: (p: any) => {
@@ -407,6 +439,23 @@ export function BatchEvaluationV2EvaluationResult({
 
   const columnDefs = useMemo(() => buildColumnDefs(), [buildColumnDefs]);
 
+  // Handle cell click to show expanded text dialog
+  const handleCellClicked = useCallback(
+    (event: CellClickedEvent) => {
+      // Skip for row number and trace button
+      const colId = event.column.getColId();
+      if (colId === "rowNumber" || colId === "trace") return;
+
+      // Get the cell value
+      const value = event.value;
+      if (!value || value === "-") return;
+
+      // Show the expanded text dialog
+      setExpandedText(stringify(value));
+    },
+    [stringify]
+  );
+
   // Auto-scroll to bottom only if user hasn't manually scrolled
   useEffect(() => {
     if (hasScrolled || !gridApiRef.current) return;
@@ -431,11 +480,39 @@ export function BatchEvaluationV2EvaluationResult({
         <style>{`
           .ag-theme-balham .ag-root-wrapper { border: none !important; border-radius: 0 !important; box-shadow: none !important; }
           .ag-theme-balham .ag-root-wrapper-body { border-radius: 0 !important; }
+          .ag-theme-balham .ag-cell { cursor: pointer; }
+
+          .ag-theme-balham .cell-with-overflow {
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+          }
+
+          .ag-theme-balham .cell-with-overflow:hover::after {
+            content: "⤢";
+            position: absolute;
+            right: 3px;
+            top: 50%;
+            border: 1px solid #1f1f1f;
+            font-size: 16px;
+            width: 20px;
+            height: 20px;
+            text-align: center;
+            transform: translateY(-50%);
+            color: #1f1f1f;
+            pointer-events: none;
+            line-height: 1;
+            border-radius: 4px;
+            padding: 0px 4px;
+            background: white;
+          }
+
           .cell-error { background: rgba(255, 0, 0, 0.2); }
           .cell-skipped { background: rgba(255, 255, 0, 0.2); }
           .cell-true { background: rgba(0, 128, 0, 0.15); }
           .cell-false { background: rgba(255, 0, 0, 0.15); }
         `}</style>
+
         <AgGridReact
           gridOptions={gridOptions}
           columnDefs={columnDefs}
@@ -445,8 +522,14 @@ export function BatchEvaluationV2EvaluationResult({
           rowBuffer={10}
           suppressAnimationFrame={false}
           onGridReady={(p) => (gridApiRef.current = p.api)}
+          onCellClicked={handleCellClicked}
         />
       </div>
+      <ExpandedTextDialog
+        open={!!expandedText}
+        onOpenChange={(open) => setExpandedText(open ? expandedText : void 0)}
+        textExpanded={expandedText}
+      />
     </Box>
   );
 }
