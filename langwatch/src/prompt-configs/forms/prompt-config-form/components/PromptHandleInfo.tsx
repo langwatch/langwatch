@@ -6,7 +6,7 @@ import type { PromptConfigFormValues } from "~/prompt-configs";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { EditablePromptHandleField } from "../../fields/EditablePromptHandleField";
 
-export function PromptHandleInfo({ configId }: { configId?: string }) {
+export function PromptHandleInfo() {
   const { project } = useOrganizationTeamProject();
   const { apiKey } = project ?? {};
   const form = useFormContext<PromptConfigFormValues>();
@@ -25,7 +25,7 @@ export function PromptHandleInfo({ configId }: { configId?: string }) {
         <EditablePromptHandleField />
 
         <HStack gap={2} alignSelf="flex-end">
-          <GeneratePromptApiSnippetDialog configId={configId} apiKey={apiKey}>
+          <GeneratePromptApiSnippetDialog promptHandle={handle} apiKey={apiKey}>
             <GeneratePromptApiSnippetDialog.Trigger>
               <GenerateApiSnippetButton hasHandle={!!handle} />
             </GeneratePromptApiSnippetDialog.Trigger>
