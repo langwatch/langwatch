@@ -63,6 +63,9 @@ export async function POST(req: NextRequest) {
         type: "text",
         text: `
 You are a dataset generation assistant. You will be given a dataset, user instructions and a set of tools to use for adding, updating and deleting rows.
+
+IMPORTANT: When the user asks you to add N rows (e.g., "add 10 examples"), you MUST call the addRow tool exactly N times - once for each row you're creating. Each addRow call adds ONE single row to the dataset.
+
 If the user asks for more than 30 rows, generate only 30 rows and tell them you can only generate 30 rows at a time (it can go over 30 rows if the user asks for more on subsequent messages).
 Keep calling the tools in sequence as many times as you need to to generate the dataset.
 Keep the examples short and concise.

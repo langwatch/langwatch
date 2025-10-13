@@ -212,7 +212,11 @@ export default function Reports() {
         ) : null}
       </HStack>
       <HStack align="start" gap={6} width="full">
-        <Grid templateColumns="repeat(2, 1fr)" gap={5} width={"100%"}>
+        <Grid
+          templateColumns={{ base: "1fr", lg: "repeat(2, 1fr)" }}
+          gap={5}
+          width={"100%"}
+        >
           {graphs.data ? (
             graphs.data.map((graph) => (
               <GraphCard
