@@ -28,8 +28,7 @@ import {
   type PercentileAggregationTypes,
 } from "./types";
 import { env } from "../../env.mjs";
-import type { FilterField } from "../filters/types";
-import type { FilterParam } from "../../hooks/useFilterParams";
+import { nonEmptyFilters } from "./utils";
 
 const labelsMapping: Partial<
   Record<
@@ -129,7 +128,12 @@ export const timeseries = async (input: TimeseriesInputType) => {
             // Fix for working with percentiles too
             .split(">values")[0]
             ?.replace(/\./g, "__");
-          const pipelinePath_ = pipelinePath(index, metric, aggregation, pipeline);
+          const pipelinePath_ = pipelinePath(
+            index,
+            metric,
+            aggregation,
+            pipeline
+          );
 
           aggregationQuery = {
             [pipelineBucketsPath]: {
@@ -364,21 +368,6 @@ const extractResultForBucket = (
   );
 };
 
-export const nonEmptyFilters = (
-  filters: Partial<Record<FilterField, FilterParam>> | undefined
-) => {
-  if (!filters) {
-    return [];
-  }
-  return Object.values(filters).filter((f) =>
-    typeof f === "string"
-      ? !!f
-      : Array.isArray(f)
-      ? f.length > 0
-      : Object.keys(f).length > 0
-  );
-};
-
 const extractResult = (
   { metric, aggregation, pipeline, key, subkey, filters }: SeriesInputType,
   index: number,
@@ -456,4 +445,5 @@ const pipelinePath = (
   metric: SeriesInputType["metric"],
   aggregation: SeriesInputType["aggregation"],
   pipeline: Required<SeriesInputType>["pipeline"]
-) => `${index}/${metric}/${aggregation}/${pipeline.field}/${pipeline.aggregation}`;
+) =>
+  `${index}/${metric}/${aggregation}/${pipeline.field}/${pipeline.aggregation}`;

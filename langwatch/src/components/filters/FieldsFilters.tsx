@@ -38,6 +38,7 @@ import { Tooltip } from "../ui/tooltip";
 
 import { useDrawer } from "~/components/CurrentDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { nonEmptyFilters } from "../../server/analytics/utils";
 
 export function FieldsFilters({
   isEditMode,
@@ -52,14 +53,7 @@ export function FieldsFilters({
   const { openDrawer } = useDrawer();
   const { hasTeamPermission } = useOrganizationTeamProject();
 
-  const nonEmptyFilters = Object.values(filters ?? filterParams.filters).filter(
-    (f) =>
-      typeof f === "string"
-        ? !!f
-        : Array.isArray(f)
-        ? f.length > 0
-        : Object.keys(f).length > 0
-  );
+  const nonEmptyFilters_ = nonEmptyFilters(filters ?? filterParams.filters);
 
   const filterKeys: FilterField[] = [
     "metadata.prompt_ids",
@@ -83,7 +77,7 @@ export function FieldsFilters({
     availableFilters[id],
   ]);
 
-  const hasAnyFilters = nonEmptyFilters.length > 0;
+  const hasAnyFilters = nonEmptyFilters_.length > 0;
 
   return (
     <VStack align="start" width="300px" gap={6}>

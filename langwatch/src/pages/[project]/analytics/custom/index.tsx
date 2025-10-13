@@ -63,10 +63,10 @@ import { Select } from "~/components/ui/select";
 import { Switch } from "~/components/ui/switch";
 import { Tooltip } from "~/components/ui/tooltip";
 import {
-  nonEmptyFilters,
   useFilterParams,
   type FilterParam,
 } from "~/hooks/useFilterParams";
+import { nonEmptyFilters } from "../../../../server/analytics/utils";
 import {
   CustomGraph,
   summaryGraphTypes,

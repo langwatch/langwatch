@@ -2,12 +2,12 @@ import { Box, Button, HStack, Text } from "@chakra-ui/react";
 import { useRouter } from "next/router";
 import { Filter, X } from "react-feather";
 import {
-  nonEmptyFilters,
   useFilterParams,
   type FilterParam,
 } from "../../hooks/useFilterParams";
 import { Tooltip } from "../ui/tooltip";
 import type { FilterField } from "../../server/filters/types";
+import { nonEmptyFilters } from "../../server/analytics/utils";
 
 export const useFilterToggle = (
   { defaultShowFilters } = { defaultShowFilters: false }

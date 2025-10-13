@@ -4,6 +4,7 @@ import { useRouter } from "next/router";
 import { availableFilters } from "../server/filters/registry";
 import type { FilterField } from "../server/filters/types";
 import qs from "qs";
+import { nonEmptyFilters } from "../server/analytics/utils";
 
 export type FilterParam =
   | string[]
@@ -179,16 +180,4 @@ export const useFilterParams = () => {
       },
     },
   };
-};
-
-export const nonEmptyFilters = (
-  filters: Partial<Record<FilterField, FilterParam>>
-) => {
-  return Object.values(filters).filter((f) =>
-    typeof f === "string"
-      ? !!f
-      : Array.isArray(f)
-      ? f.length > 0
-      : Object.keys(f).length > 0
-  );
 };
