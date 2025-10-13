@@ -116,9 +116,17 @@ async function handleTracesRequest(req: NextRequest) {
             "Project has reached plan limit"
           );
 
-          return NextResponse.json({
-            message: `ERR_PLAN_LIMIT: You have reached the monthly limit of ${activePlan.maxMessagesPerMonth} messages, please go to LangWatch dashboard to verify your plan.`,
+          span.setStatus({
+            code: SpanStatusCode.ERROR,
+            message: "Plan limit reached.",
           });
+
+          return NextResponse.json(
+            {
+              message: `ERR_PLAN_LIMIT: You have reached the monthly limit of ${activePlan.maxMessagesPerMonth} messages, please go to LangWatch dashboard to verify your plan.`,
+            },
+            { status: 429 }
+          );
         }
       } catch (error) {
         logger.error(
