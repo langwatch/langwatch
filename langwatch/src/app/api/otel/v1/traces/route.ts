@@ -16,6 +16,8 @@ import { createLogger } from "../../../../../utils/logger";
 import { withAppRouterLogger } from "../../../../../middleware/app-router-logger";
 import { getLangWatchTracer } from "langwatch";
 import { SpanKind, SpanStatusCode } from "@opentelemetry/api";
+import { getCurrentMonthMessagesCount } from "../../../../../server/api/routers/limits";
+import { dependencies } from "../../../../../injection/dependencies.server";
 
 const tracer = getLangWatchTracer("langwatch.otel.traces");
 const logger = createLogger("langwatch:otel:v1:traces");
@@ -77,6 +79,57 @@ async function handleTracesRequest(req: NextRequest) {
         return NextResponse.json(
           { message: "Invalid auth token." },
           { status: 401 }
+        );
+      }
+
+      try {
+        const currentMonthMessagesCount = await getCurrentMonthMessagesCount(
+          [project.id],
+          project.team.organizationId
+        );
+
+        const activePlan = await dependencies.subscriptionHandler.getActivePlan(
+          project.team.organizationId
+        );
+
+        if (currentMonthMessagesCount >= activePlan.maxMessagesPerMonth) {
+          if (dependencies.planLimits) {
+            try {
+              await dependencies.planLimits(
+                project.team.organizationId,
+                activePlan.name ?? "free"
+              );
+            } catch (error) {
+              logger.error(
+                { error, projectId: project.id },
+                "Error sending plan limit notification"
+              );
+            }
+          }
+          logger.info(
+            {
+              projectId: project.id,
+              currentMonthMessagesCount,
+              activePlanName: activePlan.name,
+              maxMessagesPerMonth: activePlan.maxMessagesPerMonth,
+            },
+            "Project has reached plan limit"
+          );
+
+          return NextResponse.json({
+            message: `ERR_PLAN_LIMIT: You have reached the monthly limit of ${activePlan.maxMessagesPerMonth} messages, please go to LangWatch dashboard to verify your plan.`,
+          });
+        }
+      } catch (error) {
+        logger.error(
+          { error, projectId: project.id },
+          "Error getting current month messages count"
+        );
+        Sentry.captureException(
+          new Error("Error getting current month messages count"),
+          {
+            extra: { projectId: project.id, zodError: error },
+          }
         );
       }
 
