@@ -23,8 +23,8 @@ import {
   type UsageStyle,
   type CompanySize,
   type SolutionType,
-  type Desire,
-  type Role,
+  type DesireType,
+  type RoleType,
   OnboardingScreenIndex,
   type OnboardingFlowConfig,
 } from "../types/types";
@@ -42,8 +42,8 @@ interface IntroScreensProps {
     setPhoneIsValid: (value: boolean) => void;
     setCompanySize: (value: CompanySize) => void;
     setSolutionType: (value: SolutionType | undefined) => void;
-    setDesires: (value: Desire[]) => void;
-    setRole: (value: Role | undefined) => void;
+    setDesires: (value: DesireType[]) => void;
+    setRole: (value: RoleType | undefined) => void;
   };
 }
 
@@ -166,7 +166,7 @@ export const useCreateScreens = ({
       required: false,
       heading: "Let's tailor your experience",
       component: (
-        <IconCheckboxCardGroup<Desire>
+        <IconCheckboxCardGroup<DesireType>
           label={"What brings you to LangWatch?"}
           items={desireItems}
           value={selectedDesires}
@@ -184,7 +184,7 @@ export const useCreateScreens = ({
             {"What best describes you?"}
             <Field.RequiredIndicator />
           </Field.Label>
-          <IconRadioCardGroup<Role>
+          <IconRadioCardGroup<RoleType>
             items={roleItems}
             value={role}
             onChange={setRole}

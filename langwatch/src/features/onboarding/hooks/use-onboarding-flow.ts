@@ -6,8 +6,8 @@ import {
   type UsageStyle,
   type CompanySize,
   type SolutionType,
-  type Desire,
-  type Role,
+  type DesireType,
+  type RoleType,
   OnboardingScreenIndex,
   OnboardingFlowDirection,
 } from "../types/types";
@@ -29,8 +29,8 @@ export const useOnboardingFlow = () => {
   const [phoneIsValid, setPhoneIsValid] = useState<boolean>(true);
   const [companySize, setCompanySize] = useState<CompanySize | undefined>(void 0);
   const [solutionType, setSolutionType] = useState<SolutionType | undefined>(void 0);
-  const [selectedDesires, setDesires] = useState<Desire[]>([]);
-  const [role, setRole] = useState<Role | undefined>(void 0);
+  const [selectedDesires, setDesires] = useState<DesireType[]>([]);
+  const [role, setRole] = useState<RoleType | undefined>(void 0);
 
   // Flow state
   const flow = getOnboardingFlowConfig(Boolean(isSaaS));

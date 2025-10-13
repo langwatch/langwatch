@@ -21,9 +21,17 @@ import {
   BadgeQuestionMark,
   HatGlasses,
 } from "lucide-react";
-import type { IconFormItem } from "../types/types";
+import type {
+  FormItem,
+  IconFormItem,
+  UsageStyle,
+  SolutionType,
+  CompanySize,
+  RoleType,
+  DesireType,
+} from "../types/types";
 
-export const usageStyleItems: IconFormItem[] = [
+export const usageStyleItems: IconFormItem<UsageStyle>[] = [
   {
     title: "Company",
     value: "For my company",
@@ -41,7 +49,7 @@ export const usageStyleItems: IconFormItem[] = [
   },
 ];
 
-export const companySizeItems = [
+export const companySizeItems: FormItem<CompanySize>[] = [
   {
     title: "1-10",
     value: "1_to_10",
@@ -68,7 +76,7 @@ export const companySizeItems = [
   },
 ];
 
-export const solutionTypeItems: IconFormItem[] = [
+export const solutionTypeItems: IconFormItem<SolutionType>[] = [
   {
     title: "Cloud",
     value: "SaaS",
@@ -81,7 +89,7 @@ export const solutionTypeItems: IconFormItem[] = [
   },
 ];
 
-export const desireItems: IconFormItem[] = [
+export const desireItems: IconFormItem<DesireType>[] = [
   {
     title: "Agent Simulations",
     value: "agent_simulations",
@@ -114,7 +122,7 @@ export const desireItems: IconFormItem[] = [
   },
   {
     title: "Annotation & Collaboration",
-    value: "annotation",
+    value: "annotation_collaboration",
     icon: StickyNote,
   },
   {
@@ -129,7 +137,7 @@ export const desireItems: IconFormItem[] = [
   },
 ];
 
-export const roleItems: IconFormItem[] = [
+export const roleItems: IconFormItem<RoleType>[] = [
   {
     title: "Software Engineer",
     value: "software_engineer",
@@ -162,7 +170,7 @@ export const roleItems: IconFormItem[] = [
   },
   {
     title: "CTO/C-Level",
-    value: "cto_c_level",
+    value: "cto_clevel",
     icon: ChefHat,
   },
   {

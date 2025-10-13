@@ -10,24 +10,29 @@ export enum OnboardingFlowDirection {
   BACKWARD = -1,
 }
 
-export const USAGE_STYLES = ["myself", "clients", "company"] as const;
+export const USAGE_STYLES = [
+  "For myself",
+  "For my clients",
+  "For my company",
+] as const;
 export const COMPANY_SIZES = [
-  "starting_out",
-  "2_to_10",
+  "1_to_10",
   "11_to_50",
   "51_to_200",
   "201_to_1000",
-  "1000_plus",
+  "1000_to_5000",
+  "5000_plus",
 ] as const;
-export const SOLUTION_TYPES = ["cloud", "on_premise"] as const;
+export const SOLUTION_TYPES = ["SaaS", "On-Premise"] as const;
 export const DESIRE_TYPES = [
   "everything",
-  "evaluation",
+  "evaluations",
   "model_experimentation",
   "prompt_management_optimization",
+  "agent_simulations",
   "observability",
   "safety_compliance",
-  "annotation",
+  "annotation_collaboration",
   "just_exploring",
 ] as const;
 export const ROLE_TYPES = [
@@ -37,15 +42,15 @@ export const ROLE_TYPES = [
   "engineering_manager",
   "data_scientist",
   "ai_researcher",
-  "cto_founder",
+  "cto_clevel",
   "other",
 ] as const;
 
 export type UsageStyle = (typeof USAGE_STYLES)[number];
 export type CompanySize = (typeof COMPANY_SIZES)[number];
 export type SolutionType = (typeof SOLUTION_TYPES)[number];
-export type Desire = (typeof DESIRE_TYPES)[number];
-export type Role = (typeof ROLE_TYPES)[number];
+export type DesireType = (typeof DESIRE_TYPES)[number];
+export type RoleType = (typeof ROLE_TYPES)[number];
 
 export interface OnboardingFormData {
   organizationName?: string;
@@ -54,8 +59,8 @@ export interface OnboardingFormData {
   phoneNumber?: string;
   companySize?: CompanySize;
   solutionType?: SolutionType;
-  selectedDesires: Desire[];
-  role?: Role;
+  selectedDesires: DesireType[];
+  role?: RoleType;
   utmCampaign?: string | null;
 }
 
@@ -67,12 +72,12 @@ export interface OnboardingScreen {
   subHeading?: string;
 }
 
-export interface FormItem {
+export interface FormItem<T> {
   title: string;
-  value: string;
+  value: T;
 }
 
-export interface IconFormItem extends FormItem {
+export interface IconFormItem<TValue> extends FormItem<TValue> {
   icon: React.ComponentType;
 }
 
