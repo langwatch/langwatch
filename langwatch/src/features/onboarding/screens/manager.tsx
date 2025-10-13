@@ -88,7 +88,7 @@ export const useCreateScreens = ({
             <Input
               autoFocus
               variant="outline"
-              placeholder={"My Laundry Startup"}
+              placeholder={"Company Name"}
               value={organizationName}
               onChange={(e) => setOrganizationName(e.target.value)}
             />
