@@ -484,7 +484,7 @@ const addOpenTelemetrySpanAsSpan = (
                 value: prompt,
               };
               break;
-            case typeof prompt === "object":
+            case typeof prompt === "object" && prompt !== null:
               if (prompt.messages) {
                 input = {
                   type: "chat_messages",
@@ -500,6 +500,7 @@ const addOpenTelemetrySpanAsSpan = (
               };
               break;
           }
+          delete attributesMap.gen_ai.prompt;
         }
 
         if (!output && attributesMap.gen_ai?.completion) {
