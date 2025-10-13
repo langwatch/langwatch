@@ -93,8 +93,8 @@ export const WelcomePage: React.FC = () => {
   return (
     <OrganizationOnboardingContainer
       loading={organizationIsLoading}
-      title={screens[currentScreenIndex]?.heading ?? "Welcome Aboard 👋"}
-      subTitle={screens[currentScreenIndex]?.subHeading}
+      title={(screens[flow.visibleScreens.findIndex((s) => s === currentScreenIndex)]?.heading) ?? "Welcome Aboard 👋"}
+      subTitle={screens[flow.visibleScreens.findIndex((s) => s === currentScreenIndex)]?.subHeading}
     >
         <VStack gap={4} align="stretch" position="relative" minH="400px">
           <AnimatePresence initial={false} custom={direction} mode="popLayout">
@@ -109,7 +109,7 @@ export const WelcomePage: React.FC = () => {
               style={{ width: "100%" }}
           >
             <fieldset disabled={initializeOrganization.isPending}>
-              {screens[currentScreenIndex]?.component}
+              {screens[flow.visibleScreens.findIndex((s) => s === currentScreenIndex)]?.component}
             </fieldset>
             </motion.div>
           </AnimatePresence>
@@ -120,7 +120,7 @@ export const WelcomePage: React.FC = () => {
           onNext={navigation.nextScreen}
           onSkip={navigation.skipScreen}
           canProceed={navigation.canProceed()}
-          isSkippable={!screens[currentScreenIndex]?.required}
+          isSkippable={!screens[flow.visibleScreens.findIndex((s) => s === currentScreenIndex)]?.required}
           isSubmitting={initializeOrganization.isPending}
           onFinish={handleFinalizeSubmit}
         />

@@ -40,25 +40,57 @@ export const useOnboardingFlow = () => {
   // Navigation functions
   const navigateTo = (newDirection: OnboardingFlowDirection) => {
     setDirection(newDirection);
-    setCurrentScreenIndex(prev => prev + newDirection);
+    setCurrentScreenIndex((prev) => {
+      const visible = flow.visibleScreens;
+      if (visible.length === 0) return prev;
+
+      let currentPos = visible.indexOf(prev );
+      if (currentPos === -1) {
+        // Default to first visible screen if current is not found
+        currentPos = Math.max(0, visible.indexOf(flow.first));
+      }
+
+      let newPos = currentPos + newDirection;
+      if (newPos < 0) newPos = 0;
+      if (newPos > visible.length - 1) newPos = visible.length - 1;
+
+      return visible[newPos];
+    });
   };
 
   const nextScreen = () => {
-    if (currentScreenIndex < flow.last) {
+    const visible = flow.visibleScreens;
+    const pos = visible.indexOf(currentScreenIndex );
+    if (pos === -1) {
+      // If desynced, jump towards first
+      setDirection(OnboardingFlowDirection.FORWARD);
+      setCurrentScreenIndex(visible[Math.max(0, visible.indexOf(flow.first))] ?? flow.first);
+      return;
+    }
+    if (pos < visible.length - 1) {
       navigateTo(OnboardingFlowDirection.FORWARD);
     }
   };
 
   const prevScreen = () => {
-    if (currentScreenIndex > flow.first) {
+    const visible = flow.visibleScreens;
+    const pos = visible.indexOf(currentScreenIndex );
+    if (pos === -1) {
+      // If desynced, jump towards first
+      setDirection(OnboardingFlowDirection.BACKWARD);
+      setCurrentScreenIndex(visible[Math.max(0, visible.indexOf(flow.first))] ?? flow.first);
+      return;
+    }
+    if (pos > 0) {
       navigateTo(OnboardingFlowDirection.BACKWARD);
     }
   };
 
   const skipScreen = () => {
-    if (currentScreenIndex < flow.last) {
-      navigateTo(OnboardingFlowDirection.FORWARD);
-    }
+    const visible = flow.visibleScreens;
+    if (visible.length === 0) return;
+    setDirection(OnboardingFlowDirection.FORWARD);
+    setCurrentScreenIndex(visible[visible.length - 1]);
   };
 
   // Validation logic
