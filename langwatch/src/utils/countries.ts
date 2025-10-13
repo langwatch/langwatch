@@ -262,9 +262,8 @@ export const COMMON_COUNTRIES: readonly CountryMapCode[] = [
   "US",
   "GB",
   "FR",
+  "DE",
   "BR",
-  "FR",
-  "GE",
   "ZA",
 ] as const satisfies readonly CountryMapCode[];
 
@@ -290,3 +289,9 @@ export const DEFAULT_COUNTRIES = [
   ...COMMON_COUNTRIES,
   ...rest,
 ] as const satisfies readonly CountryMapCode[];
+
+export const DEFAULT_COUNTRIES_WITH_SEPARATION = [
+  ...COMMON_COUNTRIES,
+  "SEPARATOR",
+  ...rest,
+] as const satisfies readonly (CountryMapCode | "SEPARATOR")[];

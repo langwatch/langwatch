@@ -7,7 +7,7 @@ import {
   isValidPhoneNumber,
   type CountryCode,
 } from "libphonenumber-js";
-import { countryCodeToFlagEmoji, countryCodeToName, DEFAULT_COUNTRIES } from "../../utils/countries";
+import { countryCodeToFlagEmoji, countryCodeToName, DEFAULT_COUNTRIES, DEFAULT_COUNTRIES_WITH_SEPARATION } from "../../utils/countries";
 
 export interface PhoneNumberInputProps {
   value?: string;
@@ -30,7 +30,7 @@ export function PhoneNumberInput(
   const {
     value,
     defaultCountry = "US",
-    allowedCountries = DEFAULT_COUNTRIES,
+    allowedCountries = DEFAULT_COUNTRIES_WITH_SEPARATION,
     onChange,
   } = props;
 
@@ -118,7 +118,15 @@ export function PhoneNumberInput(
             color="transparent"
             textShadow="0 0 0 transparent"
           >
-            {(allowedCountries || DEFAULT_COUNTRIES).map((code) => {
+            {(allowedCountries || DEFAULT_COUNTRIES_WITH_SEPARATION).map((code) => {
+              if (code === "SEPARATOR") {
+                return (
+                  <option key="separator" value="separator" role="separator" disabled>
+                    {"──────────────"}
+                  </option>
+                );
+              }
+
               const calling = getCountryCallingCode(code);
               const flag = countryCodeToFlagEmoji(code);
               const countryName = countryCodeToName[code];
