@@ -23,6 +23,14 @@ const logger = createLogger("langwatch:otel:v1:traces");
 const traceRequestType = (root as any).opentelemetry.proto.collector.trace.v1
   .ExportTraceServiceRequest;
 
+export const config = {
+  api: {
+    bodyParser: {
+      sizeLimit: "1mb",
+    },
+  },
+};
+
 async function handleTracesRequest(req: NextRequest) {
   return await tracer.withActiveSpan(
     "handleTracesRequest",
@@ -137,12 +145,12 @@ async function handleTracesRequest(req: NextRequest) {
             if (existingTrace?.indexing_md5s?.includes(paramsMD5)) {
               continue;
             }
-    
+
             logger.info(
               { traceId: traceForCollection.traceId },
               "collecting traces"
             );
-    
+
             promises.push(
               scheduleTraceCollectionWithFallback({
                 ...traceForCollection,

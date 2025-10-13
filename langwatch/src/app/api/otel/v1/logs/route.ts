@@ -20,6 +20,14 @@ const logger = createLogger("langwatch:otel:v1:logs");
 const logRequestType = (root as any).opentelemetry.proto.collector.logs.v1
   .ExportLogsServiceRequest;
 
+export const config = {
+  api: {
+    bodyParser: {
+      sizeLimit: "1mb",
+    },
+  },
+};
+
 async function handleLogsRequest(req: NextRequest) {
   return await tracer.withActiveSpan(
     "[POST] /api/otel/v1/logs",
