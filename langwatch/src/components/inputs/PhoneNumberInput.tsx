@@ -7,12 +7,18 @@ import {
   isValidPhoneNumber,
   type CountryCode,
 } from "libphonenumber-js";
-import { countryCodeToFlagEmoji, countryCodeToName, DEFAULT_COUNTRIES, DEFAULT_COUNTRIES_WITH_SEPARATION } from "../../utils/countries";
+import {
+  countryCodeToFlagEmoji,
+  countryCodeToName,
+  DEFAULT_COUNTRIES,
+  splitByPopularity,
+} from "../../utils/countries";
 
 export interface PhoneNumberInputProps {
   value?: string;
   defaultCountry?: CountryCode;
   allowedCountries?: ReadonlyArray<CountryCode>;
+  groupFrequentlyUsedCountries?: boolean;
   onChange?: (
     value: string | undefined,
     meta: {
@@ -30,7 +36,8 @@ export function PhoneNumberInput(
   const {
     value,
     defaultCountry = "US",
-    allowedCountries = DEFAULT_COUNTRIES_WITH_SEPARATION,
+    allowedCountries = DEFAULT_COUNTRIES,
+    groupFrequentlyUsedCountries = true,
     onChange,
   } = props;
 
@@ -99,10 +106,7 @@ export function PhoneNumberInput(
   };
 
   return (
-    <Group
-      attached
-      w="full"
-    >
+    <Group attached w="full">
       <Box position="relative" w="9em" zIndex={1}>
         <NativeSelect.Root
           size="md"
@@ -118,25 +122,34 @@ export function PhoneNumberInput(
             color="transparent"
             textShadow="0 0 0 transparent"
           >
-            {(allowedCountries || DEFAULT_COUNTRIES_WITH_SEPARATION).map((code) => {
-              if (code === "SEPARATOR") {
+            {(() => {
+              const renderOption = (code: CountryCode) => {
+                const calling = getCountryCallingCode(code);
+                const flag = countryCodeToFlagEmoji(code);
+                const countryName = countryCodeToName[code as keyof typeof countryCodeToName];
                 return (
-                  <option key="separator" value="separator" role="separator" disabled>
-                    {"──────────────"}
+                  <option key={code} value={code}>
+                    {`${countryName} ${flag} (+${calling})`}
                   </option>
+                );
+              };
+
+              if (groupFrequentlyUsedCountries) {
+                const { popular, others } = splitByPopularity(allowedCountries);
+                return (
+                  <>
+                    <optgroup label="Popular">
+                      {popular.map(renderOption)}
+                    </optgroup>
+                    <optgroup label="All countries">
+                      {others.map(renderOption)}
+                    </optgroup>
+                  </>
                 );
               }
 
-              const calling = getCountryCallingCode(code);
-              const flag = countryCodeToFlagEmoji(code);
-              const countryName = countryCodeToName[code];
-
-              return (
-                <option key={code} value={code}>
-                  {`${countryName} ${flag} (+${calling})`}
-                </option>
-              );
-            })}
+              return allowedCountries.map(renderOption);
+            })()}
           </NativeSelect.Field>
           <NativeSelect.Indicator />
         </NativeSelect.Root>
@@ -150,7 +163,9 @@ export function PhoneNumberInput(
           pr="8"
           color="inherit"
         >
-          {`${countryCodeToFlagEmoji(country)} +${getCountryCallingCode(country)}`}
+          {`${countryCodeToFlagEmoji(country)} +${getCountryCallingCode(
+            country,
+          )}`}
         </Box>
       </Box>
 

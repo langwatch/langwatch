@@ -29,7 +29,7 @@ export const countryCodeToNameUnsorted = {
   BL: "Saint Barthélemy",
   BM: "Bermuda",
   BN: "Brunei Darussalam",
-  BO: "Bolivia (Plurinational State of)",
+  BO: "Bolivia",
   BQ: "Bonaire, Sint Eustatius and Saba",
   BR: "Brazil",
   BS: "Bahamas",
@@ -39,7 +39,7 @@ export const countryCodeToNameUnsorted = {
   BZ: "Belize",
   CA: "Canada",
   CC: "Cocos (Keeling) Islands",
-  CD: "Congo (the Democratic Republic of the)",
+  CD: "Congo",
   CF: "Central African Republic",
   CG: "Congo",
   CH: "Switzerland",
@@ -72,11 +72,11 @@ export const countryCodeToNameUnsorted = {
   FI: "Finland",
   FJ: "Fiji",
   FK: "Falkland Islands [Malvinas]",
-  FM: "Micronesia (Federated States of)",
+  FM: "Micronesia",
   FO: "Faroe Islands",
   FR: "France",
   GA: "Gabon",
-  GB: "United Kingdom of Great Britain and Northern Ireland",
+  GB: "United Kingdom",
   GD: "Grenada",
   GE: "Georgia",
   GF: "French Guiana",
@@ -105,7 +105,7 @@ export const countryCodeToNameUnsorted = {
   IN: "India",
   IO: "British Indian Ocean Territory",
   IQ: "Iraq",
-  IR: "Iran (Islamic Republic of)",
+  IR: "Iran",
   IS: "Iceland",
   IT: "Italy",
   JE: "Jersey",
@@ -118,8 +118,8 @@ export const countryCodeToNameUnsorted = {
   KI: "Kiribati",
   KM: "Comoros",
   KN: "Saint Kitts and Nevis",
-  KP: "Korea (the Democratic People's Republic of)",
-  KR: "Korea (the Republic of)",
+  KP: "North Korea",
+  KR: "South Korea",
   KW: "Kuwait",
   KY: "Cayman Islands",
   KZ: "Kazakhstan",
@@ -136,9 +136,9 @@ export const countryCodeToNameUnsorted = {
   LY: "Libya",
   MA: "Morocco",
   MC: "Monaco",
-  MD: "Moldova (the Republic of)",
+  MD: "Moldova",
   ME: "Montenegro",
-  MF: "Saint Martin (French part)",
+  MF: "Saint Martin",
   MG: "Madagascar",
   MH: "Marshall Islands",
   MK: "Republic of North Macedonia",
@@ -195,7 +195,7 @@ export const countryCodeToNameUnsorted = {
   SD: "Sudan",
   SE: "Sweden",
   SG: "Singapore",
-  SH: "Saint Helena, Ascension and Tristan da Cunha",
+  SH: "Saint Helena",
   SI: "Slovenia",
   SJ: "Svalbard and Jan Mayen",
   SK: "Slovakia",
@@ -207,7 +207,7 @@ export const countryCodeToNameUnsorted = {
   SS: "South Sudan",
   ST: "Sao Tome and Principe",
   SV: "El Salvador",
-  SX: "Sint Maarten (Dutch part)",
+  SX: "Sint Maarten",
   SY: "Syrian Arab Republic",
   SZ: "Eswatini",
   TA: "Tristan da Cunha",
@@ -224,7 +224,7 @@ export const countryCodeToNameUnsorted = {
   TR: "Turkey",
   TT: "Trinidad and Tobago",
   TV: "Tuvalu",
-  TW: "Taiwan (Province of China)",
+  TW: "Taiwan",
   TZ: "Tanzania, United Republic of",
   UA: "Ukraine",
   UG: "Uganda",
@@ -233,7 +233,7 @@ export const countryCodeToNameUnsorted = {
   UZ: "Uzbekistan",
   VA: "Holy See",
   VC: "Saint Vincent and the Grenadines",
-  VE: "Venezuela (Bolivarian Republic of)",
+  VE: "Venezuela",
   VG: "Virgin Islands (British)",
   VI: "Virgin Islands (U.S.)",
   VN: "Viet Nam",
@@ -290,8 +290,20 @@ export const DEFAULT_COUNTRIES = [
   ...rest,
 ] as const satisfies readonly CountryMapCode[];
 
-export const DEFAULT_COUNTRIES_WITH_SEPARATION = [
-  ...COMMON_COUNTRIES,
-  "SEPARATOR",
-  ...rest,
-] as const satisfies readonly (CountryMapCode | "SEPARATOR")[];
+export function splitByPopularity(
+  codes: ReadonlyArray<CountryCode>,
+): { popular: CountryCode[]; others: CountryCode[] } {
+  const popularSet = new Set<string>(COMMON_COUNTRIES as readonly string[]);
+  const popular: CountryCode[] = [];
+  const others: CountryCode[] = [];
+
+  for (const code of codes) {
+    if (popularSet.has(code as unknown as string)) {
+      popular.push(code);
+    } else {
+      others.push(code);
+    }
+  }
+
+  return { popular, others };
+}
