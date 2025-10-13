@@ -5,6 +5,7 @@ import chalk from "chalk";
 import type { PromptsConfig, LocalPromptConfig, MaterializedPrompt, PromptsLock } from "../types";
 import { localPromptConfigSchema } from "../types";
 import { PromptConverter } from "@/cli/utils/promptConverter";
+import { PromptFileNotFoundError } from "./errors/prompt-not-found.error";
 
 export class FileManager {
   private static readonly PROMPTS_CONFIG_FILE = "prompts.json";
@@ -141,7 +142,7 @@ export class FileManager {
     const fullPath = path.resolve(filePath);
 
     if (!fs.existsSync(fullPath)) {
-      throw new Error(`Local prompt file not found: ${filePath}`);
+      throw new PromptFileNotFoundError(filePath);
     }
 
     try {
