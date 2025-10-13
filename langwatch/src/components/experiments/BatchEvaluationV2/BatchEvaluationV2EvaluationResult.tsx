@@ -96,6 +96,7 @@ export function BatchEvaluationV2EvaluationResult({
       sortable: false,
       suppressMenu: true,
       wrapText: false,
+      suppressMovable: true,
     }),
     []
   );
