@@ -182,7 +182,6 @@ export const useCreateScreens = ({
         <Field.Root colorPalette="orange" w="full">
           <Field.Label>
             {"What best describes you?"}
-            <Field.RequiredIndicator />
           </Field.Label>
           <IconRadioCardGroup<RoleType>
             items={roleItems}
