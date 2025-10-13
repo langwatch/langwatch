@@ -1,7 +1,6 @@
-import { Box, Button, VStack } from "@chakra-ui/react";
+import { Box, Button } from "@chakra-ui/react";
 import numeral from "numeral";
-import { useEffect, useRef } from "react";
-import { Tooltip } from "../../../components/ui/tooltip";
+import { useCallback, useEffect, useMemo, useRef } from "react";
 import type { ESBatchEvaluation } from "../../../server/experiments/types";
 import { formatMilliseconds } from "../../../utils/formatMilliseconds";
 import { formatMoney } from "../../../utils/formatMoney";
@@ -23,6 +22,14 @@ import "@ag-grid-community/styles/ag-theme-balham.css";
 
 ModuleRegistry.registerModules([ClientSideRowModelModule]);
 
+type EvaluationRowData = {
+  rowNumber: number;
+  datasetEntry?: ESBatchEvaluation["dataset"][number];
+  evaluationsForEntry: Record<
+    string,
+    ESBatchEvaluation["evaluations"][number] | undefined
+  >;
+};
 
 export function BatchEvaluationV2EvaluationResult({
   evaluator,
@@ -30,7 +37,7 @@ export function BatchEvaluationV2EvaluationResult({
   datasetByIndex,
   datasetColumns,
   predictedColumns,
-  isFinished,
+  isFinished: _isFinished,
   size = "md",
   hasScrolled,
   workflowId: _workflowId,
@@ -46,69 +53,79 @@ export function BatchEvaluationV2EvaluationResult({
   workflowId: string | null;
 }) {
   const evaluatorHeaders = getEvaluationColumns(results);
-
-  // Container ref for grid
   const containerRef = useRef<HTMLDivElement>(null);
-
+  const gridApiRef = useRef<GridApi | null>(null);
   const { openDrawer } = useDrawer();
-
-  type EvaluationRowData = {
-    rowNumber: number;
-    datasetEntry?: ESBatchEvaluation["dataset"][number];
-    evaluationsForEntry: Record<
-      string,
-      ESBatchEvaluation["evaluations"][number] | undefined
-    >;
-  };
 
   const totalRows = Math.max(
     ...Object.values(datasetByIndex).map((d) => d.index + 1)
   );
 
-  const rowData: EvaluationRowData[] = Array.from({ length: totalRows }).map(
-    (_, index) => {
-      const datasetEntry = datasetByIndex[index];
-      const evaluationsForEntry = Object.fromEntries(
-        Object.entries({ [evaluator]: results }).map(([ev, res]) => [
-          ev,
-          res.find((r) => r.index === index),
-        ])
-      );
-      return {
-        rowNumber: index + 1,
-        datasetEntry,
-        evaluationsForEntry,
-      };
-    }
+  // Utility functions
+  const stringify = useCallback(
+    (value: any) =>
+      typeof value === "object" ? JSON.stringify(value) : `${value}`,
+    []
   );
 
-  const gridApiRef = useRef<GridApi | null>(null);
+  const titleCase = useCallback(
+    (text: string) =>
+      text
+        .replace(/[_-]+/g, " ")
+        .replace(/\s+/g, " ")
+        .trim()
+        .replace(/\b\w/g, (c) => c.toUpperCase()),
+    []
+  );
 
-  const gridOptions: GridOptions = {
-    getRowId: (params) => String((params.data as EvaluationRowData).rowNumber),
-    suppressRowClickSelection: true,
-  };
+  const getRowData = (p: any) => p.data as EvaluationRowData;
 
-  const defaultColDef: ColDef = {
-    resizable: true,
-    sortable: false,
-    suppressMenu: true,
-    wrapText: false,
-  };
+  const formatValue = useCallback(
+    (val: any) => (val !== void 0 && val !== null ? stringify(val) : "-"),
+    [stringify]
+  );
 
-  const stringify = (value: any) =>
-    typeof value === "object" ? JSON.stringify(value) : `${value}`;
-  const titleCase = (text: string) =>
-    text
-      .replace(/[_-]+/g, " ")
-      .replace(/\s+/g, " ")
-      .trim()
-      .replace(/\b\w/g, (c) => c.toUpperCase());
+  // Row data
+  const rowData = useMemo(
+    () =>
+      Array.from({ length: totalRows }).map((_, index) => ({
+        rowNumber: index + 1,
+        datasetEntry: datasetByIndex[index],
+        evaluationsForEntry: {
+          [evaluator]: results.find((r) => r.index === index),
+        },
+      })),
+    [totalRows, datasetByIndex, evaluator, results]
+  );
 
-  const buildColumnDefs = (): (ColDef | ColGroupDef)[] => {
+  // Grid configuration
+  const gridOptions: GridOptions = useMemo(
+    () => ({
+      getRowId: (params) =>
+        String((params.data as EvaluationRowData).rowNumber),
+      suppressRowClickSelection: true,
+      reactiveCustomComponents: true,
+    }),
+    []
+  );
+
+  const defaultColDef: ColDef = useMemo(
+    () => ({
+      flex: 1,
+      minWidth: 10,
+      resizable: true,
+      sortable: false,
+      suppressMenu: true,
+      wrapText: false,
+    }),
+    []
+  );
+
+  // Column definitions builder
+  const buildColumnDefs = useCallback((): (ColDef | ColGroupDef)[] => {
     const colDefs: (ColDef | ColGroupDef)[] = [];
 
-    // Row number column
+    // Row number
     colDefs.push({
       headerName: "",
       width: 60,
@@ -117,90 +134,75 @@ export function BatchEvaluationV2EvaluationResult({
       pinned: "left",
     });
 
-    // Dataset columns group
+    // Dataset columns
     if (datasetColumns.size > 0) {
-      const children: ColDef[] = Array.from(datasetColumns).map((column) => ({
-        headerName: titleCase(column),
-        minWidth: 150,
-        cellRenderer: (p: any) => {
-          const data = p.data as EvaluationRowData;
-          const entry = data.datasetEntry;
-          const val = entry?.entry?.[column];
-          const img = getImageUrl(entry?.entry?.[column] ?? "");
+      const firstEntry = Object.values(datasetByIndex)[0];
+      const children: ColDef[] = Array.from(datasetColumns).map((column) => {
+        const mightHaveImages =
+          typeof firstEntry?.entry?.[column] === "string" &&
+          getImageUrl(firstEntry.entry[column]);
 
-          return img ? (
-            <ExternalImage
-              src={img}
-              minWidth="24px"
-              minHeight="24px"
-              maxHeight="120px"
-              maxWidth="100%"
-            />
-          ) : val !== undefined && val !== null ? (
-            <HoverableBigText>{stringify(val)}</HoverableBigText>
-          ) : (
-            "-"
-          );
-        },
-        tooltipValueGetter: (p: any) => {
-          const data = p.data as EvaluationRowData;
-          const entry = data.datasetEntry;
-          const val = entry?.entry?.[column];
-          return stringify(val ?? "-");
-        },
-      }));
+        return {
+          headerName: titleCase(column),
+          minWidth: 150,
+          ...(mightHaveImages
+            ? {
+                cellRenderer: (p: any) => {
+                  const val = getRowData(p).datasetEntry?.entry?.[column];
+                  const img = getImageUrl(val ?? "");
+                  return img ? (
+                    <ExternalImage
+                      src={img}
+                      minWidth="24px"
+                      minHeight="24px"
+                      maxHeight="120px"
+                      maxWidth="100%"
+                    />
+                  ) : (
+                    formatValue(val)
+                  );
+                },
+              }
+            : {
+                valueGetter: (p: any) =>
+                  formatValue(getRowData(p).datasetEntry?.entry?.[column]),
+              }),
+          tooltipValueGetter: (p: any) =>
+            stringify(getRowData(p).datasetEntry?.entry?.[column] ?? "-"),
+        };
+      });
       colDefs.push({ headerName: "Dataset", children });
     }
 
-    // Predicted columns grouped by node
+    // Predicted columns
     Object.entries(predictedColumns ?? {}).forEach(([node, columns]) => {
       const children: ColDef[] = Array.from(columns).map((column) => ({
         headerName: titleCase(column),
         minWidth: 150,
-        cellRenderer: (p: any) => {
-          const data = p.data as EvaluationRowData;
-          const entry = data.datasetEntry;
-          if (entry?.error) {
-            return (
-              <Tooltip content={entry.error} positioning={{ placement: "top" }}>
-                <Box lineClamp={1}>Error</Box>
-              </Tooltip>
-            );
-          }
-
+        valueGetter: (p: any) => {
+          const entry = getRowData(p).datasetEntry;
+          if (entry?.error) return "Error";
           let value = (entry?.predicted as any)?.[node]?.[column];
-          if (value === undefined && node === "end") {
+          if (value === void 0 && node === "end")
             value = (entry?.predicted as any)?.[column];
-          }
-
-          return value !== undefined && value !== null ? (
-            <HoverableBigText>{stringify(value)}</HoverableBigText>
-          ) : (
-            "-"
-          );
+          return formatValue(value);
         },
         tooltipValueGetter: (p: any) => {
-          const data = p.data as EvaluationRowData;
-          const entry = data.datasetEntry;
+          const entry = getRowData(p).datasetEntry;
           if (entry?.error) return entry.error;
           let value = (entry?.predicted as any)?.[node]?.[column];
-
-          if (value === undefined && node === "end") {
+          if (value === void 0 && node === "end")
             value = (entry?.predicted as any)?.[column];
-          }
-
           return stringify(value ?? "-");
         },
         cellClassRules: {
-          "cell-error": (p: any) =>
-            !!(p.data as EvaluationRowData)?.datasetEntry?.error,
+          "cell-error": (p: any) => !!getRowData(p).datasetEntry?.error,
         },
       }));
-
       colDefs.push({ headerName: titleCase(node), children });
     });
 
-    // Evaluation Data group (inputs)
+    // Evaluation inputs
     if (
       results.length > 0 &&
       evaluatorHeaders.evaluationInputsColumns.size > 0
@@ -210,39 +212,21 @@ export function BatchEvaluationV2EvaluationResult({
       ).map((column) => ({
         headerName: titleCase(column),
         minWidth: 150,
-        cellRenderer: (p: any) => {
-          const data = p.data as EvaluationRowData;
-          const entry = data.datasetEntry;
-          const evaluation = data.evaluationsForEntry[evaluator];
-
-          if (entry?.error) {
-            return (
-              <Tooltip content={entry.error} positioning={{ placement: "top" }}>
-                <Box lineClamp={1}>Error</Box>
-              </Tooltip>
-            );
-          }
-
-          const value = evaluation?.inputs?.[column];
-
-          return evaluation ? (
-            <HoverableBigText>{stringify(value ?? "-")}</HoverableBigText>
-          ) : (
-            "-"
-          );
+        valueGetter: (p: any) => {
+          const { datasetEntry, evaluationsForEntry } = getRowData(p);
+          if (datasetEntry?.error) return "Error";
+          const value = evaluationsForEntry[evaluator]?.inputs?.[column];
+          return evaluationsForEntry[evaluator] ? stringify(value ?? "-") : "-";
         },
         tooltipValueGetter: (p: any) => {
-          const data = p.data as EvaluationRowData;
-          const entry = data.datasetEntry;
-          const evaluation = data.evaluationsForEntry[evaluator];
-
-          if (entry?.error) return entry.error;
-
-          return stringify(evaluation?.inputs?.[column] ?? "-");
+          const { datasetEntry, evaluationsForEntry } = getRowData(p);
+          if (datasetEntry?.error) return datasetEntry.error;
+          return stringify(
+            evaluationsForEntry[evaluator]?.inputs?.[column] ?? "-"
+          );
         },
         cellClassRules: {
-          "cell-error": (p: any) =>
-            !!(p.data as EvaluationRowData)?.datasetEntry?.error,
+          "cell-error": (p: any) => !!getRowData(p).datasetEntry?.error,
         },
       }));
       colDefs.push({ headerName: "Evaluation Data", children });
@@ -252,35 +236,28 @@ export function BatchEvaluationV2EvaluationResult({
     colDefs.push({
       headerName: "Cost",
       minWidth: 120,
-      cellRenderer: (p: any) => {
-        const data = p.data as EvaluationRowData;
-        const entry = data.datasetEntry;
-        const evaluation = data.evaluationsForEntry[evaluator];
-        const evaluationsCost = evaluation?.cost ?? 0;
-        const total = (entry?.cost ?? 0) + (evaluationsCost ?? 0);
-        const content = (
-          <VStack align="start" gap={0}>
-            <Box>Prediction cost: {entry?.cost ?? "-"}</Box>
-            <Box>Evaluation cost: {evaluationsCost ?? "-"}</Box>
-          </VStack>
-        );
-
-        return (
-          <Tooltip content={content} positioning={{ placement: "top" }}>
-            {!!entry?.cost || !!evaluationsCost
-              ? formatMoney({ amount: total, currency: "USD" }, "$0.00[00]")
-              : "-"}
-          </Tooltip>
-        );
+      valueGetter: (p: any) => {
+        const { datasetEntry, evaluationsForEntry } = getRowData(p);
+        const total =
+          (datasetEntry?.cost ?? 0) +
+          (evaluationsForEntry[evaluator]?.cost ?? 0);
+        return total || "-";
       },
+      valueFormatter: (p: any) =>
+        p.value === "-"
+          ? "-"
+          : formatMoney({ amount: p.value, currency: "USD" }, "$0.00[00]"),
       tooltipValueGetter: (p: any) => {
-        const data = p.data as EvaluationRowData;
-        const entry = data.datasetEntry;
-        const evaluation = data.evaluationsForEntry[evaluator];
-        const evaluationsCost = evaluation?.cost ?? 0;
-        const total = (entry?.cost ?? 0) + (evaluationsCost ?? 0);
-
-        return total ? `${total}` : "-";
+        const { datasetEntry, evaluationsForEntry } = getRowData(p);
+        const predCost = datasetEntry?.cost ?? 0;
+        const evalCost = evaluationsForEntry[evaluator]?.cost ?? 0;
+        const total = predCost + evalCost;
+        if (!total) return "-";
+        const fmt = (v: number) =>
+          formatMoney({ amount: v, currency: "USD" }, "$0.00[00]");
+        return `Prediction: ${predCost ? fmt(predCost) : "-"}, Evaluation: ${
+          evalCost ? fmt(evalCost) : "-"
+        }`;
       },
     });
 
@@ -288,128 +265,96 @@ export function BatchEvaluationV2EvaluationResult({
     colDefs.push({
       headerName: "Duration",
       minWidth: 120,
-      cellRenderer: (p: any) => {
-        const data = p.data as EvaluationRowData;
-        const entry = data.datasetEntry;
-        const evaluation = data.evaluationsForEntry[evaluator];
-        const evaluationsDuration = evaluation?.duration ?? 0;
-        const total = (entry?.duration ?? 0) + (evaluationsDuration ?? 0);
-        const content = (
-          <VStack align="start" gap={0}>
-            <Box>
-              Prediction duration:{" "}
-              {entry?.duration ? formatMilliseconds(entry.duration) : "-"}
-            </Box>
-            <Box>
-              Evaluation duration:{" "}
-              {evaluationsDuration
-                ? formatMilliseconds(evaluationsDuration)
-                : "-"}
-            </Box>
-          </VStack>
-        );
-
-        return (
-          <Tooltip content={content} positioning={{ placement: "top" }}>
-            {!!entry?.duration || !!evaluationsDuration
-              ? formatMilliseconds(total)
-              : "-"}
-          </Tooltip>
-        );
+      valueGetter: (p: any) => {
+        const { datasetEntry, evaluationsForEntry } = getRowData(p);
+        const total =
+          (datasetEntry?.duration ?? 0) +
+          (evaluationsForEntry[evaluator]?.duration ?? 0);
+        return total || "-";
       },
+      valueFormatter: (p: any) =>
+        p.value === "-" ? "-" : formatMilliseconds(p.value),
       tooltipValueGetter: (p: any) => {
-        const data = p.data as EvaluationRowData;
-        const entry = data.datasetEntry;
-        const evaluation = data.evaluationsForEntry[evaluator];
-        const evaluationsDuration = evaluation?.duration ?? 0;
-        const total = (entry?.duration ?? 0) + (evaluationsDuration ?? 0);
-
-        return total ? `${total}` : "-";
+        const { datasetEntry, evaluationsForEntry } = getRowData(p);
+        const predDur = datasetEntry?.duration ?? 0;
+        const evalDur = evaluationsForEntry[evaluator]?.duration ?? 0;
+        const total = predDur + evalDur;
+        if (!total) return "-";
+        return `Prediction: ${
+          predDur ? formatMilliseconds(predDur) : "-"
+        }, Evaluation: ${evalDur ? formatMilliseconds(evalDur) : "-"}`;
       },
     });
 
-    // Evaluation Results columns
+    // Evaluation result columns
     Array.from(evaluatorHeaders.evaluationResultsColumns).forEach((column) => {
+      const isDetails = column === "details";
+      const formatEvalValue = (value: any) => {
+        if (value === false) return "false";
+        if (value === true) return "true";
+        return !isNaN(Number(value))
+          ? numeral(Number(value)).format("0.[00]")
+          : value ?? "-";
+      };
+
       colDefs.push({
         headerName: titleCase(column),
-        minWidth: column === "details" ? 240 : 120,
-        cellRenderer: (p: any) => {
-          const data = p.data as EvaluationRowData;
-          const evaluation = data.evaluationsForEntry[evaluator] as
-            | Record<string, any>
-            | undefined;
-          if (column !== "details" && evaluation?.status === "error") {
-            return (
-              <Tooltip
-                content={evaluation?.details}
-                positioning={{ placement: "top" }}
-              >
-                <Box lineClamp={1}>Error</Box>
-              </Tooltip>
-            );
-          }
-          if (column !== "details" && evaluation?.status === "skipped") {
-            return (
-              <Tooltip
-                content={evaluation?.details}
-                positioning={{ placement: "top" }}
-              >
-                <Box lineClamp={1}>Skipped</Box>
-              </Tooltip>
-            );
-          }
-          const value = evaluation?.[column];
-          if (column === "details") {
-            return (
-              <HoverableBigText
-                lineClamp={3}
-                maxWidth="300px"
-                whiteSpace="pre-wrap"
-              >
-                {value}
-              </HoverableBigText>
-            );
-          }
-          if (value === false) return "false";
-          if (value === true) return "true";
-          return !isNaN(Number(value))
-            ? numeral(Number(value)).format("0.[00]")
-            : value ?? "-";
-        },
+        minWidth: isDetails ? 240 : 120,
+        ...(isDetails
+          ? {
+              cellRenderer: (p: any) => {
+                const evaluation = getRowData(p).evaluationsForEntry[
+                  evaluator
+                ] as Record<string, any> | undefined;
+                return (
+                  <HoverableBigText
+                    lineClamp={3}
+                    maxWidth="300px"
+                    whiteSpace="pre-wrap"
+                  >
+                    {evaluation?.[column]}
+                  </HoverableBigText>
+                );
+              },
+            }
+          : {
+              valueGetter: (p: any) => {
+                const evaluation = getRowData(p).evaluationsForEntry[
+                  evaluator
+                ] as Record<string, any> | undefined;
+                if (evaluation?.status === "error") return "Error";
+                if (evaluation?.status === "skipped") return "Skipped";
+                return formatEvalValue(evaluation?.[column]);
+              },
+            }),
         tooltipValueGetter: (p: any) => {
-          const data = p.data as EvaluationRowData;
-          const evaluation = data.evaluationsForEntry[evaluator] as
+          const evaluation = getRowData(p).evaluationsForEntry[evaluator] as
             | Record<string, any>
             | undefined;
-          if (column !== "details" && evaluation?.status === "error")
-            return "Error";
-          if (column !== "details" && evaluation?.status === "skipped")
-            return "Skipped";
-          const value = evaluation?.[column];
-          if (value === false) return "false";
-          if (value === true) return "true";
-          return !isNaN(Number(value))
-            ? numeral(Number(value)).format("0.[00]")
-            : stringify(value ?? "");
+          if (!isDetails && evaluation?.status === "error")
+            return evaluation?.details ?? "Error";
+          if (!isDetails && evaluation?.status === "skipped")
+            return evaluation?.details ?? "Skipped";
+          return formatEvalValue(evaluation?.[column]);
         },
         cellClassRules: {
           "cell-error": (p: any) =>
-            (p.data as EvaluationRowData)?.evaluationsForEntry?.[evaluator]
-              ?.status === "error" && column !== "details",
+            !isDetails &&
+            getRowData(p).evaluationsForEntry[evaluator]?.status === "error",
           "cell-skipped": (p: any) =>
-            (p.data as EvaluationRowData)?.evaluationsForEntry?.[evaluator]
-              ?.status === "skipped" && column !== "details",
+            !isDetails &&
+            getRowData(p).evaluationsForEntry[evaluator]?.status === "skipped",
           "cell-true": (p: any) => {
-            const ev = (p.data as EvaluationRowData)?.evaluationsForEntry?.[
-              evaluator
-            ] as Record<string, unknown> | undefined;
-            return ev ? (ev as any)[column] === true : false;
+            const ev = getRowData(p).evaluationsForEntry[evaluator] as
+              | Record<string, any>
+              | undefined;
+            return ev?.[column] === true;
           },
           "cell-false": (p: any) => {
-            const ev = (p.data as EvaluationRowData)?.evaluationsForEntry?.[
-              evaluator
-            ] as Record<string, unknown> | undefined;
-            return ev ? (ev as any)[column] === false : false;
+            const ev = getRowData(p).evaluationsForEntry[evaluator] as
+              | Record<string, any>
+              | undefined;
+            return ev?.[column] === false;
           },
         },
       });
@@ -424,8 +369,7 @@ export function BatchEvaluationV2EvaluationResult({
         headerName: "Trace",
         minWidth: 90,
         cellRenderer: (p: any) => {
-          const data = p.data as EvaluationRowData;
-          const traceId = data.datasetEntry?.trace_id;
+          const traceId = getRowData(p).datasetEntry?.trace_id;
           return traceId ? (
             <Button
               size="xs"
@@ -448,36 +392,35 @@ export function BatchEvaluationV2EvaluationResult({
     }
 
     return colDefs;
-  };
+  }, [
+    datasetColumns,
+    predictedColumns,
+    results.length,
+    evaluatorHeaders,
+    evaluator,
+    openDrawer,
+    stringify,
+    titleCase,
+    datasetByIndex,
+    formatValue,
+  ]);
 
-  const columnDefs = buildColumnDefs();
-  const rowHeight = size === "sm" ? 28 : 34;
+  const columnDefs = useMemo(() => buildColumnDefs(), [buildColumnDefs]);
 
+  // Auto-scroll to bottom only if user hasn't manually scrolled
   useEffect(() => {
-    const container = containerRef.current;
-    let isAtBottom = true;
-    const scrollParent = container?.parentElement?.parentElement;
+    if (hasScrolled || !gridApiRef.current) return;
 
-    if (scrollParent) {
-      const currentScrollTop = scrollParent.scrollTop;
-      const scrollParentHeight = scrollParent.clientHeight;
-
-      isAtBottom =
-        currentScrollTop + scrollParentHeight + 32 >= scrollParent.scrollHeight;
-    }
-    if ((isAtBottom || (!hasScrolled && !isFinished)) && gridApiRef.current) {
-      const lastIndex = totalRows - 1;
-
-      setTimeout(
-        () => gridApiRef.current?.ensureIndexVisible(lastIndex, "bottom"),
-        100
-      );
-      setTimeout(
-        () => gridApiRef.current?.ensureIndexVisible(lastIndex, "bottom"),
-        1000
-      );
-    }
-  }, [results, isFinished, hasScrolled, totalRows]);
+    const lastIndex = totalRows - 1;
+    setTimeout(
+      () => gridApiRef.current?.ensureIndexVisible(lastIndex, "bottom"),
+      100
+    );
+    setTimeout(
+      () => gridApiRef.current?.ensureIndexVisible(lastIndex, "bottom"),
+      1000
+    );
+  }, [totalRows, hasScrolled]);
 
   return (
     <Box ref={containerRef}>
@@ -486,7 +429,6 @@ export function BatchEvaluationV2EvaluationResult({
         style={{ width: "100%", height: "60vh" }}
       >
         <style>{`
-          /* Remove outer border and radius */
           .ag-theme-balham .ag-root-wrapper { border: none !important; border-radius: 0 !important; box-shadow: none !important; }
           .ag-theme-balham .ag-root-wrapper-body { border-radius: 0 !important; }
           .cell-error { background: rgba(255, 0, 0, 0.2); }
@@ -499,13 +441,10 @@ export function BatchEvaluationV2EvaluationResult({
           columnDefs={columnDefs}
           defaultColDef={defaultColDef}
           rowData={rowData}
-          rowHeight={rowHeight}
-          rowBuffer={100}
-          suppressColumnVirtualisation
-          suppressMovableColumns
-          onGridReady={(p) => {
-            gridApiRef.current = p.api;
-          }}
+          rowHeight={size === "sm" ? 28 : 34}
+          rowBuffer={10}
+          suppressAnimationFrame={false}
+          onGridReady={(p) => (gridApiRef.current = p.api)}
         />
       </div>
     </Box>
