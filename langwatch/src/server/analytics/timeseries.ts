@@ -1,4 +1,7 @@
-import type { AggregationsAggregationContainer } from "@elastic/elasticsearch/lib/api/types";
+import type {
+  AggregationsAggregationContainer,
+  QueryDslBoolQuery,
+} from "@elastic/elasticsearch/lib/api/types";
 import type { SearchRequest } from "@elastic/elasticsearch/lib/api/typesWithBodyKey";
 import { TRPCError } from "@trpc/server";
 import {
@@ -17,6 +20,7 @@ import { prisma } from "../db";
 import { esClient, TRACE_INDEX } from "../elasticsearch";
 import {
   currentVsPreviousDates,
+  generateFilterConditions,
   generateTracesPivotQueryConditions,
 } from "../api/routers/analytics/common";
 import {
@@ -24,6 +28,8 @@ import {
   type PercentileAggregationTypes,
 } from "./types";
 import { env } from "../../env.mjs";
+import type { FilterField } from "../filters/types";
+import type { FilterParam } from "../../hooks/useFilterParams";
 
 const labelsMapping: Partial<
   Record<
@@ -79,7 +85,17 @@ export const timeseries = async (input: TimeseriesInputType) => {
 
   let aggs = Object.fromEntries(
     input.series.flatMap(
-      ({ metric, aggregation, pipeline, key, subkey }: SeriesInputType) => {
+      (
+        {
+          metric,
+          aggregation,
+          pipeline,
+          key,
+          subkey,
+          filters,
+        }: SeriesInputType,
+        index: number
+      ) => {
         const metric_ = getMetric(metric);
 
         if (metric_.requiresKey && !metric_.requiresKey.optional && !key) {
@@ -96,6 +112,7 @@ export const timeseries = async (input: TimeseriesInputType) => {
         }
 
         const metricAggregations = metric_.aggregation(
+          index,
           aggregation,
           key,
           subkey
@@ -106,9 +123,9 @@ export const timeseries = async (input: TimeseriesInputType) => {
         if (pipeline) {
           // Fix needed for OpenSearch, it doesn't support dots in field names when referenced from buckets_path
           const metricWithoutDots = metric.replace(/\./g, "__");
-          const pipelineBucketsPath = `${metricWithoutDots}__${aggregation}__${pipeline.field}`;
+          const pipelineBucketsPath = `${index}__${metricWithoutDots}__${aggregation}__${pipeline.field}`;
           const metricPath = metric_
-            .extractionPath(aggregation, key, subkey)
+            .extractionPath(index, aggregation, key, subkey)
             // Fix for working with percentiles too
             .split(">values")[0]
             ?.replace(/\./g, "__");
@@ -137,6 +154,24 @@ export const timeseries = async (input: TimeseriesInputType) => {
               },
             },
           };
+        }
+
+        if (nonEmptyFilters(filters).length > 0) {
+          aggregationQuery = Object.fromEntries(
+            Object.entries(aggregationQuery).map(([key, value]) => [
+              `${key}__filters`,
+              {
+                filter: {
+                  bool: {
+                    must: generateFilterConditions(filters ?? {}),
+                  } as QueryDslBoolQuery,
+                },
+                aggs: {
+                  [key]: value,
+                },
+              },
+            ])
+          ) as Record<string, AggregationsAggregationContainer>;
         }
 
         return Object.entries(aggregationQuery);
@@ -321,14 +356,32 @@ const extractResultForBucket = (
   bucket: any
 ) => {
   return Object.fromEntries(
-    seriesList.flatMap((series) => {
-      return Object.entries(extractResult(series, pathsAfterBuckets, bucket));
+    seriesList.flatMap((series, index) => {
+      return Object.entries(
+        extractResult(series, index, pathsAfterBuckets, bucket)
+      );
     })
   );
 };
 
+export const nonEmptyFilters = (
+  filters: Partial<Record<FilterField, FilterParam>> | undefined
+) => {
+  if (!filters) {
+    return [];
+  }
+  return Object.values(filters).filter((f) =>
+    typeof f === "string"
+      ? !!f
+      : Array.isArray(f)
+      ? f.length > 0
+      : Object.keys(f).length > 0
+  );
+};
+
 const extractResult = (
-  { metric, aggregation, pipeline, key, subkey }: SeriesInputType,
+  { metric, aggregation, pipeline, key, subkey, filters }: SeriesInputType,
+  index: number,
   pathsAfterBuckets: string | undefined,
   result: any
 ) => {
@@ -342,11 +395,21 @@ const extractResult = (
   }
 
   const metric_ = getMetric(metric);
-  const extractionPath = metric_.extractionPath(aggregation, key, subkey);
+  const extractionPath = metric_.extractionPath(
+    index,
+    aggregation,
+    key,
+    subkey
+  );
   const paths = extractionPath.split(">");
   if (pipeline) {
     const pipelinePath_ = pipelinePath(metric, aggregation, pipeline);
     return { [pipelinePath_]: current[pipelinePath_].value };
+  }
+
+  if (nonEmptyFilters(filters).length > 0) {
+    const firstPath = paths[0];
+    paths.unshift(`${firstPath}__filters`);
   }
 
   for (const path of paths) {
@@ -355,8 +418,11 @@ const extractResult = (
       const hasKeySupport = metric_.requiresKey !== undefined;
       const seriesName =
         key && hasKeySupport
-          ? `${metric}/${aggregation.replace("terms", "cardinality")}/${key}`
-          : `${metric}/${aggregation.replace("terms", "cardinality")}`;
+          ? `${index}/${metric}/${aggregation.replace(
+              "terms",
+              "cardinality"
+            )}/${key}`
+          : `${index}/${metric}/${aggregation.replace("terms", "cardinality")}`;
       return { [seriesName]: 0 };
     }
     current = current[path];
@@ -374,8 +440,11 @@ const extractResult = (
   const hasKeySupport = metric_.requiresKey !== undefined;
   const seriesName =
     key && hasKeySupport
-      ? `${metric}/${aggregation.replace("terms", "cardinality")}/${key}`
-      : `${metric}/${aggregation.replace("terms", "cardinality")}`;
+      ? `${index}/${metric}/${aggregation.replace(
+          "terms",
+          "cardinality"
+        )}/${key}`
+      : `${index}/${metric}/${aggregation.replace("terms", "cardinality")}`;
 
   return {
     [seriesName]: value,

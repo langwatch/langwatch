@@ -139,7 +139,7 @@ export function EditTriggerFilterDrawer({ triggerId }: { triggerId?: string }) {
             helper="Add or remove filters to the trigger."
             minWidth="calc(50% - 16px)"
           >
-            <FieldsFilters />
+            <FieldsFilters isEditMode />
           </HorizontalFormControl>
 
           <HStack justifyContent="flex-end" marginY={5}>

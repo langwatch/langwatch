@@ -18,7 +18,7 @@ import type { UseTRPCQueryResult } from "@trpc/react-query/shared";
 import type { inferRouterOutputs } from "@trpc/server";
 import cloneDeep from "lodash-es/cloneDeep";
 import numeral from "numeral";
-import React, { useEffect, useMemo } from "react";
+import React, { useCallback, useEffect, useMemo } from "react";
 import { ChevronDown, Search, X } from "react-feather";
 import { useDebounceValue } from "usehooks-ts";
 
@@ -39,12 +39,27 @@ import { Tooltip } from "../ui/tooltip";
 import { useDrawer } from "~/components/CurrentDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 
-export function FieldsFilters() {
-  const { nonEmptyFilters } = useFilterParams();
-  const { openDrawer, drawerOpen: isDrawerOpen } = useDrawer();
+export function FieldsFilters({
+  isEditMode,
+  filters,
+  setFilters,
+}: {
+  isEditMode?: boolean;
+  filters?: Record<FilterField, FilterParam>;
+  setFilters?: (filters: Partial<Record<FilterField, FilterParam>>) => void;
+}) {
+  const { filterParams } = useFilterParams();
+  const { openDrawer } = useDrawer();
   const { hasTeamPermission } = useOrganizationTeamProject();
 
-  const isEditMode = isDrawerOpen("editTriggerFilter");
+  const nonEmptyFilters = Object.values(filters ?? filterParams.filters).filter(
+    (f) =>
+      typeof f === "string"
+        ? !!f
+        : Array.isArray(f)
+        ? f.length > 0
+        : Object.keys(f).length > 0
+  );
 
   const filterKeys: FilterField[] = [
     "metadata.prompt_ids",
@@ -63,7 +78,7 @@ export function FieldsFilters() {
     "annotations.hasAnnotation",
   ];
 
-  const filters: [FilterField, FilterDefinition][] = filterKeys.map((id) => [
+  const allFilters: [FilterField, FilterDefinition][] = filterKeys.map((id) => [
     id,
     availableFilters[id],
   ]);
@@ -90,8 +105,14 @@ export function FieldsFilters() {
         )}
       </HStack>
       <VStack gap={3} width="full">
-        {filters.map(([id, filter]) => (
-          <FieldsFilter key={id} filterId={id} filter={filter} />
+        {allFilters.map(([id, filter]) => (
+          <FieldsFilter
+            key={id}
+            filterId={id}
+            filter={filter}
+            filters={filters}
+            setFilters={setFilters}
+          />
         ))}
       </VStack>
     </VStack>
@@ -101,13 +122,34 @@ export function FieldsFilters() {
 function FieldsFilter({
   filterId,
   filter,
+  filters: propFilters,
+  setFilters: propSetFilters,
 }: {
   filterId: FilterField;
   filter: FilterDefinition;
+  filters?: Record<FilterField, FilterParam>;
+  setFilters?: (filters: Partial<Record<FilterField, FilterParam>>) => void;
 }) {
   const gray400 = useColorRawValue("gray.400");
 
-  const { setFilter, filters } = useFilterParams();
+  const { setFilter: setQueryFilter, filters: queryFilters } =
+    useFilterParams();
+
+  const setFilter = useCallback(
+    (filterId: FilterField, values: FilterParam) => {
+      if (propSetFilters) {
+        propSetFilters({ ...propFilters, [filterId]: values });
+      } else {
+        setQueryFilter(filterId, values);
+      }
+    },
+    [propSetFilters, setQueryFilter, propFilters]
+  );
+
+  const filters = useMemo(
+    () => propFilters ?? queryFilters,
+    [propFilters, queryFilters]
+  );
 
   const searchRef = React.useRef<HTMLInputElement | null>(null);
   const [query, setQuery] = useDebounceValue("", 300);
@@ -210,6 +252,7 @@ function FieldsFilter({
                   filterId,
                 ]}
                 paddingX={4}
+                setFilter={setFilter}
               />
             )}
           </Popover.Body>
@@ -225,15 +268,15 @@ function NestedListSelection({
   keysAhead,
   keysBefore = [],
   paddingX = 0,
+  setFilter,
 }: {
   query: string;
   current: FilterParam;
   keysAhead: FilterField[];
   keysBefore?: string[];
   paddingX?: number;
+  setFilter: (filterId: FilterField, values: FilterParam) => void;
 }) {
-  const { setFilter } = useFilterParams();
-
   const filterId = keysAhead[0];
   if (!filterId) {
     console.warn("NestedListSelection called with empty keysAhead");
@@ -309,6 +352,7 @@ function NestedListSelection({
                   current={current}
                   keysAhead={keysAhead.slice(1)}
                   keysBefore={[...keysBefore, key]}
+                  setFilter={setFilter}
                 />
               );
             },
@@ -354,29 +398,6 @@ function ListSelection({
     }
   );
 
-  if (
-    filter.type === "numeric" &&
-    keys?.[0] == "thumbs_up_down" &&
-    keys?.[1] == "vote"
-  ) {
-    return (
-      <ThumbsUpDownVoteFilter
-        currentValues={currentValues}
-        onChange={onChange}
-      />
-    );
-  }
-
-  if (filter.type === "numeric") {
-    return (
-      <RangeFilter
-        filterData={filterData}
-        currentValues={currentValues}
-        onChange={onChange}
-      />
-    );
-  }
-
   const options = useMemo(() => {
     return filterData.data?.options
       .sort((a, b) => (a.count > b.count ? -1 : 1))
@@ -400,6 +421,29 @@ function ListSelection({
 
   const isEmpty = options && options.length === 0;
 
+  if (
+    filter.type === "numeric" &&
+    keys?.[0] == "thumbs_up_down" &&
+    keys?.[1] == "vote"
+  ) {
+    return (
+      <ThumbsUpDownVoteFilter
+        currentValues={currentValues}
+        onChange={onChange}
+      />
+    );
+  }
+
+  if (filter.type === "numeric") {
+    return (
+      <RangeFilter
+        filterData={filterData}
+        currentValues={currentValues}
+        onChange={onChange}
+      />
+    );
+  }
+
   return (
     <Box
       width="full"
@@ -421,6 +465,7 @@ function ListSelection({
         position="relative"
       >
         {virtualizer.getVirtualItems().map((virtualItem) => {
+          // eslint-disable-next-line prefer-const
           let { field, label, count } = options?.[virtualItem.index] ?? {
             field: "",
             label: "",

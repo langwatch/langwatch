@@ -160,14 +160,6 @@ export const useFilterParams = () => {
     return filterParams;
   };
 
-  const nonEmptyFilters = Object.values(filterParams.filters).filter((f) =>
-    typeof f === "string"
-      ? !!f
-      : Array.isArray(f)
-      ? f.length > 0
-      : Object.keys(f).length > 0
-  );
-
   return {
     filters,
     setFilter,
@@ -175,7 +167,7 @@ export const useFilterParams = () => {
     clearFilters,
     getLatestFilters,
     filterParams,
-    nonEmptyFilters,
+    nonEmptyFilters: nonEmptyFilters(filterParams.filters),
     queryOpts: {
       enabled: !!project && !!startDate && !!endDate,
       refetchOnMount: false,
@@ -187,4 +179,16 @@ export const useFilterParams = () => {
       },
     },
   };
+};
+
+export const nonEmptyFilters = (
+  filters: Partial<Record<FilterField, FilterParam>>
+) => {
+  return Object.values(filters).filter((f) =>
+    typeof f === "string"
+      ? !!f
+      : Array.isArray(f)
+      ? f.length > 0
+      : Object.keys(f).length > 0
+  );
 };

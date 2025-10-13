@@ -253,15 +253,16 @@ const CustomGraph_ = React.memo(
       });
 
     const seriesByKey = Object.fromEntries(
-      input.series.map((series) => {
+      input.series.map((series, index) => {
         const key = [
+          index,
           series.metric,
           series.aggregation,
           series.pipeline?.field,
           series.pipeline?.aggregation,
           series.key,
         ]
-          .filter((x) => x)
+          .filter((x) => x !== undefined)
           .join("/");
 
         return [key, series];
