@@ -400,7 +400,7 @@ function ListSelection({
 
   const options = useMemo(() => {
     return filterData.data?.options
-      .sort((a, b) => (a.count > b.count ? -1 : 1))
+      .toSorted((a, b) => (a.count > b.count ? -1 : 1))
       .filter((option) => {
         if (query) {
           return option.label.toLowerCase().includes(query.toLowerCase());

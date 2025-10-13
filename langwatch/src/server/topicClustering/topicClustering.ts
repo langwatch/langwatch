@@ -341,7 +341,7 @@ export const clusterTopicsForProject = async (
 
   // If results are not close to empty, schedule the seek for next page
   if (result.hits.hits.length > 10) {
-    const lastTraceSort = result.hits.hits.reverse()[0]?.sort as
+    const lastTraceSort = result.hits.hits.toReversed()[0]?.sort as
       | [number, string]
       | undefined;
     if (lastTraceSort) {

@@ -380,9 +380,9 @@ const processCollectorJob_ = async (
     metrics: computeTraceMetrics(uniqueSpans), // Use uniqueSpans for accurate total_cost calculation
     error,
     indexing_md5s: [...(existingTrace?.indexing_md5s ?? []), paramsMD5]
-      .reverse()
+      .toReversed()
       .slice(0, 10)
-      .reverse(),
+      .toReversed(),
   };
 
   if (

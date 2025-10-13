@@ -129,7 +129,7 @@ export const timeseries = async (input: TimeseriesInputType) => {
             // Fix for working with percentiles too
             .split(">values")[0]
             ?.replace(/\./g, "__");
-          const pipelinePath_ = pipelinePath(metric, aggregation, pipeline);
+          const pipelinePath_ = pipelinePath(index, metric, aggregation, pipeline);
 
           aggregationQuery = {
             [pipelineBucketsPath]: {
@@ -403,7 +403,7 @@ const extractResult = (
   );
   const paths = extractionPath.split(">");
   if (pipeline) {
-    const pipelinePath_ = pipelinePath(metric, aggregation, pipeline);
+    const pipelinePath_ = pipelinePath(index, metric, aggregation, pipeline);
     return { [pipelinePath_]: current[pipelinePath_].value };
   }
 
@@ -452,7 +452,8 @@ const extractResult = (
 };
 
 const pipelinePath = (
+  index: number,
   metric: SeriesInputType["metric"],
   aggregation: SeriesInputType["aggregation"],
   pipeline: Required<SeriesInputType>["pipeline"]
-) => `${metric}/${aggregation}/${pipeline.field}/${pipeline.aggregation}`;
+) => `${index}/${metric}/${aggregation}/${pipeline.field}/${pipeline.aggregation}`;

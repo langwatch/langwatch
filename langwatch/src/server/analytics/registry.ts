@@ -282,28 +282,27 @@ export const analyticsMetrics = {
                     return promptTokens + completionTokens;
                   `;
         return {
-          [`${index}__total_tokens_${aggregation}`]: percentileAggregationTypes.includes(
-            aggregation as any
-          )
-            ? {
-                percentiles: {
-                  script: {
-                    source: totalTokensScript,
-                  },
-                  percents: [
-                    percentileToPercent[
-                      aggregation as PercentileAggregationTypes
+          [`${index}__total_tokens_${aggregation}`]:
+            percentileAggregationTypes.includes(aggregation as any)
+              ? {
+                  percentiles: {
+                    script: {
+                      source: totalTokensScript,
+                    },
+                    percents: [
+                      percentileToPercent[
+                        aggregation as PercentileAggregationTypes
+                      ],
                     ],
-                  ],
-                },
-              }
-            : {
-                [aggregation]: {
-                  script: {
-                    source: totalTokensScript,
+                  },
+                }
+              : {
+                  [aggregation]: {
+                    script: {
+                      source: totalTokensScript,
+                    },
                   },
                 },
-              },
         };
       },
       quickwitSupport: false,
@@ -483,7 +482,12 @@ export const analyticsMetrics = {
           },
         };
       },
-      extractionPath: (index: number, aggregation: AggregationTypes, key, subkey) => {
+      extractionPath: (
+        index: number,
+        aggregation: AggregationTypes,
+        key,
+        subkey
+      ) => {
         return `${index}__event_score_${aggregation}_${key}_${subkey}>child>child>child>child`;
       },
       quickwitSupport: false,
@@ -548,7 +552,12 @@ export const analyticsMetrics = {
           },
         };
       },
-      extractionPath: (index: number, aggregation: AggregationTypes, key, subkey) => {
+      extractionPath: (
+        index: number,
+        aggregation: AggregationTypes,
+        key,
+        subkey
+      ) => {
         return `${index}__event_score_${aggregation}_${key}_${subkey}>child>child>child>child`;
       },
       quickwitSupport: false,
@@ -739,11 +748,12 @@ export const analyticsMetrics = {
         },
         [`${index}__average_duration_per_thread_avg`]: {
           avg_bucket: {
-            buckets_path: "thread_sessions>session_duration.value",
+            buckets_path: `${index}__thread_sessions>session_duration.value`,
           },
         },
       }),
-      extractionPath: (index: number) => `${index}__average_duration_per_thread_avg`,
+      extractionPath: (index: number) =>
+        `${index}__average_duration_per_thread_avg`,
       quickwitSupport: false,
     },
   },
