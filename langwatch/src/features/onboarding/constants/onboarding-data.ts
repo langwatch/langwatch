@@ -19,35 +19,32 @@ import {
   ChefHat,
   Kayak,
   BadgeQuestionMark,
+  HatGlasses,
 } from "lucide-react";
 import type { IconFormItem } from "../types/types";
 
 export const usageStyleItems: IconFormItem[] = [
   {
     title: "Company",
-    value: "company",
+    value: "For my company",
     icon: Building2,
   },
   {
     title: "Clients",
-    value: "clients",
+    value: "For my clients",
     icon: Presentation,
   },
   {
     title: "Myself",
-    value: "myself",
+    value: "For myself",
     icon: User,
   },
 ];
 
 export const companySizeItems = [
   {
-    title: "Starting out",
-    value: "starting_out",
-  },
-  {
-    title: "2-10",
-    value: "2_to_10",
+    title: "1-10",
+    value: "1_to_10",
   },
   {
     title: "11-50",
@@ -62,28 +59,37 @@ export const companySizeItems = [
     value: "201_to_1000",
   },
   {
-    title: "1000+",
-    value: "1000_plus",
+    title: "1000-5000",
+    value: "1000_to_5000",
+  },
+  {
+    title: "5000+",
+    value: "5000_plus",
   },
 ];
 
 export const solutionTypeItems: IconFormItem[] = [
   {
     title: "Cloud",
-    value: "cloud",
+    value: "SaaS",
     icon: Cloud,
   },
   {
     title: "On Premise",
-    value: "on_premise",
+    value: "On-Premise",
     icon: Server,
   },
 ];
 
 export const desireItems: IconFormItem[] = [
   {
-    title: "Evaluation",
-    value: "evaluation",
+    title: "Agent Simulations",
+    value: "agent_simulations",
+    icon: HatGlasses,
+  },
+  {
+    title: "Evaluations",
+    value: "evaluations",
     icon: Gavel,
   },
   {
@@ -107,7 +113,7 @@ export const desireItems: IconFormItem[] = [
     icon: LifeBuoy,
   },
   {
-    title: "Annotation",
+    title: "Annotation & Collaboration",
     value: "annotation",
     icon: StickyNote,
   },
@@ -155,8 +161,8 @@ export const roleItems: IconFormItem[] = [
     icon: PencilRuler,
   },
   {
-    title: "CTO/Founder",
-    value: "cto_founder",
+    title: "CTO/C-Level",
+    value: "cto_c_level",
     icon: ChefHat,
   },
   {
