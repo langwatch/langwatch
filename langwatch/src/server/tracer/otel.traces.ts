@@ -516,10 +516,10 @@ const addOpenTelemetrySpanAsSpan = (
             case Array.isArray(completion):
               output = {
                 type: "chat_messages",
-                value: completion as ChatMessage[],
+                value: completion,
               };
               break;
-            case typeof completion === "object":
+            case typeof completion === "object" && completion !== null:
               if (completion.text) {
                 output = {
                   type: "text",
@@ -536,6 +536,7 @@ const addOpenTelemetrySpanAsSpan = (
               };
               break;
           }
+          delete attributesMap.gen_ai.completion;
         }
 
         if (
