@@ -12,16 +12,46 @@ import { LoadingScreen } from "../../../components/LoadingScreen";
 import useAutosaveWizard from "../../../components/evaluations/wizard/hooks/useAutosaveWizard";
 import { useInitialLoadExperiment } from "../../../components/evaluations/wizard/hooks/useInitialLoadExperiment";
 import { CurrentDrawer } from "../../../components/CurrentDrawer";
+import { useLocalStorageSelectedDataSetId } from "../../../hooks/useLocalStorageSelectedDataSetId";
 
 export default function EvaluationWizard() {
   const { open, setOpen } = useDisclosure();
   const router = useRouter();
   const { project } = useOrganizationTeamProject();
+  const { setSelectedDataSetId, clear: clearSelectedDataSetId } =
+    useLocalStorageSelectedDataSetId();
 
   useEffect(() => {
     setOpen(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  const { setWizardState } = useEvaluationWizardStore(
+    useShallow((state) => ({
+      setWizardState: state.setWizardState,
+    }))
+  );
+
+  // Handle dataset preselection from URL parameter
+  useEffect(() => {
+    const datasetId = router.query.datasetId as string | undefined;
+    const experimentSlug = router.query.slug as string | undefined;
+
+    // Only preselect dataset if not loading an existing experiment
+    if (datasetId && !experimentSlug) {
+      void setSelectedDataSetId(datasetId);
+      // Also pre-select offline evaluation task and navigate to dataset step
+      setWizardState({
+        task: "llm_app",
+        step: "dataset",
+      });
+    }
+  }, [
+    router.query.datasetId,
+    router.query.slug,
+    setSelectedDataSetId,
+    setWizardState,
+  ]);
 
   useAutosaveWizard();
 
@@ -41,6 +71,7 @@ export default function EvaluationWizard() {
     return () => {
       skipNextAutosave();
       reset();
+      clearSelectedDataSetId();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
