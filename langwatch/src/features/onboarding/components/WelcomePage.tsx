@@ -9,6 +9,7 @@ import { motion, AnimatePresence } from "motion/react";
 import React from "react";
 import { api } from "~/utils/api";
 import { toaster } from "~/components/ui/toaster";
+import { trackEventOnce } from "~/utils/tracking";
 
 export const WelcomePage: React.FC = () => {
   const { isLoading: organizationIsLoading } = useOrganizationTeamProject({
@@ -54,6 +55,7 @@ export const WelcomePage: React.FC = () => {
 
   function handleFinalizeSubmit() {
     const form = getFormData();
+
     initializeOrganization.mutate(
       {
         orgName: form.organizationName ?? "",
@@ -70,7 +72,11 @@ export const WelcomePage: React.FC = () => {
       },
       {
         onSuccess: (response) => {
-          // window.location.href = `/${response.projectSlug}/messages`;
+          trackEventOnce("organization_initialized", {
+            category: "onboarding",
+            label: "organization_onboarding_completed",
+          });
+          window.location.href = `/${response.projectSlug}/messages`;
         },
         onError: () => {
           toaster.create({
