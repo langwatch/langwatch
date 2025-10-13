@@ -504,6 +504,7 @@ const addOpenTelemetrySpanAsSpan = (
         }
 
         if (!output && attributesMap.gen_ai?.completion) {
+        if (!output && attributesMap.gen_ai?.completion) {
           const completion = attributesMap.gen_ai?.completion;
 
           switch (true) {
@@ -512,31 +513,51 @@ const addOpenTelemetrySpanAsSpan = (
                 type: "text",
                 value: completion,
               };
+              delete attributesMap.gen_ai.completion;
               break;
             case Array.isArray(completion):
-              output = {
-                type: "chat_messages",
-                value: completion,
-              };
+              // Validate as chat_messages with strict schema
+              const output_ = z
+                .object({
+                  type: z.literal("chat_messages"),
+                  value: z.array(chatMessageSchema.strict()),
+                })
+                .safeParse({
+                  type: "chat_messages",
+                  value: completion,
+                });
+
+              if (
+                output_.success &&
+                output_.data.value.length > 0 &&
+                Object.keys(output_.data.value[0]!).length > 0
+              ) {
+                output = output_.data as TypedValueChatMessages;
+              } else {
+                output = {
+                  type: "json",
+                  value: completion,
+                };
+              }
+              delete attributesMap.gen_ai.completion;
               break;
-            case typeof completion === "object" && completion !== null:
+            case typeof completion === "object":
               if (completion.text) {
                 output = {
                   type: "text",
                   value: completion.text,
                 };
+                delete attributesMap.gen_ai.completion;
                 break;
               }
-            // fallthrough
-
-            default:
+              // If no text property, treat as generic json
               output = {
                 type: "json",
                 value: completion,
               };
+              delete attributesMap.gen_ai.completion;
               break;
           }
-          delete attributesMap.gen_ai.completion;
         }
 
         if (
