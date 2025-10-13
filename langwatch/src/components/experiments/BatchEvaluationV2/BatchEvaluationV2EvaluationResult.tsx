@@ -1,436 +1,36 @@
-import { Box, Button, HStack, Table, VStack } from "@chakra-ui/react";
+import { Box, Button } from "@chakra-ui/react";
 import numeral from "numeral";
-import { useEffect, useRef } from "react";
-import { Tooltip } from "../../../components/ui/tooltip";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ESBatchEvaluation } from "../../../server/experiments/types";
 import { formatMilliseconds } from "../../../utils/formatMilliseconds";
 import { formatMoney } from "../../../utils/formatMoney";
 import { useDrawer } from "../../CurrentDrawer";
 import { ExternalImage, getImageUrl } from "../../ExternalImage";
 import { HoverableBigText } from "../../HoverableBigText";
+import { ExpandedTextDialog } from "../../HoverableBigText";
+import { AgGridReact } from "@ag-grid-community/react";
+import type {
+  ColDef,
+  ColGroupDef,
+  GridApi,
+  GridOptions,
+  CellClickedEvent,
+} from "@ag-grid-community/core";
+import { ClientSideRowModelModule } from "@ag-grid-community/client-side-row-model";
+import { ModuleRegistry } from "@ag-grid-community/core";
+import { getEvaluationColumns } from "./utils";
+import "@ag-grid-community/styles/ag-grid.css";
+import "@ag-grid-community/styles/ag-theme-balham.css";
 
-type RenderableRow = {
-  render: () => React.ReactNode;
-  value: () => string;
-};
+ModuleRegistry.registerModules([ClientSideRowModelModule]);
 
-type EvaluationResultsTableRow = {
-  datasetColumns: RenderableRow[];
-  predictedColumns: RenderableRow[];
-  cost: RenderableRow;
-  duration: RenderableRow;
-  evaluationsColumns: Record<
-    string,
-    {
-      evaluationInputs: RenderableRow[];
-      evaluationResults: RenderableRow[];
-    }
-  >;
-};
-
-const evaluationResultsTableRow = (
-  datasetEntry: ESBatchEvaluation["dataset"][number] | undefined,
+type EvaluationRowData = {
+  rowNumber: number;
+  datasetEntry?: ESBatchEvaluation["dataset"][number];
   evaluationsForEntry: Record<
     string,
     ESBatchEvaluation["evaluations"][number] | undefined
-  >,
-  datasetColumns: Set<string>,
-  predictedColumns: Record<string, Set<string>>,
-  evaluationColumns: Record<
-    string,
-    {
-      evaluationInputsColumns: Set<string>;
-      evaluationResultsColumns: Set<string>;
-    }
-  >
-): EvaluationResultsTableRow => {
-  const evaluationsCost = Object.values(evaluationsForEntry).reduce(
-    (acc, curr) => (acc ?? 0) + (curr?.cost ?? 0),
-    0
-  );
-  const evaluationsDuration = Object.values(evaluationsForEntry).reduce(
-    (acc, curr) => (acc ?? 0) + (curr?.duration ?? 0),
-    0
-  );
-
-  const stringify = (value: any) =>
-    typeof value === "object" ? JSON.stringify(value) : `${value}`;
-
-  return {
-    datasetColumns: Array.from(datasetColumns).map((column) => ({
-      render: () => (
-        <Table.Cell key={`dataset-${column}`} maxWidth="250px">
-          {datasetEntry && getImageUrl(datasetEntry.entry[column]) ? (
-            <ExternalImage
-              src={getImageUrl(datasetEntry.entry[column])!}
-              minWidth="24px"
-              minHeight="24px"
-              maxHeight="120px"
-              maxWidth="100%"
-            />
-          ) : datasetEntry?.entry?.[column] !== undefined &&
-            datasetEntry?.entry?.[column] !== null ? (
-            <HoverableBigText>
-              {stringify(datasetEntry.entry[column])}
-            </HoverableBigText>
-          ) : (
-            "-"
-          )}
-        </Table.Cell>
-      ),
-      value: () => stringify(datasetEntry?.entry[column]),
-    })),
-    predictedColumns: Object.entries(predictedColumns).flatMap(
-      ([node, columns]) =>
-        Array.from(columns).map((column) => ({
-          render: () => {
-            if (datasetEntry?.error) {
-              return (
-                <Table.Cell key={`predicted-${column}`} background="red.200">
-                  <Tooltip
-                    content={datasetEntry.error}
-                    positioning={{ placement: "top" }}
-                  >
-                    <Box lineClamp={1}>Error</Box>
-                  </Tooltip>
-                </Table.Cell>
-              );
-            }
-
-            let value = datasetEntry?.predicted?.[node]?.[column];
-            if (value === undefined && node === "end") {
-              value = datasetEntry?.predicted?.[column];
-            }
-
-            return (
-              <Table.Cell key={`predicted-${node}-${column}`} maxWidth="250px">
-                {value !== undefined && value !== null ? (
-                  <HoverableBigText>{stringify(value)}</HoverableBigText>
-                ) : (
-                  "-"
-                )}
-              </Table.Cell>
-            );
-          },
-          value: () => {
-            let value = datasetEntry?.predicted?.[node]?.[column];
-            if (value === undefined && node === "end") {
-              value = datasetEntry?.predicted?.[column];
-            }
-            return stringify(value);
-          },
-        }))
-    ),
-    cost: {
-      render: () => (
-        <Table.Cell whiteSpace="nowrap">
-          <Tooltip
-            content={
-              <VStack align="start" gap={0}>
-                <Box>Prediction cost: {datasetEntry?.cost ?? "-"}</Box>
-                <Box>Evaluation cost: {evaluationsCost ?? "-"}</Box>
-              </VStack>
-            }
-            positioning={{ placement: "top" }}
-          >
-            {!!datasetEntry?.cost || !!evaluationsCost
-              ? formatMoney(
-                  {
-                    amount: (datasetEntry?.cost ?? 0) + (evaluationsCost ?? 0),
-                    currency: "USD",
-                  },
-                  "$0.00[00]"
-                )
-              : "-"}
-          </Tooltip>
-        </Table.Cell>
-      ),
-      value: () => datasetEntry?.cost?.toString() ?? "",
-    },
-    duration: {
-      render: () => (
-        <Table.Cell>
-          <Tooltip
-            content={
-              <VStack align="start" gap={0}>
-                <Box>
-                  Prediction duration:{" "}
-                  {datasetEntry?.duration
-                    ? formatMilliseconds(datasetEntry.duration)
-                    : "-"}
-                </Box>
-                <Box>
-                  Evaluation duration:{" "}
-                  {evaluationsDuration
-                    ? formatMilliseconds(evaluationsDuration)
-                    : "-"}
-                </Box>
-              </VStack>
-            }
-            positioning={{ placement: "top" }}
-          >
-            {!!datasetEntry?.duration || !!evaluationsDuration
-              ? formatMilliseconds(
-                  (datasetEntry?.duration ?? 0) + (evaluationsDuration ?? 0)
-                )
-              : "-"}
-          </Tooltip>
-        </Table.Cell>
-      ),
-      value: () => datasetEntry?.duration?.toString() ?? "",
-    },
-    evaluationsColumns: Object.fromEntries(
-      Object.entries(evaluationColumns).map(
-        ([
-          evaluator,
-          { evaluationInputsColumns, evaluationResultsColumns },
-        ]) => {
-          const evaluation = evaluationsForEntry[evaluator];
-
-          return [
-            evaluator,
-            {
-              evaluationCost: {
-                render: () => <Table.Cell>{evaluation?.cost}</Table.Cell>,
-                value: () => evaluation?.cost?.toString() ?? "",
-              },
-              evaluationInputs: Array.from(evaluationInputsColumns).map(
-                (column) => ({
-                  render: () =>
-                    datasetEntry?.error ? (
-                      <Table.Cell
-                        key={`evaluation-entry-${column}`}
-                        background="red.200"
-                      >
-                        <Tooltip
-                          content={datasetEntry.error}
-                          positioning={{ placement: "top" }}
-                        >
-                          <Box lineClamp={1}>Error</Box>
-                        </Tooltip>
-                      </Table.Cell>
-                    ) : (
-                      <Table.Cell
-                        key={`evaluation-entry-${column}`}
-                        maxWidth="250px"
-                      >
-                        {evaluation ? (
-                          <HoverableBigText>
-                            {stringify(evaluation.inputs?.[column] ?? "-")}
-                          </HoverableBigText>
-                        ) : (
-                          "-"
-                        )}
-                      </Table.Cell>
-                    ),
-                  value: () => evaluation?.inputs?.[column] ?? "",
-                })
-              ),
-              evaluationResults: Array.from(evaluationResultsColumns).map(
-                (column) => ({
-                  render: () => {
-                    if (
-                      column !== "details" &&
-                      evaluation?.status === "error"
-                    ) {
-                      return (
-                        <Table.Cell
-                          key={`evaluation-result-${column}`}
-                          background="red.200"
-                        >
-                          <Tooltip
-                            content={evaluation.details}
-                            positioning={{ placement: "top" }}
-                          >
-                            <Box lineClamp={1}>Error</Box>
-                          </Tooltip>
-                        </Table.Cell>
-                      );
-                    }
-
-                    if (
-                      column !== "details" &&
-                      evaluation?.status === "skipped"
-                    ) {
-                      return (
-                        <Table.Cell
-                          key={`evaluation-result-${column}`}
-                          background="yellow.100"
-                        >
-                          <Tooltip
-                            content={evaluation.details}
-                            positioning={{ placement: "top" }}
-                          >
-                            <Box lineClamp={1}>Skipped</Box>
-                          </Tooltip>
-                        </Table.Cell>
-                      );
-                    }
-
-                    const value = (
-                      evaluation as Record<string, any> | undefined
-                    )?.[column];
-                    return (
-                      <Table.Cell
-                        key={`evaluation-result-${column}`}
-                        background={
-                          value === false
-                            ? "red.100"
-                            : value === true
-                            ? "green.100"
-                            : "none"
-                        }
-                      >
-                        {column === "details" ? (
-                          <HoverableBigText
-                            lineClamp={3}
-                            maxWidth="300px"
-                            whiteSpace="pre-wrap"
-                          >
-                            {value}
-                          </HoverableBigText>
-                        ) : value === false ? (
-                          "false"
-                        ) : value === true ? (
-                          "true"
-                        ) : !isNaN(Number(value)) ? (
-                          numeral(Number(value)).format("0.[00]")
-                        ) : (
-                          value ?? "-"
-                        )}
-                      </Table.Cell>
-                    );
-                  },
-                  value: () => {
-                    if (
-                      column !== "details" &&
-                      evaluation?.status === "error"
-                    ) {
-                      return "Error";
-                    }
-
-                    if (
-                      column !== "details" &&
-                      evaluation?.status === "skipped"
-                    ) {
-                      return "Skipped";
-                    }
-
-                    const value = (
-                      evaluation as Record<string, any> | undefined
-                    )?.[column];
-
-                    return column === "details"
-                      ? value
-                      : value === false
-                      ? "false"
-                      : value === true
-                      ? "true"
-                      : !isNaN(Number(value))
-                      ? numeral(Number(value)).format("0.[00]")
-                      : value ?? "";
-                  },
-                })
-              ),
-            },
-          ];
-        }
-      )
-    ),
-  };
-};
-
-export const evaluationResultsTableData = (
-  resultsByEvaluator: Record<string, ESBatchEvaluation["evaluations"]>,
-  datasetByIndex: Record<number, ESBatchEvaluation["dataset"][number]>,
-  datasetColumns: Set<string>,
-  predictedColumns: Record<string, Set<string>>
-) => {
-  const evaluationColumns = Object.fromEntries(
-    Object.entries(resultsByEvaluator).map(([evaluator, results]) => [
-      evaluator,
-      getEvaluationColumns(results),
-    ])
-  );
-
-  const totalRows = Math.max(
-    ...Object.values(datasetByIndex).map((d) => d.index + 1)
-  );
-
-  return {
-    headers: {
-      datasetColumns,
-      predictedColumns,
-      cost: "Cost",
-      duration: "Duration",
-      evaluationColumns,
-    },
-    rows: Array.from({ length: totalRows }).map((_, index) => {
-      const datasetEntry = datasetByIndex[index];
-      const evaluationsForEntry = Object.fromEntries(
-        Object.entries(resultsByEvaluator).map(([evaluator, results]) => [
-          evaluator,
-          results.find((r) => r.index === index),
-        ])
-      );
-
-      return evaluationResultsTableRow(
-        datasetEntry,
-        evaluationsForEntry,
-        datasetColumns,
-        predictedColumns,
-        evaluationColumns
-      );
-    }),
-  };
-};
-
-const getEvaluationColumns = (
-  results: ESBatchEvaluation["evaluations"]
-): {
-  evaluationInputsColumns: Set<string>;
-  evaluationResultsColumns: Set<string>;
-} => {
-  const evaluationInputsColumns = new Set(
-    results.flatMap((result) => Object.keys(result.inputs ?? {}))
-  );
-  const evaluatorResultsColumnsMap = {
-    passed: false,
-    score: false,
-    label: false,
-    details: false,
-  };
-  for (const result of results) {
-    if (result.score !== undefined && result.score !== null) {
-      evaluatorResultsColumnsMap.score = true;
-    }
-    if (result.passed !== undefined && result.passed !== null) {
-      evaluatorResultsColumnsMap.passed = true;
-    }
-    if (result.label !== undefined && result.label !== null) {
-      evaluatorResultsColumnsMap.label = true;
-    }
-    if (result.details !== undefined && result.details !== null) {
-      evaluatorResultsColumnsMap.details = true;
-    }
-  }
-  if (
-    !evaluatorResultsColumnsMap.passed &&
-    !evaluatorResultsColumnsMap.score &&
-    !evaluatorResultsColumnsMap.label
-  ) {
-    evaluatorResultsColumnsMap.score = true;
-  }
-  const evaluationResultsColumns = new Set(
-    Object.entries(evaluatorResultsColumnsMap)
-      .filter(([_key, value]) => value)
-      .map(([key]) => key)
-  );
-
-  return {
-    evaluationInputsColumns,
-    evaluationResultsColumns,
-  };
+  >;
 };
 
 export function BatchEvaluationV2EvaluationResult({
@@ -439,10 +39,9 @@ export function BatchEvaluationV2EvaluationResult({
   datasetByIndex,
   datasetColumns,
   predictedColumns,
-  isFinished,
+  isFinished: _isFinished,
   size = "md",
-  hasScrolled,
-  workflowId,
+  workflowId: _workflowId,
 }: {
   evaluator: string;
   results: ESBatchEvaluation["evaluations"];
@@ -451,208 +50,531 @@ export function BatchEvaluationV2EvaluationResult({
   predictedColumns: Record<string, Set<string>>;
   isFinished: boolean;
   size?: "sm" | "md";
-  hasScrolled: boolean;
   workflowId: string | null;
 }) {
-  const tableData = evaluationResultsTableData(
-    { [evaluator]: results },
-    datasetByIndex,
-    datasetColumns,
-    predictedColumns
-  );
-  const evaluatorHeaders = tableData.headers.evaluationColumns[evaluator]!;
-
-  // Scroll to the bottom on rerender if component was at the bottom previously
+  const evaluatorHeaders = getEvaluationColumns(results);
   const containerRef = useRef<HTMLDivElement>(null);
+  const gridApiRef = useRef<GridApi | null>(null);
+  const isPinnedToBottomRef = useRef(true);
+  const detachViewportScrollListenerRef = useRef<(() => void) | null>(null);
+  const { openDrawer } = useDrawer();
+  const [expandedText, setExpandedText] = useState<string | undefined>(void 0);
+
+  const totalRows = Math.max(
+    ...Object.values(datasetByIndex).map((d) => d.index + 1)
+  );
+
+  // Row data
+  const rowData = useMemo(
+    () =>
+      Array.from({ length: totalRows }).map((_, index) => ({
+        rowNumber: index + 1,
+        datasetEntry: datasetByIndex[index],
+        evaluationsForEntry: {
+          [evaluator]: results.find((r) => r.index === index),
+        },
+      })),
+    [totalRows, datasetByIndex, evaluator, results]
+  );
+
+  // Grid configuration
+  const gridOptions: GridOptions = useMemo(
+    () => ({
+      getRowId: (params) =>
+        String((params.data as EvaluationRowData).rowNumber),
+      suppressRowClickSelection: true,
+      reactiveCustomComponents: true,
+      ensureDomOrder: true,
+    }),
+    []
+  );
+
+  const defaultColDef: ColDef = useMemo(
+    () => ({
+      initialWidth: 160,
+      resizable: true,
+      sortable: false,
+      suppressMenu: true,
+      wrapText: false,
+      suppressMovable: true,
+    }),
+    []
+  );
+
+  // Column definitions builder
+  const buildColumnDefs = useCallback((): (ColDef | ColGroupDef)[] => {
+    const colDefs: (ColDef | ColGroupDef)[] = [];
+
+    // Row number
+    colDefs.push({
+      colId: "rowNumber",
+      headerName: "",
+      width: 60,
+      valueGetter: (p: any) =>
+        p.node?.rowIndex != null ? p.node.rowIndex + 1 : "",
+      pinned: "left",
+    });
+
+    // Dataset columns
+    if (datasetColumns.size > 0) {
+      const firstEntry = Object.values(datasetByIndex)[0];
+      const children: ColDef[] = Array.from(datasetColumns).map((column) => {
+        const mightHaveImages =
+          typeof firstEntry?.entry?.[column] === "string" &&
+          getImageUrl(firstEntry.entry[column]);
+
+        return {
+          colId: `dataset_${column}`,
+          headerName: `Dataset Input (${column})`,
+          minWidth: 150,
+          ...(mightHaveImages
+            ? {
+                cellRenderer: (p: any) => {
+                  const val = getRowData(p).datasetEntry?.entry?.[column];
+                  const img = getImageUrl(val ?? "");
+                  return img ? (
+                    <ExternalImage
+                      src={img}
+                      minWidth="24px"
+                      minHeight="24px"
+                      maxHeight="120px"
+                      maxWidth="100%"
+                    />
+                  ) : (
+                    formatValue(val)
+                  );
+                },
+              }
+            : {
+                valueGetter: (p: any) =>
+                  formatValue(getRowData(p).datasetEntry?.entry?.[column]),
+                cellClass: "cell-with-overflow",
+              }),
+          tooltipValueGetter: (p: any) =>
+            stringify(getRowData(p).datasetEntry?.entry?.[column] ?? "-"),
+        };
+      });
+      // Flatten dataset group to avoid any group layout issues
+      colDefs.push(...children);
+    }
+
+    // Predicted columns
+    Object.entries(predictedColumns ?? {}).forEach(([node, columns]) => {
+      const children: ColDef[] = Array.from(columns).map((column) => ({
+        colId: `predicted_${node}_${column}`,
+        headerName: titleCase(column),
+        minWidth: 150,
+        cellClass: "cell-with-overflow",
+        valueGetter: (p: any) => {
+          const entry = getRowData(p).datasetEntry;
+          if (entry?.error) return "Error";
+          let value = (entry?.predicted as any)?.[node]?.[column];
+          if (value === void 0 && node === "end")
+            value = (entry?.predicted as any)?.[column];
+          return formatValue(value);
+        },
+        tooltipValueGetter: (p: any) => {
+          const entry = getRowData(p).datasetEntry;
+          if (entry?.error) return entry.error;
+          let value = (entry?.predicted as any)?.[node]?.[column];
+          if (value === void 0 && node === "end")
+            value = (entry?.predicted as any)?.[column];
+          return stringify(value ?? "-");
+        },
+        cellClassRules: {
+          "cell-error": (p: any) => !!getRowData(p).datasetEntry?.error,
+        },
+      }));
+      // Flatten predicted group as well to avoid misalignment
+      colDefs.push(...children);
+    });
+
+    // Evaluation inputs
+    if (
+      results.length > 0 &&
+      evaluatorHeaders.evaluationInputsColumns.size > 0
+    ) {
+      const children: ColDef[] = Array.from(
+        evaluatorHeaders.evaluationInputsColumns
+      ).map((column) => ({
+        colId: `eval_input_${column}`,
+        headerName: titleCase(column),
+        minWidth: 150,
+        cellClass: "cell-with-overflow",
+        valueGetter: (p: any) => {
+          const { datasetEntry, evaluationsForEntry } = getRowData(p);
+
+          if (datasetEntry?.error) return "Error";
+          const value = evaluationsForEntry[evaluator]?.inputs?.[column];
+
+          return evaluationsForEntry[evaluator] ? stringify(value ?? "-") : "-";
+        },
+        tooltipValueGetter: (p: any) => {
+          const { datasetEntry, evaluationsForEntry } = getRowData(p);
+          if (datasetEntry?.error) return datasetEntry.error;
+          return stringify(
+            evaluationsForEntry[evaluator]?.inputs?.[column] ?? "-"
+          );
+        },
+        cellClassRules: {
+          "cell-error": (p: any) => !!getRowData(p).datasetEntry?.error,
+        },
+      }));
+      // Flatten evaluation inputs group to avoid misalignment
+      colDefs.push(...children);
+    }
+
+    // Cost column (standalone after groups)
+    colDefs.push({
+      colId: "cost",
+      headerName: "Cost",
+      minWidth: 120,
+      cellClass: "cell-with-overflow",
+      valueGetter: (p: any) => {
+        const { datasetEntry, evaluationsForEntry } = getRowData(p);
+        const total =
+          (datasetEntry?.cost ?? 0) +
+          (evaluationsForEntry[evaluator]?.cost ?? 0);
+        return total || "-";
+      },
+      valueFormatter: (p: any) =>
+        p.value === "-"
+          ? "-"
+          : formatMoney({ amount: p.value, currency: "USD" }, "$0.00[00]"),
+      tooltipValueGetter: (p: any) => {
+        const { datasetEntry, evaluationsForEntry } = getRowData(p);
+        const predCost = datasetEntry?.cost ?? 0;
+        const evalCost = evaluationsForEntry[evaluator]?.cost ?? 0;
+        const total = predCost + evalCost;
+        if (!total) return "-";
+        const fmt = (v: number) =>
+          formatMoney({ amount: v, currency: "USD" }, "$0.00[00]");
+        return `Prediction: ${predCost ? fmt(predCost) : "-"}, Evaluation: ${
+          evalCost ? fmt(evalCost) : "-"
+        }`;
+      },
+    });
+
+    // Duration column (standalone after cost)
+    colDefs.push({
+      colId: "duration",
+      headerName: "Duration",
+      minWidth: 120,
+      cellClass: "cell-with-overflow",
+      valueGetter: (p: any) => {
+        const { datasetEntry, evaluationsForEntry } = getRowData(p);
+        const total =
+          (datasetEntry?.duration ?? 0) +
+          (evaluationsForEntry[evaluator]?.duration ?? 0);
+        return total || "-";
+      },
+      valueFormatter: (p: any) =>
+        p.value === "-" ? "-" : formatMilliseconds(p.value),
+      tooltipValueGetter: (p: any) => {
+        const { datasetEntry, evaluationsForEntry } = getRowData(p);
+        const predDur = datasetEntry?.duration ?? 0;
+        const evalDur = evaluationsForEntry[evaluator]?.duration ?? 0;
+        const total = predDur + evalDur;
+        if (!total) return "-";
+        return `Prediction: ${
+          predDur ? formatMilliseconds(predDur) : "-"
+        }, Evaluation: ${evalDur ? formatMilliseconds(evalDur) : "-"}`;
+      },
+    });
+
+    // Evaluation result columns (stable order)
+    const evalResultPreferredOrder = [
+      "score",
+      "passed",
+      "label",
+      "details",
+    ] as const;
+    const evaluationResultsColumnsOrdered = evalResultPreferredOrder.filter(
+      (c) => evaluatorHeaders.evaluationResultsColumns.has(c)
+    );
+
+    evaluationResultsColumnsOrdered.forEach((column) => {
+      const isDetails = column === "details";
+      const formatEvalValue = (value: any) => {
+        if (value === false) return "false";
+        if (value === true) return "true";
+        return !isNaN(Number(value))
+          ? numeral(Number(value)).format("0.[00]")
+          : value ?? "-";
+      };
+
+      colDefs.push({
+        colId: `eval_result_${column}`,
+        headerName: titleCase(column),
+        minWidth: isDetails ? 240 : 120,
+        ...(isDetails
+          ? {
+              cellRenderer: (p: any) => {
+                const evaluation = getRowData(p).evaluationsForEntry[
+                  evaluator
+                ] as Record<string, any> | undefined;
+                return (
+                  <HoverableBigText
+                    lineClamp={3}
+                    maxWidth="300px"
+                    whiteSpace="pre-wrap"
+                  >
+                    {evaluation?.[column]}
+                  </HoverableBigText>
+                );
+              },
+            }
+          : {
+              cellClass: "cell-with-overflow",
+              valueGetter: (p: any) => {
+                const evaluation = getRowData(p).evaluationsForEntry[
+                  evaluator
+                ] as Record<string, any> | undefined;
+                if (evaluation?.status === "error") return "Error";
+                if (evaluation?.status === "skipped") return "Skipped";
+                return formatEvalValue(evaluation?.[column]);
+              },
+            }),
+        tooltipValueGetter: (p: any) => {
+          const evaluation = getRowData(p).evaluationsForEntry[evaluator] as
+            | Record<string, any>
+            | undefined;
+          if (!isDetails && evaluation?.status === "error")
+            return evaluation?.details ?? "Error";
+          if (!isDetails && evaluation?.status === "skipped")
+            return evaluation?.details ?? "Skipped";
+          return formatEvalValue(evaluation?.[column]);
+        },
+        cellClassRules: {
+          "cell-error": (p: any) =>
+            !isDetails &&
+            getRowData(p).evaluationsForEntry[evaluator]?.status === "error",
+          "cell-skipped": (p: any) =>
+            !isDetails &&
+            getRowData(p).evaluationsForEntry[evaluator]?.status === "skipped",
+          "cell-true": (p: any) => {
+            const ev = getRowData(p).evaluationsForEntry[evaluator] as
+              | Record<string, any>
+              | undefined;
+            return ev?.[column] === true;
+          },
+          "cell-false": (p: any) => {
+            const ev = getRowData(p).evaluationsForEntry[evaluator] as
+              | Record<string, any>
+              | undefined;
+            return ev?.[column] === false;
+          },
+        },
+      });
+    });
+
+    // Trace column
+    const hasAnyTraceId = Object.values(datasetByIndex).some(
+      (d) => d.trace_id && d.trace_id !== "0"
+    );
+    if (hasAnyTraceId) {
+      colDefs.push({
+        colId: "trace",
+        headerName: "Trace",
+        minWidth: 90,
+        cellRenderer: (p: any) => {
+          const traceId = getRowData(p).datasetEntry?.trace_id;
+          return traceId ? (
+            <Button
+              size="xs"
+              colorPalette="gray"
+              onClick={(e) => {
+                e.preventDefault();
+                openDrawer("traceDetails", {
+                  traceId,
+                  selectedTab: "traceDetails",
+                });
+              }}
+            >
+              View
+            </Button>
+          ) : (
+            "-"
+          );
+        },
+      });
+    }
+
+    return colDefs;
+  }, [
+    datasetColumns,
+    predictedColumns,
+    results.length,
+    evaluatorHeaders,
+    evaluator,
+    openDrawer,
+    datasetByIndex,
+  ]);
+
+  const columnDefs = useMemo(() => buildColumnDefs(), [buildColumnDefs]);
+
+  // Attach scroll listener to grid viewport to detect if user is near the bottom
   useEffect(() => {
-    const container = containerRef.current;
+    const attachViewportScrollListener = () => {
+      const container = containerRef.current;
+      if (!container) return;
+      const viewportEl = container.querySelector(".ag-body-viewport");
+      if (!viewportEl || !(viewportEl instanceof HTMLElement)) return;
+
+      // Clean up previous listener if any
+      detachViewportScrollListenerRef.current?.();
+
+      const onScroll = () => {
+        const atBottom =
+          viewportEl.scrollTop + viewportEl.clientHeight >=
+          viewportEl.scrollHeight - 24;
+        isPinnedToBottomRef.current = atBottom;
+      };
+
+      // Initialize current state
+      onScroll();
+
+      viewportEl.addEventListener("scroll", onScroll, { passive: true });
+      detachViewportScrollListenerRef.current = () =>
+        viewportEl.removeEventListener("scroll", onScroll);
+    };
+
+    // Try attaching immediately (in case grid already rendered)
+    attachViewportScrollListener();
+
+    // Also attempt after a brief delay to catch grid mount
+    const t = setTimeout(attachViewportScrollListener, 100);
 
     return () => {
-      let isAtBottom = true;
-      const scrollParent = container?.parentElement?.parentElement;
-      if (scrollParent) {
-        const currentScrollTop = scrollParent.scrollTop;
-        const scrollParentHeight = scrollParent.clientHeight;
-
-        isAtBottom =
-          currentScrollTop + scrollParentHeight + 32 >=
-          scrollParent.scrollHeight;
-      }
-
-      if (isAtBottom || (!hasScrolled && !isFinished)) {
-        setTimeout(() => {
-          if (!containerRef.current || hasScrolled) return;
-          scrollParent?.scrollTo({
-            // eslint-disable-next-line react-hooks/exhaustive-deps
-            top: containerRef.current.scrollHeight,
-            behavior: "smooth",
-          });
-        }, 100);
-        setTimeout(() => {
-          if (!containerRef.current || hasScrolled) return;
-          scrollParent?.scrollTo({
-            // eslint-disable-next-line react-hooks/exhaustive-deps
-            top: containerRef.current.scrollHeight,
-            behavior: "smooth",
-          });
-        }, 1000);
-      }
+      clearTimeout(t);
+      detachViewportScrollListenerRef.current?.();
     };
-  }, [results, isFinished, hasScrolled]);
+  }, []);
 
-  const hasAnyTraceId = Object.values(datasetByIndex).some(
-    (d) => d.trace_id && d.trace_id !== "0"
+  // Handle cell click to show expanded text dialog
+  const handleCellClicked = useCallback(
+    (event: CellClickedEvent) => {
+      // Skip for row number and trace button
+      const colId = event.column.getColId();
+      if (colId === "rowNumber" || colId === "trace") return;
+
+      // Get the cell value
+      const value = event.value;
+      if (!value || value === "-") return;
+
+      // Show the expanded text dialog
+      setExpandedText(stringify(value));
+    },
+    []
   );
 
-  const { openDrawer } = useDrawer();
+  // Auto-scroll to bottom only if user is pinned to bottom
+  useEffect(() => {
+    if (!gridApiRef.current || !isPinnedToBottomRef.current) return;
+
+    const lastIndex = totalRows - 1;
+    setTimeout(
+      () => gridApiRef.current?.ensureIndexVisible(lastIndex, "bottom"),
+      100
+    );
+    setTimeout(
+      () => gridApiRef.current?.ensureIndexVisible(lastIndex, "bottom"),
+      1000
+    );
+  }, [totalRows]);
 
   return (
     <Box ref={containerRef}>
-      {/* @ts-ignore */}
-      <Table.Root size={size === "sm" ? "xs" : "sm"} variant="grid">
-        <Table.Header>
-          <Table.Row>
-            <Table.ColumnHeader
-              width="35px"
-              rowSpan={2}
-              borderTop="none"
-            ></Table.ColumnHeader>
+      <div
+        className="ag-theme-balham"
+        style={{ width: "100%", height: "60vh" }}
+      >
+        <style>{`
+          .ag-theme-balham .ag-root-wrapper { border: none !important; border-radius: 0 !important; box-shadow: none !important; }
+          .ag-theme-balham .ag-root-wrapper-body { border-radius: 0 !important; }
+          .ag-theme-balham .ag-cell { cursor: pointer; }
 
-            {datasetColumns.size > 0 && (
-              <Table.ColumnHeader
-                colSpan={datasetColumns.size}
-                paddingY={2}
-                borderTop="none"
-              >
-                <Box>Dataset</Box>
-              </Table.ColumnHeader>
-            )}
+          .ag-theme-balham .cell-with-overflow {
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+          }
 
-            {Object.keys(predictedColumns ?? {}).map((node) => (
-              <Table.ColumnHeader
-                colSpan={predictedColumns[node]?.size ?? 0}
-                paddingY={2}
-                borderTop="none"
-              >
-                <HStack>
-                  <Box>{node}</Box>
-                </HStack>
-              </Table.ColumnHeader>
-            ))}
+          .ag-theme-balham .cell-with-overflow:hover::after {
+            content: "⤢";
+            position: absolute;
+            right: 3px;
+            top: 50%;
+            border: 1px solid #1f1f1f;
+            font-size: 16px;
+            width: 20px;
+            height: 20px;
+            text-align: center;
+            transform: translateY(-50%);
+            color: #1f1f1f;
+            pointer-events: none;
+            line-height: 1;
+            border-radius: 4px;
+            padding: 0px 4px;
+            background: white;
+          }
 
-            {results.length > 0 &&
-              evaluatorHeaders.evaluationInputsColumns.size > 0 && (
-                <Table.ColumnHeader
-                  colSpan={evaluatorHeaders.evaluationInputsColumns.size}
-                  paddingY={2}
-                  borderTop="none"
-                >
-                  <Box>Evaluation Data</Box>
-                </Table.ColumnHeader>
-              )}
+          .cell-error { background: rgba(255, 0, 0, 0.2); }
+          .cell-skipped { background: rgba(255, 255, 0, 0.2); }
+          .cell-true { background: rgba(0, 128, 0, 0.15); }
+          .cell-false { background: rgba(255, 0, 0, 0.15); }
+        `}</style>
 
-            <Table.ColumnHeader rowSpan={2} borderTop="none">
-              Cost
-            </Table.ColumnHeader>
-            <Table.ColumnHeader rowSpan={2} borderTop="none">
-              Duration
-            </Table.ColumnHeader>
-
-            {Array.from(evaluatorHeaders.evaluationResultsColumns).map(
-              (column) => (
-                <Table.ColumnHeader
-                  key={`evaluation-result-${column}`}
-                  rowSpan={2}
-                  borderTop="none"
-                >
-                  {column}
-                </Table.ColumnHeader>
-              )
-            )}
-
-            {hasAnyTraceId && (
-              <Table.ColumnHeader rowSpan={2} borderTop="none">
-                Trace
-              </Table.ColumnHeader>
-            )}
-          </Table.Row>
-          <Table.Row>
-            {Array.from(tableData.headers.datasetColumns).map((column) => (
-              <Table.ColumnHeader key={`dataset-${column}`} paddingY={2}>
-                {column}
-              </Table.ColumnHeader>
-            ))}
-            {Object.entries(predictedColumns ?? {}).map(([node, columns]) =>
-              Array.from(columns).map((column) => (
-                <Table.ColumnHeader
-                  key={`predicted-${node}-${column}`}
-                  paddingY={2}
-                >
-                  {column}
-                </Table.ColumnHeader>
-              ))
-            )}
-            {Array.from(evaluatorHeaders.evaluationInputsColumns).map(
-              (column) => (
-                <Table.ColumnHeader
-                  key={`evaluation-entry-${column}`}
-                  paddingY={2}
-                >
-                  {column}
-                </Table.ColumnHeader>
-              )
-            )}
-          </Table.Row>
-        </Table.Header>
-        <Table.Body>
-          {tableData.rows.map((row, index) => (
-            <Table.Row key={index}>
-              <Table.Cell width="35px">{index + 1}</Table.Cell>
-
-              {Array.from(row.datasetColumns).map((column) => column.render())}
-
-              {Array.from(row.predictedColumns).map((column) =>
-                column.render()
-              )}
-
-              {Array.from(
-                row.evaluationsColumns[evaluator]?.evaluationInputs ?? []
-              ).map((input) => input.render())}
-
-              {row.cost.render()}
-              {row.duration.render()}
-              {Array.from(
-                row.evaluationsColumns[evaluator]?.evaluationResults ?? []
-              ).map((result) => result.render())}
-
-              {hasAnyTraceId && (
-                <Table.Cell>
-                  {(() => {
-                    const traceId = datasetByIndex[index]?.trace_id;
-                    return (
-                      traceId && (
-                        <Button
-                          size="xs"
-                          colorPalette="gray"
-                          onClick={(e) => {
-                            e.preventDefault();
-                            openDrawer("traceDetails", {
-                              traceId,
-                              selectedTab: "traceDetails",
-                            });
-                          }}
-                        >
-                          View
-                        </Button>
-                      )
-                    );
-                  })()}
-                </Table.Cell>
-              )}
-            </Table.Row>
-          ))}
-        </Table.Body>
-      </Table.Root>
+        <AgGridReact
+          gridOptions={gridOptions}
+          columnDefs={columnDefs}
+          defaultColDef={defaultColDef}
+          rowData={rowData}
+          rowHeight={size === "sm" ? 28 : 34}
+          rowBuffer={10}
+          suppressAnimationFrame={false}
+          onGridReady={(p) => {
+            gridApiRef.current = p.api;
+            // When grid is ready, re-evaluate bottom state soon after render
+            setTimeout(() => {
+              const container = containerRef.current;
+              const viewportEl = container?.querySelector(".ag-body-viewport");
+              if (viewportEl instanceof HTMLElement) {
+                const atBottom =
+                  viewportEl.scrollTop + viewportEl.clientHeight >=
+                  viewportEl.scrollHeight - 24;
+                isPinnedToBottomRef.current = atBottom;
+              }
+            }, 50);
+          }}
+          onCellClicked={handleCellClicked}
+        />
+      </div>
+      <ExpandedTextDialog
+        open={!!expandedText}
+        onOpenChange={(open) => setExpandedText(open ? expandedText : void 0)}
+        textExpanded={expandedText}
+      />
     </Box>
   );
+}
+
+function stringify(value: any) {
+  return typeof value === "object" ? JSON.stringify(value) : `${value}`;
+}
+
+function titleCase(text: string) {
+  return text
+    .replace(/[_-]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+function getRowData(p: any) {
+  return p.data as EvaluationRowData;
+}
+
+function formatValue(val: any) {
+  return val !== void 0 && val !== null ? stringify(val) : "-";
 }
