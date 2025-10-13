@@ -66,7 +66,6 @@ export function BatchEvaluationV2EvaluationResult({
     ...Object.values(datasetByIndex).map((d) => d.index + 1)
   );
 
-  // Utility functions
   const stringify = useCallback(
     (value: any) =>
       typeof value === "object" ? JSON.stringify(value) : `${value}`,
