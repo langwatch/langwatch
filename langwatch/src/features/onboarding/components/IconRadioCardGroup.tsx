@@ -7,8 +7,8 @@ import {
 } from "@chakra-ui/react";
 import type { IconFormItem } from "../types/types";
 
-interface IconRadioCardGroupProps<T = string> {
-  items: IconFormItem[];
+interface IconRadioCardGroupProps<T extends string = string> {
+  items: IconFormItem<T>[];
   value?: T;
   onChange: (value: T | undefined) => void;
   direction?: "horizontal" | "vertical";

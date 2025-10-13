@@ -33,16 +33,6 @@ export const BasicInfoConditionalFields: React.FC<
   setCompanySize,
   solutionType,
   setSolutionType,
-}: {
-  usageStyle: UsageStyle | undefined;
-  phoneNumber: string | undefined;
-  setPhoneNumber: (value: string) => void;
-  setPhoneHasValue: (value: boolean) => void;
-  setPhoneIsValid: (value: boolean) => void;
-  companySize: CompanySize | undefined;
-  setCompanySize: (value: CompanySize) => void;
-  solutionType: SolutionType | undefined;
-  setSolutionType: (value: SolutionType | undefined) => void;
 }) => {
   const showFields = usageStyle !== void 0 && usageStyle !== "For myself";
 
