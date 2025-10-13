@@ -87,6 +87,9 @@ export async function runEvaluationJob(
  * Single Responsibility: Detect if thread-based mappings are present
  */
 const hasThreadMappings = (mappingState: MappingState): boolean => {
+  if (!mappingState?.mapping) {
+    return false;
+  }
   return Object.values(mappingState.mapping).some(
     (mapping) => "type" in mapping && mapping.type === "thread"
   );
@@ -252,7 +255,7 @@ const buildDataForEvaluation = async (
     traceId: trace.trace_id,
     threadId: trace.metadata?.thread_id,
     hasThreadMappings: hasThread,
-    mappingKeys: Object.keys(mappings.mapping),
+    mappingKeys: Object.keys(mappings.mapping || {}),
   });
 
   if (hasThread) {
