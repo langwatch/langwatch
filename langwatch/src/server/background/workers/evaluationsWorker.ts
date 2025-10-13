@@ -255,7 +255,7 @@ const buildDataForEvaluation = async (
     traceId: trace.trace_id,
     threadId: trace.metadata?.thread_id,
     hasThreadMappings: hasThread,
-    mappingKeys: Object.keys(mappings.mapping),
+    mappingKeys: Object.keys(mappings.mapping || {}),
   });
 
   if (hasThread) {
