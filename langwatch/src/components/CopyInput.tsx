@@ -39,7 +39,6 @@ export function CopyInput(
             meta: {
               closable: true,
             },
-            placement: "top-end",
           });
           return;
         }
@@ -53,7 +52,6 @@ export function CopyInput(
             meta: {
               closable: true,
             },
-            placement: "top-end",
           });
         })();
       }}

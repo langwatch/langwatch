@@ -316,7 +316,6 @@ export const WizardSidebar = memo(function WizardSidebar({
                               description:
                                 "Incoming messages will now be evaluated",
                               type: "success",
-                              placement: "top-end",
                               meta: {
                                 closable: true,
                               },
@@ -327,7 +326,6 @@ export const WizardSidebar = memo(function WizardSidebar({
                               title: "Error creating monitor",
                               description: "Please try again",
                               type: "error",
-                              placement: "top-end",
                               meta: {
                                 closable: true,
                               },

@@ -186,7 +186,6 @@ export function UploadCSVForm({
           meta: {
             closable: true,
           },
-          placement: "top-end",
         });
       }
 
@@ -333,7 +332,6 @@ export function CSVReaderComponent({
               meta: {
                 closable: true,
               },
-              placement: "top-end",
             });
           }
         } else {

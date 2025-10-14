@@ -187,7 +187,6 @@ function MembersList({
             meta: {
               closable: true,
             },
-            placement: "top-end",
           });
           onAddMembersClose();
           void pendingInvites.refetch();
@@ -201,7 +200,6 @@ function MembersList({
             meta: {
               closable: true,
             },
-            placement: "top-end",
           });
         },
       }
@@ -271,7 +269,6 @@ function MembersList({
             meta: {
               closable: true,
             },
-            placement: "top-end",
           });
           // how to refect this organizationWithMembers
           void queryClient.organization.getOrganizationWithMembersAndTheirTeams
@@ -294,7 +291,6 @@ function MembersList({
             meta: {
               closable: true,
             },
-            placement: "top-end",
           });
         },
       }
@@ -324,7 +320,6 @@ function MembersList({
             meta: {
               closable: true,
             },
-            placement: "top-end",
           });
           void pendingInvites.refetch();
         },

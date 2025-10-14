@@ -21,10 +21,10 @@ toaster.create({
   meta: {
     closable: true, // notice isClosable changed to meta.closable
   },
-  placement: "top-end", // notice top-right changed to top-end
+ // notice no placement is provided now
 })
 
-with the { toaster } function comming from the components/ui/toaster.tsx. Also `useToast` is gone.
+with the { toaster } function coming from the components/ui/toaster.tsx. Also `useToast` is gone.
 
 
 Modal
@@ -467,7 +467,7 @@ toaster.create({
   meta: {
     closable: true, // notice isClosable changed to meta.closable
   },
-  placement: "top-end", // notice top-right changed to top-end
+ // notice top-right changed to top-end
 })
 ```
 

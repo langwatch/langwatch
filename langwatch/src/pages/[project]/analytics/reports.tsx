@@ -175,7 +175,6 @@ export default function Reports() {
             meta: {
               closable: true,
             },
-            placement: "top-end",
           });
         },
       }

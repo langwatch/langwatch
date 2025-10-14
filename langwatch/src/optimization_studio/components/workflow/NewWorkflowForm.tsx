@@ -212,7 +212,6 @@ export const NewWorkflowForm = ({
               meta: {
                 closable: true,
               },
-              placement: "top-end",
             });
           },
         }

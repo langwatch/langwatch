@@ -195,7 +195,6 @@ export function AddDatasetRecordDrawerV2(props: AddDatasetDrawerProps) {
             meta: {
               closable: true,
             },
-            placement: "top-end",
           });
         },
         onError: () => {
@@ -207,7 +206,6 @@ export function AddDatasetRecordDrawerV2(props: AddDatasetDrawerProps) {
             meta: {
               closable: true,
             },
-            placement: "top-end",
           });
         },
       }

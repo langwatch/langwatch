@@ -248,14 +248,12 @@ export function OptimizeModalContent({
             title: "Version saved",
             description: "New version has been saved successfully",
             type: "success",
-            placement: "top-end",
           });
         } catch (error) {
           toaster.create({
             title: "Error",
             description: "Failed to save version",
             type: "error",
-            placement: "top-end",
           });
           throw error;
         }
@@ -266,7 +264,6 @@ export function OptimizeModalContent({
           title: "Version ID not found for optimization",
           description: "Failed to find version ID for optimization",
           type: "error",
-          placement: "top-end",
         });
         return;
       }

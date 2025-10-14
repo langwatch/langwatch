@@ -115,7 +115,6 @@ export function HistoryPopover({ onClose }: { onClose: () => void }) {
             type: "success",
             duration: 5000,
             meta: { closable: true },
-            placement: "top-end",
           });
           setWorkflow({
             version,
@@ -128,7 +127,6 @@ export function HistoryPopover({ onClose }: { onClose: () => void }) {
             type: "error",
             duration: 5000,
             meta: { closable: true },
-            placement: "top-end",
           });
         },
       }
@@ -463,7 +461,6 @@ export function NewVersionFields({
               type: "error",
               duration: 5000,
               meta: { closable: true },
-              placement: "top-end",
             });
           },
         }

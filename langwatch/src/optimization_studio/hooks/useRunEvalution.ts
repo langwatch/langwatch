@@ -163,7 +163,6 @@ export const useRunEvalution = () => {
             type: "error",
             duration: 5000,
             meta: { closable: true },
-            placement: "top-end",
           });
           return;
         }
