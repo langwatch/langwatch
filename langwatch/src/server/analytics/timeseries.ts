@@ -121,6 +121,7 @@ export const timeseries = async (input: TimeseriesInputType) => {
         let aggregationQuery: Record<string, AggregationsAggregationContainer> =
           metricAggregations;
         let pipelinePath_: string | undefined;
+        let pipelineBucketsMetricPath: string | undefined;
         if (pipeline) {
           // Fix needed for OpenSearch, it doesn't support dots in field names when referenced from buckets_path
           const metricWithoutDots = metric.replace(/\./g, "__");
@@ -130,7 +131,20 @@ export const timeseries = async (input: TimeseriesInputType) => {
             // Fix for working with percentiles too
             .split(">values")[0]
             ?.replace(/\./g, "__");
-          pipelinePath_ = pipelinePath(index, metric, aggregation, pipeline);
+          pipelinePath_ = esSafePipelinePath(
+            index,
+            metric,
+            aggregation,
+            pipeline
+          );
+
+          pipelineBucketsMetricPath =
+            `${pipelineBucketsPath}>${metricPath}` +
+            (percentileAggregationTypes.includes(aggregation as any)
+              ? `.${
+                  percentileToPercent[aggregation as PercentileAggregationTypes]
+                }`
+              : "");
 
           aggregationQuery = {
             [pipelineBucketsPath]: {
@@ -142,15 +156,7 @@ export const timeseries = async (input: TimeseriesInputType) => {
             },
             [pipelinePath_]: {
               [pipelineAggregationsToElasticSearch[pipeline.aggregation]]: {
-                buckets_path:
-                  `${pipelineBucketsPath}>${metricPath}` +
-                  (percentileAggregationTypes.includes(aggregation as any)
-                    ? `.${
-                        percentileToPercent[
-                          aggregation as PercentileAggregationTypes
-                        ]
-                      }`
-                    : ""),
+                buckets_path: pipelineBucketsMetricPath,
                 gap_policy: "insert_zeros",
               },
             },
@@ -158,13 +164,13 @@ export const timeseries = async (input: TimeseriesInputType) => {
         }
 
         if (Object.keys(filterOutEmptyFilters(filters)).length > 0) {
-          const wrapperKey = pipelinePath_
+          const filtersWrapperKey = pipelinePath_
             ? `${pipelinePath_}__filters`
             : `${Object.keys(aggregationQuery)[0]}__filters`;
 
           const previousAggregationQuery = { ...aggregationQuery };
           aggregationQuery = {
-            [wrapperKey]: {
+            [filtersWrapperKey]: {
               filter: {
                 bool: {
                   must: generateFilterConditions(filters ?? {}),
@@ -175,43 +181,34 @@ export const timeseries = async (input: TimeseriesInputType) => {
           } as Record<string, AggregationsAggregationContainer>;
 
           if (asPercent) {
-            const previousAggregationQueryEntries = Object.entries(
-              previousAggregationQuery
+            const extractionPath = getMetric(metric).extractionPath(
+              index,
+              aggregation,
+              key,
+              subkey
             );
-            aggregationQuery = Object.fromEntries(
-              Object.entries(aggregationQuery).flatMap(
-                ([key_, value], index) => {
-                  const previousKey =
-                    previousAggregationQueryEntries[index]?.[0];
-                  const extractionPath = getMetric(metric).extractionPath(
-                    index,
-                    aggregation,
-                    key,
-                    subkey
-                  );
+            const percentageWrapperKey = pipelinePath_
+              ? `${pipelinePath_}__percent`
+              : `${Object.keys(aggregationQuery)[0]}__percent`;
 
-                  return [
-                    [key_, value],
-                    [previousKey, previousAggregationQueryEntries[index]?.[1]],
-                    [
-                      `${previousKey}__percent`,
-                      {
-                        bucket_script: {
-                          buckets_path: {
-                            filtered: `${key_}>${extractionPath}`,
-                            all: extractionPath,
-                          },
-                          script: {
-                            source:
-                              "params.all > 0 ? (params.filtered / params.all) * 100 : 0",
-                          },
-                        },
-                      },
-                    ],
-                  ];
-                }
-              )
-            );
+            aggregationQuery = {
+              ...aggregationQuery,
+              ...previousAggregationQuery,
+              [percentageWrapperKey]: {
+                bucket_script: {
+                  buckets_path: {
+                    filtered: `${filtersWrapperKey}>${
+                      pipelinePath_ ?? extractionPath
+                    }`,
+                    all: pipelinePath_ ?? extractionPath,
+                  },
+                  script: {
+                    source:
+                      "params.all > 0 ? (params.filtered / params.all) * 100 : 0",
+                  },
+                },
+              },
+            };
           }
         }
 
@@ -438,12 +435,24 @@ const extractResult = (
   let paths = extractionPath.split(">");
   if (pipeline) {
     const pipelinePath_ = pipelinePath(index, metric, aggregation, pipeline);
+    const esSafePipelinePath_ = esSafePipelinePath(
+      index,
+      metric,
+      aggregation,
+      pipeline
+    );
+    if (asPercent) {
+      return {
+        [pipelinePath_]:
+          current?.[`${esSafePipelinePath_}__percent`]?.value ?? 0,
+      };
+    }
     if (Object.keys(filterOutEmptyFilters(filters)).length > 0) {
-      const container = current?.[`${pipelinePath_}__filters`] ?? current;
-      const value = container?.[pipelinePath_]?.value ?? 0;
+      const container = current?.[`${esSafePipelinePath_}__filters`] ?? current;
+      const value = container?.[esSafePipelinePath_]?.value ?? 0;
       return { [pipelinePath_]: value };
     }
-    return { [pipelinePath_]: current?.[pipelinePath_]?.value ?? 0 };
+    return { [pipelinePath_]: current?.[esSafePipelinePath_]?.value ?? 0 };
   }
 
   if (Object.keys(filterOutEmptyFilters(filters)).length > 0) {
@@ -502,3 +511,10 @@ const pipelinePath = (
   pipeline: Required<SeriesInputType>["pipeline"]
 ) =>
   `${index}/${metric}/${aggregation}/${pipeline.field}/${pipeline.aggregation}`;
+
+const esSafePipelinePath = (
+  index: number,
+  metric: SeriesInputType["metric"],
+  aggregation: SeriesInputType["aggregation"],
+  pipeline: Required<SeriesInputType>["pipeline"]
+) => pipelinePath(index, metric, aggregation, pipeline).replace(/\./g, "__");
