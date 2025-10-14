@@ -6,15 +6,25 @@ import { useCreateScreens } from "../screens/manager";
 import { slideVariants, transition } from "../constants/onboarding-data";
 import { VStack } from "@chakra-ui/react";
 import { motion, AnimatePresence } from "motion/react";
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { api } from "~/utils/api";
 import { toaster } from "~/components/ui/toaster";
 import { trackEventOnce } from "~/utils/tracking";
+import { useRouter } from "next/router";
+import { useRequiredSession } from "~/hooks/useRequiredSession";
+import { LoadingScreen } from "~/components/LoadingScreen";
 
 export const WelcomePage: React.FC = () => {
-  const { isLoading: organizationIsLoading } = useOrganizationTeamProject({
-    redirectToProjectOnboarding: false,
-  });
+  const router = useRouter();
+  const { data: session } = useRequiredSession();
+  const [onboardingNeeded, setOnboardingNeeded] = useState(false);
+
+  const {
+    organization,
+    isLoading: organizationIsLoading,
+    organizations,
+    project,
+  } = useOrganizationTeamProject();
 
   const {
     setOrganizationName,
@@ -51,7 +61,23 @@ export const WelcomePage: React.FC = () => {
     },
   });
 
-  const initializeOrganization = api.onboarding.initializeOrganization.useMutation();
+  const initializeOrganization =
+    api.onboarding.initializeOrganization.useMutation();
+
+  useEffect(() => {
+    const hasAnyProject =
+      organizations?.some((org) =>
+        org.teams.some((t) => t.projects.length > 0)
+      ) ?? false;
+    if (!hasAnyProject) return;
+
+    const slug =
+      project?.slug ??
+      organizations
+        ?.flatMap((o) => o.teams)
+        .flatMap((t) => t.projects)[0]?.slug;
+    if (slug) void router.push(`/${slug}`);
+  }, [project?.slug]);
 
   function handleFinalizeSubmit() {
     const form = getFormData();
@@ -86,33 +112,46 @@ export const WelcomePage: React.FC = () => {
             meta: { closable: true },
           });
         },
-      }
+      },
     );
+  }
+
+  if (!session || !onboardingNeeded || (organizationIsLoading && !organization)) {
+    return <LoadingScreen />;
   }
 
   return (
     <OrganizationOnboardingContainer
-      loading={organizationIsLoading}
-      title={(screens[flow.visibleScreens.findIndex((s) => s === currentScreenIndex)]?.heading) ?? "Welcome Aboard 👋"}
-      subTitle={screens[flow.visibleScreens.findIndex((s) => s === currentScreenIndex)]?.subHeading}
+      title={
+        screens[flow.visibleScreens.findIndex((s) => s === currentScreenIndex)]
+          ?.heading ?? "Welcome Aboard 👋"
+      }
+      subTitle={
+        screens[flow.visibleScreens.findIndex((s) => s === currentScreenIndex)]
+          ?.subHeading
+      }
     >
-        <VStack gap={4} align="stretch" position="relative" minH="400px">
-          <AnimatePresence initial={false} custom={direction} mode="popLayout">
-            <motion.div
-              key={currentScreenIndex}
-              custom={direction}
-              variants={slideVariants}
-              initial="enter"
-              animate="center"
-              exit="exit"
-              transition={transition}
-              style={{ width: "100%" }}
+      <VStack gap={4} align="stretch" position="relative" minH="400px">
+        <AnimatePresence initial={false} custom={direction} mode="popLayout">
+          <motion.div
+            key={currentScreenIndex}
+            custom={direction}
+            variants={slideVariants}
+            initial="enter"
+            animate="center"
+            exit="exit"
+            transition={transition}
+            style={{ width: "100%" }}
           >
             <fieldset disabled={initializeOrganization.isPending}>
-              {screens[flow.visibleScreens.findIndex((s) => s === currentScreenIndex)]?.component}
+              {
+                screens[
+                  flow.visibleScreens.findIndex((s) => s === currentScreenIndex)
+                ]?.component
+              }
             </fieldset>
-            </motion.div>
-          </AnimatePresence>
+          </motion.div>
+        </AnimatePresence>
 
         <OnboardingNavigation
           currentScreenIndex={currentScreenIndex}
@@ -120,7 +159,11 @@ export const WelcomePage: React.FC = () => {
           onNext={navigation.nextScreen}
           onSkip={navigation.skipScreen}
           canProceed={navigation.canProceed()}
-          isSkippable={!screens[flow.visibleScreens.findIndex((s) => s === currentScreenIndex)]?.required}
+          isSkippable={
+            !screens[
+              flow.visibleScreens.findIndex((s) => s === currentScreenIndex)
+            ]?.required
+          }
           isSubmitting={initializeOrganization.isPending}
           onFinish={handleFinalizeSubmit}
         />
