@@ -136,7 +136,7 @@ export interface CustomGraphFormData {
       field: PipelineFields | "";
       aggregation: PipelineAggregationTypes;
     };
-    filters?: Partial<Record<FilterField, FilterParam>>;
+    filters?: Record<FilterField, FilterParam>;
   }[];
   groupBy?: FlattenAnalyticsGroupsEnum | "";
   includePrevious: boolean;
@@ -464,7 +464,7 @@ const customGraphInputToFormData = (
               field: "",
               aggregation: "avg",
             },
-      filters: series.filters,
+      filters: filterOutEmptyFilters(series.filters),
     })),
     groupBy: graphInput.groupBy ?? "",
     includePrevious: graphInput.includePrevious ?? true,
@@ -1185,8 +1185,7 @@ function SeriesField({
                 onClick={() =>
                   openDrawer("seriesFilters", {
                     filters:
-                      (field.value as Record<FilterField, FilterParam>) ??
-                      ({} as Record<FilterField, FilterParam>),
+                      field.value ?? ({} as Record<FilterField, FilterParam>),
                     onChange: ({ filters }) => {
                       form.setValue(`series.${index}.filters`, filters);
                     },
