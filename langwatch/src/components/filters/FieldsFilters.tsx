@@ -18,7 +18,7 @@ import type { UseTRPCQueryResult } from "@trpc/react-query/shared";
 import type { inferRouterOutputs } from "@trpc/server";
 import cloneDeep from "lodash-es/cloneDeep";
 import numeral from "numeral";
-import React, { useEffect, useMemo } from "react";
+import React, { useCallback, useEffect, useMemo } from "react";
 import { ChevronDown, Search, X } from "react-feather";
 import { useDebounceValue } from "usehooks-ts";
 
@@ -38,14 +38,51 @@ import { Tooltip } from "../ui/tooltip";
 
 import { useDrawer } from "~/components/CurrentDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { filterOutEmptyFilters } from "../../server/analytics/utils";
 
-export function FieldsFilters() {
-  const { nonEmptyFilters } = useFilterParams();
-  const { openDrawer, drawerOpen: isDrawerOpen } = useDrawer();
+export function QueryStringFieldsFilters({
+  hideTriggerButton = false,
+}: {
+  hideTriggerButton?: boolean;
+}) {
+  const { nonEmptyFilters, setFilters } = useFilterParams();
+
+  const { openDrawer } = useDrawer();
   const { hasTeamPermission } = useOrganizationTeamProject();
 
-  const isEditMode = isDrawerOpen("editTriggerFilter");
+  const hasAnyFilters = Object.keys(nonEmptyFilters).length > 0;
 
+  return (
+    <FieldsFilters
+      filters={nonEmptyFilters}
+      setFilters={(filters) => setFilters(filterOutEmptyFilters(filters))}
+      actionButton={
+        hasTeamPermission(TeamRoleGroup.TRIGGERS_MANAGE) &&
+        !hideTriggerButton ? (
+          <Tooltip content="Create a filter to add a trigger.">
+            <Button
+              colorPalette="orange"
+              onClick={() => openDrawer("trigger", undefined)}
+              disabled={!hasAnyFilters}
+            >
+              Add Trigger
+            </Button>
+          </Tooltip>
+        ) : undefined
+      }
+    />
+  );
+}
+
+export function FieldsFilters({
+  filters,
+  setFilters,
+  actionButton,
+}: {
+  filters: Record<FilterField, FilterParam>;
+  setFilters: (filters: Partial<Record<FilterField, FilterParam>>) => void;
+  actionButton?: React.ReactNode;
+}) {
   const filterKeys: FilterField[] = [
     "metadata.prompt_ids",
     "spans.model",
@@ -63,12 +100,10 @@ export function FieldsFilters() {
     "annotations.hasAnnotation",
   ];
 
-  const filters: [FilterField, FilterDefinition][] = filterKeys.map((id) => [
+  const allFilters: [FilterField, FilterDefinition][] = filterKeys.map((id) => [
     id,
     availableFilters[id],
   ]);
-
-  const hasAnyFilters = nonEmptyFilters.length > 0;
 
   return (
     <VStack align="start" width="300px" gap={6}>
@@ -77,21 +112,17 @@ export function FieldsFilters() {
 
         <Spacer />
 
-        {hasTeamPermission(TeamRoleGroup.TRIGGERS_MANAGE) && !isEditMode && (
-          <Tooltip content="Create a filter to add a trigger.">
-            <Button
-              colorPalette="orange"
-              onClick={() => openDrawer("trigger", undefined)}
-              disabled={!hasAnyFilters}
-            >
-              Add Trigger
-            </Button>
-          </Tooltip>
-        )}
+        {actionButton}
       </HStack>
       <VStack gap={3} width="full">
-        {filters.map(([id, filter]) => (
-          <FieldsFilter key={id} filterId={id} filter={filter} />
+        {allFilters.map(([id, filter]) => (
+          <FieldsFilter
+            key={id}
+            filterId={id}
+            filter={filter}
+            filters={filters}
+            setFilters={setFilters}
+          />
         ))}
       </VStack>
     </VStack>
@@ -101,13 +132,22 @@ export function FieldsFilters() {
 function FieldsFilter({
   filterId,
   filter,
+  filters,
+  setFilters,
 }: {
   filterId: FilterField;
   filter: FilterDefinition;
+  filters: Record<FilterField, FilterParam>;
+  setFilters: (filters: Partial<Record<FilterField, FilterParam>>) => void;
 }) {
   const gray400 = useColorRawValue("gray.400");
 
-  const { setFilter, filters } = useFilterParams();
+  const setFilter = useCallback(
+    (filterId: FilterField, values: FilterParam) => {
+      setFilters({ ...filters, [filterId]: values });
+    },
+    [setFilters, filters]
+  );
 
   const searchRef = React.useRef<HTMLInputElement | null>(null);
   const [query, setQuery] = useDebounceValue("", 300);
@@ -210,6 +250,7 @@ function FieldsFilter({
                   filterId,
                 ]}
                 paddingX={4}
+                setFilter={setFilter}
               />
             )}
           </Popover.Body>
@@ -225,15 +266,15 @@ function NestedListSelection({
   keysAhead,
   keysBefore = [],
   paddingX = 0,
+  setFilter,
 }: {
   query: string;
   current: FilterParam;
   keysAhead: FilterField[];
   keysBefore?: string[];
   paddingX?: number;
+  setFilter: (filterId: FilterField, values: FilterParam) => void;
 }) {
-  const { setFilter } = useFilterParams();
-
   const filterId = keysAhead[0];
   if (!filterId) {
     console.warn("NestedListSelection called with empty keysAhead");
@@ -309,6 +350,7 @@ function NestedListSelection({
                   current={current}
                   keysAhead={keysAhead.slice(1)}
                   keysBefore={[...keysBefore, key]}
+                  setFilter={setFilter}
                 />
               );
             },
@@ -354,6 +396,33 @@ function ListSelection({
     }
   );
 
+  const options = useMemo(() => {
+    const sortingFn = (a: { count: number }, b: { count: number }) =>
+      a.count > b.count ? -1 : 1;
+
+    if (query) {
+      return filterData.data?.options
+        .filter((option) => {
+          return option.label.toLowerCase().includes(query.toLowerCase());
+        })
+        .toSorted(sortingFn);
+    }
+
+    return filterData.data?.options.toSorted(sortingFn);
+  }, [filterData.data?.options, query]);
+
+  const parentRef = React.useRef<HTMLDivElement>(null);
+
+  const virtualizer = useVirtualizer({
+    count: options?.length ?? 0,
+    getScrollElement: () => parentRef.current,
+    estimateSize: () => 35,
+    gap: 8,
+    overscan: 5,
+  });
+
+  const isEmpty = options && options.length === 0;
+
   if (
     filter.type === "numeric" &&
     keys?.[0] == "thumbs_up_down" &&
@@ -377,29 +446,6 @@ function ListSelection({
     );
   }
 
-  const options = useMemo(() => {
-    return filterData.data?.options
-      .sort((a, b) => (a.count > b.count ? -1 : 1))
-      .filter((option) => {
-        if (query) {
-          return option.label.toLowerCase().includes(query.toLowerCase());
-        }
-        return true;
-      });
-  }, [filterData.data?.options, query]);
-
-  const parentRef = React.useRef<HTMLDivElement>(null);
-
-  const virtualizer = useVirtualizer({
-    count: options?.length ?? 0,
-    getScrollElement: () => parentRef.current,
-    estimateSize: () => 35,
-    gap: 8,
-    overscan: 5,
-  });
-
-  const isEmpty = options && options.length === 0;
-
   return (
     <Box
       width="full"
@@ -421,6 +467,7 @@ function ListSelection({
         position="relative"
       >
         {virtualizer.getVirtualItems().map((virtualItem) => {
+          // eslint-disable-next-line prefer-const
           let { field, label, count } = options?.[virtualItem.index] ?? {
             field: "",
             label: "",

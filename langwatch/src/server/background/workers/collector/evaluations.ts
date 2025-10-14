@@ -55,14 +55,14 @@ export const mapEvaluations = (
 
   const uniqueByCheckIdKeepingLast: ElasticSearchEvaluation[] | undefined =
     evaluations
-      ?.reverse()
+      ?.toReversed()
       .filter(
         (evaluation, index, self) =>
           evaluation &&
           index ===
             self.findIndex((t) => t.evaluation_id === evaluation.evaluation_id)
       )
-      .reverse();
+      .toReversed();
 
   return uniqueByCheckIdKeepingLast;
 };
@@ -72,7 +72,7 @@ export const scheduleEvaluations = async (
   spans: Span[]
 ) => {
   const isOutputEmpty = !trace.output?.value;
-  const lastOutput = spans.reverse()[0]?.output;
+  const lastOutput = spans.toReversed()[0]?.output;
   const blockedByGuardrail =
     isOutputEmpty &&
     lastOutput?.type === "guardrail_result" &&

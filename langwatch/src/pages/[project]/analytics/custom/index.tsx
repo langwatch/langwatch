@@ -62,7 +62,8 @@ import { Menu } from "~/components/ui/menu";
 import { Select } from "~/components/ui/select";
 import { Switch } from "~/components/ui/switch";
 import { Tooltip } from "~/components/ui/tooltip";
-import { useFilterParams } from "~/hooks/useFilterParams";
+import { useFilterParams, type FilterParam } from "~/hooks/useFilterParams";
+import { filterOutEmptyFilters } from "../../../../server/analytics/utils";
 import {
   CustomGraph,
   summaryGraphTypes,
@@ -72,6 +73,7 @@ import { DashboardLayout } from "../../../../components/DashboardLayout";
 import { FilterSidebar } from "../../../../components/filters/FilterSidebar";
 import {
   FilterToggle,
+  FilterToggleButton,
   useFilterToggle,
 } from "../../../../components/filters/FilterToggle";
 import {
@@ -108,6 +110,7 @@ import {
   uppercaseFirstLetterLowerCaseRest,
 } from "../../../../utils/stringCasing";
 import { LuChartArea } from "react-icons/lu";
+import { useDrawer } from "../../../../components/CurrentDrawer";
 
 // Time unit conversion constants
 const MINUTES_IN_DAY = 24 * 60; // 1440 minutes in a day
@@ -133,6 +136,7 @@ export interface CustomGraphFormData {
       field: PipelineFields | "";
       aggregation: PipelineAggregationTypes;
     };
+    filters?: Record<FilterField, FilterParam>;
   }[];
   groupBy?: FlattenAnalyticsGroupsEnum | "";
   includePrevious: boolean;
@@ -151,6 +155,7 @@ export type CustomAPICallData = Omit<SharedFiltersInput, "projectId"> & {
       field: PipelineFields | "";
       aggregation: PipelineAggregationTypes;
     };
+    filters?: Record<FilterField, FilterParam>;
   }[];
   groupBy?: FlattenAnalyticsGroupsEnum;
   timeScale: number | "full";
@@ -233,6 +238,7 @@ const defaultValues: CustomGraphFormData = {
         field: "",
         aggregation: "avg",
       },
+      filters: {} as Record<FilterField, FilterParam>,
     },
   ],
   groupBy: undefined,
@@ -458,6 +464,7 @@ const customGraphInputToFormData = (
               field: "",
               aggregation: "avg",
             },
+      filters: filterOutEmptyFilters(series.filters),
     })),
     groupBy: graphInput.groupBy ?? "",
     includePrevious: graphInput.includePrevious ?? true,
@@ -499,6 +506,7 @@ const customGraphFormToCustomGraphInput = (
         aggregation: series.aggregation,
         key: series.key,
         subkey: series.subkey,
+        filters: series.filters,
       };
     }),
     groupBy: formData.groupBy === "" ? undefined : formData.groupBy,
@@ -542,6 +550,7 @@ const customAPIinput = (
         aggregation: series.aggregation,
         key: series.key,
         subkey: series.subkey,
+        filters: series.filters,
       };
     }) as CustomAPICallData["series"],
     groupBy: formData.groupBy === "" ? undefined : formData.groupBy,
@@ -998,6 +1007,8 @@ function SeriesField({
   const metricField = form.control.register(`series.${index}.metric`);
   const metric_ = metric ? getMetric(metric) : undefined;
 
+  const { openDrawer } = useDrawer();
+
   useEffect(() => {
     const aggregation_ = aggregation
       ? metricAggregations[aggregation] ?? aggregation
@@ -1156,6 +1167,39 @@ function SeriesField({
           </NativeSelect.Root>
         </Field.Root>
       )}
+      <Field.Root>
+        <Controller
+          control={form.control}
+          name={`series.${index}.filters`}
+          render={({ field }) => {
+            const nonEmptyFilters = filterOutEmptyFilters(
+              field.value ?? ({} as Record<FilterField, FilterParam>)
+            );
+
+            return (
+              <FilterToggleButton
+                toggled={false}
+                filters={
+                  field.value ?? ({} as Record<FilterField, FilterParam>)
+                }
+                onClick={() =>
+                  openDrawer("seriesFilters", {
+                    filters:
+                      field.value ?? ({} as Record<FilterField, FilterParam>),
+                    onChange: ({ filters }) => {
+                      form.setValue(`series.${index}.filters`, filters);
+                    },
+                  })
+                }
+              >
+                {Object.keys(nonEmptyFilters).length > 0
+                  ? "Edit Filters"
+                  : "Add Filters"}
+              </FilterToggleButton>
+            );
+          }}
+        />
+      </Field.Root>
     </VStack>
   );
 }

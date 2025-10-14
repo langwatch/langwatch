@@ -4,6 +4,7 @@ import { useRouter } from "next/router";
 import { availableFilters } from "../server/filters/registry";
 import type { FilterField } from "../server/filters/types";
 import qs from "qs";
+import { filterOutEmptyFilters } from "../server/analytics/utils";
 
 export type FilterParam =
   | string[]
@@ -160,14 +161,6 @@ export const useFilterParams = () => {
     return filterParams;
   };
 
-  const nonEmptyFilters = Object.values(filterParams.filters).filter((f) =>
-    typeof f === "string"
-      ? !!f
-      : Array.isArray(f)
-      ? f.length > 0
-      : Object.keys(f).length > 0
-  );
-
   return {
     filters,
     setFilter,
@@ -175,7 +168,7 @@ export const useFilterParams = () => {
     clearFilters,
     getLatestFilters,
     filterParams,
-    nonEmptyFilters,
+    nonEmptyFilters: filterOutEmptyFilters(filterParams.filters),
     queryOpts: {
       enabled: !!project && !!startDate && !!endDate,
       refetchOnMount: false,

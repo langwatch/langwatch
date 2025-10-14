@@ -1,8 +1,10 @@
 import { Box, Button, HStack, Text } from "@chakra-ui/react";
 import { useRouter } from "next/router";
 import { Filter, X } from "react-feather";
-import { useFilterParams } from "../../hooks/useFilterParams";
+import { useFilterParams, type FilterParam } from "../../hooks/useFilterParams";
 import { Tooltip } from "../ui/tooltip";
+import type { FilterField } from "../../server/filters/types";
+import { filterOutEmptyFilters } from "../../server/analytics/utils";
 
 export const useFilterToggle = (
   { defaultShowFilters } = { defaultShowFilters: false }
@@ -46,20 +48,46 @@ export function FilterToggle({
   const { showFilters, setShowFilters } = useFilterToggle({
     defaultShowFilters,
   });
-  const { filterParams, clearFilters, nonEmptyFilters } = useFilterParams();
+  const { filterParams, clearFilters } = useFilterParams();
 
-  const hasAnyFilters = nonEmptyFilters.length > 0;
+  return (
+    <FilterToggleButton
+      toggled={showFilters}
+      onClick={() => setShowFilters(!showFilters)}
+      filters={filterParams.filters}
+      onClear={clearFilters}
+    >
+      Filters
+    </FilterToggleButton>
+  );
+}
+
+export function FilterToggleButton({
+  toggled,
+  onClick,
+  filters,
+  onClear,
+  children,
+}: {
+  toggled: boolean;
+  onClick?: () => void;
+  filters: Partial<Record<FilterField, FilterParam>>;
+  onClear?: () => void;
+  children: React.ReactNode;
+}) {
+  const nonEmptyFilters = filterOutEmptyFilters(filters);
+  const hasAnyFilters = Object.keys(nonEmptyFilters).length > 0;
 
   return (
     <Button
       variant="ghost"
-      backgroundColor={showFilters ? "gray.200" : undefined}
-      onClick={() => setShowFilters(!showFilters)}
+      backgroundColor={toggled ? "gray.200" : undefined}
+      onClick={onClick}
       minWidth="fit-content"
       paddingRight={hasAnyFilters ? 1 : undefined}
     >
       <HStack gap={0}>
-        {filterParams.filters && hasAnyFilters && (
+        {hasAnyFilters && (
           <Box
             width="12px"
             height="12px"
@@ -73,12 +101,12 @@ export function FilterToggle({
             lineHeight="12px"
             textAlign="center"
           >
-            {nonEmptyFilters.length}
+            {Object.keys(nonEmptyFilters).length}
           </Box>
         )}
         <Filter size={16} />
-        <Text paddingLeft={2}>Filters</Text>
-        {hasAnyFilters && (
+        <Text paddingLeft={2}>{children}</Text>
+        {hasAnyFilters && onClear && (
           <Tooltip content="Clear all filters" positioning={{ gutter: 0 }}>
             <Button
               as={Box}
@@ -89,7 +117,7 @@ export function FilterToggle({
               display="flex"
               onClick={(e) => {
                 e.stopPropagation();
-                clearFilters();
+                onClear?.();
               }}
               paddingX={2}
             >

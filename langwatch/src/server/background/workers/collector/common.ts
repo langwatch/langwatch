@@ -99,7 +99,7 @@ export const getLastOutputAsText = (spans: Span[]): string => {
     "inside-out"
   )
     .filter(nonEmptySpan)
-    .reverse();
+    .toReversed();
   const singleTopLevelNode =
     topLevelNodes.length === 1 ? topLevelNodes[0] : undefined;
 
@@ -110,7 +110,7 @@ export const getLastOutputAsText = (spans: Span[]): string => {
   // If the top-level node has no output, then for getting the best text that represents the output,
   // we try to find the last span to finish, this is likely the one that came up with the final answer
   const spansInFinishOrderDesc = spans
-    .sort((a, b) => b.timestamps.finished_at - a.timestamps.finished_at)
+    .toSorted((a, b) => b.timestamps.finished_at - a.timestamps.finished_at)
     .filter(nonEmptySpan);
 
   const outputs = spansInFinishOrderDesc[0]?.output;
