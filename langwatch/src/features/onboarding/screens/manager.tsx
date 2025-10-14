@@ -6,7 +6,6 @@ import {
   Icon,
   /* eslint-disable no-restricted-imports */
   Checkbox,
-  Link,
   /* eslint-enable no-restricted-imports */
 } from "@chakra-ui/react";
 import { ExternalLink } from "lucide-react";
@@ -29,6 +28,7 @@ import {
   type OnboardingFlowConfig,
 } from "../types/types";
 import { BasicInfoConditionalFields } from "../components/BasicInfoConditionalFields";
+import { Link } from "~/components/ui/link";
 
 interface IntroScreensProps {
   formData: OnboardingFormData;
@@ -115,7 +115,12 @@ export const useCreateScreens = ({
               </Checkbox.Control>
               <Checkbox.Label fontWeight={"normal"}>
                 {"I agree to the LangWatch "}
-                <Link href="https://langwatch.ai/legal/terms-conditions" fontWeight={"bold"} variant="underline">
+                <Link
+                  href="https://langwatch.ai/legal/terms-conditions"
+                  isExternal
+                  fontWeight={"bold"}
+                  variant={"underline"}
+                >
                   {"Terms of Service"}
                   <Icon size="xs">
                     <ExternalLink />
