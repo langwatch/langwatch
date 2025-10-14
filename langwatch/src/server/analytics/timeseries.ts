@@ -119,6 +119,7 @@ export const timeseries = async (input: TimeseriesInputType) => {
 
         let aggregationQuery: Record<string, AggregationsAggregationContainer> =
           metricAggregations;
+        let pipelinePath_: string | undefined;
         if (pipeline) {
           // Fix needed for OpenSearch, it doesn't support dots in field names when referenced from buckets_path
           const metricWithoutDots = metric.replace(/\./g, "__");
@@ -128,12 +129,7 @@ export const timeseries = async (input: TimeseriesInputType) => {
             // Fix for working with percentiles too
             .split(">values")[0]
             ?.replace(/\./g, "__");
-          const pipelinePath_ = pipelinePath(
-            index,
-            metric,
-            aggregation,
-            pipeline
-          );
+          pipelinePath_ = pipelinePath(index, metric, aggregation, pipeline);
 
           aggregationQuery = {
             [pipelineBucketsPath]: {
@@ -161,21 +157,19 @@ export const timeseries = async (input: TimeseriesInputType) => {
         }
 
         if (Object.keys(filterOutEmptyFilters(filters)).length > 0) {
-          aggregationQuery = Object.fromEntries(
-            Object.entries(aggregationQuery).map(([key, value]) => [
-              `${key}__filters`,
-              {
-                filter: {
-                  bool: {
-                    must: generateFilterConditions(filters ?? {}),
-                  } as QueryDslBoolQuery,
-                },
-                aggs: {
-                  [key]: value,
-                },
+          const wrapperKey = pipelinePath_
+            ? `${pipelinePath_}__filters`
+            : `${Object.keys(aggregationQuery)[0]}__filters`;
+          aggregationQuery = {
+            [wrapperKey]: {
+              filter: {
+                bool: {
+                  must: generateFilterConditions(filters ?? {}),
+                } as QueryDslBoolQuery,
               },
-            ])
-          ) as Record<string, AggregationsAggregationContainer>;
+              aggs: aggregationQuery,
+            },
+          } as Record<string, AggregationsAggregationContainer>;
         }
 
         return Object.entries(aggregationQuery);
@@ -393,7 +387,12 @@ const extractResult = (
   const paths = extractionPath.split(">");
   if (pipeline) {
     const pipelinePath_ = pipelinePath(index, metric, aggregation, pipeline);
-    return { [pipelinePath_]: current[pipelinePath_].value };
+    if (Object.keys(filterOutEmptyFilters(filters)).length > 0) {
+      const container = current?.[`${pipelinePath_}__filters`] ?? current;
+      const value = container?.[pipelinePath_]?.value ?? 0;
+      return { [pipelinePath_]: value };
+    }
+    return { [pipelinePath_]: current?.[pipelinePath_]?.value ?? 0 };
   }
 
   if (Object.keys(filterOutEmptyFilters(filters)).length > 0) {
