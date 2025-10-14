@@ -17,14 +17,14 @@ import { LoadingScreen } from "~/components/LoadingScreen";
 export const WelcomePage: React.FC = () => {
   const router = useRouter();
   const { data: session } = useRequiredSession();
-  const [onboardingNeeded, setOnboardingNeeded] = useState(false);
+  const [onboardingNeeded, setOnboardingNeeded] = useState<boolean | undefined>(void 0);
 
   const {
     organization,
     isLoading: organizationIsLoading,
     organizations,
     project,
-  } = useOrganizationTeamProject();
+  } = useOrganizationTeamProject({ redirectToOnboarding: false });
 
   const {
     setOrganizationName,
@@ -69,14 +69,21 @@ export const WelcomePage: React.FC = () => {
       organizations?.some((org) =>
         org.teams.some((t) => t.projects.length > 0)
       ) ?? false;
-    if (!hasAnyProject) return;
+    if (!hasAnyProject) {
+      setOnboardingNeeded(true);
+      return;
+    }
 
     const slug =
       project?.slug ??
       organizations
         ?.flatMap((o) => o.teams)
         .flatMap((t) => t.projects)[0]?.slug;
-    if (slug) void router.push(`/${slug}`);
+    if (slug) {
+      void router.push(`/${slug}`);
+    } else {
+      setOnboardingNeeded(true);
+    }
   }, [project?.slug]);
 
   function handleFinalizeSubmit() {
@@ -164,7 +171,7 @@ export const WelcomePage: React.FC = () => {
               flow.visibleScreens.findIndex((s) => s === currentScreenIndex)
             ]?.required
           }
-          isSubmitting={initializeOrganization.isPending}
+          isSubmitting={initializeOrganization.isPending || initializeOrganization.isSuccess}
           onFinish={handleFinalizeSubmit}
         />
       </VStack>
