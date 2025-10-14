@@ -65,7 +65,7 @@ export const OnboardingNavigation: React.FC<OnboardingNavigationProps> = ({
           colorPalette="orange"
           variant="solid"
           onClick={isLastScreen ? onFinish : onNext}
-          disabled={!canProceed || !isLastScreen}
+          disabled={!canProceed || isSubmitting}
           loading={isSubmitting}
         >
           {buttonText}

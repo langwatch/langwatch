@@ -14,28 +14,35 @@ import {
 import { usePublicEnv } from "~/hooks/usePublicEnv";
 import { getOnboardingFlowConfig } from "../constants/onboarding-flow";
 
-
-
 export const useOnboardingFlow = () => {
   const publicEnv = usePublicEnv();
   const isSaaS = publicEnv.data?.IS_SAAS;
 
   // Form state
-  const [organizationName, setOrganizationName] = useState<string | undefined>(void 0);
+  const [organizationName, setOrganizationName] = useState<string | undefined>(
+    void 0,
+  );
   const [agreement, setAgreement] = useState<boolean>(false);
   const [usageStyle, setUsageStyle] = useState<UsageStyle | undefined>(void 0);
   const [phoneNumber, setPhoneNumber] = useState<string | undefined>(void 0);
   const [phoneHasValue, setPhoneHasValue] = useState<boolean>(false);
   const [phoneIsValid, setPhoneIsValid] = useState<boolean>(true);
-  const [companySize, setCompanySize] = useState<CompanySize | undefined>(void 0);
-  const [solutionType, setSolutionType] = useState<SolutionType | undefined>(void 0);
+  const [companySize, setCompanySize] = useState<CompanySize | undefined>(
+    void 0,
+  );
+  const [solutionType, setSolutionType] = useState<SolutionType | undefined>(
+    void 0,
+  );
   const [selectedDesires, setDesires] = useState<DesireType[]>([]);
   const [role, setRole] = useState<RoleType | undefined>(void 0);
 
   // Flow state
   const flow = getOnboardingFlowConfig(Boolean(isSaaS));
-  const [currentScreenIndex, setCurrentScreenIndex] = useState<OnboardingScreenIndex>(flow.first);
-  const [direction, setDirection] = useState<OnboardingFlowDirection>(OnboardingFlowDirection.FORWARD);
+  const [currentScreenIndex, setCurrentScreenIndex] =
+    useState<OnboardingScreenIndex>(flow.first);
+  const [direction, setDirection] = useState<OnboardingFlowDirection>(
+    OnboardingFlowDirection.FORWARD,
+  );
 
   // Navigation functions
   const navigateTo = (newDirection: OnboardingFlowDirection) => {
@@ -44,7 +51,7 @@ export const useOnboardingFlow = () => {
       const visible = flow.visibleScreens;
       if (visible.length === 0) return prev;
 
-      let currentPos = visible.indexOf(prev );
+      let currentPos = visible.indexOf(prev);
       if (currentPos === -1) {
         // Default to first visible screen if current is not found
         currentPos = Math.max(0, visible.indexOf(flow.first));
@@ -54,17 +61,24 @@ export const useOnboardingFlow = () => {
       if (newPos < 0) newPos = 0;
       if (newPos > visible.length - 1) newPos = visible.length - 1;
 
+      if (visible[newPos] === void 0) {
+        console.error("Invalid screen index", newPos);
+        return prev;
+      }
+
       return visible[newPos];
     });
   };
 
   const nextScreen = () => {
     const visible = flow.visibleScreens;
-    const pos = visible.indexOf(currentScreenIndex );
+    const pos = visible.indexOf(currentScreenIndex);
     if (pos === -1) {
       // If desynced, jump towards first
       setDirection(OnboardingFlowDirection.FORWARD);
-      setCurrentScreenIndex(visible[Math.max(0, visible.indexOf(flow.first))] ?? flow.first);
+      setCurrentScreenIndex(
+        visible[Math.max(0, visible.indexOf(flow.first))] ?? flow.first,
+      );
       return;
     }
     if (pos < visible.length - 1) {
@@ -74,11 +88,13 @@ export const useOnboardingFlow = () => {
 
   const prevScreen = () => {
     const visible = flow.visibleScreens;
-    const pos = visible.indexOf(currentScreenIndex );
+    const pos = visible.indexOf(currentScreenIndex);
     if (pos === -1) {
       // If desynced, jump towards first
       setDirection(OnboardingFlowDirection.BACKWARD);
-      setCurrentScreenIndex(visible[Math.max(0, visible.indexOf(flow.first))] ?? flow.first);
+      setCurrentScreenIndex(
+        visible[Math.max(0, visible.indexOf(flow.first))] ?? flow.first,
+      );
       return;
     }
     if (pos > 0) {
@@ -87,10 +103,7 @@ export const useOnboardingFlow = () => {
   };
 
   const skipScreen = () => {
-    const visible = flow.visibleScreens;
-    if (visible.length === 0) return;
-    setDirection(OnboardingFlowDirection.FORWARD);
-    setCurrentScreenIndex(visible[visible.length - 1]);
+    nextScreen();
   };
 
   // Validation logic
@@ -127,9 +140,10 @@ export const useOnboardingFlow = () => {
     solutionType,
     selectedDesires,
     role,
-    utmCampaign: typeof window !== "undefined"
-      ? window.sessionStorage.getItem("utm_campaign")
-      : null,
+    utmCampaign:
+      typeof window !== "undefined"
+        ? window.sessionStorage.getItem("utm_campaign")
+        : null,
   });
 
   // Flow state getter
