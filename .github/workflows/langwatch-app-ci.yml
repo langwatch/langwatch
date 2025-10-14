@@ -23,17 +23,22 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 20
-          cache: "npm"
-          cache-dependency-path: "langwatch/package-lock.json"
+          node-version: 22
+          cache: "pnpm"
+          cache-dependency-path: "langwatch/pnpm-lock.yaml"
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.18.0
 
       - name: Install dependencies
         working-directory: langwatch
-        run: npm ci --prefer-offline --no-audit --no-fund --progress=false
+        run: pnpm install --frozen-lockfile
 
       - name: Prepare files
         working-directory: langwatch
-        run: npm run start:prepare:files
+        run: pnpm run start:prepare:files
 
       # - name: Install TypeScript Native Preview
       #   working-directory: langwatch
@@ -41,7 +46,7 @@ jobs:
 
       - name: Run typecheck
         working-directory: langwatch
-        run: npm run typecheck
+        run: pnpm run typecheck
 
   test-unit:
     env:
@@ -63,21 +68,26 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 20
-          cache: "npm"
-          cache-dependency-path: "langwatch/package-lock.json"
+          node-version: 22
+          cache: "pnpm"
+          cache-dependency-path: "langwatch/pnpm-lock.yaml"
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.18.0
 
       - name: Install dependencies
         working-directory: langwatch
-        run: npm ci --prefer-offline --no-audit --no-fund --progress=false
+        run: pnpm install --frozen-lockfile
 
       - name: Prepare files
         working-directory: langwatch
-        run: npm run start:prepare:files
+        run: pnpm run start:prepare:files
 
       - name: Run unit tests
         working-directory: langwatch
-        run: npm run test:unit -- --run --bail=1
+        run: pnpm run test:unit -- --run --bail=1
 
   test-integration:
     env:
@@ -139,29 +149,34 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 20
-          cache: "npm"
-          cache-dependency-path: "langwatch/package-lock.json"
+          node-version: 22
+          cache: "pnpm"
+          cache-dependency-path: "langwatch/pnpm-lock.yaml"
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.18.0
 
       - name: Install dependencies
         working-directory: langwatch
-        run: npm ci --prefer-offline --no-audit --no-fund --progress=false
+        run: pnpm install --frozen-lockfile
 
       - name: Prepare files
         working-directory: langwatch
-        run: npm run start:prepare:files
+        run: pnpm run start:prepare:files
 
       - name: Setup database
         working-directory: langwatch
-        run: npm run prisma:migrate
+        run: pnpm run prisma:migrate
 
       - name: Setup Elasticsearch
         working-directory: langwatch
-        run: npm run elastic:migrate
+        run: pnpm run elastic:migrate
 
       - name: Run integration tests
         working-directory: langwatch
-        run: npm run test:integration
+        run: pnpm run test:integration
 
   build:
     runs-on: ubuntu-latest
@@ -172,14 +187,14 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
 
       - name: Cache node_modules
         uses: actions/cache@v4
         id: modules-cache
         with:
           path: langwatch/node_modules
-          key: ${{ runner.os }}-modules-${{ hashFiles('langwatch/package-lock.json') }}
+          key: ${{ runner.os }}-modules-${{ hashFiles('langwatch/pnpm-lock.yaml') }}
           restore-keys: ${{ runner.os }}-modules-
 
       - name: Cache Next.js
@@ -189,18 +204,24 @@ jobs:
           path: |
             langwatch/.next/cache/webpack
             langwatch/.next/cache/swc
-          key: ${{ runner.os }}-nextjs-${{ hashFiles('langwatch/package-lock.json') }}
+          key: ${{ runner.os }}-nextjs-${{ hashFiles('langwatch/pnpm-lock.yaml') }}
           restore-keys: |
-            ${{ runner.os }}-nextjs-${{ hashFiles('langwatch/package-lock.json') }}-
+            ${{ runner.os }}-nextjs-${{ hashFiles('langwatch/pnpm-lock.yaml') }}-
+
+      - name: Setup pnpm
+        if: steps.modules-cache.outputs.cache-hit != 'true'
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.18.0
 
       - name: Install dependencies
         if: steps.modules-cache.outputs.cache-hit != 'true'
         working-directory: langwatch
-        run: npm ci --prefer-offline --no-audit --no-fund --progress=false
+        run: pnpm install --frozen-lockfile
 
       - name: Build
         working-directory: langwatch
-        run: npm run build
+        run: pnpm run build
 
       - name: Save Next.js cache
         if: steps.next-cache.outputs.cache-hit != 'true'

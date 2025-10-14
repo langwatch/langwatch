@@ -14,7 +14,7 @@ Check out [LangWatch integration guide](https://docs.langwatch.ai/integration/ov
 2. Navigate to the MCP item in the sidebar
 3. Set the "name" as "LangWatch"
 4. Set the "type" to `command`
-5. Set the "command" to `npx -y @langwatch/mcp-server --apiKey=sk-lw-...`
+5. Set the "command" to `pnpm dlx @langwatch/mcp-server --apiKey=sk-lw-...` (or `npx -y @langwatch/mcp-server --apiKey=sk-lw-...`)
 
 - `--apiKey`: Your LangWatch API key. This is mandatory and must be provided.
 - `--endpoint`: _Optional_ The endpoint for the LangWatch API. Defaults to `https://app.langwatch.ai` if not specified.

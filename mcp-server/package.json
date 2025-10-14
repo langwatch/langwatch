@@ -6,6 +6,7 @@
   "main": "./dist/index.js",
   "module": "./dist/index.mjs",
   "types": "./dist/index.d.ts",
+  "packageManager": "pnpm@10.18.0",
   "exports": {
     ".": {
       "import": "./dist/index.mjs",
@@ -26,7 +27,7 @@
   "author": "",
   "license": "MIT",
   "engines": {
-    "node": ">=18.0.0"
+    "node": ">=22.0.0"
   },
   "devDependencies": {
     "@ai-sdk/anthropic": "^2.0.15",

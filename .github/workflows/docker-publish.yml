@@ -44,6 +44,8 @@ jobs:
           tags: |
             langwatch/langwatch:latest
             langwatch/langwatch:${{ steps.extract_version.outputs.version }}
+          build-args: |
+            PNPM_VERSION=10.18.0
 
       - name: Build and push LangWatch NLP Docker image
         uses: docker/build-push-action@v6

@@ -28,8 +28,9 @@ jobs:
       - name: Install dependencies
         run: |
           cd langwatch
-          npm install
-          npm run build
+          corepack enable && corepack prepare pnpm@10.18.0 --activate
+          pnpm install --frozen-lockfile
+          pnpm run build
           cd ..
           uv pip install build
 

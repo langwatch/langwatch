@@ -7,8 +7,9 @@
     "types": "dist/index.d.ts",
     "author": "LangWatch",
     "license": "MIT",
+    "packageManager": "pnpm@10.18.0",
     "engines": {
-        "node": ">=20",
+        "node": ">=22",
         "pnpm": ">=8"
     },
     "files": [
@@ -57,7 +58,7 @@
         "tarball": "pnpm build && pnpm pack",
         "typecheck": "tsc --noEmit",
         "prepublish": "pnpm run build",
-        "generate:openapi-types": "npx openapi-typescript ../langwatch/src/app/api/openapiLangWatch.json -o ./src/internal/generated/openapi/api-client.ts",
+        "generate:openapi-types": "pnpm dlx openapi-typescript ../langwatch/src/app/api/openapiLangWatch.json -o ./src/internal/generated/openapi/api-client.ts",
         "generate:server-types": "./copy-types.sh"
     },
     "devDependencies": {

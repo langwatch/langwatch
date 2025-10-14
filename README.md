@@ -89,7 +89,7 @@ Start just the databases using docker and leave it running:
 docker compose up redis postgres opensearch
 ```
 
-Then, on another terminal, install the dependencies and start LangWatch:
+Then, on another terminal, install the dependencies and start LangWatch (Node 22, pnpm 10.18.0):
 
 ```bash
 make install
