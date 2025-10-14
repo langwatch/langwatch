@@ -28,7 +28,7 @@ import {
   type PercentileAggregationTypes,
 } from "./types";
 import { env } from "../../env.mjs";
-import { nonEmptyFilters } from "./utils";
+import { filterOutEmptyFilters } from "./utils";
 
 const labelsMapping: Partial<
   Record<
@@ -160,7 +160,7 @@ export const timeseries = async (input: TimeseriesInputType) => {
           };
         }
 
-        if (nonEmptyFilters(filters).length > 0) {
+        if (Object.keys(filterOutEmptyFilters(filters)).length > 0) {
           aggregationQuery = Object.fromEntries(
             Object.entries(aggregationQuery).map(([key, value]) => [
               `${key}__filters`,
@@ -396,12 +396,13 @@ const extractResult = (
     return { [pipelinePath_]: current[pipelinePath_].value };
   }
 
-  if (nonEmptyFilters(filters).length > 0) {
+  if (Object.keys(filterOutEmptyFilters(filters)).length > 0) {
     const firstPath = paths[0];
     paths.unshift(`${firstPath}__filters`);
   }
 
   for (const path of paths) {
+    // eslint-disable-next-line @typescript-eslint/prefer-optional-chain
     if (!current || !current[path]) {
       // Include key in series name if it's provided and the metric supports it
       const hasKeySupport = metric_.requiresKey !== undefined;

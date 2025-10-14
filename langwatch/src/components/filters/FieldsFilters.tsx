@@ -38,23 +38,51 @@ import { Tooltip } from "../ui/tooltip";
 
 import { useDrawer } from "~/components/CurrentDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import { nonEmptyFilters } from "../../server/analytics/utils";
+import { filterOutEmptyFilters } from "../../server/analytics/utils";
 
-export function FieldsFilters({
-  isEditMode,
-  filters,
-  setFilters,
+export function QueryStringFieldsFilters({
+  hideTriggerButton = false,
 }: {
-  isEditMode?: boolean;
-  filters?: Record<FilterField, FilterParam>;
-  setFilters?: (filters: Partial<Record<FilterField, FilterParam>>) => void;
+  hideTriggerButton?: boolean;
 }) {
-  const { filterParams } = useFilterParams();
+  const { nonEmptyFilters, setFilters } = useFilterParams();
+
   const { openDrawer } = useDrawer();
   const { hasTeamPermission } = useOrganizationTeamProject();
 
-  const nonEmptyFilters_ = nonEmptyFilters(filters ?? filterParams.filters);
+  const hasAnyFilters = Object.keys(nonEmptyFilters).length > 0;
 
+  return (
+    <FieldsFilters
+      filters={nonEmptyFilters}
+      setFilters={(filters) => setFilters(filterOutEmptyFilters(filters))}
+      actionButton={
+        hasTeamPermission(TeamRoleGroup.TRIGGERS_MANAGE) &&
+        !hideTriggerButton ? (
+          <Tooltip content="Create a filter to add a trigger.">
+            <Button
+              colorPalette="orange"
+              onClick={() => openDrawer("trigger", undefined)}
+              disabled={!hasAnyFilters}
+            >
+              Add Trigger
+            </Button>
+          </Tooltip>
+        ) : undefined
+      }
+    />
+  );
+}
+
+export function FieldsFilters({
+  filters,
+  setFilters,
+  actionButton,
+}: {
+  filters: Record<FilterField, FilterParam>;
+  setFilters: (filters: Partial<Record<FilterField, FilterParam>>) => void;
+  actionButton?: React.ReactNode;
+}) {
   const filterKeys: FilterField[] = [
     "metadata.prompt_ids",
     "spans.model",
@@ -77,8 +105,6 @@ export function FieldsFilters({
     availableFilters[id],
   ]);
 
-  const hasAnyFilters = nonEmptyFilters_.length > 0;
-
   return (
     <VStack align="start" width="300px" gap={6}>
       <HStack width={"full"}>
@@ -86,17 +112,7 @@ export function FieldsFilters({
 
         <Spacer />
 
-        {hasTeamPermission(TeamRoleGroup.TRIGGERS_MANAGE) && !isEditMode && (
-          <Tooltip content="Create a filter to add a trigger.">
-            <Button
-              colorPalette="orange"
-              onClick={() => openDrawer("trigger", undefined)}
-              disabled={!hasAnyFilters}
-            >
-              Add Trigger
-            </Button>
-          </Tooltip>
-        )}
+        {actionButton}
       </HStack>
       <VStack gap={3} width="full">
         {allFilters.map(([id, filter]) => (
@@ -116,33 +132,21 @@ export function FieldsFilters({
 function FieldsFilter({
   filterId,
   filter,
-  filters: propFilters,
-  setFilters: propSetFilters,
+  filters,
+  setFilters,
 }: {
   filterId: FilterField;
   filter: FilterDefinition;
-  filters?: Record<FilterField, FilterParam>;
-  setFilters?: (filters: Partial<Record<FilterField, FilterParam>>) => void;
+  filters: Record<FilterField, FilterParam>;
+  setFilters: (filters: Partial<Record<FilterField, FilterParam>>) => void;
 }) {
   const gray400 = useColorRawValue("gray.400");
 
-  const { setFilter: setQueryFilter, filters: queryFilters } =
-    useFilterParams();
-
   const setFilter = useCallback(
     (filterId: FilterField, values: FilterParam) => {
-      if (propSetFilters) {
-        propSetFilters({ ...propFilters, [filterId]: values });
-      } else {
-        setQueryFilter(filterId, values);
-      }
+      setFilters({ ...filters, [filterId]: values });
     },
-    [propSetFilters, setQueryFilter, propFilters]
-  );
-
-  const filters = useMemo(
-    () => propFilters ?? queryFilters,
-    [propFilters, queryFilters]
+    [setFilters, filters]
   );
 
   const searchRef = React.useRef<HTMLInputElement | null>(null);

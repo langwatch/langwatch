@@ -4,7 +4,7 @@ import { useRouter } from "next/router";
 import { availableFilters } from "../server/filters/registry";
 import type { FilterField } from "../server/filters/types";
 import qs from "qs";
-import { nonEmptyFilters } from "../server/analytics/utils";
+import { filterOutEmptyFilters } from "../server/analytics/utils";
 
 export type FilterParam =
   | string[]
@@ -168,7 +168,7 @@ export const useFilterParams = () => {
     clearFilters,
     getLatestFilters,
     filterParams,
-    nonEmptyFilters: nonEmptyFilters(filterParams.filters),
+    nonEmptyFilters: filterOutEmptyFilters(filterParams.filters),
     queryOpts: {
       enabled: !!project && !!startDate && !!endDate,
       refetchOnMount: false,

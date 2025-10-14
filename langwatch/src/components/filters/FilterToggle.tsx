@@ -1,13 +1,10 @@
 import { Box, Button, HStack, Text } from "@chakra-ui/react";
 import { useRouter } from "next/router";
 import { Filter, X } from "react-feather";
-import {
-  useFilterParams,
-  type FilterParam,
-} from "../../hooks/useFilterParams";
+import { useFilterParams, type FilterParam } from "../../hooks/useFilterParams";
 import { Tooltip } from "../ui/tooltip";
 import type { FilterField } from "../../server/filters/types";
-import { nonEmptyFilters } from "../../server/analytics/utils";
+import { filterOutEmptyFilters } from "../../server/analytics/utils";
 
 export const useFilterToggle = (
   { defaultShowFilters } = { defaultShowFilters: false }
@@ -78,8 +75,8 @@ export function FilterToggleButton({
   onClear?: () => void;
   children: React.ReactNode;
 }) {
-  const nonEmptyFilters_ = nonEmptyFilters(filters);
-  const hasAnyFilters = nonEmptyFilters_.length > 0;
+  const nonEmptyFilters = filterOutEmptyFilters(filters);
+  const hasAnyFilters = Object.keys(nonEmptyFilters).length > 0;
 
   return (
     <Button
@@ -104,7 +101,7 @@ export function FilterToggleButton({
             lineHeight="12px"
             textAlign="center"
           >
-            {nonEmptyFilters_.length}
+            {Object.keys(nonEmptyFilters).length}
           </Box>
         )}
         <Filter size={16} />

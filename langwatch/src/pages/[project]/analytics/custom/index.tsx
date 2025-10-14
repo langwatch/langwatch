@@ -62,11 +62,8 @@ import { Menu } from "~/components/ui/menu";
 import { Select } from "~/components/ui/select";
 import { Switch } from "~/components/ui/switch";
 import { Tooltip } from "~/components/ui/tooltip";
-import {
-  useFilterParams,
-  type FilterParam,
-} from "~/hooks/useFilterParams";
-import { nonEmptyFilters } from "../../../../server/analytics/utils";
+import { useFilterParams, type FilterParam } from "~/hooks/useFilterParams";
+import { filterOutEmptyFilters } from "../../../../server/analytics/utils";
 import {
   CustomGraph,
   summaryGraphTypes,
@@ -1175,7 +1172,7 @@ function SeriesField({
           control={form.control}
           name={`series.${index}.filters`}
           render={({ field }) => {
-            const nonEmptyFilters_ = nonEmptyFilters(
+            const nonEmptyFilters = filterOutEmptyFilters(
               field.value ?? ({} as Record<FilterField, FilterParam>)
             );
 
@@ -1196,7 +1193,9 @@ function SeriesField({
                   })
                 }
               >
-                {nonEmptyFilters_.length > 0 ? "Edit Filters" : "Add Filters"}
+                {Object.keys(nonEmptyFilters).length > 0
+                  ? "Edit Filters"
+                  : "Add Filters"}
               </FilterToggleButton>
             );
           }}

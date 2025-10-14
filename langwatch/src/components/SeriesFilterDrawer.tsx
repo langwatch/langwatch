@@ -55,7 +55,6 @@ export function SeriesFiltersDrawer({
             minWidth="calc(50% - 16px)"
           >
             <FieldsFilters
-              isEditMode
               filters={filters}
               setFilters={(filters) => {
                 const updatedFilters = Object.fromEntries(
