@@ -504,7 +504,7 @@ const ScoreBlock = ({
                   value={tempValue?.toString() ?? ""}
                   defaultValue={defaultRadioValue}
                   onValueChange={(change) => {
-                    setTempValue(change.value);
+                    setTempValue(change.value ?? "");
                   }}
                 >
                   <VStack align="start" gap={2}>

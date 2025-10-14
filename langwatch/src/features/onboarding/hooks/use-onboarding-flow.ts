@@ -66,7 +66,7 @@ export const useOnboardingFlow = () => {
         return prev;
       }
 
-      return visible[newPos];
+      return visible[newPos] ?? prev;
     });
   };
 
