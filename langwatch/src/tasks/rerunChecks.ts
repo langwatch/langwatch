@@ -1,7 +1,4 @@
-import type {
-  QueryDslBoolQuery,
-  QueryDslQueryContainer,
-} from "@elastic/elasticsearch/lib/api/types";
+import { estypes } from "@elastic/elasticsearch";
 import {
   // TRACE_CHECKS_INDEX,
   esClient,
@@ -49,8 +46,8 @@ export default async function execute(evaluatorId: string, projectId: string) {
                 },
               },
             },
-          ] as QueryDslQueryContainer[],
-        } as QueryDslBoolQuery,
+          ] as estypes.QueryDslQueryContainer[],
+        } as estypes.QueryDslBoolQuery,
       },
     },
   });

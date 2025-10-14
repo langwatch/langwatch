@@ -1,7 +1,4 @@
-import {
-  type MappingDenseVectorProperty,
-  type MappingProperty,
-} from "@elastic/elasticsearch/lib/api/types";
+import { estypes } from "@elastic/elasticsearch";
 import { FLATENNED_TYPE } from "../src/server/elasticsearch";
 import type {
   DSPyStep,
@@ -15,8 +12,8 @@ import {
 } from "../src/server/tracer/types";
 
 export type NonNestedMappingProperty =
-  | Omit<MappingProperty, "properties">
-  | MappingDenseVectorProperty
+  | Omit<estypes.MappingProperty, "properties">
+  | estypes.MappingDenseVectorProperty
   | { type: "knn_vector"; [key: string]: any };
 
 // Helper type to convert camelCase to snake_case at the type level

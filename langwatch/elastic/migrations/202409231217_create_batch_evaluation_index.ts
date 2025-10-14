@@ -1,4 +1,4 @@
-import type { MappingProperty } from "@elastic/elasticsearch/lib/api/types";
+import { estypes } from "@elastic/elasticsearch";
 import {
   BATCH_EVALUATION_INDEX,
   esClient,
@@ -11,7 +11,7 @@ import { Client as ElasticClient } from "@elastic/elasticsearch";
 export const migrate = async (_migrationKey: string, client: ElasticClient) => {
   await createIndex({
     index: BATCH_EVALUATION_INDEX.base,
-    mappings: batchEvaluationMapping as Record<string, MappingProperty>,
+    mappings: batchEvaluationMapping as Record<string, estypes.MappingProperty>,
     client,
   });
 

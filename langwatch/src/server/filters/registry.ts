@@ -1,7 +1,4 @@
-import type {
-  QueryDslBoolQuery,
-  QueryDslQueryContainer,
-} from "@elastic/elasticsearch/lib/api/types";
+import { estypes } from "@elastic/elasticsearch";
 
 import {
   AVAILABLE_EVALUATORS,
@@ -455,8 +452,8 @@ export const availableFilters: { [K in FilterField]: FilterDefinition } = {
               term: {
                 "error.has_error": true,
               },
-            } as QueryDslQueryContainer,
-          } as QueryDslBoolQuery,
+            } as estypes.QueryDslQueryContainer,
+          } as estypes.QueryDslBoolQuery,
         };
       } else {
         return {
@@ -776,8 +773,8 @@ export const availableFilters: { [K in FilterField]: FilterDefinition } = {
                   ),
                 },
               },
-            ] as QueryDslQueryContainer[],
-          } as QueryDslBoolQuery,
+            ] as estypes.QueryDslQueryContainer[],
+          } as estypes.QueryDslBoolQuery,
         },
       },
     }),
@@ -852,8 +849,8 @@ export const availableFilters: { [K in FilterField]: FilterDefinition } = {
                   },
                 },
               },
-            ] as QueryDslQueryContainer[],
-          } as QueryDslBoolQuery,
+            ] as estypes.QueryDslQueryContainer[],
+          } as estypes.QueryDslBoolQuery,
         },
       },
     }),
@@ -915,8 +912,8 @@ export const availableFilters: { [K in FilterField]: FilterDefinition } = {
                   "evaluations.label": values,
                 },
               },
-            ] as QueryDslQueryContainer[],
-          } as QueryDslBoolQuery,
+            ] as estypes.QueryDslQueryContainer[],
+          } as estypes.QueryDslBoolQuery,
         },
       },
     }),
@@ -990,8 +987,8 @@ export const availableFilters: { [K in FilterField]: FilterDefinition } = {
                   "evaluations.status": values,
                 },
               },
-            ] as QueryDslQueryContainer[],
-          } as QueryDslBoolQuery,
+            ] as estypes.QueryDslQueryContainer[],
+          } as estypes.QueryDslBoolQuery,
         },
       },
     }),
@@ -1121,8 +1118,8 @@ export const availableFilters: { [K in FilterField]: FilterDefinition } = {
                   },
                 },
               },
-            ] as QueryDslQueryContainer[],
-          } as QueryDslBoolQuery,
+            ] as estypes.QueryDslQueryContainer[],
+          } as estypes.QueryDslBoolQuery,
         },
       },
     }),
@@ -1221,13 +1218,13 @@ export const availableFilters: { [K in FilterField]: FilterDefinition } = {
                             },
                           },
                         },
-                      ] as QueryDslQueryContainer[],
-                    } as QueryDslBoolQuery,
+                      ] as estypes.QueryDslQueryContainer[],
+                    } as estypes.QueryDslBoolQuery,
                   },
                 },
               },
-            ] as QueryDslQueryContainer[],
-          } as QueryDslBoolQuery,
+            ] as estypes.QueryDslQueryContainer[],
+          } as estypes.QueryDslBoolQuery,
         },
       },
     }),
@@ -1380,7 +1377,7 @@ export const availableFilters: { [K in FilterField]: FilterDefinition } = {
                 field: "annotations",
               },
             },
-          } as QueryDslBoolQuery,
+          } as estypes.QueryDslBoolQuery,
         };
       } else {
         return {

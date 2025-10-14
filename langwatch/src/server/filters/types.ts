@@ -1,7 +1,4 @@
-import type {
-  AggregationsAggregationContainer,
-  QueryDslQueryContainer,
-} from "@elastic/elasticsearch/lib/api/types";
+import { estypes } from "@elastic/elasticsearch";
 import { z } from "zod";
 
 export const filterFieldsEnum = z.enum([
@@ -39,7 +36,7 @@ export type FilterDefinition = {
     values: string[],
     key: string | undefined,
     subkey: string | undefined
-  ) => QueryDslQueryContainer;
+  ) => estypes.QueryDslQueryContainer;
   single?: boolean;
   type?: "numeric";
   requiresKey?: {
@@ -53,7 +50,7 @@ export type FilterDefinition = {
       query: string | undefined,
       key: string | undefined,
       subkey: string | undefined
-    ) => Record<string, AggregationsAggregationContainer>;
+    ) => Record<string, estypes.AggregationsAggregationContainer>;
     extract: (
       result: Record<string, any>
     ) => { field: string; label: string; count: number }[];

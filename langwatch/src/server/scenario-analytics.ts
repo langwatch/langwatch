@@ -1,5 +1,5 @@
 import { SCENARIO_EVENTS_INDEX } from "~/server/elasticsearch";
-import type { AggregationsCalendarInterval } from "@elastic/elasticsearch/lib/api/types";
+import { estypes } from "@elastic/elasticsearch";
 import { ScenarioEventType } from "~/app/api/scenario-events/[[...route]]/enums";
 
 export interface ScenarioAnalyticsQueryOptions {
@@ -9,7 +9,7 @@ export interface ScenarioAnalyticsQueryOptions {
   endTime: number;
   includeDateHistogram?: boolean;
   dateHistogramOptions?: {
-    calendarInterval: AggregationsCalendarInterval;
+    calendarInterval: estypes.AggregationsCalendarInterval;
     format: string;
     timeZone: string;
   };
@@ -21,7 +21,7 @@ export interface ScenarioAnalyticsQueryOptionsForAllEventTypes {
   endTime: number;
   includeDateHistogram?: boolean;
   dateHistogramOptions?: {
-    calendarInterval: AggregationsCalendarInterval;
+    calendarInterval: estypes.AggregationsCalendarInterval;
     format: string;
     timeZone: string;
   };
@@ -42,7 +42,7 @@ export function createScenarioAnalyticsQuery(
     endTime,
     includeDateHistogram = false,
     dateHistogramOptions = {
-      calendarInterval: "day" as AggregationsCalendarInterval,
+      calendarInterval: "day" as estypes.AggregationsCalendarInterval,
       format: "yyyy-MM-dd",
       timeZone: "UTC",
     },

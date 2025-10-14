@@ -1,19 +1,14 @@
-import {
-  type QueryDslBoolQuery,
-  type QueryDslQueryContainer,
-  type SearchResponse,
-} from "@elastic/elasticsearch/lib/api/types";
-import { Client as ElasticClient } from "@elastic/elasticsearch";
+import { Client as ElasticClient, estypes } from "@elastic/elasticsearch";
 
 import { esClient, TRACE_INDEX } from "../../src/server/elasticsearch";
 
 export const migrate = async (client: ElasticClient) => {
   let searchAfter: unknown[] | undefined;
-  let response: SearchResponse<{ trace_id: string }>;
+  let response: estypes.SearchResponse<{ trace_id: string }>;
   let bulkActions = [];
 
   do {
-    const query: QueryDslQueryContainer = {
+    const query: estypes.QueryDslQueryContainer = {
       bool: {
         must: [
           {
@@ -25,7 +20,7 @@ export const migrate = async (client: ElasticClient) => {
             },
           },
         ],
-      } as QueryDslBoolQuery,
+      } as estypes.QueryDslBoolQuery,
     };
 
     response = await client.search<{ trace_id: string }>({

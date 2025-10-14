@@ -13,13 +13,14 @@ import {
   traceMapping,
   type ElasticSearchMigration,
 } from "../../elastic/schema";
-import type { MappingProperty } from "@elastic/elasticsearch/lib/api/types";
 import { env } from "../env.mjs";
 import { execSync } from "child_process";
 import { prisma } from "../server/db";
-import { type Client as ElasticClient } from "@elastic/elasticsearch";
+import { type Client as ElasticClient, estypes } from "@elastic/elasticsearch";
 import { migrations as importedMigrations } from "../../elastic/migrations";
 import { eventMapping } from "../../elastic/mappings/scenario-events";
+
+type MappingProperty = estypes.MappingProperty;
 
 const migrations: Record<string, any> = importedMigrations;
 

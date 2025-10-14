@@ -1,4 +1,4 @@
-import type { AggregationsCalendarInterval } from "@elastic/elasticsearch/lib/api/types";
+import { estypes } from "@elastic/elasticsearch";
 import { prisma } from "~/server/db";
 import { esClient } from "~/server/elasticsearch";
 import { createScenarioAnalyticsQueriesForAllEventTypes } from "~/server/scenario-analytics";
@@ -41,7 +41,7 @@ export default async function execute() {
         endTime: today.getTime(),
         includeDateHistogram: true,
         dateHistogramOptions: {
-          calendarInterval: "day" as AggregationsCalendarInterval,
+          calendarInterval: "day" as estypes.AggregationsCalendarInterval,
           format: "yyyy-MM-dd",
           timeZone: "UTC",
         },
