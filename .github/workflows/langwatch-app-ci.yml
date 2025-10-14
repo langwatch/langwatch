@@ -20,17 +20,17 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.18.0
+
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: "pnpm"
           cache-dependency-path: "langwatch/pnpm-lock.yaml"
-
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          version: 10.18.0
 
       - name: Install dependencies
         working-directory: langwatch
@@ -65,17 +65,17 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.18.0
+
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: "pnpm"
           cache-dependency-path: "langwatch/pnpm-lock.yaml"
-
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          version: 10.18.0
 
       - name: Install dependencies
         working-directory: langwatch
@@ -146,17 +146,17 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.18.0
+
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: "pnpm"
           cache-dependency-path: "langwatch/pnpm-lock.yaml"
-
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          version: 10.18.0
 
       - name: Install dependencies
         working-directory: langwatch
@@ -209,7 +209,6 @@ jobs:
             ${{ runner.os }}-nextjs-${{ hashFiles('langwatch/pnpm-lock.yaml') }}-
 
       - name: Setup pnpm
-        if: steps.modules-cache.outputs.cache-hit != 'true'
         uses: pnpm/action-setup@v4
         with:
           version: 10.18.0

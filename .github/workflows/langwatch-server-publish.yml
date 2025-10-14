@@ -25,10 +25,21 @@ jobs:
           curl -LsSf https://astral.sh/uv/install.sh | sh
           echo "$HOME/.cargo/bin" >> $GITHUB_PATH
 
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: "langwatch/pnpm-lock.yaml"
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.18.0
+
       - name: Install dependencies
         run: |
           cd langwatch
-          corepack enable && corepack prepare pnpm@10.18.0 --activate
           pnpm install --frozen-lockfile
           pnpm run build
           cd ..

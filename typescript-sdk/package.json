@@ -126,21 +126,5 @@
         "@opentelemetry/sdk-node": ">=0.200.0 <1.0.0",
         "@opentelemetry/sdk-trace-web": ">=1.19.0 <3.0.0",
         "langchain": ">=0.3.0 <1.0.0"
-    },
-    "pnpm": {
-        "overrides": {
-            "@opentelemetry/api": "^1.9.0",
-            "@opentelemetry/core": "^2.0.1",
-            "@opentelemetry/resources": "^2.0.1",
-            "@opentelemetry/sdk-trace-base": "^2.0.1",
-            "@opentelemetry/instrumentation": "0.205.0",
-            "@opentelemetry/sdk-node": "0.205.0",
-            "@opentelemetry/context-async-hooks": "^2.1.0",
-            "@opentelemetry/api-logs": "0.205.0",
-            "@opentelemetry/sdk-logs": "0.205.0",
-            "@opentelemetry/exporter-logs-otlp-http": "0.205.0",
-            "@opentelemetry/exporter-trace-otlp-http": "0.205.0",
-            "zod": "^4.0.14"
-        }
     }
 }
