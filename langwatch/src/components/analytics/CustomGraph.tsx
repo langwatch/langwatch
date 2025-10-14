@@ -118,7 +118,6 @@ export function CustomGraph({
   input,
   titleProps,
   hideGroupLabel = false,
-  size = "md",
   filters,
 }: {
   input: CustomGraphInput;

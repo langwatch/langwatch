@@ -7,10 +7,7 @@ import type { FilterField } from "~/server/filters/types";
 import { api } from "~/utils/api";
 import { Drawer } from "../components/ui/drawer";
 import { toaster } from "../components/ui/toaster";
-import {
-  FieldsFilters,
-  QueryStringFieldsFilters,
-} from "./filters/FieldsFilters";
+import { QueryStringFieldsFilters } from "./filters/FieldsFilters";
 import { HorizontalFormControl } from "./HorizontalFormControl";
 
 export function EditTriggerFilterDrawer({ triggerId }: { triggerId?: string }) {

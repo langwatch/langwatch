@@ -1221,6 +1221,7 @@ export const seriesInput = z.object({
       ])
     )
   ),
+  asPercent: z.optional(z.boolean()),
 });
 
 export type SeriesInputType = z.infer<typeof seriesInput>;
