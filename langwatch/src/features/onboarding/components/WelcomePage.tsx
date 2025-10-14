@@ -17,7 +17,9 @@ import { LoadingScreen } from "~/components/LoadingScreen";
 export const WelcomePage: React.FC = () => {
   const router = useRouter();
   const { data: session } = useRequiredSession();
-  const [onboardingNeeded, setOnboardingNeeded] = useState<boolean | undefined>(void 0);
+  const [onboardingNeeded, setOnboardingNeeded] = useState<boolean | undefined>(
+    void 0,
+  );
 
   const {
     organization,
@@ -67,7 +69,7 @@ export const WelcomePage: React.FC = () => {
   useEffect(() => {
     const hasAnyProject =
       organizations?.some((org) =>
-        org.teams.some((t) => t.projects.length > 0)
+        org.teams.some((t) => t.projects.length > 0),
       ) ?? false;
     if (!hasAnyProject) {
       setOnboardingNeeded(true);
@@ -76,10 +78,10 @@ export const WelcomePage: React.FC = () => {
 
     const slug =
       project?.slug ??
-      organizations
-        ?.flatMap((o) => o.teams)
-        .flatMap((t) => t.projects)[0]?.slug;
+      organizations?.flatMap((o) => o.teams).flatMap((t) => t.projects)[0]
+        ?.slug;
     if (slug) {
+      setOnboardingNeeded(false);
       void router.push(`/${slug}`);
     } else {
       setOnboardingNeeded(true);
@@ -123,20 +125,24 @@ export const WelcomePage: React.FC = () => {
     );
   }
 
-  if (!session || !onboardingNeeded || (organizationIsLoading && !organization)) {
+  if (
+    !session ||
+    !onboardingNeeded ||
+    (organizationIsLoading && !organization)
+  ) {
     return <LoadingScreen />;
   }
 
+  const currentVisibleIndex = flow.visibleScreens.findIndex(
+    (s) => s === currentScreenIndex,
+  );
+  const currentScreen =
+    currentVisibleIndex >= 0 ? screens[currentVisibleIndex] : undefined;
+
   return (
     <OrganizationOnboardingContainer
-      title={
-        screens[flow.visibleScreens.findIndex((s) => s === currentScreenIndex)]
-          ?.heading ?? "Welcome Aboard 👋"
-      }
-      subTitle={
-        screens[flow.visibleScreens.findIndex((s) => s === currentScreenIndex)]
-          ?.subHeading
-      }
+      title={currentScreen?.heading ?? "Welcome Aboard 👋"}
+      subTitle={currentScreen?.subHeading}
     >
       <VStack gap={4} align="stretch" position="relative" minH="400px">
         <AnimatePresence initial={false} custom={direction} mode="popLayout">
@@ -151,11 +157,7 @@ export const WelcomePage: React.FC = () => {
             style={{ width: "100%" }}
           >
             <fieldset disabled={initializeOrganization.isPending}>
-              {
-                screens[
-                  flow.visibleScreens.findIndex((s) => s === currentScreenIndex)
-                ]?.component
-              }
+              {currentScreen?.component}
             </fieldset>
           </motion.div>
         </AnimatePresence>
@@ -166,12 +168,10 @@ export const WelcomePage: React.FC = () => {
           onNext={navigation.nextScreen}
           onSkip={navigation.skipScreen}
           canProceed={navigation.canProceed()}
-          isSkippable={
-            !screens[
-              flow.visibleScreens.findIndex((s) => s === currentScreenIndex)
-            ]?.required
+          isSkippable={!currentScreen?.required}
+          isSubmitting={
+            initializeOrganization.isPending || initializeOrganization.isSuccess
           }
-          isSubmitting={initializeOrganization.isPending || initializeOrganization.isSuccess}
           onFinish={handleFinalizeSubmit}
         />
       </VStack>
