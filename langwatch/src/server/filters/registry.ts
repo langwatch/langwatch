@@ -539,6 +539,74 @@ export const availableFilters: { [K in FilterField]: FilterDefinition } = {
       },
     },
   },
+  "spans.name": {
+    name: "Span Name",
+    urlKey: "span_name",
+    requiresKey: {
+      filter: "spans.type",
+    },
+    query: (values, key) => ({
+      nested: {
+        path: "spans",
+        query: {
+          bool: {
+            must: [
+              { term: { "spans.type": key } },
+              { terms: { "spans.name": values } },
+            ],
+          },
+        },
+      },
+    }),
+    listMatch: {
+      aggregation: (query, key) => ({
+        unique_values: {
+          nested: { path: "spans" },
+          aggs: {
+            child: {
+              filter: {
+                term: { "spans.type": key },
+              },
+              aggs: {
+                child: {
+                  filter: query
+                    ? {
+                        prefix: {
+                          "spans.name": {
+                            value: query,
+                            case_insensitive: true,
+                          },
+                        },
+                      }
+                    : {
+                        match_all: {},
+                      },
+                  aggs: {
+                    child: {
+                      terms: {
+                        field: "spans.name",
+                        size: 10_000,
+                        order: { _key: "asc" },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      }),
+      extract: (result: Record<string, any>) => {
+        return (
+          result.unique_values?.child?.child?.buckets?.map((bucket: any) => ({
+            field: bucket.key,
+            label: bucket.key,
+            count: bucket.doc_count,
+          })) ?? []
+        );
+      },
+    },
+  },
   "spans.model": {
     name: "Model",
     urlKey: "model",

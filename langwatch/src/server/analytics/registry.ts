@@ -115,8 +115,13 @@ export const analyticsMetrics = {
         filter: "spans.type",
         optional: true,
       },
-      aggregation: (index: number, aggregation, key) => ({
-        [`${index}__span_type_${aggregation}`]: {
+      requiresSubkey: {
+        filter: "spans.name",
+      },
+      aggregation: (index: number, aggregation, key, subkey) => ({
+        [`${index}__span_type_${aggregation}_${key ? `_${key}` : ""}${
+          subkey ? `_${subkey}` : ""
+        }`]: {
           nested: {
             path: "spans",
           },
@@ -126,6 +131,9 @@ export const analyticsMetrics = {
                 bool: {
                   must: [
                     key ? { term: { "spans.type": key } } : { match_all: {} },
+                    subkey
+                      ? { term: { "spans.name": subkey } }
+                      : { match_all: {} },
                   ],
                 } as any,
               },
@@ -138,8 +146,10 @@ export const analyticsMetrics = {
           },
         },
       }),
-      extractionPath: (index: number, aggregation) => {
-        return `${index}__span_type_${aggregation}>child>cardinality`;
+      extractionPath: (index: number, aggregation, key, subkey) => {
+        return `${index}__span_type_${aggregation}_${key ? `_${key}` : ""}${
+          subkey ? `_${subkey}` : ""
+        }>child>cardinality`;
       },
       quickwitSupport: false,
     },
