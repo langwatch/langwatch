@@ -76,6 +76,7 @@ export const BasicInfoConditionalFields: React.FC<
               >
                 <Field.Label>{"What is your phone number?"}</Field.Label>
                 <PhoneNumberInput
+                  autoDetectDefaultCountry
                   value={phoneNumber}
                   onChange={(e164, meta) => {
                     setPhoneNumber(e164 ?? "");
