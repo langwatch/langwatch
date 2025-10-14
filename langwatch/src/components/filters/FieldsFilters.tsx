@@ -397,14 +397,18 @@ function ListSelection({
   );
 
   const options = useMemo(() => {
-    return filterData.data?.options
-      .toSorted((a, b) => (a.count > b.count ? -1 : 1))
-      .filter((option) => {
-        if (query) {
+    const sortingFn = (a: { count: number }, b: { count: number }) =>
+      a.count > b.count ? -1 : 1;
+
+    if (query) {
+      return filterData.data?.options
+        .filter((option) => {
           return option.label.toLowerCase().includes(query.toLowerCase());
-        }
-        return true;
-      });
+        })
+        .toSorted(sortingFn);
+    }
+
+    return filterData.data?.options.toSorted(sortingFn);
   }, [filterData.data?.options, query]);
 
   const parentRef = React.useRef<HTMLDivElement>(null);
