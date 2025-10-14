@@ -65,7 +65,7 @@ export function AnnotationComment({ key = "" }: { key: string }) {
     },
     {
       enabled: !!project?.id && !isPublicRoute,
-    }
+    },
   );
 
   const getAnnotation = api.annotation.getById.useQuery({
@@ -114,8 +114,8 @@ export function AnnotationComment({ key = "" }: { key: string }) {
           value.value !== "" &&
           value.value !== null &&
           (typeof value.value === "boolean" ? value.value : true) &&
-          (Array.isArray(value.value) ? value.value.length > 0 : true)
-      )
+          (Array.isArray(value.value) ? value.value.length > 0 : true),
+      ),
     );
 
     if (action === "edit") {
@@ -140,7 +140,6 @@ export function AnnotationComment({ key = "" }: { key: string }) {
               meta: {
                 closable: true,
               },
-              placement: "top-end",
             });
 
             reset();
@@ -155,10 +154,9 @@ export function AnnotationComment({ key = "" }: { key: string }) {
               meta: {
                 closable: true,
               },
-              placement: "top-end",
             });
           },
-        }
+        },
       );
     } else {
       createAnnotation.mutate(
@@ -180,7 +178,6 @@ export function AnnotationComment({ key = "" }: { key: string }) {
               meta: {
                 closable: true,
               },
-              placement: "top-end",
             });
 
             reset();
@@ -194,10 +191,9 @@ export function AnnotationComment({ key = "" }: { key: string }) {
               meta: {
                 closable: true,
               },
-              placement: "top-end",
             });
           },
-        }
+        },
       );
     }
   };
@@ -219,16 +215,15 @@ export function AnnotationComment({ key = "" }: { key: string }) {
             meta: {
               closable: true,
             },
-            placement: "top-end",
           });
           commentState.resetComment();
         },
-      }
+      },
     );
   };
   const scoreReasonModal = useDisclosure();
   const [selectedScoreTypeId, setSelectedScoreTypeId] = useState<string | null>(
-    null
+    null,
   );
 
   const handleReasonClick = (scoreTypeId: string) => {
@@ -509,7 +504,7 @@ const ScoreBlock = ({
                   value={tempValue?.toString() ?? ""}
                   defaultValue={defaultRadioValue}
                   onValueChange={(change) => {
-                    setTempValue(change.value);
+                    setTempValue(change.value ?? "");
                   }}
                 >
                   <VStack align="start" gap={2}>

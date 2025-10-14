@@ -1,5 +1,6 @@
 import { Box } from "@chakra-ui/react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence } from "motion/react";
+
 import { FullLogo } from "./icons/FullLogo";
 import { useEffect, useState } from "react";
 
@@ -22,7 +23,7 @@ export const LoadingScreen = () => {
       width="full"
       height="full"
       minHeight="100vh"
-      backgroundColor="gray.300"
+      backgroundColor="bg.emphasized"
       paddingBottom={16}
       display="flex"
       alignItems="center"

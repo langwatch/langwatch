@@ -61,7 +61,6 @@ export const useComponentExecution = () => {
         meta: {
           closable: true,
         },
-        placement: "top-end",
       });
       return false;
     }

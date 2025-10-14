@@ -129,7 +129,6 @@ function LLMModelCostForm({
             meta: {
               closable: true,
             },
-            placement: "top-end",
           });
           closeDrawer();
           void llmModelCostsQuery.refetch();
@@ -143,7 +142,6 @@ function LLMModelCostForm({
             meta: {
               closable: true,
             },
-            placement: "top-end",
           });
         },
       }

@@ -103,7 +103,6 @@ export function WorkflowCard({
                             meta: {
                               closable: true,
                             },
-                            placement: "top-end",
                           });
                         },
                       }
@@ -119,7 +118,6 @@ export function WorkflowCard({
             meta: {
               closable: true,
             },
-            placement: "top-end",
           });
         },
         onError: () => {

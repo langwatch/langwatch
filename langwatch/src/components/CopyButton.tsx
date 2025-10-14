@@ -20,7 +20,6 @@ export function CopyButton({ value, label }: { value: string; label: string }) {
             meta: {
               closable: true,
             },
-            placement: "top-end",
           });
           return;
         }
@@ -34,7 +33,6 @@ export function CopyButton({ value, label }: { value: string; label: string }) {
             meta: {
               closable: true,
             },
-            placement: "top-end",
           });
         })();
       }}

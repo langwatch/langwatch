@@ -116,7 +116,6 @@ export const MessageHoverActions = ({
           meta: {
             closable: true,
           },
-          placement: "top-end",
         });
       });
   };

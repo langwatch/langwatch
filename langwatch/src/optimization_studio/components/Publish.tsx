@@ -76,7 +76,6 @@ export function Publish({ isDisabled }: { isDisabled: boolean }) {
           type: "success",
           duration: 5000,
           meta: { closable: true },
-          placement: "top-end",
         });
       },
     });
@@ -90,7 +89,6 @@ export function Publish({ isDisabled }: { isDisabled: boolean }) {
           type: "success",
           duration: 5000,
           meta: { closable: true },
-          placement: "top-end",
         });
       },
     });
@@ -273,7 +271,6 @@ function PublishMenu({
           type: "success",
           duration: 5000,
           meta: { closable: true },
-          placement: "top-end",
         });
       },
     });
@@ -287,7 +284,6 @@ function PublishMenu({
           type: "success",
           duration: 5000,
           meta: { closable: true },
-          placement: "top-end",
         });
       },
     });
@@ -544,7 +540,6 @@ function PublishModalContent({
             meta: {
               closable: true,
             },
-            placement: "top-end",
           });
           throw error;
         }
@@ -558,7 +553,6 @@ function PublishModalContent({
           meta: {
             closable: true,
           },
-          placement: "top-end",
         });
         return;
       }
@@ -589,7 +583,6 @@ function PublishModalContent({
               meta: {
                 closable: true,
               },
-              placement: "top-end",
             });
           },
         }

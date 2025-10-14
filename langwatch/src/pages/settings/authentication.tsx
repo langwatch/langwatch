@@ -72,7 +72,6 @@ export default function AuthenticationSettings() {
       toaster.create({
         title: "Sign-in method removed",
         type: "success",
-        placement: "top-end",
         meta: {
           closable: true,
         },
@@ -83,7 +82,6 @@ export default function AuthenticationSettings() {
         description:
           error instanceof Error ? error.message : "Please try again",
         type: "error",
-        placement: "top-end",
         meta: {
           closable: true,
         },

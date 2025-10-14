@@ -60,7 +60,6 @@ export function EditTriggerFilterDrawer({ triggerId }: { triggerId?: string }) {
         title: "Error",
         description: "Please add at least one filter",
         type: "error",
-        placement: "top-end",
         meta: {
           closable: true,
         },
@@ -86,7 +85,6 @@ export function EditTriggerFilterDrawer({ triggerId }: { triggerId?: string }) {
             title: "Trigger Updated",
             description: `You have successfully updated the trigger`,
             type: "success",
-            placement: "top-end",
             meta: {
               closable: true,
             },
@@ -104,7 +102,6 @@ export function EditTriggerFilterDrawer({ triggerId }: { triggerId?: string }) {
             title: "Error",
             description: "Error updating trigger",
             type: "error",
-            placement: "top-end",
             meta: {
               closable: true,
             },

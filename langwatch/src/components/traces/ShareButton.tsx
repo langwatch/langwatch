@@ -109,7 +109,6 @@ export function ShareButton({
                                       meta: {
                                         closable: true,
                                       },
-                                      placement: "top-end",
                                     });
                                   }
                                 })
@@ -122,7 +121,6 @@ export function ShareButton({
                                     meta: {
                                       closable: true,
                                     },
-                                    placement: "top-end",
                                   });
                                 });
                             },
@@ -136,7 +134,6 @@ export function ShareButton({
                                 meta: {
                                   closable: true,
                                 },
-                                placement: "top-end",
                               });
                             },
                           }
@@ -181,7 +178,6 @@ export function ShareButton({
                             meta: {
                               closable: true,
                             },
-                            placement: "top-end",
                           });
                         },
                       }

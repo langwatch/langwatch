@@ -65,7 +65,6 @@ export const MonitorsSection = ({ title, monitors }: MonitorsSectionProps) => {
       toaster.create({
         title: "Successfully deleted monitor",
         type: "success",
-        placement: "top-end",
         meta: {
           closable: true,
         },
@@ -76,7 +75,6 @@ export const MonitorsSection = ({ title, monitors }: MonitorsSectionProps) => {
         title: "Error deleting monitor",
         description: "Please try again",
         type: "error",
-        placement: "top-end",
         meta: {
           closable: true,
         },
@@ -190,7 +188,6 @@ export const MonitorsSection = ({ title, monitors }: MonitorsSectionProps) => {
                                       monitor.enabled ? "disabled" : "enabled"
                                     }`,
                                     type: "info",
-                                    placement: "top-end",
                                     meta: { closable: true },
                                   });
                                 },

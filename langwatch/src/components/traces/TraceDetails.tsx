@@ -174,7 +174,6 @@ export function TraceDetails(props: {
             meta: {
               closable: true,
             },
-            placement: "top-end",
           });
         },
       }

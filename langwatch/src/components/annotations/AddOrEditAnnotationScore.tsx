@@ -117,7 +117,6 @@ export const AddOrEditAnnotationScore = ({
         meta: {
           closable: true,
         },
-        placement: "top-end",
       });
       return;
     }
@@ -133,7 +132,6 @@ export const AddOrEditAnnotationScore = ({
         meta: {
           closable: true,
         },
-        placement: "top-end",
       });
       return;
     }
@@ -161,7 +159,6 @@ export const AddOrEditAnnotationScore = ({
             meta: {
               closable: true,
             },
-            placement: "top-end",
           });
 
           onClose();
@@ -179,7 +176,6 @@ export const AddOrEditAnnotationScore = ({
             meta: {
               closable: true,
             },
-            placement: "top-end",
           });
         },
       }
