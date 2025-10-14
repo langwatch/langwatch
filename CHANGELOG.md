@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.1.1](https://github.com/langwatch/langwatch/compare/langwatch@v1.1.0...langwatch@v1.1.1) (2025-10-13)
+
+
+### Bug Fixes
+
+* add bodyparser limit to all otel inbound endpoints ([#707](https://github.com/langwatch/langwatch/issues/707)) ([d9ce8bb](https://github.com/langwatch/langwatch/commit/d9ce8bb107298c62e0debcdb0ba17c7936ccf872))
+* find local prompt ([#700](https://github.com/langwatch/langwatch/issues/700)) ([ab42400](https://github.com/langwatch/langwatch/commit/ab42400dea353dd72f5be66004f0cb9a11f2e7d2))
+* improve performance on evaluations table with virtualized grid ([#701](https://github.com/langwatch/langwatch/issues/701)) ([b5eb7d1](https://github.com/langwatch/langwatch/commit/b5eb7d1f67d50e1fc2b04ad46e4f1a7e316c2d7a))
+* reduce cache count to 5 min to avoid blowups, and move histograms to common place ([589797d](https://github.com/langwatch/langwatch/commit/589797d097418e4fc0f3b77ef82a65199c926bcc))
+
 ## [1.1.0](https://github.com/langwatch/langwatch/compare/langwatch@v1.0.0...langwatch@v1.1.0) (2025-10-13)
 
 
