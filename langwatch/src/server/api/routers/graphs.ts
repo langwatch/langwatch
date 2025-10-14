@@ -3,7 +3,7 @@ import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 
 import { nanoid } from "nanoid";
-import { TeamRoleGroup, checkUserPermissionForProject } from "../permission";
+import { checkProjectPermission } from "../rbac";
 import { filterFieldsEnum, type FilterField } from "../../filters/types";
 
 export const graphsRouter = createTRPCRouter({
@@ -16,7 +16,7 @@ export const graphsRouter = createTRPCRouter({
         filterParams: z.any().optional(),
       })
     )
-    .use(checkUserPermissionForProject(TeamRoleGroup.ANALYTICS_MANAGE))
+    .use(checkProjectPermission("analytics:manage"))
     .mutation(async ({ ctx, input }) => {
       const graph = JSON.parse(input.graph);
 
@@ -32,7 +32,7 @@ export const graphsRouter = createTRPCRouter({
     }),
   getAll: protectedProcedure
     .input(z.object({ projectId: z.string() }))
-    .use(checkUserPermissionForProject(TeamRoleGroup.ANALYTICS_VIEW))
+    .use(checkProjectPermission("analytics:view"))
     .query(async ({ input, ctx }) => {
       const { projectId } = input;
       const prisma = ctx.prisma;
@@ -46,7 +46,7 @@ export const graphsRouter = createTRPCRouter({
     }),
   delete: protectedProcedure
     .input(z.object({ projectId: z.string(), id: z.string() }))
-    .use(checkUserPermissionForProject(TeamRoleGroup.ANALYTICS_MANAGE))
+    .use(checkProjectPermission("analytics:manage"))
     .mutation(async ({ ctx, input }) => {
       const { id } = input;
       const prisma = ctx.prisma;
@@ -66,7 +66,7 @@ export const graphsRouter = createTRPCRouter({
     }),
   getById: protectedProcedure
     .input(z.object({ projectId: z.string(), id: z.string() }))
-    .use(checkUserPermissionForProject(TeamRoleGroup.ANALYTICS_VIEW))
+    .use(checkProjectPermission("analytics:view"))
     .query(async ({ ctx, input }) => {
       const { id } = input;
       const prisma = ctx.prisma;
@@ -122,7 +122,7 @@ export const graphsRouter = createTRPCRouter({
         filterParams: z.any().optional(),
       })
     )
-    .use(checkUserPermissionForProject(TeamRoleGroup.ANALYTICS_MANAGE))
+    .use(checkProjectPermission("analytics:manage"))
     .mutation(async ({ ctx, input }) => {
       const prisma = ctx.prisma;
 

@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 
-import { checkUserPermissionForProject, TeamRoleGroup } from "../permission";
+import { checkProjectPermission } from "../rbac";
 
 export const optimizationRouter = createTRPCRouter({
   chat: protectedProcedure
@@ -12,7 +12,7 @@ export const optimizationRouter = createTRPCRouter({
         projectId: z.string(),
       })
     )
-    .use(checkUserPermissionForProject(TeamRoleGroup.WORKFLOWS_VIEW))
+    .use(checkProjectPermission("workflows:view"))
     .mutation(async ({ ctx, input }) => {
       const { workflowId, inputMessages, projectId } = input;
 
@@ -38,7 +38,7 @@ export const optimizationRouter = createTRPCRouter({
     }),
   getPublishedWorkflow: protectedProcedure
     .input(z.object({ workflowId: z.string(), projectId: z.string() }))
-    .use(checkUserPermissionForProject(TeamRoleGroup.WORKFLOWS_VIEW))
+    .use(checkProjectPermission("workflows:view"))
     .query(async ({ ctx, input }) => {
       const { workflowId, projectId } = input;
       const workflow = await ctx.prisma.workflow.findFirst({
@@ -62,7 +62,7 @@ export const optimizationRouter = createTRPCRouter({
     }),
   disableAsComponent: protectedProcedure
     .input(z.object({ workflowId: z.string(), projectId: z.string() }))
-    .use(checkUserPermissionForProject(TeamRoleGroup.WORKFLOWS_MANAGE))
+    .use(checkProjectPermission("workflows:manage"))
     .mutation(async ({ ctx, input }) => {
       const { workflowId, projectId } = input;
 
@@ -79,7 +79,7 @@ export const optimizationRouter = createTRPCRouter({
     }),
   disableAsEvaluator: protectedProcedure
     .input(z.object({ workflowId: z.string(), projectId: z.string() }))
-    .use(checkUserPermissionForProject(TeamRoleGroup.WORKFLOWS_MANAGE))
+    .use(checkProjectPermission("workflows:manage"))
     .mutation(async ({ ctx, input }) => {
       const { workflowId, projectId } = input;
 
@@ -103,7 +103,7 @@ export const optimizationRouter = createTRPCRouter({
         isEvaluator: z.boolean(),
       })
     )
-    .use(checkUserPermissionForProject(TeamRoleGroup.WORKFLOWS_MANAGE))
+    .use(checkProjectPermission("workflows:manage"))
     .mutation(async ({ ctx, input }) => {
       const { workflowId, projectId, isComponent } = input;
       let { isEvaluator } = input;
@@ -132,7 +132,7 @@ export const optimizationRouter = createTRPCRouter({
         isComponent: z.boolean(),
       })
     )
-    .use(checkUserPermissionForProject(TeamRoleGroup.WORKFLOWS_MANAGE))
+    .use(checkProjectPermission("workflows:manage"))
     .mutation(async ({ ctx, input }) => {
       const { workflowId, projectId, isEvaluator } = input;
 
@@ -148,7 +148,7 @@ export const optimizationRouter = createTRPCRouter({
     }),
   getComponents: protectedProcedure
     .input(z.object({ projectId: z.string() }))
-    .use(checkUserPermissionForProject(TeamRoleGroup.WORKFLOWS_MANAGE))
+    .use(checkProjectPermission("workflows:manage"))
     .query(async ({ ctx, input }) => {
       const { projectId } = input;
       const workflows = await ctx.prisma.workflow.findMany({

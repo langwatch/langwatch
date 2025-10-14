@@ -17,7 +17,7 @@ import {
   clearDsl,
   recursiveAlphabeticallySortedKeys,
 } from "../../../optimization_studio/utils/dslUtils";
-import { TeamRoleGroup, checkUserPermissionForProject } from "../permission";
+import { checkProjectPermission } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 import type { OpenAIResponsesProviderOptions } from "@ai-sdk/openai";
 
@@ -30,7 +30,7 @@ export const workflowRouter = createTRPCRouter({
         commitMessage: z.string(),
       })
     )
-    .use(checkUserPermissionForProject(TeamRoleGroup.WORKFLOWS_MANAGE))
+    .use(checkProjectPermission("workflows:manage"))
     .mutation(async ({ ctx, input }) => {
       const workflow = await ctx.prisma.workflow.create({
         data: {
@@ -60,7 +60,7 @@ export const workflowRouter = createTRPCRouter({
     }),
   getAll: protectedProcedure
     .input(z.object({ projectId: z.string() }))
-    .use(checkUserPermissionForProject(TeamRoleGroup.WORKFLOWS_VIEW))
+    .use(checkProjectPermission("workflows:view"))
     .query(async ({ ctx, input }) => {
       return ctx.prisma.workflow.findMany({
         where: { projectId: input.projectId, archivedAt: null },
@@ -70,7 +70,7 @@ export const workflowRouter = createTRPCRouter({
 
   getById: protectedProcedure
     .input(z.object({ projectId: z.string(), workflowId: z.string() }))
-    .use(checkUserPermissionForProject(TeamRoleGroup.WORKFLOWS_VIEW))
+    .use(checkProjectPermission("workflows:view"))
     .query(async ({ ctx, input }) => {
       const workflow = await ctx.prisma.workflow.findUnique({
         where: {
@@ -107,7 +107,7 @@ export const workflowRouter = createTRPCRouter({
           .optional(),
       })
     )
-    .use(checkUserPermissionForProject(TeamRoleGroup.WORKFLOWS_VIEW))
+    .use(checkProjectPermission("workflows:view"))
     .query(async ({ ctx, input }) => {
       const workflow = await ctx.prisma.workflow.findUnique({
         where: {
@@ -206,7 +206,7 @@ export const workflowRouter = createTRPCRouter({
 
   restoreVersion: protectedProcedure
     .input(z.object({ projectId: z.string(), versionId: z.string() }))
-    .use(checkUserPermissionForProject(TeamRoleGroup.WORKFLOWS_MANAGE))
+    .use(checkProjectPermission("workflows:manage"))
     .mutation(async ({ ctx, input }) => {
       const version = await ctx.prisma.workflowVersion.findUnique({
         where: { id: input.versionId, projectId: input.projectId },
@@ -254,7 +254,7 @@ export const workflowRouter = createTRPCRouter({
         setAsLatestVersion: z.boolean(),
       })
     )
-    .use(checkUserPermissionForProject(TeamRoleGroup.WORKFLOWS_MANAGE))
+    .use(checkProjectPermission("workflows:manage"))
     .mutation(async ({ ctx, input }) => {
       const updatedVersion = await saveOrCommitWorkflowVersion({
         ctx,
@@ -276,7 +276,7 @@ export const workflowRouter = createTRPCRouter({
         dsl: workflowJsonSchema,
       })
     )
-    .use(checkUserPermissionForProject(TeamRoleGroup.WORKFLOWS_MANAGE))
+    .use(checkProjectPermission("workflows:manage"))
     .mutation(async ({ ctx, input }) => {
       const newVersion = await saveOrCommitWorkflowVersion({
         ctx,
@@ -296,7 +296,7 @@ export const workflowRouter = createTRPCRouter({
         versionId: z.string(),
       })
     )
-    .use(checkUserPermissionForProject(TeamRoleGroup.WORKFLOWS_MANAGE))
+    .use(checkProjectPermission("workflows:manage"))
     .mutation(async ({ ctx, input }) => {
       const version = await ctx.prisma.workflowVersion.findUnique({
         where: {
@@ -324,7 +324,7 @@ export const workflowRouter = createTRPCRouter({
 
   unpublish: protectedProcedure
     .input(z.object({ projectId: z.string(), workflowId: z.string() }))
-    .use(checkUserPermissionForProject(TeamRoleGroup.WORKFLOWS_MANAGE))
+    .use(checkProjectPermission("workflows:manage"))
     .mutation(async ({ ctx, input }) => {
       return ctx.prisma.workflow.update({
         where: { id: input.workflowId, projectId: input.projectId },
@@ -343,7 +343,7 @@ export const workflowRouter = createTRPCRouter({
         unarchive: z.boolean().optional(),
       })
     )
-    .use(checkUserPermissionForProject(TeamRoleGroup.WORKFLOWS_MANAGE))
+    .use(checkProjectPermission("workflows:manage"))
     .mutation(async ({ ctx, input }) => {
       return ctx.prisma.workflow.update({
         where: { id: input.workflowId, projectId: input.projectId },
@@ -361,7 +361,7 @@ export const workflowRouter = createTRPCRouter({
         newDsl: workflowJsonSchema,
       })
     )
-    .use(checkUserPermissionForProject(TeamRoleGroup.WORKFLOWS_MANAGE))
+    .use(checkProjectPermission("workflows:manage"))
     .mutation(async ({ input }) => {
       const prevDsl_ = JSON.stringify(
         recursiveAlphabeticallySortedKeys(clearDsl(input.prevDsl)),

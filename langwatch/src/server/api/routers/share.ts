@@ -10,11 +10,10 @@ import {
 import { prisma } from "~/server/db";
 
 import {
-  TeamRoleGroup,
   checkPermissionOrPubliclyShared,
-  checkUserPermissionForProject,
   skipPermissionCheck,
 } from "../permission";
+import { checkProjectPermission } from "../rbac";
 
 export const shareRouter = createTRPCRouter({
   getShared: publicProcedure
@@ -54,13 +53,10 @@ export const shareRouter = createTRPCRouter({
       })
     )
     .use(
-      checkPermissionOrPubliclyShared(
-        checkUserPermissionForProject(TeamRoleGroup.MESSAGES_VIEW),
-        {
-          resourceType: (input) => input.resourceType,
-          resourceParam: "resourceId",
-        }
-      )
+      checkPermissionOrPubliclyShared(checkProjectPermission("messages:view"), {
+        resourceType: (input) => input.resourceType,
+        resourceParam: "resourceId",
+      })
     )
     .query(async ({ input, ctx }) => {
       const { resourceType, resourceId } = input;
@@ -83,7 +79,7 @@ export const shareRouter = createTRPCRouter({
         resourceId: z.string(),
       })
     )
-    .use(checkUserPermissionForProject(TeamRoleGroup.MESSAGES_SHARE))
+    .use(checkProjectPermission("messages:share"))
     .mutation(async ({ input, ctx }) => {
       const { projectId, resourceType, resourceId } = input;
 
@@ -118,7 +114,7 @@ export const shareRouter = createTRPCRouter({
         resourceId: z.string(),
       })
     )
-    .use(checkUserPermissionForProject(TeamRoleGroup.MESSAGES_SHARE))
+    .use(checkProjectPermission("messages:share"))
     .mutation(async ({ input }) => {
       const { projectId, resourceType, resourceId } = input;
 
@@ -131,11 +127,7 @@ export const shareRouter = createTRPCRouter({
         projectId: z.string(),
       })
     )
-    .use(
-      checkUserPermissionForProject(
-        TeamRoleGroup.PROJECT_CHANGE_CAPTURED_DATA_VISIBILITY
-      )
-    )
+    .use(checkProjectPermission("project:manage"))
     .mutation(async ({ input }) => {
       const { projectId } = input;
 

@@ -10,11 +10,8 @@ import {
 import { TRPCError } from "@trpc/server";
 import { nanoid } from "nanoid";
 import { slugify } from "~/utils/slugify";
-import {
-  TeamRoleGroup,
-  checkPermissionOrPubliclyShared,
-  checkUserPermissionForProject,
-} from "../permission";
+import { checkPermissionOrPubliclyShared } from "../permission";
+import { checkProjectPermission } from "../rbac";
 import { getTracesWithSpans } from "./traces";
 import { getUserProtectionsForProject } from "../utils";
 import { createLogger } from "../../../utils/logger";
@@ -116,7 +113,7 @@ export const annotationRouter = createTRPCRouter({
         expectedOutput: z.string().optional().nullable(),
       })
     )
-    .use(checkUserPermissionForProject(TeamRoleGroup.ANNOTATIONS_MANAGE))
+    .use(checkProjectPermission("annotations:manage"))
     .mutation(async ({ ctx, input }) => {
       logger.info({ input }, "create annotation");
 
@@ -165,7 +162,7 @@ export const annotationRouter = createTRPCRouter({
         scoreOptions: scoreOptions,
       })
     )
-    .use(checkUserPermissionForProject(TeamRoleGroup.ANNOTATIONS_MANAGE))
+    .use(checkProjectPermission("annotations:manage"))
     .mutation(async ({ ctx, input }) => {
       return ctx.prisma.annotation.update({
         where: {
@@ -190,7 +187,7 @@ export const annotationRouter = createTRPCRouter({
     )
     .use(
       checkPermissionOrPubliclyShared(
-        checkUserPermissionForProject(TeamRoleGroup.ANNOTATIONS_VIEW),
+        checkProjectPermission("annotations:view"),
         {
           resourceType: PublicShareResourceTypes.TRACE,
           resourceParam: "traceId",
@@ -218,7 +215,7 @@ export const annotationRouter = createTRPCRouter({
         projectId: z.string(),
       })
     )
-    .use(checkUserPermissionForProject(TeamRoleGroup.ANNOTATIONS_VIEW))
+    .use(checkProjectPermission("annotations:view"))
     .query(async ({ ctx, input }) => {
       return ctx.prisma.annotation.findMany({
         where: {
@@ -237,7 +234,7 @@ export const annotationRouter = createTRPCRouter({
     }),
   getById: protectedProcedure
     .input(z.object({ annotationId: z.string(), projectId: z.string() }))
-    .use(checkUserPermissionForProject(TeamRoleGroup.ANNOTATIONS_VIEW))
+    .use(checkProjectPermission("annotations:view"))
     .query(async ({ ctx, input }) => {
       return ctx.prisma.annotation.findUnique({
         where: {
@@ -248,7 +245,7 @@ export const annotationRouter = createTRPCRouter({
     }),
   deleteById: protectedProcedure
     .input(z.object({ annotationId: z.string(), projectId: z.string() }))
-    .use(checkUserPermissionForProject(TeamRoleGroup.ANNOTATIONS_MANAGE))
+    .use(checkProjectPermission("annotations:manage"))
     .mutation(async ({ ctx, input }) => {
       const deletedAnnotation = await ctx.prisma.$transaction(async (tx) => {
         const annotation = await tx.annotation.delete({
@@ -290,7 +287,7 @@ export const annotationRouter = createTRPCRouter({
         endDate: z.date().optional(),
       })
     )
-    .use(checkUserPermissionForProject(TeamRoleGroup.ANNOTATIONS_VIEW))
+    .use(checkProjectPermission("annotations:view"))
     .query(async ({ ctx, input }) => {
       return ctx.prisma.annotation.findMany({
         where: {
@@ -320,7 +317,7 @@ export const annotationRouter = createTRPCRouter({
         queueId: z.string().optional(),
       })
     )
-    .use(checkUserPermissionForProject(TeamRoleGroup.ANNOTATIONS_MANAGE))
+    .use(checkProjectPermission("annotations:manage"))
     .mutation(async ({ ctx, input }) => {
       const slug = slugify(input.name.replace("_", "-"), {
         lower: true,
@@ -396,7 +393,7 @@ export const annotationRouter = createTRPCRouter({
     }),
   getQueues: protectedProcedure
     .input(z.object({ projectId: z.string() }))
-    .use(checkUserPermissionForProject(TeamRoleGroup.ANNOTATIONS_VIEW))
+    .use(checkProjectPermission("annotations:view"))
     .query(async ({ ctx, input }) => {
       // Get user protections for all trace fetching
       const protections = await getUserProtectionsForProject(ctx, {
@@ -459,7 +456,7 @@ export const annotationRouter = createTRPCRouter({
     }),
   getQueueItems: protectedProcedure
     .input(z.object({ projectId: z.string() }))
-    .use(checkUserPermissionForProject(TeamRoleGroup.ANNOTATIONS_VIEW))
+    .use(checkProjectPermission("annotations:view"))
     .query(async ({ ctx, input }) => {
       const queueItems = await ctx.prisma.annotationQueueItem.findMany({
         where: { projectId: input.projectId },
@@ -495,7 +492,7 @@ export const annotationRouter = createTRPCRouter({
     }),
   getPendingItemsCount: protectedProcedure
     .input(z.object({ projectId: z.string() }))
-    .use(checkUserPermissionForProject(TeamRoleGroup.ANNOTATIONS_VIEW))
+    .use(checkProjectPermission("annotations:view"))
     .query(async ({ ctx, input }) => {
       return ctx.prisma.annotationQueueItem.count({
         where: {
@@ -520,7 +517,7 @@ export const annotationRouter = createTRPCRouter({
     }),
   getAssignedItemsCount: protectedProcedure
     .input(z.object({ projectId: z.string() }))
-    .use(checkUserPermissionForProject(TeamRoleGroup.ANNOTATIONS_VIEW))
+    .use(checkProjectPermission("annotations:view"))
     .query(async ({ ctx, input }) => {
       return ctx.prisma.annotationQueueItem.count({
         where: {
@@ -532,7 +529,7 @@ export const annotationRouter = createTRPCRouter({
     }),
   getQueueItemsCounts: protectedProcedure
     .input(z.object({ projectId: z.string() }))
-    .use(checkUserPermissionForProject(TeamRoleGroup.ANNOTATIONS_VIEW))
+    .use(checkProjectPermission("annotations:view"))
     .query(async ({ ctx, input }) => {
       const userId = ctx.session.user.id;
 
@@ -599,7 +596,7 @@ export const annotationRouter = createTRPCRouter({
         annotators: z.array(z.string()),
       })
     )
-    .use(checkUserPermissionForProject(TeamRoleGroup.ANNOTATIONS_MANAGE))
+    .use(checkProjectPermission("annotations:manage"))
     .mutation(async ({ ctx, input }) => {
       await createOrUpdateQueueItems({
         traceIds: input.traceIds,
@@ -611,7 +608,7 @@ export const annotationRouter = createTRPCRouter({
     }),
   markQueueItemDone: protectedProcedure
     .input(z.object({ queueItemId: z.string(), projectId: z.string() }))
-    .use(checkUserPermissionForProject(TeamRoleGroup.ANNOTATIONS_MANAGE))
+    .use(checkProjectPermission("annotations:manage"))
     .mutation(async ({ ctx, input }) => {
       return ctx.prisma.annotationQueueItem.update({
         where: { id: input.queueItemId, projectId: input.projectId },
@@ -628,7 +625,7 @@ export const annotationRouter = createTRPCRouter({
         queueId: z.string().optional(),
       })
     )
-    .use(checkUserPermissionForProject(TeamRoleGroup.ANNOTATIONS_VIEW))
+    .use(checkProjectPermission("annotations:view"))
     .query(async ({ ctx, input }) => {
       return ctx.prisma.annotationQueue.findUnique({
         where: input.queueId
@@ -662,7 +659,7 @@ export const annotationRouter = createTRPCRouter({
         allQueueItems: z.boolean().optional(),
       })
     )
-    .use(checkUserPermissionForProject(TeamRoleGroup.ANNOTATIONS_VIEW))
+    .use(checkProjectPermission("annotations:view"))
     .query(async ({ ctx, input }) => {
       const userId = ctx.session.user.id;
       let userQueueIds: string[] = [];
@@ -694,8 +691,8 @@ export const annotationRouter = createTRPCRouter({
           input.selectedAnnotations === "pending"
             ? null
             : input.selectedAnnotations === "completed"
-            ? { not: null }
-            : undefined,
+              ? { not: null }
+              : undefined,
       };
 
       if (input.queueId) {

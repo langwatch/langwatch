@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
-import { TeamRoleGroup, checkUserPermissionForProject } from "../permission";
+import { checkProjectPermission } from "../rbac";
 import { evaluatorsSchema } from "../../evaluations/evaluators.zod.generated";
 import { runEvaluationForTrace } from "../../background/workers/evaluationsWorker";
 import {
@@ -14,7 +14,7 @@ import { getUserProtectionsForProject } from "../utils";
 export const evaluationsRouter = createTRPCRouter({
   availableEvaluators: protectedProcedure
     .input(z.object({ projectId: z.string() }))
-    .use(checkUserPermissionForProject(TeamRoleGroup.GUARDRAILS_MANAGE))
+    .use(checkProjectPermission("guardrails:manage"))
     .query(async () => {
       return Object.fromEntries(
         Object.entries(AVAILABLE_EVALUATORS).map(([key, evaluator]) => [
@@ -31,7 +31,7 @@ export const evaluationsRouter = createTRPCRouter({
 
   availableCustomEvaluators: protectedProcedure
     .input(z.object({ projectId: z.string() }))
-    .use(checkUserPermissionForProject(TeamRoleGroup.GUARDRAILS_VIEW))
+    .use(checkProjectPermission("guardrails:view"))
     .query(async ({ input }) => {
       const customEvaluators = await getCustomEvaluators({
         projectId: input.projectId,
@@ -51,9 +51,11 @@ export const evaluationsRouter = createTRPCRouter({
         mappings: mappingStateSchema,
       })
     )
-    .use(checkUserPermissionForProject(TeamRoleGroup.GUARDRAILS_MANAGE))
+    .use(checkProjectPermission("guardrails:manage"))
     .mutation(async ({ input, ctx }) => {
-      const protections = await getUserProtectionsForProject(ctx, { projectId: input.projectId });
+      const protections = await getUserProtectionsForProject(ctx, {
+        projectId: input.projectId,
+      });
 
       const result = await runEvaluationForTrace({
         projectId: input.projectId,

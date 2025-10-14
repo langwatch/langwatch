@@ -1,5 +1,5 @@
 import { TRACE_INDEX, esClient } from "../../../elasticsearch";
-import { TeamRoleGroup, checkUserPermissionForProject } from "../../permission";
+import { checkProjectPermission } from "../../rbac";
 import { protectedProcedure } from "../../trpc";
 import { generateTracesPivotQueryConditions } from "./common";
 import { sharedFiltersInputSchema } from "../../../analytics/types";
@@ -11,7 +11,7 @@ import type { ElasticSearchTrace } from "../../../tracer/types";
 
 export const topUsedDocuments = protectedProcedure
   .input(sharedFiltersInputSchema)
-  .use(checkUserPermissionForProject(TeamRoleGroup.COST_VIEW))
+  .use(checkProjectPermission("cost:view"))
   .query(async ({ input }) => {
     const { pivotIndexConditions } = generateTracesPivotQueryConditions(input);
 

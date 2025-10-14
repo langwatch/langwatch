@@ -10,14 +10,15 @@ import { env } from "../../../env.mjs";
 import { customAlphabet, nanoid } from "nanoid";
 import {
   OrganizationRoleGroup,
-  TeamRoleGroup,
-  backendHasTeamProjectPermission,
   checkUserPermissionForOrganization,
-  checkUserPermissionForProject,
-  checkUserPermissionForTeam,
   skipPermissionCheck,
   skipPermissionCheckProjectCreation,
 } from "../permission";
+import {
+  checkProjectPermission,
+  checkTeamPermission,
+  hasProjectPermission,
+} from "../rbac";
 import { getOrganizationProjectsCount } from "./limits";
 import { dependencies } from "../../../injection/dependencies.server";
 import {
@@ -88,9 +89,11 @@ export const projectRouter = createTRPCRouter({
     .use(skipPermissionCheckProjectCreation)
     .use(({ ctx, input, next }) => {
       if (input.teamId) {
-        return checkUserPermissionForTeam(
-          TeamRoleGroup.TEAM_CREATE_NEW_PROJECTS
-        )({ ctx, input: { ...input, teamId: input.teamId }, next });
+        return checkTeamPermission("team:manage")({
+          ctx,
+          input: { ...input, teamId: input.teamId },
+          next,
+        });
       } else if (input.newTeamName) {
         return checkUserPermissionForOrganization(
           OrganizationRoleGroup.ORGANIZATION_MANAGE
@@ -213,7 +216,7 @@ export const projectRouter = createTRPCRouter({
     }),
   getProjectAPIKey: protectedProcedure
     .input(z.object({ projectId: z.string() }))
-    .use(checkUserPermissionForProject(TeamRoleGroup.SETUP_PROJECT))
+    .use(checkProjectPermission("project:manage"))
     .query(async ({ input, ctx }) => {
       const prisma = ctx.prisma;
 
@@ -264,7 +267,7 @@ export const projectRouter = createTRPCRouter({
           );
         })
     )
-    .use(checkUserPermissionForProject(TeamRoleGroup.SETUP_PROJECT))
+    .use(checkProjectPermission("project:manage"))
     .use(checkCapturedDataVisibilityPermission)
     .mutation(async ({ input, ctx }) => {
       const prisma = ctx.prisma;
@@ -337,7 +340,7 @@ export const projectRouter = createTRPCRouter({
         embeddingsModel: z.string(),
       })
     )
-    .use(checkUserPermissionForProject(TeamRoleGroup.SETUP_PROJECT))
+    .use(checkProjectPermission("project:manage"))
     .mutation(async ({ input, ctx }) => {
       const prisma = ctx.prisma;
       const project = await prisma.project.findUnique({
@@ -367,7 +370,7 @@ export const projectRouter = createTRPCRouter({
         topicClusteringModel: z.string(),
       })
     )
-    .use(checkUserPermissionForProject(TeamRoleGroup.SETUP_PROJECT))
+    .use(checkProjectPermission("project:manage"))
     .mutation(async ({ input, ctx }) => {
       const prisma = ctx.prisma;
       const project = await prisma.project.findUnique({
@@ -397,7 +400,7 @@ export const projectRouter = createTRPCRouter({
         defaultModel: z.string(),
       })
     )
-    .use(checkUserPermissionForProject(TeamRoleGroup.SETUP_PROJECT))
+    .use(checkProjectPermission("project:manage"))
     .mutation(async ({ input, ctx }) => {
       const prisma = ctx.prisma;
       const project = await prisma.project.findUnique({
@@ -426,7 +429,7 @@ export const projectRouter = createTRPCRouter({
         projectId: z.string(),
       })
     )
-    .use(checkUserPermissionForProject(TeamRoleGroup.PROJECT_VIEW))
+    .use(checkProjectPermission("project:view"))
     .query(
       async ({
         input,
@@ -489,7 +492,7 @@ export const projectRouter = createTRPCRouter({
     ),
   archiveById: protectedProcedure
     .input(z.object({ projectId: z.string(), projectToArchiveId: z.string() }))
-    .use(checkUserPermissionForProject(TeamRoleGroup.SETUP_PROJECT))
+    .use(checkProjectPermission("project:manage"))
     .mutation(async ({ input, ctx }) => {
       const prisma = ctx.prisma;
       if (input.projectToArchiveId === input.projectId) {
@@ -498,10 +501,10 @@ export const projectRouter = createTRPCRouter({
           message: "You cannot archive the current project",
         });
       }
-      const canDeleteTarget = await backendHasTeamProjectPermission(
+      const canDeleteTarget = await hasProjectPermission(
         ctx,
-        { projectId: input.projectToArchiveId },
-        TeamRoleGroup.SETUP_PROJECT
+        input.projectToArchiveId,
+        "project:delete"
       );
       if (!canDeleteTarget) {
         throw new TRPCError({ code: "UNAUTHORIZED" });
@@ -516,7 +519,7 @@ export const projectRouter = createTRPCRouter({
 
   triggerTopicClustering: protectedProcedure
     .input(z.object({ projectId: z.string() }))
-    .use(checkUserPermissionForProject(TeamRoleGroup.SETUP_PROJECT))
+    .use(checkProjectPermission("project:manage"))
     .mutation(async ({ input }) => {
       const { projectId } = input;
       const { scheduleTopicClusteringForProject } = await import(
@@ -567,11 +570,7 @@ async function checkCapturedDataVisibilityPermission({
     (input.capturedInputVisibility !== void 0 ||
       input.capturedOutputVisibility !== void 0 ||
       input.traceSharingEnabled !== void 0) &&
-    !(await backendHasTeamProjectPermission(
-      ctx,
-      { projectId: input.projectId },
-      TeamRoleGroup.PROJECT_CHANGE_CAPTURED_DATA_VISIBILITY
-    ))
+    !(await hasProjectPermission(ctx, input.projectId, "project:manage"))
   ) {
     throw new TRPCError({
       code: "FORBIDDEN",

@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
-import { TeamRoleGroup, checkUserPermissionForProject } from "../permission";
+import { checkProjectPermission } from "../rbac";
 
 import { prisma } from "../../db";
 
@@ -11,7 +11,7 @@ export const integrationsChecksRouter = createTRPCRouter({
         projectId: z.string(),
       })
     )
-    .use(checkUserPermissionForProject(TeamRoleGroup.SETUP_PROJECT))
+    .use(checkProjectPermission("project:update"))
     .query(async ({ input }) => {
       const project = await prisma.project.findUnique({
         where: { id: input.projectId },
