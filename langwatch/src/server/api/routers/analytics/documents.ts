@@ -3,10 +3,7 @@ import { TeamRoleGroup, checkUserPermissionForProject } from "../../permission";
 import { protectedProcedure } from "../../trpc";
 import { generateTracesPivotQueryConditions } from "./common";
 import { sharedFiltersInputSchema } from "../../../analytics/types";
-import type {
-  QueryDslBoolQuery,
-  QueryDslQueryContainer,
-} from "@elastic/elasticsearch/lib/api/types";
+import { estypes } from "@elastic/elasticsearch";
 import type { ElasticSearchTrace } from "../../../tracer/types";
 
 export const topUsedDocuments = protectedProcedure
@@ -98,8 +95,8 @@ export const topUsedDocuments = protectedProcedure
                   trace_id: topDocuments.map((d) => d.traceId),
                 },
               },
-            ] as QueryDslQueryContainer[],
-          } as QueryDslBoolQuery,
+            ] as estypes.QueryDslQueryContainer[],
+          } as estypes.QueryDslBoolQuery,
         },
         _source: ["spans.contexts.document_id", "spans.contexts.content"],
       },

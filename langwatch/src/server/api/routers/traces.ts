@@ -1,10 +1,6 @@
 import { z } from "zod";
 
-import {
-  type SearchResponse,
-  type SearchTotalHits,
-  type Sort,
-} from "@elastic/elasticsearch/lib/api/types";
+import { estypes } from "@elastic/elasticsearch";
 import { PublicShareResourceTypes, type PrismaClient } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import shuffle from "lodash-es/shuffle";
@@ -531,7 +527,7 @@ export const getAllTracesForProject = async ({
     { projectId: input.projectId }
   );
 
-  let tracesResult: SearchResponse<ElasticSearchTrace>;
+  let tracesResult: estypes.SearchResponse<ElasticSearchTrace>;
   if (scrollId) {
     const client = await esClient({ projectId: input.projectId });
     tracesResult = await client.scroll({
@@ -567,7 +563,7 @@ export const getAllTracesForProject = async ({
                     },
                     order: input.sortDirection ?? "desc",
                   },
-                } as Sort,
+                } as estypes.Sort,
               }
             : input.sortBy.startsWith("evaluations.")
             ? {
@@ -584,14 +580,14 @@ export const getAllTracesForProject = async ({
                       },
                     },
                   },
-                } as Sort,
+                } as estypes.Sort,
               }
             : {
                 sort: {
                   [input.sortBy]: {
                     order: input.sortDirection ?? "desc",
                   },
-                } as Sort,
+                } as estypes.Sort,
               }
           : {
               sort: {
@@ -646,7 +642,7 @@ export const getAllTracesForProject = async ({
     }
   }
 
-  totalHits = (tracesResult.hits?.total as SearchTotalHits)?.value || 0;
+  totalHits = (tracesResult.hits?.total as estypes.SearchTotalHits)?.value || 0;
 
   const evaluations = Object.fromEntries(
     traces.map((trace) => [trace.trace_id, trace.evaluations ?? []])

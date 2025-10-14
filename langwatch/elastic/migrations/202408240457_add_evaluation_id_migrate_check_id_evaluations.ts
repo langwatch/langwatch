@@ -1,11 +1,6 @@
+import { Client as ElasticClient, estypes } from "@elastic/elasticsearch";
 import { esClient, TRACE_INDEX } from "../../src/server/elasticsearch";
 import { getCurrentWriteIndex } from "../helpers";
-import type {
-  QueryDslBoolQuery,
-  QueryDslQueryContainer,
-} from "@elastic/elasticsearch/lib/api/types";
-
-import { Client as ElasticClient } from "@elastic/elasticsearch";
 
 export const migrate = async (_migrationKey: string, client: ElasticClient) => {
   const currentIndex = await getCurrentWriteIndex({
@@ -59,8 +54,8 @@ export const migrate = async (_migrationKey: string, client: ElasticClient) => {
                   exists: {
                     field: "evaluations.evaluation_id",
                   },
-                } as QueryDslQueryContainer,
-              } as QueryDslBoolQuery,
+                } as estypes.QueryDslQueryContainer,
+              } as estypes.QueryDslBoolQuery,
             },
           },
         },

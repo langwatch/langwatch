@@ -1,7 +1,4 @@
-import type {
-  QueryDslBoolQuery,
-  QueryDslQueryContainer,
-} from "@elastic/elasticsearch/lib/api/types";
+import { estypes } from "@elastic/elasticsearch";
 import { CostReferenceType, CostType, type Project } from "@prisma/client";
 import { fetch as fetchHTTP2 } from "fetch-h2";
 import { nanoid } from "nanoid";
@@ -94,7 +91,7 @@ export const clusterTopicsForProject = async (
               },
             },
           ],
-        } as QueryDslBoolQuery,
+        } as estypes.QueryDslBoolQuery,
       },
     },
   });
@@ -119,7 +116,7 @@ export const clusterTopicsForProject = async (
               },
             },
           ],
-        } as QueryDslBoolQuery,
+        } as estypes.QueryDslBoolQuery,
       },
     },
   });
@@ -151,7 +148,7 @@ export const clusterTopicsForProject = async (
               },
             },
           ],
-        } as QueryDslBoolQuery,
+        } as estypes.QueryDslBoolQuery,
       },
     },
   });
@@ -194,7 +191,7 @@ export const clusterTopicsForProject = async (
     return;
   }
 
-  let presenceCondition: QueryDslQueryContainer[] = [
+  let presenceCondition: estypes.QueryDslQueryContainer[] = [
     {
       range: {
         "timestamps.started_at": {
@@ -224,8 +221,8 @@ export const clusterTopicsForProject = async (
                   term: {
                     "metadata.topic_id": topicId,
                   },
-                })) as QueryDslQueryContainer[],
-              } as QueryDslBoolQuery,
+                })) as estypes.QueryDslQueryContainer[],
+              } as estypes.QueryDslBoolQuery,
             },
             {
               bool: {
@@ -233,8 +230,8 @@ export const clusterTopicsForProject = async (
                   term: {
                     "metadata.subtopic_id": subtopicId,
                   },
-                })) as QueryDslQueryContainer[],
-              } as QueryDslBoolQuery,
+                })) as estypes.QueryDslQueryContainer[],
+              } as estypes.QueryDslBoolQuery,
             },
           ],
           minimum_should_match: 1,
@@ -268,7 +265,7 @@ export const clusterTopicsForProject = async (
             },
             ...presenceCondition,
           ],
-        } as QueryDslBoolQuery,
+        } as estypes.QueryDslBoolQuery,
       },
       _source: [
         "trace_id",

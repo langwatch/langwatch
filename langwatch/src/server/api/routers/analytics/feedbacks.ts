@@ -1,7 +1,4 @@
-import type {
-  QueryDslBoolQuery,
-  QueryDslQueryContainer,
-} from "@elastic/elasticsearch/lib/api/types";
+import { estypes } from "@elastic/elasticsearch";
 import { sharedFiltersInputSchema } from "../../../analytics/types";
 import { TRACE_INDEX, esClient } from "../../../elasticsearch";
 import {
@@ -48,18 +45,18 @@ export const feedbacks = protectedProcedure
                                       "events.event_details.key": "feedback",
                                     },
                                   },
-                                ] as QueryDslQueryContainer[],
-                              } as QueryDslBoolQuery,
+                                ] as estypes.QueryDslQueryContainer[],
+                              } as estypes.QueryDslBoolQuery,
                             },
                           },
                         },
-                      ] as QueryDslQueryContainer[],
-                    } as QueryDslBoolQuery,
+                      ] as estypes.QueryDslQueryContainer[],
+                    } as estypes.QueryDslBoolQuery,
                   },
                 },
               },
-            ] as QueryDslQueryContainer[],
-          } as QueryDslBoolQuery,
+            ] as estypes.QueryDslQueryContainer[],
+          } as estypes.QueryDslBoolQuery,
         },
       },
     });

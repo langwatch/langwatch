@@ -1,4 +1,4 @@
-import type { AggregationsAggregationContainer } from "@elastic/elasticsearch/lib/api/types";
+import { estypes } from "@elastic/elasticsearch";
 import { z } from "zod";
 import { formatMilliseconds } from "../../utils/formatMilliseconds";
 import { formatMoney } from "../../utils/formatMoney";
@@ -961,7 +961,7 @@ export const analyticsGroups = {
     thumbs_up_down: {
       label: "Thumbs Up/Down",
       aggregation: (aggToGroup) => {
-        const actualGrouping: AggregationsAggregationContainer = {
+        const actualGrouping: estypes.AggregationsAggregationContainer = {
           filters: {
             filters: {
               positive: {

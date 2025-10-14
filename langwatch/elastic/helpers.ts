@@ -1,6 +1,5 @@
-import type { MappingProperty } from "@elastic/elasticsearch/lib/api/types";
+import { type Client as ElasticClient, estypes } from "@elastic/elasticsearch";
 import type { IndexSpec } from "../src/server/elasticsearch";
-import { type Client as ElasticClient } from "@elastic/elasticsearch";
 
 export const recreateIndexAndMigrate = async ({
   indexSpec,
@@ -10,7 +9,7 @@ export const recreateIndexAndMigrate = async ({
 }: {
   indexSpec: IndexSpec;
   migrationKey: string;
-  mapping: Record<string, MappingProperty>;
+  mapping: Record<string, estypes.MappingProperty>;
   client: ElasticClient;
 }) => {
   const newIndex = `${indexSpec.base}-${migrationKey}`;
@@ -86,7 +85,7 @@ export const createIndex = async ({
   client,
 }: {
   index: string;
-  mappings: Record<string, MappingProperty>;
+  mappings: Record<string, estypes.MappingProperty>;
   client: ElasticClient;
 }) => {
   const indexExists = await client.indices.exists({ index });

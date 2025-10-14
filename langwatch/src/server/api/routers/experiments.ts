@@ -1,8 +1,4 @@
-import type {
-  AggregationsAggregate,
-  QueryDslBoolQuery,
-  SearchResponse,
-} from "@elastic/elasticsearch/lib/api/types";
+import { estypes } from "@elastic/elasticsearch";
 import { EvaluationExecutionMode, ExperimentType } from "@prisma/client";
 import type { JsonValue } from "@prisma/client/runtime/library";
 import { TRPCError } from "@trpc/server";
@@ -451,8 +447,8 @@ export const experimentsRouter = createTRPCRouter({
               must: [
                 { term: { experiment_id: experiment.id } },
                 { term: { project_id: input.projectId } },
-              ] as QueryDslBoolQuery["must"],
-            } as QueryDslBoolQuery,
+              ] as estypes.QueryDslBoolQuery["must"],
+            } as estypes.QueryDslBoolQuery,
           },
           _source: [
             "run_id",
@@ -572,8 +568,8 @@ export const experimentsRouter = createTRPCRouter({
                 { term: { project_id: input.projectId } },
                 { term: { run_id: input.runId } },
                 { term: { index: input.index } },
-              ] as QueryDslBoolQuery["must"],
-            } as QueryDslBoolQuery,
+              ] as estypes.QueryDslBoolQuery["must"],
+            } as estypes.QueryDslBoolQuery,
           },
         },
       });
@@ -628,9 +624,9 @@ export const experimentsRouter = createTRPCRouter({
       });
 
       const client = await esClient({ projectId: input.projectId });
-      let batchEvaluationRun: SearchResponse<
+      let batchEvaluationRun: estypes.SearchResponse<
         ESBatchEvaluation,
-        Record<string, AggregationsAggregate>
+        Record<string, estypes.AggregationsAggregate>
       >;
       let attempts = 0;
       while (attempts < 3) {
@@ -765,8 +761,8 @@ export const experimentsRouter = createTRPCRouter({
                 must: [
                   { term: { experiment_id: input.experimentId } },
                   { term: { project_id: input.projectId } },
-                ] as QueryDslBoolQuery["must"],
-              } as QueryDslBoolQuery,
+                ] as estypes.QueryDslBoolQuery["must"],
+              } as estypes.QueryDslBoolQuery,
             },
           },
         });
@@ -780,8 +776,8 @@ export const experimentsRouter = createTRPCRouter({
                 must: [
                   { term: { experiment_id: input.experimentId } },
                   { term: { project_id: input.projectId } },
-                ] as QueryDslBoolQuery["must"],
-              } as QueryDslBoolQuery,
+                ] as estypes.QueryDslBoolQuery["must"],
+              } as estypes.QueryDslBoolQuery,
             },
           },
         });
@@ -942,8 +938,8 @@ const getExperimentBatchEvaluationRuns = async (
           must: [
             { terms: { experiment_id: experimentIds } },
             { term: { project_id: projectId } },
-          ] as QueryDslBoolQuery["must"],
-        } as QueryDslBoolQuery,
+          ] as estypes.QueryDslBoolQuery["must"],
+        } as estypes.QueryDslBoolQuery,
       },
       sort: [{ "timestamps.created_at": "desc" }],
       aggs: {

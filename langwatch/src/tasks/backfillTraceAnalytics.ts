@@ -1,6 +1,6 @@
 import { prisma } from "~/server/db";
 import { esClient, TRACE_INDEX } from "~/server/elasticsearch";
-import type { AggregationsCalendarInterval } from "@elastic/elasticsearch/lib/api/types";
+import { estypes } from "@elastic/elasticsearch";
 import { ANALYTICS_KEYS } from "~/types";
 
 interface DateHistogramBucket {
@@ -55,7 +55,7 @@ export default async function execute() {
         daily_counts: {
           date_histogram: {
             field: "timestamps.started_at",
-            calendar_interval: "day" as AggregationsCalendarInterval,
+            calendar_interval: "day" as estypes.AggregationsCalendarInterval,
             format: "yyyy-MM-dd",
             time_zone: "UTC",
           },

@@ -1,4 +1,4 @@
-import type { AggregationsAggregationContainer } from "@elastic/elasticsearch/lib/api/types";
+import { estypes } from "@elastic/elasticsearch";
 import { z } from "zod";
 import type { RotatingColorSet } from "../../utils/rotatingColors";
 import type { DeepRequired, Unpacked } from "../../utils/types";
@@ -22,7 +22,7 @@ export type AnalyticsMetric = {
     aggregation: AggregationTypes,
     key: string | undefined,
     subkey: string | undefined
-  ) => Record<string, AggregationsAggregationContainer>;
+  ) => Record<string, estypes.AggregationsAggregationContainer>;
   extractionPath: (
     index: number,
     aggregations: AggregationTypes,
@@ -35,8 +35,8 @@ export type AnalyticsMetric = {
 export type AnalyticsGroup = {
   label: string;
   aggregation: (
-    aggToGroup: Record<string, AggregationsAggregationContainer>
-  ) => Record<string, AggregationsAggregationContainer>;
+    aggToGroup: Record<string, estypes.AggregationsAggregationContainer>
+  ) => Record<string, estypes.AggregationsAggregationContainer>;
   extractionPath: () => string;
   quickwitSupport: boolean;
 };

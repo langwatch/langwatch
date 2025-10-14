@@ -5,7 +5,7 @@ import {
   checkUserPermissionForOrganization,
 } from "../permission";
 import { TRACE_INDEX, esClient } from "../../elasticsearch";
-import type { QueryDslBoolQuery } from "@elastic/elasticsearch/lib/api/types";
+import { estypes } from "@elastic/elasticsearch";
 import { prisma } from "../../db";
 import { dependencies } from "../../../injection/dependencies.server";
 
@@ -115,8 +115,8 @@ export const getCurrentMonthMessagesCount = async (
                 },
               },
             },
-          ] as QueryDslBoolQuery["filter"],
-        } as QueryDslBoolQuery,
+          ] as estypes.QueryDslBoolQuery["filter"],
+        } as estypes.QueryDslBoolQuery,
       },
     },
   });

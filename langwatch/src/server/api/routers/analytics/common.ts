@@ -1,7 +1,4 @@
-import type {
-  QueryDslBoolQuery,
-  QueryDslQueryContainer,
-} from "@elastic/elasticsearch/lib/api/types";
+import { estypes } from "@elastic/elasticsearch";
 import { addDays, differenceInCalendarDays } from "date-fns";
 import { type z } from "zod";
 import { type sharedFiltersInputSchema } from "../../../analytics/types";
@@ -43,7 +40,7 @@ export const generateTracesPivotQueryConditions = ({
 }: z.infer<typeof sharedFiltersInputSchema> & {
   filterForAnnotatedTraces?: boolean;
 }): {
-  pivotIndexConditions: QueryDslQueryContainer;
+  pivotIndexConditions: estypes.QueryDslQueryContainer;
   isAnyFilterPresent: boolean;
   endDateUsedForQuery: number;
 } => {
@@ -71,7 +68,7 @@ export const generateTracesPivotQueryConditions = ({
           },
           ...filterConditions,
         ],
-      } as QueryDslBoolQuery,
+      } as estypes.QueryDslBoolQuery,
     },
     isAnyFilterPresent: filterConditions.length > 0,
     endDateUsedForQuery: endDate_,
@@ -81,7 +78,7 @@ export const generateTracesPivotQueryConditions = ({
 export const generateFilterConditions = (
   filters: Partial<Record<FilterField, FilterParam>>
 ) => {
-  let filterConditions: QueryDslQueryContainer[] = [];
+  let filterConditions: estypes.QueryDslQueryContainer[] = [];
   for (const [field, params] of Object.entries(filters)) {
     if (params.length == 0) {
       continue;
@@ -101,15 +98,15 @@ const collectConditions = (
     | Record<string, string[]>
     | Record<string, Record<string, string[]>>,
   keys: string[] = []
-): QueryDslQueryContainer[] => {
+): estypes.QueryDslQueryContainer[] => {
   const key = keys[0];
   const subkey = keys[1];
 
   if (Array.isArray(params)) {
-    const conditions: QueryDslQueryContainer[] = [];
+    const conditions: estypes.QueryDslQueryContainer[] = [];
     const filter = availableFilters[field];
 
-    const andConditions: QueryDslQueryContainer[] = [];
+    const andConditions: estypes.QueryDslQueryContainer[] = [];
     if (filter.requiresKey && key) {
       andConditions.push(
         availableFilters[filter.requiresKey.filter].query(
@@ -142,7 +139,7 @@ const collectConditions = (
       conditions.push({
         bool: {
           must: andConditions,
-        } as QueryDslBoolQuery,
+        } as estypes.QueryDslBoolQuery,
       });
     } else if (andConditions.length === 1) {
       conditions.push(andConditions[0]!);
@@ -150,13 +147,13 @@ const collectConditions = (
 
     return conditions;
   } else if (typeof params === "object") {
-    const conditions: QueryDslQueryContainer[] = [
+    const conditions: estypes.QueryDslQueryContainer[] = [
       {
         bool: {
           should: Object.entries(params).flatMap(([key, values]) => {
             return collectConditions(field, values, [...keys, key]);
           }),
-        } as QueryDslBoolQuery,
+        } as estypes.QueryDslBoolQuery,
       },
     ];
 

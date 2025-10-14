@@ -1,5 +1,4 @@
-import * as T from '@elastic/elasticsearch/lib/api/types'
-import { Client as ElasticClient } from "@elastic/elasticsearch";
+import { type Client as ElasticClient, estypes } from "@elastic/elasticsearch";
 import {
   type ElasticSearchTrace,
   type Trace,
@@ -37,7 +36,7 @@ export async function searchTracesWithInternals({
     ...searchParams
   },
   protections = {},
-}: SearchTracesWithInternalsOptions): Promise<{ trace: Trace, hit: T.SearchHit, source: ElasticSearchTrace }[]> {
+}: SearchTracesWithInternalsOptions): Promise<{ trace: Trace, hit: estypes.SearchHit, source: ElasticSearchTrace }[]> {
   const client = await esClient(connConfig);
   const result = await client.search<ElasticSearchTrace>({
     index,
@@ -85,7 +84,7 @@ export async function searchTraces({
   return tracesWithInternals.map(({ trace }) => trace);
 }
 
-interface AggregateTracesOptions<Aggs extends Record<string, T.AggregationsAggregationContainer>> {
+interface AggregateTracesOptions<Aggs extends Record<string, estypes.AggregationsAggregationContainer>> {
   connConfig: ConnectionConfig;
   search: Parameters<ElasticClient['search']>[0] & {
     index?: typeof TRACE_INDEX[keyof typeof TRACE_INDEX];
@@ -95,7 +94,7 @@ interface AggregateTracesOptions<Aggs extends Record<string, T.AggregationsAggre
   protections?: Protections;
 }
 
-export async function aggregateTraces<Aggs extends Record<string, T.AggregationsAggregationContainer>>({
+export async function aggregateTraces<Aggs extends Record<string, estypes.AggregationsAggregationContainer>>({
   connConfig,
   search: {
     index = TRACE_INDEX.alias,
@@ -104,13 +103,13 @@ export async function aggregateTraces<Aggs extends Record<string, T.Aggregations
     ...searchParams
   },
   protections = {}, // I don't think we need protections here, but good to have for future?
-}: AggregateTracesOptions<Aggs>): Promise<Record<keyof Aggs, (T.AggregationsMultiBucketBase & { key: string })[]>> {
+}: AggregateTracesOptions<Aggs>): Promise<Record<keyof Aggs, (estypes.AggregationsMultiBucketBase & { key: string })[]>> {
   const client = await esClient(connConfig);
   const result = await client.search<
     unknown,
     Record<
       keyof Aggs,
-      T.AggregationsMultiBucketAggregateBase<T.AggregationsMultiBucketBase & { key: string }>
+      estypes.AggregationsMultiBucketAggregateBase<estypes.AggregationsMultiBucketBase & { key: string }>
     >
   >({
     index,
@@ -120,8 +119,8 @@ export async function aggregateTraces<Aggs extends Record<string, T.Aggregations
   });
 
   const getBucketsFromAggregation = (
-    aggregation: T.AggregationsMultiBucketAggregateBase<T.AggregationsMultiBucketBase & { key: string }>
-  ): (T.AggregationsMultiBucketBase & { key: string })[] => {
+    aggregation: estypes.AggregationsMultiBucketAggregateBase<estypes.AggregationsMultiBucketBase & { key: string }>
+  ): (estypes.AggregationsMultiBucketBase & { key: string })[] => {
     if (
       aggregation &&
       'buckets' in aggregation &&
@@ -135,8 +134,8 @@ export async function aggregateTraces<Aggs extends Record<string, T.Aggregations
 
   // Initialize output with empty arrays for all keys in the input aggs, to avoid missing key errors
   const out = Object.fromEntries(
-    Object.keys(aggs).map(key => [key, [] as (T.AggregationsMultiBucketBase & { key: string })[]])
-  ) as Record<keyof Aggs, (T.AggregationsMultiBucketBase & { key: string })[]>;
+    Object.keys(aggs).map(key => [key, [] as (estypes.AggregationsMultiBucketBase & { key: string })[]])
+  ) as Record<keyof Aggs, (estypes.AggregationsMultiBucketBase & { key: string })[]>;
 
   if (result.aggregations) {
     for (const key in result.aggregations) {

@@ -1,8 +1,4 @@
-import type {
-  AggregationsAggregationContainer,
-  QueryDslBoolQuery,
-} from "@elastic/elasticsearch/lib/api/types";
-import type { SearchRequest } from "@elastic/elasticsearch/lib/api/typesWithBodyKey";
+import { estypes } from "@elastic/elasticsearch";
 import { TRPCError } from "@trpc/server";
 import {
   getGroup,
@@ -118,7 +114,7 @@ export const timeseries = async (input: TimeseriesInputType) => {
           subkey
         );
 
-        let aggregationQuery: Record<string, AggregationsAggregationContainer> =
+        let aggregationQuery: Record<string, estypes.AggregationsAggregationContainer> =
           metricAggregations;
         let pipelinePath_: string | undefined;
         let pipelineBucketsMetricPath: string | undefined;
@@ -174,11 +170,11 @@ export const timeseries = async (input: TimeseriesInputType) => {
               filter: {
                 bool: {
                   must: generateFilterConditions(filters ?? {}),
-                } as QueryDslBoolQuery,
+                } as estypes.QueryDslBoolQuery,
               },
               aggs: aggregationQuery,
             },
-          } as Record<string, AggregationsAggregationContainer>;
+          } as Record<string, estypes.AggregationsAggregationContainer>;
 
           if (asPercent) {
             const extractionPath = getMetric(metric).extractionPath(
@@ -243,7 +239,7 @@ export const timeseries = async (input: TimeseriesInputType) => {
     aggs,
   };
 
-  const queryBody: SearchRequest["body"] = {
+  const queryBody = {
     size: 0,
     query: pivotIndexConditions,
     aggs: {

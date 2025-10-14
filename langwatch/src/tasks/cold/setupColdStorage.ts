@@ -1,5 +1,4 @@
-import { type Client as ElasticClient } from "@elastic/elasticsearch";
-import type { MappingProperty } from "@elastic/elasticsearch/lib/api/types";
+import { type Client as ElasticClient, estypes } from "@elastic/elasticsearch";
 import { TRACE_COLD_INDEX, esClient } from "../../server/elasticsearch";
 import { traceMapping } from "../../../elastic/schema";
 import { env } from "../../env.mjs";
@@ -81,7 +80,7 @@ const createColdStorageIndex = async (client: ElasticClient, clusterType: string
     await client.indices.create({
       index: TRACE_COLD_INDEX.base,
       settings: settings,
-      mappings: { properties: traceMapping as Record<string, MappingProperty> },
+      mappings: { properties: traceMapping as Record<string, estypes.MappingProperty> },
     });
     console.log(`✅ Created cold storage index: ${TRACE_COLD_INDEX.base}`);
   } else {
@@ -91,7 +90,7 @@ const createColdStorageIndex = async (client: ElasticClient, clusterType: string
   // Update mapping in case there are changes
   await client.indices.putMapping({
     index: TRACE_COLD_INDEX.base,
-    properties: traceMapping as Record<string, MappingProperty>,
+    properties: traceMapping as Record<string, estypes.MappingProperty>,
   });
 
   // Set up alias
