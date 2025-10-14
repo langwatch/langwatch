@@ -14,6 +14,10 @@ on:
 env:
   NODE_ENV: "test"
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   typecheck:
     runs-on: ubuntu-latest
@@ -47,7 +51,6 @@ jobs:
 
   test-unit:
     env:
-      # Required environment variables for integration tests
       DATABASE_URL: "postgresql://langwatch_ci:ci_password@localhost:5432/langwatch_test"
       BASE_HOST: "localhost:3000"
       NEXTAUTH_SECRET: "nextauth-secret-for-ci-testing"
@@ -88,7 +91,6 @@ jobs:
 
   test-integration:
     env:
-      # Required environment variables for integration tests
       DATABASE_URL: "postgresql://langwatch_ci:ci_password@localhost:5432/langwatch_test"
       BASE_HOST: "localhost:3000"
       NEXTAUTH_SECRET: "nextauth-secret-for-ci-testing"
