@@ -111,7 +111,7 @@ export const WelcomeScreen: React.FC = () => {
             category: "onboarding",
             label: "organization_onboarding_completed",
           });
-          window.location.href = `/onboarding/product?projectSlug=${response.projectSlug}`;
+          window.location.href = `/${response.projectSlug}/messages`;
         },
         onError: () => {
           toaster.create({
