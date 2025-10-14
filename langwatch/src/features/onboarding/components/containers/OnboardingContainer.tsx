@@ -7,7 +7,7 @@ import {
 } from "@chakra-ui/react";
 import { FullLogo } from "~/components/icons/FullLogo";
 import { motion } from "motion/react";
-import SpookyScarySkeleton from "./SpookyScarySkeleton";
+import SpookyScarySkeleton from "../SpookyScarySkeleton";
 
 const MotionCenter = motion(Center);
 const MotionContainer = motion(Container);
@@ -57,3 +57,5 @@ export const OrganizationOnboardingContainer: React.FC<
     </MotionContainer>
   </Box>
 );
+
+

@@ -1,8 +1,8 @@
-import { WelcomePage } from "~/features/onboarding/components/WelcomePage";
+import { WelcomeScreen } from "~/features/onboarding/screens/WelcomeScreen";
 
 const OnboardingWelcome: React.FC = () => {
   return (
-    <WelcomePage />
+    <WelcomeScreen />
   );
 };
 

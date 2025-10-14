@@ -6,11 +6,16 @@ import {
   CheckboxCard,
   Text,
 } from "@chakra-ui/react";
-import { CheckboxGroup } from "../../../components/ui/checkbox";
-import type { IconFormItem } from "../types/types";
+import { CheckboxGroup } from "../ui/checkbox";
+
+type IconListItem<T> = {
+  title: string;
+  value: T;
+  icon: React.ComponentType;
+};
 
 interface IconCheckboxCardGroupProps<T extends string = string> {
-  items: IconFormItem<T>[];
+  items: IconListItem<T>[];
   value: T[];
   onChange: (value: T[]) => void;
   size?: "sm" | "md" | "lg";
@@ -28,7 +33,7 @@ export const IconCheckboxCardGroup = <T extends string = string>({
     colorPalette="orange"
     w={"full"}
     value={value}
-    onValueChange={value => {
+    onValueChange={(value) => {
       onChange(value as T[]);
     }}
   >
@@ -65,3 +70,7 @@ export const IconCheckboxCardGroup = <T extends string = string>({
     </VStack>
   </CheckboxGroup>
 );
+
+export default IconCheckboxCardGroup;
+
+
