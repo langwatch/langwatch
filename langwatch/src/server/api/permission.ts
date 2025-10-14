@@ -17,12 +17,23 @@ import type { Permission } from "./rbac";
 // Organized nested permissions structure for better readability
 // Each section groups related permissions together
 const teamPermissions: Record<string, Record<string, TeamUserRole[]>> = {
-  project: {
+  // Administrative resources first
+  organization: {
+    view: [TeamUserRole.ADMIN, TeamUserRole.MEMBER],
+    manage: [TeamUserRole.ADMIN],
+  },
+   project: {
     view: [TeamUserRole.ADMIN, TeamUserRole.MEMBER, TeamUserRole.VIEWER],
     setup: [TeamUserRole.ADMIN, TeamUserRole.MEMBER],
     archive: [TeamUserRole.ADMIN],
     changeCapturedDataVisibility: [TeamUserRole.ADMIN],
   },
+  team: {
+    membersManage: [TeamUserRole.ADMIN],
+    archive: [TeamUserRole.ADMIN],
+    createNewProjects: [TeamUserRole.ADMIN],
+  },
+  // Functional resources
   analytics: {
     view: [TeamUserRole.ADMIN, TeamUserRole.MEMBER, TeamUserRole.VIEWER],
     manage: [TeamUserRole.ADMIN, TeamUserRole.MEMBER],
@@ -33,6 +44,10 @@ const teamPermissions: Record<string, Record<string, TeamUserRole[]>> = {
   messages: {
     view: [TeamUserRole.ADMIN, TeamUserRole.MEMBER, TeamUserRole.VIEWER],
     share: [TeamUserRole.ADMIN, TeamUserRole.MEMBER],
+  },
+  scenarios: {
+    view: [TeamUserRole.ADMIN, TeamUserRole.MEMBER, TeamUserRole.VIEWER],
+    manage: [TeamUserRole.ADMIN, TeamUserRole.MEMBER],
   },
   annotations: {
     view: [TeamUserRole.ADMIN, TeamUserRole.MEMBER, TeamUserRole.VIEWER],
@@ -53,9 +68,6 @@ const teamPermissions: Record<string, Record<string, TeamUserRole[]>> = {
   triggers: {
     manage: [TeamUserRole.ADMIN, TeamUserRole.MEMBER],
   },
-  playground: {
-    access: [TeamUserRole.ADMIN, TeamUserRole.MEMBER],
-  },
   workflows: {
     view: [TeamUserRole.ADMIN, TeamUserRole.MEMBER, TeamUserRole.VIEWER],
     manage: [TeamUserRole.ADMIN, TeamUserRole.MEMBER],
@@ -64,14 +76,8 @@ const teamPermissions: Record<string, Record<string, TeamUserRole[]>> = {
     view: [TeamUserRole.ADMIN, TeamUserRole.MEMBER, TeamUserRole.VIEWER],
     manage: [TeamUserRole.ADMIN, TeamUserRole.MEMBER],
   },
-  team: {
-    membersManage: [TeamUserRole.ADMIN],
-    archive: [TeamUserRole.ADMIN],
-    createNewProjects: [TeamUserRole.ADMIN],
-  },
-  scenarios: {
-    view: [TeamUserRole.ADMIN, TeamUserRole.MEMBER, TeamUserRole.VIEWER],
-    manage: [TeamUserRole.ADMIN, TeamUserRole.MEMBER],
+  playground: {
+    access: [TeamUserRole.ADMIN, TeamUserRole.MEMBER],
   },
 };
 
@@ -449,7 +455,6 @@ export const LEGACY_TO_RBAC_MAPPING: Partial<
   DATASETS_VIEW: "datasets:view",
   DATASETS_MANAGE: "datasets:manage",
   TRIGGERS_MANAGE: "triggers:manage",
-  PLAYGROUND: "playground:view",
   WORKFLOWS_VIEW: "workflows:view",
   WORKFLOWS_MANAGE: "workflows:manage",
   PROMPTS_VIEW: "prompts:view",

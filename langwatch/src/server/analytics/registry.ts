@@ -1,6 +1,8 @@
 import type { AggregationsAggregationContainer } from "@elastic/elasticsearch/lib/api/types";
 import { z } from "zod";
 import { formatMilliseconds } from "../../utils/formatMilliseconds";
+import { formatMoney } from "../../utils/formatMoney";
+import { filterFieldsEnum } from "../filters/types";
 import {
   aggregationTypesEnum,
   allAggregationTypes,
@@ -8,15 +10,14 @@ import {
   percentileAggregationTypes,
   pipelineAggregationTypesEnum,
   pipelineFieldsEnum,
+  sharedFiltersInputSchema,
   type AggregationTypes,
   type AnalyticsGroup,
   type AnalyticsMetric,
   type PercentileAggregationTypes,
   type PipelineAggregationTypes,
   type PipelineFields,
-  sharedFiltersInputSchema,
 } from "./types";
-import { formatMoney } from "../../utils/formatMoney";
 
 const simpleFieldAnalytics = (
   field: string
@@ -26,8 +27,8 @@ const simpleFieldAnalytics = (
 > => ({
   format: "0.[0]",
   increaseIs: "good",
-  aggregation: (aggregation: AggregationTypes) => ({
-    [`${field.replaceAll(".", "_")}_${aggregation}`]: {
+  aggregation: (index: number, aggregation: AggregationTypes) => ({
+    [`${index}__${field.replaceAll(".", "_")}_${aggregation}`]: {
       [aggregation]: {
         field,
         ...(aggregation === "terms"
@@ -36,8 +37,8 @@ const simpleFieldAnalytics = (
       },
     },
   }),
-  extractionPath: (aggregation: AggregationTypes) =>
-    `${field.replaceAll(".", "_")}_${aggregation}`,
+  extractionPath: (index: number, aggregation: AggregationTypes) =>
+    `${index}__${field.replaceAll(".", "_")}_${aggregation}`,
 });
 
 const numericFieldAnalyticsWithPercentiles = (
@@ -51,8 +52,8 @@ const numericFieldAnalyticsWithPercentiles = (
     ...numericAggregationTypes,
     ...percentileAggregationTypes,
   ],
-  aggregation: (aggregation: AggregationTypes) => ({
-    [`${field.replaceAll(".", "_")}_${aggregation}`]:
+  aggregation: (index: number, aggregation: AggregationTypes) => ({
+    [`${index}__${field.replaceAll(".", "_")}_${aggregation}`]:
       percentileAggregationTypes.includes(aggregation as any)
         ? {
             percentiles: {
@@ -66,12 +67,12 @@ const numericFieldAnalyticsWithPercentiles = (
             [aggregation]: { field },
           },
   }),
-  extractionPath: (aggregation: AggregationTypes) =>
+  extractionPath: (index: number, aggregation: AggregationTypes) =>
     percentileAggregationTypes.includes(aggregation as any)
-      ? `${field.replaceAll(".", "_")}_${aggregation}>values>${
+      ? `${index}__${field.replaceAll(".", "_")}_${aggregation}>values>${
           percentileToPercent[aggregation as PercentileAggregationTypes]
         }.0`
-      : `${field.replaceAll(".", "_")}_${aggregation}`,
+      : `${index}__${field.replaceAll(".", "_")}_${aggregation}`,
 });
 
 export const percentileToPercent: Record<PercentileAggregationTypes, number> = {
@@ -114,8 +115,8 @@ export const analyticsMetrics = {
         filter: "spans.type",
         optional: true,
       },
-      aggregation: (aggregation, key) => ({
-        [`span_type_${aggregation}`]: {
+      aggregation: (index: number, aggregation, key) => ({
+        [`${index}__span_type_${aggregation}`]: {
           nested: {
             path: "spans",
           },
@@ -137,8 +138,8 @@ export const analyticsMetrics = {
           },
         },
       }),
-      extractionPath: (aggregation) => {
-        return `span_type_${aggregation}>child>cardinality`;
+      extractionPath: (index: number, aggregation) => {
+        return `${index}__span_type_${aggregation}>child>cardinality`;
       },
       quickwitSupport: false,
     },
@@ -158,8 +159,8 @@ export const analyticsMetrics = {
       format: "0.00a",
       increaseIs: "good",
       allowedAggregations: allAggregationTypes,
-      aggregation: (aggregation) => ({
-        [`thumbs_up_down_${aggregation}`]: {
+      aggregation: (index: number, aggregation) => ({
+        [`${index}__thumbs_up_down_${aggregation}`]: {
           nested: {
             path: "events",
           },
@@ -209,10 +210,10 @@ export const analyticsMetrics = {
           },
         },
       }),
-      extractionPath: (aggregation: AggregationTypes) => {
+      extractionPath: (index: number, aggregation: AggregationTypes) => {
         return aggregation === "cardinality"
-          ? `thumbs_up_down_${aggregation}>child>cardinality`
-          : `thumbs_up_down_${aggregation}>child>child>child>child`;
+          ? `${index}__thumbs_up_down_${aggregation}>child>cardinality`
+          : `${index}__thumbs_up_down_${aggregation}>child>child>child>child`;
       },
       quickwitSupport: false,
     },
@@ -261,7 +262,7 @@ export const analyticsMetrics = {
       label: "Total Tokens",
       colorSet: "purpleTones",
       increaseIs: "neutral",
-      aggregation: (aggregation: AggregationTypes) => {
+      aggregation: (index: number, aggregation: AggregationTypes) => {
         const totalTokensScript = `
                     long promptTokens = 0;
                     long completionTokens = 0;
@@ -281,28 +282,27 @@ export const analyticsMetrics = {
                     return promptTokens + completionTokens;
                   `;
         return {
-          [`total_tokens_${aggregation}`]: percentileAggregationTypes.includes(
-            aggregation as any
-          )
-            ? {
-                percentiles: {
-                  script: {
-                    source: totalTokensScript,
-                  },
-                  percents: [
-                    percentileToPercent[
-                      aggregation as PercentileAggregationTypes
+          [`${index}__total_tokens_${aggregation}`]:
+            percentileAggregationTypes.includes(aggregation as any)
+              ? {
+                  percentiles: {
+                    script: {
+                      source: totalTokensScript,
+                    },
+                    percents: [
+                      percentileToPercent[
+                        aggregation as PercentileAggregationTypes
+                      ],
                     ],
-                  ],
-                },
-              }
-            : {
-                [aggregation]: {
-                  script: {
-                    source: totalTokensScript,
+                  },
+                }
+              : {
+                  [aggregation]: {
+                    script: {
+                      source: totalTokensScript,
+                    },
                   },
                 },
-              },
         };
       },
       quickwitSupport: false,
@@ -312,7 +312,7 @@ export const analyticsMetrics = {
       label: "Tokens per Second",
       colorSet: "cyanTones",
       increaseIs: "good",
-      aggregation: (aggregation: AggregationTypes) => {
+      aggregation: (index: number, aggregation: AggregationTypes) => {
         const tokensPerSecondScript = `
           long completionTokens = 0;
           long duration = 0;
@@ -340,7 +340,7 @@ export const analyticsMetrics = {
           return completionTokens / (duration / 1000.0);
         `;
         return {
-          [`tokens_per_second_${aggregation}`]: {
+          [`${index}__tokens_per_second_${aggregation}`]: {
             nested: {
               path: "spans",
             },
@@ -369,12 +369,12 @@ export const analyticsMetrics = {
           },
         };
       },
-      extractionPath: (aggregation: AggregationTypes) => {
+      extractionPath: (index: number, aggregation: AggregationTypes) => {
         return percentileAggregationTypes.includes(aggregation as any)
-          ? `tokens_per_second_${aggregation}>child>values>${
+          ? `${index}__tokens_per_second_${aggregation}>child>values>${
               percentileToPercent[aggregation as PercentileAggregationTypes]
             }.0`
-          : `tokens_per_second_${aggregation}>child`;
+          : `${index}__tokens_per_second_${aggregation}>child`;
       },
       quickwitSupport: false,
     },
@@ -390,8 +390,8 @@ export const analyticsMetrics = {
         filter: "events.event_type",
         optional: true,
       },
-      aggregation: (aggregation, key) => ({
-        [`event_type_${aggregation}${key ? `_${key}` : ""}`]: {
+      aggregation: (index: number, aggregation, key) => ({
+        [`${index}__event_type_${aggregation}${key ? `_${key}` : ""}`]: {
           nested: {
             path: "events",
           },
@@ -415,8 +415,8 @@ export const analyticsMetrics = {
           },
         },
       }),
-      extractionPath: (aggregation: AggregationTypes, key) => {
-        return `event_type_${aggregation}${
+      extractionPath: (index: number, aggregation: AggregationTypes, key) => {
+        return `${index}__event_type_${aggregation}${
           key ? `_${key}` : ""
         }>child>cardinality`;
       },
@@ -436,14 +436,14 @@ export const analyticsMetrics = {
       requiresSubkey: {
         filter: "events.metrics.key",
       },
-      aggregation: (aggregation, key, subkey) => {
+      aggregation: (index: number, aggregation, key, subkey) => {
         if (!key || !subkey)
           throw new Error(
             `Key and subkey are required for event_score ${aggregation} metric`
           );
 
         return {
-          [`event_score_${aggregation}_${key}_${subkey}`]: {
+          [`${index}__event_score_${aggregation}_${key}_${subkey}`]: {
             nested: {
               path: "events",
             },
@@ -482,8 +482,13 @@ export const analyticsMetrics = {
           },
         };
       },
-      extractionPath: (aggregation: AggregationTypes, key, subkey) => {
-        return `event_score_${aggregation}_${key}_${subkey}>child>child>child>child`;
+      extractionPath: (
+        index: number,
+        aggregation: AggregationTypes,
+        key,
+        subkey
+      ) => {
+        return `${index}__event_score_${aggregation}_${key}_${subkey}>child>child>child>child`;
       },
       quickwitSupport: false,
     },
@@ -499,14 +504,14 @@ export const analyticsMetrics = {
       requiresSubkey: {
         filter: "events.event_details.key",
       },
-      aggregation: (aggregation, key, subkey) => {
+      aggregation: (index: number, aggregation, key, subkey) => {
         if (!key || !subkey)
           throw new Error(
             `Key and subkey are required for event_details ${aggregation} metric`
           );
 
         return {
-          [`event_score_${aggregation}_${key}_${subkey}`]: {
+          [`${index}__event_score_${aggregation}_${key}_${subkey}`]: {
             nested: {
               path: "events",
             },
@@ -547,8 +552,13 @@ export const analyticsMetrics = {
           },
         };
       },
-      extractionPath: (aggregation: AggregationTypes, key, subkey) => {
-        return `event_score_${aggregation}_${key}_${subkey}>child>child>child>child`;
+      extractionPath: (
+        index: number,
+        aggregation: AggregationTypes,
+        key,
+        subkey
+      ) => {
+        return `${index}__event_score_${aggregation}_${key}_${subkey}>child>child>child>child`;
       },
       quickwitSupport: false,
     },
@@ -565,9 +575,9 @@ export const analyticsMetrics = {
       requiresKey: {
         filter: "evaluations.evaluator_id",
       },
-      aggregation: (aggregation, key) => {
+      aggregation: (index: number, aggregation, key) => {
         return {
-          [`evaluation_score_${aggregation}_${key}`]: {
+          [`${index}__evaluation_score_${aggregation}_${key}`]: {
             nested: {
               path: "evaluations",
             },
@@ -590,8 +600,8 @@ export const analyticsMetrics = {
           },
         };
       },
-      extractionPath: (aggregation: AggregationTypes, key) => {
-        return `evaluation_score_${aggregation}_${key}>child>child`;
+      extractionPath: (index: number, aggregation: AggregationTypes, key) => {
+        return `${index}__evaluation_score_${aggregation}_${key}>child>child`;
       },
       quickwitSupport: false,
     },
@@ -606,9 +616,9 @@ export const analyticsMetrics = {
       requiresKey: {
         filter: "evaluations.evaluator_id",
       },
-      aggregation: (aggregation, key) => {
+      aggregation: (index: number, aggregation, key) => {
         return {
-          [`evaluation_pass_rate_${aggregation}_${key}`]: {
+          [`${index}__evaluation_pass_rate_${aggregation}_${key}`]: {
             nested: {
               path: "evaluations",
             },
@@ -645,8 +655,8 @@ export const analyticsMetrics = {
           },
         };
       },
-      extractionPath: (aggregation: AggregationTypes, key) => {
-        return `evaluation_pass_rate_${aggregation}_${key}>child>child`;
+      extractionPath: (index: number, aggregation: AggregationTypes, key) => {
+        return `${index}__evaluation_pass_rate_${aggregation}_${key}>child>child`;
       },
       quickwitSupport: false,
     },
@@ -660,8 +670,8 @@ export const analyticsMetrics = {
         filter: "evaluations.evaluator_id",
         optional: true,
       },
-      aggregation: (aggregation, key) => ({
-        [`checks_${aggregation}`]: {
+      aggregation: (index: number, aggregation, key) => ({
+        [`${index}__checks_${aggregation}`]: {
           nested: {
             path: "evaluations",
           },
@@ -689,8 +699,8 @@ export const analyticsMetrics = {
           },
         },
       }),
-      extractionPath: (aggregation: AggregationTypes) => {
-        return `checks_${aggregation}>child>child`;
+      extractionPath: (index: number, aggregation: AggregationTypes) => {
+        return `${index}__checks_${aggregation}>child>child`;
       },
       quickwitSupport: false,
     },
@@ -702,8 +712,8 @@ export const analyticsMetrics = {
       format: formatMilliseconds,
       increaseIs: "neutral",
       allowedAggregations: ["avg"],
-      aggregation: () => ({
-        thread_sessions: {
+      aggregation: (index: number) => ({
+        [`${index}__thread_sessions`]: {
           terms: {
             field: "metadata.thread_id",
             size: 10000,
@@ -736,13 +746,14 @@ export const analyticsMetrics = {
             },
           },
         },
-        average_duration_per_thread_avg: {
+        [`${index}__average_duration_per_thread_avg`]: {
           avg_bucket: {
-            buckets_path: "thread_sessions>session_duration.value",
+            buckets_path: `${index}__thread_sessions>session_duration.value`,
           },
         },
       }),
-      extractionPath: () => "average_duration_per_thread_avg",
+      extractionPath: (index: number) =>
+        `${index}__average_duration_per_thread_avg`,
       quickwitSupport: false,
     },
   },
@@ -1200,6 +1211,17 @@ export const seriesInput = z.object({
       aggregation: pipelineAggregationTypesEnum,
     })
   ),
+  filters: z.optional(
+    z.record(
+      filterFieldsEnum,
+      z.union([
+        z.array(z.string()),
+        z.record(z.string(), z.array(z.string())),
+        z.record(z.string(), z.record(z.string(), z.array(z.string()))),
+      ])
+    )
+  ),
+  asPercent: z.optional(z.boolean()),
 });
 
 export type SeriesInputType = z.infer<typeof seriesInput>;

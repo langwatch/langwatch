@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.5.0](https://github.com/langwatch/langwatch/compare/python-sdk@v0.4.2...python-sdk@v0.5.0) (2025-10-13)
+
+
+### Features
+
+* add support for otel /metrics endpoint for genai metrics ([#680](https://github.com/langwatch/langwatch/issues/680)) ([14bec0d](https://github.com/langwatch/langwatch/commit/14bec0d70d4c645d409b2b18a8f6219515563aed))
+
+
+### Miscellaneous
+
+* update to allow first_token_ms ([#702](https://github.com/langwatch/langwatch/issues/702)) ([38ffd34](https://github.com/langwatch/langwatch/commit/38ffd34f90e49c866690747c0e36b43a867cc698))
+* update version 0.5 ([#704](https://github.com/langwatch/langwatch/issues/704)) ([615510f](https://github.com/langwatch/langwatch/commit/615510fa04ebe3c33635d0edcd3e8f7faeaabb52))
+
 ## [0.4.2](https://github.com/langwatch/langwatch/compare/python-sdk@v0.4.1...python-sdk@v0.4.2) (2025-09-22)
 
 

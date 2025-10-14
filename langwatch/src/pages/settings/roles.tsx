@@ -243,7 +243,14 @@ function RolesManagement({ organizationId }: { organizationId: string }) {
   }, [editingRole, setEditValue]);
 
   return (
-    <VStack align="start" width="full" padding={8} gap={6}>
+    <VStack
+      align="start"
+      width="full"
+      paddingX={4}
+      paddingY={6}
+      gap={6}
+      maxWidth="1200px"
+    >
       <HStack justify="space-between" width="full">
         <VStack align="start" gap={1}>
           <Heading size="lg">Roles & Permissions</Heading>
@@ -266,7 +273,12 @@ function RolesManagement({ organizationId }: { organizationId: string }) {
           These are the built-in roles that cannot be modified or deleted.
         </Text>
 
-        <HStack width="full" gap={4} flexWrap="wrap">
+        <Box
+          width="full"
+          display="grid"
+          gridTemplateColumns="repeat(auto-fit, minmax(300px, 1fr))"
+          gap={4}
+        >
           <RoleCard
             name="Admin"
             description="Full access to all features and settings"
@@ -285,7 +297,7 @@ function RolesManagement({ organizationId }: { organizationId: string }) {
             isDefault
             permissionCount="View Only"
           />
-        </HStack>
+        </Box>
       </VStack>
 
       <Separator />
@@ -318,7 +330,12 @@ function RolesManagement({ organizationId }: { organizationId: string }) {
           </Card.Root>
         )}
 
-        <HStack width="full" gap={4} flexWrap="wrap">
+        <Box
+          width="full"
+          display="grid"
+          gridTemplateColumns="repeat(auto-fit, minmax(300px, 1fr))"
+          gap={4}
+        >
           {roles.data?.map((role) => (
             <RoleCard
               key={role.id}
@@ -342,7 +359,7 @@ function RolesManagement({ organizationId }: { organizationId: string }) {
               }}
             />
           ))}
-        </HStack>
+        </Box>
       </VStack>
 
       {/* Create Role Dialog */}
@@ -575,11 +592,14 @@ function RoleCard({
 }) {
   return (
     <Card.Root
-      width="300px"
+      width="100%"
+      height="100%"
       borderWidth="1px"
       borderColor="gray.200"
       _hover={{ borderColor: "orange.400", shadow: "md" }}
       transition="all 0.2s"
+      display="flex"
+      flexDirection="column"
     >
       <Card.Header>
         <HStack justify="space-between" align="start">
@@ -630,8 +650,8 @@ function RoleCard({
           )}
         </HStack>
       </Card.Header>
-      <Card.Body paddingTop={0}>
-        <VStack align="start" gap={2}>
+      <Card.Body paddingTop={0} flex={1} display="flex" flexDirection="column">
+        <VStack align="start" gap={2} flex={1}>
           <Text fontSize="sm" color="gray.600">
             {description}
           </Text>
@@ -689,16 +709,17 @@ function PermissionSelector({
 
   // Define which actions are valid for each resource
   const getValidActionsForResource = (resource: Resource): Action[] => {
-    // Share is only available for messages
+    // Cost resource only has view permission
+    if (resource === Resources.COST) {
+      return [Actions.VIEW];
+    }
+    // Messages only have view and share permissions
     if (resource === Resources.MESSAGES) {
-      return [
-        Actions.VIEW,
-        Actions.CREATE,
-        Actions.UPDATE,
-        Actions.DELETE,
-        Actions.MANAGE,
-        Actions.SHARE,
-      ];
+      return [Actions.VIEW, Actions.SHARE];
+    }
+    // Scenarios only have view permission
+    if (resource === Resources.SCENARIOS) {
+      return [Actions.VIEW];
     }
     // Most other resources don't have share
     return [
@@ -710,8 +731,27 @@ function PermissionSelector({
     ];
   };
 
+  // Define the order of resources - this is the single source of truth for UI ordering
+  const resourceOrder: Resource[] = [
+    Resources.ORGANIZATION,
+    Resources.PROJECT,
+    Resources.TEAM,
+    Resources.ANALYTICS,
+    Resources.COST,
+    Resources.MESSAGES,
+    Resources.SCENARIOS,
+    Resources.ANNOTATIONS,
+    Resources.GUARDRAILS,
+    Resources.EXPERIMENTS,
+    Resources.DATASETS,
+    Resources.TRIGGERS,
+    Resources.WORKFLOWS,
+    Resources.PROMPTS,
+    Resources.PLAYGROUND,
+  ];
+
   // Group permissions by resource using the correct valid actions
-  Object.values(Resources).forEach((resource) => {
+  resourceOrder.forEach((resource) => {
     const validActions = getValidActionsForResource(resource);
     groupedPermissions[resource] = validActions.map(
       (action) => `${resource}:${action}` as Permission
@@ -821,8 +861,27 @@ function PermissionViewer({ permissions }: { permissions: Permission[] }) {
     Permission[]
   >;
 
+  // Define the order of resources - this is the single source of truth for UI ordering
+  const resourceOrder: Resource[] = [
+    Resources.ORGANIZATION,
+    Resources.PROJECT,
+    Resources.TEAM,
+    Resources.ANALYTICS,
+    Resources.COST,
+    Resources.MESSAGES,
+    Resources.SCENARIOS,
+    Resources.ANNOTATIONS,
+    Resources.GUARDRAILS,
+    Resources.EXPERIMENTS,
+    Resources.DATASETS,
+    Resources.TRIGGERS,
+    Resources.WORKFLOWS,
+    Resources.PROMPTS,
+    Resources.PLAYGROUND,
+  ];
+
   // Group permissions by resource
-  Object.values(Resources).forEach((resource) => {
+  resourceOrder.forEach((resource) => {
     groupedPermissions[resource] = Object.values(Actions).map(
       (action) => `${resource}:${action}` as Permission
     );
@@ -830,16 +889,17 @@ function PermissionViewer({ permissions }: { permissions: Permission[] }) {
 
   // Define which actions are valid for each resource
   const getValidActionsForResource = (resource: Resource): Action[] => {
-    // Share is only available for messages
+    // Cost resource only has view permission
+    if (resource === Resources.COST) {
+      return [Actions.VIEW];
+    }
+    // Messages only have view and share permissions
     if (resource === Resources.MESSAGES) {
-      return [
-        Actions.VIEW,
-        Actions.CREATE,
-        Actions.UPDATE,
-        Actions.DELETE,
-        Actions.MANAGE,
-        Actions.SHARE,
-      ];
+      return [Actions.VIEW, Actions.SHARE];
+    }
+    // Scenarios only have view permission
+    if (resource === Resources.SCENARIOS) {
+      return [Actions.VIEW];
     }
     // Most other resources don't have share
     return [

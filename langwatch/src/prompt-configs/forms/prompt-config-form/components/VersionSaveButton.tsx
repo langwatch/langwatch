@@ -5,12 +5,10 @@ import { Tooltip } from "../../../../components/ui/tooltip";
 export function VersionSaveButton({
   disabled,
   onClick,
-  isSaving,
   hideLabel = false,
 }: {
   disabled?: boolean;
   onClick: () => void;
-  isSaving?: boolean;
   hideLabel?: boolean;
 }) {
   return (
@@ -23,15 +21,14 @@ export function VersionSaveButton({
       <Button
         type="submit"
         data-testid="save-version-button"
-        disabled={!!isSaving || !!disabled}
+        disabled={!!disabled}
         colorPalette="green"
-        loading={isSaving}
         onClick={(e) => {
           e.preventDefault();
           onClick();
         }}
       >
-        {isSaving ? <Spinner /> : <Save />}
+        <Save />
         {!hideLabel && <Text>Save Version</Text>}
       </Button>
     </Tooltip>

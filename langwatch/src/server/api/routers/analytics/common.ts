@@ -7,6 +7,7 @@ import { type z } from "zod";
 import { type sharedFiltersInputSchema } from "../../../analytics/types";
 import { availableFilters } from "../../../filters/registry";
 import type { FilterField } from "../../../filters/types";
+import type { FilterParam } from "../../../../hooks/useFilterParams";
 
 const getDaysDifference = (startDate: Date, endDate: Date) =>
   differenceInCalendarDays(endDate, startDate) + 1;
@@ -51,16 +52,7 @@ export const generateTracesPivotQueryConditions = ({
   const endDate_ =
     endDate < now && now - endDate < 1000 * 60 * 60 * 2 ? now : endDate;
 
-  let filterConditions: QueryDslQueryContainer[] = [];
-
-  for (const [field, params] of Object.entries(filters)) {
-    if (params.length == 0) {
-      continue;
-    }
-
-    const col = collectConditions(field as FilterField, params);
-    filterConditions = filterConditions.concat(col);
-  }
+  const filterConditions = generateFilterConditions(filters);
 
   return {
     pivotIndexConditions: {
@@ -84,6 +76,22 @@ export const generateTracesPivotQueryConditions = ({
     isAnyFilterPresent: filterConditions.length > 0,
     endDateUsedForQuery: endDate_,
   };
+};
+
+export const generateFilterConditions = (
+  filters: Partial<Record<FilterField, FilterParam>>
+) => {
+  let filterConditions: QueryDslQueryContainer[] = [];
+  for (const [field, params] of Object.entries(filters)) {
+    if (params.length == 0) {
+      continue;
+    }
+
+    const col = collectConditions(field as FilterField, params);
+    filterConditions = filterConditions.concat(col);
+  }
+
+  return filterConditions;
 };
 
 const collectConditions = (

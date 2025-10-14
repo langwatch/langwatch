@@ -1,16 +1,18 @@
 import { useRouter } from "next/router";
 import { useEffect, useMemo } from "react";
 import { useLocalStorage } from "usehooks-ts";
-import { api } from "../utils/api";
-import { publicRoutes, useRequiredSession } from "./useRequiredSession";
+
 import {
   organizationRolePermissionMapping,
   type OrganizationRoleGroup,
   type TeamRoleGroup,
   teamRolePermissionMapping,
 } from "../server/api/permission";
+import { api } from "../utils/api";
+
 import type { OrganizationUserRole } from "@prisma/client";
 import { usePublicEnv } from "./usePublicEnv";
+import { publicRoutes, useRequiredSession } from "./useRequiredSession";
 import {
   teamRoleHasPermission,
   organizationRoleHasPermission,
@@ -123,22 +125,23 @@ export const useOrganizationTeamProject = (
   const organization = teamsMatchingSlug?.[0]
     ? teamsMatchingSlug?.[0].organization
     : projectsTeamsOrganizationsMatchingSlug?.[0]
-    ? projectsTeamsOrganizationsMatchingSlug?.[0].organization
-    : organizations.data
-    ? organizations.data.find((org) => org.id == localStorageOrganizationId) ??
-      organizations.data[0]
-    : undefined;
+      ? projectsTeamsOrganizationsMatchingSlug?.[0].organization
+      : organizations.data
+        ? (organizations.data.find(
+            (org) => org.id == localStorageOrganizationId
+          ) ?? organizations.data[0])
+        : undefined;
 
   const team = projectsTeamsOrganizationsMatchingSlug?.[0]
     ? projectsTeamsOrganizationsMatchingSlug?.[0].team
     : organization
-    ? organization.teams.find((team) => team.id == localStorageTeamId) ??
-      organization.teams.find((team) => team.projects.length > 0) ??
-      organization.teams[0]
-    : undefined;
+      ? (organization.teams.find((team) => team.id == localStorageTeamId) ??
+        organization.teams.find((team) => team.projects.length > 0) ??
+        organization.teams[0])
+      : undefined;
 
   const project = team
-    ? projectsTeamsOrganizationsMatchingSlug?.[0]?.project ?? team.projects[0]
+    ? (projectsTeamsOrganizationsMatchingSlug?.[0]?.project ?? team.projects[0])
     : undefined;
 
   const modelProviders = api.modelProvider.getAllForProject.useQuery(
@@ -316,6 +319,7 @@ export const useOrganizationTeamProject = (
     organization,
     team,
     project: publicShareProject.data ?? project,
+    projectId: project?.id,
     // Legacy permission API (still supported)
     hasOrganizationPermission,
     hasTeamPermission,

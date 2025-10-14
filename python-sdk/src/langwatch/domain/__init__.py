@@ -157,6 +157,7 @@ class SpanMetrics(TypedDict, total=False):
     prompt_tokens: Optional[int]
     completion_tokens: Optional[int]
     cost: Optional[float]
+    first_token_ms: Optional[int]
 
 
 class SpanParams(TypedDict, total=False):

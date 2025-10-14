@@ -192,7 +192,7 @@ export function AddOrEditDatasetDrawer(props: AddDatasetDrawerProps) {
           reset();
           onClose();
           // Refetch the datasets to get the latest data
-          trpc.dataset.getAll.invalidate();
+          void trpc.dataset.getAll.invalidate();
         },
         onError: (error) => {
           toaster.create({

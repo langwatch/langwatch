@@ -1,6 +1,6 @@
 {
-  "typescript-sdk": "0.7.2",
-  "python-sdk": "0.4.2",
+  "typescript-sdk": "0.7.3",
+  "python-sdk": "0.5.0",
   "mcp-server": "0.1.0",
-  ".": "1.0.0"
+  ".": "1.1.1"
 }

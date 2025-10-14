@@ -25,7 +25,7 @@ export default function Annotations() {
   const router = useRouter();
   const { filterParams, queryOpts, nonEmptyFilters } = useFilterParams();
 
-  const hasAnyFilters = nonEmptyFilters.length > 0;
+  const hasAnyFilters = Object.keys(nonEmptyFilters).length > 0;
   const traceGroups = api.traces.getAllForProject.useQuery(
     {
       ...filterParams,

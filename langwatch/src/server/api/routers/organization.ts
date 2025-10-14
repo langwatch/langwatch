@@ -10,9 +10,14 @@ import {
 } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import { nanoid } from "nanoid";
-import { slugify } from "~/utils/slugify";
 import { z } from "zod";
+
+import { env } from "~/env.mjs";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
+import { scheduleUsageStatsForOrganization } from "~/server/background/queues/usageStatsQueue";
+
+import { dependencies } from "../../../injection/dependencies.server";
+import { elasticsearchMigrate } from "../../../tasks/elasticMigrate";
 import { sendInviteEmail } from "../../mailer/inviteEmail";
 import {
   OrganizationRoleGroup,
@@ -21,12 +26,11 @@ import {
   checkUserPermissionForTeam,
   skipPermissionCheck,
 } from "../permission";
-import { env } from "~/env.mjs";
-import { decrypt, encrypt } from "~/utils/encryption";
+
 import { signUpDataSchema } from "./onboarding";
-import { dependencies } from "../../../injection/dependencies.server";
-import { elasticsearchMigrate } from "../../../tasks/elasticMigrate";
-import { scheduleUsageStatsForOrganization } from "~/server/background/queues/usageStatsQueue";
+
+import { decrypt, encrypt } from "~/utils/encryption";
+import { slugify } from "~/utils/slugify";
 
 export type TeamWithProjects = Team & {
   projects: Project[];

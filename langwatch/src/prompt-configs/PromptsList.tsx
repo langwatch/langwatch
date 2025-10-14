@@ -7,44 +7,63 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { CopyIcon, UnplugIcon } from "lucide-react";
+import { UnplugIcon } from "lucide-react";
 import { Edit, MoreVertical, Trash2 } from "react-feather";
-
-import type { LlmConfigWithLatestVersion } from "~/server/prompt-config/repositories/llm-config.repository";
 
 import { GeneratePromptApiSnippetDialog } from "./components/GeneratePromptApiSnippetDialog";
 
 import { Menu } from "~/components/ui/menu";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import { toaster } from "../components/ui/toaster";
 import { formatTimeAgo } from "../utils/formatTimeAgo";
 import { CopyButton } from "../components/CopyButton";
 import { GenerateApiSnippetButton } from "../components/GenerateApiSnippetButton";
 import { LLMModelDisplay } from "../components/llmPromptConfigs/LLMModelDisplay";
-import { titleCase } from "../utils/stringCasing";
 import { Tooltip } from "../components/ui/tooltip";
 import { LuBuilding } from "react-icons/lu";
 
-export interface PromptConfigTableProps {
-  configs: LlmConfigWithLatestVersion[];
-  isLoading?: boolean;
-  onDelete: (config: LlmConfigWithLatestVersion) => Promise<void>;
-  onEdit: (config: LlmConfigWithLatestVersion) => Promise<void>;
+/**
+ * Flat interface for prompt list items
+ */
+interface PromptListItem {
+  id: string;
+  name: string | null;
+  handle: string | null;
+  scope: "ORGANIZATION" | "PROJECT";
+  updatedAt: Date;
+  version: number;
+  prompt: string;
+  model: string | null;
+  author?: {
+    name: string;
+  } | null;
 }
 
+/**
+ * Props for the PromptsList component
+ */
+interface PromptsListProps {
+  prompts: PromptListItem[];
+  isLoading?: boolean;
+  onDelete: (config: PromptListItem) => Promise<void>;
+  onEdit: (config: PromptListItem) => Promise<void>;
+}
+
+/**
+ * Component for displaying a list of prompt
+ */
 export function PromptsList({
-  configs,
+  prompts,
   isLoading,
   onDelete,
   onEdit,
-}: PromptConfigTableProps) {
+}: PromptsListProps) {
   const { project } = useOrganizationTeamProject();
 
   if (!project || isLoading) {
     return <Text>Loading prompts...</Text>;
   }
 
-  if (configs.length === 0) {
+  if (prompts.length === 0) {
     return (
       <Box
         textAlign="center"
@@ -64,10 +83,10 @@ export function PromptsList({
 
   return (
     <VStack gap={4} align="stretch">
-      {configs.map((config) => (
+      {prompts.map((config) => (
         <GeneratePromptApiSnippetDialog
           key={config.id}
-          configId={config.id}
+          promptHandle={config.handle}
           apiKey={project?.apiKey}
         >
           <Card.Root
@@ -119,7 +138,7 @@ export function PromptsList({
                           border="1px solid"
                           borderColor="green.200"
                         >
-                          v{config.latestVersion.version}
+                          v{config.version}
                         </Badge>
                         {config.scope === "ORGANIZATION" && (
                           <Tooltip content="This prompt is available to all projects in the organization">
@@ -131,11 +150,9 @@ export function PromptsList({
                             </Badge>
                           </Tooltip>
                         )}
-                        {config.latestVersion.configData.model && (
+                        {config.model && (
                           <HStack gap={2} align="center">
-                            <LLMModelDisplay
-                              model={config.latestVersion.configData.model}
-                            />
+                            <LLMModelDisplay model={config.model} />
                           </HStack>
                         )}
                       </HStack>
@@ -164,7 +181,7 @@ export function PromptsList({
                     >
                       <Menu.Item
                         value="edit"
-                        onClick={(event) => {
+                        onClick={(_event) => {
                           void onEdit(config);
                         }}
                       >
@@ -181,7 +198,7 @@ export function PromptsList({
                       <Menu.Item
                         value="delete"
                         color="red.600"
-                        onClick={(event) => {
+                        onClick={(_event) => {
                           void onDelete(config);
                         }}
                       >
@@ -211,9 +228,7 @@ export function PromptsList({
                   color="gray.700"
                   _dark={{ color: "gray.300" }}
                 >
-                  {config.latestVersion.configData.prompt.trim() === ""
-                    ? "<empty>"
-                    : config.latestVersion.configData.prompt}
+                  {config.prompt.trim() === "" ? "<empty>" : config.prompt}
                 </Text>
               </Box>
 
@@ -226,26 +241,14 @@ export function PromptsList({
                 borderColor="gray.100"
                 _dark={{ borderColor: "gray.700" }}
               >
-                <Text
-                  fontSize="xs"
-                  color="gray.500"
-                  _dark={{ color: "gray.400" }}
-                >
-                  updated{" "}
-                  {formatTimeAgo(
-                    config.updatedAt.getTime(),
-                    "dd/MMM HH:mm",
-                    24 * 30
-                  )}{" "}
-                  by{" "}
-                  <Text as="span" fontWeight="medium">
-                    {config.latestVersion.author?.name}
-                  </Text>
-                </Text>
+                <UpdatedInfo
+                  author={config.author}
+                  updatedAt={config.updatedAt}
+                />
 
                 <HStack gap={2}>
                   <GeneratePromptApiSnippetDialog.Trigger>
-                    <GenerateApiSnippetButton config={config} />
+                    <GenerateApiSnippetButton hasHandle={!!config.handle} />
                   </GeneratePromptApiSnippetDialog.Trigger>
                 </HStack>
               </HStack>
@@ -254,5 +257,22 @@ export function PromptsList({
         </GeneratePromptApiSnippetDialog>
       ))}
     </VStack>
+  );
+}
+
+function UpdatedInfo({
+  author,
+  updatedAt,
+}: {
+  author?: { name: string } | null;
+  updatedAt: Date;
+}) {
+  return (
+    <Text fontSize="xs" color="gray.500" _dark={{ color: "gray.400" }}>
+      updated {formatTimeAgo(updatedAt.getTime(), "dd/MMM HH:mm", 24 * 30)} by{" "}
+      <Text as="span" fontWeight="medium">
+        {author?.name ?? "Anonymous User"}
+      </Text>
+    </Text>
   );
 }

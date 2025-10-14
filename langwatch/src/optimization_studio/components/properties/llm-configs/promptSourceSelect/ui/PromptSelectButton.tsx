@@ -4,12 +4,10 @@ import { Tooltip } from "../../../../../../components/ui/tooltip";
 
 // Prompt Selection Button Component
 interface PromptSelectionButtonProps {
-  selectedConfig?: { name: string };
   onClick: () => void;
 }
 
 export function PromptSelectionButton({
-  selectedConfig,
   onClick,
 }: PromptSelectionButtonProps) {
   return (

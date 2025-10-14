@@ -29,22 +29,21 @@ export type Action = (typeof Actions)[keyof typeof Actions];
  * Resources in the system that can have permissions
  */
 export const Resources = {
+  ORGANIZATION: "organization",
   PROJECT: "project",
+  TEAM: "team",
   ANALYTICS: "analytics",
   COST: "cost",
   MESSAGES: "messages",
+  SCENARIOS: "scenarios",
   ANNOTATIONS: "annotations",
-  SPANS: "spans",
   GUARDRAILS: "guardrails",
   EXPERIMENTS: "experiments",
   DATASETS: "datasets",
   TRIGGERS: "triggers",
-  PLAYGROUND: "playground",
   WORKFLOWS: "workflows",
   PROMPTS: "prompts",
-  SCENARIOS: "scenarios",
-  TEAM: "team",
-  ORGANIZATION: "organization",
+  PLAYGROUND: "playground",
 } as const;
 
 export type Resource = (typeof Resources)[keyof typeof Resources];
@@ -82,8 +81,6 @@ const TEAM_ROLE_PERMISSIONS: Record<TeamUserRole, Permission[]> = {
     // Annotations
     "annotations:view",
     "annotations:manage",
-    // Spans
-    "spans:view",
     // Guardrails
     "guardrails:view",
     "guardrails:manage",
@@ -96,8 +93,6 @@ const TEAM_ROLE_PERMISSIONS: Record<TeamUserRole, Permission[]> = {
     // Triggers
     "triggers:view",
     "triggers:manage",
-    // Playground
-    "playground:view",
     // Workflows
     "workflows:view",
     "workflows:manage",
@@ -126,8 +121,6 @@ const TEAM_ROLE_PERMISSIONS: Record<TeamUserRole, Permission[]> = {
     // Annotations
     "annotations:view",
     "annotations:manage",
-    // Spans
-    "spans:view",
     // Guardrails
     "guardrails:view",
     "guardrails:manage",
@@ -140,8 +133,6 @@ const TEAM_ROLE_PERMISSIONS: Record<TeamUserRole, Permission[]> = {
     // Triggers
     "triggers:view",
     "triggers:manage",
-    // Playground
-    "playground:view",
     // Workflows
     "workflows:view",
     "workflows:manage",
@@ -163,8 +154,6 @@ const TEAM_ROLE_PERMISSIONS: Record<TeamUserRole, Permission[]> = {
     "messages:view",
     // Annotations
     "annotations:view",
-    // Spans
-    "spans:view",
     // Guardrails
     "guardrails:view",
     // Experiments

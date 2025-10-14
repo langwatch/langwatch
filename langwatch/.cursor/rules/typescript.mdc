@@ -32,3 +32,21 @@ function ExampleComponent() {
    - Separate business logic from UI rendering
    - Keep related code together
    - Maintain clear boundaries between concerns
+
+4. Class Organization
+   - Place public methods first
+   - Place private methods at the bottom of the class
+   - Group related methods together
+   - Use clear method names that describe their purpose
+
+
+/**
+ * Testing Guidelines
+ * - Use Vite's built-in test runner (vitest)
+ * - Place all test files in a `__tests__` directory adjacent to the code under test
+ * - Name test files as `ComponentName.test.tsx` or `hookName.test.ts`
+ * - Use descriptive test names and Given-When-Then structure in comments
+ * - Prefer testing public behavior over implementation details
+ * - Mock dependencies as needed, but avoid over-mocking
+ * - Keep tests isolated and independent
+ */

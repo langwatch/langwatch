@@ -126,14 +126,14 @@ export function BatchEvaluationV2({
             <Text>Waiting for results...</Text>
           ) : (
             <>
-              <Card.Root width="100%">
+              <Card.Root width="100%" overflow="hidden">
                 <Card.Header>
                   <Heading as="h2" size="md">
                     {selectedRun?.workflow_version?.commitMessage ??
                       "Evaluation Results"}
                   </Heading>
                 </Card.Header>
-                <Card.Body paddingTop={0}>
+                <Card.Body padding={0}>
                   <BatchEvaluationV2EvaluationResults
                     project={project}
                     experiment={experiment}

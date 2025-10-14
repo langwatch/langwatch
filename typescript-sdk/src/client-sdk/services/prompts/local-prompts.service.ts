@@ -2,6 +2,7 @@ import type { LocalPromptConfig, PromptDependency } from "@/cli/types";
 import { FileManager } from "@/cli/utils/fileManager";
 import { type Logger, NoOpLogger } from "@/logger";
 import { type PromptData } from "./types";
+import { PromptFileNotFoundError } from "@/cli/utils/errors/prompt-not-found.error";
 
 export interface LocalPromptsServiceConfig {
   fileManager?: typeof FileManager;
@@ -38,10 +39,22 @@ export class LocalPromptsService {
         return null;
       }
 
+      // Try each source in priority order until found or all sources exhausted
+      // We catch errors and return null if any of the sources fail so we
+      // can continue to the next source and return null if all sources fail
       const localPromptConfig = (
-        (await this.getFromConfig(dependency)) ??
-        (await this.getFromLockFile(handleOrId)) ??
-        (await this.getFromLocalFiles(handleOrId))
+        (await this.getFromConfig(dependency).catch((e) => {
+          if (e instanceof PromptFileNotFoundError) return null;
+          throw e;
+        })) ??
+        (await this.getFromLockFile(handleOrId).catch((e) => {
+          if (e instanceof PromptFileNotFoundError) return null;
+          throw e;
+        })) ??
+        (await this.getFromLocalFiles(handleOrId).catch((e) => {
+          if (e instanceof PromptFileNotFoundError) return null;
+          throw e;
+        }))
       );
 
       return localPromptConfig ? this.convertToPromptData({

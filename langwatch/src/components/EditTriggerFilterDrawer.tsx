@@ -7,7 +7,7 @@ import type { FilterField } from "~/server/filters/types";
 import { api } from "~/utils/api";
 import { Drawer } from "../components/ui/drawer";
 import { toaster } from "../components/ui/toaster";
-import { FieldsFilters } from "./filters/FieldsFilters";
+import { QueryStringFieldsFilters } from "./filters/FieldsFilters";
 import { HorizontalFormControl } from "./HorizontalFormControl";
 
 export function EditTriggerFilterDrawer({ triggerId }: { triggerId?: string }) {
@@ -139,7 +139,7 @@ export function EditTriggerFilterDrawer({ triggerId }: { triggerId?: string }) {
             helper="Add or remove filters to the trigger."
             minWidth="calc(50% - 16px)"
           >
-            <FieldsFilters />
+            <QueryStringFieldsFilters hideTriggerButton />
           </HorizontalFormControl>
 
           <HStack justifyContent="flex-end" marginY={5}>

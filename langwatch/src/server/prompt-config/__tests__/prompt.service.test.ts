@@ -80,6 +80,7 @@ describe("PromptService", () => {
 
       it("should update handle if provided", async () => {
         const updateData = {
+          commitMessage: "Updated handle",
           handle: "updated-prompt",
           inputs: [{ identifier: "input", type: "str" as const }],
           outputs: [{ identifier: "output", type: "str" as const }],
@@ -110,6 +111,7 @@ describe("PromptService", () => {
 
       it("should update scope if provided", async () => {
         const updateData = {
+          commitMessage: "Updated scope",
           scope: "ORGANIZATION" as const,
           inputs: [{ identifier: "input", type: "str" as const }],
           outputs: [{ identifier: "output", type: "str" as const }],

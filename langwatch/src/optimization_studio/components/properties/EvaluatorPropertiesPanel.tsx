@@ -16,11 +16,9 @@ import { useWorkflowStore } from "../../hooks/useWorkflowStore";
 import { useDebouncedCallback } from "use-debounce";
 import { useOrganizationTeamProject } from "../../../hooks/useOrganizationTeamProject";
 import { useAvailableEvaluators } from "../../../hooks/useAvailableEvaluators";
-import { usePublicEnv } from "../../../hooks/usePublicEnv";
 
 export function EvaluatorPropertiesPanel({ node }: { node: Node<Evaluator> }) {
   const { project } = useOrganizationTeamProject();
-  const publicEnv = usePublicEnv();
   const { setNode } = useWorkflowStore(({ setNode }) => ({ setNode }));
 
   const settingsFromParameters = Object.fromEntries(
