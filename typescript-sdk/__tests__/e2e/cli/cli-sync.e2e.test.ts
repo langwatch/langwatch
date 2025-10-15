@@ -231,6 +231,7 @@ describe("CLI E2E", () => {
 
         // 5. Modify remote prompt
         await langwatch.prompts.update(promptHandle, {
+          commitMessage: "Updated via CLI sync",
           temperature: 0.9,
           model: "gpt-4-turbo",
           messages: [
@@ -342,6 +343,7 @@ describe("CLI E2E", () => {
       describe("when remote is updated", () => {
         it("should get the updated version", async () => {
           await langwatch.prompts.update(promptHandle, {
+            commitMessage: "Updated via CLI sync",
             temperature: 0.8,
             model: "gpt-4-turbo",
             messages: [

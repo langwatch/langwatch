@@ -129,6 +129,13 @@ jobs:
           cache-dependency-path: "typescript-sdk/pnpm-lock.yaml"
 
       # Install LangWatch app dependencies
+      - name: Setup Node for LangWatch
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: "npm"
+          cache-dependency-path: "langwatch/package-lock.json"
+
       - name: Install LangWatch app dependencies
         working-directory: langwatch
         run: npm ci --prefer-offline --no-audit --no-fund --progress=false
