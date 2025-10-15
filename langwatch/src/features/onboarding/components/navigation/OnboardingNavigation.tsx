@@ -8,6 +8,7 @@ import { SkipForward } from "lucide-react";
 import { type OnboardingScreenIndex } from "../../types/types";
 import { usePublicEnv } from "~/hooks/usePublicEnv";
 import { getOnboardingFlowConfig } from "../../constants/onboarding-flow";
+import { useAnalytics } from "react-contextual-analytics";
 
 interface OnboardingNavigationProps {
   currentScreenIndex: OnboardingScreenIndex;
@@ -30,6 +31,7 @@ export const OnboardingNavigation: React.FC<OnboardingNavigationProps> = ({
   isSubmitting = false,
   onFinish,
 }) => {
+  const { emit } = useAnalytics();
   const publicEnv = usePublicEnv();
   const flow = getOnboardingFlowConfig(Boolean(publicEnv.data?.IS_SAAS));
   const isFirstScreen = currentScreenIndex === flow.first;
@@ -41,7 +43,10 @@ export const OnboardingNavigation: React.FC<OnboardingNavigationProps> = ({
       <Button
         visibility={isFirstScreen ? "hidden" : "visible"}
         variant="outline"
-        onClick={onPrev}
+        onClick={() => {
+          emit("clicked", "previous", { currentScreenIndex });
+          onPrev();
+        }}
         disabled={isFirstScreen}
       >
         Previous
@@ -51,7 +56,13 @@ export const OnboardingNavigation: React.FC<OnboardingNavigationProps> = ({
         {isSkippable && (
           <Button
             variant="outline"
-            onClick={isLastScreen ? onFinish : onSkip}
+            onClick={() => {
+              emit("clicked", isLastScreen ? "finish" : "skip", {
+                currentScreenIndex,
+              });
+              if (isLastScreen) onFinish();
+              else onSkip();
+            }}
             disabled={isSubmitting}
           >
             Skip
@@ -64,7 +75,14 @@ export const OnboardingNavigation: React.FC<OnboardingNavigationProps> = ({
         <Button
           colorPalette="orange"
           variant="solid"
-          onClick={isLastScreen ? onFinish : onNext}
+          onClick={() => {
+            emit("clicked", isLastScreen ? "finish" : "next", {
+              currentScreenIndex,
+              canProceed,
+            });
+            if (isLastScreen) onFinish();
+            else onNext();
+          }}
           disabled={!canProceed || isSubmitting}
           loading={isSubmitting}
         >

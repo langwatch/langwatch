@@ -13,6 +13,7 @@ import { trackEventOnce } from "~/utils/tracking";
 import { useRouter } from "next/router";
 import { useRequiredSession } from "~/hooks/useRequiredSession";
 import { LoadingScreen } from "~/components/LoadingScreen";
+import { AnalyticsBoundary } from "react-contextual-analytics";
 
 export const WelcomeScreen: React.FC = () => {
   const router = useRouter();
@@ -139,43 +140,57 @@ export const WelcomeScreen: React.FC = () => {
   const currentScreen =
     currentVisibleIndex >= 0 ? screens[currentVisibleIndex] : undefined;
 
-  return (
-    <OrganizationOnboardingContainer
-      title={currentScreen?.heading ?? "Welcome Aboard 👋"}
-      subTitle={currentScreen?.subHeading}
-    >
-      <VStack gap={4} align="stretch" position="relative" minH="400px">
-        <AnimatePresence initial={false} custom={direction} mode="popLayout">
-          <motion.div
-            key={currentScreenIndex}
-            custom={direction}
-            variants={slideVariants}
-            initial="enter"
-            animate="center"
-            exit="exit"
-            transition={transition}
-            style={{ width: "100%" }}
-          >
-            <fieldset disabled={initializeOrganization.isPending}>
-              {currentScreen?.component}
-            </fieldset>
-          </motion.div>
-        </AnimatePresence>
+  const pendingOrSuccessful = initializeOrganization.isPending || initializeOrganization.isSuccess;
 
-        <OnboardingNavigation
-          currentScreenIndex={currentScreenIndex}
-          onPrev={navigation.prevScreen}
-          onNext={navigation.nextScreen}
-          onSkip={navigation.skipScreen}
-          canProceed={navigation.canProceed()}
-          isSkippable={!currentScreen?.required}
-          isSubmitting={
-            initializeOrganization.isPending || initializeOrganization.isSuccess
-          }
-          onFinish={handleFinalizeSubmit}
-        />
-      </VStack>
-    </OrganizationOnboardingContainer>
+  return (
+    <AnalyticsBoundary name="onboarding" sendViewedEvent>
+      <OrganizationOnboardingContainer
+        title={currentScreen?.heading ?? "Welcome Aboard 👋"}
+        subTitle={currentScreen?.subHeading}
+      >
+        <VStack gap={4} align="stretch" position="relative" minH="400px">
+          <AnimatePresence initial={false} custom={direction} mode="popLayout">
+            <motion.div
+              key={currentScreenIndex}
+              custom={direction}
+              variants={slideVariants}
+              initial="enter"
+              animate="center"
+              exit="exit"
+              transition={transition}
+              style={{ width: "100%" }}
+            >
+              <AnalyticsBoundary
+                name={`onboarding.${currentScreen?.id ?? "unknown"}`}
+                attributes={{
+                  screenIndex: currentVisibleIndex,
+                  variant: flow.variant,
+                  total: flow.total,
+                  isFirst: flow.first === currentScreenIndex,
+                  isLast: flow.last === currentScreenIndex,
+                }}
+                sendViewedEvent
+              >
+                <fieldset disabled={pendingOrSuccessful}>
+                  {currentScreen?.component}
+                </fieldset>
+              </AnalyticsBoundary>
+            </motion.div>
+          </AnimatePresence>
+
+          <OnboardingNavigation
+            currentScreenIndex={currentScreenIndex}
+            onPrev={navigation.prevScreen}
+            onNext={navigation.nextScreen}
+            onSkip={navigation.skipScreen}
+            canProceed={navigation.canProceed()}
+            isSkippable={!currentScreen?.required}
+            isSubmitting={pendingOrSuccessful}
+            onFinish={handleFinalizeSubmit}
+          />
+        </VStack>
+      </OrganizationOnboardingContainer>
+    </AnalyticsBoundary>
   );
 };
 
