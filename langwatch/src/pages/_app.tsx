@@ -25,6 +25,9 @@ import { dependencies } from "../injection/dependencies.client";
 
 import { PostHogProvider } from "posthog-js/react";
 import { usePostHog } from "../hooks/usePostHog";
+import { AnalyticsProvider } from "react-contextual-analytics";
+import { createAppAnalyticsClient } from "~/utils/analyticsClient";
+import { usePublicEnv } from "~/hooks/usePublicEnv";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -524,6 +527,7 @@ const LangWatch: AppType<{
 }> = ({ Component, pageProps: { session, ...pageProps } }) => {
   const router = useRouter();
   const postHog = usePostHog();
+  const publicEnv = usePublicEnv();
 
   const [previousFeatureFlagQueryParams, setPreviousFeatureFlagQueryParams] =
     useState<{ key: string; value: string }[]>([]);
@@ -599,13 +603,20 @@ const LangWatch: AppType<{
         <Head>
           <title>LangWatch</title>
         </Head>
-        {postHog ? (
-          <PostHogProvider client={postHog}>
+        <AnalyticsProvider
+          client={createAppAnalyticsClient({
+            isSaaS: Boolean(publicEnv.data?.IS_SAAS),
+            posthogClient: postHog,
+          })}
+        >
+          {postHog ? (
+            <PostHogProvider client={postHog}>
+              <Component {...pageProps} />
+            </PostHogProvider>
+          ) : (
             <Component {...pageProps} />
-          </PostHogProvider>
-        ) : (
-          <Component {...pageProps} />
-        )}
+          )}
+        </AnalyticsProvider>
         <Toaster />
 
         {dependencies.ExtraFooterComponents && (
