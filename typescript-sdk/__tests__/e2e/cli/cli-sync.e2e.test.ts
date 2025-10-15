@@ -56,7 +56,10 @@ describe("CLI E2E", () => {
   });
 
   beforeEach(() => {
-    langwatch = new LangWatch();
+    langwatch = new LangWatch({
+      apiKey: process.env.LANGWATCH_API_KEY,
+      endpoint: process.env.LANGWATCH_ENDPOINT,
+    });
     fs.mkdirSync(TMP_BASE_DIR, { recursive: true });
     testDir = fs.mkdtempSync(path.join(TMP_BASE_DIR, "langwatch-sync-"));
     console.log("testDir", testDir);
