@@ -3,7 +3,7 @@ import { type paths } from "../../../src/internal/generated/openapi/api-client";
 import { promptResponseFactory } from "../../factories/prompt.factory";
 
 export const http = createOpenApiHttp<paths>({
-  baseUrl: process.env.LANGWATCH_API_URL ?? "https://app.langwatch.test",
+  baseUrl: process.env.LANGWATCH_API_URL
 });
 
 export const handles = [
@@ -16,8 +16,8 @@ export const handles = [
   http.post("/api/prompts", async ({ request, response }) => {
     const body = await request.json();
     const prompt = promptResponseFactory.build({
-      handle: body.handle,
-      scope: body.scope,
+      handle: body?.handle,
+      scope: body?.scope,
     });
     return response(200).json({
       ...prompt,
@@ -32,7 +32,7 @@ export const handles = [
     const prompt = promptResponseFactory.build({
       ...body,
       id: params.id,
-      handle: body.handle,
+      handle: body?.handle,
     });
     return response(200).json(prompt);
   }),

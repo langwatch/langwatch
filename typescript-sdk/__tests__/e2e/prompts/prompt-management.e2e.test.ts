@@ -24,8 +24,8 @@ describe("Prompt management", () => {
   beforeAll(async () => {
     const { LangWatch } = await getLangwatchSDK();
     langwatch = new LangWatch({
-      apiKey: "test-key",
-      endpoint: process.env.LANGWATCH_API_URL ?? "https://app.langwatch.test",
+      apiKey: process.env.LANGWATCH_API_KEY,
+      endpoint: process.env.LANGWATCH_API_URL
     });
   });
 
