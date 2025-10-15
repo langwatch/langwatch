@@ -111,7 +111,7 @@ function InnerPromptConfigForm() {
     <form style={{ width: "100%", height: "100%" }}>
       <VStack width="full" height="full" gap={6} mb={6}>
         <VStack width="full" gap={6} mb={6} paddingBottom="70px">
-          <PromptHandleInfo configId={configId} />
+          <PromptHandleInfo />
           <ModelSelectField />
           <PromptField
             templateAdapter="default"
@@ -149,7 +149,6 @@ function InnerPromptConfigForm() {
           <VersionSaveButton
             disabled={!saveEnabled}
             onClick={() => void handleSaveClick()}
-            isSaving={isSaving}
           />
         </HStack>
       </VStack>
