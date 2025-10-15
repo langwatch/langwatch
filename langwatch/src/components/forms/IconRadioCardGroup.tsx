@@ -5,10 +5,15 @@ import {
   Icon,
   RadioCard,
 } from "@chakra-ui/react";
-import type { IconFormItem } from "../types/types";
+
+type IconListItem<T> = {
+  title: string;
+  value: T;
+  icon: React.ComponentType;
+};
 
 interface IconRadioCardGroupProps<T extends string = string> {
-  items: IconFormItem<T>[];
+  items: IconListItem<T>[];
   value?: T;
   onChange: (value: T | undefined) => void;
   direction?: "horizontal" | "vertical";
@@ -29,7 +34,7 @@ export const IconRadioCardGroup = <T extends string = string>({
     variant={variant}
     w="full"
     value={value}
-    onValueChange={({ value }) => onChange(value === null ? void 0 : value as T)}
+    onValueChange={({ value }) => onChange(value === null ? void 0 : (value as T))}
     colorPalette="orange"
   >
     <Stack align="stretch" direction={{ base: "column", md: layout === "horizontal" ? "row" : "column" }}>
@@ -56,3 +61,7 @@ export const IconRadioCardGroup = <T extends string = string>({
     </Stack>
   </RadioCard.Root>
 );
+
+export default IconRadioCardGroup;
+
+

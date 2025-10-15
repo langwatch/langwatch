@@ -9,8 +9,8 @@ import {
   /* eslint-enable no-restricted-imports */
 } from "@chakra-ui/react";
 import { ExternalLink } from "lucide-react";
-import { IconRadioCardGroup } from "../components/IconRadioCardGroup";
-import { IconCheckboxCardGroup } from "../components/IconCheckboxCardGroup";
+import { IconRadioCardGroup } from "../../../components/forms/IconRadioCardGroup";
+import { IconCheckboxCardGroup } from "../../../components/forms/IconCheckboxCardGroup";
 import {
   usageStyleItems,
   desireItems,
@@ -27,7 +27,7 @@ import {
   OnboardingScreenIndex,
   type OnboardingFlowConfig,
 } from "../types/types";
-import { BasicInfoConditionalFields } from "../components/BasicInfoConditionalFields";
+import { BasicInfoConditionalFields } from "../components/sections/BasicInfoConditionalFields";
 import { Link } from "~/components/ui/link";
 
 interface IntroScreensProps {
@@ -47,7 +47,7 @@ interface IntroScreensProps {
   };
 }
 
-export const useCreateScreens = ({
+export const createWelcomeScreens = ({
   formData,
   flow,
   handlers,
@@ -201,3 +201,5 @@ export const useCreateScreens = ({
 
   return flow.visibleScreens.map((idx) => screens[idx]);
 };
+
+

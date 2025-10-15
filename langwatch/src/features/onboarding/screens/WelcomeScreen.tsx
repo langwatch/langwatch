@@ -1,8 +1,8 @@
 import { useOrganizationTeamProject } from "../../../hooks/useOrganizationTeamProject";
-import { OrganizationOnboardingContainer } from "./OnboardingContainer";
-import { OnboardingNavigation } from "./OnboardingNavigation";
+import { OrganizationOnboardingContainer } from "../components/containers/OnboardingContainer";
+import { OnboardingNavigation } from "../components/navigation/OnboardingNavigation";
 import { useOnboardingFlow } from "../hooks/use-onboarding-flow";
-import { useCreateScreens } from "../screens/manager";
+import { createWelcomeScreens } from "./create-welcome-screens";
 import { slideVariants, transition } from "../constants/onboarding-data";
 import { VStack } from "@chakra-ui/react";
 import { motion, AnimatePresence } from "motion/react";
@@ -14,7 +14,7 @@ import { useRouter } from "next/router";
 import { useRequiredSession } from "~/hooks/useRequiredSession";
 import { LoadingScreen } from "~/components/LoadingScreen";
 
-export const WelcomePage: React.FC = () => {
+export const WelcomeScreen: React.FC = () => {
   const router = useRouter();
   const { data: session } = useRequiredSession();
   const [onboardingNeeded, setOnboardingNeeded] = useState<boolean | undefined>(
@@ -46,7 +46,7 @@ export const WelcomePage: React.FC = () => {
     getFormData,
   } = useOnboardingFlow();
 
-  const screens = useCreateScreens({
+  const screens = createWelcomeScreens({
     formData: getFormData(),
     flow,
     handlers: {
@@ -178,3 +178,5 @@ export const WelcomePage: React.FC = () => {
     </OrganizationOnboardingContainer>
   );
 };
+
+

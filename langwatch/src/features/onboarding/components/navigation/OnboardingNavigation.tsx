@@ -5,9 +5,9 @@ import {
   Icon,
 } from "@chakra-ui/react";
 import { SkipForward } from "lucide-react";
-import { type OnboardingScreenIndex } from "../types/types";
+import { type OnboardingScreenIndex } from "../../types/types";
 import { usePublicEnv } from "~/hooks/usePublicEnv";
-import { getOnboardingFlowConfig } from "../constants/onboarding-flow";
+import { getOnboardingFlowConfig } from "../../constants/onboarding-flow";
 
 interface OnboardingNavigationProps {
   currentScreenIndex: OnboardingScreenIndex;
@@ -74,3 +74,5 @@ export const OnboardingNavigation: React.FC<OnboardingNavigationProps> = ({
     </HStack>
   );
 };
+
+

@@ -4,10 +4,10 @@ import { useRef, useEffect, useState } from "react";
 import {
   companySizeItems,
   solutionTypeItems,
-} from "../constants/onboarding-data";
-import type { CompanySize, SolutionType, UsageStyle } from "../types/types";
-import { IconRadioCardGroup } from "./IconRadioCardGroup";
-import { PhoneNumberInput } from "../../../components/inputs/PhoneNumberInput";
+} from "../../constants/onboarding-data";
+import type { CompanySize, SolutionType, UsageStyle } from "../../types/types";
+import { IconRadioCardGroup } from "../../../../components/forms/IconRadioCardGroup";
+import { PhoneNumberInput } from "../../../../components/inputs/PhoneNumberInput";
 
 interface BasicInfoConditionalFieldsProps {
   usageStyle: UsageStyle | undefined;
@@ -165,3 +165,5 @@ export const BasicInfoConditionalFields: React.FC<
     </AnimatePresence>
   );
 };
+
+
