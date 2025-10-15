@@ -19,6 +19,7 @@ export interface PhoneNumberInputProps {
   defaultCountry?: CountryCode;
   allowedCountries?: ReadonlyArray<CountryCode>;
   groupFrequentlyUsedCountries?: boolean;
+  autoDetectDefaultCountry?: boolean;
   onChange?: (
     value: string | undefined,
     meta: {
@@ -38,6 +39,7 @@ export function PhoneNumberInput(
     defaultCountry = "US",
     allowedCountries = DEFAULT_COUNTRIES,
     groupFrequentlyUsedCountries = true,
+    autoDetectDefaultCountry,
     onChange,
   } = props;
 
@@ -55,6 +57,8 @@ export function PhoneNumberInput(
 
   const [country, setCountry] = useState<CountryCode>(initialCountry);
   const [nationalInput, setNationalInput] = useState<string>("");
+  const [didDetectOnce, setDidDetectOnce] = useState<boolean>(false);
+  const [hasUserInteracted, setHasUserInteracted] = useState<boolean>(false);
 
   // Sync displayed value from external E.164 value when it changes
   useEffect(() => {
@@ -74,6 +78,7 @@ export function PhoneNumberInput(
   }, [value, country]);
 
   const handleCountryChange = (next: CountryCode) => {
+    setHasUserInteracted(true);
     setCountry(next);
 
     const formatted = formatNational(nationalInput.replace(/\D+/g, ""), next);
@@ -94,6 +99,7 @@ export function PhoneNumberInput(
     const raw = e.target.value;
     const formatted = formatNational(raw, country);
     setNationalInput(formatted);
+    setHasUserInteracted(true);
 
     const e164 = e164FromInput(formatted, country);
     const valid = e164 ? isValidPhoneNumber(e164) : false;
@@ -104,6 +110,63 @@ export function PhoneNumberInput(
       isValid: Boolean(valid),
     });
   };
+
+  // Detect default country once on mount when enabled
+  useEffect(() => {
+    if (!autoDetectDefaultCountry) return;
+    if (didDetectOnce) return;
+    if (value) return; // respect explicit value
+    if (props.defaultCountry !== void 0) return; // respect provided defaultCountry prop
+    if (hasUserInteracted) return;
+    if (nationalInput) return;
+
+    let cancelled = false;
+
+    const choose = (c?: string) => {
+      if (cancelled || !c) return;
+
+      const candidate = (c || "").toUpperCase() as CountryCode;
+
+      if (!allowedCountries.includes(candidate)) return;
+
+      handleCountryChange(candidate);
+      setDidDetectOnce(true);
+    };
+
+    // 1) Try meta tag hint injected by server/edge
+    try {
+      const meta = document.querySelector(
+        'meta[name="x-country"]',
+      ) as HTMLMetaElement | null;
+      if (meta?.content) {
+        choose(meta.content);
+        return () => {
+          cancelled = true;
+        };
+      }
+    } catch { /* fallthrough */ }
+
+    // 2) Try to detect with locale detection
+    try {
+      const lang = navigator.languages?.[0] || navigator.language;
+      if (lang) {
+        const loc = new Intl.Locale(lang);
+        if (loc.region) return choose(loc.region);
+      }
+    } catch { /* fallthrough */ }
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    autoDetectDefaultCountry,
+    didDetectOnce,
+    value,
+    props.defaultCountry,
+    hasUserInteracted,
+    nationalInput,
+    allowedCountries,
+  ]);
 
   return (
     <Group attached w="full">
