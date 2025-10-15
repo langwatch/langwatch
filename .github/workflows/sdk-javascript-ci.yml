@@ -61,9 +61,9 @@ jobs:
     env:
       # LangWatch server config
       DATABASE_URL: "postgresql://langwatch_ci:ci_password@localhost:5432/langwatch_test"
-      BASE_HOST: "localhost:5560"  # Changed from 3000 to 5560
+      BASE_HOST: "localhost:5560"
       NEXTAUTH_SECRET: "nextauth-secret-for-ci-testing"
-      NEXTAUTH_URL: "http://localhost:5560"  # Changed from 3000 to 5560
+      NEXTAUTH_URL: "http://localhost:5560"
       API_TOKEN_JWT_SECRET: "api-jwt-secret-for-ci-testing"
       ELASTICSEARCH_NODE_URL: "http://localhost:9200"
       REDIS_URL: "redis://localhost:6379"
@@ -172,6 +172,6 @@ jobs:
           OPENAI_API_KEY: ${{ secrets.TYPESCRIPT_SDK_OPENAI_API_KEY }}
           LANGWATCH_API_KEY: ${{ secrets.TYPESCRIPT_SDK_LANGWATCH_API_KEY }}
           E2E_LANGWATCH_API_KEY: ${{ secrets.TYPESCRIPT_SDK_E2E_LANGWATCH_API_KEY }}
-          LANGWATCH_API_URL: "http://localhost:5560" 
+          LANGWATCH_ENDPOINT: "http://localhost:5560" 
         run: pnpm test:e2e
 
