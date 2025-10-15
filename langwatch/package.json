@@ -158,6 +158,7 @@
     "random-word-slugs": "^0.1.7",
     "react": "^19.0.0",
     "react-admin": "^5.1.1",
+    "react-contextual-analytics": "^1.1.0",
     "react-dnd": "^16.0.1",
     "react-dnd-html5-backend": "^16.0.1",
     "react-dom": "^19.0.0",
