@@ -29,8 +29,8 @@ export interface PhoneNumberInputProps {
       isValid: boolean;
     },
   ) => void;
-  onFocus?: () => void;
-  onBlur?: () => void;
+  onFocus?: React.FocusEventHandler<HTMLInputElement>;
+  onBlur?: React.FocusEventHandler<HTMLInputElement>;
 }
 
 export function PhoneNumberInput(
