@@ -109,7 +109,6 @@ function SettingsForm({
             meta: {
               closable: true,
             },
-            placement: "top-end",
           });
         },
         onError: () => {
@@ -121,7 +120,6 @@ function SettingsForm({
             meta: {
               closable: true,
             },
-            placement: "top-end",
           });
         },
       }
@@ -466,7 +464,6 @@ function ProjectSettingsForm({ project }: { project: Project }) {
             meta: {
               closable: true,
             },
-            placement: "top-end",
           });
         },
         onError: () => {
@@ -478,7 +475,6 @@ function ProjectSettingsForm({ project }: { project: Project }) {
             meta: {
               closable: true,
             },
-            placement: "top-end",
           });
         },
       }

@@ -125,7 +125,6 @@ function SignInForm() {
         title: "Error",
         description: "Failed to sign in",
         type: "error",
-        placement: "top-end",
         meta: {
           closable: true,
         },

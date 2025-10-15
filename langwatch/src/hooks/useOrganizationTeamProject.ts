@@ -193,7 +193,7 @@ export const useOrganizationTeamProject = (
       org.teams.filter((team) => team.projects.length > 0)
     );
     if (!organization || !teamsWithProjectsOnAnyOrg.length) {
-      void router.push(`/onboarding/organization${returnTo}`);
+      void router.push(`/onboarding/welcome${returnTo}`);
       return;
     }
 

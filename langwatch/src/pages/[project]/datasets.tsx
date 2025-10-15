@@ -87,7 +87,6 @@ export default function Datasets() {
                             meta: {
                               closable: true,
                             },
-                            placement: "top-end",
                           });
                           addEditDatasetDrawer.onClose();
                         },
@@ -105,7 +104,6 @@ export default function Datasets() {
             meta: {
               closable: true,
             },
-            placement: "top-end",
           });
         },
         onError: () => {
@@ -118,7 +116,6 @@ export default function Datasets() {
             meta: {
               closable: true,
             },
-            placement: "top-end",
           });
         },
       }

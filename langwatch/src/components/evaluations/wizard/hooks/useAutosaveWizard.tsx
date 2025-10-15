@@ -139,7 +139,6 @@ const useAutosaveWizard = () => {
             meta: {
               closable: true,
             },
-            placement: "top-end",
           });
           Sentry.captureException(error, {
             extra: {

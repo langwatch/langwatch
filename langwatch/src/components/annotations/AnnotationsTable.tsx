@@ -25,7 +25,6 @@ import { useMemo, useState } from "react";
 import { useAnnotationQueues } from "~/hooks/useAnnotationQueues";
 import { useDrawer } from "../CurrentDrawer";
 import { NoDataInfoBlock } from "../NoDataInfoBlock";
-import { RandomColorAvatar } from "../RandomColorAvatar";
 import { RedactedField } from "../ui/RedactedField";
 
 import {
@@ -328,7 +327,7 @@ export const AnnotationsTable = ({
                   defaultValue="pending"
                   value={selectedAnnotations}
                   onValueChange={(change) =>
-                    setSelectedAnnotations(change.value)
+                    setSelectedAnnotations(change.value ?? "")
                   }
                 >
                   <VStack align="start" padding={3} gap={3}>

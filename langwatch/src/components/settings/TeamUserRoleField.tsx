@@ -96,7 +96,6 @@ export const TeamUserRoleField = ({
             meta: {
               closable: true,
             },
-            placement: "top-end",
           });
           resetForm();
         },

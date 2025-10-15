@@ -57,7 +57,7 @@ function TopicClusteringCard({ project }: { project: { id: string } }) {
         description:
           "The topic clustering job has been queued and will run shortly.",
         type: "success",
-        placement: "top-end",
+
       });
     },
     onError: (error) => {
@@ -65,7 +65,7 @@ function TopicClusteringCard({ project }: { project: { id: string } }) {
         title: "Failed to trigger topic clustering",
         description: error.message,
         type: "error",
-        placement: "top-end",
+
       });
     },
   });

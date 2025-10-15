@@ -120,7 +120,6 @@ function SignUpForm() {
         title: "Error",
         description: "Failed to sign up",
         type: "error",
-        placement: "top-end",
         meta: {
           closable: true,
         },

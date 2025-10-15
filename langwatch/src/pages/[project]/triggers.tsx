@@ -84,7 +84,6 @@ export default function Members() {
             title: "Update trigger",
             type: "error",
             description: "Failed to update trigger",
-            placement: "top-end",
             meta: {
               closable: true,
             },
@@ -118,7 +117,6 @@ export default function Members() {
             title: "Delete trigger",
             type: "success",
             description: "Trigger deleted",
-            placement: "top-end",
             meta: {
               closable: true,
             },
@@ -130,7 +128,6 @@ export default function Members() {
             title: "Delete trigger",
             type: "error",
             description: "Failed to delete trigger",
-            placement: "top-end",
             meta: {
               closable: true,
             },
@@ -503,7 +500,6 @@ const TriggerForm = ({
             title: "Custom message",
             type: "success",
             description: "Custom message added",
-            placement: "top-end",
             meta: {
               closable: true,
             },
@@ -515,7 +511,6 @@ const TriggerForm = ({
             title: "Custom message",
             type: "error",
             description: "Failed to add custom message",
-            placement: "top-end",
             meta: {
               closable: true,
             },

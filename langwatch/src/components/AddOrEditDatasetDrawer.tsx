@@ -184,7 +184,6 @@ export function AddOrEditDatasetDrawer(props: AddDatasetDrawerProps) {
               ? `Successfully updated ${data.name} dataset`
               : `Successfully created ${data.name} dataset`,
             type: "success",
-            placement: "top-end",
             meta: {
               closable: true,
             },
@@ -201,7 +200,6 @@ export function AddOrEditDatasetDrawer(props: AddDatasetDrawerProps) {
               : "Error creating dataset",
             description: error.message,
             type: "error",
-            placement: "top-end",
             meta: {
               closable: true,
             },

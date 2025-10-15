@@ -188,7 +188,6 @@ export function TryItOut({
           meta: {
             closable: true,
           },
-          placement: "top-end",
         });
         console.error(e);
         return;

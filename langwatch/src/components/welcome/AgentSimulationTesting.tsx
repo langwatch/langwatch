@@ -1,8 +1,8 @@
-import { Box, Heading, VStack, Text, HStack, Badge, Icon, Button, Circle, Link as ChakraLink } from "@chakra-ui/react";
+import { Box, Heading, VStack, Text, HStack, Badge, Icon, Button, Circle } from "@chakra-ui/react";
 import { LuBot, LuBookOpen, LuExternalLink, LuBotMessageSquare } from "react-icons/lu";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import React from "react";
-import { motion } from "framer-motion";
+import { motion } from "motion/react";
 
 const MotionBox = motion(Box);
 

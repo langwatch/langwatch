@@ -22,7 +22,10 @@ export const toaster = {
     return toaster_.create({
       duration: 5000,
       ...args,
-      placement: "top-end",
+      meta: {
+        ...args.meta,
+        placement: "top-end",
+    },
     });
   },
 };

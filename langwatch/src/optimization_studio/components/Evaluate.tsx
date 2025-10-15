@@ -276,7 +276,6 @@ export function EvaluateModalContent({
             type: "error",
             duration: 5000,
             meta: { closable: true },
-            placement: "top-end",
           });
           throw error;
         }
@@ -288,7 +287,6 @@ export function EvaluateModalContent({
           type: "error",
           duration: 5000,
           meta: { closable: true },
-          placement: "top-end",
         });
         return;
       }
