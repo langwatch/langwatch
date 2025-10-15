@@ -16,7 +16,7 @@ import {
 } from "@chakra-ui/react";
 import { Edit, Eye, Plus, Shield, Trash2 } from "react-feather";
 import { useForm } from "react-hook-form";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { Checkbox } from "../../components/ui/checkbox";
 import { Dialog } from "../../components/ui/dialog";
 import { toaster } from "../../components/ui/toaster";
@@ -551,11 +551,6 @@ function RolesManagement({ organizationId }: { organizationId: string }) {
                   <Text fontWeight="semibold">
                     Permissions ({viewingRole.permissions.length}):
                   </Text>
-                  {/* Add console log to see what's being passed */}
-                  {console.log(
-                    "Viewing role permissions:",
-                    viewingRole.permissions
-                  )}
                   <PermissionViewer permissions={viewingRole.permissions} />
                 </VStack>
               </VStack>
@@ -664,37 +659,6 @@ function RoleCard({
   );
 }
 
-/**
- * IndeterminateCheckbox component
- *
- * Single Responsibility: Renders a checkbox that can be in an indeterminate state
- */
-function IndeterminateCheckbox({
-  checked,
-  indeterminate,
-  onChange,
-  children,
-}: {
-  checked: boolean;
-  indeterminate: boolean;
-  onChange: () => void;
-  children?: React.ReactNode;
-}) {
-  const checkboxRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    if (checkboxRef.current) {
-      checkboxRef.current.indeterminate = indeterminate;
-    }
-  }, [indeterminate]);
-
-  return (
-    <Checkbox ref={checkboxRef} checked={checked} onChange={onChange}>
-      {children}
-    </Checkbox>
-  );
-}
-
 function PermissionSelector({
   selectedPermissions,
   onChange,
@@ -702,6 +666,10 @@ function PermissionSelector({
   selectedPermissions: Permission[];
   onChange: (permissions: Permission[]) => void;
 }) {
+  // Helper function to safely create permission strings
+  const createPermission = (resource: Resource, action: Action): Permission => {
+    return `${resource}:${action}`;
+  };
   const groupedPermissions: Record<Resource, Permission[]> = {} as Record<
     Resource,
     Permission[]
@@ -753,33 +721,41 @@ function PermissionSelector({
   // Group permissions by resource using the correct valid actions
   resourceOrder.forEach((resource) => {
     const validActions = getValidActionsForResource(resource);
-    groupedPermissions[resource] = validActions.map(
-      (action) => `${resource}:${action}` as Permission
+    groupedPermissions[resource] = validActions.map((action) =>
+      createPermission(resource, action)
     );
   });
 
   const togglePermission = (permission: Permission) => {
     if (selectedPermissions.includes(permission)) {
-      onChange(selectedPermissions.filter((p) => p !== permission));
-    } else {
-      onChange([...selectedPermissions, permission]);
-    }
-  };
+      // If removing a permission, remove it and any dependent permissions
+      let permissionsToRemove = [permission];
 
-  const toggleAllForResource = (resource: Resource) => {
-    const resourcePermissions = groupedPermissions[resource]!;
-    const allSelected = resourcePermissions.every((p) =>
-      selectedPermissions.includes(p)
-    );
+      // If removing manage, also remove all other permissions for this resource
+      if (permission.endsWith(":manage")) {
+        const resource = permission.split(":")[0] as Resource;
+        const resourcePermissions = groupedPermissions[resource] || [];
+        permissionsToRemove = resourcePermissions;
+      }
 
-    if (allSelected) {
       onChange(
-        selectedPermissions.filter((p) => !resourcePermissions.includes(p))
+        selectedPermissions.filter((p) => !permissionsToRemove.includes(p))
       );
     } else {
+      // If adding a permission, add it and handle hierarchy
+      let permissionsToAdd = [permission];
+
+      // If adding manage, add all permissions for this resource
+      if (permission.endsWith(":manage")) {
+        const resource = permission.split(":")[0] as Resource;
+        const resourcePermissions = groupedPermissions[resource] || [];
+        permissionsToAdd = resourcePermissions;
+      }
+
+      // Add all permissions that aren't already selected
       const newPermissions = [
-        ...selectedPermissions.filter((p) => !resourcePermissions.includes(p)),
-        ...resourcePermissions,
+        ...selectedPermissions,
+        ...permissionsToAdd.filter((p) => !selectedPermissions.includes(p)),
       ];
       onChange(newPermissions);
     }
@@ -788,14 +764,6 @@ function PermissionSelector({
   return (
     <VStack align="start" width="full" gap={4}>
       {(Object.keys(groupedPermissions) as Resource[]).map((resource) => {
-        const permissions = groupedPermissions[resource]!;
-        const allSelected = permissions.every((p) =>
-          selectedPermissions.includes(p)
-        );
-        const someSelected =
-          permissions.some((p) => selectedPermissions.includes(p)) &&
-          !allSelected;
-
         const validActions = getValidActionsForResource(resource);
 
         return (
@@ -806,28 +774,31 @@ function PermissionSelector({
                 fontWeight="semibold"
                 textTransform="capitalize"
                 marginBottom={2}
-                cursor="pointer"
-                onClick={() => toggleAllForResource(resource)}
-                _hover={{ color: "orange.600" }}
               >
-                <HStack>
-                  <IndeterminateCheckbox
-                    checked={allSelected}
-                    indeterminate={someSelected}
-                    onChange={() => toggleAllForResource(resource)}
-                  />
-                  <Text>{resource}</Text>
-                </HStack>
+                <Text>{resource}</Text>
               </Fieldset.Legend>
               <Fieldset.Content>
                 <HStack gap={4} flexWrap="wrap" paddingLeft={6}>
                   {validActions.map((action) => {
-                    const permission = `${resource}:${action}`;
+                    const permission = createPermission(resource, action);
+                    const isChecked = selectedPermissions.includes(permission);
+
+                    // Check if this permission is implicitly checked due to manage being selected
+                    const managePermission = createPermission(
+                      resource,
+                      "manage"
+                    );
+                    const isImplicitlyChecked =
+                      action !== "manage" &&
+                      selectedPermissions.includes(managePermission);
+
                     return (
                       <Checkbox
                         key={permission}
-                        checked={selectedPermissions.includes(permission)}
+                        checked={isChecked || isImplicitlyChecked}
                         onChange={() => togglePermission(permission)}
+                        disabled={isImplicitlyChecked}
+                        opacity={isImplicitlyChecked ? 0.6 : 1}
                       >
                         <Text fontSize="sm" textTransform="capitalize">
                           {action}
@@ -852,9 +823,10 @@ function PermissionSelector({
  * Single Responsibility: Displays permissions in a read-only, organized format
  */
 function PermissionViewer({ permissions }: { permissions: Permission[] }) {
-  // Add console log to see what permissions are being passed in
-  console.log("PermissionViewer received permissions:", permissions);
-  console.log("PermissionViewer permissions count:", permissions.length);
+  // Helper function to safely create permission strings
+  const createPermission = (resource: Resource, action: Action): Permission => {
+    return `${resource}:${action}`;
+  };
 
   const groupedPermissions: Record<Resource, Permission[]> = {} as Record<
     Resource,
@@ -882,8 +854,8 @@ function PermissionViewer({ permissions }: { permissions: Permission[] }) {
 
   // Group permissions by resource
   resourceOrder.forEach((resource) => {
-    groupedPermissions[resource] = Object.values(Actions).map(
-      (action) => `${resource}:${action}` as Permission
+    groupedPermissions[resource] = Object.values(Actions).map((action) =>
+      createPermission(resource, action)
     );
   });
 
@@ -921,15 +893,6 @@ function PermissionViewer({ permissions }: { permissions: Permission[] }) {
 
         if (!hasAnyPermission) return null;
 
-        // Add console log for each resource to see what's being processed
-        console.log(`Processing resource: ${resource}`);
-        console.log(`Valid actions for ${resource}:`, validActions);
-
-        const resourcePermissions = validActions.filter((action) =>
-          permissions.includes(`${resource}:${action}`)
-        );
-        console.log(`Found permissions for ${resource}:`, resourcePermissions);
-
         return (
           <Box key={resource} width="full">
             <VStack align="start" gap={2} width="full">
@@ -938,7 +901,7 @@ function PermissionViewer({ permissions }: { permissions: Permission[] }) {
               </Text>
               <HStack gap={3} flexWrap="wrap" paddingLeft={4}>
                 {validActions.map((action) => {
-                  const permission = `${resource}:${action}` as Permission;
+                  const permission = createPermission(resource, action);
                   const hasPermission = permissions.includes(permission);
 
                   if (!hasPermission) return null;

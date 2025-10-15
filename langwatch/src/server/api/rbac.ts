@@ -192,13 +192,37 @@ const ORGANIZATION_ROLE_PERMISSIONS: Record<
 // ============================================================================
 
 /**
+ * Check if a permission list includes a requested permission, with hierarchy rules
+ * manage permissions automatically include view permissions
+ */
+function hasPermissionWithHierarchy(
+  permissions: string[],
+  requestedPermission: string
+): boolean {
+  // Direct match
+  if (permissions.includes(requestedPermission)) {
+    return true;
+  }
+
+  // Hierarchy rule: manage permissions include view permissions
+  if (requestedPermission.endsWith(':view')) {
+    const managePermission = requestedPermission.replace(':view', ':manage');
+    if (permissions.includes(managePermission)) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+/**
  * Check if a team role has a specific permission
  */
 export function teamRoleHasPermission(
   role: TeamUserRole,
   permission: Permission
 ): boolean {
-  return TEAM_ROLE_PERMISSIONS[role].includes(permission);
+  return hasPermissionWithHierarchy(TEAM_ROLE_PERMISSIONS[role], permission);
 }
 
 /**
@@ -208,7 +232,7 @@ export function organizationRoleHasPermission(
   role: OrganizationUserRole,
   permission: Permission
 ): boolean {
-  return ORGANIZATION_ROLE_PERMISSIONS[role].includes(permission);
+  return hasPermissionWithHierarchy(ORGANIZATION_ROLE_PERMISSIONS[role], permission);
 }
 
 /**
@@ -393,7 +417,7 @@ export async function hasProjectPermission(
   } else if (teamData?.defaultCustomRole) {
     // Team has a custom role
     const teamPermissions = teamData.defaultCustomRole.permissions as string[];
-    if (teamPermissions.includes(permission)) {
+    if (hasPermissionWithHierarchy(teamPermissions, permission)) {
       return true;
     }
   }
@@ -412,7 +436,7 @@ export async function hasProjectPermission(
   if (customRoleAssignment) {
     const userPermissions = customRoleAssignment.customRole
       .permissions as string[];
-    if (userPermissions.includes(permission)) {
+    if (hasPermissionWithHierarchy(userPermissions, permission)) {
       return true;
     }
   }
@@ -479,7 +503,7 @@ export async function hasTeamPermission(
   } else if (teamData.defaultCustomRole) {
     // Team has a custom role
     const teamPermissions = teamData.defaultCustomRole.permissions as string[];
-    if (teamPermissions.includes(permission)) {
+    if (hasPermissionWithHierarchy(teamPermissions, permission)) {
       return true;
     }
   }
@@ -498,7 +522,7 @@ export async function hasTeamPermission(
   if (customRoleAssignment) {
     const userPermissions = customRoleAssignment.customRole
       .permissions as string[];
-    if (userPermissions.includes(permission)) {
+    if (hasPermissionWithHierarchy(userPermissions, permission)) {
       return true;
     }
   }
