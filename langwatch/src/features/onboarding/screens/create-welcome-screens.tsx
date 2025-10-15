@@ -77,7 +77,7 @@ export const createWelcomeScreens = ({
     setRole,
   } = handlers;
 
-  const OrganizationScreenAnalytics: React.FC = () => {
+  const OrganizationScreen: React.FC = () => {
     const { emit } = useAnalytics();
 
     return (
@@ -88,15 +88,7 @@ export const createWelcomeScreens = ({
             variant="outline"
             placeholder={"Company Name"}
             value={organizationName}
-            onChange={(e) => {
-              const value = e.target.value;
-
-              setOrganizationName(value);
-              emit("changed", "organization_name", {
-                value,
-                hasValue: value.trim().length > 0,
-              });
-            }}
+            onChange={(e) => setOrganizationName(e.target.value)}
           />
           <Field.HelperText>
             {
@@ -142,7 +134,7 @@ export const createWelcomeScreens = ({
     );
   };
 
-  const BasicInfoScreenAnalytics: React.FC = () => {
+  const BasicInfoScreen: React.FC = () => {
     const { emit } = useAnalytics();
     return (
       <VStack gap={4} align="stretch">
@@ -178,7 +170,7 @@ export const createWelcomeScreens = ({
     );
   };
 
-  const DesiresScreenAnalytics: React.FC = () => {
+  const DesiresScreen: React.FC = () => {
     const { emit } = useAnalytics();
     return (
       <IconCheckboxCardGroup<DesireType>
@@ -193,7 +185,7 @@ export const createWelcomeScreens = ({
     );
   };
 
-  const RoleScreenAnalytics: React.FC = () => {
+  const RoleScreen: React.FC = () => {
     const { emit } = useAnalytics();
     return (
       <Field.Root colorPalette="orange" w="full">
@@ -217,25 +209,25 @@ export const createWelcomeScreens = ({
       required: true,
       heading: "Welcome Aboard 👋",
       subHeading: "Let's kick off by creating your organization",
-      component: <OrganizationScreenAnalytics />,
+      component: <OrganizationScreen />,
     },
     [OnboardingScreenIndex.BASIC_INFO]: {
       id: "basic-info",
       required: true,
       heading: "Let's tailor your experience",
-      component: <BasicInfoScreenAnalytics />,
+      component: <BasicInfoScreen />,
     },
     [OnboardingScreenIndex.DESIRES]: {
       id: "desires",
       required: false,
       heading: "Let's tailor your experience",
-      component: <DesiresScreenAnalytics />,
+      component: <DesiresScreen />,
     },
     [OnboardingScreenIndex.ROLE]: {
       id: "role",
       required: false,
       heading: "Let's tailor your experience",
-      component: <RoleScreenAnalytics />,
+      component: <RoleScreen />,
     },
   };
 

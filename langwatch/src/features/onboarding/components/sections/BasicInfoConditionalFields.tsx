@@ -82,6 +82,7 @@ export const BasicInfoConditionalFields: React.FC<
                 <PhoneNumberInput
                   autoDetectDefaultCountry
                   value={phoneNumber}
+                  onFocus={() => emit("focused", "phone_number")}
                   onChange={(e164, meta) => {
                     setPhoneNumber(e164 ?? "");
 
@@ -91,10 +92,6 @@ export const BasicInfoConditionalFields: React.FC<
                     setLocalPhoneIsValid(Boolean(meta.isValid));
                     setPhoneHasValue(hasValue);
                     setPhoneIsValid(Boolean(meta.isValid));
-                    emit("changed", "phone_number", {
-                      hasValue,
-                      isValid: Boolean(meta.isValid),
-                    });
                   }}
                 />
               </Field.Root>

@@ -161,7 +161,7 @@ export const WelcomeScreen: React.FC = () => {
               style={{ width: "100%" }}
             >
               <AnalyticsBoundary
-                name={`onboarding.${currentScreen?.id ?? "unknown"}`}
+                name={currentScreen?.id ?? "unknown"}
                 attributes={{
                   screenIndex: currentVisibleIndex,
                   variant: flow.variant,
