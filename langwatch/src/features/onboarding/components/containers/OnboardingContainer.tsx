@@ -4,10 +4,15 @@ import {
   Container,
   VStack,
   Text,
+  HStack,
+  IconButton,
 } from "@chakra-ui/react";
 import { FullLogo } from "~/components/icons/FullLogo";
 import { motion } from "motion/react";
 import SpookyScarySkeleton from "../SpookyScarySkeleton";
+import { signOut } from "next-auth/react";
+import { LogOut } from "lucide-react";
+import { Tooltip } from "~/components/ui/tooltip";
 
 const MotionCenter = motion(Center);
 const MotionContainer = motion(Container);
@@ -22,6 +27,18 @@ export const OrganizationOnboardingContainer: React.FC<
   OnboardingContainerProps
 > = ({ children, title, subTitle, loading }) => (
   <Box w="full" minH="100dvh" background="bg.subtle">
+    <HStack position="fixed" top={2} right={2} zIndex={99}>
+      <Tooltip content="Sign out">
+        <IconButton
+          variant="ghost"
+          _hover={{ bg: "bg.emphasized" }}
+          onClick={() => void signOut()}
+        >
+          <LogOut />
+        </IconButton>
+      </Tooltip>
+    </HStack>
+
     <MotionCenter
       pt={"10vh"}
       pb={"5vh"}
