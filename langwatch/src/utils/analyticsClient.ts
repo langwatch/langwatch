@@ -1,8 +1,4 @@
-import { type Provider, createAnalyticsClient } from "react-contextual-analytics";
-import {
-  console as consoleProvider,
-  google as googleProvider,
-} from "react-contextual-analytics/providers";
+import { type Provider, createAnalyticsClient, providers } from "react-contextual-analytics";
 import type { PostHog } from "posthog-js";
 
 interface CreateAppAnalyticsClientParams {
@@ -12,16 +8,18 @@ interface CreateAppAnalyticsClientParams {
 
 export function createAppAnalyticsClient(params: CreateAppAnalyticsClientParams) {
   const { isSaaS, posthogClient } = params;
-  const providers = [] as Provider[];
+  const registeredProviders = [] as Provider[];
   const isDev = process.env.NODE_ENV !== "production";
 
-  if (isDev) providers.push(consoleProvider);
+  if (isDev) registeredProviders.push(providers.console);
 
   if (isSaaS) {
-    providers.push(googleProvider);
+    if ((window as any).gtag) {
+      registeredProviders.push(providers.google);
+    }
 
     if (posthogClient) {
-      providers.push({
+      registeredProviders.push({
         id: "posthog",
         send: async (event) => {
           if (typeof window === "undefined" || !posthogClient?.capture) return;
@@ -40,7 +38,7 @@ export function createAppAnalyticsClient(params: CreateAppAnalyticsClientParams)
     }
   }
 
-  return createAnalyticsClient(providers);
+  return createAnalyticsClient(registeredProviders, []);
 }
 
 
