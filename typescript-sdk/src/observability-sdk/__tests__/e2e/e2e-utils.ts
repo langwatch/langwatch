@@ -131,12 +131,11 @@ export async function verifyOpenTelemetrySetup(): Promise<void> {
  */
 export function setupE2ETest(): { client: LangWatch; spanProcessor: SimpleSpanProcessor } {
   let client: LangWatch;
-  let exporter: LangWatchExporter;
   let spanProcessor: SimpleSpanProcessor;
 
   beforeAll(async () => {
     validateE2EEnvironment();
-    [exporter, spanProcessor] = setupE2EObservability();
+    [, spanProcessor] = setupE2EObservability();
 
     // Give the NodeSDK a moment to fully initialize
     await delay(500);
