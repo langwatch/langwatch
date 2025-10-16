@@ -52,7 +52,7 @@
         "lint": "eslint .",
         "test": "vitest",
         "test:e2e": "vitest run -c ./vitest.e2e.config.mts",
-        "prebuild": "pnpm i && pnpm run prepare",
+        "prebuild": "pnpm run prepare",
         "build": "tsc --noEmit && tsup",
         "tarball": "pnpm build && pnpm pack",
         "typecheck": "tsc --noEmit",
