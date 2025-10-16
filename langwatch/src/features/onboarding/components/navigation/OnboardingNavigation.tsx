@@ -5,13 +5,10 @@ import {
   Icon,
 } from "@chakra-ui/react";
 import { SkipForward } from "lucide-react";
-import { type OnboardingScreenIndex } from "../../types/types";
-import { usePublicEnv } from "~/hooks/usePublicEnv";
-import { getOnboardingFlowConfig } from "../../constants/onboarding-flow";
 import { useAnalytics } from "react-contextual-analytics";
 
-interface OnboardingNavigationProps {
-  currentScreenIndex: OnboardingScreenIndex;
+interface OnboardingNavigationProps<T extends number = number> {
+  currentScreenIndex: T;
   onPrev: () => void;
   onNext: () => void;
   onSkip: () => void;
@@ -19,9 +16,11 @@ interface OnboardingNavigationProps {
   isSkippable: boolean;
   isSubmitting?: boolean;
   onFinish: () => void;
+  isFirstScreen?: boolean;
+  isLastScreen?: boolean;
 }
 
-export const OnboardingNavigation: React.FC<OnboardingNavigationProps> = ({
+export const OnboardingNavigation = <T extends number = number>({
   currentScreenIndex,
   onPrev,
   onNext,
@@ -30,12 +29,10 @@ export const OnboardingNavigation: React.FC<OnboardingNavigationProps> = ({
   isSkippable,
   isSubmitting = false,
   onFinish,
-}) => {
+  isFirstScreen = false,
+  isLastScreen = false,
+}: OnboardingNavigationProps<T>) => {
   const { emit } = useAnalytics();
-  const publicEnv = usePublicEnv();
-  const flow = getOnboardingFlowConfig(Boolean(publicEnv.data?.IS_SAAS));
-  const isFirstScreen = currentScreenIndex === flow.first;
-  const isLastScreen = currentScreenIndex === flow.last;
   const buttonText = isLastScreen ? "Finish" : "Next";
 
   return (
