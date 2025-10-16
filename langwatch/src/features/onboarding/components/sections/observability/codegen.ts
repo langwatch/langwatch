@@ -26,14 +26,19 @@ async function main(message: string): Promise<string> {
   const response = await generateText({
     model: openai("gpt-5-mini"),
     prompt: message,
-    experimental_telemetry: { isEnabled: true }, // Required
+    experimental_telemetry: { isEnabled: true }, // Don't forget to enable telemetry!
   });
 
   return response.text;
 }
 
 console.log(await main("Hello, world!"));`;
-      return { code, filename: platformToFileName(language), highlightLines: [1, 6, 7, 16], codeLanguage: "typescript" };
+      return {
+        code,
+        filename: platformToFileName(language),
+        highlightLines: [1, 6, 7, 16],
+        codeLanguage: "typescript",
+      };
     }
     case "python":
       return { code: "# Integration snippet coming soon\n# Language: Python\n# Framework: None selected", filename: platformToFileName(language), codeLanguage: "python" };
