@@ -28,7 +28,7 @@ describe("Real LLM Interactions E2E", () => {
     let traceId: string | undefined;
 
     const chatRequest = {
-      model: "gpt-4.1-nano",
+      model: "gpt-5",
       messages: [
         { role: "system", content: "You are a helpful assistant." },
         { role: "user", content: "Hello, how are you?" }
