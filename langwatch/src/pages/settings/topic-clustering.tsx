@@ -68,7 +68,7 @@ function TopicClusteringCard({ project }: { project: { id: string } }) {
   });
 
   // Only show to users with setup permissions
-  if (!hasPermission("project:update")) {
+  if (!hasPermission("project:manage")) {
     return (
       <Card.Root>
         <Card.Body>

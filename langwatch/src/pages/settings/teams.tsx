@@ -51,7 +51,7 @@ function TeamsList({ teams }: { teams: TeamWithProjectsAndMembersAndUsers[] }) {
     },
   });
   const onArchiveTeam = (teamId: string) => {
-    if (!hasPermission("team:delete")) return;
+    if (!hasPermission("team:manage")) return;
     if (teams.length === 1) {
       toaster.create({
         title: "You cannot archive the last team",
@@ -131,7 +131,7 @@ function TeamsList({ teams }: { teams: TeamWithProjectsAndMembersAndUsers[] }) {
                             color="red.500"
                             onClick={() => onArchiveTeam(team.id)}
                             disabled={
-                              !hasPermission("team:delete") ||
+                              !hasPermission("team:manage") ||
                               archiveTeam.isPending
                             }
                           >
