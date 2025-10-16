@@ -4,6 +4,8 @@ import { AnalyticsBoundary } from "react-contextual-analytics";
 import { useProductFlow } from "../hooks/use-product-flow";
 import { createProductScreens } from "./create-product-screens";
 import { ProductScreenIndex } from "../types/types";
+import { OnboardingMeshBackground } from "../components/OnboardingMeshBackground";
+import { Box } from "@chakra-ui/react";
 
 export const ProductScreen: React.FC = () => {
   const {
@@ -32,7 +34,10 @@ export const ProductScreen: React.FC = () => {
         subTitle={currentScreen.subHeading}
         compressedHeader
       >
-        {currentScreen.component}
+        <Box w="full" minH="100dvh" position="relative">
+          <OnboardingMeshBackground opacity={0.22} blurPx={96} />
+          {currentScreen.component}
+        </Box>
       </OrganizationOnboardingContainer>
     </AnalyticsBoundary>
   );
