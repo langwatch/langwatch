@@ -14,7 +14,9 @@ import {
   VStack,
   useDisclosure,
 } from "@chakra-ui/react";
-import { Edit, Eye, Info, Plus, Shield, Trash2 } from "react-feather";
+import { Edit, Eye, Info, Plus, Shield, Trash2, Users } from "react-feather";
+import { ShieldUser } from "lucide-react";
+
 import { useForm } from "react-hook-form";
 import { useEffect, useState } from "react";
 import { Checkbox } from "../../components/ui/checkbox";
@@ -269,10 +271,12 @@ function RolesManagement({ organizationId }: { organizationId: string }) {
 
       {/* Default Roles */}
       <VStack align="start" width="full" gap={4}>
-        <Heading size="md">Default Roles</Heading>
-        <Text color="gray.600" fontSize="sm">
-          These are the built-in roles that cannot be modified or deleted.
-        </Text>
+        <Box>
+          <Heading size="md">Default Roles</Heading>
+          <Text color="gray.600" fontSize="sm">
+            These are the built-in roles that cannot be modified or deleted.
+          </Text>
+        </Box>
 
         <Box
           width="full"
@@ -285,18 +289,21 @@ function RolesManagement({ organizationId }: { organizationId: string }) {
             description="Full access to all features and settings"
             isDefault
             permissionCount="All Permissions"
+            icon={ShieldUser}
           />
           <RoleCard
             name="Member"
             description="Can create and modify most resources, view costs and debug info"
             isDefault
             permissionCount="Most Permissions"
+            icon={Users}
           />
           <RoleCard
             name="Viewer"
             description="Read-only access to analytics, messages, and guardrails"
             isDefault
             permissionCount="View Only"
+            icon={Eye}
           />
         </Box>
       </VStack>
@@ -305,11 +312,13 @@ function RolesManagement({ organizationId }: { organizationId: string }) {
 
       {/* Custom Roles */}
       <VStack align="start" width="full" gap={4}>
-        <Heading size="md">Custom Roles</Heading>
-        <Text color="gray.600" fontSize="sm">
-          Custom roles created for your organization with specific permission
-          sets.
-        </Text>
+        <Box>
+          <Heading size="md">Custom Roles</Heading>
+          <Text color="gray.600" fontSize="sm">
+            Custom roles created for your organization with specific permission
+            sets.
+          </Text>
+        </Box>
 
         {roles.isLoading && (
           <VStack align="center" width="full" padding={8}>
@@ -574,6 +583,7 @@ function RoleCard({
   description,
   permissionCount,
   isDefault = false,
+  icon: Icon = Shield, // Default to Shield if no icon provided
   onDelete,
   onEdit,
   onViewPermissions,
@@ -582,6 +592,7 @@ function RoleCard({
   description: string;
   permissionCount: string;
   isDefault?: boolean;
+  icon?: React.ComponentType<{ size?: number }>; // Add icon prop
   onDelete?: () => void;
   onEdit?: () => void;
   onViewPermissions?: () => void;
@@ -601,7 +612,7 @@ function RoleCard({
         <HStack justify="space-between" align="start">
           <VStack align="start" gap={1} flex={1}>
             <HStack>
-              <Shield size={18} />
+              <Icon size={18} /> {/* Use the passed icon instead of Shield */}
               <Text fontWeight="semibold">{name}</Text>
             </HStack>
             {isDefault && (
