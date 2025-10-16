@@ -21,11 +21,10 @@ import { elasticsearchMigrate } from "../../../tasks/elasticMigrate";
 import { sendInviteEmail } from "../../mailer/inviteEmail";
 import {
   OrganizationRoleGroup,
-  TeamRoleGroup,
   checkUserPermissionForOrganization,
-  checkUserPermissionForTeam,
   skipPermissionCheck,
 } from "../permission";
+import { checkTeamPermission } from "../rbac";
 
 import { signUpDataSchema } from "./onboarding";
 
@@ -745,7 +744,7 @@ export const organizationRouter = createTRPCRouter({
         customRoleId: z.string().optional(),
       })
     )
-    .use(checkUserPermissionForTeam(TeamRoleGroup.TEAM_MEMBERS_MANAGE))
+    .use(checkTeamPermission("team:manage"))
     .mutation(async ({ input, ctx }) => {
       const prisma = ctx.prisma;
 

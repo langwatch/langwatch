@@ -7,7 +7,6 @@ import { Globe, Share } from "react-feather";
 import { CopyInput } from "../CopyInput";
 import { api } from "../../utils/api";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
-import { TeamRoleGroup } from "../../server/api/permission";
 
 export function ShareButton({
   project,
@@ -16,7 +15,7 @@ export function ShareButton({
   project: Project;
   traceId: string;
 }) {
-  const { hasTeamPermission } = useOrganizationTeamProject();
+  const { hasPermission } = useOrganizationTeamProject();
   const { open, onOpen, onClose, setOpen } = useDisclosure();
   const shareState = api.share.getSharedState.useQuery(
     {
@@ -27,12 +26,12 @@ export function ShareButton({
     {
       refetchOnWindowFocus: false,
       refetchOnMount: false,
-    }
+    },
   );
   const shareItemMutation = api.share.shareItem.useMutation();
   const unshareItemMutation = api.share.unshareItem.useMutation();
   const [disableClose, setDisableClose] = useState(false); // bugfix for modal closing when starting the mutation
-  const hasSharePermission = hasTeamPermission(TeamRoleGroup.MESSAGES_SHARE);
+  const hasSharePermission = hasPermission("messages:share");
 
   const onClose_ = useCallback(() => {
     if (disableClose) return;
@@ -136,7 +135,7 @@ export function ShareButton({
                                 },
                               });
                             },
-                          }
+                          },
                         );
                       }}
                     >
@@ -180,7 +179,7 @@ export function ShareButton({
                             },
                           });
                         },
-                      }
+                      },
                     );
                   }}
                 >

@@ -16,18 +16,17 @@ import { api } from "../../utils/api";
 import { Link } from "../../components/ui/link";
 import { toaster } from "~/components/ui/toaster";
 import { Menu } from "../../components/ui/menu";
-import { TeamRoleGroup } from "~/server/api/permission";
 import { MoreVertical } from "react-feather";
 import { Archive } from "react-feather";
 
 export default function Teams() {
-  const { organization, hasTeamPermission } = useOrganizationTeamProject();
+  const { organization, hasPermission } = useOrganizationTeamProject();
 
   const teams = api.team.getTeamsWithMembers.useQuery(
     {
       organizationId: organization?.id ?? "",
     },
-    { enabled: !!organization }
+    { enabled: !!organization },
   );
 
   if (!teams.data) return <SettingsLayout />;
@@ -52,7 +51,7 @@ function TeamsList({ teams }: { teams: TeamWithProjectsAndMembersAndUsers[] }) {
     },
   });
   const onArchiveTeam = (teamId: string) => {
-    if (!hasTeamPermission(TeamRoleGroup.TEAM_ARCHIVE)) return;
+    if (!hasPermission("team:delete")) return;
     if (teams.length === 1) {
       toaster.create({
         title: "You cannot archive the last team",
@@ -62,7 +61,7 @@ function TeamsList({ teams }: { teams: TeamWithProjectsAndMembersAndUsers[] }) {
     }
     if (
       confirm(
-        "Are you sure you want to archive this team? This action cannot be undone."
+        "Are you sure you want to archive this team? This action cannot be undone.",
       )
     ) {
       archiveTeam.mutate({ teamId, projectId: project?.id ?? "" });
@@ -132,7 +131,7 @@ function TeamsList({ teams }: { teams: TeamWithProjectsAndMembersAndUsers[] }) {
                             color="red.500"
                             onClick={() => onArchiveTeam(team.id)}
                             disabled={
-                              !hasTeamPermission(TeamRoleGroup.TEAM_ARCHIVE) ||
+                              !hasPermission("team:delete") ||
                               archiveTeam.isPending
                             }
                           >

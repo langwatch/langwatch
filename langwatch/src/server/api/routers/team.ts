@@ -5,10 +5,9 @@ import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import {
   checkUserPermissionForOrganization,
-  checkUserPermissionForTeam,
   OrganizationRoleGroup,
-  TeamRoleGroup,
 } from "../permission";
+import { checkTeamPermission } from "../rbac";
 import { nanoid } from "nanoid";
 import { slugify } from "~/utils/slugify";
 
@@ -17,8 +16,8 @@ export const teamRouter = createTRPCRouter({
     .input(z.object({ organizationId: z.string(), slug: z.string() }))
     .use(
       checkUserPermissionForOrganization(
-        OrganizationRoleGroup.ORGANIZATION_VIEW
-      )
+        OrganizationRoleGroup.ORGANIZATION_VIEW,
+      ),
     )
     .query(async ({ input, ctx }) => {
       const userId = ctx.session.user.id;
@@ -42,8 +41,8 @@ export const teamRouter = createTRPCRouter({
     .input(z.object({ organizationId: z.string() }))
     .use(
       checkUserPermissionForOrganization(
-        OrganizationRoleGroup.ORGANIZATION_VIEW
-      )
+        OrganizationRoleGroup.ORGANIZATION_VIEW,
+      ),
     )
     .query(async ({ input, ctx }) => {
       const prisma = ctx.prisma;
@@ -79,8 +78,8 @@ export const teamRouter = createTRPCRouter({
     .input(z.object({ slug: z.string(), organizationId: z.string() }))
     .use(
       checkUserPermissionForOrganization(
-        OrganizationRoleGroup.ORGANIZATION_VIEW
-      )
+        OrganizationRoleGroup.ORGANIZATION_VIEW,
+      ),
     )
     .query(async ({ input, ctx }) => {
       const prisma = ctx.prisma;
@@ -111,7 +110,7 @@ export const teamRouter = createTRPCRouter({
         throw new TRPCError({ code: "NOT_FOUND", message: "Team not found." });
       }
 
-      await checkUserPermissionForTeam(TeamRoleGroup.TEAM_MEMBERS_MANAGE)({
+      await checkTeamPermission("team:manage")({
         ctx,
         input: { teamId: team.id },
         // eslint-disable-next-line @typescript-eslint/no-empty-function
@@ -132,11 +131,11 @@ export const teamRouter = createTRPCRouter({
             userId: z.string(),
             role: z.string(),
             customRoleId: z.string().optional(),
-          })
+          }),
         ),
-      })
+      }),
     )
-    .use(checkUserPermissionForTeam(TeamRoleGroup.TEAM_MEMBERS_MANAGE))
+    .use(checkTeamPermission("team:manage"))
     .mutation(async ({ input, ctx }) => {
       const prisma = ctx.prisma;
 
@@ -171,11 +170,11 @@ export const teamRouter = createTRPCRouter({
           });
 
           const currentMembersMap = new Map(
-            currentMembers.map((member) => [member.userId, member.role])
+            currentMembers.map((member) => [member.userId, member.role]),
           );
 
           const newMembersMap = new Map(
-            input.members.map((member) => [member.userId, member.role])
+            input.members.map((member) => [member.userId, member.role]),
           );
 
           const membersToRemove = currentMembers
@@ -183,13 +182,13 @@ export const teamRouter = createTRPCRouter({
             .map((member) => member.userId);
 
           const membersToAdd = input.members.filter(
-            (member) => !currentMembersMap.has(member.userId)
+            (member) => !currentMembersMap.has(member.userId),
           );
 
           const membersToUpdate = input.members.filter(
             (member) =>
               currentMembersMap.has(member.userId) &&
-              currentMembersMap.get(member.userId) !== member.role
+              currentMembersMap.get(member.userId) !== member.role,
           );
 
           if (membersToRemove.length > 0) {
@@ -290,14 +289,14 @@ export const teamRouter = createTRPCRouter({
             userId: z.string(),
             role: z.string(),
             customRoleId: z.string().optional(),
-          })
+          }),
         ),
-      })
+      }),
     )
     .use(
       checkUserPermissionForOrganization(
-        OrganizationRoleGroup.ORGANIZATION_MANAGE
-      )
+        OrganizationRoleGroup.ORGANIZATION_MANAGE,
+      ),
     )
     .mutation(async ({ input, ctx }) => {
       const prisma = ctx.prisma;
@@ -355,7 +354,7 @@ export const teamRouter = createTRPCRouter({
     }),
   archiveById: protectedProcedure
     .input(z.object({ teamId: z.string(), projectId: z.string() }))
-    .use(checkUserPermissionForTeam(TeamRoleGroup.TEAM_ARCHIVE))
+    .use(checkTeamPermission("team:delete"))
     .mutation(async ({ input, ctx }) => {
       const prisma = ctx.prisma;
       await prisma.team.update({

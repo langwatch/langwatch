@@ -27,7 +27,7 @@ import {
   TechStackSelector,
 } from "../components/TechStack";
 import { useOrganizationTeamProject } from "../hooks/useOrganizationTeamProject";
-import { OrganizationRoleGroup, TeamRoleGroup } from "../server/api/permission";
+import { OrganizationRoleGroup } from "../server/api/permission";
 import type { FullyLoadedOrganization } from "../server/api/routers/organization";
 import { api } from "../utils/api";
 import { usePublicEnv } from "../hooks/usePublicEnv";
@@ -64,7 +64,7 @@ function SettingsForm({
   organization: FullyLoadedOrganization;
   project: Project;
 }) {
-  const { hasOrganizationPermission, hasTeamPermission } =
+  const { hasOrganizationPermission, hasPermission } =
     useOrganizationTeamProject();
   const [defaultValues, setDefaultValues] = useState<OrganizationFormData>({
     name: organization.name,
@@ -82,7 +82,7 @@ function SettingsForm({
   const apiContext = api.useContext();
 
   const onSubmit: SubmitHandler<OrganizationFormData> = (
-    data: OrganizationFormData
+    data: OrganizationFormData,
   ) => {
     if (isEqual(data, defaultValues)) return;
 
@@ -122,7 +122,7 @@ function SettingsForm({
             },
           });
         },
-      }
+      },
     );
   };
 
@@ -154,7 +154,7 @@ function SettingsForm({
                   invalid={!!getFieldState("name").error}
                 >
                   {hasOrganizationPermission(
-                    OrganizationRoleGroup.ORGANIZATION_MANAGE
+                    OrganizationRoleGroup.ORGANIZATION_MANAGE,
                   ) ? (
                     <>
                       <Input
@@ -178,7 +178,7 @@ function SettingsForm({
                   helper="The unique ID of your organization"
                 >
                   {hasOrganizationPermission(
-                    OrganizationRoleGroup.ORGANIZATION_MANAGE
+                    OrganizationRoleGroup.ORGANIZATION_MANAGE,
                   ) ? (
                     <Input
                       width="full"
@@ -197,7 +197,7 @@ function SettingsForm({
                     helper="Configure S3 storage to host data on your own infrastructure. Leave empty to use LangWatch's managed storage."
                   >
                     {hasOrganizationPermission(
-                      OrganizationRoleGroup.ORGANIZATION_MANAGE
+                      OrganizationRoleGroup.ORGANIZATION_MANAGE,
                     ) ? (
                       <VStack width="full" align="start" gap={3}>
                         <Input
@@ -240,7 +240,7 @@ function SettingsForm({
                     helper="Configure your Elasticsearch instance for advanced search capabilities"
                   >
                     {hasOrganizationPermission(
-                      OrganizationRoleGroup.ORGANIZATION_MANAGE
+                      OrganizationRoleGroup.ORGANIZATION_MANAGE,
                     ) ? (
                       <VStack width="full" align="start" gap={3}>
                         <Input
@@ -279,7 +279,7 @@ function SettingsForm({
           </Card.Body>
         </Card.Root>
 
-        {hasTeamPermission(TeamRoleGroup.SETUP_PROJECT) && (
+        {hasPermission("project:update") && (
           <ProjectSettingsForm project={project} />
         )}
       </VStack>
@@ -373,12 +373,10 @@ function ProjectSettingsForm({ project }: { project: Project }) {
     ],
   });
 
-  const { hasTeamPermission } = useOrganizationTeamProject({
+  const { hasPermission } = useOrganizationTeamProject({
     redirectToOnboarding: false,
   });
-  const userIsAdmin = hasTeamPermission(
-    TeamRoleGroup.PROJECT_CHANGE_CAPTURED_DATA_VISIBILITY
-  );
+  const userIsAdmin = hasPermission("project:manage");
 
   const defaultValues = {
     name: project.name,
@@ -477,7 +475,7 @@ function ProjectSettingsForm({ project }: { project: Project }) {
             },
           });
         },
-      }
+      },
     );
   };
 
@@ -689,7 +687,7 @@ function ProjectSettingsForm({ project }: { project: Project }) {
                               </Text>
                             </VStack>
                           </Select.Item>
-                        )
+                        ),
                       )}
                     </Select.Content>
                   </Select.Root>

@@ -8,7 +8,6 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { Spacer } from "@chakra-ui/react";
-import { TeamRoleGroup } from "~/server/api/permission";
 import { api } from "~/utils/api";
 import SettingsLayout from "../../components/SettingsLayout";
 import { toaster } from "../../components/ui/toaster";
@@ -17,7 +16,7 @@ import { TopicClusteringModel } from "./model-providers";
 import { EmbeddingsModel } from "./model-providers";
 
 export default function TopicClusteringSettings() {
-  const { project, hasTeamPermission } = useOrganizationTeamProject({
+  const { project, hasPermission } = useOrganizationTeamProject({
     redirectToOnboarding: false,
   });
 
@@ -57,7 +56,6 @@ function TopicClusteringCard({ project }: { project: { id: string } }) {
         description:
           "The topic clustering job has been queued and will run shortly.",
         type: "success",
-
       });
     },
     onError: (error) => {
@@ -65,13 +63,12 @@ function TopicClusteringCard({ project }: { project: { id: string } }) {
         title: "Failed to trigger topic clustering",
         description: error.message,
         type: "error",
-
       });
     },
   });
 
   // Only show to users with setup permissions
-  if (!hasTeamPermission(TeamRoleGroup.SETUP_PROJECT)) {
+  if (!hasPermission("project:update")) {
     return (
       <Card.Root>
         <Card.Body>
