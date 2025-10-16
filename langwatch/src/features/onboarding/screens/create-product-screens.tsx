@@ -53,7 +53,7 @@ export function createProductScreens({
     [ProductScreenIndex.OBSERVABILITY]: {
       id: "observability",
       required: false,
-      heading: "Observer? I barely know her",
+      heading: "With Great Power, Comes Great Observability",
       component: <ObservabilityScreen />,
     },
     [ProductScreenIndex.EVALUATIONS]: {
