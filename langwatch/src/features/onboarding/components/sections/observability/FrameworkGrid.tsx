@@ -21,7 +21,7 @@ export function FrameworkGrid({ language, selectedFramework, onSelectFramework }
           Select a framework/provider
         </Text>
         <Text fontSize="xs" color="fg.muted">
-          Pick your model provider or framework to tailor setup steps. You can switch this anytime.
+          Pick your model provider or framework to tailor setup guide.
         </Text>
       </VStack>
       <Grid templateColumns={{ base: "repeat(4, 1fr)", md: "repeat(8, 1fr)" }} gap={3}>
