@@ -12,7 +12,7 @@ export const server = setupServer(
 );
 
 beforeAll(async () => {
-  console.log("🚀 Starting MSW server...");
+  console.debug("🚀 Starting MSW server...");
   // NOTE: server.listen must be called before `createClient` is used to ensure
   // the msw can inject its version of `fetch` to intercept the requests.
   server.listen({
@@ -27,6 +27,6 @@ afterEach(() => {
 });
 
 afterAll(() => {
-  console.log("🛑 Closing MSW server...");
+  console.debug("🛑 Closing MSW server...");
   server.close();
 });
