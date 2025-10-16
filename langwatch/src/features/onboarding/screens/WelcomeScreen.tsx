@@ -143,7 +143,7 @@ export const WelcomeScreen: React.FC = () => {
   const pendingOrSuccessful = initializeOrganization.isPending || initializeOrganization.isSuccess;
 
   return (
-    <AnalyticsBoundary name="onboarding" sendViewedEvent>
+    <AnalyticsBoundary name="onboarding_welcome" sendViewedEvent>
       <OrganizationOnboardingContainer
         title={currentScreen?.heading ?? "Welcome Aboard 👋"}
         subTitle={currentScreen?.subHeading}
