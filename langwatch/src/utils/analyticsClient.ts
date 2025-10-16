@@ -14,7 +14,7 @@ export function createAppAnalyticsClient(params: CreateAppAnalyticsClientParams)
   if (isDev) registeredProviders.push(providers.console);
 
   if (isSaaS) {
-    if ((window as any).gtag) {
+    if (typeof window !== "undefined" && (window as any).gtag) {
       registeredProviders.push(providers.google);
     }
 
