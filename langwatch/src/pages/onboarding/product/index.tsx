@@ -1,8 +1,11 @@
 import React from "react";
-import ProductDirectionScreen from "~/features/onboarding/screens/ProductDirectionScreen";
+import { Provider } from "~/components/ui/provider";
+import ProductScreen from "~/features/onboarding/screens/ProductScreen";
 
-const OnboardingProduct: React.FC = () => {
-  return <ProductDirectionScreen />;
-};
+const OnboardingProduct: React.FC = () => (
+  <Provider>
+    <ProductScreen />
+  </Provider>
+);
 
 export default OnboardingProduct;

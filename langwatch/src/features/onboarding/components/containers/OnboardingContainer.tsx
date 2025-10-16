@@ -22,11 +22,16 @@ interface OnboardingContainerProps extends React.PropsWithChildren {
   loading?: boolean;
   title: string;
   subTitle?: string;
+
+  /**
+   * Whether to have reduced padding above/below the header for more vertically dense screens.
+   */
+  compressedHeader?: boolean;
 }
 
 export const OrganizationOnboardingContainer: React.FC<
   OnboardingContainerProps
-> = ({ children, title, subTitle, loading }) => {
+> = ({ children, title, subTitle, loading, compressedHeader }) => {
   const { emit } = useAnalytics();
 
   return (
@@ -47,8 +52,8 @@ export const OrganizationOnboardingContainer: React.FC<
       </HStack>
 
       <MotionCenter
-        pt={"10vh"}
-        pb={"5vh"}
+        pt={compressedHeader ? "5vh" : "10vh"}
+        pb={compressedHeader ? "2.5vh" : "5vh"}
         initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.4, ease: "easeOut" }}
