@@ -1,6 +1,5 @@
 import { Box, Card, Grid, GridItem, Icon, Text, VStack } from "@chakra-ui/react";
 import { Telescope, Gavel, GraduationCap, HatGlasses } from "lucide-react";
-import { OnboardingMeshBackground } from "../OnboardingMeshBackground";
 import type { ProductSelection } from "../../types/types";
 
 interface ProductOption {
@@ -46,7 +45,6 @@ export const ProductSelectionScreen: React.FC<ProductSelectionScreenProps> = ({
 }) => {
   return (
     <Box position="relative" minH="60vh">
-      <OnboardingMeshBackground opacity={0.22} blurPx={96} />
       <Grid
         pt={4}
         templateColumns="repeat(2, 1fr)"
