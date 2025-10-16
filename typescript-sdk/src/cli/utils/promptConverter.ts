@@ -1,5 +1,5 @@
 import type { LocalPromptConfig, MaterializedPrompt } from "../types";
-import { type PromptResponse } from "@/client-sdk/services/prompts/types";
+import { type PromptResponse,PromptData,type UpdatePromptBody } from "@/client-sdk/services/prompts/types";
 
 /**
  * Converter utility for transforming between YAML prompt format and API service format.
@@ -70,20 +70,12 @@ export class PromptConverter {
    * Converts a LocalPromptConfig (loaded from YAML) to the format
    * expected by the API service for upserting.
    */
-  static fromLocalToApiFormat(config: LocalPromptConfig): {
-    model: string;
-    modelParameters?: {
-      temperature?: number;
-      max_tokens?: number;
-    };
-    messages: Array<{
-      role: "system" | "user" | "assistant";
-      content: string;
-    }>;
-  } {
+  static fromLocalToApiFormat(config: LocalPromptConfig): Omit<UpdatePromptBody, "commitMessage">
+  {
     return {
       model: config.model,
-      modelParameters: config.modelParameters,
+      temperature: config.modelParameters?.temperature,
+      maxTokens: config.modelParameters?.max_tokens,
       messages: config.messages,
     };
   }
@@ -146,7 +138,7 @@ export class PromptConverter {
       errors.push("Model is required and cannot be empty");
     }
 
-    if (!config.messages || config.messages.length === 0) {
+    if (config.messages?.length === 0) {
       errors.push("At least one message is required");
     }
 

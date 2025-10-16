@@ -62,7 +62,6 @@ describe("CLI E2E", () => {
     });
     fs.mkdirSync(TMP_BASE_DIR, { recursive: true });
     testDir = fs.mkdtempSync(path.join(TMP_BASE_DIR, "langwatch-sync-"));
-    console.log("testDir", testDir);
     originalCwd = process.cwd();
     process.chdir(testDir);
     cli = new CliRunner({ cwd: testDir });
@@ -212,7 +211,6 @@ describe("CLI E2E", () => {
 
         // First sync - should create on remote
         const sync1 = cli.run("prompt sync");
-        console.log(sync1);
         expectCliResultSuccess(sync1);
         const localPrompt =
           localPromptFileManagement.readPromptFile(promptHandle);

@@ -299,11 +299,10 @@ export const syncCommand = async (): Promise<void> => {
               };
             } else {
               // User chose local - force push
+              const formattedConfig = PromptConverter.fromLocalToApiFormat(localConfig);
               const syncResult = await promptsApiService.update(promptName, {
-                ...localConfig,
-                commitMessage: `Synced from local file: ${path.basename(
-                  filePath
-                )}`,
+                ...formattedConfig,
+                commitMessage: `Updated via CLI: synced from local file`
               });
               lock.prompts[promptName] = {
                 version: syncResult.version,
