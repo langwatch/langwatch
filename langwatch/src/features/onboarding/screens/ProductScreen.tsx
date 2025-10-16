@@ -30,6 +30,7 @@ export const ProductScreen: React.FC = () => {
       <OrganizationOnboardingContainer
         title={currentScreen.heading}
         subTitle={currentScreen.subHeading}
+        compressedHeader
       >
         {currentScreen.component}
       </OrganizationOnboardingContainer>
