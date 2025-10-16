@@ -21,6 +21,7 @@
     "prisma:generate:typescript": "npx prisma generate",
     "prisma:generate:migration": "npx prisma migrate dev --create-only",
     "prisma:migrate": "npx prisma migrate deploy",
+    "prisma:seed": "tsx prisma/seed.ts",
     "elastic:migrate": "npm run task elasticMigrate",
     "types:zod:generate": "./scripts/generate-zod-types.sh",
     "copy:langevals-types": "cd src/server/evaluations && curl -L \"https://raw.githubusercontent.com/langwatch/langevals/main/ts-integration/evaluators.generated.ts?$(date +%s)\" -o evaluators.generated.ts",

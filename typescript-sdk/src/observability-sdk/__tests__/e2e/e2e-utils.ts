@@ -10,7 +10,6 @@ import { LangWatchExporter } from "../../exporters";
 import { SimpleSpanProcessor } from "@opentelemetry/sdk-trace-base";
 import { type Span as OtelSpan, trace } from "@opentelemetry/api";
 import { type GetTraceResponse } from "../../../client-sdk/services/traces/types";
-import { DEFAULT_ENDPOINT } from "@/internal/constants";
 
 type Trace = GetTraceResponse;
 type Span = NonNullable<Trace["spans"]>[number];
@@ -23,8 +22,8 @@ type Span = NonNullable<Trace["spans"]>[number];
  * Configuration for e2e tests from environment variables
  */
 export const E2E_CONFIG = {
-  apiKey: process.env.E2E_LANGWATCH_API_KEY,
-  endpoint: process.env.E2E_LANGWATCH_ENDPOINT ?? DEFAULT_ENDPOINT,
+  apiKey: process.env.LANGWATCH_API_KEY,
+  endpoint: process.env.LANGWATCH_ENDPOINT,
   timeout: parseInt(process.env.E2E_TIMEOUT ?? "30000", 10),
   retryDelay: parseInt(process.env.E2E_RETRY_DELAY ?? "1000", 10),
   maxRetries: parseInt(process.env.E2E_MAX_RETRIES ?? "3", 10),
@@ -38,8 +37,8 @@ export const E2E_CONFIG = {
 export function validateE2EEnvironment(): void {
   if (!E2E_CONFIG.apiKey) {
     throw new Error(
-      "E2E_LANGWATCH_API_KEY environment variable is required for e2e tests. " +
-      "Please set it to your LangWatch API key (e.g., E2E_LANGWATCH_API_KEY=lw-...)"
+      "LANGWATCH_API_KEY environment variable is required for e2e tests. " +
+      "Please set it to your LangWatch API key (e.g., LANGWATCH_API_KEY=sk-lw-...)"
     );
   }
 

@@ -14,6 +14,10 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  LANGWATCH_API_KEY: sk-lw-1234567890
+  LANGWATCH_ENDPOINT: http://localhost:5560
+
 jobs:
   ci:
     runs-on: ubuntu-latest
@@ -148,6 +152,10 @@ jobs:
         working-directory: langwatch
         run: npm run prisma:migrate
 
+      - name: Seed test project
+        working-directory: langwatch
+        run: npm run prisma:seed
+
       - name: Setup Elasticsearch
         working-directory: langwatch
         run: npm run elastic:migrate
@@ -170,8 +178,5 @@ jobs:
       - name: Run e2e tests
         env:
           OPENAI_API_KEY: ${{ secrets.TYPESCRIPT_SDK_OPENAI_API_KEY }}
-          LANGWATCH_API_KEY: ${{ secrets.TYPESCRIPT_SDK_LANGWATCH_API_KEY }}
-          E2E_LANGWATCH_API_KEY: ${{ secrets.TYPESCRIPT_SDK_E2E_LANGWATCH_API_KEY }}
-          LANGWATCH_ENDPOINT: "http://localhost:5560" 
         run: pnpm test:e2e
 
