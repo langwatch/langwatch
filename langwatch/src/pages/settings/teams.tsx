@@ -36,7 +36,7 @@ export default function Teams() {
 
 function TeamsList({ teams }: { teams: TeamWithProjectsAndMembersAndUsers[] }) {
   const {
-    hasTeamPermission,
+    hasPermission,
     project,
     team: currentTeam,
   } = useOrganizationTeamProject();

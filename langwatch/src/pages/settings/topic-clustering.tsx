@@ -46,7 +46,7 @@ export default function TopicClusteringSettings() {
 }
 
 function TopicClusteringCard({ project }: { project: { id: string } }) {
-  const { hasTeamPermission } = useOrganizationTeamProject({
+  const { hasPermission } = useOrganizationTeamProject({
     redirectToOnboarding: false,
   });
   const triggerClustering = api.project.triggerTopicClustering.useMutation({
