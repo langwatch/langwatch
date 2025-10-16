@@ -90,7 +90,10 @@ export const WelcomeScreen: React.FC = () => {
             category: "onboarding",
             label: "organization_onboarding_completed",
           });
-          window.location.href = `/onboarding/product`;
+
+          const params = new URLSearchParams({ projectSlug: response.projectSlug });
+
+          window.location.href = `/onboarding/product?${params.toString()}`;
         },
         onError: () => {
           toaster.create({
