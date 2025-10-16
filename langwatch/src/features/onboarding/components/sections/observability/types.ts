@@ -17,7 +17,21 @@ export type FrameworkKey =
   | "gemini"
   | "grok"
   | "azure"
-  | "opentelemetry";
+  | "opentelemetry"
+  | "n8n"
+  | "langflow"
+  | "mistral"
+  | "strands"
+  | "flowise"
+  | "crewai"
+  | "pydantic"
+  | "spring"
+  | "groq"
+  | "openrouter"
+  | "semantic_kernel"
+  | "smol_agents"
+  | "dspy"
+  ;
 
 export interface Option<T extends string> {
   key: T;
