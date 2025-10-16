@@ -60,8 +60,8 @@ describe("Content Parsing E2E", () => {
       span.setInput(chatInput);
 
       // Add message events
-      // logger.emitGenAISystemMessageEvent({ content: chatInput.messages[0]?.content ?? "" });
-      // logger.emitGenAIUserMessageEvent({ content: chatInput.messages[1]?.content ?? "" });
+      logger.emitGenAISystemMessageEvent({ content: chatInput.messages[0]?.content ?? "" });
+      logger.emitGenAIUserMessageEvent({ content: chatInput.messages[1]?.content ?? "" });
 
       await delay(50);
 
@@ -71,9 +71,9 @@ describe("Content Parsing E2E", () => {
         completionTokens: chatOutput.usage.completion_tokens,
       });
 
-      // logger.emitGenAIAssistantMessageEvent({
-      //   content: chatOutput.choices[0]?.message.content ?? ""
-      // });
+      logger.emitGenAIAssistantMessageEvent({
+        content: chatOutput.choices[0]?.message.content ?? ""
+      });
 
       span.setStatus({ code: SpanStatusCode.OK });
     });
