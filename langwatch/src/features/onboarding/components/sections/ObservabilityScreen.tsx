@@ -26,13 +26,13 @@ export function ObservabilityScreen(): React.ReactElement {
         onSelectLanguage={setSelectedPlatform}
       />
 
+      <ApiKeyCard />
+
       <FrameworkGrid
         language={selectedPlatform}
         selectedFramework={selectedFramework}
         onSelectFramework={setSelectedFramework}
       />
-
-      <ApiKeyCard />
 
       <CodePreview
         code={codegen.code}
