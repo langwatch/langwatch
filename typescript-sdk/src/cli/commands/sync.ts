@@ -6,7 +6,6 @@ import * as yaml from "js-yaml";
 import { PromptConverter } from "@/cli/utils/promptConverter";
 import {
   type ConfigData,
-  Prompt,
   PromptsApiService,
   PromptsError,
   type SyncAction,

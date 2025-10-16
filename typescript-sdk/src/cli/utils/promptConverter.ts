@@ -1,5 +1,5 @@
 import type { LocalPromptConfig, MaterializedPrompt } from "../types";
-import { type PromptResponse,PromptData,type UpdatePromptBody } from "@/client-sdk/services/prompts/types";
+import { type PromptResponse, type UpdatePromptBody } from "@/client-sdk/services/prompts/types";
 
 /**
  * Converter utility for transforming between YAML prompt format and API service format.
