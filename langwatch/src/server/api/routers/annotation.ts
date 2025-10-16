@@ -41,7 +41,7 @@ const enrichQueueItemsWithTracesAndAnnotations = async (
   ctx: { prisma: PrismaClient; session: Session | null },
   projectId: string,
   queueItems: AnnotationQueueItem[],
-  protections: Protections
+  protections: Protections,
 ) => {
   // Get all unique trace IDs from queue items
   const traceIds = [...new Set(queueItems.map((item) => item.traceId))];
@@ -86,7 +86,7 @@ const enrichQueueItemsWithTracesAndAnnotations = async (
     annotations: annotationMap.get(item.traceId) || [],
     scoreOptions: (annotationMap.get(item.traceId) || []).flatMap(
       (annotation) =>
-        annotation.scoreOptions ? Object.keys(annotation.scoreOptions) : []
+        annotation.scoreOptions ? Object.keys(annotation.scoreOptions) : [],
     ),
   }));
 };
@@ -94,7 +94,7 @@ const enrichQueueItemsWithTracesAndAnnotations = async (
 // Helper function to safely get enriched items
 const getEnrichedItems = <T extends { id: string }>(
   queueItems: T[],
-  enrichedItemMap: Map<string, any>
+  enrichedItemMap: Map<string, any>,
 ) => {
   return queueItems
     .map((item) => enrichedItemMap.get(item.id))
@@ -111,9 +111,9 @@ export const annotationRouter = createTRPCRouter({
         traceId: z.string(),
         scoreOptions: scoreOptions,
         expectedOutput: z.string().optional().nullable(),
-      })
+      }),
     )
-    .use(checkProjectPermission("annotations:manage"))
+    .use(checkProjectPermission("annotations:create"))
     .mutation(async ({ ctx, input }) => {
       logger.info({ input }, "create annotation");
 
@@ -136,7 +136,7 @@ export const annotationRouter = createTRPCRouter({
         } catch (error) {
           logger.error(
             { error, traceId: input.traceId, projectId: input.projectId },
-            "Failed to update Elasticsearch after annotation creation"
+            "Failed to update Elasticsearch after annotation creation",
           );
           throw new TRPCError({
             code: "INTERNAL_SERVER_ERROR",
@@ -160,9 +160,9 @@ export const annotationRouter = createTRPCRouter({
         isThumbsUp: z.boolean().optional().nullable(),
         expectedOutput: z.string().optional().nullable(),
         scoreOptions: scoreOptions,
-      })
+      }),
     )
-    .use(checkProjectPermission("annotations:manage"))
+    .use(checkProjectPermission("annotations:update"))
     .mutation(async ({ ctx, input }) => {
       return ctx.prisma.annotation.update({
         where: {
@@ -183,7 +183,7 @@ export const annotationRouter = createTRPCRouter({
       z.object({
         traceId: z.string(),
         projectId: z.string(),
-      })
+      }),
     )
     .use(
       checkPermissionOrPubliclyShared(
@@ -191,8 +191,8 @@ export const annotationRouter = createTRPCRouter({
         {
           resourceType: PublicShareResourceTypes.TRACE,
           resourceParam: "traceId",
-        }
-      )
+        },
+      ),
     )
     .query(async ({ ctx, input }) => {
       return ctx.prisma.annotation.findMany({
@@ -213,7 +213,7 @@ export const annotationRouter = createTRPCRouter({
       z.object({
         traceIds: z.array(z.string()),
         projectId: z.string(),
-      })
+      }),
     )
     .use(checkProjectPermission("annotations:view"))
     .query(async ({ ctx, input }) => {
@@ -245,7 +245,7 @@ export const annotationRouter = createTRPCRouter({
     }),
   deleteById: protectedProcedure
     .input(z.object({ annotationId: z.string(), projectId: z.string() }))
-    .use(checkProjectPermission("annotations:manage"))
+    .use(checkProjectPermission("annotations:delete"))
     .mutation(async ({ ctx, input }) => {
       const deletedAnnotation = await ctx.prisma.$transaction(async (tx) => {
         const annotation = await tx.annotation.delete({
@@ -258,14 +258,14 @@ export const annotationRouter = createTRPCRouter({
         try {
           await updateTraceRemoveAnnotation(
             annotation.traceId,
-            input.projectId
+            input.projectId,
           );
         } catch (error) {
           // If Elasticsearch update fails, we should fail the transaction
           // to maintain consistency between database and Elasticsearch
           logger.error(
             { error, traceId: annotation.traceId, projectId: input.projectId },
-            "Failed to update Elasticsearch after annotation deletion"
+            "Failed to update Elasticsearch after annotation deletion",
           );
           throw new TRPCError({
             code: "INTERNAL_SERVER_ERROR",
@@ -285,7 +285,7 @@ export const annotationRouter = createTRPCRouter({
         projectId: z.string(),
         startDate: z.date().optional(),
         endDate: z.date().optional(),
-      })
+      }),
     )
     .use(checkProjectPermission("annotations:view"))
     .query(async ({ ctx, input }) => {
@@ -315,9 +315,9 @@ export const annotationRouter = createTRPCRouter({
         userIds: z.array(z.string()),
         scoreTypeIds: z.array(z.string()),
         queueId: z.string().optional(),
-      })
+      }),
     )
-    .use(checkProjectPermission("annotations:manage"))
+    .use(checkProjectPermission("annotations:create"))
     .mutation(async ({ ctx, input }) => {
       const slug = slugify(input.name.replace("_", "-"), {
         lower: true,
@@ -427,7 +427,7 @@ export const annotationRouter = createTRPCRouter({
 
       // Get all queue items from all queues
       const allQueueItems = queues.flatMap(
-        (queue) => queue.AnnotationQueueItems
+        (queue) => queue.AnnotationQueueItems,
       );
 
       // Enrich queue items with traces and annotations
@@ -435,12 +435,12 @@ export const annotationRouter = createTRPCRouter({
         ctx,
         input.projectId,
         allQueueItems,
-        protections
+        protections,
       );
 
       // Create a map of enriched items by their original ID for easy lookup
       const enrichedItemMap = new Map(
-        enrichedQueueItems.map((item) => [item.id, item])
+        enrichedQueueItems.map((item) => [item.id, item]),
       );
 
       // Process queues and enrich with traces and annotations
@@ -448,7 +448,7 @@ export const annotationRouter = createTRPCRouter({
         ...queue,
         AnnotationQueueItems: getEnrichedItems(
           queue.AnnotationQueueItems,
-          enrichedItemMap
+          enrichedItemMap,
         ),
       }));
 
@@ -481,7 +481,7 @@ export const annotationRouter = createTRPCRouter({
       const traces = await getTracesWithSpans(
         input.projectId,
         traceIds,
-        protections
+        protections,
       );
       const traceMap = new Map(traces.map((trace) => [trace.trace_id, trace]));
 
@@ -577,7 +577,7 @@ export const annotationRouter = createTRPCRouter({
         queueCounts.map((item) => [
           item.annotationQueueId,
           item._count.annotationQueueId,
-        ])
+        ]),
       );
 
       // Return the result with counts mapped to queue data
@@ -594,9 +594,9 @@ export const annotationRouter = createTRPCRouter({
         traceIds: z.array(z.string()),
         projectId: z.string(),
         annotators: z.array(z.string()),
-      })
+      }),
     )
-    .use(checkProjectPermission("annotations:manage"))
+    .use(checkProjectPermission("annotations:create"))
     .mutation(async ({ ctx, input }) => {
       await createOrUpdateQueueItems({
         traceIds: input.traceIds,
@@ -608,7 +608,7 @@ export const annotationRouter = createTRPCRouter({
     }),
   markQueueItemDone: protectedProcedure
     .input(z.object({ queueItemId: z.string(), projectId: z.string() }))
-    .use(checkProjectPermission("annotations:manage"))
+    .use(checkProjectPermission("annotations:update"))
     .mutation(async ({ ctx, input }) => {
       return ctx.prisma.annotationQueueItem.update({
         where: { id: input.queueItemId, projectId: input.projectId },
@@ -623,7 +623,7 @@ export const annotationRouter = createTRPCRouter({
         projectId: z.string(),
         slug: z.string().optional(),
         queueId: z.string().optional(),
-      })
+      }),
     )
     .use(checkProjectPermission("annotations:view"))
     .query(async ({ ctx, input }) => {
@@ -657,7 +657,7 @@ export const annotationRouter = createTRPCRouter({
         queueId: z.string().optional(),
         showQueueAndUser: z.boolean().optional(),
         allQueueItems: z.boolean().optional(),
-      })
+      }),
     )
     .use(checkProjectPermission("annotations:view"))
     .query(async ({ ctx, input }) => {
@@ -754,7 +754,7 @@ export const annotationRouter = createTRPCRouter({
         ...new Set(
           queueItems
             .map((item) => item.annotationQueueId)
-            .filter((id): id is string => id !== null)
+            .filter((id): id is string => id !== null),
         ),
       ];
 
@@ -792,12 +792,12 @@ export const annotationRouter = createTRPCRouter({
         ctx,
         input.projectId,
         queueItems,
-        protections
+        protections,
       );
 
       // Create a map of enriched items by their original ID for easy lookup
       const enrichedItemMap = new Map(
-        enrichedQueueItems.map((item) => [item.id, item])
+        enrichedQueueItems.map((item) => [item.id, item]),
       );
 
       // Process queues and enrich with traces and annotations
@@ -805,7 +805,7 @@ export const annotationRouter = createTRPCRouter({
         ...queue,
         AnnotationQueueItems: getEnrichedItems(
           queue.AnnotationQueueItems,
-          enrichedItemMap
+          enrichedItemMap,
         ),
       }));
 
@@ -821,7 +821,7 @@ export const annotationRouter = createTRPCRouter({
 const updateTraceInElasticsearch = async (
   traceId: string,
   projectId: string,
-  updateScript: string
+  updateScript: string,
 ) => {
   const client = await esClient({ projectId });
   let currentColdIndex: string | undefined;
@@ -829,7 +829,7 @@ const updateTraceInElasticsearch = async (
     currentColdIndex = Object.keys(
       await client.indices.getAlias({
         name: TRACE_COLD_INDEX.alias,
-      })
+      }),
     )[0];
   } catch (error) {
     if (
@@ -884,7 +884,7 @@ const updateTraceInElasticsearch = async (
 
 const updateTraceWithAnnotation = async (
   traceId: string,
-  projectId: string
+  projectId: string,
 ) => {
   const updateScript = `
     try {
@@ -913,7 +913,7 @@ const updateTraceWithAnnotation = async (
 
 const updateTraceRemoveAnnotation = async (
   traceId: string,
-  projectId: string
+  projectId: string,
 ) => {
   const updateScript = `
     try {

@@ -25,7 +25,7 @@ export const annotationScoreRouter = createTRPCRouter({
         radioCheckboxOptions: z.array(z.string()),
         defaultRadioOption: z.string().optional().nullable(),
         defaultCheckboxOption: z.array(z.string()).optional().nullable(),
-      })
+      }),
     )
     .use(checkProjectPermission("annotations:manage"))
     .mutation(async ({ ctx, input }) => {
@@ -88,7 +88,7 @@ export const annotationScoreRouter = createTRPCRouter({
       z.object({
         projectId: z.string(),
         scoreId: z.string(),
-      })
+      }),
     )
     .use(checkProjectPermission("annotations:view"))
     .query(async ({ ctx, input }) => {
@@ -106,9 +106,9 @@ export const annotationScoreRouter = createTRPCRouter({
         scoreId: z.string(),
         active: z.boolean(),
         projectId: z.string(),
-      })
+      }),
     )
-    .use(checkProjectPermission("annotations:manage"))
+    .use(checkProjectPermission("annotations:update"))
     .mutation(async ({ ctx, input }) => {
       return ctx.prisma.annotationScore.update({
         where: { id: input.scoreId, projectId: input.projectId },
@@ -120,9 +120,9 @@ export const annotationScoreRouter = createTRPCRouter({
       z.object({
         scoreId: z.string(),
         projectId: z.string(),
-      })
+      }),
     )
-    .use(checkProjectPermission("annotations:manage"))
+    .use(checkProjectPermission("annotations:delete"))
     .mutation(async ({ ctx, input }) => {
       return ctx.prisma.annotationScore.update({
         where: { id: input.scoreId, projectId: input.projectId },

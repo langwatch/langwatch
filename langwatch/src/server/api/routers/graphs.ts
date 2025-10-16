@@ -14,9 +14,9 @@ export const graphsRouter = createTRPCRouter({
         name: z.string(),
         graph: z.string(),
         filterParams: z.any().optional(),
-      })
+      }),
     )
-    .use(checkProjectPermission("analytics:manage"))
+    .use(checkProjectPermission("analytics:create"))
     .mutation(async ({ ctx, input }) => {
       const graph = JSON.parse(input.graph);
 
@@ -46,7 +46,7 @@ export const graphsRouter = createTRPCRouter({
     }),
   delete: protectedProcedure
     .input(z.object({ projectId: z.string(), id: z.string() }))
-    .use(checkProjectPermission("analytics:manage"))
+    .use(checkProjectPermission("analytics:delete"))
     .mutation(async ({ ctx, input }) => {
       const { id } = input;
       const prisma = ctx.prisma;
@@ -120,9 +120,9 @@ export const graphsRouter = createTRPCRouter({
         graph: z.string(),
         graphId: z.string(),
         filterParams: z.any().optional(),
-      })
+      }),
     )
-    .use(checkProjectPermission("analytics:manage"))
+    .use(checkProjectPermission("analytics:update"))
     .mutation(async ({ ctx, input }) => {
       const prisma = ctx.prisma;
 

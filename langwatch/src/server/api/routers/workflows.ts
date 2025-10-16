@@ -28,9 +28,9 @@ export const workflowRouter = createTRPCRouter({
         projectId: z.string(),
         dsl: workflowJsonSchema,
         commitMessage: z.string(),
-      })
+      }),
     )
-    .use(checkProjectPermission("workflows:manage"))
+    .use(checkProjectPermission("workflows:create"))
     .mutation(async ({ ctx, input }) => {
       const workflow = await ctx.prisma.workflow.create({
         data: {
@@ -90,7 +90,7 @@ export const workflowRouter = createTRPCRouter({
 
       if (workflow.currentVersion) {
         workflow.currentVersion.dsl = migrateDSLVersion(
-          workflow.currentVersion.dsl as unknown as Workflow
+          workflow.currentVersion.dsl as unknown as Workflow,
         ) as any;
       }
 
@@ -105,7 +105,7 @@ export const workflowRouter = createTRPCRouter({
         returnDSL: z
           .union([z.boolean(), z.literal("previousVersion")])
           .optional(),
-      })
+      }),
     )
     .use(checkProjectPermission("workflows:view"))
     .query(async ({ ctx, input }) => {
@@ -206,7 +206,7 @@ export const workflowRouter = createTRPCRouter({
 
   restoreVersion: protectedProcedure
     .input(z.object({ projectId: z.string(), versionId: z.string() }))
-    .use(checkProjectPermission("workflows:manage"))
+    .use(checkProjectPermission("workflows:update"))
     .mutation(async ({ ctx, input }) => {
       const version = await ctx.prisma.workflowVersion.findUnique({
         where: { id: input.versionId, projectId: input.projectId },
@@ -252,9 +252,9 @@ export const workflowRouter = createTRPCRouter({
         workflowId: z.string(),
         dsl: workflowJsonSchema,
         setAsLatestVersion: z.boolean(),
-      })
+      }),
     )
-    .use(checkProjectPermission("workflows:manage"))
+    .use(checkProjectPermission("workflows:update"))
     .mutation(async ({ ctx, input }) => {
       const updatedVersion = await saveOrCommitWorkflowVersion({
         ctx,
@@ -274,9 +274,9 @@ export const workflowRouter = createTRPCRouter({
         workflowId: z.string(),
         commitMessage: z.string(),
         dsl: workflowJsonSchema,
-      })
+      }),
     )
-    .use(checkProjectPermission("workflows:manage"))
+    .use(checkProjectPermission("workflows:update"))
     .mutation(async ({ ctx, input }) => {
       const newVersion = await saveOrCommitWorkflowVersion({
         ctx,
@@ -294,9 +294,9 @@ export const workflowRouter = createTRPCRouter({
         projectId: z.string(),
         workflowId: z.string(),
         versionId: z.string(),
-      })
+      }),
     )
-    .use(checkProjectPermission("workflows:manage"))
+    .use(checkProjectPermission("workflows:update"))
     .mutation(async ({ ctx, input }) => {
       const version = await ctx.prisma.workflowVersion.findUnique({
         where: {
@@ -324,7 +324,7 @@ export const workflowRouter = createTRPCRouter({
 
   unpublish: protectedProcedure
     .input(z.object({ projectId: z.string(), workflowId: z.string() }))
-    .use(checkProjectPermission("workflows:manage"))
+    .use(checkProjectPermission("workflows:update"))
     .mutation(async ({ ctx, input }) => {
       return ctx.prisma.workflow.update({
         where: { id: input.workflowId, projectId: input.projectId },
@@ -341,9 +341,9 @@ export const workflowRouter = createTRPCRouter({
         projectId: z.string(),
         workflowId: z.string(),
         unarchive: z.boolean().optional(),
-      })
+      }),
     )
-    .use(checkProjectPermission("workflows:manage"))
+    .use(checkProjectPermission("workflows:delete"))
     .mutation(async ({ ctx, input }) => {
       return ctx.prisma.workflow.update({
         where: { id: input.workflowId, projectId: input.projectId },
@@ -359,19 +359,19 @@ export const workflowRouter = createTRPCRouter({
         projectId: z.string(),
         prevDsl: workflowJsonSchema,
         newDsl: workflowJsonSchema,
-      })
+      }),
     )
-    .use(checkProjectPermission("workflows:manage"))
+    .use(checkProjectPermission("workflows:update"))
     .mutation(async ({ input }) => {
       const prevDsl_ = JSON.stringify(
         recursiveAlphabeticallySortedKeys(clearDsl(input.prevDsl)),
         null,
-        2
+        2,
       );
       const newDsl_ = JSON.stringify(
         recursiveAlphabeticallySortedKeys(clearDsl(input.newDsl)),
         null,
-        2
+        2,
       );
       if (prevDsl_ === newDsl_) {
         return "no changes";
@@ -382,7 +382,7 @@ export const workflowRouter = createTRPCRouter({
         prevDsl_,
         newDsl_,
         "Previous Version",
-        "New Version"
+        "New Version",
       );
 
       const commitMessage = await generateText({
@@ -441,7 +441,7 @@ ${diff}
       });
 
       const result = commitMessage.toolResults?.find(
-        (t) => t.toolName === "commitMessage"
+        (t) => t.toolName === "commitMessage",
       )?.output;
 
       // TODO: save call costs to user account
@@ -500,7 +500,7 @@ export const saveOrCommitWorkflowVersion = async ({
     JSON.stringify({
       ...input.dsl,
       state: {},
-    })
+    }),
   );
   const data = {
     commitMessage,

@@ -31,13 +31,13 @@ export const triggerRouter = createTRPCRouter({
               z.object({
                 id: z.string(),
                 name: z.string(),
-              })
+              }),
             )
             .optional(),
         }),
-      })
+      }),
     )
-    .use(checkProjectPermission("triggers:manage"))
+    .use(checkProjectPermission("triggers:create"))
     .mutation(async ({ ctx, input }) => {
       const project = await ctx.prisma.project.findUnique({
         where: {
@@ -108,7 +108,7 @@ export const triggerRouter = createTRPCRouter({
     }),
   deleteById: protectedProcedure
     .input(z.object({ projectId: z.string(), triggerId: z.string() }))
-    .use(checkProjectPermission("triggers:manage"))
+    .use(checkProjectPermission("triggers:delete"))
     .mutation(async ({ ctx, input }) => {
       await ctx.prisma.trigger.update({
         where: {
@@ -134,9 +134,9 @@ export const triggerRouter = createTRPCRouter({
           .optional()
           .nullable(),
         name: z.string().optional(),
-      })
+      }),
     )
-    .use(checkProjectPermission("triggers:manage"))
+    .use(checkProjectPermission("triggers:update"))
     .mutation(async ({ ctx, input }) => {
       return ctx.prisma.trigger.update({
         where: { id: input.triggerId, projectId: input.projectId },
@@ -149,7 +149,7 @@ export const triggerRouter = createTRPCRouter({
     }),
   getTriggers: protectedProcedure
     .input(z.object({ projectId: z.string() }))
-    .use(checkProjectPermission("triggers:manage"))
+    .use(checkProjectPermission("triggers:view"))
     .query(async ({ ctx, input }) => {
       const triggers = await ctx.prisma.trigger.findMany({
         where: {
@@ -211,9 +211,9 @@ export const triggerRouter = createTRPCRouter({
         triggerId: z.string(),
         active: z.boolean(),
         projectId: z.string(),
-      })
+      }),
     )
-    .use(checkProjectPermission("triggers:manage"))
+    .use(checkProjectPermission("triggers:update"))
     .mutation(async ({ ctx, input }) => {
       return ctx.prisma.trigger.update({
         where: {
@@ -227,7 +227,7 @@ export const triggerRouter = createTRPCRouter({
     }),
   getTriggerById: protectedProcedure
     .input(z.object({ triggerId: z.string(), projectId: z.string() }))
-    .use(checkProjectPermission("triggers:manage"))
+    .use(checkProjectPermission("triggers:view"))
     .query(async ({ ctx, input }) => {
       return ctx.prisma.trigger.findUnique({
         where: { id: input.triggerId, projectId: input.projectId },
@@ -239,9 +239,9 @@ export const triggerRouter = createTRPCRouter({
         triggerId: z.string(),
         projectId: z.string(),
         filters: z.any(),
-      })
+      }),
     )
-    .use(checkProjectPermission("triggers:manage"))
+    .use(checkProjectPermission("triggers:update"))
     .mutation(async ({ ctx, input }) => {
       return ctx.prisma.trigger.update({
         where: { id: input.triggerId, projectId: input.projectId },

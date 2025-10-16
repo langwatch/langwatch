@@ -14,11 +14,12 @@ import {
   VStack,
   useDisclosure,
 } from "@chakra-ui/react";
-import { Edit, Eye, Plus, Shield, Trash2 } from "react-feather";
+import { Edit, Eye, Info, Plus, Shield, Trash2 } from "react-feather";
 import { useForm } from "react-hook-form";
 import { useEffect, useState } from "react";
 import { Checkbox } from "../../components/ui/checkbox";
 import { Dialog } from "../../components/ui/dialog";
+import { Tooltip } from "../../components/ui/tooltip";
 import { toaster } from "../../components/ui/toaster";
 import SettingsLayout from "../../components/SettingsLayout";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
@@ -345,7 +346,7 @@ function RolesManagement({ organizationId }: { organizationId: string }) {
               onDelete={() => {
                 if (
                   confirm(
-                    `Are you sure you want to delete the role "${role.name}"?`
+                    `Are you sure you want to delete the role "${role.name}"?`,
                   )
                 ) {
                   deleteRole.mutate({ roleId: role.id });
@@ -691,11 +692,11 @@ function PermissionSelector({
     }
     // Most other resources don't have share
     return [
+      Actions.MANAGE,
       Actions.VIEW,
       Actions.CREATE,
       Actions.UPDATE,
       Actions.DELETE,
-      Actions.MANAGE,
     ];
   };
 
@@ -715,14 +716,14 @@ function PermissionSelector({
     Resources.TRIGGERS,
     Resources.WORKFLOWS,
     Resources.PROMPTS,
-    Resources.PLAYGROUND,
+    // Resources.PLAYGROUND, // Hidden
   ];
 
   // Group permissions by resource using the correct valid actions
   resourceOrder.forEach((resource) => {
     const validActions = getValidActionsForResource(resource);
     groupedPermissions[resource] = validActions.map((action) =>
-      createPermission(resource, action)
+      createPermission(resource, action),
     );
   });
 
@@ -739,7 +740,7 @@ function PermissionSelector({
       }
 
       onChange(
-        selectedPermissions.filter((p) => !permissionsToRemove.includes(p))
+        selectedPermissions.filter((p) => !permissionsToRemove.includes(p)),
       );
     } else {
       // If adding a permission, add it and handle hierarchy
@@ -786,7 +787,7 @@ function PermissionSelector({
                     // Check if this permission is implicitly checked due to manage being selected
                     const managePermission = createPermission(
                       resource,
-                      "manage"
+                      "manage",
                     );
                     const isImplicitlyChecked =
                       action !== "manage" &&
@@ -800,9 +801,26 @@ function PermissionSelector({
                         disabled={isImplicitlyChecked}
                         opacity={isImplicitlyChecked ? 0.6 : 1}
                       >
-                        <Text fontSize="sm" textTransform="capitalize">
-                          {action}
-                        </Text>
+                        {action === "manage" ? (
+                          <Tooltip
+                            content="Manage includes all permissions (view, create, update, delete) for this resource"
+                            positioning={{ placement: "top" }}
+                            showArrow
+                          >
+                            <HStack gap={1}>
+                              <Text fontSize="sm" textTransform="capitalize">
+                                {action}
+                              </Text>
+                              <Box color="gray.500">
+                                <Info size={14} />
+                              </Box>
+                            </HStack>
+                          </Tooltip>
+                        ) : (
+                          <Text fontSize="sm" textTransform="capitalize">
+                            {action}
+                          </Text>
+                        )}
                       </Checkbox>
                     );
                   })}
@@ -855,7 +873,7 @@ function PermissionViewer({ permissions }: { permissions: Permission[] }) {
   // Group permissions by resource
   resourceOrder.forEach((resource) => {
     groupedPermissions[resource] = Object.values(Actions).map((action) =>
-      createPermission(resource, action)
+      createPermission(resource, action),
     );
   });
 
@@ -888,7 +906,7 @@ function PermissionViewer({ permissions }: { permissions: Permission[] }) {
       {(Object.keys(groupedPermissions) as Resource[]).map((resource) => {
         const validActions = getValidActionsForResource(resource);
         const hasAnyPermission = validActions.some((action) =>
-          permissions.includes(`${resource}:${action}`)
+          permissions.includes(`${resource}:${action}`),
         );
 
         if (!hasAnyPermission) return null;

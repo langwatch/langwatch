@@ -50,13 +50,13 @@ export const shareRouter = createTRPCRouter({
         projectId: z.string(),
         resourceType: z.enum(["TRACE", "THREAD"]),
         resourceId: z.string(),
-      })
+      }),
     )
     .use(
       checkPermissionOrPubliclyShared(checkProjectPermission("messages:view"), {
         resourceType: (input) => input.resourceType,
         resourceParam: "resourceId",
-      })
+      }),
     )
     .query(async ({ input, ctx }) => {
       const { resourceType, resourceId } = input;
@@ -77,7 +77,7 @@ export const shareRouter = createTRPCRouter({
         projectId: z.string(),
         resourceType: z.enum(["TRACE", "THREAD"]),
         resourceId: z.string(),
-      })
+      }),
     )
     .use(checkProjectPermission("messages:share"))
     .mutation(async ({ input, ctx }) => {
@@ -112,7 +112,7 @@ export const shareRouter = createTRPCRouter({
         projectId: z.string(),
         resourceType: z.enum(["TRACE", "THREAD"]),
         resourceId: z.string(),
-      })
+      }),
     )
     .use(checkProjectPermission("messages:share"))
     .mutation(async ({ input }) => {
@@ -125,9 +125,9 @@ export const shareRouter = createTRPCRouter({
     .input(
       z.object({
         projectId: z.string(),
-      })
+      }),
     )
-    .use(checkProjectPermission("project:manage"))
+    .use(checkProjectPermission("project:update"))
     .mutation(async ({ input }) => {
       const { projectId } = input;
 

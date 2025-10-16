@@ -29,9 +29,9 @@ export const monitorsRouter = createTRPCRouter({
     }),
   toggle: protectedProcedure
     .input(
-      z.object({ id: z.string(), projectId: z.string(), enabled: z.boolean() })
+      z.object({ id: z.string(), projectId: z.string(), enabled: z.boolean() }),
     )
-    .use(checkProjectPermission("guardrails:manage"))
+    .use(checkProjectPermission("guardrails:update"))
     .mutation(async ({ input, ctx }) => {
       const { id, enabled, projectId } = input;
       const prisma = ctx.prisma;
@@ -57,9 +57,9 @@ export const monitorsRouter = createTRPCRouter({
           EvaluationExecutionMode.AS_GUARDRAIL,
           EvaluationExecutionMode.MANUALLY,
         ]),
-      })
+      }),
     )
-    .use(checkProjectPermission("guardrails:manage"))
+    .use(checkProjectPermission("guardrails:create"))
     .mutation(async ({ input, ctx }) => {
       const {
         projectId,
@@ -109,9 +109,9 @@ export const monitorsRouter = createTRPCRouter({
           EvaluationExecutionMode.AS_GUARDRAIL,
           EvaluationExecutionMode.MANUALLY,
         ]),
-      })
+      }),
     )
-    .use(checkProjectPermission("guardrails:manage"))
+    .use(checkProjectPermission("guardrails:update"))
     .mutation(async ({ input, ctx }) => {
       const {
         id,
@@ -169,7 +169,7 @@ export const monitorsRouter = createTRPCRouter({
     }),
   delete: protectedProcedure
     .input(z.object({ id: z.string(), projectId: z.string() }))
-    .use(checkProjectPermission("guardrails:manage"))
+    .use(checkProjectPermission("guardrails:delete"))
     .mutation(async ({ input, ctx }) => {
       const { id, projectId } = input;
       const prisma = ctx.prisma;
@@ -186,9 +186,9 @@ export const monitorsRouter = createTRPCRouter({
         projectId: z.string(),
         checkId: z.string().optional(),
         name: z.string(),
-      })
+      }),
     )
-    .use(checkProjectPermission("guardrails:manage"))
+    .use(checkProjectPermission("guardrails:view"))
     .mutation(async ({ input, ctx }) => {
       const { projectId, name } = input;
       const prisma = ctx.prisma;

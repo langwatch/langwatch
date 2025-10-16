@@ -13,9 +13,9 @@ export const translateRouter = createTRPCRouter({
       z.object({
         projectId: z.string(),
         textToTranslate: z.string(),
-      })
+      }),
     )
-    .use(checkProjectPermission("triggers:manage"))
+    .use(checkProjectPermission("triggers:view"))
     .mutation(async ({ input }) => {
       try {
         const response: { text: string } = await generateText({

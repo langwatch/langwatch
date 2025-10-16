@@ -10,7 +10,7 @@ export const optimizationRouter = createTRPCRouter({
         workflowId: z.string(),
         inputMessages: z.array(z.record(z.string(), z.string())),
         projectId: z.string(),
-      })
+      }),
     )
     .use(checkProjectPermission("workflows:view"))
     .mutation(async ({ ctx, input }) => {
@@ -31,7 +31,7 @@ export const optimizationRouter = createTRPCRouter({
             "Content-Type": "application/json",
             ...(apiKey && { "x-auth-token": apiKey }),
           },
-        }
+        },
       );
 
       return await response.json();
@@ -62,7 +62,7 @@ export const optimizationRouter = createTRPCRouter({
     }),
   disableAsComponent: protectedProcedure
     .input(z.object({ workflowId: z.string(), projectId: z.string() }))
-    .use(checkProjectPermission("workflows:manage"))
+    .use(checkProjectPermission("workflows:update"))
     .mutation(async ({ ctx, input }) => {
       const { workflowId, projectId } = input;
 
@@ -79,7 +79,7 @@ export const optimizationRouter = createTRPCRouter({
     }),
   disableAsEvaluator: protectedProcedure
     .input(z.object({ workflowId: z.string(), projectId: z.string() }))
-    .use(checkProjectPermission("workflows:manage"))
+    .use(checkProjectPermission("workflows:update"))
     .mutation(async ({ ctx, input }) => {
       const { workflowId, projectId } = input;
 
@@ -101,9 +101,9 @@ export const optimizationRouter = createTRPCRouter({
         projectId: z.string(),
         isComponent: z.boolean(),
         isEvaluator: z.boolean(),
-      })
+      }),
     )
-    .use(checkProjectPermission("workflows:manage"))
+    .use(checkProjectPermission("workflows:update"))
     .mutation(async ({ ctx, input }) => {
       const { workflowId, projectId, isComponent } = input;
       let { isEvaluator } = input;
@@ -130,9 +130,9 @@ export const optimizationRouter = createTRPCRouter({
         projectId: z.string(),
         isEvaluator: z.boolean(),
         isComponent: z.boolean(),
-      })
+      }),
     )
-    .use(checkProjectPermission("workflows:manage"))
+    .use(checkProjectPermission("workflows:update"))
     .mutation(async ({ ctx, input }) => {
       const { workflowId, projectId, isEvaluator } = input;
 
@@ -148,7 +148,7 @@ export const optimizationRouter = createTRPCRouter({
     }),
   getComponents: protectedProcedure
     .input(z.object({ projectId: z.string() }))
-    .use(checkProjectPermission("workflows:manage"))
+    .use(checkProjectPermission("workflows:view"))
     .query(async ({ ctx, input }) => {
       const { projectId } = input;
       const workflows = await ctx.prisma.workflow.findMany({
@@ -164,7 +164,7 @@ export const optimizationRouter = createTRPCRouter({
       // Update the filtering to work with multiple workflows
       workflows.forEach((workflow) => {
         workflow.versions = workflow.versions.filter(
-          (version) => version.id === workflow.publishedId
+          (version) => version.id === workflow.publishedId,
         );
       });
 
