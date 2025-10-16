@@ -29,6 +29,8 @@ export interface PhoneNumberInputProps {
       isValid: boolean;
     },
   ) => void;
+  onFocus?: React.FocusEventHandler<HTMLInputElement>;
+  onBlur?: React.FocusEventHandler<HTMLInputElement>;
 }
 
 export function PhoneNumberInput(
@@ -41,6 +43,8 @@ export function PhoneNumberInput(
     groupFrequentlyUsedCountries = true,
     autoDetectDefaultCountry,
     onChange,
+    onFocus,
+    onBlur,
   } = props;
 
   const initialCountry: CountryCode = useMemo(() => {
@@ -237,6 +241,8 @@ export function PhoneNumberInput(
         onChange={handleInputChange}
         inputMode="tel"
         autoComplete="tel"
+        onFocus={onFocus}
+        onBlur={onBlur}
       />
     </Group>
   );

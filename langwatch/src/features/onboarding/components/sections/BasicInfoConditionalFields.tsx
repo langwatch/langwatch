@@ -1,6 +1,7 @@
 import { VStack, Field, SegmentGroup, NativeSelect } from "@chakra-ui/react";
 import { AnimatePresence, motion } from "motion/react";
 import { useRef, useEffect, useState } from "react";
+import { useAnalytics, AnalyticsBoundary } from "react-contextual-analytics";
 import {
   companySizeItems,
   solutionTypeItems,
@@ -36,8 +37,11 @@ export const BasicInfoConditionalFields: React.FC<
 }) => {
   const showFields = usageStyle !== void 0 && usageStyle !== "For myself";
 
-  const [phoneHasValue, setLocalPhoneHasValue] = useState<boolean>(Boolean(phoneNumber));
+  const [phoneHasValue, setLocalPhoneHasValue] = useState<boolean>(
+    Boolean(phoneNumber),
+  );
   const [phoneIsValid, setLocalPhoneIsValid] = useState<boolean>(true);
+  const { emit } = useAnalytics({ usageStyle });
 
   // Track previous visibility to decide if we should animate on first reveal
   const prevShowFieldsRef = useRef<boolean>(showFields);
@@ -78,6 +82,7 @@ export const BasicInfoConditionalFields: React.FC<
                 <PhoneNumberInput
                   autoDetectDefaultCountry
                   value={phoneNumber}
+                  onFocus={() => emit("focused", "phone_number")}
                   onChange={(e164, meta) => {
                     setPhoneNumber(e164 ?? "");
 
@@ -104,9 +109,10 @@ export const BasicInfoConditionalFields: React.FC<
                   size="sm"
                   colorPalette="orange"
                   value={companySize}
-                  onValueChange={({ value }) =>
-                    setCompanySize(value as CompanySize)
-                  }
+                  onValueChange={({ value }) => {
+                    setCompanySize(value as CompanySize);
+                    emit("selected", "company_size", { value });
+                  }}
                   display={{ base: "none", md: "flex" }}
                 >
                   <SegmentGroup.Indicator />
@@ -126,9 +132,12 @@ export const BasicInfoConditionalFields: React.FC<
                   <NativeSelect.Field
                     placeholder="Select company size"
                     value={companySize}
-                    onChange={(e) =>
-                      setCompanySize(e.target.value as CompanySize)
-                    }
+                    onChange={(e) => {
+                      setCompanySize(e.target.value as CompanySize);
+                      emit("selected", "company_size", {
+                        value: e.target.value,
+                      });
+                    }}
                   >
                     {companySizeItems.map((item) => (
                       <option key={item.value} value={item.value}>
@@ -154,7 +163,10 @@ export const BasicInfoConditionalFields: React.FC<
                 <IconRadioCardGroup<SolutionType>
                   items={solutionTypeItems}
                   value={solutionType}
-                  onChange={setSolutionType}
+                  onChange={(value) => {
+                    setSolutionType(value);
+                    emit("selected", "solution_type", { value });
+                  }}
                   direction="horizontal"
                 />
               </Field.Root>
@@ -165,5 +177,3 @@ export const BasicInfoConditionalFields: React.FC<
     </AnimatePresence>
   );
 };
-
-
