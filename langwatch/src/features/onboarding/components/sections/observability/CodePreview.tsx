@@ -23,12 +23,13 @@ const shikiAdapter = createShikiAdapter<HighlighterGeneric<any, any>>({
 
 export function CodePreview({ code, filename, codeLanguage: chakraLanguage, highlightLines, languageIcon }: CodePreviewProps): React.ReactElement | null {
   if (!code) return null;
+
   return (
     <CodeBlock.AdapterProvider value={shikiAdapter}>
       <CodeBlock.Root size="sm" code={code} language={chakraLanguage} meta={{ highlightLines }}>
         <CodeBlock.Header>
-          <CodeBlock.Title>
-            {languageIcon ? <Icon size="sm">{languageIcon}</Icon> : null}
+          <CodeBlock.Title fontSize="xs" pt={2}>
+            {languageIcon ? <Icon size="xs">{languageIcon}</Icon> : null}
             {filename}
           </CodeBlock.Title>
           <Float placement="top-end" offset="5" zIndex="1">

@@ -10,7 +10,8 @@ import { ApiKeyCard } from "./observability/ApiKeyCard";
 import { CodePreview } from "./observability/CodePreview";
 import { getLanguageCode } from "./observability/codegen";
 import { FrameworkGrid } from "./observability/FrameworkGrid";
-import { LanguageGrid } from "./observability/LanguageGrid";
+import { PlatformGrid } from "./observability/PlatformGrid";
+import { PLATFORM_OPTIONS } from "./observability/constants";
 
 
 export function ObservabilityScreen(): React.ReactElement {
@@ -20,7 +21,7 @@ export function ObservabilityScreen(): React.ReactElement {
 
   return (
     <VStack gap={6} align="stretch">
-      <LanguageGrid
+      <PlatformGrid
         selectedLanguage={selectedPlatform}
         onSelectLanguage={setSelectedPlatform}
       />
@@ -37,6 +38,7 @@ export function ObservabilityScreen(): React.ReactElement {
         code={codegen.code}
         filename={codegen.filename}
         codeLanguage={codegen.codeLanguage}
+        languageIcon={PLATFORM_OPTIONS.find((l) => l.key === selectedPlatform)?.icon}
         highlightLines={codegen.highlightLines}
       />
 

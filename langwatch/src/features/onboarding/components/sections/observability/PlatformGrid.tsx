@@ -4,20 +4,23 @@ import { PLATFORM_OPTIONS } from "./constants";
 import type { PlatformKey } from "./types";
 import { SelectableIconCard } from "./SelectableIconCard";
 
-interface LanguageGridProps {
+interface PlatformGridProps {
   selectedLanguage: PlatformKey;
   onSelectLanguage: (language: PlatformKey) => void;
 }
 
-export function LanguageGrid({ selectedLanguage, onSelectLanguage }: LanguageGridProps): React.ReactElement {
+export const PlatformGrid: React.FC<PlatformGridProps> = ({
+  selectedLanguage,
+  onSelectLanguage
+}) => {
   return (
     <VStack align="stretch" gap={3}>
       <VStack align="stretch" gap={0}>
         <Text fontSize="md" fontWeight="semibold">
-          Select your language
+          Select your platform or language
         </Text>
         <Text fontSize="xs" color="fg.muted">
-          Choose the language you want to instrument. You can add other languages later.
+          Choose the language or platform you want to instrument. You can add others later.
         </Text>
       </VStack>
       <Grid templateColumns={{ base: "repeat(4, 1fr)", md: "repeat(8, 1fr)" }} gap={3}>
