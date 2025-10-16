@@ -21,8 +21,6 @@ jobs:
         id: release
         uses: googleapis/release-please-action@v4
         with:
-          # Consider using a PAT token instead of GITHUB_TOKEN for better CI integration
-          # token: ${{ secrets.RELEASE_PLEASE_TOKEN }}
-          token: ${{ secrets.PUSH_GITHUB_TOKEN }}
+          token: ${{ secrets.RELEASE_PLEASE_TOKEN }}
           config-file: .github/release-please-config.json
           manifest-file: .github/.release-please-manifest.json
