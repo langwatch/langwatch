@@ -2,23 +2,21 @@ import { useMemo, useState } from "react";
 import {
   type OnboardingFormData,
   type OnboardingFlowState,
-  type OnboardingNavigation,
   type UsageStyle,
   type CompanySize,
   type SolutionType,
   type DesireType,
   type RoleType,
   OnboardingScreenIndex,
-  OnboardingFlowDirection,
 } from "../types/types";
 import { usePublicEnv } from "~/hooks/usePublicEnv";
 import { getOnboardingFlowConfig } from "../constants/onboarding-flow";
+import { useGenericOnboardingFlow } from "./use-generic-onboarding-flow";
 
 export const useOnboardingFlow = () => {
   const publicEnv = usePublicEnv();
   const isSaaS = publicEnv.data?.IS_SAAS;
 
-  // Form state
   const [organizationName, setOrganizationName] = useState<string | undefined>(
     void 0,
   );
@@ -36,81 +34,13 @@ export const useOnboardingFlow = () => {
   const [selectedDesires, setDesires] = useState<DesireType[]>([]);
   const [role, setRole] = useState<RoleType | undefined>(void 0);
 
-  // Flow state
+  // Flow configuration (memoized)
   const flow = useMemo(
     () => getOnboardingFlowConfig(Boolean(isSaaS)),
     [isSaaS],
   );
-  const [currentScreenIndex, setCurrentScreenIndex] =
-    useState<OnboardingScreenIndex>(flow.first);
-  const [direction, setDirection] = useState<OnboardingFlowDirection>(
-    OnboardingFlowDirection.FORWARD,
-  );
 
-  // Navigation functions
-  const navigateTo = (newDirection: OnboardingFlowDirection) => {
-    setDirection(newDirection);
-    setCurrentScreenIndex((prev) => {
-      const visible = flow.visibleScreens;
-      if (visible.length === 0) return prev;
-
-      let currentPos = visible.indexOf(prev);
-      if (currentPos === -1) {
-        // Default to first visible screen if current is not found
-        currentPos = Math.max(0, visible.indexOf(flow.first));
-      }
-
-      let newPos = currentPos + newDirection;
-      if (newPos < 0) newPos = 0;
-      if (newPos > visible.length - 1) newPos = visible.length - 1;
-
-      if (visible[newPos] === void 0) {
-        console.error("Invalid screen index", newPos);
-        return prev;
-      }
-
-      return visible[newPos] ?? prev;
-    });
-  };
-
-  const nextScreen = () => {
-    const visible = flow.visibleScreens;
-    const pos = visible.indexOf(currentScreenIndex);
-    if (pos === -1) {
-      // If desynced, jump towards first
-      setDirection(OnboardingFlowDirection.FORWARD);
-      setCurrentScreenIndex(
-        visible[Math.max(0, visible.indexOf(flow.first))] ?? flow.first,
-      );
-      return;
-    }
-    if (pos < visible.length - 1) {
-      navigateTo(OnboardingFlowDirection.FORWARD);
-    }
-  };
-
-  const prevScreen = () => {
-    const visible = flow.visibleScreens;
-    const pos = visible.indexOf(currentScreenIndex);
-    if (pos === -1) {
-      // If desynced, jump towards first
-      setDirection(OnboardingFlowDirection.BACKWARD);
-      setCurrentScreenIndex(
-        visible[Math.max(0, visible.indexOf(flow.first))] ?? flow.first,
-      );
-      return;
-    }
-    if (pos > 0) {
-      navigateTo(OnboardingFlowDirection.BACKWARD);
-    }
-  };
-
-  const skipScreen = () => {
-    nextScreen();
-  };
-
-  // Validation logic
-  const canProceed = () => {
+  const canProceed = (currentScreenIndex: OnboardingScreenIndex) => {
     switch (currentScreenIndex) {
       case OnboardingScreenIndex.ORGANIZATION:
         return Boolean(organizationName?.trim() && agreement);
@@ -133,7 +63,12 @@ export const useOnboardingFlow = () => {
     }
   };
 
-  // Form data getter
+  // Use generic flow hook for navigation
+  const { currentScreenIndex, direction, navigation } = useGenericOnboardingFlow(
+    flow,
+    canProceed
+  );
+
   const getFormData = (): OnboardingFormData => ({
     organizationName,
     agreement,
@@ -149,19 +84,10 @@ export const useOnboardingFlow = () => {
         : null,
   });
 
-  // Flow state getter
   const getFlowState = (): OnboardingFlowState => ({
     currentScreenIndex,
     direction,
   });
-
-  // Navigation interface
-  const navigation: OnboardingNavigation = {
-    nextScreen,
-    prevScreen,
-    skipScreen,
-    canProceed,
-  };
 
   const formContextValue = useMemo(
     () => ({
@@ -199,7 +125,6 @@ export const useOnboardingFlow = () => {
       role,
     ],
   );
-
   return {
     // Form state
     organizationName,
