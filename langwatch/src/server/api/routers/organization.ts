@@ -752,6 +752,25 @@ export const organizationRouter = createTRPCRouter({
       const isCustomRole = input.role.startsWith("custom:");
 
       if (isCustomRole && input.customRoleId) {
+        // Ensure the custom role belongs to the team's organization
+        const team = await prisma.team.findUnique({
+          where: { id: input.teamId },
+          select: { organizationId: true },
+        });
+        if (!team) {
+          throw new TRPCError({ code: "NOT_FOUND", message: "Team not found" });
+        }
+        const role = await prisma.customRole.findUnique({
+          where: { id: input.customRoleId },
+          select: { organizationId: true },
+        });
+        if (!role || role.organizationId !== team.organizationId) {
+          throw new TRPCError({
+            code: "FORBIDDEN",
+            message: "Role does not belong to team's organization",
+          });
+        }
+
         const customRoleId = input.customRoleId; // Store in a const for TypeScript
         // Assign custom role and set built-in role to VIEWER
         await prisma.$transaction([

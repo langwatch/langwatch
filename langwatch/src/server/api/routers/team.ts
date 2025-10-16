@@ -140,22 +140,40 @@ export const teamRouter = createTRPCRouter({
       const prisma = ctx.prisma;
 
       return await prisma.$transaction(async (tx) => {
-        // Determine if it's a custom role or built-in role
-        const isCustomRole = input.defaultRole?.startsWith("custom:");
+        // Only process defaultRole if it's explicitly provided
+        const updateData: any = {
+          name: input.name,
+        };
+
+        if (input.defaultRole !== undefined) {
+          // Determine if it's a custom role or built-in role
+          const isCustomRole = input.defaultRole.startsWith("custom:");
+
+          // Enforce invariant: custom roles must have defaultCustomRoleId
+          if (isCustomRole && !input.defaultCustomRoleId) {
+            throw new TRPCError({
+              code: "BAD_REQUEST",
+              message:
+                "defaultCustomRoleId is required when defaultRole is a custom role",
+            });
+          }
+
+          if (isCustomRole) {
+            // Custom role: set defaultRole to null and defaultCustomRoleId to the provided value
+            updateData.defaultRole = null;
+            updateData.defaultCustomRoleId = input.defaultCustomRoleId;
+          } else {
+            // Built-in role: set defaultRole to the provided value and defaultCustomRoleId to null
+            updateData.defaultRole = input.defaultRole as TeamUserRole;
+            updateData.defaultCustomRoleId = null;
+          }
+        }
 
         await tx.team.update({
           where: {
             id: input.teamId,
           },
-          data: {
-            name: input.name,
-            defaultRole: isCustomRole
-              ? null
-              : (input.defaultRole as TeamUserRole | null),
-            defaultCustomRoleId: isCustomRole
-              ? input.defaultCustomRoleId
-              : null,
-          },
+          data: updateData,
         });
 
         if (input.members.length > 0) {
@@ -214,22 +232,72 @@ export const teamRouter = createTRPCRouter({
           if (membersToAdd.length > 0) {
             for (const member of membersToAdd) {
               const isCustomRole = member.role.startsWith("custom:");
-              await tx.teamUser.create({
-                data: {
-                  userId: member.userId,
-                  teamId: input.teamId,
-                  role: isCustomRole
-                    ? TeamUserRole.VIEWER
-                    : (member.role as TeamUserRole),
-                },
-              });
 
-              if (isCustomRole && member.customRoleId) {
+              if (isCustomRole) {
+                // Validate custom role requirements
+                if (!member.customRoleId) {
+                  throw new TRPCError({
+                    code: "BAD_REQUEST",
+                    message: `customRoleId is required when role is a custom role for user ${member.userId}`,
+                  });
+                }
+
+                // Validate custom role belongs to team's organization
+                const [team, customRole] = await Promise.all([
+                  tx.team.findUnique({
+                    where: { id: input.teamId },
+                    select: { organizationId: true },
+                  }),
+                  tx.customRole.findUnique({
+                    where: { id: member.customRoleId },
+                    select: { organizationId: true },
+                  }),
+                ]);
+
+                if (!team) {
+                  throw new TRPCError({
+                    code: "NOT_FOUND",
+                    message: "Team not found",
+                  });
+                }
+
+                if (!customRole) {
+                  throw new TRPCError({
+                    code: "NOT_FOUND",
+                    message: `Custom role ${member.customRoleId} not found`,
+                  });
+                }
+
+                if (customRole.organizationId !== team.organizationId) {
+                  throw new TRPCError({
+                    code: "FORBIDDEN",
+                    message: `Custom role ${member.customRoleId} does not belong to team's organization`,
+                  });
+                }
+
+                // Create teamUser with VIEWER role and custom role assignment
+                await tx.teamUser.create({
+                  data: {
+                    userId: member.userId,
+                    teamId: input.teamId,
+                    role: TeamUserRole.VIEWER,
+                  },
+                });
+
                 await tx.teamUserCustomRole.create({
                   data: {
                     userId: member.userId,
                     teamId: input.teamId,
                     customRoleId: member.customRoleId,
+                  },
+                });
+              } else {
+                // Built-in role - create teamUser with the specified role
+                await tx.teamUser.create({
+                  data: {
+                    userId: member.userId,
+                    teamId: input.teamId,
+                    role: member.role as TeamUserRole,
                   },
                 });
               }
@@ -239,35 +307,96 @@ export const teamRouter = createTRPCRouter({
           for (const member of membersToUpdate) {
             const isCustomRole = member.role.startsWith("custom:");
 
-            await tx.teamUser.update({
-              where: {
-                userId_teamId: {
-                  teamId: input.teamId,
-                  userId: member.userId,
+            if (isCustomRole) {
+              // Validate custom role requirements
+              if (!member.customRoleId) {
+                throw new TRPCError({
+                  code: "BAD_REQUEST",
+                  message: `customRoleId is required when role is a custom role for user ${member.userId}`,
+                });
+              }
+
+              // Validate custom role belongs to team's organization
+              const [team, customRole] = await Promise.all([
+                tx.team.findUnique({
+                  where: { id: input.teamId },
+                  select: { organizationId: true },
+                }),
+                tx.customRole.findUnique({
+                  where: { id: member.customRoleId },
+                  select: { organizationId: true },
+                }),
+              ]);
+
+              if (!team) {
+                throw new TRPCError({
+                  code: "NOT_FOUND",
+                  message: "Team not found",
+                });
+              }
+
+              if (!customRole) {
+                throw new TRPCError({
+                  code: "NOT_FOUND",
+                  message: `Custom role ${member.customRoleId} not found`,
+                });
+              }
+
+              if (customRole.organizationId !== team.organizationId) {
+                throw new TRPCError({
+                  code: "FORBIDDEN",
+                  message: `Custom role ${member.customRoleId} does not belong to team's organization`,
+                });
+              }
+
+              // Update teamUser with VIEWER role
+              await tx.teamUser.update({
+                where: {
+                  userId_teamId: {
+                    teamId: input.teamId,
+                    userId: member.userId,
+                  },
                 },
-              },
-              data: {
-                role: isCustomRole
-                  ? TeamUserRole.VIEWER
-                  : (member.role as TeamUserRole),
-              },
-            });
+                data: {
+                  role: TeamUserRole.VIEWER,
+                },
+              });
 
-            // Remove existing custom roles
-            await tx.teamUserCustomRole.deleteMany({
-              where: {
-                userId: member.userId,
-                teamId: input.teamId,
-              },
-            });
+              // Remove existing custom roles
+              await tx.teamUserCustomRole.deleteMany({
+                where: {
+                  userId: member.userId,
+                  teamId: input.teamId,
+                },
+              });
 
-            // Add new custom role if applicable
-            if (isCustomRole && member.customRoleId) {
+              // Add new custom role
               await tx.teamUserCustomRole.create({
                 data: {
                   userId: member.userId,
                   teamId: input.teamId,
                   customRoleId: member.customRoleId,
+                },
+              });
+            } else {
+              // Built-in role - update teamUser with the specified role
+              await tx.teamUser.update({
+                where: {
+                  userId_teamId: {
+                    teamId: input.teamId,
+                    userId: member.userId,
+                  },
+                },
+                data: {
+                  role: member.role as TeamUserRole,
+                },
+              });
+
+              // Remove existing custom roles when switching to built-in role
+              await tx.teamUserCustomRole.deleteMany({
+                where: {
+                  userId: member.userId,
+                  teamId: input.teamId,
                 },
               });
             }

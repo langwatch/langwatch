@@ -49,7 +49,7 @@ export const roleRouter = createTRPCRouter({
       const hasPermission = await hasOrganizationPermission(
         ctx,
         role.organizationId,
-        "organization:view"
+        "organization:view",
       );
 
       if (!hasPermission) {
@@ -66,9 +66,12 @@ export const roleRouter = createTRPCRouter({
         },
       });
 
+      if (!role) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Role not found" });
+      }
       return {
-        ...role!,
-        permissions: role!.permissions as string[],
+        ...role,
+        permissions: role.permissions as string[],
       };
     }),
 
@@ -79,7 +82,7 @@ export const roleRouter = createTRPCRouter({
         name: z.string().min(1).max(50),
         description: z.string().optional(),
         permissions: z.array(permissionSchema),
-      })
+      }),
     )
     .use(checkOrganizationPermission("organization:manage"))
     .mutation(async ({ ctx, input }) => {
@@ -121,7 +124,7 @@ export const roleRouter = createTRPCRouter({
         name: z.string().min(1).max(50).optional(),
         description: z.string().optional(),
         permissions: z.array(permissionSchema).optional(),
-      })
+      }),
     )
     .use(async ({ ctx, input, next }) => {
       // Fetch role to get organizationId for permission check
@@ -141,7 +144,7 @@ export const roleRouter = createTRPCRouter({
       const hasPermission = await hasOrganizationPermission(
         ctx,
         role.organizationId,
-        "organization:manage"
+        "organization:manage",
       );
 
       if (!hasPermission) {
@@ -189,7 +192,7 @@ export const roleRouter = createTRPCRouter({
       const hasPermission = await hasOrganizationPermission(
         ctx,
         role.organizationId,
-        "organization:manage"
+        "organization:manage",
       );
 
       if (!hasPermission) {
@@ -221,11 +224,68 @@ export const roleRouter = createTRPCRouter({
         userId: z.string(),
         teamId: z.string(),
         customRoleId: z.string(),
-      })
+      }),
     )
     .use(checkTeamPermission("team:manage"))
     .mutation(async ({ ctx, input }) => {
-      const assignment = await ctx.prisma.teamUserCustomRole.create({
+      const prisma = ctx.prisma;
+
+      // Validate that the custom role belongs to the team's organization
+      // and that the user is actually a member of the team
+      const [customRole, team, teamUser] = await Promise.all([
+        prisma.customRole.findUnique({
+          where: { id: input.customRoleId },
+          select: { organizationId: true },
+        }),
+        prisma.team.findUnique({
+          where: { id: input.teamId },
+          select: { organizationId: true },
+        }),
+        prisma.teamUser.findUnique({
+          where: {
+            userId_teamId: {
+              userId: input.userId,
+              teamId: input.teamId,
+            },
+          },
+          select: { userId: true },
+        }),
+      ]);
+
+      // Validate custom role exists
+      if (!customRole) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Custom role not found",
+        });
+      }
+
+      // Validate team exists
+      if (!team) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Team not found",
+        });
+      }
+
+      // Validate organization match
+      if (customRole.organizationId !== team.organizationId) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "Custom role does not belong to team's organization",
+        });
+      }
+
+      // Validate user is a member of the team
+      if (!teamUser) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "User is not a member of the specified team",
+        });
+      }
+
+      // Create the assignment after all validations pass
+      const assignment = await prisma.teamUserCustomRole.create({
         data: {
           userId: input.userId,
           teamId: input.teamId,
@@ -242,7 +302,7 @@ export const roleRouter = createTRPCRouter({
         userId: z.string(),
         teamId: z.string(),
         customRoleId: z.string(),
-      })
+      }),
     )
     .use(checkTeamPermission("team:manage"))
     .mutation(async ({ ctx, input }) => {

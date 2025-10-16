@@ -193,7 +193,7 @@ const ORGANIZATION_ROLE_PERMISSIONS: Record<
 
 /**
  * Check if a permission list includes a requested permission, with hierarchy rules
- * manage permissions automatically include view permissions
+ * manage permissions automatically include view, create, update, and delete permissions
  */
 function hasPermissionWithHierarchy(
   permissions: string[],
@@ -204,11 +204,14 @@ function hasPermissionWithHierarchy(
     return true;
   }
 
-  // Hierarchy rule: manage permissions include view permissions
-  if (requestedPermission.endsWith(':view')) {
-    const managePermission = requestedPermission.replace(':view', ':manage');
-    if (permissions.includes(managePermission)) {
-      return true;
+  // Hierarchy rule: manage permissions include view, create, update, and delete permissions
+  const actionSuffixes = [':view', ':create', ':update', ':delete'];
+  for (const suffix of actionSuffixes) {
+    if (requestedPermission.endsWith(suffix)) {
+      const managePermission = requestedPermission.replace(suffix, ':manage');
+      if (permissions.includes(managePermission)) {
+        return true;
+      }
     }
   }
 
@@ -393,6 +396,7 @@ export async function hasProjectPermission(
         select: {
           id: true,
           members: { where: { userId: ctx.session.user.id } },
+          defaultRole: true,
           defaultCustomRole: true,
         },
       },
@@ -567,7 +571,6 @@ const DEMO_VIEW_PERMISSIONS: Permission[] = [
   "cost:view",
   "messages:view",
   "annotations:view",
-  "spans:view",
   "guardrails:view",
   "experiments:view",
   "datasets:view",
@@ -641,9 +644,14 @@ export const checkPermissionOrPubliclyShared =
     }
   ) =>
   async ({ ctx, input, next }: PermissionMiddlewareParams<InputType>) => {
-    let allowed;
+    let allowed =false;
     try {
-      allowed = await permissionCheck({ ctx, input, next });
+      await permissionCheck({
+        ctx,
+        input,
+        next: async () => true as any,
+      });
+      allowed = true;
     } catch (e) {
       if (e instanceof TRPCError && e.code === "UNAUTHORIZED") {
         allowed = false;
