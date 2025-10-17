@@ -1,11 +1,9 @@
 import { http } from "msw";
 import { setupServer } from "msw/node";
 import { beforeAll, afterEach, afterAll } from "vitest";
-import { handles } from "../prompts/handlers";
 
 export const server = setupServer(
   http.all("*", ({ request: _request }) => {
-    // console.log("🌐 MSW bypassed:", request.method, request.url);
     // Don't return 404, let it pass through for now
     return;
   }),
