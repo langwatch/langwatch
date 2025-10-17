@@ -20,12 +20,10 @@ import {
 import * as semconv from "../../semconv";
 import { getLangWatchLogger } from "../../logger";
 
-// FIXME: This test is failing on the CI only
-// I believe it's a timing issue, since it seems like only the first test
-// fails and the others pass.
 describe("Content Parsing E2E", () => {
   const setup = setupE2ETest();
 
+  // TODO: Investigate why this delay is needed and handle it better.
   beforeAll(async () => {
     await delay(30000);
   }, 35000);

@@ -19,12 +19,10 @@ import {
 } from "./e2e-utils";
 import * as semconv from "../../semconv";
 
-// FIXME: This test is failing on the CI only
-// I believe it's a timing issue, since it seems like only the first test
-// fails and the others pass.
 describe("Real LLM Interactions E2E", () => {
   const setup = setupE2ETest();
 
+  // TODO: Investigate why this delay is needed and handle it better.
   beforeAll(async () => {
     await delay(30000);
   }, 35000);
