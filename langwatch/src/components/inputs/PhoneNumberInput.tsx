@@ -73,10 +73,6 @@ export function PhoneNumberInput(
 
     const parsed = parsePhoneNumberFromString(value);
     if (parsed) {
-      if (parsed.country && parsed.country !== country) {
-        setCountry(parsed.country);
-      }
-
       setNationalInput(parsed.formatNational());
     }
   }, [value, country]);
@@ -133,7 +129,7 @@ export function PhoneNumberInput(
 
       if (!allowedCountries.includes(candidate)) return;
 
-      handleCountryChange(candidate);
+      setCountry(candidate);
       setDidDetectOnce(true);
     };
 
