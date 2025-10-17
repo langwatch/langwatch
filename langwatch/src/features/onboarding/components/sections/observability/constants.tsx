@@ -9,7 +9,7 @@ export const PLATFORM_OPTIONS: Option<PlatformKey>[] = [
   { key: "other", label: "Other" },
 ];
 
-export const FRAMEWORKS_BY_PLATFORM: Partial<Record<PlatformKey, Option<FrameworkKey>[]>> = {
+export const FRAMEWORKS_BY_PLATFORM = {
   typescript: [
     { key: "vercel_ai", label: "Vercel AI", icon: <img src="/images/external-icons/vercel-darktheme.svg" alt="Vercel AI" />, size: "2xl" },
     { key: "mastra", label: "Mastra", icon: <img src="/images/external-icons/mastra-darktheme.svg" alt="Mastra" />, size: "2xl" },
@@ -44,7 +44,7 @@ export const FRAMEWORKS_BY_PLATFORM: Partial<Record<PlatformKey, Option<Framewor
   go: [
     { key: "mistral", label: "Mistral", icon: <img src="/images/external-icons/mistral.svg" alt="Mistral" /> },
     { key: "grok", label: "Grok", icon: <img src="/images/external-icons/grok-darktheme.svg" alt="Grok" />, size: "xl" },
-    { key: "anthropic", label: "Anthropic", icon: <img src="/images/external-icons/anthropic-darktheme.svg" alt="Anthropic" />  },
+    { key: "anthropic", label: "Anthropic", icon: <img src="/images/external-icons/anthropic-darktheme.svg" alt="Anthropic" /> },
     { key: "gemini", label: "Gemini", icon: <img src="/images/external-icons/google.svg" alt="Gemini" /> },
     { key: "ollama", label: "Ollama", icon: <img src="/images/external-icons/ollama-darktheme.svg" alt="Ollama" /> },
     { key: "azure", label: "Azure", icon: <img src="/images/external-icons/azure.svg" alt="Azure" /> },
@@ -56,7 +56,10 @@ export const FRAMEWORKS_BY_PLATFORM: Partial<Record<PlatformKey, Option<Framewor
     { key: "langflow", label: "Langflow", icon: <img src="/images/external-icons/langflow.svg" alt="Langflow" /> },
     { key: "flowise", label: "Flowise", icon: <img src="/images/external-icons/flowise.svg" alt="Flowise" /> },
   ],
-};
+  other: [],
+} as const satisfies Record<PlatformKey, readonly Option<FrameworkKey>[]>;
+
+export type GoFrameworkKey = (typeof FRAMEWORKS_BY_PLATFORM)["go"][number]["key"];
 
 export function platformToFileName(key: PlatformKey): string {
   switch (key) {

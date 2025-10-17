@@ -7,15 +7,18 @@ import {
 } from "../types/types";
 import { ProductSelectionScreen } from "../components/sections/ProductSelectionScreen";
 import { ObservabilityScreen } from "../components/sections/ObservabilityScreen";
+import type { RouterOutputs } from "~/utils/api";
 
 interface ProductScreensProps {
   selectedProduct: ProductSelection | undefined;
   onSelectProduct: (product: ProductSelection) => void;
+  project?: RouterOutputs["organization"]["getAll"][number]["teams"][number]["projects"][number] | undefined;
 }
 
 export function createProductScreens({
   selectedProduct,
   onSelectProduct,
+  project,
 }: ProductScreensProps): OnboardingScreen[] {
 
   const EvaluationsScreen: React.FC = () => {
