@@ -67,7 +67,9 @@ export function PhoneNumberInput(
   // Sync displayed value from external E.164 value when it changes
   useEffect(() => {
     if (!value) {
-      setNationalInput("");
+      if (!hasUserInteracted) {
+        setNationalInput("");
+      }
       return;
     }
 
@@ -75,7 +77,7 @@ export function PhoneNumberInput(
     if (parsed) {
       setNationalInput(parsed.formatNational());
     }
-  }, [value, country]);
+  }, [value, country, hasUserInteracted]);
 
   const handleCountryChange = (next: CountryCode) => {
     setHasUserInteracted(true);
