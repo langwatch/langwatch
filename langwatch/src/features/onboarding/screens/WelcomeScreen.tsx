@@ -80,7 +80,7 @@ export const WelcomeScreen: React.FC = () => {
           terms: form.agreement,
           companySize: form.companySize,
           yourRole: form.role,
-          featureUsage: form.selectedDesires.join(", "),
+          featureUsage: form.selectedDesires.join("\n"),
           utmCampaign: form.utmCampaign,
         },
       },
