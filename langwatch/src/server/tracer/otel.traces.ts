@@ -468,6 +468,97 @@ const addOpenTelemetrySpanAsSpan = (
           }
         }
 
+        if (!input && attributesMap.gen_ai?.prompt) {
+          const prompt = attributesMap.gen_ai?.prompt;
+
+          switch (true) {
+            case typeof prompt === "string":
+              input = {
+                type: "text",
+                value: prompt,
+              };
+              break;
+            case Array.isArray(prompt):
+              input = {
+                type: "json",
+                value: prompt,
+              };
+              break;
+            case typeof prompt === "object" && prompt !== null:
+              if (prompt.messages) {
+                input = {
+                  type: "chat_messages",
+                  value: prompt.messages as unknown as ChatMessage[]
+                };
+                break;
+              }
+            // fallthrough
+            default:
+              input = {
+                type: "json",
+                value: prompt,
+              };
+              break;
+          }
+          delete attributesMap.gen_ai.prompt;
+        }
+
+        if (!output && attributesMap.gen_ai?.completion) {
+          const completion = attributesMap.gen_ai?.completion;
+
+          switch (true) {
+            case typeof completion === "string":
+              output = {
+                type: "text",
+                value: completion,
+              };
+              delete attributesMap.gen_ai.completion;
+              break;
+            case Array.isArray(completion):
+              // Validate as chat_messages with strict schema
+              const output_ = z
+                .object({
+                  type: z.literal("chat_messages"),
+                  value: z.array(chatMessageSchema.strict()),
+                })
+                .safeParse({
+                  type: "chat_messages",
+                  value: completion,
+                });
+
+              if (
+                output_.success &&
+                output_.data.value.length > 0 &&
+                Object.keys(output_.data.value[0]!).length > 0
+              ) {
+                output = output_.data as TypedValueChatMessages;
+              } else {
+                output = {
+                  type: "json",
+                  value: completion,
+                };
+              }
+              delete attributesMap.gen_ai.completion;
+              break;
+            case typeof completion === "object":
+              if (completion.text) {
+                output = {
+                  type: "text",
+                  value: completion.text as string,
+                };
+                delete attributesMap.gen_ai.completion;
+                break;
+              }
+              // If no text property, treat as generic json
+              output = {
+                type: "json",
+                value: completion,
+              };
+              delete attributesMap.gen_ai.completion;
+              break;
+          }
+        }
+
         if (
           !input &&
           attributesMap.gen_ai?.prompt &&
