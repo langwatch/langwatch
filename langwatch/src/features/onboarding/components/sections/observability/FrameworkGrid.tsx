@@ -1,7 +1,7 @@
 import React from "react";
 import { Grid, Text, VStack } from "@chakra-ui/react";
 import { FRAMEWORKS_BY_PLATFORM } from "./constants";
-import type { FrameworkKey, PlatformKey } from "./types";
+import type { FrameworkKey, PlatformKey, Option } from "./types";
 import { SelectableIconCard } from "./SelectableIconCard";
 
 interface FrameworkGridProps {
@@ -11,7 +11,7 @@ interface FrameworkGridProps {
 }
 
 export function FrameworkGrid({ language, selectedFramework, onSelectFramework }: FrameworkGridProps): React.ReactElement | null {
-  const frameworks = FRAMEWORKS_BY_PLATFORM[language];
+  const frameworks = FRAMEWORKS_BY_PLATFORM[language] as readonly Option<FrameworkKey>[];
   if (!frameworks || frameworks.length === 0) return null;
 
   return (

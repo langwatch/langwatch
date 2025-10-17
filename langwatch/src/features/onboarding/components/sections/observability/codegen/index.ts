@@ -1,5 +1,8 @@
-import type { FrameworkKey, PlatformKey } from "./types";
-import { platformToFileName } from "./constants";
+import type { FrameworkKey, PlatformKey } from "../types";
+import type { GoFrameworkKey } from "../constants";
+import { platformToFileName } from "../constants";
+import { TS_SNIPPETS } from "./snippets.ts";
+import { getGoFrameworkCode, getGoLanguageCode } from "./go.ts";
 
 interface CodegenResult {
   code: string;
@@ -11,39 +14,13 @@ interface CodegenResult {
 export function getLanguageCode(language: PlatformKey): CodegenResult {
   switch (language) {
     case "typescript": {
-      const code = `import { setupObservability } from "@langwatch/observability/node";
-import { generateText } from "ai";
-import { openai } from "@ai-sdk/openai";
-
-setupObservability({
-  // API key is automatically read from LANGWATCH_API_KEY
-  langwatch: { apiKey: "<api_key>" },
-  serviceName: "<project_name>",
-});
-
-async function main(message: string): Promise<string> {
-  // Make the LLM call
-  const response = await generateText({
-    model: openai("gpt-5-mini"),
-    prompt: message,
-    experimental_telemetry: { isEnabled: true }, // Don't forget to enable telemetry!
-  });
-
-  return response.text;
-}
-
-console.log(await main("Hello, world!"));`;
-      return {
-        code,
-        filename: platformToFileName(language),
-        highlightLines: [1, 6, 7, 16],
-        codeLanguage: "typescript",
-      };
+      const s = TS_SNIPPETS.base;
+      return { code: s.code, filename: platformToFileName(language), highlightLines: s.highlightLines, codeLanguage: "typescript" };
     }
+    case "go":
+      return getGoLanguageCode();
     case "python":
       return { code: "# Integration snippet coming soon\n# Language: Python\n# Framework: None selected", filename: platformToFileName(language), codeLanguage: "python" };
-    case "go":
-      return { code: "// Integration snippet coming soon\n// Language: Go\n// Framework: None selected", filename: platformToFileName(language), codeLanguage: "go" };
     case "opentelemetry":
       return { code: "# Integration snippet coming soon\n# Language: OpenTelemetry\n# Framework: None selected", filename: platformToFileName(language), codeLanguage: "yaml" };
     default:
@@ -51,7 +28,14 @@ console.log(await main("Hello, world!"));`;
   }
 }
 
+// Overloads to ensure only GoFrameworkKey is accepted when language is "go"
+export function getFrameworkCode(language: "go", framework: GoFrameworkKey): CodegenResult;
+export function getFrameworkCode(language: Exclude<PlatformKey, "go">, framework: FrameworkKey): CodegenResult;
+
 export function getFrameworkCode(language: PlatformKey, framework: FrameworkKey): CodegenResult {
+  if (language === "go") {
+    return getGoFrameworkCode(framework as GoFrameworkKey);
+  }
   if (language === "typescript" && framework === "vercel_ai") {
     return getLanguageCode("typescript");
   }
@@ -69,3 +53,5 @@ export function getFrameworkCode(language: PlatformKey, framework: FrameworkKey)
 function capitalize(input: string): string {
   return input.length ? input.charAt(0).toUpperCase() + input.slice(1) : input;
 }
+
+
