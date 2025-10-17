@@ -1,7 +1,21 @@
-import { describe, it, expect } from "vitest";
-import { TeamUserRole } from "@prisma/client";
-import { teamRoleHasPermission, organizationRoleHasPermission } from "../rbac";
-import { OrganizationUserRole } from "@prisma/client";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { TeamUserRole, OrganizationUserRole } from "@prisma/client";
+import {
+  teamRoleHasPermission,
+  organizationRoleHasPermission,
+  getTeamRolePermissions,
+  getOrganizationRolePermissions,
+  canView,
+  canManage,
+  canCreate,
+  canUpdate,
+  canDelete,
+  isDemoProject,
+  Resources,
+  Actions,
+  type Permission,
+} from "../rbac";
+
 // Helper function to test permission hierarchy logic
 function hasPermissionWithHierarchy(
   permissions: string[],
@@ -12,11 +26,14 @@ function hasPermissionWithHierarchy(
     return true;
   }
 
-  // Hierarchy rule: manage permissions include view permissions
-  if (requestedPermission.endsWith(":view")) {
-    const managePermission = requestedPermission.replace(":view", ":manage");
-    if (permissions.includes(managePermission)) {
-      return true;
+  // Hierarchy rule: manage permissions include view, create, update, and delete permissions
+  const actionSuffixes = [":view", ":create", ":update", ":delete"];
+  for (const suffix of actionSuffixes) {
+    if (requestedPermission.endsWith(suffix)) {
+      const managePermission = requestedPermission.replace(suffix, ":manage");
+      if (permissions.includes(managePermission)) {
+        return true;
+      }
     }
   }
 
@@ -330,6 +347,317 @@ describe("RBAC Permission System", () => {
       expect(hasPermissionWithHierarchy(permissions, "EXPERIMENTS:VIEW")).toBe(
         false,
       );
+    });
+  });
+
+  describe("Permission Helper Functions", () => {
+    describe("canView", () => {
+      it("should return true for ADMIN role on all resources", () => {
+        expect(canView(TeamUserRole.ADMIN, Resources.EXPERIMENTS)).toBe(true);
+        expect(canView(TeamUserRole.ADMIN, Resources.DATASETS)).toBe(true);
+        expect(canView(TeamUserRole.ADMIN, Resources.ANALYTICS)).toBe(true);
+        expect(canView(TeamUserRole.ADMIN, Resources.MESSAGES)).toBe(true);
+      });
+
+      it("should return true for MEMBER role on all resources", () => {
+        expect(canView(TeamUserRole.MEMBER, Resources.EXPERIMENTS)).toBe(true);
+        expect(canView(TeamUserRole.MEMBER, Resources.DATASETS)).toBe(true);
+        expect(canView(TeamUserRole.MEMBER, Resources.ANALYTICS)).toBe(true);
+        expect(canView(TeamUserRole.MEMBER, Resources.MESSAGES)).toBe(true);
+      });
+
+      it("should return true for VIEWER role on most resources", () => {
+        expect(canView(TeamUserRole.VIEWER, Resources.EXPERIMENTS)).toBe(true);
+        expect(canView(TeamUserRole.VIEWER, Resources.DATASETS)).toBe(true);
+        expect(canView(TeamUserRole.VIEWER, Resources.ANALYTICS)).toBe(true);
+        expect(canView(TeamUserRole.VIEWER, Resources.MESSAGES)).toBe(true);
+      });
+
+      it("should return false for VIEWER role on cost resource", () => {
+        expect(canView(TeamUserRole.VIEWER, Resources.COST)).toBe(false);
+      });
+    });
+
+    describe("canManage", () => {
+      it("should return true for ADMIN role on all resources", () => {
+        expect(canManage(TeamUserRole.ADMIN, Resources.EXPERIMENTS)).toBe(true);
+        expect(canManage(TeamUserRole.ADMIN, Resources.DATASETS)).toBe(true);
+        expect(canManage(TeamUserRole.ADMIN, Resources.ANALYTICS)).toBe(true);
+        // Messages only has view and share, not manage
+        expect(canManage(TeamUserRole.ADMIN, Resources.MESSAGES)).toBe(false);
+      });
+
+      it("should return true for MEMBER role on most resources", () => {
+        expect(canManage(TeamUserRole.MEMBER, Resources.EXPERIMENTS)).toBe(
+          true,
+        );
+        expect(canManage(TeamUserRole.MEMBER, Resources.DATASETS)).toBe(true);
+        expect(canManage(TeamUserRole.MEMBER, Resources.ANALYTICS)).toBe(true);
+        // Messages only has view and share, not manage
+        expect(canManage(TeamUserRole.MEMBER, Resources.MESSAGES)).toBe(false);
+      });
+
+      it("should return false for MEMBER role on project resource", () => {
+        expect(canManage(TeamUserRole.MEMBER, Resources.PROJECT)).toBe(false);
+      });
+
+      it("should return false for VIEWER role on all resources", () => {
+        expect(canManage(TeamUserRole.VIEWER, Resources.EXPERIMENTS)).toBe(
+          false,
+        );
+        expect(canManage(TeamUserRole.VIEWER, Resources.DATASETS)).toBe(false);
+        expect(canManage(TeamUserRole.VIEWER, Resources.ANALYTICS)).toBe(false);
+        expect(canManage(TeamUserRole.VIEWER, Resources.MESSAGES)).toBe(false);
+      });
+    });
+
+    describe("canCreate", () => {
+      it("should return true for ADMIN role on project resource", () => {
+        expect(canCreate(TeamUserRole.ADMIN, Resources.PROJECT)).toBe(true);
+      });
+
+      it("should return false for MEMBER role on project resource", () => {
+        expect(canCreate(TeamUserRole.MEMBER, Resources.PROJECT)).toBe(false);
+      });
+
+      it("should return false for VIEWER role on project resource", () => {
+        expect(canCreate(TeamUserRole.VIEWER, Resources.PROJECT)).toBe(false);
+      });
+    });
+
+    describe("canUpdate", () => {
+      it("should return true for ADMIN role on project resource", () => {
+        expect(canUpdate(TeamUserRole.ADMIN, Resources.PROJECT)).toBe(true);
+      });
+
+      it("should return true for MEMBER role on project resource", () => {
+        expect(canUpdate(TeamUserRole.MEMBER, Resources.PROJECT)).toBe(true);
+      });
+
+      it("should return false for VIEWER role on project resource", () => {
+        expect(canUpdate(TeamUserRole.VIEWER, Resources.PROJECT)).toBe(false);
+      });
+    });
+
+    describe("canDelete", () => {
+      it("should return true for ADMIN role on project resource", () => {
+        expect(canDelete(TeamUserRole.ADMIN, Resources.PROJECT)).toBe(true);
+      });
+
+      it("should return false for MEMBER role on project resource", () => {
+        expect(canDelete(TeamUserRole.MEMBER, Resources.PROJECT)).toBe(false);
+      });
+
+      it("should return false for VIEWER role on project resource", () => {
+        expect(canDelete(TeamUserRole.VIEWER, Resources.PROJECT)).toBe(false);
+      });
+    });
+  });
+
+  describe("Permission Retrieval Functions", () => {
+    describe("getTeamRolePermissions", () => {
+      it("should return all permissions for ADMIN role", () => {
+        const permissions = getTeamRolePermissions(TeamUserRole.ADMIN);
+        expect(permissions).toContain("project:view");
+        expect(permissions).toContain("project:create");
+        expect(permissions).toContain("project:update");
+        expect(permissions).toContain("project:delete");
+        expect(permissions).toContain("project:manage");
+        expect(permissions).toContain("experiments:view");
+        expect(permissions).toContain("experiments:manage");
+        expect(permissions).toContain("team:manage");
+      });
+
+      it("should return limited permissions for MEMBER role", () => {
+        const permissions = getTeamRolePermissions(TeamUserRole.MEMBER);
+        expect(permissions).toContain("project:view");
+        expect(permissions).toContain("project:update");
+        expect(permissions).not.toContain("project:create");
+        expect(permissions).not.toContain("project:delete");
+        expect(permissions).not.toContain("project:manage");
+        expect(permissions).toContain("experiments:view");
+        expect(permissions).toContain("experiments:manage");
+        expect(permissions).not.toContain("team:manage");
+      });
+
+      it("should return view-only permissions for VIEWER role", () => {
+        const permissions = getTeamRolePermissions(TeamUserRole.VIEWER);
+        expect(permissions).toContain("project:view");
+        expect(permissions).not.toContain("project:create");
+        expect(permissions).not.toContain("project:update");
+        expect(permissions).not.toContain("project:delete");
+        expect(permissions).not.toContain("project:manage");
+        expect(permissions).toContain("experiments:view");
+        expect(permissions).not.toContain("experiments:manage");
+        expect(permissions).not.toContain("team:manage");
+      });
+    });
+
+    describe("getOrganizationRolePermissions", () => {
+      it("should return all permissions for ORGANIZATION_ADMIN", () => {
+        const permissions = getOrganizationRolePermissions(
+          OrganizationUserRole.ADMIN,
+        );
+        expect(permissions).toContain("organization:view");
+        expect(permissions).toContain("organization:manage");
+        expect(permissions).toContain("organization:delete");
+      });
+
+      it("should return limited permissions for ORGANIZATION_MEMBER", () => {
+        const permissions = getOrganizationRolePermissions(
+          OrganizationUserRole.MEMBER,
+        );
+        expect(permissions).toContain("organization:view");
+        expect(permissions).not.toContain("organization:manage");
+        expect(permissions).not.toContain("organization:delete");
+      });
+
+      it("should return limited permissions for ORGANIZATION_EXTERNAL", () => {
+        const permissions = getOrganizationRolePermissions(
+          OrganizationUserRole.EXTERNAL,
+        );
+        expect(permissions).toContain("organization:view");
+        expect(permissions).not.toContain("organization:manage");
+        expect(permissions).not.toContain("organization:delete");
+      });
+    });
+  });
+
+  describe("Demo Project Functionality", () => {
+    // Note: Demo project tests are skipped due to environment mocking complexity
+    // The isDemoProject function uses env.DEMO_PROJECT_ID from ~/env.mjs
+    // which requires more complex mocking setup
+    it.skip("should allow view permissions for demo project", () => {
+      // This test would require mocking the env module
+    });
+
+    it.skip("should not allow manage permissions for demo project", () => {
+      // This test would require mocking the env module
+    });
+
+    it.skip("should not allow create permissions for demo project", () => {
+      // This test would require mocking the env module
+    });
+
+    it.skip("should not allow update permissions for demo project", () => {
+      // This test would require mocking the env module
+    });
+
+    it.skip("should not allow delete permissions for demo project", () => {
+      // This test would require mocking the env module
+    });
+
+    it.skip("should return false for non-demo project", () => {
+      // This test would require mocking the env module
+    });
+
+    it.skip("should allow playground view for demo project", () => {
+      // This test would require mocking the env module
+    });
+  });
+
+  describe("Permission Constants", () => {
+    it("should have all expected resources defined", () => {
+      expect(Resources.ORGANIZATION).toBe("organization");
+      expect(Resources.PROJECT).toBe("project");
+      expect(Resources.TEAM).toBe("team");
+      expect(Resources.ANALYTICS).toBe("analytics");
+      expect(Resources.COST).toBe("cost");
+      expect(Resources.MESSAGES).toBe("messages");
+      expect(Resources.SCENARIOS).toBe("scenarios");
+      expect(Resources.ANNOTATIONS).toBe("annotations");
+      expect(Resources.GUARDRAILS).toBe("guardrails");
+      expect(Resources.EXPERIMENTS).toBe("experiments");
+      expect(Resources.DATASETS).toBe("datasets");
+      expect(Resources.TRIGGERS).toBe("triggers");
+      expect(Resources.WORKFLOWS).toBe("workflows");
+      expect(Resources.PROMPTS).toBe("prompts");
+      expect(Resources.PLAYGROUND).toBe("playground");
+    });
+
+    it("should have all expected actions defined", () => {
+      expect(Actions.VIEW).toBe("view");
+      expect(Actions.CREATE).toBe("create");
+      expect(Actions.UPDATE).toBe("update");
+      expect(Actions.DELETE).toBe("delete");
+      expect(Actions.MANAGE).toBe("manage");
+      expect(Actions.SHARE).toBe("share");
+    });
+  });
+
+  describe("Permission Type Safety", () => {
+    it("should create valid permission strings", () => {
+      const permission: Permission = `${Resources.EXPERIMENTS}:${Actions.VIEW}`;
+      expect(permission).toBe("experiments:view");
+
+      const managePermission: Permission = `${Resources.DATASETS}:${Actions.MANAGE}`;
+      expect(managePermission).toBe("datasets:manage");
+    });
+
+    it("should validate permission format", () => {
+      const validPermissions: Permission[] = [
+        "experiments:view",
+        "datasets:manage",
+        "analytics:create",
+        "messages:share",
+        "project:delete",
+      ];
+
+      validPermissions.forEach((permission) => {
+        expect(permission).toMatch(/^[a-z]+:[a-z]+$/);
+      });
+    });
+  });
+
+  describe("Complex Permission Scenarios", () => {
+    it("should handle all CRUD operations for ADMIN role", () => {
+      const adminPermissions = getTeamRolePermissions(TeamUserRole.ADMIN);
+
+      // Should have all CRUD operations for project (only resource with individual CRUD)
+      expect(adminPermissions).toContain("project:view");
+      expect(adminPermissions).toContain("project:create");
+      expect(adminPermissions).toContain("project:update");
+      expect(adminPermissions).toContain("project:delete");
+      expect(adminPermissions).toContain("project:manage");
+
+      // Should have manage permissions for other resources (which include CRUD via hierarchy)
+      expect(adminPermissions).toContain("experiments:view");
+      expect(adminPermissions).toContain("experiments:manage");
+      expect(adminPermissions).toContain("datasets:view");
+      expect(adminPermissions).toContain("datasets:manage");
+    });
+
+    it("should handle mixed permissions for MEMBER role", () => {
+      const memberPermissions = getTeamRolePermissions(TeamUserRole.MEMBER);
+
+      // Should have manage permissions for most resources
+      expect(memberPermissions).toContain("experiments:manage");
+      expect(memberPermissions).toContain("datasets:manage");
+      expect(memberPermissions).toContain("analytics:manage");
+
+      // Should have limited project permissions
+      expect(memberPermissions).toContain("project:view");
+      expect(memberPermissions).toContain("project:update");
+      expect(memberPermissions).not.toContain("project:create");
+      expect(memberPermissions).not.toContain("project:delete");
+      expect(memberPermissions).not.toContain("project:manage");
+    });
+
+    it("should handle view-only permissions for VIEWER role", () => {
+      const viewerPermissions = getTeamRolePermissions(TeamUserRole.VIEWER);
+
+      // Should only have view permissions
+      expect(viewerPermissions).toContain("experiments:view");
+      expect(viewerPermissions).not.toContain("experiments:create");
+      expect(viewerPermissions).not.toContain("experiments:update");
+      expect(viewerPermissions).not.toContain("experiments:delete");
+      expect(viewerPermissions).not.toContain("experiments:manage");
+
+      expect(viewerPermissions).toContain("datasets:view");
+      expect(viewerPermissions).not.toContain("datasets:create");
+      expect(viewerPermissions).not.toContain("datasets:update");
+      expect(viewerPermissions).not.toContain("datasets:delete");
+      expect(viewerPermissions).not.toContain("datasets:manage");
     });
   });
 });
