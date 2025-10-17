@@ -14,6 +14,7 @@ import { useRouter } from "next/router";
 import { useRequiredSession } from "~/hooks/useRequiredSession";
 import { LoadingScreen } from "~/components/LoadingScreen";
 import { AnalyticsBoundary } from "react-contextual-analytics";
+import { OnboardingFormProvider } from "../contexts/form-context";
 
 export const WelcomeScreen: React.FC = () => {
   const router = useRouter();
@@ -30,39 +31,16 @@ export const WelcomeScreen: React.FC = () => {
   } = useOrganizationTeamProject({ redirectToOnboarding: false });
 
   const {
-    setOrganizationName,
-    setAgreement,
-    setUsageStyle,
-    setPhoneNumber,
-    setPhoneHasValue,
-    setPhoneIsValid,
-    setCompanySize,
-    setSolutionType,
-    setDesires,
-    setRole,
     currentScreenIndex,
     direction,
     flow,
     navigation,
     getFormData,
+    formContextValue,
   } = useOnboardingFlow();
 
-  const screens = useCreateWelcomeScreens({
-    formData: getFormData(),
-    flow,
-    handlers: {
-      setOrganizationName,
-      setAgreement,
-      setUsageStyle,
-      setPhoneNumber,
-      setPhoneHasValue,
-      setPhoneIsValid,
-      setCompanySize,
-      setSolutionType,
-      setDesires,
-      setRole,
-    },
-  });
+
+  const screens = useCreateWelcomeScreens({ flow });
 
   const initializeOrganization =
     api.onboarding.initializeOrganization.useMutation();
@@ -171,9 +149,11 @@ export const WelcomeScreen: React.FC = () => {
                 }}
                 sendViewedEvent
               >
-                <fieldset disabled={pendingOrSuccessful}>
-                  {currentScreen?.component}
-                </fieldset>
+                <OnboardingFormProvider value={formContextValue}>
+                  <fieldset disabled={pendingOrSuccessful}>
+                    {currentScreen?.component ? <currentScreen.component /> : null}
+                  </fieldset>
+                </OnboardingFormProvider>
               </AnalyticsBoundary>
             </motion.div>
           </AnimatePresence>
