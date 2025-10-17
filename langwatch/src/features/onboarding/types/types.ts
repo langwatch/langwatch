@@ -36,14 +36,14 @@ export const DESIRE_TYPES = [
   "just_exploring",
 ] as const;
 export const ROLE_TYPES = [
-  "product_manager",
-  "software_engineer",
-  "ai_engineer",
-  "engineering_manager",
-  "data_scientist",
-  "ai_researcher",
-  "cto_clevel",
-  "other",
+  "Product Manager",
+  "Software Engineer",
+  "AI Engineer",
+  "Engineering Manager",
+  "Data Scientist",
+  "AI Researcher",
+  "CTO/Founder",
+  "Other",
 ] as const;
 
 export type UsageStyle = (typeof USAGE_STYLES)[number];
