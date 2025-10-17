@@ -28,13 +28,12 @@ jobs:
           cache: "npm"
           cache-dependency-path: "langwatch/package-lock.json"
 
-      - name: Install dependencies
-        working-directory: langwatch
-        run: npm ci --prefer-offline --no-audit --no-fund --progress=false
-
-      - name: Prepare files
-        working-directory: langwatch
-        run: npm run start:prepare:files
+      - name: Setup LangWatch Server
+        uses: ./.github/actions/langwatch-server
+        with:
+          working-directory: 'langwatch'
+          port: '3000'
+          setup-database: 'false'
 
       # - name: Install TypeScript Native Preview
       #   working-directory: langwatch
@@ -68,13 +67,12 @@ jobs:
           cache: "npm"
           cache-dependency-path: "langwatch/package-lock.json"
 
-      - name: Install dependencies
-        working-directory: langwatch
-        run: npm ci --prefer-offline --no-audit --no-fund --progress=false
-
-      - name: Prepare files
-        working-directory: langwatch
-        run: npm run start:prepare:files
+      - name: Setup LangWatch Server
+        uses: ./.github/actions/langwatch-server
+        with:
+          working-directory: 'langwatch'
+          port: '3000'
+          setup-database: 'false'
 
       - name: Run unit tests
         working-directory: langwatch
@@ -94,6 +92,7 @@ jobs:
 
     runs-on: ubuntu-latest
 
+    # Services configuration (shared with sdk-javascript-ci.yml - keep in sync)
     services:
       redis:
         image: redis:alpine
@@ -144,28 +143,47 @@ jobs:
           cache: "npm"
           cache-dependency-path: "langwatch/package-lock.json"
 
-      - name: Install dependencies
-        working-directory: langwatch
-        run: npm ci --prefer-offline --no-audit --no-fund --progress=false
+      - name: Setup LangWatch Server
+        uses: ./.github/actions/langwatch-server
+        with:
+          working-directory: 'langwatch'
+          port: '3000'
+          setup-database: 'false'
 
-      - name: Prepare files
-        working-directory: langwatch
-        run: npm run start:prepare:files
-
-      - name: Setup database
-        working-directory: langwatch
-        run: npm run prisma:migrate
-
-      - name: Setup Elasticsearch
-        working-directory: langwatch
-        run: npm run elastic:migrate
+      - name: Setup LangWatch Server
+        uses: ./.github/actions/langwatch-server
+        with:
+          working-directory: 'langwatch'
+          port: '3000'
+          setup-database: 'true'
 
       - name: Run integration tests
         working-directory: langwatch
         run: npm run test:integration
 
-  build:
+  e2e:
     runs-on: ubuntu-latest
+
+    env:
+      # LangWatch server config
+      DATABASE_URL: "postgresql://langwatch_ci:ci_password@localhost:5432/langwatch_test"
+      BASE_HOST: "localhost:3000"
+      NEXTAUTH_SECRET: "nextauth-secret-for-ci-testing"
+      NEXTAUTH_URL: "http://localhost:3000"
+      API_TOKEN_JWT_SECRET: "api-jwt-secret-for-ci-testing"
+      ELASTICSEARCH_NODE_URL: "http://localhost:9200"
+      REDIS_URL: "redis://localhost:6379"
+      NODE_ENV: "test"
+      # E2E test config
+      E2E_LANGWATCH_API_KEY: ${{ secrets.E2E_LANGWATCH_API_KEY }}
+      E2E_LANGWATCH_ENDPOINT: "http://localhost:3000"
+      E2E_TIMEOUT: 120000
+      E2E_POLL_TIMEOUT: 120000
+
+    defaults:
+      run:
+        working-directory: langwatch
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -174,14 +192,32 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
+          cache: "npm"
+          cache-dependency-path: "langwatch/package-lock.json"
 
-      - name: Cache node_modules
-        uses: actions/cache@v4
-        id: modules-cache
+      # Setup and start LangWatch server with all services and prerequisites
+      - name: Setup LangWatch Server
+        uses: ./.github/workflows/reusable/langwatch-server-setup.yml
         with:
-          path: langwatch/node_modules
-          key: ${{ runner.os }}-modules-${{ hashFiles('langwatch/package-lock.json') }}
-          restore-keys: ${{ runner.os }}-modules-
+          working-directory: 'langwatch'
+          port: '3000'
+          setup-database: true
+
+      - name: Run e2e tests
+        run: npm run test:e2e
+
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup LangWatch Server
+        uses: ./.github/actions/langwatch-server
+        with:
+          working-directory: 'langwatch'
+          port: '3000'
+          setup-database: 'false'
 
       - name: Cache Next.js
         id: next-cache
@@ -193,11 +229,6 @@ jobs:
           key: ${{ runner.os }}-nextjs-${{ hashFiles('langwatch/package-lock.json') }}
           restore-keys: |
             ${{ runner.os }}-nextjs-${{ hashFiles('langwatch/package-lock.json') }}-
-
-      - name: Install dependencies
-        if: steps.modules-cache.outputs.cache-hit != 'true'
-        working-directory: langwatch
-        run: npm ci --prefer-offline --no-audit --no-fund --progress=false
 
       - name: Build
         working-directory: langwatch
