@@ -9,21 +9,38 @@ export function useProductFlow() {
   const [selectedProduct, setSelectedProduct] = useState<ProductSelection | undefined>(undefined);
   const [flowConfig, setFlowConfig] = useState<ProductFlowConfig>(PRODUCT_FLOW_CONFIG);
 
-  // Initialize selected product from URL query param
+  // Initialize selected product from URL: prefer product, then step, then slug
   useEffect(() => {
     const productFromQuery = router.query.product;
-    if (productFromQuery && typeof productFromQuery === "string") {
-      const validProducts: ProductSelection[] = [
-        "observability",
-        "evaluations",
-        "prompt-management",
-        "agent-simulations",
-      ];
-      if (validProducts.includes(productFromQuery as ProductSelection)) {
-        setSelectedProduct(productFromQuery as ProductSelection);
+    const stepFromQuery = router.query.step;
+
+    const validProducts: ProductSelection[] = [
+      "observability",
+      "evaluations",
+      "prompt-management",
+      "agent-simulations",
+    ];
+
+    let inferred: ProductSelection | undefined = undefined;
+
+    if (productFromQuery && typeof productFromQuery === "string" && validProducts.includes(productFromQuery as ProductSelection)) {
+      inferred = productFromQuery as ProductSelection;
+    } else if (stepFromQuery && typeof stepFromQuery === "string" && validProducts.includes(stepFromQuery as ProductSelection)) {
+      inferred = stepFromQuery as ProductSelection;
+    } else {
+      const currentPath: string = typeof router.asPath === "string" ? router.asPath : "";
+      const pathNoQuery = currentPath.split("?")[0] || "";
+      const segments = pathNoQuery.split("/").filter((seg): seg is string => !!seg && seg.length > 0);
+      const lastSegment = segments.length > 0 ? segments[segments.length - 1] : undefined;
+      if (lastSegment && validProducts.includes(lastSegment as ProductSelection)) {
+        inferred = lastSegment as ProductSelection;
       }
     }
-  }, [router.query.product]);
+
+    if (inferred && inferred !== selectedProduct) {
+      setSelectedProduct(inferred);
+    }
+  }, [router.query.product, router.query.step, selectedProduct]);
 
   // Screen ID mapping for URL query parameters
   const screenIdMap = useMemo(() => {
@@ -76,6 +93,20 @@ export function useProductFlow() {
       screenIdMap,
     });
 
+  // If product inferred but step missing, land on product screen and sync URL
+  useEffect(() => {
+    if (!selectedProduct) return;
+    if (typeof router.query.step === "string") return;
+
+    const productScreenMap: Record<ProductSelection, ProductScreenIndex> = {
+      observability: ProductScreenIndex.OBSERVABILITY,
+      evaluations: ProductScreenIndex.EVALUATIONS,
+      "prompt-management": ProductScreenIndex.PROMPT_MANAGEMENT,
+      "agent-simulations": ProductScreenIndex.AGENT_SIMULATIONS,
+    };
+    setCurrentScreenIndex(productScreenMap[selectedProduct]);
+  }, [selectedProduct, router.query.step, setCurrentScreenIndex]);
+
   // Handle product selection
   const handleSelectProduct = useCallback((product: ProductSelection) => {
     setSelectedProduct(product);
@@ -114,4 +145,5 @@ export function useProductFlow() {
     handleSelectProduct,
   };
 }
+
 
