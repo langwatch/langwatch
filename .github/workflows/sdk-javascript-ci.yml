@@ -7,6 +7,7 @@ on:
   pull_request:
     paths:
       - "typescript-sdk/**"
+      - "langwatch/**"
       - ".github/.release-please-manifest.json"
   workflow_dispatch:
 
@@ -20,6 +21,7 @@ env:
 
 jobs:
   ci:
+    if: contains(github.event.paths, 'typescript-sdk/')
     runs-on: ubuntu-latest
     # Run lint, typecheck, tests, and build for TypeScript SDK
     defaults:
@@ -61,7 +63,7 @@ jobs:
 
   e2e:
     runs-on: ubuntu-latest
-    
+
     env:
       # LangWatch server config
       DATABASE_URL: "postgresql://langwatch_ci:ci_password@localhost:5432/langwatch_test"
@@ -72,45 +74,6 @@ jobs:
       ELASTICSEARCH_NODE_URL: "http://localhost:9200"
       REDIS_URL: "redis://localhost:6379"
       NODE_ENV: "test"
-    
-    services:
-      redis:
-        image: redis:alpine
-        ports:
-          - 6379:6379
-        options: >-
-          --health-cmd "redis-cli ping"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-
-      elasticsearch:
-        image: docker.elastic.co/elasticsearch/elasticsearch:8.11.0
-        ports:
-          - 9200:9200
-        env:
-          discovery.type: single-node
-          xpack.security.enabled: false
-          ES_JAVA_OPTS: "-Xms512m -Xmx512m"
-        options: >-
-          --health-cmd "curl -f http://localhost:9200/_cluster/health || exit 1"
-          --health-interval 30s
-          --health-timeout 10s
-          --health-retries 5
-
-      postgres:
-        image: postgres:16
-        ports:
-          - 5432:5432
-        env:
-          POSTGRES_USER: langwatch_ci
-          POSTGRES_PASSWORD: ci_password
-          POSTGRES_DB: langwatch_test
-        options: >-
-          --health-cmd "pg_isready -U langwatch_ci"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
 
     defaults:
       run:
@@ -132,42 +95,14 @@ jobs:
           cache: "pnpm"
           cache-dependency-path: "typescript-sdk/pnpm-lock.yaml"
 
-      # Install LangWatch app dependencies
-      - name: Setup Node for LangWatch
-        uses: actions/setup-node@v4
+      # Setup and start LangWatch server with all services and prerequisites
+      - name: Setup LangWatch Server
+        uses: ./.github/workflows/reusable/langwatch-server-setup.yml
         with:
-          node-version: 20
-          cache: "npm"
-          cache-dependency-path: "langwatch/package-lock.json"
-
-      - name: Install LangWatch app dependencies
-        working-directory: langwatch
-        run: npm ci --prefer-offline --no-audit --no-fund --progress=false
-
-      - name: Prepare LangWatch files
-        working-directory: langwatch
-        run: npm run start:prepare:files
-
-      - name: Setup database
-        working-directory: langwatch
-        run: npm run prisma:migrate
-
-      - name: Seed test project
-        working-directory: langwatch
-        run: npm run prisma:seed
-
-      - name: Setup Elasticsearch
-        working-directory: langwatch
-        run: npm run elastic:migrate
-
-      # Start LangWatch server in background
-      - name: Start LangWatch server
-        working-directory: langwatch
-        run: |
-          npm run start &
-          # Wait for server to be ready (check Next.js is responding)
-          timeout 60 bash -c 'until curl -f http://localhost:5560 2>/dev/null | grep -q "LangWatch\|<!DOCTYPE"; do sleep 2; done'
-          echo "✅ LangWatch server is ready"
+          working-directory: 'langwatch'
+          port: '5560'
+          setup-database: true
+          seed-project: true
 
       - name: Install SDK dependencies
         run: pnpm install --frozen-lockfile
