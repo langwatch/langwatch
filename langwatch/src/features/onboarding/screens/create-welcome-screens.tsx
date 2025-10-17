@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useMemo } from "react";
 import {
   VStack,
   Field,
@@ -48,7 +48,7 @@ interface IntroScreensProps {
   };
 }
 
-export const createWelcomeScreens = ({
+export const useCreateWelcomeScreens = ({
   formData,
   flow,
   handlers,
@@ -203,33 +203,37 @@ export const createWelcomeScreens = ({
     );
   };
 
-  const screens: Record<OnboardingScreenIndex, OnboardingScreen> = {
-    [OnboardingScreenIndex.ORGANIZATION]: {
-      id: "organization",
-      required: true,
-      heading: "Welcome Aboard 👋",
-      subHeading: "Let's kick off by creating your organization",
-      component: <OrganizationScreen />,
-    },
-    [OnboardingScreenIndex.BASIC_INFO]: {
-      id: "basic-info",
-      required: true,
-      heading: "Let's tailor your experience",
-      component: <BasicInfoScreen />,
-    },
-    [OnboardingScreenIndex.DESIRES]: {
-      id: "desires",
-      required: false,
-      heading: "Let's tailor your experience",
-      component: <DesiresScreen />,
-    },
-    [OnboardingScreenIndex.ROLE]: {
-      id: "role",
-      required: false,
-      heading: "Let's tailor your experience",
-      component: <RoleScreen />,
-    },
-  };
+  const screens: Record<OnboardingScreenIndex, OnboardingScreen> = useMemo(
+    () => ({
+      [OnboardingScreenIndex.ORGANIZATION]: {
+        id: "organization",
+        required: true,
+        heading: "Welcome Aboard 👋",
+        subHeading: "Let's kick off by creating your organization",
+        component: <OrganizationScreen />,
+      },
+      [OnboardingScreenIndex.BASIC_INFO]: {
+        id: "basic-info",
+        required: true,
+        heading: "Let's tailor your experience",
+        component: <BasicInfoScreen />,
+      },
+      [OnboardingScreenIndex.DESIRES]: {
+        id: "desires",
+        required: false,
+        heading: "Let's tailor your experience",
+        component: <DesiresScreen />,
+      },
+      [OnboardingScreenIndex.ROLE]: {
+        id: "role",
+        required: false,
+        heading: "Let's tailor your experience",
+        component: <RoleScreen />,
+      },
+    }),
+    // Only recreate JSX when these values change
+    [organizationName, agreement, usageStyle, companySize, solutionType, selectedDesires, role],
+  );
 
   return flow.visibleScreens.map((idx) => screens[idx]);
 };
