@@ -1,4 +1,3 @@
-import type { OrganizationUserRole, TeamUserRole } from "@prisma/client";
 import { useRouter } from "next/router";
 import { useEffect, useMemo } from "react";
 import { useLocalStorage } from "usehooks-ts";
@@ -11,8 +10,14 @@ import {
 } from "../server/api/permission";
 import { api } from "../utils/api";
 
+import type { OrganizationUserRole } from "@prisma/client";
 import { usePublicEnv } from "./usePublicEnv";
 import { publicRoutes, useRequiredSession } from "./useRequiredSession";
+import {
+  teamRoleHasPermission,
+  organizationRoleHasPermission,
+  type Permission,
+} from "../server/api/rbac";
 
 export const useOrganizationTeamProject = (
   {
@@ -120,22 +125,23 @@ export const useOrganizationTeamProject = (
   const organization = teamsMatchingSlug?.[0]
     ? teamsMatchingSlug?.[0].organization
     : projectsTeamsOrganizationsMatchingSlug?.[0]
-    ? projectsTeamsOrganizationsMatchingSlug?.[0].organization
-    : organizations.data
-    ? organizations.data.find((org) => org.id == localStorageOrganizationId) ??
-      organizations.data[0]
-    : undefined;
+      ? projectsTeamsOrganizationsMatchingSlug?.[0].organization
+      : organizations.data
+        ? (organizations.data.find(
+            (org) => org.id == localStorageOrganizationId
+          ) ?? organizations.data[0])
+        : undefined;
 
   const team = projectsTeamsOrganizationsMatchingSlug?.[0]
     ? projectsTeamsOrganizationsMatchingSlug?.[0].team
     : organization
-    ? organization.teams.find((team) => team.id == localStorageTeamId) ??
-      organization.teams.find((team) => team.projects.length > 0) ??
-      organization.teams[0]
-    : undefined;
+      ? (organization.teams.find((team) => team.id == localStorageTeamId) ??
+        organization.teams.find((team) => team.projects.length > 0) ??
+        organization.teams[0])
+      : undefined;
 
   const project = team
-    ? projectsTeamsOrganizationsMatchingSlug?.[0]?.project ?? team.projects[0]
+    ? (projectsTeamsOrganizationsMatchingSlug?.[0]?.project ?? team.projects[0])
     : undefined;
 
   const modelProviders = api.modelProvider.getAllForProject.useQuery(
@@ -238,8 +244,12 @@ export const useOrganizationTeamProject = (
     return {
       isLoading: true,
       project: publicShareProject.data,
+      // Legacy API
       hasTeamPermission: () => false,
       hasOrganizationPermission: () => false,
+      // New RBAC API
+      hasPermission: () => false,
+      hasOrgPermission: () => false,
       isPublicRoute,
       isOrganizationFeatureEnabled: () => false,
     };
@@ -250,7 +260,7 @@ export const useOrganizationTeamProject = (
   const hasOrganizationPermission = (
     roleGroup: keyof typeof OrganizationRoleGroup
   ) => {
-    return (
+    return !!(
       organizationRole &&
       (
         organizationRolePermissionMapping[roleGroup] as OrganizationUserRole[]
@@ -263,12 +273,8 @@ export const useOrganizationTeamProject = (
     team_ = team
   ) => {
     const teamRole = team_?.members[0]?.role;
-    return (
-      teamRole &&
-      (teamRolePermissionMapping[roleGroup] as TeamUserRole[]).includes(
-        teamRole
-      )
-    );
+    const allowedRoles = teamRolePermissionMapping[roleGroup];
+    return !!(teamRole && allowedRoles && allowedRoles.includes(teamRole));
   };
 
   const isOrganizationFeatureEnabled = (feature: string): boolean => {
@@ -282,6 +288,30 @@ export const useOrganizationTeamProject = (
     return new Date(trialFeature.trialEndDate) > new Date();
   };
 
+  // ============================================================================
+  // NEW RBAC SYSTEM - Preferred API going forward
+  // ============================================================================
+
+  /**
+   * Check if the user has a specific permission (new RBAC system)
+   * @example hasPermission("analytics:view")
+   * @example hasPermission("datasets:manage")
+   */
+  const hasPermission = (permission: Permission, team_ = team) => {
+    const teamRole = team_?.members[0]?.role;
+    if (!teamRole) return false;
+    return teamRoleHasPermission(teamRole, permission);
+  };
+
+  /**
+   * Check if the user has an organization permission (new RBAC system)
+   * @example hasOrgPermission("organization:manage")
+   */
+  const hasOrgPermission = (permission: Permission) => {
+    if (!organizationRole) return false;
+    return organizationRoleHasPermission(organizationRole, permission);
+  };
+
   return {
     isLoading: false,
     isRefetching: organizations.isRefetching,
@@ -290,8 +320,12 @@ export const useOrganizationTeamProject = (
     team,
     project: publicShareProject.data ?? project,
     projectId: project?.id,
+    // Legacy permission API (still supported)
     hasOrganizationPermission,
     hasTeamPermission,
+    // New RBAC permission API (preferred)
+    hasPermission,
+    hasOrgPermission,
     isPublicRoute,
     modelProviders: modelProviders.data,
     isOrganizationFeatureEnabled,

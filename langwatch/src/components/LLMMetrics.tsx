@@ -1,7 +1,6 @@
 import { Card, Grid, GridItem, Heading, Tabs, VStack } from "@chakra-ui/react";
 import { useOrganizationTeamProject } from "../hooks/useOrganizationTeamProject";
 import { analyticsMetrics } from "../server/analytics/registry";
-import { TeamRoleGroup } from "../server/api/permission";
 import { CustomGraph, type CustomGraphInput } from "./analytics/CustomGraph";
 import { LLMSummary } from "./analytics/LLMSummary";
 import { usePublicEnv } from "../hooks/usePublicEnv";
@@ -14,7 +13,7 @@ export function LLMMetrics() {
   const publicEnv = usePublicEnv();
   const isNotQuickwit = publicEnv.data && !publicEnv.data.IS_QUICKWIT;
   const isQuickwit = publicEnv.data && publicEnv.data.IS_QUICKWIT;
-  const { hasTeamPermission } = useOrganizationTeamProject();
+  const { hasPermission } = useOrganizationTeamProject();
 
   const llmCallsGraph: CustomGraphInput = {
     graphId: "llmCallsGraph",
@@ -160,7 +159,7 @@ export function LLMMetrics() {
                       />
                     </Tabs.Trigger>
                   )}
-                  {hasTeamPermission(TeamRoleGroup.COST_VIEW) && (
+                  {hasPermission("cost:view") && (
                     <Tabs.Trigger
                       value="totalCostGraph"
                       paddingX={0}
@@ -215,7 +214,7 @@ export function LLMMetrics() {
                     <CustomGraph input={llmCallsGraph} />
                   </Tabs.Content>
                 )}
-                {hasTeamPermission(TeamRoleGroup.COST_VIEW) && (
+                {hasPermission("cost:view") && (
                   <Tabs.Content value="totalCostGraph">
                     <CustomGraph input={totalCostGraph} />
                   </Tabs.Content>

@@ -1,10 +1,6 @@
 import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
-import {
-  TeamRoleGroup,
-  checkUserPermissionForProject,
-  backendHasTeamProjectPermission,
-} from "../permission";
+import { checkProjectPermission, hasProjectPermission } from "../rbac";
 import {
   getProviderModelOptions,
   modelProviders,
@@ -17,27 +13,27 @@ import { KEY_CHECK } from "../../../utils/constants";
 export const modelProviderRouter = createTRPCRouter({
   getAllForProject: protectedProcedure
     .input(z.object({ projectId: z.string() }))
-    .use(checkUserPermissionForProject(TeamRoleGroup.PROJECT_VIEW))
+    .use(checkProjectPermission("project:view"))
     .query(async ({ input, ctx }) => {
       const { projectId } = input;
 
-      const hasSetupPermission = await backendHasTeamProjectPermission(
+      const hasSetupPermission = await hasProjectPermission(
         ctx,
-        { projectId },
-        TeamRoleGroup.SETUP_PROJECT
+        projectId,
+        "project:update"
       );
 
       return await getProjectModelProviders(projectId, hasSetupPermission);
     }),
   getAllForProjectForFrontend: protectedProcedure
     .input(z.object({ projectId: z.string() }))
-    .use(checkUserPermissionForProject(TeamRoleGroup.PROJECT_VIEW))
+    .use(checkProjectPermission("project:view"))
     .query(async ({ input, ctx }) => {
       const { projectId } = input;
-      const hasSetupPermission = await backendHasTeamProjectPermission(
+      const hasSetupPermission = await hasProjectPermission(
         ctx,
-        { projectId },
-        TeamRoleGroup.SETUP_PROJECT
+        projectId,
+        "project:update"
       );
       return await getProjectModelProvidersForFrontend(
         projectId,
@@ -56,7 +52,7 @@ export const modelProviderRouter = createTRPCRouter({
         customEmbeddingsModels: z.array(z.string()).optional().nullable(),
       })
     )
-    .use(checkUserPermissionForProject(TeamRoleGroup.SETUP_PROJECT))
+    .use(checkProjectPermission("project:update"))
     .mutation(async ({ input, ctx }) => {
       const {
         id,
@@ -144,7 +140,7 @@ export const modelProviderRouter = createTRPCRouter({
         provider: z.string(),
       })
     )
-    .use(checkUserPermissionForProject(TeamRoleGroup.SETUP_PROJECT))
+    .use(checkProjectPermission("project:update"))
     .mutation(async ({ input, ctx }) => {
       const { id, projectId, provider } = input;
       if (id) {
@@ -387,10 +383,9 @@ export const prepareLitellmParams = async ({
       modelProvider,
       "AZURE_API_GATEWAY_BASE_URL"
     );
-    const gatewayVersion = getModelOrDefaultEnvKey(
-      modelProvider,
-      "AZURE_API_GATEWAY_VERSION"
-    ) ?? "2024-05-01-preview";
+    const gatewayVersion =
+      getModelOrDefaultEnvKey(modelProvider, "AZURE_API_GATEWAY_VERSION") ??
+      "2024-05-01-preview";
     const gatewayHeaderName = getModelOrDefaultEnvKey(
       modelProvider,
       "AZURE_API_GATEWAY_HEADER_NAME"

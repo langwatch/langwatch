@@ -36,26 +36,25 @@ import { Link } from "../../components/ui/link";
 import { Menu } from "../../components/ui/menu";
 import { toaster } from "../../components/ui/toaster";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
-import { TeamRoleGroup } from "../../server/api/permission";
 import { api } from "../../utils/api";
 import { NewEvaluationButton } from "~/components/evaluations/NewEvaluationsButton";
 
 export default function EvaluationsV2() {
-  const { project, hasTeamPermission } = useOrganizationTeamProject();
+  const { project, hasPermission } = useOrganizationTeamProject();
   const router = useRouter();
 
   const monitors = api.monitors.getAllForProject.useQuery(
     {
       projectId: project?.id ?? "",
     },
-    { enabled: !!project }
+    { enabled: !!project },
   );
 
   const experiments = api.experiments.getAllForEvaluationsList.useQuery(
     {
       projectId: project?.id ?? "",
     },
-    { enabled: !!project }
+    { enabled: !!project },
   );
 
   const deleteExperimentMutation = api.experiments.deleteExperiment.useMutation(
@@ -82,16 +81,16 @@ export default function EvaluationsV2() {
           },
         });
       },
-    }
+    },
   );
 
   const handleDeleteExperiment = (
     experimentId: string,
-    experimentName: string
+    experimentName: string,
   ) => {
     if (
       confirm(
-        `Are you sure you want to delete the evaluation "${experimentName}"? This will also delete the workflow, monitor, and prompts associated with it. Datasets will be kept.`
+        `Are you sure you want to delete the evaluation "${experimentName}"? This will also delete the workflow, monitor, and prompts associated with it. Datasets will be kept.`,
       )
     ) {
       deleteExperimentMutation.mutate({
@@ -164,22 +163,19 @@ export default function EvaluationsV2() {
                         </EmptyState.Indicator>
                         <EmptyState.Title>No evaluations yet</EmptyState.Title>
                         <EmptyState.Description>
-                          {project &&
-                            hasTeamPermission(
-                              TeamRoleGroup.GUARDRAILS_MANAGE
-                            ) && (
-                              <>
-                                {" "}
-                                Click on{" "}
-                                <Link
-                                  textDecoration="underline"
-                                  href={`/${project.slug}/evaluations/wizard`}
-                                >
-                                  New Evaluation
-                                </Link>{" "}
-                                to get started.
-                              </>
-                            )}
+                          {project && hasPermission("guardrails:manage") && (
+                            <>
+                              {" "}
+                              Click on{" "}
+                              <Link
+                                textDecoration="underline"
+                                href={`/${project.slug}/evaluations/wizard`}
+                              >
+                                New Evaluation
+                              </Link>{" "}
+                              to get started.
+                            </>
+                          )}
                         </EmptyState.Description>
                       </EmptyState.Content>
                     </EmptyState.Root>
@@ -223,157 +219,164 @@ export default function EvaluationsV2() {
                               </Table.Row>
                             ))
                           : experiments.data
-                          ? experiments.data?.map((experiment, i) => (
-                              <Table.Row
-                                cursor="pointer"
-                                onClick={() => {
-                                  if (experiment.wizardState) {
-                                    void router.push({
-                                      pathname: `/${project?.slug}/evaluations/wizard/${experiment.slug}`,
-                                    });
-                                  } else {
-                                    void router.push({
-                                      pathname: `/${project?.slug}/experiments/${experiment.slug}`,
-                                    });
-                                  }
-                                }}
-                                key={i}
-                              >
-                                <Table.Cell>
-                                  <OverflownTextWithTooltip
-                                    lineClamp={1}
-                                    wordBreak="break-word"
-                                  >
-                                    {experiment.name ?? experiment.slug}
-                                  </OverflownTextWithTooltip>
-                                </Table.Cell>
-                                <Table.Cell whiteSpace="nowrap">
-                                  <Badge colorPalette="gray" variant="outline">
-                                    {experiment.wizardState?.task
-                                      ? taskTypeToLabel[
-                                          experiment.wizardState.task
-                                        ]
-                                      : experimentTypeToLabel[experiment.type]}
-                                  </Badge>
-                                </Table.Cell>
-                                <Table.Cell>
-                                  <OverflownTextWithTooltip
-                                    lineClamp={1}
-                                    wordBreak="break-word"
-                                  >
-                                    {experiment.dataset?.name ?? "-"}
-                                  </OverflownTextWithTooltip>
-                                </Table.Cell>
-                                <Table.Cell>
-                                  {experiment.runsSummary.primaryMetric ? (
-                                    <>
-                                      <Text
-                                        as="span"
-                                        fontSize="xs"
-                                        color="gray.600"
-                                      >
-                                        {
-                                          experiment.runsSummary.primaryMetric
-                                            .name
-                                        }
-                                        : &nbsp;
-                                      </Text>
-                                      <Text as="span" fontWeight="semibold">
-                                        {formatEvaluationSummary(
-                                          experiment.runsSummary.primaryMetric,
-                                          true
+                            ? experiments.data?.map((experiment, i) => (
+                                <Table.Row
+                                  cursor="pointer"
+                                  onClick={() => {
+                                    if (experiment.wizardState) {
+                                      void router.push({
+                                        pathname: `/${project?.slug}/evaluations/wizard/${experiment.slug}`,
+                                      });
+                                    } else {
+                                      void router.push({
+                                        pathname: `/${project?.slug}/experiments/${experiment.slug}`,
+                                      });
+                                    }
+                                  }}
+                                  key={i}
+                                >
+                                  <Table.Cell>
+                                    <OverflownTextWithTooltip
+                                      lineClamp={1}
+                                      wordBreak="break-word"
+                                    >
+                                      {experiment.name ?? experiment.slug}
+                                    </OverflownTextWithTooltip>
+                                  </Table.Cell>
+                                  <Table.Cell whiteSpace="nowrap">
+                                    <Badge
+                                      colorPalette="gray"
+                                      variant="outline"
+                                    >
+                                      {experiment.wizardState?.task
+                                        ? taskTypeToLabel[
+                                            experiment.wizardState.task
+                                          ]
+                                        : experimentTypeToLabel[
+                                            experiment.type
+                                          ]}
+                                    </Badge>
+                                  </Table.Cell>
+                                  <Table.Cell>
+                                    <OverflownTextWithTooltip
+                                      lineClamp={1}
+                                      wordBreak="break-word"
+                                    >
+                                      {experiment.dataset?.name ?? "-"}
+                                    </OverflownTextWithTooltip>
+                                  </Table.Cell>
+                                  <Table.Cell>
+                                    {experiment.runsSummary.primaryMetric ? (
+                                      <>
+                                        <Text
+                                          as="span"
+                                          fontSize="xs"
+                                          color="gray.600"
+                                        >
+                                          {
+                                            experiment.runsSummary.primaryMetric
+                                              .name
+                                          }
+                                          : &nbsp;
+                                        </Text>
+                                        <Text as="span" fontWeight="semibold">
+                                          {formatEvaluationSummary(
+                                            experiment.runsSummary
+                                              .primaryMetric,
+                                            true,
+                                          )}
+                                        </Text>
+                                      </>
+                                    ) : (
+                                      "-"
+                                    )}
+                                  </Table.Cell>
+                                  <Table.Cell>
+                                    {experiment.runsSummary.count || ""}
+                                  </Table.Cell>
+                                  <Table.Cell>
+                                    {experiment.runsSummary.latestRun
+                                      ?.timestamps && (
+                                      <>
+                                        {getFinishedAt(
+                                          experiment.runsSummary.latestRun
+                                            .timestamps,
+                                          new Date().getTime(),
+                                        ) ? (
+                                          <HStack color="green.500">
+                                            <LuCircleCheckBig size={16} />
+                                            Completed
+                                          </HStack>
+                                        ) : experiment.runsSummary.latestRun
+                                            .timestamps.stopped_at ? (
+                                          <HStack color="red.500">
+                                            <LuCircleX size={16} />
+                                            Stopped
+                                          </HStack>
+                                        ) : (
+                                          <HStack color="blue.500">
+                                            <LuClock size={16} />
+                                            Running
+                                          </HStack>
                                         )}
-                                      </Text>
-                                    </>
-                                  ) : (
-                                    "-"
-                                  )}
-                                </Table.Cell>
-                                <Table.Cell>
-                                  {experiment.runsSummary.count || ""}
-                                </Table.Cell>
-                                <Table.Cell>
-                                  {experiment.runsSummary.latestRun
-                                    ?.timestamps && (
-                                    <>
-                                      {getFinishedAt(
-                                        experiment.runsSummary.latestRun
-                                          .timestamps,
-                                        new Date().getTime()
-                                      ) ? (
-                                        <HStack color="green.500">
-                                          <LuCircleCheckBig size={16} />
-                                          Completed
-                                        </HStack>
-                                      ) : experiment.runsSummary.latestRun
-                                          .timestamps.stopped_at ? (
-                                        <HStack color="red.500">
-                                          <LuCircleX size={16} />
-                                          Stopped
-                                        </HStack>
-                                      ) : (
-                                        <HStack color="blue.500">
-                                          <LuClock size={16} />
-                                          Running
-                                        </HStack>
-                                      )}
-                                    </>
-                                  )}
-                                </Table.Cell>
-                                <Table.Cell whiteSpace="nowrap">
-                                  {new Date(
-                                    experiment.updatedAt
-                                  ).toLocaleString()}
-                                </Table.Cell>
-                                <Table.Cell>
-                                  <Box
-                                    width="full"
-                                    height="full"
-                                    display="flex"
-                                    justifyContent="end"
-                                  >
-                                    <Menu.Root>
-                                      <Menu.Trigger
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                        }}
-                                      >
-                                        <MoreVertical size={16} />
-                                      </Menu.Trigger>
-                                      <Menu.Content>
-                                        <Menu.Item
-                                          value="edit"
+                                      </>
+                                    )}
+                                  </Table.Cell>
+                                  <Table.Cell whiteSpace="nowrap">
+                                    {new Date(
+                                      experiment.updatedAt,
+                                    ).toLocaleString()}
+                                  </Table.Cell>
+                                  <Table.Cell>
+                                    <Box
+                                      width="full"
+                                      height="full"
+                                      display="flex"
+                                      justifyContent="end"
+                                    >
+                                      <Menu.Root>
+                                        <Menu.Trigger
                                           onClick={(e) => {
                                             e.stopPropagation();
-                                            void router.push(
-                                              `/${project?.slug}/evaluations/wizard/${experiment.slug}`
-                                            );
                                           }}
                                         >
-                                          <LuPencil size={16} />
-                                          Edit
-                                        </Menu.Item>
-                                        <Menu.Item
-                                          value="delete"
-                                          color="red.500"
-                                          onClick={(e) => {
-                                            e.stopPropagation();
-                                            handleDeleteExperiment(
-                                              experiment.id,
-                                              experiment.name ?? experiment.slug
-                                            );
-                                          }}
-                                        >
-                                          <LuTrash size={16} />
-                                          Delete
-                                        </Menu.Item>
-                                      </Menu.Content>
-                                    </Menu.Root>
-                                  </Box>
-                                </Table.Cell>
-                              </Table.Row>
-                            ))
-                          : null}
+                                          <MoreVertical size={16} />
+                                        </Menu.Trigger>
+                                        <Menu.Content>
+                                          <Menu.Item
+                                            value="edit"
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              void router.push(
+                                                `/${project?.slug}/evaluations/wizard/${experiment.slug}`,
+                                              );
+                                            }}
+                                          >
+                                            <LuPencil size={16} />
+                                            Edit
+                                          </Menu.Item>
+                                          <Menu.Item
+                                            value="delete"
+                                            color="red.500"
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              handleDeleteExperiment(
+                                                experiment.id,
+                                                experiment.name ??
+                                                  experiment.slug,
+                                              );
+                                            }}
+                                          >
+                                            <LuTrash size={16} />
+                                            Delete
+                                          </Menu.Item>
+                                        </Menu.Content>
+                                      </Menu.Root>
+                                    </Box>
+                                  </Table.Cell>
+                                </Table.Row>
+                              ))
+                            : null}
                       </Table.Body>
                     </Table.Root>
                   )}

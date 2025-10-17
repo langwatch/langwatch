@@ -21,7 +21,6 @@ import {
   LuPencil,
   LuTrash,
 } from "react-icons/lu";
-import { TeamRoleGroup } from "../../server/api/permission";
 import { Link } from "../ui/link";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { useRouter } from "next/router";
@@ -43,18 +42,18 @@ type MonitorsSectionProps = {
 export const MonitorsSection = ({ title, monitors }: MonitorsSectionProps) => {
   const [isCollapsed, setIsCollapsed] = useState(false);
 
-  const { project, hasTeamPermission } = useOrganizationTeamProject();
+  const { project, hasPermission } = useOrganizationTeamProject();
   const router = useRouter();
 
   const experiments = api.experiments.getAllForEvaluationsList.useQuery(
     { projectId: project?.id ?? "" },
-    { enabled: !!project }
+    { enabled: !!project },
   );
 
   const experimentsSlugMap = useMemo(() => {
     return Object.fromEntries(
       experiments.data?.map((experiment) => [experiment.id, experiment.slug]) ??
-        []
+        [],
     );
   }, [experiments.data]);
 
@@ -113,7 +112,7 @@ export const MonitorsSection = ({ title, monitors }: MonitorsSectionProps) => {
             <SimpleGrid columns={{ base: 1, md: 2, lg: 3 }} gap={4}>
               {monitors.data?.map((monitor) => {
                 const evaluatorDefinition = getEvaluatorDefinitions(
-                  monitor.checkType
+                  monitor.checkType,
                 );
                 // TODO: handle custom evaluators
 
@@ -146,7 +145,7 @@ export const MonitorsSection = ({ title, monitors }: MonitorsSectionProps) => {
 
                             console.log(
                               "experimentsSlugMap",
-                              experimentsSlugMap
+                              experimentsSlugMap,
                             );
                             console.log("monitor", monitor);
 
@@ -157,11 +156,11 @@ export const MonitorsSection = ({ title, monitors }: MonitorsSectionProps) => {
                               void router.push(
                                 `/${project.slug}/evaluations/wizard/${
                                   experimentsSlugMap[monitor.experimentId]
-                                }`
+                                }`,
                               );
                             } else {
                               void router.push(
-                                `/${project.slug}/evaluations/${monitor.id}/edit`
+                                `/${project.slug}/evaluations/${monitor.id}/edit`,
                               );
                             }
                           }}
@@ -191,7 +190,7 @@ export const MonitorsSection = ({ title, monitors }: MonitorsSectionProps) => {
                                     meta: { closable: true },
                                   });
                                 },
-                              }
+                              },
                             );
                           }}
                         >
@@ -215,7 +214,7 @@ export const MonitorsSection = ({ title, monitors }: MonitorsSectionProps) => {
 
                             if (
                               !confirm(
-                                "Are you sure you want to delete this monitor?"
+                                "Are you sure you want to delete this monitor?",
                               )
                             )
                               return;
@@ -262,20 +261,19 @@ export const MonitorsSection = ({ title, monitors }: MonitorsSectionProps) => {
             {monitors.data?.length === 0 && (
               <Text color="gray.600">
                 No real-time monitors or guardrails set up yet.
-                {project &&
-                  hasTeamPermission(TeamRoleGroup.GUARDRAILS_MANAGE) && (
-                    <>
-                      {" "}
-                      Click on{" "}
-                      <Link
-                        textDecoration="underline"
-                        href={`/${project.slug}/evaluations/wizard`}
-                      >
-                        New Evaluation
-                      </Link>{" "}
-                      to get started.
-                    </>
-                  )}
+                {project && hasPermission("guardrails:manage") && (
+                  <>
+                    {" "}
+                    Click on{" "}
+                    <Link
+                      textDecoration="underline"
+                      href={`/${project.slug}/evaluations/wizard`}
+                    >
+                      New Evaluation
+                    </Link>{" "}
+                    to get started.
+                  </>
+                )}
               </Text>
             )}
           </>

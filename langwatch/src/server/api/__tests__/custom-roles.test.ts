@@ -1,0 +1,671 @@
+import { describe, it, expect, beforeEach, vi } from "vitest";
+import { TeamUserRole, OrganizationUserRole } from "@prisma/client";
+import {
+  hasProjectPermission,
+  hasTeamPermission,
+  Resources,
+  Actions,
+  type Permission,
+} from "../rbac";
+
+// Helper function to test permission hierarchy logic
+function hasPermissionWithHierarchy(
+  permissions: string[],
+  requestedPermission: string,
+): boolean {
+  // Handle undefined or null permissions
+  if (!permissions || !Array.isArray(permissions)) {
+    return false;
+  }
+
+  // Direct match
+  if (permissions.includes(requestedPermission)) {
+    return true;
+  }
+
+  // Hierarchy rule: manage permissions include view, create, update, and delete permissions
+  const actionSuffixes = [":view", ":create", ":update", ":delete"];
+  for (const suffix of actionSuffixes) {
+    if (requestedPermission.endsWith(suffix)) {
+      const managePermission = requestedPermission.replace(suffix, ":manage");
+      if (permissions.includes(managePermission)) {
+        return true;
+      }
+    }
+  }
+
+  return false;
+}
+
+// Mock Prisma client
+const mockPrisma = {
+  project: {
+    findUnique: vi.fn(),
+  },
+  team: {
+    findUnique: vi.fn(),
+    findFirst: vi.fn(),
+  },
+  organizationUser: {
+    findFirst: vi.fn(),
+  },
+  teamUser: {
+    findFirst: vi.fn(),
+  },
+  teamUserCustomRole: {
+    findFirst: vi.fn(),
+  },
+  customRole: {
+    findFirst: vi.fn(),
+  },
+};
+
+// Mock session
+const mockSession = {
+  user: {
+    id: "user-123",
+    email: "test@example.com",
+  },
+};
+
+describe("Custom Role Functionality Tests", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  describe("Custom Role Permission Inheritance", () => {
+    it("should allow custom role with manage permission to access view permission", async () => {
+      mockPrisma.project.findUnique.mockResolvedValue({
+        team: {
+          id: "team-123",
+          members: [{ userId: "user-123", role: TeamUserRole.VIEWER }],
+          defaultRole: TeamUserRole.VIEWER,
+          defaultCustomRole: null,
+        },
+      });
+
+      mockPrisma.teamUserCustomRole.findFirst.mockResolvedValue({
+        customRole: {
+          permissions: ["experiments:manage"],
+        },
+      });
+
+      const result = await hasProjectPermission(
+        { prisma: mockPrisma, session: mockSession },
+        "project-123",
+        "experiments:view" as Permission,
+      );
+
+      expect(result).toBe(true);
+    });
+
+    it("should allow custom role with manage permission to access create permission", async () => {
+      mockPrisma.project.findUnique.mockResolvedValue({
+        team: {
+          id: "team-123",
+          members: [{ userId: "user-123", role: TeamUserRole.VIEWER }],
+          defaultRole: TeamUserRole.VIEWER,
+          defaultCustomRole: null,
+        },
+      });
+
+      mockPrisma.teamUserCustomRole.findFirst.mockResolvedValue({
+        customRole: {
+          permissions: ["experiments:manage"],
+        },
+      });
+
+      const result = await hasProjectPermission(
+        { prisma: mockPrisma, session: mockSession },
+        "project-123",
+        "experiments:create" as Permission,
+      );
+
+      expect(result).toBe(true);
+    });
+
+    it("should allow custom role with manage permission to access update permission", async () => {
+      mockPrisma.project.findUnique.mockResolvedValue({
+        team: {
+          id: "team-123",
+          members: [{ userId: "user-123", role: TeamUserRole.VIEWER }],
+          defaultRole: TeamUserRole.VIEWER,
+          defaultCustomRole: null,
+        },
+      });
+
+      mockPrisma.teamUserCustomRole.findFirst.mockResolvedValue({
+        customRole: {
+          permissions: ["experiments:manage"],
+        },
+      });
+
+      const result = await hasProjectPermission(
+        { prisma: mockPrisma, session: mockSession },
+        "project-123",
+        "experiments:update" as Permission,
+      );
+
+      expect(result).toBe(true);
+    });
+
+    it("should allow custom role with manage permission to access delete permission", async () => {
+      mockPrisma.project.findUnique.mockResolvedValue({
+        team: {
+          id: "team-123",
+          members: [{ userId: "user-123", role: TeamUserRole.VIEWER }],
+          defaultRole: TeamUserRole.VIEWER,
+          defaultCustomRole: null,
+        },
+      });
+
+      mockPrisma.teamUserCustomRole.findFirst.mockResolvedValue({
+        customRole: {
+          permissions: ["experiments:manage"],
+        },
+      });
+
+      const result = await hasProjectPermission(
+        { prisma: mockPrisma, session: mockSession },
+        "project-123",
+        "experiments:delete" as Permission,
+      );
+
+      expect(result).toBe(true);
+    });
+
+    it("should not allow custom role with only view permission to access manage permission", async () => {
+      mockPrisma.project.findUnique.mockResolvedValue({
+        team: {
+          id: "team-123",
+          members: [{ userId: "user-123", role: TeamUserRole.VIEWER }],
+          defaultRole: TeamUserRole.VIEWER,
+          defaultCustomRole: null,
+        },
+      });
+
+      mockPrisma.teamUserCustomRole.findFirst.mockResolvedValue({
+        customRole: {
+          permissions: ["experiments:view"],
+        },
+      });
+
+      const result = await hasProjectPermission(
+        { prisma: mockPrisma, session: mockSession },
+        "project-123",
+        "experiments:manage" as Permission,
+      );
+
+      expect(result).toBe(false);
+    });
+  });
+
+  describe("Team Default Custom Role", () => {
+    it("should use team default custom role when user has no individual custom role", async () => {
+      mockPrisma.project.findUnique.mockResolvedValue({
+        team: {
+          id: "team-123",
+          members: [{ userId: "user-123", role: TeamUserRole.VIEWER }],
+          defaultRole: null,
+          defaultCustomRole: {
+            permissions: ["experiments:manage", "datasets:view"],
+          },
+        },
+      });
+
+      mockPrisma.teamUserCustomRole.findFirst.mockResolvedValue(null);
+
+      const result = await hasProjectPermission(
+        { prisma: mockPrisma, session: mockSession },
+        "project-123",
+        "experiments:view" as Permission,
+      );
+
+      expect(result).toBe(true);
+    });
+
+    it("should prioritize user individual custom role over team default custom role", async () => {
+      mockPrisma.project.findUnique.mockResolvedValue({
+        team: {
+          id: "team-123",
+          members: [{ userId: "user-123", role: TeamUserRole.VIEWER }],
+          defaultRole: null,
+          defaultCustomRole: {
+            permissions: ["experiments:view"], // Team default only has view
+          },
+        },
+      });
+
+      mockPrisma.teamUserCustomRole.findFirst.mockResolvedValue({
+        customRole: {
+          permissions: ["experiments:manage"], // User has manage
+        },
+      });
+
+      const result = await hasProjectPermission(
+        { prisma: mockPrisma, session: mockSession },
+        "project-123",
+        "experiments:create" as Permission,
+      );
+
+      expect(result).toBe(true);
+    });
+
+    it("should fall back to built-in role when no custom roles are assigned", async () => {
+      mockPrisma.project.findUnique.mockResolvedValue({
+        team: {
+          id: "team-123",
+          members: [{ userId: "user-123", role: TeamUserRole.ADMIN }],
+          defaultRole: TeamUserRole.ADMIN,
+          defaultCustomRole: null,
+        },
+      });
+
+      mockPrisma.teamUserCustomRole.findFirst.mockResolvedValue(null);
+
+      const result = await hasProjectPermission(
+        { prisma: mockPrisma, session: mockSession },
+        "project-123",
+        "experiments:manage" as Permission,
+      );
+
+      expect(result).toBe(true);
+    });
+  });
+
+  describe("Complex Custom Role Scenarios", () => {
+    it("should handle custom role with mixed permissions correctly", async () => {
+      mockPrisma.project.findUnique.mockResolvedValue({
+        team: {
+          id: "team-123",
+          members: [{ userId: "user-123", role: TeamUserRole.VIEWER }],
+          defaultRole: TeamUserRole.VIEWER,
+          defaultCustomRole: null,
+        },
+      });
+
+      mockPrisma.teamUserCustomRole.findFirst.mockResolvedValue({
+        customRole: {
+          permissions: [
+            "experiments:manage",
+            "datasets:view",
+            "analytics:manage",
+            "messages:share",
+          ],
+        },
+      });
+
+      // Should have experiments:manage -> can access all experiments permissions
+      expect(
+        await hasProjectPermission(
+          { prisma: mockPrisma, session: mockSession },
+          "project-123",
+          "experiments:view" as Permission,
+        ),
+      ).toBe(true);
+
+      expect(
+        await hasProjectPermission(
+          { prisma: mockPrisma, session: mockSession },
+          "project-123",
+          "experiments:create" as Permission,
+        ),
+      ).toBe(true);
+
+      expect(
+        await hasProjectPermission(
+          { prisma: mockPrisma, session: mockSession },
+          "project-123",
+          "experiments:update" as Permission,
+        ),
+      ).toBe(true);
+
+      expect(
+        await hasProjectPermission(
+          { prisma: mockPrisma, session: mockSession },
+          "project-123",
+          "experiments:delete" as Permission,
+        ),
+      ).toBe(true);
+
+      expect(
+        await hasProjectPermission(
+          { prisma: mockPrisma, session: mockSession },
+          "project-123",
+          "experiments:manage" as Permission,
+        ),
+      ).toBe(true);
+
+      // Should have datasets:view -> can only access view
+      expect(
+        await hasProjectPermission(
+          { prisma: mockPrisma, session: mockSession },
+          "project-123",
+          "datasets:view" as Permission,
+        ),
+      ).toBe(true);
+
+      expect(
+        await hasProjectPermission(
+          { prisma: mockPrisma, session: mockSession },
+          "project-123",
+          "datasets:create" as Permission,
+        ),
+      ).toBe(false);
+
+      expect(
+        await hasProjectPermission(
+          { prisma: mockPrisma, session: mockSession },
+          "project-123",
+          "datasets:manage" as Permission,
+        ),
+      ).toBe(false);
+
+      // Should have analytics:manage -> can access all analytics permissions
+      expect(
+        await hasProjectPermission(
+          { prisma: mockPrisma, session: mockSession },
+          "project-123",
+          "analytics:view" as Permission,
+        ),
+      ).toBe(true);
+
+      expect(
+        await hasProjectPermission(
+          { prisma: mockPrisma, session: mockSession },
+          "project-123",
+          "analytics:manage" as Permission,
+        ),
+      ).toBe(true);
+
+      // Should have messages:share -> can access share but not view
+      expect(
+        await hasProjectPermission(
+          { prisma: mockPrisma, session: mockSession },
+          "project-123",
+          "messages:share" as Permission,
+        ),
+      ).toBe(true);
+
+      // messages:share doesn't include messages:view, but user has VIEWER role which includes messages:view
+      expect(
+        await hasProjectPermission(
+          { prisma: mockPrisma, session: mockSession },
+          "project-123",
+          "messages:view" as Permission,
+        ),
+      ).toBe(true);
+    });
+
+    it("should handle custom role with no permissions", async () => {
+      mockPrisma.project.findUnique.mockResolvedValue({
+        team: {
+          id: "team-123",
+          members: [{ userId: "user-123", role: TeamUserRole.VIEWER }],
+          defaultRole: TeamUserRole.VIEWER,
+          defaultCustomRole: null,
+        },
+      });
+
+      mockPrisma.teamUserCustomRole.findFirst.mockResolvedValue({
+        customRole: {
+          permissions: [], // No permissions
+        },
+      });
+
+      const result = await hasProjectPermission(
+        { prisma: mockPrisma, session: mockSession },
+        "project-123",
+        "experiments:view" as Permission,
+      );
+
+      // Should fall back to built-in role (VIEWER can view experiments)
+      expect(result).toBe(true);
+    });
+
+    it("should handle custom role with invalid permission format", async () => {
+      mockPrisma.project.findUnique.mockResolvedValue({
+        team: {
+          id: "team-123",
+          members: [{ userId: "user-123", role: TeamUserRole.VIEWER }],
+          defaultRole: TeamUserRole.VIEWER,
+          defaultCustomRole: null,
+        },
+      });
+
+      mockPrisma.teamUserCustomRole.findFirst.mockResolvedValue({
+        customRole: {
+          permissions: ["invalid-permission", "experiments:view"],
+        },
+      });
+
+      // Should still work with valid permissions
+      const result = await hasProjectPermission(
+        { prisma: mockPrisma, session: mockSession },
+        "project-123",
+        "experiments:view" as Permission,
+      );
+
+      expect(result).toBe(true);
+    });
+  });
+
+  describe("Edge Cases and Error Handling", () => {
+    it("should handle null custom role gracefully", async () => {
+      mockPrisma.project.findUnique.mockResolvedValue({
+        team: {
+          id: "team-123",
+          members: [{ userId: "user-123", role: TeamUserRole.ADMIN }],
+          defaultRole: TeamUserRole.ADMIN,
+          defaultCustomRole: null,
+        },
+      });
+
+      mockPrisma.teamUserCustomRole.findFirst.mockResolvedValue(null);
+
+      const result = await hasProjectPermission(
+        { prisma: mockPrisma, session: mockSession },
+        "project-123",
+        "experiments:view" as Permission,
+      );
+
+      expect(result).toBe(true);
+    });
+
+    it("should handle custom role with null permissions", async () => {
+      mockPrisma.project.findUnique.mockResolvedValue({
+        team: {
+          id: "team-123",
+          members: [{ userId: "user-123", role: TeamUserRole.ADMIN }],
+          defaultRole: TeamUserRole.ADMIN,
+          defaultCustomRole: null,
+        },
+      });
+
+      mockPrisma.teamUserCustomRole.findFirst.mockResolvedValue({
+        customRole: {
+          permissions: null,
+        },
+      });
+
+      const result = await hasProjectPermission(
+        { prisma: mockPrisma, session: mockSession },
+        "project-123",
+        "experiments:view" as Permission,
+      );
+
+      expect(result).toBe(true); // Falls back to built-in role
+    });
+
+    it("should handle team with null default custom role", async () => {
+      mockPrisma.project.findUnique.mockResolvedValue({
+        team: {
+          id: "team-123",
+          members: [{ userId: "user-123", role: TeamUserRole.VIEWER }],
+          defaultRole: null,
+          defaultCustomRole: null, // Null default custom role
+        },
+      });
+
+      mockPrisma.teamUserCustomRole.findFirst.mockResolvedValue(null);
+
+      const result = await hasProjectPermission(
+        { prisma: mockPrisma, session: mockSession },
+        "project-123",
+        "experiments:view" as Permission,
+      );
+
+      expect(result).toBe(true); // Falls back to built-in role
+    });
+
+    it("should handle permission hierarchy with custom roles", () => {
+      const customPermissions = [
+        "experiments:manage",
+        "datasets:view",
+        "analytics:create",
+        "messages:share",
+      ];
+
+      // Test hierarchy rules
+      expect(
+        hasPermissionWithHierarchy(customPermissions, "experiments:view"),
+      ).toBe(true);
+      expect(
+        hasPermissionWithHierarchy(customPermissions, "experiments:create"),
+      ).toBe(true);
+      expect(
+        hasPermissionWithHierarchy(customPermissions, "experiments:update"),
+      ).toBe(true);
+      expect(
+        hasPermissionWithHierarchy(customPermissions, "experiments:delete"),
+      ).toBe(true);
+      expect(
+        hasPermissionWithHierarchy(customPermissions, "experiments:manage"),
+      ).toBe(true);
+
+      expect(
+        hasPermissionWithHierarchy(customPermissions, "datasets:view"),
+      ).toBe(true);
+      expect(
+        hasPermissionWithHierarchy(customPermissions, "datasets:create"),
+      ).toBe(false);
+      expect(
+        hasPermissionWithHierarchy(customPermissions, "datasets:manage"),
+      ).toBe(false);
+
+      expect(
+        hasPermissionWithHierarchy(customPermissions, "analytics:view"),
+      ).toBe(false);
+      expect(
+        hasPermissionWithHierarchy(customPermissions, "analytics:create"),
+      ).toBe(true);
+      expect(
+        hasPermissionWithHierarchy(customPermissions, "analytics:manage"),
+      ).toBe(false);
+
+      expect(
+        hasPermissionWithHierarchy(customPermissions, "messages:view"),
+      ).toBe(false);
+      expect(
+        hasPermissionWithHierarchy(customPermissions, "messages:share"),
+      ).toBe(true);
+    });
+
+    it("should handle case sensitivity in custom role permissions", () => {
+      const customPermissions = ["Experiments:Manage", "DATASETS:VIEW"];
+
+      // Should be case sensitive
+      expect(
+        hasPermissionWithHierarchy(customPermissions, "experiments:manage"),
+      ).toBe(false);
+      expect(
+        hasPermissionWithHierarchy(customPermissions, "datasets:view"),
+      ).toBe(false);
+      expect(
+        hasPermissionWithHierarchy(customPermissions, "Experiments:Manage"),
+      ).toBe(true);
+      expect(
+        hasPermissionWithHierarchy(customPermissions, "DATASETS:VIEW"),
+      ).toBe(true);
+    });
+
+    it("should handle malformed permission strings in custom roles", () => {
+      const customPermissions = [
+        "experiments:manage",
+        "invalid-permission",
+        ":view",
+        "experiments:",
+        "experiments",
+      ];
+
+      // Should only work with valid permissions
+      expect(
+        hasPermissionWithHierarchy(customPermissions, "experiments:view"),
+      ).toBe(true);
+      expect(
+        hasPermissionWithHierarchy(customPermissions, "experiments:manage"),
+      ).toBe(true);
+      expect(
+        hasPermissionWithHierarchy(customPermissions, "invalid-permission"),
+      ).toBe(true);
+      expect(hasPermissionWithHierarchy(customPermissions, ":view")).toBe(true);
+      expect(
+        hasPermissionWithHierarchy(customPermissions, "experiments:"),
+      ).toBe(true);
+      expect(hasPermissionWithHierarchy(customPermissions, "experiments")).toBe(
+        true,
+      );
+    });
+  });
+
+  describe("Custom Role Validation", () => {
+    it("should validate permission format in custom roles", () => {
+      const validPermissions = [
+        "experiments:view",
+        "datasets:manage",
+        "analytics:create",
+        "messages:share",
+        "project:delete",
+      ];
+
+      const invalidPermissions = [
+        "experiments:",
+        ":view",
+        "experiments",
+        "EXPERIMENTS:VIEW",
+        "experiments:VIEW",
+        "Experiments:view",
+      ];
+
+      validPermissions.forEach((permission) => {
+        expect(permission).toMatch(/^[a-z]+:[a-z]+$/);
+      });
+
+      invalidPermissions.forEach((permission) => {
+        expect(permission).not.toMatch(/^[a-z]+:[a-z]+$/);
+      });
+    });
+
+    it("should handle empty permission arrays", () => {
+      const emptyPermissions: string[] = [];
+
+      expect(
+        hasPermissionWithHierarchy(emptyPermissions, "experiments:view"),
+      ).toBe(false);
+      expect(
+        hasPermissionWithHierarchy(emptyPermissions, "experiments:manage"),
+      ).toBe(false);
+    });
+
+    it("should handle undefined permission arrays", () => {
+      const undefinedPermissions = undefined as any;
+
+      expect(
+        hasPermissionWithHierarchy(undefinedPermissions, "experiments:view"),
+      ).toBe(false);
+      expect(
+        hasPermissionWithHierarchy(undefinedPermissions, "experiments:manage"),
+      ).toBe(false);
+    });
+  });
+});

@@ -5,10 +5,9 @@ import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import {
   checkUserPermissionForOrganization,
-  checkUserPermissionForTeam,
   OrganizationRoleGroup,
-  TeamRoleGroup,
 } from "../permission";
+import { checkTeamPermission } from "../rbac";
 import { nanoid } from "nanoid";
 import { slugify } from "~/utils/slugify";
 
@@ -17,8 +16,8 @@ export const teamRouter = createTRPCRouter({
     .input(z.object({ organizationId: z.string(), slug: z.string() }))
     .use(
       checkUserPermissionForOrganization(
-        OrganizationRoleGroup.ORGANIZATION_VIEW
-      )
+        OrganizationRoleGroup.ORGANIZATION_VIEW,
+      ),
     )
     .query(async ({ input, ctx }) => {
       const userId = ctx.session.user.id;
@@ -42,8 +41,8 @@ export const teamRouter = createTRPCRouter({
     .input(z.object({ organizationId: z.string() }))
     .use(
       checkUserPermissionForOrganization(
-        OrganizationRoleGroup.ORGANIZATION_VIEW
-      )
+        OrganizationRoleGroup.ORGANIZATION_VIEW,
+      ),
     )
     .query(async ({ input, ctx }) => {
       const prisma = ctx.prisma;
@@ -56,6 +55,12 @@ export const teamRouter = createTRPCRouter({
         include: {
           members: {
             include: {
+              user: true,
+            },
+          },
+          customRoleMembers: {
+            include: {
+              customRole: true,
               user: true,
             },
           },
@@ -73,8 +78,8 @@ export const teamRouter = createTRPCRouter({
     .input(z.object({ slug: z.string(), organizationId: z.string() }))
     .use(
       checkUserPermissionForOrganization(
-        OrganizationRoleGroup.ORGANIZATION_VIEW
-      )
+        OrganizationRoleGroup.ORGANIZATION_VIEW,
+      ),
     )
     .query(async ({ input, ctx }) => {
       const prisma = ctx.prisma;
@@ -90,6 +95,13 @@ export const teamRouter = createTRPCRouter({
               user: true,
             },
           },
+          customRoleMembers: {
+            include: {
+              customRole: true,
+              user: true,
+            },
+          },
+          defaultCustomRole: true,
           projects: true,
         },
       });
@@ -98,7 +110,7 @@ export const teamRouter = createTRPCRouter({
         throw new TRPCError({ code: "NOT_FOUND", message: "Team not found." });
       }
 
-      await checkUserPermissionForTeam(TeamRoleGroup.TEAM_MEMBERS_MANAGE)({
+      await checkTeamPermission("team:manage")({
         ctx,
         input: { teamId: team.id },
         // eslint-disable-next-line @typescript-eslint/no-empty-function
@@ -112,26 +124,56 @@ export const teamRouter = createTRPCRouter({
       z.object({
         teamId: z.string(),
         name: z.string(),
+        defaultRole: z.string().optional(), // Can be TeamUserRole or "custom:{roleId}"
+        defaultCustomRoleId: z.string().optional(),
         members: z.array(
           z.object({
             userId: z.string(),
-            role: z.nativeEnum(TeamUserRole),
-          })
+            role: z.string(),
+            customRoleId: z.string().optional(),
+          }),
         ),
-      })
+      }),
     )
-    .use(checkUserPermissionForTeam(TeamRoleGroup.TEAM_MEMBERS_MANAGE))
+    .use(checkTeamPermission("team:manage"))
     .mutation(async ({ input, ctx }) => {
       const prisma = ctx.prisma;
 
       return await prisma.$transaction(async (tx) => {
+        // Only process defaultRole if it's explicitly provided
+        const updateData: any = {
+          name: input.name,
+        };
+
+        if (input.defaultRole !== undefined) {
+          // Determine if it's a custom role or built-in role
+          const isCustomRole = input.defaultRole.startsWith("custom:");
+
+          // Enforce invariant: custom roles must have defaultCustomRoleId
+          if (isCustomRole && !input.defaultCustomRoleId) {
+            throw new TRPCError({
+              code: "BAD_REQUEST",
+              message:
+                "defaultCustomRoleId is required when defaultRole is a custom role",
+            });
+          }
+
+          if (isCustomRole) {
+            // Custom role: set defaultRole to null and defaultCustomRoleId to the provided value
+            updateData.defaultRole = null;
+            updateData.defaultCustomRoleId = input.defaultCustomRoleId;
+          } else {
+            // Built-in role: set defaultRole to the provided value and defaultCustomRoleId to null
+            updateData.defaultRole = input.defaultRole as TeamUserRole;
+            updateData.defaultCustomRoleId = null;
+          }
+        }
+
         await tx.team.update({
           where: {
             id: input.teamId,
           },
-          data: {
-            name: input.name,
-          },
+          data: updateData,
         });
 
         if (input.members.length > 0) {
@@ -146,11 +188,11 @@ export const teamRouter = createTRPCRouter({
           });
 
           const currentMembersMap = new Map(
-            currentMembers.map((member) => [member.userId, member.role])
+            currentMembers.map((member) => [member.userId, member.role]),
           );
 
           const newMembersMap = new Map(
-            input.members.map((member) => [member.userId, member.role])
+            input.members.map((member) => [member.userId, member.role]),
           );
 
           const membersToRemove = currentMembers
@@ -158,13 +200,13 @@ export const teamRouter = createTRPCRouter({
             .map((member) => member.userId);
 
           const membersToAdd = input.members.filter(
-            (member) => !currentMembersMap.has(member.userId)
+            (member) => !currentMembersMap.has(member.userId),
           );
 
           const membersToUpdate = input.members.filter(
             (member) =>
               currentMembersMap.has(member.userId) &&
-              currentMembersMap.get(member.userId) !== member.role
+              currentMembersMap.get(member.userId) !== member.role,
           );
 
           if (membersToRemove.length > 0) {
@@ -176,30 +218,188 @@ export const teamRouter = createTRPCRouter({
                 },
               },
             });
+            // Also remove custom role assignments
+            await tx.teamUserCustomRole.deleteMany({
+              where: {
+                teamId: input.teamId,
+                userId: {
+                  in: membersToRemove,
+                },
+              },
+            });
           }
 
           if (membersToAdd.length > 0) {
-            await tx.teamUser.createMany({
-              data: membersToAdd.map((member) => ({
-                userId: member.userId,
-                teamId: input.teamId,
-                role: member.role,
-              })),
-            });
+            for (const member of membersToAdd) {
+              const isCustomRole = member.role.startsWith("custom:");
+
+              if (isCustomRole) {
+                // Validate custom role requirements
+                if (!member.customRoleId) {
+                  throw new TRPCError({
+                    code: "BAD_REQUEST",
+                    message: `customRoleId is required when role is a custom role for user ${member.userId}`,
+                  });
+                }
+
+                // Validate custom role belongs to team's organization
+                const [team, customRole] = await Promise.all([
+                  tx.team.findUnique({
+                    where: { id: input.teamId },
+                    select: { organizationId: true },
+                  }),
+                  tx.customRole.findUnique({
+                    where: { id: member.customRoleId },
+                    select: { organizationId: true },
+                  }),
+                ]);
+
+                if (!team) {
+                  throw new TRPCError({
+                    code: "NOT_FOUND",
+                    message: "Team not found",
+                  });
+                }
+
+                if (!customRole) {
+                  throw new TRPCError({
+                    code: "NOT_FOUND",
+                    message: `Custom role ${member.customRoleId} not found`,
+                  });
+                }
+
+                if (customRole.organizationId !== team.organizationId) {
+                  throw new TRPCError({
+                    code: "FORBIDDEN",
+                    message: `Custom role ${member.customRoleId} does not belong to team's organization`,
+                  });
+                }
+
+                // Create teamUser with VIEWER role and custom role assignment
+                await tx.teamUser.create({
+                  data: {
+                    userId: member.userId,
+                    teamId: input.teamId,
+                    role: TeamUserRole.VIEWER,
+                  },
+                });
+
+                await tx.teamUserCustomRole.create({
+                  data: {
+                    userId: member.userId,
+                    teamId: input.teamId,
+                    customRoleId: member.customRoleId,
+                  },
+                });
+              } else {
+                // Built-in role - create teamUser with the specified role
+                await tx.teamUser.create({
+                  data: {
+                    userId: member.userId,
+                    teamId: input.teamId,
+                    role: member.role as TeamUserRole,
+                  },
+                });
+              }
+            }
           }
 
           for (const member of membersToUpdate) {
-            await tx.teamUser.update({
-              where: {
-                userId_teamId: {
-                  teamId: input.teamId,
-                  userId: member.userId,
+            const isCustomRole = member.role.startsWith("custom:");
+
+            if (isCustomRole) {
+              // Validate custom role requirements
+              if (!member.customRoleId) {
+                throw new TRPCError({
+                  code: "BAD_REQUEST",
+                  message: `customRoleId is required when role is a custom role for user ${member.userId}`,
+                });
+              }
+
+              // Validate custom role belongs to team's organization
+              const [team, customRole] = await Promise.all([
+                tx.team.findUnique({
+                  where: { id: input.teamId },
+                  select: { organizationId: true },
+                }),
+                tx.customRole.findUnique({
+                  where: { id: member.customRoleId },
+                  select: { organizationId: true },
+                }),
+              ]);
+
+              if (!team) {
+                throw new TRPCError({
+                  code: "NOT_FOUND",
+                  message: "Team not found",
+                });
+              }
+
+              if (!customRole) {
+                throw new TRPCError({
+                  code: "NOT_FOUND",
+                  message: `Custom role ${member.customRoleId} not found`,
+                });
+              }
+
+              if (customRole.organizationId !== team.organizationId) {
+                throw new TRPCError({
+                  code: "FORBIDDEN",
+                  message: `Custom role ${member.customRoleId} does not belong to team's organization`,
+                });
+              }
+
+              // Update teamUser with VIEWER role
+              await tx.teamUser.update({
+                where: {
+                  userId_teamId: {
+                    teamId: input.teamId,
+                    userId: member.userId,
+                  },
                 },
-              },
-              data: {
-                role: member.role,
-              },
-            });
+                data: {
+                  role: TeamUserRole.VIEWER,
+                },
+              });
+
+              // Remove existing custom roles
+              await tx.teamUserCustomRole.deleteMany({
+                where: {
+                  userId: member.userId,
+                  teamId: input.teamId,
+                },
+              });
+
+              // Add new custom role
+              await tx.teamUserCustomRole.create({
+                data: {
+                  userId: member.userId,
+                  teamId: input.teamId,
+                  customRoleId: member.customRoleId,
+                },
+              });
+            } else {
+              // Built-in role - update teamUser with the specified role
+              await tx.teamUser.update({
+                where: {
+                  userId_teamId: {
+                    teamId: input.teamId,
+                    userId: member.userId,
+                  },
+                },
+                data: {
+                  role: member.role as TeamUserRole,
+                },
+              });
+
+              // Remove existing custom roles when switching to built-in role
+              await tx.teamUserCustomRole.deleteMany({
+                where: {
+                  userId: member.userId,
+                  teamId: input.teamId,
+                },
+              });
+            }
           }
         }
 
@@ -211,18 +411,21 @@ export const teamRouter = createTRPCRouter({
       z.object({
         organizationId: z.string(),
         name: z.string(),
+        defaultRole: z.string().optional(),
+        defaultCustomRoleId: z.string().optional(),
         members: z.array(
           z.object({
             userId: z.string(),
-            role: z.nativeEnum(TeamUserRole),
-          })
+            role: z.string(),
+            customRoleId: z.string().optional(),
+          }),
         ),
-      })
+      }),
     )
     .use(
       checkUserPermissionForOrganization(
-        OrganizationRoleGroup.ORGANIZATION_MANAGE
-      )
+        OrganizationRoleGroup.ORGANIZATION_MANAGE,
+      ),
     )
     .mutation(async ({ input, ctx }) => {
       const prisma = ctx.prisma;
@@ -233,28 +436,54 @@ export const teamRouter = createTRPCRouter({
         "-" +
         teamNanoId.substring(0, 6);
 
-      const team = await prisma.team.create({
-        data: {
-          id: teamId,
-          name: input.name,
-          slug: teamSlug,
-          organizationId: input.organizationId,
-        },
-      });
+      return await prisma.$transaction(async (tx) => {
+        const isCustomRole = input.defaultRole?.startsWith("custom:");
 
-      await prisma.teamUser.createMany({
-        data: input.members.map((member) => ({
-          userId: member.userId,
-          teamId: team.id,
-          role: member.role,
-        })),
-      });
+        const team = await tx.team.create({
+          data: {
+            id: teamId,
+            name: input.name,
+            slug: teamSlug,
+            organizationId: input.organizationId,
+            defaultRole: isCustomRole
+              ? null
+              : (input.defaultRole as TeamUserRole | null),
+            defaultCustomRoleId: isCustomRole
+              ? input.defaultCustomRoleId
+              : null,
+          },
+        });
 
-      return team;
+        for (const member of input.members) {
+          const isCustomRole = member.role.startsWith("custom:");
+
+          await tx.teamUser.create({
+            data: {
+              userId: member.userId,
+              teamId: team.id,
+              role: isCustomRole
+                ? TeamUserRole.VIEWER
+                : (member.role as TeamUserRole),
+            },
+          });
+
+          if (isCustomRole && member.customRoleId) {
+            await tx.teamUserCustomRole.create({
+              data: {
+                userId: member.userId,
+                teamId: team.id,
+                customRoleId: member.customRoleId,
+              },
+            });
+          }
+        }
+
+        return team;
+      });
     }),
   archiveById: protectedProcedure
     .input(z.object({ teamId: z.string(), projectId: z.string() }))
-    .use(checkUserPermissionForTeam(TeamRoleGroup.TEAM_ARCHIVE))
+    .use(checkTeamPermission("team:delete"))
     .mutation(async ({ input, ctx }) => {
       const prisma = ctx.prisma;
       await prisma.team.update({
