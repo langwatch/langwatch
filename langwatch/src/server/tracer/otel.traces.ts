@@ -488,7 +488,7 @@ const addOpenTelemetrySpanAsSpan = (
               if (prompt.messages) {
                 input = {
                   type: "chat_messages",
-                  value: prompt.messages,
+                  value: prompt.messages as unknown as ChatMessage[]
                 };
                 break;
               }
@@ -503,7 +503,6 @@ const addOpenTelemetrySpanAsSpan = (
           delete attributesMap.gen_ai.prompt;
         }
 
-        if (!output && attributesMap.gen_ai?.completion) {
         if (!output && attributesMap.gen_ai?.completion) {
           const completion = attributesMap.gen_ai?.completion;
 
@@ -545,7 +544,7 @@ const addOpenTelemetrySpanAsSpan = (
               if (completion.text) {
                 output = {
                   type: "text",
-                  value: completion.text,
+                  value: completion.text as string,
                 };
                 delete attributesMap.gen_ai.completion;
                 break;
