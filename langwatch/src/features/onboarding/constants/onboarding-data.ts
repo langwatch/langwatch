@@ -140,42 +140,42 @@ export const desireItems: IconFormItem<DesireType>[] = [
 export const roleItems: IconFormItem<RoleType>[] = [
   {
     title: "Software Engineer",
-    value: "software_engineer",
+    value: "Software Engineer",
     icon: Code,
   },
   {
     title: "AI Engineer",
-    value: "ai_engineer",
+    value: "AI Engineer",
     icon: WandSparkles,
   },
   {
     title: "Data Scientist",
-    value: "data_scientist",
+    value: "Data Scientist",
     icon: ChevronsLeftRightEllipsis,
   },
   {
     title: "AI Researcher",
-    value: "ai_researcher",
+    value: "AI Researcher",
     icon: BrainCircuit,
   },
   {
     title: "Product Manager",
-    value: "product_manager",
+    value: "Product Manager",
     icon: Presentation,
   },
   {
     title: "Engineering Manager",
-    value: "engineering_manager",
+    value: "Engineering Manager",
     icon: PencilRuler,
   },
   {
     title: "CTO/C-Level",
-    value: "cto_clevel",
+    value: "CTO/Founder",
     icon: ChefHat,
   },
   {
     title: "Other",
-    value: "other",
+    value: "Other",
     icon: BadgeQuestionMark,
   },
 ];
