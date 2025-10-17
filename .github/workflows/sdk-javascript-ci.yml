@@ -178,7 +178,7 @@ jobs:
       - name: Run e2e tests
         env:
           OPENAI_API_KEY: ${{ secrets.TYPESCRIPT_SDK_OPENAI_API_KEY }}
-          E2E_TIMEOUT: 220000
-          E2E_POLL_TIMEOUT: 220000
+          E2E_TIMEOUT: 120000
+          E2E_POLL_TIMEOUT: 120000
         run: pnpm test:e2e
 
