@@ -342,7 +342,13 @@ export async function expectTraceToBeIngested(
   expect(trace.spans!.length).toBeGreaterThan(0);
 
   if (expectedSpanCount !== undefined) {
+    try {
     expect(trace.spans!.length).toBe(expectedSpanCount);
+    } catch (error) {
+      console.error(`Expected ${expectedSpanCount} spans, but got ${trace.spans!.length}`);
+      console.error('Spans', trace.spans);
+      throw error;
+    }
   }
 
   // Validate that spans have the basic required structure
