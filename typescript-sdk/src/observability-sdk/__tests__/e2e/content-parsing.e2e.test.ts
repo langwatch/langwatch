@@ -5,7 +5,7 @@
  * Focused on essential message and content format validation.
  */
 
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeAll } from "vitest";
 import { SpanStatusCode } from "@opentelemetry/api";
 import {
   setupE2ETest,
@@ -20,11 +20,17 @@ import {
 import * as semconv from "../../semconv";
 import { getLangWatchLogger } from "../../logger";
 
+// FIXME: This test is failing on the CI only
+// I believe it's a timing issue, since it seems like only the first test
+// fails and the others pass.
 describe("Content Parsing E2E", () => {
   const setup = setupE2ETest();
 
-  // FIXME: This test is failing on the CI only
-  it.skip("should parse and extract chat messages correctly", async () => {
+  beforeAll(async () => {
+    await delay(30000);
+  }, 35000);
+
+  it("should parse and extract chat messages correctly", async () => {
     const tracer = createTestTracer("chat-messages");
     const logger = getLangWatchLogger("chat-messages");
     const testIds = generateTestIds();
