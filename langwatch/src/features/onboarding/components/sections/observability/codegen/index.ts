@@ -3,6 +3,7 @@ import type { GoFrameworkKey } from "../constants";
 import { platformToFileName } from "../constants";
 import { TS_SNIPPETS } from "./snippets.ts";
 import { getGoFrameworkCode, getGoLanguageCode } from "./go.ts";
+import { getTypeScriptLanguageCode, getTypeScriptVercelAICode } from "./typescript";
 
 interface CodegenResult {
   code: string;
@@ -13,10 +14,8 @@ interface CodegenResult {
 
 export function getLanguageCode(language: PlatformKey): CodegenResult {
   switch (language) {
-    case "typescript": {
-      const s = TS_SNIPPETS.base;
-      return { code: s.code, filename: platformToFileName(language), highlightLines: s.highlightLines, codeLanguage: "typescript" };
-    }
+    case "typescript":
+      return getTypeScriptLanguageCode();
     case "go":
       return getGoLanguageCode();
     case "python":
@@ -37,7 +36,7 @@ export function getFrameworkCode(language: PlatformKey, framework: FrameworkKey)
     return getGoFrameworkCode(framework as GoFrameworkKey);
   }
   if (language === "typescript" && framework === "vercel_ai") {
-    return getLanguageCode("typescript");
+    return getTypeScriptVercelAICode();
   }
 
   const base = getLanguageCode(language);
