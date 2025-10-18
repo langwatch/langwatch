@@ -67,19 +67,17 @@ export function PhoneNumberInput(
   // Sync displayed value from external E.164 value when it changes
   useEffect(() => {
     if (!value) {
-      setNationalInput("");
+      if (!hasUserInteracted) {
+        setNationalInput("");
+      }
       return;
     }
 
     const parsed = parsePhoneNumberFromString(value);
     if (parsed) {
-      if (parsed.country && parsed.country !== country) {
-        setCountry(parsed.country);
-      }
-
       setNationalInput(parsed.formatNational());
     }
-  }, [value, country]);
+  }, [value, country, hasUserInteracted]);
 
   const handleCountryChange = (next: CountryCode) => {
     setHasUserInteracted(true);
@@ -133,7 +131,7 @@ export function PhoneNumberInput(
 
       if (!allowedCountries.includes(candidate)) return;
 
-      handleCountryChange(candidate);
+      setCountry(candidate);
       setDidDetectOnce(true);
     };
 

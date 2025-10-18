@@ -67,7 +67,7 @@ export interface OnboardingFormData {
 export interface OnboardingScreen {
   id: string;
   required: boolean;
-  component: React.ReactNode;
+  component: React.ComponentType<any>;
   heading: string;
   subHeading?: string;
 }

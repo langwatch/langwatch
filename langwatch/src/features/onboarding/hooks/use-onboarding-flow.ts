@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import {
   type OnboardingFormData,
   type OnboardingFlowState,
@@ -37,7 +37,10 @@ export const useOnboardingFlow = () => {
   const [role, setRole] = useState<RoleType | undefined>(void 0);
 
   // Flow state
-  const flow = getOnboardingFlowConfig(Boolean(isSaaS));
+  const flow = useMemo(
+    () => getOnboardingFlowConfig(Boolean(isSaaS)),
+    [isSaaS],
+  );
   const [currentScreenIndex, setCurrentScreenIndex] =
     useState<OnboardingScreenIndex>(flow.first);
   const [direction, setDirection] = useState<OnboardingFlowDirection>(
@@ -160,6 +163,43 @@ export const useOnboardingFlow = () => {
     canProceed,
   };
 
+  const formContextValue = useMemo(
+    () => ({
+      organizationName,
+      agreement,
+      usageStyle,
+      phoneNumber,
+      companySize,
+      solutionType,
+      selectedDesires,
+      role,
+      utmCampaign:
+        typeof window !== "undefined"
+          ? window.sessionStorage.getItem("utm_campaign")
+          : null,
+      setOrganizationName,
+      setAgreement,
+      setUsageStyle,
+      setPhoneNumber,
+      setPhoneHasValue,
+      setPhoneIsValid,
+      setCompanySize,
+      setSolutionType,
+      setDesires,
+      setRole,
+    }),
+    [
+      organizationName,
+      agreement,
+      usageStyle,
+      phoneNumber,
+      companySize,
+      solutionType,
+      selectedDesires,
+      role,
+    ],
+  );
+
   return {
     // Form state
     organizationName,
@@ -192,5 +232,6 @@ export const useOnboardingFlow = () => {
     // Getters
     getFormData,
     getFlowState,
+    formContextValue,
   };
 };
