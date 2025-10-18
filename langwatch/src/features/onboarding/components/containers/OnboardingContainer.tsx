@@ -29,7 +29,7 @@ interface OnboardingContainerProps extends React.PropsWithChildren {
   compressedHeader?: boolean;
 }
 
-export const OrganizationOnboardingContainer: React.FC<
+export const OnboardingContainer: React.FC<
   OnboardingContainerProps
 > = ({ children, title, subTitle, loading, compressedHeader }) => {
   const { emit } = useAnalytics();

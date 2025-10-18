@@ -1,6 +1,7 @@
 import { Box, Card, Grid, GridItem, Icon, Text, VStack } from "@chakra-ui/react";
 import { Telescope, Gavel, GraduationCap, HatGlasses } from "lucide-react";
 import type { ProductSelection } from "../../types/types";
+import React from "react";
 
 interface ProductOption {
   key: ProductSelection;
