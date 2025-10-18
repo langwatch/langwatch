@@ -48,10 +48,10 @@ export function ApiKeyCard({ initialApiKey }: ApiKeyCardProps): React.ReactEleme
         w="full"
         endElement={
           <HStack gap="1">
-            <IconButton size="xs" variant="ghost" onClick={toggleVisibility} aria-label={isVisible ? "Hide key" : "Show key"}>
+            <IconButton size="2xs" variant="ghost" onClick={toggleVisibility} aria-label={isVisible ? "Hide key" : "Show key"}>
               {isVisible ? <EyeOff /> : <Eye />}
             </IconButton>
-            <IconButton size="xs" variant="ghost" onClick={copyApiKey} aria-label="Copy key">
+            <IconButton size="2xs" variant="ghost" onClick={copyApiKey} aria-label="Copy key">
               <Clipboard />
             </IconButton>
           </HStack>
