@@ -90,7 +90,10 @@ export const WelcomeScreen: React.FC = () => {
             category: "onboarding",
             label: "organization_onboarding_completed",
           });
-          window.location.href = `/${response.projectSlug}/messages`;
+
+          const params = new URLSearchParams({ projectSlug: response.projectSlug });
+
+          window.location.href = `/onboarding/product?${params.toString()}`;
         },
         onError: () => {
           toaster.create({
@@ -173,5 +176,3 @@ export const WelcomeScreen: React.FC = () => {
     </AnalyticsBoundary>
   );
 };
-
-
