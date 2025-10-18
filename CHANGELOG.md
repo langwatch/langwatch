@@ -1,5 +1,35 @@
 # Changelog
 
+## [1.2.0](https://github.com/langwatch/langwatch/compare/langwatch@v1.1.1...langwatch@v1.2.0) (2025-10-18)
+
+
+### Features
+
+* add filters on series for custom graphs ([#705](https://github.com/langwatch/langwatch/issues/705)) ([b200586](https://github.com/langwatch/langwatch/commit/b2005860b7ef1637bcb050ec45c03e0c92bba37e))
+* add percentage to series ([#709](https://github.com/langwatch/langwatch/issues/709)) ([c6e63df](https://github.com/langwatch/langwatch/commit/c6e63df26f5bdb84e84e524ba2be9361bd7285e9))
+* added automatic country detection to phone input ([#714](https://github.com/langwatch/langwatch/issues/714)) ([82d3fe0](https://github.com/langwatch/langwatch/commit/82d3fe0eafcffbbec0912dcd57d5dae3c3dc9b53))
+* new onboarding flow ([#686](https://github.com/langwatch/langwatch/issues/686)) ([26d9c8d](https://github.com/langwatch/langwatch/commit/26d9c8dc55e7bc2a1e39327e26fab894197532fb))
+
+
+### Bug Fixes
+
+* failing go test with gpt5 update ([bc16d63](https://github.com/langwatch/langwatch/commit/bc16d63ad65f1fcf28077914d2f9d0d9b3cd0c53))
+* onboarding types to align with crm ([#727](https://github.com/langwatch/langwatch/issues/727)) ([8b7f9b2](https://github.com/langwatch/langwatch/commit/8b7f9b2b42723d056b6a220b162cfb6c16822805))
+* refactor to stop re-rendering causing input focus mayhem ([#729](https://github.com/langwatch/langwatch/issues/729)) ([9981533](https://github.com/langwatch/langwatch/commit/99815339e4d50fd339a25da28d4adda7bb1e3cb0))
+* release please was broken ([4e09652](https://github.com/langwatch/langwatch/commit/4e09652c3e92471b2cc00de3c8913449319a371b))
+* release please was broken with missing permissions ([#723](https://github.com/langwatch/langwatch/issues/723)) ([4e09652](https://github.com/langwatch/langwatch/commit/4e09652c3e92471b2cc00de3c8913449319a371b))
+* remove usage stats log ([#725](https://github.com/langwatch/langwatch/issues/725)) ([f113b0c](https://github.com/langwatch/langwatch/commit/f113b0ca3777e3a35fba2241e4fbc8692f61d3e6))
+* type errors in langwatch app ([#716](https://github.com/langwatch/langwatch/issues/716)) ([f6cc1c8](https://github.com/langwatch/langwatch/commit/f6cc1c8a1eb9abc4310d673cc2056c8d0fb11859))
+* updates for release please ([#711](https://github.com/langwatch/langwatch/issues/711)) ([d88597c](https://github.com/langwatch/langwatch/commit/d88597c203e6aefcb07c135f2e6fb5553ef9b4ac))
+
+
+### Miscellaneous
+
+* added onboarding signout button ([#721](https://github.com/langwatch/langwatch/issues/721)) ([2741e96](https://github.com/langwatch/langwatch/commit/2741e96f52fac4d7f72878ff31b7f2cf13f44242))
+* new onboarding analytics ([#720](https://github.com/langwatch/langwatch/issues/720)) ([af4ebf0](https://github.com/langwatch/langwatch/commit/af4ebf0d207be875780fbc1ece53caebfbbe86f1))
+* refactor onboarding component structure ([#715](https://github.com/langwatch/langwatch/issues/715)) ([3900c1b](https://github.com/langwatch/langwatch/commit/3900c1b75197dfedb5c882caf9d120112b906e85))
+* use release specific token ([#717](https://github.com/langwatch/langwatch/issues/717)) ([c8acb69](https://github.com/langwatch/langwatch/commit/c8acb69e948564407bdfb248c3690bc5f64523de))
+
 ## [1.1.1](https://github.com/langwatch/langwatch/compare/langwatch@v1.1.0...langwatch@v1.1.1) (2025-10-13)
 
 
