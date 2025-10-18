@@ -14,7 +14,7 @@ interface SelectableIconCardProps {
 export function SelectableIconCard(props: SelectableIconCardProps): React.ReactElement {
   const { label, icon, size, selected, onClick, ariaLabel } = props;
   return (
-    <Tooltip content={label} positioning={{ placement: "top" }} showArrow>
+    <Tooltip content={label} positioning={{ placement: "bottom" }} showArrow openDelay={0}>
       <Card.Root
         role="button"
         aria-label={ariaLabel}

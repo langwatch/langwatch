@@ -1,5 +1,5 @@
 import { useOrganizationTeamProject } from "../../../hooks/useOrganizationTeamProject";
-import { OrganizationOnboardingContainer } from "../components/containers/OnboardingContainer";
+import { OnboardingContainer } from "../components/containers/OnboardingContainer";
 import { OnboardingNavigation } from "../components/navigation/OnboardingNavigation";
 import { useOnboardingFlow } from "../hooks/use-onboarding-flow";
 import { useCreateWelcomeScreens } from "./create-welcome-screens";
@@ -125,7 +125,7 @@ export const WelcomeScreen: React.FC = () => {
 
   return (
     <AnalyticsBoundary name="onboarding_welcome" sendViewedEvent>
-      <OrganizationOnboardingContainer
+      <OnboardingContainer
         title={currentScreen?.heading ?? "Welcome Aboard 👋"}
         subTitle={currentScreen?.subHeading}
       >
@@ -172,7 +172,7 @@ export const WelcomeScreen: React.FC = () => {
             onFinish={handleFinalizeSubmit}
           />
         </VStack>
-      </OrganizationOnboardingContainer>
+      </OnboardingContainer>
     </AnalyticsBoundary>
   );
 };

@@ -1,57 +1,62 @@
-import React, { useMemo } from "react";
-import { OrganizationOnboardingContainer } from "../components/containers/OnboardingContainer";
+import React, { useEffect, useMemo, useState } from "react";
+import { OnboardingContainer } from "../components/containers/OnboardingContainer";
 import { AnalyticsBoundary } from "react-contextual-analytics";
 import { useProductFlow } from "../hooks/use-product-flow";
-import { createProductScreens } from "./create-product-screens";
-import { ProductScreenIndex } from "../types/types";
+import { useCreateProductScreens } from "./create-product-screens";
 import { OnboardingMeshBackground } from "../components/OnboardingMeshBackground";
 import { Box } from "@chakra-ui/react";
+import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 
 export const ProductScreen: React.FC = () => {
   const {
-    selectedProduct,
     currentScreenIndex,
+    flow,
     handleSelectProduct,
   } = useProductFlow();
 
-  const screens = useMemo(
-    () => createProductScreens({
-      selectedProduct,
-      onSelectProduct: handleSelectProduct,
-    }),
-    [selectedProduct, handleSelectProduct]
-  );
+  const { organization, isLoading } = useOrganizationTeamProject({
+    redirectToOnboarding: true,
+  });
 
-  const currentScreen = screens.find((s) => s.id === getScreenId(currentScreenIndex));
+  // Delay showing skeleton to avoid flicker on fast loads
+  const [delayedLoading, setDelayedLoading] = useState(false);
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    if (isLoading) {
+      timer = setTimeout(() => setDelayedLoading(true), 200);
+    } else {
+      setDelayedLoading(false);
+    }
+    return () => {
+      if (timer) clearTimeout(timer);
+    };
+  }, [isLoading]);
+
+  const screens = useCreateProductScreens({ flow, onSelectProduct: handleSelectProduct });
+
+  const currentVisibleIndex = useMemo(
+    () => flow.visibleScreens.findIndex((s: number) => s === currentScreenIndex),
+    [flow.visibleScreens, currentScreenIndex]
+  );
+  const currentScreen = currentVisibleIndex >= 0 ? screens[currentVisibleIndex] : undefined;
   if (!currentScreen) {
     return null;
   }
 
   return (
     <AnalyticsBoundary name="onboarding_product" sendViewedEvent>
-      <OrganizationOnboardingContainer
+      <OnboardingContainer
         title={currentScreen.heading}
         subTitle={currentScreen.subHeading}
+        loading={delayedLoading}
         compressedHeader
       >
         <Box w="full" minH="100dvh" position="relative">
           <OnboardingMeshBackground opacity={0.22} blurPx={96} />
-          {currentScreen.component}
+          {!isLoading && currentScreen.component ? <currentScreen.component /> : null}
         </Box>
-      </OrganizationOnboardingContainer>
+      </OnboardingContainer>
     </AnalyticsBoundary>
   );
 };
-
-function getScreenId(index: ProductScreenIndex): string {
-  const screenIds: Record<ProductScreenIndex, string> = {
-    [ProductScreenIndex.SELECTION]: "product-selection",
-    [ProductScreenIndex.OBSERVABILITY]: "observability",
-    [ProductScreenIndex.EVALUATIONS]: "evaluations",
-    [ProductScreenIndex.PROMPT_MANAGEMENT]: "prompt-management",
-    [ProductScreenIndex.AGENT_SIMULATIONS]: "agent-simulations",
-  };
-  return screenIds[index] ?? "product-selection";
-}
-
 export default ProductScreen;
