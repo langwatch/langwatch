@@ -48,8 +48,6 @@ function NewTeam({ organization }: { organization: FullyLoadedOrganization }) {
         {
           name: data.name,
           organizationId: organization.id,
-          defaultRole: data.defaultRole?.value,
-          defaultCustomRoleId: data.defaultRole?.customRoleId,
           members: data.members.map((member) => ({
             userId: member.userId?.value ?? "",
             role: member.role.value,
@@ -79,10 +77,10 @@ function NewTeam({ organization }: { organization: FullyLoadedOrganization }) {
               },
             });
           },
-        }
+        },
       );
     },
-    [createTeam, organization.id, router]
+    [createTeam, organization.id, router],
   );
 
   return (

@@ -28,7 +28,7 @@ export default function EditTeamPage() {
       slug: teamSlug as string,
       organizationId: organization?.id ?? "",
     },
-    { enabled: typeof teamSlug === "string" && !!organization?.id }
+    { enabled: typeof teamSlug === "string" && !!organization?.id },
   );
 
   if (!team.data) return <SettingsLayout />;
@@ -64,7 +64,7 @@ function EditTeam({ team }: { team: TeamWithProjectsAndMembersAndUsers }) {
       // Check if this user has a custom role assigned
       const customRoleAssignment = (team as any).customRoleMembers?.find(
         (crm: any) =>
-          crm.userId === member.userId && crm.teamId === member.teamId
+          crm.userId === member.userId && crm.teamId === member.teamId,
       );
 
       const role = customRoleAssignment
@@ -93,7 +93,7 @@ function EditTeam({ team }: { team: TeamWithProjectsAndMembersAndUsers }) {
   });
 
   const [defaultValues, setDefaultValues] = useState<TeamFormData>(
-    getInitialValues()
+    getInitialValues(),
   );
 
   const form = useForm({
@@ -126,8 +126,6 @@ function EditTeam({ team }: { team: TeamWithProjectsAndMembersAndUsers }) {
         {
           teamId: team.id,
           name: data.name,
-          defaultRole: data.defaultRole?.value,
-          defaultCustomRoleId: data.defaultRole?.customRoleId,
           members: data.members.map((member) => ({
             userId: member.userId?.value ?? "",
             role: member.role.value,
@@ -146,10 +144,10 @@ function EditTeam({ team }: { team: TeamWithProjectsAndMembersAndUsers }) {
             });
             void apiContext.organization.getAll.refetch();
           },
-        }
+        },
       );
     },
-    250
+    250,
   );
 
   useEffect(() => {
