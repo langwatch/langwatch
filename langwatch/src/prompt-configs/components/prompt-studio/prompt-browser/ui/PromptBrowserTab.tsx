@@ -6,6 +6,7 @@ interface PromptBrowserTabProps {
   version?: number;
   hasUnsavedChanges?: boolean;
   onClose?: () => void;
+  isActive?: boolean;
 }
 
 export function PromptBrowserTab({
@@ -15,7 +16,7 @@ export function PromptBrowserTab({
   onClose,
 }: PromptBrowserTabProps) {
   return (
-    <HStack gap={2}>
+    <HStack gap={2} height="full">
       <HStack>
         <Box>{title ?? "Untitled"}</Box>
         {hasUnsavedChanges ? (
