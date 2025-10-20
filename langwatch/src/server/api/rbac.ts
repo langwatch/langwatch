@@ -197,7 +197,7 @@ const ORGANIZATION_ROLE_PERMISSIONS: Record<
  */
 function hasPermissionWithHierarchy(
   permissions: string[],
-  requestedPermission: string
+  requestedPermission: string,
 ): boolean {
   // Direct match
   if (permissions.includes(requestedPermission)) {
@@ -205,10 +205,10 @@ function hasPermissionWithHierarchy(
   }
 
   // Hierarchy rule: manage permissions include view, create, update, and delete permissions
-  const actionSuffixes = [':view', ':create', ':update', ':delete'];
+  const actionSuffixes = [":view", ":create", ":update", ":delete"];
   for (const suffix of actionSuffixes) {
     if (requestedPermission.endsWith(suffix)) {
-      const managePermission = requestedPermission.replace(suffix, ':manage');
+      const managePermission = requestedPermission.replace(suffix, ":manage");
       if (permissions.includes(managePermission)) {
         return true;
       }
@@ -223,7 +223,7 @@ function hasPermissionWithHierarchy(
  */
 export function teamRoleHasPermission(
   role: TeamUserRole,
-  permission: Permission
+  permission: Permission,
 ): boolean {
   return hasPermissionWithHierarchy(TEAM_ROLE_PERMISSIONS[role], permission);
 }
@@ -233,9 +233,12 @@ export function teamRoleHasPermission(
  */
 export function organizationRoleHasPermission(
   role: OrganizationUserRole,
-  permission: Permission
+  permission: Permission,
 ): boolean {
-  return hasPermissionWithHierarchy(ORGANIZATION_ROLE_PERMISSIONS[role], permission);
+  return hasPermissionWithHierarchy(
+    ORGANIZATION_ROLE_PERMISSIONS[role],
+    permission,
+  );
 }
 
 /**
@@ -249,7 +252,7 @@ export function getTeamRolePermissions(role: TeamUserRole): Permission[] {
  * Get all permissions for an organization role
  */
 export function getOrganizationRolePermissions(
-  role: OrganizationUserRole
+  role: OrganizationUserRole,
 ): Permission[] {
   return ORGANIZATION_ROLE_PERMISSIONS[role];
 }
@@ -309,7 +312,7 @@ type PermissionMiddlewareParams<InputType> = {
 };
 
 export type PermissionMiddleware<InputType> = (
-  params: PermissionMiddlewareParams<InputType>
+  params: PermissionMiddlewareParams<InputType>,
 ) => Promise<any>;
 
 /**
@@ -378,7 +381,7 @@ export const checkOrganizationPermission =
 export async function hasProjectPermission(
   ctx: { prisma: PrismaClient; session: Session | null },
   projectId: string,
-  permission: Permission
+  permission: Permission,
 ): Promise<boolean> {
   if (!ctx.session?.user) {
     return false;
@@ -396,34 +399,18 @@ export async function hasProjectPermission(
         select: {
           id: true,
           members: { where: { userId: ctx.session.user.id } },
-          defaultRole: true,
-          defaultCustomRole: true,
+          // team-level baseline roles removed
         },
       },
     },
   });
 
   const teamMember = projectTeam?.team.members.find(
-    (member) => member.userId === ctx.session?.user.id
+    (member) => member.userId === ctx.session?.user.id,
   );
 
   if (!teamMember) {
     return false;
-  }
-
-  // Check team baseline permissions (from team's role - either built-in or custom)
-  const teamData = projectTeam?.team as any;
-  if (teamData?.defaultRole) {
-    // Team has a built-in role
-    if (teamRoleHasPermission(teamData.defaultRole, permission)) {
-      return true;
-    }
-  } else if (teamData?.defaultCustomRole) {
-    // Team has a custom role
-    const teamPermissions = teamData.defaultCustomRole.permissions as string[];
-    if (hasPermissionWithHierarchy(teamPermissions, permission)) {
-      return true;
-    }
   }
 
   // Check user's individual permissions (custom role or built-in role)
@@ -445,7 +432,7 @@ export async function hasProjectPermission(
     }
   }
 
-  // Fall back to built-in role permissions
+  // Fall back to user's built-in team role only
   return teamRoleHasPermission(teamMember.role, permission);
 }
 
@@ -455,7 +442,7 @@ export async function hasProjectPermission(
 export async function hasTeamPermission(
   ctx: { prisma: PrismaClient; session: Session },
   teamId: string,
-  permission: Permission
+  permission: Permission,
 ): Promise<boolean> {
   if (!ctx.session?.user) {
     return false;
@@ -463,9 +450,7 @@ export async function hasTeamPermission(
 
   const team = await ctx.prisma.team.findUnique({
     where: { id: teamId },
-    include: {
-      defaultCustomRole: true,
-    },
+    include: {},
   });
 
   if (!team?.organizationId) {
@@ -497,21 +482,6 @@ export async function hasTeamPermission(
     return false;
   }
 
-  // Check team baseline permissions (from team's role - either built-in or custom)
-  const teamData = team as any;
-  if (teamData.defaultRole) {
-    // Team has a built-in role
-    if (teamRoleHasPermission(teamData.defaultRole, permission)) {
-      return true;
-    }
-  } else if (teamData.defaultCustomRole) {
-    // Team has a custom role
-    const teamPermissions = teamData.defaultCustomRole.permissions as string[];
-    if (hasPermissionWithHierarchy(teamPermissions, permission)) {
-      return true;
-    }
-  }
-
   // Check user's individual permissions (custom role or built-in role)
   const customRoleAssignment = await ctx.prisma.teamUserCustomRole.findFirst({
     where: {
@@ -531,7 +501,7 @@ export async function hasTeamPermission(
     }
   }
 
-  // Fall back to built-in role permissions
+  // Fall back to user's built-in team role only
   return teamRoleHasPermission(teamUser.role, permission);
 }
 
@@ -541,7 +511,7 @@ export async function hasTeamPermission(
 export async function hasOrganizationPermission(
   ctx: { prisma: PrismaClient; session: Session },
   organizationId: string,
-  permission: Permission
+  permission: Permission,
 ): Promise<boolean> {
   if (!ctx.session?.user) {
     return false;
@@ -582,7 +552,7 @@ const DEMO_VIEW_PERMISSIONS: Permission[] = [
 
 export function isDemoProject(
   projectId: string,
-  permission: Permission
+  permission: Permission,
 ): boolean {
   if (!projectId || projectId !== env.DEMO_PROJECT_ID) {
     return false;
@@ -607,7 +577,7 @@ export const skipPermissionCheck = ({
   for (const key of SENSITIVE_KEYS) {
     if (key in input) {
       throw new Error(
-        `${key} is not allowed to be used without permission check`
+        `${key} is not allowed to be used without permission check`,
       );
     }
   }
@@ -641,10 +611,10 @@ export const checkPermissionOrPubliclyShared =
     }: {
       resourceType: PublicResourceTypes | ((input: any) => PublicResourceTypes);
       resourceParam: Key;
-    }
+    },
   ) =>
   async ({ ctx, input, next }: PermissionMiddlewareParams<InputType>) => {
-    let allowed =false;
+    let allowed = false;
     try {
       await permissionCheck({
         ctx,

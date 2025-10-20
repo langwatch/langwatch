@@ -101,7 +101,6 @@ export const teamRouter = createTRPCRouter({
               user: true,
             },
           },
-          defaultCustomRole: true,
           projects: true,
         },
       });
@@ -124,8 +123,6 @@ export const teamRouter = createTRPCRouter({
       z.object({
         teamId: z.string(),
         name: z.string(),
-        defaultRole: z.string().optional(), // Can be TeamUserRole or "custom:{roleId}"
-        defaultCustomRoleId: z.string().optional(),
         members: z.array(
           z.object({
             userId: z.string(),
@@ -140,34 +137,9 @@ export const teamRouter = createTRPCRouter({
       const prisma = ctx.prisma;
 
       return await prisma.$transaction(async (tx) => {
-        // Only process defaultRole if it's explicitly provided
         const updateData: any = {
           name: input.name,
         };
-
-        if (input.defaultRole !== undefined) {
-          // Determine if it's a custom role or built-in role
-          const isCustomRole = input.defaultRole.startsWith("custom:");
-
-          // Enforce invariant: custom roles must have defaultCustomRoleId
-          if (isCustomRole && !input.defaultCustomRoleId) {
-            throw new TRPCError({
-              code: "BAD_REQUEST",
-              message:
-                "defaultCustomRoleId is required when defaultRole is a custom role",
-            });
-          }
-
-          if (isCustomRole) {
-            // Custom role: set defaultRole to null and defaultCustomRoleId to the provided value
-            updateData.defaultRole = null;
-            updateData.defaultCustomRoleId = input.defaultCustomRoleId;
-          } else {
-            // Built-in role: set defaultRole to the provided value and defaultCustomRoleId to null
-            updateData.defaultRole = input.defaultRole as TeamUserRole;
-            updateData.defaultCustomRoleId = null;
-          }
-        }
 
         await tx.team.update({
           where: {
@@ -411,8 +383,6 @@ export const teamRouter = createTRPCRouter({
       z.object({
         organizationId: z.string(),
         name: z.string(),
-        defaultRole: z.string().optional(),
-        defaultCustomRoleId: z.string().optional(),
         members: z.array(
           z.object({
             userId: z.string(),
@@ -437,20 +407,12 @@ export const teamRouter = createTRPCRouter({
         teamNanoId.substring(0, 6);
 
       return await prisma.$transaction(async (tx) => {
-        const isCustomRole = input.defaultRole?.startsWith("custom:");
-
         const team = await tx.team.create({
           data: {
             id: teamId,
             name: input.name,
             slug: teamSlug,
             organizationId: input.organizationId,
-            defaultRole: isCustomRole
-              ? null
-              : (input.defaultRole as TeamUserRole | null),
-            defaultCustomRoleId: isCustomRole
-              ? input.defaultCustomRoleId
-              : null,
           },
         });
 

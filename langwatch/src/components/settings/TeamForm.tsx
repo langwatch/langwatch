@@ -120,23 +120,6 @@ export const TeamForm = ({
                   <Input width="full" disabled type="text" value={team.slug} />
                 </HorizontalFormControl>
               )}
-              {team && (
-                <HorizontalFormControl
-                  label="Team Role"
-                  helper="The role/permission level assigned to this team"
-                >
-                  <Controller
-                    control={control}
-                    name="defaultRole"
-                    render={({ field }) => (
-                      <TeamRoleSelect
-                        organizationId={organizationId}
-                        field={field}
-                      />
-                    )}
-                  />
-                </HorizontalFormControl>
-              )}
             </VStack>
           </Card.Body>
         </Card.Root>
