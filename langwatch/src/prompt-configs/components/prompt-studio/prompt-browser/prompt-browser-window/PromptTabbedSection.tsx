@@ -10,7 +10,7 @@ export function PromptTabbedSection() {
   return (
     <Box height="full" width="full" bg="white">
       <Tabs.Root defaultValue={PromptTab.Conversation}>
-        <Tabs.List>
+        <Tabs.List colorPalette="orange">
           <Tabs.Trigger value={PromptTab.Conversation}>
             Conversation
           </Tabs.Trigger>

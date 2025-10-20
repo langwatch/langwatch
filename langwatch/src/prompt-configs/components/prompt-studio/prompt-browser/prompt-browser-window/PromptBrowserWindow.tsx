@@ -21,12 +21,12 @@ export function PromptBrowserWindow(props: PromptBrowserWindowProps) {
   });
 
   return (
-    <VStack height="full" width="full" p={3}>
-      <FormProvider {...form.methods}>
+    <FormProvider {...form.methods}>
+      <VStack height="full" width="full" p={3}>
         <PromptBrowserHeader />
         <PromptMessagesEditor />
         <PromptTabbedSection />
-      </FormProvider>
-    </VStack>
+      </VStack>
+    </FormProvider>
   );
 }

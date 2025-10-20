@@ -1,4 +1,4 @@
-import { Box } from "@chakra-ui/react";
+import { Box, HStack } from "@chakra-ui/react";
 
 import { allModelOptions, useModelSelectionOptions } from "../ModelSelector";
 import { OverflownTextWithTooltip } from "../OverflownText";
@@ -17,13 +17,13 @@ export function LLMModelDisplay({
   const { modelOption } = useModelSelectionOptions(
     allModelOptions,
     model,
-    "chat"
+    "chat",
   );
 
   const isDisabled = modelOption?.isDisabled ?? !modelOption?.label;
 
   return (
-    <>
+    <HStack>
       {modelOption?.icon && (
         <Box width="14px" minWidth="14px">
           {modelOption?.icon}
@@ -46,6 +46,6 @@ export function LLMModelDisplay({
       >
         {modelOption?.label ?? model}
       </OverflownTextWithTooltip>
-    </>
+    </HStack>
   );
 }
