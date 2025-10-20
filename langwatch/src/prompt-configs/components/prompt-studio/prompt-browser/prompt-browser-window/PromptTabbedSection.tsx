@@ -1,4 +1,5 @@
 import { Box, Tabs } from "@chakra-ui/react";
+import { PromptStudioChat } from "../../chat/PromptStudioChat";
 
 enum PromptTab {
   Conversation = "conversation",
@@ -19,7 +20,7 @@ export function PromptTabbedSection() {
         </Tabs.List>
         <Tabs.Content value={PromptTab.Conversation}>
           <Box height="full" width="full" bg="white">
-            Prompt
+            <PromptStudioChat />
           </Box>
         </Tabs.Content>
         <Tabs.Content value={PromptTab.Variables}>

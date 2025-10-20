@@ -113,7 +113,7 @@ function SidebarList({
         {action && <Box onClick={(e) => e.stopPropagation()}>{action}</Box>}
       </SidebarSectionHeader>
       {(!collapsible || isOpen) && (
-        <VStack gap={1} align="stretch">
+        <VStack gap={1} align="stretch" paddingLeft={5}>
           {children}
         </VStack>
       )}
