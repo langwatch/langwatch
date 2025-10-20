@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { describe, it, expect, beforeEach, vi } from "vitest";
 import { TRPCError } from "@trpc/server";
 import { TeamUserRole, OrganizationUserRole } from "@prisma/client";
 import {
@@ -11,8 +11,6 @@ import {
   skipPermissionCheck,
   skipPermissionCheckProjectCreation,
   checkPermissionOrPubliclyShared,
-  Resources,
-  Actions,
   type Permission,
 } from "../rbac";
 
@@ -37,7 +35,7 @@ const mockPrisma = {
   publicShare: {
     findFirst: vi.fn(),
   },
-};
+} as any;
 
 // Mock session
 const mockSession = {
@@ -45,7 +43,7 @@ const mockSession = {
     id: "user-123",
     email: "test@example.com",
   },
-};
+} as any;
 
 describe("RBAC Integration Tests", () => {
   beforeEach(() => {

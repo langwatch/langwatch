@@ -584,7 +584,7 @@ export function isDemoProject(
   projectId: string,
   permission: Permission
 ): boolean {
-  if (projectId !== env.DEMO_PROJECT_ID) {
+  if (!projectId || projectId !== env.DEMO_PROJECT_ID) {
     return false;
   }
 
