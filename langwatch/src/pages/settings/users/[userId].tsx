@@ -7,16 +7,18 @@ import {
   Table,
   Text,
   VStack,
+  Icon,
 } from "@chakra-ui/react";
 import { useRouter } from "next/router";
 import { useMemo } from "react";
 import { Link } from "../../../components/ui/link";
 import { TeamUserRoleField } from "../../../components/settings/TeamUserRoleField";
 import { OrganizationUserRoleField } from "../../../components/settings/OrganizationUserRoleField";
+import { HorizontalFormControl } from "../../../components/HorizontalFormControl";
 import SettingsLayout from "../../../components/SettingsLayout";
 import { api } from "../../../utils/api";
 import { useOrganizationTeamProject } from "../../../hooks/useOrganizationTeamProject";
-import { MoreVertical, Trash } from "react-feather";
+import { MoreVertical, Trash, ChevronRight } from "react-feather";
 import { toaster } from "../../../components/ui/toaster";
 import { Menu } from "../../../components/ui/menu";
 
@@ -74,38 +76,37 @@ export default function UserDetailsPage() {
         maxWidth="980px"
         align="start"
       >
-        <HStack width="full">
+        <HStack gap="8px">
+          <Link href="/settings/members">Members</Link>
+          <Icon>
+            <ChevronRight width={12} />
+          </Icon>
+          <Text>{member.user.name}</Text>
+        </HStack>
+
+        <HStack width="full" justify="space-between" align="center">
           <Heading size="lg" as="h1">
-            {member.user.name}
+            User Roles
           </Heading>
         </HStack>
 
         <Card.Root width="full">
-          <Card.Header>
-            <Heading size="md">Profile</Heading>
-          </Card.Header>
-          <Card.Body>
-            <VStack align="start" gap={3}>
-              <Text>
-                <b>Email:</b> {member.user.email}
-              </Text>
-              <Text color="gray.600" fontSize="sm">
-                Organization-level role. Team-specific roles are set per team
-                below.
-              </Text>
-              <HStack gap={3} align="center">
-                <Text>
-                  <b>Role:</b>
-                </Text>
-                <Field.Root>
-                  <OrganizationUserRoleField
-                    organizationId={organization.id}
-                    userId={member.userId}
-                    defaultRole={member.role}
-                  />
-                </Field.Root>
-              </HStack>
-            </VStack>
+          <Card.Body paddingY={2}>
+            <HorizontalFormControl label="Email">
+              <Text>{member.user.email}</Text>
+            </HorizontalFormControl>
+            <HorizontalFormControl
+              label="Organization Role"
+              helper="Team-specific roles are set per team below."
+            >
+              <Field.Root>
+                <OrganizationUserRoleField
+                  organizationId={organization.id}
+                  userId={member.userId}
+                  defaultRole={member.role}
+                />
+              </Field.Root>
+            </HorizontalFormControl>
           </Card.Body>
         </Card.Root>
 
@@ -204,10 +205,6 @@ export default function UserDetailsPage() {
             </Table.Root>
           </Card.Body>
         </Card.Root>
-
-        <Link href="/settings/members">
-          <Button variant="outline">Back to Members</Button>
-        </Link>
       </VStack>
     </SettingsLayout>
   );

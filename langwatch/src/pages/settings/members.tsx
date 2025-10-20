@@ -302,7 +302,7 @@ function MembersList({
         paddingY={6}
         gap={6}
         width="full"
-        maxWidth="980px"
+        maxWidth="1200px"
         align="start"
       >
         <HStack width="full" marginTop={2}>
@@ -367,7 +367,7 @@ function MembersList({
                       <Table.Cell>
                         <Link href={`/settings/users/${member.userId}`}>
                           {member.user.name}{" "}
-                          <Text as="span">({roleLabel})</Text>
+                          <Text as="span">(Orginization {roleLabel})</Text>
                         </Link>
                       </Table.Cell>
                       <Table.Cell>{member.user.email}</Table.Cell>
@@ -378,24 +378,34 @@ function MembersList({
                         />
                       </Table.Cell>
                       <Table.Cell>
-                        <Menu.Root>
-                          <Menu.Trigger asChild>
-                            <Button variant={"ghost"}>
-                              <MoreVertical />
+                        <HStack gap={2}>
+                          <Link href={`/settings/users/${member.userId}`}>
+                            <Button size="sm" variant="outline">
+                              View
                             </Button>
-                          </Menu.Trigger>
-                          <Menu.Content>
-                            <Menu.Item
-                              value="remove"
-                              color="red.600"
-                              disabled={organization.members.length === 1}
-                              onClick={() => deleteMember(member.userId)}
-                            >
-                              <Trash size={14} style={{ marginRight: "8px" }} />
-                              Remove Member
-                            </Menu.Item>
-                          </Menu.Content>
-                        </Menu.Root>
+                          </Link>
+                          <Menu.Root>
+                            <Menu.Trigger asChild>
+                              <Button variant={"ghost"}>
+                                <MoreVertical />
+                              </Button>
+                            </Menu.Trigger>
+                            <Menu.Content>
+                              <Menu.Item
+                                value="remove"
+                                color="red.600"
+                                disabled={organization.members.length === 1}
+                                onClick={() => deleteMember(member.userId)}
+                              >
+                                <Trash
+                                  size={14}
+                                  style={{ marginRight: "8px" }}
+                                />
+                                Remove Member
+                              </Menu.Item>
+                            </Menu.Content>
+                          </Menu.Root>
+                        </HStack>
                       </Table.Cell>
                     </LinkBox>
                   );

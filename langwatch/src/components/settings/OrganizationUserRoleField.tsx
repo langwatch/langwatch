@@ -13,12 +13,12 @@ type OrgRoleOption = {
 
 const orgRoleOptions: OrgRoleOption[] = [
   {
-    label: "Admin",
+    label: "Organization Admin",
     value: OrganizationUserRole.ADMIN,
     description: "Can manage organization and add or remove members",
   },
   {
-    label: "Member",
+    label: "Organization Member",
     value: OrganizationUserRole.MEMBER,
     description: "Can manage their own projects and view other projects",
   },
