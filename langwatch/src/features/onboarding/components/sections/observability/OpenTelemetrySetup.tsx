@@ -1,6 +1,5 @@
 import React from "react";
 import { VStack, Text, Card, Alert } from "@chakra-ui/react";
-import { DocsLink } from "./DocsLink";
 
 export function OpenTelemetrySetup(): React.ReactElement {
   return (
@@ -19,12 +18,9 @@ export function OpenTelemetrySetup(): React.ReactElement {
                 </Alert.Description>
               </Alert.Content>
             </Alert.Root>
-            <DocsLink href="/docs/integrations/opentelemetry" />
           </VStack>
         </Card.Body>
       </Card.Root>
     </VStack>
   );
 }
-
-
