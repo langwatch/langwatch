@@ -5,7 +5,6 @@ import (
 	"log"
 	"os"
 
-	langwatch "github.com/langwatch/langwatch/sdk-go"                         // +
 	otelopenai "github.com/langwatch/langwatch/sdk-go/instrumentation/openai" // +
 	"github.com/openai/openai-go"
 	oaioption "github.com/openai/openai-go/option"
@@ -15,16 +14,12 @@ func main() {
 	ctx := context.Background()
 
 	client := openai.NewClient(
-		oaioption.WithAPIKey(os.Getenv("OPENAI_API_KEY")), // +
-		oaioption.WithMiddleware(otelopenai.Middleware("my-llm-app",
-			otelopenai.WithCaptureInput(),
-			otelopenai.WithCaptureOutput(),
+		oaioption.WithAPIKey(os.Getenv("OPENAI_API_KEY")),
+		oaioption.WithMiddleware(otelopenai.Middleware("<project_name>", // +
+			otelopenai.WithCaptureInput(),  // +
+			otelopenai.WithCaptureOutput(), // +
 		)), // +
 	)
-
-	tracer := langwatch.Tracer("my-llm-app")             // +
-	ctx, span := tracer.Start(ctx, "UserRequestHandler") // +
-	defer span.End()
 
 	response, err := client.Chat.Completions.New(ctx, openai.ChatCompletionNewParams{
 		Model: openai.ChatModelGPT5,
@@ -32,7 +27,7 @@ func main() {
 			openai.SystemMessage("You are a helpful assistant."),
 			openai.UserMessage("Hello, OpenAI!"),
 		},
-	}) // +
+	})
 	if err != nil {
 		log.Fatalf("Chat completion failed: %v", err)
 	}
