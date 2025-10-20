@@ -1,4 +1,4 @@
-import { Box, VStack, HStack, Text } from "@chakra-ui/react";
+import { Box, VStack, HStack, Text, type BoxProps } from "@chakra-ui/react";
 import { ChevronDown } from "react-feather";
 import { useState } from "react";
 
@@ -43,45 +43,68 @@ function SidebarHeader({ children }: SidebarHeaderProps) {
   );
 }
 
-interface SidebarSectionProps {
-  title: string;
+type SidebarSectionHeaderProps = BoxProps;
+
+function SidebarSectionHeader({ children }: SidebarSectionHeaderProps) {
+  return (
+    <Box
+      padding="3"
+      fontSize="sm"
+      fontWeight="medium"
+      color="gray.700"
+      bg="white"
+      borderBottom="1px solid"
+      borderColor="gray.100"
+      display="flex"
+      alignItems="center"
+      justifyContent="space-between"
+    >
+      {children}
+    </Box>
+  );
+}
+
+type SidebarSectionProps = BoxProps;
+
+function SidebarSection({ children }: SidebarSectionProps) {
+  return <Box>{children}</Box>;
+}
+
+interface SidebarListProps {
+  children: React.ReactNode;
+  title?: string;
   collapsible?: boolean;
   defaultOpen?: boolean;
   action?: React.ReactNode;
-  children: React.ReactNode;
 }
 
-function SidebarSection({
+function SidebarList({
+  children,
   title,
   collapsible = false,
   defaultOpen = true,
   action,
-  children,
-}: SidebarSectionProps) {
+}: SidebarListProps) {
   const [isOpen, setIsOpen] = useState(defaultOpen);
+
+  if (!title) {
+    return (
+      <VStack gap={1} align="stretch">
+        {children}
+      </VStack>
+    );
+  }
 
   return (
     <VStack gap={0} align="stretch">
-      <Box
-        padding="3"
-        fontSize="sm"
-        fontWeight="medium"
-        color="gray.700"
-        bg="white"
-        borderBottom="1px solid"
-        borderColor="gray.100"
-        cursor={collapsible ? "pointer" : "default"}
-        onClick={collapsible ? () => setIsOpen(!isOpen) : undefined}
-        display="flex"
-        alignItems="center"
-        justifyContent="space-between"
-        _hover={{ bg: "gray.50" }}
-      >
+      <SidebarSectionHeader>
         <HStack gap={2}>
           {collapsible && (
             <Box
               transform={isOpen ? "rotate(0deg)" : "rotate(-90deg)"}
               transition="transform 0.2s"
+              cursor="pointer"
+              onClick={() => setIsOpen(!isOpen)}
             >
               <ChevronDown size={14} />
             </Box>
@@ -89,24 +112,12 @@ function SidebarSection({
           <Text>{title}</Text>
         </HStack>
         {action && <Box onClick={(e) => e.stopPropagation()}>{action}</Box>}
-      </Box>
+      </SidebarSectionHeader>
       {(!collapsible || isOpen) && (
-        <Box padding="0" bg="white">
+        <VStack gap={1} align="stretch">
           {children}
-        </Box>
+        </VStack>
       )}
-    </VStack>
-  );
-}
-
-interface SidebarListProps {
-  children: React.ReactNode;
-}
-
-function SidebarList({ children }: SidebarListProps) {
-  return (
-    <VStack gap={1} align="stretch">
-      {children}
     </VStack>
   );
 }
@@ -193,7 +204,8 @@ function SidebarItem({
 export const Sidebar = {
   Root: SidebarRoot,
   Header: SidebarHeader,
-  Section: SidebarSection,
+  SectionHeader: SidebarSectionHeader,
   List: SidebarList,
   Item: SidebarItem,
+  Section: SidebarSection,
 };
