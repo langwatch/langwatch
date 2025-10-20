@@ -1,5 +1,5 @@
 import { HStack } from "@chakra-ui/react";
-import { PromptStudioTabbedWorkSpace } from "./tabbed-workspace/PromptStudioTabbedWorkSpace";
+import { PromptStudioTabbedWorkSpace } from "./prompt-browser/PromptStudioTabbedWorkSpace";
 
 export function PromptStudioMainContent() {
   return (
