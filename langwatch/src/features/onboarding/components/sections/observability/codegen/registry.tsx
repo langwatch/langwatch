@@ -42,20 +42,18 @@ const tsRef = (file: string): SnippetRef => ({ file, language: "typescript", fil
 const goRef = (file: string): SnippetRef => ({ file, language: "go", filename: "main.go" });
 
 function themedIcon(lightSrc: string, darkSrc: string, alt: string): React.ReactElement {
+  const isDark = true;
+
   return (
-    <picture>
-      <source srcSet={darkSrc} media="(prefers-color-scheme: dark)" />
-      <img
-        src={lightSrc}
-        alt={alt}
-        style={{ width: "100%", height: "100%", objectFit: "contain" }}
-      />
-    </picture>
+    <img
+      src={isDark ? darkSrc : lightSrc}
+      alt={alt}
+    />
   );
 }
 
 function singleIcon(src: string, alt: string): React.ReactElement {
-  return <img src={src} alt={alt} style={{ width: "100%", height: "100%", objectFit: "contain" }} />;
+  return <img src={src} alt={alt} />;
 }
 
 export const registry: IntegrationRegistry = [
