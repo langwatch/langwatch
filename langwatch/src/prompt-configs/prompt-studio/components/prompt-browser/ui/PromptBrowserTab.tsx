@@ -2,7 +2,7 @@ import { Badge, Box, Circle, HStack } from "@chakra-ui/react";
 import { X } from "react-feather";
 
 interface PromptBrowserTabProps {
-  title?: string;
+  title?: string | null;
   version?: number;
   hasUnsavedChanges?: boolean;
   onClose?: () => void;
