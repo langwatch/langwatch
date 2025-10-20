@@ -14,17 +14,17 @@ export function FrameworkGrid({ language, selectedFramework, onSelectFramework }
   const frameworks = FRAMEWORKS_BY_PLATFORM[language] as readonly Option<FrameworkKey>[];
   if (!frameworks || frameworks.length === 0) return null;
 
-  const framework = frameworks.find(f => f.key === selectedFramework);
-  if (!framework) {
-    console.error("No framework found for language: ", language);
-    return null;
-  }
+  // If no framework is selected, default to the first available framework
+  const currentFramework = selectedFramework ?? frameworks[0]?.key;
+  if (!currentFramework) return null;
+
+  const framework = frameworks.find(f => f.key === currentFramework);
 
   return (
     <VStack align="stretch" gap={3}>
       <VStack align="stretch" gap={0}>
         <Text fontSize="md" fontWeight="semibold">
-          Integrate LangWatch with {framework.label}
+          Integrate LangWatch with {framework?.label ?? 'your selected framework'}
         </Text>
         <Text fontSize="xs" color="fg.muted">
           Pick your model provider or framework to tailor setup guide.
@@ -37,7 +37,7 @@ export function FrameworkGrid({ language, selectedFramework, onSelectFramework }
             label={fw.label}
             icon={fw.icon}
             size={fw.size}
-            selected={selectedFramework === fw.key}
+            selected={currentFramework === fw.key}
             onClick={() => onSelectFramework(fw.key)}
             ariaLabel={`${fw.label} framework`}
           />

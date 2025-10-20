@@ -1,4 +1,4 @@
-export default `import { setupObservability } from "@langwatch/observability/node"; // +
+import { setupObservability } from "@langwatch/observability/node"; // +
 import { generateText } from "ai";
 import { openai } from "@ai-sdk/openai";
 
@@ -17,6 +17,3 @@ async function main(message: string): Promise<string> {
 }
 
 console.log(await main("Hello, world!")); // +
-`;
-
-

@@ -1,6 +1,7 @@
-import React from "react";
+import React, { useMemo } from "react";
 import { CodeBlock, createShikiAdapter, Float, Icon, IconButton } from "@chakra-ui/react";
 import type { HighlighterGeneric } from "shiki";
+import { useColorMode } from "../../../../../components/ui/color-mode";
 
 interface CodePreviewProps {
   code: string;
@@ -10,23 +11,33 @@ interface CodePreviewProps {
   languageIcon?: React.ReactNode;
 }
 
-const shikiAdapter = createShikiAdapter<HighlighterGeneric<any, any>>({
-  async load() {
-    const { createHighlighter } = await import("shiki");
-    return createHighlighter({
-      langs: ["typescript", "python", "go", "yaml"],
-      themes: ["github-dark", "github-light"],
-    });
-  },
-  theme: "github-dark",
-});
-
 export function CodePreview({ code, filename, codeLanguage: chakraLanguage, highlightLines, languageIcon }: CodePreviewProps): React.ReactElement | null {
+  const { colorMode } = useColorMode();
+
+  const shikiAdapter = useMemo(() => {
+    return createShikiAdapter<HighlighterGeneric<any, any>>({
+      async load() {
+        const { createHighlighter } = await import("shiki");
+        return createHighlighter({
+          langs: ["typescript", "python", "go", "yaml", "bash"],
+          themes: ["github-dark", "github-light"],
+        });
+      },
+      theme: colorMode === "dark" ? "github-dark" : "github-light",
+    });
+  }, [colorMode]);
+
   if (!code) return null;
 
   return (
     <CodeBlock.AdapterProvider value={shikiAdapter}>
-      <CodeBlock.Root size="sm" code={code} language={chakraLanguage} meta={{ highlightLines }}>
+      <CodeBlock.Root
+        size="sm"
+        code={code}
+        language={chakraLanguage}
+        meta={{ highlightLines }}
+        transition="all 0.3s ease"
+      >
         <CodeBlock.Header>
           <CodeBlock.Title fontSize="xs" pt={2}>
             {languageIcon ? <Icon size="xs">{languageIcon}</Icon> : null}
@@ -40,7 +51,14 @@ export function CodePreview({ code, filename, codeLanguage: chakraLanguage, high
             </CodeBlock.CopyTrigger>
           </Float>
         </CodeBlock.Header>
-        <CodeBlock.Content>
+        <CodeBlock.Content
+          transition="background-color 0.3s ease, color 0.3s ease"
+          css={{
+            '& pre, & code': {
+              transition: 'background-color 0.3s ease, color 0.3s ease',
+            },
+          }}
+        >
           <CodeBlock.Code>
             <CodeBlock.CodeText />
           </CodeBlock.Code>

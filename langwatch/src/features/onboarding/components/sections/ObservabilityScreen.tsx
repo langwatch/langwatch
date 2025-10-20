@@ -8,28 +8,35 @@ import {
 import type { FrameworkKey, PlatformKey } from "./observability/types";
 import { ApiKeyCard } from "./observability/ApiKeyCard";
 import { CodePreview } from "./observability/CodePreview";
-import { getLanguageCode, getFrameworkCode } from "./observability/codegen";
-import type { GoFrameworkKey } from "./observability/constants";
+import { getFrameworkCode } from "./observability/codegen";
 import { FrameworkGrid } from "./observability/FrameworkGrid";
 import { PlatformGrid } from "./observability/PlatformGrid";
 import { PLATFORM_OPTIONS, FRAMEWORKS_BY_PLATFORM } from "./observability/constants";
-
+import { InstallPreview } from "./observability/InstallPreview";
+import { getRegistryEntry } from "./observability/codegen/registry";
 
 export function ObservabilityScreen(): React.ReactElement {
   const [selectedPlatform, setSelectedPlatform] = useState<PlatformKey>("typescript");
-  const [selectedFramework, setSelectedFramework] = useState<FrameworkKey | null>(null);
+  const [selectedFramework, setSelectedFramework] = useState<FrameworkKey>("vercel_ai");
 
   function handleSelectLanguage(lang: PlatformKey): void {
     setSelectedPlatform(lang);
-    const firstFramework = FRAMEWORKS_BY_PLATFORM[lang]?.[0]?.key ?? null;
-    setSelectedFramework(firstFramework);
+    const firstFramework = FRAMEWORKS_BY_PLATFORM[lang]?.[0]?.key;
+    if (firstFramework) {
+      setSelectedFramework(firstFramework);
+    }
   }
 
   const codegen = useMemo(() => {
-    if (!selectedFramework) return getLanguageCode(selectedPlatform);
-    if (selectedPlatform === "go") return getFrameworkCode("go", selectedFramework as GoFrameworkKey);
+    if (selectedPlatform === "go") return getFrameworkCode("go", selectedFramework );
     return getFrameworkCode(selectedPlatform, selectedFramework);
   }, [selectedPlatform, selectedFramework]);
+
+  const selectedEntry = useMemo(() => {
+    return getRegistryEntry(selectedPlatform, selectedFramework);
+  }, [selectedPlatform, selectedFramework]);
+
+  const Custom = selectedEntry?.customComponent;
 
   return (
     <VStack gap={6} align="stretch">
@@ -46,13 +53,20 @@ export function ObservabilityScreen(): React.ReactElement {
         onSelectFramework={setSelectedFramework}
       />
 
-      <CodePreview
-        code={codegen.code}
-        filename={codegen.filename}
-        codeLanguage={codegen.codeLanguage}
-        languageIcon={PLATFORM_OPTIONS.find((l) => l.key === selectedPlatform)?.icon}
-        highlightLines={codegen.highlightLines}
-      />
+      {Custom ? (
+        <Custom />
+      ) : (
+        <VStack align="stretch" gap={3}>
+          <InstallPreview install={selectedEntry?.install} />
+          <CodePreview
+            code={codegen.code}
+            filename={codegen.filename}
+            codeLanguage={codegen.codeLanguage}
+            languageIcon={PLATFORM_OPTIONS.find((l) => l.key === selectedPlatform)?.icon}
+            highlightLines={codegen.highlightLines}
+          />
+        </VStack>
+      )}
 
       <Alert.Root colorPalette="orange" borderStartWidth="4px" borderStartColor="orange.500">
         <Alert.Content>
