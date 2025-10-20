@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from "react";
-import { Alert, HStack, VStack, Spinner } from "@chakra-ui/react";
+import { VStack, Grid } from "@chakra-ui/react";
+import { WaitingForTracesChip } from "./observability/WaitingForTracesChip";
 import type { FrameworkKey, PlatformKey } from "./observability/types";
 import { ApiKeyCard } from "./observability/ApiKeyCard";
 import { FrameworkGrid } from "./observability/FrameworkGrid";
@@ -31,55 +32,43 @@ export function ObservabilityScreen(): React.ReactElement {
     return getRegistryEntry(selectedPlatform, selectedFramework);
   }, [selectedPlatform, selectedFramework]);
 
-  const Custom = selectedEntry?.customComponent;
-
   return (
-    <VStack gap={6} align="stretch">
-      <PlatformGrid
-        selectedLanguage={selectedPlatform}
-        onSelectLanguage={handleSelectLanguage}
-      />
+    <>
+      <Grid templateColumns={{ base: "1fr", md: "1fr 1fr" }} gap={6} alignItems="start">
+        <VStack align="stretch" gap={6}>
+          <PlatformGrid
+            selectedLanguage={selectedPlatform}
+            onSelectLanguage={handleSelectLanguage}
+          />
 
-      <ApiKeyCard />
+          <ApiKeyCard />
 
-      <FrameworkGrid
-        language={selectedPlatform}
-        selectedFramework={selectedFramework}
-        onSelectFramework={setSelectedFramework}
-      />
-
-      {Custom ? (
-        <Custom />
-      ) : (
-        <VStack align="stretch" gap={3}>
-          <InstallPreview install={selectedEntry?.install} />
-          <FrameworkIntegrationCode
-            platform={selectedPlatform}
-            framework={selectedFramework}
-            languageIcon={
-              PLATFORM_OPTIONS.find((l) => l.key === selectedPlatform)?.icon
-            }
+          <FrameworkGrid
+            language={selectedPlatform}
+            selectedFramework={selectedFramework}
+            onSelectFramework={setSelectedFramework}
           />
         </VStack>
-      )}
 
-      <Alert.Root
-        colorPalette="orange"
-        borderStartWidth="4px"
-        borderStartColor="orange.500"
-      >
-        <Alert.Content>
-          <HStack gap={2} align="center">
-            <Spinner
-              color="orange.500"
-              borderWidth="2px"
-              animationDuration="0.6s"
-              size="sm"
-            />
-            <Alert.Title>Waiting to receive traces...</Alert.Title>
-          </HStack>
-        </Alert.Content>
-      </Alert.Root>
-    </VStack>
+        <VStack align="stretch" gap={3}>
+          {selectedEntry?.customComponent ? (
+            <selectedEntry.customComponent />
+          ) : (
+            <VStack align="stretch" gap={3}>
+              <InstallPreview install={selectedEntry?.install} />
+              <FrameworkIntegrationCode
+                platform={selectedPlatform}
+                framework={selectedFramework}
+                languageIcon={
+                  PLATFORM_OPTIONS.find((l) => l.key === selectedPlatform)?.icon
+                }
+              />
+            </VStack>
+          )}
+        </VStack>
+      </Grid>
+
+      <WaitingForTracesChip />
+    </>
   );
 }
