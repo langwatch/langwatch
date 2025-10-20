@@ -1,6 +1,6 @@
 import React from "react";
 import type { FrameworkKey, PlatformKey } from "./types";
-import { useCodegen } from "./codegen";
+import { useCodegen } from "../../../codegen";
 import { CodePreview } from "./CodePreview";
 
 export function FrameworkIntegrationCode({

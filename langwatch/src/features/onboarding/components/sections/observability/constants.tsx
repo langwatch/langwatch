@@ -1,7 +1,7 @@
 /* eslint-disable @next/next/no-img-element */
 
 import type { FrameworkKey, PlatformKey, Option } from "./types";
-import { deriveFrameworksByPlatform } from "./codegen/registry";
+import { deriveFrameworksByPlatform } from "../../../codegen/registry";
 
 export const PLATFORM_OPTIONS: Option<PlatformKey>[] = [
   { key: "typescript", label: "TypeScript", icon: <img src="/images/external-icons/typescript.svg" alt="TypeScript" /> },

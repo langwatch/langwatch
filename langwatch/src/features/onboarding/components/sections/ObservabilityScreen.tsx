@@ -10,7 +10,7 @@ import {
   FRAMEWORKS_BY_PLATFORM,
 } from "./observability/constants";
 import { InstallPreview } from "./observability/InstallPreview";
-import { getRegistryEntry } from "./observability/codegen/registry";
+import { getRegistryEntry } from "../../codegen/registry";
 import { FrameworkIntegrationCode } from "./observability/FrameworkIntegrationCode";
 
 export function ObservabilityScreen(): React.ReactElement {
