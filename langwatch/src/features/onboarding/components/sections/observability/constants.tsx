@@ -15,18 +15,3 @@ export const PLATFORM_OPTIONS: Option<PlatformKey>[] = [
 export const FRAMEWORKS_BY_PLATFORM = deriveFrameworksByPlatform() as Record<PlatformKey, readonly Option<FrameworkKey>[]>;
 
 export type GoFrameworkKey = (typeof FRAMEWORKS_BY_PLATFORM)["go"][number]["key"];
-
-export function platformToFileName(key: PlatformKey): string {
-  switch (key) {
-    case "typescript":
-      return "app.ts";
-    case "python":
-      return "app.py";
-    case "go":
-      return "main.go";
-    case "opentelemetry":
-      return "opentelemetry.yaml";
-    default:
-      return "";
-  }
-}

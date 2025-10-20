@@ -2,8 +2,7 @@ import React from "react";
 import { Card, VStack, Text, CodeBlock, Float, IconButton, createShikiAdapter } from "@chakra-ui/react";
 import type { HighlighterGeneric } from "shiki";
 import { useColorMode } from "../../../../../components/ui/color-mode";
-
-const bash = require("./codegen/snippets/noandlo/n8n.snippet.sh?raw") as string;
+import bashSnippet from "./codegen/snippets/noandlo/n8n.snippet.sh";
 
 export function NoLoN8nSetup(): React.ReactElement {
   const { colorMode } = useColorMode();
@@ -27,7 +26,7 @@ export function NoLoN8nSetup(): React.ReactElement {
         <VStack align="stretch" gap={3}>
           <Text fontSize="sm">Install the LangWatch n8n nodes, set environment variables, and restart n8n.</Text>
           <CodeBlock.AdapterProvider value={shikiAdapter}>
-            <CodeBlock.Root code={bash} language="bash" size="sm">
+            <CodeBlock.Root code={bashSnippet} language="bash" size="sm">
               <CodeBlock.Header>
                 <CodeBlock.Title>n8n install and configure</CodeBlock.Title>
                 <Float placement="top-end" offset="5" zIndex="1">

@@ -217,13 +217,7 @@ export function getRegistryEntry(platform: PlatformKey, framework: FrameworkKey)
   return registry.find((r) => r.platform === platform && r.framework === framework);
 }
 
-export function derivePlatformOptions(): Record<PlatformKey, { label: string } | undefined> {
-  const out = {} as Record<PlatformKey, { label: string } | undefined>;
-  for (const r of registry) {
-    if (!out[r.platform]) out[r.platform] = { label: r.platform };
-  }
-  return out;
-}
+// derivePlatformOptions removed; platform options are sourced from constants.tsx
 
 export function deriveFrameworksByPlatform(): Record<PlatformKey, { key: FrameworkKey; label: string; icon?: React.ReactNode }[]> {
   const out: Record<PlatformKey, { key: FrameworkKey; label: string; icon?: React.ReactNode }[]> = {
