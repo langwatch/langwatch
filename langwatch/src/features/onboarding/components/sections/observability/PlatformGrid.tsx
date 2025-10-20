@@ -1,5 +1,5 @@
 import React from "react";
-import { Grid, Text, VStack } from "@chakra-ui/react";
+import { Grid, HStack, Text, VStack } from "@chakra-ui/react";
 import { PLATFORM_OPTIONS } from "./constants";
 import type { PlatformKey } from "./types";
 import { SelectableIconCard } from "./SelectableIconCard";
@@ -23,7 +23,7 @@ export const PlatformGrid: React.FC<PlatformGridProps> = ({
           Choose the language or platform you want to instrument. You can add others later.
         </Text>
       </VStack>
-      <Grid templateColumns={{ base: "repeat(4, 1fr)", md: "repeat(8, 1fr)" }} gap={3}>
+      <HStack gap={3}>
         {PLATFORM_OPTIONS.map((lang) => (
           <SelectableIconCard
             key={lang.key}
@@ -34,7 +34,7 @@ export const PlatformGrid: React.FC<PlatformGridProps> = ({
             ariaLabel={`${lang.label} language`}
           />
         ))}
-      </Grid>
+      </HStack>
   </VStack>
   );
 }

@@ -2,9 +2,7 @@ import { setupObservability } from "@langwatch/observability/node"; // +
 import { generateText } from "ai";
 import { openai } from "@ai-sdk/openai";
 
-setupObservability({ // +
-  serviceName: "<project_name>", // +
-}); // +
+setupObservability({ serviceName: "<project_name>" }); // +
 
 async function main(message: string): Promise<string> {
   const response = await generateText({

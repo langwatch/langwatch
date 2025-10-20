@@ -52,6 +52,7 @@ export const ProductScreen: React.FC = () => {
         subTitle={currentScreen.subHeading}
         loading={delayedLoading}
         compressedHeader
+        widthVariant={currentScreen.widthVariant ?? "narrow"}
       >
         <Box w="full" minH="100dvh" position="relative">
           <OnboardingMeshBackground opacity={0.22} blurPx={96} />

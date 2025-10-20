@@ -27,6 +27,8 @@ export function SelectableIconCard(props: SelectableIconCardProps): React.ReactE
         transition="all 0.2s ease"
         aspectRatio="1 / 1"
         display="flex"
+        maxW="75px"
+        minW="65px"
         alignItems="center"
         justifyContent="center"
         _hover={{ filter: "grayscale(0%)" }}

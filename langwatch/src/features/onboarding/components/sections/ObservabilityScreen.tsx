@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from "react";
-import { VStack, Grid } from "@chakra-ui/react";
+import { VStack, Grid, Box } from "@chakra-ui/react";
 import { WaitingForTracesChip } from "./observability/WaitingForTracesChip";
 import type { FrameworkKey, PlatformKey } from "./observability/types";
 import { ApiKeyCard } from "./observability/ApiKeyCard";
@@ -34,7 +34,7 @@ export function ObservabilityScreen(): React.ReactElement {
 
   return (
     <>
-      <Grid templateColumns={{ base: "1fr", md: "1fr 1fr" }} gap={6} alignItems="start">
+      <Grid templateColumns={{ base: "1fr", "xl": "1fr 1fr" }} gap={{ base: 6, "xl": 32 }} alignItems="start">
         <VStack align="stretch" gap={6}>
           <PlatformGrid
             selectedLanguage={selectedPlatform}
@@ -50,19 +50,21 @@ export function ObservabilityScreen(): React.ReactElement {
           />
         </VStack>
 
-        <VStack align="stretch" gap={3}>
+        <VStack align="stretch" gap={3} minW={0} w="full">
           {selectedEntry?.customComponent ? (
             <selectedEntry.customComponent />
           ) : (
-            <VStack align="stretch" gap={3}>
+            <VStack align="stretch" gap={3} minW={0} w="full">
               <InstallPreview install={selectedEntry?.install} />
-              <FrameworkIntegrationCode
-                platform={selectedPlatform}
-                framework={selectedFramework}
-                languageIcon={
-                  PLATFORM_OPTIONS.find((l) => l.key === selectedPlatform)?.icon
-                }
-              />
+              <Box minW={0} w="full" overflowX="auto">
+                <FrameworkIntegrationCode
+                  platform={selectedPlatform}
+                  framework={selectedFramework}
+                  languageIcon={
+                    PLATFORM_OPTIONS.find((l) => l.key === selectedPlatform)?.icon
+                  }
+                />
+              </Box>
             </VStack>
           )}
         </VStack>

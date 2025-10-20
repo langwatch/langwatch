@@ -27,12 +27,17 @@ interface OnboardingContainerProps extends React.PropsWithChildren {
    * Whether to have reduced padding above/below the header for more vertically dense screens.
    */
   compressedHeader?: boolean;
+  /**
+   * Controls the maximum width of the container content. Single Responsibility: layout width.
+   */
+  widthVariant?: "narrow" | "full";
 }
 
 export const OnboardingContainer: React.FC<
   OnboardingContainerProps
-> = ({ children, title, subTitle, loading, compressedHeader }) => {
+> = ({ children, title, subTitle, loading, compressedHeader, widthVariant = "narrow" }) => {
   const { emit } = useAnalytics();
+  const containerSize = widthVariant === "full" ? "8xl" : "md";
 
   return (
     <Box w="full" minH="100dvh" background="bg.subtle">
@@ -63,7 +68,8 @@ export const OnboardingContainer: React.FC<
 
       <MotionContainer
         mt={"10"}
-        maxW={"700px"}
+        width="8xl"
+        fluid
         initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.4, ease: "easeOut" }}

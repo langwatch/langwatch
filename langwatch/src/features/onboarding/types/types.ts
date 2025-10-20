@@ -78,6 +78,7 @@ export interface OnboardingScreen {
   component: React.ComponentType<any>;
   heading: string;
   subHeading?: string;
+  widthVariant?: "narrow" | "full";
 }
 
 export interface FormItem<T> {
