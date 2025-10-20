@@ -235,6 +235,7 @@
     "node-mocks-http": "^1.17.2",
     "prettier": "^3.0.3",
     "prisma": "5.7.0",
+    "raw-loader": "^4.0.2",
     "simple-statistics": "^7.8.3",
     "ts-to-zod": "^3.4.1",
     "tsx": "^4.7.0",
