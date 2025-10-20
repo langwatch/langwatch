@@ -1,6 +1,6 @@
 import type { FrameworkKey, PlatformKey } from "../types";
 import type { GoFrameworkKey } from "../constants";
-import { platformToFileName } from "../constants";
+import { platformToFileName } from "./platform.ts";
 import { parseSnippet } from "./snippets.ts";
 import { registry, getRegistryEntry } from "./registry";
 
