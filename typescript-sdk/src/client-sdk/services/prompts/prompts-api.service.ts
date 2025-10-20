@@ -76,7 +76,9 @@ export class PromptsApiService {
     const errorMessage =
       typeof error === "string"
         ? error
-        : error?.error ?? error?.message ?? "Unknown error occurred";
+        : error?.error != null
+            ? JSON.stringify(error.error)
+            : (error?.message ?? "Unknown error occurred");
     throw new PromptsError(
       `Failed to ${operation}: ${errorMessage}`,
       operation,

@@ -215,7 +215,15 @@ const processCollectorJob_ = async (
   id: string | undefined,
   data: CollectorJob
 ) => {
-  logger.debug({ jobId: id, data }, "processing job");
+  logger.info(
+    {
+      jobId: id,
+      ...(data.traceId && { traceId: data.traceId }),
+      ...(data.projectId && { projectId: data.projectId }),
+      ...(data.spans?.length && { spanCount: data.spans.length }),
+    },
+    "processing job",
+  );
 
   let spans = data.spans;
   const {

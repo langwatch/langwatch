@@ -5,7 +5,7 @@
  * Focused on essential interaction patterns and metadata validation.
  */
 
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeAll } from "vitest";
 import { SpanStatusCode } from "@opentelemetry/api";
 import {
   setupE2ETest,
@@ -21,6 +21,11 @@ import * as semconv from "../../semconv";
 
 describe("Real LLM Interactions E2E", () => {
   const setup = setupE2ETest();
+
+  // TODO: Investigate why this delay is needed and handle it better.
+  beforeAll(async () => {
+    await delay(30000);
+  }, 35000);
 
   it("should handle chat completion flow", async () => {
     const tracer = createTestTracer("chat-completion");

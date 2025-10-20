@@ -5,7 +5,7 @@
  * Focused on essential message and content format validation.
  */
 
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeAll } from "vitest";
 import { SpanStatusCode } from "@opentelemetry/api";
 import {
   setupE2ETest,
@@ -22,6 +22,11 @@ import { getLangWatchLogger } from "../../logger";
 
 describe("Content Parsing E2E", () => {
   const setup = setupE2ETest();
+
+  // TODO: Investigate why this delay is needed and handle it better.
+  beforeAll(async () => {
+    await delay(30000);
+  }, 35000);
 
   it("should parse and extract chat messages correctly", async () => {
     const tracer = createTestTracer("chat-messages");

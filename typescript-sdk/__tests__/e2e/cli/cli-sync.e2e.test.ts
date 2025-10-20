@@ -39,65 +39,66 @@ const createUniquePromptName = () => {
   return `${PROMPT_NAME_PREFIX}-${Date.now()}`;
 };
 
-if (!process.env.CI) {
-  describe("CLI E2E", () => {
-    let testDir: string;
-    let originalCwd: string;
-    let langwatch: LangWatch;
-    let localPromptFileManagement: PromptFileManager;
-    let materializedPromptFileManagement: PromptFileManager;
-    let lockFileManager: LockFileManager;
-    let cli: CliRunner;
+describe("CLI E2E", () => {
+  let testDir: string;
+  let originalCwd: string;
+  let langwatch: LangWatch;
+  let localPromptFileManagement: PromptFileManager;
+  let materializedPromptFileManagement: PromptFileManager;
+  let lockFileManager: LockFileManager;
+  let cli: CliRunner;
 
-    beforeAll(() => {
-      // Clean up temporary directories before next run
-      if (fs.existsSync(TMP_BASE_DIR)) {
-        fs.rmSync(TMP_BASE_DIR, { recursive: true, force: true });
-      }
+  beforeAll(() => {
+    // Clean up temporary directories before next run
+    if (fs.existsSync(TMP_BASE_DIR)) {
+      fs.rmSync(TMP_BASE_DIR, { recursive: true, force: true });
+    }
+  });
+
+  beforeEach(() => {
+    langwatch = new LangWatch({
+      apiKey: process.env.LANGWATCH_API_KEY,
+      endpoint: process.env.LANGWATCH_ENDPOINT,
     });
-
-    beforeEach(() => {
-      langwatch = new LangWatch();
-      fs.mkdirSync(TMP_BASE_DIR, { recursive: true });
-      testDir = fs.mkdtempSync(path.join(TMP_BASE_DIR, "langwatch-sync-"));
-      console.log("testDir", testDir);
-      originalCwd = process.cwd();
-      process.chdir(testDir);
-      cli = new CliRunner({ cwd: testDir });
-      localPromptFileManagement = new PromptFileManager({ cwd: testDir });
-      materializedPromptFileManagement = new PromptFileManager({
-        cwd: testDir,
-        materializedDir: true,
-      });
-      lockFileManager = new LockFileManager({ cwd: testDir });
+    fs.mkdirSync(TMP_BASE_DIR, { recursive: true });
+    testDir = fs.mkdtempSync(path.join(TMP_BASE_DIR, "langwatch-sync-"));
+    originalCwd = process.cwd();
+    process.chdir(testDir);
+    cli = new CliRunner({ cwd: testDir });
+    localPromptFileManagement = new PromptFileManager({ cwd: testDir });
+    materializedPromptFileManagement = new PromptFileManager({
+      cwd: testDir,
+      materializedDir: true,
     });
+    lockFileManager = new LockFileManager({ cwd: testDir });
+  });
 
-    afterEach(async () => {
-      process.chdir(originalCwd);
-    });
+  afterEach(async () => {
+    process.chdir(originalCwd);
+  });
 
-    afterAll(async () => {
-      // Clean up test prompts
-      const apiHelpers = new ApiHelpers(langwatch);
-      await apiHelpers.cleapUpTestPrompts();
-    });
+  afterAll(async () => {
+    // Clean up test prompts
+    const apiHelpers = new ApiHelpers(langwatch);
+    await apiHelpers.cleapUpTestPrompts();
+  });
 
-    describe("sync", () => {
-      describe("create local -> sync -> update local -> sync", () => {
-        it("should keep remote prompt up to date", async () => {
-          // Initialize project
-          const initResult = cli.run("prompt init");
-          expectCliResultSuccess(initResult);
+  describe("sync", () => {
+    describe("create local -> sync -> update local -> sync", () => {
+      it("should keep remote prompt up to date", async () => {
+        // Initialize project
+        const initResult = cli.run("prompt init");
+        expectCliResultSuccess(initResult);
 
-          const promptHandle = createUniquePromptName();
+        const promptHandle = createUniquePromptName();
 
-          // Create local prompt
-          const createResult = cli.run(`prompt create ${promptHandle}`);
-          expectCliResultSuccess(createResult);
+        // Create local prompt
+        const createResult = cli.run(`prompt create ${promptHandle}`);
+        expectCliResultSuccess(createResult);
 
-          // Verify prompt file content
-          expect(localPromptFileManagement.getPromptFileContent(promptHandle))
-            .toMatchInlineSnapshot(`
+        // Verify prompt file content
+        expect(localPromptFileManagement.getPromptFileContent(promptHandle))
+          .toMatchInlineSnapshot(`
           "model: openai/gpt-5
           modelParameters:
             temperature: 0.7
@@ -109,41 +110,47 @@ if (!process.env.CI) {
           "
         `);
 
-          // Add to config
-          const filePath =
-            localPromptFileManagement.getPromptFilePath(promptHandle);
-          cli.run(`prompt add ${promptHandle} ${filePath}`);
+        // Add to config
+        const filePath =
+          localPromptFileManagement.getPromptFilePath(promptHandle);
+        cli.run(`prompt add ${promptHandle} ${filePath}`);
 
-          // First sync - should create on remote
-          const sync1 = cli.run("prompt sync");
-          expectCliResultSuccess(sync1);
-          expect(sync1.output).toContain(`Pushed ${promptHandle}`);
+        // First sync - should create on remote
+        const sync1 = cli.run("prompt sync");
+        expectCliResultSuccess(sync1);
+        expect(sync1.output).toContain(`Pushed ${promptHandle}`);
 
-          // Verify remote prompt
-          const remotePrompt = await langwatch.prompts.get(promptHandle);
-          expect(remotePrompt.model).toBe("openai/gpt-5");
-          expect(remotePrompt.temperature).toBe(0.7);
-          expect(remotePrompt.messages).toEqual([
-            { role: "system", content: "You are a helpful assistant." },
-            { role: "user", content: "{{input}}" },
-          ]);
+        // Verify remote prompt
+        const remotePrompt = await langwatch.prompts.get(promptHandle);
+        if (!remotePrompt) {
+          throw new Error("Remote prompt not found");
+        }
+        expect(remotePrompt.model).toBe("openai/gpt-5");
+        expect(remotePrompt.temperature).toBe(0.7);
+        expect(remotePrompt.messages).toEqual([
+          { role: "system", content: "You are a helpful assistant." },
+          { role: "user", content: "{{input}}" },
+        ]);
 
-          // Verify lock file
-          const lock1 = lockFileManager.readLockFile();
-          expect(lock1.prompts[promptHandle]).toBeDefined();
-          expect(lock1.prompts[promptHandle].version).toBe(0);
+        // Verify lock file
+        const lock1 = lockFileManager.readLockFile();
+        if (!lock1) {
+          throw new Error("Lock file not found");
+        }
+        expect(lock1.prompts[promptHandle]).toBeDefined();
+        expect(lock1.prompts[promptHandle].version).toBe(0);
 
-          // Modify local file
-          localPromptFileManagement.updatePromptFile(promptHandle, {
-            model: "gpt-4-turbo",
-            modelParameters: { temperature: 0.9 },
-            messages: [
-              { role: "system", content: "You are an updated system message." },
-              { role: "user", content: "You are an updated user message." },
-            ],
-          });
-          expect(localPromptFileManagement.getPromptFileContent(promptHandle))
-            .toMatchInlineSnapshot(`
+        // Modify local file
+        localPromptFileManagement.updatePromptFile(promptHandle, {
+          model: "gpt-4-turbo",
+          modelParameters: { temperature: 0.9 },
+          messages: [
+            { role: "system", content: "You are an updated system message." },
+            { role: "user", content: "You are an updated user message." },
+          ],
+        });
+        expect(localPromptFileManagement.getPromptFileContent(promptHandle))
+          .toMatchInlineSnapshot(`
         "model: gpt-4-turbo
         modelParameters:
           temperature: 0.9
@@ -155,97 +162,107 @@ if (!process.env.CI) {
         "
       `);
 
-          // Second sync - should update on remote
-          const sync2 = cli.run("prompt sync");
-          expectCliResultSuccess(sync2);
+        // Second sync - should update on remote
+        const sync2 = cli.run("prompt sync");
+        expectCliResultSuccess(sync2);
 
-          // Verify remote prompt
-          const updatedRemotePrompt = await langwatch.prompts.get(promptHandle);
-          expect(updatedRemotePrompt.model).toBe("gpt-4-turbo");
-          expect(updatedRemotePrompt.temperature).toBe(0.9);
-          expect(updatedRemotePrompt.messages).toEqual([
-            { role: "system", content: "You are an updated system message." },
-            { role: "user", content: "You are an updated user message." },
-          ]);
+        // Verify remote prompt
+        const updatedRemotePrompt = await langwatch.prompts.get(promptHandle);
+        if (!updatedRemotePrompt) {
+          throw new Error("Updated remote prompt not found");
+        }
+        expect(updatedRemotePrompt.model).toBe("gpt-4-turbo");
+        expect(updatedRemotePrompt.temperature).toBe(0.9);
+        expect(updatedRemotePrompt.messages).toEqual([
+          { role: "system", content: "You are an updated system message." },
+          { role: "user", content: "You are an updated user message." },
+        ]);
 
-          // Verify version incremented
-          const lock2 = lockFileManager.readLockFile();
-          expect(lock2.prompts[promptHandle].version).toBe(1);
+        // Verify version incremented
+        const lock2 = lockFileManager.readLockFile();
+        if (!lock2) {
+          throw new Error("Lock file not found");
+        }
+        expect(lock2.prompts[promptHandle].version).toBe(1);
 
-          // Third sync - should be up-to-date
-          const sync3 = cli.run("prompt sync");
-          expectCliResultSuccess(sync3);
-          expect(sync3.output).toContain("no changes");
+        // Third sync - should be up-to-date
+        const sync3 = cli.run("prompt sync");
+        expectCliResultSuccess(sync3);
+        expect(sync3.output).toContain("no changes");
+      });
+    });
+
+    describe("when there are changes on the remote prompt", () => {
+      let promptHandle: string;
+
+      beforeEach(async () => {
+        // Initialize project
+        const init = cli.run("prompt init");
+        expectCliResultSuccess(init);
+
+        // Create local prompt
+        promptHandle = createUniquePromptName();
+        const createResult = cli.run(`prompt create ${promptHandle}`);
+        expectCliResultSuccess(createResult);
+        const filePath =
+          localPromptFileManagement.getPromptFilePath(promptHandle);
+        const addResult = cli.run(`prompt add ${promptHandle} ${filePath}`);
+        expectCliResultSuccess(addResult);
+
+        // First sync - should create on remote
+        const sync1 = cli.run("prompt sync");
+        expectCliResultSuccess(sync1);
+        const localPrompt =
+          localPromptFileManagement.readPromptFile(promptHandle);
+
+        // Verify remote prompt
+        const remotePrompt = await langwatch.prompts.get(promptHandle);
+        if (!remotePrompt) {
+          throw new Error("Remote prompt not found");
+        }
+        expect(remotePrompt.handle).toBe(promptHandle);
+        expect(remotePrompt.model).toBe(localPrompt.model);
+        if (!localPrompt.modelParameters) {
+          throw new Error("Local prompt model parameters not found");
+        }
+        expect(remotePrompt.temperature).toBe(
+          localPrompt.modelParameters.temperature,
+        );
+        expect(remotePrompt.messages).toEqual(localPrompt.messages);
+
+        // 5. Modify remote prompt
+        await langwatch.prompts.update(promptHandle, {
+          commitMessage: "Updated via CLI sync",
+          temperature: 0.9,
+          model: "gpt-4-turbo",
+          messages: [
+            {
+              role: "system",
+              content: "You an updated system message.",
+            },
+            {
+              role: "user",
+              content: "Do you like apples?",
+            },
+          ],
         });
       });
 
-      describe("when there are changes on the remote prompt", () => {
-        let promptHandle: string;
+      describe("when user chooses to use remote version", () => {
+        it("should replace the local prompt with the remote version", async () => {
+          // Second sync - should sync
+          const sync2 = await cli.runInteractive("prompt sync", ["r"]);
 
-        beforeEach(async () => {
-          // Initialize project
-          const init = cli.run("prompt init");
-          expectCliResultSuccess(init);
+          // Verify conflict output
+          expect(sync2.output).toContain(`Conflict`);
+          expect(sync2.output).toContain(`Differences:`);
+          expect(sync2.output).toContain(`• model: openai/gpt-5 → gpt-4-turbo`);
+          expect(sync2.output).toContain(`• prompt content differs`);
+          expect(sync2.output).toContain(`• messages differ`);
+          expect(sync2.output).toContain(`• temperature: 0.7 → 0.9`);
 
-          // Create local prompt
-          promptHandle = createUniquePromptName();
-          const createResult = cli.run(`prompt create ${promptHandle}`);
-          expectCliResultSuccess(createResult);
-          const filePath =
-            localPromptFileManagement.getPromptFilePath(promptHandle);
-          const addResult = cli.run(`prompt add ${promptHandle} ${filePath}`);
-          expectCliResultSuccess(addResult);
-
-          // First sync - should create on remote
-          const sync1 = cli.run("prompt sync");
-          console.log(sync1);
-          expectCliResultSuccess(sync1);
-          const localPrompt =
-            localPromptFileManagement.readPromptFile(promptHandle);
-
-          // Verify remote prompt
-          const remotePrompt = await langwatch.prompts.get(promptHandle);
-          expect(remotePrompt.handle).toBe(promptHandle);
-          expect(remotePrompt.model).toBe(localPrompt.model);
-          expect(remotePrompt.temperature).toBe(
-            localPrompt.modelParameters.temperature,
-          );
-          expect(remotePrompt.messages).toEqual(localPrompt.messages);
-
-          // 5. Modify remote prompt
-          await langwatch.prompts.update(promptHandle, {
-            temperature: 0.9,
-            model: "gpt-4-turbo",
-            messages: [
-              {
-                role: "system",
-                content: "You an updated system message.",
-              },
-              {
-                role: "user",
-                content: "Do you like apples?",
-              },
-            ],
-          });
-        });
-
-        describe("when user chooses to use remote version", () => {
-          it("should replace the local prompt with the remote version", async () => {
-            // Second sync - should sync
-            const sync2 = await cli.runInteractive("prompt sync", ["r"]);
-
-            // Verify conflict output
-            expect(sync2.output).toContain(`Conflict`);
-            expect(sync2.output).toContain(`Differences:`);
-            expect(sync2.output).toContain(
-              `• model: openai/gpt-5 → gpt-4-turbo`,
-            );
-            expect(sync2.output).toContain(`• prompt content differs`);
-            expect(sync2.output).toContain(`• messages differ`);
-            expect(sync2.output).toContain(`• temperature: 0.7 → 0.9`);
-
-            expect(localPromptFileManagement.getPromptFileContent(promptHandle))
-              .toMatchInlineSnapshot(`
+          expect(localPromptFileManagement.getPromptFileContent(promptHandle))
+            .toMatchInlineSnapshot(`
               "model: gpt-4-turbo
               modelParameters:
                 temperature: 0.9
@@ -256,55 +273,58 @@ if (!process.env.CI) {
                   content: Do you like apples?
               "
             `);
-          });
-        });
-
-        describe("when user chooses to use local version", () => {
-          it("should replace the remote version with the local version", async () => {
-            const current =
-              localPromptFileManagement.readPromptFile(promptHandle);
-            // Run sync and choose local version ('l')
-            const sync = await cli.runInteractive(`prompt sync`, ["l"]);
-            expectCliResultSuccess(sync);
-
-            // Remote should now match local
-            const updatedRemote = await langwatch.prompts.get(promptHandle);
-            expect(updatedRemote.model).toBe(current.model);
-            expect(updatedRemote.prompt).toBe(current.messages[0].content);
-            expect(updatedRemote.messages).toEqual(current.messages);
-          });
         });
       });
 
-      // Using latest is a special case. It should always pull down and never push up to remote
-      describe("@latest sync", () => {
-        let promptHandle: string;
-
-        beforeEach(async () => {
-          promptHandle = createUniquePromptName();
-          await langwatch.prompts.create({
-            handle: promptHandle,
-            model: "gpt-4-turbo",
-            temperature: 0.9,
-            prompt: "You are a helpful assistant.",
-          });
-
-          // Update to change from draft
-          const addResult = await cli.runInteractive(
-            `prompt add ${promptHandle}@latest`,
-            ["y"],
-          );
-
-          expectCliResultSuccess(addResult);
-
-          const sync = cli.run("prompt sync");
+      describe("when user chooses to use local version", () => {
+        it("should replace the remote version with the local version", async () => {
+          const current =
+            localPromptFileManagement.readPromptFile(promptHandle);
+          // Run sync and choose local version ('l')
+          const sync = await cli.runInteractive(`prompt sync`, ["l"]);
           expectCliResultSuccess(sync);
+
+          // Remote should now match local
+          const updatedRemote = await langwatch.prompts.get(promptHandle);
+          if (!updatedRemote) {
+            throw new Error("Updated remote prompt not found");
+          }
+          expect(updatedRemote.model).toBe(current.model);
+          expect(updatedRemote.prompt).toBe(current.messages[0].content);
+          expect(updatedRemote.messages).toEqual(current.messages);
+        });
+      });
+    });
+
+    // Using latest is a special case. It should always pull down and never push up to remote
+    describe("@latest sync", () => {
+      let promptHandle: string;
+
+      beforeEach(async () => {
+        promptHandle = createUniquePromptName();
+        await langwatch.prompts.create({
+          handle: promptHandle,
+          model: "gpt-4-turbo",
+          temperature: 0.9,
+          prompt: "You are a helpful assistant.",
         });
 
-        it("should pull down the latest version from remote into materialized", async () => {
-          expect(
-            materializedPromptFileManagement.getPromptFileContent(promptHandle),
-          ).toMatchInlineSnapshot(`
+        // Update to change from draft
+        const addResult = await cli.runInteractive(
+          `prompt add ${promptHandle}@latest`,
+          ["y"],
+        );
+
+        expectCliResultSuccess(addResult);
+
+        const sync = cli.run("prompt sync");
+        expectCliResultSuccess(sync);
+      });
+
+      it("should pull down the latest version from remote into materialized", async () => {
+        expect(
+          materializedPromptFileManagement.getPromptFileContent(promptHandle),
+        ).toMatchInlineSnapshot(`
           "model: gpt-4-turbo
           messages:
             - role: system
@@ -313,32 +333,31 @@ if (!process.env.CI) {
             temperature: 0.9
           "
         `);
-        });
+      });
 
-        it("should not be in the prompts directory", () => {
-          expect(() =>
-            localPromptFileManagement.getPromptFileContent(promptHandle),
-          ).toThrow();
-        });
+      it("should not be in the prompts directory", () => {
+        expect(() =>
+          localPromptFileManagement.getPromptFileContent(promptHandle),
+        ).toThrow();
+      });
 
-        describe("when remote is updated", () => {
-          it("should get the updated version", async () => {
-            await langwatch.prompts.update(promptHandle, {
-              temperature: 0.8,
-              model: "gpt-4-turbo",
-              messages: [
-                { role: "system", content: "I am an updated system message." },
-              ],
-            });
+      describe("when remote is updated", () => {
+        it("should get the updated version", async () => {
+          await langwatch.prompts.update(promptHandle, {
+            commitMessage: "Updated via CLI sync",
+            temperature: 0.8,
+            model: "gpt-4-turbo",
+            messages: [
+              { role: "system", content: "I am an updated system message." },
+            ],
+          });
 
-            const sync = cli.run("prompt sync");
-            expectCliResultSuccess(sync);
+          const sync = cli.run("prompt sync");
+          expectCliResultSuccess(sync);
 
-            expect(
-              materializedPromptFileManagement.getPromptFileContent(
-                promptHandle,
-              ),
-            ).toMatchInlineSnapshot(`
+          expect(
+            materializedPromptFileManagement.getPromptFileContent(promptHandle),
+          ).toMatchInlineSnapshot(`
             "model: gpt-4-turbo
             messages:
               - role: system
@@ -347,25 +366,23 @@ if (!process.env.CI) {
               temperature: 0.8
             "
           `);
-          });
         });
+      });
 
-        describe("when pegged to a version", () => {
-          it("should sync the correct version", async () => {
-            const addResult = await cli.runInteractive(
-              `prompt add ${promptHandle}@0`,
-              ["y"],
-            );
-            expectCliResultSuccess(addResult);
+      describe("when pegged to a version", () => {
+        it("should sync the correct version", async () => {
+          const addResult = await cli.runInteractive(
+            `prompt add ${promptHandle}@0`,
+            ["y"],
+          );
+          expectCliResultSuccess(addResult);
 
-            const sync = cli.run("prompt sync");
-            expectCliResultSuccess(sync);
+          const sync = cli.run("prompt sync");
+          expectCliResultSuccess(sync);
 
-            expect(
-              materializedPromptFileManagement.getPromptFileContent(
-                promptHandle,
-              ),
-            ).toMatchInlineSnapshot(`
+          expect(
+            materializedPromptFileManagement.getPromptFileContent(promptHandle),
+          ).toMatchInlineSnapshot(`
             "model: gpt-4-turbo
             messages:
               - role: system
@@ -374,9 +391,8 @@ if (!process.env.CI) {
               temperature: 0.9
             "
           `);
-          });
         });
       });
     });
   });
-}
+});

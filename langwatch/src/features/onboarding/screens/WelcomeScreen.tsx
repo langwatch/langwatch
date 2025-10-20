@@ -2,7 +2,7 @@ import { useOrganizationTeamProject } from "../../../hooks/useOrganizationTeamPr
 import { OrganizationOnboardingContainer } from "../components/containers/OnboardingContainer";
 import { OnboardingNavigation } from "../components/navigation/OnboardingNavigation";
 import { useOnboardingFlow } from "../hooks/use-onboarding-flow";
-import { createWelcomeScreens } from "./create-welcome-screens";
+import { useCreateWelcomeScreens } from "./create-welcome-screens";
 import { slideVariants, transition } from "../constants/onboarding-data";
 import { VStack } from "@chakra-ui/react";
 import { motion, AnimatePresence } from "motion/react";
@@ -13,6 +13,8 @@ import { trackEventOnce } from "~/utils/tracking";
 import { useRouter } from "next/router";
 import { useRequiredSession } from "~/hooks/useRequiredSession";
 import { LoadingScreen } from "~/components/LoadingScreen";
+import { AnalyticsBoundary } from "react-contextual-analytics";
+import { OnboardingFormProvider } from "../contexts/form-context";
 
 export const WelcomeScreen: React.FC = () => {
   const router = useRouter();
@@ -29,39 +31,16 @@ export const WelcomeScreen: React.FC = () => {
   } = useOrganizationTeamProject({ redirectToOnboarding: false });
 
   const {
-    setOrganizationName,
-    setAgreement,
-    setUsageStyle,
-    setPhoneNumber,
-    setPhoneHasValue,
-    setPhoneIsValid,
-    setCompanySize,
-    setSolutionType,
-    setDesires,
-    setRole,
     currentScreenIndex,
     direction,
     flow,
     navigation,
     getFormData,
+    formContextValue,
   } = useOnboardingFlow();
 
-  const screens = createWelcomeScreens({
-    formData: getFormData(),
-    flow,
-    handlers: {
-      setOrganizationName,
-      setAgreement,
-      setUsageStyle,
-      setPhoneNumber,
-      setPhoneHasValue,
-      setPhoneIsValid,
-      setCompanySize,
-      setSolutionType,
-      setDesires,
-      setRole,
-    },
-  });
+
+  const screens = useCreateWelcomeScreens({ flow });
 
   const initializeOrganization =
     api.onboarding.initializeOrganization.useMutation();
@@ -101,7 +80,7 @@ export const WelcomeScreen: React.FC = () => {
           terms: form.agreement,
           companySize: form.companySize,
           yourRole: form.role,
-          featureUsage: form.selectedDesires.join(", "),
+          featureUsage: form.selectedDesires.join("\n"),
           utmCampaign: form.utmCampaign,
         },
       },
@@ -139,43 +118,59 @@ export const WelcomeScreen: React.FC = () => {
   const currentScreen =
     currentVisibleIndex >= 0 ? screens[currentVisibleIndex] : undefined;
 
-  return (
-    <OrganizationOnboardingContainer
-      title={currentScreen?.heading ?? "Welcome Aboard 👋"}
-      subTitle={currentScreen?.subHeading}
-    >
-      <VStack gap={4} align="stretch" position="relative" minH="400px">
-        <AnimatePresence initial={false} custom={direction} mode="popLayout">
-          <motion.div
-            key={currentScreenIndex}
-            custom={direction}
-            variants={slideVariants}
-            initial="enter"
-            animate="center"
-            exit="exit"
-            transition={transition}
-            style={{ width: "100%" }}
-          >
-            <fieldset disabled={initializeOrganization.isPending}>
-              {currentScreen?.component}
-            </fieldset>
-          </motion.div>
-        </AnimatePresence>
+  const pendingOrSuccessful = initializeOrganization.isPending || initializeOrganization.isSuccess;
 
-        <OnboardingNavigation
-          currentScreenIndex={currentScreenIndex}
-          onPrev={navigation.prevScreen}
-          onNext={navigation.nextScreen}
-          onSkip={navigation.skipScreen}
-          canProceed={navigation.canProceed()}
-          isSkippable={!currentScreen?.required}
-          isSubmitting={
-            initializeOrganization.isPending || initializeOrganization.isSuccess
-          }
-          onFinish={handleFinalizeSubmit}
-        />
-      </VStack>
-    </OrganizationOnboardingContainer>
+  return (
+    <AnalyticsBoundary name="onboarding_welcome" sendViewedEvent>
+      <OrganizationOnboardingContainer
+        title={currentScreen?.heading ?? "Welcome Aboard 👋"}
+        subTitle={currentScreen?.subHeading}
+      >
+        <VStack gap={4} align="stretch" position="relative" minH="400px">
+          <AnimatePresence initial={false} custom={direction} mode="popLayout">
+            <motion.div
+              key={currentScreenIndex}
+              custom={direction}
+              variants={slideVariants}
+              initial="enter"
+              animate="center"
+              exit="exit"
+              transition={transition}
+              style={{ width: "100%" }}
+            >
+              <AnalyticsBoundary
+                name={currentScreen?.id ?? "unknown"}
+                attributes={{
+                  screenIndex: currentVisibleIndex,
+                  variant: flow.variant,
+                  total: flow.total,
+                  isFirst: flow.first === currentScreenIndex,
+                  isLast: flow.last === currentScreenIndex,
+                }}
+                sendViewedEvent
+              >
+                <OnboardingFormProvider value={formContextValue}>
+                  <fieldset disabled={pendingOrSuccessful}>
+                    {currentScreen?.component ? <currentScreen.component /> : null}
+                  </fieldset>
+                </OnboardingFormProvider>
+              </AnalyticsBoundary>
+            </motion.div>
+          </AnimatePresence>
+
+          <OnboardingNavigation
+            currentScreenIndex={currentScreenIndex}
+            onPrev={navigation.prevScreen}
+            onNext={navigation.nextScreen}
+            onSkip={navigation.skipScreen}
+            canProceed={navigation.canProceed()}
+            isSkippable={!currentScreen?.required}
+            isSubmitting={pendingOrSuccessful}
+            onFinish={handleFinalizeSubmit}
+          />
+        </VStack>
+      </OrganizationOnboardingContainer>
+    </AnalyticsBoundary>
   );
 };
 
