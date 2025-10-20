@@ -1,3 +1,5 @@
+/* eslint-disable @next/next/no-img-element */
+
 import type { FrameworkKey, PlatformKey, Option } from "./types";
 
 export const PLATFORM_OPTIONS: Option<PlatformKey>[] = [
@@ -11,8 +13,8 @@ export const PLATFORM_OPTIONS: Option<PlatformKey>[] = [
 
 export const FRAMEWORKS_BY_PLATFORM = {
   typescript: [
-    { key: "vercel_ai", label: "Vercel AI", icon: <img src="/images/external-icons/vercel-darktheme.svg" alt="Vercel AI" />, size: "2xl" },
-    { key: "mastra", label: "Mastra", icon: <img src="/images/external-icons/mastra-darktheme.svg" alt="Mastra" />, size: "2xl" },
+    { key: "vercel_ai", label: "Vercel AI SDK", icon: <img src="/images/external-icons/vercel-darktheme.svg" alt="Vercel AI" />, size: "2xl" },
+    { key: "mastra", label: "Mastra Agents", icon: <img src="/images/external-icons/mastra-darktheme.svg" alt="Mastra" />, size: "2xl" },
     { key: "langchain", label: "LangChain", icon: <img src="/images/external-icons/langchain-darktheme.svg" alt="LangChain" />, size: "2xl" },
     { key: "openai", label: "OpenAI", icon: <img src="/images/external-icons/openai-darktheme.svg" alt="OpenAI" />, size: "xl" },
     { key: "azure", label: "Azure", icon: <img src="/images/external-icons/azure.svg" alt="Azure" /> },

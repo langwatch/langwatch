@@ -14,11 +14,17 @@ export function FrameworkGrid({ language, selectedFramework, onSelectFramework }
   const frameworks = FRAMEWORKS_BY_PLATFORM[language] as readonly Option<FrameworkKey>[];
   if (!frameworks || frameworks.length === 0) return null;
 
+  const framework = frameworks.find(f => f.key === selectedFramework);
+  if (!framework) {
+    console.error("No framework found for language: ", language);
+    return null;
+  }
+
   return (
     <VStack align="stretch" gap={3}>
       <VStack align="stretch" gap={0}>
         <Text fontSize="md" fontWeight="semibold">
-          Select a framework/provider
+          Integrate LangWatch with {framework.label}
         </Text>
         <Text fontSize="xs" color="fg.muted">
           Pick your model provider or framework to tailor setup guide.
