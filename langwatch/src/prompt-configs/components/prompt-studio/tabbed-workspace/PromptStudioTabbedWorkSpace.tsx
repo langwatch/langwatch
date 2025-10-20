@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Box } from "@chakra-ui/react";
 import { BrowserLikeTabs } from "./ui";
+import { PromptBrowserTab } from "./ui/PromptBrowserTab";
 
 // Placeholder components for now - these would be replaced with actual implementations
 function PromptEditor() {
@@ -82,12 +83,17 @@ export function PromptStudioTabbedWorkSpace() {
       onTabClose={handleTabClose}
       onAddTab={handleAddTab}
     >
-      <BrowserLikeTabs.Tab value="prompt-editor" title="Prompt Editor">
-        <PromptEditor />
-      </BrowserLikeTabs.Tab>
-      <BrowserLikeTabs.Tab value="prompt-preview" title="Prompt Preview">
-        <PromptPreview />
-      </BrowserLikeTabs.Tab>
+      <PromptBrowserTab
+        value="prompt-editor"
+        version={1}
+        title="Prompt Editor"
+        hasUnsavedChanges={true}
+      />
+      <PromptBrowserTab
+        value="prompt-preview"
+        version={1}
+        title="Prompt Preview"
+      />
       <BrowserLikeTabs.Content value="prompt-editor">
         <PromptEditor />
       </BrowserLikeTabs.Content>

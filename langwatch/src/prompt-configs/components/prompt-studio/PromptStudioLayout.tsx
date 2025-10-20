@@ -8,7 +8,7 @@ export function PromptStudioLayout() {
     <DashboardLayout position="relative">
       <HStack width="full" height="full" gap={0}>
         <PromptStudioSidebar />
-        <Box width="full">
+        <Box width="full" height="full">
           <PromptStudioMainContent />
         </Box>
       </HStack>
