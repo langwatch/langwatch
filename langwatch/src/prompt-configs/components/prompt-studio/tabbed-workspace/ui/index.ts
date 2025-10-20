@@ -1,0 +1,1 @@
+export { BrowserLikeTabs } from "./BrowserLikeTabs";
