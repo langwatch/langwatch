@@ -2,7 +2,7 @@ import React, { useMemo, useState } from "react";
 import { VStack, Grid, Box } from "@chakra-ui/react";
 import { WaitingForTracesChip } from "./observability/WaitingForTracesChip";
 import type { FrameworkKey, PlatformKey } from "./observability/types";
-import { ApiKeyCard } from "./observability/ApiKeyCard";
+import { ApiIntegrationInfoCard } from "./observability/ApiIntegrationInfoCard";
 import { FrameworkGrid } from "./observability/FrameworkGrid";
 import { PlatformGrid } from "./observability/PlatformGrid";
 import {
@@ -41,13 +41,13 @@ export function ObservabilityScreen(): React.ReactElement {
             onSelectLanguage={handleSelectLanguage}
           />
 
-          <ApiKeyCard />
-
           <FrameworkGrid
             language={selectedPlatform}
             selectedFramework={selectedFramework}
             onSelectFramework={setSelectedFramework}
           />
+
+          <ApiIntegrationInfoCard />
         </VStack>
 
         <VStack align="stretch" gap={3} minW={0} w="full">
