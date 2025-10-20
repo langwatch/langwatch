@@ -3,9 +3,6 @@ import type { FrameworkKey, PlatformKey } from "./types";
 import { useCodegen } from "./codegen";
 import { CodePreview } from "./CodePreview";
 
-/**
- * Single Responsibility: Render framework/platform-specific integration code with project-aware substitutions.
- */
 export function FrameworkIntegrationCode({
   platform,
   framework,

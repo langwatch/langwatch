@@ -61,6 +61,7 @@ export const useCreateProductScreens = ({
         id: "observability",
         required: false,
         heading: "With Great Power, Comes Great Observability",
+        widthVariant: "full",
         component: ObservabilityScreen,
       },
       [ProductScreenIndex.EVALUATIONS]: {

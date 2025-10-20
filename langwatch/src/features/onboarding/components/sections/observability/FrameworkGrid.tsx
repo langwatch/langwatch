@@ -1,7 +1,7 @@
 import React from "react";
-import { Grid, Text, VStack } from "@chakra-ui/react";
+import { HStack, Text, VStack } from "@chakra-ui/react";
 import { FRAMEWORKS_BY_PLATFORM } from "./constants";
-import type { FrameworkKey, PlatformKey, Option } from "./types";
+import type { FrameworkKey, PlatformKey } from "./types";
 import { SelectableIconCard } from "./SelectableIconCard";
 
 interface FrameworkGridProps {
@@ -11,7 +11,7 @@ interface FrameworkGridProps {
 }
 
 export function FrameworkGrid({ language, selectedFramework, onSelectFramework }: FrameworkGridProps): React.ReactElement | null {
-  const frameworks = FRAMEWORKS_BY_PLATFORM[language] as readonly Option<FrameworkKey>[];
+  const frameworks = FRAMEWORKS_BY_PLATFORM[language] ;
   if (!frameworks || frameworks.length === 0) return null;
 
   // If no framework is selected, default to the first available framework
@@ -30,7 +30,7 @@ export function FrameworkGrid({ language, selectedFramework, onSelectFramework }
           Pick your model provider or framework to tailor setup guide.
         </Text>
       </VStack>
-      <Grid templateColumns={{ base: "repeat(4, 1fr)", md: "repeat(8, 1fr)" }} gap={3}>
+      <HStack gap={3}>
         {frameworks.map((fw) => (
           <SelectableIconCard
             key={fw.key}
@@ -42,7 +42,7 @@ export function FrameworkGrid({ language, selectedFramework, onSelectFramework }
             ariaLabel={`${fw.label} framework`}
           />
         ))}
-      </Grid>
+      </HStack>
     </VStack>
   );
 }
