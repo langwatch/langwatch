@@ -6,10 +6,11 @@ on:
   workflow_dispatch:
 
 jobs:
-  build-and-push:
+  extract-version:
     runs-on: ubuntu-latest
     if: startsWith(github.event.release.tag_name, 'langwatch@') || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main')
-
+    outputs:
+      version: ${{ steps.extract_version.outputs.version }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -26,6 +27,14 @@ jobs:
           fi
           echo "version=${VERSION}" >> $GITHUB_OUTPUT
 
+  build-and-push-amd64:
+    runs-on: ubuntu-latest
+    needs: extract-version
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
@@ -35,26 +44,72 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Build and push LangWatch Docker image
+      - name: Build and push LangWatch Docker image (AMD64)
         uses: docker/build-push-action@v6
         with:
           context: .
           push: true
-          platforms: linux/amd64,linux/arm64/v8
+          platforms: linux/amd64
           tags: |
             langwatch/langwatch:latest
-            langwatch/langwatch:${{ steps.extract_version.outputs.version }}
+            langwatch/langwatch:${{ needs.extract-version.outputs.version }}
 
-      - name: Build and push LangWatch NLP Docker image
+      - name: Build and push LangWatch NLP Docker image (AMD64)
         uses: docker/build-push-action@v6
         with:
           context: .
           file: Dockerfile.langwatch_nlp
           push: true
-          platforms: linux/amd64,linux/arm64/v8
+          platforms: linux/amd64
           tags: |
             langwatch/langwatch_nlp:latest
-            langwatch/langwatch_nlp:${{ steps.extract_version.outputs.version }}
+            langwatch/langwatch_nlp:${{ needs.extract-version.outputs.version }}
+
+  build-and-push-arm64:
+    runs-on: arm64-runner-16gb
+    needs: extract-version
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build and push LangWatch Docker image (ARM64)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          platforms: linux/arm64/v8
+          tags: |
+            langwatch/langwatch:latest
+            langwatch/langwatch:${{ needs.extract-version.outputs.version }}
+
+      - name: Build and push LangWatch NLP Docker image (ARM64)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile.langwatch_nlp
+          push: true
+          platforms: linux/arm64/v8
+          tags: |
+            langwatch/langwatch_nlp:latest
+            langwatch/langwatch_nlp:${{ needs.extract-version.outputs.version }}
+
+  notify:
+    runs-on: ubuntu-latest
+    needs: [build-and-push-amd64, build-and-push-arm64]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
 
       - name: Notify Slack
         env:
@@ -63,4 +118,4 @@ jobs:
           bash .github/scripts/notify-slack-release.sh \
             CHANGELOG.md \
             "LangWatch" \
-            "${{ steps.extract_version.outputs.version }}"
+            "${{ needs.extract-version.outputs.version }}"
