@@ -284,7 +284,7 @@ describe("Custom Role Functionality Tests", () => {
             "experiments:manage",
             "datasets:view",
             "analytics:manage",
-            "messages:share",
+            "traces:share",
           ],
         },
       });
@@ -377,7 +377,7 @@ describe("Custom Role Functionality Tests", () => {
         await hasProjectPermission(
           { prisma: mockPrisma, session: mockSession },
           "project-123",
-          "messages:share" as Permission,
+          "traces:share" as Permission,
         ),
       ).toBe(true);
 
@@ -386,7 +386,7 @@ describe("Custom Role Functionality Tests", () => {
         await hasProjectPermission(
           { prisma: mockPrisma, session: mockSession },
           "project-123",
-          "messages:view" as Permission,
+          "traces:view" as Permission,
         ),
       ).toBe(true);
     });
@@ -517,7 +517,7 @@ describe("Custom Role Functionality Tests", () => {
         "experiments:manage",
         "datasets:view",
         "analytics:create",
-        "messages:share",
+        "traces:share",
       ];
 
       // Test hierarchy rules
@@ -557,11 +557,11 @@ describe("Custom Role Functionality Tests", () => {
         hasPermissionWithHierarchy(customPermissions, "analytics:manage"),
       ).toBe(false);
 
+      expect(hasPermissionWithHierarchy(customPermissions, "traces:view")).toBe(
+        false,
+      );
       expect(
-        hasPermissionWithHierarchy(customPermissions, "messages:view"),
-      ).toBe(false);
-      expect(
-        hasPermissionWithHierarchy(customPermissions, "messages:share"),
+        hasPermissionWithHierarchy(customPermissions, "traces:share"),
       ).toBe(true);
     });
 
@@ -618,7 +618,7 @@ describe("Custom Role Functionality Tests", () => {
         "experiments:view",
         "datasets:manage",
         "analytics:create",
-        "messages:share",
+        "traces:share",
         "project:delete",
       ];
 

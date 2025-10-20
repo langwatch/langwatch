@@ -47,7 +47,7 @@ describe("Demo Project and Public Sharing Tests", () => {
         "project:view",
         "analytics:view",
         "cost:view",
-        "messages:view",
+        "traces:view",
         "annotations:view",
         "guardrails:view",
         "experiments:view",
@@ -72,7 +72,7 @@ describe("Demo Project and Public Sharing Tests", () => {
       const managePermissions = [
         "project:manage",
         "analytics:manage",
-        "messages:manage",
+        "traces:manage",
         "annotations:manage",
         "guardrails:manage",
         "experiments:manage",
@@ -153,7 +153,7 @@ describe("Demo Project and Public Sharing Tests", () => {
     });
 
     it("should not allow share permissions for demo project", async () => {
-      const sharePermissions = ["messages:share"];
+      const sharePermissions = ["traces:share"];
 
       for (const permission of sharePermissions) {
         const result = await hasProjectPermission(

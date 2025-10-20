@@ -28,7 +28,10 @@ import SettingsLayout from "../../components/SettingsLayout";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { api } from "../../utils/api";
 import type { Permission, Resource, Action } from "../../server/api/rbac";
-import { Resources, Actions } from "../../server/api/rbac";
+import {
+  orderedResources,
+  getValidActionsForResource,
+} from "../../utils/permissionsConfig";
 
 /**
  * Role Management Settings Page
@@ -694,48 +697,8 @@ function PermissionSelector({
     Permission[]
   >;
 
-  // Define which actions are valid for each resource
-  const getValidActionsForResource = (resource: Resource): Action[] => {
-    // Cost resource only has view permission
-    if (resource === Resources.COST) {
-      return [Actions.VIEW];
-    }
-    // Messages only have view and share permissions
-    if (resource === Resources.MESSAGES) {
-      return [Actions.VIEW, Actions.SHARE];
-    }
-    // Scenarios only have view permission
-    if (resource === Resources.SCENARIOS) {
-      return [Actions.VIEW];
-    }
-    // Most other resources don't have share
-    return [
-      Actions.MANAGE,
-      Actions.VIEW,
-      Actions.CREATE,
-      Actions.UPDATE,
-      Actions.DELETE,
-    ];
-  };
-
-  // Define the order of resources - this is the single source of truth for UI ordering
-  const resourceOrder: Resource[] = [
-    Resources.ORGANIZATION,
-    Resources.PROJECT,
-    Resources.TEAM,
-    Resources.ANALYTICS,
-    Resources.COST,
-    Resources.MESSAGES,
-    Resources.SCENARIOS,
-    Resources.ANNOTATIONS,
-    Resources.GUARDRAILS,
-    Resources.EXPERIMENTS,
-    Resources.DATASETS,
-    Resources.TRIGGERS,
-    Resources.WORKFLOWS,
-    Resources.PROMPTS,
-    // Resources.PLAYGROUND, // Hidden
-  ];
+  // Use orderedResources from shared config (PLAYGROUND hidden, ORG/TEAM omitted)
+  const resourceOrder: Resource[] = orderedResources;
 
   // Group permissions by resource using the correct valid actions
   resourceOrder.forEach((resource) => {
@@ -869,55 +832,18 @@ function PermissionViewer({ permissions }: { permissions: Permission[] }) {
     Permission[]
   >;
 
-  // Define the order of resources - this is the single source of truth for UI ordering
-  const resourceOrder: Resource[] = [
-    Resources.ORGANIZATION,
-    Resources.PROJECT,
-    Resources.TEAM,
-    Resources.ANALYTICS,
-    Resources.COST,
-    Resources.MESSAGES,
-    Resources.SCENARIOS,
-    Resources.ANNOTATIONS,
-    Resources.GUARDRAILS,
-    Resources.EXPERIMENTS,
-    Resources.DATASETS,
-    Resources.TRIGGERS,
-    Resources.WORKFLOWS,
-    Resources.PROMPTS,
-    Resources.PLAYGROUND,
-  ];
+  // Use orderedResources from shared config (PLAYGROUND hidden, ORG/TEAM omitted)
+  const resourceOrder: Resource[] = orderedResources;
 
-  // Group permissions by resource
+  // Group permissions by resource using shared valid actions
   resourceOrder.forEach((resource) => {
-    groupedPermissions[resource] = Object.values(Actions).map((action) =>
+    const validActions = getValidActionsForResource(resource);
+    groupedPermissions[resource] = validActions.map((action) =>
       createPermission(resource, action),
     );
   });
 
-  // Define which actions are valid for each resource
-  const getValidActionsForResource = (resource: Resource): Action[] => {
-    // Cost resource only has view permission
-    if (resource === Resources.COST) {
-      return [Actions.VIEW];
-    }
-    // Messages only have view and share permissions
-    if (resource === Resources.MESSAGES) {
-      return [Actions.VIEW, Actions.SHARE];
-    }
-    // Scenarios only have view permission
-    if (resource === Resources.SCENARIOS) {
-      return [Actions.VIEW];
-    }
-    // Most other resources don't have share
-    return [
-      Actions.VIEW,
-      Actions.CREATE,
-      Actions.UPDATE,
-      Actions.DELETE,
-      Actions.MANAGE,
-    ];
-  };
+  // Reuse shared getValidActionsForResource
 
   return (
     <VStack align="start" width="full" gap={3}>

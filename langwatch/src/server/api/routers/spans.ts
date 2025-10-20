@@ -10,10 +10,10 @@ export const spansRouter = createTRPCRouter({
   getAllForTrace: publicProcedure
     .input(z.object({ projectId: z.string(), traceId: z.string() }))
     .use(
-      checkPermissionOrPubliclyShared(checkProjectPermission("messages:view"), {
+      checkPermissionOrPubliclyShared(checkProjectPermission("traces:view"), {
         resourceType: PublicShareResourceTypes.TRACE,
         resourceParam: "traceId",
-      })
+      }),
     )
     .query(async ({ input, ctx }) => {
       const protections = await getUserProtectionsForProject(ctx, {

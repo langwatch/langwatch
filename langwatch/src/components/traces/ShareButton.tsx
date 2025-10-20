@@ -31,7 +31,7 @@ export function ShareButton({
   const shareItemMutation = api.share.shareItem.useMutation();
   const unshareItemMutation = api.share.unshareItem.useMutation();
   const [disableClose, setDisableClose] = useState(false); // bugfix for modal closing when starting the mutation
-  const hasSharePermission = hasPermission("messages:share");
+  const hasSharePermission = hasPermission("traces:share");
 
   const onClose_ = useCallback(() => {
     if (disableClose) return;

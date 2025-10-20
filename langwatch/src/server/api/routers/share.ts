@@ -53,7 +53,7 @@ export const shareRouter = createTRPCRouter({
       }),
     )
     .use(
-      checkPermissionOrPubliclyShared(checkProjectPermission("messages:view"), {
+      checkPermissionOrPubliclyShared(checkProjectPermission("traces:view"), {
         resourceType: (input) => input.resourceType,
         resourceParam: "resourceId",
       }),
@@ -79,7 +79,7 @@ export const shareRouter = createTRPCRouter({
         resourceId: z.string(),
       }),
     )
-    .use(checkProjectPermission("messages:share"))
+    .use(checkProjectPermission("traces:share"))
     .mutation(async ({ input, ctx }) => {
       const { projectId, resourceType, resourceId } = input;
 
@@ -114,7 +114,7 @@ export const shareRouter = createTRPCRouter({
         resourceId: z.string(),
       }),
     )
-    .use(checkProjectPermission("messages:share"))
+    .use(checkProjectPermission("traces:share"))
     .mutation(async ({ input }) => {
       const { projectId, resourceType, resourceId } = input;
 

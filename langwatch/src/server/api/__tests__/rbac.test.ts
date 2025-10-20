@@ -305,13 +305,13 @@ describe("RBAC Permission System", () => {
 
   describe("Edge Cases", () => {
     it("should handle permissions with different action types", () => {
-      const permissions = ["messages:share", "triggers:manage"];
+      const permissions = ["traces:share", "triggers:manage"];
 
       // Share permissions don't follow the view/manage hierarchy
-      expect(hasPermissionWithHierarchy(permissions, "messages:share")).toBe(
+      expect(hasPermissionWithHierarchy(permissions, "traces:share")).toBe(
         true,
       );
-      expect(hasPermissionWithHierarchy(permissions, "messages:view")).toBe(
+      expect(hasPermissionWithHierarchy(permissions, "traces:view")).toBe(
         false,
       );
 
@@ -356,21 +356,21 @@ describe("RBAC Permission System", () => {
         expect(canView(TeamUserRole.ADMIN, Resources.EXPERIMENTS)).toBe(true);
         expect(canView(TeamUserRole.ADMIN, Resources.DATASETS)).toBe(true);
         expect(canView(TeamUserRole.ADMIN, Resources.ANALYTICS)).toBe(true);
-        expect(canView(TeamUserRole.ADMIN, Resources.MESSAGES)).toBe(true);
+        expect(canView(TeamUserRole.ADMIN, Resources.TRACES)).toBe(true);
       });
 
       it("should return true for MEMBER role on all resources", () => {
         expect(canView(TeamUserRole.MEMBER, Resources.EXPERIMENTS)).toBe(true);
         expect(canView(TeamUserRole.MEMBER, Resources.DATASETS)).toBe(true);
         expect(canView(TeamUserRole.MEMBER, Resources.ANALYTICS)).toBe(true);
-        expect(canView(TeamUserRole.MEMBER, Resources.MESSAGES)).toBe(true);
+        expect(canView(TeamUserRole.MEMBER, Resources.TRACES)).toBe(true);
       });
 
       it("should return true for VIEWER role on most resources", () => {
         expect(canView(TeamUserRole.VIEWER, Resources.EXPERIMENTS)).toBe(true);
         expect(canView(TeamUserRole.VIEWER, Resources.DATASETS)).toBe(true);
         expect(canView(TeamUserRole.VIEWER, Resources.ANALYTICS)).toBe(true);
-        expect(canView(TeamUserRole.VIEWER, Resources.MESSAGES)).toBe(true);
+        expect(canView(TeamUserRole.VIEWER, Resources.TRACES)).toBe(true);
       });
 
       it("should return false for VIEWER role on cost resource", () => {
@@ -383,8 +383,8 @@ describe("RBAC Permission System", () => {
         expect(canManage(TeamUserRole.ADMIN, Resources.EXPERIMENTS)).toBe(true);
         expect(canManage(TeamUserRole.ADMIN, Resources.DATASETS)).toBe(true);
         expect(canManage(TeamUserRole.ADMIN, Resources.ANALYTICS)).toBe(true);
-        // Messages only has view and share, not manage
-        expect(canManage(TeamUserRole.ADMIN, Resources.MESSAGES)).toBe(false);
+        // Traces only has view and share, not manage
+        expect(canManage(TeamUserRole.ADMIN, Resources.TRACES)).toBe(false);
       });
 
       it("should return true for MEMBER role on most resources", () => {
@@ -393,8 +393,8 @@ describe("RBAC Permission System", () => {
         );
         expect(canManage(TeamUserRole.MEMBER, Resources.DATASETS)).toBe(true);
         expect(canManage(TeamUserRole.MEMBER, Resources.ANALYTICS)).toBe(true);
-        // Messages only has view and share, not manage
-        expect(canManage(TeamUserRole.MEMBER, Resources.MESSAGES)).toBe(false);
+        // Traces only has view and share, not manage
+        expect(canManage(TeamUserRole.MEMBER, Resources.TRACES)).toBe(false);
       });
 
       it("should return false for MEMBER role on project resource", () => {
@@ -407,7 +407,7 @@ describe("RBAC Permission System", () => {
         );
         expect(canManage(TeamUserRole.VIEWER, Resources.DATASETS)).toBe(false);
         expect(canManage(TeamUserRole.VIEWER, Resources.ANALYTICS)).toBe(false);
-        expect(canManage(TeamUserRole.VIEWER, Resources.MESSAGES)).toBe(false);
+        expect(canManage(TeamUserRole.VIEWER, Resources.TRACES)).toBe(false);
       });
     });
 
@@ -563,7 +563,7 @@ describe("RBAC Permission System", () => {
       expect(Resources.TEAM).toBe("team");
       expect(Resources.ANALYTICS).toBe("analytics");
       expect(Resources.COST).toBe("cost");
-      expect(Resources.MESSAGES).toBe("messages");
+      expect(Resources.TRACES).toBe("traces");
       expect(Resources.SCENARIOS).toBe("scenarios");
       expect(Resources.ANNOTATIONS).toBe("annotations");
       expect(Resources.GUARDRAILS).toBe("guardrails");
@@ -599,7 +599,7 @@ describe("RBAC Permission System", () => {
         "experiments:view",
         "datasets:manage",
         "analytics:create",
-        "messages:share",
+        "traces:share",
         "project:delete",
       ];
 

@@ -93,7 +93,7 @@ export async function getUserProtectionsForProject(
     // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
     ctx.publiclyShared ||
     !ctx.session?.user?.id ||
-    isDemoProject(projectId, "messages:view")
+    isDemoProject(projectId, "traces:view")
   ) {
     return {
       canSeeCosts,

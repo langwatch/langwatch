@@ -22,7 +22,7 @@ const teamPermissions: Record<string, Record<string, TeamUserRole[]>> = {
     view: [TeamUserRole.ADMIN, TeamUserRole.MEMBER],
     manage: [TeamUserRole.ADMIN],
   },
-   project: {
+  project: {
     view: [TeamUserRole.ADMIN, TeamUserRole.MEMBER, TeamUserRole.VIEWER],
     setup: [TeamUserRole.ADMIN, TeamUserRole.MEMBER],
     archive: [TeamUserRole.ADMIN],
@@ -153,14 +153,14 @@ export const organizationRolePermissionMapping = {
 };
 
 export const TeamRoleGroup = Object.fromEntries(
-  Object.keys(teamRolePermissionMapping).map((key) => [key, key])
+  Object.keys(teamRolePermissionMapping).map((key) => [key, key]),
 ) as Record<
   keyof typeof teamRolePermissionMapping,
   keyof typeof teamRolePermissionMapping
 >;
 
 export const OrganizationRoleGroup = Object.fromEntries(
-  Object.keys(organizationRolePermissionMapping).map((key) => [key, key])
+  Object.keys(organizationRolePermissionMapping).map((key) => [key, key]),
 ) as Record<
   keyof typeof organizationRolePermissionMapping,
   keyof typeof organizationRolePermissionMapping
@@ -168,7 +168,7 @@ export const OrganizationRoleGroup = Object.fromEntries(
 
 export const isDemoProject = (
   projectId: string,
-  roleGroup: string
+  roleGroup: string,
 ): boolean => {
   if (
     projectId === env.DEMO_PROJECT_ID &&
@@ -202,7 +202,7 @@ type PermissionMiddlewareParams<InputType> = {
 };
 
 export type PermissionMiddleware<InputType> = (
-  params: PermissionMiddlewareParams<InputType>
+  params: PermissionMiddlewareParams<InputType>,
 ) => Promise<any>;
 
 type PublicResourceTypes = "TRACE" | "THREAD";
@@ -219,7 +219,7 @@ export const checkPermissionOrPubliclyShared =
     }: {
       resourceType: PublicResourceTypes | ((input: any) => PublicResourceTypes);
       resourceParam: Key;
-    }
+    },
   ) =>
   async ({ ctx, input, next }: PermissionMiddlewareParams<InputType>) => {
     let allowed;
@@ -269,7 +269,7 @@ export const checkUserPermissionForProject =
 export const backendHasTeamProjectPermission = async (
   ctx: { prisma: PrismaClient; session: Session | null },
   input: { projectId: string },
-  roleGroup: keyof typeof TeamRoleGroup
+  roleGroup: keyof typeof TeamRoleGroup,
 ): Promise<boolean> => {
   if (!ctx.session?.user) {
     return false;
@@ -289,7 +289,7 @@ export const backendHasTeamProjectPermission = async (
   });
 
   const teamMember = projectTeam?.team.members.find(
-    (member) => member.userId === ctx.session?.user.id
+    (member) => member.userId === ctx.session?.user.id,
   );
 
   if (!projectTeam || !teamMember || projectTeam.team.members.length === 0) {
@@ -317,7 +317,7 @@ export const checkUserPermissionForTeam =
 export const backendHasTeamPermission = async (
   ctx: { prisma: PrismaClient; session: Session },
   input: { teamId: string },
-  roleGroup: keyof typeof TeamRoleGroup
+  roleGroup: keyof typeof TeamRoleGroup,
 ) => {
   if (!ctx.session?.user) {
     return false;
@@ -376,7 +376,7 @@ export const checkUserPermissionForOrganization =
 export const backendHasOrganizationPermission = async (
   ctx: { prisma: PrismaClient; session: Session },
   input: { organizationId: string },
-  roleGroup: keyof typeof OrganizationRoleGroup
+  roleGroup: keyof typeof OrganizationRoleGroup,
 ) => {
   if (!ctx.session?.user) {
     return false;
@@ -409,7 +409,7 @@ export const skipPermissionCheck = ({
   for (const key of SENSITIVE_KEYS) {
     if (key in input) {
       throw new Error(
-        `${key} is not allowed to be used without permission check`
+        `${key} is not allowed to be used without permission check`,
       );
     }
   }
@@ -444,8 +444,8 @@ export const LEGACY_TO_RBAC_MAPPING: Partial<
   ANALYTICS_VIEW: "analytics:view",
   ANALYTICS_MANAGE: "analytics:manage",
   COST_VIEW: "cost:view",
-  MESSAGES_VIEW: "messages:view",
-  MESSAGES_SHARE: "messages:share",
+  MESSAGES_VIEW: "traces:view",
+  MESSAGES_SHARE: "traces:share",
   ANNOTATIONS_VIEW: "annotations:view",
   ANNOTATIONS_MANAGE: "annotations:manage",
   GUARDRAILS_VIEW: "guardrails:view",
@@ -470,7 +470,7 @@ export const LEGACY_TO_RBAC_MAPPING: Partial<
  * Convert legacy permission to new RBAC permission
  */
 export function legacyToRbacPermission(
-  legacyKey: keyof typeof TeamRoleGroup
+  legacyKey: keyof typeof TeamRoleGroup,
 ): Permission | undefined {
   return LEGACY_TO_RBAC_MAPPING[legacyKey];
 }

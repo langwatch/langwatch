@@ -58,7 +58,7 @@ export const TeamUserRoleField = ({
         label: customRole.name,
         value: `custom:${customRole.id}`,
         description:
-          customRole.description ||
+          customRole.description ??
           `${customRole.permissions.length} permissions`,
         isCustom: true,
         customRoleId: customRole.id,
@@ -99,7 +99,7 @@ export const TeamUserRoleField = ({
           });
           resetForm();
         },
-      }
+      },
     );
   };
 
@@ -146,13 +146,13 @@ export const TeamRoleSelect = ({
 
   const allRoleOptions: RoleOption[] = [
     ...Object.values(teamRolesOptions),
-    ...(customRoles.data?.map((role) => ({
+    ...(customRoles.data ?? []).map((role) => ({
       label: role.name,
       value: `custom:${role.id}`,
-      description: role.description || `${role.permissions.length} permissions`,
+      description: role.description ?? `${role.permissions.length} permissions`,
       isCustom: true,
       customRoleId: role.id,
-    })) || []),
+    })),
   ];
 
   return (
@@ -161,6 +161,12 @@ export const TeamRoleSelect = ({
       options={allRoleOptions}
       hideSelectedOptions={false}
       isSearchable={false}
+      chakraStyles={{
+        container: (base) => ({
+          ...base,
+          minWidth: "200px",
+        }),
+      }}
       useBasicStyles
       isLoading={customRoles.isLoading}
       components={{

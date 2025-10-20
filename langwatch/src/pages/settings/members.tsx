@@ -15,7 +15,6 @@ import {
 } from "@chakra-ui/react";
 import { Link } from "../../components/ui/link";
 import { OrganizationUserRole } from "@prisma/client";
-import { Select as MultiSelect, chakraComponents } from "chakra-react-select";
 import { Lock, Mail, MoreVertical, Plus, Trash } from "react-feather";
 import { CopyInput } from "../../components/CopyInput";
 import { AddMembersForm } from "../../components/AddMembersForm";
@@ -65,7 +64,7 @@ export default function Members() {
       {
         organizationId: organization?.id ?? "",
       },
-      { enabled: !!organization }
+      { enabled: !!organization },
     );
   const activePlan = api.plan.getActivePlan.useQuery(
     {
@@ -73,7 +72,7 @@ export default function Members() {
     },
     {
       enabled: !!organization,
-    }
+    },
   );
 
   if (!organization || !organizationWithMembers.data || !activePlan.data)
@@ -122,13 +121,11 @@ function MembersList({
       {
         organizationId: organization?.id ?? "",
       },
-      { enabled: !!organization }
+      { enabled: !!organization },
     );
   const createInvitesMutation = api.organization.createInvites.useMutation();
   const deleteMemberMutation = api.organization.deleteMember.useMutation();
   const deleteInviteMutation = api.organization.deleteInvite.useMutation();
-  const updateOrganizationMemberRoleMutation =
-    api.organization.updateMemberRole.useMutation();
 
   const [selectedInvites, setSelectedInvites] = useState<
     { inviteCode: string; email: string }[]
@@ -150,7 +147,7 @@ function MembersList({
         organizationId: organization.id,
         invites: data.invites.map((invite) => ({
           email: invite.email.toLowerCase(),
-          role: invite.role!.value as OrganizationUserRole,
+          role: OrganizationUserRole.MEMBER,
           teamIds: invite.teamOptions
             .map((teamOption) => teamOption.value)
             .join(","),
@@ -168,7 +165,7 @@ function MembersList({
               }
               return acc;
             },
-            [] as { inviteCode: string; email: string }[]
+            [] as { inviteCode: string; email: string }[],
           );
 
           setSelectedInvites(newInvites);
@@ -202,54 +199,7 @@ function MembersList({
             },
           });
         },
-      }
-    );
-  };
-
-  const onRoleChange = (userId: string, value: OrganizationUserRole) => {
-    updateOrganizationMemberRoleMutation.mutate(
-      {
-        userId: userId,
-        organizationId: organization.id,
-        role: value,
       },
-      {
-        onSuccess: () => {
-          void queryClient.organization.getOrganizationWithMembersAndTheirTeams
-            .invalidate()
-            .catch((error) => {
-              Sentry.captureException(error, {
-                tags: {
-                  userId,
-                  organizationId: organization.id,
-                },
-              });
-            });
-          toaster.create({
-            title: "Member role updated successfully",
-            description: `The member role has been updated to ${
-              selectOptions.find((option) => option.value === value)?.label ??
-              value
-            }`,
-            type: "success",
-            duration: 5000,
-          });
-        },
-        onError: (error) => {
-          Sentry.captureException(error, {
-            tags: {
-              userId,
-              organizationId: organization.id,
-            },
-          });
-          toaster.create({
-            title: "Error updating member role",
-            type: "error",
-            description:
-              error.message ?? "There was an error updating the member role",
-          });
-        },
-      }
     );
   };
 
@@ -293,7 +243,7 @@ function MembersList({
             },
           });
         },
-      }
+      },
     );
   };
 
@@ -323,16 +273,16 @@ function MembersList({
           });
           void pendingInvites.refetch();
         },
-      }
+      },
     );
   };
 
   const sortedMembers = useMemo(
     () =>
       [...organization.members].sort((a, b) =>
-        b.user.id.localeCompare(a.user.id)
+        b.user.id.localeCompare(a.user.id),
       ),
-    [organization.members]
+    [organization.members],
   );
 
   const currentUserIsAdmin = useMemo(
@@ -340,9 +290,9 @@ function MembersList({
       organization.members.some(
         (member) =>
           member.userId === user?.id &&
-          member.role === OrganizationUserRole.ADMIN
+          member.role === OrganizationUserRole.ADMIN,
       ),
-    [organization.members, user?.id]
+    [organization.members, user?.id],
   );
 
   return (
@@ -403,40 +353,24 @@ function MembersList({
                 <Table.Row>
                   <Table.ColumnHeader>Name</Table.ColumnHeader>
                   <Table.ColumnHeader>Email</Table.ColumnHeader>
-                  <Table.ColumnHeader w={"20%"}>Role</Table.ColumnHeader>
                   <Table.ColumnHeader>Teams</Table.ColumnHeader>
                   <Table.ColumnHeader>Actions</Table.ColumnHeader>
                 </Table.Row>
               </Table.Header>
               <Table.Body>
                 {sortedMembers.map((member) => {
-                  const relevantUpdateRoleMutation =
-                    updateOrganizationMemberRoleMutation.variables?.userId ===
-                      member.userId &&
-                    updateOrganizationMemberRoleMutation.variables
-                      ?.organizationId === organization.id;
-                  const roleUpdateLoading =
-                    updateOrganizationMemberRoleMutation.isLoading &&
-                    relevantUpdateRoleMutation;
-
+                  const roleLabel =
+                    selectOptions.find((option) => option.value === member.role)
+                      ?.label ?? member.role;
                   return (
                     <LinkBox as={Table.Row} key={member.userId}>
-                      <Table.Cell>{member.user.name}</Table.Cell>
-                      <Table.Cell>{member.user.email}</Table.Cell>
                       <Table.Cell>
-                        <OrganizationMemberSelect
-                          defaultValue={member.role}
-                          memberId={member.userId}
-                          onRoleChange={(_, value) => {
-                            // Only update the role if it's different
-                            if (member.role !== value) {
-                              onRoleChange(member.userId, value);
-                            }
-                          }}
-                          loading={roleUpdateLoading}
-                          disabled={roleUpdateLoading}
-                        />
+                        <Link href={`/settings/users/${member.userId}`}>
+                          {member.user.name}{" "}
+                          <Text as="span">({roleLabel})</Text>
+                        </Link>
                       </Table.Cell>
+                      <Table.Cell>{member.user.email}</Table.Cell>
                       <Table.Cell>
                         <TeamMembershipsDisplay
                           teamMemberships={member.user.teamMemberships}
@@ -490,7 +424,7 @@ function MembersList({
                         <Table.Cell>{invite.email}</Table.Cell>
                         <Table.Cell>
                           {selectOptions.find(
-                            (option) => option.value === invite.role
+                            (option) => option.value === invite.role,
                           )?.label ?? invite.role}
                         </Table.Cell>
                         <Table.Cell>
@@ -529,7 +463,7 @@ function MembersList({
                                 onClick={() =>
                                   viewInviteLink(
                                     invite.inviteCode,
-                                    invite.email
+                                    invite.email,
                                   )
                                 }
                               >
@@ -688,56 +622,5 @@ const TeamIdsDisplay = ({ teamIds, teams }: TeamIdsDisplayProps) => {
         );
       })}
     </Flex>
-  );
-};
-
-const OrganizationMemberSelect = ({
-  defaultValue,
-  onRoleChange,
-  memberId,
-  loading,
-  disabled,
-}: RoleSelectProps) => {
-  return (
-    <MultiSelect
-      size={"sm"}
-      options={selectOptions}
-      defaultValue={selectOptions.find(
-        (option) => option.value === defaultValue
-      )}
-      onChange={(value) => {
-        onRoleChange?.(memberId ?? "", value!.value as OrganizationUserRole);
-      }}
-      isLoading={loading}
-      isDisabled={disabled}
-      hideSelectedOptions={false}
-      isSearchable={false}
-      components={{
-        Menu: ({ children, ...props }) => (
-          <chakraComponents.Menu
-            {...props}
-            innerProps={{
-              ...props.innerProps,
-              style: { width: "350px", zIndex: 10 },
-            }}
-          >
-            {children}
-          </chakraComponents.Menu>
-        ),
-        Option: ({ children, ...props }) => (
-          <chakraComponents.Option {...props}>
-            <VStack align="start">
-              <Text>{children}</Text>
-              <Text
-                color={props.isSelected ? "white" : "gray.500"}
-                fontSize="13px"
-              >
-                {props.data.description}
-              </Text>
-            </VStack>
-          </chakraComponents.Option>
-        ),
-      }}
-    />
   );
 };
