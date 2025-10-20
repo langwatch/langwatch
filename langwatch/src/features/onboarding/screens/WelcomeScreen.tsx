@@ -39,7 +39,6 @@ export const WelcomeScreen: React.FC = () => {
     formContextValue,
   } = useOnboardingFlow();
 
-
   const screens = useCreateWelcomeScreens({ flow });
 
   const initializeOrganization =
