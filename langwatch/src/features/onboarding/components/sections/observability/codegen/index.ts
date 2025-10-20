@@ -1,5 +1,6 @@
 import type { FrameworkKey, PlatformKey } from "../types";
 import type { GoFrameworkKey } from "../constants";
+import { useActiveProject } from "../../../../context/ActiveProjectContext";
 import { platformToFileName } from "./platform.ts";
 import { parseSnippet } from "./snippets.ts";
 import { registry, getRegistryEntry } from "./registry";
@@ -58,6 +59,18 @@ export function getFrameworkCode(language: PlatformKey, framework: FrameworkKey)
 
 function capitalize(input: string): string {
   return input.length ? input.charAt(0).toUpperCase() + input.slice(1) : input;
+}
+
+// React hook wrapper that injects project-specific substitutions
+export function useCodegen(language: "go", framework: GoFrameworkKey): CodegenResult;
+export function useCodegen(language: Exclude<PlatformKey, "go">, framework: FrameworkKey): CodegenResult;
+export function useCodegen(language: PlatformKey, framework: FrameworkKey): CodegenResult {
+  const { project } = useActiveProject();
+  const projectName = project?.name ?? "my-llm-app";
+  const base = language === "go"
+    ? getFrameworkCode("go", framework as GoFrameworkKey)
+    : getFrameworkCode(language, framework);
+  return { ...base, code: base.code.replaceAll("<project_name>", projectName) };
 }
 
 

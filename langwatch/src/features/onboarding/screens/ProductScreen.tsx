@@ -6,7 +6,8 @@ import { useCreateProductScreens } from "./create-product-screens";
 import { OnboardingMeshBackground } from "../components/OnboardingMeshBackground";
 import { Box } from "@chakra-ui/react";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import { useRouter } from "next/router";
+import { useProjectBySlugOrLatest } from "~/hooks/useProjectBySlugOrLatest";
+import { ActiveProjectProvider } from "../context/ActiveProjectContext";
 
 export const ProductScreen: React.FC = () => {
   const {
@@ -14,12 +15,10 @@ export const ProductScreen: React.FC = () => {
     flow,
     handleSelectProduct,
   } = useProductFlow();
-  const router = useRouter();
-  const projectSlug = useProjectSlug();
-
   const { organization, isLoading } = useOrganizationTeamProject({
     redirectToOnboarding: true,
   });
+  const { project: activeProject } = useProjectBySlugOrLatest(organization);
 
   // Delay showing skeleton to avoid flicker on fast loads
   const [delayedLoading, setDelayedLoading] = useState(false);
@@ -38,10 +37,10 @@ export const ProductScreen: React.FC = () => {
   const screens = useCreateProductScreens({ flow, onSelectProduct: handleSelectProduct });
 
   const currentVisibleIndex = useMemo(
-    () => flow.visibleScreens.findIndex((s: number) => s === currentScreenIndex),
+    () => flow.visibleScreens.findIndex((s) => Number(s) === Number(currentScreenIndex)),
     [flow.visibleScreens, currentScreenIndex]
   );
-  const currentScreen = currentVisibleIndex >= 0 ? screens[currentVisibleIndex] : undefined;
+  const currentScreen = currentVisibleIndex >= 0 ? screens[currentVisibleIndex] : void 0;
   if (!currentScreen) {
     return null;
   }
@@ -56,7 +55,9 @@ export const ProductScreen: React.FC = () => {
       >
         <Box w="full" minH="100dvh" position="relative">
           <OnboardingMeshBackground opacity={0.22} blurPx={96} />
-          {!isLoading && currentScreen.component ? <currentScreen.component /> : null}
+          <ActiveProjectProvider value={{ project: activeProject, organization }}>
+            {!isLoading && currentScreen.component ? <currentScreen.component /> : null}
+          </ActiveProjectProvider>
         </Box>
       </OnboardingContainer>
     </AnalyticsBoundary>
@@ -64,18 +65,3 @@ export const ProductScreen: React.FC = () => {
 };
 export default ProductScreen;
 
-
-function useProject(organization: Organization): Project | null {
-  const projectSlug: string | null = null;
-
-  const router = useRouter();
-  const projectSlugQuery = router.query.projectSlug;
-  if (!projectSlugQuery) {
-    return null;
-  }
-  if (Array.isArray(projectSlug)) {
-    return projectSlug[0] ?? null;
-  }
-
-  return projectSlug;
-}

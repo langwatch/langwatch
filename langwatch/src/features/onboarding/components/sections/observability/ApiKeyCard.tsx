@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import {
   HStack,
   IconButton,
@@ -12,29 +12,14 @@ import {
 import { toaster } from "../../../../../components/ui/toaster";
 import { Eye, EyeOff, Clipboard, ClipboardPlus } from "lucide-react";
 import { Tooltip } from "~/components/ui/tooltip";
+import { useActiveProject } from "../../../context/ActiveProjectContext";
 
-function generateTemporaryApiKey(): string {
-  const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789";
-  let body = "";
-  for (let index = 0; index < 32; index++) {
-    body += alphabet[Math.floor(Math.random() * alphabet.length)];
-  }
-  return `sk-lw-${body}`;
-}
+interface ApiKeyCardProps { apiKey?: string }
 
-interface ApiKeyCardProps {
-  initialApiKey?: string;
-}
-
-export function ApiKeyCard({
-  initialApiKey,
-}: ApiKeyCardProps): React.ReactElement {
-  const [apiKey, setApiKey] = useState<string>(initialApiKey ?? "");
-  const [isVisible, setIsVisible] = useState<boolean>(false);
-
-  useEffect(() => {
-    if (!apiKey) setApiKey(generateTemporaryApiKey());
-  }, [apiKey]);
+export function ApiKeyCard({ apiKey }: ApiKeyCardProps): React.ReactElement {
+  const [isVisible, setIsVisible] = useState(false);
+  const { project } = useActiveProject();
+  const effectiveApiKey = project?.apiKey ?? apiKey ?? "";
 
   function toggleVisibility(): void {
     setIsVisible((prev) => !prev);
@@ -42,7 +27,7 @@ export function ApiKeyCard({
 
   async function copyApiKey({ withBashPrefix }: { withBashPrefix?: boolean }): Promise<void> {
     try {
-      await navigator.clipboard.writeText(withBashPrefix ? `LANGWATCH_API_KEY=${apiKey}` : apiKey);
+      await navigator.clipboard.writeText(withBashPrefix ? `LANGWATCH_API_KEY=${effectiveApiKey}` : effectiveApiKey);
       toaster.create({
         title: "Copied",
         description: "API key copied to clipboard",
@@ -74,7 +59,8 @@ export function ApiKeyCard({
         w="full"
         startAddonProps={{ bg: "bg.muted/60", color: "fg.muted", border: "0"  }}
         startAddon={<Text fontSize="xs">LANGWATCH_API_KEY=</Text>}
-        endElement={
+        endAddonProps={{ bg: "bg.muted/40", color: "fg.muted", border: "0" }}
+        endAddon={
           <HStack gap="1">
             <IconButton
               size="2xs"
@@ -109,10 +95,11 @@ export function ApiKeyCard({
       >
         <Input
           bg="bg.muted/40"
+          borderRight={0}
           size="sm"
           variant="subtle"
           type={isVisible ? "text" : "password"}
-          value={apiKey}
+          value={effectiveApiKey}
           readOnly
           aria-label="Your API key"
         />

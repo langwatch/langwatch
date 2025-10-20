@@ -41,10 +41,6 @@ export type IntegrationRegistry = IntegrationSpec[];
 const tsRef = (file: string): SnippetRef => ({ file, language: "typescript", filename: "app.ts" });
 const goRef = (file: string): SnippetRef => ({ file, language: "go", filename: "main.go" });
 
-/**
- * Render a themed icon that swaps source based on prefers-color-scheme.
- * Single Responsibility: encapsulates the light/dark asset switching for icons.
- */
 function themedIcon(lightSrc: string, darkSrc: string, alt: string): React.ReactElement {
   return (
     <picture>
@@ -58,10 +54,6 @@ function themedIcon(lightSrc: string, darkSrc: string, alt: string): React.React
   );
 }
 
-/**
- * Render a single-source icon.
- * Single Responsibility: returns a normalized <img> with consistent sizing.
- */
 function singleIcon(src: string, alt: string): React.ReactElement {
   return <img src={src} alt={alt} style={{ width: "100%", height: "100%", objectFit: "contain" }} />;
 }
@@ -80,10 +72,10 @@ export const registry: IntegrationRegistry = [
     ),
     install: {
       js: {
-        npm: "npm i @langwatch/observability ai @ai-sdk/openai",
-        pnpm: "pnpm add @langwatch/observability ai @ai-sdk/openai",
-        yarn: "yarn add @langwatch/observability ai @ai-sdk/openai",
-        bun: "bun add @langwatch/observability ai @ai-sdk/openai",
+        npm: "npm i langwatch ai @ai-sdk/openai",
+        pnpm: "pnpm add langwatch ai @ai-sdk/openai",
+        yarn: "yarn add langwatch ai @ai-sdk/openai",
+        bun: "bun add langwatch ai @ai-sdk/openai",
       },
     },
     snippet: tsRef(vercelAiTsSource as unknown as string),

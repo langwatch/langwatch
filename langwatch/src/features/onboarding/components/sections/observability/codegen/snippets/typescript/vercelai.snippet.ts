@@ -3,9 +3,8 @@ import { generateText } from "ai";
 import { openai } from "@ai-sdk/openai";
 
 setupObservability({ // +
-  langwatch: { apiKey: "<api_key>" },
-  serviceName: "<project_name>",
-});
+  serviceName: "<project_name>", // +
+}); // +
 
 async function main(message: string): Promise<string> {
   const response = await generateText({
