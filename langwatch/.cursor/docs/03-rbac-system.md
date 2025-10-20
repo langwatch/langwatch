@@ -4,17 +4,17 @@
 
 LangWatch implements a comprehensive RBAC system to manage permissions across the platform. The system operates at three levels:
 
-- **Organization**: Top-level entity
-- **Team**: Groups within an organization
-- **Project**: Individual projects within a team
+-   **Organization**: Top-level entity
+-   **Team**: Groups within an organization
+-   **Project**: Individual projects within a team
 
 ## Architecture
 
 ### Files
 
-- **`src/server/api/rbac.ts`**: New RBAC system (preferred)
-- **`src/server/api/permission.ts`**: Legacy permission system (backward compatible)
-- **`src/hooks/useOrganizationTeamProject.ts`**: Client-side permission hooks
+-   **`src/server/api/rbac.ts`**: New RBAC system (preferred)
+-   **`src/server/api/permission.ts`**: Legacy permission system (backward compatible)
+-   **`src/hooks/useOrganizationTeamProject.ts`**: Client-side permission hooks
 
 ## Roles
 
@@ -24,20 +24,20 @@ Defined in Prisma schema: `TeamUserRole`
 
 1. **ADMIN**
 
-   - Full control over the team
-   - Can manage members, projects, and all resources
-   - Can create and delete projects
+    - Full control over the team
+    - Can manage members, projects, and all resources
+    - Can create and delete projects
 
 2. **MEMBER**
 
-   - Can create and modify most resources
-   - Can view costs and debug information
-   - Cannot manage team members or delete projects
+    - Can create and modify most resources
+    - Can view costs and debug information
+    - Cannot manage team members or delete projects
 
 3. **VIEWER**
-   - Read-only access
-   - Can view analytics, messages, and guardrails
-   - Cannot see costs or modify anything
+    - Read-only access
+    - Can view analytics, messages, and guardrails
+    - Cannot see costs or modify anything
 
 ### Organization Roles
 
@@ -45,17 +45,17 @@ Defined in Prisma schema: `OrganizationUserRole`
 
 1. **ADMIN**
 
-   - Full control over the organization
-   - Can manage teams and billing
-   - Has implicit admin rights on all teams
+    - Full control over the organization
+    - Can manage teams and billing
+    - Has implicit admin rights on all teams
 
 2. **MEMBER**
 
-   - Can view organization details
-   - Standard member access
+    - Can view organization details
+    - Standard member access
 
 3. **EXTERNAL**
-   - Limited view access for external collaborators
+    - Limited view access for external collaborators
 
 ## Permission System
 
@@ -76,35 +76,33 @@ type Permission = `${Resource}:${Action}`;
 
 All resources that can have permissions:
 
-- `project`
-- `analytics`
-- `cost`
-- `messages`
-- `annotations`
-- `spans`
-- `guardrails`
-- `experiments`
-- `datasets`
-- `triggers`
-- `playground`
-- `workflows`
-- `prompts`
-- `scenarios`
-- `team`
-- `organization`
+-   `project`
+-   `analytics`
+-   `cost`
+-   `messages`
+-   `annotations`
+-   `spans`
+-   `guardrails`
+-   `experiments`
+-   `datasets`
+-   `triggers`
+-   `playground`
+-   `workflows`
+-   `prompts`
+-   `scenarios`
+-   `team`
+-   `organization`
 
 #### Actions
 
 Standard actions that can be performed:
 
-- `view` - Read access
-- `create` - Create new items
-- `update` - Modify existing items
-- `delete` - Remove items
-- `manage` - Full CRUD + settings
-- `share` - Share with others
-- `execute` - Run/execute (e.g., playground)
-- `debug` - Access debug information
+-   `view` - Read access
+-   `create` - Create new items
+-   `update` - Modify existing items
+-   `delete` - Remove items
+-   `manage` - Full CRUD + settings
+-   `share` - Share with others
 
 ### Client-Side Usage
 
@@ -112,21 +110,21 @@ Standard actions that can be performed:
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 
 function MyComponent() {
-  const { hasPermission } = useOrganizationTeamProject();
+    const { hasPermission } = useOrganizationTeamProject();
 
-  // New RBAC API (preferred)
-  if (hasPermission("analytics:view")) {
-    // Show analytics
-  }
+    // New RBAC API (preferred)
+    if (hasPermission("analytics:view")) {
+        // Show analytics
+    }
 
-  if (hasPermission("datasets:manage")) {
-    // Show edit/delete buttons
-  }
+    if (hasPermission("datasets:manage")) {
+        // Show edit/delete buttons
+    }
 
-  // Legacy API (still supported)
-  if (hasTeamPermission(TeamRoleGroup.ANALYTICS_VIEW)) {
-    // Old way still works
-  }
+    // Legacy API (still supported)
+    if (hasTeamPermission(TeamRoleGroup.ANALYTICS_VIEW)) {
+        // Old way still works
+    }
 }
 ```
 
@@ -138,11 +136,11 @@ function MyComponent() {
 import { checkProjectPermission } from "~/server/api/rbac";
 
 export const myProcedure = protectedProcedure
-  .input(z.object({ projectId: z.string() }))
-  .use(checkProjectPermission("analytics:view"))
-  .query(async ({ input }) => {
-    // User is authorized
-  });
+    .input(z.object({ projectId: z.string() }))
+    .use(checkProjectPermission("analytics:view"))
+    .query(async ({ input }) => {
+        // User is authorized
+    });
 ```
 
 #### Manual Permission Checks
@@ -151,11 +149,11 @@ export const myProcedure = protectedProcedure
 import { hasProjectPermission } from "~/server/api/rbac";
 
 async function myFunction(ctx, projectId: string) {
-  if (!(await hasProjectPermission(ctx, projectId, "datasets:manage"))) {
-    throw new Error("Unauthorized");
-  }
+    if (!(await hasProjectPermission(ctx, projectId, "datasets:manage"))) {
+        throw new Error("Unauthorized");
+    }
 
-  // Continue with authorized action
+    // Continue with authorized action
 }
 ```
 
@@ -229,24 +227,24 @@ The system provides backward compatibility while you migrate:
 ```typescript
 // OLD WAY (still works)
 import {
-  TeamRoleGroup,
-  checkUserPermissionForProject,
+    TeamRoleGroup,
+    checkUserPermissionForProject,
 } from "~/server/api/permission";
 
 export const oldProcedure = protectedProcedure
-  .use(checkUserPermissionForProject(TeamRoleGroup.ANALYTICS_VIEW))
-  .query(async ({ input }) => {
-    // ...
-  });
+    .use(checkUserPermissionForProject(TeamRoleGroup.ANALYTICS_VIEW))
+    .query(async ({ input }) => {
+        // ...
+    });
 
 // NEW WAY (preferred)
 import { checkProjectPermission } from "~/server/api/rbac";
 
 export const newProcedure = protectedProcedure
-  .use(checkProjectPermission("analytics:view"))
-  .query(async ({ input }) => {
-    // ...
-  });
+    .use(checkProjectPermission("analytics:view"))
+    .query(async ({ input }) => {
+        // ...
+    });
 ```
 
 ### Mapping Table
@@ -267,30 +265,30 @@ To add a new permission:
 
 1. **Add Resource or Action** (if needed) in `src/server/api/rbac.ts`:
 
-   ```typescript
-   export const Resources = {
-     // ...
-     MY_NEW_RESOURCE: "myNewResource",
-   } as const;
-   ```
+    ```typescript
+    export const Resources = {
+        // ...
+        MY_NEW_RESOURCE: "myNewResource",
+    } as const;
+    ```
 
 2. **Update Role Permissions**:
 
-   ```typescript
-   const TEAM_ROLE_PERMISSIONS: Record<TeamUserRole, Permission[]> = {
-     [TeamUserRole.ADMIN]: [
-       // ...
-       "myNewResource:view",
-       "myNewResource:manage",
-     ],
-     // ... other roles
-   };
-   ```
+    ```typescript
+    const TEAM_ROLE_PERMISSIONS: Record<TeamUserRole, Permission[]> = {
+        [TeamUserRole.ADMIN]: [
+            // ...
+            "myNewResource:view",
+            "myNewResource:manage",
+        ],
+        // ... other roles
+    };
+    ```
 
 3. **Use in Code**:
-   ```typescript
-   .use(checkProjectPermission("myNewResource:view"))
-   ```
+    ```typescript
+    .use(checkProjectPermission("myNewResource:view"))
+    ```
 
 ## Best Practices
 
@@ -309,17 +307,17 @@ import { teamRoleHasPermission } from "~/server/api/rbac";
 import { TeamUserRole } from "@prisma/client";
 
 describe("Permissions", () => {
-  it("should allow admins to manage datasets", () => {
-    expect(teamRoleHasPermission(TeamUserRole.ADMIN, "datasets:manage")).toBe(
-      true
-    );
-  });
+    it("should allow admins to manage datasets", () => {
+        expect(
+            teamRoleHasPermission(TeamUserRole.ADMIN, "datasets:manage"),
+        ).toBe(true);
+    });
 
-  it("should not allow viewers to manage datasets", () => {
-    expect(teamRoleHasPermission(TeamUserRole.VIEWER, "datasets:manage")).toBe(
-      false
-    );
-  });
+    it("should not allow viewers to manage datasets", () => {
+        expect(
+            teamRoleHasPermission(TeamUserRole.VIEWER, "datasets:manage"),
+        ).toBe(false);
+    });
 });
 ```
 
@@ -354,5 +352,3 @@ Potential improvements to the RBAC system:
 1. Use `LEGACY_TO_RBAC_MAPPING` to find equivalent permissions
 2. Update client code to use `hasPermission()` instead of `hasTeamPermission()`
 3. Test each permission boundary after migration
-
-
