@@ -8,6 +8,7 @@ import { Box } from "@chakra-ui/react";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useProjectBySlugOrLatest } from "~/hooks/useProjectBySlugOrLatest";
 import { ActiveProjectProvider } from "../context/ActiveProjectContext";
+import { LoadingScreen } from "~/components/LoadingScreen";
 
 export const ProductScreen: React.FC = () => {
   const {
@@ -43,6 +44,10 @@ export const ProductScreen: React.FC = () => {
   const currentScreen = currentVisibleIndex >= 0 ? screens[currentVisibleIndex] : void 0;
   if (!currentScreen) {
     return null;
+  }
+
+  if (isLoading) {
+    return <LoadingScreen />;
   }
 
   return (

@@ -27,7 +27,6 @@ export function ObservabilityScreen(): React.ReactElement {
     }
   }
 
-
   const selectedEntry = useMemo(() => {
     return getRegistryEntry(selectedPlatform, selectedFramework);
   }, [selectedPlatform, selectedFramework]);
