@@ -1,5 +1,4 @@
-import { Box, Button, HStack, Tabs, VStack } from "@chakra-ui/react";
-import { Plus } from "react-feather";
+import { Box, HStack, Tabs, VStack } from "@chakra-ui/react";
 
 interface BrowserLikeTabsRootProps {
   children: React.ReactNode;
@@ -77,26 +76,19 @@ function BrowserLikeTabsTrigger({
   return (
     <Tabs.Trigger
       value={value}
-      paddingX={4}
-      paddingY={2.5}
       minWidth="fit-content"
-      borderRadius="md"
       marginBottom="-1px"
       cursor="pointer"
       transition="all 0.15s ease-in-out"
-      bg="gray.50"
+      bg="gray.200"
       color="gray.600"
-      _hover={{ bg: "gray.30" }}
+      _hover={{ bg: "gray.100" }}
       _selected={{
         bg: "white",
         color: "gray.800",
       }}
     >
-      <HStack gap={2}>
-        <Box as="span" whiteSpace="nowrap" fontSize="sm" fontWeight="500">
-          {children}
-        </Box>
-      </HStack>
+      {children}
     </Tabs.Trigger>
   );
 }
