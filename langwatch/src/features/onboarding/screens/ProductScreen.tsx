@@ -6,6 +6,7 @@ import { useCreateProductScreens } from "./create-product-screens";
 import { OnboardingMeshBackground } from "../components/OnboardingMeshBackground";
 import { Box } from "@chakra-ui/react";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { useRouter } from "next/router";
 
 export const ProductScreen: React.FC = () => {
   const {
@@ -13,6 +14,8 @@ export const ProductScreen: React.FC = () => {
     flow,
     handleSelectProduct,
   } = useProductFlow();
+  const router = useRouter();
+  const projectSlug = useProjectSlug();
 
   const { organization, isLoading } = useOrganizationTeamProject({
     redirectToOnboarding: true,
@@ -60,3 +63,19 @@ export const ProductScreen: React.FC = () => {
   );
 };
 export default ProductScreen;
+
+
+function useProject(organization: Organization): Project | null {
+  const projectSlug: string | null = null;
+
+  const router = useRouter();
+  const projectSlugQuery = router.query.projectSlug;
+  if (!projectSlugQuery) {
+    return null;
+  }
+  if (Array.isArray(projectSlug)) {
+    return projectSlug[0] ?? null;
+  }
+
+  return projectSlug;
+}

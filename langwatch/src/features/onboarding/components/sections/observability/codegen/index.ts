@@ -1,9 +1,8 @@
 import type { FrameworkKey, PlatformKey } from "../types";
 import type { GoFrameworkKey } from "../constants";
 import { platformToFileName } from "../constants";
-import { TS_SNIPPETS } from "./snippets.ts";
-import { getGoFrameworkCode, getGoLanguageCode } from "./go.ts";
-import { getTypeScriptLanguageCode, getTypeScriptVercelAICode } from "./typescript";
+import { parseSnippet } from "./snippets.ts";
+import { registry, getRegistryEntry } from "./registry";
 
 interface CodegenResult {
   code: string;
@@ -15,9 +14,17 @@ interface CodegenResult {
 export function getLanguageCode(language: PlatformKey): CodegenResult {
   switch (language) {
     case "typescript":
-      return getTypeScriptLanguageCode();
+      try {
+        // Use base TS snippet
+        const base = registry.find((r) => r.platform === "typescript" && r.framework === "openai" && r.snippet)?.snippet;
+        if (base?.file) {
+          const parsed = parseSnippet(base.file as unknown as string);
+          return { code: parsed.code, filename: base.filename, codeLanguage: base.language, highlightLines: parsed.highlightLines };
+        }
+      } catch {}
+      return { code: "", filename: platformToFileName(language), codeLanguage: "typescript" };
     case "go":
-      return getGoLanguageCode();
+      return { code: "// Integration snippet coming soon", filename: platformToFileName(language), codeLanguage: "go" };
     case "python":
       return { code: "# Integration snippet coming soon\n# Language: Python\n# Framework: None selected", filename: platformToFileName(language), codeLanguage: "python" };
     case "opentelemetry":
@@ -32,13 +39,13 @@ export function getFrameworkCode(language: "go", framework: GoFrameworkKey): Cod
 export function getFrameworkCode(language: Exclude<PlatformKey, "go">, framework: FrameworkKey): CodegenResult;
 
 export function getFrameworkCode(language: PlatformKey, framework: FrameworkKey): CodegenResult {
-  if (language === "go") {
-    return getGoFrameworkCode(framework as GoFrameworkKey);
+  // Prefer registry-driven lookup
+  const entry = getRegistryEntry(language, framework);
+  if (entry?.snippet) {
+    const parsed = parseSnippet(entry.snippet.file as unknown as string);
+    return { code: parsed.code, filename: entry.snippet.filename, codeLanguage: entry.snippet.language, highlightLines: parsed.highlightLines };
   }
-  if (language === "typescript" && framework === "vercel_ai") {
-    return getTypeScriptVercelAICode();
-  }
-
+  // Fallback placeholder
   const base = getLanguageCode(language);
   const prefix = ["typescript", "go"].includes(language) ? "//" : "#";
   const frameworkLabel = framework.replaceAll("_", " ");

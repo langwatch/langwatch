@@ -35,6 +35,6 @@ export const PlatformGrid: React.FC<PlatformGridProps> = ({
           />
         ))}
       </Grid>
-    </VStack>
+  </VStack>
   );
 }
