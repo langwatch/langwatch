@@ -52,9 +52,11 @@ export function CustomCopilotKitChat({
 function CustomCopilotKitChatInner({
   messages,
   smallerView,
+  hideInput,
 }: {
   messages: ScenarioMessageSnapshotEvent["messages"];
   smallerView?: boolean;
+  hideInput?: boolean;
 }) {
   const { project } = useOrganizationTeamProject();
   const { setMessages } = useCopilotChat({
@@ -74,7 +76,7 @@ function CustomCopilotKitChatInner({
         {
           error,
         },
-        "Failed to convert scenario messages to CopilotKit messages"
+        "Failed to convert scenario messages to CopilotKit messages",
       );
     }
   }, [messages]);
@@ -107,7 +109,7 @@ function CustomCopilotKitChatInner({
                             traceId: message_.traceId ?? "",
                             selectedTab: "traceDetails",
                           },
-                          { replace: true }
+                          { replace: true },
                         );
                       } else {
                         openDrawer("traceDetails", {
@@ -131,7 +133,7 @@ function CustomCopilotKitChatInner({
       RenderResultMessage={({ message }) => (
         <ToolResultMessage message={message as ResultMessage} />
       )}
-      Input={() => <div></div>}
+      Input={hideInput ? () => <div></div> : undefined}
     />
   );
 }
