@@ -1,4 +1,5 @@
 import {
+  Badge,
   Box,
   Button,
   Card,
@@ -603,7 +604,7 @@ function RoleCard({
       height="100%"
       borderWidth="1px"
       borderColor="gray.200"
-      _hover={{ borderColor: "orange.400", shadow: "md" }}
+      _hover={!isDefault ? { borderColor: "orange.400", shadow: "md" } : {}}
       transition="all 0.2s"
       display="flex"
       flexDirection="column"
@@ -662,9 +663,15 @@ function RoleCard({
           <Text fontSize="sm" color="gray.600">
             {description}
           </Text>
-          <Text fontSize="xs" color="orange.600" fontWeight="medium">
-            {permissionCount}
-          </Text>
+          {isDefault ? (
+            <Badge colorPalette="orange" size="sm">
+              {permissionCount}
+            </Badge>
+          ) : (
+            <Text fontSize="xs" color="orange.600" fontWeight="medium">
+              {permissionCount}
+            </Text>
+          )}
         </VStack>
       </Card.Body>
     </Card.Root>
