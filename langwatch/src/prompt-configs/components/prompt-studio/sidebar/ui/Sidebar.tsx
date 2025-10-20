@@ -36,7 +36,6 @@ function SidebarHeader({ children }: SidebarHeaderProps) {
       fontWeight="semibold"
       borderBottom="1px solid"
       borderColor="gray.200"
-      bg="white"
     >
       {children}
     </Box>
@@ -52,7 +51,6 @@ function SidebarSectionHeader({ children }: SidebarSectionHeaderProps) {
       fontSize="sm"
       fontWeight="medium"
       color="gray.700"
-      bg="white"
       borderBottom="1px solid"
       borderColor="gray.100"
       display="flex"
