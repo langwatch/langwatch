@@ -3,40 +3,9 @@ import { TeamUserRole, OrganizationUserRole } from "@prisma/client";
 import {
   hasProjectPermission,
   hasTeamPermission,
-  hasOrganizationPermission,
   Resources,
-  Actions,
   type Permission,
 } from "../rbac";
-
-// Helper function to test permission hierarchy logic
-function hasPermissionWithHierarchy(
-  permissions: string[],
-  requestedPermission: string,
-): boolean {
-  // Handle undefined or null permissions
-  if (!permissions || !Array.isArray(permissions)) {
-    return false;
-  }
-
-  // Direct match
-  if (permissions.includes(requestedPermission)) {
-    return true;
-  }
-
-  // Hierarchy rule: manage permissions include view, create, update, and delete permissions
-  const actionSuffixes = [":view", ":create", ":update", ":delete"];
-  for (const suffix of actionSuffixes) {
-    if (requestedPermission.endsWith(suffix)) {
-      const managePermission = requestedPermission.replace(suffix, ":manage");
-      if (permissions.includes(managePermission)) {
-        return true;
-      }
-    }
-  }
-
-  return false;
-}
 
 // Mock Prisma client
 const mockPrisma = {
@@ -56,7 +25,7 @@ const mockPrisma = {
   teamUserCustomRole: {
     findFirst: vi.fn(),
   },
-};
+} as any;
 
 // Mock session
 const mockSession = {
@@ -64,7 +33,7 @@ const mockSession = {
     id: "user-123",
     email: "test@example.com",
   },
-};
+} as any;
 
 describe("Team Permission Inheritance Tests", () => {
   beforeEach(() => {

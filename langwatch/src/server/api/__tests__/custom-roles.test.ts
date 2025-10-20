@@ -1,12 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { TeamUserRole, OrganizationUserRole } from "@prisma/client";
-import {
-  hasProjectPermission,
-  hasTeamPermission,
-  Resources,
-  Actions,
-  type Permission,
-} from "../rbac";
+import { TeamUserRole } from "@prisma/client";
+import { hasProjectPermission, type Permission } from "../rbac";
 
 // Helper function to test permission hierarchy logic
 function hasPermissionWithHierarchy(
@@ -58,7 +52,7 @@ const mockPrisma = {
   customRole: {
     findFirst: vi.fn(),
   },
-};
+} as any;
 
 // Mock session
 const mockSession = {
@@ -66,7 +60,7 @@ const mockSession = {
     id: "user-123",
     email: "test@example.com",
   },
-};
+} as any;
 
 describe("Custom Role Functionality Tests", () => {
   beforeEach(() => {

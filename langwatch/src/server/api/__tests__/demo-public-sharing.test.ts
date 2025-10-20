@@ -1,13 +1,10 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { TRPCError } from "@trpc/server";
 import { TeamUserRole } from "@prisma/client";
 import {
   hasProjectPermission,
   isDemoProject,
   checkPermissionOrPubliclyShared,
   checkProjectPermission,
-  Resources,
-  Actions,
   type Permission,
 } from "../rbac";
 
@@ -19,7 +16,7 @@ const mockPrisma = {
   publicShare: {
     findFirst: vi.fn(),
   },
-};
+} as any;
 
 // Mock session
 const mockSession = {
@@ -27,7 +24,7 @@ const mockSession = {
     id: "user-123",
     email: "test@example.com",
   },
-};
+} as any;
 
 describe("Demo Project and Public Sharing Tests", () => {
   beforeEach(() => {
@@ -381,7 +378,7 @@ describe("Demo Project and Public Sharing Tests", () => {
           projectId: "project-123",
           traceId: "trace-123",
           resourceType: "TRACE",
-        },
+        } as any,
         next: mockNext,
       });
 
@@ -584,7 +581,7 @@ describe("Demo Project and Public Sharing Tests", () => {
       await expect(
         middleware({
           ctx: mockCtx,
-          input: { projectId: "project-123" }, // Missing traceId
+          input: { projectId: "project-123", traceId: "trace-123" } as any, // Missing traceId
           next: mockNext,
         }),
       ).rejects.toThrow();
@@ -608,7 +605,7 @@ describe("Demo Project and Public Sharing Tests", () => {
       await expect(
         middleware({
           ctx: mockCtx,
-          input: { projectId: "project-123", traceId: null }, // Invalid traceId
+          input: { projectId: "project-123", traceId: null } as any, // Invalid traceId
           next: mockNext,
         }),
       ).rejects.toThrow();
