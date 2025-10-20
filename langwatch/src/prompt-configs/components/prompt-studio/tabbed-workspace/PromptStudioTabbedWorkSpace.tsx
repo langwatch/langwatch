@@ -76,30 +76,32 @@ export function PromptStudioTabbedWorkSpace() {
   };
 
   return (
-    <BrowserLikeTabs.Root
-      tabs={tabs}
-      activeTabId={activeTabId}
-      onTabChange={handleTabChange}
-      onTabClose={handleTabClose}
-      onAddTab={handleAddTab}
-    >
-      <PromptBrowserTab
-        value="prompt-editor"
-        version={1}
-        title="Prompt Editor"
-        hasUnsavedChanges={true}
-      />
-      <PromptBrowserTab
-        value="prompt-preview"
-        version={1}
-        title="Prompt Preview"
-      />
-      <BrowserLikeTabs.Content value="prompt-editor">
-        <PromptEditor />
-      </BrowserLikeTabs.Content>
-      <BrowserLikeTabs.Content value="prompt-preview">
-        <PromptPreview />
-      </BrowserLikeTabs.Content>
-    </BrowserLikeTabs.Root>
+    <Box minW="400px" height="full">
+      <BrowserLikeTabs.Root
+        tabs={tabs}
+        activeTabId={activeTabId}
+        onTabChange={handleTabChange}
+        onTabClose={handleTabClose}
+        onAddTab={handleAddTab}
+      >
+        <PromptBrowserTab
+          value="prompt-editor"
+          version={1}
+          title="Prompt Editor"
+          hasUnsavedChanges={true}
+        />
+        <PromptBrowserTab
+          value="prompt-preview"
+          version={1}
+          title="Prompt Preview"
+        />
+        <BrowserLikeTabs.Content value="prompt-editor">
+          <PromptEditor />
+        </BrowserLikeTabs.Content>
+        <BrowserLikeTabs.Content value="prompt-preview">
+          <PromptPreview />
+        </BrowserLikeTabs.Content>
+      </BrowserLikeTabs.Root>
+    </Box>
   );
 }

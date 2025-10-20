@@ -10,7 +10,8 @@ function SidebarRoot({ children }: SidebarRootProps) {
   return (
     <Box
       as="nav"
-      width="280px"
+      width="380px"
+      minWidth="300px"
       height="100%"
       bg="gray.50"
       borderRight="1px solid"
