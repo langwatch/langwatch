@@ -1,6 +1,6 @@
-import type { FrameworkKey, PlatformKey } from "../types";
-import type { GoFrameworkKey } from "../constants";
-import { useActiveProject } from "../../../../context/ActiveProjectContext";
+import type { FrameworkKey, PlatformKey } from "../components/sections/observability/types";
+import type { GoFrameworkKey } from "../components/sections/observability/constants";
+import { useActiveProject } from "../context/ActiveProjectContext";
 import { platformToFileName } from "./platform.ts";
 import { parseSnippet } from "./snippets.ts";
 import { registry, getRegistryEntry } from "./registry";
@@ -68,7 +68,7 @@ export function useCodegen(language: PlatformKey, framework: FrameworkKey): Code
   const { project } = useActiveProject();
   const projectName = project?.name ?? "my-llm-app";
   const base = language === "go"
-    ? getFrameworkCode("go", framework as GoFrameworkKey)
+    ? getFrameworkCode("go", framework )
     : getFrameworkCode(language, framework);
   return { ...base, code: base.code.replaceAll("<project_name>", projectName) };
 }

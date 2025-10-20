@@ -1,8 +1,8 @@
 /* eslint-disable @next/next/no-img-element */
 import React from "react";
-import type { FrameworkKey, PlatformKey } from "../types.ts";
-import { NoLoN8nSetup } from "../NoLoN8nSetup.tsx";
-import { OpenTelemetrySetup } from "../OpenTelemetrySetup.tsx";
+import type { FrameworkKey, PlatformKey } from "../components/sections/observability/types";
+import { NoLoN8nSetup } from "../components/sections/observability/NoLoN8nSetup";
+import { OpenTelemetrySetup } from "../components/sections/observability/OpenTelemetrySetup";
 import vercelAiTsSource from "./snippets/typescript/vercelai.snippet.ts?raw";
 import goOpenaiSource from "./snippets/go/openai.snippet.go";
 import goAzureSource from "./snippets/go/azure.snippet.go";

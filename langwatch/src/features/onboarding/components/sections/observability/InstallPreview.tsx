@@ -8,7 +8,7 @@ import {
 } from "@chakra-ui/react";
 import type { HighlighterGeneric } from "shiki";
 import { useColorMode } from "../../../../../components/ui/color-mode";
-import type { InstallMatrix } from "./codegen/registry";
+import type { InstallMatrix } from "../../../codegen/registry";
 
 interface InstallPreviewProps {
   install?: InstallMatrix;
