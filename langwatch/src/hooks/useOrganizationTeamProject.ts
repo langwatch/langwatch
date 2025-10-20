@@ -32,7 +32,7 @@ export const useOrganizationTeamProject = (
     redirectToOnboarding: true,
     redirectToProjectOnboarding: true,
     keepFetching: false,
-  }
+  },
 ) => {
   const session = useRequiredSession();
 
@@ -43,19 +43,19 @@ export const useOrganizationTeamProject = (
   const shareId = typeof router.query.id === "string" ? router.query.id : "";
   const publicShare = api.share.getShared.useQuery(
     { id: shareId },
-    { enabled: !!shareId && !!isPublicRoute }
+    { enabled: !!shareId && !!isPublicRoute },
   );
   const publicShareProject = api.project.publicGetById.useQuery(
     {
       id: publicShare.data?.projectId ?? "",
       shareId: publicShare.data?.id ?? "",
     },
-    { enabled: !!publicShare.data?.projectId && !!publicShare.data?.id }
+    { enabled: !!publicShare.data?.projectId && !!publicShare.data?.id },
   );
 
   const isDemo = Boolean(
     publicEnv.data?.DEMO_PROJECT_SLUG &&
-      router.query.project === publicEnv.data.DEMO_PROJECT_SLUG
+      router.query.project === publicEnv.data.DEMO_PROJECT_SLUG,
   );
 
   const organizations = api.organization.getAll.useQuery(
@@ -64,21 +64,21 @@ export const useOrganizationTeamProject = (
       enabled: !!session.data || !isPublicRoute,
       staleTime: keepFetching ? undefined : Infinity,
       refetchInterval: keepFetching ? 5_000 : undefined,
-    }
+    },
   );
 
   const [localStorageOrganizationId, setLocalStorageOrganizationId] =
     useLocalStorage<string>("selectedOrganizationId", "");
   const [localStorageTeamId, setLocalStorageTeamId] = useLocalStorage<string>(
     "selectedTeamId",
-    ""
+    "",
   );
   const [localStorageProjectSlug, setLocalStorageProjectSlug] =
     useLocalStorage<string>("selectedProjectSlug", "");
 
   const reservedProjectSlugs = useMemo(
     () => ["analytics", "datasets", "evaluations", "experiments", "messages"],
-    []
+    [],
   );
 
   const projectQueryParam =
@@ -97,7 +97,7 @@ export const useOrganizationTeamProject = (
     ? organizations.data?.flatMap((organization) =>
         organization.teams
           .filter((team) => team.slug === teamSlug)
-          .map((team) => ({ organization, team }))
+          .map((team) => ({ organization, team })),
       )
     : undefined;
 
@@ -118,30 +118,29 @@ export const useOrganizationTeamProject = (
             if (a.team.id == localStorageTeamId) return -1;
             if (b.team.id == localStorageTeamId) return 1;
             return 0;
-          })
-      )
+          }),
+      ),
   );
 
   const organization = teamsMatchingSlug?.[0]
     ? teamsMatchingSlug?.[0].organization
     : projectsTeamsOrganizationsMatchingSlug?.[0]
-      ? projectsTeamsOrganizationsMatchingSlug?.[0].organization
-      : organizations.data
-        ? (organizations.data.find(
-            (org) => org.id == localStorageOrganizationId
-          ) ?? organizations.data[0])
-        : undefined;
+    ? projectsTeamsOrganizationsMatchingSlug?.[0].organization
+    : organizations.data
+    ? organizations.data.find((org) => org.id == localStorageOrganizationId) ??
+      organizations.data[0]
+    : undefined;
 
   const team = projectsTeamsOrganizationsMatchingSlug?.[0]
     ? projectsTeamsOrganizationsMatchingSlug?.[0].team
     : organization
-      ? (organization.teams.find((team) => team.id == localStorageTeamId) ??
-        organization.teams.find((team) => team.projects.length > 0) ??
-        organization.teams[0])
-      : undefined;
+    ? organization.teams.find((team) => team.id == localStorageTeamId) ??
+      organization.teams.find((team) => team.projects.length > 0) ??
+      organization.teams[0]
+    : undefined;
 
   const project = team
-    ? (projectsTeamsOrganizationsMatchingSlug?.[0]?.project ?? team.projects[0])
+    ? projectsTeamsOrganizationsMatchingSlug?.[0]?.project ?? team.projects[0]
     : undefined;
 
   const modelProviders = api.modelProvider.getAllForProject.useQuery(
@@ -150,7 +149,7 @@ export const useOrganizationTeamProject = (
       enabled: !!project?.id,
       refetchOnMount: false,
       refetchOnWindowFocus: true,
-    }
+    },
   );
 
   useEffect(() => {
@@ -190,7 +189,7 @@ export const useOrganizationTeamProject = (
       : "";
 
     const teamsWithProjectsOnAnyOrg = organizations.data.flatMap((org) =>
-      org.teams.filter((team) => team.projects.length > 0)
+      org.teams.filter((team) => team.projects.length > 0),
     );
     if (!organization || !teamsWithProjectsOnAnyOrg.length) {
       void router.push(`/onboarding/welcome${returnTo}`);
@@ -198,7 +197,7 @@ export const useOrganizationTeamProject = (
     }
 
     const hasTeamsWithProjectsOnCurrentOrg = organization.teams.some(
-      (team) => team.projects.length > 0
+      (team) => team.projects.length > 0,
     );
     if (
       !hasTeamsWithProjectsOnCurrentOrg &&
@@ -258,7 +257,7 @@ export const useOrganizationTeamProject = (
   const organizationRole = organization?.members[0]?.role;
 
   const hasOrganizationPermission = (
-    roleGroup: keyof typeof OrganizationRoleGroup
+    roleGroup: keyof typeof OrganizationRoleGroup,
   ) => {
     return !!(
       organizationRole &&
@@ -270,7 +269,7 @@ export const useOrganizationTeamProject = (
 
   const hasTeamPermission = (
     roleGroup: keyof typeof TeamRoleGroup,
-    team_ = team
+    team_ = team,
   ) => {
     const teamRole = team_?.members[0]?.role;
     const allowedRoles = teamRolePermissionMapping[roleGroup];
@@ -280,7 +279,7 @@ export const useOrganizationTeamProject = (
   const isOrganizationFeatureEnabled = (feature: string): boolean => {
     if (!organization?.features) return false;
     const trialFeature = organization.features.find(
-      (f) => f.feature === feature
+      (f) => f.feature === feature,
     );
     if (!trialFeature) return false;
 

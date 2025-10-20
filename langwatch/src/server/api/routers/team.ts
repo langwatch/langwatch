@@ -419,6 +419,13 @@ export const teamRouter = createTRPCRouter({
         for (const member of input.members) {
           const isCustomRole = member.role.startsWith("custom:");
 
+          if (isCustomRole && !member.customRoleId) {
+            throw new TRPCError({
+              code: "BAD_REQUEST",
+              message: `customRoleId is required when role is a custom role for user ${member.userId}`,
+            });
+          }
+
           await tx.teamUser.create({
             data: {
               userId: member.userId,
@@ -429,12 +436,12 @@ export const teamRouter = createTRPCRouter({
             },
           });
 
-          if (isCustomRole && member.customRoleId) {
+          if (isCustomRole) {
             await tx.teamUserCustomRole.create({
               data: {
                 userId: member.userId,
                 teamId: team.id,
-                customRoleId: member.customRoleId,
+                customRoleId: member.customRoleId!,
               },
             });
           }
