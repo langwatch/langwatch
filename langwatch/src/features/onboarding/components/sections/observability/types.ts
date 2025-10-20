@@ -21,7 +21,6 @@ export type FrameworkKey =
   | "n8n"
   | "langflow"
   | "mistral"
-  | "strands"
   | "flowise"
   | "crewai"
   | "pydantic"
