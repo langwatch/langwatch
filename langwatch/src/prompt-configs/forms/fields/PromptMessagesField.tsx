@@ -49,7 +49,7 @@ export function PromptMessagesField({
     id: string,
     handle: string,
     content: PromptTextAreaOnAddMention,
-    idx: number
+    idx: number,
   ) => void;
 }) {
   const form = useFormContext<PromptConfigFormValues>();
@@ -83,22 +83,7 @@ export function PromptMessagesField({
       : undefined;
   }, [errors]);
 
-  /**
-   * Filter out system message, since the prompt field is
-   * used for the system prompt
-   */
-  const filteredMessageFields = useMemo(() => {
-    return {
-      ...messageFields,
-      fields: messageFields.fields.filter((field) => field.role !== "system"),
-    } as UseFieldArrayReturn<
-      PromptConfigFormValues,
-      "version.configData.messages",
-      "id"
-    >;
-  }, [messageFields]);
-
-  return filteredMessageFields.fields.map((field, idx) => {
+  return messageFields.fields.map((field, idx) => {
     return (
       <VerticalFormControl
         key={field.id}
@@ -141,10 +126,8 @@ export function PromptMessagesField({
                   </NativeSelect.Root>
                 </HStack>
                 <Spacer />
-                {idx === filteredMessageFields.fields.length - 1 && (
-                  <AddRemoveMessageFieldButton
-                    messageFields={filteredMessageFields}
-                  />
+                {idx === messageFields.fields.length - 1 && (
+                  <AddRemoveMessageFieldButton messageFields={messageFields} />
                 )}
               </HStack>
             )}

@@ -1,6 +1,6 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import isEqual from "lodash-es/isEqual";
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import { useForm, type DeepPartial } from "react-hook-form";
 
 import { formSchema, type PromptConfigFormValues } from "~/prompt-configs";
@@ -34,6 +34,23 @@ export const usePromptConfigForm = ({
   });
 
   const formData = methods.watch();
+  const messages = methods.watch("version.configData.messages");
+  const systemMessage = useMemo(
+    () => messages.find(({ role }) => role === "system")?.content,
+    [messages],
+  );
+
+  /**
+   * In the case that we're using system messages,
+   * make sure to keep the prompt synced
+   */
+  useEffect(() => {
+    if (systemMessage) {
+      methods.setValue("version.configData.prompt", systemMessage, {
+        shouldDirty: true,
+      });
+    }
+  }, [systemMessage, methods]);
 
   // Handle syncing the inputs/outputs with the demonstrations columns
   useEffect(() => {
@@ -48,11 +65,11 @@ export const usePromptConfigForm = ({
     if (!isEqual(newColumns, currentColumns)) {
       methods.setValue(
         "version.configData.demonstrations.inline.columnTypes",
-        newColumns
+        newColumns,
       );
       methods.setValue(
         "version.configData.demonstrations.inline.records",
-        currentRecords
+        currentRecords,
       );
     }
   }, [formData, methods]);
@@ -62,10 +79,10 @@ export const usePromptConfigForm = ({
     if (disableNodeSync) return;
     disableOnChange = true;
     for (const [key, value] of Object.entries(
-      initialConfigValues?.version?.configData ?? {}
+      initialConfigValues?.version?.configData ?? {},
     )) {
       const currentValue = methods.getValues(
-        `version.configData.${key}` as any
+        `version.configData.${key}` as any,
       );
       if (!isEqual(currentValue, value)) {
         methods.setValue(`version.configData.${key}` as any, value as any);

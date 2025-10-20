@@ -27,7 +27,7 @@ import {
 import { kebabCase } from "~/utils/stringCasing";
 
 export function promptConfigFormValuesToOptimizationStudioNodeData(
-  formValues: PromptConfigFormValues
+  formValues: PromptConfigFormValues,
 ): Node<LlmPromptConfigComponent>["data"] {
   return {
     configId: formValues.configId,
@@ -66,7 +66,7 @@ export function promptConfigFormValuesToOptimizationStudioNodeData(
 }
 
 export function safeOptimizationStudioNodeDataToPromptConfigFormInitialValues(
-  nodeData: Node<Signature | LlmPromptConfigComponent>["data"]
+  nodeData: Node<Signature | LlmPromptConfigComponent>["data"],
 ): DeepPartial<PromptConfigFormValues> {
   const parametersMap = nodeData.parameters
     ? Object.fromEntries(nodeData.parameters.map((p) => [p.identifier, p]))
@@ -110,7 +110,7 @@ export function safeOptimizationStudioNodeDataToPromptConfigFormInitialValues(
 }
 
 function safeInputs(
-  inputs: Signature["inputs"]
+  inputs: Signature["inputs"],
 ): PromptConfigFormValues["version"]["configData"]["inputs"] {
   return (
     inputs?.map((input) => {
@@ -129,7 +129,7 @@ function safeInputs(
 }
 
 function safeOutputs(
-  outputs: Signature["outputs"]
+  outputs: Signature["outputs"],
 ): PromptConfigFormValues["version"]["configData"]["outputs"] {
   return (
     outputs?.map((output) => {
@@ -153,7 +153,7 @@ function safeOutputs(
 
 export function inputsAndOutputsToDemostrationColumns(
   inputs: PromptConfigFormValues["version"]["configData"]["inputs"],
-  outputs: PromptConfigFormValues["version"]["configData"]["outputs"]
+  outputs: PromptConfigFormValues["version"]["configData"]["outputs"],
 ): { name: string; type: DatasetColumnType; id: string }[] {
   return [
     ...inputs
@@ -172,7 +172,7 @@ export function inputsAndOutputsToDemostrationColumns(
 }
 
 function inputOutputTypeToDatasetColumnType(
-  type_: LlmConfigInputType | LlmConfigOutputType
+  type_: LlmConfigInputType | LlmConfigOutputType,
 ): DatasetColumnType {
   switch (type_) {
     case "str":
@@ -204,21 +204,21 @@ function inputOutputTypeToDatasetColumnType(
 
 export function createNewOptimizationStudioPromptName(
   workflowName: string,
-  nodes: Node<Component>[]
+  nodes: Node<Component>[],
 ) {
   const nodesWithSameName = nodes.filter(
-    (node) => node.data.name?.startsWith(kebabCase(workflowName))
+    (node) => node.data.name?.startsWith(kebabCase(workflowName)),
   ).length;
 
   const promptName = kebabCase(
-    `${workflowName}-new-prompt-${nodesWithSameName + 1}`
+    `${workflowName}-new-prompt-${nodesWithSameName + 1}`,
   );
 
   return promptName;
 }
 
 export function versionedPromptToLlmPromptConfigComponentNodeData(
-  prompt: VersionedPrompt
+  prompt: VersionedPrompt,
 ): Node<LlmPromptConfigComponent>["data"] {
   return {
     configId: prompt.id,
@@ -268,14 +268,14 @@ export function versionedPromptToLlmPromptConfigComponentNodeData(
  * @returns
  */
 export function formValuesToTriggerSaveVersionParams(
-  formValues: PromptConfigFormValues
+  formValues: PromptConfigFormValues,
 ): Omit<Omit<SaveVersionParams, "projectId">["data"], "commitMessage"> {
   const systemPrompt =
     formValues.version.configData.prompt ??
     formValues.version.configData.messages?.find((msg) => msg.role === "system")
       ?.content;
   const messages = formValues.version.configData.messages?.filter(
-    (msg) => msg.role !== "system"
+    (msg) => msg.role !== "system",
   );
 
   return {
@@ -293,7 +293,7 @@ export function formValuesToTriggerSaveVersionParams(
 }
 
 export function versionedPromptToPromptConfigFormValues(
-  prompt: VersionedPrompt
+  prompt: VersionedPrompt,
 ): PromptConfigFormValues {
   return {
     configId: prompt.id,
@@ -307,6 +307,8 @@ export function versionedPromptToPromptConfigFormValues(
     version: {
       configData: {
         prompt: prompt.prompt,
+        // The system message should be stored in the prompt field in the DB,
+        // so this shouldn't be necessary, but it's a precaution.
         messages: prompt.messages.filter((msg) => msg.role !== "system"),
         inputs: prompt.inputs,
         outputs: prompt.outputs,
@@ -323,8 +325,21 @@ export function versionedPromptToPromptConfigFormValues(
   };
 }
 
+export function versionedPromptToPromptConfigFormValuesWithSystemMessage(
+  prompt: VersionedPrompt,
+): PromptConfigFormValues {
+  const base = versionedPromptToPromptConfigFormValues(prompt);
+
+  base.version.configData.messages = [
+    { role: "system", content: prompt.prompt },
+    ...base.version.configData.messages,
+  ];
+
+  return base;
+}
+
 export function versionedPromptToOptimizationStudioNodeData(
-  prompt: VersionedPrompt
+  prompt: VersionedPrompt,
 ): Required<
   Omit<
     LlmPromptConfigComponent,

@@ -2,32 +2,11 @@ import { useState } from "react";
 import { Box } from "@chakra-ui/react";
 import { BrowserLikeTabs } from "./ui";
 import { PromptBrowserTab } from "./ui/PromptBrowserTab";
-
-// Placeholder components for now - these would be replaced with actual implementations
-function PromptEditor() {
-  return (
-    <Box padding={4} height="full">
-      <Box bg="gray.100" height="full" borderRadius="md" padding={4}>
-        Prompt Editor Component - Coming Soon
-      </Box>
-    </Box>
-  );
-}
-
-function PromptPreview() {
-  return (
-    <Box padding={4} height="full">
-      <Box bg="gray.100" height="full" borderRadius="md" padding={4}>
-        Prompt Preview Component - Coming Soon
-      </Box>
-    </Box>
-  );
-}
+import { PromptBrowserWindow } from "./prompt-browser-window/PromptBrowserWindow";
 
 interface Tab {
   id: string;
   title: string;
-  content: React.ReactNode;
   hasUnsavedChanges?: boolean;
 }
 
@@ -36,12 +15,10 @@ export function PromptStudioTabbedWorkSpace() {
     {
       id: "prompt-editor",
       title: "Prompt Editor",
-      content: <PromptEditor />,
     },
     {
       id: "prompt-preview",
       title: "Prompt Preview",
-      content: <PromptPreview />,
     },
   ]);
 
@@ -68,7 +45,6 @@ export function PromptStudioTabbedWorkSpace() {
     const newTab: Tab = {
       id: newTabId,
       title: `New Tab ${tabs.length + 1}`,
-      content: <PromptEditor />,
     };
 
     setTabs([...tabs, newTab]);
@@ -96,10 +72,10 @@ export function PromptStudioTabbedWorkSpace() {
           title="Prompt Preview"
         />
         <BrowserLikeTabs.Content value="prompt-editor">
-          <PromptEditor />
+          <PromptBrowserWindow configId="prompt_TbiIk6DRso_RfA2CpP6g3" />
         </BrowserLikeTabs.Content>
         <BrowserLikeTabs.Content value="prompt-preview">
-          <PromptPreview />
+          <PromptBrowserWindow />
         </BrowserLikeTabs.Content>
       </BrowserLikeTabs.Root>
     </Box>
