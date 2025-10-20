@@ -1,5 +1,5 @@
 import { PromptStudioLayout } from "~/prompt-configs/components/prompt-studio/PromptStudioLayout";
 
-export function PromptStudioPage() {
+export default function PromptStudioPage() {
   return <PromptStudioLayout />;
 }

@@ -1,3 +1,11 @@
+import { Box } from "@chakra-ui/react";
+import { PromptStudioTabbedWorkSpace } from "./tabbed-workspace/PromptStudioTabbedWorkSpace";
+
 export function PromptStudioMainContent() {
-  return <div>PromptStudioMainContent</div>;
+  return (
+    <Box>
+      <PromptStudioTabbedWorkSpace />
+      <PromptStudioTabbedWorkSpace />
+    </Box>
+  );
 }
