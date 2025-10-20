@@ -13,13 +13,15 @@ import { toaster } from "../../../../../components/ui/toaster";
 import { Eye, EyeOff, Clipboard, ClipboardPlus } from "lucide-react";
 import { Tooltip } from "~/components/ui/tooltip";
 import { useActiveProject } from "../../../context/ActiveProjectContext";
+import { usePublicEnv } from "~/hooks/usePublicEnv";
 
-interface ApiKeyCardProps { apiKey?: string }
-
-export function ApiKeyCard({ apiKey }: ApiKeyCardProps): React.ReactElement {
+export function ApiIntegrationInfoCard(): React.ReactElement {
   const [isVisible, setIsVisible] = useState(false);
   const { project } = useActiveProject();
-  const effectiveApiKey = project?.apiKey ?? apiKey ?? "";
+  const publicEnv = usePublicEnv();
+
+  const effectiveApiKey = project?.apiKey ?? "";
+  const effectiveEndpoint = publicEnv.data?.BASE_HOST ?? "";
 
   function toggleVisibility(): void {
     setIsVisible((prev) => !prev);
@@ -44,11 +46,28 @@ export function ApiKeyCard({ apiKey }: ApiKeyCardProps): React.ReactElement {
     }
   }
 
+  async function copyEndpoint(): Promise<void> {
+    try {
+      await navigator.clipboard.writeText(effectiveEndpoint);
+      toaster.create({
+        title: "Copied",
+        description: "Endpoint copied to clipboard",
+      });
+    } catch {
+      toaster.create({
+        title: "Copy failed",
+        description: "Couldn't copy the endpoint. Please try again.",
+        type: "error",
+        meta: { closable: true },
+      });
+    }
+  }
+
   return (
     <VStack align="stretch" gap={3}>
       <VStack align="stretch" gap={0}>
         <Text fontSize="md" fontWeight="semibold">
-          Your LangWatch API key
+          Your LangWatch Integration Info
         </Text>
         <Text fontSize="xs" color="fg.muted">
           {"You can access your API key again anytime in the project's settings "}
@@ -80,7 +99,7 @@ export function ApiKeyCard({ apiKey }: ApiKeyCardProps): React.ReactElement {
                 <Clipboard />
               </IconButton>
             </Tooltip>
-            <Tooltip content="Copy key with bash prefix">
+            <Tooltip content="Copy key with environment variable prefix">
               <IconButton
                 size="2xs"
                 variant="ghost"
@@ -104,6 +123,40 @@ export function ApiKeyCard({ apiKey }: ApiKeyCardProps): React.ReactElement {
           aria-label="Your API key"
         />
       </InputGroup>
+
+      {effectiveEndpoint && effectiveEndpoint !== "https://app.langwatch.ai" && (
+        <InputGroup
+          w="full"
+          startAddonProps={{ bg: "bg.muted/60", color: "fg.muted", border: "0" }}
+          startAddon={<Text fontSize="xs">LANGWATCH_ENDPOINT=</Text>}
+          endAddonProps={{ bg: "bg.muted/40", color: "fg.muted", border: "0" }}
+          endAddon={
+            <HStack gap="1">
+              <Tooltip content="Copy key">
+                <IconButton
+                  size="2xs"
+                  variant="ghost"
+                  onClick={() => void copyEndpoint()}
+                  aria-label="Copy endpoint"
+                >
+                  <Clipboard />
+                </IconButton>
+              </Tooltip>
+            </HStack>
+          }
+        >
+          <Input
+            bg="bg.muted/40"
+            borderRight={0}
+            size="sm"
+            variant="subtle"
+            type={"text"}
+            value={effectiveEndpoint}
+            readOnly
+            aria-label="Your LangWatch Endpoint"
+          />
+        </InputGroup>
+      )}
     </VStack>
   );
 }
