@@ -197,9 +197,12 @@ function DraggableTabsGroup({
     onTabChange,
   };
 
+  const childrenCount = React.Children.count(children);
+
   return (
     <TabGroupContext.Provider value={groupContextValue}>
       <BrowserLikeTabs.Root
+        maxWidth={childrenCount > 1 ? "50%" : undefined}
         value={activeTabId}
         onValueChange={(tabId) => onTabChange?.(groupId, tabId)}
         onClick={() => onClick?.(groupId, activeTabId ?? "")}
@@ -287,6 +290,7 @@ function DraggableTabTrigger({ value, children }: DraggableTabTriggerProps) {
     <div
       ref={setNodeRef}
       style={{
+        flex: 1,
         display: "flex",
         alignItems: "stretch",
         ...style,

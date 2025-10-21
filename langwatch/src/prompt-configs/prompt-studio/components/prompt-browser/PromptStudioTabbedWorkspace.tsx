@@ -1,4 +1,4 @@
-import { Spacer } from "@chakra-ui/react";
+import { HStack, Spacer } from "@chakra-ui/react";
 import { PromptBrowserWindowContent } from "./prompt-browser-window/PromptBrowserWindowContent";
 import { PromptBrowserTab } from "./ui/PromptBrowserTab";
 import { useDraggableTabsBrowserStore } from "../../prompt-studio-store/DraggableTabsBrowserStore";
@@ -51,27 +51,30 @@ export function PromptStudioTabbedWorkspace() {
           onClick={() => setActiveWindow({ windowId: window.id })}
         >
           <DraggableTabsBrowser.TabBar>
-            {window.tabs.map((tab) => (
-              <DraggableTabsBrowser.Trigger key={tab.id} value={tab.id}>
-                <DraggableTabsBrowser.Tab>
-                  <PromptBrowserTab
-                    hasUnsavedChanges={tab.data.form.isDirty}
-                    title={tab.data.meta.title ?? "Untitled"}
-                    version={tab.data.meta.versionNumber}
-                    onClose={() => handleClose(tab.id)}
-                  />
-                </DraggableTabsBrowser.Tab>
-              </DraggableTabsBrowser.Trigger>
-            ))}
-            <Spacer />
+            <HStack gap={0} overflowX="auto">
+              {window.tabs.map((tab) => (
+                <DraggableTabsBrowser.Trigger key={tab.id} value={tab.id}>
+                  <DraggableTabsBrowser.Tab>
+                    <PromptBrowserTab
+                      hasUnsavedChanges={tab.data.form.isDirty}
+                      title={tab.data.meta.title ?? "Untitled"}
+                      version={tab.data.meta.versionNumber}
+                      onClose={() => handleClose(tab.id)}
+                    />
+                  </DraggableTabsBrowser.Tab>
+                </DraggableTabsBrowser.Trigger>
+              ))}
+            </HStack>
             {window.id === activeWindowId && (
-              <SplitSquareHorizontal
-                size="18px"
-                cursor="pointer"
-                onClick={() =>
-                  window.activeTabId && handleSplit(window.activeTabId)
-                }
-              />
+              <HStack flexShrink={0} paddingX={3}>
+                <SplitSquareHorizontal
+                  size="18px"
+                  cursor="pointer"
+                  onClick={() =>
+                    window.activeTabId && handleSplit(window.activeTabId)
+                  }
+                />
+              </HStack>
             )}
           </DraggableTabsBrowser.TabBar>
           {window.tabs.map((tab) => (
