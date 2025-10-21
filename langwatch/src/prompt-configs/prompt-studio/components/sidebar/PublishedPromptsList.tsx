@@ -1,6 +1,4 @@
 import { Sidebar } from "./ui/Sidebar";
-import { api } from "~/utils/api";
-import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useMemo } from "react";
 import { modelProviderIcons } from "~/server/modelProviders/iconsMap";
 import { useDraggableTabsBrowserStore } from "../../prompt-studio-store/DraggableTabsBrowserStore";
@@ -9,17 +7,18 @@ import { useAllPromptsForProject } from "~/prompt-configs/hooks/useAllPromptsFor
 
 export function PublishedPromptsList() {
   const { data } = useAllPromptsForProject();
+  const { addTab } = useDraggableTabsBrowserStore();
+
+  /**
+   * Group the prompts by folder, derived from the handle prefix.
+   */
   const groupedPrompts = useMemo(() => {
     const publishedPrompts = data?.filter((prompt) => prompt.version > 0);
-    console.log(publishedPrompts);
     return groupBy(publishedPrompts, (prompt) =>
       prompt.handle?.includes("/") ? prompt.handle?.split("/")[0] : "default",
     );
   }, [data]);
 
-  const { addTab } = useDraggableTabsBrowserStore();
-
-  console.log(groupedPrompts);
   return (
     <>
       {Object.entries(groupedPrompts).map(([folder, prompts]) => (
@@ -37,7 +36,13 @@ export function PublishedPromptsList() {
                   prompt.model.split("/")[0] as keyof typeof modelProviderIcons
                 ]
               }
-              onClick={() => addTab({ data: { promptId: prompt.id } })}
+              onClick={() =>
+                addTab({
+                  data: {
+                    prompt,
+                  },
+                })
+              }
             >
               {prompt.handle ?? "Untitled"}
             </Sidebar.Item>

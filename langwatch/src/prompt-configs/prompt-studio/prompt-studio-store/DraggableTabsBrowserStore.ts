@@ -2,7 +2,11 @@ import { create } from "zustand";
 import { immer } from "zustand/middleware/immer";
 
 export interface TabData {
-  promptId: string;
+  prompt: {
+    id: string;
+    handle: string | null;
+    version: number;
+  };
 }
 
 export interface Tab {

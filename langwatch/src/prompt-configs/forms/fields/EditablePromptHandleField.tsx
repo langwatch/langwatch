@@ -1,4 +1,5 @@
-import { Button, HStack, Text } from "@chakra-ui/react";
+import { Button, HStack, Text, type StackProps } from "@chakra-ui/react";
+import clsx from "clsx";
 import { useFormContext } from "react-hook-form";
 import { LuPencil } from "react-icons/lu";
 
@@ -11,10 +12,14 @@ import { createLogger } from "~/utils/logger";
 import { CopyButton } from "../../../components/CopyButton";
 
 const logger = createLogger(
-  "langwatch:prompt-configs:editable-prompt-handle-field"
+  "langwatch:prompt-configs:editable-prompt-handle-field",
 );
 
-export function EditablePromptHandleField() {
+type EditablePromptHandleFieldProps = StackProps;
+
+export function EditablePromptHandleField(
+  props: EditablePromptHandleFieldProps,
+) {
   const form = useFormContext<PromptConfigFormValues>();
   const { triggerChangeHandle } = usePromptConfigContext();
 
@@ -57,7 +62,6 @@ export function EditablePromptHandleField() {
     <HStack
       paddingX={1}
       gap={1}
-      className="group"
       width="full"
       position="relative"
       minWidth={0}
@@ -69,6 +73,8 @@ export function EditablePromptHandleField() {
           opacity: 1,
         },
       }}
+      {...props}
+      className={clsx("group", props.className)}
     >
       {handle ? (
         <Text
