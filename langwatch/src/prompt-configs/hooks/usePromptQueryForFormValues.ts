@@ -32,8 +32,10 @@ export const usePromptQueryForFormValues = (params: {
 
   // ---- Form setup and configuration ----
   // Transform the LLM config into form values
-  const initialConfigValues: PromptConfigFormValues = useMemo(
+  const initialConfigValues: PromptConfigFormValues | undefined = useMemo(
     () => {
+      if (isLoading) return undefined;
+
       // If prompt is found, use the prompt values
       return prompt
         ? useSystemMessage

@@ -1,4 +1,4 @@
-import { HStack } from "@chakra-ui/react";
+import { HStack, Spacer } from "@chakra-ui/react";
 import { EditablePromptHandleField } from "~/prompt-configs/forms/fields/EditablePromptHandleField";
 import { GeneratePromptApiSnippetDialog } from "~/prompt-configs/components/GeneratePromptApiSnippetDialog";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
@@ -6,6 +6,7 @@ import { GenerateApiSnippetButton } from "~/components/GenerateApiSnippetButton"
 import { useFormContext } from "react-hook-form";
 import type { PromptConfigFormValues } from "~/prompt-configs";
 import { ModelSelectFieldMini } from "~/prompt-configs/forms/fields/ModelSelectFieldMini";
+import { SavePromptButton } from "./SavePromptButton";
 
 export function PromptBrowserHeader() {
   const { project } = useOrganizationTeamProject();
@@ -14,16 +15,22 @@ export function PromptBrowserHeader() {
 
   return (
     <HStack width="full" bg="white">
-      <EditablePromptHandleField />
-      <GeneratePromptApiSnippetDialog
-        promptHandle={handle}
-        apiKey={project?.apiKey}
-      >
-        <GeneratePromptApiSnippetDialog.Trigger>
-          <GenerateApiSnippetButton hasHandle={!!handle} />
-        </GeneratePromptApiSnippetDialog.Trigger>
-      </GeneratePromptApiSnippetDialog>
-      <ModelSelectFieldMini />
+      <HStack>
+        <EditablePromptHandleField width="auto" />
+        <GeneratePromptApiSnippetDialog
+          promptHandle={handle}
+          apiKey={project?.apiKey}
+        >
+          <GeneratePromptApiSnippetDialog.Trigger>
+            <GenerateApiSnippetButton hasHandle={!!handle} />
+          </GeneratePromptApiSnippetDialog.Trigger>
+        </GeneratePromptApiSnippetDialog>
+        <ModelSelectFieldMini />
+      </HStack>
+      <Spacer />
+      <HStack>
+        <SavePromptButton />
+      </HStack>
     </HStack>
   );
 }

@@ -1,5 +1,5 @@
 import { Spacer } from "@chakra-ui/react";
-import { PromptBrowserWindow } from "./prompt-browser-window/PromptBrowserWindow";
+import { PromptBrowserWindowContent } from "./prompt-browser-window/PromptBrowserWindowContent";
 import { PromptBrowserTab } from "./ui/PromptBrowserTab";
 import { useDraggableTabsBrowserStore } from "../../prompt-studio-store/DraggableTabsBrowserStore";
 import { DraggableTabsBrowser } from "./ui/DraggableTabsBrowser";
@@ -21,7 +21,6 @@ export function PromptStudioTabbedWorkspace() {
     from: { groupId: string; index: number };
     to: { groupId: string; index: number };
   }) {
-    console.log("handleTabMove", params);
     moveTab({
       tabId: params.tabId,
       windowId: params.to.groupId,
@@ -56,8 +55,8 @@ export function PromptStudioTabbedWorkspace() {
               <DraggableTabsBrowser.Trigger key={tab.id} value={tab.id}>
                 <DraggableTabsBrowser.Tab>
                   <PromptBrowserTab
-                    title={tab.data.promptId}
-                    version={1}
+                    title={tab.data.prompt.handle ?? "Untitled"}
+                    version={tab.data.prompt.version}
                     onClose={() => handleClose(tab.id)}
                   />
                 </DraggableTabsBrowser.Tab>
@@ -76,7 +75,7 @@ export function PromptStudioTabbedWorkspace() {
           </DraggableTabsBrowser.TabBar>
           {window.tabs.map((tab) => (
             <DraggableTabsBrowser.Content key={tab.id} value={tab.id}>
-              <PromptBrowserWindow configId={tab.data.promptId} />
+              <PromptBrowserWindowContent configId={tab.data.prompt.id} />
             </DraggableTabsBrowser.Content>
           ))}
         </DraggableTabsBrowser.Group>
