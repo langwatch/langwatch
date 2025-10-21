@@ -40,20 +40,11 @@ export function OrganizationUserRoleField({
   const updateOrganizationMemberRoleMutation =
     api.organization.updateMemberRole.useMutation();
 
-  const currentOption = useMemo(
-    () =>
-      orgRoleOptions.find((o) => o.value === defaultRole) ?? orgRoleOptions[1],
-    [defaultRole],
-  );
-
   // Local state for optimistic updates
-  const [selectedRole, setSelectedRole] =
-    useState<OrgRoleOption>(currentOption);
-
-  // Update local state when defaultRole prop changes
-  useEffect(() => {
-    setSelectedRole(currentOption);
-  }, [currentOption]);
+  const [selectedRole, setSelectedRole] = useState<OrgRoleOption>(
+    () =>
+      orgRoleOptions.find((o) => o.value === defaultRole) ?? orgRoleOptions[0]!,
+  );
 
   return (
     <VStack align="start">
@@ -94,7 +85,10 @@ export function OrganizationUserRoleField({
                 },
                 onError: (error) => {
                   // Revert optimistic update on error
-                  setSelectedRole(currentOption);
+                  setSelectedRole(
+                    orgRoleOptions.find((o) => o.value === defaultRole) ??
+                      orgRoleOptions[0]!,
+                  );
                   toaster.create({
                     title: "Error updating role",
                     description: error.message ?? "Please try again",

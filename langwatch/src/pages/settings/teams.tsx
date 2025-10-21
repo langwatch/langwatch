@@ -8,19 +8,17 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { Plus } from "react-feather";
+import { Archive, MoreVertical, Plus } from "react-feather";
+import { toaster } from "~/components/ui/toaster";
 import SettingsLayout from "../../components/SettingsLayout";
+import { Link } from "../../components/ui/link";
+import { Menu } from "../../components/ui/menu";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import type { TeamWithProjectsAndMembersAndUsers } from "../../server/api/routers/organization";
 import { api } from "../../utils/api";
-import { Link } from "../../components/ui/link";
-import { toaster } from "~/components/ui/toaster";
-import { Menu } from "../../components/ui/menu";
-import { MoreVertical } from "react-feather";
-import { Archive } from "react-feather";
 
 export default function Teams() {
-  const { organization, hasPermission } = useOrganizationTeamProject();
+  const { organization } = useOrganizationTeamProject();
 
   const teams = api.team.getTeamsWithMembers.useQuery(
     {

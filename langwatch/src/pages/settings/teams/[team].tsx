@@ -1,22 +1,19 @@
+import type { TeamUserRole } from "@prisma/client";
 import isEqual from "lodash-es/isEqual";
 import { useRouter } from "next/router";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useForm, useWatch, type SubmitHandler } from "react-hook-form";
 import { useDebouncedCallback } from "use-debounce";
-import type { TeamUserRole } from "@prisma/client";
 import SettingsLayout from "../../../components/SettingsLayout";
 import {
   TeamForm,
   type TeamFormData,
 } from "../../../components/settings/TeamForm";
+import { toaster } from "../../../components/ui/toaster";
 import type { TeamWithProjectsAndMembersAndUsers } from "../../../server/api/routers/organization";
 import { api } from "../../../utils/api";
-import { toaster } from "../../../components/ui/toaster";
 
-import {
-  teamRolesOptions,
-  type RoleOption,
-} from "../../../components/settings/TeamUserRoleField";
+import { teamRolesOptions } from "../../../components/settings/TeamUserRoleField";
 import { useOrganizationTeamProject } from "../../../hooks/useOrganizationTeamProject";
 
 // Type guards for safe access to custom role data
@@ -26,16 +23,9 @@ function isValidCustomRoleMember(
   return (
     typeof member === "object" &&
     member !== null &&
-    "userId" in member &&
-    "teamId" in member &&
-    "customRoleId" in member &&
     "customRole" in member &&
-    "user" in member &&
-    typeof (member as any).customRole === "object" &&
-    (member as any).customRole !== null &&
-    "id" in (member as any).customRole &&
-    "name" in (member as any).customRole &&
-    "permissions" in (member as any).customRole
+    typeof (member as { customRole: unknown }).customRole === "object" &&
+    (member as { customRole: unknown }).customRole !== null
   );
 }
 

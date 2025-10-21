@@ -308,10 +308,9 @@ export const roleRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       await ctx.prisma.teamUserCustomRole.delete({
         where: {
-          userId_teamId_customRoleId: {
+          userId_teamId: {
             userId: input.userId,
             teamId: input.teamId,
-            customRoleId: input.customRoleId,
           },
         },
       });

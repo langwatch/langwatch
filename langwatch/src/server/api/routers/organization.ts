@@ -73,7 +73,7 @@ export type TeamWithProjectsAndMembersAndUsers = Team & {
     };
     user: User;
   }>;
-  defaultRole?: TeamUserRole;
+  defaultRole?: TeamUserRole | null;
 };
 
 export type UserWithTeams = User & {
@@ -828,21 +828,23 @@ export const organizationRouter = createTRPCRouter({
         });
       }
 
-      const isTargetUserAdmin = targetUserMembership.role === TeamUserRole.ADMIN;
-      const wouldDemoteAdmin = isTargetUserAdmin && (
-        isCustomRole || // Custom roles set built-in role to VIEWER
-        (input.role as TeamUserRole) !== TeamUserRole.ADMIN // Changing to non-admin built-in role
-      );
+      const isTargetUserAdmin =
+        targetUserMembership.role === TeamUserRole.ADMIN;
+      const wouldDemoteAdmin =
+        isTargetUserAdmin &&
+        (isCustomRole || // Custom roles set built-in role to VIEWER
+          (input.role as TeamUserRole) !== TeamUserRole.ADMIN); // Changing to non-admin built-in role
 
       if (adminCount === 1 && wouldDemoteAdmin) {
         // Optional: Check for self-demotion
         if (input.userId === ctx.session.user.id) {
           throw new TRPCError({
             code: "FORBIDDEN",
-            message: "You cannot demote yourself from the last admin position in this team",
+            message:
+              "You cannot demote yourself from the last admin position in this team",
           });
         }
-        
+
         throw new TRPCError({
           code: "FORBIDDEN",
           message: "Cannot remove or demote the last admin from this team",
