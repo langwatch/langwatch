@@ -24,6 +24,7 @@ export interface DraggableTabsBrowserState {
   removeTab: (params: { tabId: string }) => void;
   splitTab: (params: { tabId: string }) => void;
   moveTab: (params: { tabId: string; windowId: string; index: number }) => void;
+  setActiveTab: (params: { windowId: string; tabId: string }) => void;
 }
 
 export const useDraggableTabsBrowserStore = create<DraggableTabsBrowserState>()(
@@ -134,6 +135,16 @@ export const useDraggableTabsBrowserStore = create<DraggableTabsBrowserState>()(
 
         if (!state.windows.find((w) => w.id === state.activeWindowId)) {
           state.activeWindowId = state.windows[0]?.id ?? null;
+        }
+      });
+    },
+
+    setActiveTab: ({ windowId, tabId }) => {
+      set((state) => {
+        const window = state.windows.find((w) => w.id === windowId);
+        if (window && window.tabs.some((tab) => tab.id === tabId)) {
+          window.activeTabId = tabId;
+          state.activeWindowId = windowId;
         }
       });
     },
