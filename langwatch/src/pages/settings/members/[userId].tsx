@@ -33,11 +33,86 @@ export default function UserDetailsPage() {
   const organizationWithMembers =
     api.organization.getOrganizationWithMembersAndTheirTeams.useQuery(
       { organizationId: organization?.id ?? "" },
-      { enabled: !!organization },
+      {
+        enabled: !!organization?.id,
+        retry: false, // Don't retry on error to avoid infinite loops
+      },
     );
 
   const apiContext = api.useContext();
   const updateTeam = api.team.update.useMutation();
+
+  /**
+   * Remove user from team
+   * Single Responsibility: Handle the removal of a user from a specific team
+   */
+  const handleRemoveFromTeam = async (
+    teamMembership: NonNullable<typeof member>["user"]["teamMemberships"][0],
+  ) => {
+    if (!member || !organization) {
+      toaster.create({
+        title: "Missing required data",
+        type: "error",
+        duration: 2000,
+      });
+      return;
+    }
+
+    try {
+      const teams = await apiContext.team.getTeamsWithMembers.fetch({
+        organizationId: organization.id,
+      });
+
+      const team = teams.find(
+        (t) =>
+          t.id === teamMembership.teamId || t.slug === teamMembership.team.slug,
+      );
+
+      if (!team) {
+        toaster.create({
+          title: "Team not found",
+          type: "error",
+          duration: 2000,
+        });
+        return;
+      }
+
+      const newMembers = team.members
+        .filter((m) => m.userId !== member.userId)
+        .map(({ userId, role }) => ({ userId, role }));
+
+      updateTeam.mutate(
+        {
+          teamId: teamMembership.teamId,
+          name: teamMembership.team.name,
+          members: newMembers,
+        },
+        {
+          onSuccess: () => {
+            toaster.create({
+              title: "Removed from team",
+              type: "success",
+              duration: 2000,
+            });
+            void organizationWithMembers.refetch();
+          },
+          onError: () => {
+            toaster.create({
+              title: "Failed to remove from team",
+              type: "error",
+              duration: 2000,
+            });
+          },
+        },
+      );
+    } catch (error) {
+      toaster.create({
+        title: "Failed to load team",
+        type: "error",
+        duration: 2000,
+      });
+    }
+  };
 
   const member = useMemo(() => {
     if (!userId || !organizationWithMembers.data) return undefined;
@@ -138,6 +213,19 @@ export default function UserDetailsPage() {
                               user: member.user,
                             }}
                             organizationId={organization.id}
+                            customRole={(() => {
+                              const customRoleAssignment =
+                                member.user.customRoleAssignments.find(
+                                  (cra) => cra.teamId === tm.teamId,
+                                );
+                              return customRoleAssignment?.customRole
+                                ? {
+                                    ...customRoleAssignment.customRole,
+                                    permissions: customRoleAssignment.customRole
+                                      .permissions as string[],
+                                  }
+                                : undefined;
+                            })()}
                           />
                         </Field.Root>
                       </Table.Cell>
@@ -153,46 +241,7 @@ export default function UserDetailsPage() {
                               value="remove"
                               color="red.600"
                               onClick={() => {
-                                apiContext.team.getTeamsWithMembers
-                                  .fetch({ organizationId: organization.id })
-                                  .then((teams) => {
-                                    const team = teams.find(
-                                      (t) =>
-                                        t.id === tm.teamId ||
-                                        t.slug === tm.team.slug,
-                                    );
-                                    if (!team) return;
-                                    const newMembers = team.members
-                                      .filter((m) => m.userId !== member.userId)
-                                      .map(({ userId, role }) => ({
-                                        userId,
-                                        role,
-                                      }));
-                                    updateTeam.mutate(
-                                      {
-                                        teamId: tm.teamId,
-                                        name: tm.team.name,
-                                        members: newMembers,
-                                      },
-                                      {
-                                        onSuccess: () => {
-                                          toaster.create({
-                                            title: "Removed from team",
-                                            type: "success",
-                                            duration: 2000,
-                                          });
-                                          void organizationWithMembers.refetch();
-                                        },
-                                      },
-                                    );
-                                  })
-                                  .catch(() => {
-                                    toaster.create({
-                                      title: "Failed to load team",
-                                      type: "error",
-                                      duration: 2000,
-                                    });
-                                  });
+                                void handleRemoveFromTeam(tm);
                               }}
                             >
                               <Trash size={14} style={{ marginRight: "8px" }} />

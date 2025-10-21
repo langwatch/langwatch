@@ -399,7 +399,6 @@ export async function hasProjectPermission(
         select: {
           id: true,
           members: { where: { userId: ctx.session.user.id } },
-          // team-level baseline roles removed
         },
       },
     },
@@ -432,12 +431,12 @@ export async function hasProjectPermission(
     const userPermissions = Array.isArray(rawPermissions)
       ? (rawPermissions as string[])
       : [];
-    if (hasPermissionWithHierarchy(userPermissions, permission)) {
-      return true;
-    }
+
+    // If user has custom role, ONLY use custom role permissions (no fallback)
+    return hasPermissionWithHierarchy(userPermissions, permission);
   }
 
-  // Fall back to user's built-in team role only
+  // Only fall back to built-in team role if NO custom role exists
   return teamRoleHasPermission(teamMember.role, permission);
 }
 
