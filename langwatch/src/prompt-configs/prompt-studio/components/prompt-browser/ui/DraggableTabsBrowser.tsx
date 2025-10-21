@@ -5,18 +5,24 @@ import {
   useDroppable,
   type DragEndEvent,
   DragOverlay,
+  closestCenter,
 } from "@dnd-kit/core";
+import {
+  SortableContext,
+  useSortable,
+  horizontalListSortingStrategy,
+} from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { BrowserLikeTabs } from "./BrowserLikeTabs";
+import { HStack } from "@chakra-ui/react";
 
 // Context for managing drag state and callbacks
 interface DraggableTabsContextValue {
-  onTabMove: (
-    fromGroupId: string,
-    toGroupId: string,
-    tabId: string,
-    destinationIndex: number,
-  ) => void;
+  onTabMove: (params: {
+    tabId: string;
+    from: { groupId: string; index: number };
+    to: { groupId: string; index: number };
+  }) => void;
   activeDrag: {
     groupId: string;
     tabId: string;
@@ -66,12 +72,11 @@ function useTabGroupContext() {
  */
 interface DraggableTabsBrowserProps {
   children: React.ReactNode;
-  onTabMove: (
-    fromGroupId: string,
-    toGroupId: string,
-    tabId: string,
-    destinationIndex: number,
-  ) => void;
+  onTabMove: (params: {
+    tabId: string;
+    from: { groupId: string; index: number };
+    to: { groupId: string; index: number };
+  }) => void;
 }
 
 function DraggableTabsBrowserRoot({
@@ -86,6 +91,7 @@ function DraggableTabsBrowserRoot({
 
   function handleDragStart(event: any) {
     const { groupId, tabId, label } = event.active.data.current;
+    console.log("handleDragStart", groupId, tabId, label);
     setActiveDrag({ groupId, tabId, label });
   }
 
@@ -98,17 +104,19 @@ function DraggableTabsBrowserRoot({
     const overData = over.data.current;
     if (!activeData || !overData) return;
 
+    console.log("handleDragEnd", activeData, overData);
+
+    // Use the sortable index from the drag data
+    const activeIndex = activeData.sortable?.index;
+    const overIndex = overData.sortable?.index;
+
     // Only move if group or tab positions differ
-    if (
-      activeData.groupId !== overData.groupId ||
-      activeData.tabIndex !== overData.tabIndex
-    ) {
-      onTabMove(
-        activeData.groupId,
-        overData.groupId,
-        activeData.tabId,
-        overData.tabIndex,
-      );
+    if (activeData.groupId !== overData.groupId || activeIndex !== overIndex) {
+      onTabMove({
+        tabId: activeData.tabId,
+        from: { groupId: activeData.groupId, index: activeIndex },
+        to: { groupId: overData.groupId, index: overIndex },
+      });
     }
   }
 
@@ -120,13 +128,17 @@ function DraggableTabsBrowserRoot({
 
   return (
     <DraggableTabsContext.Provider value={contextValue}>
-      <DndContext onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
-        <React.Fragment>
+      <DndContext
+        onDragStart={handleDragStart}
+        onDragEnd={handleDragEnd}
+        collisionDetection={closestCenter}
+      >
+        <HStack width="full" height="full" gap={0}>
           {children}
           <DragOverlay>
             {activeDrag ? <DragOverlayContent activeDrag={activeDrag} /> : null}
           </DragOverlay>
-        </React.Fragment>
+        </HStack>
       </DndContext>
     </DraggableTabsContext.Provider>
   );
@@ -209,19 +221,21 @@ function DraggableTabsTabBar({
   children,
   rightSlot,
 }: DraggableTabsTabBarProps) {
-  const { groupId } = useTabGroupContext();
-
-  // The entire bar is the drop area for new tabs/tabs reordered
-  const { setNodeRef: setDropRef } = useDroppable({
-    id: `tab-bar-drop-${groupId}`,
-    data: { groupId },
-  });
+  // Extract tab IDs directly from children
+  const tabIds = React.useMemo(() => {
+    return React.Children.map(children, (child) => {
+      if (React.isValidElement(child) && child.props.value) {
+        return child.props.value;
+      }
+      return null;
+    }).filter(Boolean) as string[];
+  }, [children]);
 
   return (
     <BrowserLikeTabs.Bar rightSlot={rightSlot}>
-      <div ref={setDropRef} style={{ display: "contents" }}>
+      <SortableContext items={tabIds} strategy={horizontalListSortingStrategy}>
         <BrowserLikeTabs.List>{children}</BrowserLikeTabs.List>
-      </div>
+      </SortableContext>
     </BrowserLikeTabs.Bar>
   );
 }
@@ -237,7 +251,6 @@ interface DraggableTabsTriggerProps {
 }
 
 function DraggableTabsTrigger({ value, children }: DraggableTabsTriggerProps) {
-  const { activeDrag } = useDraggableTabsContext();
   const { groupId } = useTabGroupContext();
 
   // Extract label from children for drag overlay
@@ -252,27 +265,23 @@ function DraggableTabsTrigger({ value, children }: DraggableTabsTriggerProps) {
     return children;
   }, [children]);
 
-  // Get tab index by finding position in parent
-  const tabIndex = React.useMemo(() => {
-    // This is a bit hacky, but we need the index for drag-and-drop
-    // In a real implementation, you might want to use a ref or context to track this
-    return 0; // TODO: Implement proper index tracking
-  }, []);
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({
+    id: value,
+    data: { groupId, tabId: value, label },
+  });
 
-  const { attributes, listeners, setNodeRef, transform, isDragging } =
-    useDraggable({
-      id: `tab-${groupId}-${value}`,
-      data: { groupId, tabId: value, tabIndex, label },
-      disabled: !!activeDrag && activeDrag.tabId !== value,
-    });
-
-  const style: React.CSSProperties = transform
-    ? {
-        transform: CSS.Transform.toString(transform),
-        opacity: 0.75,
-        zIndex: 10,
-      }
-    : {};
+  const style: React.CSSProperties = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  };
 
   return (
     <div
@@ -281,7 +290,6 @@ function DraggableTabsTrigger({ value, children }: DraggableTabsTriggerProps) {
         display: "flex",
         alignItems: "stretch",
         ...style,
-        pointerEvents: isDragging ? "none" : undefined,
         cursor: isDragging ? "grabbing" : "grab",
       }}
       {...attributes}
