@@ -181,6 +181,7 @@ interface DraggableTabsGroupProps {
   groupId: string;
   activeTabId?: string;
   onTabChange?: (groupId: string, tabId: string) => void;
+  onClick?: (groupId: string, tabId: string) => void;
 }
 
 function DraggableTabsGroup({
@@ -188,6 +189,7 @@ function DraggableTabsGroup({
   groupId,
   activeTabId,
   onTabChange,
+  onClick,
 }: DraggableTabsGroupProps) {
   const groupContextValue: TabGroupContextValue = {
     groupId,
@@ -200,6 +202,7 @@ function DraggableTabsGroup({
       <BrowserLikeTabs.Root
         value={activeTabId}
         onValueChange={(tabId) => onTabChange?.(groupId, tabId)}
+        onClick={() => onClick?.(groupId, activeTabId ?? "")}
       >
         {children}
       </BrowserLikeTabs.Root>
@@ -214,13 +217,9 @@ function DraggableTabsGroup({
  */
 interface DraggableTabsTabBarProps {
   children: React.ReactNode;
-  rightSlot?: React.ReactNode;
 }
 
-function DraggableTabsTabBar({
-  children,
-  rightSlot,
-}: DraggableTabsTabBarProps) {
+function DraggableTabsTabBar({ children }: DraggableTabsTabBarProps) {
   // Extract tab IDs directly from children
   const tabIds = React.useMemo(() => {
     return React.Children.map(children, (child) => {
@@ -235,7 +234,7 @@ function DraggableTabsTabBar({
   }, [children]);
 
   return (
-    <BrowserLikeTabs.Bar rightSlot={rightSlot}>
+    <BrowserLikeTabs.Bar>
       <SortableContext items={tabIds} strategy={horizontalListSortingStrategy}>
         <BrowserLikeTabs.List>{children}</BrowserLikeTabs.List>
       </SortableContext>

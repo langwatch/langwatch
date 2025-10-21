@@ -25,12 +25,19 @@ export interface DraggableTabsBrowserState {
   splitTab: (params: { tabId: string }) => void;
   moveTab: (params: { tabId: string; windowId: string; index: number }) => void;
   setActiveTab: (params: { windowId: string; tabId: string }) => void;
+  setActiveWindow: (params: { windowId: string }) => void;
 }
 
 export const useDraggableTabsBrowserStore = create<DraggableTabsBrowserState>()(
   immer((set) => ({
     windows: [],
     activeWindowId: null,
+
+    setActiveWindow: ({ windowId }) => {
+      set((state) => {
+        state.activeWindowId = windowId;
+      });
+    },
 
     addTab: ({ data }) => {
       set((state) => {

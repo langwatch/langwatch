@@ -6,8 +6,15 @@ import { DraggableTabsBrowser } from "./ui/DraggableTabsBrowser";
 import { SplitSquareHorizontal } from "lucide-react";
 
 export function PromptStudioTabbedWorkSpace() {
-  const { windows, removeTab, splitTab, moveTab, setActiveTab } =
-    useDraggableTabsBrowserStore();
+  const {
+    windows,
+    removeTab,
+    splitTab,
+    moveTab,
+    setActiveTab,
+    activeWindowId,
+    setActiveWindow,
+  } = useDraggableTabsBrowserStore();
 
   function handleTabMove(params: {
     tabId: string;
@@ -42,6 +49,7 @@ export function PromptStudioTabbedWorkSpace() {
           groupId={window.id}
           activeTabId={window.activeTabId ?? undefined}
           onTabChange={handleTabChange}
+          onClick={() => setActiveWindow({ windowId: window.id })}
         >
           <DraggableTabsBrowser.TabBar>
             {window.tabs.map((tab) => (
@@ -56,12 +64,15 @@ export function PromptStudioTabbedWorkSpace() {
               </DraggableTabsBrowser.Trigger>
             ))}
             <Spacer />
-            <SplitSquareHorizontal
-              size="18px"
-              onClick={() =>
-                window.activeTabId && handleSplit(window.activeTabId)
-              }
-            />
+            {window.id === activeWindowId && (
+              <SplitSquareHorizontal
+                size="18px"
+                cursor="pointer"
+                onClick={() =>
+                  window.activeTabId && handleSplit(window.activeTabId)
+                }
+              />
+            )}
           </DraggableTabsBrowser.TabBar>
           {window.tabs.map((tab) => (
             <DraggableTabsBrowser.Content key={tab.id} value={tab.id}>
