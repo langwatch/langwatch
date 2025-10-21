@@ -1,4 +1,4 @@
-import { Badge, Box, Circle, HStack } from "@chakra-ui/react";
+import { Badge, Box, Circle, HStack, Text } from "@chakra-ui/react";
 import { X } from "react-feather";
 
 interface PromptBrowserTabProps {
@@ -18,7 +18,9 @@ export function PromptBrowserTab({
   return (
     <HStack gap={2} height="full">
       <HStack>
-        <Box>{title ?? "Untitled"}</Box>
+        <Text textOverflow="ellipsis" whiteSpace="nowrap" overflow="hidden">
+          {title ?? "Untitled"}
+        </Text>
         {hasUnsavedChanges ? (
           <Box>
             <Circle size="10px" bg="orange.400" color="gray.50" />
