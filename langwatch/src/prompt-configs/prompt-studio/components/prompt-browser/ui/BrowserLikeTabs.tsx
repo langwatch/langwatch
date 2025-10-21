@@ -18,12 +18,21 @@ function BrowserLikeTabsRoot({
   height = "full",
 }: BrowserLikeTabsRootProps) {
   return (
-    <VStack gap={0} height={height} align="stretch" bg="gray.50">
+    <VStack
+      gap={0}
+      height={height}
+      align="stretch"
+      bg="gray.50"
+      width="full"
+      borderRight="1px solid"
+      borderColor="gray.200"
+    >
       <Tabs.Root
         value={value}
         defaultValue={defaultValue}
         onValueChange={(change) => onValueChange?.(change.value)}
         colorPalette={colorPalette}
+        width="full"
       >
         {children}
       </Tabs.Root>
@@ -103,10 +112,14 @@ function BrowserLikeTabsContent({
   children,
 }: BrowserLikeTabsContentProps) {
   return (
-    <Tabs.Content value={value}>
-      <Box height="full" width="full" bg="white" overflow="hidden">
-        {children}
-      </Box>
+    <Tabs.Content
+      value={value}
+      width="full"
+      height="full"
+      bg="white"
+      overflowY="scroll"
+    >
+      {children}
     </Tabs.Content>
   );
 }

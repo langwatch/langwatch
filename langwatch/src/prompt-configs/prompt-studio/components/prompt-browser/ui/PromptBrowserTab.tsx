@@ -34,6 +34,10 @@ export function PromptBrowserTab({
         borderRadius="3px"
         transition="all 0.1s ease-in-out"
         padding={0.5}
+        onPointerDown={(e) => {
+          // Stop the event from bubbling up to drag listeners
+          e.stopPropagation();
+        }}
         onClick={(e) => {
           e.stopPropagation();
           onClose?.();
