@@ -1,8 +1,8 @@
 /* eslint-disable @next/next/no-img-element */
 import React from "react";
-import type { FrameworkKey, PlatformKey } from "../components/sections/observability/types";
-import { NoLoN8nSetup } from "../components/sections/observability/NoLoN8nSetup";
-import { OpenTelemetrySetup } from "../components/sections/observability/OpenTelemetrySetup";
+import type { FrameworkKey, PlatformKey } from "../model";
+import { NoLoN8nSetup } from "../../../components/sections/observability/NoLoN8nSetup";
+import { OpenTelemetrySetup } from "../../../components/sections/observability/OpenTelemetrySetup";
 import vercelAiTsSource from "./snippets/typescript/vercelai.snippet.ts?raw";
 import goOpenaiSource from "./snippets/go/openai.snippet.go";
 import goAzureSource from "./snippets/go/azure.snippet.go";
@@ -40,6 +40,7 @@ export type IntegrationRegistry = IntegrationSpec[];
 // Helpers to build snippet refs
 const tsRef = (file: string): SnippetRef => ({ file, language: "typescript", filename: "app.ts" });
 const goRef = (file: string): SnippetRef => ({ file, language: "go", filename: "main.go" });
+const pyRef = (file: string): SnippetRef => ({ file, language: "python", filename: "app.py" });
 
 function themedIcon(lightSrc: string, darkSrc: string, alt: string): React.ReactElement {
   const isDark = true;
@@ -102,8 +103,6 @@ export const registry: IntegrationRegistry = [
     install: { go: { "go get": "go get github.com/langwatch/langwatch/sdk-go github.com/openai/openai-go" } },
     snippet: goRef(goAzureSource as unknown as string),
   },
-
-  // Go - additional providers
   {
     platform: "go",
     framework: "anthropic",
@@ -179,28 +178,6 @@ export const registry: IntegrationRegistry = [
     },
     customComponent: NoLoN8nSetup,
   },
-
-  // Placeholders to be filled incrementally
-  {
-    platform: "python",
-    framework: "openai",
-    label: "OpenAI",
-    docs: { internal: "/docs/integrations/python/openai", external: "https://platform.openai.com/docs" },
-    icon: themedIcon(
-      "/images/external-icons/openai-lighttheme.svg",
-      "/images/external-icons/openai-darktheme.svg",
-      "OpenAI",
-    ),
-    install: { python: { pip: "pip install langwatch", uv: "uv add langwatch" } },
-  },
-  {
-    platform: "opentelemetry",
-    framework: "opentelemetry",
-    label: "OpenTelemetry",
-    docs: { internal: "/docs/integrations/opentelemetry", external: "https://opentelemetry.io/docs/" },
-    icon: singleIcon("/images/external-icons/otel.svg", "OpenTelemetry"),
-    customComponent: OpenTelemetrySetup,
-  },
 ];
 
 export function getRegistryEntry(platform: PlatformKey, framework: FrameworkKey): IntegrationSpec | undefined {
@@ -218,5 +195,3 @@ export function deriveFrameworksByPlatform(): Record<PlatformKey, { key: Framewo
   }
   return out;
 }
-
-

@@ -49,5 +49,3 @@ export function NoLoN8nSetup(): React.ReactElement {
     </Card.Root>
   );
 }
-
-

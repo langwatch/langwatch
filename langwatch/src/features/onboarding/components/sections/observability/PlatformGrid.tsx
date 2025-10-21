@@ -1,7 +1,7 @@
 import React from "react";
 import { Grid, HStack, Text, VStack } from "@chakra-ui/react";
-import { PLATFORM_OPTIONS } from "./constants";
-import type { PlatformKey } from "./types";
+import { PLATFORM_OPTIONS } from "../../../regions/observability/ui-options";
+import type { PlatformKey } from "../../../regions/observability/model";
 import { SelectableIconCard } from "./SelectableIconCard";
 
 interface PlatformGridProps {

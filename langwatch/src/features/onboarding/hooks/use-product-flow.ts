@@ -29,7 +29,7 @@ export function useProductFlow() {
       inferred = stepFromQuery as ProductSelection;
     } else {
       const currentPath: string = typeof router.asPath === "string" ? router.asPath : "";
-      const pathNoQuery = currentPath.split("?")[0] || "";
+      const pathNoQuery = currentPath.split("?")[0] ?? "";
       const segments = pathNoQuery.split("/").filter((seg): seg is string => !!seg && seg.length > 0);
       const lastSegment = segments.length > 0 ? segments[segments.length - 1] : undefined;
       if (lastSegment && validProducts.includes(lastSegment as ProductSelection)) {
@@ -145,5 +145,3 @@ export function useProductFlow() {
     handleSelectProduct,
   };
 }
-
-

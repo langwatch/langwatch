@@ -1,7 +1,7 @@
 import React from "react";
 import { HStack, Text, VStack } from "@chakra-ui/react";
-import { FRAMEWORKS_BY_PLATFORM } from "./constants";
-import type { FrameworkKey, PlatformKey } from "./types";
+import { FRAMEWORKS_BY_PLATFORM } from "../../../regions/observability/ui-options";
+import type { FrameworkKey, PlatformKey } from "../../../regions/observability/model";
 import { SelectableIconCard } from "./SelectableIconCard";
 
 interface FrameworkGridProps {
@@ -36,7 +36,6 @@ export function FrameworkGrid({ language, selectedFramework, onSelectFramework }
             key={fw.key}
             label={fw.label}
             icon={fw.icon}
-            size={fw.size}
             selected={currentFramework === fw.key}
             onClick={() => onSelectFramework(fw.key)}
             ariaLabel={`${fw.label} framework`}
@@ -46,5 +45,3 @@ export function FrameworkGrid({ language, selectedFramework, onSelectFramework }
     </VStack>
   );
 }
-
-

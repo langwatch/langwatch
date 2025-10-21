@@ -7,7 +7,7 @@ import { OnboardingMeshBackground } from "../components/OnboardingMeshBackground
 import { Box } from "@chakra-ui/react";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useProjectBySlugOrLatest } from "~/hooks/useProjectBySlugOrLatest";
-import { ActiveProjectProvider } from "../context/ActiveProjectContext";
+import { ActiveProjectProvider } from "../contexts/ActiveProjectContext";
 import { LoadingScreen } from "~/components/LoadingScreen";
 
 export const ProductScreen: React.FC = () => {
