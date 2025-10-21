@@ -2,7 +2,7 @@ import React from "react";
 import { Card, VStack, Text, CodeBlock, Float, IconButton, createShikiAdapter } from "@chakra-ui/react";
 import type { HighlighterGeneric } from "shiki";
 import { useColorMode } from "../../../../../components/ui/color-mode";
-import bashSnippet from "../../../codegen/snippets/noandlo/n8n.snippet.sh";
+import bashSnippet from "../../../regions/observability/codegen/snippets/noandlo/n8n.snippet.sh";
 
 export function NoLoN8nSetup(): React.ReactElement {
   const { colorMode } = useColorMode();
