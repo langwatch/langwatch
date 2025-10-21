@@ -365,7 +365,7 @@ function MembersList({
                   return (
                     <LinkBox as={Table.Row} key={member.userId}>
                       <Table.Cell>
-                        <Link href={`/settings/users/${member.userId}`}>
+                        <Link href={`/settings/members/${member.userId}`}>
                           {member.user.name}{" "}
                           <Text as="span">(Orginization {roleLabel})</Text>
                         </Link>
@@ -379,7 +379,7 @@ function MembersList({
                       </Table.Cell>
                       <Table.Cell>
                         <HStack gap={2}>
-                          <Link href={`/settings/users/${member.userId}`}>
+                          <Link href={`/settings/members/${member.userId}`}>
                             <Button size="sm" variant="outline">
                               View
                             </Button>

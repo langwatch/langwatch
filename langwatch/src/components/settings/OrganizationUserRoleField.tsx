@@ -1,6 +1,6 @@
 import { HStack, Spinner, Text, VStack } from "@chakra-ui/react";
 import { OrganizationUserRole } from "@prisma/client";
-import { useMemo } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { api } from "../../utils/api";
 import { toaster } from "../ui/toaster";
 import { Select as MultiSelect, chakraComponents } from "chakra-react-select";
@@ -46,12 +46,21 @@ export function OrganizationUserRoleField({
     [defaultRole],
   );
 
+  // Local state for optimistic updates
+  const [selectedRole, setSelectedRole] =
+    useState<OrgRoleOption>(currentOption);
+
+  // Update local state when defaultRole prop changes
+  useEffect(() => {
+    setSelectedRole(currentOption);
+  }, [currentOption]);
+
   return (
     <VStack align="start">
       <HStack gap={6}>
         <MultiSelect
           options={orgRoleOptions}
-          defaultValue={currentOption}
+          value={selectedRole}
           isSearchable={false}
           chakraStyles={{
             container: (base) => ({
@@ -61,7 +70,14 @@ export function OrganizationUserRoleField({
           }}
           onChange={(value) => {
             const next = (value as OrgRoleOption | null)?.value;
-            if (!next || next === defaultRole) return;
+            if (!next || next === selectedRole.value) return;
+
+            // Optimistic update - immediately update UI
+            const nextOption = orgRoleOptions.find((o) => o.value === next);
+            if (nextOption) {
+              setSelectedRole(nextOption);
+            }
+
             updateOrganizationMemberRoleMutation.mutate(
               { organizationId, userId, role: next },
               {
@@ -77,6 +93,8 @@ export function OrganizationUserRoleField({
                   });
                 },
                 onError: (error) => {
+                  // Revert optimistic update on error
+                  setSelectedRole(currentOption);
                   toaster.create({
                     title: "Error updating role",
                     description: error.message ?? "Please try again",
@@ -106,7 +124,7 @@ export function OrganizationUserRoleField({
                     color={props.isSelected ? "white" : "gray.500"}
                     fontSize="13px"
                   >
-                    {(props.data as OrgRoleOption).description}
+                    {props.data.description}
                   </Text>
                 </VStack>
               </chakraComponents.Option>

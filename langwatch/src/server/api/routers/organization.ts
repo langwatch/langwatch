@@ -61,6 +61,25 @@ export type TeamMemberWithTeam = TeamUser & {
 export type TeamWithProjectsAndMembersAndUsers = Team & {
   members: TeamMemberWithUser[];
   projects: Project[];
+  customRoleMembers: Array<{
+    userId: string;
+    teamId: string;
+    customRoleId: string;
+    customRole: {
+      id: string;
+      name: string;
+      description: string | null;
+      permissions: unknown; // JSON field, will be validated as array
+    };
+    user: User;
+  }>;
+  defaultRole?: TeamUserRole;
+  defaultCustomRole?: {
+    id: string;
+    name: string;
+    description: string | null;
+    permissions: unknown; // JSON field, will be validated as array
+  };
 };
 
 export type UserWithTeams = User & {
@@ -82,7 +101,7 @@ export const organizationRouter = createTRPCRouter({
         orgName: z.string().optional(),
         phoneNumber: z.string().optional(),
         signUpData: signUpDataSchema.optional(),
-      })
+      }),
     )
     .use(skipPermissionCheck)
     .mutation(async ({ input, ctx }) => {
@@ -148,7 +167,7 @@ export const organizationRouter = createTRPCRouter({
           });
 
           return { organization, team };
-        }
+        },
       );
 
       // Add usage stats job for the new organization
@@ -171,8 +190,8 @@ export const organizationRouter = createTRPCRouter({
     .input(z.object({ userId: z.string(), organizationId: z.string() }))
     .use(
       checkUserPermissionForOrganization(
-        OrganizationRoleGroup.ORGANIZATION_MANAGE
-      )
+        OrganizationRoleGroup.ORGANIZATION_MANAGE,
+      ),
     )
     .mutation(async ({ input, ctx }) => {
       const { userId, organizationId } = input;
@@ -202,7 +221,7 @@ export const organizationRouter = createTRPCRouter({
     .input(
       z.object({
         isDemo: z.boolean().optional(),
-      })
+      }),
     )
     .use(skipPermissionCheck)
     .query(async ({ ctx, input }) => {
@@ -260,7 +279,7 @@ export const organizationRouter = createTRPCRouter({
 
       for (const organization of organizations) {
         for (const project of organization.teams.flatMap(
-          (team) => team.projects
+          (team) => team.projects,
         )) {
           if (project.s3AccessKeyId) {
             project.s3AccessKeyId = decrypt(project.s3AccessKeyId);
@@ -279,14 +298,14 @@ export const organizationRouter = createTRPCRouter({
       for (const organization of organizations) {
         organization.members = organization.members.filter(
           (member) =>
-            member.userId === userId || member.userId === demoProjectUserId
+            member.userId === userId || member.userId === demoProjectUserId,
         );
         if (organization.s3AccessKeyId) {
           organization.s3AccessKeyId = decrypt(organization.s3AccessKeyId);
         }
         if (organization.s3SecretAccessKey) {
           organization.s3SecretAccessKey = decrypt(
-            organization.s3SecretAccessKey
+            organization.s3SecretAccessKey,
           );
         }
         if (organization.s3Endpoint) {
@@ -294,12 +313,12 @@ export const organizationRouter = createTRPCRouter({
         }
         if (organization.elasticsearchNodeUrl) {
           organization.elasticsearchNodeUrl = decrypt(
-            organization.elasticsearchNodeUrl
+            organization.elasticsearchNodeUrl,
           );
         }
         if (organization.elasticsearchApiKey) {
           organization.elasticsearchApiKey = decrypt(
-            organization.elasticsearchApiKey
+            organization.elasticsearchApiKey,
           );
         }
 
@@ -310,7 +329,7 @@ export const organizationRouter = createTRPCRouter({
         organization.teams = organization.teams.filter((team) => {
           team.members = team.members.filter(
             (member) =>
-              member.userId === userId || member.userId === demoProjectUserId
+              member.userId === userId || member.userId === demoProjectUserId,
           );
           return isExternal
             ? team.members.some((member) => member.userId === userId)
@@ -320,16 +339,16 @@ export const organizationRouter = createTRPCRouter({
         if (
           isDemo &&
           organization.teams.some((team) =>
-            team.projects.some((project) => project.id === demoProjectId)
+            team.projects.some((project) => project.id === demoProjectId),
           )
         ) {
           organization.teams = organization.teams.flatMap((team) => {
             if (team.projects.some((project) => project.id === demoProjectId)) {
               team.projects = team.projects.filter(
-                (project) => project.id === demoProjectId
+                (project) => project.id === demoProjectId,
               );
               team.members = team.members.filter(
-                (member) => member.userId === demoProjectUserId
+                (member) => member.userId === demoProjectUserId,
               );
               return [team];
             } else {
@@ -374,13 +393,13 @@ export const organizationRouter = createTRPCRouter({
           {
             message:
               "S3 Endpoint, Access Key ID, and Secret Access Key must all be provided together",
-          }
-        )
+          },
+        ),
     )
     .use(
       checkUserPermissionForOrganization(
-        OrganizationRoleGroup.ORGANIZATION_MANAGE
-      )
+        OrganizationRoleGroup.ORGANIZATION_MANAGE,
+      ),
     )
     .mutation(async ({ input, ctx }) => {
       const userId = ctx.session.user.id;
@@ -435,12 +454,12 @@ export const organizationRouter = createTRPCRouter({
     .input(
       z.object({
         organizationId: z.string(),
-      })
+      }),
     )
     .use(
       checkUserPermissionForOrganization(
-        OrganizationRoleGroup.ORGANIZATION_VIEW
-      )
+        OrganizationRoleGroup.ORGANIZATION_VIEW,
+      ),
     )
     .query(async ({ input, ctx }) => {
       const userId = ctx.session.user.id;
@@ -489,14 +508,14 @@ export const organizationRouter = createTRPCRouter({
             email: z.string().email(),
             teamIds: z.string(),
             role: z.nativeEnum(OrganizationUserRole),
-          })
+          }),
         ),
-      })
+      }),
     )
     .use(
       checkUserPermissionForOrganization(
-        OrganizationRoleGroup.ORGANIZATION_MANAGE
-      )
+        OrganizationRoleGroup.ORGANIZATION_MANAGE,
+      ),
     )
     .mutation(async ({ input, ctx }) => {
       const prisma = ctx.prisma;
@@ -520,7 +539,7 @@ export const organizationRouter = createTRPCRouter({
       const subscriptionLimits =
         await dependencies.subscriptionHandler.getActivePlan(
           input.organizationId,
-          ctx.session.user
+          ctx.session.user,
         );
 
       if (
@@ -593,7 +612,7 @@ export const organizationRouter = createTRPCRouter({
             invite: savedInvite,
             noEmailProvider: !env.SENDGRID_API_KEY,
           };
-        })
+        }),
       );
 
       // Filter out any null values (skipped invites)
@@ -603,8 +622,8 @@ export const organizationRouter = createTRPCRouter({
     .input(z.object({ inviteId: z.string(), organizationId: z.string() }))
     .use(
       checkUserPermissionForOrganization(
-        OrganizationRoleGroup.ORGANIZATION_MANAGE
-      )
+        OrganizationRoleGroup.ORGANIZATION_MANAGE,
+      ),
     )
     .mutation(async ({ input, ctx }) => {
       const prisma = ctx.prisma;
@@ -616,12 +635,12 @@ export const organizationRouter = createTRPCRouter({
     .input(
       z.object({
         organizationId: z.string(),
-      })
+      }),
     )
     .use(
       checkUserPermissionForOrganization(
-        OrganizationRoleGroup.ORGANIZATION_VIEW
-      )
+        OrganizationRoleGroup.ORGANIZATION_VIEW,
+      ),
     )
     .query(async ({ input, ctx }) => {
       const prisma = ctx.prisma;
@@ -640,7 +659,7 @@ export const organizationRouter = createTRPCRouter({
     .input(
       z.object({
         inviteCode: z.string(),
-      })
+      }),
     )
     .use(skipPermissionCheck)
     .mutation(async ({ input, ctx }) => {
@@ -705,8 +724,8 @@ export const organizationRouter = createTRPCRouter({
             invite.teamIds
               .split(",")
               .map((s) => s.trim())
-              .filter(Boolean)
-          )
+              .filter(Boolean),
+          ),
         );
 
         if (dedupedTeamIds.length > 0) {
@@ -742,7 +761,7 @@ export const organizationRouter = createTRPCRouter({
         userId: z.string(),
         role: z.string(), // Can be TeamUserRole or "custom:{roleId}"
         customRoleId: z.string().optional(),
-      })
+      }),
     )
     .use(checkTeamPermission("team:manage"))
     .mutation(async ({ input, ctx }) => {
@@ -831,12 +850,12 @@ export const organizationRouter = createTRPCRouter({
     .input(
       z.object({
         organizationId: z.string(),
-      })
+      }),
     )
     .use(
       checkUserPermissionForOrganization(
-        OrganizationRoleGroup.ORGANIZATION_VIEW
-      )
+        OrganizationRoleGroup.ORGANIZATION_VIEW,
+      ),
     )
     .query(async ({ input, ctx }) => {
       const prisma = ctx.prisma;
@@ -859,12 +878,12 @@ export const organizationRouter = createTRPCRouter({
         userId: z.string(),
         organizationId: z.string(),
         role: z.nativeEnum(OrganizationUserRole),
-      })
+      }),
     )
     .use(
       checkUserPermissionForOrganization(
-        OrganizationRoleGroup.ORGANIZATION_MANAGE
-      )
+        OrganizationRoleGroup.ORGANIZATION_MANAGE,
+      ),
     )
     .mutation(async ({ input, ctx }) => {
       const prisma = ctx.prisma;

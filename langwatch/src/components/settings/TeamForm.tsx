@@ -154,7 +154,7 @@ export const TeamForm = ({
                         {member.saved ? (
                           <>
                             <Link
-                              href={`/settings/users/${member.userId?.value}`}
+                              href={`/settings/members/${member.userId?.value}`}
                             >
                               {member.userId?.label}
                             </Link>

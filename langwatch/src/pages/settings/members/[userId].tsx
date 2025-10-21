@@ -39,6 +39,7 @@ export default function UserDetailsPage() {
 
   const apiContext = api.useContext();
   const updateTeam = api.team.update.useMutation();
+  const removeMember = api.team.removeMember.useMutation();
 
   const member = useMemo(() => {
     if (!userId || !organizationWithMembers.data) return undefined;
@@ -86,7 +87,7 @@ export default function UserDetailsPage() {
 
         <HStack width="full" justify="space-between" align="center">
           <Heading size="lg" as="h1">
-            User Roles
+            Member
           </Heading>
         </HStack>
 
@@ -151,46 +152,32 @@ export default function UserDetailsPage() {
                               value="remove"
                               color="red.600"
                               onClick={() => {
-                                apiContext.team.getTeamsWithMembers
-                                  .fetch({ organizationId: organization.id })
-                                  .then((teams) => {
-                                    const team = (teams as any[]).find(
-                                      (t) =>
-                                        t.id === tm.teamId ||
-                                        t.slug === tm.team.slug,
-                                    );
-                                    if (!team) return;
-                                    const newMembers = (team.members as any[])
-                                      .filter((m) => m.userId !== member.userId)
-                                      .map((m) => ({
-                                        userId: m.userId,
-                                        role: m.role,
-                                      }));
-                                    updateTeam.mutate(
-                                      {
-                                        teamId: tm.teamId,
-                                        name: tm.team.name,
-                                        members: newMembers,
-                                      },
-                                      {
-                                        onSuccess: () => {
-                                          toaster.create({
-                                            title: "Removed from team",
-                                            type: "success",
-                                            duration: 2000,
-                                          });
-                                          void organizationWithMembers.refetch();
-                                        },
-                                      },
-                                    );
-                                  })
-                                  .catch(() => {
-                                    toaster.create({
-                                      title: "Failed to load team",
-                                      type: "error",
-                                      duration: 2000,
-                                    });
-                                  });
+                                removeMember.mutate(
+                                  {
+                                    teamId: tm.teamId,
+                                    userId: member.userId,
+                                  },
+                                  {
+                                    onSuccess: () => {
+                                      toaster.create({
+                                        title: "Removed from team",
+                                        type: "success",
+                                        duration: 2000,
+                                      });
+                                      // Invalidate relevant queries
+                                      void apiContext.team.getTeamsWithMembers.invalidate();
+                                      void organizationWithMembers.refetch();
+                                    },
+                                    onError: (error) => {
+                                      toaster.create({
+                                        title: "Failed to remove member",
+                                        description: error.message,
+                                        type: "error",
+                                        duration: 2000,
+                                      });
+                                    },
+                                  },
+                                );
                               }}
                             >
                               <Trash size={14} style={{ marginRight: "8px" }} />

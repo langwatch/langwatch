@@ -102,6 +102,7 @@ export const teamRouter = createTRPCRouter({
             },
           },
           projects: true,
+          defaultCustomRole: true,
         },
       });
 
@@ -460,5 +461,90 @@ export const teamRouter = createTRPCRouter({
         data: { archivedAt: new Date() },
       });
       return { success: true };
+    }),
+  removeMember: protectedProcedure
+    .input(
+      z.object({
+        teamId: z.string(),
+        userId: z.string(),
+      }),
+    )
+    .use(checkTeamPermission("team:manage"))
+    .mutation(async ({ input, ctx }) => {
+      const prisma = ctx.prisma;
+
+      return await prisma.$transaction(async (tx) => {
+        // Validate that the team exists and user has permission
+        const team = await tx.team.findUnique({
+          where: { id: input.teamId },
+          select: {
+            id: true,
+            name: true,
+            organizationId: true,
+            members: {
+              where: { userId: input.userId },
+              select: { userId: true, role: true },
+            },
+          },
+        });
+
+        if (!team) {
+          throw new TRPCError({
+            code: "NOT_FOUND",
+            message: "Team not found",
+          });
+        }
+
+        // Check if user is actually a member
+        const membership = team.members[0];
+        if (!membership) {
+          throw new TRPCError({
+            code: "NOT_FOUND",
+            message: "User is not a member of this team",
+          });
+        }
+
+        // Remove the membership by unique constraint (atomic operation)
+        await tx.teamUser.delete({
+          where: {
+            userId_teamId: {
+              userId: input.userId,
+              teamId: input.teamId,
+            },
+          },
+        });
+
+        // Also remove any custom role assignments
+        await tx.teamUserCustomRole.deleteMany({
+          where: {
+            userId: input.userId,
+            teamId: input.teamId,
+          },
+        });
+
+        // Return updated team data for client cache invalidation
+        const updatedTeam = await tx.team.findUnique({
+          where: { id: input.teamId },
+          include: {
+            members: {
+              include: {
+                user: true,
+              },
+            },
+            customRoleMembers: {
+              include: {
+                customRole: true,
+                user: true,
+              },
+            },
+          },
+        });
+
+        return {
+          success: true,
+          team: updatedTeam,
+          removedUserId: input.userId,
+        };
+      });
     }),
 });

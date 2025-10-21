@@ -1,9 +1,9 @@
 import isEqual from "lodash-es/isEqual";
 import { useRouter } from "next/router";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useForm, useWatch, type SubmitHandler } from "react-hook-form";
 import { useDebouncedCallback } from "use-debounce";
-import { TeamUserRole } from "@prisma/client";
+import type { TeamUserRole } from "@prisma/client";
 import SettingsLayout from "../../../components/SettingsLayout";
 import {
   TeamForm,
@@ -18,6 +18,50 @@ import {
   type RoleOption,
 } from "../../../components/settings/TeamUserRoleField";
 import { useOrganizationTeamProject } from "../../../hooks/useOrganizationTeamProject";
+
+// Type guards for safe access to custom role data
+function isValidCustomRoleMember(
+  member: unknown,
+): member is TeamWithProjectsAndMembersAndUsers["customRoleMembers"][0] {
+  return (
+    typeof member === "object" &&
+    member !== null &&
+    "userId" in member &&
+    "teamId" in member &&
+    "customRoleId" in member &&
+    "customRole" in member &&
+    "user" in member &&
+    typeof (member as any).customRole === "object" &&
+    (member as any).customRole !== null &&
+    "id" in (member as any).customRole &&
+    "name" in (member as any).customRole &&
+    "permissions" in (member as any).customRole
+  );
+}
+
+function isValidPermissions(permissions: unknown): permissions is string[] {
+  return (
+    Array.isArray(permissions) &&
+    permissions.every((p) => typeof p === "string")
+  );
+}
+
+function isValidDefaultCustomRole(role: unknown): role is {
+  id: string;
+  name: string;
+  description: string | null;
+  permissions: unknown;
+} {
+  return (
+    typeof role === "object" &&
+    role !== null &&
+    "id" in role &&
+    "name" in role &&
+    "permissions" in role &&
+    typeof (role as any).id === "string" &&
+    typeof (role as any).name === "string"
+  );
+}
 
 export default function EditTeamPage() {
   const router = useRouter();
@@ -38,62 +82,70 @@ export default function EditTeamPage() {
 
 function EditTeam({ team }: { team: TeamWithProjectsAndMembersAndUsers }) {
   // Get team's default role if it exists (either built-in or custom)
-  const teamDefaultCustomRole = (team as any).defaultCustomRole;
-  const teamBuiltInRole = (team as any).defaultRole;
+  const teamDefaultCustomRole = team.defaultCustomRole;
+  const teamBuiltInRole = team.defaultRole;
 
-  const teamDefaultRole = teamDefaultCustomRole
-    ? ({
-        label: teamDefaultCustomRole.name,
-        value: `custom:${teamDefaultCustomRole.id}`,
-        description:
-          teamDefaultCustomRole.description ||
-          `${
-            (teamDefaultCustomRole.permissions as string[]).length
-          } permissions`,
-        isCustom: true,
-        customRoleId: teamDefaultCustomRole.id,
-      } as RoleOption)
-    : teamBuiltInRole
-    ? teamRolesOptions[teamBuiltInRole as TeamUserRole]
-    : undefined;
+  const teamDefaultRole = useMemo(() => {
+    return teamDefaultCustomRole &&
+      isValidDefaultCustomRole(teamDefaultCustomRole)
+      ? ({
+          label: teamDefaultCustomRole.name,
+          value: `custom:${teamDefaultCustomRole.id}`,
+          description:
+            teamDefaultCustomRole.description ??
+            (isValidPermissions(teamDefaultCustomRole.permissions)
+              ? `${teamDefaultCustomRole.permissions.length} permissions`
+              : "Custom role"),
+          isCustom: true,
+          customRoleId: teamDefaultCustomRole.id,
+        } as RoleOption)
+      : teamBuiltInRole
+      ? teamRolesOptions[teamBuiltInRole as TeamUserRole]
+      : undefined;
+  }, [teamDefaultCustomRole, teamBuiltInRole]);
 
-  const getInitialValues = (): TeamFormData => ({
-    name: team.name,
-    defaultRole: teamDefaultRole,
-    members: team.members.map((member) => {
-      // Check if this user has a custom role assigned
-      const customRoleAssignment = (team as any).customRoleMembers?.find(
-        (crm: any) =>
-          crm.userId === member.userId && crm.teamId === member.teamId,
-      );
+  const getInitialValues = useCallback(
+    (teamData: TeamWithProjectsAndMembersAndUsers): TeamFormData => ({
+      name: teamData.name,
+      defaultRole: teamDefaultRole,
+      members: teamData.members.map((member) => {
+        // Check if this user has a custom role assigned
+        const customRoleAssignment = teamData.customRoleMembers?.find(
+          (crm) => crm.userId === member.userId && crm.teamId === member.teamId,
+        );
 
-      const role = customRoleAssignment
-        ? {
-            label: customRoleAssignment.customRole.name,
-            value: `custom:${customRoleAssignment.customRole.id}`,
-            description:
-              customRoleAssignment.customRole.description ||
-              `${
-                (customRoleAssignment.customRole.permissions as string[]).length
-              } permissions`,
-            isCustom: true,
-            customRoleId: customRoleAssignment.customRole.id,
-          }
-        : teamRolesOptions[member.role];
+        const role =
+          customRoleAssignment && isValidCustomRoleMember(customRoleAssignment)
+            ? {
+                label: customRoleAssignment.customRole.name,
+                value: `custom:${customRoleAssignment.customRole.id}`,
+                description:
+                  customRoleAssignment.customRole.description ??
+                  (isValidPermissions(
+                    customRoleAssignment.customRole.permissions,
+                  )
+                    ? `${customRoleAssignment.customRole.permissions.length} permissions`
+                    : "Custom role"),
+                isCustom: true,
+                customRoleId: customRoleAssignment.customRole.id,
+              }
+            : teamRolesOptions[member.role];
 
-      return {
-        userId: {
-          label: `${member.user.name} (${member.user.email})`,
-          value: member.user.id,
-        },
-        role,
-        saved: true,
-      };
+        return {
+          userId: {
+            label: `${member.user.name} (${member.user.email})`,
+            value: member.user.id,
+          },
+          role,
+          saved: true,
+        };
+      }),
     }),
-  });
+    [teamDefaultRole],
+  );
 
   const [defaultValues, setDefaultValues] = useState<TeamFormData>(
-    getInitialValues(),
+    getInitialValues(team),
   );
 
   const form = useForm({
@@ -102,15 +154,10 @@ function EditTeam({ team }: { team: TeamWithProjectsAndMembersAndUsers }) {
 
   // Reset form when team data changes (e.g., on refresh/reload)
   useEffect(() => {
-    const newValues = getInitialValues();
+    const newValues = getInitialValues(team);
     setDefaultValues(newValues);
     form.reset(newValues);
-  }, [
-    team.id,
-    team.name,
-    (team as any).defaultCustomRole?.id,
-    (team as any).defaultRole,
-  ]);
+  }, [team, getInitialValues, form]);
   const { handleSubmit, control } = form;
   const formWatch = useWatch({ control });
   const updateTeam = api.team.update.useMutation();

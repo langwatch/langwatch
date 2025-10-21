@@ -639,6 +639,8 @@ export const checkPermissionOrPubliclyShared =
     } catch (e) {
       if (e instanceof TRPCError && e.code === "UNAUTHORIZED") {
         allowed = false;
+      } else {
+        throw e;
       }
     }
 

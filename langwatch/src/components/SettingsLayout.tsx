@@ -32,7 +32,9 @@ export default function SettingsLayout({
           <MenuLink href={`/${project?.slug}/triggers`}>Triggers</MenuLink>
           <MenuLink href="/settings/projects">Projects</MenuLink>
           <MenuLink href="/settings/teams">Teams</MenuLink>
-          <MenuLink href="/settings/members">Members</MenuLink>
+          <MenuLink href="/settings/members" includePath="members">
+            Members
+          </MenuLink>
           <MenuLink href="/settings/roles">Roles & Permissions</MenuLink>
 
           <MenuLink href="/settings/annotation-scores">
