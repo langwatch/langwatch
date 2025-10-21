@@ -7,11 +7,21 @@ import { useFormContext } from "react-hook-form";
 import type { PromptConfigFormValues } from "~/prompt-configs";
 import { ModelSelectFieldMini } from "~/prompt-configs/forms/fields/ModelSelectFieldMini";
 import { SavePromptButton } from "./SavePromptButton";
+import { VersionHistoryButton } from "~/prompt-configs/forms/prompt-config-form/components/VersionHistoryButton";
+import type { VersionedPrompt } from "~/server/prompt-config/prompt.service";
+import { versionedPromptToPromptConfigFormValuesWithSystemMessage } from "~/prompt-configs/utils/llmPromptConfigUtils";
 
 export function PromptBrowserHeader() {
   const { project } = useOrganizationTeamProject();
   const formMethods = useFormContext<PromptConfigFormValues>();
   const handle = formMethods.watch("handle");
+  const configId = formMethods.watch("configId");
+
+  const handleOnRestore = async (params: VersionedPrompt) => {
+    const newFormValues =
+      versionedPromptToPromptConfigFormValuesWithSystemMessage(params);
+    formMethods.reset(newFormValues);
+  };
 
   return (
     <HStack width="full" bg="white">
@@ -29,6 +39,12 @@ export function PromptBrowserHeader() {
       </HStack>
       <Spacer />
       <HStack>
+        {configId && (
+          <VersionHistoryButton
+            configId={configId}
+            onRestoreSuccess={(params) => handleOnRestore(params)}
+          />
+        )}
         <SavePromptButton />
       </HStack>
     </HStack>

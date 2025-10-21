@@ -5,6 +5,7 @@ import { useMemo } from "react";
 import { modelProviderIcons } from "~/server/modelProviders/iconsMap";
 import { Text } from "@chakra-ui/react";
 import { useDraggableTabsBrowserStore } from "../../prompt-studio-store/DraggableTabsBrowserStore";
+import { computeInitialFormValuesForPrompt } from "~/prompt-configs/utils/computeInitialFormValuesForPrompt";
 
 export function DraftPromptsList() {
   const { project } = useOrganizationTeamProject();
@@ -33,7 +34,30 @@ export function DraftPromptsList() {
               draft.model.split("/")[0] as keyof typeof modelProviderIcons
             ]
           }
-          onClick={() => addTab({ data: { promptId: draft.id } })}
+          onClick={() => {
+            const projectDefaultModel = project?.defaultModel;
+            const normalizedDefaultModel =
+              typeof projectDefaultModel === "string"
+                ? projectDefaultModel
+                : undefined;
+            const defaultValues = computeInitialFormValuesForPrompt({
+              prompt: draft,
+              defaultModel: normalizedDefaultModel,
+              useSystemMessage: true,
+            });
+            addTab({
+              data: {
+                form: {
+                  defaultValues,
+                  isDirty: false,
+                },
+                meta: {
+                  title: defaultValues.handle ?? null,
+                  versionNumber: defaultValues.versionMetadata?.versionNumber,
+                },
+              },
+            });
+          }}
         >
           <Text
             fontStyle={!draft.handle ? "italic" : "normal"}

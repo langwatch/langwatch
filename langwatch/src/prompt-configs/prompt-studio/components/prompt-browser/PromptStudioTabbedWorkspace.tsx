@@ -55,8 +55,9 @@ export function PromptStudioTabbedWorkspace() {
               <DraggableTabsBrowser.Trigger key={tab.id} value={tab.id}>
                 <DraggableTabsBrowser.Tab>
                   <PromptBrowserTab
-                    title={tab.data.prompt.handle ?? "Untitled"}
-                    version={tab.data.prompt.version}
+                    hasUnsavedChanges={tab.data.form.isDirty}
+                    title={tab.data.meta.title ?? "Untitled"}
+                    version={tab.data.meta.versionNumber}
                     onClose={() => handleClose(tab.id)}
                   />
                 </DraggableTabsBrowser.Tab>
@@ -75,7 +76,10 @@ export function PromptStudioTabbedWorkspace() {
           </DraggableTabsBrowser.TabBar>
           {window.tabs.map((tab) => (
             <DraggableTabsBrowser.Content key={tab.id} value={tab.id}>
-              <PromptBrowserWindowContent configId={tab.data.prompt.id} />
+              <PromptBrowserWindowContent
+                configId={tab.data.form.defaultValues.configId}
+                tabId={tab.id}
+              />
             </DraggableTabsBrowser.Content>
           ))}
         </DraggableTabsBrowser.Group>

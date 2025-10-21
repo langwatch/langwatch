@@ -4,10 +4,13 @@ import { modelProviderIcons } from "~/server/modelProviders/iconsMap";
 import { useDraggableTabsBrowserStore } from "../../prompt-studio-store/DraggableTabsBrowserStore";
 import { groupBy } from "lodash-es";
 import { useAllPromptsForProject } from "~/prompt-configs/hooks/useAllPromptsForProject";
+import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { computeInitialFormValuesForPrompt } from "~/prompt-configs/utils/computeInitialFormValuesForPrompt";
 
 export function PublishedPromptsList() {
   const { data } = useAllPromptsForProject();
   const { addTab } = useDraggableTabsBrowserStore();
+  const { project } = useOrganizationTeamProject();
 
   /**
    * Group the prompts by folder, derived from the handle prefix.
@@ -36,13 +39,31 @@ export function PublishedPromptsList() {
                   prompt.model.split("/")[0] as keyof typeof modelProviderIcons
                 ]
               }
-              onClick={() =>
+              onClick={() => {
+                const projectDefaultModel = project?.defaultModel;
+                const normalizedDefaultModel =
+                  typeof projectDefaultModel === "string"
+                    ? projectDefaultModel
+                    : undefined;
+                const defaultValues = computeInitialFormValuesForPrompt({
+                  prompt,
+                  defaultModel: normalizedDefaultModel,
+                  useSystemMessage: true,
+                });
                 addTab({
                   data: {
-                    prompt,
+                    form: {
+                      defaultValues,
+                      isDirty: false,
+                    },
+                    meta: {
+                      title: defaultValues.handle ?? null,
+                      versionNumber:
+                        defaultValues.versionMetadata?.versionNumber,
+                    },
                   },
-                })
-              }
+                });
+              }}
             >
               {prompt.handle ?? "Untitled"}
             </Sidebar.Item>

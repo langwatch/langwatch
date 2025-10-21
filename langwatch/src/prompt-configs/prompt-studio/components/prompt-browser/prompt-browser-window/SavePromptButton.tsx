@@ -6,9 +6,11 @@ import type { PromptConfigFormValues } from "~/prompt-configs";
 export function SavePromptButton() {
   const formMethods = useFormContext<PromptConfigFormValues>();
   const { handleSaveVersion } = useHandleSavePrompt();
-  const isDraft = !Boolean(formMethods.watch("handle"));
+  const handle = formMethods.watch("handle");
+  const isDraft = !Boolean(handle);
   const isDirty = formMethods.formState.isDirty;
   const saveEnabled = isDirty || isDraft;
+
   return (
     <Button
       onClick={handleSaveVersion}
