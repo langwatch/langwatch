@@ -2,8 +2,11 @@
 import React from "react";
 import type { FrameworkKey, PlatformKey } from "../model";
 import { NoLoN8nSetup } from "../../../components/sections/observability/NoLoN8nSetup";
-import { OpenTelemetrySetup } from "../../../components/sections/observability/OpenTelemetrySetup";
 import vercelAiTsSource from "./snippets/typescript/vercelai.snippet.ts?raw";
+import mastraTsSource from "./snippets/typescript/mastra.snippet.ts?raw";
+import langgraphTsSource from "./snippets/typescript/langgraph.snippet.ts?raw";
+import langchainTsSource from "./snippets/typescript/langchain.snippet.ts?raw";
+import openaiTsSource from "./snippets/typescript/openai.snippet.ts?raw";
 import goOpenaiSource from "./snippets/go/openai.snippet.go";
 import goAzureSource from "./snippets/go/azure.snippet.go";
 import goAnthropicSource from "./snippets/go/anthropic.snippet.go";
@@ -79,6 +82,87 @@ export const registry: IntegrationRegistry = [
     },
     snippet: tsRef(vercelAiTsSource as unknown as string),
   },
+  {
+    platform: "typescript",
+    framework: "mastra",
+    label: "Mastra",
+    docs: { internal: "/docs/integrations/typescript/mastra", external: "https://docs.mastra.ai/" },
+    icon: themedIcon(
+      "/images/external-icons/mastra-lighttheme.svg",
+      "/images/external-icons/mastra-darktheme.svg",
+      "Mastra",
+    ),
+    install: {
+      js: {
+        npm: "npm i langwatch @mastra/core @ai-sdk/openai",
+        pnpm: "pnpm add langwatch @mastra/core @ai-sdk/openai",
+        yarn: "yarn add langwatch @mastra/core @ai-sdk/openai",
+        bun: "bun add langwatch @mastra/core @ai-sdk/openai",
+      },
+    },
+    snippet: tsRef(mastraTsSource as unknown as string),
+  },
+  {
+    platform: "typescript",
+    framework: "langgraph",
+    label: "LangGraph",
+    docs: { internal: "/docs/integrations/typescript/langgraph", external: "https://langchain-ai.github.io/langgraph/" },
+    icon: themedIcon(
+      "/images/external-icons/langchain-lighttheme.svg",
+      "/images/external-icons/langchain-darktheme.svg",
+      "LangGraph",
+    ),
+    install: {
+      js: {
+        npm: "npm i langwatch @langchain/openai @langchain/core @langchain/langgraph zod",
+        pnpm: "pnpm add langwatch @langchain/openai @langchain/core @langchain/langgraph zod",
+        yarn: "yarn add langwatch @langchain/openai @langchain/core @langchain/langgraph zod",
+        bun: "bun add langwatch @langchain/openai @langchain/core @langchain/langgraph zod",
+      },
+    },
+    snippet: tsRef(langgraphTsSource as unknown as string),
+  },
+  {
+    platform: "typescript",
+    framework: "langchain",
+    label: "LangChain",
+    docs: { internal: "/docs/integrations/typescript/langchain", external: "https://langchain-ai.github.io/langchain/" },
+    icon: themedIcon(
+      "/images/external-icons/langchain-lighttheme.svg",
+      "/images/external-icons/langchain-darktheme.svg",
+      "LangChain",
+    ),
+    install: {
+      js: {
+        npm: "npm i langwatch @langchain/openai @langchain/core",
+        pnpm: "pnpm add langwatch @langchain/openai @langchain/core",
+        yarn: "yarn add langwatch @langchain/openai @langchain/core",
+        bun: "bun add langwatch @langchain/openai @langchain/core",
+      },
+    },
+    snippet: tsRef(langchainTsSource as unknown as string),
+  },
+  {
+    platform: "typescript",
+    framework: "openai",
+    label: "OpenAI (Manual Instrumentation)",
+    docs: { internal: "/docs/integrations/typescript/openai" },
+    icon: themedIcon(
+      "/images/external-icons/openai-lighttheme.svg",
+      "/images/external-icons/openai-darktheme.svg",
+      "LangGraph",
+    ),
+    install: {
+      js: {
+        npm: "npm i langwatch openai",
+        pnpm: "pnpm add langwatch openai",
+        yarn: "yarn add langwatch openai",
+        bun: "bun add langwatch openai",
+      },
+    },
+    snippet: tsRef(openaiTsSource as unknown as string),
+  },
+
 
   // Go
   {

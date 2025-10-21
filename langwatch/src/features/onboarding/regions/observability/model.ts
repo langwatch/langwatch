@@ -3,6 +3,7 @@ export type PlatformKey = "typescript" | "python" | "go" | "opentelemetry" | "no
 export type FrameworkKey =
   | "vercel_ai"
   | "mastra"
+  | "langgraph"
   | "langchain"
   | "openai"
   | "litellm"
