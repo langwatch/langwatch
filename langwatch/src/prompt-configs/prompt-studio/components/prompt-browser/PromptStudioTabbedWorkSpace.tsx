@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Box } from "@chakra-ui/react";
 import { BrowserLikeTabs } from "./ui/BrowserLikeTabs";
 import { PromptBrowserWindow } from "./prompt-browser-window/PromptBrowserWindow";
@@ -6,42 +6,43 @@ import { PromptBrowserTab } from "./ui/PromptBrowserTab";
 import { usePromptStudioStore } from "../../prompt-studio-store/store";
 import { api } from "~/utils/api";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { useAllPromptsForProject } from "~/prompt-configs/hooks/useAllPromptsForProject";
 
 interface PromptStudioTabbedWorkSpaceProps {
-  workspaceId: string;
+  workspaceIndex: number;
 }
 
 export function PromptStudioTabbedWorkSpace({
-  workspaceId,
+  workspaceIndex,
 }: PromptStudioTabbedWorkSpaceProps) {
-  const { projectId = "" } = useOrganizationTeamProject();
-  const { removePrompt } = usePromptStudioStore();
-  const workspace = usePromptStudioStore((state) =>
-    state.getWorkspace(workspaceId),
+  const { data: prompts } = useAllPromptsForProject();
+  const removePrompt = usePromptStudioStore((s) => s.removePrompt);
+  const getPromptIdsForWorkspaceIndex = usePromptStudioStore(
+    (s) => s.getPromptIdsForWorkspaceIndex,
+  );
+  const setActiveWorkspaceIndex = usePromptStudioStore(
+    (s) => s.setActiveWorkspaceIndex,
   );
 
   function handleTabChange(tabId: string) {
+    setActiveWorkspaceIndex(workspaceIndex);
     setActiveTabId(tabId);
   }
 
   function handleTabClose(tabId: string) {
-    removePrompt({ configId: tabId, workspaceId });
+    setActiveWorkspaceIndex(workspaceIndex);
+    removePrompt({ id: tabId });
   }
 
-  // Don't do it this way
-  const { data: prompts } = api.prompts.getAllPromptsForProject.useQuery(
-    {
-      projectId: projectId,
-    },
-    {
-      enabled: !!projectId,
-    },
-  );
+  const promptIdsForWorkspace = getPromptIdsForWorkspaceIndex({
+    workspaceIndex,
+  });
 
   const tabs = useMemo(() => {
-    const configIds = workspace?.prompts.map((prompt) => prompt.configId);
-    return prompts?.filter((prompt) => configIds?.includes(prompt.id));
-  }, [workspace, prompts]);
+    return prompts?.filter(
+      (prompt) => promptIdsForWorkspace?.includes(prompt.id),
+    );
+  }, [prompts, promptIdsForWorkspace]);
 
   const [activeTabId, setActiveTabId] = useState<string | null>(
     tabs?.[0]?.id ?? null,
@@ -51,7 +52,12 @@ export function PromptStudioTabbedWorkSpace({
   if (activeTabId === null) return null;
 
   return (
-    <Box minW="400px" height="full" width="full">
+    <Box
+      minW="400px"
+      height="full"
+      width="full"
+      onPointerDown={() => setActiveWorkspaceIndex(workspaceIndex)}
+    >
       <BrowserLikeTabs.Root
         value={activeTabId}
         onValueChange={handleTabChange}

@@ -15,6 +15,8 @@ import type {
   StudioClientEvent,
   StudioServerEvent,
 } from "~/optimization_studio/types/events";
+import { addEnvs } from "~/optimization_studio/server/addEnvs";
+import { loadDatasets } from "~/optimization_studio/server/loadDatasets";
 import { studioBackendPostEvent } from "../../workflows/post_event/post-event";
 
 const DEFAULT_MODEL = "gpt-4o";
@@ -55,13 +57,21 @@ export class PromptStudioAdapter implements CopilotServiceAdapter {
       nodeId,
       forwardedParameters?.model || this.model,
     );
-    const event: StudioClientEvent = this.createExecuteComponentEvent(
-      traceId,
-      workflow,
-      nodeId,
-      {
-        input,
+
+    // Build execute_flow event (inputs must be an array)
+    const rawEvent: StudioClientEvent = {
+      type: "execute_flow",
+      payload: {
+        trace_id: traceId,
+        workflow,
+        inputs: [{ input }],
       },
+    } as StudioClientEvent;
+
+    // Enrich with envs and datasets to match server route behavior
+    const preparedEvent = await loadDatasets(
+      await addEnvs(rawEvent, this.projectId),
+      this.projectId,
     );
 
     // Stream workflow server events into CopilotKit runtime events
@@ -81,7 +91,7 @@ export class PromptStudioAdapter implements CopilotServiceAdapter {
       try {
         await studioBackendPostEvent({
           projectId: this.projectId,
-          message: event,
+          message: preparedEvent,
           onEvent: (serverEvent: StudioServerEvent) => {
             if (
               serverEvent.type === "component_state_change" &&

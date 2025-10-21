@@ -3,6 +3,7 @@ import { api } from "~/utils/api";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useMemo } from "react";
 import { modelProviderIcons } from "~/server/modelProviders/iconsMap";
+import { usePromptStudioStore } from "../../prompt-studio-store/store";
 
 export function PublishedPromptsList() {
   const { project } = useOrganizationTeamProject();
@@ -19,6 +20,19 @@ export function PublishedPromptsList() {
     return data?.filter((prompt) => prompt.version > 0);
   }, [data]);
 
+  const addPrompt = usePromptStudioStore((s) => s.addPrompt);
+  const active = usePromptStudioStore((s) => s.activeWorkspaceIndex);
+  const setActive = usePromptStudioStore((s) => s.setActiveWorkspaceIndex);
+
+  function ensureTargetIndex(): number {
+    if (active == null) {
+      // Start at 0 for the first workspace
+      setActive(0);
+      return 0;
+    }
+    return active;
+  }
+
   return (
     <Sidebar.List>
       {prompts?.map((prompt) => (
@@ -29,6 +43,7 @@ export function PublishedPromptsList() {
               prompt.model.split("/")[0] as keyof typeof modelProviderIcons
             ]
           }
+          onClick={() => addPrompt({ id: prompt.id, workspaceIndex: ensureTargetIndex() })}
         >
           {prompt.name}
         </Sidebar.Item>
