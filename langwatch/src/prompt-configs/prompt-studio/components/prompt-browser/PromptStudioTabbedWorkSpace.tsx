@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Box } from "@chakra-ui/react";
+import { Box, Spacer } from "@chakra-ui/react";
 import { BrowserLikeTabs } from "./ui/BrowserLikeTabs";
 import { PromptBrowserWindow } from "./prompt-browser-window/PromptBrowserWindow";
 import { PromptBrowserTab } from "./ui/PromptBrowserTab";
@@ -7,83 +7,84 @@ import { usePromptStudioStore } from "../../prompt-studio-store/store";
 import { api } from "~/utils/api";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useAllPromptsForProject } from "~/prompt-configs/hooks/useAllPromptsForProject";
+import { DraggableTabsBrowser } from "./ui/DraggableTabsBrowser";
+import { SplitSquareVertical } from "lucide-react";
 
-interface PromptStudioTabbedWorkSpaceProps {
-  workspaceIndex: number;
-}
-
-export function PromptStudioTabbedWorkSpace({
-  workspaceIndex,
-}: PromptStudioTabbedWorkSpaceProps) {
-  const { data: prompts } = useAllPromptsForProject();
+export function PromptStudioTabbedWorkSpace() {
+  const promptsInWorkspaces = usePromptStudioStore(
+    (s) => s.promptsInWorkspaces,
+  );
+  const promptIdsByWorkspaceIndex = useMemo(() => {
+    return promptsInWorkspaces.reduce(
+      (acc, prompt) => {
+        acc[prompt.workspaceIndex] = [
+          ...(acc[prompt.workspaceIndex] ?? []),
+          prompt.id,
+        ];
+        return acc;
+      },
+      {} as Record<number, string[]>,
+    );
+  }, [promptsInWorkspaces]);
   const removePrompt = usePromptStudioStore((s) => s.removePrompt);
-  const getPromptIdsForWorkspaceIndex = usePromptStudioStore(
-    (s) => s.getPromptIdsForWorkspaceIndex,
-  );
-  const setActiveWorkspaceIndex = usePromptStudioStore(
-    (s) => s.setActiveWorkspaceIndex,
-  );
+  const splitPrompt = usePromptStudioStore((s) => s.splitPrompt);
 
-  function handleTabChange(tabId: string) {
-    setActiveWorkspaceIndex(workspaceIndex);
-    setActiveTabId(tabId);
+  function handleTabMove(
+    fromGroupId: string,
+    toGroupId: string,
+    tabId: string,
+    destinationIndex: number,
+  ) {
+    console.log(
+      "handleTabMove",
+      fromGroupId,
+      toGroupId,
+      tabId,
+      destinationIndex,
+    );
   }
 
-  function handleTabClose(tabId: string) {
-    setActiveWorkspaceIndex(workspaceIndex);
+  function handleClose(tabId: string) {
+    console.log("handleClose", tabId);
     removePrompt({ id: tabId });
   }
 
-  const promptIdsForWorkspace = getPromptIdsForWorkspaceIndex({
-    workspaceIndex,
-  });
-
-  const tabs = useMemo(() => {
-    return prompts?.filter(
-      (prompt) => promptIdsForWorkspace?.includes(prompt.id),
-    );
-  }, [prompts, promptIdsForWorkspace]);
-
-  const [activeTabId, setActiveTabId] = useState<string | null>(
-    tabs?.[0]?.id ?? null,
-  );
-
-  if (!tabs || tabs.length === 0) return null;
-  if (activeTabId === null) return null;
+  console.log(promptsInWorkspaces, promptIdsByWorkspaceIndex);
 
   return (
-    <Box
-      minW="400px"
-      height="full"
-      width="full"
-      onPointerDown={() => setActiveWorkspaceIndex(workspaceIndex)}
-    >
-      <BrowserLikeTabs.Root
-        value={activeTabId}
-        onValueChange={handleTabChange}
-        colorPalette="orange"
-      >
-        <BrowserLikeTabs.Bar>
-          <BrowserLikeTabs.List>
-            {tabs.map((tab) => (
-              <BrowserLikeTabs.Trigger key={tab.id} value={tab.id}>
-                <PromptBrowserTab
-                  title={tab.handle}
-                  version={tab.version}
-                  hasUnsavedChanges={tab.version === 0}
-                  onClose={() => handleTabClose(tab.id)}
-                />
-              </BrowserLikeTabs.Trigger>
+    <DraggableTabsBrowser.Root onTabMove={handleTabMove}>
+      {Object.entries(promptIdsByWorkspaceIndex).map(
+        ([workspaceIndex, promptIds]) => (
+          <DraggableTabsBrowser.Group
+            key={workspaceIndex}
+            groupId={workspaceIndex}
+            activeTabId={promptIds[0]}
+          >
+            <DraggableTabsBrowser.TabBar>
+              {promptIds.map((promptId) => (
+                <DraggableTabsBrowser.Trigger key={promptId} value={promptId}>
+                  <PromptBrowserTab
+                    title={promptId}
+                    version={1}
+                    onClose={() => handleClose(promptId)}
+                  />
+                </DraggableTabsBrowser.Trigger>
+              ))}
+              <Spacer />
+              <SplitSquareVertical
+                onClick={() =>
+                  promptIds[0] && splitPrompt({ id: promptIds[0] })
+                }
+              />
+            </DraggableTabsBrowser.TabBar>
+            {promptIds.map((promptId) => (
+              <DraggableTabsBrowser.Content key={promptId} value={promptId}>
+                <PromptBrowserWindow configId={promptId} />
+              </DraggableTabsBrowser.Content>
             ))}
-          </BrowserLikeTabs.List>
-        </BrowserLikeTabs.Bar>
-
-        {tabs.map((tab) => (
-          <BrowserLikeTabs.Content key={tab.id} value={tab.id}>
-            <PromptBrowserWindow configId={tab.id} />
-          </BrowserLikeTabs.Content>
-        ))}
-      </BrowserLikeTabs.Root>
-    </Box>
+          </DraggableTabsBrowser.Group>
+        ),
+      )}
+    </DraggableTabsBrowser.Root>
   );
 }
