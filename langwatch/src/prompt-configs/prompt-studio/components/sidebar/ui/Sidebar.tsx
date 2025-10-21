@@ -81,7 +81,7 @@ function SidebarList({
   children,
   title,
   collapsible = false,
-  defaultOpen = true,
+  defaultOpen = false,
   action,
 }: SidebarListProps) {
   const [isOpen, setIsOpen] = useState(defaultOpen);

@@ -53,7 +53,6 @@ function BrowserLikeTabsBar({ children }: BrowserLikeTabsBarProps) {
       bg="white"
       borderBottom="1px solid"
       borderColor="gray.200"
-      paddingX={2}
     >
       {children}
     </HStack>
@@ -86,7 +85,7 @@ function BrowserLikeTabsTrigger({
       marginBottom="-1px"
       cursor="pointer"
       transition="all 0.15s ease-in-out"
-      bg="gray.200"
+      bg="gray.100"
       color="gray.600"
       _hover={{ bg: "gray.100" }}
       _selected={{

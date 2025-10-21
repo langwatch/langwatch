@@ -86,6 +86,9 @@ export function EditablePromptHandleField(
           minWidth={0}
           overflow="hidden"
           transition="opacity 0.2s"
+          textOverflow="ellipsis"
+          whiteSpace="nowrap"
+          overflow="hidden"
         >
           {handle}
         </Text>
