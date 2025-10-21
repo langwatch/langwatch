@@ -5,7 +5,7 @@ import { useDraggableTabsBrowserStore } from "../../prompt-studio-store/Draggabl
 import { DraggableTabsBrowser } from "./ui/DraggableTabsBrowser";
 import { SplitSquareHorizontal } from "lucide-react";
 
-export function PromptStudioTabbedWorkSpace() {
+export function PromptStudioTabbedWorkspace() {
   const {
     windows,
     removeTab,

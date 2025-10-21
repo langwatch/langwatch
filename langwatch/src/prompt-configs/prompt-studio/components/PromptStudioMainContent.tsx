@@ -1,10 +1,10 @@
 import { HStack } from "@chakra-ui/react";
-import { PromptStudioTabbedWorkSpace } from "./prompt-browser/PromptStudioTabbedWorkSpace";
+import { PromptStudioTabbedWorkspace } from "./prompt-browser/PromptStudioTabbedWorkspace";
 
 export function PromptStudioMainContent() {
   return (
     <HStack width="full" height="full" gap={0} overflowX="scroll">
-      <PromptStudioTabbedWorkSpace />
+      <PromptStudioTabbedWorkspace />
     </HStack>
   );
 }
