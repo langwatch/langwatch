@@ -46,9 +46,13 @@ export const usePromptConfigForm = ({
    */
   useEffect(() => {
     if (systemMessage) {
-      methods.setValue("version.configData.prompt", systemMessage, {
-        shouldDirty: true,
-      });
+      const currentPrompt = methods.getValues("version.configData.prompt");
+      // Only sync when value differs; do not mark dirty for this derived update
+      if (currentPrompt !== systemMessage) {
+        methods.setValue("version.configData.prompt", systemMessage, {
+          shouldDirty: false,
+        });
+      }
     }
   }, [systemMessage, methods]);
 
