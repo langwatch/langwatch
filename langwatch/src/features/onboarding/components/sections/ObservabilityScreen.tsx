@@ -1,16 +1,13 @@
 import React, { useMemo, useState } from "react";
 import { VStack, Grid, Box } from "@chakra-ui/react";
 import { WaitingForTracesChip } from "./observability/WaitingForTracesChip";
-import type { FrameworkKey, PlatformKey } from "./observability/types";
+import type { FrameworkKey, PlatformKey } from "../../regions/observability/model";
 import { ApiIntegrationInfoCard } from "./observability/ApiIntegrationInfoCard";
 import { FrameworkGrid } from "./observability/FrameworkGrid";
 import { PlatformGrid } from "./observability/PlatformGrid";
-import {
-  PLATFORM_OPTIONS,
-  FRAMEWORKS_BY_PLATFORM,
-} from "./observability/constants";
+import { PLATFORM_OPTIONS, FRAMEWORKS_BY_PLATFORM } from "../../regions/observability/ui-options";
 import { InstallPreview } from "./observability/InstallPreview";
-import { getRegistryEntry } from "../../codegen/registry";
+import { getRegistryEntry } from "../../regions/observability/codegen/registry";
 import { FrameworkIntegrationCode } from "./observability/FrameworkIntegrationCode";
 
 export function ObservabilityScreen(): React.ReactElement {

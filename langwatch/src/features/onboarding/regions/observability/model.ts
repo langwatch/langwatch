@@ -1,6 +1,3 @@
-import type React from "react";
-import type { IconProps } from "@chakra-ui/react";
-
 export type PlatformKey = "typescript" | "python" | "go" | "opentelemetry" | "no_and_lo" | "other";
 
 export type FrameworkKey =
@@ -29,12 +26,9 @@ export type FrameworkKey =
   | "openrouter"
   | "semantic_kernel"
   | "smol_agents"
-  | "dspy"
-  ;
+  | "dspy";
 
 export interface Option<T extends string> {
   key: T;
   label: string;
-  icon?: React.ReactNode;
-  size?: IconProps["size"];
 }

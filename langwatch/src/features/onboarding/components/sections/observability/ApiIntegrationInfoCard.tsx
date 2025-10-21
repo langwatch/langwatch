@@ -12,7 +12,7 @@ import {
 import { toaster } from "../../../../../components/ui/toaster";
 import { Eye, EyeOff, Clipboard, ClipboardPlus } from "lucide-react";
 import { Tooltip } from "~/components/ui/tooltip";
-import { useActiveProject } from "../../../context/ActiveProjectContext";
+import { useActiveProject } from "../../../contexts/ActiveProjectContext";
 import { usePublicEnv } from "~/hooks/usePublicEnv";
 
 export function ApiIntegrationInfoCard(): React.ReactElement {

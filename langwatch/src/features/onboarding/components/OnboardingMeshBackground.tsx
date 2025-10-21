@@ -42,5 +42,3 @@ export const OnboardingMeshBackground: React.FC<{ opacity?: number; blurPx?: num
 );
 
 export default OnboardingMeshBackground;
-
-

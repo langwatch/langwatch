@@ -51,5 +51,3 @@ export const OnboardingFormProvider: React.FC<
     {children}
   </OnboardingFormContext.Provider>
 );
-
-

@@ -22,5 +22,3 @@ export function useActiveProject(): ActiveProjectContextValue {
   const ctx = useContext(ActiveProjectContext);
   return ctx ?? {};
 }
-
-

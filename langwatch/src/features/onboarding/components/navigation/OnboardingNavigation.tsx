@@ -89,5 +89,3 @@ export const OnboardingNavigation = <T extends number = number>({
     </HStack>
   );
 };
-
-

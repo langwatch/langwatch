@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Box, HStack, Spinner, Text } from "@chakra-ui/react";
 import { useColorRawValue } from "../../../../../components/ui/color-mode";
-import { useActiveProject } from "../../../context/ActiveProjectContext";
+import { useActiveProject } from "../../../contexts/ActiveProjectContext";
 import { api } from "~/utils/api";
 import { useRouter } from "next/router";
 import { CheckCircle } from "react-feather";
