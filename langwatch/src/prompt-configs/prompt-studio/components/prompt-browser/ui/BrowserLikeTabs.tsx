@@ -1,12 +1,11 @@
-import { Box, HStack, Tabs, VStack } from "@chakra-ui/react";
+import { Box, HStack, Tabs, VStack, type StackProps } from "@chakra-ui/react";
 
-interface BrowserLikeTabsRootProps {
+interface BrowserLikeTabsRootProps extends StackProps {
   children: React.ReactNode;
   value?: string;
   defaultValue?: string;
   onValueChange?: (value: string) => void;
   colorPalette?: string;
-  height?: string;
 }
 
 function BrowserLikeTabsRoot({
@@ -15,12 +14,13 @@ function BrowserLikeTabsRoot({
   defaultValue,
   onValueChange,
   colorPalette = "orange",
-  height = "full",
+  ...props
 }: BrowserLikeTabsRootProps) {
   return (
     <VStack
+      height="full"
+      {...props}
       gap={0}
-      height={height}
       align="stretch"
       bg="gray.50"
       width="full"
@@ -43,10 +43,9 @@ function BrowserLikeTabsRoot({
 
 interface BrowserLikeTabsBarProps {
   children: React.ReactNode;
-  rightSlot?: React.ReactNode;
 }
 
-function BrowserLikeTabsBar({ children, rightSlot }: BrowserLikeTabsBarProps) {
+function BrowserLikeTabsBar({ children }: BrowserLikeTabsBarProps) {
   return (
     <HStack
       gap={0}
@@ -57,17 +56,14 @@ function BrowserLikeTabsBar({ children, rightSlot }: BrowserLikeTabsBarProps) {
       paddingX={2}
     >
       {children}
-      <HStack gap={1} marginLeft="auto">
-        {rightSlot}
-      </HStack>
     </HStack>
   );
 }
 
 function BrowserLikeTabsList({ children }: { children: React.ReactNode }) {
   return (
-    <Tabs.List>
-      <HStack gap={0} overflowX="auto">
+    <Tabs.List width="full">
+      <HStack gap={0} overflowX="auto" width="full">
         {children}
       </HStack>
     </Tabs.List>
