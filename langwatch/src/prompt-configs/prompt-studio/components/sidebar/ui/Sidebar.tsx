@@ -88,7 +88,7 @@ function SidebarList({
 
   if (!title) {
     return (
-      <VStack gap={1} align="stretch">
+      <VStack gap={1} align="stretch" paddingLeft={2}>
         {children}
       </VStack>
     );
@@ -162,8 +162,8 @@ function SidebarItem({
     >
       {icon && (
         <Box
-          width="20px"
-          height="20px"
+          width="16px"
+          height="16px"
           borderRadius="full"
           bg="gray.100"
           display="flex"

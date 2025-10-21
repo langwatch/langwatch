@@ -4,39 +4,46 @@ import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useMemo } from "react";
 import { modelProviderIcons } from "~/server/modelProviders/iconsMap";
 import { useDraggableTabsBrowserStore } from "../../prompt-studio-store/DraggableTabsBrowserStore";
+import { groupBy } from "lodash-es";
+import { useAllPromptsForProject } from "~/prompt-configs/hooks/useAllPromptsForProject";
 
 export function PublishedPromptsList() {
-  const { project } = useOrganizationTeamProject();
-  const { data } = api.prompts.getAllPromptsForProject.useQuery(
-    {
-      projectId: project?.id ?? "",
-    },
-    {
-      enabled: !!project?.id,
-    },
-  );
-
-  const prompts = useMemo(() => {
-    return data?.filter((prompt) => prompt.version > 0);
+  const { data } = useAllPromptsForProject();
+  const groupedPrompts = useMemo(() => {
+    const publishedPrompts = data?.filter((prompt) => prompt.version > 0);
+    console.log(publishedPrompts);
+    return groupBy(publishedPrompts, (prompt) =>
+      prompt.handle?.includes("/") ? prompt.handle?.split("/")[0] : "default",
+    );
   }, [data]);
 
   const { addTab } = useDraggableTabsBrowserStore();
 
+  console.log(groupedPrompts);
   return (
-    <Sidebar.List>
-      {prompts?.map((prompt) => (
-        <Sidebar.Item
-          key={prompt.id}
-          icon={
-            modelProviderIcons[
-              prompt.model.split("/")[0] as keyof typeof modelProviderIcons
-            ]
-          }
-          onClick={() => addTab({ data: { promptId: prompt.id } })}
+    <>
+      {Object.entries(groupedPrompts).map(([folder, prompts]) => (
+        <Sidebar.List
+          key={folder}
+          title={folder === "default" ? undefined : folder}
+          collapsible={folder !== "default"}
+          defaultOpen={false}
         >
-          {prompt.name}
-        </Sidebar.Item>
+          {prompts.map((prompt) => (
+            <Sidebar.Item
+              key={prompt.id}
+              icon={
+                modelProviderIcons[
+                  prompt.model.split("/")[0] as keyof typeof modelProviderIcons
+                ]
+              }
+              onClick={() => addTab({ data: { promptId: prompt.id } })}
+            >
+              {prompt.handle ?? "Untitled"}
+            </Sidebar.Item>
+          ))}
+        </Sidebar.List>
       ))}
-    </Sidebar.List>
+    </>
   );
 }
