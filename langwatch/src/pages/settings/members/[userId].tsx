@@ -156,17 +156,17 @@ export default function UserDetailsPage() {
                                 apiContext.team.getTeamsWithMembers
                                   .fetch({ organizationId: organization.id })
                                   .then((teams) => {
-                                    const team = (teams as any[]).find(
+                                    const team = teams.find(
                                       (t) =>
                                         t.id === tm.teamId ||
                                         t.slug === tm.team.slug,
                                     );
                                     if (!team) return;
-                                    const newMembers = (team.members as any[])
+                                    const newMembers = team.members
                                       .filter((m) => m.userId !== member.userId)
-                                      .map((m) => ({
-                                        userId: m.userId,
-                                        role: m.role,
+                                      .map(({ userId, role }) => ({
+                                        userId,
+                                        role,
                                       }));
                                     updateTeam.mutate(
                                       {

@@ -795,86 +795,87 @@ export const organizationRouter = createTRPCRouter({
       // Check if this is a custom role
       const isCustomRole = input.role.startsWith("custom:");
 
-      // Pre-update guard: Prevent removing or demoting the last built-in ADMIN
-      const adminCount = await prisma.teamUser.count({
-        where: {
-          teamId: input.teamId,
-          role: TeamUserRole.ADMIN,
-        },
-      });
-
-      if (adminCount === 0) {
-        throw new TRPCError({
-          code: "FORBIDDEN",
-          message: "No admin found for this team",
-        });
-      }
-
-      // Check if the target user is currently an admin
-      const targetUserMembership = await prisma.teamUser.findUnique({
-        where: {
-          userId_teamId: {
-            userId: input.userId,
-            teamId: input.teamId,
-          },
-        },
-        select: { role: true },
-      });
-
-      if (!targetUserMembership) {
-        throw new TRPCError({
-          code: "NOT_FOUND",
-          message: "User is not a member of this team",
-        });
-      }
-
-      const isTargetUserAdmin =
-        targetUserMembership.role === TeamUserRole.ADMIN;
-      const wouldDemoteAdmin =
-        isTargetUserAdmin &&
-        (isCustomRole || // Custom roles set built-in role to VIEWER
-          (input.role as TeamUserRole) !== TeamUserRole.ADMIN); // Changing to non-admin built-in role
-
-      if (adminCount === 1 && wouldDemoteAdmin) {
-        // Optional: Check for self-demotion
-        if (input.userId === ctx.session.user.id) {
-          throw new TRPCError({
-            code: "FORBIDDEN",
-            message:
-              "You cannot demote yourself from the last admin position in this team",
-          });
-        }
-
-        throw new TRPCError({
-          code: "FORBIDDEN",
-          message: "Cannot remove or demote the last admin from this team",
-        });
-      }
-
       if (isCustomRole && input.customRoleId) {
-        // Ensure the custom role belongs to the team's organization
-        const team = await prisma.team.findUnique({
-          where: { id: input.teamId },
-          select: { organizationId: true },
-        });
-        if (!team) {
-          throw new TRPCError({ code: "NOT_FOUND", message: "Team not found" });
-        }
-        const role = await prisma.customRole.findUnique({
-          where: { id: input.customRoleId },
-          select: { organizationId: true },
-        });
-        if (!role || role.organizationId !== team.organizationId) {
-          throw new TRPCError({
-            code: "FORBIDDEN",
-            message: "Role does not belong to team's organization",
-          });
-        }
-
         const customRoleId = input.customRoleId; // Store in a const for TypeScript
-        // Assign custom role and set built-in role to VIEWER
-        await prisma.$transaction([
-          prisma.teamUser.update({
+
+        // Atomic transaction with admin validation
+        await prisma.$transaction(async (tx) => {
+          // Ensure the custom role belongs to the team's organization
+          const team = await tx.team.findUnique({
+            where: { id: input.teamId },
+            select: { organizationId: true },
+          });
+          if (!team) {
+            throw new TRPCError({
+              code: "NOT_FOUND",
+              message: "Team not found",
+            });
+          }
+          const role = await tx.customRole.findUnique({
+            where: { id: input.customRoleId },
+            select: { organizationId: true },
+          });
+          if (!role || role.organizationId !== team.organizationId) {
+            throw new TRPCError({
+              code: "FORBIDDEN",
+              message: "Role does not belong to team's organization",
+            });
+          }
+          // Lock and validate admin count within transaction
+          const adminCount = await tx.teamUser.count({
+            where: {
+              teamId: input.teamId,
+              role: TeamUserRole.ADMIN,
+            },
+          });
+
+          if (adminCount === 0) {
+            throw new TRPCError({
+              code: "FORBIDDEN",
+              message: "No admin found for this team",
+            });
+          }
+
+          // Lock the target user's membership row to prevent concurrent modifications
+          const targetUserMembership = await tx.teamUser.findUnique({
+            where: {
+              userId_teamId: {
+                userId: input.userId,
+                teamId: input.teamId,
+              },
+            },
+            select: { role: true },
+          });
+
+          if (!targetUserMembership) {
+            throw new TRPCError({
+              code: "NOT_FOUND",
+              message: "User is not a member of this team",
+            });
+          }
+
+          const isTargetUserAdmin =
+            targetUserMembership.role === TeamUserRole.ADMIN;
+          const wouldDemoteAdmin = isTargetUserAdmin; // Custom roles always demote to VIEWER
+
+          if (adminCount === 1 && wouldDemoteAdmin) {
+            // Optional: Check for self-demotion
+            if (input.userId === ctx.session.user.id) {
+              throw new TRPCError({
+                code: "FORBIDDEN",
+                message:
+                  "You cannot demote yourself from the last admin position in this team",
+              });
+            }
+
+            throw new TRPCError({
+              code: "FORBIDDEN",
+              message: "Cannot remove or demote the last admin from this team",
+            });
+          }
+
+          // Perform the updates
+          await tx.teamUser.update({
             where: {
               userId_teamId: {
                 userId: input.userId,
@@ -884,27 +885,100 @@ export const organizationRouter = createTRPCRouter({
             data: {
               role: TeamUserRole.VIEWER, // Default to VIEWER for custom roles
             },
-          }),
+          });
+
           // Remove any existing custom roles for this user on this team
-          prisma.teamUserCustomRole.deleteMany({
+          await tx.teamUserCustomRole.deleteMany({
             where: {
               userId: input.userId,
               teamId: input.teamId,
             },
-          }),
+          });
+
           // Assign the new custom role
-          prisma.teamUserCustomRole.create({
+          await tx.teamUserCustomRole.create({
             data: {
               userId: input.userId,
               teamId: input.teamId,
               customRoleId: customRoleId,
             },
-          }),
-        ]);
+          });
+
+          // Post-update validation: ensure we still have at least one admin
+          const finalAdminCount = await tx.teamUser.count({
+            where: {
+              teamId: input.teamId,
+              role: TeamUserRole.ADMIN,
+            },
+          });
+
+          if (finalAdminCount === 0) {
+            throw new TRPCError({
+              code: "FORBIDDEN",
+              message: "Operation would result in no admins for this team",
+            });
+          }
+        });
       } else {
         // It's a built-in role - update it and remove any custom roles
-        await prisma.$transaction([
-          prisma.teamUser.update({
+        await prisma.$transaction(async (tx) => {
+          // Lock and validate admin count within transaction
+          const adminCount = await tx.teamUser.count({
+            where: {
+              teamId: input.teamId,
+              role: TeamUserRole.ADMIN,
+            },
+          });
+
+          if (adminCount === 0) {
+            throw new TRPCError({
+              code: "FORBIDDEN",
+              message: "No admin found for this team",
+            });
+          }
+
+          // Lock the target user's membership row to prevent concurrent modifications
+          const targetUserMembership = await tx.teamUser.findUnique({
+            where: {
+              userId_teamId: {
+                userId: input.userId,
+                teamId: input.teamId,
+              },
+            },
+            select: { role: true },
+          });
+
+          if (!targetUserMembership) {
+            throw new TRPCError({
+              code: "NOT_FOUND",
+              message: "User is not a member of this team",
+            });
+          }
+
+          const isTargetUserAdmin =
+            targetUserMembership.role === TeamUserRole.ADMIN;
+          const wouldDemoteAdmin =
+            isTargetUserAdmin &&
+            (input.role as TeamUserRole) !== TeamUserRole.ADMIN;
+
+          if (adminCount === 1 && wouldDemoteAdmin) {
+            // Optional: Check for self-demotion
+            if (input.userId === ctx.session.user.id) {
+              throw new TRPCError({
+                code: "FORBIDDEN",
+                message:
+                  "You cannot demote yourself from the last admin position in this team",
+              });
+            }
+
+            throw new TRPCError({
+              code: "FORBIDDEN",
+              message: "Cannot remove or demote the last admin from this team",
+            });
+          }
+
+          // Perform the updates
+          await tx.teamUser.update({
             where: {
               userId_teamId: {
                 userId: input.userId,
@@ -914,15 +988,31 @@ export const organizationRouter = createTRPCRouter({
             data: {
               role: input.role as TeamUserRole,
             },
-          }),
+          });
+
           // Remove any custom roles when switching to built-in role
-          prisma.teamUserCustomRole.deleteMany({
+          await tx.teamUserCustomRole.deleteMany({
             where: {
               userId: input.userId,
               teamId: input.teamId,
             },
-          }),
-        ]);
+          });
+
+          // Post-update validation: ensure we still have at least one admin
+          const finalAdminCount = await tx.teamUser.count({
+            where: {
+              teamId: input.teamId,
+              role: TeamUserRole.ADMIN,
+            },
+          });
+
+          if (finalAdminCount === 0) {
+            throw new TRPCError({
+              code: "FORBIDDEN",
+              message: "Operation would result in no admins for this team",
+            });
+          }
+        });
       }
 
       return { success: true };
@@ -969,43 +1059,62 @@ export const organizationRouter = createTRPCRouter({
     .mutation(async ({ input, ctx }) => {
       const prisma = ctx.prisma;
 
-      if (input.role !== OrganizationUserRole.ADMIN) {
-        const currentMember = await prisma.organizationUser.findUnique({
+      return await prisma.$transaction(async (tx) => {
+        if (input.role !== OrganizationUserRole.ADMIN) {
+          // Lock the target user's membership row to prevent concurrent modifications
+          const currentMember = await tx.organizationUser.findUnique({
+            where: {
+              userId_organizationId: {
+                userId: input.userId,
+                organizationId: input.organizationId,
+              },
+            },
+          });
+
+          if (currentMember?.role === OrganizationUserRole.ADMIN) {
+            const adminCount = await tx.organizationUser.count({
+              where: {
+                organizationId: input.organizationId,
+                role: OrganizationUserRole.ADMIN,
+              },
+            });
+
+            if (adminCount <= 1) {
+              throw new TRPCError({
+                code: "BAD_REQUEST",
+                message: "Cannot remove the last admin from an organization",
+              });
+            }
+          }
+        }
+
+        await tx.organizationUser.update({
           where: {
             userId_organizationId: {
               userId: input.userId,
               organizationId: input.organizationId,
             },
           },
+          data: { role: input.role },
         });
 
-        if (currentMember?.role === OrganizationUserRole.ADMIN) {
-          const adminCount = await prisma.organizationUser.count({
-            where: {
-              organizationId: input.organizationId,
-              role: OrganizationUserRole.ADMIN,
-            },
-          });
-
-          if (adminCount <= 1) {
-            throw new TRPCError({
-              code: "BAD_REQUEST",
-              message: "Cannot remove the last admin from an organization",
-            });
-          }
-        }
-      }
-
-      await prisma.organizationUser.update({
-        where: {
-          userId_organizationId: {
-            userId: input.userId,
+        // Post-update validation: ensure we still have at least one admin
+        const finalAdminCount = await tx.organizationUser.count({
+          where: {
             organizationId: input.organizationId,
+            role: OrganizationUserRole.ADMIN,
           },
-        },
-        data: { role: input.role },
-      });
+        });
 
-      return { success: true };
+        if (finalAdminCount === 0) {
+          throw new TRPCError({
+            code: "FORBIDDEN",
+            message:
+              "Operation would result in no admins for this organization",
+          });
+        }
+
+        return { success: true };
+      });
     }),
 });

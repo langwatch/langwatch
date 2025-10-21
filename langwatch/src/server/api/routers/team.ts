@@ -463,6 +463,22 @@ export const teamRouter = createTRPCRouter({
           });
 
           if (isCustomRole) {
+            // Verify the custom role belongs to the same organization
+            const customRole = await tx.customRole.findUnique({
+              where: { id: member.customRoleId! },
+              select: { organizationId: true },
+            });
+
+            if (
+              !customRole ||
+              customRole.organizationId !== team.organizationId
+            ) {
+              throw new TRPCError({
+                code: "BAD_REQUEST",
+                message: `Custom role ${member.customRoleId} is invalid for this team`,
+              });
+            }
+
             await tx.teamUserCustomRole.create({
               data: {
                 userId: member.userId,
@@ -471,6 +487,21 @@ export const teamRouter = createTRPCRouter({
               },
             });
           }
+        }
+
+        // Post-creation validation: ensure we have at least one admin
+        const finalAdminCount = await tx.teamUser.count({
+          where: {
+            teamId: team.id,
+            role: TeamUserRole.ADMIN,
+          },
+        });
+
+        if (finalAdminCount === 0) {
+          throw new TRPCError({
+            code: "FORBIDDEN",
+            message: "Team must have at least one admin",
+          });
         }
 
         return team;
@@ -498,57 +529,58 @@ export const teamRouter = createTRPCRouter({
     .mutation(async ({ input, ctx }) => {
       const prisma = ctx.prisma;
 
-      // Pre-removal guard: Prevent removing the last built-in ADMIN
-      const adminCount = await prisma.teamUser.count({
-        where: {
-          teamId: input.teamId,
-          role: TeamUserRole.ADMIN,
-        },
-      });
-
-      if (adminCount === 0) {
-        throw new TRPCError({
-          code: "FORBIDDEN",
-          message: "No admin found for this team",
-        });
-      }
-
-      // Check if the target user is currently an admin
-      const targetUserMembership = await prisma.teamUser.findUnique({
-        where: {
-          userId_teamId: {
-            userId: input.userId,
+      return await prisma.$transaction(async (tx) => {
+        // Lock and validate admin count within transaction
+        const adminCount = await tx.teamUser.count({
+          where: {
             teamId: input.teamId,
+            role: TeamUserRole.ADMIN,
           },
-        },
-        select: { role: true },
-      });
-
-      if (!targetUserMembership) {
-        throw new TRPCError({
-          code: "NOT_FOUND",
-          message: "User is not a member of this team",
         });
-      }
 
-      const isTargetUserAdmin = targetUserMembership.role === TeamUserRole.ADMIN;
-
-      if (adminCount === 1 && isTargetUserAdmin) {
-        // Optional: Check for self-removal
-        if (input.userId === ctx.session.user.id) {
+        if (adminCount === 0) {
           throw new TRPCError({
             code: "FORBIDDEN",
-            message: "You cannot remove yourself from the last admin position in this team",
+            message: "No admin found for this team",
           });
         }
-        
-        throw new TRPCError({
-          code: "FORBIDDEN",
-          message: "Cannot remove the last admin from this team",
-        });
-      }
 
-      return await prisma.$transaction(async (tx) => {
+        // Check if the target user is currently an admin
+        const targetUserMembership = await tx.teamUser.findUnique({
+          where: {
+            userId_teamId: {
+              userId: input.userId,
+              teamId: input.teamId,
+            },
+          },
+          select: { role: true },
+        });
+
+        if (!targetUserMembership) {
+          throw new TRPCError({
+            code: "NOT_FOUND",
+            message: "User is not a member of this team",
+          });
+        }
+
+        const isTargetUserAdmin =
+          targetUserMembership.role === TeamUserRole.ADMIN;
+
+        if (adminCount === 1 && isTargetUserAdmin) {
+          // Optional: Check for self-removal
+          if (input.userId === ctx.session.user.id) {
+            throw new TRPCError({
+              code: "FORBIDDEN",
+              message:
+                "You cannot remove yourself from the last admin position in this team",
+            });
+          }
+
+          throw new TRPCError({
+            code: "FORBIDDEN",
+            message: "Cannot remove the last admin from this team",
+          });
+        }
         // Validate that the team exists
         const team = await tx.team.findUnique({
           where: { id: input.teamId },
@@ -583,6 +615,21 @@ export const teamRouter = createTRPCRouter({
             teamId: input.teamId,
           },
         });
+
+        // Post-removal validation: ensure we still have at least one admin
+        const finalAdminCount = await tx.teamUser.count({
+          where: {
+            teamId: input.teamId,
+            role: TeamUserRole.ADMIN,
+          },
+        });
+
+        if (finalAdminCount === 0) {
+          throw new TRPCError({
+            code: "FORBIDDEN",
+            message: "Operation would result in no admins for this team",
+          });
+        }
 
         // Return updated team data for client cache invalidation
         const updatedTeam = await tx.team.findUnique({
