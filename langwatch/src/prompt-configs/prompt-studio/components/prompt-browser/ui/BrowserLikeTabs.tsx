@@ -33,6 +33,7 @@ function BrowserLikeTabsRoot({
         onValueChange={(change) => onValueChange?.(change.value)}
         colorPalette={colorPalette}
         width="full"
+        height="full"
       >
         {children}
       </Tabs.Root>

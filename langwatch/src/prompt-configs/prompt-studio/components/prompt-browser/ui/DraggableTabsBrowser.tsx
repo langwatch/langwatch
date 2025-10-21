@@ -1,11 +1,12 @@
 import React from "react";
 import {
   DndContext,
-  useDraggable,
-  useDroppable,
   type DragEndEvent,
   DragOverlay,
+  PointerSensor,
   closestCenter,
+  useSensor,
+  useSensors,
 } from "@dnd-kit/core";
 import {
   SortableContext,
@@ -35,16 +36,6 @@ interface DraggableTabsContextValue {
 
 const DraggableTabsContext =
   React.createContext<DraggableTabsContextValue | null>(null);
-
-function useDraggableTabsContext() {
-  const context = React.useContext(DraggableTabsContext);
-  if (!context) {
-    throw new Error(
-      "DraggableTabs components must be used within DraggableTabsBrowser",
-    );
-  }
-  return context;
-}
 
 // Context for managing group state
 interface TabGroupContextValue {
@@ -89,6 +80,14 @@ function DraggableTabsBrowserRoot({
     label?: React.ReactNode;
   } | null>(null);
 
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8, // Drag starts after moving 8 pixels
+      },
+    }),
+  );
+
   function handleDragStart(event: any) {
     const { groupId, tabId, label } = event.active.data.current;
     console.log("handleDragStart", groupId, tabId, label);
@@ -129,6 +128,7 @@ function DraggableTabsBrowserRoot({
   return (
     <DraggableTabsContext.Provider value={contextValue}>
       <DndContext
+        sensors={sensors}
         onDragStart={handleDragStart}
         onDragEnd={handleDragEnd}
         collisionDetection={closestCenter}
@@ -166,7 +166,7 @@ function DragOverlayContent({
         pointerEvents: "none",
       }}
     >
-      {activeDrag.label || "Dragging tab..."}
+      {activeDrag.label ?? "Dragging tab..."}
     </div>
   );
 }
@@ -224,11 +224,14 @@ function DraggableTabsTabBar({
   // Extract tab IDs directly from children
   const tabIds = React.useMemo(() => {
     return React.Children.map(children, (child) => {
-      if (React.isValidElement(child) && child.props.value) {
-        return child.props.value;
+      if (React.isValidElement(child)) {
+        const props = child.props as { value?: string };
+        if (props.value) {
+          return props.value;
+        }
       }
       return null;
-    }).filter(Boolean) as string[];
+    })?.filter(Boolean)!;
   }, [children]);
 
   return (
@@ -241,26 +244,24 @@ function DraggableTabsTabBar({
 }
 
 /**
- * DraggableTabsBrowser Trigger Component
+ * DraggableTabTrigger Component
  *
- * Single Responsibility: Wraps a tab with drag-and-drop functionality
+ * Single Responsibility: Handles both dragging and tab selection trigger functionality
  */
-interface DraggableTabsTriggerProps {
+interface DraggableTabTriggerProps {
   value: string;
   children: React.ReactNode;
 }
 
-function DraggableTabsTrigger({ value, children }: DraggableTabsTriggerProps) {
+function DraggableTabTrigger({ value, children }: DraggableTabTriggerProps) {
   const { groupId } = useTabGroupContext();
 
   // Extract label from children for drag overlay
   const label = React.useMemo(() => {
     const child = React.Children.only(children);
-    if (React.isValidElement(child) && child.type === DraggableTabsTab) {
-      return (
-        (child.props as DraggableTabsTabProps).label ??
-        (child.props as DraggableTabsTabProps).children
-      );
+    if (React.isValidElement(child) && child.type === DraggableBrowserTab) {
+      const props = child.props as DraggableBrowserTabProps;
+      return props.label ?? props.children;
     }
     return children;
   }, [children]);
@@ -303,16 +304,16 @@ function DraggableTabsTrigger({ value, children }: DraggableTabsTriggerProps) {
 }
 
 /**
- * DraggableTabsBrowser Tab Component
+ * DraggableBrowserTab Component
  *
- * Single Responsibility: Renders tab content (typically used inside Trigger)
+ * Single Responsibility: Renders tab content with browser-like styling
  */
-interface DraggableTabsTabProps {
+interface DraggableBrowserTabProps {
   label?: React.ReactNode;
   children?: React.ReactNode;
 }
 
-function DraggableTabsTab({ label, children }: DraggableTabsTabProps) {
+function DraggableBrowserTab({ label, children }: DraggableBrowserTabProps) {
   return <>{label ?? children}</>;
 }
 
@@ -337,7 +338,7 @@ export const DraggableTabsBrowser = {
   Root: DraggableTabsBrowserRoot,
   Group: DraggableTabsGroup,
   TabBar: DraggableTabsTabBar,
-  Trigger: DraggableTabsTrigger,
-  Tab: DraggableTabsTab,
+  Trigger: DraggableTabTrigger,
+  Tab: DraggableBrowserTab,
   Content: DraggableTabsContent,
 };
