@@ -4,6 +4,7 @@ import { api } from "~/utils/api";
 import { useMemo } from "react";
 import { modelProviderIcons } from "~/server/modelProviders/iconsMap";
 import { Text } from "@chakra-ui/react";
+import { usePromptStudioStore } from "../../prompt-studio-store/store";
 
 export function DraftPromptsList() {
   const { project } = useOrganizationTeamProject();
@@ -20,6 +21,18 @@ export function DraftPromptsList() {
     return data?.filter((prompt) => prompt.version === 0);
   }, [data]);
 
+  const addPrompt = usePromptStudioStore((s) => s.addPrompt);
+  const active = usePromptStudioStore((s) => s.activeWorkspaceIndex);
+  const setActive = usePromptStudioStore((s) => s.setActiveWorkspaceIndex);
+
+  function ensureTargetIndex(): number {
+    if (active == null) {
+      setActive(0);
+      return 0;
+    }
+    return active;
+  }
+
   return (
     <Sidebar.List title="Drafts" collapsible defaultOpen={false}>
       {drafts?.map((draft) => (
@@ -30,6 +43,7 @@ export function DraftPromptsList() {
               draft.model.split("/")[0] as keyof typeof modelProviderIcons
             ]
           }
+          onClick={() => addPrompt({ id: draft.id, workspaceIndex: ensureTargetIndex() })}
         >
           <Text
             fontStyle={!draft.handle ? "italic" : "normal"}
