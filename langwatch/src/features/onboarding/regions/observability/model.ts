@@ -13,6 +13,7 @@ export type FrameworkKey =
   | "ollama"
   | "anthropic"
   | "gemini"
+  | "agno"
   | "grok"
   | "azure"
   | "opentelemetry"

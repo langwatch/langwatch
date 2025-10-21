@@ -14,6 +14,7 @@ import goGeminiSource from "./snippets/go/gemini.snippet.go";
 import goGrokSource from "./snippets/go/grok.snippet.go";
 import goMistralSource from "./snippets/go/mistral.snippet.go";
 import goOllamaSource from "./snippets/go/ollama.snippet.go";
+import agnoPySource from "./snippets/python/agno.snippet.py";
 
 export interface InstallMatrix {
   js?: { npm: string; pnpm: string; yarn: string; bun: string };
@@ -163,6 +164,24 @@ export const registry: IntegrationRegistry = [
     snippet: tsRef(openaiTsSource as unknown as string),
   },
 
+  // Python
+  {
+    platform: "python",
+    framework: "agno",
+    label: "Agno",
+    docs: { internal: "/docs/integrations/python/agno" },
+    icon: singleIcon(
+      "/images/external-icons/agno.png",
+      "Agno",
+    ),
+    install: {
+      python: {
+        pip: "pip install langwatch agno openai openinference-instrumentation-agno yfinance",
+        uv: "uv add langwatch agno openai openinference-instrumentation-agno yfinance",
+      },
+    },
+    snippet: pyRef(agnoPySource as unknown as string),
+  },
 
   // Go
   {
