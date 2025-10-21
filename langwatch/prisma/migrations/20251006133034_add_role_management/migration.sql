@@ -19,7 +19,7 @@ CREATE TABLE "TeamUserCustomRole" (
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
-    CONSTRAINT "TeamUserCustomRole_pkey" PRIMARY KEY ("userId","teamId","customRoleId")
+    CONSTRAINT "TeamUserCustomRole_pkey" PRIMARY KEY ("userId","teamId")
 );
 
 -- CreateIndex

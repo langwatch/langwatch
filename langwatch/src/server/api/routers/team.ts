@@ -11,6 +11,44 @@ import { checkTeamPermission } from "../rbac";
 import { nanoid } from "nanoid";
 import { slugify } from "~/utils/slugify";
 
+// Reusable schema for team member role validation
+const teamMemberRoleSchema = z
+  .object({
+    userId: z.string(),
+    role: z.union([
+      z.nativeEnum(TeamUserRole),
+      z
+        .string()
+        .regex(
+          /^custom:[a-zA-Z0-9_-]+$/,
+          "Custom role must be in format 'custom:{roleId}'",
+        ),
+    ]),
+    customRoleId: z.string().optional(),
+  })
+  .superRefine((data, ctx) => {
+    const isCustomRole = data.role.startsWith("custom:");
+
+    if (isCustomRole) {
+      if (!data.customRoleId || data.customRoleId.trim() === "") {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "customRoleId is required when using a custom role",
+          path: ["customRoleId"],
+        });
+      }
+    } else {
+      if (data.customRoleId !== undefined) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message:
+            "customRoleId must not be provided when using a built-in role",
+          path: ["customRoleId"],
+        });
+      }
+    }
+  });
+
 export const teamRouter = createTRPCRouter({
   getBySlug: protectedProcedure
     .input(z.object({ organizationId: z.string(), slug: z.string() }))
@@ -123,13 +161,7 @@ export const teamRouter = createTRPCRouter({
       z.object({
         teamId: z.string(),
         name: z.string(),
-        members: z.array(
-          z.object({
-            userId: z.string(),
-            role: z.string(),
-            customRoleId: z.string().optional(),
-          }),
-        ),
+        members: z.array(teamMemberRoleSchema),
       }),
     )
     .use(checkTeamPermission("team:manage"))
@@ -383,13 +415,7 @@ export const teamRouter = createTRPCRouter({
       z.object({
         organizationId: z.string(),
         name: z.string(),
-        members: z.array(
-          z.object({
-            userId: z.string(),
-            role: z.string(),
-            customRoleId: z.string().optional(),
-          }),
-        ),
+        members: z.array(teamMemberRoleSchema),
       }),
     )
     .use(
@@ -472,18 +498,64 @@ export const teamRouter = createTRPCRouter({
     .mutation(async ({ input, ctx }) => {
       const prisma = ctx.prisma;
 
+      // Pre-removal guard: Prevent removing the last built-in ADMIN
+      const adminCount = await prisma.teamUser.count({
+        where: {
+          teamId: input.teamId,
+          role: TeamUserRole.ADMIN,
+        },
+      });
+
+      if (adminCount === 0) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "No admin found for this team",
+        });
+      }
+
+      // Check if the target user is currently an admin
+      const targetUserMembership = await prisma.teamUser.findUnique({
+        where: {
+          userId_teamId: {
+            userId: input.userId,
+            teamId: input.teamId,
+          },
+        },
+        select: { role: true },
+      });
+
+      if (!targetUserMembership) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "User is not a member of this team",
+        });
+      }
+
+      const isTargetUserAdmin = targetUserMembership.role === TeamUserRole.ADMIN;
+
+      if (adminCount === 1 && isTargetUserAdmin) {
+        // Optional: Check for self-removal
+        if (input.userId === ctx.session.user.id) {
+          throw new TRPCError({
+            code: "FORBIDDEN",
+            message: "You cannot remove yourself from the last admin position in this team",
+          });
+        }
+        
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "Cannot remove the last admin from this team",
+        });
+      }
+
       return await prisma.$transaction(async (tx) => {
-        // Validate that the team exists and user has permission
+        // Validate that the team exists
         const team = await tx.team.findUnique({
           where: { id: input.teamId },
           select: {
             id: true,
             name: true,
             organizationId: true,
-            members: {
-              where: { userId: input.userId },
-              select: { userId: true, role: true },
-            },
           },
         });
 
@@ -491,15 +563,6 @@ export const teamRouter = createTRPCRouter({
           throw new TRPCError({
             code: "NOT_FOUND",
             message: "Team not found",
-          });
-        }
-
-        // Check if user is actually a member
-        const membership = team.members[0];
-        if (!membership) {
-          throw new TRPCError({
-            code: "NOT_FOUND",
-            message: "User is not a member of this team",
           });
         }
 

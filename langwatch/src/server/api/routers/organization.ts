@@ -750,12 +750,43 @@ export const organizationRouter = createTRPCRouter({
     }),
   updateTeamMemberRole: protectedProcedure
     .input(
-      z.object({
-        teamId: z.string(),
-        userId: z.string(),
-        role: z.string(), // Can be TeamUserRole or "custom:{roleId}"
-        customRoleId: z.string().optional(),
-      }),
+      z
+        .object({
+          teamId: z.string(),
+          userId: z.string(),
+          role: z.union([
+            z.nativeEnum(TeamUserRole),
+            z
+              .string()
+              .regex(
+                /^custom:[a-zA-Z0-9_-]+$/,
+                "Custom role must be in format 'custom:{roleId}'",
+              ),
+          ]),
+          customRoleId: z.string().optional(),
+        })
+        .superRefine((data, ctx) => {
+          const isCustomRole = data.role.startsWith("custom:");
+
+          if (isCustomRole) {
+            if (!data.customRoleId || data.customRoleId.trim() === "") {
+              ctx.addIssue({
+                code: z.ZodIssueCode.custom,
+                message: "customRoleId is required when using a custom role",
+                path: ["customRoleId"],
+              });
+            }
+          } else {
+            if (data.customRoleId !== undefined) {
+              ctx.addIssue({
+                code: z.ZodIssueCode.custom,
+                message:
+                  "customRoleId must not be provided when using a built-in role",
+                path: ["customRoleId"],
+              });
+            }
+          }
+        }),
     )
     .use(checkTeamPermission("team:manage"))
     .mutation(async ({ input, ctx }) => {
@@ -763,6 +794,60 @@ export const organizationRouter = createTRPCRouter({
 
       // Check if this is a custom role
       const isCustomRole = input.role.startsWith("custom:");
+
+      // Pre-update guard: Prevent removing or demoting the last built-in ADMIN
+      const adminCount = await prisma.teamUser.count({
+        where: {
+          teamId: input.teamId,
+          role: TeamUserRole.ADMIN,
+        },
+      });
+
+      if (adminCount === 0) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "No admin found for this team",
+        });
+      }
+
+      // Check if the target user is currently an admin
+      const targetUserMembership = await prisma.teamUser.findUnique({
+        where: {
+          userId_teamId: {
+            userId: input.userId,
+            teamId: input.teamId,
+          },
+        },
+        select: { role: true },
+      });
+
+      if (!targetUserMembership) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "User is not a member of this team",
+        });
+      }
+
+      const isTargetUserAdmin = targetUserMembership.role === TeamUserRole.ADMIN;
+      const wouldDemoteAdmin = isTargetUserAdmin && (
+        isCustomRole || // Custom roles set built-in role to VIEWER
+        (input.role as TeamUserRole) !== TeamUserRole.ADMIN // Changing to non-admin built-in role
+      );
+
+      if (adminCount === 1 && wouldDemoteAdmin) {
+        // Optional: Check for self-demotion
+        if (input.userId === ctx.session.user.id) {
+          throw new TRPCError({
+            code: "FORBIDDEN",
+            message: "You cannot demote yourself from the last admin position in this team",
+          });
+        }
+        
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "Cannot remove or demote the last admin from this team",
+        });
+      }
 
       if (isCustomRole && input.customRoleId) {
         // Ensure the custom role belongs to the team's organization

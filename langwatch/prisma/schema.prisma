@@ -826,7 +826,7 @@ model TeamUserCustomRole {
     createdAt    DateTime   @default(now())
     updatedAt    DateTime   @default(now()) @updatedAt
 
-    @@id([userId, teamId, customRoleId])
+    @@id([userId, teamId])
     @@index([teamId])
     @@index([userId])
     @@index([customRoleId])
