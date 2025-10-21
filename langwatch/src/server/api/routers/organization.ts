@@ -74,12 +74,6 @@ export type TeamWithProjectsAndMembersAndUsers = Team & {
     user: User;
   }>;
   defaultRole?: TeamUserRole;
-  defaultCustomRole?: {
-    id: string;
-    name: string;
-    description: string | null;
-    permissions: unknown; // JSON field, will be validated as array
-  };
 };
 
 export type UserWithTeams = User & {

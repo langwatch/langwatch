@@ -102,7 +102,6 @@ export const teamRouter = createTRPCRouter({
             },
           },
           projects: true,
-          defaultCustomRole: true,
         },
       });
 

@@ -85,7 +85,6 @@ describe("RBAC Integration Tests", () => {
           id: "team-123",
           members: [], // No members
           defaultRole: TeamUserRole.ADMIN,
-          defaultCustomRole: null,
         },
       });
 
@@ -103,7 +102,6 @@ describe("RBAC Integration Tests", () => {
           id: "team-123",
           members: [{ userId: "user-123", role: TeamUserRole.ADMIN }],
           defaultRole: TeamUserRole.ADMIN,
-          defaultCustomRole: null,
         },
       });
 
@@ -123,7 +121,6 @@ describe("RBAC Integration Tests", () => {
           id: "team-123",
           members: [{ userId: "user-123", role: TeamUserRole.VIEWER }],
           defaultRole: TeamUserRole.VIEWER,
-          defaultCustomRole: null,
         },
       });
 
@@ -141,27 +138,6 @@ describe("RBAC Integration Tests", () => {
       expect(result).toBe(true);
     });
 
-    it("should return true when team has custom role with permission", async () => {
-      mockPrisma.project.findUnique.mockResolvedValue({
-        team: {
-          id: "team-123",
-          members: [{ userId: "user-123", role: TeamUserRole.VIEWER }],
-          defaultRole: null,
-          defaultCustomRole: {
-            permissions: ["experiments:manage"],
-          },
-        },
-      });
-
-      mockPrisma.teamUserCustomRole.findFirst.mockResolvedValue(null);
-
-      const result = await hasProjectPermission(
-        { prisma: mockPrisma, session: mockSession },
-        "project-123",
-        "experiments:view" as Permission,
-      );
-      expect(result).toBe(true);
-    });
   });
 
   describe("hasTeamPermission", () => {
@@ -178,7 +154,6 @@ describe("RBAC Integration Tests", () => {
       mockPrisma.team.findUnique.mockResolvedValue({
         id: "team-123",
         organizationId: "org-123",
-        defaultCustomRole: null,
       });
 
       mockPrisma.organizationUser.findFirst.mockResolvedValue({
@@ -197,7 +172,6 @@ describe("RBAC Integration Tests", () => {
       mockPrisma.team.findUnique.mockResolvedValue({
         id: "team-123",
         organizationId: "org-123",
-        defaultCustomRole: null,
       });
 
       mockPrisma.organizationUser.findFirst.mockResolvedValue({
@@ -218,7 +192,6 @@ describe("RBAC Integration Tests", () => {
       mockPrisma.team.findUnique.mockResolvedValue({
         id: "team-123",
         organizationId: "org-123",
-        defaultCustomRole: null,
       });
 
       mockPrisma.organizationUser.findFirst.mockResolvedValue({
@@ -318,7 +291,6 @@ describe("RBAC Integration Tests", () => {
             id: "team-123",
             members: [],
             defaultRole: TeamUserRole.VIEWER,
-            defaultCustomRole: null,
           },
         });
 
@@ -341,7 +313,6 @@ describe("RBAC Integration Tests", () => {
             id: "team-123",
             members: [{ userId: "user-123", role: TeamUserRole.ADMIN }],
             defaultRole: TeamUserRole.ADMIN,
-            defaultCustomRole: null,
           },
         });
 
@@ -367,7 +338,6 @@ describe("RBAC Integration Tests", () => {
         mockPrisma.team.findUnique.mockResolvedValue({
           id: "team-123",
           organizationId: "org-123",
-          defaultCustomRole: null,
         });
 
         mockPrisma.organizationUser.findFirst.mockResolvedValue({
@@ -393,7 +363,6 @@ describe("RBAC Integration Tests", () => {
         mockPrisma.team.findUnique.mockResolvedValue({
           id: "team-123",
           organizationId: "org-123",
-          defaultCustomRole: null,
         });
 
         mockPrisma.organizationUser.findFirst.mockResolvedValue({
@@ -499,7 +468,6 @@ describe("RBAC Integration Tests", () => {
             id: "team-123",
             members: [{ userId: "user-123", role: TeamUserRole.ADMIN }],
             defaultRole: TeamUserRole.ADMIN,
-            defaultCustomRole: null,
           },
         });
 
@@ -527,7 +495,6 @@ describe("RBAC Integration Tests", () => {
             id: "team-123",
             members: [],
             defaultRole: TeamUserRole.VIEWER,
-            defaultCustomRole: null,
           },
         });
 
@@ -559,7 +526,6 @@ describe("RBAC Integration Tests", () => {
             id: "team-123",
             members: [],
             defaultRole: TeamUserRole.VIEWER,
-            defaultCustomRole: null,
           },
         });
 

@@ -46,23 +46,6 @@ function isValidPermissions(permissions: unknown): permissions is string[] {
   );
 }
 
-function isValidDefaultCustomRole(role: unknown): role is {
-  id: string;
-  name: string;
-  description: string | null;
-  permissions: unknown;
-} {
-  return (
-    typeof role === "object" &&
-    role !== null &&
-    "id" in role &&
-    "name" in role &&
-    "permissions" in role &&
-    typeof (role as any).id === "string" &&
-    typeof (role as any).name === "string"
-  );
-}
-
 export default function EditTeamPage() {
   const router = useRouter();
   const teamSlug = router.query.team;
@@ -81,28 +64,14 @@ export default function EditTeamPage() {
 }
 
 function EditTeam({ team }: { team: TeamWithProjectsAndMembersAndUsers }) {
-  // Get team's default role if it exists (either built-in or custom)
-  const teamDefaultCustomRole = team.defaultCustomRole;
+  // Get team's default role if it exists (built-in only)
   const teamBuiltInRole = team.defaultRole;
 
   const teamDefaultRole = useMemo(() => {
-    return teamDefaultCustomRole &&
-      isValidDefaultCustomRole(teamDefaultCustomRole)
-      ? ({
-          label: teamDefaultCustomRole.name,
-          value: `custom:${teamDefaultCustomRole.id}`,
-          description:
-            teamDefaultCustomRole.description ??
-            (isValidPermissions(teamDefaultCustomRole.permissions)
-              ? `${teamDefaultCustomRole.permissions.length} permissions`
-              : "Custom role"),
-          isCustom: true,
-          customRoleId: teamDefaultCustomRole.id,
-        } as RoleOption)
-      : teamBuiltInRole
+    return teamBuiltInRole
       ? teamRolesOptions[teamBuiltInRole as TeamUserRole]
       : undefined;
-  }, [teamDefaultCustomRole, teamBuiltInRole]);
+  }, [teamBuiltInRole]);
 
   const getInitialValues = useCallback(
     (teamData: TeamWithProjectsAndMembersAndUsers): TeamFormData => ({

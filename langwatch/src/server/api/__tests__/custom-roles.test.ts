@@ -74,7 +74,6 @@ describe("Custom Role Functionality Tests", () => {
           id: "team-123",
           members: [{ userId: "user-123", role: TeamUserRole.VIEWER }],
           defaultRole: TeamUserRole.VIEWER,
-          defaultCustomRole: null,
         },
       });
 
@@ -99,7 +98,6 @@ describe("Custom Role Functionality Tests", () => {
           id: "team-123",
           members: [{ userId: "user-123", role: TeamUserRole.VIEWER }],
           defaultRole: TeamUserRole.VIEWER,
-          defaultCustomRole: null,
         },
       });
 
@@ -124,7 +122,6 @@ describe("Custom Role Functionality Tests", () => {
           id: "team-123",
           members: [{ userId: "user-123", role: TeamUserRole.VIEWER }],
           defaultRole: TeamUserRole.VIEWER,
-          defaultCustomRole: null,
         },
       });
 
@@ -149,7 +146,6 @@ describe("Custom Role Functionality Tests", () => {
           id: "team-123",
           members: [{ userId: "user-123", role: TeamUserRole.VIEWER }],
           defaultRole: TeamUserRole.VIEWER,
-          defaultCustomRole: null,
         },
       });
 
@@ -174,7 +170,6 @@ describe("Custom Role Functionality Tests", () => {
           id: "team-123",
           members: [{ userId: "user-123", role: TeamUserRole.VIEWER }],
           defaultRole: TeamUserRole.VIEWER,
-          defaultCustomRole: null,
         },
       });
 
@@ -194,79 +189,6 @@ describe("Custom Role Functionality Tests", () => {
     });
   });
 
-  describe("Team Default Custom Role", () => {
-    it("should use team default custom role when user has no individual custom role", async () => {
-      mockPrisma.project.findUnique.mockResolvedValue({
-        team: {
-          id: "team-123",
-          members: [{ userId: "user-123", role: TeamUserRole.VIEWER }],
-          defaultRole: null,
-          defaultCustomRole: {
-            permissions: ["experiments:manage", "datasets:view"],
-          },
-        },
-      });
-
-      mockPrisma.teamUserCustomRole.findFirst.mockResolvedValue(null);
-
-      const result = await hasProjectPermission(
-        { prisma: mockPrisma, session: mockSession },
-        "project-123",
-        "experiments:view" as Permission,
-      );
-
-      expect(result).toBe(true);
-    });
-
-    it("should prioritize user individual custom role over team default custom role", async () => {
-      mockPrisma.project.findUnique.mockResolvedValue({
-        team: {
-          id: "team-123",
-          members: [{ userId: "user-123", role: TeamUserRole.VIEWER }],
-          defaultRole: null,
-          defaultCustomRole: {
-            permissions: ["experiments:view"], // Team default only has view
-          },
-        },
-      });
-
-      mockPrisma.teamUserCustomRole.findFirst.mockResolvedValue({
-        customRole: {
-          permissions: ["experiments:manage"], // User has manage
-        },
-      });
-
-      const result = await hasProjectPermission(
-        { prisma: mockPrisma, session: mockSession },
-        "project-123",
-        "experiments:create" as Permission,
-      );
-
-      expect(result).toBe(true);
-    });
-
-    it("should fall back to built-in role when no custom roles are assigned", async () => {
-      mockPrisma.project.findUnique.mockResolvedValue({
-        team: {
-          id: "team-123",
-          members: [{ userId: "user-123", role: TeamUserRole.ADMIN }],
-          defaultRole: TeamUserRole.ADMIN,
-          defaultCustomRole: null,
-        },
-      });
-
-      mockPrisma.teamUserCustomRole.findFirst.mockResolvedValue(null);
-
-      const result = await hasProjectPermission(
-        { prisma: mockPrisma, session: mockSession },
-        "project-123",
-        "experiments:manage" as Permission,
-      );
-
-      expect(result).toBe(true);
-    });
-  });
-
   describe("Complex Custom Role Scenarios", () => {
     it("should handle custom role with mixed permissions correctly", async () => {
       mockPrisma.project.findUnique.mockResolvedValue({
@@ -274,7 +196,6 @@ describe("Custom Role Functionality Tests", () => {
           id: "team-123",
           members: [{ userId: "user-123", role: TeamUserRole.VIEWER }],
           defaultRole: TeamUserRole.VIEWER,
-          defaultCustomRole: null,
         },
       });
 
@@ -397,7 +318,6 @@ describe("Custom Role Functionality Tests", () => {
           id: "team-123",
           members: [{ userId: "user-123", role: TeamUserRole.VIEWER }],
           defaultRole: TeamUserRole.VIEWER,
-          defaultCustomRole: null,
         },
       });
 
@@ -423,7 +343,6 @@ describe("Custom Role Functionality Tests", () => {
           id: "team-123",
           members: [{ userId: "user-123", role: TeamUserRole.VIEWER }],
           defaultRole: TeamUserRole.VIEWER,
-          defaultCustomRole: null,
         },
       });
 
@@ -451,7 +370,6 @@ describe("Custom Role Functionality Tests", () => {
           id: "team-123",
           members: [{ userId: "user-123", role: TeamUserRole.ADMIN }],
           defaultRole: TeamUserRole.ADMIN,
-          defaultCustomRole: null,
         },
       });
 
@@ -472,7 +390,6 @@ describe("Custom Role Functionality Tests", () => {
           id: "team-123",
           members: [{ userId: "user-123", role: TeamUserRole.ADMIN }],
           defaultRole: TeamUserRole.ADMIN,
-          defaultCustomRole: null,
         },
       });
 
@@ -497,7 +414,7 @@ describe("Custom Role Functionality Tests", () => {
           id: "team-123",
           members: [{ userId: "user-123", role: TeamUserRole.VIEWER }],
           defaultRole: null,
-          defaultCustomRole: null, // Null default custom role
+ // Null default custom role
         },
       });
 

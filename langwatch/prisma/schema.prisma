@@ -122,23 +122,20 @@ model OrganizationUser {
 }
 
 model Team {
-    id                  String               @id @default(nanoid())
-    name                String
-    slug                String               @unique
-    members             TeamUser[]
-    organizationId      String
-    organization        Organization         @relation(fields: [organizationId], references: [id])
-    projects            Project[]
-    createdAt           DateTime             @default(now())
-    updatedAt           DateTime             @default(now()) @updatedAt
-    archivedAt          DateTime?
-    customRoleMembers   TeamUserCustomRole[]
-    defaultRole         TeamUserRole? // Built-in team role
-    defaultCustomRoleId String?
-    defaultCustomRole   CustomRole?          @relation("TeamDefaultRole", fields: [defaultCustomRoleId], references: [id])
+    id                String               @id @default(nanoid())
+    name              String
+    slug              String               @unique
+    members           TeamUser[]
+    organizationId    String
+    organization      Organization         @relation(fields: [organizationId], references: [id])
+    projects          Project[]
+    createdAt         DateTime             @default(now())
+    updatedAt         DateTime             @default(now()) @updatedAt
+    archivedAt        DateTime?
+    customRoleMembers TeamUserCustomRole[]
+    defaultRole       TeamUserRole? // Built-in team role
 
     @@index([organizationId])
-    @@index([defaultCustomRoleId])
 }
 
 model Organization {
@@ -814,7 +811,6 @@ model CustomRole {
     createdAt      DateTime             @default(now())
     updatedAt      DateTime             @default(now()) @updatedAt
     teamUsers      TeamUserCustomRole[]
-    teamsAsDefault Team[]               @relation("TeamDefaultRole")
 
     @@unique([organizationId, name])
     @@index([organizationId])
