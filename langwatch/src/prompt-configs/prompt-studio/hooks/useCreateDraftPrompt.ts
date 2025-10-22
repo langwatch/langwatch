@@ -1,7 +1,8 @@
 import { useCallback } from "react";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useDraggableTabsBrowserStore } from "../prompt-studio-store/DraggableTabsBrowserStore";
-import { computeInitialFormValuesForPrompt } from "~/prompt-configs/utils/computeInitialFormValuesForPrompt";
+import type { PromptConfigFormValues } from "~/prompt-configs/types";
+import { DEFAULT_MODEL } from "~/utils/constants";
 
 /**
  * Hook to create a draft prompt in the database
@@ -14,13 +15,28 @@ export function useCreateDraftPrompt() {
   const createDraftPrompt = useCallback(async () => {
     const projectDefaultModel = project?.defaultModel;
     const normalizedDefaultModel =
-      typeof projectDefaultModel === "string" ? projectDefaultModel : undefined;
+      typeof projectDefaultModel === "string"
+        ? projectDefaultModel
+        : DEFAULT_MODEL;
 
-    const defaultValues = computeInitialFormValuesForPrompt({
-      prompt: null,
-      defaultModel: normalizedDefaultModel,
-      useSystemMessage: true,
-    });
+    const defaultValues: PromptConfigFormValues = {
+      handle: null,
+      scope: "PROJECT",
+      version: {
+        configData: {
+          prompt: "You are a helpful assistant.",
+          llm: {
+            model: normalizedDefaultModel,
+          },
+          inputs: [{ identifier: "input", type: "str" }],
+          outputs: [{ identifier: "output", type: "str" }],
+          messages: [
+            { role: "system", content: "You are a helpful assistant." },
+            { role: "user", content: "{{input}}" },
+          ],
+        },
+      },
+    };
 
     addTab({
       data: {
