@@ -55,7 +55,7 @@ describe("RBAC Integration Tests", () => {
       const result = await hasProjectPermission(
         { prisma: mockPrisma, session: null },
         "project-123",
-        "experiments:view" as Permission,
+        "workflows:view" as Permission,
       );
       expect(result).toBe(false);
     });
@@ -72,7 +72,7 @@ describe("RBAC Integration Tests", () => {
       const result = await hasProjectPermission(
         { prisma: mockPrisma, session: mockSession },
         "demo-project-123",
-        "experiments:manage" as Permission,
+        "workflows:manage" as Permission,
       );
       expect(result).toBe(false);
 
@@ -91,7 +91,7 @@ describe("RBAC Integration Tests", () => {
       const result = await hasProjectPermission(
         { prisma: mockPrisma, session: mockSession },
         "project-123",
-        "experiments:view" as Permission,
+        "workflows:view" as Permission,
       );
       expect(result).toBe(false);
     });
@@ -110,7 +110,7 @@ describe("RBAC Integration Tests", () => {
       const result = await hasProjectPermission(
         { prisma: mockPrisma, session: mockSession },
         "project-123",
-        "experiments:view" as Permission,
+        "workflows:view" as Permission,
       );
       expect(result).toBe(true);
     });
@@ -126,18 +126,17 @@ describe("RBAC Integration Tests", () => {
 
       mockPrisma.teamUserCustomRole.findFirst.mockResolvedValue({
         customRole: {
-          permissions: ["experiments:manage"],
+          permissions: ["workflows:manage"],
         },
       });
 
       const result = await hasProjectPermission(
         { prisma: mockPrisma, session: mockSession },
         "project-123",
-        "experiments:view" as Permission,
+        "workflows:view" as Permission,
       );
       expect(result).toBe(true);
     });
-
   });
 
   describe("hasTeamPermission", () => {
@@ -145,7 +144,7 @@ describe("RBAC Integration Tests", () => {
       const result = await hasTeamPermission(
         { prisma: mockPrisma, session: null as any },
         "team-123",
-        "experiments:view" as Permission,
+        "workflows:view" as Permission,
       );
       expect(result).toBe(false);
     });
@@ -163,7 +162,7 @@ describe("RBAC Integration Tests", () => {
       const result = await hasTeamPermission(
         { prisma: mockPrisma, session: mockSession },
         "team-123",
-        "experiments:view" as Permission,
+        "workflows:view" as Permission,
       );
       expect(result).toBe(true);
     });
@@ -183,7 +182,7 @@ describe("RBAC Integration Tests", () => {
       const result = await hasTeamPermission(
         { prisma: mockPrisma, session: mockSession },
         "team-123",
-        "experiments:view" as Permission,
+        "workflows:view" as Permission,
       );
       expect(result).toBe(false);
     });
@@ -207,7 +206,7 @@ describe("RBAC Integration Tests", () => {
       const result = await hasTeamPermission(
         { prisma: mockPrisma, session: mockSession },
         "team-123",
-        "experiments:view" as Permission,
+        "workflows:view" as Permission,
       );
       expect(result).toBe(true);
     });
@@ -295,7 +294,7 @@ describe("RBAC Integration Tests", () => {
         });
 
         const middleware = checkProjectPermission(
-          "experiments:manage" as Permission,
+          "workflows:manage" as Permission,
         );
 
         await expect(
@@ -319,7 +318,7 @@ describe("RBAC Integration Tests", () => {
         mockPrisma.teamUserCustomRole.findFirst.mockResolvedValue(null);
 
         const middleware = checkProjectPermission(
-          "experiments:view" as Permission,
+          "workflows:view" as Permission,
         );
 
         const result = await middleware({
@@ -347,7 +346,7 @@ describe("RBAC Integration Tests", () => {
         mockPrisma.teamUser.findFirst.mockResolvedValue(null);
 
         const middleware = checkTeamPermission(
-          "experiments:manage" as Permission,
+          "workflows:manage" as Permission,
         );
 
         await expect(
@@ -369,9 +368,7 @@ describe("RBAC Integration Tests", () => {
           role: OrganizationUserRole.ADMIN,
         });
 
-        const middleware = checkTeamPermission(
-          "experiments:view" as Permission,
-        );
+        const middleware = checkTeamPermission("workflows:view" as Permission);
 
         const result = await middleware({
           ctx: mockCtx,
@@ -474,7 +471,7 @@ describe("RBAC Integration Tests", () => {
         mockPrisma.teamUserCustomRole.findFirst.mockResolvedValue(null);
 
         const middleware = checkPermissionOrPubliclyShared(
-          checkProjectPermission("experiments:view" as Permission),
+          checkProjectPermission("workflows:view" as Permission),
           { resourceType: "TRACE", resourceParam: "traceId" },
         );
 
@@ -505,7 +502,7 @@ describe("RBAC Integration Tests", () => {
         });
 
         const middleware = checkPermissionOrPubliclyShared(
-          checkProjectPermission("experiments:view" as Permission),
+          checkProjectPermission("workflows:view" as Permission),
           { resourceType: "TRACE", resourceParam: "traceId" },
         );
 
@@ -532,7 +529,7 @@ describe("RBAC Integration Tests", () => {
         mockPrisma.publicShare.findFirst.mockResolvedValue(null);
 
         const middleware = checkPermissionOrPubliclyShared(
-          checkProjectPermission("experiments:view" as Permission),
+          checkProjectPermission("workflows:view" as Permission),
           { resourceType: "TRACE", resourceParam: "traceId" },
         );
 

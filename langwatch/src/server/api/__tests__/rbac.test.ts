@@ -43,9 +43,9 @@ function hasPermissionWithHierarchy(
 describe("RBAC Permission System", () => {
   describe("Permission Hierarchy Logic", () => {
     it("should allow direct permission match", () => {
-      const permissions = ["experiments:view", "datasets:manage"];
+      const permissions = ["workflows:view", "datasets:manage"];
 
-      expect(hasPermissionWithHierarchy(permissions, "experiments:view")).toBe(
+      expect(hasPermissionWithHierarchy(permissions, "workflows:view")).toBe(
         true,
       );
       expect(hasPermissionWithHierarchy(permissions, "datasets:manage")).toBe(
@@ -54,49 +54,49 @@ describe("RBAC Permission System", () => {
     });
 
     it("should allow manage permissions to include view permissions", () => {
-      const permissions = ["experiments:manage"];
+      const permissions = ["workflows:manage"];
 
-      expect(hasPermissionWithHierarchy(permissions, "experiments:view")).toBe(
+      expect(hasPermissionWithHierarchy(permissions, "workflows:view")).toBe(
         true,
       );
-      expect(
-        hasPermissionWithHierarchy(permissions, "experiments:manage"),
-      ).toBe(true);
+      expect(hasPermissionWithHierarchy(permissions, "workflows:manage")).toBe(
+        true,
+      );
     });
 
     it("should not allow view permissions to include manage permissions", () => {
-      const permissions = ["experiments:view"];
+      const permissions = ["workflows:view"];
 
-      expect(hasPermissionWithHierarchy(permissions, "experiments:view")).toBe(
+      expect(hasPermissionWithHierarchy(permissions, "workflows:view")).toBe(
         true,
       );
-      expect(
-        hasPermissionWithHierarchy(permissions, "experiments:manage"),
-      ).toBe(false);
+      expect(hasPermissionWithHierarchy(permissions, "workflows:manage")).toBe(
+        false,
+      );
     });
 
     it("should not allow unrelated permissions", () => {
       const permissions = ["datasets:view"];
 
-      expect(hasPermissionWithHierarchy(permissions, "experiments:view")).toBe(
+      expect(hasPermissionWithHierarchy(permissions, "workflows:view")).toBe(
         false,
       );
-      expect(
-        hasPermissionWithHierarchy(permissions, "experiments:manage"),
-      ).toBe(false);
+      expect(hasPermissionWithHierarchy(permissions, "workflows:manage")).toBe(
+        false,
+      );
     });
 
     it("should work with different resource types", () => {
       const permissions = [
         "analytics:manage",
-        "guardrails:manage",
+        "evaluations:manage",
         "prompts:manage",
       ];
 
       expect(hasPermissionWithHierarchy(permissions, "analytics:view")).toBe(
         true,
       );
-      expect(hasPermissionWithHierarchy(permissions, "guardrails:view")).toBe(
+      expect(hasPermissionWithHierarchy(permissions, "evaluations:view")).toBe(
         true,
       );
       expect(hasPermissionWithHierarchy(permissions, "prompts:view")).toBe(
@@ -107,40 +107,40 @@ describe("RBAC Permission System", () => {
     it("should handle empty permissions array", () => {
       const permissions: string[] = [];
 
-      expect(hasPermissionWithHierarchy(permissions, "experiments:view")).toBe(
+      expect(hasPermissionWithHierarchy(permissions, "workflows:view")).toBe(
         false,
       );
-      expect(
-        hasPermissionWithHierarchy(permissions, "experiments:manage"),
-      ).toBe(false);
+      expect(hasPermissionWithHierarchy(permissions, "workflows:manage")).toBe(
+        false,
+      );
     });
   });
 
   describe("Team Role Permissions", () => {
     it("should allow ADMIN to access all experiment permissions", () => {
+      expect(teamRoleHasPermission(TeamUserRole.ADMIN, "workflows:view")).toBe(
+        true,
+      );
       expect(
-        teamRoleHasPermission(TeamUserRole.ADMIN, "experiments:view"),
-      ).toBe(true);
-      expect(
-        teamRoleHasPermission(TeamUserRole.ADMIN, "experiments:manage"),
+        teamRoleHasPermission(TeamUserRole.ADMIN, "workflows:manage"),
       ).toBe(true);
     });
 
     it("should allow MEMBER to access all experiment permissions", () => {
+      expect(teamRoleHasPermission(TeamUserRole.MEMBER, "workflows:view")).toBe(
+        true,
+      );
       expect(
-        teamRoleHasPermission(TeamUserRole.MEMBER, "experiments:view"),
-      ).toBe(true);
-      expect(
-        teamRoleHasPermission(TeamUserRole.MEMBER, "experiments:manage"),
+        teamRoleHasPermission(TeamUserRole.MEMBER, "workflows:manage"),
       ).toBe(true);
     });
 
     it("should allow VIEWER to access only experiment view permissions", () => {
+      expect(teamRoleHasPermission(TeamUserRole.VIEWER, "workflows:view")).toBe(
+        true,
+      );
       expect(
-        teamRoleHasPermission(TeamUserRole.VIEWER, "experiments:view"),
-      ).toBe(true);
-      expect(
-        teamRoleHasPermission(TeamUserRole.VIEWER, "experiments:manage"),
+        teamRoleHasPermission(TeamUserRole.VIEWER, "workflows:manage"),
       ).toBe(false);
     });
 
@@ -248,45 +248,45 @@ describe("RBAC Permission System", () => {
 
   describe("Custom Role Scenarios", () => {
     it("should simulate custom role with only manage permission", () => {
-      // Simulate a custom role that only has experiments:manage
-      const customPermissions = ["experiments:manage"];
+      // Simulate a custom role that only has workflows:manage
+      const customPermissions = ["workflows:manage"];
 
       // Should be able to access both view and manage
       expect(
-        hasPermissionWithHierarchy(customPermissions, "experiments:view"),
+        hasPermissionWithHierarchy(customPermissions, "workflows:view"),
       ).toBe(true);
       expect(
-        hasPermissionWithHierarchy(customPermissions, "experiments:manage"),
+        hasPermissionWithHierarchy(customPermissions, "workflows:manage"),
       ).toBe(true);
     });
 
     it("should simulate custom role with only view permission", () => {
-      // Simulate a custom role that only has experiments:view
-      const customPermissions = ["experiments:view"];
+      // Simulate a custom role that only has workflows:view
+      const customPermissions = ["workflows:view"];
 
       // Should only be able to access view
       expect(
-        hasPermissionWithHierarchy(customPermissions, "experiments:view"),
+        hasPermissionWithHierarchy(customPermissions, "workflows:view"),
       ).toBe(true);
       expect(
-        hasPermissionWithHierarchy(customPermissions, "experiments:manage"),
+        hasPermissionWithHierarchy(customPermissions, "workflows:manage"),
       ).toBe(false);
     });
 
     it("should simulate custom role with mixed permissions", () => {
       // Simulate a custom role with mixed permissions
       const customPermissions = [
-        "experiments:manage",
+        "workflows:manage",
         "datasets:view",
         "analytics:manage",
       ];
 
       // Should work correctly for each permission type
       expect(
-        hasPermissionWithHierarchy(customPermissions, "experiments:view"),
+        hasPermissionWithHierarchy(customPermissions, "workflows:view"),
       ).toBe(true);
       expect(
-        hasPermissionWithHierarchy(customPermissions, "experiments:manage"),
+        hasPermissionWithHierarchy(customPermissions, "workflows:manage"),
       ).toBe(true);
       expect(
         hasPermissionWithHierarchy(customPermissions, "datasets:view"),
@@ -325,12 +325,10 @@ describe("RBAC Permission System", () => {
     });
 
     it("should handle malformed permission strings", () => {
-      const permissions = ["experiments:manage"];
+      const permissions = ["workflows:manage"];
 
       // Should not match malformed strings
-      expect(hasPermissionWithHierarchy(permissions, "experiments:")).toBe(
-        false,
-      );
+      expect(hasPermissionWithHierarchy(permissions, "workflows:")).toBe(false);
       expect(hasPermissionWithHierarchy(permissions, ":view")).toBe(false);
       expect(hasPermissionWithHierarchy(permissions, "experiments")).toBe(
         false,
@@ -338,13 +336,13 @@ describe("RBAC Permission System", () => {
     });
 
     it("should handle case sensitivity", () => {
-      const permissions = ["experiments:manage"];
+      const permissions = ["workflows:manage"];
 
       // Should be case sensitive
-      expect(hasPermissionWithHierarchy(permissions, "Experiments:view")).toBe(
+      expect(hasPermissionWithHierarchy(permissions, "Evaluations:view")).toBe(
         false,
       );
-      expect(hasPermissionWithHierarchy(permissions, "EXPERIMENTS:VIEW")).toBe(
+      expect(hasPermissionWithHierarchy(permissions, "EVALUATIONS:VIEW")).toBe(
         false,
       );
     });
@@ -353,21 +351,21 @@ describe("RBAC Permission System", () => {
   describe("Permission Helper Functions", () => {
     describe("canView", () => {
       it("should return true for ADMIN role on all resources", () => {
-        expect(canView(TeamUserRole.ADMIN, Resources.EXPERIMENTS)).toBe(true);
+        expect(canView(TeamUserRole.ADMIN, Resources.EVALUATIONS)).toBe(true);
         expect(canView(TeamUserRole.ADMIN, Resources.DATASETS)).toBe(true);
         expect(canView(TeamUserRole.ADMIN, Resources.ANALYTICS)).toBe(true);
         expect(canView(TeamUserRole.ADMIN, Resources.TRACES)).toBe(true);
       });
 
       it("should return true for MEMBER role on all resources", () => {
-        expect(canView(TeamUserRole.MEMBER, Resources.EXPERIMENTS)).toBe(true);
+        expect(canView(TeamUserRole.MEMBER, Resources.EVALUATIONS)).toBe(true);
         expect(canView(TeamUserRole.MEMBER, Resources.DATASETS)).toBe(true);
         expect(canView(TeamUserRole.MEMBER, Resources.ANALYTICS)).toBe(true);
         expect(canView(TeamUserRole.MEMBER, Resources.TRACES)).toBe(true);
       });
 
       it("should return true for VIEWER role on most resources", () => {
-        expect(canView(TeamUserRole.VIEWER, Resources.EXPERIMENTS)).toBe(true);
+        expect(canView(TeamUserRole.VIEWER, Resources.EVALUATIONS)).toBe(true);
         expect(canView(TeamUserRole.VIEWER, Resources.DATASETS)).toBe(true);
         expect(canView(TeamUserRole.VIEWER, Resources.ANALYTICS)).toBe(true);
         expect(canView(TeamUserRole.VIEWER, Resources.TRACES)).toBe(true);
@@ -380,7 +378,7 @@ describe("RBAC Permission System", () => {
 
     describe("canManage", () => {
       it("should return true for ADMIN role on all resources", () => {
-        expect(canManage(TeamUserRole.ADMIN, Resources.EXPERIMENTS)).toBe(true);
+        expect(canManage(TeamUserRole.ADMIN, Resources.EVALUATIONS)).toBe(true);
         expect(canManage(TeamUserRole.ADMIN, Resources.DATASETS)).toBe(true);
         expect(canManage(TeamUserRole.ADMIN, Resources.ANALYTICS)).toBe(true);
         // Traces only has view and share, not manage
@@ -388,7 +386,7 @@ describe("RBAC Permission System", () => {
       });
 
       it("should return true for MEMBER role on most resources", () => {
-        expect(canManage(TeamUserRole.MEMBER, Resources.EXPERIMENTS)).toBe(
+        expect(canManage(TeamUserRole.MEMBER, Resources.EVALUATIONS)).toBe(
           true,
         );
         expect(canManage(TeamUserRole.MEMBER, Resources.DATASETS)).toBe(true);
@@ -402,7 +400,7 @@ describe("RBAC Permission System", () => {
       });
 
       it("should return false for VIEWER role on all resources", () => {
-        expect(canManage(TeamUserRole.VIEWER, Resources.EXPERIMENTS)).toBe(
+        expect(canManage(TeamUserRole.VIEWER, Resources.EVALUATIONS)).toBe(
           false,
         );
         expect(canManage(TeamUserRole.VIEWER, Resources.DATASETS)).toBe(false);
@@ -463,8 +461,8 @@ describe("RBAC Permission System", () => {
         expect(permissions).toContain("project:update");
         expect(permissions).toContain("project:delete");
         expect(permissions).toContain("project:manage");
-        expect(permissions).toContain("experiments:view");
-        expect(permissions).toContain("experiments:manage");
+        expect(permissions).toContain("workflows:view");
+        expect(permissions).toContain("workflows:manage");
         expect(permissions).toContain("team:manage");
       });
 
@@ -475,8 +473,8 @@ describe("RBAC Permission System", () => {
         expect(permissions).not.toContain("project:create");
         expect(permissions).not.toContain("project:delete");
         expect(permissions).not.toContain("project:manage");
-        expect(permissions).toContain("experiments:view");
-        expect(permissions).toContain("experiments:manage");
+        expect(permissions).toContain("workflows:view");
+        expect(permissions).toContain("workflows:manage");
         expect(permissions).not.toContain("team:manage");
       });
 
@@ -487,8 +485,8 @@ describe("RBAC Permission System", () => {
         expect(permissions).not.toContain("project:update");
         expect(permissions).not.toContain("project:delete");
         expect(permissions).not.toContain("project:manage");
-        expect(permissions).toContain("experiments:view");
-        expect(permissions).not.toContain("experiments:manage");
+        expect(permissions).toContain("workflows:view");
+        expect(permissions).not.toContain("workflows:manage");
         expect(permissions).not.toContain("team:manage");
       });
     });
@@ -566,8 +564,7 @@ describe("RBAC Permission System", () => {
       expect(Resources.TRACES).toBe("traces");
       expect(Resources.SCENARIOS).toBe("scenarios");
       expect(Resources.ANNOTATIONS).toBe("annotations");
-      expect(Resources.GUARDRAILS).toBe("guardrails");
-      expect(Resources.EXPERIMENTS).toBe("experiments");
+      expect(Resources.EVALUATIONS).toBe("evaluations");
       expect(Resources.DATASETS).toBe("datasets");
       expect(Resources.TRIGGERS).toBe("triggers");
       expect(Resources.WORKFLOWS).toBe("workflows");
@@ -587,8 +584,8 @@ describe("RBAC Permission System", () => {
 
   describe("Permission Type Safety", () => {
     it("should create valid permission strings", () => {
-      const permission: Permission = `${Resources.EXPERIMENTS}:${Actions.VIEW}`;
-      expect(permission).toBe("experiments:view");
+      const permission: Permission = `${Resources.WORKFLOWS}:${Actions.VIEW}`;
+      expect(permission).toBe("workflows:view");
 
       const managePermission: Permission = `${Resources.DATASETS}:${Actions.MANAGE}`;
       expect(managePermission).toBe("datasets:manage");
@@ -596,7 +593,7 @@ describe("RBAC Permission System", () => {
 
     it("should validate permission format", () => {
       const validPermissions: Permission[] = [
-        "experiments:view",
+        "workflows:view",
         "datasets:manage",
         "analytics:create",
         "traces:share",
@@ -621,8 +618,8 @@ describe("RBAC Permission System", () => {
       expect(adminPermissions).toContain("project:manage");
 
       // Should have manage permissions for other resources (which include CRUD via hierarchy)
-      expect(adminPermissions).toContain("experiments:view");
-      expect(adminPermissions).toContain("experiments:manage");
+      expect(adminPermissions).toContain("workflows:view");
+      expect(adminPermissions).toContain("workflows:manage");
       expect(adminPermissions).toContain("datasets:view");
       expect(adminPermissions).toContain("datasets:manage");
     });
@@ -631,7 +628,7 @@ describe("RBAC Permission System", () => {
       const memberPermissions = getTeamRolePermissions(TeamUserRole.MEMBER);
 
       // Should have manage permissions for most resources
-      expect(memberPermissions).toContain("experiments:manage");
+      expect(memberPermissions).toContain("workflows:manage");
       expect(memberPermissions).toContain("datasets:manage");
       expect(memberPermissions).toContain("analytics:manage");
 
@@ -647,11 +644,11 @@ describe("RBAC Permission System", () => {
       const viewerPermissions = getTeamRolePermissions(TeamUserRole.VIEWER);
 
       // Should only have view permissions
-      expect(viewerPermissions).toContain("experiments:view");
-      expect(viewerPermissions).not.toContain("experiments:create");
-      expect(viewerPermissions).not.toContain("experiments:update");
-      expect(viewerPermissions).not.toContain("experiments:delete");
-      expect(viewerPermissions).not.toContain("experiments:manage");
+      expect(viewerPermissions).toContain("workflows:view");
+      expect(viewerPermissions).not.toContain("workflows:create");
+      expect(viewerPermissions).not.toContain("workflows:update");
+      expect(viewerPermissions).not.toContain("workflows:delete");
+      expect(viewerPermissions).not.toContain("workflows:manage");
 
       expect(viewerPermissions).toContain("datasets:view");
       expect(viewerPermissions).not.toContain("datasets:create");

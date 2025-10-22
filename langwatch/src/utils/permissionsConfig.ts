@@ -14,8 +14,6 @@ export const orderedResources: Resource[] = [
   Resources.SCENARIOS,
   Resources.ANNOTATIONS,
   Resources.ANALYTICS,
-  Resources.GUARDRAILS,
-  Resources.EXPERIMENTS,
   Resources.EVALUATIONS,
   Resources.DATASETS,
   Resources.TRIGGERS,

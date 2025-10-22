@@ -57,7 +57,7 @@ const teamPermissions: Record<string, Record<string, TeamUserRole[]>> = {
     view: [TeamUserRole.ADMIN, TeamUserRole.MEMBER, TeamUserRole.VIEWER],
     manage: [TeamUserRole.ADMIN, TeamUserRole.MEMBER],
   },
-  experiments: {
+  workflows: {
     view: [TeamUserRole.ADMIN, TeamUserRole.MEMBER, TeamUserRole.VIEWER],
     manage: [TeamUserRole.ADMIN, TeamUserRole.MEMBER],
   },
@@ -109,6 +109,9 @@ export const teamRolePermissionMapping: Record<string, TeamUserRole[]> = {
   // Guardrails permissions
   GUARDRAILS_VIEW: teamPermissions.guardrails!.view!,
   GUARDRAILS_MANAGE: teamPermissions.guardrails!.manage!,
+
+  EVALUATIONS_VIEW: teamPermissions.evaluations!.view!,
+  EVALUATIONS_MANAGE: teamPermissions.evaluations!.manage!,
 
   // Experiments permissions
   EXPERIMENTS_VIEW: teamPermissions.experiments!.view!,
@@ -448,15 +451,11 @@ export const LEGACY_TO_RBAC_MAPPING: Partial<
   MESSAGES_SHARE: "traces:share",
   ANNOTATIONS_VIEW: "annotations:view",
   ANNOTATIONS_MANAGE: "annotations:manage",
-  GUARDRAILS_VIEW: "guardrails:view",
-  GUARDRAILS_MANAGE: "guardrails:manage",
-  EXPERIMENTS_VIEW: "experiments:view",
-  EXPERIMENTS_MANAGE: "experiments:manage",
+  WORKFLOWS_VIEW: "workflows:view",
+  WORKFLOWS_MANAGE: "workflows:manage",
   DATASETS_VIEW: "datasets:view",
   DATASETS_MANAGE: "datasets:manage",
   TRIGGERS_MANAGE: "triggers:manage",
-  WORKFLOWS_VIEW: "workflows:view",
-  WORKFLOWS_MANAGE: "workflows:manage",
   PROMPTS_VIEW: "prompts:view",
   PROMPTS_MANAGE: "prompts:manage",
   TEAM_MEMBERS_MANAGE: "team:manage",

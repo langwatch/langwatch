@@ -37,9 +37,7 @@ export const Resources = {
   TRACES: "traces",
   SCENARIOS: "scenarios",
   ANNOTATIONS: "annotations",
-  GUARDRAILS: "guardrails",
   EVALUATIONS: "evaluations",
-  EXPERIMENTS: "experiments",
   DATASETS: "datasets",
   TRIGGERS: "triggers",
   WORKFLOWS: "workflows",
@@ -82,15 +80,12 @@ const TEAM_ROLE_PERMISSIONS: Record<TeamUserRole, Permission[]> = {
     // Annotations
     "annotations:view",
     "annotations:manage",
-    // Guardrails
-    "guardrails:view",
-    "guardrails:manage",
     // Evaluations
     "evaluations:view",
     "evaluations:manage",
-    // Experiments
-    "experiments:view",
-    "experiments:manage",
+    // Workflows
+    "workflows:view",
+    "workflows:manage",
     // Datasets
     "datasets:view",
     "datasets:manage",
@@ -125,15 +120,12 @@ const TEAM_ROLE_PERMISSIONS: Record<TeamUserRole, Permission[]> = {
     // Annotations
     "annotations:view",
     "annotations:manage",
-    // Guardrails
-    "guardrails:view",
-    "guardrails:manage",
     // Evaluations
     "evaluations:view",
     "evaluations:manage",
-    // Experiments
-    "experiments:view",
-    "experiments:manage",
+    // Workflows
+    "workflows:view",
+    "workflows:manage",
     // Datasets
     "datasets:view",
     "datasets:manage",
@@ -161,12 +153,8 @@ const TEAM_ROLE_PERMISSIONS: Record<TeamUserRole, Permission[]> = {
     "traces:view",
     // Annotations
     "annotations:view",
-    // Guardrails
-    "guardrails:view",
     // Evaluations
     "evaluations:view",
-    // Experiments
-    "experiments:view",
     // Datasets
     "datasets:view",
     // Workflows
@@ -558,9 +546,8 @@ const DEMO_VIEW_PERMISSIONS: Permission[] = [
   "cost:view",
   "traces:view",
   "annotations:view",
-  "guardrails:view",
-  "experiments:view",
   "datasets:view",
+  "evaluations:view",
   "workflows:view",
   "prompts:view",
   "scenarios:view",

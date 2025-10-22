@@ -90,7 +90,7 @@ describe.skip("Role Management API Tests", () => {
             id: "role-2",
             name: "Experiment Manager",
             description: "Can manage experiments",
-            permissions: ["experiments:manage"],
+            permissions: ["workflows:manage"],
             organizationId: "org-123",
             createdAt: new Date(),
             updatedAt: new Date(),

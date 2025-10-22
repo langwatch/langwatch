@@ -52,8 +52,8 @@ describe("Demo Project and Public Sharing Tests", () => {
         "cost:view",
         "traces:view",
         "annotations:view",
-        "guardrails:view",
-        "experiments:view",
+        "evaluations:view",
+        "workflows:view",
         "datasets:view",
         "workflows:view",
         "prompts:view",
@@ -77,8 +77,8 @@ describe("Demo Project and Public Sharing Tests", () => {
         "analytics:manage",
         "traces:manage",
         "annotations:manage",
-        "guardrails:manage",
-        "experiments:manage",
+        "evaluations:manage",
+        "workflows:manage",
         "datasets:manage",
         "workflows:manage",
         "prompts:manage",
@@ -98,7 +98,7 @@ describe("Demo Project and Public Sharing Tests", () => {
     it("should not allow create permissions for demo project", async () => {
       const createPermissions = [
         "project:create",
-        "experiments:create",
+        "workflows:create",
         "datasets:create",
         "workflows:create",
         "prompts:create",
@@ -118,7 +118,7 @@ describe("Demo Project and Public Sharing Tests", () => {
     it("should not allow update permissions for demo project", async () => {
       const updatePermissions = [
         "project:update",
-        "experiments:update",
+        "workflows:update",
         "datasets:update",
         "workflows:update",
         "prompts:update",
@@ -138,7 +138,7 @@ describe("Demo Project and Public Sharing Tests", () => {
     it("should not allow delete permissions for demo project", async () => {
       const deletePermissions = [
         "project:delete",
-        "experiments:delete",
+        "workflows:delete",
         "datasets:delete",
         "workflows:delete",
         "prompts:delete",
@@ -243,7 +243,7 @@ describe("Demo Project and Public Sharing Tests", () => {
       mockPrisma.teamUserCustomRole.findFirst.mockResolvedValue(null);
 
       const middleware = checkPermissionOrPubliclyShared(
-        checkProjectPermission("experiments:view" as Permission),
+        checkProjectPermission("workflows:view" as Permission),
         { resourceType: "TRACE", resourceParam: "traceId" },
       );
 
@@ -274,7 +274,7 @@ describe("Demo Project and Public Sharing Tests", () => {
       });
 
       const middleware = checkPermissionOrPubliclyShared(
-        checkProjectPermission("experiments:view" as Permission),
+        checkProjectPermission("workflows:view" as Permission),
         { resourceType: "TRACE", resourceParam: "traceId" },
       );
 
@@ -301,7 +301,7 @@ describe("Demo Project and Public Sharing Tests", () => {
       mockPrisma.publicShare.findFirst.mockResolvedValue(null);
 
       const middleware = checkPermissionOrPubliclyShared(
-        checkProjectPermission("experiments:view" as Permission),
+        checkProjectPermission("workflows:view" as Permission),
         { resourceType: "TRACE", resourceParam: "traceId" },
       );
 
@@ -333,7 +333,7 @@ describe("Demo Project and Public Sharing Tests", () => {
         });
 
         const middleware = checkPermissionOrPubliclyShared(
-          checkProjectPermission("experiments:view" as Permission),
+          checkProjectPermission("workflows:view" as Permission),
           { resourceType: resourceType as any, resourceParam: "resourceId" },
         );
 
@@ -364,7 +364,7 @@ describe("Demo Project and Public Sharing Tests", () => {
       });
 
       const middleware = checkPermissionOrPubliclyShared(
-        checkProjectPermission("experiments:view" as Permission),
+        checkProjectPermission("workflows:view" as Permission),
         {
           resourceType: (input: any) => input.resourceType || "TRACE",
           resourceParam: "traceId",
@@ -391,7 +391,7 @@ describe("Demo Project and Public Sharing Tests", () => {
       );
 
       const middleware = checkPermissionOrPubliclyShared(
-        checkProjectPermission("experiments:view" as Permission),
+        checkProjectPermission("workflows:view" as Permission),
         { resourceType: "TRACE", resourceParam: "traceId" },
       );
 
@@ -418,7 +418,7 @@ describe("Demo Project and Public Sharing Tests", () => {
       );
 
       const middleware = checkPermissionOrPubliclyShared(
-        checkProjectPermission("experiments:view" as Permission),
+        checkProjectPermission("workflows:view" as Permission),
         { resourceType: "TRACE", resourceParam: "traceId" },
       );
 
@@ -521,7 +521,7 @@ describe("Demo Project and Public Sharing Tests", () => {
       mockPrisma.publicShare.findFirst.mockResolvedValue(null);
 
       const middleware = checkPermissionOrPubliclyShared(
-        checkProjectPermission("experiments:view" as Permission),
+        checkProjectPermission("workflows:view" as Permission),
         { resourceType: "TRACE", resourceParam: "traceId" },
       );
 
@@ -546,7 +546,7 @@ describe("Demo Project and Public Sharing Tests", () => {
       mockPrisma.publicShare.findFirst.mockResolvedValue(undefined);
 
       const middleware = checkPermissionOrPubliclyShared(
-        checkProjectPermission("experiments:view" as Permission),
+        checkProjectPermission("workflows:view" as Permission),
         { resourceType: "TRACE", resourceParam: "traceId" },
       );
 
@@ -569,7 +569,7 @@ describe("Demo Project and Public Sharing Tests", () => {
       });
 
       const middleware = checkPermissionOrPubliclyShared(
-        checkProjectPermission("experiments:view" as Permission),
+        checkProjectPermission("workflows:view" as Permission),
         { resourceType: "TRACE", resourceParam: "traceId" },
       );
 
@@ -592,7 +592,7 @@ describe("Demo Project and Public Sharing Tests", () => {
       });
 
       const middleware = checkPermissionOrPubliclyShared(
-        checkProjectPermission("experiments:view" as Permission),
+        checkProjectPermission("workflows:view" as Permission),
         { resourceType: "TRACE", resourceParam: "traceId" },
       );
 
@@ -645,7 +645,7 @@ describe("Demo Project and Public Sharing Tests", () => {
       });
 
       const middleware = checkPermissionOrPubliclyShared(
-        checkProjectPermission("experiments:view" as Permission),
+        checkProjectPermission("workflows:view" as Permission),
         { resourceType: "TRACE", resourceParam: "traceId" },
       );
 

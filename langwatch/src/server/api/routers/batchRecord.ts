@@ -7,7 +7,7 @@ import { TRPCError } from "@trpc/server";
 export const batchRecordRouter = createTRPCRouter({
   getAllByexperimentIdGroup: protectedProcedure
     .input(z.object({ projectId: z.string() }))
-    .use(checkProjectPermission("experiments:view"))
+    .use(checkProjectPermission("workflows:view"))
     .query(async ({ input, ctx }) => {
       const { projectId } = input;
       const prisma = ctx.prisma;
@@ -30,7 +30,7 @@ export const batchRecordRouter = createTRPCRouter({
     }),
   getAllByexperimentSlug: protectedProcedure
     .input(z.object({ projectId: z.string(), experimentSlug: z.string() }))
-    .use(checkProjectPermission("experiments:view"))
+    .use(checkProjectPermission("workflows:view"))
     .query(async ({ input, ctx }) => {
       const { projectId, experimentSlug } = input;
       const prisma = ctx.prisma;

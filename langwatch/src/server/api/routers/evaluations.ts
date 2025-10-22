@@ -14,7 +14,7 @@ import { getUserProtectionsForProject } from "../utils";
 export const evaluationsRouter = createTRPCRouter({
   availableEvaluators: protectedProcedure
     .input(z.object({ projectId: z.string() }))
-    .use(checkProjectPermission("guardrails:view"))
+    .use(checkProjectPermission("evaluations:view"))
     .query(async () => {
       return Object.fromEntries(
         Object.entries(AVAILABLE_EVALUATORS).map(([key, evaluator]) => [
@@ -31,7 +31,7 @@ export const evaluationsRouter = createTRPCRouter({
 
   availableCustomEvaluators: protectedProcedure
     .input(z.object({ projectId: z.string() }))
-    .use(checkProjectPermission("guardrails:view"))
+    .use(checkProjectPermission("evaluations:view"))
     .query(async ({ input }) => {
       const customEvaluators = await getCustomEvaluators({
         projectId: input.projectId,
@@ -51,7 +51,7 @@ export const evaluationsRouter = createTRPCRouter({
         mappings: mappingStateSchema,
       }),
     )
-    .use(checkProjectPermission("guardrails:create"))
+    .use(checkProjectPermission("evaluations:manage"))
     .mutation(async ({ input, ctx }) => {
       const protections = await getUserProtectionsForProject(ctx, {
         projectId: input.projectId,

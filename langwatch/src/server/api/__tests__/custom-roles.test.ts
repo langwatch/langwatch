@@ -79,14 +79,14 @@ describe("Custom Role Functionality Tests", () => {
 
       mockPrisma.teamUserCustomRole.findFirst.mockResolvedValue({
         customRole: {
-          permissions: ["experiments:manage"],
+          permissions: ["workflows:manage"],
         },
       });
 
       const result = await hasProjectPermission(
         { prisma: mockPrisma, session: mockSession },
         "project-123",
-        "experiments:view" as Permission,
+        "workflows:view" as Permission,
       );
 
       expect(result).toBe(true);
@@ -103,14 +103,14 @@ describe("Custom Role Functionality Tests", () => {
 
       mockPrisma.teamUserCustomRole.findFirst.mockResolvedValue({
         customRole: {
-          permissions: ["experiments:manage"],
+          permissions: ["workflows:manage"],
         },
       });
 
       const result = await hasProjectPermission(
         { prisma: mockPrisma, session: mockSession },
         "project-123",
-        "experiments:create" as Permission,
+        "workflows:create" as Permission,
       );
 
       expect(result).toBe(true);
@@ -127,14 +127,14 @@ describe("Custom Role Functionality Tests", () => {
 
       mockPrisma.teamUserCustomRole.findFirst.mockResolvedValue({
         customRole: {
-          permissions: ["experiments:manage"],
+          permissions: ["workflows:manage"],
         },
       });
 
       const result = await hasProjectPermission(
         { prisma: mockPrisma, session: mockSession },
         "project-123",
-        "experiments:update" as Permission,
+        "workflows:update" as Permission,
       );
 
       expect(result).toBe(true);
@@ -151,14 +151,14 @@ describe("Custom Role Functionality Tests", () => {
 
       mockPrisma.teamUserCustomRole.findFirst.mockResolvedValue({
         customRole: {
-          permissions: ["experiments:manage"],
+          permissions: ["workflows:manage"],
         },
       });
 
       const result = await hasProjectPermission(
         { prisma: mockPrisma, session: mockSession },
         "project-123",
-        "experiments:delete" as Permission,
+        "workflows:delete" as Permission,
       );
 
       expect(result).toBe(true);
@@ -175,14 +175,14 @@ describe("Custom Role Functionality Tests", () => {
 
       mockPrisma.teamUserCustomRole.findFirst.mockResolvedValue({
         customRole: {
-          permissions: ["experiments:view"],
+          permissions: ["workflows:view"],
         },
       });
 
       const result = await hasProjectPermission(
         { prisma: mockPrisma, session: mockSession },
         "project-123",
-        "experiments:manage" as Permission,
+        "workflows:manage" as Permission,
       );
 
       expect(result).toBe(false);
@@ -202,7 +202,7 @@ describe("Custom Role Functionality Tests", () => {
       mockPrisma.teamUserCustomRole.findFirst.mockResolvedValue({
         customRole: {
           permissions: [
-            "experiments:manage",
+            "workflows:manage",
             "datasets:view",
             "analytics:manage",
             "traces:share",
@@ -211,12 +211,12 @@ describe("Custom Role Functionality Tests", () => {
         },
       });
 
-      // Should have experiments:manage -> can access all experiments permissions
+      // Should have workflows:manage -> can access all workflows permissions
       expect(
         await hasProjectPermission(
           { prisma: mockPrisma, session: mockSession },
           "project-123",
-          "experiments:view" as Permission,
+          "workflows:view" as Permission,
         ),
       ).toBe(true);
 
@@ -224,7 +224,7 @@ describe("Custom Role Functionality Tests", () => {
         await hasProjectPermission(
           { prisma: mockPrisma, session: mockSession },
           "project-123",
-          "experiments:create" as Permission,
+          "workflows:create" as Permission,
         ),
       ).toBe(true);
 
@@ -232,7 +232,7 @@ describe("Custom Role Functionality Tests", () => {
         await hasProjectPermission(
           { prisma: mockPrisma, session: mockSession },
           "project-123",
-          "experiments:update" as Permission,
+          "workflows:update" as Permission,
         ),
       ).toBe(true);
 
@@ -240,7 +240,7 @@ describe("Custom Role Functionality Tests", () => {
         await hasProjectPermission(
           { prisma: mockPrisma, session: mockSession },
           "project-123",
-          "experiments:delete" as Permission,
+          "workflows:delete" as Permission,
         ),
       ).toBe(true);
 
@@ -248,7 +248,7 @@ describe("Custom Role Functionality Tests", () => {
         await hasProjectPermission(
           { prisma: mockPrisma, session: mockSession },
           "project-123",
-          "experiments:manage" as Permission,
+          "workflows:manage" as Permission,
         ),
       ).toBe(true);
 
@@ -331,10 +331,10 @@ describe("Custom Role Functionality Tests", () => {
       const result = await hasProjectPermission(
         { prisma: mockPrisma, session: mockSession },
         "project-123",
-        "experiments:view" as Permission,
+        "workflows:view" as Permission,
       );
 
-      // Should fall back to built-in role (VIEWER can view experiments)
+      // Should fall back to built-in role (VIEWER can view workflows)
       expect(result).toBe(true);
     });
 
@@ -349,7 +349,7 @@ describe("Custom Role Functionality Tests", () => {
 
       mockPrisma.teamUserCustomRole.findFirst.mockResolvedValue({
         customRole: {
-          permissions: ["invalid-permission", "experiments:view"],
+          permissions: ["invalid-permission", "workflows:view"],
         },
       });
 
@@ -357,7 +357,7 @@ describe("Custom Role Functionality Tests", () => {
       const result = await hasProjectPermission(
         { prisma: mockPrisma, session: mockSession },
         "project-123",
-        "experiments:view" as Permission,
+        "workflows:view" as Permission,
       );
 
       expect(result).toBe(true);
@@ -379,7 +379,7 @@ describe("Custom Role Functionality Tests", () => {
       const result = await hasProjectPermission(
         { prisma: mockPrisma, session: mockSession },
         "project-123",
-        "experiments:view" as Permission,
+        "workflows:view" as Permission,
       );
 
       expect(result).toBe(true);
@@ -403,7 +403,7 @@ describe("Custom Role Functionality Tests", () => {
       const result = await hasProjectPermission(
         { prisma: mockPrisma, session: mockSession },
         "project-123",
-        "experiments:view" as Permission,
+        "workflows:view" as Permission,
       );
 
       expect(result).toBe(true); // Falls back to built-in role
@@ -424,7 +424,7 @@ describe("Custom Role Functionality Tests", () => {
       const result = await hasProjectPermission(
         { prisma: mockPrisma, session: mockSession },
         "project-123",
-        "experiments:view" as Permission,
+        "workflows:view" as Permission,
       );
 
       expect(result).toBe(true); // Falls back to built-in role
@@ -432,7 +432,7 @@ describe("Custom Role Functionality Tests", () => {
 
     it("should handle permission hierarchy with custom roles", () => {
       const customPermissions = [
-        "experiments:manage",
+        "workflows:manage",
         "datasets:view",
         "analytics:create",
         "traces:share",
@@ -440,19 +440,19 @@ describe("Custom Role Functionality Tests", () => {
 
       // Test hierarchy rules
       expect(
-        hasPermissionWithHierarchy(customPermissions, "experiments:view"),
+        hasPermissionWithHierarchy(customPermissions, "workflows:view"),
       ).toBe(true);
       expect(
-        hasPermissionWithHierarchy(customPermissions, "experiments:create"),
+        hasPermissionWithHierarchy(customPermissions, "workflows:create"),
       ).toBe(true);
       expect(
-        hasPermissionWithHierarchy(customPermissions, "experiments:update"),
+        hasPermissionWithHierarchy(customPermissions, "workflows:update"),
       ).toBe(true);
       expect(
-        hasPermissionWithHierarchy(customPermissions, "experiments:delete"),
+        hasPermissionWithHierarchy(customPermissions, "workflows:delete"),
       ).toBe(true);
       expect(
-        hasPermissionWithHierarchy(customPermissions, "experiments:manage"),
+        hasPermissionWithHierarchy(customPermissions, "workflows:manage"),
       ).toBe(true);
 
       expect(
@@ -488,7 +488,7 @@ describe("Custom Role Functionality Tests", () => {
 
       // Should be case sensitive
       expect(
-        hasPermissionWithHierarchy(customPermissions, "experiments:manage"),
+        hasPermissionWithHierarchy(customPermissions, "workflows:manage"),
       ).toBe(false);
       expect(
         hasPermissionWithHierarchy(customPermissions, "datasets:view"),
@@ -503,28 +503,28 @@ describe("Custom Role Functionality Tests", () => {
 
     it("should handle malformed permission strings in custom roles", () => {
       const customPermissions = [
-        "experiments:manage",
+        "workflows:manage",
         "invalid-permission",
         ":view",
-        "experiments:",
-        "experiments",
+        "workflows:",
+        "workflows",
       ];
 
       // Should only work with valid permissions
       expect(
-        hasPermissionWithHierarchy(customPermissions, "experiments:view"),
+        hasPermissionWithHierarchy(customPermissions, "workflows:view"),
       ).toBe(true);
       expect(
-        hasPermissionWithHierarchy(customPermissions, "experiments:manage"),
+        hasPermissionWithHierarchy(customPermissions, "workflows:manage"),
       ).toBe(true);
       expect(
         hasPermissionWithHierarchy(customPermissions, "invalid-permission"),
       ).toBe(true);
       expect(hasPermissionWithHierarchy(customPermissions, ":view")).toBe(true);
-      expect(
-        hasPermissionWithHierarchy(customPermissions, "experiments:"),
-      ).toBe(true);
-      expect(hasPermissionWithHierarchy(customPermissions, "experiments")).toBe(
+      expect(hasPermissionWithHierarchy(customPermissions, "workflows:")).toBe(
+        true,
+      );
+      expect(hasPermissionWithHierarchy(customPermissions, "workflows")).toBe(
         true,
       );
     });
@@ -533,7 +533,7 @@ describe("Custom Role Functionality Tests", () => {
   describe("Custom Role Validation", () => {
     it("should validate permission format in custom roles", () => {
       const validPermissions = [
-        "experiments:view",
+        "workflows:view",
         "datasets:manage",
         "analytics:create",
         "traces:share",
@@ -541,11 +541,11 @@ describe("Custom Role Functionality Tests", () => {
       ];
 
       const invalidPermissions = [
-        "experiments:",
+        "workflows:",
         ":view",
-        "experiments",
+        "workflows",
         "EXPERIMENTS:VIEW",
-        "experiments:VIEW",
+        "workflows:VIEW",
         "Experiments:view",
       ];
 
@@ -562,10 +562,10 @@ describe("Custom Role Functionality Tests", () => {
       const emptyPermissions: string[] = [];
 
       expect(
-        hasPermissionWithHierarchy(emptyPermissions, "experiments:view"),
+        hasPermissionWithHierarchy(emptyPermissions, "workflows:view"),
       ).toBe(false);
       expect(
-        hasPermissionWithHierarchy(emptyPermissions, "experiments:manage"),
+        hasPermissionWithHierarchy(emptyPermissions, "workflows:manage"),
       ).toBe(false);
     });
 
@@ -573,10 +573,10 @@ describe("Custom Role Functionality Tests", () => {
       const undefinedPermissions = undefined as any;
 
       expect(
-        hasPermissionWithHierarchy(undefinedPermissions, "experiments:view"),
+        hasPermissionWithHierarchy(undefinedPermissions, "workflows:view"),
       ).toBe(false);
       expect(
-        hasPermissionWithHierarchy(undefinedPermissions, "experiments:manage"),
+        hasPermissionWithHierarchy(undefinedPermissions, "workflows:manage"),
       ).toBe(false);
     });
   });

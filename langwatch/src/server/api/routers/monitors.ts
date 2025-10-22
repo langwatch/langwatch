@@ -15,7 +15,7 @@ import { EvaluationExecutionMode } from "@prisma/client";
 export const monitorsRouter = createTRPCRouter({
   getAllForProject: protectedProcedure
     .input(z.object({ projectId: z.string() }))
-    .use(checkProjectPermission("guardrails:view"))
+    .use(checkProjectPermission("evaluations:view"))
     .query(async ({ input, ctx }) => {
       const { projectId } = input;
       const prisma = ctx.prisma;
@@ -31,7 +31,7 @@ export const monitorsRouter = createTRPCRouter({
     .input(
       z.object({ id: z.string(), projectId: z.string(), enabled: z.boolean() }),
     )
-    .use(checkProjectPermission("guardrails:update"))
+    .use(checkProjectPermission("evaluations:manage"))
     .mutation(async ({ input, ctx }) => {
       const { id, enabled, projectId } = input;
       const prisma = ctx.prisma;
@@ -59,7 +59,7 @@ export const monitorsRouter = createTRPCRouter({
         ]),
       }),
     )
-    .use(checkProjectPermission("guardrails:create"))
+    .use(checkProjectPermission("evaluations:manage"))
     .mutation(async ({ input, ctx }) => {
       const {
         projectId,
@@ -111,7 +111,7 @@ export const monitorsRouter = createTRPCRouter({
         ]),
       }),
     )
-    .use(checkProjectPermission("guardrails:update"))
+    .use(checkProjectPermission("evaluations:manage"))
     .mutation(async ({ input, ctx }) => {
       const {
         id,
@@ -149,7 +149,7 @@ export const monitorsRouter = createTRPCRouter({
     }),
   getById: protectedProcedure
     .input(z.object({ id: z.string(), projectId: z.string() }))
-    .use(checkProjectPermission("guardrails:view"))
+    .use(checkProjectPermission("evaluations:view"))
     .query(async ({ input, ctx }) => {
       const { id, projectId } = input;
       const prisma = ctx.prisma;
@@ -169,7 +169,7 @@ export const monitorsRouter = createTRPCRouter({
     }),
   delete: protectedProcedure
     .input(z.object({ id: z.string(), projectId: z.string() }))
-    .use(checkProjectPermission("guardrails:delete"))
+    .use(checkProjectPermission("evaluations:manage"))
     .mutation(async ({ input, ctx }) => {
       const { id, projectId } = input;
       const prisma = ctx.prisma;
@@ -188,7 +188,7 @@ export const monitorsRouter = createTRPCRouter({
         name: z.string(),
       }),
     )
-    .use(checkProjectPermission("guardrails:view"))
+    .use(checkProjectPermission("evaluations:view"))
     .mutation(async ({ input, ctx }) => {
       const { projectId, name } = input;
       const prisma = ctx.prisma;
