@@ -208,7 +208,7 @@ export default function Users() {
   if (!hasAnalyticsViewPermission) {
     return (
       <GraphsLayout>
-        <PermissionAlert message="You don't have permission to view analytics. Contact your team administrator to request access." />
+        <PermissionAlert permission="analytics:view" />
       </GraphsLayout>
     );
   }

@@ -17,7 +17,7 @@ export function PermissionAlert({
   message,
   alertProps = {},
 }: PermissionAlertProps) {
-  const defaultMessage = `You don't have permission to view this content.`;
+  const defaultMessage = `You don't have permission to view this content. Ask your team administrator to request access.`;
   const alertMessage = message ?? defaultMessage;
 
   return (

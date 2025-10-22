@@ -37,6 +37,22 @@ export type TeamWithProjects = Team & {
 
 export type TeamWithProjectsAndMembers = TeamWithProjects & {
   members: TeamUser[];
+  customRoleMembers: Array<{
+    userId: string;
+    teamId: string;
+    customRoleId: string;
+    customRole: {
+      id: string;
+      name: string;
+      description: string | null;
+      permissions: string[];
+    };
+    user: {
+      id: string;
+      name: string | null;
+      email: string;
+    };
+  }>;
 };
 
 export type OrganizationFeature = {

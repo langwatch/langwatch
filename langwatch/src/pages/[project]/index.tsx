@@ -107,7 +107,7 @@ function Index() {
     return (
       <GraphsLayout>
         <PermissionAlert
-          message="You don't have permission to view analytics. Contact your team administrator to request access."
+          permission="analytics:view"
           alertProps={{ marginBottom: 6 }}
         />
       </GraphsLayout>
