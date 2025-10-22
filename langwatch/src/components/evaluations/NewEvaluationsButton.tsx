@@ -7,7 +7,7 @@ import { AskIfUserWantsToContinueDraftDialog } from "./AskIfUserWantsToContinueD
 
 export function NewEvaluationButton() {
   const { project, hasPermission } = useOrganizationTeamProject();
-  const enabled = !!project && hasPermission("guardrails:manage");
+  const enabled = !!project && hasPermission("evaluations:manage");
   const router = useRouter();
   const projectId = project?.id ?? "";
   const { data: lastExperiment } = api.experiments.getLastExperiment.useQuery(
@@ -24,11 +24,13 @@ export function NewEvaluationButton() {
   const isLastExperimentADraft = lastExperiment?.name?.startsWith("Draft");
 
   const openNewEvaluation = () => {
-    router.push(`/${project.slug}/evaluations/wizard`);
+    void router.push(`/${project.slug}/evaluations/wizard`);
   };
 
   const handleContinueDraft = () => {
-    router.push(`/${project.slug}/evaluations/wizard/${lastExperiment?.slug}`);
+    void router.push(
+      `/${project.slug}/evaluations/wizard/${lastExperiment?.slug}`,
+    );
   };
 
   const handleOnClick = () => {

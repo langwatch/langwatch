@@ -174,7 +174,7 @@ export default function EvaluationsV2() {
                         </EmptyState.Indicator>
                         <EmptyState.Title>No evaluations yet</EmptyState.Title>
                         <EmptyState.Description>
-                          {project && hasPermission("guardrails:manage") && (
+                          {project && hasPermission("evaluations:manage") && (
                             <>
                               {" "}
                               Click on{" "}

@@ -261,7 +261,7 @@ export const MonitorsSection = ({ title, monitors }: MonitorsSectionProps) => {
             {monitors.data?.length === 0 && (
               <Text color="gray.600">
                 No real-time monitors or guardrails set up yet.
-                {project && hasPermission("guardrails:manage") && (
+                {project && hasPermission("evaluations:manage") && (
                   <>
                     {" "}
                     Click on{" "}
