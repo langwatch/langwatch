@@ -18,6 +18,7 @@ import type {
 import { addEnvs } from "~/optimization_studio/server/addEnvs";
 import { loadDatasets } from "~/optimization_studio/server/loadDatasets";
 import { studioBackendPostEvent } from "../../workflows/post_event/post-event";
+import type { LLMConfig } from "~/optimization_studio/types/dsl";
 
 const DEFAULT_MODEL = "gpt-4o";
 
@@ -35,6 +36,11 @@ export class PromptStudioAdapter implements CopilotServiceAdapter {
     this.model = params.model ?? DEFAULT_MODEL;
   }
 
+  /**
+   * Process with direct call
+   * @param request
+   * @returns
+   */
   async process(
     request: CopilotRuntimeChatCompletionRequest,
   ): Promise<CopilotRuntimeChatCompletionResponse> {
@@ -43,7 +49,17 @@ export class PromptStudioAdapter implements CopilotServiceAdapter {
       messages,
       forwardedParameters,
       threadId: threadIdFromRequest,
+      // @ts-expect-error - properties is not part of the CopilotRuntimeChatCompletionRequest interface
+      properties,
     } = request;
+
+    console.log({
+      forwardedParameters,
+      threadIdFromRequest,
+      messages,
+      request,
+      properties,
+    });
 
     const threadId = threadIdFromRequest ?? randomUUID();
     const nodeId = "prompt_node";
@@ -55,16 +71,25 @@ export class PromptStudioAdapter implements CopilotServiceAdapter {
     const workflow = this.createWorkflow(
       workflowId,
       nodeId,
-      forwardedParameters?.model || this.model,
+      forwardedParameters?.model
+        ? {
+            model: forwardedParameters.model,
+            temperature: forwardedParameters.temperature,
+            max_tokens: forwardedParameters.maxTokens,
+          }
+        : {
+            model: this.model,
+          },
     );
 
     // Build execute_flow event (inputs must be an array)
     const rawEvent: StudioClientEvent = {
-      type: "execute_flow",
+      type: "execute_component",
       payload: {
         trace_id: traceId,
         workflow,
-        inputs: [{ input }],
+        node_id: nodeId,
+        inputs: { input },
       },
     } as StudioClientEvent;
 
@@ -176,8 +201,11 @@ export class PromptStudioAdapter implements CopilotServiceAdapter {
   private createWorkflow(
     workflowId: string,
     nodeId: string,
-    model: string,
+    llm: LLMConfig,
   ): Workflow {
+    const nodeData = this.defaultSignatureNodeData();
+    nodeData.parameters[0]!.value = llm;
+
     return {
       spec_version: "1.4",
       workflow_id: workflowId,
@@ -186,7 +214,9 @@ export class PromptStudioAdapter implements CopilotServiceAdapter {
       description: "",
       version: "1.0",
       default_llm: {
-        model,
+        model: llm.model,
+        temperature: llm.temperature,
+        max_tokens: llm.max_tokens,
       },
       template_adapter: "default",
       enable_tracing: true,
@@ -194,7 +224,7 @@ export class PromptStudioAdapter implements CopilotServiceAdapter {
         {
           ...LlmSignatureNodeFactory.build({
             id: nodeId,
-            data: this.defaultSignatureNodeData(),
+            data: nodeData,
           }),
           position: { x: 0, y: 0 },
         },
