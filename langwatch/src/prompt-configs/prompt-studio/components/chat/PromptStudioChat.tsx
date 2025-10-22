@@ -1,16 +1,13 @@
 import { CopilotKit } from "@copilotkit/react-core";
 import { CopilotChat } from "@copilotkit/react-ui";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import type { PromptConfigFormValues } from "~/prompt-configs/types";
 
 interface PromptStudioChatProps {
-  parameters: {
-    temperature?: number;
-    model: string;
-    maxTokens?: number;
-  };
+  formValues: PromptConfigFormValues;
 }
 
-export function PromptStudioChat({ parameters }: PromptStudioChatProps) {
+export function PromptStudioChat({ formValues }: PromptStudioChatProps) {
   const { project } = useOrganizationTeamProject();
   return (
     <CopilotKit
@@ -18,11 +15,10 @@ export function PromptStudioChat({ parameters }: PromptStudioChatProps) {
       headers={{
         "X-Auth-Token": project?.apiKey ?? "",
       }}
-      properties={{
-        projectId: project?.id ?? "",
+      forwardedParameters={{
+        // @ts-expect-error - Total hack
+        model: JSON.stringify(formValues),
       }}
-      threadId="demo"
-      forwardedParameters={parameters}
     >
       <CopilotChat />
     </CopilotKit>

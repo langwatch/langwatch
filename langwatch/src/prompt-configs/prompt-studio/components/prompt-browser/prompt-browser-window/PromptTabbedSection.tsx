@@ -28,13 +28,7 @@ export function PromptTabbedSection() {
         </Tabs.List>
         <Tabs.Content value={PromptTab.Conversation}>
           <Box height="full" width="full" bg="white">
-            <PromptStudioChat
-              parameters={{
-                model: llm.model,
-                temperature: llm.temperature,
-                maxTokens: llm.maxTokens,
-              }}
-            />
+            <PromptStudioChat formValues={form.getValues()} />
           </Box>
         </Tabs.Content>
         <Tabs.Content value={PromptTab.Variables}>

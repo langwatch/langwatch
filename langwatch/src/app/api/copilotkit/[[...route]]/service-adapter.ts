@@ -20,10 +20,10 @@ import { loadDatasets } from "~/optimization_studio/server/loadDatasets";
 import { studioBackendPostEvent } from "../../workflows/post_event/post-event";
 import type { LLMConfig } from "~/optimization_studio/types/dsl";
 import type { ChatMessage } from "~/server/tracer/types";
+import type { PromptConfigFormValues } from "~/prompt-configs/types";
 
 type PromptStudioAdapterParams = {
   projectId: string;
-  model?: string;
 };
 
 export class PromptStudioAdapter implements CopilotServiceAdapter {
@@ -46,18 +46,12 @@ export class PromptStudioAdapter implements CopilotServiceAdapter {
       messages,
       forwardedParameters,
       threadId: threadIdFromRequest,
-      // @ts-expect-error - properties is not part of the CopilotRuntimeChatCompletionRequest interface
-      properties,
     } = request;
 
-    console.log({
-      forwardedParameters,
-      threadIdFromRequest,
-      messages,
-      request,
-      properties,
-    });
-
+    // @ts-expect-error - Total hack
+    const { model } = forwardedParameters;
+    const formValues = JSON.parse(model) as PromptConfigFormValues;
+    console.log(model);
     const threadId = threadIdFromRequest ?? randomUUID();
     const nodeId = "prompt_node";
     const traceId = `trace_${randomUUID()}`;
@@ -67,16 +61,11 @@ export class PromptStudioAdapter implements CopilotServiceAdapter {
     const workflow = this.createWorkflow({
       workflowId,
       nodeId,
-      llm: {
-        model: forwardedParameters?.model ?? "",
-        temperature: forwardedParameters?.temperature ?? 0,
-        max_tokens: forwardedParameters?.maxTokens ?? 0,
-      } as LLMConfig,
-      instructions: "",
-      messages: messages.map((message: any) => ({
+      formValues,
+      messagesHistory: messages.map((message: any) => ({
         role: message.role,
         content: message.content,
-      })) as any,
+      })),
     });
 
     // Build execute_flow event (inputs must be an array)
@@ -201,15 +190,13 @@ export class PromptStudioAdapter implements CopilotServiceAdapter {
   private createWorkflow(params: {
     workflowId: string;
     nodeId: string;
-    llm: LLMConfig;
-    instructions?: string;
-    messages?: ChatMessage[];
+    formValues: PromptConfigFormValues;
+    messagesHistory: ChatMessage[];
   }): Workflow {
-    const { workflowId, nodeId, llm, instructions, messages } = params;
+    const { workflowId, nodeId, formValues, messagesHistory } = params;
     const nodeData = this.buildNodeData({
-      llm,
-      instructions,
-      messages,
+      formValues,
+      messagesHistory,
     });
 
     return {
@@ -220,9 +207,9 @@ export class PromptStudioAdapter implements CopilotServiceAdapter {
       description: "",
       version: "1.0",
       default_llm: {
-        model: llm.model,
-        temperature: llm.temperature,
-        max_tokens: llm.max_tokens,
+        model: formValues.version.configData.llm.model,
+        temperature: formValues.version.configData.llm.temperature,
+        max_tokens: formValues.version.configData.llm.maxTokens,
       },
       template_adapter: "default",
       enable_tracing: true,
@@ -241,10 +228,10 @@ export class PromptStudioAdapter implements CopilotServiceAdapter {
   }
 
   private buildNodeData(params: {
-    llm: LLMConfig;
-    instructions?: string;
-    messages?: ChatMessage[];
+    formValues: PromptConfigFormValues;
+    messagesHistory: ChatMessage[];
   }): Omit<LlmPromptConfigComponent, "configId"> {
+    const { formValues, messagesHistory } = params;
     return {
       name: "LLM Node",
       description: "LLM calling node",
@@ -252,39 +239,31 @@ export class PromptStudioAdapter implements CopilotServiceAdapter {
         {
           identifier: "llm",
           type: "llm",
-          value: params.llm,
+          value: formValues.version.configData.llm,
         },
         {
           identifier: "prompting_technique",
           type: "prompting_technique",
-          value: undefined,
+          value: formValues.version.configData.promptingTechnique ?? undefined,
         },
         {
           identifier: "instructions",
           type: "str",
-          value: params.instructions ?? "",
+          value: formValues.version.configData.prompt ?? "",
         },
         {
           identifier: "messages",
           type: "chat_messages",
-          value: params.messages ?? [],
+          value: messagesHistory,
         },
         {
           identifier: "demonstrations",
           type: "dataset",
-          value: {
-            inline: {
-              records: { input: [], output: [] },
-              columnTypes: [
-                { name: "input", type: "string" },
-                { name: "output", type: "string" },
-              ],
-            },
-          },
+          value: formValues.version.configData.demonstrations ?? undefined,
         },
       ],
-      inputs: [{ identifier: "input", type: "str" }],
-      outputs: [{ identifier: "output", type: "str" }],
+      inputs: formValues.version.configData.inputs,
+      outputs: formValues.version.configData.outputs,
     };
   }
 }
