@@ -14,7 +14,6 @@ enum PromptTab {
  */
 export function PromptTabbedSection() {
   const form = useFormContext<PromptConfigFormValues>();
-  const llm = form.watch("version.configData.llm");
 
   return (
     <Box height="full" width="full" bg="white">

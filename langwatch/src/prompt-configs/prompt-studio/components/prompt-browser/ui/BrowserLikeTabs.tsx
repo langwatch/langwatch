@@ -85,7 +85,7 @@ function BrowserLikeTabsTrigger({
       transition="all 0.15s ease-in-out"
       bg="gray.100"
       color="gray.600"
-      _hover={{ bg: "gray.100" }}
+      _hover={{ bg: "white" }}
       _selected={{
         bg: "white",
         color: "gray.800",
