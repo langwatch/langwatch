@@ -1,7 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { TRPCError } from "@trpc/server";
-// import { roleRouter } from "../routers/role";
-// import { teamRouter } from "../routers/team";
 import { hasOrganizationPermission } from "../rbac";
 
 // Mock the RBAC functions

@@ -278,11 +278,11 @@ export const backendHasTeamProjectPermission = async (
     },
   });
 
-  const teamMember = projectTeam?.team.members.find(
+  const teamMember = projectTeam?.team?.members?.find(
     (member) => member.userId === ctx.session?.user.id,
   );
 
-  if (!projectTeam || !teamMember || projectTeam.team.members.length === 0) {
+  if (!projectTeam?.team || !teamMember) {
     return false;
   }
 
