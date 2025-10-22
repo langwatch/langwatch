@@ -206,6 +206,7 @@ describe("Custom Role Functionality Tests", () => {
             "datasets:view",
             "analytics:manage",
             "traces:share",
+            "traces:view",
           ],
         },
       });
@@ -302,7 +303,7 @@ describe("Custom Role Functionality Tests", () => {
         ),
       ).toBe(true);
 
-      // messages:share doesn't include messages:view, but user has VIEWER role which includes messages:view
+      // User has traces:view permission in custom role
       expect(
         await hasProjectPermission(
           { prisma: mockPrisma, session: mockSession },
@@ -414,7 +415,7 @@ describe("Custom Role Functionality Tests", () => {
           id: "team-123",
           members: [{ userId: "user-123", role: TeamUserRole.VIEWER }],
           defaultRole: null,
- // Null default custom role
+          // Null default custom role
         },
       });
 

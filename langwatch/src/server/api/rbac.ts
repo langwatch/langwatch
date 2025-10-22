@@ -439,8 +439,11 @@ export async function hasProjectPermission(
       | undefined;
     const userPermissions = Array.isArray(rawPermissions) ? rawPermissions : [];
 
-    // If user has custom role, ONLY use custom role permissions (no fallback)
-    return hasPermissionWithHierarchy(userPermissions, permission);
+    // If custom role has permissions, use them; otherwise fall back to built-in role
+    if (userPermissions.length > 0) {
+      return hasPermissionWithHierarchy(userPermissions, permission);
+    }
+    // Fall back to built-in role if custom role has no permissions
   }
 
   // Only fall back to built-in team role if NO custom role exists
