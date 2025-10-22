@@ -10,7 +10,7 @@ export function PromptMessagesEditor() {
     name: "version.configData.messages",
   });
   return (
-    <Box height="full" width="full" bg="white">
+    <Box width="full" bg="white">
       <PromptMessagesField
         // TODO: Since this field needs to be used in the form context, consider not passing this prop
         messageFields={messageFields}
