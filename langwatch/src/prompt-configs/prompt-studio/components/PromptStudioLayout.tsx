@@ -9,7 +9,13 @@ export function PromptStudioLayout() {
     <DashboardLayout position="relative">
       <HStack width="full" height="full" gap={0} position="relative">
         <PromptConfigProvider>
-          <Box position="relative" top={0} left={0} width="400px" height="full">
+          <HStack
+            position="relative"
+            top={0}
+            left={0}
+            width="400px"
+            height="full"
+          >
             <Box
               position="absolute"
               top={0}
@@ -19,7 +25,7 @@ export function PromptStudioLayout() {
             >
               <PromptStudioSidebar />
             </Box>
-          </Box>
+          </HStack>
           <PromptStudioMainContent />
         </PromptConfigProvider>
       </HStack>
