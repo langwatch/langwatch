@@ -45,6 +45,7 @@ export function PromptStudioTabbedWorkspace() {
       {windows.map((window) => (
         <DraggableTabsBrowser.Group
           key={window.id}
+          maxWidth={window.tabs.length > 1 ? "50%" : undefined}
           groupId={window.id}
           activeTabId={window.activeTabId ?? undefined}
           onTabChange={handleTabChange}

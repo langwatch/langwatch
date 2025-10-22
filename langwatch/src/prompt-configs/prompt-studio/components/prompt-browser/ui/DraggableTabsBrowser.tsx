@@ -15,7 +15,7 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { BrowserLikeTabs } from "./BrowserLikeTabs";
-import { HStack } from "@chakra-ui/react";
+import { HStack, type StackProps } from "@chakra-ui/react";
 
 // Context for managing drag state and callbacks
 interface DraggableTabsContextValue {
@@ -176,8 +176,8 @@ function DragOverlayContent({
  *
  * Single Responsibility: Manages a group of tabs with shared state and drop zone
  */
-interface DraggableTabsGroupProps {
-  children: React.ReactNode;
+interface DraggableTabsGroupProps
+  extends Omit<StackProps, "onClick" | "defaultValue"> {
   groupId: string;
   activeTabId?: string;
   onTabChange?: (groupId: string, tabId: string) => void;
@@ -190,6 +190,7 @@ function DraggableTabsGroup({
   activeTabId,
   onTabChange,
   onClick,
+  ...props
 }: DraggableTabsGroupProps) {
   const groupContextValue: TabGroupContextValue = {
     groupId,
@@ -197,12 +198,10 @@ function DraggableTabsGroup({
     onTabChange,
   };
 
-  const childrenCount = React.Children.count(children);
-
   return (
     <TabGroupContext.Provider value={groupContextValue}>
       <BrowserLikeTabs.Root
-        maxWidth={childrenCount > 1 ? "50%" : undefined}
+        {...props}
         value={activeTabId}
         onValueChange={(tabId) => onTabChange?.(groupId, tabId)}
         onClick={() => onClick?.(groupId, activeTabId ?? "")}

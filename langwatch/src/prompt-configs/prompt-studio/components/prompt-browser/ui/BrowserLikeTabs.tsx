@@ -1,11 +1,9 @@
-import { Box, HStack, Tabs, VStack, type StackProps } from "@chakra-ui/react";
+import { HStack, Tabs, VStack, type StackProps } from "@chakra-ui/react";
 
 interface BrowserLikeTabsRootProps extends StackProps {
-  children: React.ReactNode;
   value?: string;
   defaultValue?: string;
   onValueChange?: (value: string) => void;
-  colorPalette?: string;
 }
 
 function BrowserLikeTabsRoot({
