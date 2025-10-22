@@ -68,10 +68,6 @@ const teamPermissions: Record<string, Record<string, TeamUserRole[]>> = {
   triggers: {
     manage: [TeamUserRole.ADMIN, TeamUserRole.MEMBER],
   },
-  workflows: {
-    view: [TeamUserRole.ADMIN, TeamUserRole.MEMBER, TeamUserRole.VIEWER],
-    manage: [TeamUserRole.ADMIN, TeamUserRole.MEMBER],
-  },
   prompts: {
     view: [TeamUserRole.ADMIN, TeamUserRole.MEMBER, TeamUserRole.VIEWER],
     manage: [TeamUserRole.ADMIN, TeamUserRole.MEMBER],
@@ -110,12 +106,8 @@ export const teamRolePermissionMapping: Record<string, TeamUserRole[]> = {
   GUARDRAILS_VIEW: teamPermissions.guardrails!.view!,
   GUARDRAILS_MANAGE: teamPermissions.guardrails!.manage!,
 
-  EVALUATIONS_VIEW: teamPermissions.evaluations!.view!,
-  EVALUATIONS_MANAGE: teamPermissions.evaluations!.manage!,
-
-  // Experiments permissions
-  EXPERIMENTS_VIEW: teamPermissions.experiments!.view!,
-  EXPERIMENTS_MANAGE: teamPermissions.experiments!.manage!,
+  WORKFLOWS_VIEW: teamPermissions.workflows!.view!,
+  WORKFLOWS_MANAGE: teamPermissions.workflows!.manage!,
 
   // Datasets permissions
   DATASETS_VIEW: teamPermissions.datasets!.view!,
@@ -126,10 +118,6 @@ export const teamRolePermissionMapping: Record<string, TeamUserRole[]> = {
 
   // Playground permissions
   PLAYGROUND: teamPermissions.playground!.access!,
-
-  // Workflows permissions
-  WORKFLOWS_VIEW: teamPermissions.workflows!.view!,
-  WORKFLOWS_MANAGE: teamPermissions.workflows!.manage!,
 
   // Prompts permissions
   PROMPTS_VIEW: teamPermissions.prompts!.view!,
@@ -183,7 +171,6 @@ export const isDemoProject = (
       roleGroup === TeamRoleGroup.ANNOTATIONS_VIEW ||
       roleGroup === TeamRoleGroup.PLAYGROUND ||
       roleGroup === TeamRoleGroup.PROJECT_VIEW ||
-      roleGroup === TeamRoleGroup.EXPERIMENTS_VIEW ||
       roleGroup === TeamRoleGroup.WORKFLOWS_VIEW ||
       roleGroup === TeamRoleGroup.PROMPTS_VIEW ||
       roleGroup === TeamRoleGroup.SCENARIOS_VIEW)
