@@ -1,5 +1,5 @@
 import { Box } from "@chakra-ui/react";
-import { PromptMessagesField } from "~/prompt-configs/forms/fields/PromptMessagesField";
+import { PromptMessagesField } from "~/prompt-configs/forms/fields/message-history-fields/PromptMessagesField";
 import { useFieldArray, useFormContext } from "react-hook-form";
 import type { PromptConfigFormValues } from "~/prompt-configs";
 

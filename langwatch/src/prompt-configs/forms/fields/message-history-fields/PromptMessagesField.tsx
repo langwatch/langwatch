@@ -1,28 +1,32 @@
 import {
   Box,
-  Button,
   Field,
   HStack,
-  NativeSelect,
+  Icon,
   Spacer,
+  useDisclosure,
+  Collapsible,
 } from "@chakra-ui/react";
-import { ChevronDown } from "lucide-react";
-import { useMemo } from "react";
+import { ChevronDown } from "react-feather";
+import { useEffect, useMemo } from "react";
 import {
   useFormContext,
   type UseFieldArrayReturn,
   Controller,
 } from "react-hook-form";
-import { LuMinus, LuPlus } from "react-icons/lu";
+// removed react-icons add/remove; handled by dedicated components
 
-import { PropertySectionTitle } from "../../../optimization_studio/components/properties/BasePropertiesPanel";
+import { PropertySectionTitle } from "../../../../optimization_studio/components/properties/BasePropertiesPanel";
 import {
   PromptTextArea,
   type PromptTextAreaOnAddMention,
-} from "../../components/ui/PromptTextArea";
+} from "../../../components/ui/PromptTextArea";
 import type { PromptConfigFormValues } from "~/prompt-configs";
 
 import { VerticalFormControl } from "~/components/VerticalFormControl";
+import { AddMessageButton } from "./AddMessageButton";
+import { RemoveMessageButton } from "./RemoveMessageButton";
+import { MessageRoleLabel } from "./MessageRoleLabel";
 
 /**
  * Type for message field errors
@@ -82,56 +86,39 @@ export function PromptMessagesField({
       ? errors.version?.configData?.messages
       : undefined;
   }, [errors]);
+  const { open, setOpen } = useDisclosure();
 
-  return messageFields.fields.map((field, idx) => {
+  useEffect(() => {
+    setOpen(true);
+  }, [setOpen]);
+
+  const systemIndex = useMemo(
+    () => messageFields.fields.findIndex((m) => m.role === "system"),
+    [messageFields.fields],
+  );
+
+  const handleAdd = (role: "user" | "assistant") => {
+    messageFields.append({ role, content: "" });
+  };
+
+  const renderMessageRow = (
+    field: (typeof messageFields.fields)[number],
+    idx: number,
+  ) => {
+    const role = field.role;
+
     return (
       <VerticalFormControl
+        width="full"
         key={field.id}
         label={
-          <Controller
-            control={form.control}
-            name={`version.configData.messages.${idx}.role`}
-            render={({ field }) => (
-              <HStack width="full">
-                <HStack position="relative">
-                  <PropertySectionTitle padding={0}>
-                    {field.value}
-                  </PropertySectionTitle>
-                  <Box color="gray.600" paddingTop={1}>
-                    <ChevronDown size={14} />
-                  </Box>
-                  <NativeSelect.Root
-                    size="sm"
-                    position="absolute"
-                    top={0}
-                    left={0}
-                    height="32px"
-                    width="100%"
-                    cursor="pointer"
-                    zIndex={10}
-                    opacity={0}
-                  >
-                    <NativeSelect.Field
-                      {...field}
-                      cursor="pointer"
-                      _invalid={
-                        getMessageError(idx, "role")
-                          ? { borderColor: "red.500" }
-                          : undefined
-                      }
-                    >
-                      <option value="user">User</option>
-                      <option value="assistant">Assistant</option>
-                    </NativeSelect.Field>
-                  </NativeSelect.Root>
-                </HStack>
-                <Spacer />
-                {idx === messageFields.fields.length - 1 && (
-                  <AddRemoveMessageFieldButton messageFields={messageFields} />
-                )}
-              </HStack>
+          <HStack width="full">
+            <MessageRoleLabel role={role} />
+            <Spacer />
+            {role !== "system" && (
+              <RemoveMessageButton onRemove={() => messageFields.remove(idx)} />
             )}
-          />
+          </HStack>
         }
         invalid={!!errors.version?.configData?.messages}
         error={messageErrors}
@@ -164,44 +151,41 @@ export function PromptMessagesField({
         )}
       </VerticalFormControl>
     );
-  });
-}
-
-export function AddRemoveMessageFieldButton({
-  messageFields,
-}: {
-  messageFields: UseFieldArrayReturn<
-    PromptConfigFormValues,
-    "version.configData.messages",
-    "id"
-  >;
-}) {
-  const { append, remove } = messageFields;
-
-  const handleAdd = () => {
-    append({ role: "user", content: "" });
-  };
-
-  const handleRemove = () => {
-    if (messageFields.fields.length > 0) {
-      remove(messageFields.fields.length - 1);
-    }
   };
 
   return (
-    <HStack gap={2}>
-      <Button
-        size="xs"
-        variant="ghost"
-        onClick={handleRemove}
-        type="button"
-        disabled={messageFields.fields.length === 0}
-      >
-        <LuMinus size={16} />
-      </Button>
-      <Button size="xs" variant="ghost" onClick={handleAdd} type="button">
-        <LuPlus size={16} />
-      </Button>
-    </HStack>
+    <Box width="full" bg="white">
+      <HStack width="full" py={2}>
+        <HStack gap={2} cursor="pointer" onClick={() => setOpen(!open)}>
+          <Icon
+            asChild
+            transform={open ? "rotate(0deg)" : "rotate(-90deg)"}
+            transition="transform 0.15s ease"
+            color="gray.700"
+          >
+            <ChevronDown size={16} />
+          </Icon>
+          <PropertySectionTitle padding={0}>Messages</PropertySectionTitle>
+        </HStack>
+        <Spacer />
+        <AddMessageButton onAdd={handleAdd} />
+      </HStack>
+
+      <Collapsible.Root open={open}>
+        <Collapsible.Content padding={4}>
+          {(() => {
+            const systemField =
+              systemIndex >= 0 ? messageFields.fields[systemIndex] : undefined;
+            return systemField
+              ? renderMessageRow(systemField, systemIndex)
+              : null;
+          })()}
+          {messageFields.fields.map((field, idx) => {
+            if (idx === systemIndex) return null;
+            return renderMessageRow(field, idx);
+          })}
+        </Collapsible.Content>
+      </Collapsible.Root>
+    </Box>
   );
 }

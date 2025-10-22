@@ -136,7 +136,7 @@ export class PromptService {
         organizationId,
         version: params.version,
         versionId: params.versionId,
-      }
+      },
     );
 
     if (!config) {
@@ -183,7 +183,7 @@ export class PromptService {
       this.transformToVersionedPrompt({
         ...config,
         latestVersion: version,
-      })
+      }),
     );
   }
 
@@ -238,7 +238,7 @@ export class PromptService {
         params.maxTokens !== undefined ||
         params.promptingTechnique !== undefined ||
         params.demonstrations !== undefined ||
-        params.responseFormat !== undefined
+        params.responseFormat !== undefined,
     );
 
     shouldCreateVersion &&
@@ -247,22 +247,22 @@ export class PromptService {
         messages: params.messages,
       });
 
-    // Get the system prompt from the messages
-    const messageSystemPrompt = params.messages?.find(
-      (msg) => msg.role === "system"
-    )?.content;
+    // Normalize system message into prompt
+    const normalizedCreate = this.normalizeSystemMessage({
+      prompt: params.prompt,
+      messages: params.messages,
+    });
+    params.prompt = normalizedCreate.prompt;
+    params.messages = normalizedCreate.messages as unknown as
+      | Array<{
+          role: "user" | "assistant" | "system";
+          content: string;
+        }>
+      | undefined;
 
-    // If the system prompt is provided in the messages,
-    // strip it from the messages
-    // and set the prompt to the system prompt
-    if (messageSystemPrompt) {
-      params.messages = params.messages?.filter((msg) => msg.role !== "system");
-      params.prompt ??= messageSystemPrompt;
-    }
-
-    if (!messageSystemPrompt && !params.prompt) {
+    if (!normalizedCreate.prompt && !params.prompt) {
       throw new SystemPromptConflictError(
-        "A system prompt is required when creating a prompt"
+        "A system prompt is required when creating a prompt",
       );
     }
 
@@ -303,6 +303,32 @@ export class PromptService {
   }
 
   /**
+   * Normalize system message rules for prompt/messages.
+   * Single Responsibility: Ensure system content lives in prompt and is removed from messages.
+   */
+  private normalizeSystemMessage(data: {
+    prompt?: string;
+    messages?: Array<{ role: string; content: string }> | undefined;
+  }): { prompt?: string; messages?: Array<{ role: string; content: string }> } {
+    const messageSystemPrompt = data.messages?.find(
+      (msg) => msg.role === "system",
+    )?.content;
+    const normalized: {
+      prompt?: string;
+      messages?: Array<{ role: string; content: string }>;
+    } = { ...data };
+    if (messageSystemPrompt) {
+      normalized.prompt = normalized.prompt ?? messageSystemPrompt;
+      normalized.messages = (normalized.messages ?? []).filter(
+        (msg) => msg.role !== "system",
+      );
+    }
+    return normalized;
+  }
+
+  // Draft persistence removed (client-only draft creation/update)
+
+  /**
    * Updates only the prompt's handle and scope without creating a new version.
    * Single Responsibility: Update the prompt's handle and scope.
    */
@@ -319,13 +345,13 @@ export class PromptService {
     const updatedConfig = await this.repository.updateConfig(
       idOrHandle,
       projectId,
-      data
+      data,
     );
 
     // Get the latest version to return complete prompt
     const latestVersion = (await this.repository.versions.getLatestVersion(
       updatedConfig.id,
-      projectId
+      projectId,
     )) as LatestConfigVersionSchema;
 
     return this.transformToVersionedPrompt({
@@ -370,18 +396,14 @@ export class PromptService {
 
     this.versionService.assertNoSystemPromptConflict(newVersionData);
 
-    const messageSystemPrompt = newVersionData.messages?.find(
-      (msg) => msg.role === "system"
-    )?.content;
-
-    // We want to ensure that the system prompt is always in the prompt field
-    // and the messages array doesn't contain the system message
-    if (messageSystemPrompt) {
-      newVersionData.prompt = messageSystemPrompt;
-      newVersionData.messages = newVersionData.messages?.filter(
-        (msg) => msg.role !== "system"
-      );
-    }
+    const normalizedUpdate = this.normalizeSystemMessage(newVersionData);
+    newVersionData.prompt = normalizedUpdate.prompt;
+    newVersionData.messages = normalizedUpdate.messages as unknown as
+      | Array<{
+          role: "user" | "assistant" | "system";
+          content: string;
+        }>
+      | undefined;
 
     // Handle in a transaction to ensure atomicity
     const result = await this.prisma.$transaction(
@@ -394,7 +416,7 @@ export class PromptService {
             handle,
             scope,
           },
-          { tx }
+          { tx },
         );
 
         // Get the latest version
@@ -402,7 +424,7 @@ export class PromptService {
         const latestVersion = (await this.repository.versions.getLatestVersion(
           updatedConfig.id,
           projectId,
-          { tx }
+          { tx },
         )) as LatestConfigVersionSchema;
 
         // Create the new version directly
@@ -426,7 +448,7 @@ export class PromptService {
           ...updatedConfig,
           latestVersion: updatedVersion,
         } as LlmConfigWithLatestVersion);
-      }
+      },
     );
 
     return result;
@@ -588,7 +610,7 @@ export class PromptService {
 
     if (!permission.hasPermission) {
       throw new Error(
-        permission.reason ?? "No permission to modify this prompt"
+        permission.reason ?? "No permission to modify this prompt",
       );
     }
 
@@ -607,7 +629,7 @@ export class PromptService {
     if (localVersion === remoteVersion) {
       const comparison = this.repository.compareConfigContent(
         localConfigData,
-        remoteConfigData
+        remoteConfigData,
       );
 
       if (comparison.isEqual) {
@@ -646,7 +668,7 @@ export class PromptService {
       if (localBaseVersion) {
         const baseComparison = this.repository.compareConfigContent(
           localConfigData,
-          localBaseVersion.configData as Record<string, unknown>
+          localBaseVersion.configData as Record<string, unknown>,
         );
 
         if (baseComparison.isEqual) {
@@ -664,7 +686,7 @@ export class PromptService {
           differences:
             this.repository.compareConfigContent(
               localConfigData,
-              remoteConfigData
+              remoteConfigData,
             ).differences ?? [],
           remoteConfigData,
         },
@@ -680,7 +702,7 @@ export class PromptService {
         differences:
           this.repository.compareConfigContent(
             localConfigData,
-            remoteConfigData
+            remoteConfigData,
           ).differences ?? [],
         remoteConfigData,
       },
@@ -701,7 +723,7 @@ export class PromptService {
     const result = await this.repository.deleteConfig(
       params.idOrHandle,
       params.projectId,
-      organizationId
+      organizationId,
     );
     return result;
   }
@@ -711,7 +733,7 @@ export class PromptService {
    * expected by the API and service layer.
    */
   private transformToVersionedPrompt(
-    config: Omit<LlmConfigWithLatestVersion, "deletedAt">
+    config: Omit<LlmConfigWithLatestVersion, "deletedAt">,
   ): VersionedPrompt {
     const prompt = config.latestVersion.configData.prompt;
 
@@ -754,7 +776,7 @@ export class PromptService {
   }
 
   private async getOrganizationIdFromProjectId(
-    projectId: string
+    projectId: string,
   ): Promise<string> {
     const project = await this.prisma.project.findUnique({
       where: { id: projectId },

@@ -17,7 +17,7 @@ import {
   OutputsFieldGroup,
 } from "../fields/PromptConfigVersionFieldGroup";
 import { PromptField } from "../fields/PromptField";
-import { PromptMessagesField } from "../fields/PromptMessagesField";
+import { PromptMessagesField } from "../fields/message-history-fields/PromptMessagesField";
 
 import { PromptHandleInfo } from "./components/PromptHandleInfo";
 import { VersionHistoryButton } from "./components/VersionHistoryButton";
@@ -104,7 +104,7 @@ function InnerPromptConfigForm() {
     async (prompt: VersionedPrompt) => {
       methods.reset(versionedPromptToPromptConfigFormValues(prompt));
     },
-    [methods]
+    [methods],
   );
 
   return (

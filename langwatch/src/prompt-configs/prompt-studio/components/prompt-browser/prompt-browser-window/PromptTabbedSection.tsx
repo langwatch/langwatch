@@ -1,13 +1,8 @@
-import { Box, Tabs, VStack } from "@chakra-ui/react";
+import { Box, Tabs } from "@chakra-ui/react";
 import { PromptStudioChat } from "../../chat/PromptStudioChat";
 import { useFormContext } from "react-hook-form";
 import type { PromptConfigFormValues } from "~/prompt-configs/types";
-import { ModelSelectField } from "~/prompt-configs/forms/fields/ModelSelectField";
-import {
-  InputsFieldGroup,
-  OutputsFieldGroup,
-} from "~/prompt-configs/forms/fields/PromptConfigVersionFieldGroup";
-import { DemonstrationsField } from "~/prompt-configs/forms/fields/DemonstrationsField";
+import { SettingsTab } from "./SettingsTab";
 
 enum PromptTab {
   Conversation = "conversation",
@@ -31,8 +26,8 @@ export function PromptTabbedSection() {
           <Tabs.Trigger value={PromptTab.Variables}>Variables</Tabs.Trigger>
           <Tabs.Trigger value={PromptTab.Settings}>Settings</Tabs.Trigger>
         </Tabs.List>
-        <Tabs.Content value={PromptTab.Conversation}>
-          <Box height="full" width="full" bg="white">
+        <Tabs.Content value={PromptTab.Conversation} height="full" width="full">
+          <Box marginTop="auto" width="full" bg="white">
             <PromptStudioChat formValues={form.getValues()} />
           </Box>
         </Tabs.Content>
@@ -43,12 +38,7 @@ export function PromptTabbedSection() {
         </Tabs.Content>
         <Tabs.Content value={PromptTab.Settings}>
           <Box height="full" width="full" bg="white">
-            <VStack width="full" gap={6} p={3} align="start">
-              <ModelSelectField />
-              <InputsFieldGroup />
-              <OutputsFieldGroup />
-              <DemonstrationsField />
-            </VStack>
+            <SettingsTab />
           </Box>
         </Tabs.Content>
       </Tabs.Root>

@@ -9,6 +9,7 @@ import type { VersionedPrompt } from "~/server/prompt-config/prompt.service";
 /**
  * computeInitialFormValuesForPrompt
  * Single Responsibility: Produce initial form values from either a prompt, a default model, or defaults.
+ * TODO: This seems redundant with the other methods. Let's consider a refactor
  */
 export function computeInitialFormValuesForPrompt(params: {
   prompt?: VersionedPrompt | null;
