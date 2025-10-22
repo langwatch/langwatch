@@ -69,7 +69,6 @@ function Index() {
   const returnTo = router.query.return_to;
 
   const hasAnalyticsViewPermission = hasPermission("analytics:view");
-  console.log("hasAnalyticsViewPermission", hasAnalyticsViewPermission);
 
   /**
    * Validates if a returnTo URL is safe to redirect to

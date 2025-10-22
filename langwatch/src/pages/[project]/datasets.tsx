@@ -40,17 +40,10 @@ export default function Datasets() {
   const router = useRouter();
   const { openDrawer } = useDrawer();
   const hasDatasetsViewPermission = hasPermission("datasets:view");
-  if (!hasDatasetsViewPermission) {
-    return (
-      <DashboardLayout>
-        <PermissionAlert permission="datasets:view" />
-      </DashboardLayout>
-    );
-  }
 
   const datasets = api.dataset.getAll.useQuery(
     { projectId: project?.id ?? "" },
-    { enabled: !!project },
+    { enabled: !!project && hasDatasetsViewPermission },
   );
 
   const datasetDelete = api.dataset.deleteById.useMutation();
@@ -62,6 +55,14 @@ export default function Datasets() {
       }
     | undefined
   >();
+
+  if (!hasDatasetsViewPermission) {
+    return (
+      <DashboardLayout>
+        <PermissionAlert permission="datasets:view" />
+      </DashboardLayout>
+    );
+  }
 
   const deleteDataset = (id: string, name: string) => {
     datasetDelete.mutate(

@@ -46,14 +46,6 @@ export default function EvaluationsV2() {
 
   const hasEvaluationsManagePermission = hasPermission("evaluations:manage");
 
-  if (!hasEvaluationsManagePermission) {
-    return (
-      <DashboardLayout>
-        <PermissionAlert permission="evaluations:manage" />
-      </DashboardLayout>
-    );
-  }
-
   const monitors = api.monitors.getAllForProject.useQuery(
     {
       projectId: project?.id ?? "",
@@ -110,6 +102,14 @@ export default function EvaluationsV2() {
       });
     }
   };
+
+  if (!hasEvaluationsManagePermission) {
+    return (
+      <DashboardLayout>
+        <PermissionAlert permission="evaluations:manage" />
+      </DashboardLayout>
+    );
+  }
 
   if (!project) return null;
 
