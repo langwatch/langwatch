@@ -19,8 +19,7 @@ import { addEnvs } from "~/optimization_studio/server/addEnvs";
 import { loadDatasets } from "~/optimization_studio/server/loadDatasets";
 import { studioBackendPostEvent } from "../../workflows/post_event/post-event";
 import type { LLMConfig } from "~/optimization_studio/types/dsl";
-
-const DEFAULT_MODEL = "gpt-4o";
+import type { ChatMessage } from "~/server/tracer/types";
 
 type PromptStudioAdapterParams = {
   projectId: string;
@@ -29,11 +28,9 @@ type PromptStudioAdapterParams = {
 
 export class PromptStudioAdapter implements CopilotServiceAdapter {
   private projectId: string;
-  private model: string;
 
   constructor(params: PromptStudioAdapterParams) {
     this.projectId = params.projectId;
-    this.model = params.model ?? DEFAULT_MODEL;
   }
 
   /**
@@ -65,22 +62,22 @@ export class PromptStudioAdapter implements CopilotServiceAdapter {
     const nodeId = "prompt_node";
     const traceId = `trace_${randomUUID()}`;
     const workflowId = `prompt_execution_${randomUUID().slice(0, 6)}`;
-
     const input = this.getLastUserMessageContent(messages) ?? "";
 
-    const workflow = this.createWorkflow(
+    const workflow = this.createWorkflow({
       workflowId,
       nodeId,
-      forwardedParameters?.model
-        ? {
-            model: forwardedParameters.model,
-            temperature: forwardedParameters.temperature,
-            max_tokens: forwardedParameters.maxTokens,
-          }
-        : {
-            model: this.model,
-          },
-    );
+      llm: {
+        model: forwardedParameters?.model ?? "",
+        temperature: forwardedParameters?.temperature ?? 0,
+        max_tokens: forwardedParameters?.maxTokens ?? 0,
+      } as LLMConfig,
+      instructions: "",
+      messages: messages.map((message: any) => ({
+        role: message.role,
+        content: message.content,
+      })) as any,
+    });
 
     // Build execute_flow event (inputs must be an array)
     const rawEvent: StudioClientEvent = {
@@ -89,7 +86,10 @@ export class PromptStudioAdapter implements CopilotServiceAdapter {
         trace_id: traceId,
         workflow,
         node_id: nodeId,
-        inputs: { input },
+        inputs: {
+          input: input,
+          messages: messages,
+        },
       },
     } as StudioClientEvent;
 
@@ -198,13 +198,19 @@ export class PromptStudioAdapter implements CopilotServiceAdapter {
     return undefined;
   }
 
-  private createWorkflow(
-    workflowId: string,
-    nodeId: string,
-    llm: LLMConfig,
-  ): Workflow {
-    const nodeData = this.defaultSignatureNodeData();
-    nodeData.parameters[0]!.value = llm;
+  private createWorkflow(params: {
+    workflowId: string;
+    nodeId: string;
+    llm: LLMConfig;
+    instructions?: string;
+    messages?: ChatMessage[];
+  }): Workflow {
+    const { workflowId, nodeId, llm, instructions, messages } = params;
+    const nodeData = this.buildNodeData({
+      llm,
+      instructions,
+      messages,
+    });
 
     return {
       spec_version: "1.4",
@@ -234,10 +240,11 @@ export class PromptStudioAdapter implements CopilotServiceAdapter {
     };
   }
 
-  private defaultSignatureNodeData(): Omit<
-    LlmPromptConfigComponent,
-    "configId"
-  > {
+  private buildNodeData(params: {
+    llm: LLMConfig;
+    instructions?: string;
+    messages?: ChatMessage[];
+  }): Omit<LlmPromptConfigComponent, "configId"> {
     return {
       name: "LLM Node",
       description: "LLM calling node",
@@ -245,7 +252,7 @@ export class PromptStudioAdapter implements CopilotServiceAdapter {
         {
           identifier: "llm",
           type: "llm",
-          value: { model: this.model },
+          value: params.llm,
         },
         {
           identifier: "prompting_technique",
@@ -255,12 +262,12 @@ export class PromptStudioAdapter implements CopilotServiceAdapter {
         {
           identifier: "instructions",
           type: "str",
-          value: "You are a helpful assistant.",
+          value: params.instructions ?? "",
         },
         {
           identifier: "messages",
           type: "chat_messages",
-          value: [{ role: "user", content: "{{input}}" }],
+          value: params.messages ?? [],
         },
         {
           identifier: "demonstrations",
@@ -279,22 +286,5 @@ export class PromptStudioAdapter implements CopilotServiceAdapter {
       inputs: [{ identifier: "input", type: "str" }],
       outputs: [{ identifier: "output", type: "str" }],
     };
-  }
-
-  private createExecuteComponentEvent(
-    traceId: string,
-    workflow: Workflow,
-    nodeId: string,
-    inputs: Record<string, string>,
-  ): StudioClientEvent {
-    return {
-      type: "execute_component",
-      payload: {
-        trace_id: traceId,
-        workflow,
-        node_id: nodeId,
-        inputs,
-      },
-    } as StudioClientEvent;
   }
 }
