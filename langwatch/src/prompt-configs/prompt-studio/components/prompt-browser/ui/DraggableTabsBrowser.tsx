@@ -103,8 +103,6 @@ function DraggableTabsBrowserRoot({
     const overData = over.data.current;
     if (!activeData || !overData) return;
 
-    console.log("handleDragEnd", activeData, overData);
-
     // Use the sortable index from the drag data
     const activeIndex = activeData.sortable?.index;
     const overIndex = overData.sortable?.index;
@@ -133,7 +131,7 @@ function DraggableTabsBrowserRoot({
         onDragEnd={handleDragEnd}
         collisionDetection={closestCenter}
       >
-        <HStack width="full" height="full" gap={0}>
+        <HStack width="full" gap={0} height="full">
           {children}
           <DragOverlay>
             {activeDrag ? <DragOverlayContent activeDrag={activeDrag} /> : null}
@@ -319,21 +317,7 @@ function DraggableBrowserTab({ label, children }: DraggableBrowserTabProps) {
   return <>{label ?? children}</>;
 }
 
-/**
- * DraggableTabsBrowser Content Component
- *
- * Single Responsibility: Renders tab panel content
- */
-interface DraggableTabsContentProps {
-  value: string;
-  children: React.ReactNode;
-}
-
-function DraggableTabsContent({ value, children }: DraggableTabsContentProps) {
-  return (
-    <BrowserLikeTabs.Content value={value}>{children}</BrowserLikeTabs.Content>
-  );
-}
+const DraggableTabsContent = BrowserLikeTabs.Content;
 
 // Export compound component
 export const DraggableTabsBrowser = {

@@ -1,8 +1,9 @@
-import { Box, Tabs } from "@chakra-ui/react";
+import { Box, HStack, Tabs } from "@chakra-ui/react";
 import { PromptStudioChat } from "../../chat/PromptStudioChat";
 import { useFormContext } from "react-hook-form";
 import type { PromptConfigFormValues } from "~/prompt-configs/types";
-import { SettingsTab } from "./SettingsTab";
+import { SettingsTabContent } from "./SettingsTabContent";
+import { useRef } from "react";
 
 enum PromptTab {
   Conversation = "conversation",
@@ -17,31 +18,49 @@ export function PromptTabbedSection() {
   const form = useFormContext<PromptConfigFormValues>();
 
   return (
-    <Box height="full" width="full" bg="white">
-      <Tabs.Root defaultValue={PromptTab.Conversation}>
-        <Tabs.List colorPalette="orange">
-          <Tabs.Trigger value={PromptTab.Conversation}>
-            Conversation
-          </Tabs.Trigger>
-          <Tabs.Trigger value={PromptTab.Variables}>Variables</Tabs.Trigger>
-          <Tabs.Trigger value={PromptTab.Settings}>Settings</Tabs.Trigger>
-        </Tabs.List>
-        <Tabs.Content value={PromptTab.Conversation} height="full" width="full">
-          <Box marginTop="auto" width="full" bg="white">
+    <Tabs.Root
+      defaultValue={PromptTab.Conversation}
+      display="flex"
+      flexDirection="column"
+      flex={1}
+      width="full"
+    >
+      <Tabs.List colorPalette="orange">
+        <Tabs.Trigger value={PromptTab.Conversation}>Conversation</Tabs.Trigger>
+        <Tabs.Trigger value={PromptTab.Variables}>Variables</Tabs.Trigger>
+        <Tabs.Trigger value={PromptTab.Settings}>Settings</Tabs.Trigger>
+      </Tabs.List>
+      <HStack flex={1} width="full">
+        <Tabs.Content
+          value={PromptTab.Conversation}
+          flex={1}
+          width="full"
+          height="full"
+          display="flex"
+          position="relative"
+        >
+          <Box
+            position="absolute"
+            bottom={0}
+            left={0}
+            width="full"
+            maxHeight="full"
+            overflowY="scroll"
+          >
             <PromptStudioChat formValues={form.getValues()} />
           </Box>
         </Tabs.Content>
         <Tabs.Content value={PromptTab.Variables}>
-          <Box height="full" width="full" bg="white">
+          <Box height="full" width="full">
             Prompt
           </Box>
         </Tabs.Content>
-        <Tabs.Content value={PromptTab.Settings}>
-          <Box height="full" width="full" bg="white">
-            <SettingsTab />
+        <Tabs.Content value={PromptTab.Settings} flex={1} width="full">
+          <Box height="full" width="full">
+            <SettingsTabContent />
           </Box>
         </Tabs.Content>
-      </Tabs.Root>
-    </Box>
+      </HStack>
+    </Tabs.Root>
   );
 }

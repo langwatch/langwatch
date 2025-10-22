@@ -6,7 +6,7 @@ interface PromptBrowserTabProps {
   version?: number;
   hasUnsavedChanges?: boolean;
   onClose?: () => void;
-  isActive?: boolean;
+  dimmed?: boolean;
 }
 
 export function PromptBrowserTab({
@@ -14,6 +14,7 @@ export function PromptBrowserTab({
   version,
   hasUnsavedChanges,
   onClose,
+  dimmed,
 }: PromptBrowserTabProps) {
   return (
     <HStack gap={2} height="full">
@@ -36,6 +37,8 @@ export function PromptBrowserTab({
         borderRadius="3px"
         transition="all 0.1s ease-in-out"
         padding={0.5}
+        opacity={dimmed ? 0.25 : 1}
+        _hover={{ opacity: 1 }}
         onPointerDown={(e) => {
           // Stop the event from bubbling up to drag listeners
           e.stopPropagation();

@@ -3,7 +3,7 @@ import { PromptStudioTabbedWorkspace } from "./prompt-browser/PromptStudioTabbed
 
 export function PromptStudioMainContent() {
   return (
-    <HStack width="full" height="full" gap={0} overflowX="scroll">
+    <HStack width="full" height="full" gap={0} overflowX="scroll" bg="white">
       <PromptStudioTabbedWorkspace />
     </HStack>
   );

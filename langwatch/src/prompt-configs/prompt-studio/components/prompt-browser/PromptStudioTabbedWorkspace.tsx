@@ -1,4 +1,4 @@
-import { HStack } from "@chakra-ui/react";
+import { HStack, Spacer } from "@chakra-ui/react";
 import { PromptBrowserWindowContent } from "./prompt-browser-window/PromptBrowserWindowContent";
 import { PromptBrowserTab } from "./ui/PromptBrowserTab";
 import { useDraggableTabsBrowserStore } from "../../prompt-studio-store/DraggableTabsBrowserStore";
@@ -16,6 +16,8 @@ export function PromptStudioTabbedWorkspace() {
     setActiveWindow,
   } = useDraggableTabsBrowserStore();
 
+  // TODO: This isn't really working for the index/sorting within the same group
+  // The start/over index is being calculated as -1, so nothing happens
   function handleTabMove(params: {
     tabId: string;
     from: { groupId: string; index: number };
@@ -61,11 +63,13 @@ export function PromptStudioTabbedWorkspace() {
                       title={tab.data.meta.title ?? "Untitled"}
                       version={tab.data.meta.versionNumber}
                       onClose={() => handleClose(tab.id)}
+                      dimmed={window.id !== activeWindowId}
                     />
                   </DraggableTabsBrowser.Tab>
                 </DraggableTabsBrowser.Trigger>
               ))}
             </HStack>
+            <Spacer />
             {window.id === activeWindowId && (
               <HStack flexShrink={0} paddingX={3}>
                 <SplitSquareHorizontal
@@ -78,14 +82,20 @@ export function PromptStudioTabbedWorkspace() {
               </HStack>
             )}
           </DraggableTabsBrowser.TabBar>
-          {window.tabs.map((tab) => (
-            <DraggableTabsBrowser.Content key={tab.id} value={tab.id}>
-              <PromptBrowserWindowContent
-                configId={tab.data.form.defaultValues.configId}
-                tabId={tab.id}
-              />
-            </DraggableTabsBrowser.Content>
-          ))}
+          <HStack width="full" flex={1}>
+            {window.tabs.map((tab) => (
+              <DraggableTabsBrowser.Content
+                key={tab.id}
+                value={tab.id}
+                height="full"
+              >
+                <PromptBrowserWindowContent
+                  configId={tab.data.form.defaultValues.configId}
+                  tabId={tab.id}
+                />
+              </DraggableTabsBrowser.Content>
+            ))}
+          </HStack>
         </DraggableTabsBrowser.Group>
       ))}
     </DraggableTabsBrowser.Root>

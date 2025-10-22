@@ -15,16 +15,7 @@ function BrowserLikeTabsRoot({
   ...props
 }: BrowserLikeTabsRootProps) {
   return (
-    <VStack
-      height="full"
-      {...props}
-      gap={0}
-      align="stretch"
-      bg="gray.50"
-      width="full"
-      borderRight="1px solid"
-      borderColor="gray.200"
-    >
+    <VStack height="full" {...props} gap={0} align="stretch" width="full">
       <Tabs.Root
         value={value}
         defaultValue={defaultValue}
@@ -32,6 +23,8 @@ function BrowserLikeTabsRoot({
         colorPalette={colorPalette}
         width="full"
         height="full"
+        display="flex"
+        flexDirection="column"
       >
         {children}
       </Tabs.Root>
@@ -48,7 +41,7 @@ function BrowserLikeTabsBar({ children }: BrowserLikeTabsBarProps) {
     <HStack
       gap={0}
       width="full"
-      bg="white"
+      bg="gray.50"
       borderBottom="1px solid"
       borderColor="gray.200"
     >
@@ -96,27 +89,7 @@ function BrowserLikeTabsTrigger({
   );
 }
 
-interface BrowserLikeTabsContentProps {
-  value: string;
-  children: React.ReactNode;
-}
-
-function BrowserLikeTabsContent({
-  value,
-  children,
-}: BrowserLikeTabsContentProps) {
-  return (
-    <Tabs.Content
-      value={value}
-      width="full"
-      height="full"
-      bg="white"
-      overflowY="scroll"
-    >
-      {children}
-    </Tabs.Content>
-  );
-}
+const BrowserLikeTabsContent = Tabs.Content;
 
 export const BrowserLikeTabs = {
   Root: BrowserLikeTabsRoot,
