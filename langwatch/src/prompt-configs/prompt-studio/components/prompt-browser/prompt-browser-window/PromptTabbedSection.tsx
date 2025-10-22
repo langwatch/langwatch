@@ -52,7 +52,7 @@ export function PromptTabbedSection() {
         </Tabs.Content>
         <Tabs.Content value={PromptTab.Variables}>
           <Box height="full" width="full">
-            Prompt
+            Variables
           </Box>
         </Tabs.Content>
         <Tabs.Content value={PromptTab.Settings} flex={1} width="full">

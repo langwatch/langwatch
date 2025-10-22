@@ -262,7 +262,7 @@ export class PromptStudioAdapter implements CopilotServiceAdapter {
           value: formValues.version.configData.demonstrations ?? undefined,
         },
       ],
-      inputs: formValues.version.configData.inputs,
+      inputs: [],
       outputs: formValues.version.configData.outputs,
     };
   }
