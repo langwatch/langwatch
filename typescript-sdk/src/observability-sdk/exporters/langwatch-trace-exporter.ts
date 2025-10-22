@@ -11,8 +11,16 @@ import {
 export interface LangWatchTraceExporterOptions {
   endpoint?: string;
   apiKey?: string;
-  includeAllSpans?: boolean;
-  debug?: boolean;
+
+  /**
+   * Optional preset to filter spans before exporting.
+   * - 'none': Export all spans. Default behavior.
+   * - 'vercel-ai-only': Export only spans produced by the Vercel AI SDK
+   *   (detected via instrumentation scope name equal to 'ai').
+   * - 'noise-reduced': Export all spans except common framework noise, currently
+   *   filtering out spans whose name starts with an HTTP verb (e.g., 'GET /users').
+   */
+  filterPreset?: "none" | "vercel-ai-only" | "noise-reduced";
 }
 
 /**
@@ -23,6 +31,7 @@ export interface LangWatchTraceExporterOptions {
  * - Authorization headers using the provided API key or environment variables/fallback
  * - SDK version and language identification headers
  * - Proper endpoint configuration for LangWatch ingestion using provided URL or environment variables/fallback
+ * - Optional span filtering via a simple preset, controlled by the `filterPreset` option
  *
  * @example
  * ```typescript
@@ -34,11 +43,13 @@ export interface LangWatchTraceExporterOptions {
  * // Using custom options
  * const exporter = new LangWatchTraceExporter({
  *   apiKey: 'your-api-key',
- *   endpoint: 'https://custom.langwatch.com'
+ *   endpoint: 'https://custom.langwatch.com',
+ *   filterPreset: 'noise-reduced', // drops spans whose name starts with HTTP verbs
  * });
  * ```
  */
 export class LangWatchTraceExporter extends OTLPTraceExporter {
+  private readonly filterPreset: "none" | "vercel-ai-only" | "noise-reduced";
   /**
    * Creates a new LangWatchExporter instance.
    *
@@ -47,8 +58,8 @@ export class LangWatchTraceExporter extends OTLPTraceExporter {
    *                     will use environment variables or fallback configuration.
    * @param opts.endpoint - Optional custom endpoint URL for LangWatch ingestion.
    *                       If not provided, will use environment variables or fallback configuration.
-   * @param opts.includeAllSpans - Deprecated: This option is deprecated and will be removed in a future version
-   * @param opts.debug - Deprecated: This option is deprecated and will be removed in a future version
+  * @param opts.filterPreset - Optional preset used to filter spans before exporting.
+  *                           One of 'none' | 'vercel-ai-only' | 'noise-reduced'. Defaults to 'none'.
    */
   constructor(opts?: LangWatchTraceExporterOptions) {
     const apiKey = opts?.apiKey ?? process.env.LANGWATCH_API_KEY ?? "";
@@ -56,17 +67,6 @@ export class LangWatchTraceExporter extends OTLPTraceExporter {
       opts?.endpoint ??
       process.env.LANGWATCH_ENDPOINT ??
       DEFAULT_ENDPOINT;
-
-    if (opts && opts.includeAllSpans !== void 0) {
-      console.warn(
-        "[LangWatchExporter] The behavior of `includeAllSpans` is deprecated and will be removed in a future version",
-      );
-    }
-    if (opts && opts.debug !== void 0) {
-      console.warn(
-        "[LangWatchExporter] The behavior of `debug` is deprecated and will be removed in a future version",
-      );
-    }
 
     const url = new URL(TRACES_PATH, endpoint);
     const otelEndpoint = url.toString();
@@ -81,5 +81,57 @@ export class LangWatchTraceExporter extends OTLPTraceExporter {
       },
       url: otelEndpoint.toString(),
     });
+
+    this.filterPreset = normalizePreset(opts?.filterPreset ?? "none");
   }
+
+  export(spans: unknown[], resultCallback: (result: unknown) => void): void {
+    const filtered = applyPresetFilter(this.filterPreset, spans as MinimalReadableSpan[]);
+
+    super.export(filtered as unknown as [], resultCallback as unknown as (result: unknown) => void);
+  }
+}
+
+interface MinimalReadableSpan {
+  name: string;
+  instrumentationScope?: { name?: string };
+}
+
+function normalizePreset(preset: LangWatchTraceExporterOptions["filterPreset"]): "none" | "vercel-ai-only" | "noise-reduced" {
+  switch (preset) {
+    case "none":
+    case "vercel-ai-only":
+    case "noise-reduced":
+      return preset;
+    default:
+      return "none";
+  }
+}
+
+function applyPresetFilter(
+  preset: "none" | "vercel-ai-only" | "noise-reduced",
+  spans: MinimalReadableSpan[],
+): MinimalReadableSpan[] {
+  if (preset === "none") return spans;
+  if (preset === "noise-reduced") {
+    return spans.filter((s) => !isHttpRequestSpan(s));
+  }
+  if (preset === "vercel-ai-only") {
+    return spans.filter((s) => isVercelAiSpan(s));
+  }
+
+  return spans;
+}
+
+function isVercelAiSpan(span: MinimalReadableSpan): boolean {
+  const scope = span.instrumentationScope?.name?.toLowerCase?.() ?? "";
+
+  return scope === "ai";
+}
+
+function isHttpRequestSpan(span: MinimalReadableSpan): boolean {
+  const name = span.name ?? "";
+  const verbMatch = /^(GET|POST|PUT|DELETE|PATCH|OPTIONS|HEAD)\b/i.test(name);
+
+  return verbMatch;
 }
