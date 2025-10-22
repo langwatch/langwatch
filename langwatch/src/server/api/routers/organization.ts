@@ -45,12 +45,12 @@ export type TeamWithProjectsAndMembers = TeamWithProjects & {
       id: string;
       name: string;
       description: string | null;
-      permissions: string[];
+      permissions: unknown;
     };
     user: {
       id: string;
       name: string | null;
-      email: string;
+      email: string | null;
     };
   }>;
 };
