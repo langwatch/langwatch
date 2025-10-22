@@ -16,6 +16,7 @@ export const orderedResources: Resource[] = [
   Resources.ANALYTICS,
   Resources.GUARDRAILS,
   Resources.EXPERIMENTS,
+  Resources.EVALUATIONS,
   Resources.DATASETS,
   Resources.TRIGGERS,
   Resources.WORKFLOWS,

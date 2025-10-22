@@ -38,6 +38,7 @@ export const Resources = {
   SCENARIOS: "scenarios",
   ANNOTATIONS: "annotations",
   GUARDRAILS: "guardrails",
+  EVALUATIONS: "evaluations",
   EXPERIMENTS: "experiments",
   DATASETS: "datasets",
   TRIGGERS: "triggers",
@@ -84,6 +85,9 @@ const TEAM_ROLE_PERMISSIONS: Record<TeamUserRole, Permission[]> = {
     // Guardrails
     "guardrails:view",
     "guardrails:manage",
+    // Evaluations
+    "evaluations:view",
+    "evaluations:manage",
     // Experiments
     "experiments:view",
     "experiments:manage",
@@ -124,6 +128,9 @@ const TEAM_ROLE_PERMISSIONS: Record<TeamUserRole, Permission[]> = {
     // Guardrails
     "guardrails:view",
     "guardrails:manage",
+    // Evaluations
+    "evaluations:view",
+    "evaluations:manage",
     // Experiments
     "experiments:view",
     "experiments:manage",
@@ -156,6 +163,8 @@ const TEAM_ROLE_PERMISSIONS: Record<TeamUserRole, Permission[]> = {
     "annotations:view",
     // Guardrails
     "guardrails:view",
+    // Evaluations
+    "evaluations:view",
     // Experiments
     "experiments:view",
     // Datasets
@@ -195,7 +204,7 @@ const ORGANIZATION_ROLE_PERMISSIONS: Record<
  * Check if a permission list includes a requested permission, with hierarchy rules
  * manage permissions automatically include view, create, update, and delete permissions
  */
-function hasPermissionWithHierarchy(
+export function hasPermissionWithHierarchy(
   permissions: string[],
   requestedPermission: string,
 ): boolean {
@@ -413,7 +422,7 @@ export async function hasProjectPermission(
   }
 
   // Check user's individual permissions (custom role or built-in role)
-  const customRoleAssignment = await ctx.prisma.teamUserCustomRole?.findFirst({
+  const customRoleAssignment = await ctx.prisma.teamUserCustomRole.findFirst({
     where: {
       userId: ctx.session.user.id,
       teamId: projectTeam?.team.id,
@@ -428,9 +437,7 @@ export async function hasProjectPermission(
       | string[]
       | null
       | undefined;
-    const userPermissions = Array.isArray(rawPermissions)
-      ? (rawPermissions as string[])
-      : [];
+    const userPermissions = Array.isArray(rawPermissions) ? rawPermissions : [];
 
     // If user has custom role, ONLY use custom role permissions (no fallback)
     return hasPermissionWithHierarchy(userPermissions, permission);
@@ -487,7 +494,7 @@ export async function hasTeamPermission(
   }
 
   // Check user's individual permissions (custom role or built-in role)
-  const customRoleAssignment = await ctx.prisma.teamUserCustomRole?.findFirst({
+  const customRoleAssignment = await ctx.prisma.teamUserCustomRole.findFirst({
     where: {
       userId: ctx.session.user.id,
       teamId: teamId,
@@ -502,9 +509,7 @@ export async function hasTeamPermission(
       | string[]
       | null
       | undefined;
-    const userPermissions = Array.isArray(rawPermissions)
-      ? (rawPermissions as string[])
-      : [];
+    const userPermissions = Array.isArray(rawPermissions) ? rawPermissions : [];
     if (hasPermissionWithHierarchy(userPermissions, permission)) {
       return true;
     }
@@ -565,7 +570,7 @@ export function isDemoProject(
 ): boolean {
   if (!projectId || projectId !== env.DEMO_PROJECT_ID) {
     // Prefer dynamic process.env in tests; fall back to env.DEMO_PROJECT_ID
-    const demoId = process.env.DEMO_PROJECT_ID || env.DEMO_PROJECT_ID;
+    const demoId = process.env.DEMO_PROJECT_ID ?? env.DEMO_PROJECT_ID;
     if (!demoId || projectId !== demoId) {
       return false;
     }

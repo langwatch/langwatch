@@ -13,7 +13,7 @@ import { PromptsList } from "~/prompt-configs/PromptsList";
 import { api } from "~/utils/api";
 import { usePrompts } from "~/prompt-configs/hooks";
 import type { VersionedPrompt } from "~/server/prompt-config/prompt.service";
-
+import { PermissionAlert } from "../../components/PermissionAlert";
 /**
  * Custom hook for managing prompt configuration data operations and state.
  *
@@ -41,7 +41,7 @@ import type { VersionedPrompt } from "~/server/prompt-config/prompt.service";
 function usePromptConfigManagement(projectId: string | undefined) {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [configToDelete, setConfigToDelete] = useState<{ id: string } | null>(
-    null
+    null,
   );
   const { deletePrompt } = usePrompts();
 
@@ -61,7 +61,7 @@ function usePromptConfigManagement(projectId: string | undefined) {
             type: "error",
           });
         },
-      }
+      },
     );
 
   // Mutation for deleting a prompt config.
@@ -97,7 +97,7 @@ function usePromptConfigManagement(projectId: string | undefined) {
         });
       }
     },
-    [deletePrompt, projectId]
+    [deletePrompt, projectId],
   );
 
   /**
@@ -109,7 +109,7 @@ function usePromptConfigManagement(projectId: string | undefined) {
       setConfigToDelete(config);
       setIsDeleteDialogOpen(true);
     },
-    [setConfigToDelete, setIsDeleteDialogOpen]
+    [setConfigToDelete, setIsDeleteDialogOpen],
   );
 
   /**
@@ -145,7 +145,7 @@ function usePromptConfigManagement(projectId: string | undefined) {
       {
         publishedPrompts: [] as VersionedPrompt[],
         draftPrompts: [] as VersionedPrompt[],
-      }
+      },
     );
   }, [promptConfigs]);
 
@@ -175,9 +175,19 @@ function usePromptConfigManagement(projectId: string | undefined) {
  */
 export default function PromptConfigsPage() {
   // Get current project and prompt selection state from hooks.
-  const { project } = useOrganizationTeamProject();
+  const { project, hasPermission } = useOrganizationTeamProject();
+  const hasPromptsViewPermission = hasPermission("prompts:view");
+
   const { selectedPromptId, setSelectedPromptId, clearSelection } =
     usePromptIdQueryParam();
+
+  if (!hasPromptsViewPermission) {
+    return (
+      <DashboardLayout>
+        <PermissionAlert permission="prompts:view" />
+      </DashboardLayout>
+    );
+  }
 
   // State for whether the prompt config panel is expanded (visible).
   const [isPaneExpanded, setIsPaneExpanded] = useState(true); // Start open
@@ -257,7 +267,7 @@ export default function PromptConfigsPage() {
   const panelRef = useRef<HTMLDivElement>(null);
   const centerContentElementRef: HTMLDivElement | null =
     panelRef.current?.querySelector(
-      `#${CENTER_CONTENT_BOX_ID}`
+      `#${CENTER_CONTENT_BOX_ID}`,
     ) as HTMLDivElement | null;
 
   return (

@@ -9,6 +9,7 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
+import { PermissionAlert } from "../../components/PermissionAlert";
 import type { GetServerSidePropsContext } from "next";
 import { useRouter } from "next/router";
 import { useEffect } from "react";
@@ -44,7 +45,7 @@ export default function ProjectRouter() {
 }
 
 export const getServerSideProps = async (
-  context: GetServerSidePropsContext
+  context: GetServerSidePropsContext,
 ) => {
   const path =
     "/" +
@@ -62,10 +63,13 @@ export const getServerSideProps = async (
 };
 
 function Index() {
-  const { project } = useOrganizationTeamProject();
+  const { project, hasPermission } = useOrganizationTeamProject();
 
   const router = useRouter();
   const returnTo = router.query.return_to;
+
+  const hasAnalyticsViewPermission = hasPermission("analytics:view");
+  console.log("hasAnalyticsViewPermission", hasAnalyticsViewPermission);
 
   /**
    * Validates if a returnTo URL is safe to redirect to
@@ -97,6 +101,17 @@ function Index() {
   // Don't render anything while redirecting
   if (typeof returnTo === "string" && isValidReturnToUrl(returnTo)) {
     return null;
+  }
+
+  if (!hasAnalyticsViewPermission) {
+    return (
+      <GraphsLayout>
+        <PermissionAlert
+          message="You don't have permission to view analytics. Contact your team administrator to request access."
+          alertProps={{ marginBottom: 6 }}
+        />
+      </GraphsLayout>
+    );
   }
 
   return (
@@ -136,7 +151,7 @@ function DocumentsMetrics() {
   const { filterParams, queryOpts } = useFilterParams();
   const documents = api.analytics.topUsedDocuments.useQuery(
     filterParams,
-    queryOpts
+    queryOpts,
   );
 
   const count = documents.data?.totalUniqueDocuments;

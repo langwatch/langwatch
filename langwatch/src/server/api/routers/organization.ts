@@ -261,6 +261,12 @@ export const organizationRouter = createTRPCRouter({
               },
               include: {
                 members: true,
+                customRoleMembers: {
+                  include: {
+                    customRole: true,
+                    user: true,
+                  },
+                },
                 projects: {
                   where: {
                     archivedAt: null,

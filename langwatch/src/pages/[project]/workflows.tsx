@@ -23,16 +23,27 @@ import { Tooltip } from "../../components/ui/tooltip";
 
 import { api } from "../../utils/api";
 import { trackEvent } from "../../utils/tracking";
+import { PermissionAlert } from "../../components/PermissionAlert";
 
 export default function Workflows() {
-  const { project, isOrganizationFeatureEnabled, organization } =
+  const { project, isOrganizationFeatureEnabled, organization, hasPermission } =
     useOrganizationTeamProject();
+
+  const hasWorkflowsViewPermission = hasPermission("workflows:view");
 
   const { open, onClose, onOpen } = useDisclosure();
 
+  if (!hasWorkflowsViewPermission) {
+    return (
+      <DashboardLayout>
+        <PermissionAlert permission="workflows:view" />
+      </DashboardLayout>
+    );
+  }
+
   const workflows = api.workflow.getAll.useQuery(
     { projectId: project?.id ?? "" },
-    { enabled: !!project }
+    { enabled: !!project },
   );
 
   const usage = api.limits.getUsage.useQuery(
@@ -41,7 +52,7 @@ export default function Workflows() {
       enabled: !!organization,
       refetchOnWindowFocus: false,
       refetchOnMount: false,
-    }
+    },
   );
 
   const canCreateWorkflow =

@@ -16,6 +16,7 @@ import { publicRoutes, useRequiredSession } from "./useRequiredSession";
 import {
   teamRoleHasPermission,
   organizationRoleHasPermission,
+  hasPermissionWithHierarchy,
   type Permission,
 } from "../server/api/rbac";
 
@@ -299,6 +300,26 @@ export const useOrganizationTeamProject = (
   const hasPermission = (permission: Permission, team_ = team) => {
     const teamRole = team_?.members[0]?.role;
     if (!teamRole) return false;
+
+    // Check if user has custom role assignment
+    const customRoleAssignment = team_?.customRoleMembers?.find(
+      (member) => member.userId === session.data?.user?.id,
+    );
+
+    if (customRoleAssignment) {
+      // If user has custom role, ONLY use custom role permissions (no fallback)
+      const rawPermissions = customRoleAssignment.customRole.permissions as
+        | string[]
+        | null
+        | undefined;
+      const userPermissions = Array.isArray(rawPermissions)
+        ? rawPermissions
+        : [];
+
+      return hasPermissionWithHierarchy(userPermissions, permission);
+    }
+
+    // Only fall back to built-in team role if NO custom role exists
     return teamRoleHasPermission(teamRole, permission);
   };
 

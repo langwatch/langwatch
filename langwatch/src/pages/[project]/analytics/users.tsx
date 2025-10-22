@@ -11,6 +11,8 @@ import { AnalyticsHeader } from "../../../components/analytics/AnalyticsHeader";
 import { FeedbacksTable } from "../../../components/analytics/FeedbacksTable";
 import { QuickwitNote } from "../../../components/analytics/QuickwitNote";
 import { usePublicEnv } from "../../../hooks/usePublicEnv";
+import { useOrganizationTeamProject } from "../../../hooks/useOrganizationTeamProject";
+import { PermissionAlert } from "../../../components/PermissionAlert";
 
 // Time unit conversion constants
 const MINUTES_IN_DAY = 24 * 60; // 1440 minutes in a day
@@ -200,6 +202,16 @@ export default function Users() {
   const publicEnv = usePublicEnv();
   const isNotQuickwit = publicEnv.data && !publicEnv.data.IS_QUICKWIT;
   const isQuickwit = publicEnv.data && publicEnv.data.IS_QUICKWIT;
+  const { hasPermission } = useOrganizationTeamProject();
+  const hasAnalyticsViewPermission = hasPermission("analytics:view");
+
+  if (!hasAnalyticsViewPermission) {
+    return (
+      <GraphsLayout>
+        <PermissionAlert message="You don't have permission to view analytics. Contact your team administrator to request access." />
+      </GraphsLayout>
+    );
+  }
 
   return (
     <GraphsLayout>

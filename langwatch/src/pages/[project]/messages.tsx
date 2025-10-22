@@ -8,11 +8,14 @@ import { api } from "../../utils/api";
 import { useEffect, useState } from "react";
 import { useFilterParams } from "../../hooks/useFilterParams";
 import { useFieldRedaction } from "../../hooks/useFieldRedaction";
+import { PermissionAlert } from "../../components/PermissionAlert";
 
 export default function MessagesOrIntegrationGuide() {
   const { project } = useOrganizationTeamProject();
 
   const { isTableView } = useTableView();
+  const { hasPermission } = useOrganizationTeamProject();
+  const hasTracesViewPermission = hasPermission("traces:view");
 
   const [waitingForFirstMessage, setWaitingForFirstMessage] = useState(false);
 
@@ -23,7 +26,7 @@ export default function MessagesOrIntegrationGuide() {
       filters: {},
       pageSize: 1,
     },
-    { enabled: !!project && waitingForFirstMessage }
+    { enabled: !!project && waitingForFirstMessage },
   );
 
   // Preload field redaction status to avoid cascading loading states
@@ -41,6 +44,14 @@ export default function MessagesOrIntegrationGuide() {
       setWaitingForFirstMessage(false);
     }
   }, [project, traces.data, waitingForFirstMessage]);
+
+  if (!hasTracesViewPermission) {
+    return (
+      <DashboardLayout>
+        <PermissionAlert permission="traces:view" />
+      </DashboardLayout>
+    );
+  }
 
   if (project && (!project.firstMessage || waitingForFirstMessage)) {
     return (
