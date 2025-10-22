@@ -31,7 +31,6 @@ const logger = createLogger("langwatch:api:copilotkit");
 type Variables = {
   project: Project;
   llmConfigRepository: LlmConfigRepository;
-  properties: Record<string, any>;
 };
 
 // Define the Hono app
@@ -53,9 +52,6 @@ app.post(
   async (c) => {
     const project = c.get("project");
     const runtime = new CopilotRuntime();
-    const properties = c.get("properties");
-
-    console.log({ properties });
 
     const handler = copilotRuntimeNodeHttpEndpoint({
       runtime,
