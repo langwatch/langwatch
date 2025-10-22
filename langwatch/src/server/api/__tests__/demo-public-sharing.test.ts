@@ -16,6 +16,9 @@ const mockPrisma = {
   publicShare: {
     findFirst: vi.fn(),
   },
+  teamUserCustomRole: {
+    findFirst: vi.fn(),
+  },
 } as any;
 
 // Mock session
@@ -237,6 +240,7 @@ describe("Demo Project and Public Sharing Tests", () => {
           defaultRole: TeamUserRole.ADMIN,
         },
       });
+      mockPrisma.teamUserCustomRole.findFirst.mockResolvedValue(null);
 
       const middleware = checkPermissionOrPubliclyShared(
         checkProjectPermission("experiments:view" as Permission),
