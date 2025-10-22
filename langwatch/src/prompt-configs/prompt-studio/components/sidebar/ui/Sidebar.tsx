@@ -10,8 +10,7 @@ function SidebarRoot({ children }: SidebarRootProps) {
   return (
     <Box
       as="nav"
-      width="380px"
-      minWidth="300px"
+      width="full"
       height="100%"
       bg="gray.50"
       borderRight="1px solid"
@@ -159,6 +158,7 @@ function SidebarItem({
       display="flex"
       alignItems="center"
       gap={2}
+      width="full"
     >
       {icon && (
         <Box

@@ -62,6 +62,12 @@ export function DraftPromptsList() {
           <Text
             fontStyle={!draft.handle ? "italic" : "normal"}
             opacity={!draft.handle ? 0.8 : 1}
+            fontSize="sm"
+            fontWeight="normal"
+            overflow="hidden"
+            textOverflow="ellipsis"
+            whiteSpace="nowrap"
+            width="full"
           >
             {draft.handle ?? "Untitled"}
           </Text>

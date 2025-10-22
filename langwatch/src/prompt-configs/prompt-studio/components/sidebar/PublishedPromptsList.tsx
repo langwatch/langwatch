@@ -6,7 +6,8 @@ import { groupBy } from "lodash-es";
 import { useAllPromptsForProject } from "~/prompt-configs/hooks/useAllPromptsForProject";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { computeInitialFormValuesForPrompt } from "~/prompt-configs/utils/computeInitialFormValuesForPrompt";
-
+import { Text } from "@chakra-ui/react";
+import { LuFolder } from "react-icons/lu";
 export function PublishedPromptsList() {
   const { data } = useAllPromptsForProject();
   const { addTab } = useDraggableTabsBrowserStore();
@@ -65,7 +66,13 @@ export function PublishedPromptsList() {
                 });
               }}
             >
-              {prompt.handle ?? "Untitled"}
+              <Text
+                overflow="hidden"
+                textOverflow="ellipsis"
+                whiteSpace="nowrap"
+              >
+                {prompt.handle ?? "Untitled"}
+              </Text>
             </Sidebar.Item>
           ))}
         </Sidebar.List>
