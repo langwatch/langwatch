@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import { VStack } from "@chakra-ui/react";
 import { PromptBrowserHeader } from "./PromptBrowserHeader";
 import { PromptMessagesEditor } from "./PromptMessagesEditor";
@@ -7,6 +7,7 @@ import { usePromptConfigForm } from "~/prompt-configs/hooks";
 import { FormProvider } from "react-hook-form";
 import { useDraggableTabsBrowserStore } from "~/prompt-configs/prompt-studio/prompt-studio-store/DraggableTabsBrowserStore";
 import type { PromptConfigFormValues } from "~/prompt-configs/types";
+import debounce from "lodash/debounce";
 
 interface PromptBrowserWindowContentProps {
   configId?: string;
@@ -49,9 +50,19 @@ function PromptBrowserWindowInner(props: {
   const form = usePromptConfigForm(props);
   const { updateTabData } = useDraggableTabsBrowserStore();
 
+  const updateTabDataDebounced = useMemo(
+    () => debounce(updateTabData, 500),
+    [updateTabData],
+  );
+
+  const setValueDebounced = useMemo(
+    () => debounce(form.methods.setValue, 500),
+    [form.methods],
+  );
+
   // Handle syncing the form-derived metadata to the tab data (live title/version)
   form.methods.watch((values) => {
-    updateTabData({
+    updateTabDataDebounced({
       tabId: props.tabId,
       updater: (data) => ({
         ...data,
@@ -63,6 +74,20 @@ function PromptBrowserWindowInner(props: {
       }),
     });
   });
+
+  // Handle syncing system message to prompt
+  const messages = form.methods.watch("version.configData.messages");
+  const systemMessage = useMemo(
+    () => messages.find(({ role }) => role === "system")?.content,
+    [messages],
+  );
+  useEffect(() => {
+    if (systemMessage) {
+      setValueDebounced("version.configData.prompt", systemMessage, {
+        shouldDirty: false,
+      });
+    }
+  }, [systemMessage, setValueDebounced]);
 
   useEffect(() => {
     const isDirty = form.methods.formState.isDirty;
