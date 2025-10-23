@@ -56,7 +56,7 @@ import { createLogger } from "../../../utils/logger";
 const logger = createLogger("langwatch:workers:evaluationsWorker");
 
 export async function runEvaluationJob(
-  job: Job<EvaluationJob, any, string>
+  job: Job<EvaluationJob, any, string>,
 ): Promise<EvaluationResultWithThreadId> {
   const check = await prisma.monitor.findUnique({
     where: {
@@ -88,7 +88,7 @@ export async function runEvaluationJob(
  */
 const hasThreadMappings = (mappingState: MappingState): boolean => {
   return Object.values(mappingState.mapping).some(
-    (mapping) => "type" in mapping && mapping.type === "thread"
+    (mapping) => "type" in mapping && mapping.type === "thread",
   );
 };
 
@@ -100,12 +100,12 @@ const buildThreadData = async (
   projectId: string,
   trace: Trace,
   mappingState: MappingState,
-  protections: Protections
+  protections: Protections,
 ): Promise<Record<string, any>> => {
   const threadId = trace.metadata?.thread_id;
   if (!threadId) {
     throw new Error(
-      "Trace does not have a thread_id for thread-based evaluation"
+      "Trace does not have a thread_id for thread-based evaluation",
     );
   }
 
@@ -133,7 +133,7 @@ const buildThreadData = async (
 
   // Process each mapping
   for (const [targetField, mappingConfig] of Object.entries(
-    mappingState.mapping
+    mappingState.mapping,
   )) {
     if ("type" in mappingConfig && mappingConfig.type === "thread") {
       const source = mappingConfig.source;
@@ -147,7 +147,7 @@ const buildThreadData = async (
       const selectedFields = mappingConfig.selectedFields ?? [];
       result[targetField] = THREAD_MAPPINGS[source].mapping(
         { thread_id: threadId, traces: threadTraces },
-        selectedFields as (keyof typeof TRACE_MAPPINGS)[]
+        selectedFields as (keyof typeof TRACE_MAPPINGS)[],
       );
 
       logger.info("Mapped thread field", {
@@ -171,7 +171,8 @@ const buildThreadData = async (
           trace,
           { [targetField]: traceMappingConfig as any },
           new Set(),
-          undefined
+          undefined,
+          undefined,
         )[0];
         result[targetField] = mapped?.[targetField];
         logger.info("Mapped trace field", {
@@ -196,7 +197,7 @@ const buildThreadData = async (
 
 const switchMapping = (
   trace: Trace,
-  mapping_: MappingState
+  mapping_: MappingState,
 ): Record<string, string | number> | undefined => {
   const mapping = !mapping_
     ? DEFAULT_MAPPINGS
@@ -216,7 +217,8 @@ const switchMapping = (
       }
     >,
     new Set(),
-    undefined
+    undefined,
+    undefined,
   )[0];
 };
 
@@ -240,7 +242,7 @@ const buildDataForEvaluation = async (
   trace: Trace,
   mappings: MappingState,
   projectId: string,
-  protections: Protections
+  protections: Protections,
 ): Promise<DataForEvaluation> => {
   let data: Record<string, any>;
 
@@ -283,7 +285,7 @@ const buildDataForEvaluation = async (
     const evaluator = AVAILABLE_EVALUATORS[evaluatorType];
     const fields = [...evaluator.requiredFields, ...evaluator.optionalFields];
     const data_ = Object.fromEntries(
-      fields.map((field) => [field, data[field] ?? ""])
+      fields.map((field) => [field, data[field] ?? ""]),
     );
 
     return {
@@ -338,7 +340,7 @@ export const runEvaluationForTrace = async ({
     trace,
     mappings,
     projectId,
-    protections
+    protections,
   );
 
   const result = await runEvaluation({
@@ -379,7 +381,7 @@ export const runEvaluation = async ({
     throw new Error("Project not found");
   }
   const maxMonthlyUsage = await maxMonthlyUsageLimit(
-    project.team.organizationId
+    project.team.organizationId,
   );
   const getCurrentCost = await getCurrentMonthCost(project.team.organizationId);
   if (getCurrentCost >= maxMonthlyUsage) {
@@ -400,7 +402,7 @@ export const runEvaluation = async ({
   }
 
   let evaluatorEnv: Record<string, string> = Object.fromEntries(
-    (evaluator.envVars ?? []).map((envVar) => [envVar, process.env[envVar]!])
+    (evaluator.envVars ?? []).map((envVar) => [envVar, process.env[envVar]!]),
   );
 
   const setupModelEnv = async (model: string, embeddings: boolean) => {
@@ -432,7 +434,7 @@ export const runEvaluation = async ({
       Object.entries(params).map(([key, value]) => [
         embeddings ? `X_LITELLM_EMBEDDINGS_${key}` : `X_LITELLM_${key}`,
         value,
-      ])
+      ]),
     );
 
     // TODO: adapt embeddings_model_to_langchain on langevals to also use litellm and not need this
@@ -485,11 +487,11 @@ export const runEvaluation = async ({
               contexts: tryAndConvertTo(data.data.contexts, "string[]"),
               expected_contexts: tryAndConvertTo(
                 data.data.expected_contexts,
-                "string[]"
+                "string[]",
               ),
               expected_output: tryAndConvertTo(
                 data.data.expected_output,
-                "string"
+                "string",
               ),
               conversation: tryAndConvertTo(data.data.conversation, "array"),
             },
@@ -497,7 +499,7 @@ export const runEvaluation = async ({
           settings: settings && typeof settings === "object" ? settings : {},
           env: evaluatorEnv,
         }),
-      }
+      },
     );
   } catch (error) {
     if (error instanceof Error && error.message.includes("fetch failed")) {
@@ -542,8 +544,8 @@ export const runEvaluation = async ({
 
 export const startEvaluationsWorker = (
   processFn: (
-    job: Job<EvaluationJob, any, EvaluatorTypes>
-  ) => Promise<EvaluationResultWithThreadId>
+    job: Job<EvaluationJob, any, EvaluatorTypes>,
+  ) => Promise<EvaluationResultWithThreadId>,
 ) => {
   if (!connection) {
     logger.info("no redis connection, skipping trace checks worker");
@@ -576,7 +578,7 @@ export const startEvaluationsWorker = (
                 reject(new Error("Job timed out after 5 minutes"));
               }
             },
-            5 * 60 * 1000
+            5 * 60 * 1000,
           );
         });
 
@@ -666,7 +668,7 @@ export const startEvaluationsWorker = (
       connection,
       concurrency: 3,
       stalledInterval: 10 * 60 * 1000, // 10 minutes
-    }
+    },
   );
 
   traceChecksWorker.on("ready", () => {
@@ -691,7 +693,7 @@ const customEvaluation = async (
   projectId: string,
   evaluatorType: EvaluatorTypes,
   data: Record<string, any>,
-  trace?: Trace
+  trace?: Trace,
 ): Promise<SingleEvaluationResult> => {
   const workflowId = evaluatorType.split("/")[1];
 
@@ -716,7 +718,7 @@ const customEvaluation = async (
   const response = await runEvaluationWorkflow(
     workflowId,
     project.id,
-    requestBody
+    requestBody,
   );
 
   const { result, status } = response;
