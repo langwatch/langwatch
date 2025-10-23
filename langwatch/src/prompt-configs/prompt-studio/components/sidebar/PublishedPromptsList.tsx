@@ -75,6 +75,8 @@ export function PublishedPromptsList() {
                 overflow="hidden"
                 textOverflow="ellipsis"
                 whiteSpace="nowrap"
+                fontSize="sm"
+                fontWeight="normal"
               >
                 {getDisplayHandle(prompt.handle)}
               </Text>
