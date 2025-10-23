@@ -23,6 +23,10 @@ export function PromptStudioChat({
     });
   }, [formValues, variables]);
 
+  console.log("additionalParams", {
+    variables,
+  });
+
   return (
     <CopilotKit
       height="full"
