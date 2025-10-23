@@ -2,6 +2,7 @@ import { Box } from "@chakra-ui/react";
 import { PromptMessagesField } from "~/prompt-configs/forms/fields/message-history-fields/PromptMessagesField";
 import { useFieldArray, useFormContext } from "react-hook-form";
 import type { PromptConfigFormValues } from "~/prompt-configs";
+import { useMemo } from "react";
 
 export function PromptMessagesEditor() {
   const form = useFormContext<PromptConfigFormValues>();
@@ -9,12 +10,15 @@ export function PromptMessagesEditor() {
     control: form.control,
     name: "version.configData.messages",
   });
+  const inputs = form.watch("version.configData.inputs");
+  const availableMentions = useMemo(() => {
+    return inputs.map((input) => input.identifier);
+  }, [inputs]);
   return (
     <Box width="full" bg="white">
       <PromptMessagesField
-        // TODO: Since this field needs to be used in the form context, consider not passing this prop
         messageFields={messageFields}
-        availableFields={[]}
+        availableFields={availableMentions}
         otherNodesFields={{}}
       />
     </Box>

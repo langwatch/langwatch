@@ -19,18 +19,35 @@ export function PromptTextArea({
   isTemplateSupported = true,
   ...props
 }: {
+  /**
+   * `availableFields` are strings that can be used as mentions in the prompt text area.
+   *
+   * i.e. ["inputA", "bob"]
+   * Text area will then allow the user to insert these strings as mentions, such as `{{inputA}}` or `{{bob}}`.
+   */
   availableFields: string[];
   value?: string;
   onChange?: (event: { target: { value: string } }) => void;
   placeholder?: string;
+  /**
+   * `otherNodesFields` are fields that belong to other nodes in a visual or logical prompt configuration graph.
+   * Each node may have its own set of output fields, and these can be referenced using the syntax `${nodeId}.${field}`.
+   *
+   * Example: For a node with id "A" that produces a field "summary", `${nodeId}.${field}` would yield "A.summary" as a mention.
+   *
+   * This combined mention data enables intelligent autocompletion and referencing of dynamic fields while editing prompts.
+   */
   otherNodesFields: Record<string, string[]>;
   onAddEdge?: (
     id: string,
     handle: string,
-    content: PromptTextAreaOnAddMention
+    content: PromptTextAreaOnAddMention,
   ) => void;
   isTemplateSupported?: boolean;
 } & Omit<BoxProps, "onChange">) {
+  /**
+   * `mentionData` contains all the possible variables ("mentions") that users can reference in the prompt text area.
+   */
   const mentionData = useMemo(
     () => [
       ...availableFields.map((field) => ({
@@ -41,14 +58,14 @@ export function PromptTextArea({
         fields.map((field) => ({
           id: `${nodeId}.${field}`,
           display: `${nodeId}.${field}`,
-        }))
+        })),
       ),
     ],
-    [availableFields, otherNodesFields]
+    [availableFields, otherNodesFields],
   );
   const availableIds = useMemo(
     () => mentionData.map((m) => m.id),
-    [mentionData]
+    [mentionData],
   );
 
   const boxRef = useRef<HTMLDivElement>(null);
@@ -225,7 +242,7 @@ export function PromptTextArea({
                 _search,
                 highlightedDisplay,
                 _index,
-                focused
+                focused,
               ) => (
                 <Box
                   background={focused ? "blue.100" : "white"}
