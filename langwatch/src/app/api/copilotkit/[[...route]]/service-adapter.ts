@@ -51,11 +51,11 @@ export class PromptStudioAdapter implements CopilotServiceAdapter {
     } = request;
 
     // @ts-expect-error - Total hack
-    const { model, variables: variablesRaw } = forwardedParameters;
-    const formValues = JSON.parse(model) as PromptConfigFormValues;
-    const variables = variablesRaw
-      ? (JSON.parse(variablesRaw as string) as any[])
-      : [];
+    const { model: additionalParams } = forwardedParameters;
+    const { formValues, variables } = JSON.parse(additionalParams) as {
+      formValues: PromptConfigFormValues;
+      variables: z.infer<typeof runtimeInputsSchema>;
+    };
     const threadId = threadIdFromRequest ?? randomUUID();
     const nodeId = "prompt_node";
     const traceId = `trace_${randomUUID()}`;
@@ -74,7 +74,6 @@ export class PromptStudioAdapter implements CopilotServiceAdapter {
     ];
 
     const workflow = this.createWorkflow({
-      variables,
       workflowId,
       nodeId,
       formValues,
@@ -88,7 +87,17 @@ export class PromptStudioAdapter implements CopilotServiceAdapter {
         trace_id: traceId,
         workflow,
         node_id: nodeId,
-        inputs: variables,
+        inputs: {
+          input: messagesHistory.find((m) => m.role === "user"),
+          messages: messagesHistory,
+        },
+        // variables.reduce(
+        //   (acc, variable) => {
+        //     acc[variable.identifier] = variable.value;
+        //     return acc;
+        //   },
+        //   {} as Record<string, any>,
+        // ),
       },
     } as StudioClientEvent;
 
@@ -117,55 +126,62 @@ export class PromptStudioAdapter implements CopilotServiceAdapter {
           projectId: this.projectId,
           message: preparedEvent,
           onEvent: (serverEvent: StudioServerEvent) => {
-            if (
-              serverEvent.type === "component_state_change" &&
-              serverEvent.payload?.component_id === nodeId
-            ) {
-              const state = serverEvent.payload.execution_state;
+            try {
+              if (
+                serverEvent.type === "component_state_change" &&
+                serverEvent.payload?.component_id === nodeId
+              ) {
+                const state = serverEvent.payload.execution_state;
 
-              if (!state) return;
+                if (!state) return;
 
-              // Start on first state notification
-              if (!started) {
-                started = true;
-                eventStream$.sendTextMessageStart({ messageId });
-              }
-
-              const current =
-                typeof state.outputs?.output === "string"
-                  ? state.outputs.output
-                  : undefined;
-              if (current && current.length >= lastOutput.length) {
-                const delta = current.slice(lastOutput.length);
-                if (delta) {
-                  eventStream$.sendTextMessageContent({
-                    messageId,
-                    content: String(delta),
-                  });
+                // Start on first state notification
+                if (!started) {
+                  started = true;
+                  eventStream$.sendTextMessageStart({ messageId });
                 }
-                lastOutput = current;
-              }
 
-              if (state.status === "success" || state.status === "error") {
+                const current =
+                  typeof state.outputs?.output === "string"
+                    ? state.outputs.output
+                    : undefined;
+                if (current && current.length >= lastOutput.length) {
+                  const delta = current.slice(lastOutput.length);
+                  if (delta) {
+                    eventStream$.sendTextMessageContent({
+                      messageId,
+                      content: String(delta),
+                    });
+                  }
+                  lastOutput = current;
+                }
+
+                if (state.status === "success" || state.status === "error") {
+                  finishIfNeeded();
+                }
+              } else if (serverEvent.type === "error") {
+                console.error(serverEvent);
+                if (!started) {
+                  started = true;
+                  eventStream$.sendTextMessageStart({ messageId });
+                }
+                const msg = serverEvent.payload?.message ?? "An error occurred";
+                eventStream$.sendTextMessageContent({
+                  messageId,
+                  content: `❌ ${msg}`,
+                });
+                finishIfNeeded();
+              } else if (serverEvent.type === "done") {
                 finishIfNeeded();
               }
-            } else if (serverEvent.type === "error") {
-              if (!started) {
-                started = true;
-                eventStream$.sendTextMessageStart({ messageId });
-              }
-              const msg = serverEvent.payload?.message ?? "An error occurred";
-              eventStream$.sendTextMessageContent({
-                messageId,
-                content: `❌ ${msg}`,
-              });
-              finishIfNeeded();
-            } else if (serverEvent.type === "done") {
-              finishIfNeeded();
+            } catch (error) {
+              console.error(error);
+              throw error;
             }
           },
         });
       } catch (err: any) {
+        console.error(err);
         if (!started) {
           started = true;
           eventStream$.sendTextMessageStart({ messageId });
@@ -183,33 +199,16 @@ export class PromptStudioAdapter implements CopilotServiceAdapter {
     return { threadId };
   }
 
-  private getLastUserMessageContent(messages: any[]): string | undefined {
-    for (let i = messages.length - 1; i >= 0; i--) {
-      const m = messages[i];
-      if (
-        typeof m?.isTextMessage === "function" &&
-        m.isTextMessage() &&
-        m.role === "user"
-      ) {
-        return m.content as string;
-      }
-    }
-    return undefined;
-  }
-
   private createWorkflow(params: {
     workflowId: string;
     nodeId: string;
     formValues: PromptConfigFormValues;
     messagesHistory: ChatMessage[];
-    variables: z.infer<typeof runtimeInputsSchema>;
   }): Workflow {
-    const { workflowId, nodeId, formValues, messagesHistory, variables } =
-      params;
+    const { workflowId, nodeId, formValues, messagesHistory } = params;
     const nodeData = this.buildNodeData({
       formValues,
       messagesHistory,
-      variables,
     });
 
     return {
@@ -243,9 +242,8 @@ export class PromptStudioAdapter implements CopilotServiceAdapter {
   private buildNodeData(params: {
     formValues: PromptConfigFormValues;
     messagesHistory: ChatMessage[];
-    variables: z.infer<typeof runtimeInputsSchema>;
   }): Omit<LlmPromptConfigComponent, "configId"> {
-    const { formValues, messagesHistory, variables } = params;
+    const { formValues, messagesHistory } = params;
     return {
       name: "LLM Node",
       description: "LLM calling node",
@@ -268,7 +266,7 @@ export class PromptStudioAdapter implements CopilotServiceAdapter {
         {
           identifier: "messages",
           type: "chat_messages",
-          value: messagesHistory,
+          value: messagesHistory.filter((m) => m.role !== "system"),
         },
         {
           identifier: "demonstrations",
@@ -276,7 +274,7 @@ export class PromptStudioAdapter implements CopilotServiceAdapter {
           value: formValues.version.configData.demonstrations ?? undefined,
         },
       ],
-      inputs: variables,
+      inputs: [],
       outputs: formValues.version.configData.outputs,
     };
   }
