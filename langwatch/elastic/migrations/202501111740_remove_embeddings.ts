@@ -1,15 +1,14 @@
-import {
-  type QueryDslBoolQuery,
-  type QueryDslQueryContainer,
-  type SearchResponse,
-} from "@elastic/elasticsearch/lib/api/types";
-import { Client as ElasticClient } from "@elastic/elasticsearch";
+import { type estypes } from "@elastic/elasticsearch";
+import { type Client as ElasticClient } from "@elastic/elasticsearch";
 
 import { esClient, TRACE_INDEX } from "../../src/server/elasticsearch";
+type QueryDslBoolQuery = estypes.QueryDslBoolQuery;
+type QueryDslQueryContainer = estypes.QueryDslQueryContainer;
+type SearchResponse = estypes.SearchResponse;
 
 export const migrate = async (client: ElasticClient) => {
   let searchAfter: unknown[] | undefined;
-  let response: SearchResponse<{ trace_id: string }>;
+  let response: SearchResponse;
   let bulkActions = [];
 
   do {

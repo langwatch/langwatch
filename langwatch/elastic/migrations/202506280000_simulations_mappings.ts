@@ -1,8 +1,10 @@
-import type { MappingProperty } from "@elastic/elasticsearch/lib/api/types";
+import type { estypes } from "@elastic/elasticsearch";
 import { type Client as ElasticClient } from "@elastic/elasticsearch";
 import { createIndex } from "../helpers";
 import { eventMapping } from "../mappings/scenario-events";
 import { SCENARIO_EVENTS_INDEX } from "../../src/server/elasticsearch";
+
+type MappingProperty = estypes.MappingProperty;
 
 export const migrate = async (_migrationKey: string, client: ElasticClient) => {
   await createIndex({
@@ -16,3 +18,4 @@ export const migrate = async (_migrationKey: string, client: ElasticClient) => {
     is_write_index: true,
   });
 };
+elastic / migrations;
