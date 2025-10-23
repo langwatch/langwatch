@@ -3,7 +3,10 @@ import { PromptStudioChat } from "../../chat/PromptStudioChat";
 import { useFormContext } from "react-hook-form";
 import type { PromptConfigFormValues } from "~/prompt-configs/types";
 import { SettingsTabContent } from "./SettingsTabContent";
-import { useRef } from "react";
+import { useMemo, useState } from "react";
+import { VariablesForm } from "./VariablesForm";
+import type { z } from "zod";
+import { type runtimeInputsSchema } from "~/prompt-configs/schemas/field-schemas";
 
 enum PromptTab {
   Conversation = "conversation",
@@ -16,6 +19,11 @@ enum PromptTab {
  */
 export function PromptTabbedSection() {
   const form = useFormContext<PromptConfigFormValues>();
+  const inputs = form.getValues().version.configData.inputs ?? [];
+  const [variables, setVariables] = useState<
+    z.infer<typeof runtimeInputsSchema>
+  >([]);
+  const formValues = useMemo(() => form.getValues(), [form]);
 
   return (
     <Tabs.Root
@@ -47,12 +55,12 @@ export function PromptTabbedSection() {
             maxHeight="full"
             overflowY="scroll"
           >
-            <PromptStudioChat formValues={form.getValues()} />
+            <PromptStudioChat formValues={formValues} variables={variables} />
           </Box>
         </Tabs.Content>
         <Tabs.Content value={PromptTab.Variables}>
           <Box height="full" width="full">
-            Variables
+            <VariablesForm inputs={inputs} onChange={setVariables} />
           </Box>
         </Tabs.Content>
         <Tabs.Content value={PromptTab.Settings} flex={1} width="full">

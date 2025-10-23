@@ -3,6 +3,7 @@ import { configDefaults, defineConfig } from "vitest/config";
 
 export default defineConfig({
   test: {
+    environment: "happy-dom",
     setupFiles: ["./test-setup.ts"],
     exclude: [
       ...configDefaults.exclude,
@@ -14,16 +15,20 @@ export default defineConfig({
       "saas-src/**/*",
     ],
   },
+  esbuild: {
+    jsx: "automatic",
+    jsxImportSource: "react",
+  },
   resolve: {
     alias: {
       "~/": join(__dirname, "./src/"),
       "@injected-dependencies.client": join(
         __dirname,
-        "./src/injection/injection.client.ts"
+        "./src/injection/injection.client.ts",
       ),
       "@injected-dependencies.server": join(
         __dirname,
-        "./src/injection/injection.server.ts"
+        "./src/injection/injection.server.ts",
       ),
     },
   },

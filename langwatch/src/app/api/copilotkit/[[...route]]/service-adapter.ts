@@ -49,8 +49,11 @@ export class PromptStudioAdapter implements CopilotServiceAdapter {
     } = request;
 
     // @ts-expect-error - Total hack
-    const { model } = forwardedParameters;
+    const { model, variables: variablesRaw } = forwardedParameters;
     const formValues = JSON.parse(model) as PromptConfigFormValues;
+    const variables = variablesRaw
+      ? (JSON.parse(variablesRaw as string) as any[])
+      : [];
     console.log(model);
     const threadId = threadIdFromRequest ?? randomUUID();
     const nodeId = "prompt_node";
@@ -58,14 +61,23 @@ export class PromptStudioAdapter implements CopilotServiceAdapter {
     const workflowId = `prompt_execution_${randomUUID().slice(0, 6)}`;
     const input = this.getLastUserMessageContent(messages) ?? "";
 
+    // Prepend form messages (excluding system) to Copilot messages
+    const formMsgs = (formValues.version.configData.messages ?? []).filter(
+      (m) => m.role !== "system",
+    );
+    const messagesHistory = [
+      ...formMsgs,
+      ...messages.map((message: any) => ({
+        role: message.role,
+        content: message.content,
+      })),
+    ];
+
     const workflow = this.createWorkflow({
       workflowId,
       nodeId,
       formValues,
-      messagesHistory: messages.map((message: any) => ({
-        role: message.role,
-        content: message.content,
-      })),
+      messagesHistory,
     });
 
     // Build execute_flow event (inputs must be an array)
@@ -75,10 +87,7 @@ export class PromptStudioAdapter implements CopilotServiceAdapter {
         trace_id: traceId,
         workflow,
         node_id: nodeId,
-        inputs: {
-          input: input,
-          messages: messages,
-        },
+        inputs: variables,
       },
     } as StudioClientEvent;
 
@@ -262,7 +271,7 @@ export class PromptStudioAdapter implements CopilotServiceAdapter {
           value: formValues.version.configData.demonstrations ?? undefined,
         },
       ],
-      inputs: [],
+      inputs: formValues.version.configData.inputs ?? [],
       outputs: formValues.version.configData.outputs,
     };
   }

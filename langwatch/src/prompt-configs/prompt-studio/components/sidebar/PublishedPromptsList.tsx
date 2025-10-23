@@ -7,7 +7,12 @@ import { useAllPromptsForProject } from "~/prompt-configs/hooks/useAllPromptsFor
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { computeInitialFormValuesForPrompt } from "~/prompt-configs/utils/computeInitialFormValuesForPrompt";
 import { Text } from "@chakra-ui/react";
-import { LuFolder } from "react-icons/lu";
+
+export function getDisplayHandle(handle?: string | null): string {
+  if (!handle) return "Untitled";
+  return handle?.includes("/") ? handle.split("/")[1]! : handle;
+}
+
 export function PublishedPromptsList() {
   const { data } = useAllPromptsForProject();
   const { addTab } = useDraggableTabsBrowserStore();
@@ -71,7 +76,7 @@ export function PublishedPromptsList() {
                 textOverflow="ellipsis"
                 whiteSpace="nowrap"
               >
-                {prompt.handle ?? "Untitled"}
+                {getDisplayHandle(prompt.handle)}
               </Text>
             </Sidebar.Item>
           ))}

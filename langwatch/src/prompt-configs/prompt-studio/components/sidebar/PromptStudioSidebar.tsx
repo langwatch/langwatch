@@ -6,6 +6,10 @@ import { AddPromptButton } from "./AddPromptButton";
 import { SessionSnapshotsList } from "./SessionSnapshotsList";
 import { ConversationHistoryList } from "./ConversationHistoryList";
 
+/**
+ * The Prompt Studio sidebar component.
+ * Note: drafts and sessions are not yet supported
+ */
 export function PromptStudioSidebar() {
   return (
     <Sidebar.Root>
@@ -15,15 +19,15 @@ export function PromptStudioSidebar() {
           <AddPromptButton />
         </Sidebar.SectionHeader>
         <PublishedPromptsList />
-        <DraftPromptsList />
+        {/* <DraftPromptsList /> */}
       </Sidebar.Section>
-      <Sidebar.Section>
+      {/* <Sidebar.Section>
         <Sidebar.SectionHeader>
           <Text>Sessions</Text>
         </Sidebar.SectionHeader>
         <SessionSnapshotsList />
         <ConversationHistoryList />
-      </Sidebar.Section>
+      </Sidebar.Section> */}
     </Sidebar.Root>
   );
 }
