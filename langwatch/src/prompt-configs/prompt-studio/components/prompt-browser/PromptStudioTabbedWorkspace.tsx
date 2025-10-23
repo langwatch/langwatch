@@ -35,6 +35,14 @@ export function PromptStudioTabbedWorkspace() {
   }
 
   function handleClose(tabId: string) {
+    const tab = windows.flatMap((w) => w.tabs).find((t) => t.id === tabId);
+
+    if (tab?.data.form.isDirty) {
+      if (!confirm("Your unsaved changes will be lost. Proceed anyway?")) {
+        return;
+      }
+    }
+
     removeTab({ tabId });
   }
 
