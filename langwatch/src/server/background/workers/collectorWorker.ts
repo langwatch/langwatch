@@ -119,7 +119,7 @@ export const scheduleTraceCollectionWithGrouping = async (
     if (existingJob && "spans" in existingJob.data) {
       logger.debug(
         { collectionJobTraceId: collectorJob.traceId },
-        "found existing job trace, merging...",
+        `found existing job trace, merging... (attempt ${attempts + 1})`,
       );
       const mergedJob = mergeCollectorJobs(existingJob.data, collectorJob);
       try {
@@ -133,7 +133,7 @@ export const scheduleTraceCollectionWithGrouping = async (
         // so we'll try again with a different job id
         if (attempts > 2) {
           logger.error(
-            { error, attempts },
+            { error, attempts: attempts + 1 },
             "failed to merge insert jobs, giving up",
           );
           throw error;
