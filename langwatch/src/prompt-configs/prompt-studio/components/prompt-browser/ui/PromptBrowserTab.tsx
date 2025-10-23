@@ -1,5 +1,7 @@
-import { Badge, Box, Circle, HStack, Text } from "@chakra-ui/react";
+import { Box, Circle, HStack, Text } from "@chakra-ui/react";
 import { X } from "react-feather";
+import { VersionBadge } from "~/prompt-configs/components/ui/VersionBadge";
+import { OrganizationBadge } from "~/prompt-configs/components/ui/OrganizationBadge";
 
 interface PromptBrowserTabProps {
   title?: string | null;
@@ -7,6 +9,7 @@ interface PromptBrowserTabProps {
   hasUnsavedChanges?: boolean;
   onClose?: () => void;
   dimmed?: boolean;
+  scope?: "PROJECT" | "ORGANIZATION";
 }
 
 export function PromptBrowserTab({
@@ -15,7 +18,9 @@ export function PromptBrowserTab({
   hasUnsavedChanges,
   onClose,
   dimmed,
+  scope,
 }: PromptBrowserTabProps) {
+  console.log("scope", scope);
   return (
     <HStack gap={2} height="full">
       <HStack>
@@ -27,10 +32,9 @@ export function PromptBrowserTab({
             <Circle size="10px" bg="orange.400" color="gray.50" />
           </Box>
         ) : version != null ? (
-          <Badge colorPalette="gray" fontSize="sm" textTransform="none">
-            v{version}
-          </Badge>
+          <VersionBadge version={version} />
         ) : null}
+        {scope === "ORGANIZATION" && <OrganizationBadge />}
       </HStack>
       <Box
         role="button"

@@ -28,7 +28,7 @@ export function useCreateDraftPrompt() {
           llm: {
             model: normalizedDefaultModel,
           },
-          inputs: [],
+          inputs: [{ identifier: "input", type: "str" }],
           outputs: [{ identifier: "output", type: "str" }],
           messages: [
             { role: "system", content: "You are a helpful assistant." },

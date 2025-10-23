@@ -47,7 +47,6 @@ export function PromptStudioTabbedWorkspace() {
       {windows.map((window) => (
         <DraggableTabsBrowser.Group
           key={window.id}
-          // maxWidth={windows.length > 1 ? "50%" : undefined}
           groupId={window.id}
           activeTabId={window.activeTabId ?? undefined}
           onTabChange={handleTabChange}
@@ -65,6 +64,7 @@ export function PromptStudioTabbedWorkspace() {
                       version={tab.data.meta.versionNumber}
                       onClose={() => handleClose(tab.id)}
                       dimmed={window.id !== activeWindowId}
+                      scope={tab.data.form.defaultValues.scope}
                     />
                   </DraggableTabsBrowser.Tab>
                 </DraggableTabsBrowser.Trigger>
