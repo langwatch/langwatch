@@ -21,6 +21,8 @@ import { studioBackendPostEvent } from "../../workflows/post_event/post-event";
 import type { LLMConfig } from "~/optimization_studio/types/dsl";
 import type { ChatMessage } from "~/server/tracer/types";
 import type { PromptConfigFormValues } from "~/prompt-configs/types";
+import type { runtimeInputsSchema } from "~/prompt-configs/schemas";
+import type z from "zod";
 
 type PromptStudioAdapterParams = {
   projectId: string;
@@ -54,12 +56,10 @@ export class PromptStudioAdapter implements CopilotServiceAdapter {
     const variables = variablesRaw
       ? (JSON.parse(variablesRaw as string) as any[])
       : [];
-    console.log(model);
     const threadId = threadIdFromRequest ?? randomUUID();
     const nodeId = "prompt_node";
     const traceId = `trace_${randomUUID()}`;
     const workflowId = `prompt_execution_${randomUUID().slice(0, 6)}`;
-    const input = this.getLastUserMessageContent(messages) ?? "";
 
     // Prepend form messages (excluding system) to Copilot messages
     const formMsgs = (formValues.version.configData.messages ?? []).filter(
@@ -74,6 +74,7 @@ export class PromptStudioAdapter implements CopilotServiceAdapter {
     ];
 
     const workflow = this.createWorkflow({
+      variables,
       workflowId,
       nodeId,
       formValues,
@@ -201,11 +202,14 @@ export class PromptStudioAdapter implements CopilotServiceAdapter {
     nodeId: string;
     formValues: PromptConfigFormValues;
     messagesHistory: ChatMessage[];
+    variables: z.infer<typeof runtimeInputsSchema>;
   }): Workflow {
-    const { workflowId, nodeId, formValues, messagesHistory } = params;
+    const { workflowId, nodeId, formValues, messagesHistory, variables } =
+      params;
     const nodeData = this.buildNodeData({
       formValues,
       messagesHistory,
+      variables,
     });
 
     return {
@@ -239,8 +243,9 @@ export class PromptStudioAdapter implements CopilotServiceAdapter {
   private buildNodeData(params: {
     formValues: PromptConfigFormValues;
     messagesHistory: ChatMessage[];
+    variables: z.infer<typeof runtimeInputsSchema>;
   }): Omit<LlmPromptConfigComponent, "configId"> {
-    const { formValues, messagesHistory } = params;
+    const { formValues, messagesHistory, variables } = params;
     return {
       name: "LLM Node",
       description: "LLM calling node",
@@ -271,7 +276,7 @@ export class PromptStudioAdapter implements CopilotServiceAdapter {
           value: formValues.version.configData.demonstrations ?? undefined,
         },
       ],
-      inputs: formValues.version.configData.inputs ?? [],
+      inputs: variables,
       outputs: formValues.version.configData.outputs,
     };
   }
