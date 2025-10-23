@@ -11,7 +11,7 @@ import type { PromptConfigFormValues } from "~/prompt-configs";
  * Hook to handle the saving of a prompt in the prompt studio.
  */
 export function useHandleSavePrompt() {
-  const { triggerSaveVersion } = usePromptConfigContext();
+  const { triggerSaveVersion, triggerCreatePrompt } = usePromptConfigContext();
   const methods = useFormContext<PromptConfigFormValues>();
   const configId = methods.watch("configId");
 
@@ -30,23 +30,19 @@ export function useHandleSavePrompt() {
     const onError = (error: Error) => {
       console.error(error);
       toaster.create({
-        title: "Error saving version",
+        title: "Error saving",
         description: error.message,
         type: "error",
         closable: true,
       });
     };
-    if (!configId) {
-      toaster.create({
-        title: "Error saving version",
-        description: "No config ID found",
-        type: "error",
-        closable: true,
-      });
-      return;
+
+    if (configId) {
+      void triggerSaveVersion({ id: configId, data, onSuccess, onError });
+    } else {
+      void triggerCreatePrompt({ data, onSuccess, onError });
     }
-    void triggerSaveVersion({ id: configId, data, onSuccess, onError });
-  }, [triggerSaveVersion, configId, methods]);
+  }, [triggerSaveVersion, configId, methods, triggerCreatePrompt]);
 
   return { handleSaveVersion };
 }

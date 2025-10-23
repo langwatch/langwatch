@@ -65,7 +65,10 @@ function PromptBrowserWindowInner(props: {
     updateTabDataDebounced({
       tabId: props.tabId,
       updater: (data) => ({
-        ...data,
+        form: {
+          ...data.form,
+          defaultValues: values,
+        },
         meta: {
           ...data.meta,
           title: values.handle ?? null,
