@@ -3,10 +3,10 @@ import { TeamRoleGroup, checkUserPermissionForProject } from "../../permission";
 import { protectedProcedure } from "../../trpc";
 import { generateTracesPivotQueryConditions } from "./common";
 import { sharedFiltersInputSchema } from "../../../analytics/types";
-import type {
-  QueryDslBoolQuery,
-  QueryDslQueryContainer,
-} from "@elastic/elasticsearch/lib/api/types";
+import { estypes } from "@elastic/elasticsearch";
+
+type QueryDslBoolQuery = estypes.QueryDslBoolQuery;
+type QueryDslQueryContainer = estypes.QueryDslQueryContainer;
 import type { ElasticSearchTrace } from "../../../tracer/types";
 
 export const topUsedDocuments = protectedProcedure

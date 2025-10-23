@@ -7,7 +7,9 @@ import { protectedProcedure } from "../../trpc";
 import { availableFilters } from "../../../filters/registry";
 import { sharedFiltersInputSchema } from "../../../analytics/types";
 import { generateTracesPivotQueryConditions } from "./common";
-import type { AggregationsAggregationContainer } from "@elastic/elasticsearch/lib/api/typesWithBodyKey";
+import { estypesWithBody } from "@elastic/elasticsearch";
+
+type AggregationsAggregationContainer = estypesWithBody.AggregationsAggregationContainer;
 
 export const dataForFilter = protectedProcedure
   .input(
