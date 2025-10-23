@@ -23,7 +23,7 @@ export interface TabData {
     /** Version number for display, if available */
     versionNumber?: number;
     /** Scope of the tab */
-    scope: "PROJECT" | "ORGANIZATION";
+    scope?: "PROJECT" | "ORGANIZATION";
   };
 }
 
