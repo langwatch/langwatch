@@ -1,10 +1,10 @@
-import { Box, Circle, HStack, Text } from "@chakra-ui/react";
+import { Box, Circle, HStack, Text, type StackProps } from "@chakra-ui/react";
 import { X } from "react-feather";
 import { VersionBadge } from "~/prompt-configs/components/ui/VersionBadge";
 import { OrganizationBadge } from "~/prompt-configs/components/ui/OrganizationBadge";
 
-interface PromptBrowserTabProps {
-  title?: string | null;
+interface PromptBrowserTabProps extends StackProps {
+  tabTitle?: string | null;
   version?: number;
   hasUnsavedChanges?: boolean;
   onClose?: () => void;
@@ -13,18 +13,19 @@ interface PromptBrowserTabProps {
 }
 
 export function PromptBrowserTab({
-  title,
+  tabTitle,
   version,
   hasUnsavedChanges,
   onClose,
   dimmed,
   scope,
+  ...rest
 }: PromptBrowserTabProps) {
   return (
-    <HStack gap={2} height="full">
+    <HStack gap={2} height="full" {...rest}>
       <HStack>
         <Text textOverflow="ellipsis" whiteSpace="nowrap" overflow="hidden">
-          {title ?? "Untitled"}
+          {tabTitle ?? "Untitled"}
         </Text>
         {hasUnsavedChanges ? (
           <Box>

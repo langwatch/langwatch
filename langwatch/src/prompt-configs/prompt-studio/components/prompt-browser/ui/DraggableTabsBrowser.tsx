@@ -15,7 +15,7 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { BrowserLikeTabs } from "./BrowserLikeTabs";
-import { HStack, type StackProps } from "@chakra-ui/react";
+import { HStack, type HtmlProps, type StackProps } from "@chakra-ui/react";
 
 // Context for managing drag state and callbacks
 interface DraggableTabsContextValue {
@@ -247,12 +247,17 @@ function DraggableTabsTabBar({ children }: DraggableTabsTabBarProps) {
  *
  * Single Responsibility: Handles both dragging and tab selection trigger functionality
  */
-interface DraggableTabTriggerProps {
+interface DraggableTabTriggerProps
+  extends React.HTMLAttributes<HTMLDivElement> {
   value: string;
   children: React.ReactNode;
 }
 
-function DraggableTabTrigger({ value, children }: DraggableTabTriggerProps) {
+function DraggableTabTrigger({
+  value,
+  children,
+  ...rest
+}: DraggableTabTriggerProps) {
   const { groupId } = useTabGroupContext();
 
   // Extract label from children for drag overlay
@@ -278,6 +283,7 @@ function DraggableTabTrigger({ value, children }: DraggableTabTriggerProps) {
   });
 
   const style: React.CSSProperties = {
+    ...rest.style,
     transform: CSS.Transform.toString(transform),
     transition,
     opacity: isDragging ? 0.5 : 1,
@@ -285,6 +291,7 @@ function DraggableTabTrigger({ value, children }: DraggableTabTriggerProps) {
 
   return (
     <div
+      {...rest}
       ref={setNodeRef}
       style={{
         flex: 1,

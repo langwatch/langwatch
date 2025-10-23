@@ -52,6 +52,7 @@ export function PromptStudioTabbedWorkspace() {
           onTabChange={handleTabChange}
           onClick={() => setActiveWindow({ windowId: window.id })}
           borderRight="1px solid var(--chakra-colors-gray-350)"
+          maxWidth={windows.length > 1 ? "50vw" : "auto"}
         >
           <DraggableTabsBrowser.TabBar>
             <HStack gap={0} overflowX="auto">
@@ -60,7 +61,7 @@ export function PromptStudioTabbedWorkspace() {
                   <DraggableTabsBrowser.Tab>
                     <PromptBrowserTab
                       hasUnsavedChanges={tab.data.form.isDirty}
-                      title={tab.data.meta.title ?? "Untitled"}
+                      tabTitle={tab.data.meta.title ?? "Untitled"}
                       version={tab.data.meta.versionNumber}
                       onClose={() => handleClose(tab.id)}
                       dimmed={window.id !== activeWindowId}
