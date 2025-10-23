@@ -93,11 +93,6 @@ export class PromptStudioAdapter implements CopilotServiceAdapter {
       },
     } as StudioClientEvent;
 
-    console.log({
-      rawEvent,
-      workflow,
-    });
-
     // Enrich with envs and datasets to match server route behavior
     const preparedEvent = await loadDatasets(
       await addEnvs(rawEvent, this.projectId),

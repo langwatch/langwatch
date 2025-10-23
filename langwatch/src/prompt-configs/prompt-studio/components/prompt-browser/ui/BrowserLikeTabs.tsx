@@ -15,7 +15,7 @@ function BrowserLikeTabsRoot({
   ...props
 }: BrowserLikeTabsRootProps) {
   return (
-    <VStack height="full" {...props} gap={0} align="stretch" width="full">
+    <VStack height="full" gap={0} align="stretch" width="full" {...props}>
       <Tabs.Root
         value={value}
         defaultValue={defaultValue}
