@@ -95,8 +95,6 @@ export const modelProviderRouter = createTRPCRouter({
           }
         }
       } catch (e) {
-        console.error(`Validation error for ${provider}:`, e);
-        console.error("Custom keys:", customKeys);
         throw new Error(`Invalid keys for ${provider}`);
       }
 
