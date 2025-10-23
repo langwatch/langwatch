@@ -77,7 +77,7 @@ export async function runEvaluationJob(
     traceId: job.data.trace.trace_id,
     evaluatorType: job.data.check.type,
     settings: check.parameters,
-    mappings: check.mappings as MappingState,
+    mappings: check.mappings as MappingState | null,
     protections,
   });
 }
@@ -86,7 +86,10 @@ export async function runEvaluationJob(
  * Check if any mapping has type "thread"
  * Single Responsibility: Detect if thread-based mappings are present
  */
-const hasThreadMappings = (mappingState: MappingState): boolean => {
+const hasThreadMappings = (mappingState: MappingState | null): boolean => {
+  if (!mappingState) {
+    return false;
+  }
   return Object.values(mappingState.mapping).some(
     (mapping) => "type" in mapping && mapping.type === "thread"
   );
@@ -99,9 +102,12 @@ const hasThreadMappings = (mappingState: MappingState): boolean => {
 const buildThreadData = async (
   projectId: string,
   trace: Trace,
-  mappingState: MappingState,
+  mappingState: MappingState | null,
   protections: Protections
 ): Promise<Record<string, any>> => {
+  if (!mappingState) {
+    throw new Error("Mapping state is required for thread-based evaluation");
+  }
   const threadId = trace.metadata?.thread_id;
   if (!threadId) {
     throw new Error(
@@ -238,7 +244,7 @@ export type EvaluationResultWithThreadId = SingleEvaluationResult & {
 const buildDataForEvaluation = async (
   evaluatorType: EvaluatorTypes,
   trace: Trace,
-  mappings: MappingState,
+  mappings: MappingState | null,
   projectId: string,
   protections: Protections
 ): Promise<DataForEvaluation> => {
@@ -252,7 +258,7 @@ const buildDataForEvaluation = async (
     traceId: trace.trace_id,
     threadId: trace.metadata?.thread_id,
     hasThreadMappings: hasThread,
-    mappingKeys: Object.keys(mappings.mapping),
+    mappingKeys: mappings ? Object.keys(mappings.mapping) : [],
   });
 
   if (hasThread) {
@@ -267,7 +273,7 @@ const buildDataForEvaluation = async (
     logger.info("Using regular trace-based mapping", {
       traceId: trace.trace_id,
     });
-    const mappedData = switchMapping(trace, mappings);
+    const mappedData = switchMapping(trace, mappings ?? DEFAULT_MAPPINGS);
     if (!mappedData) {
       throw new Error("No mapped data found to run evaluator");
     }
@@ -305,7 +311,7 @@ export const runEvaluationForTrace = async ({
   traceId: string;
   evaluatorType: EvaluatorTypes;
   settings: Record<string, any> | string | number | boolean | null;
-  mappings: MappingState;
+  mappings: MappingState | null;
   protections: Protections;
 }): Promise<EvaluationResultWithThreadId> => {
   const trace = await getTraceById({
