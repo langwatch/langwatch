@@ -1,8 +1,8 @@
-import type {
-  AggregationsAggregate,
-  QueryDslBoolQuery,
-  SearchResponse,
-} from "@elastic/elasticsearch/lib/api/types";
+import { estypes } from "@elastic/elasticsearch";
+
+type AggregationsAggregate = estypes.AggregationsAggregate;
+type QueryDslBoolQuery = estypes.QueryDslBoolQuery;
+type SearchResponse = estypes.SearchResponse;
 import { EvaluationExecutionMode, ExperimentType } from "@prisma/client";
 import type { JsonValue } from "@prisma/client/runtime/library";
 import { TRPCError } from "@trpc/server";

@@ -1,10 +1,10 @@
 import { z } from "zod";
 
-import {
-  type SearchResponse,
-  type SearchTotalHits,
-  type Sort,
-} from "@elastic/elasticsearch/lib/api/types";
+import { estypes } from "@elastic/elasticsearch";
+
+type SearchResponse = estypes.SearchResponse;
+type SearchTotalHits = estypes.SearchTotalHits;
+type Sort = estypes.Sort;
 import { PublicShareResourceTypes, type PrismaClient } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import shuffle from "lodash-es/shuffle";
