@@ -175,15 +175,7 @@ function SidebarItem({
         </Box>
       )}
       <Box flex={1} minWidth={0}>
-        <Text
-          fontSize="sm"
-          fontWeight="normal"
-          overflow="hidden"
-          textOverflow="ellipsis"
-          whiteSpace="nowrap"
-        >
-          {children}
-        </Text>
+        {children}
         {meta && (
           <Text
             fontSize="xs"
