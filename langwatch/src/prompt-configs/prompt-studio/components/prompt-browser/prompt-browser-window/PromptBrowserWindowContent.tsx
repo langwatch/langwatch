@@ -22,6 +22,7 @@ export function PromptBrowserWindowContent(
 ) {
   const { windows } = useDraggableTabsBrowserStore();
   const tab = windows.flatMap((w) => w.tabs).find((t) => t.id === props.tabId);
+  // This is a bad idea, as it will slow everything down
   const initialConfigValues = tab?.data.form.defaultValues;
 
   /**
@@ -65,14 +66,12 @@ function PromptBrowserWindowInner(props: {
     updateTabDataDebounced({
       tabId: props.tabId,
       updater: (data) => ({
-        form: {
-          ...data.form,
-          defaultValues: values,
-        },
+        ...data,
         meta: {
           ...data.meta,
           title: values.handle ?? null,
           versionNumber: values.versionMetadata?.versionNumber,
+          scope: values.scope,
         },
       }),
     });
