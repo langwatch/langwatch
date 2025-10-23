@@ -328,7 +328,10 @@ export const TRACE_MAPPINGS = {
       trace: TraceWithAnnotations,
       key: string,
       subkey: string,
-      data: { allTraces?: TraceWithAnnotations[]; selectedFields?: string[] },
+      data: {
+        allTraces?: TraceWithAnnotations[];
+        selectedFields?: string[];
+      } = {},
     ) => {
       // Return all traces that belong to the same thread_id as the current trace
       const threadId = trace.metadata?.thread_id;
@@ -649,7 +652,7 @@ export const mapTraceToDatasetEntry = (
         ([column, { source, key, subkey, selectedFields }]) => {
           const source_ =
             source && source in TRACE_MAPPINGS
-              ? TRACE_MAPPINGS[source as keyof typeof TRACE_MAPPINGS]
+              ? TRACE_MAPPINGS[source]
               : undefined;
 
           let value = source_?.mapping(trace, key!, subkey!, {
