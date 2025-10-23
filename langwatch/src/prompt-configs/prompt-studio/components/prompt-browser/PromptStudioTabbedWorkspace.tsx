@@ -64,7 +64,7 @@ export function PromptStudioTabbedWorkspace() {
                       version={tab.data.meta.versionNumber}
                       onClose={() => handleClose(tab.id)}
                       dimmed={window.id !== activeWindowId}
-                      scope={tab.data.form.defaultValues.scope}
+                      scope={tab.data.meta.scope}
                     />
                   </DraggableTabsBrowser.Tab>
                 </DraggableTabsBrowser.Trigger>

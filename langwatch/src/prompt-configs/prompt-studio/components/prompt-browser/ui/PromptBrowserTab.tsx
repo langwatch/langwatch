@@ -20,7 +20,6 @@ export function PromptBrowserTab({
   dimmed,
   scope,
 }: PromptBrowserTabProps) {
-  console.log("scope", scope);
   return (
     <HStack gap={2} height="full">
       <HStack>
