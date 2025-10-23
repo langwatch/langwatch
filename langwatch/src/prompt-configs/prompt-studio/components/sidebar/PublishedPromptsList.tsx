@@ -6,7 +6,7 @@ import { groupBy } from "lodash-es";
 import { useAllPromptsForProject } from "~/prompt-configs/hooks/useAllPromptsForProject";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { computeInitialFormValuesForPrompt } from "~/prompt-configs/utils/computeInitialFormValuesForPrompt";
-import { Text } from "@chakra-ui/react";
+import { PublishedPromptContent } from "./PublishedPromptContent";
 
 export function getDisplayHandle(handle?: string | null): string {
   if (!handle) return "Untitled";
@@ -71,15 +71,10 @@ export function PublishedPromptsList() {
                 });
               }}
             >
-              <Text
-                overflow="hidden"
-                textOverflow="ellipsis"
-                whiteSpace="nowrap"
-                fontSize="sm"
-                fontWeight="normal"
-              >
-                {getDisplayHandle(prompt.handle)}
-              </Text>
+              <PublishedPromptContent
+                promptId={prompt.id}
+                promptHandle={prompt.handle}
+              />
             </Sidebar.Item>
           ))}
         </Sidebar.List>
