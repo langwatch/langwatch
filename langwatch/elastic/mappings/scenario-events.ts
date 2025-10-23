@@ -3,7 +3,9 @@
  * Maps the schema defined in schemas.ts to Elasticsearch field types
  */
 
-import type { MappingProperty } from "@elastic/elasticsearch/lib/api/types";
+import { estypes } from "@elastic/elasticsearch";
+
+type MappingProperty = estypes.MappingProperty;
 import { FLATENNED_TYPE } from "~/server/elasticsearch";
 import type {
   ScenarioEvent,
