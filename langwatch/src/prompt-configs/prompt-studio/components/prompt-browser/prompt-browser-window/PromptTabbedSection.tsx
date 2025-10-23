@@ -24,6 +24,7 @@ export function PromptTabbedSection() {
     z.infer<typeof runtimeInputsSchema>
   >([]);
   const formValues = useMemo(() => form.getValues(), [form]);
+  const hasInputs = inputs.length > 0;
 
   return (
     <Tabs.Root
@@ -35,7 +36,9 @@ export function PromptTabbedSection() {
     >
       <Tabs.List colorPalette="orange">
         <Tabs.Trigger value={PromptTab.Conversation}>Conversation</Tabs.Trigger>
-        <Tabs.Trigger value={PromptTab.Variables}>Variables</Tabs.Trigger>
+        {hasInputs && (
+          <Tabs.Trigger value={PromptTab.Variables}>Variables</Tabs.Trigger>
+        )}
         <Tabs.Trigger value={PromptTab.Settings}>Settings</Tabs.Trigger>
       </Tabs.List>
       <HStack flex={1} width="full">
