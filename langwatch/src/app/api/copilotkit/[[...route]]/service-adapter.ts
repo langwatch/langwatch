@@ -65,13 +65,12 @@ export class PromptStudioAdapter implements CopilotServiceAdapter {
     const formMsgs = (formValues.version.configData.messages ?? []).filter(
       (m) => m.role !== "system",
     );
-    const messagesHistory = [
-      ...formMsgs,
-      ...messages.map((message: any) => ({
+    const messagesHistory = [...formMsgs, ...messages]
+      .map((message: any) => ({
         role: message.role,
         content: message.content,
-      })),
-    ];
+      }))
+      .filter((message) => message.role !== "system");
 
     const workflow = this.createWorkflow({
       workflowId,
@@ -88,16 +87,15 @@ export class PromptStudioAdapter implements CopilotServiceAdapter {
         workflow,
         node_id: nodeId,
         inputs: {
-          input: messagesHistory.find((m) => m.role === "user"),
+          ...variables?.reduce(
+            (acc, variable) => {
+              acc[variable.identifier] = variable.value;
+              return acc;
+            },
+            {} as Record<string, any>,
+          ),
           messages: messagesHistory,
         },
-        // variables.reduce(
-        //   (acc, variable) => {
-        //     acc[variable.identifier] = variable.value;
-        //     return acc;
-        //   },
-        //   {} as Record<string, any>,
-        // ),
       },
     } as StudioClientEvent;
 
@@ -274,7 +272,7 @@ export class PromptStudioAdapter implements CopilotServiceAdapter {
           value: formValues.version.configData.demonstrations ?? undefined,
         },
       ],
-      inputs: [],
+      inputs: formValues.version.configData.inputs,
       outputs: formValues.version.configData.outputs,
     };
   }
