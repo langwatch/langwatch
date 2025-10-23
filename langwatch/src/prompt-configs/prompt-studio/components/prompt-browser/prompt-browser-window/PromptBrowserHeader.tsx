@@ -24,7 +24,7 @@ export function PromptBrowserHeader() {
   };
 
   return (
-    <HStack width="full" bg="white">
+    <HStack width="full" bg="white" display="flex" flexDirection="row">
       <HStack>
         <EditablePromptHandleField width="auto" />
         <GeneratePromptApiSnippetDialog

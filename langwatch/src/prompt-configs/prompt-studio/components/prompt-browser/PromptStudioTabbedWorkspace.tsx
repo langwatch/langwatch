@@ -47,11 +47,12 @@ export function PromptStudioTabbedWorkspace() {
       {windows.map((window) => (
         <DraggableTabsBrowser.Group
           key={window.id}
-          maxWidth={windows.length > 1 ? "50%" : undefined}
+          // maxWidth={windows.length > 1 ? "50%" : undefined}
           groupId={window.id}
           activeTabId={window.activeTabId ?? undefined}
           onTabChange={handleTabChange}
           onClick={() => setActiveWindow({ windowId: window.id })}
+          borderRight="1px solid var(--chakra-colors-gray-350)"
         >
           <DraggableTabsBrowser.TabBar>
             <HStack gap={0} overflowX="auto">
