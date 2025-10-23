@@ -87,17 +87,16 @@ export class PromptStudioAdapter implements CopilotServiceAdapter {
         workflow,
         node_id: nodeId,
         inputs: {
-          ...variables?.reduce(
-            (acc, variable) => {
-              acc[variable.identifier] = variable.value;
-              return acc;
-            },
-            {} as Record<string, any>,
-          ),
+          ...variables,
           messages: messagesHistory,
         },
       },
     } as StudioClientEvent;
+
+    console.log({
+      rawEvent,
+      workflow,
+    });
 
     // Enrich with envs and datasets to match server route behavior
     const preparedEvent = await loadDatasets(
