@@ -1,38 +1,32 @@
-import { useEffect } from "react";
+import { zodResolver } from "@hookform/resolvers/zod";
 import { VStack, Textarea } from "@chakra-ui/react";
 import { useForm } from "react-hook-form";
+import { useMemo } from "react";
 import type { z } from "zod";
-import { type runtimeInputsSchema } from "~/prompt-configs/schemas/field-schemas";
+import { runtimeInputsSchema } from "~/prompt-configs/schemas/field-schemas";
 
 type RuntimeInput = z.infer<typeof runtimeInputsSchema>[number];
 
 export type VariablesFormProps = {
   inputs: RuntimeInput[];
-  onChange: (values: Record<string, unknown>) => void;
+  onChange: (values: z.infer<typeof runtimeInputsSchema>) => void;
 };
 
 export function VariablesForm({ inputs, onChange }: VariablesFormProps) {
-  // Convert array of inputs to a values object (by identifier)
-  const defaultValues = Object.fromEntries(
-    (inputs || []).map((field) => [
-      field.identifier,
-      typeof field.value === "object" && field.value !== null
-        ? JSON.stringify(field.value)
-        : field.value ?? "",
-    ]),
-  );
+  const defaultValues = useMemo(() => {
+    return inputs.map((input) => ({
+      ...input,
+      value: input.value ?? "",
+    }));
+  }, [inputs]);
 
-  const form = useForm<Record<string, string>>({
+  const form = useForm<z.infer<typeof runtimeInputsSchema>>({
     defaultValues,
+    resolver: zodResolver(runtimeInputsSchema),
   });
 
   // Watch form state and call onChange when it updates
-  const values = form.watch();
-  useEffect(() => {
-    onChange(values);
-    // We intentionally want this to run whenever form values change
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [values]);
+  form.watch((values) => onChange(values));
 
   return (
     <VStack align="start" gap={3} width="full">
@@ -57,8 +51,8 @@ export function VariablesForm({ inputs, onChange }: VariablesFormProps) {
                 input.type === "image"
                   ? "image url"
                   : input.type === "str"
-                  ? undefined
-                  : input.type
+                    ? undefined
+                    : input.type
               }
               size="sm"
             />

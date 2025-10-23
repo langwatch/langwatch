@@ -58,12 +58,17 @@ export function PromptTabbedSection() {
             <PromptStudioChat formValues={formValues} variables={variables} />
           </Box>
         </Tabs.Content>
-        <Tabs.Content value={PromptTab.Variables}>
+        <Tabs.Content value={PromptTab.Variables} height="full">
           <Box height="full" width="full">
             <VariablesForm inputs={inputs} onChange={setVariables} />
           </Box>
         </Tabs.Content>
-        <Tabs.Content value={PromptTab.Settings} flex={1} width="full">
+        <Tabs.Content
+          value={PromptTab.Settings}
+          flex={1}
+          width="full"
+          height="full"
+        >
           <Box height="full" width="full">
             <SettingsTabContent />
           </Box>

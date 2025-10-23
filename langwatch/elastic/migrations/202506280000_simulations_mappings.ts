@@ -18,4 +18,3 @@ export const migrate = async (_migrationKey: string, client: ElasticClient) => {
     is_write_index: true,
   });
 };
-elastic / migrations;
