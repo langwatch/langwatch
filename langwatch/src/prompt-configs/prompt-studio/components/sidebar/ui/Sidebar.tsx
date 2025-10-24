@@ -12,7 +12,6 @@ function SidebarRoot({ children }: SidebarRootProps) {
       as="nav"
       width="full"
       height="100%"
-      bg="white"
       borderRight="1px solid"
       borderColor="gray.200"
       overflowY="auto"
@@ -44,8 +43,8 @@ function SidebarSectionHeader({
 }: SidebarSectionHeaderProps) {
   return (
     <Box
-      paddingX="2"
-      paddingY="1"
+      paddingX="3"
+      paddingBottom="2"
       fontSize="sm"
       fontWeight="medium"
       color="gray.700"

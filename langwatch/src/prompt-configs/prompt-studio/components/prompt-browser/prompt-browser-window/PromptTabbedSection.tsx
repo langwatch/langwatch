@@ -34,14 +34,14 @@ export function PromptTabbedSection() {
       flex={1}
       width="full"
     >
-      <Tabs.List colorPalette="orange">
+      <Tabs.List colorPalette="orange" paddingX={3}>
         <Tabs.Trigger value={PromptTab.Conversation}>Conversation</Tabs.Trigger>
         {hasInputs && (
           <Tabs.Trigger value={PromptTab.Variables}>Variables</Tabs.Trigger>
         )}
         <Tabs.Trigger value={PromptTab.Settings}>Settings</Tabs.Trigger>
       </Tabs.List>
-      <HStack flex={1} width="full" alignItems="center" justifyContent="center">
+      <HStack flex={1} width="full" maxWidth="768px" margin="0 auto">
         <Tabs.Content
           value={PromptTab.Conversation}
           flex={1}
@@ -49,7 +49,6 @@ export function PromptTabbedSection() {
           height="full"
           display="flex"
           position="relative"
-          maxWidth="768px"
         >
           <Box
             position="absolute"

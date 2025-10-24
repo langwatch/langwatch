@@ -13,7 +13,7 @@ export function PromptStudioLayout() {
             position="relative"
             top={0}
             left={0}
-            width="400px"
+            width="300px"
             height="full"
           >
             <Box
@@ -22,6 +22,8 @@ export function PromptStudioLayout() {
               left={0}
               width="full"
               height="full"
+              paddingY="3"
+              bg="white"
             >
               <PromptStudioSidebar />
             </Box>

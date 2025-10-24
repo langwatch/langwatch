@@ -113,7 +113,9 @@ export function PromptMessagesField({
         key={field.id}
         label={
           <HStack width="full">
-            <MessageRoleLabel role={role} />
+            {role !== "system" && open && (
+              <MessageRoleLabel role={role} marginLeft={-1} />
+            )}
             <Spacer />
             {role !== "system" && (
               <RemoveMessageButton onRemove={() => messageFields.remove(idx)} />
@@ -123,6 +125,7 @@ export function PromptMessagesField({
         invalid={!!errors.version?.configData?.messages}
         error={messageErrors}
         size="sm"
+        marginTop={idx === 0 ? 2 : 4}
       >
         <Controller
           control={form.control}
@@ -133,6 +136,7 @@ export function PromptMessagesField({
               otherNodesFields={otherNodesFields}
               value={field.value}
               onChange={field.onChange}
+              bg="white"
               _invalid={
                 getMessageError(idx, "content")
                   ? { borderColor: "red.500" }
@@ -154,8 +158,8 @@ export function PromptMessagesField({
   };
 
   return (
-    <Box width="full" bg="white">
-      <HStack width="full" py={2}>
+    <Box width="full" padding={2}>
+      <HStack width="full">
         <HStack gap={2} cursor="pointer" onClick={() => setOpen(!open)}>
           <Icon
             asChild
@@ -165,14 +169,16 @@ export function PromptMessagesField({
           >
             <ChevronDown size={16} />
           </Icon>
-          <PropertySectionTitle padding={0}>Messages</PropertySectionTitle>
+          <PropertySectionTitle transition="opacity 0.15s ease" padding={0}>
+            {open ? "System prompt" : "Messages"}
+          </PropertySectionTitle>
         </HStack>
         <Spacer />
         <AddMessageButton onAdd={handleAdd} />
       </HStack>
 
       <Collapsible.Root open={open}>
-        <Collapsible.Content padding={4}>
+        <Collapsible.Content>
           {(() => {
             const systemField =
               systemIndex >= 0 ? messageFields.fields[systemIndex] : undefined;

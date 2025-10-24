@@ -15,7 +15,7 @@ export function PromptMessagesEditor() {
     return inputs.map((input) => input.identifier);
   }, [inputs]);
   return (
-    <Box width="full" bg="white">
+    <Box width="full" bg="gray.100" paddingY={1} paddingX={2} borderRadius="md">
       <PromptMessagesField
         messageFields={messageFields}
         availableFields={availableMentions}

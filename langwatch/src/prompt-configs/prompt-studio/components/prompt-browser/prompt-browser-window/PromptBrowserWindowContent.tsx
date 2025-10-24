@@ -1,5 +1,5 @@
 import { useEffect, useMemo } from "react";
-import { VStack } from "@chakra-ui/react";
+import { Box, VStack } from "@chakra-ui/react";
 import { PromptBrowserHeader } from "./PromptBrowserHeader";
 import { PromptMessagesEditor } from "./PromptMessagesEditor";
 import { PromptTabbedSection } from "./PromptTabbedSection";
@@ -116,9 +116,13 @@ function PromptBrowserWindowInner(props: {
 
   return (
     <FormProvider {...form.methods}>
-      <VStack height="full" width="full" p={3}>
-        <PromptBrowserHeader />
-        <PromptMessagesEditor />
+      <VStack height="full" width="full" gap={3} paddingBottom={3}>
+        <Box paddingX={3} width="full">
+          <PromptBrowserHeader />
+        </Box>
+        <Box paddingX={3} width="full">
+          <PromptMessagesEditor />
+        </Box>
         <PromptTabbedSection />
       </VStack>
     </FormProvider>
