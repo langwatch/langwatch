@@ -292,6 +292,9 @@ export function formValuesToTriggerSaveVersionParams(
   };
 }
 
+/**
+ * Converts the versioned prompt to form values without the system message.
+ */
 export function versionedPromptToPromptConfigFormValues(
   prompt: VersionedPrompt,
 ): PromptConfigFormValues {
@@ -325,6 +328,10 @@ export function versionedPromptToPromptConfigFormValues(
   };
 }
 
+/**
+ * Converts the versioned prompt to form values with the system message.
+ * The system message is added to the messages array.
+ */
 export function versionedPromptToPromptConfigFormValuesWithSystemMessage(
   prompt: VersionedPrompt,
 ): PromptConfigFormValues {

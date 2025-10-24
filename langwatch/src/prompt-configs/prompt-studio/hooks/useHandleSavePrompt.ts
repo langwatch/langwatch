@@ -17,9 +17,12 @@ export function useHandleSavePrompt() {
 
   const handleSaveVersion = useCallback(() => {
     const values = methods.getValues();
+    console.log("values", values);
     const data = formValuesToTriggerSaveVersionParams(values);
     const onSuccess = (prompt: VersionedPrompt) => {
-      methods.reset(versionedPromptToPromptConfigFormValuesWithSystemMessage(prompt));
+      methods.reset(
+        versionedPromptToPromptConfigFormValuesWithSystemMessage(prompt),
+      );
       toaster.create({
         title: "Prompt saved",
         description: `Prompt ${prompt.handle} is now at version ${prompt.version}`,
