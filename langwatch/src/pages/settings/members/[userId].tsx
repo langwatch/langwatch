@@ -214,15 +214,13 @@ export default function UserDetailsPage() {
                             }}
                             organizationId={organization.id}
                             customRole={(() => {
-                              const customRoleAssignment =
-                                member.user.customRoleAssignments.find(
-                                  (cra) => cra.teamId === tm.teamId,
-                                );
-                              return customRoleAssignment?.customRole
+                              // Check if this team membership has an assigned custom role
+                              const assignedRole = tm.assignedRole;
+                              return assignedRole
                                 ? {
-                                    ...customRoleAssignment.customRole,
-                                    permissions: customRoleAssignment.customRole
-                                      .permissions as string[],
+                                    ...assignedRole,
+                                    permissions:
+                                      assignedRole.permissions as string[],
                                   }
                                 : undefined;
                             })()}

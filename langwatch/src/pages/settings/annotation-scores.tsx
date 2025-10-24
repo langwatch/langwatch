@@ -1,4 +1,16 @@
-import { Badge, Box, Button, Card, Heading, HStack, Skeleton, Spacer, Table, Text, VStack } from "@chakra-ui/react";
+import {
+  Badge,
+  Box,
+  Button,
+  Card,
+  Heading,
+  HStack,
+  Skeleton,
+  Spacer,
+  Table,
+  Text,
+  VStack,
+} from "@chakra-ui/react";
 import { AnnotationScoreDataType } from "@prisma/client";
 import { Edit, MoreVertical, Plus, ThumbsUp, Trash } from "react-feather";
 import { useDrawer } from "~/components/CurrentDrawer";
@@ -13,8 +25,9 @@ import { Switch } from "../../components/ui/switch";
 import { toaster } from "../../components/ui/toaster";
 import { api } from "../../utils/api";
 import { DeleteConfirmationDialog } from "../../components/annotations/DeleteConfirmationDialog";
+import { withPermissionGuard } from "../../components/WithPermissionGuard";
 
-const AnnotationScorePage = () => {
+function AnnotationScorePage() {
   const { project } = useOrganizationTeamProject();
 
   const { openDrawer, drawerOpen: isDrawerOpen, closeDrawer } = useDrawer();
@@ -23,7 +36,7 @@ const AnnotationScorePage = () => {
     {
       projectId: project?.id ?? "",
     },
-    { enabled: !!project }
+    { enabled: !!project },
   );
 
   const toggleAnnotationScore = api.annotationScore.toggle.useMutation();
@@ -57,7 +70,7 @@ const AnnotationScorePage = () => {
             },
           });
         },
-      }
+      },
     );
   };
 
@@ -94,7 +107,7 @@ const AnnotationScorePage = () => {
               },
             });
           },
-        }
+        },
       );
     }
     setDeleteDialogOpen(false);
@@ -102,25 +115,38 @@ const AnnotationScorePage = () => {
 
   return (
     <SettingsLayout>
-      <VStack paddingX={4} paddingY={6} gap={6} width="full" maxWidth="6xl" align="start">
+      <VStack
+        paddingX={4}
+        paddingY={6}
+        gap={6}
+        width="full"
+        maxWidth="6xl"
+        align="start"
+      >
         <HStack width="full" marginTop={2}>
           <Heading size="lg" as="h1">
             Annotation Scoring
           </Heading>
           <Spacer />
-          <Button size="sm" colorPalette="orange" onClick={() => openDrawer("addOrEditAnnotationScore")}>
+          <Button
+            size="sm"
+            colorPalette="orange"
+            onClick={() => openDrawer("addOrEditAnnotationScore")}
+          >
             <Plus size={20} /> Add new score metric
           </Button>
         </HStack>
         <Card.Root width="full">
           <Card.Body>
-            {getAllAnnotationScores.data && getAllAnnotationScores.data.length == 0 ? (
+            {getAllAnnotationScores.data &&
+            getAllAnnotationScores.data.length == 0 ? (
               <NoDataInfoBlock
                 title="No scoring setup yet"
                 description="Add new scoring metrics for your annotations."
                 docsInfo={
                   <Text>
-                    To learn more about scores and how to use them, please visit our{" "}
+                    To learn more about scores and how to use them, please visit
+                    our{" "}
                     <Link
                       color="orange.400"
                       href="https://docs.langwatch.ai/features/annotations#annotation-scoring"
@@ -172,7 +198,10 @@ const AnnotationScorePage = () => {
                           <Table.Cell>{score.description}</Table.Cell>
                           <Table.Cell width="20%">
                             <Text lineClamp={1}>
-                              {score.dataType === AnnotationScoreDataType.CHECKBOX ? "Checkbox" : "Multiple choice"}
+                              {score.dataType ===
+                              AnnotationScoreDataType.CHECKBOX
+                                ? "Checkbox"
+                                : "Multiple choice"}
                             </Text>
                           </Table.Cell>
                           <Table.Cell>
@@ -214,7 +243,11 @@ const AnnotationScorePage = () => {
                                     });
                                   }}
                                 >
-                                  <Box display="flex" alignItems="center" gap={2}>
+                                  <Box
+                                    display="flex"
+                                    alignItems="center"
+                                    gap={2}
+                                  >
                                     <Edit size={14} />
                                     Edit
                                   </Box>
@@ -226,7 +259,12 @@ const AnnotationScorePage = () => {
                                     handleDeleteScore(score.id);
                                   }}
                                 >
-                                  <Box display="flex" alignItems="center" gap={2} color="red.600">
+                                  <Box
+                                    display="flex"
+                                    alignItems="center"
+                                    gap={2}
+                                    color="red.600"
+                                  >
                                     <Trash size={14} />
                                     Delete
                                   </Box>
@@ -251,11 +289,19 @@ const AnnotationScorePage = () => {
       />
     </SettingsLayout>
   );
-};
+}
 
-export default AnnotationScorePage;
+export default withPermissionGuard("annotations:manage", {
+  layoutComponent: SettingsLayout,
+})(AnnotationScorePage);
 
-const ScoreOptions = ({ options, dataType }: { options: { label: string; value: number }[]; dataType: string }) => {
+const ScoreOptions = ({
+  options,
+  dataType,
+}: {
+  options: { label: string; value: number }[];
+  dataType: string;
+}) => {
   return (
     <>
       {dataType === "CHECKBOX" ? (

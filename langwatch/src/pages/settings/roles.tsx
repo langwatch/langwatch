@@ -33,13 +33,15 @@ import {
   getValidActionsForResource,
 } from "../../utils/permissionsConfig";
 
+import { withPermissionGuard } from "../../components/WithPermissionGuard";
+
 /**
  * Role Management Settings Page
  *
  * Single Responsibility: Allows organization admins to create and manage custom roles
  * with granular permission assignments.
  */
-export default function RolesSettings() {
+function RolesSettings() {
   const { organization } = useOrganizationTeamProject();
 
   if (!organization) {
@@ -58,6 +60,10 @@ export default function RolesSettings() {
     </SettingsLayout>
   );
 }
+
+export default withPermissionGuard("project:manage", {
+  layoutComponent: SettingsLayout,
+})(RolesSettings);
 
 type RoleFormData = {
   name: string;

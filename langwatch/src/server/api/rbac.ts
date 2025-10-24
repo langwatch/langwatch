@@ -232,10 +232,17 @@ export function organizationRoleHasPermission(
   role: OrganizationUserRole,
   permission: Permission,
 ): boolean {
-  return hasPermissionWithHierarchy(
-    ORGANIZATION_ROLE_PERMISSIONS[role],
+  const rolePermissions = ORGANIZATION_ROLE_PERMISSIONS[role];
+  const result = hasPermissionWithHierarchy(rolePermissions, permission);
+
+  console.log("🔍 organizationRoleHasPermission Debug:", {
+    role,
     permission,
-  );
+    rolePermissions,
+    result,
+  });
+
+  return result;
 }
 
 /**
@@ -395,7 +402,15 @@ export async function hasProjectPermission(
       team: {
         select: {
           id: true,
-          members: { where: { userId: ctx.session.user.id } },
+          members: {
+            where: { userId: ctx.session.user.id },
+            select: {
+              userId: true,
+              teamId: true,
+              role: true,
+              assignedRoleId: true,
+            },
+          },
         },
       },
     },
@@ -410,28 +425,27 @@ export async function hasProjectPermission(
   }
 
   // Check user's individual permissions (custom role or built-in role)
-  const customRoleAssignment = await ctx.prisma.teamUserCustomRole.findFirst({
-    where: {
-      userId: ctx.session.user.id,
-      teamId: projectTeam?.team.id,
-    },
-    include: {
-      customRole: true,
-    },
-  });
+  if (teamMember.assignedRoleId) {
+    const customRole = await ctx.prisma.customRole.findUnique({
+      where: { id: teamMember.assignedRoleId },
+    });
 
-  if (customRoleAssignment) {
-    const rawPermissions = customRoleAssignment.customRole.permissions as
-      | string[]
-      | null
-      | undefined;
-    const userPermissions = Array.isArray(rawPermissions) ? rawPermissions : [];
+    if (customRole) {
+      const rawPermissions = customRole.permissions as
+        | string[]
+        | null
+        | undefined;
+      const userPermissions = Array.isArray(rawPermissions)
+        ? rawPermissions
+        : [];
 
-    // If custom role has permissions, use them; otherwise fall back to built-in role
-    if (userPermissions.length > 0) {
-      return hasPermissionWithHierarchy(userPermissions, permission);
+      // If custom role has permissions, use them; otherwise fall back to built-in role
+      if (userPermissions.length > 0) {
+        return hasPermissionWithHierarchy(userPermissions, permission);
+      }
+      // Fall back to built-in role if custom role has no permissions
+      return teamRoleHasPermission(teamMember.role, permission);
     }
-    // Fall back to built-in role if custom role has no permissions
   }
 
   // Only fall back to built-in team role if NO custom role exists
@@ -478,6 +492,12 @@ export async function hasTeamPermission(
       userId: ctx.session.user.id,
       teamId: teamId,
     },
+    select: {
+      userId: true,
+      teamId: true,
+      role: true,
+      assignedRoleId: true,
+    },
   });
 
   if (!teamUser) {
@@ -485,24 +505,22 @@ export async function hasTeamPermission(
   }
 
   // Check user's individual permissions (custom role or built-in role)
-  const customRoleAssignment = await ctx.prisma.teamUserCustomRole.findFirst({
-    where: {
-      userId: ctx.session.user.id,
-      teamId: teamId,
-    },
-    include: {
-      customRole: true,
-    },
-  });
+  if (teamUser.assignedRoleId) {
+    const customRole = await ctx.prisma.customRole.findUnique({
+      where: { id: teamUser.assignedRoleId },
+    });
 
-  if (customRoleAssignment) {
-    const rawPermissions = customRoleAssignment.customRole.permissions as
-      | string[]
-      | null
-      | undefined;
-    const userPermissions = Array.isArray(rawPermissions) ? rawPermissions : [];
-    if (hasPermissionWithHierarchy(userPermissions, permission)) {
-      return true;
+    if (customRole) {
+      const rawPermissions = customRole.permissions as
+        | string[]
+        | null
+        | undefined;
+      const userPermissions = Array.isArray(rawPermissions)
+        ? rawPermissions
+        : [];
+      if (hasPermissionWithHierarchy(userPermissions, permission)) {
+        return true;
+      }
     }
   }
 
@@ -519,8 +537,15 @@ export async function hasOrganizationPermission(
   permission: Permission,
 ): Promise<boolean> {
   if (!ctx.session?.user) {
+    console.log("🔍 hasOrganizationPermission: No session user");
     return false;
   }
+
+  console.log("🔍 hasOrganizationPermission Debug:", {
+    userId: ctx.session.user.id,
+    organizationId,
+    permission,
+  });
 
   const organizationUser = await ctx.prisma.organizationUser?.findFirst({
     where: {
@@ -529,11 +554,48 @@ export async function hasOrganizationPermission(
     },
   });
 
-  if (!organizationUser) {
-    return false;
+  console.log("🔍 hasOrganizationPermission Result:", {
+    organizationUser,
+    found: !!organizationUser,
+    role: organizationUser?.role,
+  });
+
+  // Check organization role first
+  if (organizationUser) {
+    const orgResult = organizationRoleHasPermission(
+      organizationUser.role,
+      permission,
+    );
+    console.log("🔍 hasOrganizationPermission Org Role Result:", {
+      role: organizationUser.role,
+      result: orgResult,
+    });
+    if (orgResult) return true;
   }
 
-  return organizationRoleHasPermission(organizationUser.role, permission);
+  // Fallback: Check if user has team admin role in any team of this organization
+  const teamAdminMembership = await ctx.prisma.teamUser.findFirst({
+    where: {
+      userId: ctx.session.user.id,
+      role: TeamUserRole.ADMIN,
+      team: {
+        organizationId: organizationId,
+      },
+    },
+  });
+
+  console.log("🔍 hasOrganizationPermission Team Admin Check:", {
+    foundTeamAdmin: !!teamAdminMembership,
+    teamId: teamAdminMembership?.teamId,
+  });
+
+  if (teamAdminMembership) {
+    console.log("🔍 hasOrganizationPermission Final Result: true (Team Admin)");
+    return true;
+  }
+
+  console.log("🔍 hasOrganizationPermission Final Result: false");
+  return false;
 }
 
 // ============================================================================

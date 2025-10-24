@@ -24,7 +24,9 @@ import { Link } from "../../components/ui/link";
 import { Tooltip } from "../../components/ui/tooltip";
 import { toaster } from "../../components/ui/toaster";
 
-export default function Projects() {
+import { withPermissionGuard } from "../../components/WithPermissionGuard";
+
+function Projects() {
   const { organization } = useOrganizationTeamProject();
 
   if (!organization) return null;
@@ -132,6 +134,10 @@ function ProjectsList({
     </SettingsLayout>
   );
 }
+
+export default withPermissionGuard("project:view", {
+  layoutComponent: SettingsLayout,
+})(Projects);
 
 export function TeamProjectsList({
   team,

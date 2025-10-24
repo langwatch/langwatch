@@ -10,7 +10,7 @@ import {
 } from "../server/api/permission";
 import { api } from "../utils/api";
 
-import type { OrganizationUserRole } from "@prisma/client";
+import { OrganizationUserRole, TeamUserRole } from "@prisma/client";
 import { usePublicEnv } from "./usePublicEnv";
 import { publicRoutes, useRequiredSession } from "./useRequiredSession";
 import {
@@ -297,18 +297,14 @@ export const useOrganizationTeamProject = (
    * @example hasPermission("analytics:view")
    * @example hasPermission("datasets:manage")
    */
-  const hasPermission = (permission: Permission, team_ = team) => {
-    const teamRole = team_?.members[0]?.role;
-    if (!teamRole) return false;
+  const hasPermission = (permission: Permission) => {
+    const teamMember = team?.members[0];
+    if (!teamMember) return false;
 
     // Check if user has custom role assignment
-    const customRoleAssignment = team_?.customRoleMembers?.find(
-      (member) => member.userId === session.data?.user?.id,
-    );
-
-    if (customRoleAssignment) {
+    if (teamMember.assignedRole) {
       // If user has custom role, ONLY use custom role permissions (no fallback)
-      const rawPermissions = customRoleAssignment.customRole.permissions as
+      const rawPermissions = teamMember.assignedRole.permissions as
         | string[]
         | null
         | undefined;
@@ -320,7 +316,7 @@ export const useOrganizationTeamProject = (
     }
 
     // Only fall back to built-in team role if NO custom role exists
-    return teamRoleHasPermission(teamRole, permission);
+    return teamRoleHasPermission(teamMember.role, permission);
   };
 
   /**
@@ -328,8 +324,24 @@ export const useOrganizationTeamProject = (
    * @example hasOrgPermission("organization:manage")
    */
   const hasOrgPermission = (permission: Permission) => {
-    if (!organizationRole) return false;
-    return organizationRoleHasPermission(organizationRole, permission);
+    // Check organization role first
+    if (organizationRole) {
+      const orgResult = organizationRoleHasPermission(
+        organizationRole,
+        permission,
+      );
+
+      if (orgResult) return true;
+    }
+
+    // Fallback: Check if user has team admin role (team admins can access org permissions)
+    const teamMember = team?.members[0];
+
+    if (teamMember?.role === TeamUserRole.ADMIN) {
+      return true;
+    }
+
+    return false;
   };
 
   return {

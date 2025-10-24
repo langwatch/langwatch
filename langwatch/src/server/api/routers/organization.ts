@@ -6,6 +6,7 @@ import {
   type Team,
   type TeamUser,
   type User,
+  type CustomRole,
   TeamUserRole,
 } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
@@ -19,12 +20,8 @@ import { scheduleUsageStatsForOrganization } from "~/server/background/queues/us
 import { dependencies } from "../../../injection/dependencies.server";
 import { elasticsearchMigrate } from "../../../tasks/elasticMigrate";
 import { sendInviteEmail } from "../../mailer/inviteEmail";
-import {
-  OrganizationRoleGroup,
-  checkUserPermissionForOrganization,
-  skipPermissionCheck,
-} from "../permission";
-import { checkTeamPermission } from "../rbac";
+import { OrganizationRoleGroup, skipPermissionCheck } from "../permission";
+import { checkTeamPermission, checkOrganizationPermission } from "../rbac";
 
 import { signUpDataSchema } from "./onboarding";
 
@@ -36,23 +33,9 @@ export type TeamWithProjects = Team & {
 };
 
 export type TeamWithProjectsAndMembers = TeamWithProjects & {
-  members: TeamUser[];
-  customRoleMembers: Array<{
-    userId: string;
-    teamId: string;
-    customRoleId: string;
-    customRole: {
-      id: string;
-      name: string;
-      description: string | null;
-      permissions: unknown;
-    };
-    user: {
-      id: string;
-      name: string | null;
-      email: string | null;
-    };
-  }>;
+  members: (TeamUser & {
+    assignedRole?: CustomRole | null;
+  })[];
 };
 
 export type OrganizationFeature = {
@@ -77,18 +60,6 @@ export type TeamMemberWithTeam = TeamUser & {
 export type TeamWithProjectsAndMembersAndUsers = Team & {
   members: TeamMemberWithUser[];
   projects: Project[];
-  customRoleMembers: Array<{
-    userId: string;
-    teamId: string;
-    customRoleId: string;
-    customRole: {
-      id: string;
-      name: string;
-      description: string | null;
-      permissions: unknown; // JSON field, will be validated as array
-    };
-    user: User;
-  }>;
   defaultRole?: TeamUserRole | null;
 };
 
@@ -198,11 +169,7 @@ export const organizationRouter = createTRPCRouter({
     }),
   deleteMember: protectedProcedure
     .input(z.object({ userId: z.string(), organizationId: z.string() }))
-    .use(
-      checkUserPermissionForOrganization(
-        OrganizationRoleGroup.ORGANIZATION_MANAGE,
-      ),
-    )
+    .use(checkOrganizationPermission("organization:manage"))
     .mutation(async ({ input, ctx }) => {
       const { userId, organizationId } = input;
       const prisma = ctx.prisma;
@@ -269,18 +236,20 @@ export const organizationRouter = createTRPCRouter({
             ],
           },
           include: {
-            members: true,
+            members: {
+              where: {
+                userId: userId,
+              },
+            },
             features: true,
             teams: {
               where: {
                 archivedAt: null,
               },
               include: {
-                members: true,
-                customRoleMembers: {
+                members: {
                   include: {
-                    customRole: true,
-                    user: true,
+                    assignedRole: true,
                   },
                 },
                 projects: {
@@ -412,11 +381,7 @@ export const organizationRouter = createTRPCRouter({
           },
         ),
     )
-    .use(
-      checkUserPermissionForOrganization(
-        OrganizationRoleGroup.ORGANIZATION_MANAGE,
-      ),
-    )
+    .use(checkOrganizationPermission("organization:manage"))
     .mutation(async ({ input, ctx }) => {
       const userId = ctx.session.user.id;
       const prisma = ctx.prisma;
@@ -472,11 +437,7 @@ export const organizationRouter = createTRPCRouter({
         organizationId: z.string(),
       }),
     )
-    .use(
-      checkUserPermissionForOrganization(
-        OrganizationRoleGroup.ORGANIZATION_VIEW,
-      ),
-    )
+    .use(checkOrganizationPermission("organization:view"))
     .query(async ({ input, ctx }) => {
       const userId = ctx.session.user.id;
       const prisma = ctx.prisma;
@@ -497,12 +458,9 @@ export const organizationRouter = createTRPCRouter({
                 include: {
                   teamMemberships: {
                     where: { team: { archivedAt: null } },
-                    include: { team: true },
-                  },
-                  customRoleAssignments: {
                     include: {
-                      customRole: true,
                       team: true,
+                      assignedRole: true,
                     },
                   },
                 },
@@ -534,11 +492,7 @@ export const organizationRouter = createTRPCRouter({
         ),
       }),
     )
-    .use(
-      checkUserPermissionForOrganization(
-        OrganizationRoleGroup.ORGANIZATION_MANAGE,
-      ),
-    )
+    .use(checkOrganizationPermission("organization:manage"))
     .mutation(async ({ input, ctx }) => {
       const prisma = ctx.prisma;
 
@@ -642,11 +596,7 @@ export const organizationRouter = createTRPCRouter({
     }),
   deleteInvite: protectedProcedure
     .input(z.object({ inviteId: z.string(), organizationId: z.string() }))
-    .use(
-      checkUserPermissionForOrganization(
-        OrganizationRoleGroup.ORGANIZATION_MANAGE,
-      ),
-    )
+    .use(checkOrganizationPermission("organization:manage"))
     .mutation(async ({ input, ctx }) => {
       const prisma = ctx.prisma;
       await prisma.organizationInvite.delete({
@@ -659,11 +609,7 @@ export const organizationRouter = createTRPCRouter({
         organizationId: z.string(),
       }),
     )
-    .use(
-      checkUserPermissionForOrganization(
-        OrganizationRoleGroup.ORGANIZATION_VIEW,
-      ),
-    )
+    .use(checkOrganizationPermission("organization:view"))
     .query(async ({ input, ctx }) => {
       const prisma = ctx.prisma;
 
@@ -912,23 +858,7 @@ export const organizationRouter = createTRPCRouter({
             },
             data: {
               role: TeamUserRole.VIEWER, // Default to VIEWER for custom roles
-            },
-          });
-
-          // Remove any existing custom roles for this user on this team
-          await tx.teamUserCustomRole.deleteMany({
-            where: {
-              userId: input.userId,
-              teamId: input.teamId,
-            },
-          });
-
-          // Assign the new custom role
-          await tx.teamUserCustomRole.create({
-            data: {
-              userId: input.userId,
-              teamId: input.teamId,
-              customRoleId: customRoleId,
+              assignedRoleId: customRoleId,
             },
           });
 
@@ -1015,14 +945,7 @@ export const organizationRouter = createTRPCRouter({
             },
             data: {
               role: input.role as TeamUserRole,
-            },
-          });
-
-          // Remove any custom roles when switching to built-in role
-          await tx.teamUserCustomRole.deleteMany({
-            where: {
-              userId: input.userId,
-              teamId: input.teamId,
+              assignedRoleId: null, // Clear custom role assignment
             },
           });
 
@@ -1051,11 +974,7 @@ export const organizationRouter = createTRPCRouter({
         organizationId: z.string(),
       }),
     )
-    .use(
-      checkUserPermissionForOrganization(
-        OrganizationRoleGroup.ORGANIZATION_VIEW,
-      ),
-    )
+    .use(checkOrganizationPermission("organization:view"))
     .query(async ({ input, ctx }) => {
       const prisma = ctx.prisma;
 
@@ -1079,11 +998,7 @@ export const organizationRouter = createTRPCRouter({
         role: z.nativeEnum(OrganizationUserRole),
       }),
     )
-    .use(
-      checkUserPermissionForOrganization(
-        OrganizationRoleGroup.ORGANIZATION_MANAGE,
-      ),
-    )
+    .use(checkOrganizationPermission("organization:manage"))
     .mutation(async ({ input, ctx }) => {
       const prisma = ctx.prisma;
 

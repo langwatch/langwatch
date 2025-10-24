@@ -37,6 +37,7 @@ import { type PlanInfo } from "../../server/subscriptionHandler";
 import { api } from "../../utils/api";
 import * as Sentry from "@sentry/nextjs";
 import { usePublicEnv } from "../../hooks/usePublicEnv";
+import { withPermissionGuard } from "../../components/WithPermissionGuard";
 
 const selectOptions = [
   {
@@ -56,7 +57,7 @@ const selectOptions = [
   },
 ];
 
-export default function Members() {
+function Members() {
   const { organization } = useOrganizationTeamProject();
 
   const organizationWithMembers =
@@ -86,6 +87,10 @@ export default function Members() {
     />
   );
 }
+
+export default withPermissionGuard("project:manage", {
+  layoutComponent: SettingsLayout,
+})(Members);
 
 function MembersList({
   organization,

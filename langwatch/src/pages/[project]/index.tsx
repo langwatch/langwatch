@@ -10,6 +10,8 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { PermissionAlert } from "../../components/PermissionAlert";
+import { withPermissionGuard } from "../../components/WithPermissionGuard";
+import type { Permission } from "../../server/api/rbac";
 import type { GetServerSidePropsContext } from "next";
 import { useRouter } from "next/router";
 import { useEffect } from "react";
@@ -29,7 +31,7 @@ import { AnalyticsHeader } from "../../components/analytics/AnalyticsHeader";
 import { LLMMetrics } from "../../components/LLMMetrics";
 import * as Sentry from "@sentry/nextjs";
 
-export default function ProjectRouter() {
+function ProjectRouter() {
   const router = useRouter();
 
   const path =
@@ -41,7 +43,7 @@ export default function ProjectRouter() {
     return <Page />;
   }
 
-  return Index();
+  return <IndexContentWithPermission />;
 }
 
 export const getServerSideProps = async (
@@ -62,13 +64,11 @@ export const getServerSideProps = async (
   };
 };
 
-function Index() {
-  const { project, hasPermission } = useOrganizationTeamProject();
+function IndexContent() {
+  const { project } = useOrganizationTeamProject();
 
   const router = useRouter();
   const returnTo = router.query.return_to;
-
-  const hasAnalyticsViewPermission = hasPermission("analytics:view");
 
   /**
    * Validates if a returnTo URL is safe to redirect to
@@ -100,17 +100,6 @@ function Index() {
   // Don't render anything while redirecting
   if (typeof returnTo === "string" && isValidReturnToUrl(returnTo)) {
     return null;
-  }
-
-  if (!hasAnalyticsViewPermission) {
-    return (
-      <GraphsLayout>
-        <PermissionAlert
-          permission="analytics:view"
-          alertProps={{ marginBottom: 6 }}
-        />
-      </GraphsLayout>
-    );
   }
 
   return (
@@ -199,3 +188,9 @@ function DocumentsMetrics() {
     </>
   );
 }
+
+const IndexContentWithPermission = withPermissionGuard("analytics:view", {
+  layoutComponent: GraphsLayout,
+})(IndexContent);
+
+export default ProjectRouter;

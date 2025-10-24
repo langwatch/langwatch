@@ -12,7 +12,7 @@ import { FeedbacksTable } from "../../../components/analytics/FeedbacksTable";
 import { QuickwitNote } from "../../../components/analytics/QuickwitNote";
 import { usePublicEnv } from "../../../hooks/usePublicEnv";
 import { useOrganizationTeamProject } from "../../../hooks/useOrganizationTeamProject";
-import { PermissionAlert } from "../../../components/PermissionAlert";
+import { withPermissionGuard } from "../../../components/WithPermissionGuard";
 
 // Time unit conversion constants
 const MINUTES_IN_DAY = 24 * 60; // 1440 minutes in a day
@@ -198,20 +198,10 @@ const userThreads = {
   height: 300,
 };
 
-export default function Users() {
+function UsersContent() {
   const publicEnv = usePublicEnv();
   const isNotQuickwit = publicEnv.data && !publicEnv.data.IS_QUICKWIT;
   const isQuickwit = publicEnv.data && publicEnv.data.IS_QUICKWIT;
-  const { hasPermission } = useOrganizationTeamProject();
-  const hasAnalyticsViewPermission = hasPermission("analytics:view");
-
-  if (!hasAnalyticsViewPermission) {
-    return (
-      <GraphsLayout>
-        <PermissionAlert permission="analytics:view" />
-      </GraphsLayout>
-    );
-  }
 
   return (
     <GraphsLayout>
@@ -332,3 +322,7 @@ export default function Users() {
     </GraphsLayout>
   );
 }
+
+export default withPermissionGuard("analytics:view", {
+  layoutComponent: GraphsLayout,
+})(UsersContent);

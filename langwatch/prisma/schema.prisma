@@ -70,7 +70,6 @@ model User {
     assignedQueueItems      AnnotationQueueItem[]    @relation("AssignedTo")
     createdQueueItems       AnnotationQueueItem[]    @relation("CreatedBy")
     llmPromptConfigVersions LlmPromptConfigVersion[]
-    customRoleAssignments   TeamUserCustomRole[]
 }
 
 model VerificationToken {
@@ -94,17 +93,20 @@ enum OrganizationUserRole {
 }
 
 model TeamUser {
-    userId    String
-    teamId    String
-    role      TeamUserRole
-    user      User         @relation(fields: [userId], references: [id])
-    team      Team         @relation(fields: [teamId], references: [id])
-    createdAt DateTime     @default(now())
-    updatedAt DateTime     @default(now()) @updatedAt
+    userId         String
+    teamId         String
+    role           TeamUserRole
+    assignedRoleId String?
+    assignedRole   CustomRole?  @relation(fields: [assignedRoleId], references: [id])
+    user           User         @relation(fields: [userId], references: [id])
+    team           Team         @relation(fields: [teamId], references: [id])
+    createdAt      DateTime     @default(now())
+    updatedAt      DateTime     @default(now()) @updatedAt
 
     @@id([userId, teamId])
     @@index([teamId])
     @@index([userId])
+    @@index([assignedRoleId])
 }
 
 model OrganizationUser {
@@ -122,18 +124,17 @@ model OrganizationUser {
 }
 
 model Team {
-    id                String               @id @default(nanoid())
-    name              String
-    slug              String               @unique
-    members           TeamUser[]
-    organizationId    String
-    organization      Organization         @relation(fields: [organizationId], references: [id])
-    projects          Project[]
-    createdAt         DateTime             @default(now())
-    updatedAt         DateTime             @default(now()) @updatedAt
-    archivedAt        DateTime?
-    customRoleMembers TeamUserCustomRole[]
-    defaultRole       TeamUserRole? // Built-in team role
+    id             String        @id @default(nanoid())
+    name           String
+    slug           String        @unique
+    members        TeamUser[]
+    organizationId String
+    organization   Organization  @relation(fields: [organizationId], references: [id])
+    projects       Project[]
+    createdAt      DateTime      @default(now())
+    updatedAt      DateTime      @default(now()) @updatedAt
+    archivedAt     DateTime?
+    defaultRole    TeamUserRole? // Built-in team role
 
     @@index([organizationId])
 }
@@ -802,32 +803,16 @@ model Analytics {
 }
 
 model CustomRole {
-    id             String               @id @default(nanoid())
+    id             String       @id @default(nanoid())
     organizationId String
-    organization   Organization         @relation(fields: [organizationId], references: [id])
+    organization   Organization @relation(fields: [organizationId], references: [id])
     name           String
     description    String?
     permissions    Json // Array of Permission strings
-    createdAt      DateTime             @default(now())
-    updatedAt      DateTime             @default(now()) @updatedAt
-    teamUsers      TeamUserCustomRole[]
+    createdAt      DateTime     @default(now())
+    updatedAt      DateTime     @default(now()) @updatedAt
+    assignedUsers  TeamUser[]
 
     @@unique([organizationId, name])
     @@index([organizationId])
-}
-
-model TeamUserCustomRole {
-    userId       String
-    teamId       String
-    customRoleId String
-    customRole   CustomRole @relation(fields: [customRoleId], references: [id])
-    user         User       @relation(fields: [userId], references: [id])
-    team         Team       @relation(fields: [teamId], references: [id])
-    createdAt    DateTime   @default(now())
-    updatedAt    DateTime   @default(now()) @updatedAt
-
-    @@id([userId, teamId])
-    @@index([teamId])
-    @@index([userId])
-    @@index([customRoleId])
 }

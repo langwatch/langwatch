@@ -36,3 +36,6 @@ CREATE INDEX "TeamUserCustomRole_userId_idx" ON "TeamUserCustomRole"("userId");
 
 -- CreateIndex
 CREATE INDEX "TeamUserCustomRole_customRoleId_idx" ON "TeamUserCustomRole"("customRoleId");
+
+-- AlterTable
+ALTER TABLE "Team" ADD COLUMN     "defaultRole" "TeamUserRole";

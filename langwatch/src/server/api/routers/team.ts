@@ -94,12 +94,7 @@ export const teamRouter = createTRPCRouter({
           members: {
             include: {
               user: true,
-            },
-          },
-          customRoleMembers: {
-            include: {
-              customRole: true,
-              user: true,
+              assignedRole: true,
             },
           },
           projects: {
@@ -131,12 +126,7 @@ export const teamRouter = createTRPCRouter({
           members: {
             include: {
               user: true,
-            },
-          },
-          customRoleMembers: {
-            include: {
-              customRole: true,
-              user: true,
+              assignedRole: true,
             },
           },
           projects: true,
@@ -222,15 +212,6 @@ export const teamRouter = createTRPCRouter({
                 },
               },
             });
-            // Also remove custom role assignments
-            await tx.teamUserCustomRole.deleteMany({
-              where: {
-                teamId: input.teamId,
-                userId: {
-                  in: membersToRemove,
-                },
-              },
-            });
           }
 
           if (membersToAdd.length > 0) {
@@ -285,14 +266,7 @@ export const teamRouter = createTRPCRouter({
                     userId: member.userId,
                     teamId: input.teamId,
                     role: TeamUserRole.VIEWER,
-                  },
-                });
-
-                await tx.teamUserCustomRole.create({
-                  data: {
-                    userId: member.userId,
-                    teamId: input.teamId,
-                    customRoleId: member.customRoleId,
+                    assignedRoleId: member.customRoleId,
                   },
                 });
               } else {
@@ -353,7 +327,7 @@ export const teamRouter = createTRPCRouter({
                 });
               }
 
-              // Update teamUser with VIEWER role
+              // Update teamUser with VIEWER role and assign custom role
               await tx.teamUser.update({
                 where: {
                   userId_teamId: {
@@ -363,23 +337,7 @@ export const teamRouter = createTRPCRouter({
                 },
                 data: {
                   role: TeamUserRole.VIEWER,
-                },
-              });
-
-              // Remove existing custom roles
-              await tx.teamUserCustomRole.deleteMany({
-                where: {
-                  userId: member.userId,
-                  teamId: input.teamId,
-                },
-              });
-
-              // Add new custom role
-              await tx.teamUserCustomRole.create({
-                data: {
-                  userId: member.userId,
-                  teamId: input.teamId,
-                  customRoleId: member.customRoleId,
+                  assignedRoleId: member.customRoleId,
                 },
               });
             } else {
@@ -393,14 +351,7 @@ export const teamRouter = createTRPCRouter({
                 },
                 data: {
                   role: member.role as TeamUserRole,
-                },
-              });
-
-              // Remove existing custom roles when switching to built-in role
-              await tx.teamUserCustomRole.deleteMany({
-                where: {
-                  userId: member.userId,
-                  teamId: input.teamId,
+                  assignedRoleId: null, // Clear custom role assignment
                 },
               });
             }
@@ -459,6 +410,7 @@ export const teamRouter = createTRPCRouter({
               role: isCustomRole
                 ? TeamUserRole.VIEWER
                 : (member.role as TeamUserRole),
+              assignedRoleId: isCustomRole ? member.customRoleId : null,
             },
           });
 
@@ -478,14 +430,6 @@ export const teamRouter = createTRPCRouter({
                 message: `Custom role ${member.customRoleId} is invalid for this team`,
               });
             }
-
-            await tx.teamUserCustomRole.create({
-              data: {
-                userId: member.userId,
-                teamId: team.id,
-                customRoleId: member.customRoleId!,
-              },
-            });
           }
         }
 
@@ -608,14 +552,6 @@ export const teamRouter = createTRPCRouter({
           },
         });
 
-        // Also remove any custom role assignments
-        await tx.teamUserCustomRole.deleteMany({
-          where: {
-            userId: input.userId,
-            teamId: input.teamId,
-          },
-        });
-
         // Post-removal validation: ensure we still have at least one admin
         const finalAdminCount = await tx.teamUser.count({
           where: {
@@ -638,12 +574,7 @@ export const teamRouter = createTRPCRouter({
             members: {
               include: {
                 user: true,
-              },
-            },
-            customRoleMembers: {
-              include: {
-                customRole: true,
-                user: true,
+                assignedRole: true,
               },
             },
           },

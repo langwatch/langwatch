@@ -25,7 +25,7 @@ import {
 } from "~/components/analytics/CustomGraph";
 import { useFilterToggle } from "~/components/filters/FilterToggle";
 import { useOrganizationTeamProject } from "../../../hooks/useOrganizationTeamProject";
-import { PermissionAlert } from "../../../components/PermissionAlert";
+import { withPermissionGuard } from "../../../components/WithPermissionGuard";
 import type { FilterField } from "~/server/filters/types";
 import { api } from "~/utils/api";
 import { Link } from "../../../components/ui/link";
@@ -154,8 +154,8 @@ function GraphCard({
   );
 }
 
-export default function Reports() {
-  const { project, hasPermission } = useOrganizationTeamProject();
+function ReportsContent() {
+  const { project } = useOrganizationTeamProject();
   const { showFilters } = useFilterToggle();
 
   const graphs = api.graphs.getAll.useQuery({ projectId: project?.id ?? "" });
@@ -181,16 +181,6 @@ export default function Reports() {
       },
     );
   };
-
-  const hasAnalyticsViewPermission = hasPermission("analytics:view");
-
-  if (!hasAnalyticsViewPermission) {
-    return (
-      <GraphsLayout>
-        <PermissionAlert permission="analytics:view" />
-      </GraphsLayout>
-    );
-  }
 
   return (
     <GraphsLayout>
@@ -249,3 +239,7 @@ export default function Reports() {
     </GraphsLayout>
   );
 }
+
+export default withPermissionGuard("analytics:view", {
+  layoutComponent: GraphsLayout,
+})(ReportsContent);

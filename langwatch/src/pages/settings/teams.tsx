@@ -16,8 +16,9 @@ import { Menu } from "../../components/ui/menu";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import type { TeamWithProjectsAndMembersAndUsers } from "../../server/api/routers/organization";
 import { api } from "../../utils/api";
+import { withPermissionGuard } from "../../components/WithPermissionGuard";
 
-export default function Teams() {
+function Teams() {
   const { organization } = useOrganizationTeamProject();
 
   const teams = api.team.getTeamsWithMembers.useQuery(
@@ -31,6 +32,10 @@ export default function Teams() {
 
   return <TeamsList teams={teams.data} />;
 }
+
+export default withPermissionGuard("project:manage", {
+  layoutComponent: SettingsLayout,
+})(Teams);
 
 function TeamsList({ teams }: { teams: TeamWithProjectsAndMembersAndUsers[] }) {
   const {

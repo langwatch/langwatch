@@ -20,7 +20,7 @@ import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 import { AnalyticsHeader } from "../../../components/analytics/AnalyticsHeader";
 import { getEvaluatorDefinitions } from "../../../server/evaluations/getEvaluator";
-import { PermissionAlert } from "../../../components/PermissionAlert";
+import { withPermissionGuard } from "../../../components/WithPermissionGuard";
 
 // Time unit conversion constants
 const MINUTES_IN_DAY = 24 * 60; // 1440 minutes in a day
@@ -152,24 +152,14 @@ const creatChecks = (checks: any) => {
   });
 };
 
-export default function Evaluations() {
-  const { project, hasPermission } = useOrganizationTeamProject();
+function EvaluationsContent() {
+  const { project } = useOrganizationTeamProject();
   const checks = api.monitors.getAllForProject.useQuery(
     {
       projectId: project?.id ?? "",
     },
     { enabled: !!project },
   );
-
-  const hasAnalyticsViewPermission = hasPermission("analytics:view");
-
-  if (!hasAnalyticsViewPermission) {
-    return (
-      <GraphsLayout>
-        <PermissionAlert permission="analytics:view" />
-      </GraphsLayout>
-    );
-  }
 
   return (
     <GraphsLayout>
@@ -214,3 +204,7 @@ export default function Evaluations() {
     </GraphsLayout>
   );
 }
+
+export default withPermissionGuard("analytics:view", {
+  layoutComponent: GraphsLayout,
+})(EvaluationsContent);

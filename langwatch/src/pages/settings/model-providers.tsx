@@ -47,6 +47,7 @@ import {
   KEY_CHECK,
 } from "../../utils/constants";
 import { dependencies } from "../../injection/dependencies.client";
+import { PermissionAlert } from "../../components/PermissionAlert";
 
 /**
  * Handles creating multiple options from comma-separated input
@@ -74,7 +75,10 @@ const handleCreateMultipleOptions = (
 };
 
 export default function ModelsPage() {
-  const { project, organizations } = useOrganizationTeamProject();
+  const { project, organizations, hasPermission } =
+    useOrganizationTeamProject();
+  const hasModelProvidersManagePermission = hasPermission("project:manage");
+
   const modelProviders = api.modelProvider.getAllForProjectForFrontend.useQuery(
     { projectId: project?.id ?? "" },
     { enabled: !!project },
@@ -126,6 +130,7 @@ export default function ModelsPage() {
                   </Box>
                 ))}
               {modelProviders.data &&
+                hasModelProvidersManagePermission &&
                 Object.values(modelProviders.data).map((provider, index) => (
                   <ModelProviderForm
                     key={index}
@@ -134,6 +139,9 @@ export default function ModelsPage() {
                     updateMutation={updateMutation}
                   />
                 ))}
+              {!hasModelProvidersManagePermission && (
+                <PermissionAlert permission="project:manage" />
+              )}
             </VStack>
           </Card.Body>
         </Card.Root>

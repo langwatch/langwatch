@@ -17,15 +17,21 @@ import { teamRolesOptions } from "../../../components/settings/TeamUserRoleField
 import { useOrganizationTeamProject } from "../../../hooks/useOrganizationTeamProject";
 
 // Type guards for safe access to custom role data
-function isValidCustomRoleMember(
-  member: unknown,
-): member is TeamWithProjectsAndMembersAndUsers["customRoleMembers"][0] {
+function isValidCustomRole(
+  role: unknown,
+): role is {
+  id: string;
+  name: string;
+  description: string | null;
+  permissions: unknown;
+} {
   return (
-    typeof member === "object" &&
-    member !== null &&
-    "customRole" in member &&
-    typeof (member as { customRole: unknown }).customRole === "object" &&
-    (member as { customRole: unknown }).customRole !== null
+    typeof role === "object" &&
+    role !== null &&
+    "id" in role &&
+    "name" in role &&
+    typeof (role as { id: unknown }).id === "string" &&
+    typeof (role as { name: unknown }).name === "string"
   );
 }
 
@@ -69,24 +75,20 @@ function EditTeam({ team }: { team: TeamWithProjectsAndMembersAndUsers }) {
       defaultRole: teamDefaultRole,
       members: teamData.members.map((member) => {
         // Check if this user has a custom role assigned
-        const customRoleAssignment = teamData.customRoleMembers?.find(
-          (crm) => crm.userId === member.userId && crm.teamId === member.teamId,
-        );
+        const assignedRole = member.assignedRole;
 
         const role =
-          customRoleAssignment && isValidCustomRoleMember(customRoleAssignment)
+          assignedRole && isValidCustomRole(assignedRole)
             ? {
-                label: customRoleAssignment.customRole.name,
-                value: `custom:${customRoleAssignment.customRole.id}`,
+                label: assignedRole.name,
+                value: `custom:${assignedRole.id}`,
                 description:
-                  customRoleAssignment.customRole.description ??
-                  (isValidPermissions(
-                    customRoleAssignment.customRole.permissions,
-                  )
-                    ? `${customRoleAssignment.customRole.permissions.length} permissions`
+                  assignedRole.description ??
+                  (isValidPermissions(assignedRole.permissions)
+                    ? `${assignedRole.permissions.length} permissions`
                     : "Custom role"),
                 isCustom: true,
-                customRoleId: customRoleAssignment.customRole.id,
+                customRoleId: assignedRole.id,
               }
             : teamRolesOptions[member.role];
 

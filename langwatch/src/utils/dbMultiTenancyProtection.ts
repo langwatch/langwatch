@@ -22,7 +22,6 @@ const EXEMPT_MODELS = [
    * Custom roles are organization-level, not project-level
    */
   "CustomRole",
-  "TeamUserCustomRole",
 ];
 
 const _guardProjectId = ({ params }: { params: Prisma.MiddlewareParams }) => {
@@ -51,7 +50,7 @@ const _guardProjectId = ({ params }: { params: Prisma.MiddlewareParams }) => {
 
     if (!hasProjectId) {
       throw new Error(
-        `The ${action} action on the ${model} model requires a 'projectId' in the data field`
+        `The ${action} action on the ${model} model requires a 'projectId' in the data field`,
       );
     }
   } else if (
@@ -63,7 +62,7 @@ const _guardProjectId = ({ params }: { params: Prisma.MiddlewareParams }) => {
     throw new Error(
       params.args?.where?.OR
         ? `The ${action} action on the ${model} model requires that all the OR clauses check for either the projectId or organizationId`
-        : `The ${action} action on the ${model} model requires a 'projectId' or 'projectId.in' in the where clause`
+        : `The ${action} action on the ${model} model requires a 'projectId' or 'projectId.in' in the where clause`,
     );
   }
 };

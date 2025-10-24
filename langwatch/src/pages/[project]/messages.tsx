@@ -8,14 +8,12 @@ import { api } from "../../utils/api";
 import { useEffect, useState } from "react";
 import { useFilterParams } from "../../hooks/useFilterParams";
 import { useFieldRedaction } from "../../hooks/useFieldRedaction";
-import { PermissionAlert } from "../../components/PermissionAlert";
+import { withPermissionGuard } from "../../components/WithPermissionGuard";
 
-export default function MessagesOrIntegrationGuide() {
+function MessagesOrIntegrationGuideContent() {
   const { project } = useOrganizationTeamProject();
 
   const { isTableView } = useTableView();
-  const { hasPermission } = useOrganizationTeamProject();
-  const hasTracesViewPermission = hasPermission("traces:view");
 
   const [waitingForFirstMessage, setWaitingForFirstMessage] = useState(false);
 
@@ -45,14 +43,6 @@ export default function MessagesOrIntegrationGuide() {
     }
   }, [project, traces.data, waitingForFirstMessage]);
 
-  if (!hasTracesViewPermission) {
-    return (
-      <DashboardLayout>
-        <PermissionAlert permission="traces:view" />
-      </DashboardLayout>
-    );
-  }
-
   if (project && (!project.firstMessage || waitingForFirstMessage)) {
     return (
       <DashboardLayout>
@@ -75,3 +65,7 @@ export default function MessagesOrIntegrationGuide() {
     </DashboardLayout>
   );
 }
+
+export default withPermissionGuard("traces:view", {
+  layoutComponent: DashboardLayout,
+})(MessagesOrIntegrationGuideContent);

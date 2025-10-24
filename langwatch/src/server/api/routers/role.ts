@@ -285,11 +285,15 @@ export const roleRouter = createTRPCRouter({
       }
 
       // Create the assignment after all validations pass
-      const assignment = await prisma.teamUserCustomRole.create({
+      const assignment = await prisma.teamUser.update({
+        where: {
+          userId_teamId: {
+            userId: input.userId,
+            teamId: input.teamId,
+          },
+        },
         data: {
-          userId: input.userId,
-          teamId: input.teamId,
-          customRoleId: input.customRoleId,
+          assignedRoleId: input.customRoleId,
         },
       });
 
@@ -306,12 +310,15 @@ export const roleRouter = createTRPCRouter({
     )
     .use(checkTeamPermission("team:manage"))
     .mutation(async ({ ctx, input }) => {
-      await ctx.prisma.teamUserCustomRole.delete({
+      await ctx.prisma.teamUser.update({
         where: {
           userId_teamId: {
             userId: input.userId,
             teamId: input.teamId,
           },
+        },
+        data: {
+          assignedRoleId: null, // Clear custom role assignment
         },
       });
 

@@ -39,6 +39,8 @@ import { Switch } from "../components/ui/switch";
 import { Dialog } from "../components/ui/dialog";
 import { Lock } from "react-feather";
 
+import { withPermissionGuard } from "../components/WithPermissionGuard";
+
 type OrganizationFormData = {
   name: string;
   s3Endpoint: string;
@@ -49,13 +51,17 @@ type OrganizationFormData = {
   s3Bucket: string;
 };
 
-export default function Settings() {
+function Settings() {
   const { organization, project } = useOrganizationTeamProject();
 
   if (!organization || !project) return null;
 
   return <SettingsForm organization={organization} project={project} />;
 }
+
+export default withPermissionGuard("organization:manage", {
+  layoutComponent: SettingsLayout,
+})(Settings);
 
 function SettingsForm({
   organization,
