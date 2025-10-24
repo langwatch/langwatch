@@ -5,50 +5,38 @@ import { PromptMessagesEditor } from "./PromptMessagesEditor";
 import { PromptTabbedSection } from "./PromptTabbedSection";
 import { usePromptConfigForm } from "~/prompt-configs/hooks";
 import { FormProvider } from "react-hook-form";
-import { useDraggableTabsBrowserStore } from "~/prompt-configs/prompt-studio/prompt-studio-store/DraggableTabsBrowserStore";
+import {
+  useDraggableTabsBrowserStore,
+  type TabData,
+} from "~/prompt-configs/prompt-studio/prompt-studio-store/DraggableTabsBrowserStore";
 import type { PromptConfigFormValues } from "~/prompt-configs/types";
 import debounce from "lodash/debounce";
 import { cloneDeep } from "lodash";
+import { useTabId } from "../ui/TabContext";
 
-interface PromptBrowserWindowContentProps {
-  configId?: string;
-  tabId: string;
-}
+export { useTabId } from "../ui/TabContext";
 
-/**
- * Main component of the prompt browser window content.
- */
-export function PromptBrowserWindowContent(
-  props: PromptBrowserWindowContentProps,
-) {
+export function PromptBrowserWindowContent() {
+  const tabId = useTabId();
   const { windows } = useDraggableTabsBrowserStore();
-  const tab = windows.flatMap((w) => w.tabs).find((t) => t.id === props.tabId);
-  const defaultValues = tab?.data.form.defaultValues;
+  const tab = windows.flatMap((w) => w.tabs).find((t) => t.id === tabId);
+  const currentValues = tab?.data.form.currentValues;
   const initialConfigValues = useMemo(
-    () => cloneDeep(defaultValues),
-    [defaultValues],
+    () => cloneDeep(currentValues),
+    [currentValues],
   );
 
-  /**
-   * If the prompt is not found, don't render the window.
-   */
   if (!initialConfigValues) return null;
 
   return (
     <PromptBrowserWindowInner
-      configId={props.configId}
       initialConfigValues={initialConfigValues as PromptConfigFormValues}
-      tabId={props.tabId}
+      tabId={tabId}
     />
   );
 }
 
-/**
- * Inner component of the prompt browser window.
- * Allows a controlled form creation based on the initial config values.
- */
 function PromptBrowserWindowInner(props: {
-  configId?: string;
   initialConfigValues: PromptConfigFormValues;
   tabId: string;
 }) {
@@ -65,16 +53,13 @@ function PromptBrowserWindowInner(props: {
     [form.methods],
   );
 
-  // Handle syncing the form-derived metadata to the tab data (live title/version)
   form.methods.watch((values) => {
     updateTabDataDebounced({
       tabId: props.tabId,
-      updater: (data) => ({
+      updater: (data: TabData) => ({
         ...data,
         form: {
-          ...data.form,
-          // I don't love that we have to do this here as I think it affects performance.
-          defaultValues: cloneDeep(values),
+          currentValues: cloneDeep(values),
         },
         meta: {
           ...data.meta,
@@ -99,20 +84,6 @@ function PromptBrowserWindowInner(props: {
       });
     }
   }, [systemMessage, setValueDebounced]);
-
-  useEffect(() => {
-    const isDirty = form.methods.formState.isDirty;
-    updateTabData({
-      tabId: props.tabId,
-      updater: (data) => ({
-        ...data,
-        form: {
-          ...data.form,
-          isDirty,
-        },
-      }),
-    });
-  }, [form.methods.formState.isDirty, props.tabId, updateTabData]);
 
   return (
     <FormProvider {...form.methods}>

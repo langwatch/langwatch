@@ -3,26 +3,19 @@ import { immer } from "zustand/middleware/immer";
 import type { DeepPartial } from "react-hook-form";
 import type { PromptConfigFormValues } from "~/prompt-configs";
 import { createJSONStorage, persist } from "zustand/middleware";
+import { cloneDeep } from "lodash";
 
 /**
  * Data associated with a tab in the prompt studio browser.
  * Single Responsibility: Represents the state and metadata for a prompt tab.
  */
 export interface TabData {
-  /** Partial form state for this tab */
   form: {
-    /** Default values to initialize the form */
-    defaultValues: DeepPartial<PromptConfigFormValues>;
-    /** Current form dirty state */
-    isDirty: boolean;
+    currentValues: DeepPartial<PromptConfigFormValues>;
   };
-  /** Derived, live-updating metadata for tab */
   meta: {
-    /** Title shown on tab (from form handle) */
     title: string | null;
-    /** Version number for display, if available */
     versionNumber?: number;
-    /** Scope of the tab */
     scope?: "PROJECT" | "ORGANIZATION";
   };
 }
@@ -187,9 +180,14 @@ export const useDraggableTabsBrowserStore = create<DraggableTabsBrowserState>()(
                 {
                   id: newTabId,
                   data: {
-                    ...sourceTab.data,
-                    form: { ...sourceTab.data.form },
-                    meta: { ...sourceTab.data.meta },
+                    form: {
+                      currentValues: cloneDeep(
+                        sourceTab.data.form.currentValues,
+                      ),
+                    },
+                    meta: {
+                      ...sourceTab.data.meta,
+                    },
                   },
                 },
               ],
@@ -295,7 +293,7 @@ export const useDraggableTabsBrowserStore = create<DraggableTabsBrowserState>()(
     ),
     {
       name: "draggable-tabs-browser-store",
-      storage: createJSONStorage(() => localStorage), // localStorage key
+      storage: createJSONStorage(() => localStorage),
     },
   ),
 );

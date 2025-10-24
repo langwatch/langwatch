@@ -1,23 +1,20 @@
 import { Button } from "@chakra-ui/react";
-import { useFormContext } from "react-hook-form";
 import { useHandleSavePrompt } from "~/prompt-configs/prompt-studio/hooks/useHandleSavePrompt";
-import type { PromptConfigFormValues } from "~/prompt-configs";
+import { useTabId } from "../ui/TabContext";
+import { useHasUnsavedChanges } from "~/prompt-configs/prompt-studio/hooks/useHasUnsavedChanges";
 
 export function SavePromptButton() {
-  const formMethods = useFormContext<PromptConfigFormValues>();
   const { handleSaveVersion } = useHandleSavePrompt();
-  const handle = formMethods.watch("handle");
-  const isDraft = !Boolean(handle);
-  const isDirty = formMethods.formState.isDirty;
-  const saveEnabled = isDirty || isDraft;
+  const tabId = useTabId();
+  const hasUnsavedChanges = useHasUnsavedChanges(tabId);
 
   return (
     <Button
       onClick={handleSaveVersion}
-      disabled={!saveEnabled}
+      disabled={!hasUnsavedChanges}
       variant="outline"
     >
-      {saveEnabled ? "Save" : "Saved"}
+      {hasUnsavedChanges ? "Save" : "Saved"}
     </Button>
   );
 }

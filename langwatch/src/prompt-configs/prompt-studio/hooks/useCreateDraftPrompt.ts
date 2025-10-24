@@ -39,10 +39,11 @@ export function useCreateDraftPrompt() {
 
     addTab({
       data: {
-        form: { defaultValues, isDirty: false },
+        form: {
+          currentValues: defaultValues,
+        },
         meta: {
-          title: defaultValues.handle ?? null,
-          versionNumber: defaultValues.versionMetadata?.versionNumber,
+          title: defaultValues.handle,
         },
       },
     });
