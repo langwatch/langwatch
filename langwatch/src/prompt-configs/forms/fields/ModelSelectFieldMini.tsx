@@ -21,14 +21,14 @@ export function ModelSelectFieldMini() {
                 border="1px solid"
                 borderColor={open ? "blue.200" : "gray.200"}
                 bg={open ? "blue.50" : "white"}
-                borderRadius="md"
-                padding="2"
+                borderRadius="sm"
+                padding="1"
                 cursor="pointer"
                 position="relative"
               >
                 <HStack onClick={onToggle} width="full">
-                <LLMModelDisplay model={field.value?.model ?? ""}/>
-                <ChevronDown size={16} />
+                  <LLMModelDisplay model={field.value?.model ?? ""} />
+                  <ChevronDown size={16} />
                 </HStack>
                 <LLMConfigModal
                   open={open}
