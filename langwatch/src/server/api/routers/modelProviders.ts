@@ -24,7 +24,7 @@ export const modelProviderRouter = createTRPCRouter({
       const hasSetupPermission = await backendHasTeamProjectPermission(
         ctx,
         { projectId },
-        TeamRoleGroup.SETUP_PROJECT
+        TeamRoleGroup.SETUP_PROJECT,
       );
 
       return await getProjectModelProviders(projectId, hasSetupPermission);
@@ -37,11 +37,11 @@ export const modelProviderRouter = createTRPCRouter({
       const hasSetupPermission = await backendHasTeamProjectPermission(
         ctx,
         { projectId },
-        TeamRoleGroup.SETUP_PROJECT
+        TeamRoleGroup.SETUP_PROJECT,
       );
       return await getProjectModelProvidersForFrontend(
         projectId,
-        hasSetupPermission
+        hasSetupPermission,
       );
     }),
   update: protectedProcedure
@@ -54,7 +54,7 @@ export const modelProviderRouter = createTRPCRouter({
         customKeys: z.object({}).passthrough().optional().nullable(),
         customModels: z.array(z.string()).optional().nullable(),
         customEmbeddingsModels: z.array(z.string()).optional().nullable(),
-      })
+      }),
     )
     .use(checkUserPermissionForProject(TeamRoleGroup.SETUP_PROJECT))
     .mutation(async ({ input, ctx }) => {
@@ -72,13 +72,28 @@ export const modelProviderRouter = createTRPCRouter({
         throw new Error("Invalid provider");
       }
 
+      const providerSchema =
+        modelProviders[provider as keyof typeof modelProviders]!.keysSchema;
       const validator = z.union([
-        modelProviders[provider as keyof typeof modelProviders]!.keysSchema,
+        providerSchema,
         z.object({ MANAGED: z.string() }),
       ]);
       let validatedKeys;
       try {
         validatedKeys = customKeys ? validator.parse(customKeys) : null;
+
+        // Filter out null values for Azure provider to avoid saving nulls to database
+        if (provider === "azure" && validatedKeys) {
+          validatedKeys = Object.fromEntries(
+            Object.entries(validatedKeys).filter(
+              ([_, value]) => value !== null,
+            ),
+          );
+          // If all keys are filtered out, set to null
+          if (Object.keys(validatedKeys).length === 0) {
+            validatedKeys = null;
+          }
+        }
       } catch (e) {
         throw new Error(`Invalid keys for ${provider}`);
       }
@@ -101,15 +116,35 @@ export const modelProviderRouter = createTRPCRouter({
           });
 
       if (existingModelProvider) {
-        // Merge custom keys, preserving existing values when frontend sends "HAS_KEY" or dots
+        // Smart merging: preserve masked standard keys, but replace custom headers completely
         let mergedCustomKeys: Record<string, any> | null = validatedKeys;
         if (validatedKeys && existingModelProvider.customKeys) {
+          const existingKeys = existingModelProvider.customKeys as Record<
+            string,
+            any
+          >;
+
+          // Standard Azure keys that should preserve masked values
+          const standardAzureKeys = new Set([
+            "AZURE_OPENAI_API_KEY",
+            "AZURE_OPENAI_ENDPOINT",
+            "AZURE_API_GATEWAY_BASE_URL",
+            "AZURE_API_GATEWAY_VERSION",
+          ]);
+
           mergedCustomKeys = {
-            ...(existingModelProvider.customKeys as Record<string, any>),
+            // Start with new keys (includes all custom headers)
+            ...validatedKeys,
+            // Override with existing values for masked standard keys
             ...Object.fromEntries(
-              Object.entries(validatedKeys).filter(
-                ([_key, value]) => value !== "HAS_KEY••••••••••••••••••••••••"
-              )
+              Object.entries(existingKeys)
+                .filter(
+                  ([key, value]) =>
+                    standardAzureKeys.has(key) &&
+                    (validatedKeys as any)[key] ===
+                      "HAS_KEY••••••••••••••••••••••••",
+                )
+                .map(([key, value]) => [key, value]),
             ),
           };
         }
@@ -142,7 +177,7 @@ export const modelProviderRouter = createTRPCRouter({
         id: z.string().optional(),
         projectId: z.string(),
         provider: z.string(),
-      })
+      }),
     )
     .use(checkUserPermissionForProject(TeamRoleGroup.SETUP_PROJECT))
     .mutation(async ({ input, ctx }) => {
@@ -161,7 +196,7 @@ export const modelProviderRouter = createTRPCRouter({
 
 export const getProjectModelProviders = async (
   projectId: string,
-  includeKeys = true
+  includeKeys = true,
 ) => {
   const project = await prisma.project.findUnique({
     where: { id: projectId },
@@ -189,16 +224,16 @@ export const getProjectModelProviders = async (
             disabledByDefault: !enabled,
             customKeys: null,
             models: getProviderModelOptions(providerKey, "chat").map(
-              (m) => m.value
+              (m) => m.value,
             ),
             embeddingsModels: getProviderModelOptions(
               providerKey,
-              "embedding"
+              "embedding",
             ).map((m) => m.value),
             deploymentMapping: null,
           };
           return [providerKey, modelProvider_];
-        })
+        }),
     );
 
   const savedModelProviders = (
@@ -210,7 +245,7 @@ export const getProjectModelProviders = async (
       (modelProvider) =>
         modelProvider.customKeys ??
         modelProvider.enabled !==
-          defaultModelProviders[modelProvider.provider]?.enabled
+          defaultModelProviders[modelProvider.provider]?.enabled,
     )
     .reduce(
       (acc, modelProvider) => {
@@ -236,7 +271,7 @@ export const getProjectModelProviders = async (
           [modelProvider.provider]: modelProvider_,
         };
       },
-      {} as Record<string, MaybeStoredModelProvider>
+      {} as Record<string, MaybeStoredModelProvider>,
     );
 
   return {
@@ -248,7 +283,7 @@ export const getProjectModelProviders = async (
 // Frontend-only function that masks API keys for security
 export const getProjectModelProvidersForFrontend = async (
   projectId: string,
-  includeKeys = true
+  includeKeys = true,
 ) => {
   const modelProviders = await getProjectModelProviders(projectId, includeKeys);
 
@@ -269,7 +304,7 @@ export const getProjectModelProvidersForFrontend = async (
             KEY_CHECK.some((k) => key.includes(k))
               ? "HAS_KEY••••••••••••••••••••••••"
               : value,
-          ])
+          ]),
         ),
       };
     }
@@ -280,7 +315,7 @@ export const getProjectModelProvidersForFrontend = async (
 
 const getModelOrDefaultEnvKey = (
   modelProvider: MaybeStoredModelProvider,
-  envKey: string
+  envKey: string,
 ) => {
   return (
     (modelProvider.customKeys as Record<string, string>)?.[envKey] ??
@@ -298,7 +333,7 @@ const getModelOrDefaultApiKey = (modelProvider: MaybeStoredModelProvider) => {
 };
 
 const getModelOrDefaultEndpointKey = (
-  modelProvider: MaybeStoredModelProvider
+  modelProvider: MaybeStoredModelProvider,
 ) => {
   const providerDefinition =
     modelProviders[modelProvider.provider as keyof typeof modelProviders];
@@ -320,13 +355,18 @@ export const prepareEnvKeys = (modelProvider: MaybeStoredModelProvider) => {
 
   // TODO: add AZURE_DEPLOYMENT_NAME and AZURE_EMBEDDINGS_DEPLOYMENT_NAME for deployment name mapping
 
+  const getSchemaShape = (schema: any) => {
+    if ("innerType" in schema) {
+      return schema.innerType().shape;
+    }
+    if ("shape" in schema) {
+      return schema.shape;
+    }
+    return {};
+  };
+
   return Object.fromEntries(
-    Object.keys(
-      ("innerType" in providerDefinition.keysSchema
-        ? providerDefinition.keysSchema.innerType()
-        : providerDefinition.keysSchema
-      ).shape
-    )
+    Object.keys(getSchemaShape(providerDefinition.keysSchema))
       .map((key) => [key, getModelOrDefaultEnvKey(modelProvider, key)])
       .map(([key, value]) => {
         if (key === "CUSTOM_API_KEY") {
@@ -337,7 +377,7 @@ export const prepareEnvKeys = (modelProvider: MaybeStoredModelProvider) => {
         }
         return [key, value];
       })
-      .filter(([_key, value]) => !!value)
+      .filter(([_key, value]) => !!value),
   );
 };
 
@@ -385,30 +425,40 @@ export const prepareLitellmParams = async ({
   if (modelProvider.provider === "azure") {
     const gatewayBaseUrl = getModelOrDefaultEnvKey(
       modelProvider,
-      "AZURE_API_GATEWAY_BASE_URL"
+      "AZURE_API_GATEWAY_BASE_URL",
     );
-    const gatewayVersion = getModelOrDefaultEnvKey(
-      modelProvider,
-      "AZURE_API_GATEWAY_VERSION"
-    ) ?? "2024-05-01-preview";
-    const gatewayHeaderName = getModelOrDefaultEnvKey(
-      modelProvider,
-      "AZURE_API_GATEWAY_HEADER_NAME"
-    );
-    const gatewayHeaderKey = getModelOrDefaultEnvKey(
-      modelProvider,
-      "AZURE_API_GATEWAY_HEADER_KEY"
-    );
+    const gatewayVersion =
+      getModelOrDefaultEnvKey(modelProvider, "AZURE_API_GATEWAY_VERSION") ??
+      "2024-05-01-preview";
 
     // If API Gateway is configured, route through the gateway endpoint
     if (gatewayBaseUrl) {
       params.api_base = gatewayBaseUrl;
       params.use_azure_gateway = "true";
       params.api_version = gatewayVersion;
-      // Set custom header parameters for API Gateway
-      if (gatewayHeaderName && gatewayHeaderKey) {
-        params.azure_api_gateway_header_name = gatewayHeaderName;
-        params.azure_api_gateway_header_key = gatewayHeaderKey;
+    }
+
+    // Pass through all custom headers for Azure providers
+    if (modelProvider.customKeys) {
+      const customKeys = modelProvider.customKeys as Record<string, string>;
+      const standardAzureKeys = new Set([
+        "AZURE_OPENAI_API_KEY",
+        "AZURE_OPENAI_ENDPOINT",
+        "AZURE_API_GATEWAY_BASE_URL",
+        "AZURE_API_GATEWAY_VERSION",
+      ]);
+
+      // Collect all custom headers
+      const customHeaders: Record<string, string> = {};
+      Object.entries(customKeys).forEach(([key, value]) => {
+        if (!standardAzureKeys.has(key) && value && typeof value === "string") {
+          customHeaders[key] = value;
+        }
+      });
+
+      // If we have custom headers, pass them through
+      if (Object.keys(customHeaders).length > 0) {
+        params.custom_headers = JSON.stringify(customHeaders);
       }
     }
   }
