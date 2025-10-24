@@ -1,5 +1,27 @@
 # Changelog
 
+## [1.3.0](https://github.com/langwatch/langwatch/compare/langwatch@v1.2.0...langwatch@v1.3.0) (2025-10-24)
+
+
+### Features
+
+* add threads to traces on dataset select ([#735](https://github.com/langwatch/langwatch/issues/735)) ([e5e1ead](https://github.com/langwatch/langwatch/commit/e5e1ead3d3b4e98b2ae058b6e90ab4b0a087ce86))
+* add threads to traces on dataset select ([#735](https://github.com/langwatch/langwatch/issues/735)) ([82ee55e](https://github.com/langwatch/langwatch/commit/82ee55e1b929aca4e7b77cf4ad4843ff22055f2d))
+* allow to skip migrations during startup ([#731](https://github.com/langwatch/langwatch/issues/731)) ([73f41bc](https://github.com/langwatch/langwatch/commit/73f41bc045a37bd6ebb6e958a3c7d020f624d01e))
+* custom headers ([#740](https://github.com/langwatch/langwatch/issues/740)) ([c36e5a7](https://github.com/langwatch/langwatch/commit/c36e5a7e7e517d6b63567080923be6107303ed57))
+
+
+### Bug Fixes
+
+* cold index detection for opensearch used in annotations ([#737](https://github.com/langwatch/langwatch/issues/737)) ([134379e](https://github.com/langwatch/langwatch/commit/134379ee8fdda54d68c4e180f37f1350a141c668))
+* mapping state is nullable, fallback to default mappings for trace evaluations ([#736](https://github.com/langwatch/langwatch/issues/736)) ([e5e1ead](https://github.com/langwatch/langwatch/commit/e5e1ead3d3b4e98b2ae058b6e90ab4b0a087ce86))
+* rare race condition where trace is picked up right at the moment where we are trying to merge it by deleting + rescheduling with spans grouped AND fallback to sync if scheduling fails completely ([#739](https://github.com/langwatch/langwatch/issues/739)) ([d8a7d4c](https://github.com/langwatch/langwatch/commit/d8a7d4c9d985eb28201e467817d082d1eef1689b))
+
+
+### Miscellaneous
+
+* add span count and weight details for better debugging of immense traces ([2be915e](https://github.com/langwatch/langwatch/commit/2be915e1735c0632caac8d8082f632d461643967))
+
 ## [1.2.0](https://github.com/langwatch/langwatch/compare/langwatch@v1.1.1...langwatch@v1.2.0) (2025-10-18)
 
 
