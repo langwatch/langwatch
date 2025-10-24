@@ -40,7 +40,6 @@ export function PromptBrowserTab({
         role="button"
         borderRadius="3px"
         transition="all 0.1s ease-in-out"
-        padding={0.5}
         opacity={dimmed ? 0.25 : 1}
         _hover={{ opacity: 1 }}
         onPointerDown={(e) => {

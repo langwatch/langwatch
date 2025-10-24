@@ -23,14 +23,22 @@ export function PublishedPromptsList() {
    */
   const groupedPrompts = useMemo(() => {
     const publishedPrompts = data?.filter((prompt) => prompt.version > 0);
-    return groupBy(publishedPrompts, (prompt) =>
+    const grouped = groupBy(publishedPrompts, (prompt) =>
       prompt.handle?.includes("/") ? prompt.handle?.split("/")[0] : "default",
     );
+    // Put the default folder last
+    const sorted = Object.entries(grouped).sort((a, b) => {
+      if (a[0] === "default") return 1;
+      if (b[0] === "default") return -1;
+      return 0;
+    });
+
+    return sorted;
   }, [data]);
 
   return (
     <>
-      {Object.entries(groupedPrompts).map(([folder, prompts]) => (
+      {groupedPrompts.map(([folder, prompts]) => (
         <Sidebar.List
           key={folder}
           title={folder === "default" ? undefined : folder}
