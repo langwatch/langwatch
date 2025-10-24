@@ -20,10 +20,10 @@ export function AddMessageButton(props: {
       </Menu.Trigger>
       <Menu.Content>
         <Menu.Item value="add-user" onClick={() => onAdd("user")}>
-          Add user message
+          User
         </Menu.Item>
         <Menu.Item value="add-assistant" onClick={() => onAdd("assistant")}>
-          Add assistant message
+          Assistant
         </Menu.Item>
       </Menu.Content>
     </Menu.Root>
