@@ -67,8 +67,7 @@ export function PublishedPromptsList() {
                 addTab({
                   data: {
                     form: {
-                      defaultValues,
-                      isDirty: false,
+                      currentValues: defaultValues,
                     },
                     meta: {
                       title: defaultValues.handle ?? null,

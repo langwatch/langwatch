@@ -47,8 +47,7 @@ export function useUrlParamToOpenNewTab() {
       addTab({
         data: {
           form: {
-            defaultValues,
-            isDirty: false,
+            currentValues: defaultValues,
           },
           meta: {
             title: defaultValues.handle ?? null,

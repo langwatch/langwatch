@@ -2,39 +2,41 @@ import { Box, Circle, HStack, Text, type StackProps } from "@chakra-ui/react";
 import { X } from "react-feather";
 import { VersionBadge } from "~/prompt-configs/components/ui/VersionBadge";
 import { OrganizationBadge } from "~/prompt-configs/components/ui/OrganizationBadge";
+import { withController } from "~/utils/withControllerHOC";
+import { usePromptBrowserTabController } from "./usePromptBrowserTabController";
 
 interface PromptBrowserTabProps extends StackProps {
-  tabTitle?: string | null;
-  version?: number;
-  hasUnsavedChanges?: boolean;
-  onClose?: () => void;
+  onRemove: () => void;
   dimmed?: boolean;
-  scope?: "PROJECT" | "ORGANIZATION";
 }
 
-export function PromptBrowserTab({
-  tabTitle,
-  version,
+type PromptBrowserTabControllerProps = ReturnType<
+  typeof usePromptBrowserTabController
+>;
+
+function PromptBrowserTabView({
+  tab,
   hasUnsavedChanges,
-  onClose,
   dimmed,
-  scope,
+  handleClose,
   ...rest
-}: PromptBrowserTabProps) {
+}: PromptBrowserTabProps & PromptBrowserTabControllerProps) {
+  if (!tab) return null;
+
   return (
     <HStack gap={2} height="full" {...rest}>
       <HStack>
         <Text textOverflow="ellipsis" whiteSpace="nowrap" overflow="hidden">
-          {tabTitle ?? "Untitled"}
+          {tab.data.meta.title ?? "Untitled"}
         </Text>
         {hasUnsavedChanges ? (
           <Box>
             <Circle size="10px" bg="orange.400" color="gray.50" />
           </Box>
-        ) : version != null ? (
-          <VersionBadge version={version} />
+        ) : tab.data.meta.versionNumber != null ? (
+          <VersionBadge version={tab.data.meta.versionNumber} />
         ) : null}
-        {scope === "ORGANIZATION" && <OrganizationBadge />}
+        {tab.data.meta.scope === "ORGANIZATION" && <OrganizationBadge />}
       </HStack>
       <Box
         role="button"
@@ -43,16 +45,18 @@ export function PromptBrowserTab({
         opacity={dimmed ? 0.25 : 1}
         _hover={{ opacity: 1 }}
         onPointerDown={(e) => {
-          // Stop the event from bubbling up to drag listeners
           e.stopPropagation();
         }}
-        onClick={(e) => {
-          e.stopPropagation();
-          onClose?.();
-        }}
+        onClick={handleClose}
       >
         <X width="18px" />
       </Box>
     </HStack>
   );
 }
+
+export const PromptBrowserTab = withController(
+  PromptBrowserTabView,
+  usePromptBrowserTabController,
+);
+
