@@ -7,7 +7,7 @@ import {
 import type { PromptConfigFormValues } from "~/prompt-configs";
 import { VerticalFormControl } from "~/components/VerticalFormControl";
 import { PropertySectionTitle } from "../../../optimization_studio/components/properties/BasePropertiesPanel";
-import { AddRemoveMessageFieldButton } from "./message-history-fields/PromptMessagesField";
+import { AddRemoveMessageFieldButton } from "./message-history-fields/AddRemoveMessageFieldButton";
 import {
   PromptTextArea,
   type PromptTextAreaOnAddMention,
