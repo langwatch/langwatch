@@ -37,6 +37,8 @@ export function PromptStudioTabbedWorkspace() {
   function handleClose(tabId: string) {
     const tab = windows.flatMap((w) => w.tabs).find((t) => t.id === tabId);
 
+    // TODO: This shouldn't be dirty on new tabs. CHeck the logic somewhere
+    // Also, on refresh, these should still be dirty
     if (tab?.data.form.isDirty) {
       if (!confirm("Your unsaved changes will be lost. Proceed anyway?")) {
         return;

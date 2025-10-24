@@ -6,9 +6,7 @@ import { api } from "~/utils/api";
  * Enforces refresh of queries when mutations are successful.
  */
 export const usePrompts = () => {
-  const trpc = api.useContext();
-  const createDraft = api.prompts.createDraft.useMutation();
-  const updateDraft = api.prompts.updateDraft.useMutation();
+  const trpc = api.useUtils();
   const createPrompt = api.prompts.create.useMutation();
   const updatePrompt = api.prompts.update.useMutation();
   const updateHandle = api.prompts.updateHandle.useMutation();
@@ -19,18 +17,6 @@ export const usePrompts = () => {
 
   const invalidateAll = async () =>
     Promise.all([await trpc.prompts.invalidate()]);
-
-  const wrappedCreateDraft: typeof createDraft.mutateAsync = async (params) => {
-    const prompt = await createDraft.mutateAsync(params);
-    await invalidateAll();
-    return prompt;
-  };
-
-  const wrappedUpdateDraft: typeof updateDraft.mutateAsync = async (params) => {
-    const prompt = await updateDraft.mutateAsync(params);
-    await invalidateAll();
-    return prompt;
-  };
 
   const wrappedCreatePrompt: typeof createPrompt.mutateAsync = async (
     params,
@@ -85,10 +71,8 @@ export const usePrompts = () => {
   };
 
   return {
-    createDraft: wrappedCreateDraft,
     createPrompt: wrappedCreatePrompt,
     updatePrompt: wrappedUpdatePrompt,
-    updateDraft: wrappedUpdateDraft,
     updateHandle: wrappedUpdateHandle,
     getPromptById: wrappedGetPromptById,
     restoreVersion: wrappedRestoreVersion,
