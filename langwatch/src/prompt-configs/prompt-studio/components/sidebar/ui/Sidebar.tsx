@@ -44,7 +44,7 @@ function SidebarSectionHeader({
   return (
     <Box
       paddingX="3"
-      paddingBottom="2"
+      paddingY="2"
       fontSize="sm"
       fontWeight="medium"
       color="gray.700"
