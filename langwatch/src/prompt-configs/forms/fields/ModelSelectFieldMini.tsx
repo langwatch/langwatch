@@ -1,7 +1,7 @@
 import { useFormContext, Controller } from "react-hook-form";
 import type { PromptConfigFormValues } from "~/prompt-configs";
 import { LLMConfigModal } from "~/components/llmPromptConfigs/LLMConfigModal";
-import { Box, HStack, useDisclosure } from "@chakra-ui/react";
+import { HStack, useDisclosure } from "@chakra-ui/react";
 import { LLMModelDisplay } from "~/components/llmPromptConfigs/LLMModelDisplay";
 import { ChevronDown } from "react-feather";
 
@@ -24,10 +24,9 @@ export function ModelSelectFieldMini() {
                 borderRadius="md"
                 padding="2"
                 cursor="pointer"
-                onClick={onToggle}
                 position="relative"
               >
-                <LLMModelDisplay model={field.value?.model ?? ""} />
+                <LLMModelDisplay model={field.value?.model ?? ""} onClick={onToggle}/>
                 <ChevronDown size={16} />
                 <LLMConfigModal
                   open={open}

@@ -1,7 +1,12 @@
-import { Box, HStack } from "@chakra-ui/react";
+import { Box, HStack, type StackProps } from "@chakra-ui/react";
 
 import { allModelOptions, useModelSelectionOptions } from "../ModelSelector";
 import { OverflownTextWithTooltip } from "../OverflownText";
+
+export interface LLMModelDisplayProps extends StackProps {
+  model: string;
+  fontSize?: string;
+}
 
 /**
  * LLM Model Display
@@ -10,10 +15,8 @@ import { OverflownTextWithTooltip } from "../OverflownText";
 export function LLMModelDisplay({
   model,
   fontSize = "14px",
-}: {
-  model: string;
-  fontSize?: string;
-}) {
+  ...props
+}: LLMModelDisplayProps) {
   const { modelOption } = useModelSelectionOptions(
     allModelOptions,
     model,
@@ -23,7 +26,7 @@ export function LLMModelDisplay({
   const isDisabled = modelOption?.isDisabled ?? !modelOption?.label;
 
   return (
-    <HStack>
+    <HStack {...props}>
       {modelOption?.icon && (
         <Box width="14px" minWidth="14px">
           {modelOption?.icon}
