@@ -440,7 +440,6 @@ export class LlmConfigRepository {
 
         newVersionData = {
           configData,
-          version: 0,
           schemaVersion: LATEST_SCHEMA_VERSION,
           commitMessage: "Initial version",
         };
@@ -454,7 +453,7 @@ export class LlmConfigRepository {
       const newVersion = await tx.llmPromptConfigVersion.create({
         data: {
           ...newVersionData,
-          version: 0,
+          version: 1,
           configData: newVersionData.configData as Prisma.InputJsonValue,
           id: this.versions.generateVersionId(),
           configId: newConfig.id,

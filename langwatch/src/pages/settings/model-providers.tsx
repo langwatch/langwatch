@@ -762,6 +762,7 @@ type DefaultModelForm = {
 function DefaultModel() {
   const { project } = useOrganizationTeamProject();
   const updateDefaultModel = api.project.updateDefaultModel.useMutation();
+  const trpc = api.useUtils();
 
   const { register, handleSubmit, control } = useForm<DefaultModelForm>({
     defaultValues: {
@@ -777,6 +778,7 @@ function DefaultModel() {
         projectId: project?.id ?? "",
         defaultModel: data.defaultModel,
       });
+      await trpc.project.invalidate();
       toaster.create({
         title: "Default Model Updated",
         type: "success",
