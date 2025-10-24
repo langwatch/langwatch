@@ -19,7 +19,7 @@ import { RunAccordionItem } from "./RunAccordionItem";
 
 // Main sidebar component
 export const SetRunHistorySidebarComponent = (
-  props: ReturnType<typeof useSetRunHistorySidebarController>
+  props: ReturnType<typeof useSetRunHistorySidebarController>,
 ) => {
   const [openIndex, setOpenIndex] = useState<string[]>(["0"]);
   const { runs, onRunClick, isLoading, scenarioSetId, pagination } = props;

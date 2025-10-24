@@ -43,7 +43,7 @@ export const RunAccordionItem = ({
       }
       return acc;
     },
-    { passedCount: 0, failedCount: 0 }
+    { passedCount: 0, failedCount: 0 },
   );
 
   return (
@@ -111,13 +111,8 @@ export const RunAccordionItem = ({
           </VStack>
         </Button>
         <Accordion.ItemTrigger p={7} flex="0" m={0}>
-          <Icon
-            as={ChevronDown}
-            boxSize={4}
-            transform={isOpen ? "rotate(180deg)" : "rotate(0deg)"}
-          />
+          <Accordion.ItemIndicator />
         </Accordion.ItemTrigger>
-        <Accordion.ItemIndicator />
       </HStack>
       <Accordion.ItemContent>
         <Accordion.ItemBody>
