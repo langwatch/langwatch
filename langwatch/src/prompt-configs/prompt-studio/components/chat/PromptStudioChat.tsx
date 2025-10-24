@@ -34,15 +34,11 @@ export function PromptStudioChat({
         // @ts-expect-error - Total hack to pass additional params to the service adapter
         model: additionalParams,
       }}
-      onError={(error) => {
+      onError={(error: Error) => {
         console.error(error);
       }}
     >
-      <CopilotChat
-        onError={(error) => {
-          console.error(error);
-        }}
-      />
+      <CopilotChat />
     </CopilotKit>
   );
 }

@@ -1,4 +1,4 @@
-import { estypes } from "@elastic/elasticsearch";
+import { type estypes } from "@elastic/elasticsearch";
 
 type AggregationsAggregate = estypes.AggregationsAggregate;
 type QueryDslBoolQuery = estypes.QueryDslBoolQuery;
@@ -46,7 +46,7 @@ export const experimentsRouter = createTRPCRouter({
         wizardState: wizardStateSchema,
         dsl: workflowJsonSchema,
         commitMessage: z.string().optional(),
-      })
+      }),
     )
     .use(checkUserPermissionForProject(TeamRoleGroup.EXPERIMENTS_MANAGE))
     .mutation(async ({ ctx, input }) => {
@@ -188,7 +188,7 @@ export const experimentsRouter = createTRPCRouter({
       z.object({
         projectId: z.string(),
         experimentId: z.string(),
-      })
+      }),
     )
     .use(checkUserPermissionForProject(TeamRoleGroup.EXPERIMENTS_MANAGE))
     .mutation(async ({ input }) => {
@@ -237,7 +237,7 @@ export const experimentsRouter = createTRPCRouter({
           (evaluator.data.parameters ?? []).map((param) => [
             param.identifier,
             param.value,
-          ])
+          ]),
         ) as Record<string, any>,
         mappings: wizardState.realTimeTraceMappings ?? {},
         sample: wizardState.realTimeExecution?.sample ?? 1,
@@ -268,7 +268,7 @@ export const experimentsRouter = createTRPCRouter({
         projectId: z.string(),
         experimentId: z.string().optional(),
         experimentSlug: z.string().optional(),
-      })
+      }),
     )
     .use(checkUserPermissionForProject(TeamRoleGroup.EXPERIMENTS_VIEW))
     .query(async ({ input }) => {
@@ -291,7 +291,7 @@ export const experimentsRouter = createTRPCRouter({
       } else if (input.experimentSlug) {
         const experiment = await getExperimentBySlug(
           input.projectId,
-          input.experimentSlug
+          input.experimentSlug,
         );
 
         return experiment;
@@ -309,13 +309,13 @@ export const experimentsRouter = createTRPCRouter({
         projectId: z.string(),
         experimentSlug: z.string(),
         randomSeed: z.number().optional(),
-      })
+      }),
     )
     .use(checkUserPermissionForProject(TeamRoleGroup.EXPERIMENTS_VIEW))
     .query(async ({ input }) => {
       const experiment = await getExperimentBySlug(
         input.projectId,
-        input.experimentSlug
+        input.experimentSlug,
       );
 
       const workflow = experiment.workflowId
@@ -370,7 +370,7 @@ export const experimentsRouter = createTRPCRouter({
       const getDatasetId = (dsl: JsonValue | undefined) => {
         return (
           (dsl as Workflow | undefined)?.nodes.find(
-            (node) => node.type === "entry"
+            (node) => node.type === "entry",
           ) as Node<Entry>
         )?.data.dataset?.id;
       };
@@ -390,19 +390,19 @@ export const experimentsRouter = createTRPCRouter({
             },
             where: { projectId: input.projectId, id: { in: datasetIds } },
           })
-        ).map((dataset) => [dataset.id, dataset])
+        ).map((dataset) => [dataset.id, dataset]),
       );
 
       const runsByExperimentId = await getExperimentBatchEvaluationRuns(
         input.projectId,
-        experiments.map((experiment) => experiment.id)
+        experiments.map((experiment) => experiment.id),
       );
 
       const experimentsWithDatasetsAndRuns = experiments
         .map((experiment) => {
           const runs = runsByExperimentId[experiment.id] ?? [];
           const latestRun = runs.sort(
-            (a, b) => b.timestamps.created_at - a.timestamps.created_at
+            (a, b) => b.timestamps.created_at - a.timestamps.created_at,
           )[0];
           const primaryMetric = latestRun
             ? Object.values(latestRun?.summary.evaluations)[0]
@@ -438,7 +438,7 @@ export const experimentsRouter = createTRPCRouter({
     .query(async ({ input }) => {
       const experiment = await getExperimentBySlug(
         input.projectId,
-        input.experimentSlug
+        input.experimentSlug,
       );
       const client = await esClient({ projectId: input.projectId });
 
@@ -487,10 +487,10 @@ export const experimentsRouter = createTRPCRouter({
       ).buckets
         .map((bucket: any) => {
           const steps = dspySteps.hits.hits.filter(
-            (hit) => hit._source!.run_id === bucket.key
+            (hit) => hit._source!.run_id === bucket.key,
           );
           const versionId = steps.filter(
-            (step) => step._source!.workflow_version_id
+            (step) => step._source!.workflow_version_id,
           )[0]?._source!.workflow_version_id;
 
           return {
@@ -516,11 +516,11 @@ export const experimentsRouter = createTRPCRouter({
                         acc +
                         (curr.completion_tokens ?? 0) +
                         (curr.prompt_tokens ?? 0),
-                      0
+                      0,
                     ),
                     total_cost: llmCalls.reduce(
                       (acc, curr) => acc + (curr?.cost ?? 0),
-                      0
+                      0,
                     ),
                   },
                   timestamps: {
@@ -529,16 +529,16 @@ export const experimentsRouter = createTRPCRouter({
                 } as DSPyStepSummary;
               })
               .sort(
-                (a, b) => a.timestamps.created_at - b.timestamps.created_at
+                (a, b) => a.timestamps.created_at - b.timestamps.created_at,
               ),
             created_at: Math.min(
-              ...steps.map((hit) => hit._source!.timestamps.created_at)
+              ...steps.map((hit) => hit._source!.timestamps.created_at),
             ),
           };
         })
         .sort(
           (a: DSPyRunsSummary, b: DSPyRunsSummary) =>
-            b.created_at - a.created_at
+            b.created_at - a.created_at,
         );
 
       return result;
@@ -551,13 +551,13 @@ export const experimentsRouter = createTRPCRouter({
         experimentSlug: z.string(),
         runId: z.string(),
         index: z.string(),
-      })
+      }),
     )
     .use(checkUserPermissionForProject(TeamRoleGroup.EXPERIMENTS_VIEW))
     .query(async ({ input }) => {
       const experiment = await getExperimentBySlug(
         input.projectId,
-        input.experimentSlug
+        input.experimentSlug,
       );
 
       const client = await esClient({ projectId: input.projectId });
@@ -595,12 +595,12 @@ export const experimentsRouter = createTRPCRouter({
     .query(async ({ input }) => {
       const experiment = await getExperimentById(
         input.projectId,
-        input.experimentId
+        input.experimentId,
       );
 
       const runsByExperimentId = await getExperimentBatchEvaluationRuns(
         input.projectId,
-        [experiment.id]
+        [experiment.id],
       );
 
       return { runs: runsByExperimentId[experiment.id] ?? [] };
@@ -612,13 +612,13 @@ export const experimentsRouter = createTRPCRouter({
         projectId: z.string(),
         experimentId: z.string(),
         runId: z.string(),
-      })
+      }),
     )
     .use(checkUserPermissionForProject(TeamRoleGroup.EXPERIMENTS_VIEW))
     .query(async ({ input }) => {
       const experiment = await getExperimentById(
         input.projectId,
-        input.experimentId
+        input.experimentId,
       );
 
       const id = batchEvaluationId({
@@ -628,10 +628,7 @@ export const experimentsRouter = createTRPCRouter({
       });
 
       const client = await esClient({ projectId: input.projectId });
-      let batchEvaluationRun: SearchResponse<
-        ESBatchEvaluation,
-        Record<string, AggregationsAggregate>
-      >;
+      let batchEvaluationRun: SearchResponse;
       let attempts = 0;
       while (attempts < 3) {
         batchEvaluationRun = await client.search<ESBatchEvaluation>({
@@ -654,8 +651,7 @@ export const experimentsRouter = createTRPCRouter({
       if (!result) {
         throw new TRPCError({
           code: "NOT_FOUND",
-          message:
-            "Batch evaluation run not found",
+          message: "Batch evaluation run not found",
         });
       }
 
@@ -667,7 +663,7 @@ export const experimentsRouter = createTRPCRouter({
       z.object({
         projectId: z.string(),
         experimentId: z.string(),
-      })
+      }),
     )
     .use(checkUserPermissionForProject(TeamRoleGroup.EXPERIMENTS_MANAGE))
     .mutation(async ({ input }) => {
@@ -808,7 +804,7 @@ export const experimentsRouter = createTRPCRouter({
 
 const getExperimentBySlug = async (
   projectId: string,
-  experimentSlug: string
+  experimentSlug: string,
 ) => {
   const experiment = await prisma.experiment.findFirst({
     where: {
@@ -871,7 +867,7 @@ const getVersionMap = async (projectId: string, versionIds: string[]) => {
       acc[version.id] = version;
       return acc;
     },
-    {} as Record<string, (typeof versions)[number]>
+    {} as Record<string, (typeof versions)[number]>,
   );
 
   return versionsMap;
@@ -889,7 +885,7 @@ const findNextDraftName = async (projectId: string) => {
   });
 
   const draftCount = experiments.filter(
-    (draft) => draft.name?.startsWith("Draft")
+    (draft) => draft.name?.startsWith("Draft"),
   ).length;
 
   const slugs = new Set(experiments.map((experiment) => experiment.slug));
@@ -909,7 +905,7 @@ const findNextDraftName = async (projectId: string) => {
 
 const getExperimentBatchEvaluationRuns = async (
   projectId: string,
-  experimentIds: string[]
+  experimentIds: string[],
 ) => {
   type ESBatchEvaluationRunInfo = Pick<
     ESBatchEvaluation,
@@ -1047,7 +1043,7 @@ const getExperimentBatchEvaluationRuns = async (
     const source = hit._source!;
 
     const runAgg = (batchEvaluationRuns.aggregations!.runs as any).buckets.find(
-      (bucket: any) => bucket.key === source.run_id
+      (bucket: any) => bucket.key === source.run_id,
     );
 
     return {
@@ -1089,7 +1085,7 @@ const getExperimentBatchEvaluationRuns = async (
                   : {}),
               },
             ];
-          })
+          }),
         ) as Record<
           string,
           {
@@ -1110,7 +1106,7 @@ const getExperimentBatchEvaluationRuns = async (
       acc[run.experiment_id]!.push(run);
       return acc;
     },
-    {} as Record<string, (typeof runs)[number][]>
+    {} as Record<string, (typeof runs)[number][]>,
   );
 
   return runsByExperimentId;

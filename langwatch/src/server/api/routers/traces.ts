@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { estypes } from "@elastic/elasticsearch";
+import { type estypes } from "@elastic/elasticsearch";
 
 type SearchResponse = estypes.SearchResponse;
 type SearchTotalHits = estypes.SearchTotalHits;
@@ -65,8 +65,8 @@ export const tracesRouter = createTRPCRouter({
         {
           resourceType: PublicShareResourceTypes.TRACE,
           resourceParam: "traceId",
-        }
-      )
+        },
+      ),
     )
     .query(async ({ ctx, input }) => {
       const trace = await getTraceById({
@@ -92,8 +92,8 @@ export const tracesRouter = createTRPCRouter({
         {
           resourceType: PublicShareResourceTypes.TRACE,
           resourceParam: "traceId",
-        }
-      )
+        },
+      ),
     )
     .query(async ({ input, ctx }) => {
       const protections = await getUserProtectionsForProject(ctx, {
@@ -112,7 +112,7 @@ export const tracesRouter = createTRPCRouter({
       z.object({
         projectId: z.string(),
         traceIds: z.array(z.string()),
-      })
+      }),
     )
     .use(checkUserPermissionForProject(TeamRoleGroup.MESSAGES_VIEW))
     .query(async ({ input, ctx }) => {
@@ -169,12 +169,12 @@ export const tracesRouter = createTRPCRouter({
             },
             select: { id: true, name: true, parentId: true },
           })
-        ).map((topic) => [topic.id, topic])
+        ).map((topic) => [topic.id, topic]),
       );
 
       const mapBuckets = (
         buckets: Array<{ key: string; doc_count: number }>,
-        includeParent = false
+        includeParent = false,
       ) => {
         return buckets.reduce(
           (acc, bucket) => {
@@ -196,7 +196,7 @@ export const tracesRouter = createTRPCRouter({
             name: string;
             count: number;
             parentId?: string | null;
-          }[]
+          }[],
         );
       };
 
@@ -250,7 +250,7 @@ export const tracesRouter = createTRPCRouter({
         projectId: z.string(),
         threadId: z.string(),
         traceId: z.string(),
-      })
+      }),
     )
     .use(
       checkPermissionOrPubliclyShared(
@@ -258,8 +258,8 @@ export const tracesRouter = createTRPCRouter({
         {
           resourceType: PublicShareResourceTypes.TRACE,
           resourceParam: "traceId",
-        }
-      )
+        },
+      ),
     )
     .query(async ({ input, ctx }) => {
       const { projectId, threadId } = input;
@@ -290,8 +290,8 @@ export const tracesRouter = createTRPCRouter({
 
       const filteredTraces = tracesGrouped.filter((trace) =>
         publicSharedTraces.some(
-          (publicShare) => publicShare.resourceId === trace.trace_id
-        )
+          (publicShare) => publicShare.resourceId === trace.trace_id,
+        ),
       );
 
       return filteredTraces;
@@ -363,7 +363,7 @@ export const tracesRouter = createTRPCRouter({
         projectId: z.string(),
         query: z.string().optional(),
         sortBy: z.string().optional(),
-      })
+      }),
     )
     .use(checkUserPermissionForProject(TeamRoleGroup.MESSAGES_VIEW))
     .query(async ({ ctx, input }) => {
@@ -376,7 +376,7 @@ export const tracesRouter = createTRPCRouter({
         ctx,
       });
       const traceIds = groups.flatMap((group) =>
-        group.map((trace) => trace.trace_id)
+        group.map((trace) => trace.trace_id),
       );
 
       if (traceIds.length === 0) {
@@ -390,7 +390,7 @@ export const tracesRouter = createTRPCRouter({
       const traceWithSpans = await getTracesWithSpans(
         projectId,
         traceIds,
-        protections
+        protections,
       );
 
       return traceWithSpans;
@@ -406,7 +406,7 @@ export const tracesRouter = createTRPCRouter({
           .or(z.string().startsWith("custom/")),
         preconditions: z.array(checkPreconditionSchema),
         expectedResults: z.number(),
-      })
+      }),
     )
     .use(checkUserPermissionForProject(TeamRoleGroup.MESSAGES_VIEW))
     .query(async ({ ctx, input }) => {
@@ -419,7 +419,7 @@ export const tracesRouter = createTRPCRouter({
         ctx,
       });
       const traceIds = groups.flatMap((group) =>
-        group.map((trace) => trace.trace_id)
+        group.map((trace) => trace.trace_id),
       );
 
       if (traceIds.length === 0) {
@@ -435,7 +435,7 @@ export const tracesRouter = createTRPCRouter({
       const traceWithSpans = await getTracesWithSpans(
         projectId,
         traceIds,
-        protections
+        protections,
       );
 
       const passedPreconditions = traceWithSpans.filter(
@@ -445,11 +445,11 @@ export const tracesRouter = createTRPCRouter({
             evaluatorType,
             trace,
             trace.spans ?? [],
-            preconditions
-          )
+            preconditions,
+          ),
       );
       const passedPreconditionsTraceIds = passedPreconditions?.map(
-        (trace) => trace.trace_id
+        (trace) => trace.trace_id,
       );
 
       let samples = shuffle(passedPreconditions)
@@ -459,11 +459,11 @@ export const tracesRouter = createTRPCRouter({
         samples = samples.concat(
           shuffle(
             traceWithSpans.filter(
-              (trace) => !passedPreconditionsTraceIds?.includes(trace.trace_id)
-            )
+              (trace) => !passedPreconditionsTraceIds?.includes(trace.trace_id),
+            ),
           )
             .slice(0, expectedResults - samples.length)
-            .map((sample) => ({ ...sample, passesPreconditions: false }))
+            .map((sample) => ({ ...sample, passesPreconditions: false })),
         );
       }
 
@@ -475,7 +475,7 @@ export const tracesRouter = createTRPCRouter({
       getAllForProjectInput.extend({
         includeSpans: z.boolean(),
         scrollId: z.string().optional(),
-      })
+      }),
     )
     .use(checkUserPermissionForProject(TeamRoleGroup.MESSAGES_VIEW))
     .mutation(async ({ ctx, input }) => {
@@ -528,10 +528,10 @@ export const getAllTracesForProject = async ({
       session: ctx.session,
       publiclyShared: ctx.publiclyShared,
     },
-    { projectId: input.projectId }
+    { projectId: input.projectId },
   );
 
-  let tracesResult: SearchResponse<ElasticSearchTrace>;
+  let tracesResult: SearchResponse;
   if (scrollId) {
     const client = await esClient({ projectId: input.projectId });
     tracesResult = await client.scroll({
@@ -605,7 +605,7 @@ export const getAllTracesForProject = async ({
   }
 
   const traces = tracesResult.hits.hits
-    .map((hit) => hit._source!)
+    .map((hit) => hit._source)
     .map((t) => transformElasticSearchTraceToTrace(t, protections));
 
   if (input.groupBy === "thread_id") {
@@ -632,7 +632,7 @@ export const getAllTracesForProject = async ({
         protections,
       });
       const filteredTracesByThreadId = tracesFromThreadId.filter(
-        (trace) => !existingTraceIds.has(trace.trace_id)
+        (trace) => !existingTraceIds.has(trace.trace_id),
       );
 
       traces.unshift(...filteredTracesByThreadId);
@@ -649,7 +649,7 @@ export const getAllTracesForProject = async ({
   totalHits = (tracesResult.hits?.total as SearchTotalHits)?.value || 0;
 
   const evaluations = Object.fromEntries(
-    traces.map((trace) => [trace.trace_id, trace.evaluations ?? []])
+    traces.map((trace) => [trace.trace_id, trace.evaluations ?? []]),
   );
 
   // TODO: Remove this cast once we have a way to include guardrails in the traces directly on ES
@@ -666,7 +666,7 @@ export const getAllTracesForProject = async ({
 export const getTracesWithSpans = async (
   projectId: string,
   traceIds: string[],
-  protections: Protections
+  protections: Protections,
 ) => {
   const traces = await searchTraces({
     connConfig: { projectId },
@@ -708,7 +708,7 @@ export const getTracesWithSpans = async (
 
 const groupTraces = <T extends Trace>(
   groupBy: string | undefined,
-  traces: T[]
+  traces: T[],
 ) => {
   const groups: T[][] = [];
 
@@ -789,7 +789,7 @@ export const getEvaluationsMultiple = async (input: {
   });
 
   return Object.fromEntries(
-    traces.map((trace) => [trace.trace_id, trace.evaluations ?? []])
+    traces.map((trace) => [trace.trace_id, trace.evaluations ?? []]),
   );
 };
 

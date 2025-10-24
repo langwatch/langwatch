@@ -6,7 +6,7 @@ import { api } from "~/utils/api";
  * Enforces refresh of queries when mutations are successful.
  */
 export const usePrompts = () => {
-  const trpc = api.useUtils();
+  const trpc = api.useContext();
   const createPrompt = api.prompts.create.useMutation();
   const updatePrompt = api.prompts.update.useMutation();
   const updateHandle = api.prompts.updateHandle.useMutation();
