@@ -88,7 +88,6 @@ export function EditablePromptHandleField(
           transition="opacity 0.2s"
           textOverflow="ellipsis"
           whiteSpace="nowrap"
-          overflow="hidden"
         >
           {handle}
         </Text>

@@ -5,11 +5,11 @@ import { useMemo } from "react";
 import type { z } from "zod";
 import { runtimeInputsSchema } from "~/prompt-configs/schemas/field-schemas";
 
-type RuntimeInput = z.infer<typeof runtimeInputsSchema>[number];
+type RuntimeInputFormValues = z.infer<typeof runtimeInputsSchema>;
 
 export type VariablesFormProps = {
-  inputs: RuntimeInput[];
-  onChange: (values: z.infer<typeof runtimeInputsSchema>) => void;
+  inputs: RuntimeInputFormValues;
+  onChange: (values: RuntimeInputFormValues) => void;
 };
 
 export function VariablesForm({ inputs, onChange }: VariablesFormProps) {
@@ -20,13 +20,15 @@ export function VariablesForm({ inputs, onChange }: VariablesFormProps) {
     }));
   }, [inputs]);
 
-  const form = useForm<z.infer<typeof runtimeInputsSchema>>({
+  const form = useForm<RuntimeInputFormValues>({
     defaultValues,
     resolver: zodResolver(runtimeInputsSchema),
   });
 
   // Watch form state and call onChange when it updates
-  form.watch((values) => onChange(values));
+  form.watch((values) => {
+    onChange(values as RuntimeInputFormValues);
+  });
 
   return (
     <VStack align="start" gap={3} width="full">
@@ -46,13 +48,13 @@ export function VariablesForm({ inputs, onChange }: VariablesFormProps) {
             </label>
             <Textarea
               id={input.identifier}
-              {...form.register(input.identifier)}
+              {...form.register(`${inputs.indexOf(input)}` as any)}
               placeholder={
                 input.type === "image"
                   ? "image url"
                   : input.type === "str"
-                    ? undefined
-                    : input.type
+                  ? undefined
+                  : input.type
               }
               size="sm"
             />

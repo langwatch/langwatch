@@ -98,12 +98,12 @@ export const PromptConfigPanel = forwardRef(function PromptConfigPanel(
       return prompt
         ? versionedPromptToPromptConfigFormValues(prompt)
         : // If default model is set, use the default model merged with the default values
-          typeof defaultModel === "string"
-          ? buildDefaultFormValues({
-              version: { configData: { llm: { model: defaultModel } } },
-            })
-          : // If no default model is set, use the default values
-            buildDefaultFormValues({});
+        typeof defaultModel === "string"
+        ? buildDefaultFormValues({
+            version: { configData: { llm: { model: defaultModel } } },
+          })
+        : // If no default model is set, use the default values
+          buildDefaultFormValues({});
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [Boolean(prompt), defaultModel, configId],
@@ -192,8 +192,8 @@ export const PromptConfigPanel = forwardRef(function PromptConfigPanel(
             title={
               <HStack>
                 <Text whiteSpace="nowrap">Prompt Configuration</Text>
-                {Boolean(prompt?.version && prompt.handle) && (
-                  <VersionBadge version={prompt?.version} />
+                {prompt?.version && prompt?.handle && (
+                  <VersionBadge version={prompt.version} />
                 )}
                 {prompt?.scope === "ORGANIZATION" && (
                   <Tooltip content="This prompt is available to all projects in the organization">
