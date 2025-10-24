@@ -177,7 +177,7 @@ export const roleRouter = createTRPCRouter({
       const role = await ctx.prisma.customRole.findUnique({
         where: { id: input.roleId },
         include: {
-          teamUsers: true,
+          assignedUsers: true,
         },
       });
 
@@ -200,10 +200,10 @@ export const roleRouter = createTRPCRouter({
       }
 
       // Check if role is in use
-      if (role.teamUsers.length > 0) {
+      if (role.assignedUsers.length > 0) {
         throw new TRPCError({
           code: "PRECONDITION_FAILED",
-          message: `Cannot delete role that is assigned to ${role.teamUsers.length} user(s)`,
+          message: `Cannot delete role that is assigned to ${role.assignedUsers.length} user(s)`,
         });
       }
 

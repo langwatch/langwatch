@@ -75,7 +75,7 @@ function ProjectsList({
                     <Table.Row>
                       <Table.ColumnHeader>{team.name}</Table.ColumnHeader>
                       <Table.ColumnHeader textAlign="right">
-                        {hasPermission("project:create", team) &&
+                        {hasPermission("project:create") &&
                           (!usage.data ||
                           usage.data.projectsCount <
                             usage.data.activePlan.maxProjects ||
@@ -186,7 +186,7 @@ export function TeamProjectsList({
           </Table.Cell>
           <Table.Cell textAlign="right">
             {teamProject.id !== project?.id &&
-              hasPermission("project:delete", team) && (
+              hasPermission("project:delete") && (
                 <Menu.Root>
                   <Menu.Trigger className="js-inner-menu">
                     <MoreVertical size={18} />

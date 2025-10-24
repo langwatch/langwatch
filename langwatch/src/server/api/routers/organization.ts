@@ -51,6 +51,7 @@ export type FullyLoadedOrganization = Organization & {
 
 export type TeamMemberWithUser = TeamUser & {
   user: User;
+  assignedRole?: CustomRole | null;
 };
 
 export type TeamMemberWithTeam = TeamUser & {

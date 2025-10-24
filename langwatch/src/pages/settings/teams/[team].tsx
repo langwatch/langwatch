@@ -17,9 +17,7 @@ import { teamRolesOptions } from "../../../components/settings/TeamUserRoleField
 import { useOrganizationTeamProject } from "../../../hooks/useOrganizationTeamProject";
 
 // Type guards for safe access to custom role data
-function isValidCustomRole(
-  role: unknown,
-): role is {
+function isValidCustomRole(role: unknown): role is {
   id: string;
   name: string;
   description: string | null;
@@ -64,9 +62,7 @@ function EditTeam({ team }: { team: TeamWithProjectsAndMembersAndUsers }) {
   const teamBuiltInRole = team.defaultRole;
 
   const teamDefaultRole = useMemo(() => {
-    return teamBuiltInRole
-      ? teamRolesOptions[teamBuiltInRole as TeamUserRole]
-      : undefined;
+    return teamBuiltInRole ? teamRolesOptions[teamBuiltInRole] : undefined;
   }, [teamBuiltInRole]);
 
   const getInitialValues = useCallback(
