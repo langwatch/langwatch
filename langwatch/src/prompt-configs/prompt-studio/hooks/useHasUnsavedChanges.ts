@@ -5,11 +5,13 @@ import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 import { computeInitialFormValuesForPrompt } from "~/prompt-configs/utils/computeInitialFormValuesForPrompt";
 import { type PromptConfigFormValues } from "~/prompt-configs/types";
+import type { DeepPartial } from "react-hook-form";
 
 function compareFormValues(
-  a: PromptConfigFormValues,
-  b: PromptConfigFormValues,
+  a?: DeepPartial<PromptConfigFormValues>,
+  b?: DeepPartial<PromptConfigFormValues>,
 ): boolean {
+  if (!a || !b) return false;
   return (
     a.configId === b.configId &&
     a.handle === b.handle &&
@@ -51,7 +53,6 @@ export function useHasUnsavedChanges(tabId: string): boolean {
       useSystemMessage: true,
     });
 
-    if (!currentValues) return true;
-    return !compareFormValues(savedValues, currentValues);
+    return !currentValues || !compareFormValues(savedValues, currentValues);
   }, [configId, savedPrompt, currentValues, project?.defaultModel]);
 }

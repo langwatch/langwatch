@@ -199,6 +199,7 @@ export function PromptTextArea({
               background: "transparent",
               overflow: "auto",
               resize: "vertical",
+              border: "none",
             },
           }}
           inputRef={textareaRef}
