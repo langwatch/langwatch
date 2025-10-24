@@ -95,14 +95,13 @@ function SidebarList({
 
   return (
     <VStack gap={0} align="stretch">
-      <SidebarSectionHeader>
+      <SidebarSectionHeader onClick={() => setIsOpen(!isOpen)}>
         <HStack gap={2}>
           {collapsible && (
             <Box
               transform={isOpen ? "rotate(0deg)" : "rotate(-90deg)"}
               transition="transform 0.2s"
               cursor="pointer"
-              onClick={() => setIsOpen(!isOpen)}
             >
               <ChevronDown size={14} />
             </Box>
