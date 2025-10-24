@@ -1,7 +1,10 @@
 import { HStack, Spacer } from "@chakra-ui/react";
 import { PromptBrowserWindowContent } from "./prompt-browser-window/PromptBrowserWindowContent";
 import { PromptBrowserTab } from "./ui/PromptBrowserTab";
-import { useDraggableTabsBrowserStore } from "../../prompt-studio-store/DraggableTabsBrowserStore";
+import {
+  useDraggableTabsBrowserStore,
+  type Tab,
+} from "../../prompt-studio-store/DraggableTabsBrowserStore";
 import { DraggableTabsBrowser } from "./ui/DraggableTabsBrowser";
 import { SplitSquareHorizontal } from "lucide-react";
 
@@ -34,18 +37,17 @@ export function PromptStudioTabbedWorkspace() {
     setActiveTab({ windowId: groupId, tabId });
   }
 
-  function handleClose(tabId: string) {
-    const tab = windows.flatMap((w) => w.tabs).find((t) => t.id === tabId);
-
-    // TODO: This shouldn't be dirty on new tabs. CHeck the logic somewhere
-    // Also, on refresh, these should still be dirty
-    if (tab?.data.form.isDirty) {
+  function handleClose(tab: Tab) {
+    if (
+      Boolean(tab?.data.form.isDirty) ||
+      !Boolean(tab?.data.form.defaultValues.configId)
+    ) {
       if (!confirm("Your unsaved changes will be lost. Proceed anyway?")) {
         return;
       }
     }
 
-    removeTab({ tabId });
+    removeTab({ tabId: tab.id });
   }
 
   function handleSplit(tabId: string) {
@@ -74,10 +76,13 @@ export function PromptStudioTabbedWorkspace() {
                 >
                   <DraggableTabsBrowser.Trigger value={tab.id}>
                     <PromptBrowserTab
-                      hasUnsavedChanges={tab.data.form.isDirty}
+                      hasUnsavedChanges={
+                        tab.data.form.isDirty ||
+                        !Boolean(tab.data.form.defaultValues.configId)
+                      }
                       tabTitle={tab.data.meta.title ?? "Untitled"}
                       version={tab.data.meta.versionNumber}
-                      onClose={() => handleClose(tab.id)}
+                      onClose={() => handleClose(tab)}
                       dimmed={window.id !== activeWindowId}
                       scope={tab.data.meta.scope}
                     />
