@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.1](https://github.com/langwatch/langwatch/compare/python-sdk@v0.5.0...python-sdk@v0.5.1) (2025-10-24)
+
+
+### Miscellaneous
+
+* add span count and weight details for better debugging of immense traces ([2be915e](https://github.com/langwatch/langwatch/commit/2be915e1735c0632caac8d8082f632d461643967))
+
 ## [0.5.0](https://github.com/langwatch/langwatch/compare/python-sdk@v0.4.2...python-sdk@v0.5.0) (2025-10-13)
 
 

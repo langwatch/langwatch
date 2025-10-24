@@ -834,8 +834,8 @@ const updateTraceInElasticsearch = async (
   } catch (error) {
     if (
       error instanceof Error &&
-      error.message.includes("alias") &&
-      error.message.includes("missing")
+      ((error.message.includes("alias") && error.message.includes("missing")) ||
+        (error as any).meta?.body?.error?.includes("missing"))
     ) {
       // no cold index found, that's fine
     } else {
