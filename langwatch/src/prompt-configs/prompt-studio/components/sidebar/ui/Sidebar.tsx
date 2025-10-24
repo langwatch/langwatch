@@ -44,7 +44,10 @@ function SidebarHeader({ children }: SidebarHeaderProps) {
 
 type SidebarSectionHeaderProps = BoxProps;
 
-function SidebarSectionHeader({ children }: SidebarSectionHeaderProps) {
+function SidebarSectionHeader({
+  children,
+  ...props
+}: SidebarSectionHeaderProps) {
   return (
     <Box
       padding="3"
@@ -56,6 +59,7 @@ function SidebarSectionHeader({ children }: SidebarSectionHeaderProps) {
       display="flex"
       alignItems="center"
       justifyContent="space-between"
+      {...props}
     >
       {children}
     </Box>
@@ -84,10 +88,11 @@ function SidebarList({
   action,
 }: SidebarListProps) {
   const [isOpen, setIsOpen] = useState(defaultOpen);
+  console.log("isOpen", isOpen, title);
 
   if (!title) {
     return (
-      <VStack gap={1} align="stretch" paddingLeft={2}>
+      <VStack gap={0} align="stretch" paddingLeft={2}>
         {children}
       </VStack>
     );
@@ -95,13 +100,12 @@ function SidebarList({
 
   return (
     <VStack gap={0} align="stretch">
-      <SidebarSectionHeader onClick={() => setIsOpen(!isOpen)}>
+      <SidebarSectionHeader onClick={() => setIsOpen(!isOpen)} cursor="pointer">
         <HStack gap={2}>
           {collapsible && (
             <Box
               transform={isOpen ? "rotate(0deg)" : "rotate(-90deg)"}
               transition="transform 0.2s"
-              cursor="pointer"
             >
               <ChevronDown size={14} />
             </Box>
@@ -111,7 +115,7 @@ function SidebarList({
         {action && <Box onClick={(e) => e.stopPropagation()}>{action}</Box>}
       </SidebarSectionHeader>
       {(!collapsible || isOpen) && (
-        <VStack gap={1} align="stretch" paddingLeft={5}>
+        <VStack gap={0} align="stretch" paddingLeft={5}>
           {children}
         </VStack>
       )}
@@ -146,7 +150,7 @@ function SidebarItem({
 
   return (
     <Box
-      padding="2"
+      paddingX="2"
       fontSize="sm"
       color={active ? "blue.600" : "gray.700"}
       bg={active ? "blue.50" : "transparent"}
