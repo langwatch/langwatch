@@ -88,7 +88,6 @@ function SidebarList({
   action,
 }: SidebarListProps) {
   const [isOpen, setIsOpen] = useState(defaultOpen);
-  console.log("isOpen", isOpen, title);
 
   if (!title) {
     return (

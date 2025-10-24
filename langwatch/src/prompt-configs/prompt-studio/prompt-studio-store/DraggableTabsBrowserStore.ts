@@ -93,6 +93,7 @@ export interface DraggableTabsBrowserState {
  */
 export const useDraggableTabsBrowserStore = create<DraggableTabsBrowserState>()(
   persist(
+    // TODO: because of immer, we are doing a lot of deep clones. Probably shouldn't.
     immer(
       (set: (updater: (state: DraggableTabsBrowserState) => void) => void) => ({
         windows: [],
@@ -275,6 +276,7 @@ export const useDraggableTabsBrowserStore = create<DraggableTabsBrowserState>()(
             const tab = state.windows
               .flatMap((w) => w.tabs)
               .find((t) => t.id === tabId);
+
             if (tab) {
               tab.data = updater(tab.data);
             }

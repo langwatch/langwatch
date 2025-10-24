@@ -35,10 +35,7 @@ export const usePromptConfigForm = ({
 
   const formData = methods.watch();
   const messages = methods.watch("version.configData.messages");
-  const systemMessage = useMemo(
-    () => messages.find(({ role }) => role === "system")?.content,
-    [messages],
-  );
+  const systemMessage = messages.find(({ role }) => role === "system")?.content;
 
   /**
    * In the case that we're using system messages,

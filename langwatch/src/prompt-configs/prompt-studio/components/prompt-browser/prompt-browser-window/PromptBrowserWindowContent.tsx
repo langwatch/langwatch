@@ -8,6 +8,7 @@ import { FormProvider } from "react-hook-form";
 import { useDraggableTabsBrowserStore } from "~/prompt-configs/prompt-studio/prompt-studio-store/DraggableTabsBrowserStore";
 import type { PromptConfigFormValues } from "~/prompt-configs/types";
 import debounce from "lodash/debounce";
+import { cloneDeep } from "lodash";
 
 interface PromptBrowserWindowContentProps {
   configId?: string;
@@ -22,8 +23,11 @@ export function PromptBrowserWindowContent(
 ) {
   const { windows } = useDraggableTabsBrowserStore();
   const tab = windows.flatMap((w) => w.tabs).find((t) => t.id === props.tabId);
-  // This is a bad idea, as it will slow everything down
-  const initialConfigValues = tab?.data.form.defaultValues;
+  const defaultValues = tab?.data.form.defaultValues;
+  const initialConfigValues = useMemo(
+    () => cloneDeep(defaultValues),
+    [defaultValues],
+  );
 
   /**
    * If the prompt is not found, don't render the window.
@@ -67,6 +71,11 @@ function PromptBrowserWindowInner(props: {
       tabId: props.tabId,
       updater: (data) => ({
         ...data,
+        form: {
+          ...data.form,
+          // I don't love that we have to do this here as I think it affects performance.
+          defaultValues: cloneDeep(values),
+        },
         meta: {
           ...data.meta,
           title: values.handle ?? null,
