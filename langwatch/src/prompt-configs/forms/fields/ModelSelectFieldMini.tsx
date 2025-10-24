@@ -26,8 +26,10 @@ export function ModelSelectFieldMini() {
                 cursor="pointer"
                 position="relative"
               >
-                <LLMModelDisplay model={field.value?.model ?? ""} onClick={onToggle}/>
+                <HStack onClick={onToggle} width="full">
+                <LLMModelDisplay model={field.value?.model ?? ""}/>
                 <ChevronDown size={16} />
+                </HStack>
                 <LLMConfigModal
                   open={open}
                   onClose={onClose}

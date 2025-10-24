@@ -3,7 +3,7 @@ import { usePromptConfigContext } from "~/prompt-configs/providers/PromptConfigP
 import { formValuesToTriggerSaveVersionParams } from "~/prompt-configs/utils/llmPromptConfigUtils";
 import { toaster } from "~/components/ui/toaster";
 import { type VersionedPrompt } from "~/server/prompt-config";
-import { versionedPromptToPromptConfigFormValues } from "~/prompt-configs/utils/llmPromptConfigUtils";
+import { versionedPromptToPromptConfigFormValuesWithSystemMessage } from "~/prompt-configs/utils/llmPromptConfigUtils";
 import { useFormContext } from "react-hook-form";
 import type { PromptConfigFormValues } from "~/prompt-configs";
 
@@ -19,7 +19,7 @@ export function useHandleSavePrompt() {
     const values = methods.getValues();
     const data = formValuesToTriggerSaveVersionParams(values);
     const onSuccess = (prompt: VersionedPrompt) => {
-      methods.reset(versionedPromptToPromptConfigFormValues(prompt));
+      methods.reset(versionedPromptToPromptConfigFormValuesWithSystemMessage(prompt));
       toaster.create({
         title: "Prompt saved",
         description: `Prompt ${prompt.handle} is now at version ${prompt.version}`,
