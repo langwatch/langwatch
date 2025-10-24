@@ -183,7 +183,16 @@ export const useDraggableTabsBrowserStore = create<DraggableTabsBrowserState>()(
 
             const newWindow: Window = {
               id: newWindowId,
-              tabs: [{ id: newTabId, data: { ...sourceTab.data } }],
+              tabs: [
+                {
+                  id: newTabId,
+                  data: {
+                    ...sourceTab.data,
+                    form: { ...sourceTab.data.form },
+                    meta: { ...sourceTab.data.meta },
+                  },
+                },
+              ],
               activeTabId: newTabId,
             };
 

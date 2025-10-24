@@ -12,8 +12,6 @@ import {
 import { api } from "~/utils/api";
 import { createLogger } from "~/utils/logger";
 
-const logger = createLogger("langwatch:optimization_studio:use-node-drift");
-
 /**
  * useNodeDrift hook provides drift detection and reload functionality for a node's prompt config.
  * - Detects if the node's data is out of sync with the latest version in the database (hasDrift).
@@ -35,9 +33,8 @@ export function useNodeDrift(node: Node<LlmPromptConfigComponent>) {
     },
     {
       enabled: !!idOrHandle && !!project?.id,
-    }
+    },
   );
-  const formProps = useFormContext<PromptConfigFormValues>();
   /**
    * If the node data (saved in the studio node array) is different from the latest prompt in the database,
    * show a warning and provide a button to reload the latest version into the form (which should update the node data)
@@ -47,7 +44,7 @@ export function useNodeDrift(node: Node<LlmPromptConfigComponent>) {
       return false;
     return !isNodeDataEqual(
       node.data,
-      versionedPromptToOptimizationStudioNodeData(latestPrompt)
+      versionedPromptToOptimizationStudioNodeData(latestPrompt),
     );
   }, [latestPrompt, node.data, isFetchingLatestPrompt, isLoadingPrompt]);
 
