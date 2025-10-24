@@ -12,7 +12,7 @@ function SidebarRoot({ children }: SidebarRootProps) {
       as="nav"
       width="full"
       height="100%"
-      bg="gray.50"
+      bg="white"
       borderRight="1px solid"
       borderColor="gray.200"
       overflowY="auto"
@@ -30,13 +30,7 @@ interface SidebarHeaderProps {
 
 function SidebarHeader({ children }: SidebarHeaderProps) {
   return (
-    <Box
-      padding="4"
-      fontSize="lg"
-      fontWeight="semibold"
-      borderBottom="1px solid"
-      borderColor="gray.200"
-    >
+    <Box padding="4" fontSize="lg" fontWeight="semibold">
       {children}
     </Box>
   );
@@ -50,12 +44,11 @@ function SidebarSectionHeader({
 }: SidebarSectionHeaderProps) {
   return (
     <Box
-      padding="3"
+      paddingX="2"
+      paddingY="1"
       fontSize="sm"
       fontWeight="medium"
       color="gray.700"
-      borderBottom="1px solid"
-      borderColor="gray.100"
       display="flex"
       alignItems="center"
       justifyContent="space-between"
@@ -165,7 +158,6 @@ function SidebarItem({
       {icon && (
         <Box
           width="16px"
-          height="16px"
           borderRadius="full"
           bg="gray.100"
           display="flex"

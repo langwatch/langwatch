@@ -67,8 +67,12 @@ export function PromptStudioTabbedWorkspace() {
           <DraggableTabsBrowser.TabBar>
             <HStack gap={0} overflowX="auto">
               {window.tabs.map((tab) => (
-                <DraggableTabsBrowser.Trigger key={tab.id} value={tab.id}>
-                  <DraggableTabsBrowser.Tab>
+                <DraggableTabsBrowser.Tab
+                  key={tab.id}
+                  id={tab.id}
+                  borderRight="1px solid var(--chakra-colors-gray-350)"
+                >
+                  <DraggableTabsBrowser.Trigger value={tab.id}>
                     <PromptBrowserTab
                       hasUnsavedChanges={tab.data.form.isDirty}
                       tabTitle={tab.data.meta.title ?? "Untitled"}
@@ -77,8 +81,8 @@ export function PromptStudioTabbedWorkspace() {
                       dimmed={window.id !== activeWindowId}
                       scope={tab.data.meta.scope}
                     />
-                  </DraggableTabsBrowser.Tab>
-                </DraggableTabsBrowser.Trigger>
+                  </DraggableTabsBrowser.Trigger>
+                </DraggableTabsBrowser.Tab>
               ))}
             </HStack>
             <Spacer />

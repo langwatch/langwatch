@@ -15,7 +15,7 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { BrowserLikeTabs } from "./BrowserLikeTabs";
-import { HStack, type HtmlProps, type StackProps } from "@chakra-ui/react";
+import { Box, HStack, type StackProps, type BoxProps } from "@chakra-ui/react";
 
 // Context for managing drag state and callbacks
 interface DraggableTabsContextValue {
@@ -247,28 +247,15 @@ function DraggableTabsTabBar({ children }: DraggableTabsTabBarProps) {
  *
  * Single Responsibility: Handles both dragging and tab selection trigger functionality
  */
-interface DraggableTabTriggerProps
-  extends React.HTMLAttributes<HTMLDivElement> {
-  value: string;
+interface DraggableTabTriggerProps extends BoxProps {
   children: React.ReactNode;
+  id: string;
 }
 
-function DraggableTabTrigger({
-  value,
-  children,
-  ...rest
-}: DraggableTabTriggerProps) {
-  const { groupId } = useTabGroupContext();
+const DraggableBrowserTabTrigger = BrowserLikeTabs.Trigger;
 
-  // Extract label from children for drag overlay
-  const label = React.useMemo(() => {
-    const child = React.Children.only(children);
-    if (React.isValidElement(child) && child.type === DraggableBrowserTab) {
-      const props = child.props as DraggableBrowserTabProps;
-      return props.label ?? props.children;
-    }
-    return children;
-  }, [children]);
+function DraggableTab({ id, children, ...rest }: DraggableTabTriggerProps) {
+  const { groupId } = useTabGroupContext();
 
   const {
     attributes,
@@ -278,8 +265,8 @@ function DraggableTabTrigger({
     transition,
     isDragging,
   } = useSortable({
-    id: value,
-    data: { groupId, tabId: value, label },
+    id,
+    data: { groupId, tabId: id },
   });
 
   const style: React.CSSProperties = {
@@ -290,7 +277,7 @@ function DraggableTabTrigger({
   };
 
   return (
-    <div
+    <Box
       {...rest}
       ref={setNodeRef}
       style={{
@@ -303,25 +290,9 @@ function DraggableTabTrigger({
       {...attributes}
       {...listeners}
     >
-      <BrowserLikeTabs.Trigger value={value}>
-        {children}
-      </BrowserLikeTabs.Trigger>
-    </div>
+      {children}
+    </Box>
   );
-}
-
-/**
- * DraggableBrowserTab Component
- *
- * Single Responsibility: Renders tab content with browser-like styling
- */
-interface DraggableBrowserTabProps {
-  label?: React.ReactNode;
-  children?: React.ReactNode;
-}
-
-function DraggableBrowserTab({ label, children }: DraggableBrowserTabProps) {
-  return <>{label ?? children}</>;
 }
 
 const DraggableTabsContent = BrowserLikeTabs.Content;
@@ -331,7 +302,7 @@ export const DraggableTabsBrowser = {
   Root: DraggableTabsBrowserRoot,
   Group: DraggableTabsGroup,
   TabBar: DraggableTabsTabBar,
-  Trigger: DraggableTabTrigger,
-  Tab: DraggableBrowserTab,
+  Trigger: DraggableBrowserTabTrigger,
+  Tab: DraggableTab,
   Content: DraggableTabsContent,
 };

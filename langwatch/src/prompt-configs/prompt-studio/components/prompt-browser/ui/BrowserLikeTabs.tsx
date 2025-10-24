@@ -38,13 +38,7 @@ interface BrowserLikeTabsBarProps {
 
 function BrowserLikeTabsBar({ children }: BrowserLikeTabsBarProps) {
   return (
-    <HStack
-      gap={0}
-      width="full"
-      bg="gray.50"
-      borderBottom="1px solid"
-      borderColor="gray.200"
-    >
+    <HStack gap={0} width="full" bg="gray.100">
       {children}
     </HStack>
   );
