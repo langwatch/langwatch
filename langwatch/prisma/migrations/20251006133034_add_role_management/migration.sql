@@ -11,31 +11,14 @@ CREATE TABLE "CustomRole" (
     CONSTRAINT "CustomRole_pkey" PRIMARY KEY ("id")
 );
 
--- CreateTable
-CREATE TABLE "TeamUserCustomRole" (
-    "userId" TEXT NOT NULL,
-    "teamId" TEXT NOT NULL,
-    "customRoleId" TEXT NOT NULL,
-    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-
-    CONSTRAINT "TeamUserCustomRole_pkey" PRIMARY KEY ("userId","teamId")
-);
-
 -- CreateIndex
 CREATE INDEX "CustomRole_organizationId_idx" ON "CustomRole"("organizationId");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "CustomRole_organizationId_name_key" ON "CustomRole"("organizationId", "name");
 
--- CreateIndex
-CREATE INDEX "TeamUserCustomRole_teamId_idx" ON "TeamUserCustomRole"("teamId");
-
--- CreateIndex
-CREATE INDEX "TeamUserCustomRole_userId_idx" ON "TeamUserCustomRole"("userId");
-
--- CreateIndex
-CREATE INDEX "TeamUserCustomRole_customRoleId_idx" ON "TeamUserCustomRole"("customRoleId");
-
 -- AlterTable
-ALTER TABLE "Team" ADD COLUMN     "defaultRole" "TeamUserRole";
+ALTER TABLE "TeamUser" ADD COLUMN     "assignedRoleId" TEXT;
+
+-- CreateIndex
+CREATE INDEX "TeamUser_assignedRoleId_idx" ON "TeamUser"("assignedRoleId");

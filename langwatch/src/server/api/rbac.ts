@@ -233,16 +233,7 @@ export function organizationRoleHasPermission(
   permission: Permission,
 ): boolean {
   const rolePermissions = ORGANIZATION_ROLE_PERMISSIONS[role];
-  const result = hasPermissionWithHierarchy(rolePermissions, permission);
-
-  console.log("🔍 organizationRoleHasPermission Debug:", {
-    role,
-    permission,
-    rolePermissions,
-    result,
-  });
-
-  return result;
+  return hasPermissionWithHierarchy(rolePermissions, permission);
 }
 
 /**
@@ -537,15 +528,8 @@ export async function hasOrganizationPermission(
   permission: Permission,
 ): Promise<boolean> {
   if (!ctx.session?.user) {
-    console.log("🔍 hasOrganizationPermission: No session user");
     return false;
   }
-
-  console.log("🔍 hasOrganizationPermission Debug:", {
-    userId: ctx.session.user.id,
-    organizationId,
-    permission,
-  });
 
   const organizationUser = await ctx.prisma.organizationUser?.findFirst({
     where: {
@@ -554,22 +538,12 @@ export async function hasOrganizationPermission(
     },
   });
 
-  console.log("🔍 hasOrganizationPermission Result:", {
-    organizationUser,
-    found: !!organizationUser,
-    role: organizationUser?.role,
-  });
-
   // Check organization role first
   if (organizationUser) {
     const orgResult = organizationRoleHasPermission(
       organizationUser.role,
       permission,
     );
-    console.log("🔍 hasOrganizationPermission Org Role Result:", {
-      role: organizationUser.role,
-      result: orgResult,
-    });
     if (orgResult) return true;
   }
 
@@ -584,17 +558,10 @@ export async function hasOrganizationPermission(
     },
   });
 
-  console.log("🔍 hasOrganizationPermission Team Admin Check:", {
-    foundTeamAdmin: !!teamAdminMembership,
-    teamId: teamAdminMembership?.teamId,
-  });
-
   if (teamAdminMembership) {
-    console.log("🔍 hasOrganizationPermission Final Result: true (Team Admin)");
     return true;
   }
 
-  console.log("🔍 hasOrganizationPermission Final Result: false");
   return false;
 }
 
