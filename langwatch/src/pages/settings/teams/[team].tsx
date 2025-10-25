@@ -58,17 +58,9 @@ export default function EditTeamPage() {
 }
 
 function EditTeam({ team }: { team: TeamWithProjectsAndMembersAndUsers }) {
-  // Get team's default role if it exists (built-in only)
-  const teamBuiltInRole = team.defaultRole;
-
-  const teamDefaultRole = useMemo(() => {
-    return teamBuiltInRole ? teamRolesOptions[teamBuiltInRole] : undefined;
-  }, [teamBuiltInRole]);
-
   const getInitialValues = useCallback(
     (teamData: TeamWithProjectsAndMembersAndUsers): TeamFormData => ({
       name: teamData.name,
-      defaultRole: teamDefaultRole,
       members: teamData.members.map((member) => {
         // Check if this user has a custom role assigned
         const assignedRole = member.assignedRole;
@@ -98,7 +90,7 @@ function EditTeam({ team }: { team: TeamWithProjectsAndMembersAndUsers }) {
         };
       }),
     }),
-    [teamDefaultRole],
+    [],
   );
 
   const [defaultValues, setDefaultValues] = useState<TeamFormData>(

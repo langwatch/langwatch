@@ -36,7 +36,6 @@ import {
 
 export type TeamFormData = {
   name: string;
-  defaultRole?: TeamUserRoleForm["role"];
   members: {
     userId?: { label: string; value: string };
     role: TeamUserRoleForm["role"];

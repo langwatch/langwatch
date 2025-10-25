@@ -84,7 +84,6 @@ describe("RBAC Integration Tests", () => {
         team: {
           id: "team-123",
           members: [], // No members
-          defaultRole: TeamUserRole.ADMIN,
         },
       });
 
@@ -101,7 +100,6 @@ describe("RBAC Integration Tests", () => {
         team: {
           id: "team-123",
           members: [{ userId: "user-123", role: TeamUserRole.ADMIN }],
-          defaultRole: TeamUserRole.ADMIN,
         },
       });
 
@@ -120,7 +118,6 @@ describe("RBAC Integration Tests", () => {
         team: {
           id: "team-123",
           members: [{ userId: "user-123", role: TeamUserRole.VIEWER }],
-          defaultRole: TeamUserRole.VIEWER,
         },
       });
 
@@ -290,7 +287,6 @@ describe("RBAC Integration Tests", () => {
           team: {
             id: "team-123",
             members: [],
-            defaultRole: TeamUserRole.VIEWER,
           },
         });
 
@@ -312,7 +308,6 @@ describe("RBAC Integration Tests", () => {
           team: {
             id: "team-123",
             members: [{ userId: "user-123", role: TeamUserRole.ADMIN }],
-            defaultRole: TeamUserRole.ADMIN,
           },
         });
 
@@ -465,7 +460,6 @@ describe("RBAC Integration Tests", () => {
           team: {
             id: "team-123",
             members: [{ userId: "user-123", role: TeamUserRole.ADMIN }],
-            defaultRole: TeamUserRole.ADMIN,
           },
         });
 
@@ -492,7 +486,6 @@ describe("RBAC Integration Tests", () => {
           team: {
             id: "team-123",
             members: [],
-            defaultRole: TeamUserRole.VIEWER,
           },
         });
 
@@ -523,7 +516,6 @@ describe("RBAC Integration Tests", () => {
           team: {
             id: "team-123",
             members: [],
-            defaultRole: TeamUserRole.VIEWER,
           },
         });
 

@@ -61,7 +61,6 @@ export type TeamMemberWithTeam = TeamUser & {
 export type TeamWithProjectsAndMembersAndUsers = Team & {
   members: TeamMemberWithUser[];
   projects: Project[];
-  defaultRole?: TeamUserRole | null;
 };
 
 export type UserWithTeams = User & {

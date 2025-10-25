@@ -74,7 +74,6 @@ describe("Custom Role Functionality Tests", () => {
         team: {
           id: "team-123",
           members: [{ userId: "user-123", role: TeamUserRole.VIEWER }],
-          defaultRole: TeamUserRole.VIEWER,
         },
       });
 
@@ -104,7 +103,6 @@ describe("Custom Role Functionality Tests", () => {
               assignedRoleId: "custom-role-123",
             },
           ],
-          defaultRole: TeamUserRole.VIEWER,
         },
       });
 
@@ -133,7 +131,6 @@ describe("Custom Role Functionality Tests", () => {
               assignedRoleId: "custom-role-123",
             },
           ],
-          defaultRole: TeamUserRole.VIEWER,
         },
       });
 
@@ -162,7 +159,6 @@ describe("Custom Role Functionality Tests", () => {
               assignedRoleId: "custom-role-123",
             },
           ],
-          defaultRole: TeamUserRole.VIEWER,
         },
       });
 
@@ -185,7 +181,6 @@ describe("Custom Role Functionality Tests", () => {
         team: {
           id: "team-123",
           members: [{ userId: "user-123", role: TeamUserRole.VIEWER }],
-          defaultRole: TeamUserRole.VIEWER,
         },
       });
 
@@ -217,7 +212,6 @@ describe("Custom Role Functionality Tests", () => {
               assignedRoleId: "custom-role-123",
             },
           ],
-          defaultRole: TeamUserRole.VIEWER,
         },
       });
 
@@ -339,7 +333,6 @@ describe("Custom Role Functionality Tests", () => {
         team: {
           id: "team-123",
           members: [{ userId: "user-123", role: TeamUserRole.VIEWER }],
-          defaultRole: TeamUserRole.VIEWER,
         },
       });
 
@@ -364,7 +357,6 @@ describe("Custom Role Functionality Tests", () => {
         team: {
           id: "team-123",
           members: [{ userId: "user-123", role: TeamUserRole.VIEWER }],
-          defaultRole: TeamUserRole.VIEWER,
         },
       });
 
@@ -391,7 +383,6 @@ describe("Custom Role Functionality Tests", () => {
         team: {
           id: "team-123",
           members: [{ userId: "user-123", role: TeamUserRole.ADMIN }],
-          defaultRole: TeamUserRole.ADMIN,
         },
       });
 
@@ -411,7 +402,6 @@ describe("Custom Role Functionality Tests", () => {
         team: {
           id: "team-123",
           members: [{ userId: "user-123", role: TeamUserRole.ADMIN }],
-          defaultRole: TeamUserRole.ADMIN,
         },
       });
 
@@ -435,7 +425,6 @@ describe("Custom Role Functionality Tests", () => {
         team: {
           id: "team-123",
           members: [{ userId: "user-123", role: TeamUserRole.VIEWER }],
-          defaultRole: null,
           // Null default custom role
         },
       });

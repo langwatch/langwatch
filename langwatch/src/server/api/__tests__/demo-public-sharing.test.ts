@@ -237,7 +237,6 @@ describe("Demo Project and Public Sharing Tests", () => {
         team: {
           id: "team-123",
           members: [{ userId: "user-123", role: TeamUserRole.ADMIN }],
-          defaultRole: TeamUserRole.ADMIN,
         },
       });
       mockPrisma.teamUserCustomRole.findFirst.mockResolvedValue(null);
@@ -263,7 +262,6 @@ describe("Demo Project and Public Sharing Tests", () => {
         team: {
           id: "team-123",
           members: [],
-          defaultRole: TeamUserRole.VIEWER,
         },
       });
 
@@ -294,7 +292,6 @@ describe("Demo Project and Public Sharing Tests", () => {
         team: {
           id: "team-123",
           members: [],
-          defaultRole: TeamUserRole.VIEWER,
         },
       });
 
@@ -322,7 +319,6 @@ describe("Demo Project and Public Sharing Tests", () => {
           team: {
             id: "team-123",
             members: [],
-            defaultRole: TeamUserRole.VIEWER,
           },
         });
 
@@ -353,7 +349,6 @@ describe("Demo Project and Public Sharing Tests", () => {
         team: {
           id: "team-123",
           members: [],
-          defaultRole: TeamUserRole.VIEWER,
         },
       });
 
@@ -409,7 +404,6 @@ describe("Demo Project and Public Sharing Tests", () => {
         team: {
           id: "team-123",
           members: [],
-          defaultRole: TeamUserRole.VIEWER,
         },
       });
 
@@ -514,7 +508,6 @@ describe("Demo Project and Public Sharing Tests", () => {
         team: {
           id: "team-123",
           members: [],
-          defaultRole: TeamUserRole.VIEWER,
         },
       });
 
@@ -539,7 +532,6 @@ describe("Demo Project and Public Sharing Tests", () => {
         team: {
           id: "team-123",
           members: [],
-          defaultRole: TeamUserRole.VIEWER,
         },
       });
 
@@ -564,7 +556,6 @@ describe("Demo Project and Public Sharing Tests", () => {
         team: {
           id: "team-123",
           members: [],
-          defaultRole: TeamUserRole.VIEWER,
         },
       });
 
@@ -587,7 +578,6 @@ describe("Demo Project and Public Sharing Tests", () => {
         team: {
           id: "team-123",
           members: [],
-          defaultRole: TeamUserRole.VIEWER,
         },
       });
 
@@ -634,7 +624,6 @@ describe("Demo Project and Public Sharing Tests", () => {
         team: {
           id: "team-123",
           members: [],
-          defaultRole: TeamUserRole.VIEWER,
         },
       });
 
@@ -667,7 +656,6 @@ describe("Demo Project and Public Sharing Tests", () => {
         team: {
           id: "team-123",
           members: [{ userId: "user-123", role: TeamUserRole.ADMIN }],
-          defaultRole: TeamUserRole.ADMIN,
         },
       });
 
