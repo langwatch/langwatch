@@ -224,6 +224,7 @@ describe("RBAC Integration Tests", () => {
 
     it("should return false when user is not organization member", async () => {
       mockPrisma.organizationUser.findFirst.mockResolvedValue(null);
+      mockPrisma.teamUser.findFirst.mockResolvedValue(null);
 
       const result = await hasOrganizationPermission(
         { prisma: mockPrisma, session: mockSession },
