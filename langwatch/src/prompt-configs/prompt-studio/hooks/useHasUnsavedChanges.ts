@@ -28,7 +28,7 @@ export function useHasUnsavedChanges(tabId: string): boolean {
   const { data: savedPrompt, isLoading: isLoadingSavedPrompt } =
     api.prompts.getByIdOrHandle.useQuery(
       {
-        idOrHandle: configId!,
+        idOrHandle: configId,
         projectId: project?.id ?? "",
       },
       {

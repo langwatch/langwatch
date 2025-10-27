@@ -235,3 +235,14 @@ div input[type="number"] {
 .copilotKitChat .poweredBy {
     display: none !important;
 }
+
+.prompt-studio-chat {
+    .copilotKitChat {
+        height: 100%;
+    }
+    .copilotKitMessages {
+        width: 100%;
+        max-width: 768px;
+        margin: 0 auto;
+    }
+}
