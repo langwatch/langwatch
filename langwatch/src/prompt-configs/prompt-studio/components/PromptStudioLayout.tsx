@@ -24,7 +24,6 @@ export function PromptStudioLayout() {
                 left={0}
                 width="full"
                 height="full"
-                paddingY="3"
                 bg="white"
               >
                 <PromptStudioSidebar />

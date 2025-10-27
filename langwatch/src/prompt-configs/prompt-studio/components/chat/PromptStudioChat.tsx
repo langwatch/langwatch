@@ -26,7 +26,6 @@ export function PromptStudioChat({
 
   return (
     <CopilotKit
-      height="full"
       runtimeUrl="/api/copilotkit"
       headers={{
         "X-Auth-Token": project?.apiKey ?? "",

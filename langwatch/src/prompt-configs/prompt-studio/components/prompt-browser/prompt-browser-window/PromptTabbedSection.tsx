@@ -55,8 +55,8 @@ export function PromptTabbedSection() {
             bottom={0}
             left={0}
             width="full"
+            height="full"
             maxHeight="full"
-            overflowY="scroll"
           >
             <PromptStudioChat formValues={formValues} variables={variables} />
           </Box>

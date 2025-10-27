@@ -15,6 +15,7 @@ function SidebarRoot({ children }: SidebarRootProps) {
       borderRight="1px solid"
       borderColor="gray.200"
       overflowY="auto"
+      paddingY="3"
     >
       <VStack gap={0} align="stretch">
         {children}

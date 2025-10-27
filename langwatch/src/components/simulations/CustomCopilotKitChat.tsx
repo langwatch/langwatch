@@ -20,6 +20,14 @@ import { Markdown } from "../Markdown";
 
 const logger = createLogger("CustomCopilotKitChat.tsx");
 
+type CustomCopilotKitChatProps = CustomCopilotKitChatInnerProps;
+
+interface CustomCopilotKitChatInnerProps {
+  messages: ScenarioMessageSnapshotEvent["messages"];
+  smallerView?: boolean;
+  hideInput?: boolean;
+}
+
 /**
  * This is a wrapper around the CopilotKit component that allows us to use the CopilotKit chat without having to
  * worry about the runtime.
@@ -27,12 +35,8 @@ const logger = createLogger("CustomCopilotKitChat.tsx");
  * @returns A CopilotKit component with the chat history of the simulation.
  */
 export function CustomCopilotKitChat({
-  messages,
-  smallerView,
-}: {
-  messages: ScenarioMessageSnapshotEvent["messages"];
-  smallerView?: boolean;
-}) {
+  ...innerProps
+}: CustomCopilotKitChatProps) {
   const { project } = useOrganizationTeamProject();
   return (
     <CopilotKit
@@ -41,10 +45,7 @@ export function CustomCopilotKitChat({
         "X-Auth-Token": project?.apiKey ?? "",
       }}
     >
-      <CustomCopilotKitChatInner
-        messages={messages}
-        smallerView={smallerView}
-      />
+      <CustomCopilotKitChatInner {...innerProps} />
     </CopilotKit>
   );
 }
@@ -53,11 +54,7 @@ function CustomCopilotKitChatInner({
   messages,
   smallerView,
   hideInput,
-}: {
-  messages: ScenarioMessageSnapshotEvent["messages"];
-  smallerView?: boolean;
-  hideInput?: boolean;
-}) {
+}: CustomCopilotKitChatInnerProps) {
   const { project } = useOrganizationTeamProject();
   const { setMessages } = useCopilotChat({
     headers: {

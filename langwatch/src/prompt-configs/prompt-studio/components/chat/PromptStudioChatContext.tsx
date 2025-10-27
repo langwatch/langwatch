@@ -31,7 +31,7 @@ interface PromptStudioChatContextType {
   syncedInput: string;
   /** Update the synced input value */
   setSyncedInput: (input: string) => void;
-  /** Whether sync is currently enabled */
+  /** Whether sync is currently enabled. Defaults to true. */
   isSynced: boolean;
   /** Toggle sync on/off */
   setIsSynced: (synced: boolean) => void;
@@ -80,7 +80,7 @@ export function PromptStudioChatProvider({
   children,
 }: PromptStudioChatProviderProps) {
   const [syncedInput, setSyncedInput] = useState("");
-  const [isSynced, setIsSynced] = useState(false);
+  const [isSynced, setIsSynced] = useState(true);
   const [submitTrigger, setSubmitTrigger] = useState<SubmitTrigger | null>(
     null,
   );

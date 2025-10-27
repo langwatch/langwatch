@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { Box } from "@chakra-ui/react";
+import { Box, HStack } from "@chakra-ui/react";
 import type { InputProps } from "@copilotkit/react-ui";
 import { usePromptStudioChatSync } from "./PromptStudioChatContext";
 import { ChatSendButton } from "./ui/ChatSendButton";
@@ -97,7 +97,7 @@ export function SyncedChatInput({
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === "Enter" && !e.shiftKey) {
+    if (e.key === "Enter" && (!e.shiftKey || e.ctrlKey)) {
       e.preventDefault();
       void handleSend();
     }
@@ -118,7 +118,7 @@ export function SyncedChatInput({
     >
       <Box
         position="relative"
-        borderRadius="lg"
+        borderRadius="md"
         border="1px solid"
         borderColor="gray.300"
         _focusWithin={{ borderColor: "orange.500" }}
@@ -132,33 +132,40 @@ export function SyncedChatInput({
           ref={textareaRef}
         />
 
-        {/* Left icon - Paperclip */}
-        <ChatAttachButton
-          position="absolute"
-          left={3}
-          bottom={2}
-          onAttach={onUpload}
-        />
+        <HStack
+          width="full"
+          justify="space-between"
+          padding={2}
+          position="relative"
+        >
+          {/* Left icon - Paperclip */}
+          <ChatAttachButton
+            // position="absolute"
+            left={3}
+            bottom={2}
+            onAttach={onUpload}
+          />
 
-        {/* Bottom left - Sync checkbox (shows on hover) */}
-        <ChatSyncCheckbox
-          position="absolute"
-          left="50%"
-          bottom={2}
-          transform="translateX(-50%)"
-          checked={isSynced}
-          onChange={setIsSynced}
-          visible={isHovered}
-        />
+          {/* Bottom left - Sync checkbox (shows on hover) */}
+          <ChatSyncCheckbox
+            position="absolute"
+            left="50%"
+            bottom={2}
+            transform="translateX(-50%)"
+            checked={isSynced}
+            onChange={setIsSynced}
+            visible={isHovered}
+          />
 
-        {/* Right icon - Send button */}
-        <ChatSendButton
-          position="absolute"
-          right={3}
-          bottom={2}
-          disabled={inProgress || !currentInput.trim()}
-          onSend={handleSend}
-        />
+          {/* Right icon - Send button */}
+          <ChatSendButton
+            // position="absolute"
+            right={3}
+            bottom={2}
+            disabled={inProgress || !currentInput.trim()}
+            onSend={() => void handleSend()}
+          />
+        </HStack>
       </Box>
     </Box>
   );
