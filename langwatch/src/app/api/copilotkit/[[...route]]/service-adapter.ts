@@ -47,8 +47,6 @@ export class PromptStudioAdapter implements CopilotServiceAdapter {
       messages,
       forwardedParameters,
       threadId: threadIdFromRequest,
-      agentSession,
-      agentStates,
     } = request;
 
     // @ts-expect-error - Total hack
@@ -108,28 +106,9 @@ export class PromptStudioAdapter implements CopilotServiceAdapter {
       const messageId = traceId;
       let lastOutput = "";
 
-      console.log("Sending agent state message START", {
-        agentStates: JSON.stringify(agentStates),
-      });
-
       const finishIfNeeded = () => {
         if (started && !ended) {
           ended = true;
-          // eventStream$.sendAgentStateMessage({
-          //   threadId: threadId,
-          //   agentName: "",
-          //   nodeName: agentSession?.nodeName ?? "main",
-          //   runId: traceId,
-          //   active: true,
-          //   role: "assistant",
-          //   state: JSON.stringify({ traceId }), // Or additional metadata
-          //   running: true,
-          // });
-          eventStream$.sendActionExecutionResult({
-            actionExecutionId: traceId,
-            actionName: "trace_sent",
-            result: traceId,
-          });
           eventStream$.sendTextMessageEnd({ messageId });
         }
       };
@@ -166,6 +145,8 @@ export class PromptStudioAdapter implements CopilotServiceAdapter {
                     eventStream$.sendTextMessageContent({
                       messageId,
                       content: String(delta),
+                      // @ts-expect-error - Total hack
+                      traceId,
                     });
                   }
                   lastOutput = current;
