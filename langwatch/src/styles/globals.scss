@@ -241,3 +241,17 @@ span[data-highlight]::after {
     pointer-events: none;
     overflow: unset !important;
 }
+
+.prompt-studio-chat {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    .copilotKitChat {
+        height: 100%;
+    }
+    .copilotKitMessages {
+        width: 100%;
+        max-width: 768px;
+        margin: 0 auto;
+    }
+}

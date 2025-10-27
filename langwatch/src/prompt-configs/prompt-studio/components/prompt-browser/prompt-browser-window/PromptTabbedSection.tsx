@@ -41,7 +41,7 @@ export function PromptTabbedSection() {
         )}
         <Tabs.Trigger value={PromptTab.Settings}>Settings</Tabs.Trigger>
       </Tabs.List>
-      <HStack flex={1} width="full" maxWidth="768px" margin="0 auto">
+      <HStack flex={1} width="full" margin="0 auto">
         <Tabs.Content
           value={PromptTab.Conversation}
           flex={1}

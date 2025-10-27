@@ -379,7 +379,13 @@ function createDraggableTabsBrowserStore(projectId: string) {
  * Hook to access the project-scoped draggable tabs browser store.
  * Single Responsibility: Provides access to the appropriate store instance for the current project.
  */
-export function useDraggableTabsBrowserStore() {
+export function useDraggableTabsBrowserStore(): DraggableTabsBrowserState;
+export function useDraggableTabsBrowserStore<T>(
+  selector: (state: DraggableTabsBrowserState) => T,
+): T;
+export function useDraggableTabsBrowserStore<T>(
+  selector?: (state: DraggableTabsBrowserState) => T,
+): T | DraggableTabsBrowserState {
   const { projectId } = useOrganizationTeamProject();
   const key = projectId ?? "__default__";
 
@@ -388,7 +394,10 @@ export function useDraggableTabsBrowserStore() {
   }
 
   const useStore = storeInstances.get(key)!;
-  return useStore();
+
+  // Call the store hook with or without selector
+  // @ts-expect-error - Zustand types are complex, but this works at runtime
+  return useStore(selector);
 }
 
 /**

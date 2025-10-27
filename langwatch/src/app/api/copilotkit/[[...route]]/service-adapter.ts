@@ -47,6 +47,8 @@ export class PromptStudioAdapter implements CopilotServiceAdapter {
       messages,
       forwardedParameters,
       threadId: threadIdFromRequest,
+      agentSession,
+      agentStates,
     } = request;
 
     // @ts-expect-error - Total hack
@@ -103,23 +105,32 @@ export class PromptStudioAdapter implements CopilotServiceAdapter {
     void eventSource.stream(async (eventStream$) => {
       let started = false;
       let ended = false;
-      const messageId = randomUUID();
+      const messageId = traceId;
       let lastOutput = "";
+
+      console.log("Sending agent state message START", {
+        agentStates: JSON.stringify(agentStates),
+      });
 
       const finishIfNeeded = () => {
         if (started && !ended) {
           ended = true;
-          eventStream$.sendTextMessageEnd({ messageId });
-          eventStream$.sendAgentStateMessage({
-            threadId: threadId,
-            agentName: "prompt_execution",
-            nodeName: nodeId,
-            runId: traceId,  // Store traceId here!
-            active: true,
-            role: "assistant",
-            state: JSON.stringify({ traceId }), // Or additional metadata
-            running: true,
+          // eventStream$.sendAgentStateMessage({
+          //   threadId: threadId,
+          //   agentName: "",
+          //   nodeName: agentSession?.nodeName ?? "main",
+          //   runId: traceId,
+          //   active: true,
+          //   role: "assistant",
+          //   state: JSON.stringify({ traceId }), // Or additional metadata
+          //   running: true,
+          // });
+          eventStream$.sendActionExecutionResult({
+            actionExecutionId: traceId,
+            actionName: "trace_sent",
+            result: traceId,
           });
+          eventStream$.sendTextMessageEnd({ messageId });
         }
       };
 
@@ -140,7 +151,9 @@ export class PromptStudioAdapter implements CopilotServiceAdapter {
                 // Start on first state notification
                 if (!started) {
                   started = true;
-                  eventStream$.sendTextMessageStart({ messageId });
+                  eventStream$.sendTextMessageStart({
+                    messageId,
+                  });
                 }
 
                 const current =

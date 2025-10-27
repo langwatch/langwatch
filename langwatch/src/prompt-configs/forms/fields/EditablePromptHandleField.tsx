@@ -5,7 +5,7 @@ import { LuPencil } from "react-icons/lu";
 
 import { toaster } from "~/components/ui/toaster";
 import type { PromptConfigFormValues } from "~/prompt-configs";
-import { versionedPromptToPromptConfigFormValues } from "~/prompt-configs/utils/llmPromptConfigUtils";
+import { versionedPromptToPromptConfigFormValuesWithSystemMessage } from "~/prompt-configs/utils/llmPromptConfigUtils";
 import { usePromptConfigContext } from "~/prompt-configs/providers/PromptConfigProvider";
 import type { VersionedPrompt } from "~/server/prompt-config";
 import { createLogger } from "~/utils/logger";
@@ -36,7 +36,9 @@ export function EditablePromptHandleField(
     }
 
     const onSuccess = (prompt: VersionedPrompt) => {
-      form.reset(versionedPromptToPromptConfigFormValues(prompt));
+      form.reset(
+        versionedPromptToPromptConfigFormValuesWithSystemMessage(prompt),
+      );
       toaster.create({
         title: "Prompt handle changed",
         description: `Prompt handle has been changed to ${prompt.handle}`,
@@ -64,7 +66,7 @@ export function EditablePromptHandleField(
       gap={1}
       width="full"
       position="relative"
-      minWidth={0}
+      minWidth="80px"
       _hover={{
         "& .handle-text": {
           opacity: 0.4,

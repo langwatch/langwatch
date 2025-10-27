@@ -25,7 +25,6 @@ export function useHandleSavePrompt() {
 
   const handleSaveVersion = useCallback(() => {
     const values = methods.getValues();
-    console.log("values", values);
     const data = formValuesToTriggerSaveVersionParams(values);
     const onSuccess = (prompt: VersionedPrompt) => {
       const newSavedState =

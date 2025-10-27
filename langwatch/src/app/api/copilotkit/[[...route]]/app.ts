@@ -24,6 +24,7 @@ import {
 
 import { createLogger } from "~/utils/logger";
 import { PromptStudioAdapter } from "./service-adapter";
+import { AbstractAgent, HttpAgent, type Message } from "@ag-ui/client";
 
 const logger = createLogger("langwatch:api:copilotkit");
 
@@ -51,7 +52,11 @@ app.post(
   }),
   async (c) => {
     const project = c.get("project");
-    const runtime = new CopilotRuntime();
+    const runtime = new CopilotRuntime({
+      // agents: {
+      //   prompt_execution: new PromptExecutionAgent(),
+      // },
+    });
 
     const handler = copilotRuntimeNodeHttpEndpoint({
       runtime,

@@ -123,6 +123,9 @@ export function SyncedChatInput({
         borderColor="gray.300"
         _focusWithin={{ borderColor: "orange.500" }}
         bg="white"
+        width="full"
+        maxWidth="768px"
+        margin="0 auto"
       >
         <ChatTextArea
           inProgress={inProgress}
@@ -131,7 +134,6 @@ export function SyncedChatInput({
           onKeyDown={handleKeyDown}
           ref={textareaRef}
         />
-
         <HStack
           width="full"
           justify="space-between"

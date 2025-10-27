@@ -11,6 +11,7 @@ export function TraceMessage({ traceId, ...props }: TraceMessageProps) {
   return (
     <HStack marginTop={-6} paddingBottom={4} {...props}>
       <Button
+        colorPalette="gray"
         onClick={() => {
           if (drawerOpen("traceDetails")) {
             openDrawer(
