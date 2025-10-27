@@ -1,11 +1,12 @@
 import { useState, useRef, useEffect } from "react";
-import { Box, Textarea } from "@chakra-ui/react";
+import { Box } from "@chakra-ui/react";
 import type { InputProps } from "@copilotkit/react-ui";
 import { usePromptStudioChatSync } from "./PromptStudioChatContext";
 import { ChatSendButton } from "./ui/ChatSendButton";
 import { ChatSyncCheckbox } from "./ui/ChatSyncCheckbox";
 import { ChatAttachButton } from "./ui/ChatAttachButton";
 import { ChatTextArea } from "./ui/ChatTextArea";
+import { useIsTabActive } from "../../hooks/useIsTabActive";
 
 /**
  * Custom chat input with sync across tabs functionality.
@@ -35,7 +36,11 @@ export function SyncedChatInput({
   const [localInput, setLocalInput] = useState("");
   const [isHovered, setIsHovered] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const lastProcessedTrigger = useRef<number>(0);
+  const isTabActive = useIsTabActive();
+  const lastProcessedTrigger = useRef<number>(
+    // This is important: it prevents the chat from submitting on mount.
+    submitTrigger?.timestamp ?? Date.now(),
+  );
 
   // Use synced or local input based on sync state
   const currentInput = isSynced ? syncedInput : localInput;
@@ -61,11 +66,14 @@ export function SyncedChatInput({
 
     lastProcessedTrigger.current = submitTrigger.timestamp;
 
+    // If the current tab is not active, don't submit the message.
+    if (!isTabActive) return;
+
     // Submit the message
     void onSend(submitTrigger.message).catch((error) => {
       console.error("Failed to send synced message:", error);
     });
-  }, [submitTrigger, isSynced, onSend]);
+  }, [submitTrigger, isSynced, onSend, isTabActive]);
 
   const handleSend = async () => {
     if (!currentInput.trim() || inProgress) return;
