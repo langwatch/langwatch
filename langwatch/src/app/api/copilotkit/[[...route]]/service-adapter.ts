@@ -110,6 +110,16 @@ export class PromptStudioAdapter implements CopilotServiceAdapter {
         if (started && !ended) {
           ended = true;
           eventStream$.sendTextMessageEnd({ messageId });
+          eventStream$.sendAgentStateMessage({
+            threadId: threadId,
+            agentName: "prompt_execution",
+            nodeName: nodeId,
+            runId: traceId,  // Store traceId here!
+            active: true,
+            role: "assistant",
+            state: JSON.stringify({ traceId }), // Or additional metadata
+            running: true,
+          });
         }
       };
 
