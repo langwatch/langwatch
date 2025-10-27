@@ -8,23 +8,26 @@ export interface ChatTextAreaProps extends TextareaProps {
 
 export const ChatTextArea = forwardRef<HTMLTextAreaElement, ChatTextAreaProps>(
   ({ inProgress, ...props }, ref) => {
-  return (
-    <Textarea
-      {...props}
-      ref={ref}
-      placeholder="Type your message here. Shift+Enter for new line."
-      disabled={inProgress}
-      resize="none"
-      rows={1}
-      minHeight="100px"
-      maxHeight="200px"
-      paddingY={3}
-      paddingLeft={12}
-      paddingRight={12}
-      border="none"
-      outline="none"
-      _focus={{ boxShadow: "none" }}
-      _disabled={{ opacity: 0.6, cursor: "not-allowed" }}
-    />
-  );
-}
+    return (
+      <Textarea
+        {...props}
+        ref={ref}
+        placeholder="Type your message here. Shift+Enter for new line."
+        disabled={inProgress}
+        resize="none"
+        rows={1}
+        minHeight="100px"
+        maxHeight="200px"
+        paddingY={3}
+        paddingLeft={12}
+        paddingRight={12}
+        border="none"
+        outline="none"
+        _focus={{ boxShadow: "none" }}
+        _disabled={{ opacity: 0.6, cursor: "not-allowed" }}
+      />
+    );
+  },
+);
+
+ChatTextArea.displayName = "ChatTextArea";
