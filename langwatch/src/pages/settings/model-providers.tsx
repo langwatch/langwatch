@@ -1,5 +1,4 @@
 import {
-  Alert,
   Box,
   Button,
   Card,
@@ -597,8 +596,8 @@ function ModelProviderForm({
                   </Field.Root>
                 )}
 
-                {/* Custom Headers Section for Azure */}
-                {provider.provider === "azure" && isEnabled && (
+                {/* Custom Headers Section for Azure and Custom providers */}
+                {(provider.provider === "azure" || provider.provider === "custom") && isEnabled && (
                   <VStack width="full" align="start" paddingTop={4}>
                     {extraHeaderFields.length > 0 && (
                       <Grid
@@ -747,15 +746,6 @@ function ModelProviderForm({
                     Save
                   </Button>
                 </HStack>
-                {provider.provider === "custom" && (
-                  <Alert.Root status="info">
-                    <Alert.Indicator />
-                    <Alert.Content>
-                      Custom provider supports only OpenAI compatible endpoints,
-                      contact support if you have a custom format.
-                    </Alert.Content>
-                  </Alert.Root>
-                )}
               </>
             )}
           </VStack>
