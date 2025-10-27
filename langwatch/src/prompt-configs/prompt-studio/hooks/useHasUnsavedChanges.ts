@@ -7,17 +7,13 @@ import { computeInitialFormValuesForPrompt } from "~/prompt-configs/utils/comput
 import { type PromptConfigFormValues } from "~/prompt-configs/types";
 import type { DeepPartial } from "react-hook-form";
 
-function compareFormValues(
+function areFormValuesEqual(
   a?: DeepPartial<PromptConfigFormValues>,
   b?: DeepPartial<PromptConfigFormValues>,
 ): boolean {
   if (!a || !b) return false;
-  return (
-    a.configId === b.configId &&
-    a.handle === b.handle &&
-    a.scope === b.scope &&
-    isEqual(a.version, b.version)
-  );
+  // Use JSON.stringify to normalize the objects for comparison (ie Dates, etc)
+  return isEqual(JSON.parse(JSON.stringify(a)), JSON.parse(JSON.stringify(b)));
 }
 
 export function useHasUnsavedChanges(tabId: string): boolean {
@@ -29,19 +25,26 @@ export function useHasUnsavedChanges(tabId: string): boolean {
   const configId = tab?.data.form.currentValues.configId;
   const currentValues = tab?.data.form.currentValues;
 
-  const { data: savedPrompt } = api.prompts.getByIdOrHandle.useQuery(
-    {
-      idOrHandle: configId!,
-      projectId: project?.id ?? "",
-    },
-    {
-      enabled: !!configId && !!project?.id,
-    },
-  );
+  const { data: savedPrompt, isLoading: isLoadingSavedPrompt } =
+    api.prompts.getByIdOrHandle.useQuery(
+      {
+        idOrHandle: configId!,
+        projectId: project?.id ?? "",
+      },
+      {
+        enabled: !!configId && !!project?.id,
+      },
+    );
 
   return useMemo(() => {
+    // Never been saved
     if (!configId) return true;
-    if (!savedPrompt) return false;
+    // Still loading the saved prompt
+    if (isLoadingSavedPrompt) return false;
+    // No saved prompt found, never been saved?
+    if (!savedPrompt) return true;
+    // No current values, still creating store for form
+    if (!currentValues) return false;
 
     const projectDefaultModel = project?.defaultModel;
     const normalizedDefaultModel =
@@ -53,6 +56,12 @@ export function useHasUnsavedChanges(tabId: string): boolean {
       useSystemMessage: true,
     });
 
-    return !currentValues || !compareFormValues(savedValues, currentValues);
-  }, [configId, savedPrompt, currentValues, project?.defaultModel]);
+    return !areFormValuesEqual(savedValues, currentValues);
+  }, [
+    configId,
+    savedPrompt,
+    currentValues,
+    project?.defaultModel,
+    isLoadingSavedPrompt,
+  ]);
 }
