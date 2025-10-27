@@ -7,7 +7,6 @@ import { randomUUID } from "@copilotkit/shared";
 
 import { LlmSignatureNodeFactory } from "~/components/evaluations/wizard/hooks/evaluation-wizard-store/slices/factories/llm-signature-node.factory";
 import type {
-  ExecutionState,
   LlmPromptConfigComponent,
   Workflow,
 } from "~/optimization_studio/types/dsl";
@@ -18,11 +17,11 @@ import type {
 import { addEnvs } from "~/optimization_studio/server/addEnvs";
 import { loadDatasets } from "~/optimization_studio/server/loadDatasets";
 import { studioBackendPostEvent } from "../../workflows/post_event/post-event";
-import type { LLMConfig } from "~/optimization_studio/types/dsl";
 import type { ChatMessage } from "~/server/tracer/types";
 import type { PromptConfigFormValues } from "~/prompt-configs/types";
 import type { runtimeInputsSchema } from "~/prompt-configs/schemas";
 import type z from "zod";
+import { generateOtelTraceId } from "~/utils/trace";
 
 type PromptStudioAdapterParams = {
   projectId: string;
@@ -58,7 +57,7 @@ export class PromptStudioAdapter implements CopilotServiceAdapter {
     };
     const threadId = threadIdFromRequest ?? randomUUID();
     const nodeId = "prompt_node";
-    const traceId = `trace_${randomUUID()}`;
+    const traceId = generateOtelTraceId();
     const workflowId = `prompt_execution_${randomUUID().slice(0, 6)}`;
 
     // Prepend form messages (excluding system) to Copilot messages
