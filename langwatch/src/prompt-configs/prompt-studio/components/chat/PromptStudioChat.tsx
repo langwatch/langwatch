@@ -5,6 +5,7 @@ import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import type { PromptConfigFormValues } from "~/prompt-configs/types";
 import type { z } from "zod";
 import { type runtimeInputsSchema } from "~/prompt-configs/schemas/field-schemas";
+import { SyncedChatInput } from "./SyncedChatInput";
 
 interface PromptStudioChatProps {
   formValues: PromptConfigFormValues;
@@ -38,7 +39,7 @@ export function PromptStudioChat({
         console.error(error);
       }}
     >
-      <CopilotChat />
+      <CopilotChat Input={SyncedChatInput} />
     </CopilotKit>
   );
 }
