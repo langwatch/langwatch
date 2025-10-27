@@ -166,10 +166,12 @@ export const useDraggableTabsBrowserStore = create<DraggableTabsBrowserState>()(
        */
       splitTab: ({ tabId }) => {
         set((state) => {
-          const sourceTab = state.windows
-            .flatMap((w) => w.tabs)
-            .find((tab) => tab.id === tabId);
-
+          const tabWindowIndex = state.windows.findIndex((w) =>
+            w.tabs.some((t) => t.id === tabId),
+          );
+          const tabWindow = state.windows[tabWindowIndex];
+          if (!tabWindow) return;
+          const sourceTab = tabWindow.tabs.find((t) => t.id === tabId);
           if (!sourceTab) return;
 
           const newWindowId = `window-${Date.now()}`;
@@ -193,7 +195,8 @@ export const useDraggableTabsBrowserStore = create<DraggableTabsBrowserState>()(
             activeTabId: newTabId,
           };
 
-          state.windows.push(newWindow);
+          // Insert new window directly after the source window
+          state.windows.splice(tabWindowIndex + 1, 0, newWindow);
           state.activeWindowId = newWindowId;
         });
       },

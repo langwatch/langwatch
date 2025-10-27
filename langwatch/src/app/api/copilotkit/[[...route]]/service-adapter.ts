@@ -83,6 +83,7 @@ export class PromptStudioAdapter implements CopilotServiceAdapter {
     const rawEvent: StudioClientEvent = {
       type: "execute_component",
       payload: {
+        enable_tracing: true,
         trace_id: traceId,
         workflow,
         node_id: nodeId,
