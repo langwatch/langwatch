@@ -15,7 +15,7 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { Trash2, Plus } from "react-feather";
+import { Trash2, Plus, Eye, EyeOff } from "react-feather";
 import { zodResolver } from "@hookform/resolvers/zod";
 import React, { useCallback, useState, useEffect, useMemo } from "react";
 import { Controller, useFieldArray, useForm } from "react-hook-form";
@@ -170,7 +170,7 @@ type ModelProviderForm = {
   customKeys?: Record<string, unknown> | null;
   customModels?: { value: string; label: string }[] | null;
   customEmbeddingsModels?: { value: string; label: string }[] | null;
-  extraHeaders?: { key: string; value: string }[] | null;
+  extraHeaders?: { key: string; value: string; concealed?: boolean }[] | null;
 };
 
 function ModelProviderForm({
@@ -255,7 +255,11 @@ function ModelProviderForm({
         provider.provider,
         "embedding",
       ),
-      extraHeaders: provider.extraHeaders ?? [],
+      extraHeaders: (provider.extraHeaders ?? []).map(header => ({
+        key: header.key,
+        value: header.value,
+        concealed: !!header.value, // Conceal by default if value exists from DB
+      })),
     },
     resolver: (data, ...args) => {
       const data_ = {
@@ -302,6 +306,7 @@ function ModelProviderForm({
               z.object({
                 key: z.string(),
                 value: z.string(),
+                concealed: z.boolean().optional(),
               }),
             )
             .optional()
@@ -358,6 +363,14 @@ function ModelProviderForm({
         customKeys = { ...baseKeys, ...customHeaderKeys };
       }
 
+      // Strip the concealed field before sending to backend
+      const extraHeadersToSend = (data.extraHeaders ?? [])
+        .filter((h) => h.key?.trim())
+        .map(({ key, value }) => ({
+          key,
+          value,
+        }));
+
       await localUpdateMutation.mutateAsync({
         id: provider.id,
         projectId: project?.id ?? "",
@@ -368,7 +381,7 @@ function ModelProviderForm({
         customEmbeddingsModels: (data.customEmbeddingsModels ?? []).map(
           (m) => m.value,
         ),
-        extraHeaders: data.extraHeaders?.filter((h) => h.key?.trim()) ?? [],
+        extraHeaders: extraHeadersToSend,
       });
       toaster.create({
         title: "API Keys Updated",
@@ -520,7 +533,7 @@ function ModelProviderForm({
                       setUseApiGateway(e.target.checked);
                       // Add default api-key header when enabling API Gateway if no headers exist
                       if (e.target.checked && extraHeaderFields.length === 0) {
-                        appendExtraHeader({ key: "api-key", value: "" });
+                        appendExtraHeader({ key: "api-key", value: "", concealed: false });
                       }
                     }}
                     checked={useApiGateway}
@@ -589,42 +602,64 @@ function ModelProviderForm({
                   <VStack width="full" align="start" paddingTop={4}>
                     {extraHeaderFields.length > 0 && (
                       <Grid
-                        templateColumns="auto auto auto"
+                        templateColumns="auto auto auto auto"
                         gap={4}
                         rowGap={2}
                         width="full"
                       >
-                        <GridItem color="gray.500" colSpan={3}>
+                        <GridItem color="gray.500" colSpan={4}>
                           <SmallLabel>Extra Headers</SmallLabel>
                         </GridItem>
-                        {extraHeaderFields.map((field, index) => (
-                          <React.Fragment key={field.id}>
-                            <GridItem>
-                              <Input
-                                {...register(`extraHeaders.${index}.key`)}
-                                placeholder="Header name"
-                                autoComplete="off"
-                              />
-                            </GridItem>
-                            <GridItem>
-                              <Input
-                                {...register(`extraHeaders.${index}.value`)}
-                                placeholder="Header value"
-                                autoComplete="off"
-                              />
-                            </GridItem>
-                            <GridItem>
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                colorPalette="red"
-                                onClick={() => removeExtraHeader(index)}
-                              >
-                                <Trash2 size={16} />
-                              </Button>
-                            </GridItem>
-                          </React.Fragment>
-                        ))}
+                        {extraHeaderFields.map((field, index) => {
+                          const concealed = watch(`extraHeaders.${index}.concealed`);
+                          return (
+                            <React.Fragment key={field.id}>
+                              <GridItem>
+                                <Input
+                                  {...register(`extraHeaders.${index}.key`)}
+                                  placeholder="Header name"
+                                  autoComplete="off"
+                                />
+                              </GridItem>
+                              <GridItem>
+                                <Input
+                                  {...register(`extraHeaders.${index}.value`)}
+                                  type={concealed ? "password" : "text"}
+                                  placeholder="Header value"
+                                  autoComplete="off"
+                                />
+                              </GridItem>
+                              <GridItem>
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={() =>
+                                    setValue(
+                                      `extraHeaders.${index}.concealed`,
+                                      !concealed
+                                    )
+                                  }
+                                >
+                                  {concealed ? (
+                                    <EyeOff size={16} />
+                                  ) : (
+                                    <Eye size={16} />
+                                  )}
+                                </Button>
+                              </GridItem>
+                              <GridItem>
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  colorPalette="red"
+                                  onClick={() => removeExtraHeader(index)}
+                                >
+                                  <Trash2 size={16} />
+                                </Button>
+                              </GridItem>
+                            </React.Fragment>
+                          );
+                        })}
                       </Grid>
                     )}
 
@@ -632,7 +667,7 @@ function ModelProviderForm({
                       <Button
                         size="xs"
                         variant="outline"
-                        onClick={() => appendExtraHeader({ key: "", value: "" })}
+                        onClick={() => appendExtraHeader({ key: "", value: "", concealed: false })}
                       >
                         <Plus size={16} />
                         Add Header
