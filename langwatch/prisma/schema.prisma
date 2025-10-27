@@ -493,6 +493,7 @@ model ModelProvider {
     provider               String
     enabled                Boolean
     customKeys             Json?
+    extraHeaders           Json?
     customModels           Json?
     customEmbeddingsModels Json?
     deploymentMapping      Json?

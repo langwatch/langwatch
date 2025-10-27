@@ -1,5 +1,4 @@
 import {
-  Alert,
   Box,
   Button,
   Card,
@@ -15,10 +14,10 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { Trash2, Plus } from "react-feather";
+import { Trash2, Plus, Eye, EyeOff } from "react-feather";
 import { zodResolver } from "@hookform/resolvers/zod";
 import React, { useCallback, useState, useEffect, useMemo } from "react";
-import { Controller, useForm } from "react-hook-form";
+import { Controller, useFieldArray, useForm } from "react-hook-form";
 import { z } from "zod";
 import { ProjectSelector } from "../../components/DashboardLayout";
 import { HorizontalFormControl } from "../../components/HorizontalFormControl";
@@ -170,12 +169,7 @@ type ModelProviderForm = {
   customKeys?: Record<string, unknown> | null;
   customModels?: { value: string; label: string }[] | null;
   customEmbeddingsModels?: { value: string; label: string }[] | null;
-};
-
-type CustomHeader = {
-  id: string;
-  key: string;
-  value: string;
+  extraHeaders?: { key: string; value: string; concealed?: boolean }[] | null;
 };
 
 function ModelProviderForm({
@@ -197,105 +191,32 @@ function ModelProviderForm({
     return false;
   });
 
-  // State for custom headers
-  const [customHeaders, setCustomHeaders] = useState<CustomHeader[]>(() => {
-    if (provider.provider === "azure" && provider.customKeys) {
-      const headers: CustomHeader[] = [];
-      const keys = provider.customKeys as Record<string, unknown>;
-
-      // Extract custom headers (keys that are not standard Azure keys)
-      const standardAzureKeys = new Set([
-        "AZURE_OPENAI_API_KEY",
-        "AZURE_OPENAI_ENDPOINT",
-        "AZURE_API_GATEWAY_BASE_URL",
-        "AZURE_API_GATEWAY_VERSION",
-      ]);
-
-      Object.entries(keys).forEach(([key, value]) => {
-        if (!standardAzureKeys.has(key) && typeof value === "string") {
-          headers.push({
-            id: `header_${Date.now()}_${key}`, // Generate unique ID
-            key: key,
-            value: value,
-          });
-        }
-      });
-
-      return headers;
-    }
-    return [];
-  });
-
   const localUpdateMutation = api.modelProvider.update.useMutation();
-
-  // Functions to handle custom headers
-  const addCustomHeader = useCallback(() => {
-    const newHeader: CustomHeader = {
-      id: `header_${Date.now()}`,
-      key: customHeaders.length === 0 ? "api-key" : "",
-      value: "",
-    };
-    setCustomHeaders((prev) => [...prev, newHeader]);
-  }, [customHeaders.length]);
-
-  const removeCustomHeader = useCallback((id: string) => {
-    setCustomHeaders((prev) => prev.filter((header) => header.id !== id));
-  }, []);
-
-  const updateCustomHeader = useCallback(
-    (id: string, field: "key" | "value", value: string) => {
-      setCustomHeaders((prev) =>
-        prev.map((header) => {
-          if (header.id === id) {
-            return { ...header, [field]: value };
-          }
-          return header;
-        }),
-      );
-    },
-    [],
-  );
 
   const providerDefinition =
     modelProvidersRegistry[
-      provider.provider as keyof typeof modelProvidersRegistry
+    provider.provider as keyof typeof modelProvidersRegistry
     ];
 
   // Get filtered keys based on API Gateway toggle for Azure
   const getFilteredKeys = useCallback(
     (keys: Record<string, unknown>) => {
       if (provider.provider === "azure") {
-        const baseKeys = useApiGateway
+        return useApiGateway
           ? {
-              // Show only API Gateway keys
-              AZURE_API_GATEWAY_BASE_URL: keys.AZURE_API_GATEWAY_BASE_URL || "",
-              AZURE_API_GATEWAY_VERSION: keys.AZURE_API_GATEWAY_VERSION || "",
-            }
-          : {
-              // Show only regular Azure OpenAI keys
-              AZURE_OPENAI_API_KEY: keys.AZURE_OPENAI_API_KEY || "",
-              AZURE_OPENAI_ENDPOINT: keys.AZURE_OPENAI_ENDPOINT || "",
-            };
-
-        // Add custom headers
-        const customHeaderKeys: Record<string, string> = {};
-        customHeaders.forEach((header) => {
-          if (header.key.trim() && header.value.trim()) {
-            // Sanitize the key name to ensure it's valid
-            const sanitizedKey = header.key
-              .trim()
-              .replace(/[^a-zA-Z0-9_-]/g, "_");
-            if (sanitizedKey) {
-              customHeaderKeys[sanitizedKey] = header.value.trim();
-            }
+            // Show only API Gateway keys
+            AZURE_API_GATEWAY_BASE_URL: keys.AZURE_API_GATEWAY_BASE_URL || "",
+            AZURE_API_GATEWAY_VERSION: keys.AZURE_API_GATEWAY_VERSION || "",
           }
-        });
-
-        return { ...baseKeys, ...customHeaderKeys };
+          : {
+            // Show only regular Azure OpenAI keys
+            AZURE_OPENAI_API_KEY: keys.AZURE_OPENAI_API_KEY || "",
+            AZURE_OPENAI_ENDPOINT: keys.AZURE_OPENAI_ENDPOINT || "",
+          };
       }
       return keys;
     },
-    [provider.provider, useApiGateway, customHeaders],
+    [provider.provider, useApiGateway],
   );
 
   const getStoredModelOptions = (
@@ -320,8 +241,8 @@ function ModelProviderForm({
       enabled: provider.enabled,
       customKeys: provider.customKeys
         ? (getFilteredKeys(
-            provider.customKeys as Record<string, unknown>,
-          ) as Record<string, unknown> | null)
+          provider.customKeys as Record<string, unknown>,
+        ) as Record<string, unknown> | null)
         : null,
       customModels: getStoredModelOptions(
         provider.models ?? [],
@@ -333,6 +254,11 @@ function ModelProviderForm({
         provider.provider,
         "embedding",
       ),
+      extraHeaders: (provider.extraHeaders ?? []).map(header => ({
+        key: header.key,
+        value: header.value,
+        concealed: !!header.value, // Conceal by default if value exists from DB
+      })),
     },
     resolver: (data, ...args) => {
       const data_ = {
@@ -349,12 +275,12 @@ function ModelProviderForm({
           enabled: z.boolean(),
           customKeys: providerDefinition?.keysSchema
             ? z
-                .union([
-                  providerDefinition.keysSchema,
-                  z.object({ MANAGED: z.string() }),
-                ])
-                .optional()
-                .nullable()
+              .union([
+                providerDefinition.keysSchema,
+                z.object({ MANAGED: z.string() }),
+              ])
+              .optional()
+              .nullable()
             : z.object({ MANAGED: z.string() }).optional().nullable(),
           customModels: z
             .array(
@@ -374,13 +300,29 @@ function ModelProviderForm({
             )
             .optional()
             .nullable(),
+          extraHeaders: z
+            .array(
+              z.object({
+                key: z.string(),
+                value: z.string(),
+                concealed: z.boolean().optional(),
+              }),
+            )
+            .optional()
+            .nullable(),
         }),
       )(data_, ...args);
     },
   });
   const { register, handleSubmit, formState, watch, setValue, control } = form;
 
-  // Update form when API Gateway toggle or custom headers change
+  // Use field array for extra headers
+  const { fields: extraHeaderFields, append: appendExtraHeader, remove: removeExtraHeader } = useFieldArray({
+    control,
+    name: "extraHeaders",
+  });
+
+  // Update form when API Gateway toggle changes
   useEffect(() => {
     if (provider.provider === "azure" && provider.customKeys) {
       const filteredKeys = getFilteredKeys(
@@ -390,7 +332,6 @@ function ModelProviderForm({
     }
   }, [
     useApiGateway,
-    customHeaders,
     provider.provider,
     provider.customKeys,
     setValue,
@@ -405,9 +346,9 @@ function ModelProviderForm({
         // Start with the form data (standard Azure keys)
         const baseKeys = data.customKeys || {};
 
-        // Add custom headers from state
+        // Add extra headers from form data
         const customHeaderKeys: Record<string, string> = {};
-        customHeaders.forEach((header) => {
+        (data.extraHeaders ?? []).forEach((header) => {
           if (header.key.trim() && header.value.trim()) {
             const sanitizedKey = header.key
               .trim()
@@ -421,6 +362,14 @@ function ModelProviderForm({
         customKeys = { ...baseKeys, ...customHeaderKeys };
       }
 
+      // Strip the concealed field before sending to backend
+      const extraHeadersToSend = (data.extraHeaders ?? [])
+        .filter((h) => h.key?.trim())
+        .map(({ key, value }) => ({
+          key,
+          value,
+        }));
+
       await localUpdateMutation.mutateAsync({
         id: provider.id,
         projectId: project?.id ?? "",
@@ -431,6 +380,7 @@ function ModelProviderForm({
         customEmbeddingsModels: (data.customEmbeddingsModels ?? []).map(
           (m) => m.value,
         ),
+        extraHeaders: extraHeadersToSend,
       });
       toaster.create({
         title: "API Keys Updated",
@@ -449,7 +399,6 @@ function ModelProviderForm({
       project?.id,
       refetch,
       provider.customKeys,
-      customHeaders,
     ],
   );
 
@@ -555,9 +504,7 @@ function ModelProviderForm({
                 justifyContent="center"
               >
                 {
-                  modelProviderIcons[
-                    provider.provider as keyof typeof modelProviderIcons
-                  ]
+                  modelProviderIcons[provider.provider as keyof typeof modelProviderIcons]
                 }
               </Box>
               <Text>{providerDefinition?.name || provider.provider}</Text>
@@ -581,7 +528,13 @@ function ModelProviderForm({
               {provider.provider === "azure" && isEnabled && (
                 <Field.Root>
                   <Switch
-                    onChange={(e) => setUseApiGateway(e.target.checked)}
+                    onChange={(e) => {
+                      setUseApiGateway(e.target.checked);
+                      // Add default api-key header when enabling API Gateway if no headers exist
+                      if (e.target.checked && extraHeaderFields.length === 0) {
+                        appendExtraHeader({ key: "api-key", value: "", concealed: false });
+                      }
+                    }}
                     checked={useApiGateway}
                   >
                     Use API Gateway
@@ -628,7 +581,7 @@ function ModelProviderForm({
                               autoComplete="off"
                               placeholder={
                                 displayKeys[key]?._def?.typeName ===
-                                "ZodOptional"
+                                  "ZodOptional"
                                   ? "optional"
                                   : undefined
                               }
@@ -643,58 +596,69 @@ function ModelProviderForm({
                   </Field.Root>
                 )}
 
-                {/* Custom Headers Section for Azure */}
-                {provider.provider === "azure" && isEnabled && (
+                {/* Custom Headers Section for Azure and Custom providers */}
+                {(provider.provider === "azure" || provider.provider === "custom") && isEnabled && (
                   <VStack width="full" align="start" paddingTop={4}>
-                    {customHeaders.length > 0 && (
+                    {extraHeaderFields.length > 0 && (
                       <Grid
-                        templateColumns="auto auto auto"
+                        templateColumns="auto auto auto auto"
                         gap={4}
                         rowGap={2}
                         width="full"
                       >
-                        {customHeaders.map((header) => (
-                          <React.Fragment key={header.id}>
-                            <GridItem>
-                              <Input
-                                value={header.key}
-                                onChange={(e) =>
-                                  updateCustomHeader(
-                                    header.id,
-                                    "key",
-                                    e.target.value,
-                                  )
-                                }
-                                placeholder="Header name"
-                                autoComplete="off"
-                              />
-                            </GridItem>
-                            <GridItem>
-                              <Input
-                                value={header.value}
-                                onChange={(e) =>
-                                  updateCustomHeader(
-                                    header.id,
-                                    "value",
-                                    e.target.value,
-                                  )
-                                }
-                                placeholder="Header value"
-                                autoComplete="off"
-                              />
-                            </GridItem>
-                            <GridItem>
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                colorPalette="red"
-                                onClick={() => removeCustomHeader(header.id)}
-                              >
-                                <Trash2 size={16} />
-                              </Button>
-                            </GridItem>
-                          </React.Fragment>
-                        ))}
+                        <GridItem color="gray.500" colSpan={4}>
+                          <SmallLabel>Extra Headers</SmallLabel>
+                        </GridItem>
+                        {extraHeaderFields.map((field, index) => {
+                          const concealed = watch(`extraHeaders.${index}.concealed`);
+                          return (
+                            <React.Fragment key={field.id}>
+                              <GridItem>
+                                <Input
+                                  {...register(`extraHeaders.${index}.key`)}
+                                  placeholder="Header name"
+                                  autoComplete="off"
+                                />
+                              </GridItem>
+                              <GridItem>
+                                <Input
+                                  {...register(`extraHeaders.${index}.value`)}
+                                  type={concealed ? "password" : "text"}
+                                  placeholder="Header value"
+                                  autoComplete="off"
+                                />
+                              </GridItem>
+                              <GridItem>
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={() =>
+                                    setValue(
+                                      `extraHeaders.${index}.concealed`,
+                                      !concealed
+                                    )
+                                  }
+                                >
+                                  {concealed ? (
+                                    <EyeOff size={16} />
+                                  ) : (
+                                    <Eye size={16} />
+                                  )}
+                                </Button>
+                              </GridItem>
+                              <GridItem>
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  colorPalette="red"
+                                  onClick={() => removeExtraHeader(index)}
+                                >
+                                  <Trash2 size={16} />
+                                </Button>
+                              </GridItem>
+                            </React.Fragment>
+                          );
+                        })}
                       </Grid>
                     )}
 
@@ -702,7 +666,7 @@ function ModelProviderForm({
                       <Button
                         size="xs"
                         variant="outline"
-                        onClick={addCustomHeader}
+                        onClick={() => appendExtraHeader({ key: "", value: "", concealed: false })}
                       >
                         <Plus size={16} />
                         Add Header
@@ -741,34 +705,34 @@ function ModelProviderForm({
                     provider.provider === "azure" ||
                     provider.provider === "gemini" ||
                     provider.provider === "bedrock") && (
-                    <>
-                      <Box width="full">
-                        <SmallLabel>Embeddings Models</SmallLabel>
-                        <Controller
-                          name="customEmbeddingsModels"
-                          control={control}
-                          render={({ field }) => (
-                            <CreatableSelect
-                              {...field}
-                              onCreateOption={(newValue) => {
-                                handleCreateMultipleOptions(
-                                  newValue,
-                                  field.value ?? [],
-                                  field.onChange,
-                                );
-                              }}
-                              isMulti
-                              options={getProviderModelOptions(
-                                provider.provider,
-                                "embedding",
-                              )}
-                              placeholder="Add custom embeddings model"
-                            />
-                          )}
-                        />
-                      </Box>
-                    </>
-                  )}
+                      <>
+                        <Box width="full">
+                          <SmallLabel>Embeddings Models</SmallLabel>
+                          <Controller
+                            name="customEmbeddingsModels"
+                            control={control}
+                            render={({ field }) => (
+                              <CreatableSelect
+                                {...field}
+                                onCreateOption={(newValue) => {
+                                  handleCreateMultipleOptions(
+                                    newValue,
+                                    field.value ?? [],
+                                    field.onChange,
+                                  );
+                                }}
+                                isMulti
+                                options={getProviderModelOptions(
+                                  provider.provider,
+                                  "embedding",
+                                )}
+                                placeholder="Add custom embeddings model"
+                              />
+                            )}
+                          />
+                        </Box>
+                      </>
+                    )}
                 </VStack>
 
                 <HStack width="full">
@@ -782,15 +746,6 @@ function ModelProviderForm({
                     Save
                   </Button>
                 </HStack>
-                {provider.provider === "custom" && (
-                  <Alert.Root status="info">
-                    <Alert.Indicator />
-                    <Alert.Content>
-                      Custom provider supports only OpenAI compatible endpoints,
-                      contact support if you have a custom format.
-                    </Alert.Content>
-                  </Alert.Root>
-                )}
               </>
             )}
           </VStack>

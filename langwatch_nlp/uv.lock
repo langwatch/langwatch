@@ -1676,7 +1676,7 @@ wheels = [
 
 [[package]]
 name = "langevals-core"
-version = "0.1.16"
+version = "0.1.19"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "anyio" },
@@ -1690,9 +1690,9 @@ dependencies = [
     { name = "transformers" },
     { name = "vertexai" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/33/d9/9c5b33a4fb26156312de3effab98483f9db9da03607aee036593544bb174/langevals_core-0.1.16.tar.gz", hash = "sha256:0878ecbfda0ba326c0d4127795a45d1384dd707cbba1dd032b90c525c3ae9560", size = 5662, upload-time = "2025-09-29T16:31:14.873Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/9a/59/461a3dfe922d7c3a590e4eb68a5783460de6bc1f0f5c5e33981275a0de65/langevals_core-0.1.19.tar.gz", hash = "sha256:8e91e2e4428a93c6197fd2169c26bdc1c1d8b9425bdfc090c5a7cc52946938d2", size = 5799, upload-time = "2025-10-27T17:26:11.387Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/47/fa/746b776be6ab453d30618c143a96c17c2cb8a2ced847da42f70c3a178fc9/langevals_core-0.1.16-py3-none-any.whl", hash = "sha256:7419dd3d04ee1811b02af3702f637a5f7f4034378fbe5cbb1ac20a8475d4d84d", size = 6745, upload-time = "2025-09-29T16:31:13.885Z" },
+    { url = "https://files.pythonhosted.org/packages/ba/54/3d6216be401a2f86e9e17201d7cab60b9bf66268895d37bc72fce49a0e99/langevals_core-0.1.19-py3-none-any.whl", hash = "sha256:175f3bb0d1cef3517ce973a52757b8a1e3b2141761ba81689da8d5a78f0efb92", size = 6877, upload-time = "2025-10-27T17:26:10.621Z" },
 ]
 
 [[package]]
@@ -1713,7 +1713,7 @@ wheels = [
 
 [[package]]
 name = "langwatch"
-version = "0.5.0"
+version = "0.5.1"
 source = { editable = "../python-sdk" }
 dependencies = [
     { name = "attrs" },
@@ -1861,7 +1861,7 @@ requires-dist = [
     { name = "isort", specifier = ">=6.0.1" },
     { name = "jinja2", specifier = ">=3.1.4" },
     { name = "langchain-community", specifier = ">=0.0.28,<0.1" },
-    { name = "langevals-core", specifier = ">=0.1.16,<0.2" },
+    { name = "langevals-core", specifier = ">=0.1.19,<0.2" },
     { name = "langwatch", editable = "../python-sdk" },
     { name = "litellm", extras = ["proxy"], specifier = "==1.76.0" },
     { name = "mangum", specifier = ">=0.17.0,<0.18" },
