@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.3.1](https://github.com/langwatch/langwatch/compare/langwatch@v1.3.0...langwatch@v1.3.1) (2025-10-27)
+
+
+### Bug Fixes
+
+* azure ai gateway for azure OpenAI ([#744](https://github.com/langwatch/langwatch/issues/744)) ([5dc7953](https://github.com/langwatch/langwatch/commit/5dc79539049c32153e49790650dcac6bfb0317e5))
+* double indicator issue ([#738](https://github.com/langwatch/langwatch/issues/738)) ([4936071](https://github.com/langwatch/langwatch/commit/493607172b53fd034b6a94a77ee7927556a0fbfb))
+
 ## [1.3.0](https://github.com/langwatch/langwatch/compare/langwatch@v1.2.0...langwatch@v1.3.0) (2025-10-24)
 
 
