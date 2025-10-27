@@ -120,13 +120,13 @@ function DraggableTabsBrowserRoot({
     const overIndex = overData.sortable?.index;
 
     // Only move if group or tab positions differ
-    if (activeData.groupId !== overData.groupId || activeIndex !== overIndex) {
-      onTabMove({
-        tabId: activeData.tabId,
-        from: { groupId: activeData.groupId, index: activeIndex },
-        to: { groupId: overData.groupId, index: overIndex },
-      });
-    }
+    // if (activeData.groupId !== overData.groupId || activeIndex !== overIndex) {
+    onTabMove({
+      tabId: activeData.tabId,
+      from: { groupId: activeData.groupId, index: activeIndex },
+      to: { groupId: overData.groupId, index: overIndex },
+    });
+    // }
   }
 
   const contextValue: DraggableTabsContextValue = {

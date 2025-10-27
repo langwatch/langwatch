@@ -55,7 +55,6 @@ export function PromptStudioChat(props: PromptStudioChatProps) {
 function PromptStudioChatInner() {
   const { visibleMessages } = useCopilotChat();
 
-  console.log("visibleMessages", visibleMessages);
   return (
     <CopilotChat
       Input={SyncedChatInput}
