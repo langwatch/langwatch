@@ -16,6 +16,8 @@ import {
 import { CSS } from "@dnd-kit/utilities";
 import { BrowserLikeTabs } from "./BrowserLikeTabs";
 import { Box, HStack, type StackProps, type BoxProps } from "@chakra-ui/react";
+import { PromptBrowserTab } from "../tab/PromptBrowserTab";
+import { TabIdProvider } from "./TabContext";
 
 // Context for managing drag state and callbacks
 interface DraggableTabsContextValue {
@@ -36,6 +38,16 @@ interface DraggableTabsContextValue {
 
 const DraggableTabsContext =
   React.createContext<DraggableTabsContextValue | null>(null);
+
+export function useDraggableTabsContext() {
+  const context = React.useContext(DraggableTabsContext);
+  if (!context) {
+    throw new Error(
+      "DraggableTabsBrowser components must be used within DraggableTabsBrowser.Root",
+    );
+  }
+  return context;
+}
 
 // Context for managing group state
 interface TabGroupContextValue {
@@ -230,12 +242,15 @@ function DraggableTabsTabBar({ children }: DraggableTabsTabBarProps) {
         }
       }
       return null;
-    })?.filter(Boolean)!;
+    })?.filter(Boolean);
   }, [children]);
 
   return (
     <BrowserLikeTabs.Bar>
-      <SortableContext items={tabIds} strategy={horizontalListSortingStrategy}>
+      <SortableContext
+        items={tabIds ?? []}
+        strategy={horizontalListSortingStrategy}
+      >
         <BrowserLikeTabs.List>{children}</BrowserLikeTabs.List>
       </SortableContext>
     </BrowserLikeTabs.Bar>
@@ -264,16 +279,30 @@ function DraggableTab({ id, children, ...rest }: DraggableTabTriggerProps) {
     transform,
     transition,
     isDragging,
+    isOver,
   } = useSortable({
     id,
-    data: { groupId, tabId: id },
+    data: {
+      groupId,
+      tabId: id,
+      label: (
+        <TabIdProvider tabId={id}>
+          <PromptBrowserTab
+            onRemove={() => {
+              console.log("remove tab", id);
+            }}
+            dimmed={false}
+          />
+        </TabIdProvider>
+      ),
+    },
   });
 
   const style: React.CSSProperties = {
     ...rest.style,
     transform: CSS.Transform.toString(transform),
     transition,
-    opacity: isDragging ? 0.5 : 1,
+    opacity: isDragging || isOver ? 0.5 : 1,
   };
 
   return (
