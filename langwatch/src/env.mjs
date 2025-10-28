@@ -190,10 +190,7 @@ export const env = createEnv({
         ENABLE_CRON_TASKS:
             process.env.ENABLE_CRON_TASKS === "1" ||
             process.env.ENABLE_CRON_TASKS?.toLowerCase() === "true" ||
-            (!process.env.ENABLE_CRON_TASKS &&
-                process.env.DISABLE_CRON_TASKS !== "1" &&
-                process.env.DISABLE_CRON_TASKS?.toLowerCase() !== "true" &&
-                process.env.NODE_ENV === "development"),
+            process.env.NODE_ENV === "development",
     },
     /**
      * Run `build` or `dev` with `SKIP_ENV_VALIDATION` to skip env validation.
