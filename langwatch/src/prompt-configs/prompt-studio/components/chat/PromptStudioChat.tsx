@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useEffect, useMemo } from "react";
 import { CopilotKit, useCopilotChat } from "@copilotkit/react-core";
 import { AssistantMessage, CopilotChat } from "@copilotkit/react-ui";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
@@ -9,6 +9,10 @@ import { SyncedChatInput } from "./SyncedChatInput";
 import { TraceMessage } from "~/components/copilot-kit/TraceMessage";
 import { Box, type BoxProps } from "@chakra-ui/react";
 import clsx from "clsx";
+import { TextMessage, Role } from "@copilotkit/runtime-client-gql";
+import { useDraggableTabsBrowserStore } from "../../prompt-studio-store/DraggableTabsBrowserStore";
+import { useTabId } from "../prompt-browser/ui/TabContext";
+import { convertScenarioMessagesToCopilotKit } from "~/components/simulations/utils/convert-scenario-messages";
 
 interface PromptStudioChatProps extends BoxProps {
   formValues: PromptConfigFormValues;
@@ -45,6 +49,13 @@ export function PromptStudioChat(props: PromptStudioChatProps) {
           console.error(error);
         }}
         disableSystemMessage
+        initialMessages={[
+          {
+            id: "1",
+            role: "user",
+            content: "Hello, how are you?",
+          },
+        ]}
       >
         <PromptStudioChatInner />
       </CopilotKit>
@@ -53,17 +64,26 @@ export function PromptStudioChat(props: PromptStudioChatProps) {
 }
 
 function PromptStudioChatInner() {
-  const { visibleMessages } = useCopilotChat();
+  const tabId = useTabId();
+  const { getTabById } = useDraggableTabsBrowserStore((state) => ({
+    getTabById: state.getByTabId,
+  }));
+  const { setMessages } = useCopilotChat({});
+
+  useEffect(() => {
+    const tab = getTabById(tabId);
+    const initialMessages = tab?.chat?.initialMessages;
+    if (initialMessages?.length) {
+      void setMessages(
+        convertScenarioMessagesToCopilotKit(initialMessages as any),
+      );
+    }
+  }, [setMessages, tabId, getTabById]);
 
   return (
     <CopilotChat
       Input={SyncedChatInput}
-      RenderActionExecutionMessage={({ message }) => {
-        console.log("message", message);
-        return null;
-      }}
       AssistantMessage={(props) => {
-        console.log("props", props);
         return (
           <>
             <AssistantMessage {...props} />
