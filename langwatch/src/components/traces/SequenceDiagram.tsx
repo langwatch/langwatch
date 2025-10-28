@@ -90,7 +90,8 @@ const getParticipantName = (span: Span): string | null => {
   if (span.type === "tool") {
     return null;
   }
-  return span.name ?? null;
+  // Sanitize all other participant names to avoid Mermaid syntax errors
+  return span.name ? span.name.replace(/[^a-zA-Z0-9]/g, "_") : null;
 };
 
 /**
