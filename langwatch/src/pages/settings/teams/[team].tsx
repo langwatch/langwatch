@@ -40,6 +40,51 @@ function isValidPermissions(permissions: unknown): permissions is string[] {
   );
 }
 
+// Helper function to convert a member's role to form data
+function memberToRoleFormOption(
+  assignedRole: unknown,
+  builtInRole: TeamUserRole,
+):
+  | ReturnType<
+      typeof import("./TeamUserRoleField").teamRolesOptions
+    >[TeamUserRole]
+  | {
+      label: string;
+      value: string;
+      description: string;
+      isCustom: true;
+      customRoleId: string;
+    } {
+  if (assignedRole && isValidCustomRole(assignedRole)) {
+    return {
+      label: assignedRole.name,
+      value: `custom:${assignedRole.id}`,
+      description:
+        assignedRole.description ??
+        (isValidPermissions(assignedRole.permissions)
+          ? `${assignedRole.permissions.length} permissions`
+          : "Custom role"),
+      isCustom: true,
+      customRoleId: assignedRole.id,
+    };
+  }
+  return teamRolesOptions[builtInRole];
+}
+
+// Helper function to convert team member to form member
+function teamMemberToFormMember(
+  member: TeamWithProjectsAndMembersAndUsers["members"][number],
+) {
+  return {
+    userId: {
+      label: `${member.user.name} (${member.user.email})`,
+      value: member.user.id,
+    },
+    role: memberToRoleFormOption(member.assignedRole, member.role),
+    saved: true,
+  };
+}
+
 export default function EditTeamPage() {
   const router = useRouter();
   const teamSlug = router.query.team;
@@ -61,34 +106,7 @@ function EditTeam({ team }: { team: TeamWithProjectsAndMembersAndUsers }) {
   const getInitialValues = useCallback(
     (teamData: TeamWithProjectsAndMembersAndUsers): TeamFormData => ({
       name: teamData.name,
-      members: teamData.members.map((member) => {
-        // Check if this user has a custom role assigned
-        const assignedRole = member.assignedRole;
-
-        const role =
-          assignedRole && isValidCustomRole(assignedRole)
-            ? {
-                label: assignedRole.name,
-                value: `custom:${assignedRole.id}`,
-                description:
-                  assignedRole.description ??
-                  (isValidPermissions(assignedRole.permissions)
-                    ? `${assignedRole.permissions.length} permissions`
-                    : "Custom role"),
-                isCustom: true,
-                customRoleId: assignedRole.id,
-              }
-            : teamRolesOptions[member.role];
-
-        return {
-          userId: {
-            label: `${member.user.name} (${member.user.email})`,
-            value: member.user.id,
-          },
-          role,
-          saved: true,
-        };
-      }),
+      members: teamData.members.map(teamMemberToFormMember),
     }),
     [],
   );

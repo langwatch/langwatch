@@ -57,6 +57,11 @@ const selectOptions = [
   },
 ];
 
+// Create a Map for fast O(1) lookups instead of O(n) .find() in render
+const roleLabelMap = new Map(
+  selectOptions.map((option) => [option.value, option.label]),
+);
+
 function Members() {
   const { organization } = useOrganizationTeamProject();
 
@@ -88,7 +93,7 @@ function Members() {
   );
 }
 
-export default withPermissionGuard("project:manage", {
+export default withPermissionGuard("organization:manage", {
   layoutComponent: SettingsLayout,
 })(Members);
 
@@ -365,8 +370,7 @@ function MembersList({
               <Table.Body>
                 {sortedMembers.map((member) => {
                   const roleLabel =
-                    selectOptions.find((option) => option.value === member.role)
-                      ?.label ?? member.role;
+                    roleLabelMap.get(member.role) ?? member.role;
                   return (
                     <LinkBox as={Table.Row} key={member.userId}>
                       <Table.Cell>
@@ -570,14 +574,6 @@ function MembersList({
       </Dialog.Root>
     </SettingsLayout>
   );
-}
-
-interface RoleSelectProps {
-  defaultValue?: OrganizationUserRole;
-  onRoleChange?: (userId: string, value: OrganizationUserRole) => void;
-  memberId?: string;
-  loading?: boolean;
-  disabled?: boolean;
 }
 
 interface TeamMembershipsDisplayProps {

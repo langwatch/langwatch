@@ -10,7 +10,6 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { useRouter } from "next/router";
-import { useMemo } from "react";
 import { ChevronRight, MoreVertical, Trash } from "react-feather";
 import { HorizontalFormControl } from "../../../components/HorizontalFormControl";
 import { OrganizationUserRoleField } from "../../../components/settings/OrganizationUserRoleField";
@@ -30,26 +29,29 @@ export default function UserDetailsPage() {
   const { userId } = router.query as { userId?: string };
   const { organization } = useOrganizationTeamProject();
 
-  const organizationWithMembers =
-    api.organization.getOrganizationWithMembersAndTheirTeams.useQuery(
-      { organizationId: organization?.id ?? "" },
-      {
-        enabled: !!organization?.id,
-        retry: false, // Don't retry on error to avoid infinite loops
-      },
-    );
+  const member = api.organization.getMemberById.useQuery(
+    {
+      organizationId: organization?.id ?? "",
+      userId: userId ?? "",
+    },
+    {
+      enabled: !!organization?.id && !!userId,
+      retry: false,
+    },
+  );
 
-  const apiContext = api.useContext();
-  const updateTeam = api.team.update.useMutation();
+  const removeMemberFromTeam = api.team.removeMember.useMutation();
 
   /**
    * Remove user from team
    * Single Responsibility: Handle the removal of a user from a specific team
    */
   const handleRemoveFromTeam = async (
-    teamMembership: NonNullable<typeof member>["user"]["teamMemberships"][0],
+    teamMembership: NonNullable<
+      typeof member.data
+    >["user"]["teamMemberships"][0],
   ) => {
-    if (!member || !organization) {
+    if (!member.data || !organization) {
       toaster.create({
         title: "Missing required data",
         type: "error",
@@ -58,74 +60,38 @@ export default function UserDetailsPage() {
       return;
     }
 
-    try {
-      const teams = await apiContext.team.getTeamsWithMembers.fetch({
-        organizationId: organization.id,
-      });
-
-      const team = teams.find(
-        (t) =>
-          t.id === teamMembership.teamId || t.slug === teamMembership.team.slug,
-      );
-
-      if (!team) {
-        toaster.create({
-          title: "Team not found",
-          type: "error",
-          duration: 2000,
-        });
-        return;
-      }
-
-      const newMembers = team.members
-        .filter((m) => m.userId !== member.userId)
-        .map(({ userId, role }) => ({ userId, role }));
-
-      updateTeam.mutate(
-        {
-          teamId: teamMembership.teamId,
-          name: teamMembership.team.name,
-          members: newMembers,
+    removeMemberFromTeam.mutate(
+      {
+        teamId: teamMembership.teamId,
+        userId: member.data.userId,
+      },
+      {
+        onSuccess: () => {
+          toaster.create({
+            title: "Removed from team",
+            type: "success",
+            duration: 2000,
+          });
+          void member.refetch();
         },
-        {
-          onSuccess: () => {
-            toaster.create({
-              title: "Removed from team",
-              type: "success",
-              duration: 2000,
-            });
-            void organizationWithMembers.refetch();
-          },
-          onError: () => {
-            toaster.create({
-              title: "Failed to remove from team",
-              type: "error",
-              duration: 2000,
-            });
-          },
+        onError: () => {
+          toaster.create({
+            title: "Failed to remove from team",
+            type: "error",
+            duration: 2000,
+          });
         },
-      );
-    } catch (error) {
-      toaster.create({
-        title: "Failed to load team",
-        type: "error",
-        duration: 2000,
-      });
-    }
+      },
+    );
   };
 
-  const member = useMemo(() => {
-    if (!userId || !organizationWithMembers.data) return undefined;
-    return organizationWithMembers.data.members.find(
-      (m) => m.userId === userId,
-    );
-  }, [userId, organizationWithMembers.data]);
-
-  if (!organization || !organizationWithMembers.data) {
+  if (!organization || !member.data) {
     return <SettingsLayout />;
   }
 
-  if (!member) {
+  const memberData = member.data;
+
+  if (!memberData) {
     return (
       <SettingsLayout>
         <VStack paddingX={4} paddingY={6} gap={6} align="start">
@@ -155,7 +121,7 @@ export default function UserDetailsPage() {
           <Icon>
             <ChevronRight width={12} />
           </Icon>
-          <Text>{member.user.name}</Text>
+          <Text>{memberData.user.name}</Text>
         </HStack>
 
         <HStack width="full" justify="space-between" align="center">
@@ -167,7 +133,7 @@ export default function UserDetailsPage() {
         <Card.Root width="full">
           <Card.Body paddingY={2}>
             <HorizontalFormControl label="Email">
-              <Text>{member.user.email}</Text>
+              <Text>{memberData.user.email}</Text>
             </HorizontalFormControl>
             <HorizontalFormControl
               label="Organization Role"
@@ -176,8 +142,8 @@ export default function UserDetailsPage() {
               <Field.Root>
                 <OrganizationUserRoleField
                   organizationId={organization.id}
-                  userId={member.userId}
-                  defaultRole={member.role}
+                  userId={memberData.userId}
+                  defaultRole={memberData.role}
                 />
               </Field.Root>
             </HorizontalFormControl>
@@ -196,7 +162,7 @@ export default function UserDetailsPage() {
                 </Table.Row>
               </Table.Header>
               <Table.Body>
-                {member.user.teamMemberships
+                {memberData.user.teamMemberships
                   .filter((tm) => tm.team.organizationId === organization.id)
                   .map((tm) => (
                     <Table.Row key={tm.team.id}>
@@ -210,7 +176,7 @@ export default function UserDetailsPage() {
                           <TeamUserRoleField
                             member={{
                               ...tm,
-                              user: member.user,
+                              user: memberData!.user,
                             }}
                             organizationId={organization.id}
                             customRole={(() => {

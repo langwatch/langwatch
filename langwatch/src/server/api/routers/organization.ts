@@ -479,6 +479,64 @@ export const organizationRouter = createTRPCRouter({
 
       return organization;
     }),
+
+  getMemberById: protectedProcedure
+    .input(
+      z.object({
+        organizationId: z.string(),
+        userId: z.string(),
+      }),
+    )
+    .use(checkOrganizationPermission("organization:view"))
+    .query(async ({ input, ctx }) => {
+      const prisma = ctx.prisma;
+
+      // Check that the current user has access to this organization
+      const currentUserMembership = await prisma.organizationUser.findFirst({
+        where: {
+          organizationId: input.organizationId,
+          userId: ctx.session.user.id,
+        },
+      });
+
+      if (!currentUserMembership) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Organization not found",
+        });
+      }
+
+      // Get the requested member
+      const member = await prisma.organizationUser.findFirst({
+        where: {
+          organizationId: input.organizationId,
+          userId: input.userId,
+        },
+        include: {
+          user: {
+            include: {
+              teamMemberships: {
+                where: { team: { archivedAt: null } },
+                include: {
+                  team: true,
+                  assignedRole: true,
+                },
+              },
+            },
+          },
+        },
+      });
+
+      if (!member) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Member not found",
+        });
+      }
+
+      return member;
+    }),
+
   createInvites: protectedProcedure
     .input(
       z.object({

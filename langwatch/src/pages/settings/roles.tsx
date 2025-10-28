@@ -61,7 +61,7 @@ function RolesSettings() {
   );
 }
 
-export default withPermissionGuard("project:manage", {
+export default withPermissionGuard("organization:manage", {
   layoutComponent: SettingsLayout,
 })(RolesSettings);
 
