@@ -5,7 +5,7 @@ import { useDraggableTabsBrowserStore } from "../../prompt-studio-store/Draggabl
 import { DraggableTabsBrowser } from "./ui/DraggableTabsBrowser";
 import { SplitSquareHorizontal } from "lucide-react";
 import { TabIdProvider } from "./ui/TabContext";
-import { useLoadSpanIntoPromptStudio } from "../../hooks/useGetTraceForTab";
+import { useLoadSpanIntoPromptStudio } from "../../hooks/useLoadSpanIntoPromptStudio";
 
 export function PromptStudioTabbedWorkspace() {
   const {

@@ -9,7 +9,6 @@ import { SyncedChatInput } from "./SyncedChatInput";
 import { TraceMessage } from "~/components/copilot-kit/TraceMessage";
 import { Box, type BoxProps } from "@chakra-ui/react";
 import clsx from "clsx";
-import { TextMessage, Role } from "@copilotkit/runtime-client-gql";
 import { useDraggableTabsBrowserStore } from "../../prompt-studio-store/DraggableTabsBrowserStore";
 import { useTabId } from "../prompt-browser/ui/TabContext";
 import { convertScenarioMessagesToCopilotKit } from "~/components/simulations/utils/convert-scenario-messages";
