@@ -538,28 +538,13 @@ export async function hasOrganizationPermission(
     },
   });
 
-  // Check organization role first
+  // Only check organization role - team admins do NOT get automatic organization permissions
   if (organizationUser) {
     const orgResult = organizationRoleHasPermission(
       organizationUser.role,
       permission,
     );
     if (orgResult) return true;
-  }
-
-  // Fallback: Check if user has team admin role in any team of this organization
-  const teamAdminMembership = await ctx.prisma.teamUser.findFirst({
-    where: {
-      userId: ctx.session.user.id,
-      role: TeamUserRole.ADMIN,
-      team: {
-        organizationId: organizationId,
-      },
-    },
-  });
-
-  if (teamAdminMembership) {
-    return true;
   }
 
   return false;

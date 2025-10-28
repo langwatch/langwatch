@@ -181,29 +181,34 @@ canCreate(TeamUserRole.MEMBER, "project"); // false
 
 ### Team Roles Permission Matrix
 
-| Resource    | ADMIN                                | MEMBER        | VIEWER |
-| ----------- | ------------------------------------ | ------------- | ------ |
-| Project     | view, create, update, delete, manage | view, update  | view   |
-| Analytics   | view, manage                         | view, manage  | view   |
-| Cost        | view                                 | view          | ❌     |
-| Messages    | view, share                          | view, share   | view   |
-| Annotations | view, manage                         | view, manage  | view   |
-| Spans       | view, debug                          | view, debug   | view   |
-| Guardrails  | view, manage                         | view, manage  | view   |
-| Experiments | view, manage                         | view, manage  | view   |
-| Datasets    | view, manage                         | view, manage  | view   |
-| Triggers    | view, manage                         | view, manage  | ❌     |
-| Playground  | view, execute                        | view, execute | ❌     |
-| Workflows   | view, manage                         | view, manage  | view   |
-| Prompts     | view, manage                         | view, manage  | view   |
-| Scenarios   | view, manage                         | view, manage  | view   |
-| Team        | view, manage                         | view          | view   |
+| Resource    | ADMIN        | MEMBER       | VIEWER |
+| ----------- | ------------ | ------------ | ------ |
+| Project     | view, manage | view, manage | view   |
+| Analytics   | view, manage | view, manage | view   |
+| Cost        | view         | view         | ❌     |
+| Messages    | view, share  | view, share  | view   |
+| Annotations | view, manage | view, manage | view   |
+| Guardrails  | view, manage | view, manage | view   |
+| Datasets    | view, manage | view, manage | view   |
+| Triggers    | view, manage | view, manage | ❌     |
+| Workflows   | view, manage | view, manage | view   |
+| Prompts     | view, manage | view, manage | view   |
+| Scenarios   | view, manage | view, manage | view   |
+| Team        | view, manage | view         | view   |
 
 ## Special Cases
 
 ### Organization Admin Override
 
 Organization ADMINs have **implicit admin rights on all teams** within their organization, even if they're not explicitly added to the team.
+
+⚠️ **Important**: The reverse is NOT true - team admins do NOT automatically get organization-level permissions. Team admins can only manage their team. To grant organization-level permissions, users must be assigned the appropriate organization role (ADMIN, MEMBER, or EXTERNAL).
+
+This ensures proper separation of concerns:
+
+-   **Organization level**: Manage organization settings, billing, all teams
+-   **Team level**: Manage team members, projects within a team
+-   **Project level**: Manage resources within a project
 
 ### Demo Project
 

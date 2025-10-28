@@ -10,7 +10,7 @@ import {
 } from "../server/api/permission";
 import { api } from "../utils/api";
 
-import { OrganizationUserRole, TeamUserRole } from "@prisma/client";
+import { type OrganizationUserRole } from "@prisma/client";
 import { usePublicEnv } from "./usePublicEnv";
 import { publicRoutes, useRequiredSession } from "./useRequiredSession";
 import {
@@ -304,19 +304,13 @@ export const useOrganizationTeamProject = (
     const isOrgPermission = permission.startsWith("organization:");
 
     if (isOrgPermission) {
-      // Check organization role first
+      // Only check organization role - team admins do NOT get automatic organization permissions
       if (organizationRole) {
         const orgResult = organizationRoleHasPermission(
           organizationRole,
           permission,
         );
         if (orgResult) return true;
-      }
-
-      // Fallback: Check if user has team admin role (team admins can access org permissions)
-      const teamMember = team?.members[0];
-      if (teamMember?.role === TeamUserRole.ADMIN) {
-        return true;
       }
       return false;
     }
@@ -348,7 +342,7 @@ export const useOrganizationTeamProject = (
    * @example hasOrgPermission("organization:manage")
    */
   const hasOrgPermission = (permission: Permission) => {
-    // Check organization role first
+    // Only check organization role - team admins do NOT get automatic organization permissions
     if (organizationRole) {
       const orgResult = organizationRoleHasPermission(
         organizationRole,
@@ -356,13 +350,6 @@ export const useOrganizationTeamProject = (
       );
 
       if (orgResult) return true;
-    }
-
-    // Fallback: Check if user has team admin role (team admins can access org permissions)
-    const teamMember = team?.members[0];
-
-    if (teamMember?.role === TeamUserRole.ADMIN) {
-      return true;
     }
 
     return false;

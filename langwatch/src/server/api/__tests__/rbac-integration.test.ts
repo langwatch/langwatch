@@ -269,6 +269,43 @@ describe("RBAC Integration Tests", () => {
       );
       expect(result).toBe(false);
     });
+
+    it("should NOT allow team admin to access organization permissions", async () => {
+      // User is organization MEMBER (not admin)
+      mockPrisma.organizationUser.findFirst.mockResolvedValue({
+        role: OrganizationUserRole.MEMBER,
+      });
+
+      // User is team ADMIN in one team
+      mockPrisma.teamUser.findFirst.mockResolvedValue({
+        userId: "user-123",
+        teamId: "team-123",
+        role: TeamUserRole.ADMIN,
+      });
+
+      const result = await hasOrganizationPermission(
+        { prisma: mockPrisma, session: mockSession },
+        "org-123",
+        "organization:manage" as Permission,
+      );
+
+      // Team admin should NOT get organization permissions
+      expect(result).toBe(false);
+    });
+
+    it("should only allow organization admins to manage organization", async () => {
+      mockPrisma.organizationUser.findFirst.mockResolvedValue({
+        role: OrganizationUserRole.ADMIN,
+      });
+
+      const result = await hasOrganizationPermission(
+        { prisma: mockPrisma, session: mockSession },
+        "org-123",
+        "organization:manage" as Permission,
+      );
+
+      expect(result).toBe(true);
+    });
   });
 
   describe("Permission Middleware", () => {
