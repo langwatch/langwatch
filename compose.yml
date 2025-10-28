@@ -14,6 +14,7 @@ services:
       LANGEVALS_ENDPOINT: http://langevals:5562
       INSTALL_METHOD: docker
       NODE_ENV: production
+      ENABLE_CRON_TASKS: true
     env_file:
       - langwatch/.env
     pull_policy: always
