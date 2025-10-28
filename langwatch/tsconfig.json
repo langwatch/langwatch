@@ -27,7 +27,9 @@
         "node_modules/@trpc/server/dist/core/internals/utils"
       ],
       "zod/lib/helpers/errorUtil": ["node_modules/zod/lib/helpers/errorUtil"],
-      "@langwatch-oss/*": ["./*"]
+      "@langwatch-oss/*": ["./*"],
+      "@injected-dependencies.client": ["./src/injection/injection.client.ts"],
+      "@injected-dependencies.server": ["./src/injection/injection.server.ts"]
     },
     "plugins": [
       {
