@@ -386,12 +386,34 @@ const MermaidRenderer = ({ syntax }: { syntax: string }) => {
           startOnLoad: false,
           theme: "base",
           themeVariables: {
-            primaryColor: "#ffffff",
-            primaryTextColor: "#000000",
-            primaryBorderColor: "#cccccc",
-            lineColor: "#666666",
-            secondaryColor: "#f8f9fa",
-            tertiaryColor: "#ffffff",
+            // Modern color scheme
+            primaryColor: "#F7FAFC", // Light light gray background for boxes
+            primaryTextColor: "#1A202C", // Dark text
+            primaryBorderColor: "#E2E8F0", // Light gray border
+            lineColor: "#4A5568", // Darker gray for lines
+            secondaryColor: "#F7FAFC", // Light light gray
+            tertiaryColor: "#EDF2F7",
+            // Actor (agent) styling - light light gray
+            actorBkg: "#F7FAFC",
+            actorBorder: "#D2D8E0",
+            actorTextColor: "#2D3748",
+            // Participant (LLM) styling - light light gray
+            participantBkg: "#F7FAFC",
+            participantBorder: "#E2E8F0",
+            participantTextColor: "#2D3748",
+            // Labels
+            labelTextColor: "#2D3748",
+            labelBoxBkgColor: "#FFFFFF",
+            labelBoxBorderColor: "#E2E8F0",
+            // Signal (message) colors
+            signalColor: "#2D3748",
+            signalTextColor: "#2D3748",
+            // Activation boxes - light blue
+            activationBkgColor: "#DBEAFE",
+            activationBorderColor: "#60A5FA",
+            // Font
+            fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif',
+            fontSize: "14px",
           },
           sequence: {
             diagramMarginX: 50,
@@ -403,8 +425,8 @@ const MermaidRenderer = ({ syntax }: { syntax: string }) => {
             boxTextMargin: 5,
             noteMargin: 10,
             messageMargin: 35,
-            mirrorActors: false,
-            bottomMarginAdj: 1,
+            mirrorActors: true,
+            bottomMarginAdj: 16,
             useMaxWidth: true,
             rightAngles: false,
             showSequenceNumbers: false,
@@ -488,9 +510,24 @@ const SequenceDiagram = ({
 
   return (
     <VStack align="start" width="full" gap={4}>
-      <MermaidRenderer syntax={mermaidSyntax} />
+      <Box
+        width="full"
+        background="white"
+        borderRadius="md"
+        padding={4}
+        boxShadow="sm"
+      >
+        <MermaidRenderer syntax={mermaidSyntax} />
+      </Box>
 
-      <Box as="details" width="full">
+      <Box
+        as="details"
+        width="full"
+        background="white"
+        borderRadius="md"
+        padding={4}
+        boxShadow="sm"
+      >
         <Box as="summary" cursor="pointer" color="gray.500" fontSize="sm">
           Show Mermaid Syntax
         </Box>
@@ -499,6 +536,7 @@ const SequenceDiagram = ({
           fontSize="xs"
           background="gray.50"
           padding={4}
+          marginTop={4}
           borderRadius="md"
           overflow="auto"
         >
@@ -511,6 +549,23 @@ const SequenceDiagram = ({
 
 type SequenceDiagramProps = {
   traceId: string;
+};
+
+/**
+ * Count unique participants in spans for given span types
+ * Single Responsibility: Calculate number of participants that would be rendered
+ */
+const countParticipants = (spans: Span[], includedTypes: SpanTypes[]): number => {
+  const participants = new Set<string>();
+  spans
+    .filter((span) => includedTypes.includes(span.type))
+    .forEach((span) => {
+      const participantName = getParticipantName(span);
+      if (participantName) {
+        participants.add(participantName);
+      }
+    });
+  return participants.size;
 };
 
 /**
@@ -534,6 +589,19 @@ export function SequenceDiagramContainer(props: SequenceDiagramProps) {
     }
   );
 
+  // Auto-include "span" types if there are too few participants
+  useEffect(() => {
+    if (!spans.data || spans.data.length === 0) return;
+    
+    // Count participants with default selection (without "span")
+    const participantCount = countParticipants(spans.data, defaultSelectedSpanTypes);
+    
+    // If 2 or fewer participants, automatically include "span" type
+    if (participantCount <= 2 && !selectedSpanTypes.includes("span")) {
+      setSelectedSpanTypes([...defaultSelectedSpanTypes, "span"]);
+    }
+  }, [spans.data]);
+
   useEffect(() => {
     if ((trace.data?.timestamps.inserted_at ?? 0) < Date.now() - 10 * 1000) {
       return;
@@ -551,7 +619,7 @@ export function SequenceDiagramContainer(props: SequenceDiagramProps) {
   }
 
   return (
-    <VStack align="start" width="full" gap={4}>
+    <VStack align="start" width="full" gap={4} paddingX={4}>
       <Select.Root
         multiple
         collection={spanTypesCollection}
@@ -565,7 +633,7 @@ export function SequenceDiagramContainer(props: SequenceDiagramProps) {
         <HStack width="full">
           <Spacer />
           <Select.Label>Include span types:</Select.Label>
-          <Select.Control width="120px">
+          <Select.Control width="120px" background="white">
             <Select.Trigger>
               <Select.ValueText placeholder="Select span types" />
             </Select.Trigger>
