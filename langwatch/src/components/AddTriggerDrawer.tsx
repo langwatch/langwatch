@@ -213,7 +213,6 @@ export function TriggerDrawer() {
             title: "Trigger Created",
             description: "You have successfully created a trigger",
             type: "success",
-            placement: "top-end",
             meta: {
               closable: true,
             },
@@ -226,7 +225,6 @@ export function TriggerDrawer() {
             title: "Error",
             description: "Error creating trigger",
             type: "error",
-            placement: "top-end",
             meta: {
               closable: true,
             },

@@ -10,7 +10,6 @@ import { LangWatchExporter } from "../../exporters";
 import { SimpleSpanProcessor } from "@opentelemetry/sdk-trace-base";
 import { type Span as OtelSpan, trace } from "@opentelemetry/api";
 import { type GetTraceResponse } from "../../../client-sdk/services/traces/types";
-import { DEFAULT_ENDPOINT } from "@/internal/constants";
 
 type Trace = GetTraceResponse;
 type Span = NonNullable<Trace["spans"]>[number];
@@ -23,8 +22,8 @@ type Span = NonNullable<Trace["spans"]>[number];
  * Configuration for e2e tests from environment variables
  */
 export const E2E_CONFIG = {
-  apiKey: process.env.E2E_LANGWATCH_API_KEY,
-  endpoint: process.env.E2E_LANGWATCH_ENDPOINT ?? DEFAULT_ENDPOINT,
+  apiKey: process.env.LANGWATCH_API_KEY,
+  endpoint: process.env.LANGWATCH_ENDPOINT,
   timeout: parseInt(process.env.E2E_TIMEOUT ?? "30000", 10),
   retryDelay: parseInt(process.env.E2E_RETRY_DELAY ?? "1000", 10),
   maxRetries: parseInt(process.env.E2E_MAX_RETRIES ?? "3", 10),
@@ -38,12 +37,12 @@ export const E2E_CONFIG = {
 export function validateE2EEnvironment(): void {
   if (!E2E_CONFIG.apiKey) {
     throw new Error(
-      "E2E_LANGWATCH_API_KEY environment variable is required for e2e tests. " +
-      "Please set it to your LangWatch API key (e.g., E2E_LANGWATCH_API_KEY=lw-...)"
+      "LANGWATCH_API_KEY environment variable is required for e2e tests. " +
+      "Please set it to your LangWatch API key (e.g., LANGWATCH_API_KEY=sk-lw-...)"
     );
   }
 
-  console.log(`✅ E2E tests configured for endpoint: ${E2E_CONFIG.endpoint}`);
+  console.debug(`✅ E2E tests configured for endpoint: ${E2E_CONFIG.endpoint}`);
 }
 
 // =============================================================================
@@ -54,7 +53,7 @@ export function validateE2EEnvironment(): void {
  * Sets up LangWatch observability for e2e tests
  */
 export function setupE2EObservability(): [LangWatchExporter, SimpleSpanProcessor] {
-  console.log("🔧 Setting up E2E observability...");
+  console.debug("🔧 Setting up E2E observability...");
 
   const exporter = new LangWatchExporter({
     apiKey: E2E_CONFIG.apiKey!,
@@ -62,18 +61,14 @@ export function setupE2EObservability(): [LangWatchExporter, SimpleSpanProcessor
   });
   const spanProcessor = new SimpleSpanProcessor(exporter);
 
-  console.log("🔧 Calling setupObservability...");
+  console.debug("🔧 Calling setupObservability...");
   setupObservability({
-    langwatch: {
-      apiKey: E2E_CONFIG.apiKey!,
-      endpoint: E2E_CONFIG.endpoint,
-    },
     spanProcessors: [spanProcessor],
     debug: { logLevel: "debug" },
     advanced: { UNSAFE_forceOpenTelemetryReinitialization: true },
   });
 
-  console.log("✅ E2E observability setup complete");
+  console.debug("✅ E2E observability setup complete");
   return [exporter, spanProcessor];
 }
 
@@ -91,10 +86,10 @@ export function setupE2ELangWatchClientSDK(): LangWatch {
  * Verifies that OpenTelemetry is properly initialized by creating a test span
  */
 export async function verifyOpenTelemetrySetup(): Promise<void> {
-  console.log("🔍 Verifying OpenTelemetry setup...");
+  console.debug("🔍 Verifying OpenTelemetry setup...");
 
   const provider = trace.getTracerProvider();
-  console.log(`🔍 TracerProvider: ${provider.constructor.name}`);
+  console.debug(`🔍 TracerProvider: ${provider.constructor.name}`);
 
   const testTracer = getLangWatchTracer("setup-verification");
 
@@ -105,7 +100,7 @@ export async function verifyOpenTelemetrySetup(): Promise<void> {
       const context = span.spanContext();
       const traceId = context.traceId;
 
-      console.log(`🔍 Test span created with trace ID: ${traceId}`);
+      console.debug(`🔍 Test span created with trace ID: ${traceId}`);
 
       if (traceId === "00000000000000000000000000000000") {
         reject(new Error("OpenTelemetry setup verification failed: trace ID is all zeros"));
@@ -117,7 +112,7 @@ export async function verifyOpenTelemetrySetup(): Promise<void> {
         return;
       }
 
-      console.log("✅ OpenTelemetry setup verification successful");
+      console.debug("✅ OpenTelemetry setup verification successful");
       resolve();
     } catch (error) {
       reject(new Error(`OpenTelemetry setup verification failed: ${String(error)}`));
@@ -132,12 +127,11 @@ export async function verifyOpenTelemetrySetup(): Promise<void> {
  */
 export function setupE2ETest(): { client: LangWatch; spanProcessor: SimpleSpanProcessor } {
   let client: LangWatch;
-  let exporter: LangWatchExporter;
   let spanProcessor: SimpleSpanProcessor;
 
   beforeAll(async () => {
     validateE2EEnvironment();
-    [exporter, spanProcessor] = setupE2EObservability();
+    [, spanProcessor] = setupE2EObservability();
 
     // Give the NodeSDK a moment to fully initialize
     await delay(500);
@@ -198,7 +192,7 @@ export function createTestTracer(testName: string) {
   const timestamp = Date.now();
   const tracerName = `e2e-test-${testName}-${timestamp}`;
 
-  console.log(`🔍 Creating test tracer: ${tracerName}`);
+  console.debug(`🔍 Creating test tracer: ${tracerName}`);
 
   // Check the global trace provider
   const tracer = getLangWatchTracer(tracerName);
@@ -298,14 +292,14 @@ export async function pollForTrace(
         // If we have an expected span count, wait for it
         if (expectedSpanCount !== undefined) {
           if (trace.spans.length >= expectedSpanCount) {
-            console.log(`✅ Trace ${traceId} found with ${trace.spans.length} spans (expected ${expectedSpanCount})`);
+            console.debug(`✅ Trace ${traceId} found with ${trace.spans.length} spans (expected ${expectedSpanCount})`);
             return trace;
           } else {
-            console.log(`⏳ Trace ${traceId} has ${trace.spans.length} spans, waiting for ${expectedSpanCount}... (${Date.now() - startTime}ms elapsed)`);
+            console.debug(`⏳ Trace ${traceId} has ${trace.spans.length} spans, waiting for ${expectedSpanCount}... (${Date.now() - startTime}ms elapsed)`);
           }
         } else {
           // No expected count, any spans are fine
-          console.log(`✅ Trace ${traceId} found with ${trace.spans.length} spans`);
+          console.debug(`✅ Trace ${traceId} found with ${trace.spans.length} spans`);
           return trace;
         }
       }
@@ -318,7 +312,7 @@ export async function pollForTrace(
     }
 
     if (expectedSpanCount === undefined) {
-      console.log(`⏳ Waiting for trace ${traceId}... (${Date.now() - startTime}ms elapsed)`);
+      console.debug(`⏳ Waiting for trace ${traceId}... (${Date.now() - startTime}ms elapsed)`);
     }
     await delay(pollInterval);
   }
@@ -344,7 +338,13 @@ export async function expectTraceToBeIngested(
   expect(trace.spans!.length).toBeGreaterThan(0);
 
   if (expectedSpanCount !== undefined) {
+    try {
     expect(trace.spans!.length).toBe(expectedSpanCount);
+    } catch (error) {
+      console.error(`Expected ${expectedSpanCount} spans, but got ${trace.spans!.length}`);
+      console.error('Spans', trace.spans);
+      throw error;
+    }
   }
 
   // Validate that spans have the basic required structure

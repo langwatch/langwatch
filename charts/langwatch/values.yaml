@@ -1040,10 +1040,6 @@ prometheus:
       ## @param prometheus.external.secretKeys.connectionString [string] Secret key for connection string.
       connectionString: "connection-string"
 
-  image:
-    # Use the legacy image to deal with Bitnami's overall product deprecation
-    repository: bitnamilegacy/prometheus
-
   version: 2.1.23
 
   # Alertmanager configuration for alert routing
@@ -1060,6 +1056,13 @@ prometheus:
 
   # Prometheus server configuration
   server:
+    # Image configuration
+    ## @extra prometheus.server.image Image configuration.
+    ## @param prometheus.server.image.repository [string, default: bitnamilegacy/prometheus] Image repository.
+    image:
+      # Use the legacy image to deal with Bitnami's overall product deprecation
+      repository: bitnamilegacy/prometheus
+
     # Number of Prometheus replicas
     # See: https://kubespec.dev/apps/v1/Deployment#spec.replicas
     ## @param prometheus.server.replicaCount [default: 1] Number of Prometheus replicas.

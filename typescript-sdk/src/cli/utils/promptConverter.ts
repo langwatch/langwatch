@@ -1,5 +1,5 @@
 import type { LocalPromptConfig, MaterializedPrompt } from "../types";
-import { type PromptResponse } from "@/client-sdk/services/prompts/types";
+import { type PromptResponse, type UpdatePromptBody } from "@/client-sdk/services/prompts/types";
 
 /**
  * Converter utility for transforming between YAML prompt format and API service format.
@@ -70,20 +70,12 @@ export class PromptConverter {
    * Converts a LocalPromptConfig (loaded from YAML) to the format
    * expected by the API service for upserting.
    */
-  static fromLocalToApiFormat(config: LocalPromptConfig): {
-    model: string;
-    modelParameters?: {
-      temperature?: number;
-      max_tokens?: number;
-    };
-    messages: Array<{
-      role: "system" | "user" | "assistant";
-      content: string;
-    }>;
-  } {
+  static fromLocalToApiFormat(config: LocalPromptConfig): Omit<UpdatePromptBody, "commitMessage">
+  {
     return {
       model: config.model,
-      modelParameters: config.modelParameters,
+      temperature: config.modelParameters?.temperature,
+      maxTokens: config.modelParameters?.max_tokens,
       messages: config.messages,
     };
   }
@@ -112,57 +104,5 @@ export class PromptConverter {
       role: "user" | "assistant";
       content: string;
     }>;
-  }
-
-  /**
-   * Converts version specification strings to actual version constraints.
-   * Handles npm-style version specs like "latest", "5", "^5", etc.
-   */
-  static parseVersionSpec(versionSpec: string): {
-    type: "latest" | "exact" | "tag";
-    value: string;
-  } {
-    if (versionSpec === "latest") {
-      return { type: "latest", value: "latest" };
-    }
-
-    // For now, treat everything else as tags until we implement proper semver
-    if (/^\d+$/.test(versionSpec)) {
-      return { type: "exact", value: versionSpec };
-    }
-
-    // Handle prefixes like ^, ~, etc. as tags for now
-    return { type: "tag", value: versionSpec };
-  }
-
-  /**
-   * Validates that a YAML config can be safely converted to API format.
-   * Returns validation errors if any, or null if valid.
-   */
-  static validateForApiConversion(config: LocalPromptConfig): string[] {
-    const errors: string[] = [];
-
-    if (!config.model?.trim()) {
-      errors.push("Model is required and cannot be empty");
-    }
-
-    if (!config.messages || config.messages.length === 0) {
-      errors.push("At least one message is required");
-    }
-
-    if (config.messages) {
-      config.messages.forEach((message, index) => {
-        if (!["system", "user", "assistant"].includes(message.role)) {
-          errors.push(
-            `Message ${index}: role must be 'system', 'user', or 'assistant'`,
-          );
-        }
-        if (!message.content?.trim()) {
-          errors.push(`Message ${index}: content cannot be empty`);
-        }
-      });
-    }
-
-    return errors;
   }
 }

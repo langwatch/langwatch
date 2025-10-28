@@ -845,7 +845,6 @@ export function MessagesTable({
         meta: {
           closable: true,
         },
-        placement: "top-end",
       });
       console.error(error);
     }
@@ -880,7 +879,6 @@ export function MessagesTable({
             meta: {
               closable: true,
             },
-            placement: "top-end",
             action: {
               label: "View Queues",
               onClick: () => {

@@ -26,8 +26,6 @@ export async function runUsageStatsJob(job: Job<UsageStatsJob, void, string>) {
   try {
     const stats = await collectUsageStats(job.data.instance_id);
 
-    logger.info({ stats }, "usage stats collected");
-
     const installMethod = process.env.INSTALL_METHOD || "self-hosted"; // Default to self-hosted if not specified
 
     fetch("https://app.langwatch.ai/api/track_usage", {
@@ -76,7 +74,7 @@ export const startUsageStatsWorker = () => {
     {
       connection,
       concurrency: 1, // Only one job at a time since it's a daily task
-    }
+    },
   );
 
   usageStatsWorker.on("ready", () => {

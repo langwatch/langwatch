@@ -8,6 +8,7 @@ on:
     paths:
       - "langwatch/**"
       - ".github/workflows/langwatch-app-ci.yml"
+      - ".github/.release-please-manifest.json"
   workflow_dispatch:
 
 env:

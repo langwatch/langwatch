@@ -66,7 +66,6 @@ export default function EvaluationsV2() {
         toaster.create({
           title: "Experiment deleted",
           type: "success",
-          placement: "top-end",
           meta: {
             closable: true,
           },
@@ -78,7 +77,6 @@ export default function EvaluationsV2() {
           description:
             "Please try again. If the problem persists, contact support.",
           type: "error",
-          placement: "top-end",
           meta: {
             closable: true,
           },

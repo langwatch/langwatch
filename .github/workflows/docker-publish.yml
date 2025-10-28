@@ -6,10 +6,11 @@ on:
   workflow_dispatch:
 
 jobs:
-  build-and-push:
+  extract-version:
     runs-on: ubuntu-latest
     if: startsWith(github.event.release.tag_name, 'langwatch@') || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main')
-
+    outputs:
+      version: ${{ steps.extract_version.outputs.version }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -26,6 +27,14 @@ jobs:
           fi
           echo "version=${VERSION}" >> $GITHUB_OUTPUT
 
+  build-and-push-amd64:
+    runs-on: ubuntu-latest
+    needs: extract-version
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
@@ -35,26 +44,121 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Build and push LangWatch Docker image
+      - name: Build and push LangWatch Docker image (AMD64)
         uses: docker/build-push-action@v6
         with:
           context: .
           push: true
-          platforms: linux/amd64,linux/arm64/v8
+          platforms: linux/amd64
           tags: |
-            langwatch/langwatch:latest
-            langwatch/langwatch:${{ steps.extract_version.outputs.version }}
+            langwatch/langwatch:${{ needs.extract-version.outputs.version }}-amd64
 
-      - name: Build and push LangWatch NLP Docker image
+      - name: Build and push LangWatch NLP Docker image (AMD64)
         uses: docker/build-push-action@v6
         with:
           context: .
           file: Dockerfile.langwatch_nlp
           push: true
-          platforms: linux/amd64,linux/arm64/v8
+          platforms: linux/amd64
           tags: |
-            langwatch/langwatch_nlp:latest
-            langwatch/langwatch_nlp:${{ steps.extract_version.outputs.version }}
+            langwatch/langwatch_nlp:${{ needs.extract-version.outputs.version }}-amd64
+
+  build-and-push-arm64:
+    runs-on: arm64-runner-16gb
+    needs: extract-version
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build and push LangWatch Docker image (ARM64)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          platforms: linux/arm64/v8
+          tags: |
+            langwatch/langwatch:${{ needs.extract-version.outputs.version }}-arm64
+
+      - name: Build and push LangWatch NLP Docker image (ARM64)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile.langwatch_nlp
+          push: true
+          platforms: linux/arm64/v8
+          tags: |
+            langwatch/langwatch_nlp:${{ needs.extract-version.outputs.version }}-arm64
+
+  create-manifest:
+    runs-on: ubuntu-latest
+    needs: [extract-version, build-and-push-amd64, build-and-push-arm64]
+
+    steps:
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Create and push multi-arch manifest for LangWatch (latest)
+        run: |
+          docker buildx imagetools create -t langwatch/langwatch:latest \
+            langwatch/langwatch:${{ needs.extract-version.outputs.version }}-amd64 \
+            langwatch/langwatch:${{ needs.extract-version.outputs.version }}-arm64
+
+      - name: Create and push multi-arch manifest for LangWatch (version)
+        run: |
+          docker buildx imagetools create -t langwatch/langwatch:${{ needs.extract-version.outputs.version }} \
+            langwatch/langwatch:${{ needs.extract-version.outputs.version }}-amd64 \
+            langwatch/langwatch:${{ needs.extract-version.outputs.version }}-arm64
+
+      - name: Create and push multi-arch manifest for LangWatch NLP (latest)
+        run: |
+          docker buildx imagetools create -t langwatch/langwatch_nlp:latest \
+            langwatch/langwatch_nlp:${{ needs.extract-version.outputs.version }}-amd64 \
+            langwatch/langwatch_nlp:${{ needs.extract-version.outputs.version }}-arm64
+
+      - name: Create and push multi-arch manifest for LangWatch NLP (version)
+        run: |
+          docker buildx imagetools create -t langwatch/langwatch_nlp:${{ needs.extract-version.outputs.version }} \
+            langwatch/langwatch_nlp:${{ needs.extract-version.outputs.version }}-amd64 \
+            langwatch/langwatch_nlp:${{ needs.extract-version.outputs.version }}-arm64
+
+      - name: Delete temporary architecture-specific tags
+        run: |
+          # Note: Docker Hub API doesn't provide easy tag deletion via CLI
+          # These temporary tags will remain but won't be used
+          # Alternatively, use Docker Hub API for cleanup:
+          TOKEN=$(curl -s -H "Content-Type: application/json" -X POST \
+            -d '{"username": "${{ secrets.DOCKERHUB_USERNAME }}", "password": "${{ secrets.DOCKERHUB_TOKEN }}"}' \
+            https://hub.docker.com/v2/users/login/ | jq -r .token)
+
+          for tag in "${{ needs.extract-version.outputs.version }}-amd64" "${{ needs.extract-version.outputs.version }}-arm64"; do
+            curl -s -X DELETE \
+              -H "Authorization: JWT ${TOKEN}" \
+              "https://hub.docker.com/v2/repositories/langwatch/langwatch/tags/${tag}/"
+            curl -s -X DELETE \
+              -H "Authorization: JWT ${TOKEN}" \
+              "https://hub.docker.com/v2/repositories/langwatch/langwatch_nlp/tags/${tag}/"
+          done
+
+  notify:
+    runs-on: ubuntu-latest
+    needs: [extract-version, create-manifest]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
 
       - name: Notify Slack
         env:
@@ -63,4 +167,4 @@ jobs:
           bash .github/scripts/notify-slack-release.sh \
             CHANGELOG.md \
             "LangWatch" \
-            "${{ steps.extract_version.outputs.version }}"
+            "${{ needs.extract-version.outputs.version }}"

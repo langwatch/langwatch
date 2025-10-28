@@ -7,7 +7,16 @@ on:
   pull_request:
     paths:
       - "typescript-sdk/**"
+      - ".github/.release-please-manifest.json"
   workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  LANGWATCH_API_KEY: sk-lw-1234567890
+  LANGWATCH_ENDPOINT: http://localhost:5560
 
 jobs:
   ci:
@@ -18,17 +27,14 @@ jobs:
         working-directory: typescript-sdk
     steps:
       - name: Checkout
-        # Checkout the repository code
         uses: actions/checkout@v4
 
       - name: Setup pnpm
-        # Install and configure pnpm package manager
         uses: pnpm/action-setup@v2
         with:
           version: 10.12.1
 
       - name: Setup Node
-        # Install Node.js and configure pnpm caching
         uses: actions/setup-node@v4
         with:
           node-version: 20
@@ -36,34 +42,143 @@ jobs:
           cache-dependency-path: "typescript-sdk/pnpm-lock.yaml"
 
       - name: Install dependencies
-        # Install all project dependencies from pnpm-lock.yaml
         run: pnpm install --frozen-lockfile
 
       - name: Install TypeScript Native Preview
-        # Install TypeScript Native Preview for enhanced type checking
         run: pnpm install -D @typescript/native-preview
 
       - name: Run lint check
-        # Check code style and catch potential errors with ESLint
         run: pnpm run lint
 
       - name: Build
-        # Compile TypeScript and build production artifacts. When running this
-        # we don't need to also run the typecheck step.
         run: pnpm run build
 
       - name: Run tests
-        # Execute unit tests with Vitest
         env:
           OPENAI_API_KEY: ${{ secrets.TYPESCRIPT_SDK_OPENAI_API_KEY }}
           LANGWATCH_API_KEY: ${{ secrets.TYPESCRIPT_SDK_LANGWATCH_API_KEY }}
         run: pnpm test
 
+  e2e:
+    runs-on: ubuntu-latest
+    
+    env:
+      # LangWatch server config
+      DATABASE_URL: "postgresql://langwatch_ci:ci_password@localhost:5432/langwatch_test"
+      BASE_HOST: "localhost:5560"
+      NEXTAUTH_SECRET: "nextauth-secret-for-ci-testing"
+      NEXTAUTH_URL: "http://localhost:5560"
+      API_TOKEN_JWT_SECRET: "api-jwt-secret-for-ci-testing"
+      ELASTICSEARCH_NODE_URL: "http://localhost:9200"
+      REDIS_URL: "redis://localhost:6379"
+      NODE_ENV: "test"
+    
+    services:
+      redis:
+        image: redis:alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+      elasticsearch:
+        image: docker.elastic.co/elasticsearch/elasticsearch:8.11.0
+        ports:
+          - 9200:9200
+        env:
+          discovery.type: single-node
+          xpack.security.enabled: false
+          ES_JAVA_OPTS: "-Xms512m -Xmx512m"
+        options: >-
+          --health-cmd "curl -f http://localhost:9200/_cluster/health || exit 1"
+          --health-interval 30s
+          --health-timeout 10s
+          --health-retries 5
+
+      postgres:
+        image: postgres:16
+        ports:
+          - 5432:5432
+        env:
+          POSTGRES_USER: langwatch_ci
+          POSTGRES_PASSWORD: ci_password
+          POSTGRES_DB: langwatch_test
+        options: >-
+          --health-cmd "pg_isready -U langwatch_ci"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    defaults:
+      run:
+        working-directory: typescript-sdk
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 10.12.1
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: "pnpm"
+          cache-dependency-path: "typescript-sdk/pnpm-lock.yaml"
+
+      # Install LangWatch app dependencies
+      - name: Setup Node for LangWatch
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: "npm"
+          cache-dependency-path: "langwatch/package-lock.json"
+
+      - name: Install LangWatch app dependencies
+        working-directory: langwatch
+        run: npm ci --prefer-offline --no-audit --no-fund --progress=false
+
+      - name: Prepare LangWatch files
+        working-directory: langwatch
+        run: npm run start:prepare:files
+
+      - name: Setup database
+        working-directory: langwatch
+        run: npm run prisma:migrate
+
+      - name: Seed test project
+        working-directory: langwatch
+        run: npm run prisma:seed
+
+      - name: Setup Elasticsearch
+        working-directory: langwatch
+        run: npm run elastic:migrate
+
+      # Start LangWatch server in background
+      - name: Start LangWatch server
+        working-directory: langwatch
+        run: |
+          npm run start &
+          # Wait for server to be ready (check Next.js is responding)
+          timeout 60 bash -c 'until curl -f http://localhost:5560 2>/dev/null | grep -q "LangWatch\|<!DOCTYPE"; do sleep 2; done'
+          echo "✅ LangWatch server is ready"
+
+      - name: Install SDK dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build SDK
+        run: pnpm run build
+
       - name: Run e2e tests
-        # Execute end-to-end integration tests
         env:
           OPENAI_API_KEY: ${{ secrets.TYPESCRIPT_SDK_OPENAI_API_KEY }}
-          LANGWATCH_API_KEY: ${{ secrets.TYPESCRIPT_SDK_LANGWATCH_API_KEY }}
-          E2E_LANGWATCH_API_KEY: ${{ secrets.TYPESCRIPT_SDK_E2E_LANGWATCH_API_KEY }}
+          E2E_TIMEOUT: 120000
+          E2E_POLL_TIMEOUT: 120000
         run: pnpm test:e2e
 

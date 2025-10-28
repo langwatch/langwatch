@@ -1,16 +1,18 @@
+import type { OrganizationUserRole, TeamUserRole } from "@prisma/client";
 import { useRouter } from "next/router";
 import { useEffect, useMemo } from "react";
 import { useLocalStorage } from "usehooks-ts";
-import { api } from "../utils/api";
-import { publicRoutes, useRequiredSession } from "./useRequiredSession";
+
 import {
   organizationRolePermissionMapping,
   type OrganizationRoleGroup,
   type TeamRoleGroup,
   teamRolePermissionMapping,
 } from "../server/api/permission";
-import type { OrganizationUserRole, TeamUserRole } from "@prisma/client";
+import { api } from "../utils/api";
+
 import { usePublicEnv } from "./usePublicEnv";
+import { publicRoutes, useRequiredSession } from "./useRequiredSession";
 
 export const useOrganizationTeamProject = (
   {
@@ -185,7 +187,7 @@ export const useOrganizationTeamProject = (
       org.teams.filter((team) => team.projects.length > 0)
     );
     if (!organization || !teamsWithProjectsOnAnyOrg.length) {
-      void router.push(`/onboarding/organization${returnTo}`);
+      void router.push(`/onboarding/welcome${returnTo}`);
       return;
     }
 
@@ -287,6 +289,7 @@ export const useOrganizationTeamProject = (
     organization,
     team,
     project: publicShareProject.data ?? project,
+    projectId: project?.id,
     hasOrganizationPermission,
     hasTeamPermission,
     isPublicRoute,

@@ -168,7 +168,6 @@ export function DatasetSelectionItem({
                             meta: {
                               closable: true,
                             },
-                            placement: "top-end",
                             duration: 5000,
                           });
                         },
@@ -186,7 +185,6 @@ export function DatasetSelectionItem({
             meta: {
               closable: true,
             },
-            placement: "top-end",
           });
         },
         onError: () => {
@@ -199,7 +197,6 @@ export function DatasetSelectionItem({
             meta: {
               closable: true,
             },
-            placement: "top-end",
           });
         },
       }

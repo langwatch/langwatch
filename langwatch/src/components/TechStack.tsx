@@ -199,7 +199,7 @@ export function TechStackSelector<
               {...field}
               onChange={undefined}
               onValueChange={(change) => {
-                handleLanguageChange(change.value);
+                handleLanguageChange(change.value ?? "");
               }}
             >
               <HStack gap={6} alignItems="stretch" wrap="wrap">

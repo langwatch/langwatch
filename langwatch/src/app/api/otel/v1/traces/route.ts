@@ -16,12 +16,22 @@ import { createLogger } from "../../../../../utils/logger";
 import { withAppRouterLogger } from "../../../../../middleware/app-router-logger";
 import { getLangWatchTracer } from "langwatch";
 import { SpanKind, SpanStatusCode } from "@opentelemetry/api";
+import { getCurrentMonthMessagesCount } from "../../../../../server/api/routers/limits";
+import { dependencies } from "../../../../../injection/dependencies.server";
 
 const tracer = getLangWatchTracer("langwatch.otel.traces");
 const logger = createLogger("langwatch:otel:v1:traces");
 
 const traceRequestType = (root as any).opentelemetry.proto.collector.trace.v1
   .ExportTraceServiceRequest;
+
+export const config = {
+  api: {
+    bodyParser: {
+      sizeLimit: "1mb",
+    },
+  },
+};
 
 async function handleTracesRequest(req: NextRequest) {
   return await tracer.withActiveSpan(
@@ -49,7 +59,7 @@ async function handleTracesRequest(req: NextRequest) {
             message:
               "Authentication token is required. Use X-Auth-Token header or Authorization: Bearer token.",
           },
-          { status: 401 }
+          { status: 401 },
         );
       }
 
@@ -68,7 +78,66 @@ async function handleTracesRequest(req: NextRequest) {
 
         return NextResponse.json(
           { message: "Invalid auth token." },
-          { status: 401 }
+          { status: 401 },
+        );
+      }
+
+      try {
+        const currentMonthMessagesCount = await getCurrentMonthMessagesCount(
+          [project.id],
+          project.team.organizationId,
+        );
+
+        const activePlan = await dependencies.subscriptionHandler.getActivePlan(
+          project.team.organizationId,
+        );
+
+        if (currentMonthMessagesCount >= activePlan.maxMessagesPerMonth) {
+          if (dependencies.planLimits) {
+            try {
+              await dependencies.planLimits(
+                project.team.organizationId,
+                activePlan.name ?? "free",
+              );
+            } catch (error) {
+              logger.error(
+                { error, projectId: project.id },
+                "Error sending plan limit notification",
+              );
+            }
+          }
+          logger.info(
+            {
+              projectId: project.id,
+              currentMonthMessagesCount,
+              activePlanName: activePlan.name,
+              maxMessagesPerMonth: activePlan.maxMessagesPerMonth,
+            },
+            "Project has reached plan limit",
+          );
+
+          span.setStatus({
+            code: SpanStatusCode.ERROR,
+            message: "Plan limit reached.",
+          });
+
+          return NextResponse.json(
+            {
+              message: `ERR_PLAN_LIMIT: You have reached the monthly limit of ${activePlan.maxMessagesPerMonth} messages, please go to LangWatch dashboard to verify your plan.`,
+            },
+            { status: 429 },
+          );
+        }
+      } catch (error) {
+        logger.error(
+          { error, projectId: project.id },
+          "Error getting current month messages count",
+        );
+        Sentry.captureException(
+          new Error("Error getting current month messages count"),
+          {
+            extra: { projectId: project.id, zodError: error },
+          },
         );
       }
 
@@ -86,7 +155,7 @@ async function handleTracesRequest(req: NextRequest) {
         try {
           const json = JSON.parse(Buffer.from(body).toString("utf-8"));
           traceRequest = traceRequestType.decode(
-            new Uint8Array(traceRequestType.encode(json).finish())
+            new Uint8Array(traceRequestType.encode(json).finish()),
           );
           if (
             !traceRequest.resourceSpans ||
@@ -100,7 +169,7 @@ async function handleTracesRequest(req: NextRequest) {
               error: jsonError,
               traceRequest: Buffer.from(body).toString("base64"),
             },
-            "error parsing traces"
+            "error parsing traces",
           );
           Sentry.captureException(error, {
             extra: {
@@ -112,7 +181,7 @@ async function handleTracesRequest(req: NextRequest) {
 
           return NextResponse.json(
             { error: "Failed to parse traces" },
-            { status: 400 }
+            { status: 400 },
           );
         }
       }
@@ -132,17 +201,31 @@ async function handleTracesRequest(req: NextRequest) {
               .digest("hex");
             const existingTrace = await fetchExistingMD5s(
               traceForCollection.traceId,
-              project.id
+              project.id,
             );
             if (existingTrace?.indexing_md5s?.includes(paramsMD5)) {
               continue;
             }
-    
+
             logger.info(
-              { traceId: traceForCollection.traceId },
-              "collecting traces"
+              {
+                traceId: traceForCollection.traceId,
+                traceRequestSizeMb: parseFloat(
+                  (
+                    Buffer.from(JSON.stringify(traceRequest)).length /
+                    (1024 * 1024)
+                  ).toFixed(3),
+                ),
+                traceRequestSpansCount:
+                  traceRequest.resourceSpans?.reduce(
+                    (acc, resourceSpan) =>
+                      acc + (resourceSpan?.scopeSpans?.length ?? 0),
+                    0,
+                  ) ?? 0,
+              },
+              "collecting traces",
             );
-    
+
             promises.push(
               scheduleTraceCollectionWithFallback({
                 ...traceForCollection,
@@ -152,12 +235,12 @@ async function handleTracesRequest(req: NextRequest) {
                 expectedOutput: void 0,
                 evaluations: void 0,
                 collectedAt: Date.now(),
-              })
+              }),
             );
           }
 
           return promises;
-        }
+        },
       );
 
       if (promises.length === 0) {
@@ -169,11 +252,11 @@ async function handleTracesRequest(req: NextRequest) {
         { kind: SpanKind.PRODUCER },
         async () => {
           await Promise.all(promises);
-        }
+        },
       );
 
       return NextResponse.json({ message: "Trace received successfully." });
-    }
+    },
   );
 }
 

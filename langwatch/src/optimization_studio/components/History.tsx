@@ -115,7 +115,6 @@ export function HistoryPopover({ onClose }: { onClose: () => void }) {
             type: "success",
             duration: 5000,
             meta: { closable: true },
-            placement: "top-end",
           });
           setWorkflow({
             version,
@@ -128,14 +127,13 @@ export function HistoryPopover({ onClose }: { onClose: () => void }) {
             type: "error",
             duration: 5000,
             meta: { closable: true },
-            placement: "top-end",
           });
         },
       }
     );
   };
 
-  const onRestore = useCallback(
+  const onRestoreSuccess = useCallback(
     async (versionId: string) => {
       if (!project || !workflowId) return;
 
@@ -268,7 +266,7 @@ export function HistoryPopover({ onClose }: { onClose: () => void }) {
                   >
                     <Button
                       variant="ghost"
-                      onClick={() => void onRestore(version.id)}
+                      onClick={() => void onRestoreSuccess(version.id)}
                       loading={restoreVersion.isLoading}
                     >
                       <HistoryIcon size={24} />
@@ -463,7 +461,6 @@ export function NewVersionFields({
               type: "error",
               duration: 5000,
               meta: { closable: true },
-              placement: "top-end",
             });
           },
         }

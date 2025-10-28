@@ -44,6 +44,16 @@ jobs:
         working-directory: ./typescript-sdk
         run: pnpm build
 
+      ## We run these against the current codebase for the CI build
+      ## but here we want to validate the SDK against the deployed app
+      ## before publishing
+      - name: Run e2e tests
+        working-directory: ./typescript-sdk
+        env:
+          OPENAI_API_KEY: ${{ secrets.TYPESCRIPT_SDK_OPENAI_API_KEY }}
+          LANGWATCH_API_KEY: ${{ secrets.TYPESCRIPT_SDK_LANGWATCH_API_KEY }}
+        run: pnpm test:e2e
+
       - name: Publish to npm
         working-directory: ./typescript-sdk
         run: pnpm publish --provenance --access public --no-git-checks

@@ -23,7 +23,7 @@ export const getRAGChunks = (
   const sortedSpans = flattenSpanTree(
     organizeSpansIntoTree(spans as Span[]),
     "inside-out"
-  ).reverse();
+  ).toReversed();
   const lastRagSpan = sortedSpans.find((span) => span.type === "rag") as
     | ElasticSearchSpan
     | undefined;
@@ -40,7 +40,7 @@ export const getRAGInfo = (
   const sortedSpans = flattenSpanTree(
     organizeSpansIntoTree(spans as Span[]),
     "inside-out"
-  ).reverse();
+  ).toReversed();
   const lastRagSpan = sortedSpans.find((span) => span.type === "rag") as
     | ElasticSearchSpan
     | undefined;

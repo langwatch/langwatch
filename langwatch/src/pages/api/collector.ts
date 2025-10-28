@@ -26,10 +26,6 @@ import {
   spanValidatorSchema,
 } from "../../server/tracer/types.generated";
 import { createLogger } from "../../utils/logger";
-import {
-  getPayloadSizeHistogram,
-  traceSpanCountHistogram,
-} from "../../server/metrics";
 import { withPagesRouterLogger } from "../../middleware/pages-router-logger";
 
 const logger = createLogger("langwatch:collector");
@@ -143,8 +139,6 @@ async function handleCollectorRequest(
     );
   }
 
-  getPayloadSizeHistogram("collector").observe(JSON.stringify(req.body).length);
-
   // We migrated those keys to inside metadata, but we still want to support them for retrocompatibility for a while
   if (!("metadata" in req.body) || !req.body.metadata) {
     req.body.metadata = {};
@@ -249,8 +243,6 @@ async function handleCollectorRequest(
       .status(400)
       .json({ message: "Invalid 'spans' field, expecting array" });
   }
-
-  traceSpanCountHistogram.observe(req.body.spans?.length ?? 0);
 
   if (req.body.spans?.length > 200) {
     logger.info(

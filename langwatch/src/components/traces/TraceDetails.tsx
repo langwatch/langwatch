@@ -174,7 +174,6 @@ export function TraceDetails(props: {
             meta: {
               closable: true,
             },
-            placement: "top-end",
           });
         },
       }
@@ -370,7 +369,14 @@ export function TraceDetails(props: {
             </VStack>
           )}
         </Tabs.Content>
-        <Tabs.Content value="sequenceDiagram" paddingX={6} paddingY={4}>
+        <Tabs.Content
+          value="sequenceDiagram"
+          paddingX={0}
+          padding={0}
+          paddingY={6}
+          background="gray.100"
+          flexGrow={1}
+        >
           {selectedTab === "sequenceDiagram" && (
             <SequenceDiagramContainer traceId={props.traceId} />
           )}

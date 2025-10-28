@@ -1,47 +1,44 @@
-import { useDisclosure } from "@chakra-ui/react";
 import {
   createContext,
   useCallback,
   useContext,
-  useRef,
   useState,
+  type ComponentProps,
 } from "react";
-import { type UseFormReturn } from "react-hook-form";
-
-import type { LlmConfigWithLatestVersion } from "../../server/prompt-config/repositories";
-import {
-  ChangeHandleDialog,
-  type ChangeHandleDialogFormValues,
-} from "../forms/ChangeHandleDialog";
+import { ChangeHandleDialog } from "../forms/ChangeHandleDialog";
 import {
   SaveVersionDialog,
   type SaveDialogFormValues,
 } from "../forms/SaveVersionDialog";
-import { usePromptConfig } from "../hooks/usePromptConfig";
-import type { PromptConfigFormValues } from "../hooks/usePromptConfigForm";
+import type { ChangeHandleFormValues } from "../forms/schemas/change-handle-form.schema";
+import { usePrompts } from "../hooks/usePrompts";
+import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import type { PromptConfigContextType } from "./types";
 
-import { toaster } from "~/components/ui/toaster";
-import { promptConfigFormValuesVersionToLlmConfigVersionConfigData } from "~/prompt-configs/llmPromptConfigUtils";
-
-interface PromptConfigContextType {
-  triggerSaveVersion: ({
-    config,
-    form,
-    updateConfigValues,
-    editingHandleOrScope,
-  }: {
-    config: LlmConfigWithLatestVersion;
-    form: UseFormReturn<PromptConfigFormValues>;
-    updateConfigValues: PromptConfigFormValues;
-    editingHandleOrScope: boolean;
-  }) => Promise<void>;
-}
-
-const PromptConfigContext = createContext<PromptConfigContextType>({
+/**
+ * Creates a default context value that throws descriptive errors
+ */
+const createDefaultContextValue = (): PromptConfigContextType => ({
+  triggerCreatePrompt: () => {
+    throw new Error(
+      "triggerCreatePrompt must be called within PromptConfigProvider"
+    );
+  },
   triggerSaveVersion: () => {
-    throw new Error("No triggerSaveVersion function provided");
+    throw new Error(
+      "triggerSaveVersion must be called within PromptConfigProvider"
+    );
+  },
+  triggerChangeHandle: () => {
+    throw new Error(
+      "triggerChangeHandle must be called within PromptConfigProvider"
+    );
   },
 });
+
+const PromptConfigContext = createContext<PromptConfigContextType>(
+  createDefaultContextValue()
+);
 
 export const usePromptConfigContext = () => {
   const context = useContext(PromptConfigContext);
@@ -53,142 +50,162 @@ export const usePromptConfigContext = () => {
   return context;
 };
 
+/**
+ * Provider for prompt configuration operations.
+ * Single Responsibility: Manages dialog-based prompt operations with closures.
+ */
 export function PromptConfigProvider({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  // Dialog state
-  const {
-    open: isOpen,
-    onOpen: openDialog,
-    onClose: closeDialog,
-  } = useDisclosure();
-  const [currentConfig, setCurrentConfig] =
-    useState<LlmConfigWithLatestVersion | null>(null);
-  const [editingHandleOrScope, setEditingHandleOrScope] = useState(false);
+  const { projectId = "" } = useOrganizationTeamProject();
 
-  // Prompt config state
-  const { updatePromptConfig, createNewVersion } = usePromptConfig();
+  // Each state contains all props needed for the respective dialog
+  const [saveVersionDialogProps, setSaveVersionDialogProps] =
+    useState<ComponentProps<typeof SaveVersionDialog> | null>(null);
 
-  // Closure to save the function that will do the saving
-  const updateConfigClosureRef = useRef<
-    ((saveFormValues: SaveDialogFormValues) => Promise<void>) | null
-  >(null);
+  const [createPromptDialogProps, setCreatePromptDialogProps] =
+    useState<ComponentProps<typeof ChangeHandleDialog> | null>(null);
 
-  const triggerSaveVersion = useCallback(
-    async ({
-      config,
-      form,
-      updateConfigValues,
-      editingHandleOrScope,
-    }: {
-      config: LlmConfigWithLatestVersion;
-      form: UseFormReturn<PromptConfigFormValues>;
-      updateConfigValues: PromptConfigFormValues;
-      editingHandleOrScope: boolean;
-    }) => {
-      setCurrentConfig(config);
-      setEditingHandleOrScope(editingHandleOrScope);
-      // Trigger the form validation
-      const isValid = await form.trigger();
+  const [changeHandleDialogProps, setChangeHandleDialogProps] =
+    useState<ComponentProps<typeof ChangeHandleDialog> | null>(null);
 
-      if (!isValid) {
-        // If the form is not valid, don't save
-        return;
-      }
+  const { createPrompt, updatePrompt, updateHandle, getPromptById } =
+    usePrompts();
 
-      // Save a ref to the function that will do the saving
-      // with the saveFormValues enclosed in the closure
-      updateConfigClosureRef.current = async (
-        saveFormValues: SaveDialogFormValues | ChangeHandleDialogFormValues
-      ) => {
-        try {
-          if ("handle" in saveFormValues) {
-            await updatePromptConfig(config.id, {
-              handle: saveFormValues.handle,
-              scope: saveFormValues.scope,
+  const triggerSaveVersion: PromptConfigContextType["triggerSaveVersion"] =
+    useCallback(
+      ({ id, data, onSuccess, onError }) => {
+        const onSubmit = async (formValues: SaveDialogFormValues) => {
+          try {
+            const prompt = await updatePrompt({
+              projectId,
+              id,
+              data: {
+                ...data,
+                commitMessage: formValues.commitMessage,
+              },
             });
+            onSuccess?.(prompt);
+          } catch (error) {
+            onError?.(error as Error);
+          } finally {
+            setSaveVersionDialogProps(null);
           }
+        };
 
-          if (saveFormValues.saveNewVersion) {
-            const version = await createNewVersion(
-              config.id,
-              promptConfigFormValuesVersionToLlmConfigVersionConfigData(
-                updateConfigValues.version
-              ),
-              saveFormValues.commitMessage
-            );
-            toaster.success({
-              title: "Version saved",
-              description: `Version ${version.version} has been saved successfully.`,
+        setSaveVersionDialogProps({
+          isOpen: true,
+          onClose: () => setSaveVersionDialogProps(null),
+          onSubmit,
+        });
+      },
+      [updatePrompt, projectId]
+    );
+
+  const triggerCreatePrompt: PromptConfigContextType["triggerCreatePrompt"] =
+    useCallback(
+      ({ data, onSuccess, onError }) => {
+        const onSubmit = async (formValues: ChangeHandleFormValues) => {
+          try {
+            const prompt = await createPrompt({
+              projectId,
+              data: {
+                ...data,
+                handle: formValues.handle,
+                scope: formValues.scope,
+                commitMessage: "Initial version",
+              },
             });
-          } else {
-            if (
-              "handle" in saveFormValues &&
-              config.handle !== saveFormValues.handle
-            ) {
-              toaster.success({
-                title: "Prompt config updated",
-                description: `Prompt identifier has been updated successfully.`,
-              });
-            } else {
-              toaster.success({
-                title: "Prompt config updated",
-                description: `Prompt scope has been updated successfully.`,
-              });
+            onSuccess?.(prompt);
+          } catch (error) {
+            onError?.(error as Error);
+          } finally {
+            setCreatePromptDialogProps(null);
+          }
+        };
+
+        setCreatePromptDialogProps({
+          isOpen: true,
+          onClose: () => setCreatePromptDialogProps(null),
+          onSubmit,
+        });
+      },
+      [createPrompt, projectId]
+    );
+
+  const triggerChangeHandle: PromptConfigContextType["triggerChangeHandle"] =
+    useCallback(
+      ({ id, onSuccess, onError }) => {
+        void (async () => {
+          try {
+            const prompt = await getPromptById({ id, projectId });
+
+            if (!prompt) {
+              throw new Error("Prompt not found");
             }
+
+            const onSubmit = async (formValues: ChangeHandleFormValues) => {
+              try {
+                const updatedPrompt = await updateHandle({
+                  projectId,
+                  id,
+                  data: formValues,
+                });
+                onSuccess?.(updatedPrompt);
+              } catch (error) {
+                onError?.(error as Error);
+              } finally {
+                setChangeHandleDialogProps(null);
+              }
+            };
+
+            setChangeHandleDialogProps({
+              isOpen: true,
+              onClose: () => setChangeHandleDialogProps(null),
+              currentHandle: prompt.handle,
+              currentScope: prompt.scope,
+              onSubmit,
+            });
+          } catch (error) {
+            onError?.(error as Error);
           }
-
-          closeDialog();
-        } catch (error) {
-          console.error(error);
-          toaster.error({
-            title: "Failed to save version",
-            description:
-              error instanceof Error ? error.message : "Please try again.",
-          });
-        }
-      };
-
-      openDialog();
-    },
-    [openDialog, updatePromptConfig, createNewVersion, closeDialog]
-  );
-
-  const firstTimeSave = !!(
-    currentConfig &&
-    (!currentConfig.handle ||
-      // currentConfig.handle === currentConfig.id || // possibly not needed
-      currentConfig.latestVersion.version === 0)
-  );
+        })();
+      },
+      [updateHandle, getPromptById, projectId]
+    );
 
   return (
-    <PromptConfigContext.Provider value={{ triggerSaveVersion }}>
+    <PromptConfigContext.Provider
+      value={{ triggerCreatePrompt, triggerSaveVersion, triggerChangeHandle }}
+    >
       {children}
-      {currentConfig && (firstTimeSave || editingHandleOrScope) ? (
-        <ChangeHandleDialog
-          config={currentConfig}
-          isOpen={isOpen}
-          onClose={closeDialog}
-          onSubmit={async (changeHandleFormValues) => {
-            if (!updateConfigClosureRef.current)
-              throw new Error("No closure found");
-            await updateConfigClosureRef.current(changeHandleFormValues);
-          }}
-          firstTimeSave={firstTimeSave}
-        />
-      ) : (
-        <SaveVersionDialog
-          isOpen={isOpen}
-          onClose={closeDialog}
-          onSubmit={async (saveFormValues) => {
-            if (!updateConfigClosureRef.current)
-              throw new Error("No closure found");
-            await updateConfigClosureRef.current(saveFormValues);
-          }}
-        />
-      )}
+
+      {/* 
+      We cannot render the dialogs conditionally - doing so will break the state machine of chakra dialogs
+      ie: index.mjs:321 [@zag-js/core > transition] Cannot transition a stopped machine
+       */}
+      <SaveVersionDialog
+        isOpen={false}
+        onClose={() => void 0}
+        onSubmit={() => Promise.resolve()}
+        {...saveVersionDialogProps}
+      />
+
+      <ChangeHandleDialog
+        isOpen={false}
+        onClose={() => void 0}
+        onSubmit={() => Promise.resolve()}
+        {...createPromptDialogProps}
+      />
+
+      <ChangeHandleDialog
+        isOpen={false}
+        onClose={() => void 0}
+        onSubmit={() => Promise.resolve()}
+        {...changeHandleDialogProps}
+      />
     </PromptConfigContext.Provider>
   );
 }

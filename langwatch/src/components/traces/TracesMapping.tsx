@@ -11,6 +11,7 @@ import {
 
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { ArrowRight } from "react-feather";
+import { Select as MultiSelect } from "chakra-react-select";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import type { DatasetRecordEntry } from "../../server/datasets/types";
 import {
@@ -44,7 +45,7 @@ export const DATASET_INFERRED_MAPPINGS_BY_NAME: Record<
   spans: "spans",
 };
 const DATASET_INFERRED_MAPPINGS_BY_NAME_TRANSPOSED = Object.entries(
-  DATASET_INFERRED_MAPPINGS_BY_NAME
+  DATASET_INFERRED_MAPPINGS_BY_NAME,
 ).reduce(
   (acc, [key, value]) => {
     if (acc[value]) {
@@ -54,7 +55,7 @@ const DATASET_INFERRED_MAPPINGS_BY_NAME_TRANSPOSED = Object.entries(
     }
     return acc;
   },
-  {} as Record<string, string[]>
+  {} as Record<string, string[]>,
 );
 
 export const TracesMapping = ({
@@ -104,30 +105,59 @@ export const TracesMapping = ({
       projectId: project?.id ?? "",
       traceIds: traces.map((trace) => trace.trace_id),
     },
-    { enabled: !!project, refetchOnWindowFocus: false }
+    { enabled: !!project, refetchOnWindowFocus: false },
   );
   const getAnnotationScoreOptions = api.annotationScore.getAllActive.useQuery(
     { projectId: project?.id ?? "" },
     {
       enabled: !!project?.id,
       refetchOnWindowFocus: false,
-    }
+    },
+  );
+
+  // Get all unique thread_ids from the current traces
+  const threadIds = useMemo(() => {
+    const ids = traces
+      .map((trace) => trace.metadata?.thread_id)
+      .filter((id): id is string => !!id);
+    return Array.from(new Set(ids));
+  }, [traces]);
+
+  // Fetch all traces for these thread_ids
+  const allThreadTraces = api.traces.getTracesWithSpansByThreadIds.useQuery(
+    {
+      projectId: project?.id ?? "",
+      threadIds,
+    },
+    {
+      enabled: !!project?.id && threadIds.length > 0,
+      refetchOnWindowFocus: false,
+    },
   );
   const traces_ = useMemo(
     () =>
       traces.map((trace) => ({
         ...trace,
         annotations: annotationScores.data?.filter(
-          (annotation) => annotation.traceId === trace.trace_id
+          (annotation) => annotation.traceId === trace.trace_id,
         ),
       })),
-    [traces, annotationScores.data]
+    [traces, annotationScores.data],
   );
 
   const currentMapping = traceMapping ?? { mapping: {}, expansions: [] };
 
   type LocalTraceMappingState = Omit<MappingState, "expansions"> & {
     expansions: Set<keyof typeof TRACE_EXPANSIONS>;
+    mapping: Record<
+      string,
+      {
+        source: keyof typeof TRACE_MAPPINGS | "";
+        key?: string;
+        subkey?: string;
+        selectedFields?: string[];
+      }
+    >;
   };
 
   const [traceMappingState, setTraceMappingState_] =
@@ -137,7 +167,9 @@ export const TracesMapping = ({
     });
   const setTraceMappingState = useCallback(
     (
-      callback: (mappingState: LocalTraceMappingState) => LocalTraceMappingState
+      callback: (
+        mappingState: LocalTraceMappingState,
+      ) => LocalTraceMappingState,
     ) => {
       const newMappingState = callback(traceMappingState);
       setTraceMappingState_(newMappingState);
@@ -146,7 +178,7 @@ export const TracesMapping = ({
         expansions: Array.from(newMappingState.expansions),
       });
     },
-    [traceMappingState, setTraceMapping]
+    [traceMappingState, setTraceMapping],
   );
   const mapping = traceMappingState.mapping;
 
@@ -156,14 +188,14 @@ export const TracesMapping = ({
         .map((mapping) => {
           const source =
             mapping.source && mapping.source in TRACE_MAPPINGS
-              ? TRACE_MAPPINGS[mapping.source as keyof typeof TRACE_MAPPINGS]
+              ? TRACE_MAPPINGS[mapping.source]
               : undefined;
           if (source && "expandable_by" in source && source.expandable_by) {
             return source.expandable_by;
           }
           return undefined;
         })
-        .filter((x): x is keyof typeof TRACE_EXPANSIONS => x !== undefined)
+        .filter((x): x is keyof typeof TRACE_EXPANSIONS => x !== undefined),
     );
 
     return result;
@@ -172,10 +204,10 @@ export const TracesMapping = ({
     () =>
       new Set(
         Array.from(traceMappingState.expansions).filter((x) =>
-          availableExpansions.has(x)
-        )
+          availableExpansions.has(x),
+        ),
       ),
-    [traceMappingState.expansions, availableExpansions]
+    [traceMappingState.expansions, availableExpansions],
   );
 
   const now = useMemo(() => new Date().getTime(), []);
@@ -189,11 +221,12 @@ export const TracesMapping = ({
           name,
           // Prefer existing mapping from traceMappingState, then currentMapping, then default
           traceMappingState.mapping[name] ??
-            currentMapping.mapping[name] ?? {
+            (currentMapping.mapping[name] as any) ?? {
               source: (DATASET_INFERRED_MAPPINGS_BY_NAME[name] ??
                 "") as keyof typeof TRACE_MAPPINGS,
+              selectedFields: [],
             },
-        ]) ?? []
+        ]) ?? [],
       ),
       expansions:
         traceMappingState.expansions.size > 0
@@ -214,7 +247,9 @@ export const TracesMapping = ({
       JSON.stringify(traceMappingState) !==
         JSON.stringify(traceMappingStateWithDefaults)
     ) {
-      setTraceMappingState_(traceMappingStateWithDefaults);
+      setTraceMappingState_(
+        traceMappingStateWithDefaults as LocalTraceMappingState,
+      );
       setTraceMapping?.({
         ...traceMappingStateWithDefaults,
         expansions: Array.from(traceMappingStateWithDefaults.expansions),
@@ -229,14 +264,14 @@ export const TracesMapping = ({
       dsl.targetEdges.map((edge) => [
         edge.targetHandle?.split(".")[1] ?? "",
         edge,
-      ])
+      ]),
     );
     const targetEdgesWithDefaults = [
       ...dsl.targetEdges.filter(
         (edge) =>
           dsl.sourceOptions[edge.source]?.fields.includes(
-            edge.sourceHandle?.split(".")[1] ?? ""
-          )
+            edge.sourceHandle?.split(".")[1] ?? "",
+          ),
       ),
       ...(targetFields
         .map((targetField) => {
@@ -254,7 +289,7 @@ export const TracesMapping = ({
             | { source: string; sourceHandle: string }
             | undefined;
           for (const [source, { fields }] of Object.entries(
-            dsl.sourceOptions
+            dsl.sourceOptions,
           )) {
             for (const option of mappingOptions) {
               if (option && fields.includes(option)) {
@@ -302,7 +337,8 @@ export const TracesMapping = ({
         trace,
         mapping,
         expansions,
-        getAnnotationScoreOptions.data
+        getAnnotationScoreOptions.data,
+        allThreadTraces.data ?? traces_,
       );
 
       // Add each expanded entry to the final results
@@ -323,11 +359,12 @@ export const TracesMapping = ({
     mapping,
     setDatasetEntries,
     traces_,
+    allThreadTraces.data,
     project?.id,
     now,
   ]);
 
-  const isThreeColumns = task === "real_time";
+  const isThreeColumns = task === "real_time" && !!dsl;
 
   return (
     <Grid
@@ -351,11 +388,13 @@ export const TracesMapping = ({
         ([targetField, { source, key, subkey }], index) => {
           const traceMappingDefinition =
             source && source in TRACE_MAPPINGS
-              ? TRACE_MAPPINGS[source as keyof typeof TRACE_MAPPINGS]
+              ? TRACE_MAPPINGS[source]
               : undefined;
 
           const subkeys =
-            traceMappingDefinition && "subkeys" in traceMappingDefinition
+            traceMappingDefinition &&
+            "subkeys" in traceMappingDefinition &&
+            source !== "threads"
               ? traceMappingDefinition.subkeys(traces_, key!, {
                   annotationScoreOptions: getAnnotationScoreOptions.data,
                 })
@@ -380,7 +419,7 @@ export const TracesMapping = ({
 
                           dsl.setTargetEdges?.([
                             ...(dsl.targetEdges?.filter(
-                              (edge) => edge.targetHandle !== targetHandle
+                              (edge) => edge.targetHandle !== targetHandle,
                             ) ?? []),
                             {
                               id: `${Date.now()}-${index}`,
@@ -418,7 +457,7 @@ export const TracesMapping = ({
                                 {options}
                               </optgroup>
                             );
-                          }
+                          },
                         )}
                       </NativeSelect.Field>
                       <NativeSelect.Indicator />
@@ -450,7 +489,7 @@ export const TracesMapping = ({
                                 "expandable_by" in targetMapping &&
                                 targetMapping.expandable_by &&
                                 !availableExpansions.has(
-                                  targetMapping.expandable_by
+                                  targetMapping.expandable_by,
                                 )
                               ) {
                                 newExpansions = new Set([
@@ -469,6 +508,7 @@ export const TracesMapping = ({
                                       | "",
                                     key: undefined,
                                     subkey: undefined,
+                                    selectedFields: [],
                                   },
                                 },
                                 expansions: newExpansions,
@@ -530,7 +570,7 @@ export const TracesMapping = ({
                                       <option key={key} value={key}>
                                         {label}
                                       </option>
-                                    )
+                                    ),
                                   )}
                               </NativeSelect.Field>
                               <NativeSelect.Indicator />
@@ -578,11 +618,63 @@ export const TracesMapping = ({
                                   <option key={key} value={key}>
                                     {label}
                                   </option>
-                                )
+                                ),
                               )}
                             </NativeSelect.Field>
                             <NativeSelect.Indicator />
                           </NativeSelect.Root>
+                        </HStack>
+                      )}
+                      {source === "threads" && (
+                        <HStack align="start" width="full">
+                          <Box
+                            width="16px"
+                            minWidth="16px"
+                            height="24px"
+                            border="2px solid"
+                            borderRadius="0 0 0 6px"
+                            borderColor="gray.300"
+                            borderTop={0}
+                            borderRight={0}
+                            marginLeft="12px"
+                          />
+                          <MultiSelect
+                            isMulti
+                            options={Object.keys(TRACE_MAPPINGS).map((key) => ({
+                              label: key,
+                              value: key,
+                            }))}
+                            value={(
+                              mapping[targetField]?.selectedFields ?? []
+                            ).map((field) => ({
+                              label: field,
+                              value: field,
+                            }))}
+                            onChange={(newValue) => {
+                              setTraceMappingState((prev) => ({
+                                ...prev,
+                                mapping: {
+                                  ...prev.mapping,
+                                  [targetField]: {
+                                    ...(prev.mapping[targetField] as any),
+                                    selectedFields: newValue.map(
+                                      (v) => v.value,
+                                    ),
+                                  },
+                                },
+                              }));
+                            }}
+                            placeholder="Select trace fields..."
+                            closeMenuOnSelect={false}
+                            hideSelectedOptions={false}
+                            chakraStyles={{
+                              container: (base) => ({
+                                ...base,
+                                width: "100%",
+                                minWidth: "150px",
+                              }),
+                            }}
+                          />
                         </HStack>
                       )}
                     </VStack>
@@ -599,7 +691,7 @@ export const TracesMapping = ({
               </GridItem>
             </React.Fragment>
           );
-        }
+        },
       )}
 
       {!disableExpansions && availableExpansions.size > 0 && (
@@ -630,8 +722,8 @@ export const TracesMapping = ({
                           ? new Set([...prev.expansions, expansion])
                           : new Set(
                               Array.from(prev.expansions).filter(
-                                (x) => x !== expansion
-                              )
+                                (x) => x !== expansion,
+                              ),
                             );
 
                       return {

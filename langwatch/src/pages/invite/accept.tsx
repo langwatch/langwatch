@@ -41,7 +41,6 @@ export default function Accept() {
             meta: {
               closable: true,
             },
-            placement: "top-end",
             duration: 5000,
           });
 

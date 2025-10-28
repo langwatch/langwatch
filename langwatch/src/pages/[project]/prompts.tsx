@@ -1,9 +1,6 @@
 import { Flex, Spacer, VStack, Tabs, Badge } from "@chakra-ui/react";
 import { useState, useMemo, useRef, useEffect, useCallback } from "react";
 import { Plus } from "react-feather";
-
-import type { LlmConfigWithLatestVersion } from "~/server/prompt-config/repositories/llm-config.repository";
-
 import { DeleteConfirmationDialog } from "~/components/annotations/DeleteConfirmationDialog";
 import { DashboardLayout } from "~/components/DashboardLayout";
 import { CENTER_CONTENT_BOX_ID } from "~/components/executable-panel/InputOutputExecutablePanel";
@@ -13,8 +10,9 @@ import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { usePromptIdQueryParam } from "~/hooks/usePromptIdQueryParam";
 import { PromptConfigPanel } from "~/prompt-configs/PromptConfigPanel";
 import { PromptsList } from "~/prompt-configs/PromptsList";
-import { createDraftHandle } from "~/prompt-configs/utils/create-handle";
 import { api } from "~/utils/api";
+import { usePrompts } from "~/prompt-configs/hooks";
+import type { VersionedPrompt } from "~/server/prompt-config/prompt.service";
 
 /**
  * Custom hook for managing prompt configuration data operations and state.
@@ -41,79 +39,65 @@ import { api } from "~/utils/api";
  * }
  */
 function usePromptConfigManagement(projectId: string | undefined) {
-  const utils = api.useContext();
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
-  const [configToDelete, setConfigToDelete] =
-    useState<LlmConfigWithLatestVersion | null>(null);
+  const [configToDelete, setConfigToDelete] = useState<{ id: string } | null>(
+    null
+  );
+  const { deletePrompt } = usePrompts();
 
   // Fetch all prompt configs for the current project.
-  const {
-    data: promptConfigs,
-    refetch: refetchPromptConfigs,
-    isLoading,
-  } = api.llmConfigs.getPromptConfigs.useQuery(
-    {
-      projectId: projectId ?? "",
-    },
-    {
-      enabled: !!projectId,
-      onError: (error) => {
-        // Show error toast if fetching fails
-        toaster.create({
-          title: "Error loading prompt configs",
-          description: error.message,
-          type: "error",
-        });
+  const { data: promptConfigs, isLoading } =
+    api.prompts.getAllPromptsForProject.useQuery(
+      {
+        projectId: projectId ?? "",
       },
-    }
-  );
-
-  // Mutation for creating a new prompt config with an initial version.
-  const createConfigWithInitialVersionMutation =
-    api.llmConfigs.createConfigWithInitialVersion.useMutation();
+      {
+        enabled: !!projectId,
+        onError: (error) => {
+          // Show error toast if fetching fails
+          toaster.create({
+            title: "Error loading prompt configs",
+            description: error.message,
+            type: "error",
+          });
+        },
+      }
+    );
 
   // Mutation for deleting a prompt config.
-  const deleteConfigMutation = api.llmConfigs.deletePromptConfig.useMutation({
-    onSuccess: () => {
-      // Invalidate prompt config cache and show success toast.
-      void utils.llmConfigs.getPromptConfigs.invalidate();
-      toaster.create({
-        title: "Prompt config deleted",
-        type: "success",
-        meta: {
-          closable: true,
-        },
-      });
-    },
-    onError: (error) => {
-      // Show error toast if deletion fails
-      toaster.create({
-        title: "Error deleting prompt config",
-        description: error instanceof Error ? error.message : "Unknown error",
-        type: "error",
-        meta: {
-          closable: true,
-        },
-      });
-    },
-  });
+  const deleteConfigMutation = useCallback(
+    async ({ id }: { id: string }) => {
+      if (!projectId) {
+        toaster.create({
+          title: "Error deleting prompt config",
+          description: "Project ID is required",
+          type: "error",
+        });
 
-  /**
-   * Create a new prompt config for the given project.
-   * @param name Name for the new prompt config.
-   * @param projectId Project ID to associate the config with.
-   * @returns The created prompt config.
-   */
-  const createConfig = useCallback(
-    async (handle: string, projectId: string) => {
-      const result = await createConfigWithInitialVersionMutation.mutateAsync({
-        handle,
-        projectId,
-      });
-      void refetchPromptConfigs();
-      return result;
+        return;
+      }
+
+      try {
+        await deletePrompt({
+          idOrHandle: id,
+          projectId,
+        });
+        toaster.create({
+          title: "Prompt config deleted",
+          type: "success",
+          meta: {
+            closable: true,
+          },
+        });
+      } catch (error) {
+        toaster.create({
+          title: "Error deleting prompt config",
+          description: error instanceof Error ? error.message : "Unknown error",
+          type: "error",
+        });
+      }
     },
-    [createConfigWithInitialVersionMutation, refetchPromptConfigs]
+    [deletePrompt, projectId]
   );
 
   /**
@@ -121,7 +105,7 @@ function usePromptConfigManagement(projectId: string | undefined) {
    * @param config The config to delete.
    */
   const handleDeleteConfig = useCallback(
-    (config: LlmConfigWithLatestVersion) => {
+    (config: { id: string }) => {
       setConfigToDelete(config);
       setIsDeleteDialogOpen(true);
     },
@@ -136,12 +120,9 @@ function usePromptConfigManagement(projectId: string | undefined) {
     if (!configToDelete) return;
 
     try {
-      await deleteConfigMutation.mutateAsync({
+      await deleteConfigMutation({
         id: configToDelete.id,
-        projectId: configToDelete.projectId,
       });
-
-      await refetchPromptConfigs();
     } catch (error) {
       toaster.create({
         title: "Error deleting prompt config",
@@ -149,15 +130,32 @@ function usePromptConfigManagement(projectId: string | undefined) {
         type: "error",
       });
     }
-  }, [configToDelete, deleteConfigMutation, refetchPromptConfigs]);
+  }, [configToDelete, deleteConfigMutation]);
+
+  const { publishedPrompts, draftPrompts } = useMemo(() => {
+    return (promptConfigs ?? []).reduce(
+      (acc, config) => {
+        if (config.handle && config.version > 0) {
+          acc.publishedPrompts.push(config);
+        } else {
+          acc.draftPrompts.push(config);
+        }
+        return acc;
+      },
+      {
+        publishedPrompts: [] as VersionedPrompt[],
+        draftPrompts: [] as VersionedPrompt[],
+      }
+    );
+  }, [promptConfigs]);
 
   return {
     promptConfigs,
+    publishedPrompts,
+    draftPrompts,
     isLoading,
-    refetchPromptConfigs,
     isDeleteDialogOpen,
     setIsDeleteDialogOpen,
-    createConfig,
     handleDeleteConfig,
     confirmDeleteConfig,
   };
@@ -186,13 +184,13 @@ export default function PromptConfigsPage() {
 
   // Use custom hook to manage prompt config data and actions.
   const {
-    promptConfigs,
     isLoading,
     isDeleteDialogOpen,
     setIsDeleteDialogOpen,
-    createConfig,
     handleDeleteConfig,
     confirmDeleteConfig,
+    publishedPrompts,
+    draftPrompts,
   } = usePromptConfigManagement(project?.id);
 
   // When a new prompt is selected, always expand the panel.
@@ -224,10 +222,7 @@ export default function PromptConfigsPage() {
         return;
       }
 
-      // Create a new prompt config with default handle.
-      const handle = createDraftHandle();
-      const result = await createConfig(handle, project.id);
-      setSelectedPromptId(result.id);
+      setSelectedPromptId("draft");
     } catch (error) {
       toaster.create({
         title: `Error creating prompt config`,
@@ -241,7 +236,7 @@ export default function PromptConfigsPage() {
    * Handler for editing a prompt config.
    * Opens the config in the side panel.
    */
-  const handleEditConfig = async (config: LlmConfigWithLatestVersion) => {
+  const handleEditConfig = async (config: { id: string }) => {
     setSelectedPromptId(config.id);
     setIsPaneExpanded(true);
   };
@@ -264,23 +259,6 @@ export default function PromptConfigsPage() {
     panelRef.current?.querySelector(
       `#${CENTER_CONTENT_BOX_ID}`
     ) as HTMLDivElement | null;
-
-  const { publishedPrompts, draftPrompts } = useMemo(() => {
-    return (promptConfigs ?? []).reduce(
-      (acc, config) => {
-        if (config.handle && config.latestVersion.version > 0) {
-          acc.publishedPrompts.push(config);
-        } else {
-          acc.draftPrompts.push(config);
-        }
-        return acc;
-      },
-      {
-        publishedPrompts: [] as LlmConfigWithLatestVersion[],
-        draftPrompts: [] as LlmConfigWithLatestVersion[],
-      }
-    );
-  }, [promptConfigs]);
 
   return (
     <DashboardLayout position="relative">
@@ -333,7 +311,7 @@ export default function PromptConfigsPage() {
                 </Tabs.List>
                 <Tabs.Content value="published">
                   <PromptsList
-                    configs={publishedPrompts ?? []}
+                    prompts={publishedPrompts ?? []}
                     isLoading={isLoading}
                     onDelete={async (config) => {
                       void handleDeleteConfig(config);
@@ -343,7 +321,7 @@ export default function PromptConfigsPage() {
                 </Tabs.Content>
                 <Tabs.Content value="draft">
                   <PromptsList
-                    configs={draftPrompts ?? []}
+                    prompts={draftPrompts ?? []}
                     isLoading={isLoading}
                     onDelete={async (config) => {
                       void handleDeleteConfig(config);

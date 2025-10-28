@@ -84,12 +84,14 @@ const ModelSelectorWithWarning = ({
 const ArrayField = <T extends EvaluatorTypes>({
   fieldSchema,
   fieldName,
+  prefix,
   evaluator,
   variant = "default",
   renderField,
 }: {
   fieldSchema: ZodType;
   fieldName: string;
+  prefix: string;
   evaluator: EvaluatorDefinition<T> | undefined;
   variant?: "default" | "studio";
   renderField: <T extends EvaluatorTypes>(
@@ -99,7 +101,7 @@ const ArrayField = <T extends EvaluatorTypes>({
   ) => React.JSX.Element | null;
 }) => {
   const { control } = useFormContext();
-  const fullPath = fieldName;
+  const fullPath = prefix ? `${prefix}.${fieldName}` : fieldName;
 
   const { fields, append, remove } = useFieldArray({
     control,
@@ -226,7 +228,7 @@ const DynamicZodForm = ({
     const fieldSchema_ =
       fieldSchema instanceof z.ZodOptional ? fieldSchema.unwrap() : fieldSchema;
 
-    const fieldKey = fieldName.split(".").reverse()[0] ?? "";
+    const fieldKey = fieldName.split(".").toReversed()[0] ?? "";
 
     if (fieldSchema_ instanceof z.ZodDefault) {
       return renderField(fieldSchema_._def.innerType, fieldName, evaluator);
@@ -270,7 +272,7 @@ const DynamicZodForm = ({
               fontWeight={variant === "studio" ? 400 : undefined}
               fontSize={variant === "studio" ? "13px" : undefined}
             >
-              {camelCaseToTitleCase(fieldName.split(".").reverse()[0] ?? "")}
+              {camelCaseToTitleCase(fieldName.split(".").toReversed()[0] ?? "")}
             </Field.Label>
           </HStack>
         </Field.Root>
@@ -372,7 +374,8 @@ const DynamicZodForm = ({
       return (
         <ArrayField
           fieldSchema={fieldSchema_}
-          fieldName={fullPath}
+          fieldName={fieldName}
+          prefix={prefix}
           evaluator={evaluator}
           variant={variant}
           renderField={renderField}

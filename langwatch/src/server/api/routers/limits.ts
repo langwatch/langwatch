@@ -72,7 +72,7 @@ type CacheEntry = {
   lastUpdated: number;
 };
 
-const ONE_HOUR = 60 * 60 * 1000;
+const FIVE_MINUTES = 5 * 60 * 1000;
 const messageCountCache = new Map<string, CacheEntry>();
 
 export const getCurrentMonthMessagesCount = async (
@@ -87,7 +87,7 @@ export const getCurrentMonthMessagesCount = async (
   const cachedResult = messageCountCache.get(cacheKey);
 
   // Return cached result if valid
-  if (cachedResult && now - cachedResult.lastUpdated < ONE_HOUR) {
+  if (cachedResult && now - cachedResult.lastUpdated < FIVE_MINUTES) {
     return cachedResult.count;
   }
 

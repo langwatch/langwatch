@@ -8,6 +8,7 @@ on:
     paths:
       - "python-sdk/**"
       - "!python-sdk/src/langwatch/__version__.py"
+      - ".github/.release-please-manifest.json"
   workflow_dispatch:
 
 jobs:

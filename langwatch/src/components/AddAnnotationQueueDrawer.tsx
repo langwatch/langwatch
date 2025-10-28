@@ -154,7 +154,6 @@ export const AddAnnotationQueueDrawer = ({
             meta: {
               closable: true,
             },
-            placement: "top-end",
           });
           handleClose();
           reset();
@@ -167,7 +166,6 @@ export const AddAnnotationQueueDrawer = ({
             meta: {
               closable: true,
             },
-            placement: "top-end",
           });
         },
       }

@@ -18,11 +18,13 @@ export type AnalyticsMetric = {
   };
   allowedAggregations: AggregationTypes[];
   aggregation: (
+    index: number,
     aggregation: AggregationTypes,
     key: string | undefined,
     subkey: string | undefined
   ) => Record<string, AggregationsAggregationContainer>;
   extractionPath: (
+    index: number,
     aggregations: AggregationTypes,
     key: string | undefined,
     subkey: string | undefined

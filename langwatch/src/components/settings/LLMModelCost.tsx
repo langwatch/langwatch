@@ -234,7 +234,6 @@ function ActionsMenu({
                       meta: {
                         closable: true,
                       },
-                      placement: "top-end",
                     });
                     void llmModelCosts.refetch();
                   },
@@ -246,7 +245,6 @@ function ActionsMenu({
                       meta: {
                         closable: true,
                       },
-                      placement: "top-end",
                     });
                   },
                 }

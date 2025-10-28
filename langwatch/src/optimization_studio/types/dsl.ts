@@ -2,12 +2,9 @@ import type { Edge, Node } from "@xyflow/react";
 import { z } from "zod";
 
 import type { EvaluatorTypes } from "~/server/evaluations/evaluators.generated";
-
-import {
-  datasetColumnTypeSchema,
-  type DatasetColumns,
-} from "../../server/datasets/types";
 import type { LlmConfigInputType, LlmConfigOutputType } from "~/types";
+
+import { datasetColumnTypeSchema } from "../../server/datasets/types";
 import type { ChatMessage } from "../../server/tracer/types";
 
 export const FIELD_TYPES = [
@@ -124,7 +121,7 @@ type PromptingTechniqueParameter = StronglyTypedFieldBase & {
 /**
  * Parameter specific to Demonstrations
  */
-type DemonstrationsParameter = StronglyTypedFieldBase & {
+export type DemonstrationsParameter = StronglyTypedFieldBase & {
   type: "dataset";
   identifier: "demonstrations";
   value: NodeDataset | undefined;
@@ -149,7 +146,17 @@ type MessagesParameter = StronglyTypedFieldBase & {
 };
 
 export type LlmPromptConfigComponent = Signature & {
-  configId: string;
+  // Config ID stored at root level
+  configId?: string;
+  handle?: string | null;
+
+  // Version metadata (optional, for database-sourced prompts)
+  versionMetadata?: {
+    versionId: string;
+    versionNumber: number;
+    versionCreatedAt: string; // ISO string
+  };
+
   inputs: (Omit<Field, "type"> & { type: LlmConfigInputType })[];
   outputs: (Omit<Field, "type"> & { type: LlmConfigOutputType })[];
   parameters: (
@@ -182,7 +189,11 @@ export const nodeDatasetSchema = z.object({
     .object({
       records: z.record(z.array(z.string())),
       columnTypes: z.array(
-        z.object({ name: z.string(), type: datasetColumnTypeSchema })
+        z.object({
+          id: z.string().optional(),
+          name: z.string(),
+          type: datasetColumnTypeSchema,
+        })
       ),
     })
     .optional(),

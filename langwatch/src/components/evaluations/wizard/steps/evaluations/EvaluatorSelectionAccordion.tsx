@@ -66,8 +66,10 @@ export const EvaluatorSelectionAccordion = ({
         variant="outline"
         colorPalette="green"
         value={getFirstEvaluatorNode()?.data.evaluator}
-        onValueChange={(e: { value: EvaluatorTypes | `custom/${string}` }) => {
-          handleEvaluatorSelect(e.value);
+        onValueChange={e => {
+          if (e.value) {
+            handleEvaluatorSelect(e.value as (EvaluatorTypes | `custom/${string}`));
+          }
         }}
         paddingTop={2}
         paddingBottom={5}

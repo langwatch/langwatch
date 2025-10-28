@@ -211,9 +211,11 @@ export const CategorySelectionAccordion = ({
         variant="outline"
         colorPalette="green"
         value={wizardState.evaluatorCategory}
-        onValueChange={(e: { value: string }) =>
-          handleCategorySelect(e.value as EvaluationCategory)
-        }
+        onValueChange={e => {
+          if (e.value) {
+            handleCategorySelect(e.value as EvaluationCategory)
+          }
+        }}
         paddingTop={2}
         paddingBottom={5}
         paddingX="1px"

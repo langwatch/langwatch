@@ -118,7 +118,6 @@ export function CustomGraph({
   input,
   titleProps,
   hideGroupLabel = false,
-  size = "md",
   filters,
 }: {
   input: CustomGraphInput;
@@ -245,7 +244,7 @@ const CustomGraph_ = React.memo(
     );
     const sortedKeys = expectedKeys
       .filter((key) => keysToSum[key]! !== 0)
-      .sort((a, b) => {
+      .toSorted((a, b) => {
         const totalA = keysToSum[a]!;
         const totalB = keysToSum[b]!;
 
@@ -253,15 +252,16 @@ const CustomGraph_ = React.memo(
       });
 
     const seriesByKey = Object.fromEntries(
-      input.series.map((series) => {
+      input.series.map((series, index) => {
         const key = [
+          index,
           series.metric,
           series.aggregation,
           series.pipeline?.field,
           series.pipeline?.aggregation,
           series.key,
         ]
-          .filter((x) => x)
+          .filter((x) => x !== undefined && x !== "")
           .join("/");
 
         return [key, series];
@@ -424,7 +424,7 @@ const CustomGraph_ = React.memo(
 
       const seriesSet = Object.fromEntries(
         input.series
-          .reverse()
+          .toReversed()
           .map((series) => [
             series.metric +
               series.aggregation +
@@ -518,7 +518,7 @@ const CustomGraph_ = React.memo(
         timeseries,
         nameForSeries
       );
-      const sortedCurrentData = summaryData.current.sort(
+      const sortedCurrentData = summaryData.current.toSorted(
         (a, b) => b.value - a.value
       );
 

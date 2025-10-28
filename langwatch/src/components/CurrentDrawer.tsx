@@ -11,6 +11,7 @@ import { UploadCSVModal } from "./datasets/UploadCSVModal";
 import { LLMModelCostDrawer } from "./settings/LLMModelCostDrawer";
 import { TraceDetailsDrawer } from "./TraceDetailsDrawer";
 import { EditTriggerFilterDrawer } from "./EditTriggerFilterDrawer";
+import { SeriesFiltersDrawer } from "./SeriesFilterDrawer";
 
 type DrawerProps = {
   open: string;
@@ -27,6 +28,7 @@ const drawers = {
   uploadCSV: UploadCSVModal,
   addOrEditDataset: AddOrEditDatasetDrawer,
   editTriggerFilter: EditTriggerFilterDrawer,
+  seriesFilters: SeriesFiltersDrawer,
 } satisfies Record<string, React.FC<any>>;
 
 // workaround to pass complexProps to drawers
