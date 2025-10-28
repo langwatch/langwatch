@@ -28,7 +28,7 @@ import { Tooltip } from "../ui/tooltip";
 import { RenderInputOutput } from "./RenderInputOutput";
 import { OverflownTextWithTooltip } from "../OverflownText";
 import { RedactedField } from "../ui/RedactedField";
-import { useGoToSpanInPlaygroundTab } from "~/prompt-configs/prompt-studio/hooks/useLoadSpanIntoPromptStudio";
+import { useGoToSpanInPlaygroundTabUrlBuilder } from "~/prompt-configs/prompt-studio/hooks/useLoadSpanIntoPromptStudio";
 
 export function SpanDetails({ span }: { project: Project; span: Span }) {
   const estimatedCost = (
@@ -39,7 +39,7 @@ export function SpanDetails({ span }: { project: Project; span: Span }) {
     </Tooltip>
   );
 
-  const { goToSpanInPlaygroundTab } = useGoToSpanInPlaygroundTab();
+  const { buildUrl } = useGoToSpanInPlaygroundTabUrlBuilder();
 
   const canOpenSpanInPromptStudio = useMemo(() => {
     return (
@@ -66,14 +66,12 @@ export function SpanDetails({ span }: { project: Project; span: Span }) {
             <b>Span ID:</b> <Text as="code">{span.span_id}</Text>
           </Text>
           {canOpenSpanInPromptStudio && (
-            <Button
-              size="xs"
-              colorPalette="orange"
-              onClick={() => goToSpanInPlaygroundTab(span.span_id)}
-            >
-              <Play size={16} />
-              Open in Playground
-            </Button>
+            <Link href={buildUrl(span.span_id).toString()} target="_blank">
+              <Button size="xs" colorPalette="orange">
+                <Play size={16} />
+                Open in Playground
+              </Button>
+            </Link>
           )}
         </HStack>
         <HStack>

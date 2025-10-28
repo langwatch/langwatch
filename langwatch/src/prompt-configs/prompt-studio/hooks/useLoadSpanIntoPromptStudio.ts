@@ -1,4 +1,4 @@
-import { api } from "~/utils/api";
+import { api, type RouterOutputs } from "~/utils/api";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useRouter } from "next/router";
 import { useSearchParams } from "next/navigation";
@@ -14,22 +14,20 @@ const QUERY_PARAM_PROMPT_PLAYGROUND_SPAN_ID = "promptPlaygroundSpanId";
  * Hook for navigation to prompt studio with a span ID.
  * Single Responsibility: Navigate to prompt studio page with span query param.
  */
-export function useGoToSpanInPlaygroundTab() {
-  const router = useRouter();
+export function useGoToSpanInPlaygroundTabUrlBuilder() {
   const { project } = useOrganizationTeamProject();
 
-  const goToSpanInPlaygroundTab = async (spanId: string) => {
-    return await router.push({
-      pathname: "/[project]/prompt-studio",
-      query: {
-        project: project?.slug,
-        spanId,
-      },
-    });
+  const buildUrl = (spanId: string) => {
+    const url = new URL(
+      `/${project?.slug}/prompt-studio`,
+      window.location.origin,
+    );
+    url.searchParams.set(QUERY_PARAM_PROMPT_PLAYGROUND_SPAN_ID, spanId);
+    return url;
   };
 
   return {
-    goToSpanInPlaygroundTab,
+    buildUrl,
   };
 }
 
@@ -59,15 +57,22 @@ function useSpanIdFromUrl() {
  * Creates default form values for a new prompt config.
  * Single Responsibility: Generate initial prompt configuration structure.
  */
-function createDefaultPromptFormValues(): PromptConfigFormValues {
+function createDefaultPromptFormValues(
+  spanData: RouterOutputs["spans"]["getForPromptStudio"],
+): PromptConfigFormValues {
   return {
     handle: null,
     scope: "PROJECT",
     version: {
       configData: {
-        prompt: "You are a helpful assistant.",
+        prompt:
+          typeof spanData.llmConfig?.systemPrompt === "string"
+            ? spanData.llmConfig.systemPrompt
+            : JSON.stringify(spanData.llmConfig?.systemPrompt),
         llm: {
-          model: DEFAULT_MODEL,
+          model: spanData.llmConfig.model,
+          temperature: spanData.llmConfig.temperature ?? undefined,
+          maxTokens: spanData.llmConfig.maxTokens,
         },
         inputs: [],
         outputs: [{ identifier: "output", type: "str" }],
@@ -116,7 +121,7 @@ export function useLoadSpanIntoPromptStudio() {
       });
 
       if (spanData) {
-        const defaultValues = createDefaultPromptFormValues();
+        const defaultValues = createDefaultPromptFormValues(spanData);
         const chatMessages = transformSpanMessagesToChat(
           spanData.messages,
           spanData.traceId,
