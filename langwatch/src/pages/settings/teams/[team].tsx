@@ -13,7 +13,10 @@ import { toaster } from "../../../components/ui/toaster";
 import type { TeamWithProjectsAndMembersAndUsers } from "../../../server/api/routers/organization";
 import { api } from "../../../utils/api";
 
-import { teamRolesOptions } from "../../../components/settings/TeamUserRoleField";
+import {
+  teamRolesOptions,
+  type RoleOption,
+} from "../../../components/settings/TeamUserRoleField";
 import { useOrganizationTeamProject } from "../../../hooks/useOrganizationTeamProject";
 
 // Type guards for safe access to custom role data
@@ -44,17 +47,7 @@ function isValidPermissions(permissions: unknown): permissions is string[] {
 function memberToRoleFormOption(
   assignedRole: unknown,
   builtInRole: TeamUserRole,
-):
-  | ReturnType<
-      typeof import("./TeamUserRoleField").teamRolesOptions
-    >[TeamUserRole]
-  | {
-      label: string;
-      value: string;
-      description: string;
-      isCustom: true;
-      customRoleId: string;
-    } {
+): RoleOption {
   if (assignedRole && isValidCustomRole(assignedRole)) {
     return {
       label: assignedRole.name,
@@ -66,7 +59,7 @@ function memberToRoleFormOption(
           : "Custom role"),
       isCustom: true,
       customRoleId: assignedRole.id,
-    };
+    } as RoleOption;
   }
   return teamRolesOptions[builtInRole];
 }
