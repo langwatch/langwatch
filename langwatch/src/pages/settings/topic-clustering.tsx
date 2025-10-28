@@ -14,8 +14,10 @@ import { toaster } from "../../components/ui/toaster";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { TopicClusteringModel } from "./model-providers";
 import { EmbeddingsModel } from "./model-providers";
+import { PermissionAlert } from "~/components/PermissionAlert";
+import { withPermissionGuard } from "~/components/WithPermissionGuard";
 
-export default function TopicClusteringSettings() {
+function TopicClusteringSettings() {
   const { project, hasPermission } = useOrganizationTeamProject({
     redirectToOnboarding: false,
   });
@@ -45,10 +47,11 @@ export default function TopicClusteringSettings() {
   );
 }
 
+export default withPermissionGuard("project:manage", {
+  layoutComponent: SettingsLayout,
+})(TopicClusteringSettings);
+
 function TopicClusteringCard({ project }: { project: { id: string } }) {
-  const { hasPermission } = useOrganizationTeamProject({
-    redirectToOnboarding: false,
-  });
   const triggerClustering = api.project.triggerTopicClustering.useMutation({
     onSuccess: () => {
       toaster.create({
@@ -66,19 +69,6 @@ function TopicClusteringCard({ project }: { project: { id: string } }) {
       });
     },
   });
-
-  // Only show to users with setup permissions
-  if (!hasPermission("project:manage")) {
-    return (
-      <Card.Root>
-        <Card.Body>
-          <Text color="gray.600">
-            You need project setup permissions to manage topic clustering.
-          </Text>
-        </Card.Body>
-      </Card.Root>
-    );
-  }
 
   return (
     <VStack

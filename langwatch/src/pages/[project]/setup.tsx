@@ -10,6 +10,6 @@ function SetupGuide() {
   );
 }
 
-export default withPermissionGuard("project:manage", {
+export default withPermissionGuard("project:view", {
   layoutComponent: DashboardLayout,
 })(SetupGuide);

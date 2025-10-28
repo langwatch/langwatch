@@ -20,6 +20,7 @@ import { NoDataInfoBlock } from "~/components/NoDataInfoBlock";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import SettingsLayout from "../../components/SettingsLayout";
 import { Link } from "../../components/ui/link";
+import { Tooltip } from "../../components/ui/tooltip";
 import { Menu } from "../../components/ui/menu";
 import { Switch } from "../../components/ui/switch";
 import { toaster } from "../../components/ui/toaster";
@@ -28,7 +29,7 @@ import { DeleteConfirmationDialog } from "../../components/annotations/DeleteCon
 import { withPermissionGuard } from "../../components/WithPermissionGuard";
 
 function AnnotationScorePage() {
-  const { project } = useOrganizationTeamProject();
+  const { project, hasPermission } = useOrganizationTeamProject();
 
   const { openDrawer, drawerOpen: isDrawerOpen, closeDrawer } = useDrawer();
 
@@ -128,13 +129,19 @@ function AnnotationScorePage() {
             Annotation Scoring
           </Heading>
           <Spacer />
-          <Button
-            size="sm"
-            colorPalette="orange"
-            onClick={() => openDrawer("addOrEditAnnotationScore")}
+          <Tooltip
+            content="You need annotations view permissions to add new scores."
+            disabled={hasPermission("annotations:manage")}
           >
-            <Plus size={20} /> Add new score metric
-          </Button>
+            <Button
+              size="sm"
+              colorPalette="orange"
+              onClick={() => openDrawer("addOrEditAnnotationScore")}
+              disabled={!hasPermission("annotations:manage")}
+            >
+              <Plus size={20} /> Add new score metric
+            </Button>
+          </Tooltip>
         </HStack>
         <Card.Root width="full">
           <Card.Body>
@@ -291,7 +298,7 @@ function AnnotationScorePage() {
   );
 }
 
-export default withPermissionGuard("annotations:manage", {
+export default withPermissionGuard("annotations:view", {
   layoutComponent: SettingsLayout,
 })(AnnotationScorePage);
 

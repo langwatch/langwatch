@@ -159,9 +159,15 @@ export default function ModelsPage() {
           <Card.Root width="full">
             <Card.Body width="full">
               <VStack gap={0} width="full" align="stretch">
-                <DefaultModel />
-                <TopicClusteringModel />
-                <EmbeddingsModel />
+                {!hasModelProvidersManagePermission ? (
+                  <PermissionAlert permission="project:manage" />
+                ) : (
+                  <>
+                    <DefaultModel />
+                    <TopicClusteringModel />
+                    <EmbeddingsModel />
+                  </>
+                )}
               </VStack>
             </Card.Body>
           </Card.Root>

@@ -42,7 +42,7 @@ import { withPermissionGuard } from "../../components/WithPermissionGuard";
  * with granular permission assignments.
  */
 function RolesSettings() {
-  const { organization } = useOrganizationTeamProject();
+  const { organization, hasPermission } = useOrganizationTeamProject();
 
   if (!organization) {
     return (
@@ -56,12 +56,15 @@ function RolesSettings() {
 
   return (
     <SettingsLayout>
-      <RolesManagement organizationId={organization.id} />
+      <RolesManagement
+        organizationId={organization.id}
+        hasPermission={hasPermission}
+      />
     </SettingsLayout>
   );
 }
 
-export default withPermissionGuard("organization:manage", {
+export default withPermissionGuard("organization:view", {
   layoutComponent: SettingsLayout,
 })(RolesSettings);
 
@@ -71,7 +74,13 @@ type RoleFormData = {
   permissions: Permission[];
 };
 
-function RolesManagement({ organizationId }: { organizationId: string }) {
+function RolesManagement({
+  organizationId,
+  hasPermission,
+}: {
+  organizationId: string;
+  hasPermission: (permission: Permission) => boolean;
+}) {
   const { open, onOpen, onClose } = useDisclosure();
   const {
     open: editOpen,
@@ -272,9 +281,18 @@ function RolesManagement({ organizationId }: { organizationId: string }) {
             access
           </Text>
         </VStack>
-        <Button colorPalette="orange" onClick={onOpen}>
-          <Plus size={16} /> Create Role
-        </Button>
+        <Tooltip
+          content="You need organization view permissions to create roles."
+          disabled={hasPermission("organization:manage")}
+        >
+          <Button
+            colorPalette="orange"
+            onClick={onOpen}
+            disabled={!hasPermission("organization:manage")}
+          >
+            <Plus size={16} /> Create Role
+          </Button>
+        </Tooltip>
       </HStack>
 
       <Separator />
@@ -362,6 +380,7 @@ function RolesManagement({ organizationId }: { organizationId: string }) {
               name={role.name}
               description={role.description ?? ""}
               permissionCount={`${role.permissions.length} permissions`}
+              hasPermission={hasPermission}
               onDelete={() => {
                 if (
                   confirm(
@@ -597,6 +616,7 @@ function RoleCard({
   onDelete,
   onEdit,
   onViewPermissions,
+  hasPermission,
 }: {
   name: string;
   description: string;
@@ -606,6 +626,7 @@ function RoleCard({
   onDelete?: () => void;
   onEdit?: () => void;
   onViewPermissions?: () => void;
+  hasPermission: (permission: Permission) => boolean;
 }) {
   return (
     <Card.Root
@@ -639,6 +660,7 @@ function RoleCard({
                   variant="ghost"
                   colorPalette="blue"
                   onClick={onViewPermissions}
+                  disabled={!hasPermission("organization:manage")}
                 >
                   <Eye size={14} />
                 </Button>
@@ -649,6 +671,7 @@ function RoleCard({
                   variant="ghost"
                   colorPalette="orange"
                   onClick={onEdit}
+                  disabled={!hasPermission("organization:manage")}
                 >
                   <Edit size={14} />
                 </Button>
@@ -659,6 +682,7 @@ function RoleCard({
                   variant="ghost"
                   colorPalette="red"
                   onClick={onDelete}
+                  disabled={!hasPermission("organization:manage")}
                 >
                   <Trash2 size={14} />
                 </Button>

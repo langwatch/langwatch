@@ -33,7 +33,7 @@ function Teams() {
   return <TeamsList teams={teams.data} />;
 }
 
-export default withPermissionGuard("project:manage", {
+export default withPermissionGuard("team:view", {
   layoutComponent: SettingsLayout,
 })(Teams);
 

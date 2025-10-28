@@ -93,7 +93,7 @@ function Members() {
   );
 }
 
-export default withPermissionGuard("organization:manage", {
+export default withPermissionGuard("organization:view", {
   layoutComponent: SettingsLayout,
 })(Members);
 

@@ -59,7 +59,7 @@ function Settings() {
   return <SettingsForm organization={organization} project={project} />;
 }
 
-export default withPermissionGuard("organization:manage", {
+export default withPermissionGuard("organization:view", {
   layoutComponent: SettingsLayout,
 })(Settings);
 

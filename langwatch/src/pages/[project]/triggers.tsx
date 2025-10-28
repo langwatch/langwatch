@@ -465,7 +465,7 @@ function Triggers() {
   );
 }
 
-export default withPermissionGuard("triggers:manage", {
+export default withPermissionGuard("triggers:view", {
   layoutComponent: SettingsLayout,
 })(Triggers);
 
