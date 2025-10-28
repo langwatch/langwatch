@@ -101,10 +101,8 @@ export const spansRouter = createTRPCRouter({
         },
       });
 
-      console.log("traces", traces);
-
       const trace = traces[0];
-      console.log("trace", trace);
+      console.log("trace", JSON.stringify(trace?.spans, null, 2));
       if (!trace) {
         throw new TRPCError({ code: "NOT_FOUND", message: "Trace not found." });
       }
@@ -136,6 +134,17 @@ export const spansRouter = createTRPCRouter({
         Array.isArray(span.output.value)
       ) {
         messages.push(...span.output.value);
+      } else if (
+        span.output?.type === "json" &&
+        Array.isArray(span.output.value) &&
+        span.output.value.length > 0 &&
+        typeof span.output.value[0] === "string"
+      ) {
+        // If output type is json and it's an array of strings, treat first string as assistant reply
+        messages.push({
+          role: "assistant",
+          content: span.output.value[0],
+        });
       } else if (span.output?.value) {
         const content =
           typeof span.output.value === "string"
@@ -146,8 +155,10 @@ export const spansRouter = createTRPCRouter({
 
       // Extract LLM config
       const params = span.params ?? {};
+      const systemPrompt = messages.find((m) => m.role === "system")?.content;
       const llmConfig = {
         model: (span as any).model ?? null,
+        systemPrompt,
         temperature: params.temperature ?? null,
         maxTokens: params.max_tokens ?? params.maxTokens ?? null,
         topP: params.top_p ?? params.topP ?? null,
