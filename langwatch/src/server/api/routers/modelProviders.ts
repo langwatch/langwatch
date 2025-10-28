@@ -50,6 +50,7 @@ export const modelProviderRouter = createTRPCRouter({
         customKeys: z.object({}).passthrough().optional().nullable(),
         customModels: z.array(z.string()).optional().nullable(),
         customEmbeddingsModels: z.array(z.string()).optional().nullable(),
+        extraHeaders: z.array(z.object({ key: z.string(), value: z.string() })).optional().nullable(),
       }),
     )
     .use(checkProjectPermission("project:update"))
@@ -62,6 +63,7 @@ export const modelProviderRouter = createTRPCRouter({
         customKeys,
         customModels,
         customEmbeddingsModels,
+        extraHeaders,
       } = input;
 
       if (!(provider in modelProviders)) {
@@ -100,19 +102,20 @@ export const modelProviderRouter = createTRPCRouter({
         enabled,
         customModels,
         customEmbeddingsModels,
+        extraHeaders,
       };
 
       const existingModelProvider = id
         ? await ctx.prisma.modelProvider.findUnique({
-            where: { id, projectId },
-          })
+          where: { id, projectId },
+        })
         : // TOOD: when we go support custom models, this should be skipped
-          await ctx.prisma.modelProvider.findFirst({
-            where: { provider, projectId },
-          });
+        await ctx.prisma.modelProvider.findFirst({
+          where: { provider, projectId },
+        });
 
       if (existingModelProvider) {
-        // Smart merging: preserve masked standard keys, but replace custom headers completely
+        // Smart merging: preserve masked standard keys, but replace extra headers completely
         let mergedCustomKeys: Record<string, any> | null = validatedKeys;
         if (validatedKeys && existingModelProvider.customKeys) {
           const existingKeys = existingModelProvider.customKeys as Record<
@@ -129,7 +132,7 @@ export const modelProviderRouter = createTRPCRouter({
           ]);
 
           mergedCustomKeys = {
-            // Start with new keys (includes all custom headers)
+            // Start with new keys (includes all extra headers)
             ...validatedKeys,
             // Override with existing values for masked standard keys
             ...Object.fromEntries(
@@ -138,7 +141,7 @@ export const modelProviderRouter = createTRPCRouter({
                   ([key, value]) =>
                     standardAzureKeys.has(key) &&
                     (validatedKeys as any)[key] ===
-                      "HAS_KEY••••••••••••••••••••••••",
+                    "HAS_KEY••••••••••••••••••••••••",
                 )
                 .map(([key, value]) => [key, value]),
             ),
@@ -154,6 +157,7 @@ export const modelProviderRouter = createTRPCRouter({
             customEmbeddingsModels: customEmbeddingsModels
               ? customEmbeddingsModels
               : [],
+            extraHeaders: extraHeaders ? (extraHeaders as any) : [],
           },
         });
       } else {
@@ -162,6 +166,7 @@ export const modelProviderRouter = createTRPCRouter({
             ...data,
             customModels: customModels ?? undefined,
             customEmbeddingsModels: customEmbeddingsModels ?? undefined,
+            extraHeaders: extraHeaders ? (extraHeaders as any) : [],
           },
         });
       }
@@ -227,6 +232,7 @@ export const getProjectModelProviders = async (
               "embedding",
             ).map((m) => m.value),
             deploymentMapping: null,
+            extraHeaders: [],
           };
           return [providerKey, modelProvider_];
         }),
@@ -241,7 +247,7 @@ export const getProjectModelProviders = async (
       (modelProvider) =>
         modelProvider.customKeys ??
         modelProvider.enabled !==
-          defaultModelProviders[modelProvider.provider]?.enabled,
+        defaultModelProviders[modelProvider.provider]?.enabled,
     )
     .reduce(
       (acc, modelProvider) => {
@@ -256,6 +262,7 @@ export const getProjectModelProviders = async (
           deploymentMapping: modelProvider.deploymentMapping,
           disabledByDefault:
             defaultModelProviders[modelProvider.provider]?.disabledByDefault,
+          extraHeaders: modelProvider.extraHeaders as { key: string; value: string }[] | null,
         };
 
         if (!includeKeys) {
@@ -434,28 +441,10 @@ export const prepareLitellmParams = async ({
       params.api_version = gatewayVersion;
     }
 
-    // Pass through all custom headers for Azure providers
-    if (modelProvider.customKeys) {
-      const customKeys = modelProvider.customKeys as Record<string, string>;
-      const standardAzureKeys = new Set([
-        "AZURE_OPENAI_API_KEY",
-        "AZURE_OPENAI_ENDPOINT",
-        "AZURE_API_GATEWAY_BASE_URL",
-        "AZURE_API_GATEWAY_VERSION",
-      ]);
-
-      // Collect all custom headers
-      const customHeaders: Record<string, string> = {};
-      Object.entries(customKeys).forEach(([key, value]) => {
-        if (!standardAzureKeys.has(key) && value && typeof value === "string") {
-          customHeaders[key] = value;
-        }
-      });
-
-      // If we have custom headers, pass them through
-      if (Object.keys(customHeaders).length > 0) {
-        params.custom_headers = JSON.stringify(customHeaders);
-      }
+    // Pass through all extra headers
+    if (modelProvider.extraHeaders) {
+      const extraHeaders = modelProvider.extraHeaders as { key: string; value: string }[];
+      params.extra_headers = JSON.stringify(Object.fromEntries(extraHeaders.map(({ key, value }) => [key, value])));
     }
   }
 

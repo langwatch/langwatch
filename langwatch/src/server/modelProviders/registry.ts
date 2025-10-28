@@ -30,6 +30,7 @@ export type MaybeStoredModelProvider = Omit<
   models?: string[] | null;
   embeddingsModels?: string[] | null;
   disabledByDefault?: boolean;
+  extraHeaders?: { key: string; value: string }[] | null;
 };
 
 export const getProviderModelOptions = (

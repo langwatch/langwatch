@@ -9,20 +9,20 @@ import {
 
 import { TRPCError } from "@trpc/server";
 import { nanoid } from "nanoid";
-import { slugify } from "~/utils/slugify";
-import { checkPermissionOrPubliclyShared } from "../permission";
-import { checkProjectPermission } from "../rbac";
-import { getTracesWithSpans } from "./traces";
-import { getUserProtectionsForProject } from "../utils";
-import { createLogger } from "../../../utils/logger";
+import type { Session } from "next-auth";
 import {
   TRACE_COLD_INDEX,
   TRACE_INDEX,
   esClient,
   traceIndexId,
 } from "~/server/elasticsearch";
+import { createLogger } from "../../../utils/logger";
+import { slugify } from "../../../utils/slugify";
 import type { Protections } from "../../elasticsearch/protections";
-import type { Session } from "next-auth";
+import { checkPermissionOrPubliclyShared } from "../permission";
+import { checkProjectPermission } from "../rbac";
+import { getUserProtectionsForProject } from "../utils";
+import { getTracesWithSpans } from "./traces";
 
 const scoreOptionSchema = z.object({
   value: z
@@ -691,8 +691,8 @@ export const annotationRouter = createTRPCRouter({
           input.selectedAnnotations === "pending"
             ? null
             : input.selectedAnnotations === "completed"
-              ? { not: null }
-              : undefined,
+            ? { not: null }
+            : undefined,
       };
 
       if (input.queueId) {
