@@ -269,12 +269,14 @@ export const getProjectLambdaArn = async (
           { projectId },
           "Lambda function already exists, skipping creation"
         );
+        await new Promise((resolve) => setTimeout(resolve, 1000));
         lambdaConfig = await checkLambdaExists(lambda, functionName);
         if (!lambdaConfig) {
           throw new Error("Error retrieving Lambda function");
         }
+      } else {
+        throw error;
       }
-      throw error;
     }
   } else {
     // Get complete function details to check image URI
