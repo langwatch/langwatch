@@ -10,6 +10,7 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { useRouter } from "next/router";
+import { useMemo } from "react";
 import { ChevronRight, MoreVertical, Trash } from "react-feather";
 import { HorizontalFormControl } from "../../../components/HorizontalFormControl";
 import { OrganizationUserRoleField } from "../../../components/settings/OrganizationUserRoleField";
@@ -28,6 +29,8 @@ export default function UserDetailsPage() {
   const router = useRouter();
   const { userId } = router.query as { userId?: string };
   const { organization } = useOrganizationTeamProject();
+
+  const apiContext = api.useContext();
 
   const member = api.organization.getMemberById.useQuery(
     {
@@ -72,7 +75,9 @@ export default function UserDetailsPage() {
             type: "success",
             duration: 2000,
           });
-          void member.refetch();
+          // Invalidate organization queries to refresh member data and team memberships
+          void apiContext.organization.getMemberById.invalidate();
+          void apiContext.organization.getAll.invalidate();
         },
         onError: () => {
           toaster.create({
@@ -84,6 +89,14 @@ export default function UserDetailsPage() {
       },
     );
   };
+
+  const filteredTeamMemberships = useMemo(
+    () =>
+      member.data?.user.teamMemberships.filter(
+        (tm) => tm.team.organizationId === organization?.id,
+      ) ?? [],
+    [member.data?.user.teamMemberships, organization?.id],
+  );
 
   if (!organization || !member.data) {
     return <SettingsLayout />;
@@ -162,60 +175,58 @@ export default function UserDetailsPage() {
                 </Table.Row>
               </Table.Header>
               <Table.Body>
-                {memberData.user.teamMemberships
-                  .filter((tm) => tm.team.organizationId === organization.id)
-                  .map((tm) => (
-                    <Table.Row key={tm.team.id}>
-                      <Table.Cell>
-                        <Link href={`/settings/teams/${tm.team.slug}`}>
-                          {tm.team.name}
-                        </Link>
-                      </Table.Cell>
-                      <Table.Cell>
-                        <Field.Root>
-                          <TeamUserRoleField
-                            member={{
-                              ...tm,
-                              user: memberData!.user,
+                {filteredTeamMemberships.map((tm) => (
+                  <Table.Row key={tm.team.id}>
+                    <Table.Cell>
+                      <Link href={`/settings/teams/${tm.team.slug}`}>
+                        {tm.team.name}
+                      </Link>
+                    </Table.Cell>
+                    <Table.Cell>
+                      <Field.Root>
+                        <TeamUserRoleField
+                          member={{
+                            ...tm,
+                            user: memberData.user,
+                          }}
+                          organizationId={organization.id}
+                          customRole={(() => {
+                            // Check if this team membership has an assigned custom role
+                            const assignedRole = tm.assignedRole;
+                            return assignedRole
+                              ? {
+                                  ...assignedRole,
+                                  permissions:
+                                    assignedRole.permissions as string[],
+                                }
+                              : undefined;
+                          })()}
+                        />
+                      </Field.Root>
+                    </Table.Cell>
+                    <Table.Cell>
+                      <Menu.Root>
+                        <Menu.Trigger asChild>
+                          <Button variant={"ghost"}>
+                            <MoreVertical />
+                          </Button>
+                        </Menu.Trigger>
+                        <Menu.Content>
+                          <Menu.Item
+                            value="remove"
+                            color="red.600"
+                            onClick={() => {
+                              void handleRemoveFromTeam(tm);
                             }}
-                            organizationId={organization.id}
-                            customRole={(() => {
-                              // Check if this team membership has an assigned custom role
-                              const assignedRole = tm.assignedRole;
-                              return assignedRole
-                                ? {
-                                    ...assignedRole,
-                                    permissions:
-                                      assignedRole.permissions as string[],
-                                  }
-                                : undefined;
-                            })()}
-                          />
-                        </Field.Root>
-                      </Table.Cell>
-                      <Table.Cell>
-                        <Menu.Root>
-                          <Menu.Trigger asChild>
-                            <Button variant={"ghost"}>
-                              <MoreVertical />
-                            </Button>
-                          </Menu.Trigger>
-                          <Menu.Content>
-                            <Menu.Item
-                              value="remove"
-                              color="red.600"
-                              onClick={() => {
-                                void handleRemoveFromTeam(tm);
-                              }}
-                            >
-                              <Trash size={14} style={{ marginRight: "8px" }} />
-                              Remove from team
-                            </Menu.Item>
-                          </Menu.Content>
-                        </Menu.Root>
-                      </Table.Cell>
-                    </Table.Row>
-                  ))}
+                          >
+                            <Trash size={14} style={{ marginRight: "8px" }} />
+                            Remove from team
+                          </Menu.Item>
+                        </Menu.Content>
+                      </Menu.Root>
+                    </Table.Cell>
+                  </Table.Row>
+                ))}
               </Table.Body>
             </Table.Root>
           </Card.Body>

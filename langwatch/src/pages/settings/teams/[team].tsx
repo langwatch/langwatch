@@ -1,7 +1,7 @@
 import type { TeamUserRole } from "@prisma/client";
 import isEqual from "lodash-es/isEqual";
 import { useRouter } from "next/router";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useForm, useWatch, type SubmitHandler } from "react-hook-form";
 import { useDebouncedCallback } from "use-debounce";
 import SettingsLayout from "../../../components/SettingsLayout";

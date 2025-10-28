@@ -313,6 +313,7 @@ function RolesManagement({
           gap={4}
         >
           <RoleCard
+            hasPermission={hasPermission}
             name="Admin"
             description="Full access to all features and settings"
             isDefault
@@ -320,6 +321,7 @@ function RolesManagement({
             icon={ShieldUser}
           />
           <RoleCard
+            hasPermission={hasPermission}
             name="Member"
             description="Can create and modify most resources, view costs and debug info"
             isDefault
@@ -327,6 +329,7 @@ function RolesManagement({
             icon={Users}
           />
           <RoleCard
+            hasPermission={hasPermission}
             name="Viewer"
             description="Read-only access to analytics, messages, and guardrails"
             isDefault

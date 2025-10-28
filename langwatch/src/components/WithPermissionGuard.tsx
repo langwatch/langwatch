@@ -33,13 +33,10 @@ export function withPermissionGuard(
     } = options ?? {};
 
     const GuardedComponent = (props: P) => {
-      const { hasPermission, hasOrgPermission } = useOrganizationTeamProject();
+      const { hasAnyPermission } = useOrganizationTeamProject();
 
-      // Determine if this is an organization permission or team permission
-      const isOrgPermission = permission.startsWith("organization:");
-      const hasRequiredPermission = isOrgPermission
-        ? hasOrgPermission(permission)
-        : hasPermission(permission);
+      // Unified permission checker automatically routes to org or team permissions
+      const hasRequiredPermission = hasAnyPermission(permission);
 
       if (!hasRequiredPermission) {
         const fallbackContent = (

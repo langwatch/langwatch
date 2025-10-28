@@ -6,6 +6,7 @@ import {
   hasOrganizationPermission,
 } from "../rbac";
 import { TRPCError } from "@trpc/server";
+import { RoleService } from "../../role";
 
 const permissionSchema = z.string().regex(/^[a-z]+:[a-z]+$/);
 
@@ -14,35 +15,21 @@ export const roleRouter = createTRPCRouter({
     .input(z.object({ organizationId: z.string() }))
     .use(checkOrganizationPermission("organization:view"))
     .query(async ({ ctx, input }) => {
-      const roles = await ctx.prisma.customRole.findMany({
-        where: {
-          organizationId: input.organizationId,
-        },
-        orderBy: {
-          createdAt: "desc",
-        },
-      });
-
-      return roles.map((role) => ({
-        ...role,
-        permissions: role.permissions as string[],
-      }));
+      const roleService = new RoleService(ctx.prisma);
+      return roleService.getAllRoles(input.organizationId);
     }),
 
   getById: protectedProcedure
     .input(z.object({ roleId: z.string() }))
     .use(async ({ ctx, input, next }) => {
       // Need to fetch role first to check organization permission
-      const role = await ctx.prisma.customRole.findUnique({
-        where: { id: input.roleId },
-        select: { organizationId: true },
-      });
-
-      if (!role) {
-        throw new TRPCError({
-          code: "NOT_FOUND",
-          message: "Role not found",
-        });
+      const roleService = new RoleService(ctx.prisma);
+      let role;
+      try {
+        role = await roleService.getRoleById(input.roleId);
+      } catch (error) {
+        // Let service errors through (like NOT_FOUND)
+        throw error;
       }
 
       // Check if user has permission for this organization
@@ -60,19 +47,8 @@ export const roleRouter = createTRPCRouter({
       return next();
     })
     .query(async ({ ctx, input }) => {
-      const role = await ctx.prisma.customRole.findUnique({
-        where: {
-          id: input.roleId,
-        },
-      });
-
-      if (!role) {
-        throw new TRPCError({ code: "NOT_FOUND", message: "Role not found" });
-      }
-      return {
-        ...role,
-        permissions: role.permissions as string[],
-      };
+      const roleService = new RoleService(ctx.prisma);
+      return roleService.getRoleById(input.roleId);
     }),
 
   create: protectedProcedure
@@ -86,35 +62,13 @@ export const roleRouter = createTRPCRouter({
     )
     .use(checkOrganizationPermission("organization:manage"))
     .mutation(async ({ ctx, input }) => {
-      const existing = await ctx.prisma.customRole.findUnique({
-        where: {
-          organizationId_name: {
-            organizationId: input.organizationId,
-            name: input.name,
-          },
-        },
+      const roleService = new RoleService(ctx.prisma);
+      return roleService.createRole({
+        organizationId: input.organizationId,
+        name: input.name,
+        description: input.description,
+        permissions: input.permissions,
       });
-
-      if (existing) {
-        throw new TRPCError({
-          code: "CONFLICT",
-          message: "A role with this name already exists",
-        });
-      }
-
-      const role = await ctx.prisma.customRole.create({
-        data: {
-          organizationId: input.organizationId,
-          name: input.name,
-          description: input.description,
-          permissions: input.permissions,
-        },
-      });
-
-      return {
-        ...role,
-        permissions: role.permissions as string[],
-      };
     }),
 
   update: protectedProcedure
@@ -128,16 +82,12 @@ export const roleRouter = createTRPCRouter({
     )
     .use(async ({ ctx, input, next }) => {
       // Fetch role to get organizationId for permission check
-      const role = await ctx.prisma.customRole.findUnique({
-        where: { id: input.roleId },
-        select: { organizationId: true },
-      });
-
-      if (!role) {
-        throw new TRPCError({
-          code: "NOT_FOUND",
-          message: "Role not found",
-        });
+      const roleService = new RoleService(ctx.prisma);
+      let role;
+      try {
+        role = await roleService.getRoleById(input.roleId);
+      } catch (error) {
+        throw error;
       }
 
       // Check if user has permission for this organization
@@ -155,37 +105,24 @@ export const roleRouter = createTRPCRouter({
       return next();
     })
     .mutation(async ({ ctx, input }) => {
-      const updated = await ctx.prisma.customRole.update({
-        where: { id: input.roleId },
-        data: {
-          name: input.name,
-          description: input.description,
-          permissions: input.permissions,
-        },
+      const roleService = new RoleService(ctx.prisma);
+      return roleService.updateRole(input.roleId, {
+        name: input.name,
+        description: input.description,
+        permissions: input.permissions,
       });
-
-      return {
-        ...updated,
-        permissions: updated.permissions as string[],
-      };
     }),
 
   delete: protectedProcedure
     .input(z.object({ roleId: z.string() }))
     .use(async ({ ctx, input, next }) => {
       // Fetch role to get organizationId and check usage
-      const role = await ctx.prisma.customRole.findUnique({
-        where: { id: input.roleId },
-        include: {
-          assignedUsers: true,
-        },
-      });
-
-      if (!role) {
-        throw new TRPCError({
-          code: "NOT_FOUND",
-          message: "Role not found",
-        });
+      const roleService = new RoleService(ctx.prisma);
+      let role;
+      try {
+        role = await roleService.getRoleById(input.roleId);
+      } catch (error) {
+        throw error;
       }
 
       // Check if user has permission for this organization
@@ -200,10 +137,11 @@ export const roleRouter = createTRPCRouter({
       }
 
       // Check if role is in use
-      if (role.assignedUsers.length > 0) {
+      const roleWithUsers = await roleService.getRoleWithUsers(input.roleId);
+      if (roleWithUsers && roleWithUsers.assignedUsers.length > 0) {
         throw new TRPCError({
           code: "PRECONDITION_FAILED",
-          message: `Cannot delete role that is assigned to ${role.assignedUsers.length} user(s)`,
+          message: `Cannot delete role that is assigned to ${roleWithUsers.assignedUsers.length} user(s)`,
         });
       }
 
@@ -211,11 +149,8 @@ export const roleRouter = createTRPCRouter({
       return next();
     })
     .mutation(async ({ ctx, input }) => {
-      await ctx.prisma.customRole.delete({
-        where: { id: input.roleId },
-      });
-
-      return { success: true };
+      const roleService = new RoleService(ctx.prisma);
+      return roleService.deleteRole(input.roleId);
     }),
 
   assignToUser: protectedProcedure
@@ -228,76 +163,12 @@ export const roleRouter = createTRPCRouter({
     )
     .use(checkTeamPermission("team:manage"))
     .mutation(async ({ ctx, input }) => {
-      const prisma = ctx.prisma;
-
-      // Validate that the custom role belongs to the team's organization
-      // and that the user is actually a member of the team
-      const [customRole, team, teamUser] = await Promise.all([
-        prisma.customRole.findUnique({
-          where: { id: input.customRoleId },
-          select: { organizationId: true },
-        }),
-        prisma.team.findUnique({
-          where: { id: input.teamId },
-          select: { organizationId: true },
-        }),
-        prisma.teamUser.findUnique({
-          where: {
-            userId_teamId: {
-              userId: input.userId,
-              teamId: input.teamId,
-            },
-          },
-          select: { userId: true },
-        }),
-      ]);
-
-      // Validate custom role exists
-      if (!customRole) {
-        throw new TRPCError({
-          code: "NOT_FOUND",
-          message: "Custom role not found",
-        });
-      }
-
-      // Validate team exists
-      if (!team) {
-        throw new TRPCError({
-          code: "NOT_FOUND",
-          message: "Team not found",
-        });
-      }
-
-      // Validate organization match
-      if (customRole.organizationId !== team.organizationId) {
-        throw new TRPCError({
-          code: "FORBIDDEN",
-          message: "Custom role does not belong to team's organization",
-        });
-      }
-
-      // Validate user is a member of the team
-      if (!teamUser) {
-        throw new TRPCError({
-          code: "FORBIDDEN",
-          message: "User is not a member of the specified team",
-        });
-      }
-
-      // Create the assignment after all validations pass
-      const assignment = await prisma.teamUser.update({
-        where: {
-          userId_teamId: {
-            userId: input.userId,
-            teamId: input.teamId,
-          },
-        },
-        data: {
-          assignedRoleId: input.customRoleId,
-        },
-      });
-
-      return assignment;
+      const roleService = new RoleService(ctx.prisma);
+      return roleService.assignRoleToUser(
+        input.userId,
+        input.teamId,
+        input.customRoleId,
+      );
     }),
 
   removeFromUser: protectedProcedure
@@ -310,18 +181,7 @@ export const roleRouter = createTRPCRouter({
     )
     .use(checkTeamPermission("team:manage"))
     .mutation(async ({ ctx, input }) => {
-      await ctx.prisma.teamUser.update({
-        where: {
-          userId_teamId: {
-            userId: input.userId,
-            teamId: input.teamId,
-          },
-        },
-        data: {
-          assignedRoleId: null, // Clear custom role assignment
-        },
-      });
-
-      return { success: true };
+      const roleService = new RoleService(ctx.prisma);
+      return roleService.removeRoleFromUser(input.userId, input.teamId);
     }),
 });

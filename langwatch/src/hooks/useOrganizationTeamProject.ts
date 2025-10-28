@@ -250,6 +250,7 @@ export const useOrganizationTeamProject = (
       // New RBAC API
       hasPermission: () => false,
       hasOrgPermission: () => false,
+      hasAnyPermission: () => false,
       isPublicRoute,
       isOrganizationFeatureEnabled: () => false,
     };
@@ -294,10 +295,33 @@ export const useOrganizationTeamProject = (
 
   /**
    * Check if the user has a specific permission (new RBAC system)
+   * Automatically routes between organization and team permissions
    * @example hasPermission("analytics:view")
-   * @example hasPermission("datasets:manage")
+   * @example hasPermission("organization:manage")
    */
   const hasPermission = (permission: Permission) => {
+    // Check if this is an organization permission
+    const isOrgPermission = permission.startsWith("organization:");
+
+    if (isOrgPermission) {
+      // Check organization role first
+      if (organizationRole) {
+        const orgResult = organizationRoleHasPermission(
+          organizationRole,
+          permission,
+        );
+        if (orgResult) return true;
+      }
+
+      // Fallback: Check if user has team admin role (team admins can access org permissions)
+      const teamMember = team?.members[0];
+      if (teamMember?.role === TeamUserRole.ADMIN) {
+        return true;
+      }
+      return false;
+    }
+
+    // Team-level permission checking
     const teamMember = team?.members[0];
     if (!teamMember) return false;
 
@@ -344,6 +368,20 @@ export const useOrganizationTeamProject = (
     return false;
   };
 
+  /**
+   * Unified permission checker that automatically routes to org or team permissions
+   * This is the recommended API as it handles the routing logic automatically
+   * @example hasAnyPermission("analytics:view")
+   * @example hasAnyPermission("organization:manage")
+   */
+  const hasAnyPermission = (permission: Permission) => {
+    // Determine if this is an organization permission or team permission
+    const isOrgPermission = permission.startsWith("organization:");
+    return isOrgPermission
+      ? hasOrgPermission(permission)
+      : hasPermission(permission);
+  };
+
   return {
     isLoading: false,
     isRefetching: organizations.isRefetching,
@@ -358,6 +396,7 @@ export const useOrganizationTeamProject = (
     // New RBAC permission API (preferred)
     hasPermission,
     hasOrgPermission,
+    hasAnyPermission, // Unified API that auto-routes between org and team permissions
     isPublicRoute,
     modelProviders: modelProviders.data,
     isOrganizationFeatureEnabled,
