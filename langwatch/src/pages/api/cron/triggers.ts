@@ -57,15 +57,6 @@ export default async function handler(
     return res.status(401).end();
   }
 
-  if (!process.env.CRON_API_KEY) {
-    return res.status(403).json({ error: "CRON_API_KEY not configured" });
-  }
-
-  const results = await runTriggers();
-  return res.status(200).json(results);
-}
-
-export const runTriggers = async () => {
   const projects = await prisma.project.findMany({
     where: {
       firstMessage: true,
@@ -88,8 +79,8 @@ export const runTriggers = async () => {
     results.push(traces);
   }
 
-  return results;
-};
+  return res.status(200).json(results);
+}
 
 const getTracesForAlert = async (trigger: Trigger, projects: Project[]) => {
   const {
