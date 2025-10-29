@@ -166,6 +166,29 @@ const TEAM_ROLE_PERMISSIONS: Record<TeamUserRole, Permission[]> = {
     // Team
     "team:view",
   ],
+  [TeamUserRole.CUSTOM]: [
+    // CUSTOM role permissions fall back to VIEWER if no assignedRoleId or custom role has no permissions
+    // Projects
+    "project:view",
+    // Analytics
+    "analytics:view",
+    // Traces
+    "traces:view",
+    // Annotations
+    "annotations:view",
+    // Evaluations
+    "evaluations:view",
+    // Datasets
+    "datasets:view",
+    // Workflows
+    "workflows:view",
+    // Prompts
+    "prompts:view",
+    // Scenarios
+    "scenarios:view",
+    // Team
+    "team:view",
+  ],
 };
 
 /**

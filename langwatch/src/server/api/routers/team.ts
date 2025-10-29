@@ -253,12 +253,12 @@ export const teamRouter = createTRPCRouter({
                   });
                 }
 
-                // Create teamUser with VIEWER role and custom role assignment
+                // Create teamUser with CUSTOM role and custom role assignment
                 await tx.teamUser.create({
                   data: {
                     userId: member.userId,
                     teamId: input.teamId,
-                    role: TeamUserRole.VIEWER,
+                    role: TeamUserRole.CUSTOM,
                     assignedRoleId: member.customRoleId,
                   },
                 });
@@ -320,7 +320,7 @@ export const teamRouter = createTRPCRouter({
                 });
               }
 
-              // Update teamUser with VIEWER role and assign custom role
+              // Update teamUser with CUSTOM role and assign custom role
               await tx.teamUser.update({
                 where: {
                   userId_teamId: {
@@ -329,7 +329,7 @@ export const teamRouter = createTRPCRouter({
                   },
                 },
                 data: {
-                  role: TeamUserRole.VIEWER,
+                  role: TeamUserRole.CUSTOM,
                   assignedRoleId: member.customRoleId,
                 },
               });
@@ -401,7 +401,7 @@ export const teamRouter = createTRPCRouter({
               userId: member.userId,
               teamId: team.id,
               role: isCustomRole
-                ? TeamUserRole.VIEWER
+                ? TeamUserRole.CUSTOM
                 : (member.role as TeamUserRole),
               assignedRoleId: isCustomRole ? member.customRoleId : null,
             },

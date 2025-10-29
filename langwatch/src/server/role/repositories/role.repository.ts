@@ -1,4 +1,8 @@
-import { type PrismaClient, type CustomRole } from "@prisma/client";
+import {
+  type PrismaClient,
+  type CustomRole,
+  TeamUserRole,
+} from "@prisma/client";
 
 export type CreateRoleParams = {
   organizationId: string;
@@ -94,7 +98,10 @@ export class RoleRepository {
           teamId,
         },
       },
-      data: { assignedRoleId: customRoleId },
+      data: {
+        role: TeamUserRole.CUSTOM,
+        assignedRoleId: customRoleId,
+      },
     });
   }
 
@@ -106,7 +113,10 @@ export class RoleRepository {
           teamId,
         },
       },
-      data: { assignedRoleId: null },
+      data: {
+        role: TeamUserRole.VIEWER, // Revert to VIEWER when removing custom role
+        assignedRoleId: null,
+      },
     });
   }
 }

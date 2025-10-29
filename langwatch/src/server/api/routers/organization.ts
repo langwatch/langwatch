@@ -888,7 +888,7 @@ export const organizationRouter = createTRPCRouter({
 
           const isTargetUserAdmin =
             targetUserMembership.role === TeamUserRole.ADMIN;
-          const wouldDemoteAdmin = isTargetUserAdmin; // Custom roles always demote to VIEWER
+          const wouldDemoteAdmin = isTargetUserAdmin; // Custom roles always demote from ADMIN
 
           if (adminCount === 1 && wouldDemoteAdmin) {
             // Optional: Check for self-demotion
@@ -915,7 +915,7 @@ export const organizationRouter = createTRPCRouter({
               },
             },
             data: {
-              role: TeamUserRole.VIEWER, // Default to VIEWER for custom roles
+              role: TeamUserRole.CUSTOM, // Use CUSTOM role for custom role assignments
               assignedRoleId: customRoleId,
             },
           });

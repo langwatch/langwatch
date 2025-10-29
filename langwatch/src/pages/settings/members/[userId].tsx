@@ -227,6 +227,8 @@ export default function UserDetailsPage() {
                             ? "Member"
                             : tm.role === "VIEWER"
                             ? "Viewer"
+                            : tm.role === "CUSTOM"
+                            ? tm.assignedRole?.name ?? "Custom"
                             : tm.role}
                         </Text>
                       )}

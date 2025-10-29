@@ -84,6 +84,7 @@ enum TeamUserRole {
     ADMIN
     MEMBER
     VIEWER
+    CUSTOM
 }
 
 enum OrganizationUserRole {
