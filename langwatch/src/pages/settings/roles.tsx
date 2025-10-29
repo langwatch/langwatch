@@ -742,15 +742,26 @@ function PermissionSelector({
   });
 
   const togglePermission = (permission: Permission) => {
+    const [resource, action] = permission.split(":") as [Resource, Action];
+    const viewPermission = createPermission(resource, "view");
+
     if (selectedPermissions.includes(permission)) {
       // If removing a permission, remove it and any dependent permissions
       let permissionsToRemove = [permission];
 
       // If removing manage, also remove all other permissions for this resource
       if (permission.endsWith(":manage")) {
-        const resource = permission.split(":")[0] as Resource;
         const resourcePermissions = groupedPermissions[resource] || [];
         permissionsToRemove = resourcePermissions;
+      }
+      // If removing view, also remove create/update/delete (can't use them without view)
+      else if (action === "view") {
+        const resourcePermissions = groupedPermissions[resource] || [];
+        const dependentActions = ["create", "update", "delete"];
+        const dependentPermissions = resourcePermissions.filter((p) =>
+          dependentActions.some((a) => p.endsWith(`:${a}`)),
+        );
+        permissionsToRemove = [...permissionsToRemove, ...dependentPermissions];
       }
 
       onChange(
@@ -762,9 +773,16 @@ function PermissionSelector({
 
       // If adding manage, add all permissions for this resource
       if (permission.endsWith(":manage")) {
-        const resource = permission.split(":")[0] as Resource;
         const resourcePermissions = groupedPermissions[resource] || [];
         permissionsToAdd = resourcePermissions;
+      }
+      // If adding create/update/delete, also automatically add view
+      else if (
+        action === "create" ||
+        action === "update" ||
+        action === "delete"
+      ) {
+        permissionsToAdd.push(viewPermission);
       }
 
       // Add all permissions that aren't already selected

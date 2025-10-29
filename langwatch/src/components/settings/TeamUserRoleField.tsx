@@ -91,7 +91,8 @@ export const TeamUserRoleField = ({
         onError: () => {
           toaster.create({
             title: "Failed to update user role",
-            description: "Please try that again",
+            description:
+              "You need administrator permissions to update this user's role",
             type: "error",
             meta: {
               closable: true,

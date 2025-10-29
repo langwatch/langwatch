@@ -137,13 +137,6 @@ export const teamRouter = createTRPCRouter({
         throw new TRPCError({ code: "NOT_FOUND", message: "Team not found." });
       }
 
-      await checkTeamPermission("team:manage")({
-        ctx,
-        input: { teamId: team.id },
-        // eslint-disable-next-line @typescript-eslint/no-empty-function
-        next: () => {},
-      });
-
       return team;
     }),
   update: protectedProcedure

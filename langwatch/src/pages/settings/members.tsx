@@ -376,7 +376,10 @@ function MembersList({
                       <Table.Cell>
                         <Link href={`/settings/members/${member.userId}`}>
                           {member.user.name}{" "}
-                          <Text as="span">(Organization {roleLabel})</Text>
+                          <Text
+                            as="span"
+                            whiteSpace="nowrap"
+                          >{`(Organization ${roleLabel})`}</Text>
                         </Link>
                       </Table.Cell>
                       <Table.Cell>{member.user.email}</Table.Cell>

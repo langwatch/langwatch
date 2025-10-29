@@ -18,6 +18,10 @@ import {
   type RoleOption,
 } from "../../../components/settings/TeamUserRoleField";
 import { useOrganizationTeamProject } from "../../../hooks/useOrganizationTeamProject";
+import { withPermissionGuard } from "~/components/WithPermissionGuard";
+import { PermissionAlert } from "~/components/PermissionAlert";
+import { Card, Heading, HStack, Skeleton, VStack } from "@chakra-ui/react";
+import { TRPCClientError } from "@trpc/client";
 
 // Type guards for safe access to custom role data
 function isValidCustomRole(role: unknown): role is {
@@ -78,7 +82,7 @@ function teamMemberToFormMember(
   };
 }
 
-export default function EditTeamPage() {
+function EditTeamPage() {
   const router = useRouter();
   const teamSlug = router.query.team;
   const { organization } = useOrganizationTeamProject();
@@ -90,7 +94,62 @@ export default function EditTeamPage() {
     { enabled: typeof teamSlug === "string" && !!organization?.id },
   );
 
-  if (!team.data) return <SettingsLayout />;
+  // Handle UNAUTHORIZED error first
+  if (team.error) {
+    const error = team.error;
+    if (
+      error instanceof TRPCClientError &&
+      error.data?.code === "UNAUTHORIZED"
+    ) {
+      return (
+        <SettingsLayout>
+          <VStack paddingX={4} paddingY={6} gap={4} align="start">
+            <PermissionAlert
+              permission="team:view"
+              message="You don't have permission to view this team. Please contact your team administrator for access."
+            />
+          </VStack>
+        </SettingsLayout>
+      );
+    }
+  }
+
+  // Handle loading state
+  if (team.isLoading || !team.data) {
+    return (
+      <SettingsLayout>
+        <VStack
+          paddingX={4}
+          paddingY={6}
+          gap={6}
+          width="full"
+          maxWidth="920px"
+          align="start"
+        >
+          <HStack gap="8px">
+            <Skeleton height="20px" width="60px" />
+            <Skeleton height="20px" width="12px" />
+            <Skeleton height="20px" width="120px" />
+          </HStack>
+          <Skeleton height="32px" width="200px" />
+          <Card.Root width="full">
+            <Card.Body paddingY={4}>
+              <VStack gap={4} align="start">
+                <VStack gap={2} align="start" width="full">
+                  <Skeleton height="16px" width="80px" />
+                  <Skeleton height="40px" width="full" />
+                </VStack>
+                <VStack gap={2} align="start" width="full">
+                  <Skeleton height="16px" width="100px" />
+                  <Skeleton height="40px" width="full" />
+                </VStack>
+              </VStack>
+            </Card.Body>
+          </Card.Root>
+        </VStack>
+      </SettingsLayout>
+    );
+  }
 
   return <EditTeam team={team.data} />;
 }
@@ -151,6 +210,22 @@ function EditTeam({ team }: { team: TeamWithProjectsAndMembersAndUsers }) {
             });
             void apiContext.organization.getAll.refetch();
           },
+          onError: (error) => {
+            if (
+              error instanceof TRPCClientError &&
+              error.data?.code === "UNAUTHORIZED"
+            ) {
+              toaster.create({
+                title:
+                  "You need to be an administrator of the organization to update this team",
+                type: "error",
+                duration: 5000,
+                meta: {
+                  closable: true,
+                },
+              });
+            }
+          },
         },
       );
     },
@@ -173,3 +248,6 @@ function EditTeam({ team }: { team: TeamWithProjectsAndMembersAndUsers }) {
     </SettingsLayout>
   );
 }
+export default withPermissionGuard("team:view", {
+  layoutComponent: SettingsLayout,
+})(EditTeamPage);

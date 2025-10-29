@@ -28,7 +28,10 @@ import { api } from "../../../utils/api";
 export default function UserDetailsPage() {
   const router = useRouter();
   const { userId } = router.query as { userId?: string };
-  const { organization } = useOrganizationTeamProject();
+  const { organization, hasOrgPermission, hasPermission } =
+    useOrganizationTeamProject();
+
+  const canManageOrganization = hasOrgPermission("organization:manage");
 
   const apiContext = api.useContext();
 
@@ -152,13 +155,23 @@ export default function UserDetailsPage() {
               label="Organization Role"
               helper="Team-specific roles are set per team below."
             >
-              <Field.Root>
-                <OrganizationUserRoleField
-                  organizationId={organization.id}
-                  userId={memberData.userId}
-                  defaultRole={memberData.role}
-                />
-              </Field.Root>
+              {canManageOrganization ? (
+                <Field.Root>
+                  <OrganizationUserRoleField
+                    organizationId={organization.id}
+                    userId={memberData.userId}
+                    defaultRole={memberData.role}
+                  />
+                </Field.Root>
+              ) : (
+                <Text>
+                  {memberData.role === "ADMIN"
+                    ? "Organization Admin"
+                    : memberData.role === "MEMBER"
+                    ? "Organization Member"
+                    : memberData.role}
+                </Text>
+              )}
             </HorizontalFormControl>
           </Card.Body>
         </Card.Root>
@@ -183,47 +196,63 @@ export default function UserDetailsPage() {
                       </Link>
                     </Table.Cell>
                     <Table.Cell>
-                      <Field.Root>
-                        <TeamUserRoleField
-                          member={{
-                            ...tm,
-                            user: memberData.user,
-                          }}
-                          organizationId={organization.id}
-                          customRole={(() => {
-                            // Check if this team membership has an assigned custom role
-                            const assignedRole = tm.assignedRole;
-                            return assignedRole
-                              ? {
-                                  ...assignedRole,
-                                  permissions:
-                                    assignedRole.permissions as string[],
-                                }
-                              : undefined;
-                          })()}
-                        />
-                      </Field.Root>
+                      {hasPermission("team:manage") ? (
+                        <Field.Root>
+                          <TeamUserRoleField
+                            member={{
+                              ...tm,
+                              user: memberData.user,
+                            }}
+                            organizationId={organization.id}
+                            customRole={(() => {
+                              // Check if this team membership has an assigned custom role
+                              const assignedRole = tm.assignedRole;
+                              return assignedRole
+                                ? {
+                                    ...assignedRole,
+                                    permissions:
+                                      assignedRole.permissions as string[],
+                                  }
+                                : undefined;
+                            })()}
+                          />
+                        </Field.Root>
+                      ) : (
+                        <Text>
+                          {tm.assignedRole
+                            ? tm.assignedRole.name
+                            : tm.role === "ADMIN"
+                            ? "Admin"
+                            : tm.role === "MEMBER"
+                            ? "Member"
+                            : tm.role === "VIEWER"
+                            ? "Viewer"
+                            : tm.role}
+                        </Text>
+                      )}
                     </Table.Cell>
                     <Table.Cell>
-                      <Menu.Root>
-                        <Menu.Trigger asChild>
-                          <Button variant={"ghost"}>
-                            <MoreVertical />
-                          </Button>
-                        </Menu.Trigger>
-                        <Menu.Content>
-                          <Menu.Item
-                            value="remove"
-                            color="red.600"
-                            onClick={() => {
-                              void handleRemoveFromTeam(tm);
-                            }}
-                          >
-                            <Trash size={14} style={{ marginRight: "8px" }} />
-                            Remove from team
-                          </Menu.Item>
-                        </Menu.Content>
-                      </Menu.Root>
+                      {hasPermission("team:manage") && (
+                        <Menu.Root>
+                          <Menu.Trigger asChild>
+                            <Button variant={"ghost"}>
+                              <MoreVertical />
+                            </Button>
+                          </Menu.Trigger>
+                          <Menu.Content>
+                            <Menu.Item
+                              value="remove"
+                              color="red.600"
+                              onClick={() => {
+                                void handleRemoveFromTeam(tm);
+                              }}
+                            >
+                              <Trash size={14} style={{ marginRight: "8px" }} />
+                              Remove from team
+                            </Menu.Item>
+                          </Menu.Content>
+                        </Menu.Root>
+                      )}
                     </Table.Cell>
                   </Table.Row>
                 ))}
