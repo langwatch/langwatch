@@ -492,11 +492,7 @@ class LangWatchTrackedBootstrapFewShotWithRandomSearch(
         def patched_evaluate_call(self, program: dspy.Module, *args, **kwargs):
             nonlocal step
 
-            if "return_all_scores" not in kwargs or not kwargs["return_all_scores"]:
-                raise ValueError(
-                    "return_all_scores is not True for some reason, please report it at https://github.com/langwatch/langwatch/issues"
-                )
-            score, subscores = original_evaluate_call(self, program, *args, **kwargs)  # type: ignore
+            result = original_evaluate_call(self, program, *args, **kwargs)
 
             langwatch_dspy.log_step(
                 optimizer=DSPyOptimizer(
@@ -513,7 +509,7 @@ class LangWatchTrackedBootstrapFewShotWithRandomSearch(
                     },
                 ),
                 index=str(step),
-                score=score,
+                score=result.score,
                 label="score",
                 predictors=[
                     DSPyPredictor(name=name, predictor=predictor)
@@ -523,7 +519,7 @@ class LangWatchTrackedBootstrapFewShotWithRandomSearch(
 
             step += 1
 
-            return score, subscores
+            return result
 
         Evaluate.__call__ = patched_evaluate_call
 

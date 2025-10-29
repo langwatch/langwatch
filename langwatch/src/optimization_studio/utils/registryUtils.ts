@@ -3,6 +3,8 @@ import type { useAvailableEvaluators } from "../../hooks/useAvailableEvaluators"
 import { type EvaluatorTypes } from "../../server/evaluations/evaluators.generated";
 import type { Evaluator, Field } from "../types/dsl";
 
+export const DEFAULT_MAX_TOKENS = 128_000
+
 export const convertEvaluators = (
   evaluators: Exclude<
     ReturnType<typeof useAvailableEvaluators>,
