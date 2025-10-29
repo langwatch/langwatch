@@ -17,7 +17,6 @@ export function PromptStudioTabbedWorkspace() {
     activeWindowId,
     setActiveWindow,
   } = useDraggableTabsBrowserStore();
-  useLoadSpanIntoPromptStudio();
 
   function handleTabMove(params: {
     tabId: string;
