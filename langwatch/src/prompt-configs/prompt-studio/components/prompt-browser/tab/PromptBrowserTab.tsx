@@ -22,21 +22,22 @@ function PromptBrowserTabView({
   ...rest
 }: PromptBrowserTabProps & PromptBrowserTabControllerProps) {
   if (!tab) return null;
+  const meta = tab.data.meta ?? {};
 
   return (
     <HStack gap={2} height="full" {...rest}>
       <HStack>
         <Text textOverflow="ellipsis" whiteSpace="nowrap" overflow="hidden">
-          {tab.data.meta.title ?? "Untitled"}
+          {meta.title ?? "Untitled"}
         </Text>
         {hasUnsavedChanges ? (
           <Box>
             <Circle size="10px" bg="orange.400" color="gray.50" />
           </Box>
-        ) : tab.data.meta.versionNumber != null ? (
-          <VersionBadge version={tab.data.meta.versionNumber} />
+        ) : meta.versionNumber != null ? (
+          <VersionBadge version={meta.versionNumber ?? 0} />
         ) : null}
-        {tab.data.meta.scope === "ORGANIZATION" && <OrganizationBadge />}
+        {meta.scope === "ORGANIZATION" && <OrganizationBadge />}
       </HStack>
       <Box
         role="button"
@@ -59,4 +60,3 @@ export const PromptBrowserTab = withController(
   PromptBrowserTabView,
   usePromptBrowserTabController,
 );
-

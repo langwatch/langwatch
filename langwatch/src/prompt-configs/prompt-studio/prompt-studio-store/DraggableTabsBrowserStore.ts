@@ -5,6 +5,8 @@ import { cloneDeep } from "lodash";
 import { createLogger } from "~/utils/logger";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { z } from "zod";
+import { Role } from "@copilotkit/runtime-client-gql";
+import { formSchema } from "~/prompt-configs/schemas";
 
 const logger = createLogger("DraggableTabsBrowserStore");
 
@@ -13,14 +15,35 @@ const logger = createLogger("DraggableTabsBrowserStore");
  * Single Responsibility: Represents the state and metadata for a prompt tab.
  */
 export const TabDataSchema = z.object({
+  chat: z
+    .object({
+      initialMessages: z
+        .array(
+          z.object({
+            id: z.string(),
+            role: z.nativeEnum(Role),
+            content: z.string(),
+          }),
+        )
+        .default([]),
+    })
+    .default({
+      initialMessages: [],
+    }),
   form: z.object({
-    currentValues: z.any(), // Note: You may want to provide a more precise schema for PromptConfigFormValues
+    currentValues: formSchema.deepPartial(),
   }),
-  meta: z.object({
-    title: z.string().nullable(),
-    versionNumber: z.number().optional(),
-    scope: z.enum(["PROJECT", "ORGANIZATION"]).optional(),
-  }),
+  meta: z
+    .object({
+      title: z.string().nullable(),
+      versionNumber: z.number().optional(),
+      scope: z.enum(["PROJECT", "ORGANIZATION"]).optional(),
+    })
+    .default({
+      title: null,
+      versionNumber: undefined,
+      scope: undefined,
+    }),
 });
 export type TabData = z.infer<typeof TabDataSchema>;
 
@@ -72,6 +95,8 @@ export interface DraggableTabsBrowserState {
     tabId: string;
     updater: (data: TabData) => TabData;
   }) => void;
+  /** Get data by tabId */
+  getByTabId: (tabId: string) => TabData | undefined;
   /** Is the tab id active? Checks across all windows and tavs */
   isTabIdActive: (tabId: string) => boolean;
 
@@ -327,6 +352,16 @@ function createDraggableTabsBrowserStore(projectId: string) {
           } catch (error) {
             logger.error({ error }, "Failed to clear localStorage");
           }
+        },
+
+        /**
+         * Get data by tabId
+         */
+        getByTabId: (tabId) => {
+          const state = get();
+          return state.windows
+            .flatMap((w) => w.tabs)
+            .find((t) => t.id === tabId)?.data;
         },
       })),
       {

@@ -2,7 +2,7 @@ import {
   TextMessage,
   Role,
   type MessageRole,
-  Message,
+  type Message,
   ActionExecutionMessage,
   ResultMessage,
   ImageMessage,
@@ -14,7 +14,7 @@ import { safeJsonParseOrStringFallback } from "./safe-json-parse-or-string-fallb
  * Converts scenario messages to CopilotKit messages with proper ordering
  */
 export function convertScenarioMessagesToCopilotKit(
-  messages: ScenarioMessageSnapshotEvent["messages"]
+  messages: ScenarioMessageSnapshotEvent["messages"],
 ): (Message & { traceId?: string })[] {
   const convertedMessages: (Message & { traceId?: string })[] = [];
 
@@ -39,7 +39,7 @@ export function convertScenarioMessagesToCopilotKit(
  * Extracts tool calls from a message
  */
 function extractToolCalls(
-  message: ScenarioMessageSnapshotEvent["messages"][0]
+  message: ScenarioMessageSnapshotEvent["messages"][0],
 ): (ActionExecutionMessage & { traceId?: string })[] {
   if (!("toolCalls" in message) || !message.toolCalls) {
     return [];
@@ -52,7 +52,7 @@ function extractToolCalls(
       id: `${message.id}-tool-${toolCall.function?.name}`,
       name: toolCall.function?.name,
       arguments: safeJsonParseOrStringFallback(
-        toolCall.function?.arguments ?? "{}"
+        toolCall.function?.arguments ?? "{}",
       ),
     });
 
@@ -66,7 +66,7 @@ function extractToolCalls(
  * Converts message content to appropriate message types
  */
 function convertMessageContent(
-  message: ScenarioMessageSnapshotEvent["messages"][0]
+  message: ScenarioMessageSnapshotEvent["messages"][0],
 ): (Message & { traceId?: string })[] {
   const content =
     typeof message.content === "string"
@@ -97,7 +97,7 @@ function convertMessageContent(
  */
 function convertMixedContent(
   content: any[],
-  originalMessage: ScenarioMessageSnapshotEvent["messages"][0]
+  originalMessage: ScenarioMessageSnapshotEvent["messages"][0],
 ): Message[] {
   const messages: Message[] = [];
 
@@ -108,13 +108,13 @@ function convertMixedContent(
           id: `${originalMessage.id}-content-${index}`,
           role: originalMessage.role as MessageRole,
           content: item.text,
-        })
+        }),
       );
     } else if (typeof item === "object" && item.image) {
       const imageMessage = createImageMessage(
         item.image,
         originalMessage,
-        index
+        index,
       );
       if (imageMessage) {
         messages.push(imageMessage);
@@ -126,7 +126,7 @@ function convertMixedContent(
         new ActionExecutionMessage({
           name: item.name,
           arguments: item.arguments ?? item.input,
-        })
+        }),
       );
     } else if (item.type === "tool_result") {
       messages.push(
@@ -134,7 +134,7 @@ function convertMixedContent(
           actionExecutionId: item.tool_use_id,
           actionName: item.name ?? "tool_result",
           result: item.content,
-        })
+        }),
       );
     }
   });
@@ -148,7 +148,7 @@ function convertMixedContent(
 function createImageMessage(
   imageData: string,
   originalMessage: ScenarioMessageSnapshotEvent["messages"][0],
-  index: number
+  index: number,
 ): ImageMessage | null {
   const dataUrlMatch = imageData.match(/^data:image\/([^;]+);base64,(.+)$/);
 
@@ -176,7 +176,7 @@ function createImageMessage(
  * Creates a tool result message
  */
 function createToolResultMessage(
-  message: ScenarioMessageSnapshotEvent["messages"][0]
+  message: ScenarioMessageSnapshotEvent["messages"][0],
 ): ResultMessage & { traceId?: string } {
   const resultMessage: ResultMessage & { traceId?: string } = new ResultMessage(
     {
@@ -186,9 +186,9 @@ function createToolResultMessage(
       result: safeJsonParseOrStringFallback(
         typeof message.content === "string"
           ? message.content
-          : JSON.stringify(message.content ?? {})
+          : JSON.stringify(message.content ?? {}),
       ),
-    }
+    },
   );
   resultMessage.traceId = message.trace_id;
   return resultMessage;
