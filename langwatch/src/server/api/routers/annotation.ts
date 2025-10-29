@@ -9,7 +9,7 @@ import {
 
 import { TRPCError } from "@trpc/server";
 import { nanoid } from "nanoid";
-import { slugify } from "../../../utils/slugify";
+import { slugify } from "~/utils/slugify";
 import {
   TeamRoleGroup,
   checkPermissionOrPubliclyShared,

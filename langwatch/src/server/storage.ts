@@ -7,7 +7,7 @@ import fs from "fs/promises";
 import path from "path";
 import { prisma } from "./db";
 import { env } from "../env.mjs";
-import { decrypt } from "../utils/encryption";
+import { decrypt } from "~/utils/encryption";
 
 export class StorageService {
   private async getLocalStoragePath(projectId: string, key: string) {
