@@ -66,7 +66,7 @@ export function SpanDetails({ span }: { project: Project; span: Span }) {
             <b>Span ID:</b> <Text as="code">{span.span_id}</Text>
           </Text>
           {canOpenSpanInPromptStudio && (
-            <Link href={buildUrl(span.span_id).toString()} target="_blank">
+            <Link href={buildUrl(span.span_id).toString()} target="_blank" rel="noopener noreferrer">
               <Button size="xs" colorPalette="orange">
                 <Play size={16} />
                 Open in Playground

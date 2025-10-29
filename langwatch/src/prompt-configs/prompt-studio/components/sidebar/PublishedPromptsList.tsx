@@ -7,6 +7,7 @@ import { useAllPromptsForProject } from "~/prompt-configs/hooks/useAllPromptsFor
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { computeInitialFormValuesForPrompt } from "~/prompt-configs/utils/computeInitialFormValuesForPrompt";
 import { PublishedPromptContent } from "./PublishedPromptContent";
+import { SidebarEmptyState } from "./ui/SidebarEmptyState";
 
 export function getDisplayHandle(handle?: string | null): string {
   if (!handle) return "Untitled";
@@ -36,6 +37,12 @@ export function PublishedPromptsList() {
     return sorted;
   }, [data]);
 
+  const publishedPrompts = data?.filter((prompt) => prompt.version > 0);
+
+  if (!publishedPrompts || publishedPrompts.length === 0) {
+    return <SidebarEmptyState />;
+  }
+
   return (
     <>
       {groupedPrompts.map(([folder, prompts]) => (
@@ -50,7 +57,7 @@ export function PublishedPromptsList() {
               key={prompt.id}
               icon={
                 modelProviderIcons[
-                  prompt.model.split("/")[0] as keyof typeof modelProviderIcons
+                  prompt.model?.split("/")[0] as keyof typeof modelProviderIcons
                 ]
               }
               onClick={() => {
@@ -66,6 +73,9 @@ export function PublishedPromptsList() {
                 });
                 addTab({
                   data: {
+                    chat: {
+                      initialMessages: [],
+                    },
                     form: {
                       currentValues: defaultValues,
                     },

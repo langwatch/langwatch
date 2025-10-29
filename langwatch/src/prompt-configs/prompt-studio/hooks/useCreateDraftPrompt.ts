@@ -39,6 +39,9 @@ export function useCreateDraftPrompt() {
 
     addTab({
       data: {
+        chat: {
+          initialMessages: [],
+        },
         form: {
           currentValues: defaultValues,
         },
