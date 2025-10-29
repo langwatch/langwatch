@@ -711,6 +711,9 @@ export class PromptService {
 
   /**
    * Delete a prompt
+   *
+   * NOTE: This will only delete the config if the provided projectId matches the config's projectId
+   * otherwise it will throw with a permission error.
    */
   async deletePrompt(params: {
     idOrHandle: string;
@@ -720,6 +723,21 @@ export class PromptService {
     const organizationId =
       params.organizationId ??
       (await this.getOrganizationIdFromProjectId(params.projectId));
+
+    // Check permission before deleting
+    const permissionCheck = await this.repository.checkModifyPermission({
+      idOrHandle: params.idOrHandle,
+      projectId: params.projectId,
+      organizationId,
+    });
+
+    if (!permissionCheck.hasPermission) {
+      throw new Error(
+        permissionCheck.reason ??
+          "You don't have permission to delete this prompt",
+      );
+    }
+
     const result = await this.repository.deleteConfig(
       params.idOrHandle,
       params.projectId,

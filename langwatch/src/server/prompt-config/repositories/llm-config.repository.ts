@@ -343,6 +343,9 @@ export class LlmConfigRepository {
 
   /**
    * Delete an LLM config and all its versions
+   *
+   * NOTE: This will only delete the config if the provided projectId matches the config's projectId
+   * otherwise it will throw.
    */
   async deleteConfig(
     idOrHandle: string,
@@ -359,6 +362,13 @@ export class LlmConfigRepository {
       throw new NotFoundError(`Prompt config not found. ID: ${idOrHandle}`);
     }
 
+    const isProjectMatch = config.projectId === projectId;
+    if (!isProjectMatch) {
+      throw new Error(`Project ID mismatch. Config projectId: ${config.projectId} does not match requested projectId: ${projectId}`);
+    }
+
+
+    // This will error if the projectId !== config.projectId
     await this.prisma.llmPromptConfig.delete({
       where: { id: config.id, projectId },
     });
