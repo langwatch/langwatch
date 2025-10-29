@@ -37,7 +37,7 @@ export function PublishedPromptActions({
     } catch (error) {
       toaster.create({
         title: "Failed to delete prompt",
-        description: "An error occurred while deleting the prompt",
+        description: error instanceof Error ? error.message : "An unknown error occurred",
         type: "error",
       });
     } finally {

@@ -50,7 +50,7 @@ export function EditablePromptHandleField(
       console.error(error);
       toaster.create({
         title: "Error changing prompt handle",
-        description: "Failed to change prompt handle",
+        description: error.message,
         type: "error",
       });
     };

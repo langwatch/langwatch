@@ -342,6 +342,11 @@ export class PromptService {
   }): Promise<VersionedPrompt> {
     const { idOrHandle, projectId, data } = params;
 
+    await this.assertModifyPermission({
+      idOrHandle,
+      projectId,
+    });
+
     const updatedConfig = await this.repository.updateConfig(
       idOrHandle,
       projectId,
@@ -602,17 +607,11 @@ export class PromptService {
     }
 
     // Check modify permissions
-    const permission = await this.repository.checkModifyPermission({
+    await this.assertModifyPermission({
       idOrHandle,
       projectId,
-      organizationId,
+      organizationId: organizationId,
     });
-
-    if (!permission.hasPermission) {
-      throw new Error(
-        permission.reason ?? "No permission to modify this prompt",
-      );
-    }
 
     const remoteVersion = existingPrompt.version;
     const remoteConfigData: LatestConfigVersionSchema["configData"] = {
@@ -724,19 +723,11 @@ export class PromptService {
       params.organizationId ??
       (await this.getOrganizationIdFromProjectId(params.projectId));
 
-    // Check permission before deleting
-    const permissionCheck = await this.repository.checkModifyPermission({
+    await this.assertModifyPermission({
       idOrHandle: params.idOrHandle,
       projectId: params.projectId,
       organizationId,
     });
-
-    if (!permissionCheck.hasPermission) {
-      throw new Error(
-        permissionCheck.reason ??
-          "You don't have permission to delete this prompt",
-      );
-    }
 
     const result = await this.repository.deleteConfig(
       params.idOrHandle,
@@ -829,5 +820,29 @@ export class PromptService {
       }),
       ...(responseFormat !== undefined && { response_format: responseFormat }),
     };
+  }
+
+  /**
+   * Assert permission to modify/delete a prompt
+   */
+  private async assertModifyPermission(params: {
+    idOrHandle: string;
+    projectId: string;
+    // Deduced from projectId if not provided
+    organizationId?: string;
+  }): Promise<void> {
+    const organizationId =
+      params.organizationId ??
+      (await this.getOrganizationIdFromProjectId(params.projectId));
+
+    const permission = await this.repository.checkModifyPermission({
+      idOrHandle: params.idOrHandle,
+      projectId: params.projectId,
+      organizationId,
+    });
+
+    if (!permission.hasPermission) {
+      throw new Error(permission.reason ?? "You don't have permission to modify this prompt");
+    }
   }
 }
