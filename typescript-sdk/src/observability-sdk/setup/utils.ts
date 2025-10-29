@@ -58,6 +58,10 @@ export function getConcreteProvider(provider: unknown): unknown {
     delegate = (provider as any).getDelegate();
   } else if ((provider as any).delegate) {
     delegate = (provider as any).delegate;
+  } else if ((provider as any)._delegate) {
+    // Also check for _delegate (OpenTelemetry's actual property name)
+    // See: https://github.com/langwatch/langwatch/issues/753
+    delegate = (provider as any)._delegate;
   }
 
   if (delegate && typeof delegate === "object") {
