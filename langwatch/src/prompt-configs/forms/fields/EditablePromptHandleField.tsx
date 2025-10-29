@@ -4,12 +4,15 @@ import { useFormContext } from "react-hook-form";
 import { LuPencil } from "react-icons/lu";
 
 import { toaster } from "~/components/ui/toaster";
+import { Tooltip } from "~/components/ui/tooltip";
 import type { PromptConfigFormValues } from "~/prompt-configs";
 import { versionedPromptToPromptConfigFormValuesWithSystemMessage } from "~/prompt-configs/utils/llmPromptConfigUtils";
 import { usePromptConfigContext } from "~/prompt-configs/providers/PromptConfigProvider";
 import type { VersionedPrompt } from "~/server/prompt-config";
 import { createLogger } from "~/utils/logger";
 import { CopyButton } from "../../../components/CopyButton";
+import { api } from "~/utils/api";
+import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 
 const logger = createLogger(
   "langwatch:prompt-configs:editable-prompt-handle-field",
@@ -22,6 +25,21 @@ export function EditablePromptHandleField(
 ) {
   const form = useFormContext<PromptConfigFormValues>();
   const { triggerChangeHandle } = usePromptConfigContext();
+  const { project } = useOrganizationTeamProject();
+
+  const configId = form.watch("configId");
+
+  const { data: permission } = api.prompts.checkModifyPermission.useQuery(
+    {
+      idOrHandle: configId ?? "",
+      projectId: project?.id ?? "",
+    },
+    {
+      enabled: !!configId && !!project?.id,
+    }
+  );
+
+  const canEdit = permission?.hasPermission ?? true;
 
   const handleTriggerChangeHandle = () => {
     const id = form.watch("configId");
@@ -107,18 +125,29 @@ export function EditablePromptHandleField(
           background="gray.50"
           paddingX={1}
         >
-          <Button
-            id="js-edit-prompt-handle"
-            onClick={handleTriggerChangeHandle}
-            variant="ghost"
-            _hover={{
-              backgroundColor: "gray.100",
-            }}
-            textTransform="uppercase"
-            size="xs"
+          <Tooltip
+            content={permission?.reason ?? "Edit prompt handle"}
+            disabled={canEdit}
+            positioning={{ placement: "top" }}
+            showArrow
+            portalled={false}
           >
-            <LuPencil />
-          </Button>
+            <Button
+              id="js-edit-prompt-handle"
+              onClick={handleTriggerChangeHandle}
+              variant="ghost"
+              _hover={{
+                backgroundColor: canEdit ? "gray.100" : undefined,
+              }}
+              textTransform="uppercase"
+              size="xs"
+              disabled={!canEdit}
+              opacity={canEdit ? 1 : 0.5}
+              cursor={canEdit ? "pointer" : "not-allowed"}
+            >
+              <LuPencil />
+            </Button>
+          </Tooltip>
           <CopyButton value={handle} label="Prompt ID" />
         </HStack>
       )}

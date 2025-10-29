@@ -34,9 +34,6 @@ export function PublishedPromptActions({
   );
 
   const canDelete = permission?.hasPermission ?? true;
-  const deleteLabel = canDelete
-    ? "Delete prompt"
-    : "Cannot delete (created by another project)";
 
   const handleDelete = useCallback(async () => {
     if (!project?.id) return;
@@ -95,7 +92,9 @@ export function PublishedPromptActions({
                 cursor={canDelete ? "pointer" : "not-allowed"}
               >
                 <Trash2 size={16} />
-                <Text>{deleteLabel}</Text>
+                <Text as="span" ml={2}>
+                  Delete prompt
+                </Text>
               </Menu.Item>
             </Tooltip>
           </Menu.Content>

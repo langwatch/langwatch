@@ -90,6 +90,19 @@ export const PromptConfigPanel = forwardRef(function PromptConfigPanel(
       },
     );
 
+  // Check modify permissions for the prompt
+  const { data: permission } = api.prompts.checkModifyPermission.useQuery(
+    {
+      idOrHandle: configId,
+      projectId,
+    },
+    {
+      enabled: !!projectId && !!configId,
+    }
+  );
+
+  const canEdit = permission?.hasPermission ?? true;
+
   // ---- Form setup and configuration ----
   // Transform the LLM config into form values
   const initialConfigValues: PromptConfigFormValues = useMemo(
@@ -196,9 +209,16 @@ export const PromptConfigPanel = forwardRef(function PromptConfigPanel(
                   <VersionBadge version={prompt.version} />
                 )}
                 {prompt?.scope === "ORGANIZATION" && (
-                  <Tooltip content="This prompt is available to all projects in the organization">
+                  <Tooltip
+                    content={
+                      canEdit
+                        ? "This prompt is available to all projects in the organization"
+                        : permission?.reason ?? "Cannot edit (created by another project)"
+                    }
+                  >
                     <Button
                       onClick={() => {
+                        if (!canEdit) return;
                         // Hack to call the edit handle dialog, as triggering from here and dealing with all the provider context shaneningans is too complicated
                         const button =
                           document.querySelector<HTMLButtonElement>(
@@ -211,6 +231,9 @@ export const PromptConfigPanel = forwardRef(function PromptConfigPanel(
                       variant="plain"
                       asChild
                       size="xs"
+                      disabled={!canEdit}
+                      opacity={canEdit ? 1 : 0.5}
+                      cursor={canEdit ? "pointer" : "not-allowed"}
                     >
                       <OrganizationBadge />
                     </Button>

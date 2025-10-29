@@ -33,7 +33,7 @@ export const Tooltip = React.forwardRef<HTMLDivElement, TooltipProps>(
         disabled={!props.content}
         {...rest}
       >
-        <ChakraTooltip.Trigger asChild>
+        <ChakraTooltip.Trigger asChild={portalled}>
           {typeof children === "string" ? <Text>{children}</Text> : children}
         </ChakraTooltip.Trigger>
         <Portal disabled={!portalled} container={portalRef}>
