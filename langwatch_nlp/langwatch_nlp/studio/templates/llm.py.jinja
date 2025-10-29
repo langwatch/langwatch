@@ -18,10 +18,6 @@ from langwatch_nlp.studio.dspy import LLMNode, TemplateAdapter
 {{ value["code"] }}
 {% endfor %}
 
-{% if standalone and workflow.template_adapter == "default" %}
-dspy.configure(adapter=TemplateAdapter())
-{% endif %}
-
 class {{ class_name }}Signature(dspy.Signature):
     {% if parameters.get('instructions', '') %}
     {{ escape_prompt(parameters.get('instructions', '')) }}

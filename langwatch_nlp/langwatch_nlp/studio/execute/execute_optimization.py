@@ -40,23 +40,10 @@ from langwatch_nlp.studio.utils import (
 
 from sklearn.model_selection import train_test_split
 
-import dspy.primitives.module
 from dspy.teleprompt import MIPROv2
 from dspy.utils.asyncify import asyncify
 from langwatch_nlp.studio.s3_cache import setup_s3_cache
 import sentry_sdk
-
-_original_postprocess_parameter_name = dspy.primitives.module.postprocess_parameter_name
-
-
-def postprocess_parameter_name(name, value):
-    if name.startswith("components['"):
-        name = name.split("['")[1].split("']")[0]
-
-    return _original_postprocess_parameter_name(name, value)
-
-
-dspy.primitives.module.postprocess_parameter_name = postprocess_parameter_name
 
 
 async def execute_optimization(

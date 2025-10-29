@@ -1,5 +1,6 @@
 import { DEFAULT_DATASET_NAME } from "../../components/datasets/DatasetTable";
 import type { End, Entry, Evaluator, Signature, Workflow } from "../types/dsl";
+import { DEFAULT_MAX_TOKENS } from "../utils/registryUtils";
 
 export const entryNode = () => ({
   id: "entry",
@@ -136,8 +137,8 @@ export const customEvaluatorTemplate: Workflow = {
   version: "1.0",
   default_llm: {
     model: "openai/gpt-5",
-    temperature: 0,
-    max_tokens: 8192,
+    temperature: 1,
+    max_tokens: DEFAULT_MAX_TOKENS,
   },
   template_adapter: "default",
   workflow_type: "evaluator",
@@ -222,7 +223,8 @@ Return your judgment as either TRUE (no significant cognitive biases) or FALSE (
       position: { x: 580, y: 155 },
       data: {
         name: "ExactMatch",
-        cls: "ExactMatchEvaluator",
+        cls: "LangWatchEvaluator",
+        evaluator: "langevals/exact_match",
         inputs: [
           { identifier: "output", type: "str" },
           { identifier: "expected_output", type: "str" },

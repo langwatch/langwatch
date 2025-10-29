@@ -5,7 +5,6 @@ import {
   type Evaluator,
   type Field,
   type PromptingTechnique,
-  type Retriever,
   type Signature,
 } from "./types/dsl";
 import { convertEvaluators } from "./utils/registryUtils";
@@ -128,77 +127,6 @@ const retrieverInputsAndOutputs: {
   ],
 };
 
-const retrievers: Retriever[] = [
-  {
-    cls: "ColBERTv2",
-    name: "ColBERTv2",
-    description: "Retriever for a ColBERTv2 vector database",
-    parameters: [
-      {
-        identifier: "k",
-        desc: "Number of contexts to retrieve",
-        type: "int",
-        value: 3,
-      },
-      {
-        identifier: "url",
-        desc: "URL of the ColBERTv2 index",
-        type: "str",
-        value: "http://20.102.90.50:2017/wiki17_abstracts",
-      },
-    ],
-    ...retrieverInputsAndOutputs,
-  },
-  {
-    cls: "WeaviateRM",
-    name: "Weaviate",
-    description: "Retriever for a Weaviate vector database",
-    parameters: [
-      {
-        identifier: "k",
-        desc: "Number of contexts to retrieve",
-        type: "int",
-        value: 3,
-      },
-      {
-        identifier: "weaviate_url",
-        desc: "URL of the Weaviate instance",
-        type: "str",
-      },
-      {
-        identifier: "weaviate_api_key",
-        desc: "API key for the Weaviate Cloud instance",
-        type: "str",
-        optional: true,
-      },
-      {
-        identifier: "weaviate_collection_name",
-        desc: "Name of the Weaviate collection",
-        type: "str",
-      },
-      {
-        identifier: "weaviate_collection_text_key",
-        desc: "Name of the key in the Weaviate collection that contains the text",
-        type: "str",
-        value: "content",
-      },
-      {
-        identifier: "embedding_header_key",
-        desc: "Name of the header key in the Weaviate for the embeddings model api key",
-        type: "str",
-        value: "X-Cohere-Api-Key",
-      },
-      {
-        identifier: "embedding_header_value",
-        desc: "API key for the embeddings model",
-        type: "str",
-        value: "xxx",
-      },
-    ],
-    ...retrieverInputsAndOutputs,
-  },
-];
-
 const ALLOWED_EVALUATORS = [
   "langevals/exact_match",
   "langevals/llm_answer_match",
@@ -244,5 +172,4 @@ export const MODULES = {
   code,
   promptingTechniques,
   evaluators,
-  retrievers,
 };
