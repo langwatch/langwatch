@@ -845,4 +845,24 @@ export class PromptService {
       throw new Error(permission.reason ?? "You don't have permission to modify this prompt");
     }
   }
+
+  /**
+   * Check if user has permission to modify/delete a prompt
+   * Single Responsibility: Delegate permission check to repository with proper context
+   */
+  async checkModifyPermission(params: {
+    idOrHandle: string;
+    projectId: string;
+    organizationId?: string;
+  }): Promise<{ hasPermission: boolean; reason?: string }> {
+    const organizationId =
+      params.organizationId ??
+      (await this.getOrganizationIdFromProjectId(params.projectId));
+
+    return await this.repository.checkModifyPermission({
+      idOrHandle: params.idOrHandle,
+      projectId: params.projectId,
+      organizationId,
+    });
+  }
 }

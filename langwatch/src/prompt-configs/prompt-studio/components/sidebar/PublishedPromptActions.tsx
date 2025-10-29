@@ -1,12 +1,14 @@
-import { Box, Button } from "@chakra-ui/react";
+import { Box, Button, Text } from "@chakra-ui/react";
 import { MoreVertical, Trash2 } from "react-feather";
 import { Menu } from "~/components/ui/menu";
+import { Tooltip } from "~/components/ui/tooltip";
 import { DeleteConfirmationDialog } from "~/components/annotations/DeleteConfirmationDialog";
 import { useState, useCallback } from "react";
 import { usePrompts } from "~/prompt-configs/hooks/usePrompts";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { toaster } from "~/components/ui/toaster";
 import { getDisplayHandle } from "./PublishedPromptsList";
+import { api } from "~/utils/api";
 
 interface PublishedPromptActionsProps {
   promptId: string;
@@ -20,6 +22,21 @@ export function PublishedPromptActions({
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const { deletePrompt } = usePrompts();
   const { project } = useOrganizationTeamProject();
+
+  const { data: permission } = api.prompts.checkModifyPermission.useQuery(
+    {
+      idOrHandle: promptId,
+      projectId: project?.id ?? "",
+    },
+    {
+      enabled: !!project?.id,
+    }
+  );
+
+  const canDelete = permission?.hasPermission ?? true;
+  const deleteLabel = canDelete
+    ? "Delete prompt"
+    : "Cannot delete (created by another project)";
 
   const handleDelete = useCallback(async () => {
     if (!project?.id) return;
@@ -64,12 +81,23 @@ export function PublishedPromptActions({
             </Button>
           </Menu.Trigger>
           <Menu.Content onClick={(event) => event.stopPropagation()}>
-            <Menu.Item
-              value="delete"
-              onClick={() => setIsDeleteDialogOpen(true)}
+            <Tooltip
+              content={permission?.reason}
+              disabled={canDelete}
+              positioning={{ placement: "right" }}
+              showArrow
             >
-              <Trash2 size={16} /> Delete prompt
-            </Menu.Item>
+              <Menu.Item
+                value="delete"
+                onClick={() => canDelete && setIsDeleteDialogOpen(true)}
+                disabled={!canDelete}
+                opacity={canDelete ? 1 : 0.5}
+                cursor={canDelete ? "pointer" : "not-allowed"}
+              >
+                <Trash2 size={16} />
+                <Text>{deleteLabel}</Text>
+              </Menu.Item>
+            </Tooltip>
           </Menu.Content>
         </Menu.Root>
       </Box>
