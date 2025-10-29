@@ -13,13 +13,14 @@ import {
   traceMapping,
   type ElasticSearchMigration,
 } from "../../elastic/schema";
-import type { MappingProperty } from "@elastic/elasticsearch/lib/api/types";
 import { env } from "../env.mjs";
 import { execSync } from "child_process";
 import { prisma } from "../server/db";
 import { type Client as ElasticClient } from "@elastic/elasticsearch";
 import { migrations as importedMigrations } from "../../elastic/migrations";
 import { eventMapping } from "../../elastic/mappings/scenario-events";
+import { type estypes } from "@elastic/elasticsearch";
+type MappingProperty = estypes.MappingProperty;
 
 const migrations: Record<string, any> = importedMigrations;
 
@@ -58,7 +59,7 @@ export const elasticsearchMigrate = async (organizationId?: string) => {
       "\x1b[33m%s\x1b[0m",
       `Migration index not found, creating ${
         process.env.IS_OPENSEARCH ? "OpenSearch" : "Elasticsearch"
-      } indexes from scratch`
+      } indexes from scratch`,
     );
     await createIndexes(lastMigration, client);
     await new Promise((resolve) => setTimeout(resolve, 3000));
@@ -70,7 +71,7 @@ export const elasticsearchMigrate = async (organizationId?: string) => {
       "\x1b[32m%s\x1b[0m",
       `${
         process.env.IS_OPENSEARCH ? "OpenSearch" : "Elasticsearch"
-      } is up to date, no migrations to execute`
+      } is up to date, no migrations to execute`,
     );
     return;
   }
@@ -96,7 +97,7 @@ const quickwitMigrate = async () => {
     try {
       const result = execSync(
         `./quickwit/quickwit index create --index-config ${filePath}`,
-        { stdio: ["pipe", "pipe", "pipe"] }
+        { stdio: ["pipe", "pipe", "pipe"] },
       );
       console.log(result.toString());
     } catch (error) {
@@ -131,7 +132,7 @@ const getLastAppliedMigration = async (client: ElasticClient) => {
 const getMigrationsToExecute = async (client: ElasticClient) => {
   const lastMigration = (await getLastAppliedMigration(client)) ?? "0_";
   return Object.keys(migrations).filter(
-    (migration) => migration > lastMigration
+    (migration) => migration > lastMigration,
   );
 };
 
@@ -172,7 +173,7 @@ const createIndexes = async (lastMigration: string, client: ElasticClient) => {
   // DSPy Steps
   const dspyStepExists = await getLastIndexForBase(
     DSPY_STEPS_INDEX.base,
-    client
+    client,
   );
   if (!dspyStepExists) {
     await client.indices.create({
@@ -199,7 +200,7 @@ const createIndexes = async (lastMigration: string, client: ElasticClient) => {
   // Batch Evaluations
   const batchEvaluationExists = await getLastIndexForBase(
     BATCH_EVALUATION_INDEX.base,
-    client
+    client,
   );
   if (!batchEvaluationExists) {
     await client.indices.create({
@@ -226,7 +227,7 @@ const createIndexes = async (lastMigration: string, client: ElasticClient) => {
   // Scenario Events
   const scenarioEventExists = await getLastIndexForBase(
     SCENARIO_EVENTS_INDEX.base,
-    client
+    client,
   );
   if (!scenarioEventExists) {
     await client.indices.create({

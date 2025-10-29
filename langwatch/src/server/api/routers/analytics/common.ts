@@ -1,7 +1,7 @@
-import type {
-  QueryDslBoolQuery,
-  QueryDslQueryContainer,
-} from "@elastic/elasticsearch/lib/api/types";
+import { estypes } from "@elastic/elasticsearch";
+
+type QueryDslBoolQuery = estypes.QueryDslBoolQuery;
+type QueryDslQueryContainer = estypes.QueryDslQueryContainer;
 import { addDays, differenceInCalendarDays } from "date-fns";
 import { type z } from "zod";
 import { type sharedFiltersInputSchema } from "../../../analytics/types";

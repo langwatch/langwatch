@@ -56,7 +56,7 @@ export class LlmConfigRepository {
 
   constructor(
     private readonly prisma: PrismaClient,
-    versions = new LlmConfigVersionsRepository(prisma)
+    versions = new LlmConfigVersionsRepository(prisma),
   ) {
     this.versions = versions;
   }
@@ -100,7 +100,7 @@ export class LlmConfigRepository {
           config.handle = this.removeHandlePrefixes(
             config.handle,
             projectId,
-            organizationId
+            organizationId,
           );
 
           if (!config.versions?.[0]) {
@@ -114,7 +114,7 @@ export class LlmConfigRepository {
         } catch (error) {
           logger.error(
             { error, configId: config.id },
-            "Error parsing LLM config version"
+            "Error parsing LLM config version",
           );
           return null;
         }
@@ -240,14 +240,14 @@ export class LlmConfigRepository {
     // This should never happen, but if it does, we want to know about it
     if (!config.versions[0]) {
       throw new NotFoundError(
-        `Prompt config has no versions. ID: ${idOrHandle}`
+        `Prompt config has no versions. ID: ${idOrHandle}`,
       );
     }
 
     config.handle = this.removeHandlePrefixes(
       config.handle,
       projectId,
-      organizationId
+      organizationId,
     );
 
     try {
@@ -259,7 +259,7 @@ export class LlmConfigRepository {
       throw new Error(
         `Failed to parse LLM config version: ${
           error instanceof Error ? error.message : "Unknown error"
-        }`
+        }`,
       );
     }
   }
@@ -273,7 +273,7 @@ export class LlmConfigRepository {
     data: Partial<CreateLlmConfigParams>,
     options?: {
       tx?: Prisma.TransactionClient;
-    }
+    },
   ): Promise<LlmPromptConfig> {
     const { tx } = options ?? {};
     const client = tx ?? this.prisma;
@@ -291,7 +291,7 @@ export class LlmConfigRepository {
 
     if (!organizationId) {
       throw new NotFoundError(
-        `Organization not found. Project ID: ${projectId}`
+        `Organization not found. Project ID: ${projectId}`,
       );
     }
 
@@ -335,7 +335,7 @@ export class LlmConfigRepository {
     updatedConfig.handle = this.removeHandlePrefixes(
       updatedConfig.handle,
       projectId,
-      existingConfig.organizationId
+      existingConfig.organizationId,
     );
 
     return updatedConfig;
@@ -347,7 +347,7 @@ export class LlmConfigRepository {
   async deleteConfig(
     idOrHandle: string,
     projectId: string,
-    organizationId: string
+    organizationId: string,
   ): Promise<{ success: boolean }> {
     const config = await this.getConfigByIdOrHandleWithLatestVersion({
       idOrHandle,
@@ -440,7 +440,6 @@ export class LlmConfigRepository {
 
         newVersionData = {
           configData,
-          version: 0,
           schemaVersion: LATEST_SCHEMA_VERSION,
           commitMessage: "Initial version",
         };
@@ -454,7 +453,7 @@ export class LlmConfigRepository {
       const newVersion = await tx.llmPromptConfigVersion.create({
         data: {
           ...newVersionData,
-          version: 0,
+          version: 1,
           configData: newVersionData.configData as Prisma.InputJsonValue,
           id: this.versions.generateVersionId(),
           configId: newConfig.id,
@@ -473,7 +472,7 @@ export class LlmConfigRepository {
       updatedConfig.handle = this.removeHandlePrefixes(
         updatedConfig.handle,
         configData.projectId,
-        configData.organizationId
+        configData.organizationId,
       );
 
       return {
@@ -506,7 +505,7 @@ export class LlmConfigRepository {
           handle: string;
           scope: "ORGANIZATION";
           organizationId: string;
-        }
+        },
   ): string {
     const { handle, scope } = args;
 
@@ -520,7 +519,7 @@ export class LlmConfigRepository {
   removeHandlePrefixes(
     handle: string | null,
     projectId: string,
-    organizationId: string
+    organizationId: string,
   ): string | null {
     if (!handle) {
       return null;
@@ -605,7 +604,7 @@ export class LlmConfigRepository {
    */
   compareConfigContent(
     config1: unknown,
-    config2: unknown
+    config2: unknown,
   ): { isEqual: boolean; differences?: string[] } {
     try {
       // Get the configData schema for normalization
@@ -625,12 +624,12 @@ export class LlmConfigRepository {
         const differences: string[] = [];
         if (!parseResult1.success) {
           differences.push(
-            "config1 validation failed: " + parseResult1.error.message
+            "config1 validation failed: " + parseResult1.error.message,
           );
         }
         if (!parseResult2.success) {
           differences.push(
-            "config2 validation failed: " + parseResult2.error.message
+            "config2 validation failed: " + parseResult2.error.message,
           );
         }
         return { isEqual: false, differences };
@@ -643,12 +642,12 @@ export class LlmConfigRepository {
       const json1 = JSON.stringify(
         normalized1,
         Object.keys(normalized1).sort(),
-        2
+        2,
       );
       const json2 = JSON.stringify(
         normalized2,
         Object.keys(normalized2).sort(),
-        2
+        2,
       );
 
       const isEqual = json1 === json2;
@@ -660,7 +659,7 @@ export class LlmConfigRepository {
         // TODO: move this to a more git diff kinda of approach
         if (normalized1.model !== normalized2.model) {
           differences.push(
-            `model: ${normalized1.model} → ${normalized2.model}`
+            `model: ${normalized1.model} → ${normalized2.model}`,
           );
         }
         if (normalized1.prompt !== normalized2.prompt) {
@@ -686,12 +685,12 @@ export class LlmConfigRepository {
         }
         if (normalized1.temperature !== normalized2.temperature) {
           differences.push(
-            `temperature: ${normalized1.temperature} → ${normalized2.temperature}`
+            `temperature: ${normalized1.temperature} → ${normalized2.temperature}`,
           );
         }
         if (normalized1.max_tokens !== normalized2.max_tokens) {
           differences.push(
-            `max_tokens: ${normalized1.max_tokens} → ${normalized2.max_tokens}`
+            `max_tokens: ${normalized1.max_tokens} → ${normalized2.max_tokens}`,
           );
         }
 
@@ -720,7 +719,7 @@ export class LlmConfigRepository {
    * Build a default version base for a config
    */
   private buildDefaultVersionConfigData(
-    params: Record<string, unknown>
+    params: Record<string, unknown>,
   ): CreateLlmConfigVersionParams["configData"] {
     return {
       prompt: "You are a helpful assistant",

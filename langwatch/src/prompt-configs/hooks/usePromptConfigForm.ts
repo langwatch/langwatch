@@ -1,6 +1,6 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import isEqual from "lodash-es/isEqual";
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import { useForm, type DeepPartial } from "react-hook-form";
 
 import { formSchema, type PromptConfigFormValues } from "~/prompt-configs";
@@ -20,7 +20,7 @@ let disableFormSyncTimeout: NodeJS.Timeout | null = null;
 export const usePromptConfigForm = ({
   configId,
   onChange,
-  initialConfigValues = {},
+  initialConfigValues,
 }: UsePromptConfigFormProps) => {
   const methods = useForm<PromptConfigFormValues>({
     /**
@@ -34,6 +34,24 @@ export const usePromptConfigForm = ({
   });
 
   const formData = methods.watch();
+  const messages = methods.watch("version.configData.messages");
+  const systemMessage = messages.find(({ role }) => role === "system")?.content;
+
+  /**
+   * In the case that we're using system messages,
+   * make sure to keep the prompt synced
+   */
+  useEffect(() => {
+    if (systemMessage) {
+      const currentPrompt = methods.getValues("version.configData.prompt");
+      // Only sync when value differs; do not mark dirty for this derived update
+      if (currentPrompt !== systemMessage) {
+        methods.setValue("version.configData.prompt", systemMessage, {
+          shouldDirty: false,
+        });
+      }
+    }
+  }, [systemMessage, methods]);
 
   // Handle syncing the inputs/outputs with the demonstrations columns
   useEffect(() => {
@@ -48,11 +66,11 @@ export const usePromptConfigForm = ({
     if (!isEqual(newColumns, currentColumns)) {
       methods.setValue(
         "version.configData.demonstrations.inline.columnTypes",
-        newColumns
+        newColumns,
       );
       methods.setValue(
         "version.configData.demonstrations.inline.records",
-        currentRecords
+        currentRecords,
       );
     }
   }, [formData, methods]);
@@ -62,10 +80,10 @@ export const usePromptConfigForm = ({
     if (disableNodeSync) return;
     disableOnChange = true;
     for (const [key, value] of Object.entries(
-      initialConfigValues?.version?.configData ?? {}
+      initialConfigValues?.version?.configData ?? {},
     )) {
       const currentValue = methods.getValues(
-        `version.configData.${key}` as any
+        `version.configData.${key}` as any,
       );
       if (!isEqual(currentValue, value)) {
         methods.setValue(`version.configData.${key}` as any, value as any);

@@ -7,7 +7,6 @@ import {
   type ForwardedRef,
   type SetStateAction,
 } from "react";
-import { LuBuilding } from "react-icons/lu";
 import { useDebouncedCallback } from "use-debounce";
 
 import { useInvokePrompt } from "./hooks/useInvokePrompt";
@@ -33,6 +32,8 @@ import { PanelHeader } from "./components/ui/PanelHeader";
 import { PromptConfigForm } from "./forms/prompt-config-form/PromptConfigForm";
 import type { PromptConfigFormValues } from "./types";
 import { buildDefaultFormValues } from "./utils/buildDefaultFormValues";
+import { OrganizationBadge } from "./components/ui/OrganizationBadge";
+import { VersionBadge } from "./components/ui/VersionBadge";
 
 /**
  * Panel for configuring and testing LLM prompts
@@ -57,7 +58,7 @@ export const PromptConfigPanel = forwardRef(function PromptConfigPanel(
     isPaneExpanded: isExpanded,
     setIsPaneExpanded: setIsExpanded,
   }: PromptConfigPanelProps,
-  ref: ForwardedRef<HTMLDivElement>
+  ref: ForwardedRef<HTMLDivElement>,
 ) {
   // ---- State and hooks ----
   const { project } = useOrganizationTeamProject();
@@ -86,7 +87,7 @@ export const PromptConfigPanel = forwardRef(function PromptConfigPanel(
         refetchOnWindowFocus: false,
         refetchOnMount: false,
         refetchOnReconnect: false,
-      }
+      },
     );
 
   // ---- Form setup and configuration ----
@@ -105,7 +106,7 @@ export const PromptConfigPanel = forwardRef(function PromptConfigPanel(
           buildDefaultFormValues({});
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [Boolean(prompt), defaultModel, configId]
+    [Boolean(prompt), defaultModel, configId],
   );
 
   // Setup form with the config values
@@ -166,7 +167,7 @@ export const PromptConfigPanel = forwardRef(function PromptConfigPanel(
     {
       leading: true,
       trailing: false,
-    }
+    },
   );
 
   // Early return if panel is closed
@@ -191,14 +192,8 @@ export const PromptConfigPanel = forwardRef(function PromptConfigPanel(
             title={
               <HStack>
                 <Text whiteSpace="nowrap">Prompt Configuration</Text>
-                {Boolean(prompt?.version && prompt.handle) && (
-                  <Badge
-                    colorPalette="green"
-                    border="1px solid"
-                    borderColor="green.200"
-                  >
-                    v{prompt?.version}
-                  </Badge>
+                {prompt?.version && prompt?.handle && (
+                  <VersionBadge version={prompt.version} />
                 )}
                 {prompt?.scope === "ORGANIZATION" && (
                   <Tooltip content="This prompt is available to all projects in the organization">
@@ -207,7 +202,7 @@ export const PromptConfigPanel = forwardRef(function PromptConfigPanel(
                         // Hack to call the edit handle dialog, as triggering from here and dealing with all the provider context shaneningans is too complicated
                         const button =
                           document.querySelector<HTMLButtonElement>(
-                            "#js-edit-prompt-handle"
+                            "#js-edit-prompt-handle",
                           );
                         if (button) {
                           button.click();
@@ -217,12 +212,7 @@ export const PromptConfigPanel = forwardRef(function PromptConfigPanel(
                       asChild
                       size="xs"
                     >
-                      <Badge colorPalette="purple" variant="outline">
-                        <HStack>
-                          <LuBuilding />
-                          Organization
-                        </HStack>
-                      </Badge>
+                      <OrganizationBadge />
                     </Button>
                   </Tooltip>
                 )}
