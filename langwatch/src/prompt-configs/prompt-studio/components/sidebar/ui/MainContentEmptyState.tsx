@@ -1,26 +1,20 @@
-import { Center, EmptyState } from "@chakra-ui/react";
-import { LuFileText } from "react-icons/lu";
+import { useAllPromptsForProject } from "~/prompt-configs/hooks/useAllPromptsForProject";
+import { NoPromptsOnboardingState } from "./NoPromptsOnboardingState";
+import { NoTabsOpenState } from "./NoTabsOpenState";
 
 /**
  * Empty state component for the main content area when no tabs are open.
- * Single Responsibility: Display a welcoming empty state to guide users to create or open a prompt.
+ * Single Responsibility: Route to appropriate empty state based on whether prompts exist.
  */
 export function MainContentEmptyState() {
-  return (
-    <Center width="full" height="full" bg="white">
-      <EmptyState.Root>
-        <EmptyState.Content>
-          <EmptyState.Indicator>
-            <LuFileText />
-          </EmptyState.Indicator>
-          <EmptyState.Title>No prompts open</EmptyState.Title>
-          <EmptyState.Description>
-            Click the + button in the sidebar to create your first prompt, or
-            select an existing prompt to get started.
-          </EmptyState.Description>
-        </EmptyState.Content>
-      </EmptyState.Root>
-    </Center>
-  );
+  const { data } = useAllPromptsForProject();
+  const publishedPrompts = data?.filter((prompt) => prompt.version > 0);
+  const hasNoPrompts = !publishedPrompts || publishedPrompts.length === 0;
+
+  if (hasNoPrompts) {
+    return <NoPromptsOnboardingState />;
+  }
+
+  return <NoTabsOpenState />;
 }
 
