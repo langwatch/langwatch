@@ -6,10 +6,12 @@ import type { ContentfulStatusCode } from "hono/utils/http-status";
  */
 export abstract class HttpError extends Error {
   abstract readonly status: ContentfulStatusCode;
+  error: string;
 
   constructor(message: string) {
     super(message);
     this.name = this.constructor.name;
+    this.error = message;
   }
 }
 
@@ -18,7 +20,7 @@ export abstract class HttpError extends Error {
  */
 export class BadRequestError extends HttpError {
   readonly status = 400;
-  constructor(message: string) {
+  constructor(message: string = "Bad request") {
     super(message);
   }
 }
@@ -38,7 +40,7 @@ export class UnauthorizedError extends HttpError {
  */
 export class NotFoundError extends HttpError {
   readonly status = 404;
-  constructor(message: string) {
+  constructor(message: string = "Not found") {
     super(message);
   }
 }
@@ -48,7 +50,7 @@ export class NotFoundError extends HttpError {
  */
 export class UnprocessableEntityError extends HttpError {
   readonly status = 422;
-  constructor(message: string) {
+  constructor(message: string = "Unprocessable entity") {
     super(message);
   }
 }
@@ -62,4 +64,5 @@ export class InternalServerError extends HttpError {
     super(message);
   }
 }
+
 

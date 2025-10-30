@@ -1,10 +1,5 @@
 import { z } from "zod";
 
-export const errorSchema = z.object({
-  status: z.string().default("error"),
-  message: z.string(),
-});
-
 export const datasetOutputSchema = z.object({
   data: z.array(
     z.object({

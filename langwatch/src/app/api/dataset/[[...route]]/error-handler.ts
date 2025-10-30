@@ -1,8 +1,8 @@
 import type { Context } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { createLogger } from "../../../../utils/logger";
-import { errorSchema } from "./schemas";
-import { HttpError } from "../../shared/errors";
+import { errorSchema } from "../../shared/schemas";
+import { HttpError, InternalServerError } from "../../shared/errors";
 
 const logger = createLogger("langwatch:api:dataset:errors");
 
@@ -12,12 +12,13 @@ const logger = createLogger("langwatch:api:dataset:errors");
  */
 export const handleDatasetError = async (
   error: Error & { status?: ContentfulStatusCode },
-  c: Context
+  c: Context,
 ): Promise<Response> => {
   const path = c.req.path;
   const method = c.req.method;
   const routeParams = c.req.param();
-  const status = error instanceof HttpError ? error.status : error.status ?? 500;
+  const status =
+    error instanceof HttpError ? error.status : error.status ?? 500;
 
   // Log the error with context (including status code)
   logger.error(
@@ -32,32 +33,15 @@ export const handleDatasetError = async (
         stack: error.stack,
       },
     },
-    `Dataset API Error [${status}]: ${error.message || String(error)}`
+    `Dataset API Error [${status}]: ${error.message || String(error)}`,
   );
 
   // Handle HttpError instances (our typed errors)
   if (error instanceof HttpError) {
-    return c.json(
-      errorSchema.parse({ status: "error", message: error.message }),
-      error.status
-    );
-  }
-
-  // Handle errors with status property
-  if (error.status) {
-    return c.json(
-      errorSchema.parse({ status: "error", message: error.message ?? "An error occurred" }),
-      error.status
-    );
+    return c.json(errorSchema.parse(error), error.status);
   }
 
   // Default to 500 for unexpected errors
-  return c.json(
-    errorSchema.parse({
-      status: "error",
-      message: "Internal server error",
-    }),
-    500
-  );
+  const internalError = new InternalServerError();
+  return c.json(errorSchema.parse(internalError), internalError.status);
 };
-

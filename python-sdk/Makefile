@@ -58,6 +58,8 @@ ensure-openapi-python-client:
 	fi
 
 generate/api-client: ensure-openapi-python-client
+	@echo "Generating OpenAPI spec..."
+	@cd ../langwatch && npm run task generateOpenAPISpec
 	@echo "Deleting old API client..."
 	@rm -rf src/langwatch/generated/langwatch_rest_api_client
 	@echo "Building API client..."

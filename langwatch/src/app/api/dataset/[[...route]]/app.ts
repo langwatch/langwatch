@@ -16,7 +16,8 @@ import {
 import { baseResponses } from "../../shared/base-responses";
 import { MAX_LIMIT_MB } from "./constants";
 import { buildStandardSuccessResponse } from "./utils";
-import { datasetOutputSchema, errorSchema } from "./schemas";
+import { datasetOutputSchema } from "./schemas";
+import { errorSchema } from "../../shared/schemas";
 import { handleDatasetError } from "./error-handler";
 patchZodOpenapi();
 
