@@ -7,13 +7,21 @@ import { prisma } from "../../../../server/db";
 import { describeRoute } from "hono-openapi";
 import { patchZodOpenapi } from "../../../../utils/extend-zod-openapi";
 import { loggerMiddleware } from "../../middleware/logger";
+import {
+  UnauthorizedError,
+  NotFoundError,
+  BadRequestError,
+  UnprocessableEntityError,
+} from "../../shared/errors";
 import { baseResponses } from "./constants";
 import { buildStandardSuccessResponse } from "./utils";
 import { datasetOutputSchema, errorSchema } from "./schemas";
+import { handleDatasetError } from "./error-handler";
 patchZodOpenapi();
 
 export const app = new Hono().basePath("/api/dataset");
 app.use(loggerMiddleware());
+app.onError(handleDatasetError);
 
 app.post(
   "/:slug/entries",
@@ -47,13 +55,13 @@ app.post(
     const { entries } = c.req.valid("json");
 
     if (!apiKey) {
-      return c.json({ error: "Unauthorized" }, 401);
+      throw new UnauthorizedError();
     }
     const project = await prisma.project.findUnique({
       where: { apiKey },
     });
     if (!project) {
-      return c.json({ error: "Unauthorized" }, 401);
+      throw new UnauthorizedError();
     }
 
     const dataset = await prisma.dataset.findFirst({
@@ -63,7 +71,7 @@ app.post(
       },
     });
     if (!dataset) {
-      return c.json({ error: "Dataset not found" }, 404);
+      throw new NotFoundError("Dataset not found");
     }
 
     const columns = Object.fromEntries(
@@ -75,11 +83,8 @@ app.post(
     for (const entry of entries) {
       for (const [key] of Object.entries(entry)) {
         if (!columns[key]) {
-          return c.json(
-            {
-              error: `Column \`${key}\` is not present in the \`${dataset.name}\` dataset`,
-            },
-            400
+          throw new BadRequestError(
+            `Column \`${key}\` is not present in the \`${dataset.name}\` dataset`
           );
         }
       }
@@ -118,21 +123,21 @@ app.get(
   async (c) => {
     const { slugOrId } = c.req.param();
     if (!slugOrId) {
-      return c.json({ error: "Dataset slug or id is required" }, 422);
+      throw new UnprocessableEntityError("Dataset slug or id is required");
     }
 
     const apiKey =
       c.req.header("X-Auth-Token") ??
       c.req.header("Authorization")?.split(" ")[1];
     if (!apiKey) {
-      return c.json({ error: "Unauthorized" }, 401);
+      throw new UnauthorizedError();
     }
 
     const project = await prisma.project.findUnique({
       where: { apiKey },
     });
     if (!project) {
-      return c.json({ error: "Unauthorized" }, 401);
+      throw new UnauthorizedError();
     }
 
     const dataset = await prisma.dataset.findFirst({
@@ -142,9 +147,13 @@ app.get(
       },
     });
     if (!dataset) {
-      return c.json({ error: "Dataset not found" }, 404);
+      throw new NotFoundError("Dataset not found");
     }
 
-    return c.json(dataset);
+    const datasetRecords = await prisma.datasetRecord.findMany({
+      where: { datasetId: dataset.id, projectId: project.id },
+    });
+
+    return c.json({ data: datasetRecords });
   }
 );
