@@ -50,7 +50,7 @@ export const WorkflowPropertiesPanel = () => {
     setWorkflow({ workflow_type: workflowType });
   };
 
-  const updateNode = useCallback((workflowType: WorkflowTypes) => {
+  const updateNode = (workflowType: WorkflowTypes) => {
     if (!endNode) return;
 
     if (workflowType === "evaluator") {
@@ -77,7 +77,7 @@ export const WorkflowPropertiesPanel = () => {
       updateNodeInternals(endNode.id);
       setIsEvaluator(false);
     }
-  }, [endNode, setNode, updateNodeInternals]);
+  };
 
   useEffect(() => {
     if (
@@ -86,7 +86,8 @@ export const WorkflowPropertiesPanel = () => {
     ) {
       updateNode(workflow.workflow_type);
     }
-  }, [workflow.workflow_type, isEvaluator, updateNode]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [workflow.workflow_type, isEvaluator]);
 
 
   return (
