@@ -23,9 +23,6 @@ from litellm.files.main import ModelResponse
 trace_urls: dict[str, str] = {}
 
 
-chainlit_config.config.project.enable_telemetry = False
-
-
 class TraceIdCapturerExporter(SpanExporter):
     def __init__(self):
         self.captured_trace_id: Optional[str] = None
