@@ -15,6 +15,7 @@ import type { Component, Entry } from "../../types/dsl";
 import { useDrawer } from "../../../components/CurrentDrawer";
 import { Menu } from "../../../components/ui/menu";
 import { toaster } from "../../../components/ui/toaster";
+import { useDeleteDatasetConfirmation } from "../../../hooks/useDeleteDatasetConfirmation";
 
 export function DatasetSelection({
   node,
@@ -27,7 +28,7 @@ export function DatasetSelection({
 
   const datasets = api.dataset.getAll.useQuery(
     { projectId: project?.id ?? "" },
-    { enabled: !!project }
+    { enabled: !!project },
   );
 
   const { openDrawer } = useDrawer();
@@ -124,14 +125,14 @@ export function DatasetSelectionItem({
           setRendered(true);
         });
       },
-      100 + Math.floor(Math.random() * 200)
+      100 + Math.floor(Math.random() * 200),
     );
   }, []);
 
   const { project } = useOrganizationTeamProject();
   const datasetDelete = api.dataset.deleteById.useMutation();
 
-  const deleteDataset = (id: string, name: string) => {
+  const deleteDataset = ({ id, name }: { id: string; name: string }) => {
     datasetDelete.mutate(
       { projectId: project?.id ?? "", datasetId: id },
       {
@@ -171,7 +172,7 @@ export function DatasetSelectionItem({
                             duration: 5000,
                           });
                         },
-                      }
+                      },
                     );
                   }}
                 >
@@ -199,9 +200,12 @@ export function DatasetSelectionItem({
             },
           });
         },
-      }
+      },
     );
   };
+
+  const { showDeleteDialog, DeleteDialog } =
+    useDeleteDatasetConfirmation(deleteDataset);
 
   return (
     <VStack
@@ -213,6 +217,7 @@ export function DatasetSelectionItem({
       background="#F5F7F7"
       className="ag-borderless"
       position="relative"
+      overflow="hidden"
     >
       {dataset?.id && (
         <Box position="absolute" top={0} right={0} zIndex={11}>
@@ -243,7 +248,10 @@ export function DatasetSelectionItem({
                 css={{ color: "var(--chakra-colors-red-600)" }}
                 onClick={(event) => {
                   event.stopPropagation();
-                  deleteDataset(dataset?.id ?? "", dataset?.name ?? "");
+                  showDeleteDialog({
+                    id: dataset?.id ?? "",
+                    name: dataset?.name ?? "",
+                  });
                 }}
               >
                 <Trash2 size={14} /> Delete dataset
@@ -278,6 +286,7 @@ export function DatasetSelectionItem({
       <Text fontSize="14px" fontWeight="bold" padding={4}>
         {dataset?.name ?? DEFAULT_DATASET_NAME}
       </Text>
+      <DeleteDialog />
     </VStack>
   );
 }
