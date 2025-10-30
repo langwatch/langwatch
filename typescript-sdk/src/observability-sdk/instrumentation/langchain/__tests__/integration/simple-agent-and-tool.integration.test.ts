@@ -35,6 +35,7 @@ describe("LangChain Integration Tests", () => {
     spanProcessor = new SimpleSpanProcessor(spanExporter);
 
     observabilityHandle = setupObservability({
+      langwatch: "disabled",
       serviceName: "langchain-integration-test",
       debug: { logger: new NoOpLogger() },
       spanProcessors: [spanProcessor],
@@ -63,7 +64,8 @@ describe("LangChain Integration Tests", () => {
       { root: true },
       async () => {
         const llm = new ChatOpenAI({
-          model: "gpt-5",
+          model: "gpt-5-mini",
+          reasoning: { effort: "minimal" },
           temperature: 1,
         });
 
@@ -88,7 +90,7 @@ describe("LangChain Integration Tests", () => {
     );
     expect(llmSpan).toBeDefined();
     expect(llmSpan?.attributes["langwatch.span.type"]).toBe("llm");
-    expect(llmSpan?.attributes["gen_ai.request.model"]).toBe("gpt-5");
+    expect(llmSpan?.attributes["gen_ai.request.model"]).toBe("gpt-5-mini");
 
     // New naming: should not be prefixed with "LLM:" anymore
     expect(llmSpan?.name.startsWith("LLM:")).toBe(false);
@@ -116,7 +118,8 @@ describe("LangChain Integration Tests", () => {
       { root: true },
       async () => {
         const llm = new ChatOpenAI({
-          model: "gpt-5",
+          model: "gpt-5-mini",
+          reasoning: { effort: "minimal" },
           temperature: 1,
         });
 
@@ -140,7 +143,7 @@ describe("LangChain Integration Tests", () => {
 
         const tracingCallback = new LangWatchCallbackHandler();
         const result = await agentExecutor.invoke(
-          { input: "What is the current time?" },
+          { input: "What is the current time? Please send me the time in the ISO8601 format, such as 2025-01-01T00:00:00Z" },
           { callbacks: [tracingCallback] },
         );
 
@@ -169,7 +172,8 @@ describe("LangChain Integration Tests", () => {
       { root: true },
       async () => {
         const llm = new ChatOpenAI({
-          model: "gpt-5",
+          model: "gpt-5-mini",
+          reasoning: { effort: "minimal" },
           temperature: 1,
         });
 
@@ -248,7 +252,8 @@ describe("LangChain Integration Tests", () => {
         { root: true },
         async () => {
           const llm = new ChatOpenAI({
-            model: "gpt-5",
+            model: "gpt-5-mini",
+            reasoning: { effort: "minimal" },
             temperature: 1,
           });
 
@@ -270,8 +275,8 @@ describe("LangChain Integration Tests", () => {
       expect(llmSpan).toBeDefined();
 
       // Verify naming follows the new pattern: "openai gpt-5 (temp 0.7)"
-      expect(llmSpan?.name).toMatch(/openai gpt-5 \(temp 1\)/);
-      expect(llmSpan?.attributes["gen_ai.request.model"]).toBe("gpt-5");
+      expect(llmSpan?.name).toMatch(/openai gpt-5-mini \(temp 1\)/);
+      expect(llmSpan?.attributes["gen_ai.request.model"]).toBe("gpt-5-mini");
       expect(llmSpan?.attributes["gen_ai.request.temperature"]).toBe(1);
     });
 
@@ -295,7 +300,8 @@ describe("LangChain Integration Tests", () => {
         { root: true },
         async () => {
           const llm = new ChatOpenAI({
-            model: "gpt-5",
+            model: "gpt-5-mini",
+          reasoning: { effort: "minimal" },
             temperature: 1,
           });
 
@@ -357,7 +363,8 @@ describe("LangChain Integration Tests", () => {
         { root: true },
         async () => {
           const llm = new ChatOpenAI({
-            model: "gpt-5",
+            model: "gpt-5-mini",
+          reasoning: { effort: "minimal" },
             temperature: 1,
           });
 
@@ -391,6 +398,8 @@ describe("LangChain Integration Tests", () => {
       await spanProcessor.forceFlush();
       const finishedSpans = spanExporter.getFinishedSpans();
 
+      console.log("Finished spans:", finishedSpans);
+
       // Find agent/component spans
       const componentSpans = finishedSpans.filter(
         (span) => span.attributes["langwatch.span.type"] === "component",
@@ -412,7 +421,8 @@ describe("LangChain Integration Tests", () => {
         { root: true },
         async () => {
           const llm = new ChatOpenAI({
-            model: "gpt-5",
+            model: "gpt-5-mini",
+          reasoning: { effort: "minimal" },
             temperature: 1,
           });
 
@@ -455,7 +465,8 @@ describe("LangChain Integration Tests", () => {
         { root: true },
         async () => {
           const llm = new ChatOpenAI({
-            model: "gpt-5",
+            model: "gpt-5-mini",
+          reasoning: { effort: "minimal" },
             temperature: 1,
           });
 
@@ -492,7 +503,8 @@ describe("LangChain Integration Tests", () => {
         { root: true },
         async () => {
           const llm = new ChatOpenAI({
-            model: "gpt-5",
+            model: "gpt-5-mini",
+          reasoning: { effort: "minimal" },
             temperature: 1,
           });
 
@@ -526,7 +538,8 @@ describe("LangChain Integration Tests", () => {
         { root: true },
         async () => {
           const llm = new ChatOpenAI({
-            model: "gpt-5",
+            model: "gpt-5-mini",
+          reasoning: { effort: "minimal" },
             temperature: 1,
           });
 
@@ -549,7 +562,7 @@ describe("LangChain Integration Tests", () => {
 
       // Verify GenAI attributes are present
       expect(llmSpan?.attributes["gen_ai.system"]).toBe("openai");
-      expect(llmSpan?.attributes["gen_ai.request.model"]).toBe("gpt-5");
+      expect(llmSpan?.attributes["gen_ai.request.model"]).toBe("gpt-5-mini");
       expect(llmSpan?.attributes["gen_ai.request.temperature"]).toBe(1);
 
       // Verify no deprecated llm.* attributes
@@ -566,7 +579,8 @@ describe("LangChain Integration Tests", () => {
         { root: true },
         async () => {
           const llm = new ChatOpenAI({
-            model: "gpt-5",
+            model: "gpt-5-mini",
+            reasoning: { effort: "minimal" },
             temperature: 1,
           });
 
