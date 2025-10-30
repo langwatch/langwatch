@@ -192,6 +192,7 @@ async def test_example(example_file: str):
                         "API Error",
                         "Connection error",
                         "Timeout",
+                        "Request timed out",
                     ]
                 ):
                     pytest.skip(

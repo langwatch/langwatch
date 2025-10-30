@@ -14,11 +14,7 @@ langwatch.setup(
     instrumentors=[DSPyInstrumentor()],
 )
 
-llm = dspy.OpenAI(
-    model="gpt-4o-mini",  # gpt-5 is not supported: his is a chat model and not supported in the v1/completions endpoint. Did you mean to use v1/chat/completions?
-    max_tokens=2048,
-    api_key=os.environ["OPENAI_API_KEY"],
-)
+llm = dspy.LM("openai/gpt-4o-mini", api_key=os.environ["OPENAI_API_KEY"])
 
 colbertv2_wiki17_abstracts = dspy.ColBERTv2(
     url="http://20.102.90.50:2017/wiki17_abstracts"
