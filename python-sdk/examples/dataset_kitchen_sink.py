@@ -30,7 +30,7 @@ def main(messages=None):
     dataset_slug_or_id = os.getenv("LANGWATCH_DATASET_ID") or "test-dataset-35"
     print(f"Dataset slug or ID: {dataset_slug_or_id}")
     print(
-        f"LangWatch endpoint: {os.getenv('LANGWATCH_ENDPOINT') or langwatch._endpoint_url}"
+        f"LangWatch endpoint: {os.getenv('LANGWATCH_ENDPOINT') or langwatch._endpoint}"
     )
 
     if not dataset_slug_or_id:
