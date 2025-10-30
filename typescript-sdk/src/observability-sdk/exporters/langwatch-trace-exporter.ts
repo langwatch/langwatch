@@ -1,4 +1,6 @@
 import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-http";
+import { type ReadableSpan } from "@opentelemetry/sdk-trace-base";
+import { type ExportResult } from '@opentelemetry/core';
 import {
   DEFAULT_ENDPOINT,
   LANGWATCH_SDK_LANGUAGE,
@@ -30,7 +32,6 @@ export interface Match {
   matches?: RegExp;
   ignoreCase?: boolean;
 }
-
 
 /**
  * LangWatchTraceExporter extends the OpenTelemetry OTLP HTTP trace exporter
@@ -102,26 +103,21 @@ export class LangWatchTraceExporter extends OTLPTraceExporter {
       url: otelEndpoint.toString(),
     });
 
-    this.filters = Array.isArray(opts?.filters) ? opts!.filters! : [{ preset: "excludeHttpRequests" }];
+    this.filters = Array.isArray(opts?.filters) ? opts.filters : [{ preset: "excludeHttpRequests" }];
   }
 
-  export(spans: unknown[], resultCallback: (result: unknown) => void): void {
-    const filtered = applyFilters(this.filters, spans as MinimalReadableSpan[]);
-    super.export(filtered as unknown as [], resultCallback as unknown as (result: unknown) => void);
+  export(spans: ReadableSpan[], resultCallback: (result: ExportResult) => void): void {
+    const filtered = applyFilters(this.filters, spans);
+    super.export(filtered, resultCallback);
   }
 }
 
-interface MinimalReadableSpan {
-  name: string;
-  instrumentationScope?: { name?: string };
-}
-
-function applyFilters(filters: TraceFilter[] | undefined, spans: MinimalReadableSpan[]): MinimalReadableSpan[] {
+function applyFilters(filters: TraceFilter[] | undefined, spans: ReadableSpan[]): ReadableSpan[] {
   if (!filters || filters.length === 0) return spans;
   return filters.reduce((current, rule) => applyFilterRule(rule, current), spans);
 }
 
-function applyFilterRule(rule: TraceFilter, spans: MinimalReadableSpan[]): MinimalReadableSpan[] {
+function applyFilterRule(rule: TraceFilter, spans: ReadableSpan[]): ReadableSpan[] {
   if ('preset' in rule && rule.preset) {
     return applyPreset((rule as { preset: TraceFilter extends { preset: infer P } ? P : never }).preset as any, spans);
   }
@@ -141,15 +137,15 @@ function applyFilterRule(rule: TraceFilter, spans: MinimalReadableSpan[]): Minim
 
 function applyPreset(
   preset: "aiOnly" | "excludeHttpRequests",
-  spans: MinimalReadableSpan[],
-): MinimalReadableSpan[] {
+  spans: ReadableSpan[],
+): ReadableSpan[] {
   if (preset === "aiOnly") return spans.filter((s) => isVercelAiSpan(s));
   if (preset === "excludeHttpRequests") return spans.filter((s) => !isHttpRequestSpan(s));
 
   return spans;
 }
 
-function matchesCriteria(span: MinimalReadableSpan, criteria: Criteria): boolean {
+function matchesCriteria(span: ReadableSpan, criteria: Criteria): boolean {
   if (criteria.instrumentationScopeName !== void 0) {
     const matchers = normalizeToMatchers(criteria.instrumentationScopeName);
     const scopeName = span.instrumentationScope?.name ?? "";
@@ -199,13 +195,13 @@ function valueMatches(value: string, rule: Match, opts: { defaultIgnoreCase: boo
   return false;
 }
 
-function isVercelAiSpan(span: MinimalReadableSpan): boolean {
+function isVercelAiSpan(span: ReadableSpan): boolean {
   const scope = span.instrumentationScope?.name?.toLowerCase?.() ?? "";
 
   return scope === "ai";
 }
 
-function isHttpRequestSpan(span: MinimalReadableSpan): boolean {
+function isHttpRequestSpan(span: ReadableSpan): boolean {
   const name = span.name ?? "";
   const verbMatch = /^(GET|POST|PUT|DELETE|PATCH|OPTIONS|HEAD)\b/i.test(name);
 
