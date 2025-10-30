@@ -5927,6 +5927,9 @@
                                         },
                                         "toolCallId": {
                                           "type": "string"
+                                        },
+                                        "error": {
+                                          "type": "string"
                                         }
                                       },
                                       "required": [

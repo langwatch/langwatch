@@ -115,11 +115,11 @@ const buildThreadData = async (
     );
   }
 
-  logger.info("Fetching thread traces", {
+  logger.info({
     threadId,
     traceId: trace.trace_id,
     projectId,
-  });
+  }, "Fetching thread traces");
 
   // Fetch all traces in the thread
   const threadTraces = await getTracesGroupedByThreadId({
@@ -129,11 +129,11 @@ const buildThreadData = async (
     includeSpans: true,
   });
 
-  logger.info("Thread traces fetched", {
+  logger.info({
     threadId,
     traceCount: threadTraces.length,
     traceIds: threadTraces.map((t) => t.trace_id),
-  });
+  }, "Thread traces fetched");
 
   const result: Record<string, any> = {};
 
@@ -156,14 +156,14 @@ const buildThreadData = async (
         selectedFields as (keyof typeof TRACE_MAPPINGS)[],
       );
 
-      logger.info("Mapped thread field", {
+      logger.info({
         targetField,
         source,
         ...(selectedFields.length > 0 && { selectedFields }),
         ...(source === "traces" && {
           traceCount: (result[targetField] as any[]).length,
         }),
-      });
+      }, "Mapped thread field");
     } else {
       // Regular trace mapping - use current trace
       // Type guard ensures mappingConfig.source is from TRACE_MAPPINGS
@@ -181,22 +181,22 @@ const buildThreadData = async (
           undefined,
         )[0];
         result[targetField] = mapped?.[targetField];
-        logger.info("Mapped trace field", {
+        logger.info({
           targetField,
           source: mappingConfig.source,
           value:
             typeof result[targetField] === "string"
               ? result[targetField].substring(0, 100) + "..."
               : result[targetField],
-        });
+        }, "Mapped trace field");
       }
     }
   }
 
-  logger.info("Thread data build complete", {
+  logger.info({
     threadId,
     resultKeys: Object.keys(result),
-  });
+  }, "Thread data build complete");
 
   return result;
 };
@@ -255,26 +255,26 @@ const buildDataForEvaluation = async (
   // Check if we have thread mappings
   const hasThread = hasThreadMappings(mappings);
 
-  logger.info("Building data for evaluation", {
+  logger.info({
     evaluatorType,
     traceId: trace.trace_id,
     threadId: trace.metadata?.thread_id,
     hasThreadMappings: hasThread,
     mappingKeys: mappings ? Object.keys(mappings.mapping) : [],
-  });
+  }, "Building data for evaluation");
 
   if (hasThread) {
     // Use thread-based data extraction
-    logger.info("Using thread-based data extraction", {
+    logger.info({
       traceId: trace.trace_id,
       threadId: trace.metadata?.thread_id,
-    });
+    }, "Using thread-based data extraction");
     data = await buildThreadData(projectId, trace, mappings, protections);
   } else {
     // Use regular trace-based mapping
-    logger.info("Using regular trace-based mapping", {
+    logger.info({
       traceId: trace.trace_id,
-    });
+    }, "Using regular trace-based mapping");
     const mappedData = switchMapping(trace, mappings ?? DEFAULT_MAPPINGS);
     if (!mappedData) {
       throw new Error("No mapped data found to run evaluator");

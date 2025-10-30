@@ -60,7 +60,7 @@ const sendWithSES = async (content: EmailContent) => {
   try {
     const command = new SendEmailCommand(params);
     const data = await sesClient.send(command);
-    logger.info("Email sent successfully:", data);
+    logger.info({ data }, "Email sent successfully");
     return data;
   } catch (error) {
     logger.error({ error }, "Error sending email with SES");
