@@ -36,10 +36,6 @@ jobs:
         working-directory: langwatch
         run: npm run start:prepare:files
 
-      # - name: Install TypeScript Native Preview
-      #   working-directory: langwatch
-      #   run: npm install -D @typescript/native-preview
-
       - name: Run typecheck
         working-directory: langwatch
         run: npm run typecheck
