@@ -58,3 +58,11 @@ export {
 } from "./semconv";
 
 export * as attributes from "./semconv/attributes";
+
+export {
+  AISDKSpanProcessor,
+  isAISDKSpan,
+  getAISDKSpanType,
+} from "./instrumentation/vercel-ai-sdk";
+
+export { LangWatchCallbackHandler } from "./instrumentation/langchain";
