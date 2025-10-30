@@ -37,7 +37,7 @@
     "@ag-grid-community/core": "^32.3.3",
     "@ag-grid-community/react": "^32.3.3",
     "@ag-grid-community/styles": "^32.3.3",
-    "@ag-ui/core": "^0.0.28",
+    "@ag-ui/core": "^0.0.39",
     "@ai-sdk/amazon-bedrock": "^3.0.10",
     "@ai-sdk/azure": "^2.0.20",
     "@ai-sdk/google": "^2.0.8",

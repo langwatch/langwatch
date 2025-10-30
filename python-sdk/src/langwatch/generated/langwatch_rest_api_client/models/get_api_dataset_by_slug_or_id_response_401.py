@@ -41,7 +41,6 @@ class GetApiDatasetBySlugOrIdResponse401:
     @classmethod
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
         d = dict(src_dict)
-        print("from_dict", d)
         error = d.pop("error")
 
         message = d.pop("message", UNSET)
