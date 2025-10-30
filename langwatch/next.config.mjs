@@ -45,6 +45,8 @@ const config = {
   logging: false,
   distDir: process.env.NEXTJS_DIST_DIR ?? ".next",
 
+  serverExternalPackages: ["pino", "pino-pretty"],
+
   typescript: {
     // Typechecking here is slow, and is now handled by a dedicated CI job using tsgo!
     ignoreBuildErrors: true,

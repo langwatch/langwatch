@@ -2,7 +2,7 @@ import type { Context } from "hono";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { createLogger } from "../../../../utils/logger";
 import { errorSchema } from "./schemas";
-import { HttpError } from "../../../shared/errors";
+import { HttpError } from "../../shared/errors";
 
 const logger = createLogger("langwatch:api:dataset:errors");
 
@@ -34,6 +34,8 @@ export const handleDatasetError = async (
     },
     `Dataset API Error [${status}]: ${error.message || String(error)}`
   );
+
+  console.log("error in handleDatasetError", error);
 
   // Handle HttpError instances (our typed errors)
   if (error instanceof HttpError) {

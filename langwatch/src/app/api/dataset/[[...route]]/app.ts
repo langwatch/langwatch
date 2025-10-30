@@ -13,7 +13,8 @@ import {
   BadRequestError,
   UnprocessableEntityError,
 } from "../../shared/errors";
-import { baseResponses } from "./constants";
+import { baseResponses } from "../../shared/base-responses";
+import { MAX_LIMIT_MB } from "./constants";
 import { buildStandardSuccessResponse } from "./utils";
 import { datasetOutputSchema, errorSchema } from "./schemas";
 import { handleDatasetError } from "./error-handler";
@@ -153,6 +154,13 @@ app.get(
     const datasetRecords = await prisma.datasetRecord.findMany({
       where: { datasetId: dataset.id, projectId: project.id },
     });
+
+    const responseSize = JSON.stringify(datasetRecords).length;
+    if (responseSize > MAX_LIMIT_MB * 1024 * 1024) {
+      throw new BadRequestError(
+        `Dataset size exceeds ${MAX_LIMIT_MB}MB limit`
+      );
+    }
 
     return c.json({ data: datasetRecords });
   }
