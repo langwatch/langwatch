@@ -175,7 +175,7 @@ function valueMatches(value: string, rule: Match, opts: { defaultIgnoreCase: boo
 
   if (rule.equals !== void 0) {
     return ignoreCase
-      ? raw.localeCompare(rule.equals, void 0, { sensitivity: "accent" }) === 0
+      ? raw.localeCompare(rule.equals, void 0, { sensitivity: "base" }) === 0
       : raw === rule.equals;
   }
 
