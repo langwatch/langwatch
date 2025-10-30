@@ -6,6 +6,8 @@ const logger = createLogger("langwatch:api:hono");
 
 export const loggerMiddleware = () => {
   return async (c: Context, next: Next): Promise<any> => {
+    logger.info({ url: c.req.url, path: c.req.path }, "loggerMiddleware called");
+    console.log("loggerMiddleware", c.req.url);
     const start = Date.now();
     let error: any = c.error;
 

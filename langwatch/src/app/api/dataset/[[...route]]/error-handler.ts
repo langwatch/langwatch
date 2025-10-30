@@ -35,8 +35,6 @@ export const handleDatasetError = async (
     `Dataset API Error [${status}]: ${error.message || String(error)}`
   );
 
-  console.log("error in handleDatasetError", error);
-
   // Handle HttpError instances (our typed errors)
   if (error instanceof HttpError) {
     return c.json(
