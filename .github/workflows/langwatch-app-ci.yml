@@ -34,8 +34,6 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: "pnpm"
-          cache-dependency-path: "langwatch/pnpm-lock.yaml"
 
       - name: Install dependencies
         working-directory: langwatch
@@ -74,8 +72,6 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: "pnpm"
-          cache-dependency-path: "langwatch/pnpm-lock.yaml"
 
       - name: Install dependencies
         working-directory: langwatch
@@ -154,8 +150,6 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: "pnpm"
-          cache-dependency-path: "langwatch/pnpm-lock.yaml"
 
       - name: Install dependencies
         working-directory: langwatch
@@ -192,8 +186,6 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: "pnpm"
-          cache-dependency-path: "langwatch/pnpm-lock.yaml"
 
       - name: Cache Next.js
         id: next-cache
