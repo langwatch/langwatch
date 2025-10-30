@@ -20,7 +20,7 @@ import traceback
 from langwatch.dataset import get_dataset, Dataset, DatasetEntry, GetDatasetOptions
 
 
-def main():
+def main(messages=None):
     """Demonstrate all dataset SDK capabilities."""
 
     # Initialize LangWatch
