@@ -18,8 +18,6 @@ import { nodeDatasetSchema } from "~/optimization_studio/types/dsl";
 
 /**
  * Router for handling prompts - the business-facing interface
- * Currently only supports upsert operation
- * TODO: Add other operations as needed
  */
 export const promptsRouter = createTRPCRouter({
   /**
@@ -41,7 +39,7 @@ export const promptsRouter = createTRPCRouter({
       z.object({
         versionId: z.string(),
         projectId: z.string(),
-      })
+      }),
     )
     .use(checkUserPermissionForProject(TeamRoleGroup.PROMPTS_MANAGE))
     .mutation(async ({ ctx, input }) => {
@@ -76,7 +74,7 @@ export const promptsRouter = createTRPCRouter({
           demonstrations: nodeDatasetSchema.optional(),
           handle: handleSchema,
         }),
-      })
+      }),
     )
     .use(checkUserPermissionForProject(TeamRoleGroup.PROMPTS_MANAGE))
     .mutation(async ({ ctx, input }) => {
@@ -114,7 +112,7 @@ export const promptsRouter = createTRPCRouter({
           responseFormat: responseFormatSchema.optional(),
           demonstrations: nodeDatasetSchema.optional(),
         }),
-      })
+      }),
     )
     .use(checkUserPermissionForProject(TeamRoleGroup.PROMPTS_MANAGE))
     .mutation(async ({ ctx, input }) => {
@@ -143,7 +141,7 @@ export const promptsRouter = createTRPCRouter({
           handle: handleSchema,
           scope: z.nativeEnum(PromptScope),
         }),
-      })
+      }),
     )
     .use(checkUserPermissionForProject(TeamRoleGroup.PROMPTS_MANAGE))
     .mutation(async ({ ctx, input }) => {
@@ -163,7 +161,7 @@ export const promptsRouter = createTRPCRouter({
       z.object({
         idOrHandle: z.string(),
         projectId: z.string(),
-      })
+      }),
     )
     .use(checkUserPermissionForProject(TeamRoleGroup.PROMPTS_VIEW))
     .query(async ({ ctx, input }) => {
@@ -180,7 +178,7 @@ export const promptsRouter = createTRPCRouter({
         handle: handleSchema,
         projectId: z.string(),
         scope: z.nativeEnum(PromptScope),
-      })
+      }),
     )
     .use(checkUserPermissionForProject(TeamRoleGroup.PROMPTS_VIEW))
     .query(async ({ ctx, input }) => {
@@ -196,7 +194,7 @@ export const promptsRouter = createTRPCRouter({
       z.object({
         idOrHandle: z.string(),
         projectId: z.string(),
-      })
+      }),
     )
     .use(checkUserPermissionForProject(TeamRoleGroup.PROMPTS_VIEW))
     .query(async ({ ctx, input }) => {
@@ -212,7 +210,7 @@ export const promptsRouter = createTRPCRouter({
       z.object({
         idOrHandle: z.string(),
         projectId: z.string(),
-      })
+      }),
     )
     .use(checkUserPermissionForProject(TeamRoleGroup.PROMPTS_MANAGE))
     .mutation(async ({ ctx, input }) => {

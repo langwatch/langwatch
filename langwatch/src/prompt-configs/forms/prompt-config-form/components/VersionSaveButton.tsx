@@ -1,4 +1,4 @@
-import { Button, Spinner, Text } from "@chakra-ui/react";
+import { Button, Text } from "@chakra-ui/react";
 import { Save } from "lucide-react";
 import { Tooltip } from "../../../../components/ui/tooltip";
 

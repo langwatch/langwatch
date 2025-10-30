@@ -1,20 +1,25 @@
-import { Button, HStack, Text } from "@chakra-ui/react";
+import { Button, HStack, Text, type StackProps } from "@chakra-ui/react";
+import clsx from "clsx";
 import { useFormContext } from "react-hook-form";
 import { LuPencil } from "react-icons/lu";
 
 import { toaster } from "~/components/ui/toaster";
 import type { PromptConfigFormValues } from "~/prompt-configs";
-import { versionedPromptToPromptConfigFormValues } from "~/prompt-configs/utils/llmPromptConfigUtils";
+import { versionedPromptToPromptConfigFormValuesWithSystemMessage } from "~/prompt-configs/utils/llmPromptConfigUtils";
 import { usePromptConfigContext } from "~/prompt-configs/providers/PromptConfigProvider";
 import type { VersionedPrompt } from "~/server/prompt-config";
 import { createLogger } from "~/utils/logger";
 import { CopyButton } from "../../../components/CopyButton";
 
 const logger = createLogger(
-  "langwatch:prompt-configs:editable-prompt-handle-field"
+  "langwatch:prompt-configs:editable-prompt-handle-field",
 );
 
-export function EditablePromptHandleField() {
+type EditablePromptHandleFieldProps = StackProps;
+
+export function EditablePromptHandleField(
+  props: EditablePromptHandleFieldProps,
+) {
   const form = useFormContext<PromptConfigFormValues>();
   const { triggerChangeHandle } = usePromptConfigContext();
 
@@ -31,7 +36,9 @@ export function EditablePromptHandleField() {
     }
 
     const onSuccess = (prompt: VersionedPrompt) => {
-      form.reset(versionedPromptToPromptConfigFormValues(prompt));
+      form.reset(
+        versionedPromptToPromptConfigFormValuesWithSystemMessage(prompt),
+      );
       toaster.create({
         title: "Prompt handle changed",
         description: `Prompt handle has been changed to ${prompt.handle}`,
@@ -57,10 +64,9 @@ export function EditablePromptHandleField() {
     <HStack
       paddingX={1}
       gap={1}
-      className="group"
       width="full"
       position="relative"
-      minWidth={0}
+      minWidth="80px"
       _hover={{
         "& .handle-text": {
           opacity: 0.4,
@@ -69,6 +75,8 @@ export function EditablePromptHandleField() {
           opacity: 1,
         },
       }}
+      {...props}
+      className={clsx("group", props.className)}
     >
       {handle ? (
         <Text
@@ -80,6 +88,8 @@ export function EditablePromptHandleField() {
           minWidth={0}
           overflow="hidden"
           transition="opacity 0.2s"
+          textOverflow="ellipsis"
+          whiteSpace="nowrap"
         >
           {handle}
         </Text>

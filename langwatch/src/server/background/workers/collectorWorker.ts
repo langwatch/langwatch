@@ -258,9 +258,17 @@ const processCollectorJob_ = async (
     paramsMD5,
   } = data;
 
-  const project = await prisma.project.findUniqueOrThrow({
+  const project = await prisma.project.findUnique({
     where: { id: projectId, archivedAt: null },
   });
+
+  if (!project) {
+    logger.warn(
+      { projectId, traceId },
+      "Project not found or archived, skipping collector job"
+    );
+    return;
+  }
 
   spans = addGuardrailCosts(spans);
   try {

@@ -88,7 +88,7 @@ export function FieldsDefinition({
   const { setNode } = useWorkflowStore(
     useShallow((state) => ({
       setNode: state.setNode,
-    }))
+    })),
   );
   const {
     control,
@@ -168,7 +168,7 @@ export function FieldsDefinition({
           },
           validate: (value) => {
             const identifiers = control._formValues.fields.map(
-              (f: FieldType) => f.identifier
+              (f: FieldType) => f.identifier,
             );
             return (
               identifiers.filter((id: string) => id === value).length === 1 ||
@@ -298,7 +298,7 @@ export function FieldsForm({
       setNode: state.setNode,
       default_llm: state.default_llm,
       setNodeParameter: state.setNodeParameter,
-    }))
+    })),
   );
 
   const {
@@ -351,7 +351,7 @@ export function FieldsForm({
                     parameters: node.data.parameters?.map((p) =>
                       p.identifier === field.identifier
                         ? { ...p, value: llmConfig }
-                        : p
+                        : p,
                     ),
                   },
                 });
@@ -363,7 +363,7 @@ export function FieldsForm({
 
         if (field.type === "code") {
           const stateField = parameters?.find(
-            (p) => p.identifier === field.identifier
+            (p) => p.identifier === field.identifier,
           );
           return (
             <Box position="relative" width="full" key={field.id}>
@@ -476,6 +476,10 @@ export function FieldsForm({
   );
 }
 
+export interface PropertySectionTitleProps extends StackProps {
+  tooltip?: React.ReactNode;
+}
+
 export function PropertySectionTitle({
   children,
   tooltip,
@@ -540,7 +544,7 @@ export function BasePropertiesPanel({
       propertiesExpanded: state.propertiesExpanded,
       setPropertiesExpanded: state.setPropertiesExpanded,
       setNode: state.setNode,
-    }))
+    })),
   );
 
   const [isEditingName, setIsEditingName] = useState(false);

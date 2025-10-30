@@ -1,4 +1,6 @@
-import type { MappingProperty } from "@elastic/elasticsearch/lib/api/types";
+import { estypes } from "@elastic/elasticsearch";
+
+type MappingProperty = estypes.MappingProperty;
 import type { IndexSpec } from "../src/server/elasticsearch";
 import { type Client as ElasticClient } from "@elastic/elasticsearch";
 

@@ -46,7 +46,7 @@ export function SaveVersionDialog({
       });
       reset();
     },
-    [onSubmit, reset]
+    [onSubmit, reset],
   );
 
   return (
@@ -60,7 +60,7 @@ export function SaveVersionDialog({
       }}
     >
       <Dialog.Backdrop />
-      <Dialog.Content>
+      <Dialog.Content backdrop={false}>
         <Dialog.Header>
           <Dialog.Title>Save Version</Dialog.Title>
         </Dialog.Header>

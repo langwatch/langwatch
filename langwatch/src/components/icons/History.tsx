@@ -6,6 +6,7 @@ export function HistoryIcon({ size = 24 }: { size: number }) {
       height={size}
       fill="none"
       viewBox="0 0 22 22"
+      overflow="visible"
     >
       <path
         stroke="currentColor"

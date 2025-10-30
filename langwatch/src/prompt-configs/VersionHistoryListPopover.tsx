@@ -20,6 +20,7 @@ import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 import { usePrompts } from "./hooks";
 import type { VersionedPrompt } from "~/server/prompt-config";
+import { useAllPromptsForProject } from "./hooks/useAllPromptsForProject";
 
 /**
  * Minimal interface for version history display
@@ -262,17 +263,7 @@ export function VersionHistoryListPopover({
   const { open, setOpen, onClose } = useDisclosure();
   const { project } = useOrganizationTeamProject();
   const { restoreVersion } = usePrompts();
-  const { data: prompts, isLoading } =
-    api.prompts.getAllVersionsForPrompt.useQuery(
-      {
-        idOrHandle: configId,
-        projectId: project?.id ?? "",
-      },
-      {
-        enabled: !!project?.id && !!configId,
-      }
-    );
-
+  const { data: prompts, isLoading } = useAllPromptsForProject();
   const handleRestore = async (params: {
     versionId: string;
     configId: string;
@@ -305,7 +296,7 @@ export function VersionHistoryListPopover({
         commitMessage: prompt.commitMessage,
         author: prompt.author,
       })) ?? [],
-    [prompts]
+    [prompts],
   );
 
   return (

@@ -1,4 +1,6 @@
-import type { AggregationsAggregationContainer } from "@elastic/elasticsearch/lib/api/types";
+import { estypes } from "@elastic/elasticsearch";
+
+type AggregationsAggregationContainer = estypes.AggregationsAggregationContainer;
 import { z } from "zod";
 import { formatMilliseconds } from "../../utils/formatMilliseconds";
 import { formatMoney } from "../../utils/formatMoney";

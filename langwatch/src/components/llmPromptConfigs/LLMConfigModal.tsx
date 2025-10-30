@@ -7,7 +7,7 @@ import { allModelOptions, ModelSelector } from "../ModelSelector";
 import { Link } from "../ui/link";
 import { Tooltip } from "../ui/tooltip";
 
-interface LlmConfigModalValues  {
+interface LlmConfigModalValues {
   model: string;
   temperature?: number;
   max_tokens?: number;
@@ -16,12 +16,6 @@ interface LlmConfigModalValues  {
 /**
  * Controlled LLM Config Modal
  * Can be used outside of the form context (does not use react-hook-form)
- * @param param0 - The props for the LLMConfigModal
- * @param param0.open - Whether the modal is open
- * @param param0.onClose - The function to close the modal
- * @param param0.values - The values for the LLM config
- * @param param0.onChange - The function to change the values
- * @returns 
  */
 export function LLMConfigModal({
   open,

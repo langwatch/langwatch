@@ -15,7 +15,7 @@ export const handleSchema = z
   .string()
   .regex(
     /^[a-z0-9_-]+(?:\/[a-z0-9_-]+)?$/,
-    "Handle should be in the 'identifier' or 'namespace/identifier' format. Only lowercase letters, numbers, hyphens, underscores and up to one slash are allowed."
+    "Handle should be in the 'identifier' or 'namespace/identifier' format. Only lowercase letters, numbers, hyphens, underscores and up to one slash are allowed.",
   );
 
 /**
@@ -112,3 +112,17 @@ export const modelNameSchema = z.string();
  * Schema for schema version
  */
 export const schemaVersionSchema = z.nativeEnum(SchemaVersion);
+
+/**
+ * Extended runtime input schema including a value for execution time.
+ * Single Responsibility: Add value-carrying variant of inputs for runtime usage.
+ */
+export const inputWithValueSchema = inputsSchema.extend({
+  value: z.any().optional(),
+});
+
+/**
+ * Array schema for variables passed at runtime to executions.
+ * Single Responsibility: Validate the variables payload shape.
+ */
+export const runtimeInputsSchema = z.array(inputWithValueSchema);

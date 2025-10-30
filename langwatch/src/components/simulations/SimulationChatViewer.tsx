@@ -17,7 +17,7 @@ export function SimulationChatViewer({
     },
     {
       enabled: !!project,
-    }
+    },
   );
 
   return (
@@ -30,7 +30,11 @@ export function SimulationChatViewer({
       }
       status={data?.status}
     >
-      <CustomCopilotKitChat messages={data?.messages ?? []} smallerView />
+      <CustomCopilotKitChat
+        messages={data?.messages ?? []}
+        smallerView
+        hideInput
+      />
     </SimulationCard>
   );
 }

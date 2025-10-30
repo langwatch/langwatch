@@ -1,10 +1,10 @@
 import { z } from "zod";
 
-import {
-  type SearchResponse,
-  type SearchTotalHits,
-  type Sort,
-} from "@elastic/elasticsearch/lib/api/types";
+import { type estypes } from "@elastic/elasticsearch";
+
+type SearchResponse = estypes.SearchResponse;
+type SearchTotalHits = estypes.SearchTotalHits;
+type Sort = estypes.Sort;
 import { PublicShareResourceTypes, type PrismaClient } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
 import shuffle from "lodash-es/shuffle";
@@ -65,8 +65,8 @@ export const tracesRouter = createTRPCRouter({
         {
           resourceType: PublicShareResourceTypes.TRACE,
           resourceParam: "traceId",
-        }
-      )
+        },
+      ),
     )
     .query(async ({ ctx, input }) => {
       const trace = await getTraceById({
@@ -92,8 +92,8 @@ export const tracesRouter = createTRPCRouter({
         {
           resourceType: PublicShareResourceTypes.TRACE,
           resourceParam: "traceId",
-        }
-      )
+        },
+      ),
     )
     .query(async ({ input, ctx }) => {
       const protections = await getUserProtectionsForProject(ctx, {
@@ -112,7 +112,7 @@ export const tracesRouter = createTRPCRouter({
       z.object({
         projectId: z.string(),
         traceIds: z.array(z.string()),
-      })
+      }),
     )
     .use(checkUserPermissionForProject(TeamRoleGroup.MESSAGES_VIEW))
     .query(async ({ input, ctx }) => {
@@ -169,12 +169,12 @@ export const tracesRouter = createTRPCRouter({
             },
             select: { id: true, name: true, parentId: true },
           })
-        ).map((topic) => [topic.id, topic])
+        ).map((topic) => [topic.id, topic]),
       );
 
       const mapBuckets = (
         buckets: Array<{ key: string; doc_count: number }>,
-        includeParent = false
+        includeParent = false,
       ) => {
         return buckets.reduce(
           (acc, bucket) => {
@@ -196,7 +196,7 @@ export const tracesRouter = createTRPCRouter({
             name: string;
             count: number;
             parentId?: string | null;
-          }[]
+          }[],
         );
       };
 
@@ -250,7 +250,7 @@ export const tracesRouter = createTRPCRouter({
         projectId: z.string(),
         threadId: z.string(),
         traceId: z.string(),
-      })
+      }),
     )
     .use(
       checkPermissionOrPubliclyShared(
@@ -258,8 +258,8 @@ export const tracesRouter = createTRPCRouter({
         {
           resourceType: PublicShareResourceTypes.TRACE,
           resourceParam: "traceId",
-        }
-      )
+        },
+      ),
     )
     .query(async ({ input, ctx }) => {
       const { projectId, threadId } = input;
@@ -290,8 +290,8 @@ export const tracesRouter = createTRPCRouter({
 
       const filteredTraces = tracesGrouped.filter((trace) =>
         publicSharedTraces.some(
-          (publicShare) => publicShare.resourceId === trace.trace_id
-        )
+          (publicShare) => publicShare.resourceId === trace.trace_id,
+        ),
       );
 
       return filteredTraces;
@@ -363,7 +363,7 @@ export const tracesRouter = createTRPCRouter({
         projectId: z.string(),
         query: z.string().optional(),
         sortBy: z.string().optional(),
-      })
+      }),
     )
     .use(checkUserPermissionForProject(TeamRoleGroup.MESSAGES_VIEW))
     .query(async ({ ctx, input }) => {
@@ -376,7 +376,7 @@ export const tracesRouter = createTRPCRouter({
         ctx,
       });
       const traceIds = groups.flatMap((group) =>
-        group.map((trace) => trace.trace_id)
+        group.map((trace) => trace.trace_id),
       );
 
       if (traceIds.length === 0) {
@@ -390,7 +390,7 @@ export const tracesRouter = createTRPCRouter({
       const traceWithSpans = await getTracesWithSpans(
         projectId,
         traceIds,
-        protections
+        protections,
       );
 
       return traceWithSpans;
@@ -406,7 +406,7 @@ export const tracesRouter = createTRPCRouter({
           .or(z.string().startsWith("custom/")),
         preconditions: z.array(checkPreconditionSchema),
         expectedResults: z.number(),
-      })
+      }),
     )
     .use(checkUserPermissionForProject(TeamRoleGroup.MESSAGES_VIEW))
     .query(async ({ ctx, input }) => {
@@ -419,7 +419,7 @@ export const tracesRouter = createTRPCRouter({
         ctx,
       });
       const traceIds = groups.flatMap((group) =>
-        group.map((trace) => trace.trace_id)
+        group.map((trace) => trace.trace_id),
       );
 
       if (traceIds.length === 0) {
@@ -435,7 +435,7 @@ export const tracesRouter = createTRPCRouter({
       const traceWithSpans = await getTracesWithSpans(
         projectId,
         traceIds,
-        protections
+        protections,
       );
 
       const passedPreconditions = traceWithSpans.filter(
@@ -445,11 +445,11 @@ export const tracesRouter = createTRPCRouter({
             evaluatorType,
             trace,
             trace.spans ?? [],
-            preconditions
-          )
+            preconditions,
+          ),
       );
       const passedPreconditionsTraceIds = passedPreconditions?.map(
-        (trace) => trace.trace_id
+        (trace) => trace.trace_id,
       );
 
       let samples = shuffle(passedPreconditions)
@@ -459,11 +459,11 @@ export const tracesRouter = createTRPCRouter({
         samples = samples.concat(
           shuffle(
             traceWithSpans.filter(
-              (trace) => !passedPreconditionsTraceIds?.includes(trace.trace_id)
-            )
+              (trace) => !passedPreconditionsTraceIds?.includes(trace.trace_id),
+            ),
           )
             .slice(0, expectedResults - samples.length)
-            .map((sample) => ({ ...sample, passesPreconditions: false }))
+            .map((sample) => ({ ...sample, passesPreconditions: false })),
         );
       }
 
@@ -475,7 +475,7 @@ export const tracesRouter = createTRPCRouter({
       getAllForProjectInput.extend({
         includeSpans: z.boolean(),
         scrollId: z.string().optional(),
-      })
+      }),
     )
     .use(checkUserPermissionForProject(TeamRoleGroup.MESSAGES_VIEW))
     .mutation(async ({ ctx, input }) => {
@@ -490,6 +490,130 @@ export const tracesRouter = createTRPCRouter({
         includeSpans: input.includeSpans,
         scrollId: input.scrollId,
       });
+    }),
+
+  /**
+   * Get a span for Prompt Studio
+   */
+  getSpanForPromptStudio: protectedProcedure
+    .input(
+      z.object({
+        projectId: z.string(),
+        traceId: z.string(),
+        spanId: z.string(),
+      }),
+    )
+    .use(checkUserPermissionForProject(TeamRoleGroup.MESSAGES_VIEW))
+    .query(async ({ ctx, input }) => {
+      const { projectId, traceId, spanId } = input;
+
+      const protections = await getUserProtectionsForProject(ctx, {
+        projectId,
+      });
+
+      // Get the trace with spans
+      const traces = await getTracesWithSpans(
+        projectId,
+        [traceId],
+        protections,
+      );
+      const trace = traces[0];
+
+      if (!trace) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Trace not found." });
+      }
+
+      // Find the specific span
+      const span = trace.spans?.find((s) => s.span_id === spanId);
+
+      if (!span) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Span not found." });
+      }
+
+      // Ensure it's an LLM span
+      if (span.type !== "llm") {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Span is not an LLM span.",
+        });
+      }
+
+      // Extract messages from span input
+      const messages: Array<{ role: string; content: string }> = [];
+
+      if (span.input) {
+        const inputValue = span.input.value;
+
+        // Try to parse as JSON if it's a string
+        if (typeof inputValue === "string") {
+          try {
+            const parsed = JSON.parse(inputValue);
+            if (Array.isArray(parsed)) {
+              messages.push(...parsed);
+            } else {
+              // Single message object
+              messages.push(parsed);
+            }
+          } catch {
+            // If not JSON, treat as plain text user message
+            messages.push({ role: "user", content: inputValue });
+          }
+        } else if (Array.isArray(inputValue)) {
+          messages.push(...inputValue);
+        } else if (typeof inputValue === "object" && inputValue !== null) {
+          messages.push(inputValue as { role: string; content: string });
+        }
+      }
+
+      // Extract output message if exists
+      if (span.output) {
+        const outputValue = span.output.value;
+        let outputContent: string | null = null;
+
+        if (typeof outputValue === "string") {
+          outputContent = outputValue;
+        } else if (typeof outputValue === "object" && outputValue !== null) {
+          // Try to extract content from object
+          outputContent =
+            (outputValue as any).content ?? JSON.stringify(outputValue);
+        }
+
+        if (outputContent) {
+          messages.push({ role: "assistant", content: outputContent });
+        }
+      }
+
+      // Extract LLM configuration
+      const llmConfig = {
+        model: (span as any).model ?? null,
+        temperature: span.params?.temperature ?? null,
+        maxTokens: span.params?.max_tokens ?? span.params?.maxTokens ?? null,
+        topP: span.params?.top_p ?? span.params?.topP ?? null,
+        // Include any other litellm params
+        litellmParams: span.params ? { ...span.params } : {},
+      };
+
+      // Clean up litellmParams - remove already extracted fields
+      if (llmConfig.litellmParams) {
+        delete llmConfig.litellmParams.temperature;
+        delete llmConfig.litellmParams.max_tokens;
+        delete llmConfig.litellmParams.maxTokens;
+        delete llmConfig.litellmParams.top_p;
+        delete llmConfig.litellmParams.topP;
+      }
+
+      // Return packaged data
+      return {
+        spanId: span.span_id,
+        traceId: trace.trace_id,
+        spanName: span.name ?? null,
+        messages,
+        llmConfig,
+        vendor: (span as any).vendor ?? null,
+        error: span.error ?? null,
+        timestamps: span.timestamps,
+        metrics: span.metrics ?? null,
+      };
     }),
 });
 
@@ -528,10 +652,10 @@ export const getAllTracesForProject = async ({
       session: ctx.session,
       publiclyShared: ctx.publiclyShared,
     },
-    { projectId: input.projectId }
+    { projectId: input.projectId },
   );
 
-  let tracesResult: SearchResponse<ElasticSearchTrace>;
+  let tracesResult: SearchResponse;
   if (scrollId) {
     const client = await esClient({ projectId: input.projectId });
     tracesResult = await client.scroll({
@@ -570,29 +694,29 @@ export const getAllTracesForProject = async ({
                 } as Sort,
               }
             : input.sortBy.startsWith("evaluations.")
-            ? {
-                sort: {
-                  "evaluations.score": {
-                    order: input.sortDirection ?? "desc",
-                    nested: {
-                      path: "evaluations",
-                      filter: {
-                        term: {
-                          "evaluations.evaluator_id":
-                            input.sortBy.split(".")[1],
+              ? {
+                  sort: {
+                    "evaluations.score": {
+                      order: input.sortDirection ?? "desc",
+                      nested: {
+                        path: "evaluations",
+                        filter: {
+                          term: {
+                            "evaluations.evaluator_id":
+                              input.sortBy.split(".")[1],
+                          },
                         },
                       },
                     },
-                  },
-                } as Sort,
-              }
-            : {
-                sort: {
-                  [input.sortBy]: {
-                    order: input.sortDirection ?? "desc",
-                  },
-                } as Sort,
-              }
+                  } as Sort,
+                }
+              : {
+                  sort: {
+                    [input.sortBy]: {
+                      order: input.sortDirection ?? "desc",
+                    },
+                  } as Sort,
+                }
           : {
               sort: {
                 "timestamps.started_at": {
@@ -605,7 +729,7 @@ export const getAllTracesForProject = async ({
   }
 
   const traces = tracesResult.hits.hits
-    .map((hit) => hit._source!)
+    .map((hit) => hit._source)
     .map((t) => transformElasticSearchTraceToTrace(t, protections));
 
   if (input.groupBy === "thread_id") {
@@ -632,7 +756,7 @@ export const getAllTracesForProject = async ({
         protections,
       });
       const filteredTracesByThreadId = tracesFromThreadId.filter(
-        (trace) => !existingTraceIds.has(trace.trace_id)
+        (trace) => !existingTraceIds.has(trace.trace_id),
       );
 
       traces.unshift(...filteredTracesByThreadId);
@@ -649,7 +773,7 @@ export const getAllTracesForProject = async ({
   totalHits = (tracesResult.hits?.total as SearchTotalHits)?.value || 0;
 
   const evaluations = Object.fromEntries(
-    traces.map((trace) => [trace.trace_id, trace.evaluations ?? []])
+    traces.map((trace) => [trace.trace_id, trace.evaluations ?? []]),
   );
 
   // TODO: Remove this cast once we have a way to include guardrails in the traces directly on ES
@@ -666,7 +790,7 @@ export const getAllTracesForProject = async ({
 export const getTracesWithSpans = async (
   projectId: string,
   traceIds: string[],
-  protections: Protections
+  protections: Protections,
 ) => {
   const traces = await searchTraces({
     connConfig: { projectId },
@@ -708,7 +832,7 @@ export const getTracesWithSpans = async (
 
 const groupTraces = <T extends Trace>(
   groupBy: string | undefined,
-  traces: T[]
+  traces: T[],
 ) => {
   const groups: T[][] = [];
 
@@ -789,7 +913,7 @@ export const getEvaluationsMultiple = async (input: {
   });
 
   return Object.fromEntries(
-    traces.map((trace) => [trace.trace_id, trace.evaluations ?? []])
+    traces.map((trace) => [trace.trace_id, trace.evaluations ?? []]),
   );
 };
 

@@ -1,7 +1,7 @@
-import type {
-  AggregationsAggregationContainer,
-  QueryDslQueryContainer,
-} from "@elastic/elasticsearch/lib/api/types";
+import { estypes } from "@elastic/elasticsearch";
+
+type AggregationsAggregationContainer = estypes.AggregationsAggregationContainer;
+type QueryDslQueryContainer = estypes.QueryDslQueryContainer;
 import { z } from "zod";
 
 export const filterFieldsEnum = z.enum([

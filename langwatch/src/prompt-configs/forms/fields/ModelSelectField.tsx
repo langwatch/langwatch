@@ -24,7 +24,7 @@ export function ModelSelectField() {
   const { modelOption } = useModelSelectionOptions(
     allModelOptions,
     currentModel,
-    "chat"
+    "chat",
   );
   const isModelDisabled = modelOption?.isDisabled ?? false;
 
@@ -51,6 +51,11 @@ export function ModelSelectField() {
           }}
         />
       </VerticalFormControl>
+      {/**
+       * TODO: Remove?
+       * I don't think we need this here,
+       * as it's already integrated with the LLMConfigField
+       */}
       {isModelDisabled && (
         <AddModelProviderKey
           runWhat="run this prompt"

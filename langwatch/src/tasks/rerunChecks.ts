@@ -1,7 +1,7 @@
-import type {
-  QueryDslBoolQuery,
-  QueryDslQueryContainer,
-} from "@elastic/elasticsearch/lib/api/types";
+import { estypes } from "@elastic/elasticsearch";
+
+type QueryDslBoolQuery = estypes.QueryDslBoolQuery;
+type QueryDslQueryContainer = estypes.QueryDslQueryContainer;
 import {
   // TRACE_CHECKS_INDEX,
   esClient,

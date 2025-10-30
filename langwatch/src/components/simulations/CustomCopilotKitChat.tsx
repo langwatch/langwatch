@@ -14,11 +14,18 @@ import { ToolResultMessage } from "./messages/ToolResultMessage";
 import { ToolCallMessage } from "./messages/ToolCallMessage";
 import { convertScenarioMessagesToCopilotKit } from "./utils/convert-scenario-messages";
 import { createLogger } from "~/utils/logger";
-import { LuListTree } from "react-icons/lu";
-import { useDrawer } from "../CurrentDrawer";
 import { Markdown } from "../Markdown";
+import { TraceMessage } from "../copilot-kit/TraceMessage";
 
 const logger = createLogger("CustomCopilotKitChat.tsx");
+
+type CustomCopilotKitChatProps = CustomCopilotKitChatInnerProps;
+
+interface CustomCopilotKitChatInnerProps {
+  messages: ScenarioMessageSnapshotEvent["messages"];
+  smallerView?: boolean;
+  hideInput?: boolean;
+}
 
 /**
  * This is a wrapper around the CopilotKit component that allows us to use the CopilotKit chat without having to
@@ -27,12 +34,8 @@ const logger = createLogger("CustomCopilotKitChat.tsx");
  * @returns A CopilotKit component with the chat history of the simulation.
  */
 export function CustomCopilotKitChat({
-  messages,
-  smallerView,
-}: {
-  messages: ScenarioMessageSnapshotEvent["messages"];
-  smallerView?: boolean;
-}) {
+  ...innerProps
+}: CustomCopilotKitChatProps) {
   const { project } = useOrganizationTeamProject();
   return (
     <CopilotKit
@@ -41,10 +44,7 @@ export function CustomCopilotKitChat({
         "X-Auth-Token": project?.apiKey ?? "",
       }}
     >
-      <CustomCopilotKitChatInner
-        messages={messages}
-        smallerView={smallerView}
-      />
+      <CustomCopilotKitChatInner {...innerProps} />
     </CopilotKit>
   );
 }
@@ -52,18 +52,14 @@ export function CustomCopilotKitChat({
 function CustomCopilotKitChatInner({
   messages,
   smallerView,
-}: {
-  messages: ScenarioMessageSnapshotEvent["messages"];
-  smallerView?: boolean;
-}) {
+  hideInput,
+}: CustomCopilotKitChatInnerProps) {
   const { project } = useOrganizationTeamProject();
   const { setMessages } = useCopilotChat({
     headers: {
       "X-Auth-Token": project?.apiKey ?? "",
     },
   });
-
-  const { openDrawer, drawerOpen } = useDrawer();
 
   useEffect(() => {
     try {
@@ -74,7 +70,7 @@ function CustomCopilotKitChatInner({
         {
           error,
         },
-        "Failed to convert scenario messages to CopilotKit messages"
+        "Failed to convert scenario messages to CopilotKit messages",
       );
     }
   }, [messages]);
@@ -97,30 +93,7 @@ function CustomCopilotKitChatInner({
             {!smallerView &&
               message_.traceId &&
               message_.role === Role.Assistant && (
-                <HStack marginTop={-6} paddingBottom={4}>
-                  <Button
-                    onClick={() => {
-                      if (drawerOpen("traceDetails")) {
-                        openDrawer(
-                          "traceDetails",
-                          {
-                            traceId: message_.traceId ?? "",
-                            selectedTab: "traceDetails",
-                          },
-                          { replace: true }
-                        );
-                      } else {
-                        openDrawer("traceDetails", {
-                          traceId: message_.traceId ?? "",
-                          selectedTab: "traceDetails",
-                        });
-                      }
-                    }}
-                  >
-                    <LuListTree />
-                    View Trace
-                  </Button>
-                </HStack>
+                <TraceMessage traceId={message_.traceId} />
               )}
           </VStack>
         );
@@ -131,7 +104,7 @@ function CustomCopilotKitChatInner({
       RenderResultMessage={({ message }) => (
         <ToolResultMessage message={message as ResultMessage} />
       )}
-      Input={() => <div></div>}
+      Input={hideInput ? () => <div></div> : undefined}
     />
   );
 }

@@ -7,7 +7,7 @@ import {
 import type { PromptConfigFormValues } from "~/prompt-configs";
 import { VerticalFormControl } from "~/components/VerticalFormControl";
 import { PropertySectionTitle } from "../../../optimization_studio/components/properties/BasePropertiesPanel";
-import { AddRemoveMessageFieldButton } from "./PromptMessagesField";
+import { AddRemoveMessageFieldButton } from "./message-history-fields/AddRemoveMessageFieldButton";
 import {
   PromptTextArea,
   type PromptTextAreaOnAddMention,
@@ -32,7 +32,7 @@ export function PromptField({
   onAddEdge?: (
     id: string,
     handle: string,
-    content: PromptTextAreaOnAddMention
+    content: PromptTextAreaOnAddMention,
   ) => void;
   isTemplateSupported?: boolean;
 }) {
