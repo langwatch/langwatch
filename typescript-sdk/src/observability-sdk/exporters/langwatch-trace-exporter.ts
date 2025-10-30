@@ -17,7 +17,7 @@ export interface LangWatchTraceExporterOptions {
 }
 
 export type TraceFilter =
-  | { preset: "aiOnly" | "excludeHttpRequests" }
+  | { preset: "vercelAIOnly" | "excludeHttpRequests" }
   | { include: Criteria }
   | { exclude: Criteria };
 
@@ -51,8 +51,8 @@ export interface Match {
  * const exporter = new LangWatchTraceExporter();
  *
  * // 2) Vercel AI only
- * const exporterAiOnly = new LangWatchTraceExporter({
- *   filters: [{ preset: 'aiOnly' }],
+ * const exporterVercelAIOnly = new LangWatchTraceExporter({
+ *   filters: [{ preset: 'vercelAIOnly' }],
  * });
  *
  * // 3) Reduce framework noise (exclude HTTP request spans)
@@ -80,7 +80,7 @@ export class LangWatchTraceExporter extends OTLPTraceExporter {
    * @param opts.endpoint - Optional custom endpoint URL for LangWatch ingestion.
    *                       If not provided, will use environment variables or fallback configuration.
   * @param opts.filters - Optional array of intent-based filters applied sequentially (AND semantics).
-  *                       When omitted or empty, no filtering is applied.
+  *                       When omitted, a default preset filter of "excludeHttpRequests" is applied.
    */
   constructor(opts?: LangWatchTraceExporterOptions) {
     const apiKey = opts?.apiKey ?? process.env.LANGWATCH_API_KEY ?? "";
@@ -136,10 +136,10 @@ function applyFilterRule(rule: TraceFilter, spans: ReadableSpan[]): ReadableSpan
 }
 
 function applyPreset(
-  preset: "aiOnly" | "excludeHttpRequests",
+  preset: "vercelAIOnly" | "excludeHttpRequests",
   spans: ReadableSpan[],
 ): ReadableSpan[] {
-  if (preset === "aiOnly") return spans.filter((s) => isVercelAiSpan(s));
+  if (preset === "vercelAIOnly") return spans.filter((s) => isVercelAiSpan(s));
   if (preset === "excludeHttpRequests") return spans.filter((s) => !isHttpRequestSpan(s));
 
   return spans;
