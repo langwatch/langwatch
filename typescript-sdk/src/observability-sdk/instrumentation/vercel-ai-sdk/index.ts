@@ -9,15 +9,11 @@
  */
 
 import { type Span, type ReadableSpan, type SpanProcessor } from "@opentelemetry/sdk-trace-base";
-import { type Context, SpanStatusCode } from "@opentelemetry/api";
+import { SpanStatusCode } from "@opentelemetry/api";
 import type { SpanType } from "../../span/types";
 import {
   ATTR_LANGWATCH_SPAN_TYPE,
-  ATTR_LANGWATCH_INPUT,
-  ATTR_LANGWATCH_OUTPUT,
-  ATTR_LANGWATCH_METRICS,
 } from "../../semconv/attributes";
-import { shouldCaptureInput, shouldCaptureOutput } from "../../config";
 
 /**
  * Mapping of AI SDK span names to LangWatch span types
@@ -71,9 +67,8 @@ export class AISDKSpanProcessor implements SpanProcessor {
    * Called when a span starts. Enriches AI SDK spans with LangWatch attributes.
    *
    * @param span - The span being started (writable)
-   * @param parentContext - The parent context
    */
-  onStart(span: Span, parentContext: Context): void {
+  onStart(span: Span): void {
     try {
       const spanName = span.name;
 
@@ -83,14 +78,14 @@ export class AISDKSpanProcessor implements SpanProcessor {
       }
 
       // Add LangWatch span type for categorization
-      const type = AI_SDK_SPAN_TYPE_MAP[spanName] || "llm";
+      const type = AI_SDK_SPAN_TYPE_MAP[spanName] ?? "llm";
       span.setAttribute(ATTR_LANGWATCH_SPAN_TYPE, type);
 
       // Mark as instrumented by AI SDK processor
       span.setAttribute("langwatch.ai_sdk.instrumented", true);
       span.setAttribute("langwatch.ai_sdk.span_name", spanName);
 
-    } catch (error) {
+    } catch {
       // Silently fail to avoid breaking the span
       // Instrumentation should never break application logic
     }
@@ -122,7 +117,7 @@ export class AISDKSpanProcessor implements SpanProcessor {
         });
       }
 
-    } catch (error) {
+    } catch {
       // Silently fail to avoid breaking span export
     }
   }
@@ -176,7 +171,7 @@ export function isAISDKSpan(spanName: string): boolean {
  * ```
  */
 export function getAISDKSpanType(spanName: string): SpanType {
-  return AI_SDK_SPAN_TYPE_MAP[spanName] || "llm";
+  return AI_SDK_SPAN_TYPE_MAP[spanName] ?? "llm";
 }
 
 /**

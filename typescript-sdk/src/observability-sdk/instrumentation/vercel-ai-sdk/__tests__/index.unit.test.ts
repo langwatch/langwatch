@@ -15,17 +15,16 @@ describe('AISDKSpanProcessor', () => {
   beforeEach(() => {
     processor = new AISDKSpanProcessor();
     mockSpan = {
-      name: '',
       setAttribute: vi.fn(),
       setAttributes: vi.fn(),
-    };
+    } as any;
   });
 
   describe('onStart', () => {
     it('enriches AI SDK spans with LangWatch attributes', () => {
-      mockSpan.name = 'ai.streamText';
+      (mockSpan as any).name = 'ai.streamText';
 
-      processor.onStart(mockSpan as Span, {} as any);
+      processor.onStart(mockSpan as Span);
 
       expect(mockSpan.setAttribute).toHaveBeenCalledWith('langwatch.span.type', 'llm');
       expect(mockSpan.setAttribute).toHaveBeenCalledWith('langwatch.ai_sdk.instrumented', true);
@@ -33,60 +32,60 @@ describe('AISDKSpanProcessor', () => {
     });
 
     it('correctly maps ai.generateText to llm type', () => {
-      mockSpan.name = 'ai.generateText';
+      (mockSpan as any).name = 'ai.generateText';
 
-      processor.onStart(mockSpan as Span, {} as any);
+      processor.onStart(mockSpan as Span);
 
       expect(mockSpan.setAttribute).toHaveBeenCalledWith('langwatch.span.type', 'llm');
     });
 
     it('correctly maps ai.toolCall to tool type', () => {
-      mockSpan.name = 'ai.toolCall';
+      (mockSpan as any).name = 'ai.toolCall';
 
-      processor.onStart(mockSpan as Span, {} as any);
+      processor.onStart(mockSpan as Span);
 
       expect(mockSpan.setAttribute).toHaveBeenCalledWith('langwatch.span.type', 'tool');
     });
 
     it('correctly maps ai.embed to component type', () => {
-      mockSpan.name = 'ai.embed';
+      (mockSpan as any).name = 'ai.embed';
 
-      processor.onStart(mockSpan as Span, {} as any);
+      processor.onStart(mockSpan as Span);
 
       expect(mockSpan.setAttribute).toHaveBeenCalledWith('langwatch.span.type', 'component');
     });
 
     it('defaults unknown AI SDK spans to llm type', () => {
-      mockSpan.name = 'ai.unknownOperation';
+      (mockSpan as any).name = 'ai.unknownOperation';
 
-      processor.onStart(mockSpan as Span, {} as any);
+      processor.onStart(mockSpan as Span);
 
       expect(mockSpan.setAttribute).toHaveBeenCalledWith('langwatch.span.type', 'llm');
     });
 
     it('ignores non-AI SDK spans', () => {
-      mockSpan.name = 'http.request';
+      (mockSpan as any).name = 'http.request';
 
-      processor.onStart(mockSpan as Span, {} as any);
+      processor.onStart(mockSpan as Span);
 
       expect(mockSpan.setAttribute).not.toHaveBeenCalled();
     });
 
     it('handles spans with empty names', () => {
-      mockSpan.name = '';
+      (mockSpan as any).name = '';
 
-      expect(() => processor.onStart(mockSpan as Span, {} as any)).not.toThrow();
+      expect(() => processor.onStart(mockSpan as Span)).not.toThrow();
       expect(mockSpan.setAttribute).not.toHaveBeenCalled();
     });
 
     it('handles errors gracefully without throwing', () => {
-      mockSpan.name = 'ai.streamText';
+      (mockSpan as any).name = 'ai.streamText';
       mockSpan.setAttribute = vi.fn(() => {
         throw new Error('setAttribute failed');
       });
 
       // Should not throw - errors are caught and silently handled
-      expect(() => processor.onStart(mockSpan as Span, {} as any)).not.toThrow();
+      expect(() => processor.onStart(mockSpan as Span)).not.toThrow();
     });
 
     it('processes all supported AI SDK span types', () => {
@@ -113,7 +112,7 @@ describe('AISDKSpanProcessor', () => {
           setAttributes: vi.fn(),
         };
 
-        processor.onStart(span as any, {} as any);
+        processor.onStart(span as any);
 
         expect(span.setAttribute).toHaveBeenCalledWith('langwatch.span.type', expectedType);
       });
@@ -132,15 +131,15 @@ describe('AISDKSpanProcessor', () => {
     });
 
     it('ignores non-AI SDK spans', () => {
-      mockReadableSpan.name = 'http.request';
+      (mockReadableSpan as any).name = 'http.request';
 
       // Should not throw or log errors
       expect(() => processor.onEnd(mockReadableSpan as ReadableSpan)).not.toThrow();
     });
 
     it('processes AI SDK spans without errors', () => {
-      mockReadableSpan.name = 'ai.streamText';
-      mockReadableSpan.attributes = {
+      (mockReadableSpan as any).name = 'ai.streamText';
+      (mockReadableSpan as any).attributes = {
         'langwatch.span.type': 'llm',
       };
 
@@ -148,7 +147,7 @@ describe('AISDKSpanProcessor', () => {
     });
 
     it('handles errors gracefully', () => {
-      mockReadableSpan.name = 'ai.streamText';
+      (mockReadableSpan as any).name = 'ai.streamText';
       // Trigger error by making attributes throw
       Object.defineProperty(mockReadableSpan, 'attributes', {
         get: () => {
@@ -161,21 +160,21 @@ describe('AISDKSpanProcessor', () => {
     });
 
     it('handles successful spans', () => {
-      mockReadableSpan.name = 'ai.generateText';
-      mockReadableSpan.attributes = {
+      (mockReadableSpan as any).name = 'ai.generateText';
+      (mockReadableSpan as any).attributes = {
         'langwatch.span.type': 'llm',
       };
-      mockReadableSpan.status = { code: SpanStatusCode.OK };
+      (mockReadableSpan as any).status = { code: SpanStatusCode.OK };
 
       expect(() => processor.onEnd(mockReadableSpan as ReadableSpan)).not.toThrow();
     });
 
     it('handles error spans', () => {
-      mockReadableSpan.name = 'ai.streamText';
-      mockReadableSpan.attributes = {
+      (mockReadableSpan as any).name = 'ai.streamText';
+      (mockReadableSpan as any).attributes = {
         'langwatch.span.type': 'llm',
       };
-      mockReadableSpan.status = { code: SpanStatusCode.ERROR };
+      (mockReadableSpan as any).status = { code: SpanStatusCode.ERROR };
 
       expect(() => processor.onEnd(mockReadableSpan as ReadableSpan)).not.toThrow();
     });
@@ -208,7 +207,7 @@ describe('AISDKSpanProcessor', () => {
         setAttribute: vi.fn(),
       };
 
-      expect(() => processor.onStart(span as any, {} as any)).not.toThrow();
+      expect(() => processor.onStart(span as any)).not.toThrow();
     });
 
     it('handles undefined span name gracefully', () => {
@@ -217,7 +216,7 @@ describe('AISDKSpanProcessor', () => {
         setAttribute: vi.fn(),
       };
 
-      expect(() => processor.onStart(span as any, {} as any)).not.toThrow();
+      expect(() => processor.onStart(span as any)).not.toThrow();
     });
 
     it('handles span names that start with "ai" but are not "ai."', () => {
@@ -226,7 +225,7 @@ describe('AISDKSpanProcessor', () => {
         setAttribute: vi.fn(),
       };
 
-      processor.onStart(span as any, {} as any);
+      processor.onStart(span as any);
 
       // Should not process spans that don't start with exactly "ai."
       expect(span.setAttribute).not.toHaveBeenCalled();
@@ -238,7 +237,7 @@ describe('AISDKSpanProcessor', () => {
         setAttribute: vi.fn(),
       };
 
-      processor.onStart(span as any, {} as any);
+      processor.onStart(span as any);
 
       // Should not process - prefix check is case-sensitive
       expect(span.setAttribute).not.toHaveBeenCalled();
@@ -250,7 +249,7 @@ describe('AISDKSpanProcessor', () => {
         setAttribute: vi.fn(),
       };
 
-      processor.onStart(span as any, {} as any);
+      processor.onStart(span as any);
 
       // Should process and default to llm type
       expect(span.setAttribute).toHaveBeenCalledWith('langwatch.span.type', 'llm');

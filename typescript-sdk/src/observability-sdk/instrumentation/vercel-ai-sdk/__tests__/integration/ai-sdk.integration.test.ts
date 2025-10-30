@@ -176,7 +176,7 @@ describe("AI SDK Integration Tests", () => {
     const tracer = getLangWatchTracer("ai-sdk-integration-test");
 
     // Simulate AI SDK's hierarchical span creation
-    await tracer.withActiveSpan("ai.streamText", { root: true }, async (parentSpan) => {
+    await tracer.withActiveSpan("ai.streamText", { root: true }, async () => {
       // AI SDK creates child spans for tool calls
       const childSpan = tracer.startSpan("ai.toolCall");
       childSpan.end();
