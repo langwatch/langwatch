@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/router";
 import { OnboardingFlowDirection } from "../types/types";
 
@@ -12,28 +12,43 @@ export function useGenericOnboardingFlow<TScreenIndex extends number, TFlowConfi
   options?: {
     queryParamName?: string;
     screenIdMap?: { indexToId: Map<TScreenIndex, string>; idToIndex: Map<string, TScreenIndex> };
+    firstScreenId?: string;
   }
 ) {
   const router = useRouter();
   const [currentScreenIndex, setCurrentScreenIndex] = useState<TScreenIndex>(flowConfig.first);
   const [direction, setDirection] = useState<OnboardingFlowDirection>(OnboardingFlowDirection.FORWARD);
+  const isUpdatingUrl = useRef(false);
 
   const useUrlSync = options?.screenIdMap !== undefined;
   const queryParamName = options?.queryParamName ?? "step";
   const screenIdMap = options?.screenIdMap;
+  const firstScreenId = options?.firstScreenId;
 
   // Sync currentScreenIndex with URL query parameter (only if screenIdMap provided)
   useEffect(() => {
     if (!useUrlSync || !screenIdMap) return;
+    if (isUpdatingUrl.current) return;
 
     const stepFromQuery = router.query[queryParamName];
-    if (stepFromQuery && typeof stepFromQuery === "string") {
+
+    // Handle falsy step as first screen
+    if (!stepFromQuery) {
+      if (currentScreenIndex !== flowConfig.first) {
+        setCurrentScreenIndex(flowConfig.first);
+      }
+      return;
+    }
+
+    if (typeof stepFromQuery === "string") {
       const screenIndex = screenIdMap.idToIndex.get(stepFromQuery);
       if (screenIndex !== void 0 && flowConfig.visibleScreens.includes(screenIndex)) {
-        setCurrentScreenIndex(screenIndex);
+        if (currentScreenIndex !== screenIndex) {
+          setCurrentScreenIndex(screenIndex);
+        }
       }
     }
-  }, [router.query, queryParamName, flowConfig.visibleScreens, screenIdMap, useUrlSync]);
+  }, [router.query, queryParamName, flowConfig.visibleScreens, flowConfig.first, screenIdMap, useUrlSync, currentScreenIndex]);
 
   // Update URL when screen changes (only if screenIdMap provided)
   const updateUrlForScreen = (screenIndex: TScreenIndex) => {
@@ -42,8 +57,17 @@ export function useGenericOnboardingFlow<TScreenIndex extends number, TFlowConfi
     const screenId = screenIdMap.indexToId.get(screenIndex);
     if (!screenId) return;
 
+    isUpdatingUrl.current = true;
+
     const currentQuery = { ...router.query };
-    currentQuery[queryParamName] = screenId;
+
+    // If this is the first screen, remove the step param entirely
+    if (firstScreenId && screenId === firstScreenId) {
+      delete currentQuery[queryParamName];
+    } else {
+      currentQuery[queryParamName] = screenId;
+    }
+
     void router.push(
       {
         pathname: router.pathname,
@@ -51,7 +75,12 @@ export function useGenericOnboardingFlow<TScreenIndex extends number, TFlowConfi
       },
       void 0,
       { shallow: true }
-    );
+    ).then(() => {
+      // Clear the flag after navigation completes
+      setTimeout(() => {
+        isUpdatingUrl.current = false;
+      }, 100);
+    });
   };
 
   const navigateTo = (newDirection: OnboardingFlowDirection) => {
@@ -118,6 +147,12 @@ export function useGenericOnboardingFlow<TScreenIndex extends number, TFlowConfi
     return canProceedFn(currentScreenIndex);
   };
 
+  const canGoBack = () => {
+    const visible = flowConfig.visibleScreens;
+    const pos = visible.indexOf(currentScreenIndex);
+    return pos > 0;
+  };
+
   return {
     currentScreenIndex,
     direction,
@@ -128,6 +163,7 @@ export function useGenericOnboardingFlow<TScreenIndex extends number, TFlowConfi
       skipScreen,
       canProceed,
     },
+    canGoBack: canGoBack(),
     setCurrentScreenIndex: (index: TScreenIndex) => {
       setCurrentScreenIndex(index);
       updateUrlForScreen(index);
