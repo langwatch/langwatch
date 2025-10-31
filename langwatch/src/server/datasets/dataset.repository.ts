@@ -17,16 +17,13 @@ export type CreateDatasetInput = Omit<
 export type UpdateDatasetInput = {
   id: string;
   projectId: string;
-  data: {
-    name?: string;
-    slug?: string;
-    columnTypes?: Prisma.InputJsonValue;
-  };
+  data: Prisma.DatasetUpdateInput;
 };
 
 /**
  * Repository layer for dataset data access.
  * Single Responsibility: Database operations for datasets.
+ * {@link Dataset} represents a collection of data records with associated metadata.
  */
 export class DatasetRepository {
   constructor(private readonly prisma: PrismaClient) {}
@@ -34,11 +31,17 @@ export class DatasetRepository {
   /**
    * Finds a single dataset by id within a project.
    */
-  async findOne(input: {
-    id: string;
-    projectId: string;
-  }): Promise<Dataset | null> {
-    return await this.prisma.dataset.findFirst({
+  async findOne(
+    input: {
+      id: string;
+      projectId: string;
+    },
+    options?: {
+      tx?: Prisma.TransactionClient;
+    }
+  ): Promise<Dataset | null> {
+    const client = options?.tx ?? this.prisma;
+    return await client.dataset.findFirst({
       where: {
         id: input.id,
         projectId: input.projectId,
@@ -49,12 +52,18 @@ export class DatasetRepository {
   /**
    * Finds dataset by slug within a project.
    */
-  async findBySlug(input: {
-    slug: string;
-    projectId: string;
-    excludeId?: string;
-  }): Promise<Dataset | null> {
-    return await this.prisma.dataset.findFirst({
+  async findBySlug(
+    input: {
+      slug: string;
+      projectId: string;
+      excludeId?: string;
+    },
+    options?: {
+      tx?: Prisma.TransactionClient;
+    }
+  ): Promise<Dataset | null> {
+    const client = options?.tx ?? this.prisma;
+    return await client.dataset.findFirst({
       where: {
         slug: input.slug,
         projectId: input.projectId,
@@ -81,12 +90,38 @@ export class DatasetRepository {
 
   /**
    * Updates an existing dataset.
+   *
+   * Validates that the dataset belongs to the specified project before updating.
+   * This guard prevents cross-project updates at the data layer.
+   *
+   * @throws {Error} if dataset not found or doesn't belong to project
    */
-  async update(input: UpdateDatasetInput): Promise<Dataset> {
-    return await this.prisma.dataset.update({
+  async update(
+    input: UpdateDatasetInput,
+    options?: {
+      tx?: Prisma.TransactionClient;
+    }
+  ): Promise<Dataset> {
+    const client = options?.tx ?? this.prisma;
+
+    // Verify dataset exists and belongs to project
+    const existing = await client.dataset.findFirst({
       where: {
         id: input.id,
         projectId: input.projectId,
+      },
+    });
+
+    if (!existing) {
+      throw new Error(
+        `Dataset ${input.id} not found in project ${input.projectId}`
+      );
+    }
+
+    // Perform update (Prisma .update() with @id only accepts unique field)
+    return await client.dataset.update({
+      where: {
+        id: input.id,
       },
       data: input.data,
     });
@@ -95,11 +130,13 @@ export class DatasetRepository {
   /**
    * Gets project with organization info for S3 configuration check.
    */
-  async getProjectWithOrgS3Settings(projectId: string): Promise<{
+  async getProjectWithOrgS3Settings(input: {
+    projectId: string;
+  }): Promise<{
     canUseS3: boolean;
   }> {
     const project = await this.prisma.project.findUnique({
-      where: { id: projectId },
+      where: { id: input.projectId },
       include: { team: { include: { organization: true } } },
     });
 
@@ -109,65 +146,11 @@ export class DatasetRepository {
   }
 
   /**
-   * Finds all dataset records for a dataset.
-   */
-  async findDatasetRecords(input: {
-    datasetId: string;
-    projectId: string;
-  }) {
-    return await this.prisma.datasetRecord.findMany({
-      where: {
-        datasetId: input.datasetId,
-        projectId: input.projectId,
-      },
-    });
-  }
-
-  /**
-   * Updates dataset records in a transaction.
-   */
-  async updateDatasetRecordsTransaction(
-    updates: Array<{
-      id: string;
-      datasetId: string;
-      projectId: string;
-      entry: Prisma.InputJsonValue;
-    }>
-  ): Promise<void> {
-    await this.prisma.$transaction(
-      updates.map((update) =>
-        this.prisma.datasetRecord.update({
-          where: {
-            id: update.id,
-            datasetId: update.datasetId,
-            projectId: update.projectId,
-          },
-          data: {
-            entry: update.entry,
-          },
-        })
-      )
-    );
-  }
-
-  /**
-   * Finds experiment by id and project.
-   */
-  async findExperiment(input: { id: string; projectId: string }) {
-    return await this.prisma.experiment.findFirst({
-      where: {
-        id: input.id,
-        projectId: input.projectId,
-      },
-    });
-  }
-
-  /**
    * Finds all dataset slugs in a project (for name conflict checking).
    */
-  async findAllSlugs(projectId: string): Promise<Array<{ slug: string }>> {
+  async findAllSlugs(input: { projectId: string }): Promise<Array<{ slug: string }>> {
     return await this.prisma.dataset.findMany({
-      where: { projectId },
+      where: { projectId: input.projectId },
       select: { slug: true },
     });
   }

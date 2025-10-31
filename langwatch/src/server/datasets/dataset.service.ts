@@ -1,10 +1,12 @@
-import { type PrismaClient } from "@prisma/client";
+import { type PrismaClient, type Prisma } from "@prisma/client";
 import { nanoid } from "nanoid";
 import { slugify } from "~/utils/slugify";
 import type { DatasetColumns, DatasetRecordEntry } from "./types";
 import { tryToMapPreviousColumnsToNewColumns } from "~/optimization_studio/utils/datasetUtils";
 import { createManyDatasetRecords } from "../api/routers/datasetRecord";
 import { DatasetRepository } from "./dataset.repository";
+import { DatasetRecordRepository } from "./dataset-record.repository";
+import { ExperimentRepository } from "./experiment.repository";
 import { DatasetNotFoundError, DatasetConflictError } from "./errors";
 
 /**
@@ -39,14 +41,21 @@ export type ValidateDatasetNameResult = {
  * Throws domain-specific errors that can be mapped by the router layer.
  */
 export class DatasetService {
-  constructor(private readonly repository: DatasetRepository) {}
+  constructor(
+    private readonly prisma: PrismaClient,
+    private readonly repository: DatasetRepository,
+    private readonly recordRepository: DatasetRecordRepository,
+    private readonly experimentRepository: ExperimentRepository
+  ) {}
 
   /**
    * Static factory method for creating a DatasetService with proper DI.
    */
   static create(prisma: PrismaClient): DatasetService {
     const repository = new DatasetRepository(prisma);
-    return new DatasetService(repository);
+    const recordRepository = new DatasetRecordRepository(prisma);
+    const experimentRepository = new ExperimentRepository(prisma);
+    return new DatasetService(prisma, repository, recordRepository, experimentRepository);
   }
 
   /**
@@ -88,6 +97,7 @@ export class DatasetService {
    * Handles column type migrations by remapping existing records.
    *
    * @throws {DatasetNotFoundError} if dataset doesn't exist
+   * @throws {DatasetConflictError} if slug collides with another dataset
    */
   private async updateExistingDataset(params: {
     datasetId: string;
@@ -97,37 +107,65 @@ export class DatasetService {
   }) {
     const { datasetId, projectId, name, columnTypes } = params;
 
-    const existingDataset = await this.repository.findOne({
-      id: datasetId,
-      projectId,
-    });
+    return await this.prisma.$transaction(async (tx) => {
+      // Get existing dataset for column comparison
+      const existingDataset = await this.repository.findOne(
+        {
+          id: datasetId,
+          projectId,
+        },
+        { tx }
+      );
 
-    if (!existingDataset) {
-      throw new DatasetNotFoundError();
-    }
+      if (!existingDataset) {
+        throw new DatasetNotFoundError();
+      }
 
-    const slug = this.generateSlug(name);
+      const slug = this.generateSlug(name);
 
-    if (
-      JSON.stringify(existingDataset.columnTypes) !==
-      JSON.stringify(columnTypes)
-    ) {
-      await this.migrateDatasetRecordColumns({
-        datasetId,
-        projectId,
-        oldColumnTypes: existingDataset.columnTypes as DatasetColumns,
-        newColumnTypes: columnTypes,
-      });
-    }
+      // Check for slug collision with other datasets (excluding current one)
+      const conflictingDataset = await this.repository.findBySlug(
+        {
+          slug,
+          projectId,
+          excludeId: datasetId,
+        },
+        { tx }
+      );
 
-    return await this.repository.update({
-      id: datasetId,
-      projectId,
-      data: {
-        name,
-        slug,
-        columnTypes,
-      },
+      if (conflictingDataset) {
+        throw new DatasetConflictError();
+      }
+
+      // Migrate records if column schema changed
+      if (
+        JSON.stringify(existingDataset.columnTypes) !==
+        JSON.stringify(columnTypes)
+      ) {
+        await this.migrateDatasetRecordColumns(
+          {
+            datasetId,
+            projectId,
+            oldColumnTypes: existingDataset.columnTypes as DatasetColumns,
+            newColumnTypes: columnTypes,
+          },
+          { tx }
+        );
+      }
+
+      // Update the dataset (repository validates ownership - will throw if datasetId doesn't belong to projectId)
+      return await this.repository.update(
+        {
+          id: datasetId,
+          projectId,
+          data: {
+            name,
+            slug,
+            columnTypes,
+          },
+        },
+        { tx }
+      );
     });
   }
 
@@ -155,9 +193,9 @@ export class DatasetService {
       throw new DatasetConflictError();
     }
 
-    const { canUseS3 } = await this.repository.getProjectWithOrgS3Settings(
-      projectId
-    );
+    const { canUseS3 } = await this.repository.getProjectWithOrgS3Settings({
+      projectId,
+    });
 
     const dataset = await this.repository.create({
       id: `dataset_${nanoid()}`,
@@ -182,18 +220,26 @@ export class DatasetService {
   /**
    * Migrates dataset records when column types change.
    */
-  private async migrateDatasetRecordColumns(params: {
-    datasetId: string;
-    projectId: string;
-    oldColumnTypes: DatasetColumns;
-    newColumnTypes: DatasetColumns;
-  }): Promise<void> {
+  private async migrateDatasetRecordColumns(
+    params: {
+      datasetId: string;
+      projectId: string;
+      oldColumnTypes: DatasetColumns;
+      newColumnTypes: DatasetColumns;
+    },
+    options?: {
+      tx?: Prisma.TransactionClient;
+    }
+  ): Promise<void> {
     const { datasetId, projectId, oldColumnTypes, newColumnTypes } = params;
 
-    const datasetRecords = await this.repository.findDatasetRecords({
-      datasetId,
-      projectId,
-    });
+    const datasetRecords = await this.recordRepository.findDatasetRecords(
+      {
+        datasetId,
+        projectId,
+      },
+      options
+    );
 
     const updatedEntries = tryToMapPreviousColumnsToNewColumns(
       datasetRecords.map((record) => record.entry as DatasetRecordEntry),
@@ -201,13 +247,18 @@ export class DatasetService {
       newColumnTypes
     );
 
-    await this.repository.updateDatasetRecordsTransaction(
+    if (updatedEntries.length !== datasetRecords.length) {
+      throw new Error(
+        `Column migration failed: expected ${datasetRecords.length} records but got ${updatedEntries.length}`
+      );
+    }
+
+    await this.recordRepository.updateDatasetRecordsTransaction(
       datasetRecords.map((record, index) => ({
         id: record.id,
-        datasetId,
-        projectId,
         entry: updatedEntries[index]!,
-      }))
+      })),
+      options
     );
   }
 
@@ -242,7 +293,7 @@ export class DatasetService {
     projectId: string,
     proposedName: string
   ): Promise<string> {
-    const datasets = await this.repository.findAllSlugs(projectId);
+    const datasets = await this.repository.findAllSlugs({ projectId });
     const slugSet = new Set(datasets.map((d) => d.slug));
 
     let index = 1;
@@ -265,7 +316,7 @@ export class DatasetService {
    * Format: lowercase, kebab-case, alphanumeric + hyphens only
    */
   private generateSlug(name: string): string {
-    return slugify(name.replace("_", "-"), {
+    return slugify(name.replaceAll("_", "-"), {
       lower: true,
       strict: true,
     });
@@ -283,7 +334,7 @@ export class DatasetService {
       return "Draft Dataset";
     }
 
-    const experiment = await this.repository.findExperiment({
+    const experiment = await this.experimentRepository.findExperiment({
       id: experimentId,
       projectId,
     });
@@ -301,7 +352,7 @@ export class DatasetService {
     projectId: string,
     baseName: string
   ): Promise<string> {
-    const datasets = await this.repository.findAllSlugs(projectId);
+    const datasets = await this.repository.findAllSlugs({ projectId });
     const slugSet = new Set(datasets.map((d) => d.slug));
 
     let index = 1;

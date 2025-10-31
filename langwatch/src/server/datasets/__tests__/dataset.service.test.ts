@@ -31,6 +31,9 @@ describe("DatasetService", () => {
       it.todo("throws DatasetNotFoundError if dataset missing");
       it.todo("triggers column migration when columnTypes differ");
       it.todo("preserves slug format (kebab-case)");
+      it.todo("throws DatasetConflictError if slug collides with another dataset");
+      it.todo("allows updating with same name/slug without conflict");
+      it.todo("wraps all operations in transaction for atomicity");
     });
 
     describe("when using experimentId", () => {
@@ -54,7 +57,7 @@ describe("DatasetService", () => {
   describe("generateSlug", () => {
     it.todo("converts to lowercase");
     it.todo("replaces spaces with hyphens");
-    it.todo("replaces underscores with hyphens");
+    it.todo("replaces ALL underscores with hyphens");
     it.todo("removes special characters");
   });
 });
