@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.6.0](https://github.com/langwatch/langwatch/compare/python-sdk@v0.5.1...python-sdk@v0.6.0) (2025-10-31)
+
+
+### Features
+
+* upgrade to dspy v3 ([9833bbb](https://github.com/langwatch/langwatch/commit/9833bbb2b1e1c210350dbea6c502a8f0e624badc))
+* upgrade to DSPy v3 🎉 ([#752](https://github.com/langwatch/langwatch/issues/752)) ([9833bbb](https://github.com/langwatch/langwatch/commit/9833bbb2b1e1c210350dbea6c502a8f0e624badc))
+
+
+### Bug Fixes
+
+* dataset routes ([#756](https://github.com/langwatch/langwatch/issues/756)) ([da736e0](https://github.com/langwatch/langwatch/commit/da736e025280208ceed620cd1bb8c43366120f0e))
+
 ## [0.5.1](https://github.com/langwatch/langwatch/compare/python-sdk@v0.5.0...python-sdk@v0.5.1) (2025-10-24)
 
 
