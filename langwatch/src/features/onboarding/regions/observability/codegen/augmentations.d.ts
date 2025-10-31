@@ -13,17 +13,17 @@ declare module "*.snippet.go" {
   export default content;
 }
 
-declare module "*.snippet.go?raw" {
-  const content: string;
-  export default content;
-}
-
 declare module "*.snippet.sh" {
   const content: string;
   export default content;
 }
 
 declare module "*.snippet.py" {
+  const content: string;
+  export default content;
+}
+
+declare module "*.snippet.yaml" {
   const content: string;
   export default content;
 }
