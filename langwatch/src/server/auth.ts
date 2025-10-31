@@ -26,6 +26,9 @@ import GoogleProvider from "next-auth/providers/google";
 import OktaProvider from "next-auth/providers/okta";
 import type { Account, Organization } from "@prisma/client";
 import * as Sentry from "@sentry/nextjs";
+import { createLogger } from "../utils/logger";
+
+const logger = createLogger("langwatch:auth");
 
 /**
  * Module augmentation for `next-auth` types. Allows us to add custom properties to the `session`
@@ -95,7 +98,10 @@ export const authOptions = (
       };
     },
     signIn: async ({ user, account }) => {
-      if (!user.email) return false;
+      if (!user.email) {
+        logger.error({ user }, "SignIn failed: No email provided");
+        return false;
+      }
 
       const existingUser = await prisma.user.findUnique({
         where: { email: user.email },
@@ -164,17 +170,20 @@ export const authOptions = (
         })
       : env.NEXTAUTH_PROVIDER === "azure-ad"
       ? AzureADProvider({
-          clientId: env.AZURE_CLIENT_ID ?? "",
-          clientSecret: env.AZURE_CLIENT_SECRET ?? "",
-          tenantId: env.AZURE_TENANT_ID ?? "",
+          clientId: env.AZURE_AD_CLIENT_ID ?? "",
+          clientSecret: env.AZURE_AD_CLIENT_SECRET ?? "",
+          tenantId: env.AZURE_AD_TENANT_ID ?? "",
           authorization: {
-            params: { prompt: "login", scope: "openid email profile" },
+            params: {
+              prompt: "login",
+              scope: "openid email profile User.Read",
+            },
           },
           profile(profile) {
             return {
-              id: profile.sub ?? profile.id,
-              name: profile.displayName,
-              email: profile.mail ?? profile.userPrincipalName,
+              id: profile.sub ?? profile.oid ?? profile.id,
+              name: profile.name ?? profile.displayName,
+              email: profile.email ?? profile.mail ?? profile.userPrincipalName,
               image: null, // Microsoft Graph doesn't return image by default
             };
           },
