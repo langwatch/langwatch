@@ -1,31 +1,32 @@
 spring.ai:
-chat:
-  client:
+  chat:
+    client:
+      observations:
+        log-prompt: true # +
     observations:
-      log-prompt: true # +
-  observations:
-    log-prompt: true # Include prompt content in tracing (disabled by default for privacy) # +
-    log-completion: true # Include completion content in tracing (disabled by default) # +
-openai:
-  api-key: ${OPENAI_API_KEY}
+      log-prompt: true # Include prompt content in tracing (disabled by default for privacy) # +
+      log-completion: true # Include completion content in tracing (disabled by default) # +
+  openai:
+    api-key: ${OPENAI_API_KEY}
 
 
 management:
-tracing.enabled: true # +
-logging.export.enabled: true # +
+  tracing.enabled: true # +
+  logging.export.enabled: true # +
 
 otel:
-java:
-  global-autoconfigure:
-    enabled: true # +
-exporter:
-  otlp:
-    endpoint: "https://app.langwatch.ai/api/otel" # +
-    protocol: "http/protobuf" # +
-    headers:
-      Authorization: ${LANGWATCH_API_KEY} # +
-traces:
-  exporter: otlp
-  sampler:
-    ratio: 1.0
-logs.exporter: otlp
+  java:
+    global-autoconfigure:
+      enabled: true # +
+  exporter:
+    otlp:
+      endpoint: "<project_endpoint>/api/otel" # +
+      protocol: "http/protobuf" # +
+      headers:
+        Authorization: ${LANGWATCH_API_KEY} # +
+  traces:
+    exporter: otlp
+    sampler:
+      ratio: 1.0
+  metrics.exporter: otlp
+  logs.exporter: otlp

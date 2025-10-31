@@ -1,7 +1,6 @@
 /* eslint-disable @next/next/no-img-element */
 import React from "react";
 import type { FrameworkKey, PlatformKey } from "../model";
-import { NoLoN8nSetup } from "../../../components/sections/observability/NoLoN8nSetup";
 import vercelAiTsSource from "./snippets/typescript/vercelai.snippet.ts?raw";
 import mastraTsSource from "./snippets/typescript/mastra.snippet.ts?raw";
 import langgraphTsSource from "./snippets/typescript/langgraph.snippet.ts?raw";
@@ -24,6 +23,8 @@ import openaiPySource from "./snippets/python/openai.snippet.py";
 import pydanticPySource from "./snippets/python/pydanticai.snippet.py";
 import openaiAgentsPySource from "./snippets/python/openaiagents.snippet.py";
 import springAiYamlSource from "./snippets/java/springai.snippet.yaml?raw";
+import n8nBashSource from "./snippets/noandlo/n8n.snippet.sh?raw";
+import { OpenTelemetrySetup } from "../../../components/sections/observability/OpenTelemetrySetup";
 
 export interface InstallMatrix {
   js?: { npm: string; pnpm: string; yarn: string; bun: string };
@@ -39,7 +40,7 @@ export interface SnippetRef {
 
 export interface IntegrationSpec {
   platform: PlatformKey;
-  framework: FrameworkKey;
+  framework?: FrameworkKey;
   label: string;
   icon?: React.ReactNode;
   docs: { internal?: string; external?: string };
@@ -55,6 +56,7 @@ const tsRef = (file: string): SnippetRef => ({ file, language: "typescript", fil
 const goRef = (file: string): SnippetRef => ({ file, language: "go", filename: "main.go" });
 const pyRef = (file: string): SnippetRef => ({ file, language: "python", filename: "app.py" });
 const yamlRef = (file: string): SnippetRef => ({ file, language: "yaml", filename: "application.yaml" });
+const bashRef = (file: string): SnippetRef => ({ file, language: "bash", filename: "run.sh" });
 
 function themedIcon(lightSrc: string, darkSrc: string, alt: string): React.ReactElement {
   const isDark = true;
@@ -426,6 +428,14 @@ export const registry: IntegrationRegistry = [
     snippet: yamlRef(springAiYamlSource as unknown as string),
   },
 
+  {
+    platform: "opentelemetry",
+    docs: { internal: "/integration/opentelemetry/guide" },
+    icon: singleIcon("/images/external-icons/opentelemetry.svg", "OpenTelemetry"),
+    label: "OpenTelemetry",
+    customComponent: OpenTelemetrySetup,
+  },
+
   // No/Lo
   {
     platform: "no_and_lo",
@@ -441,20 +451,27 @@ export const registry: IntegrationRegistry = [
         bun: "bun add @langwatch/n8n-observability @langwatch/n8n-nodes-langwatch",
       },
     },
-    customComponent: NoLoN8nSetup,
+    snippet: bashRef(n8nBashSource as unknown as string),
   },
 ];
 
-export function getRegistryEntry(platform: PlatformKey, framework: FrameworkKey): IntegrationSpec | undefined {
+export function getRegistryEntry(platform: PlatformKey, framework?: FrameworkKey): IntegrationSpec | undefined {
+  // If no framework is provided, return the first entry for the platform (platform-only items)
+  if (!framework) {
+    return registry.find((r) => r.platform === platform);
+  }
   return registry.find((r) => r.platform === platform && r.framework === framework);
 }
 
 export function deriveFrameworksByPlatform(): Record<PlatformKey, { key: FrameworkKey; label: string; icon?: React.ReactNode }[]> {
   const out: Record<PlatformKey, { key: FrameworkKey; label: string; icon?: React.ReactNode }[]> = {
-    typescript: [], python: [], go: [], java: [], opentelemetry: [], no_and_lo: [], other: [],
+    typescript: [], python: [], go: [], java: [], opentelemetry: [], no_and_lo: [],
   };
   for (const r of registry) {
-    out[r.platform].push({ key: r.framework, label: r.label, icon: r.icon });
+    // Skip entries without a framework (platform-only items)
+    if (r.framework) {
+      out[r.platform].push({ key: r.framework, label: r.label, icon: r.icon });
+    }
   }
   return out;
 }

@@ -21,27 +21,36 @@ export function ObservabilityScreen(): React.ReactElement {
     const firstFramework = FRAMEWORKS_BY_PLATFORM[lang]?.[0]?.key;
     if (firstFramework) {
       setSelectedFramework(firstFramework);
+    } else {
+      // Platform has no frameworks, clear framework selection
+      setSelectedFramework(null as any);
     }
   }
 
+  const hasFrameworks = useMemo(() => {
+    return FRAMEWORKS_BY_PLATFORM[selectedPlatform]?.length > 0;
+  }, [selectedPlatform]);
+
   const selectedEntry = useMemo(() => {
-    return getRegistryEntry(selectedPlatform, selectedFramework);
-  }, [selectedPlatform, selectedFramework]);
+    return getRegistryEntry(selectedPlatform, hasFrameworks ? selectedFramework : undefined);
+  }, [selectedPlatform, selectedFramework, hasFrameworks]);
 
   return (
     <>
-      <Grid templateColumns={{ base: "1fr", "xl": "1fr 1fr" }} gap={{ base: 6, "xl": 32 }} alignItems="start">
+      <Grid templateColumns={{ base: "1fr", "xl": "1fr 1fr" }} gap={{ base: 6, "xl": 32 }} alignItems="start" mb={20}>
         <VStack align="stretch" gap={6}>
           <PlatformGrid
             selectedLanguage={selectedPlatform}
             onSelectLanguage={handleSelectLanguage}
           />
 
-          <FrameworkGrid
-            language={selectedPlatform}
-            selectedFramework={selectedFramework}
-            onSelectFramework={setSelectedFramework}
-          />
+          {hasFrameworks && (
+            <FrameworkGrid
+              language={selectedPlatform}
+              selectedFramework={selectedFramework}
+              onSelectFramework={setSelectedFramework}
+            />
+          )}
 
           <ApiIntegrationInfoCard />
         </VStack>

@@ -2,6 +2,7 @@ import type { FrameworkKey, PlatformKey } from "../model.ts";
 import { useActiveProject } from "../../../contexts/ActiveProjectContext.tsx";
 import { parseSnippet } from "./snippets.ts";
 import { getRegistryEntry } from "./registry.tsx";
+import { usePublicEnv } from "~/hooks/usePublicEnv.ts";
 
 interface CodegenResult {
   code: string;
@@ -33,10 +34,17 @@ export function useCodegen(
   language: PlatformKey,
   framework: FrameworkKey,
 ): CodegenResult | null {
+  const publicEnv = usePublicEnv();
   const { project } = useActiveProject();
   const projectName = project?.name ?? "my-llm-app";
+  const effectiveEndpoint = publicEnv.data?.BASE_HOST ?? "";
+
   const base = getFrameworkCode(language, framework);
   if (!base) return null;
 
-  return { ...base, code: base.code.replaceAll("<project_name>", projectName) };
+  return {
+    ...base,
+    code: base.code.replaceAll("<project_name>", projectName)
+      .replaceAll("<project_endpoint>", effectiveEndpoint),
+  };
 }

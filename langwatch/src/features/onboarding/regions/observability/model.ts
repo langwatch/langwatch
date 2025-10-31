@@ -4,8 +4,7 @@ export type PlatformKey =
   | "go"
   | "java"
   | "opentelemetry"
-  | "no_and_lo"
-  | "other";
+  | "no_and_lo";
 
 export type FrameworkKey =
   | "vercel_ai"

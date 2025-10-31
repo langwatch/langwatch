@@ -76,7 +76,7 @@ export function InstallPreview({
               ))}
             </Tabs.List>
             <CodeBlock.CopyTrigger asChild>
-              <IconButton variant="ghost" size="2xs">
+              <IconButton variant="ghost" size="2xs" mr={"-4px"}>
                 <CodeBlock.CopyIndicator />
               </IconButton>
             </CodeBlock.CopyTrigger>
