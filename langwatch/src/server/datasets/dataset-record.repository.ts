@@ -3,6 +3,10 @@ import {
   type DatasetRecord,
   type Prisma,
 } from "@prisma/client";
+import { nanoid } from "nanoid";
+import * as Sentry from "@sentry/nextjs";
+import { StorageService } from "../storage";
+import type { DatasetRecordEntry } from "./types";
 
 /**
  * Repository layer for dataset record data access.
@@ -11,7 +15,11 @@ import {
  * {@link DatasetRecord} represents individual rows/entries within a {@link Dataset}.
  */
 export class DatasetRecordRepository {
-  constructor(private readonly prisma: PrismaClient) {}
+  private readonly storageService: StorageService;
+
+  constructor(private readonly prisma: PrismaClient) {
+    this.storageService = new StorageService();
+  }
 
   /**
    * Finds all dataset records for a specific dataset.
@@ -75,6 +83,106 @@ export class DatasetRecordRepository {
     } else {
       await this.prisma.$transaction(updatePromises);
     }
+  }
+
+  /**
+   * Creates multiple dataset records in batch.
+   * Handles both S3-backed datasets (JSON file storage) and Prisma-backed datasets.
+   * 
+   * @param input - Dataset and record information
+   * @param options - Optional transaction client to use
+   */
+  async batchCreate(
+    input: {
+      datasetId: string;
+      projectId: string;
+      datasetRecords: DatasetRecordEntry[];
+      useS3: boolean;
+    },
+    options?: {
+      tx?: Prisma.TransactionClient;
+    }
+  ): Promise<void> {
+    const { datasetId, projectId, datasetRecords, useS3 } = input;
+    const client = options?.tx ?? this.prisma;
+
+    if (useS3) {
+      const recordData = this.createRecordData(
+        datasetRecords,
+        { datasetId, projectId },
+        true
+      );
+
+      let existingRecords: any[] = [];
+      try {
+        const { records: fetchedRecords } = await this.storageService.getObject(
+          projectId,
+          datasetId
+        );
+        existingRecords = fetchedRecords;
+      } catch (error) {
+        if ((error as any).name !== "NoSuchKey") {
+          Sentry.captureException(error);
+          throw error;
+        }
+      }
+
+      const allRecords = [...existingRecords, ...recordData];
+
+      await this.storageService.putObject(
+        projectId,
+        datasetId,
+        JSON.stringify(allRecords)
+      );
+
+      await client.dataset.update({
+        where: { id: datasetId, projectId },
+        data: { s3RecordCount: allRecords.length },
+      });
+    } else {
+      const recordData = this.createRecordData(datasetRecords, {
+        datasetId,
+        projectId,
+      });
+
+      await client.datasetRecord.createMany({
+        data: recordData as (DatasetRecord & { entry: any })[],
+      });
+    }
+  }
+
+  /**
+   * Helper method to format dataset records for storage.
+   * @private
+   */
+  private createRecordData(
+    entries: DatasetRecordEntry[],
+    { datasetId, projectId }: { datasetId: string; projectId: string },
+    useS3 = false
+  ) {
+    return entries.map((entry, index) => {
+      const id = entry.id ?? nanoid();
+      const entryWithoutId: Omit<typeof entry, "id"> = { ...entry };
+      delete (entryWithoutId as any).id;
+
+      const record = {
+        id,
+        entry: entryWithoutId,
+        datasetId,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        projectId,
+      };
+
+      if (useS3) {
+        return {
+          ...record,
+          position: (index + 1) * 1000,
+        };
+      }
+
+      return record;
+    });
   }
 }
 

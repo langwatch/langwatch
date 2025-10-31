@@ -24,6 +24,11 @@ describe("DatasetService", () => {
       it.todo("throws DatasetConflictError if slug exists");
       it.todo("creates dataset with S3 config from org settings");
       it.todo("creates dataset records if provided");
+      it.todo("wraps dataset and record creation in transaction");
+    });
+
+    describe("when creating with records and record creation fails", () => {
+      it.todo("rolls back dataset creation");
     });
 
     describe("when updating existing dataset", () => {

@@ -45,5 +45,41 @@ describe("DatasetRecordRepository", () => {
       it.todo("creates new transaction");
     });
   });
+
+  describe("batchCreate", () => {
+    describe("when using Prisma storage", () => {
+      it.todo("creates all records via createMany");
+      it.todo("generates IDs for entries without id");
+      it.todo("removes id from entry data before storage");
+      it.todo("sets correct projectId and datasetId on all records");
+    });
+
+    describe("when using S3 storage", () => {
+      it.todo("fetches existing records from S3");
+      it.todo("appends new records to existing records");
+      it.todo("writes combined records to S3");
+      it.todo("updates dataset s3RecordCount");
+      it.todo("sets position field on records");
+    });
+
+    describe("when S3 file does not exist", () => {
+      it.todo("handles NoSuchKey error gracefully");
+      it.todo("creates new records array");
+    });
+
+    describe("when S3 operation fails with unexpected error", () => {
+      it.todo("captures error in Sentry");
+      it.todo("throws error");
+    });
+
+    describe("when tx provided", () => {
+      it.todo("uses provided tx client for dataset update");
+      it.todo("uses provided tx client for createMany");
+    });
+
+    describe("when no tx provided", () => {
+      it.todo("uses default prisma client");
+    });
+  });
 });
 
