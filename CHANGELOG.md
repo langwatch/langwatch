@@ -1,5 +1,22 @@
 # Changelog
 
+## [1.6.0](https://github.com/langwatch/langwatch/compare/langwatch@v1.5.1...langwatch@v1.6.0) (2025-10-31)
+
+
+### Features
+
+* include workflow name in export filename ([#768](https://github.com/langwatch/langwatch/issues/768)) ([c4397bf](https://github.com/langwatch/langwatch/commit/c4397bf83bf0b24befb98b0d2d1f88673233f575))
+
+
+### Bug Fixes
+
+* prevent users from removing themselves from the org ([c99ad0b](https://github.com/langwatch/langwatch/commit/c99ad0ba5d5d570a9d018f38ee2dd20e1881305a))
+
+
+### Miscellaneous
+
+* update invite email copy ([#770](https://github.com/langwatch/langwatch/issues/770)) ([e9162d1](https://github.com/langwatch/langwatch/commit/e9162d15f1dc5cded6cdd81464c662eb61dafd5b))
+
 ## [1.5.1](https://github.com/langwatch/langwatch/compare/langwatch@v1.5.0...langwatch@v1.5.1) (2025-10-31)
 
 
