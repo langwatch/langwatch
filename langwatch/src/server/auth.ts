@@ -50,7 +50,7 @@ declare module "next-auth" {
  * @see https://next-auth.js.org/configuration/options
  */
 export const authOptions = (
-  req: NextApiRequest | GetServerSidePropsContext["req"] | NextRequest
+  req: NextApiRequest | GetServerSidePropsContext["req"] | NextRequest,
 ): NextAuthOptions => ({
   session: {
     strategy: env.NEXTAUTH_PROVIDER === "email" ? "jwt" : "database",
@@ -128,7 +128,7 @@ export const authOptions = (
         await createUserAndAddToOrganization(
           user,
           orgWithSsoDomain,
-          account as Account
+          account as Account,
         );
 
         return true;
@@ -274,7 +274,7 @@ export const authOptions = (
             if (!user?.password) return null;
             const passwordMatch = await compare(
               credentials?.password ?? "",
-              user.password
+              user.password,
             );
             if (!passwordMatch) return null;
 
@@ -305,7 +305,7 @@ export const authOptions = (
 const createUserAndAddToOrganization = async (
   user: User,
   organization: Organization,
-  account: Account
+  account: Account,
 ) => {
   const newUser = await prisma.user.create({
     data: {
@@ -343,7 +343,7 @@ const createUserAndAddToOrganization = async (
 
 const linkExistingUserToOAuthProvider = async (
   existingUser: User,
-  account: NextAuthAccount
+  account: NextAuthAccount,
 ) => {
   // Wrap operations in a transaction
   try {
@@ -390,11 +390,16 @@ const linkExistingUserToOAuthProvider = async (
 
 const checkIfSsoProviderIsAllowed = async (
   org: Organization,
-  provider: NextAuthAccount
+  provider: NextAuthAccount,
 ) => {
   if (
     org?.ssoProvider &&
-    !provider.providerAccountId.startsWith(org.ssoProvider)
+    !(
+      // Auth0
+      provider.providerAccountId.startsWith(org.ssoProvider) ||
+      // NextAuth
+      provider.provider === org.ssoProvider
+    )
   ) {
     throw new Error("SSO_PROVIDER_NOT_ALLOWED");
   }
