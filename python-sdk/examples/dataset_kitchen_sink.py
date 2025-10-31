@@ -27,7 +27,7 @@ def main(messages=None):
     langwatch.setup()
 
     # Example dataset slug or ID (replace with your actual dataset)
-    dataset_slug_or_id = os.getenv("LANGWATCH_DATASET_ID") or "test-dataset-35"
+    dataset_slug_or_id = os.getenv("LANGWATCH_DATASET_ID") or "test-dataset-1234"
     print(f"Dataset slug or ID: {dataset_slug_or_id}")
     print(
         f"LangWatch endpoint: {os.getenv('LANGWATCH_ENDPOINT') or langwatch._endpoint}"

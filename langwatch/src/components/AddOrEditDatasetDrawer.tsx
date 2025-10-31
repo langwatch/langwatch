@@ -10,10 +10,9 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Trash2 } from "react-feather";
 import { useFieldArray, useForm, type FieldErrors } from "react-hook-form";
-import { slugify } from "~/utils/slugify";
 import { Drawer } from "../components/ui/drawer";
 import { toaster } from "../components/ui/toaster";
 import { useOrganizationTeamProject } from "../hooks/useOrganizationTeamProject";
@@ -29,6 +28,8 @@ import { useDrawer } from "./CurrentDrawer";
 import { HorizontalFormControl } from "./HorizontalFormControl";
 import { DatasetPreview } from "./datasets/DatasetPreview";
 import type { InMemoryDataset } from "./datasets/DatasetTable";
+import { useDatasetSlugValidation } from "./datasets/useDatasetSlugValidation";
+import { DatasetSlugDisplay } from "./datasets/DatasetSlugDisplay";
 
 interface AddDatasetDrawerProps {
   datasetToSave?: Omit<InMemoryDataset, "datasetRecords"> & {
@@ -123,11 +124,14 @@ export function AddOrEditDatasetDrawer(props: AddDatasetDrawerProps) {
   });
 
   const name = watch("name");
-  const slug = slugify((name || "").replace("_", "-"), {
-    lower: true,
-    strict: true,
-  });
   const columnTypes = watch("columnTypes");
+
+  // Use custom hook for slug validation against a name + datasetId
+  const { slugInfo, displaySlug, slugWillChange, dbSlug, resetSlugInfo } =
+    useDatasetSlugValidation({
+      name,
+      datasetId: props.datasetToSave?.datasetId,
+    });
 
   useEffect(() => {
     if (props.datasetToSave) {
@@ -143,6 +147,7 @@ export function AddOrEditDatasetDrawer(props: AddDatasetDrawerProps) {
         columnTypes: initialColumns,
       });
     }
+    resetSlugInfo();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [!!props.open]);
 
@@ -194,11 +199,17 @@ export function AddOrEditDatasetDrawer(props: AddDatasetDrawerProps) {
           void trpc.dataset.getAll.invalidate();
         },
         onError: (error) => {
+          // Check if it's a slug conflict error from backend
+          const isConflictError = error.message.includes("already exists") ||
+                                  (error as any).data?.code === "CONFLICT";
+
           toaster.create({
             title: props.datasetToSave?.datasetId
               ? "Error updating dataset"
               : "Error creating dataset",
-            description: error.message,
+            description: isConflictError
+              ? "A dataset with this name already exists. Please choose a different name."
+              : error.message,
             type: "error",
             meta: {
               closable: true,
@@ -235,10 +246,17 @@ export function AddOrEditDatasetDrawer(props: AddDatasetDrawerProps) {
               label="Name"
               helper="Give it a name that identifies what this group of examples is
               going to focus on"
-              invalid={!!errors.name}
+              invalid={!!errors.name || (slugInfo?.hasConflict ?? false)}
             >
               <Input {...register("name")} />
-              {slug && <Field.HelperText>slug: {slug}</Field.HelperText>}
+              <DatasetSlugDisplay
+                marginLeft={1}
+                marginTop={1}
+                displaySlug={displaySlug}
+                slugWillChange={slugWillChange}
+                dbSlug={dbSlug}
+                slugInfo={slugInfo}
+              />
               <Field.ErrorText>{errors.name?.message}</Field.ErrorText>
             </HorizontalFormControl>
 

@@ -1,4 +1,3 @@
-import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 
@@ -8,24 +7,29 @@ import {
   datasetRecordFormSchema,
 } from "../../datasets/types.generated";
 import { TeamRoleGroup, checkUserPermissionForProject } from "../permission";
-import { createManyDatasetRecords } from "./datasetRecord";
-import { tryToMapPreviousColumnsToNewColumns } from "../../../optimization_studio/utils/datasetUtils";
-import type { DatasetColumns, DatasetRecordEntry } from "../../datasets/types";
-import { prisma } from "../../db";
-import { slugify } from "../../../utils/slugify";
+import { DatasetService } from "../../datasets/dataset.service";
+import { datasetErrorHandler } from "../../datasets/middleware";
+import { slugify } from "~/utils/slugify";
 
-const getOrgCanUseS3FromProject = async (projectId: string) => {
-  const project = await prisma.project.findUnique({
-    where: { id: projectId },
-    include: { team: { include: { organization: true } } },
-  });
-
-  return {
-    canUseS3: project?.team?.organization?.useCustomS3,
-  };
-};
-
+/**
+ * Dataset Router - Manages dataset CRUD operations
+ *
+ * SLUG BEHAVIOR:
+ * - Slugs are auto-generated from dataset names (kebab-case)
+ * - Slugs automatically update when dataset names change
+ * - Unique constraint: (projectId, slug) at database level
+ * - External APIs can use either slug OR id for retrieval
+ *
+ * ARCHITECTURE:
+ * - Router: Thin orchestration layer (input validation, permissions, error mapping)
+ * - Service: Business logic (slug generation, migrations, validation)
+ * - Repository: Data access layer (Prisma queries)
+ */
 export const datasetRouter = createTRPCRouter({
+  /**
+   * Creates a new dataset or updates an existing one.
+   * Delegates all business logic to DatasetService.
+   */
   upsert: protectedProcedure
     .input(
       z.intersection(
@@ -48,117 +52,45 @@ export const datasetRouter = createTRPCRouter({
       )
     )
     .use(checkUserPermissionForProject(TeamRoleGroup.DATASETS_MANAGE))
+    .use(datasetErrorHandler)
     .mutation(async ({ ctx, input }) => {
-      if ("datasetId" in input && input.datasetId) {
-        const existingDataset = await ctx.prisma.dataset.findFirst({
-          where: {
-            id: input.datasetId,
-            projectId: input.projectId,
-          },
-        });
+      const datasetService = DatasetService.create(ctx.prisma);
 
-        if (!existingDataset) {
-          throw new TRPCError({
-            code: "NOT_FOUND",
-            message: "Dataset not found.",
-          });
-        }
-
-        if (
-          JSON.stringify(existingDataset.columnTypes) !==
-          JSON.stringify(input.columnTypes)
-        ) {
-          const datasetRecords = await ctx.prisma.datasetRecord.findMany({
-            where: {
-              datasetId: input.datasetId,
-              projectId: input.projectId,
-            },
-          });
-
-          const updatedEntries = tryToMapPreviousColumnsToNewColumns(
-            datasetRecords.map((record) => record.entry as DatasetRecordEntry),
-            existingDataset.columnTypes as DatasetColumns,
-            input.columnTypes
-          );
-
-          await ctx.prisma.$transaction(
-            datasetRecords.map((record, index) =>
-              ctx.prisma.datasetRecord.update({
-                where: {
-                  id: record.id,
-                  datasetId: input.datasetId,
-                  projectId: input.projectId,
-                },
-                data: {
-                  entry: updatedEntries[index],
-                },
-              })
-            )
-          );
-        }
-
-        return await ctx.prisma.dataset.update({
-          where: {
-            id: input.datasetId,
-            projectId: input.projectId,
-          },
-          data: {
-            name: input.name,
-            columnTypes: input.columnTypes,
-          },
-        });
-      }
-
-      const name =
-        "name" in input
-          ? input.name
-          : await findNextDatasetNameForExperiment(
-              input.projectId,
-              input.experimentId
-            );
-
-      const slug = slugify(name.replace("_", "-"), {
-        lower: true,
-        strict: true,
+      // Delegate all business logic to service
+      return await datasetService.upsertDataset({
+        projectId: input.projectId,
+        name: "name" in input ? input.name : undefined,
+        experimentId: "experimentId" in input ? input.experimentId : undefined,
+        columnTypes: input.columnTypes,
+        datasetId: "datasetId" in input ? input.datasetId : undefined,
+        datasetRecords: input.datasetRecords,
       });
-
-      const existingDataset = await ctx.prisma.dataset.findFirst({
-        where: {
-          slug: slug,
-          projectId: input.projectId,
-        },
-      });
-
-      if (existingDataset) {
-        throw new TRPCError({
-          code: "CONFLICT",
-          message: "A dataset with this name already exists.",
-        });
-      }
-
-      const { canUseS3 } = await getOrgCanUseS3FromProject(input.projectId);
-
-      const dataset = await ctx.prisma.dataset.create({
-        data: {
-          id: `dataset_${nanoid()}`,
-          slug,
-          name,
-          projectId: input.projectId,
-          columnTypes: input.columnTypes,
-          useS3: canUseS3,
-        },
-      });
-
-      if (input.datasetRecords) {
-        await createManyDatasetRecords({
-          datasetId: dataset.id,
-          projectId: input.projectId,
-          datasetRecords: input.datasetRecords,
-        });
-      }
-
-      return dataset;
     }),
+
+  /**
+   * Validates a dataset name and returns computed slug with availability.
+   * Used by frontend for real-time validation.
+   */
+  validateDatasetName: protectedProcedure
+    .input(
+      z.object({
+        projectId: z.string(),
+        proposedName: z.string(),
+        excludeDatasetId: z.string().optional(),
+      })
+    )
+    .use(checkUserPermissionForProject(TeamRoleGroup.DATASETS_VIEW))
+    .use(datasetErrorHandler)
+    .query(async ({ input, ctx }) => {
+      const datasetService = DatasetService.create(ctx.prisma);
+      return await datasetService.validateDatasetName(input);
+    }),
+
+
+  /**
+   * Get all datasets for a project.
+   * Used by frontend to display all datasets for a project.
+   */
   getAll: protectedProcedure
     .input(z.object({ projectId: z.string() }))
     .use(checkUserPermissionForProject(TeamRoleGroup.DATASETS_VIEW))
@@ -178,6 +110,11 @@ export const datasetRouter = createTRPCRouter({
 
       return datasets;
     }),
+
+  /**
+   * Get a dataset by its id.
+   * Used by frontend to display a dataset by its id.
+   */
   getById: protectedProcedure
     .input(z.object({ projectId: z.string(), datasetId: z.string() }))
     .use(checkUserPermissionForProject(TeamRoleGroup.DATASETS_VIEW))
@@ -270,45 +207,12 @@ export const datasetRouter = createTRPCRouter({
   findNextName: protectedProcedure
     .input(z.object({ projectId: z.string(), proposedName: z.string() }))
     .use(checkUserPermissionForProject(TeamRoleGroup.DATASETS_VIEW))
-    .query(async ({ input }) => {
-      const { projectId, proposedName } = input;
-      return await findNextName(projectId, proposedName);
+    .use(datasetErrorHandler)
+    .query(async ({ input, ctx }) => {
+      const datasetService = DatasetService.create(ctx.prisma);
+      return await datasetService.findNextAvailableName(
+        input.projectId,
+        input.proposedName
+      );
     }),
 });
-
-const findNextDatasetNameForExperiment = async (
-  projectId: string,
-  experimentId: string
-) => {
-  const experiment = await prisma.experiment.findFirst({
-    where: { id: experimentId, projectId },
-  });
-
-  return await findNextName(projectId, experiment?.name ?? "Draft Dataset");
-};
-
-const findNextName = async (projectId: string, name: string) => {
-  const datasets = await prisma.dataset.findMany({
-    select: {
-      name: true,
-      slug: true,
-    },
-    where: {
-      projectId: projectId,
-    },
-  });
-
-  const slugs = new Set(datasets.map((dataset) => dataset.slug));
-
-  let draftName;
-  let index = 1;
-  while (true) {
-    draftName = index === 1 ? name : `${name} (${index})`;
-    if (!slugs.has(slugify(draftName))) {
-      break;
-    }
-    index++;
-  }
-
-  return draftName;
-};
