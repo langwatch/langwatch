@@ -186,6 +186,7 @@ export const datasetRouter = createTRPCRouter({
       const dataset = await ctx.prisma.dataset.findFirst({
         where: { id: datasetId, projectId, archivedAt: null },
       });
+
       return dataset;
     }),
   deleteById: protectedProcedure

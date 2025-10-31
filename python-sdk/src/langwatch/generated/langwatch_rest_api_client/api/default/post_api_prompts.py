@@ -10,6 +10,7 @@ from ...models.post_api_prompts_response_200 import PostApiPromptsResponse200
 from ...models.post_api_prompts_response_400 import PostApiPromptsResponse400
 from ...models.post_api_prompts_response_401 import PostApiPromptsResponse401
 from ...models.post_api_prompts_response_409 import PostApiPromptsResponse409
+from ...models.post_api_prompts_response_422 import PostApiPromptsResponse422
 from ...models.post_api_prompts_response_500 import PostApiPromptsResponse500
 from ...types import Response
 
@@ -42,6 +43,7 @@ def _parse_response(
         PostApiPromptsResponse400,
         PostApiPromptsResponse401,
         PostApiPromptsResponse409,
+        PostApiPromptsResponse422,
         PostApiPromptsResponse500,
     ]
 ]:
@@ -61,6 +63,10 @@ def _parse_response(
         response_409 = PostApiPromptsResponse409.from_dict(response.json())
 
         return response_409
+    if response.status_code == 422:
+        response_422 = PostApiPromptsResponse422.from_dict(response.json())
+
+        return response_422
     if response.status_code == 500:
         response_500 = PostApiPromptsResponse500.from_dict(response.json())
 
@@ -79,6 +85,7 @@ def _build_response(
         PostApiPromptsResponse400,
         PostApiPromptsResponse401,
         PostApiPromptsResponse409,
+        PostApiPromptsResponse422,
         PostApiPromptsResponse500,
     ]
 ]:
@@ -100,6 +107,7 @@ def sync_detailed(
         PostApiPromptsResponse400,
         PostApiPromptsResponse401,
         PostApiPromptsResponse409,
+        PostApiPromptsResponse422,
         PostApiPromptsResponse500,
     ]
 ]:
@@ -113,7 +121,7 @@ def sync_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[Union[PostApiPromptsResponse200, PostApiPromptsResponse400, PostApiPromptsResponse401, PostApiPromptsResponse409, PostApiPromptsResponse500]]
+        Response[Union[PostApiPromptsResponse200, PostApiPromptsResponse400, PostApiPromptsResponse401, PostApiPromptsResponse409, PostApiPromptsResponse422, PostApiPromptsResponse500]]
     """
 
     kwargs = _get_kwargs(
@@ -137,6 +145,7 @@ def sync(
         PostApiPromptsResponse400,
         PostApiPromptsResponse401,
         PostApiPromptsResponse409,
+        PostApiPromptsResponse422,
         PostApiPromptsResponse500,
     ]
 ]:
@@ -150,7 +159,7 @@ def sync(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Union[PostApiPromptsResponse200, PostApiPromptsResponse400, PostApiPromptsResponse401, PostApiPromptsResponse409, PostApiPromptsResponse500]
+        Union[PostApiPromptsResponse200, PostApiPromptsResponse400, PostApiPromptsResponse401, PostApiPromptsResponse409, PostApiPromptsResponse422, PostApiPromptsResponse500]
     """
 
     return sync_detailed(
@@ -169,6 +178,7 @@ async def asyncio_detailed(
         PostApiPromptsResponse400,
         PostApiPromptsResponse401,
         PostApiPromptsResponse409,
+        PostApiPromptsResponse422,
         PostApiPromptsResponse500,
     ]
 ]:
@@ -182,7 +192,7 @@ async def asyncio_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[Union[PostApiPromptsResponse200, PostApiPromptsResponse400, PostApiPromptsResponse401, PostApiPromptsResponse409, PostApiPromptsResponse500]]
+        Response[Union[PostApiPromptsResponse200, PostApiPromptsResponse400, PostApiPromptsResponse401, PostApiPromptsResponse409, PostApiPromptsResponse422, PostApiPromptsResponse500]]
     """
 
     kwargs = _get_kwargs(
@@ -204,6 +214,7 @@ async def asyncio(
         PostApiPromptsResponse400,
         PostApiPromptsResponse401,
         PostApiPromptsResponse409,
+        PostApiPromptsResponse422,
         PostApiPromptsResponse500,
     ]
 ]:
@@ -217,7 +228,7 @@ async def asyncio(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Union[PostApiPromptsResponse200, PostApiPromptsResponse400, PostApiPromptsResponse401, PostApiPromptsResponse409, PostApiPromptsResponse500]
+        Union[PostApiPromptsResponse200, PostApiPromptsResponse400, PostApiPromptsResponse401, PostApiPromptsResponse409, PostApiPromptsResponse422, PostApiPromptsResponse500]
     """
 
     return (

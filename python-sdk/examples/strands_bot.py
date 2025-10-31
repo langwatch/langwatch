@@ -10,10 +10,7 @@ load_dotenv()
 import chainlit.config as cl_config
 import chainlit as cl
 
-cl_config.config.project.enable_telemetry = False
-
 # OpenTelemetry Setup Options:
-
 
 # Option 1: Use only the LangWatch SDK. This is the simplest option.
 langwatch.setup()  # The api key is set from the environment variable automatically

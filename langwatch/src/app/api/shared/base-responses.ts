@@ -22,6 +22,12 @@ export const baseResponses: Record<number, RouteResponse> = {
       "application/json": { schema: resolver(badRequestSchema) },
     },
   },
+  422: {
+    description: "Unprocessable Entity",
+    content: {
+      "application/json": { schema: resolver(errorSchema) },
+    },
+  },
   500: {
     description: "Internal Server Error",
     content: {

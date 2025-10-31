@@ -9,6 +9,7 @@ from ...models.delete_api_prompts_by_id_response_200 import DeleteApiPromptsById
 from ...models.delete_api_prompts_by_id_response_400 import DeleteApiPromptsByIdResponse400
 from ...models.delete_api_prompts_by_id_response_401 import DeleteApiPromptsByIdResponse401
 from ...models.delete_api_prompts_by_id_response_404 import DeleteApiPromptsByIdResponse404
+from ...models.delete_api_prompts_by_id_response_422 import DeleteApiPromptsByIdResponse422
 from ...models.delete_api_prompts_by_id_response_500 import DeleteApiPromptsByIdResponse500
 from ...types import Response
 
@@ -32,6 +33,7 @@ def _parse_response(
         DeleteApiPromptsByIdResponse400,
         DeleteApiPromptsByIdResponse401,
         DeleteApiPromptsByIdResponse404,
+        DeleteApiPromptsByIdResponse422,
         DeleteApiPromptsByIdResponse500,
     ]
 ]:
@@ -51,6 +53,10 @@ def _parse_response(
         response_404 = DeleteApiPromptsByIdResponse404.from_dict(response.json())
 
         return response_404
+    if response.status_code == 422:
+        response_422 = DeleteApiPromptsByIdResponse422.from_dict(response.json())
+
+        return response_422
     if response.status_code == 500:
         response_500 = DeleteApiPromptsByIdResponse500.from_dict(response.json())
 
@@ -69,6 +75,7 @@ def _build_response(
         DeleteApiPromptsByIdResponse400,
         DeleteApiPromptsByIdResponse401,
         DeleteApiPromptsByIdResponse404,
+        DeleteApiPromptsByIdResponse422,
         DeleteApiPromptsByIdResponse500,
     ]
 ]:
@@ -90,6 +97,7 @@ def sync_detailed(
         DeleteApiPromptsByIdResponse400,
         DeleteApiPromptsByIdResponse401,
         DeleteApiPromptsByIdResponse404,
+        DeleteApiPromptsByIdResponse422,
         DeleteApiPromptsByIdResponse500,
     ]
 ]:
@@ -103,7 +111,7 @@ def sync_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[Union[DeleteApiPromptsByIdResponse200, DeleteApiPromptsByIdResponse400, DeleteApiPromptsByIdResponse401, DeleteApiPromptsByIdResponse404, DeleteApiPromptsByIdResponse500]]
+        Response[Union[DeleteApiPromptsByIdResponse200, DeleteApiPromptsByIdResponse400, DeleteApiPromptsByIdResponse401, DeleteApiPromptsByIdResponse404, DeleteApiPromptsByIdResponse422, DeleteApiPromptsByIdResponse500]]
     """
 
     kwargs = _get_kwargs(
@@ -127,6 +135,7 @@ def sync(
         DeleteApiPromptsByIdResponse400,
         DeleteApiPromptsByIdResponse401,
         DeleteApiPromptsByIdResponse404,
+        DeleteApiPromptsByIdResponse422,
         DeleteApiPromptsByIdResponse500,
     ]
 ]:
@@ -140,7 +149,7 @@ def sync(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Union[DeleteApiPromptsByIdResponse200, DeleteApiPromptsByIdResponse400, DeleteApiPromptsByIdResponse401, DeleteApiPromptsByIdResponse404, DeleteApiPromptsByIdResponse500]
+        Union[DeleteApiPromptsByIdResponse200, DeleteApiPromptsByIdResponse400, DeleteApiPromptsByIdResponse401, DeleteApiPromptsByIdResponse404, DeleteApiPromptsByIdResponse422, DeleteApiPromptsByIdResponse500]
     """
 
     return sync_detailed(
@@ -159,6 +168,7 @@ async def asyncio_detailed(
         DeleteApiPromptsByIdResponse400,
         DeleteApiPromptsByIdResponse401,
         DeleteApiPromptsByIdResponse404,
+        DeleteApiPromptsByIdResponse422,
         DeleteApiPromptsByIdResponse500,
     ]
 ]:
@@ -172,7 +182,7 @@ async def asyncio_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[Union[DeleteApiPromptsByIdResponse200, DeleteApiPromptsByIdResponse400, DeleteApiPromptsByIdResponse401, DeleteApiPromptsByIdResponse404, DeleteApiPromptsByIdResponse500]]
+        Response[Union[DeleteApiPromptsByIdResponse200, DeleteApiPromptsByIdResponse400, DeleteApiPromptsByIdResponse401, DeleteApiPromptsByIdResponse404, DeleteApiPromptsByIdResponse422, DeleteApiPromptsByIdResponse500]]
     """
 
     kwargs = _get_kwargs(
@@ -194,6 +204,7 @@ async def asyncio(
         DeleteApiPromptsByIdResponse400,
         DeleteApiPromptsByIdResponse401,
         DeleteApiPromptsByIdResponse404,
+        DeleteApiPromptsByIdResponse422,
         DeleteApiPromptsByIdResponse500,
     ]
 ]:
@@ -207,7 +218,7 @@ async def asyncio(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Union[DeleteApiPromptsByIdResponse200, DeleteApiPromptsByIdResponse400, DeleteApiPromptsByIdResponse401, DeleteApiPromptsByIdResponse404, DeleteApiPromptsByIdResponse500]
+        Union[DeleteApiPromptsByIdResponse200, DeleteApiPromptsByIdResponse400, DeleteApiPromptsByIdResponse401, DeleteApiPromptsByIdResponse404, DeleteApiPromptsByIdResponse422, DeleteApiPromptsByIdResponse500]
     """
 
     return (
