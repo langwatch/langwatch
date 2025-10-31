@@ -170,6 +170,54 @@ span.end();
 
 ## Advanced
 
+### Filtering Spans
+
+Control which spans are sent to LangWatch using the built-in filter DSL. By default, HTTP request spans are excluded to reduce framework noise.
+
+#### Using Presets
+
+```ts
+import { LangWatchTraceExporter } from "langwatch";
+
+// Keep only Vercel AI SDK spans
+const exporter = new LangWatchTraceExporter({
+  filters: [{ preset: "vercelAIOnly" }],
+});
+
+// No filtering (send all spans)
+const exporter = new LangWatchTraceExporter({
+  filters: null, // or filters: []
+});
+```
+
+#### Custom Filters
+
+```ts
+// Include only specific scopes
+const exporter = new LangWatchTraceExporter({
+  filters: [
+    { include: { instrumentationScopeName: [{ equals: "ai" }] } },
+  ],
+});
+
+// Exclude spans by name pattern
+const exporter = new LangWatchTraceExporter({
+  filters: [
+    { exclude: { name: [{ startsWith: "internal." }] } },
+  ],
+});
+
+// Combine filters (AND pipeline)
+const exporter = new LangWatchTraceExporter({
+  filters: [
+    { include: { instrumentationScopeName: [{ equals: "ai" }] } },
+    { preset: "excludeHttpRequests" },
+  ],
+});
+```
+
+**Learn more:** See the [Filtering Spans Tutorial](https://docs.langwatch.ai/integration/typescript/tutorials/filtering-spans) for comprehensive examples and best practices.
+
 ### Custom OpenTelemetry Integration
 ```ts
 import { FilterableBatchSpanProcessor, LangWatchExporter } from "langwatch";
