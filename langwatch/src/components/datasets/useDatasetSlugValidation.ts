@@ -85,9 +85,13 @@ export function useDatasetSlugValidation({
       debouncedSlugCheck();
     } else {
       setSlugInfo(null);
+      debouncedSlugCheck.cancel();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [name]);
+
+    return () => {
+      debouncedSlugCheck.cancel();
+    };
+  }, [name, debouncedSlugCheck]);
 
   // Computed display values
   const displaySlug = datasetId
