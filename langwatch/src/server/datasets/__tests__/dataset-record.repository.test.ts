@@ -22,6 +22,7 @@ describe("DatasetRecordRepository", () => {
   describe("updateDatasetRecordsTransaction", () => {
     describe("when updating multiple records", () => {
       it.todo("updates all records atomically");
+      it.todo("enforces projectId on all records");
     });
 
     describe("when one update fails", () => {
@@ -30,6 +31,10 @@ describe("DatasetRecordRepository", () => {
 
     describe("when record id does not exist", () => {
       it.todo("throws error");
+    });
+
+    describe("when record belongs to different project", () => {
+      it.todo("throws error due to projectId mismatch");
     });
 
     describe("when tx provided", () => {

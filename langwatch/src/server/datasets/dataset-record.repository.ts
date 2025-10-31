@@ -37,15 +37,17 @@ export class DatasetRecordRepository {
   /**
    * Updates multiple dataset records atomically within a transaction.
    *
-   * Each record is identified by its unique `id`. Caller must ensure records
-   * belong to expected dataset/project before calling (e.g., via findDatasetRecords).
+   * All records must belong to the same project (enforced by single projectId parameter).
+   * Caller must ensure records belong to expected dataset/project before calling.
    *
+   * @param projectId - The project all records belong to
    * @param updates - Array of records to update, where:
    *   - id: The unique identifier of the DatasetRecord to update
    *   - entry: The JSON data payload to store in the record
    * @param options - Optional transaction client to use
    */
   async updateDatasetRecordsTransaction(
+    projectId: string,
     updates: Array<{
       id: string;
       entry: Prisma.InputJsonValue;
@@ -60,6 +62,7 @@ export class DatasetRecordRepository {
       client.datasetRecord.update({
         where: {
           id: update.id,
+          projectId,
         },
         data: {
           entry: update.entry,

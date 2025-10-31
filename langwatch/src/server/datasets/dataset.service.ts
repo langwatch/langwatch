@@ -254,6 +254,7 @@ export class DatasetService {
     }
 
     await this.recordRepository.updateDatasetRecordsTransaction(
+      projectId,
       datasetRecords.map((record, index) => ({
         id: record.id,
         entry: updatedEntries[index]!,
