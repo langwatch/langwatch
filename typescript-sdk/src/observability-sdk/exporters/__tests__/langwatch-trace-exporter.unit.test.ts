@@ -275,7 +275,7 @@ describe("LangWatchExporter", () => {
       const options: LangWatchTraceExporterOptions = {
         apiKey: "test-key",
         endpoint: "https://test.com",
-        filters: [{ preset: "aiOnly" }],
+        filters: [{ preset: "vercelAIOnly" }],
       };
 
       expect(() => {
@@ -318,8 +318,34 @@ describe("LangWatchExporter", () => {
       expect(names).not.toContain("GET /users");
     });
 
-    it("preset aiOnly keeps only AI spans", () => {
-      const exporter = new LangWatchTraceExporter({ filters: [{ preset: "aiOnly" }] });
+    it("accepts null filters to disable filtering", () => {
+      const exporter = new LangWatchTraceExporter({ filters: null });
+      const spans = makeSpans();
+      (exporter as any).export(spans, () => undefined);
+      const result = (exporter as any).__lastExportedSpans;
+      expect(result).toHaveLength(3);
+      expect(result.map((s: any) => s.name)).toEqual(expect.arrayContaining([
+        "GET /users",
+        "chat.completion",
+        "custom op"
+      ]));
+    });
+
+    it("accepts empty array to disable filtering", () => {
+      const exporter = new LangWatchTraceExporter({ filters: [] });
+      const spans = makeSpans();
+      (exporter as any).export(spans, () => undefined);
+      const result = (exporter as any).__lastExportedSpans;
+      expect(result).toHaveLength(3);
+      expect(result.map((s: any) => s.name)).toEqual(expect.arrayContaining([
+        "GET /users",
+        "chat.completion",
+        "custom op"
+      ]));
+    });
+
+    it("preset vercelAIOnly keeps only AI spans", () => {
+      const exporter = new LangWatchTraceExporter({ filters: [{ preset: "vercelAIOnly" }] });
       const spans = makeSpans();
       (exporter as any).export(spans, () => undefined);
       const result = (exporter as any).__lastExportedSpans;
@@ -339,7 +365,7 @@ describe("LangWatchExporter", () => {
 
     it("pipeline include instrumentation ai then exclude http requests", () => {
       const exporter = new LangWatchTraceExporter({ filters: [
-        { include: { instrumentationScopeName: "ai" } },
+        { include: { instrumentationScopeName: [{ equals: "ai" }] } },
         { preset: "excludeHttpRequests" },
       ] });
       const spans = makeSpans();
@@ -351,7 +377,7 @@ describe("LangWatchExporter", () => {
 
     it("criteria by name startsWith only", () => {
       const exporter = new LangWatchTraceExporter({ filters: [
-        { include: { name: { startsWith: "chat." } } },
+        { include: { name: [{ startsWith: "chat." }] } },
       ] });
       const spans = makeSpans();
       (exporter as any).export(spans, () => undefined);
@@ -360,9 +386,9 @@ describe("LangWatchExporter", () => {
       expect(result[0].name).toBe("chat.completion");
     });
 
-    it("include instrumentationScopeName as string (case-insensitive by default)", () => {
+    it("include instrumentationScopeName equals (case-sensitive by default)", () => {
       const exporter = new LangWatchTraceExporter({ filters: [
-        { include: { instrumentationScopeName: "AI" } },
+        { include: { instrumentationScopeName: [{ equals: "ai" }] } },
       ] });
       const spans = makeSpans();
       (exporter as any).export(spans, () => undefined);
@@ -371,9 +397,9 @@ describe("LangWatchExporter", () => {
       expect(result[0].instrumentationScope.name).toBe("ai");
     });
 
-    it("include name as string equals (case-sensitive by default)", () => {
+    it("include name equals (case-sensitive by default)", () => {
       const exporter = new LangWatchTraceExporter({ filters: [
-        { include: { name: "chat.completion" } },
+        { include: { name: [{ equals: "chat.completion" }] } },
       ] });
       const spans = makeSpans();
       (exporter as any).export(spans, () => undefined);
@@ -383,7 +409,7 @@ describe("LangWatchExporter", () => {
 
     it("include name equals with ignoreCase true", () => {
       const exporter = new LangWatchTraceExporter({ filters: [
-        { include: { name: { equals: "CHAT.completion", ignoreCase: true } } },
+        { include: { name: [{ equals: "CHAT.completion", ignoreCase: true }] } },
       ] });
       const spans = makeSpans();
       (exporter as any).export(spans, () => undefined);
@@ -415,8 +441,8 @@ describe("LangWatchExporter", () => {
 
     it("include then exclude applies sequentially (AND pipeline)", () => {
       const exporter = new LangWatchTraceExporter({ filters: [
-        { include: { instrumentationScopeName: "ai" } },
-        { exclude: { name: { equals: "chat.completion" } } },
+        { include: { instrumentationScopeName: [{ equals: "ai" }] } },
+        { exclude: { name: [{ equals: "chat.completion" }] } },
       ] });
       const spans = makeSpans();
       (exporter as any).export(spans, () => undefined);
@@ -426,8 +452,8 @@ describe("LangWatchExporter", () => {
 
     it("exclude then include can restore only matching subset (results zero here)", () => {
       const exporter = new LangWatchTraceExporter({ filters: [
-        { exclude: { name: { startsWith: "chat." } } },
-        { include: { instrumentationScopeName: "ai" } },
+        { exclude: { name: [{ startsWith: "chat." }] } },
+        { include: { instrumentationScopeName: [{ equals: "ai" }] } },
       ] });
       const spans = makeSpans();
       (exporter as any).export(spans, () => undefined);

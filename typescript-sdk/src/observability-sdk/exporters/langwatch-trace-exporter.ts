@@ -9,62 +9,138 @@ import {
   LANGWATCH_SDK_VERSION,
   TRACES_PATH,
 } from "../../internal/constants";
+import {
+  type TraceFilter,
+  type Criteria,
+  type Match,
+  applyFilters,
+} from "./trace-filters";
 
+/**
+ * Configuration options for the LangWatchTraceExporter.
+ *
+ * @property endpoint - Custom LangWatch endpoint URL. Falls back to LANGWATCH_ENDPOINT env var or default.
+ * @property apiKey - API key for authentication. Falls back to LANGWATCH_API_KEY env var.
+ * @property filters - Array of filters applied sequentially to spans before export.
+ *                     Default: `[{ preset: "excludeHttpRequests" }]` to reduce framework noise.
+ *                     Pass `null` or `[]` to disable all filtering.
+ */
 export interface LangWatchTraceExporterOptions {
   endpoint?: string;
   apiKey?: string;
-  filters?: TraceFilter[];
+  filters?: TraceFilter[] | null;
 }
 
-export type TraceFilter =
-  | { preset: "vercelAIOnly" | "excludeHttpRequests" }
-  | { include: Criteria }
-  | { exclude: Criteria };
-
-export interface Criteria {
-  instrumentationScopeName?: string | Match | Match[];
-  name?: string | Match | Match[];
-}
-
-export interface Match {
-  equals?: string;
-  startsWith?: string;
-  matches?: RegExp;
-  ignoreCase?: boolean;
-}
+export type { TraceFilter, Criteria, Match };
 
 /**
  * LangWatchTraceExporter extends the OpenTelemetry OTLP HTTP trace exporter
  * to send trace data to LangWatch with proper authentication and metadata headers.
  *
- * This exporter automatically configures:
- * - Authorization headers using the provided API key or environment variables/fallback
- * - SDK version and language identification headers
- * - Proper endpoint configuration for LangWatch ingestion using provided URL or environment variables/fallback
- * - Optional intent-based span filtering via `filters`, applied sequentially (AND semantics)
+ * ## Features
+ * - Automatic authorization header configuration via API key
+ * - SDK version and runtime identification headers
+ * - Proper endpoint URL construction for LangWatch ingestion
+ * - Intent-based span filtering with presets and custom criteria
  *
- * @example
+ * ## Filtering Behavior
+ * - **Default**: HTTP request spans are excluded to reduce framework noise
+ * - **Pipeline**: Filters are applied sequentially with AND semantics
+ * - **Matching**: All string comparisons are case-sensitive by default
+ * - **Array Syntax**: All criteria require arrays of Match objects for explicit filtering
+ *
+ * ## Filter Types
+ * - **Presets**: Pre-configured common filters (`vercelAIOnly`, `excludeHttpRequests`)
+ * - **Include**: Keep only spans matching criteria (OR within field, AND across fields)
+ * - **Exclude**: Remove spans matching criteria (OR within field, AND across fields)
+ *
+ * @example Basic usage with default filtering
  * ```typescript
  * import { LangWatchTraceExporter } from '@langwatch/observability';
  *
- * // 1) Using environment variables/fallback configuration (no filtering)
+ * // Default: excludes HTTP request spans
  * const exporter = new LangWatchTraceExporter();
+ * ```
  *
- * // 2) Vercel AI only
- * const exporterVercelAIOnly = new LangWatchTraceExporter({
+ * @example Using presets
+ * ```typescript
+ * // Keep only Vercel AI SDK spans
+ * const exporterAI = new LangWatchTraceExporter({
  *   filters: [{ preset: 'vercelAIOnly' }],
  * });
  *
- * // 3) Reduce framework noise (exclude HTTP request spans)
- * const exporterNoiseReduced = new LangWatchTraceExporter({
+ * // Explicitly exclude HTTP requests (same as default)
+ * const exporterNoHttp = new LangWatchTraceExporter({
  *   filters: [{ preset: 'excludeHttpRequests' }],
  * });
  *
- * // 4) Advanced pipeline: keep only AI spans that are not HTTP requests
- * const exporterPipeline = new LangWatchTraceExporter({
+ * // No filtering at all (send all spans)
+ * const exporterAll = new LangWatchTraceExporter({
+ *   filters: null, // or filters: []
+ * });
+ * ```
+ *
+ * @example Custom filtering with criteria
+ * ```typescript
+ * // Include only spans with specific scope
+ * const exporter1 = new LangWatchTraceExporter({
  *   filters: [
- *     { include: { instrumentationScopeName: 'ai' } },
+ *     { include: { instrumentationScopeName: [{ equals: 'ai' }] } }
+ *   ],
+ * });
+ *
+ * // Exclude spans by name pattern
+ * const exporter2 = new LangWatchTraceExporter({
+ *   filters: [
+ *     { exclude: { name: [{ startsWith: 'internal.' }] } }
+ *   ],
+ * });
+ *
+ * // Case-insensitive matching
+ * const exporter3 = new LangWatchTraceExporter({
+ *   filters: [
+ *     { include: { name: [{ equals: 'chat.completion', ignoreCase: true }] } }
+ *   ],
+ * });
+ * ```
+ *
+ * @example Filter pipelines (AND semantics)
+ * ```typescript
+ * // Keep AI spans, then remove HTTP requests
+ * const exporter = new LangWatchTraceExporter({
+ *   filters: [
+ *     { include: { instrumentationScopeName: [{ equals: 'ai' }] } },
  *     { preset: 'excludeHttpRequests' },
+ *   ],
+ * });
+ * ```
+ *
+ * @example OR semantics within a field
+ * ```typescript
+ * // Include spans with name starting with 'chat.' OR 'llm.'
+ * const exporter = new LangWatchTraceExporter({
+ *   filters: [
+ *     {
+ *       include: {
+ *         name: [
+ *           { startsWith: 'chat.' },
+ *           { startsWith: 'llm.' }
+ *         ]
+ *       }
+ *     }
+ *   ],
+ * });
+ * ```
+ *
+ * @example Using regex patterns
+ * ```typescript
+ * const exporter = new LangWatchTraceExporter({
+ *   filters: [
+ *     {
+ *       include: {
+ *         name: [{ matches: /^(chat|llm)\./i }]
+ *       }
+ *     }
  *   ],
  * });
  * ```
@@ -72,15 +148,30 @@ export interface Match {
 export class LangWatchTraceExporter extends OTLPTraceExporter {
   private readonly filters: TraceFilter[];
   /**
-   * Creates a new LangWatchExporter instance.
+   * Creates a new LangWatchTraceExporter instance.
    *
-   * @param opts - Optional configuration options for the exporter
-   * @param opts.apiKey - Optional API key for LangWatch authentication. If not provided,
-   *                     will use environment variables or fallback configuration.
-   * @param opts.endpoint - Optional custom endpoint URL for LangWatch ingestion.
-   *                       If not provided, will use environment variables or fallback configuration.
-  * @param opts.filters - Optional array of intent-based filters applied sequentially (AND semantics).
-  *                       When omitted, a default preset filter of "excludeHttpRequests" is applied.
+   * @param opts - Configuration options for the exporter
+   * @param opts.apiKey - API key for LangWatch authentication.
+   *                     Falls back to `LANGWATCH_API_KEY` environment variable, then empty string.
+   * @param opts.endpoint - Custom endpoint URL for LangWatch ingestion.
+   *                       Falls back to `LANGWATCH_ENDPOINT` environment variable, then default endpoint.
+   * @param opts.filters - Array of filters applied sequentially to spans before export (AND semantics).
+   *                      When omitted, defaults to `[{ preset: "excludeHttpRequests" }]`.
+   *                      Pass `null` or `[]` to disable all filtering and send all spans.
+   *
+   * @example
+   * ```typescript
+   * // With API key and default filtering
+   * const exporter = new LangWatchTraceExporter({
+   *   apiKey: 'your-api-key'
+   * });
+   *
+   * // With custom endpoint and no filtering
+   * const exporter = new LangWatchTraceExporter({
+   *   endpoint: 'https://custom.langwatch.ai',
+   *   filters: null
+   * });
+   * ```
    */
   constructor(opts?: LangWatchTraceExporterOptions) {
     const apiKey = opts?.apiKey ?? process.env.LANGWATCH_API_KEY ?? "";
@@ -103,107 +194,18 @@ export class LangWatchTraceExporter extends OTLPTraceExporter {
       url: otelEndpoint.toString(),
     });
 
-    this.filters = Array.isArray(opts?.filters) ? opts.filters : [{ preset: "excludeHttpRequests" }];
+    // Handle filters: null or [] = no filtering, undefined = default, array = use provided
+    if (opts?.filters === null || (Array.isArray(opts?.filters) && opts.filters.length === 0)) {
+      this.filters = [];
+    } else if (Array.isArray(opts?.filters)) {
+      this.filters = opts.filters;
+    } else {
+      this.filters = [{ preset: "excludeHttpRequests" }];
+    }
   }
 
   export(spans: ReadableSpan[], resultCallback: (result: ExportResult) => void): void {
     const filtered = applyFilters(this.filters, spans);
     super.export(filtered, resultCallback);
   }
-}
-
-function applyFilters(filters: TraceFilter[] | undefined, spans: ReadableSpan[]): ReadableSpan[] {
-  if (!filters || filters.length === 0) return spans;
-  return filters.reduce((current, rule) => applyFilterRule(rule, current), spans);
-}
-
-function applyFilterRule(rule: TraceFilter, spans: ReadableSpan[]): ReadableSpan[] {
-  if ('preset' in rule && rule.preset) {
-    return applyPreset((rule as { preset: TraceFilter extends { preset: infer P } ? P : never }).preset as any, spans);
-  }
-
-  if ('include' in rule && rule.include) {
-    const criteria = (rule as { include: Criteria }).include;
-    return spans.filter((s) => matchesCriteria(s, criteria));
-  }
-
-  if ('exclude' in rule && rule.exclude) {
-    const criteria = (rule as { exclude: Criteria }).exclude;
-    return spans.filter((s) => !matchesCriteria(s, criteria));
-  }
-
-  return spans;
-}
-
-function applyPreset(
-  preset: "vercelAIOnly" | "excludeHttpRequests",
-  spans: ReadableSpan[],
-): ReadableSpan[] {
-  if (preset === "vercelAIOnly") return spans.filter((s) => isVercelAiSpan(s));
-  if (preset === "excludeHttpRequests") return spans.filter((s) => !isHttpRequestSpan(s));
-
-  return spans;
-}
-
-function matchesCriteria(span: ReadableSpan, criteria: Criteria): boolean {
-  if (criteria.instrumentationScopeName !== void 0) {
-    const matchers = normalizeToMatchers(criteria.instrumentationScopeName);
-    const scopeName = span.instrumentationScope?.name ?? "";
-    const ok = matchers.some((m) => valueMatches(scopeName, m, { defaultIgnoreCase: true }));
-    if (!ok) return false;
-  }
-
-  if (criteria.name !== void 0) {
-    const matchers = normalizeToMatchers(criteria.name);
-    const ok = matchers.some((m) => valueMatches(span.name ?? "", m, { defaultIgnoreCase: false }));
-    if (!ok) return false;
-  }
-
-  return true;
-}
-
-function normalizeToMatchers(input: string | Match | Match[]): Match[] {
-  if (Array.isArray(input)) return input;
-  if (typeof input === "string") return [{ equals: input }];
-
-  return [input];
-}
-
-function valueMatches(value: string, rule: Match, opts: { defaultIgnoreCase: boolean }): boolean {
-  const raw = value ?? "";
-  const ignoreCase = rule.ignoreCase ?? opts.defaultIgnoreCase;
-
-  if (rule.equals !== void 0) {
-    return ignoreCase
-      ? raw.localeCompare(rule.equals, void 0, { sensitivity: "base" }) === 0
-      : raw === rule.equals;
-  }
-
-  if (rule.startsWith !== void 0) {
-    return ignoreCase
-      ? raw.toLowerCase().startsWith(rule.startsWith.toLowerCase())
-      : raw.startsWith(rule.startsWith);
-  }
-
-  if (rule.matches instanceof RegExp) {
-    const re = ignoreCase && !rule.matches.flags.includes("i")
-      ? new RegExp(rule.matches.source, (rule.matches.flags || "") + "i")
-      : rule.matches;
-    return re.test(raw);
-  }
-
-  return false;
-}
-
-function isVercelAiSpan(span: ReadableSpan): boolean {
-  const scope = span.instrumentationScope?.name?.toLowerCase?.() ?? "";
-
-  return scope === "ai";
-}
-
-function isHttpRequestSpan(span: ReadableSpan): boolean {
-  const name = span.name ?? "";
-  const verbMatch = /^(GET|POST|PUT|DELETE|PATCH|OPTIONS|HEAD)\b/i.test(name);
-
-  return verbMatch;
 }
