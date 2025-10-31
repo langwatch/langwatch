@@ -104,9 +104,7 @@ export class DatasetRepository {
   ): Promise<Dataset> {
     const client = options?.tx ?? this.prisma;
 
-    // Use updateMany to satisfy middleware projectId requirement
-    // updateMany accepts compound where clauses and validates ownership
-    const result = await client.dataset.updateMany({
+    const result = await client.dataset.update({
       where: {
         id: input.id,
         projectId: input.projectId,
@@ -114,7 +112,7 @@ export class DatasetRepository {
       data: input.data,
     });
 
-    if (result.count === 0) {
+    if (!result) {
       throw new Error(
         `Dataset ${input.id} not found in project ${input.projectId}`
       );
