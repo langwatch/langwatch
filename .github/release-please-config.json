@@ -67,6 +67,15 @@
       "component": "langwatch",
       "include-component-in-tag": true,
       "tag-separator": "@",
+      "exclude-paths": [
+        "typescript-sdk",
+        "sdk-go",
+        "mcp-server",
+        "charts",
+        ".github",
+        ".cursor",
+        "assets"
+      ],
       "changelog-sections": [
         { "type": "feat", "section": "Features" },
         { "type": "fix", "section": "Bug Fixes" },
