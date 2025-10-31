@@ -63,7 +63,7 @@ export const ProductScreen: React.FC = () => {
         showBackButton={canGoBack}
         onBack={() => navigation.prevScreen()}
       >
-        <Box w="full" minH="100dvh" position="relative">
+        <Box w="full" position="relative">
           <OnboardingMeshBackground opacity={0.4} blurPx={90} />
           <ActiveProjectProvider value={{ project: activeProject, organization }}>
             {!isLoading && currentScreen.component ? <currentScreen.component /> : null}
