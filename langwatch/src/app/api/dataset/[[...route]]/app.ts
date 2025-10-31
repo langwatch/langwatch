@@ -1,9 +1,9 @@
 import { resolver, validator as zValidator } from "hono-openapi/zod";
 import { Hono } from "hono";
 import { z } from "zod";
-import { createManyDatasetRecords } from "../../../../server/api/routers/datasetRecord";
 import type { DatasetColumns } from "../../../../server/datasets/types";
 import { prisma } from "../../../../server/db";
+import { DatasetService } from "../../../../server/datasets/dataset.service";
 import { describeRoute } from "hono-openapi";
 import { patchZodOpenapi } from "../../../../utils/extend-zod-openapi";
 import { loggerMiddleware } from "../../middleware/logger";
@@ -95,10 +95,11 @@ export const app = new Hono()
 
       const now = Date.now();
 
-      await createManyDatasetRecords({
-        datasetId: dataset.id,
+      const datasetService = DatasetService.create(prisma);
+      await datasetService.createRecords({
         projectId: project.id,
-        datasetRecords: entries.map((entry, index) => ({
+        datasetId: dataset.id,
+        entries: entries.map((entry, index) => ({
           id: `${now}-${index}`,
           ...entry,
         })),

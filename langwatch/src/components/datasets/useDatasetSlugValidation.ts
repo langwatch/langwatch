@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useDebouncedCallback } from "use-debounce";
 import { api } from "../../utils/api";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
@@ -44,6 +44,12 @@ export function useDatasetSlugValidation({
   const { project } = useOrganizationTeamProject();
   const projectId = project?.id;
 
+  /**
+   * Request token to prevent race conditions.
+   * Incremented before each API call; responses only update state if their token matches the latest.
+   */
+  const requestTokenRef = useRef(0);
+
   // Fetch existing dataset slug from DB if editing
   const { data: existingDataset } = api.dataset.getById.useQuery(
     {
@@ -72,8 +78,13 @@ export function useDatasetSlugValidation({
   // Debounced validation check (500ms)
   const debouncedSlugCheck = useDebouncedCallback(() => {
     if (name && name.trim() !== "" && projectId) {
+      // Increment token before making the request to invalidate any previous pending responses
+      requestTokenRef.current += 1;
+      const currentToken = requestTokenRef.current;
+
       validateDatasetName.refetch().then((result) => {
-        if (result.data) {
+        // Only update state if this response is from the most recent request (race condition prevention)
+        if (currentToken === requestTokenRef.current && result.data) {
           setSlugInfo({
             slug: result.data.slug,
             hasConflict: !result.data.available,
@@ -95,10 +106,14 @@ export function useDatasetSlugValidation({
     } else {
       setSlugInfo(null);
       debouncedSlugCheck.cancel();
+      // Invalidate any pending responses when clearing the name
+      requestTokenRef.current += 1;
     }
 
     return () => {
       debouncedSlugCheck.cancel();
+      // Invalidate any pending responses on unmount
+      requestTokenRef.current += 1;
     };
   }, [name, debouncedSlugCheck]);
 

@@ -3,7 +3,6 @@ import { nanoid } from "nanoid";
 import { slugify } from "~/utils/slugify";
 import type { DatasetColumns, DatasetRecordEntry } from "./types";
 import { tryToMapPreviousColumnsToNewColumns } from "~/optimization_studio/utils/datasetUtils";
-import { createManyDatasetRecords } from "../api/routers/datasetRecord";
 import { DatasetRepository } from "./dataset.repository";
 import { DatasetRecordRepository } from "./dataset-record.repository";
 import { ExperimentRepository } from "./experiment.repository";
@@ -31,6 +30,25 @@ export type ValidateDatasetNameResult = {
   available: boolean;
   slug: string;
   conflictsWith?: string;
+};
+
+export type CreateRecordsParams = {
+  projectId: string;
+  datasetId: string;
+  entries: DatasetRecordEntry[];
+};
+
+export type UpdateRecordParams = {
+  projectId: string;
+  datasetId: string;
+  recordId: string;
+  entry: any;
+};
+
+export type DeleteRecordsParams = {
+  projectId: string;
+  datasetId: string;
+  recordIds: string[];
 };
 
 /**
@@ -171,6 +189,7 @@ export class DatasetService {
 
   /**
    * Creates a new dataset with generated slug and optional records.
+   * Both dataset creation and record seeding are atomic (transactional).
    *
    * @throws {DatasetConflictError} if slug already exists
    */
@@ -197,24 +216,34 @@ export class DatasetService {
       projectId,
     });
 
-    const dataset = await this.repository.create({
-      id: `dataset_${nanoid()}`,
-      slug,
-      name,
-      projectId,
-      columnTypes,
-      useS3: canUseS3,
+    // Wrap both dataset creation and record seeding in a transaction
+    return await this.prisma.$transaction(async (tx) => {
+      const dataset = await this.repository.create(
+        {
+          id: `dataset_${nanoid()}`,
+          slug,
+          name,
+          projectId,
+          columnTypes,
+          useS3: canUseS3,
+        },
+        { tx }
+      );
+
+      if (datasetRecords) {
+        await this.recordRepository.batchCreate(
+          {
+            datasetId: dataset.id,
+            projectId,
+            datasetRecords,
+            useS3: canUseS3,
+          },
+          { tx }
+        );
+      }
+
+      return dataset;
     });
-
-    if (datasetRecords) {
-      await createManyDatasetRecords({
-        datasetId: dataset.id,
-        projectId,
-        datasetRecords,
-      });
-    }
-
-    return dataset;
   }
 
   /**
@@ -369,6 +398,76 @@ export class DatasetService {
 
       index++;
     }
+  }
+
+  /**
+   * Creates multiple dataset records for an existing dataset.
+   *
+   * @throws {DatasetNotFoundError} if dataset doesn't exist
+   */
+  async createRecords(params: CreateRecordsParams): Promise<void> {
+    const { projectId, datasetId, entries } = params;
+
+    const dataset = await this.repository.findOne({ id: datasetId, projectId });
+    if (!dataset) {
+      throw new DatasetNotFoundError();
+    }
+
+    await this.recordRepository.batchCreate({
+      datasetId,
+      projectId,
+      datasetRecords: entries,
+      useS3: dataset.useS3,
+    });
+  }
+
+  /**
+   * Updates or creates a single dataset record.
+   *
+   * @throws {DatasetNotFoundError} if dataset doesn't exist
+   */
+  async updateRecord(params: UpdateRecordParams): Promise<void> {
+    const { projectId, datasetId, recordId, entry } = params;
+
+    const dataset = await this.repository.findOne({ id: datasetId, projectId });
+    if (!dataset) {
+      throw new DatasetNotFoundError();
+    }
+
+    await this.recordRepository.upsert({
+      recordId,
+      entry,
+      datasetId,
+      projectId,
+      useS3: dataset.useS3,
+    });
+  }
+
+  /**
+   * Deletes multiple dataset records.
+   *
+   * @throws {DatasetNotFoundError} if dataset doesn't exist or no records deleted
+   */
+  async deleteRecords(params: DeleteRecordsParams): Promise<{ deletedCount: number }> {
+    const { projectId, datasetId, recordIds } = params;
+
+    const dataset = await this.repository.findOne({ id: datasetId, projectId });
+    if (!dataset) {
+      throw new DatasetNotFoundError();
+    }
+
+    const result = await this.recordRepository.batchDelete({
+      recordIds,
+      datasetId,
+      projectId,
+      useS3: dataset.useS3,
+    });
+
+    if (result.deletedCount === 0) {
+      throw new DatasetNotFoundError();
+    }
+
+    return result;
   }
 }
 
