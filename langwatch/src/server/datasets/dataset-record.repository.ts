@@ -88,7 +88,7 @@ export class DatasetRecordRepository {
   /**
    * Creates multiple dataset records in batch.
    * Handles both S3-backed datasets (JSON file storage) and Prisma-backed datasets.
-   * 
+   *
    * @param input - Dataset and record information
    * @param options - Optional transaction client to use
    */
@@ -187,7 +187,7 @@ export class DatasetRecordRepository {
 
   /**
    * Updates or creates a single dataset record.
-   * 
+   *
    * @param input - Record update information
    * @param options - Optional transaction client
    */
@@ -212,7 +212,7 @@ export class DatasetRecordRepository {
       const recordIndex = records.findIndex(
         (record: any) => record.id === recordId
       );
-      
+
       if (recordIndex === -1) {
         const newRecord = {
           id: recordId,
@@ -266,7 +266,7 @@ export class DatasetRecordRepository {
 
   /**
    * Deletes multiple dataset records.
-   * 
+   *
    * @param input - Record deletion information
    * @param options - Optional transaction client
    * @returns Number of deleted records

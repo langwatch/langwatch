@@ -402,7 +402,7 @@ export class DatasetService {
 
   /**
    * Creates multiple dataset records for an existing dataset.
-   * 
+   *
    * @throws {DatasetNotFoundError} if dataset doesn't exist
    */
   async createRecords(params: CreateRecordsParams): Promise<void> {
@@ -423,7 +423,7 @@ export class DatasetService {
 
   /**
    * Updates or creates a single dataset record.
-   * 
+   *
    * @throws {DatasetNotFoundError} if dataset doesn't exist
    */
   async updateRecord(params: UpdateRecordParams): Promise<void> {
@@ -445,7 +445,7 @@ export class DatasetService {
 
   /**
    * Deletes multiple dataset records.
-   * 
+   *
    * @throws {DatasetNotFoundError} if dataset doesn't exist or no records deleted
    */
   async deleteRecords(params: DeleteRecordsParams): Promise<{ deletedCount: number }> {
