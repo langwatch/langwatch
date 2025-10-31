@@ -150,6 +150,7 @@ export const useOnboardingFlow = () => {
     currentScreenIndex,
     direction,
     flow,
+    isPublicEnvLoading: publicEnv.isLoading,
 
     // Navigation
     navigation,

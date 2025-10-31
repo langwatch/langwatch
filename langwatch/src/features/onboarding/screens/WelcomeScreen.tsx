@@ -37,6 +37,7 @@ export const WelcomeScreen: React.FC = () => {
     navigation,
     getFormData,
     formContextValue,
+    isPublicEnvLoading,
   } = useOnboardingFlow();
 
   const screens = useCreateWelcomeScreens({ flow });
@@ -120,6 +121,12 @@ export const WelcomeScreen: React.FC = () => {
   const currentScreen =
     currentVisibleIndex >= 0 ? screens[currentVisibleIndex] : undefined;
 
+  const isFirstScreen = currentVisibleIndex <= 0;
+  const isLastScreen =
+    currentVisibleIndex >= 0 &&
+    currentVisibleIndex === flow.visibleScreens.length - 1 &&
+    (flow.variant !== "self_hosted" || !isPublicEnvLoading);
+
   const pendingOrSuccessful = initializeOrganization.isPending || initializeOrganization.isSuccess;
 
   return (
@@ -146,8 +153,8 @@ export const WelcomeScreen: React.FC = () => {
                   screenIndex: currentVisibleIndex,
                   variant: flow.variant,
                   total: flow.total,
-                  isFirst: flow.first === currentScreenIndex,
-                  isLast: flow.last === currentScreenIndex,
+                  isFirst: isFirstScreen,
+                  isLast: isLastScreen,
                 }}
                 sendViewedEvent
               >
@@ -169,6 +176,8 @@ export const WelcomeScreen: React.FC = () => {
             isSkippable={!currentScreen?.required}
             isSubmitting={pendingOrSuccessful}
             onFinish={handleFinalizeSubmit}
+            isFirstScreen={isFirstScreen}
+            isLastScreen={isLastScreen}
           />
         </VStack>
       </OnboardingContainer>

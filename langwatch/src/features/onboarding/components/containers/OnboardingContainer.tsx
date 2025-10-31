@@ -43,8 +43,18 @@ interface OnboardingContainerProps extends React.PropsWithChildren {
 
 export const OnboardingContainer: React.FC<
   OnboardingContainerProps
-> = ({ children, title, subTitle, loading, compressedHeader, widthVariant: _widthVariant = "narrow", showBackButton, onBack }) => {
+> = ({ children, title, subTitle, loading, compressedHeader, widthVariant = "narrow", showBackButton, onBack }) => {
   const { emit } = useAnalytics();
+  const isFullWidth = widthVariant === "full";
+  const containerWidthProps = isFullWidth
+    ? {
+        maxW: { base: "100%", "2xl": "1440px" },
+        px: { base: 4, md: 10 },
+      }
+    : {
+        maxW: { base: "100%", md: "720px", xl: "840px" },
+        px: { base: 4, md: 8 },
+      };
 
   return (
     <Box w="full" minH="100dvh" background="bg.subtle">
@@ -89,8 +99,10 @@ export const OnboardingContainer: React.FC<
 
       <MotionContainer
         mt={"10"}
-        width="8xl"
-        fluid
+        width="full"
+        mx="auto"
+        {...containerWidthProps}
+        {...(isFullWidth ? { fluid: true } : {})}
         initial={{ opacity: 0, y: 8 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.4, ease: "easeOut" }}
