@@ -79,7 +79,7 @@ export const registry: IntegrationRegistry = [
     platform: "typescript",
     framework: "vercel_ai",
     label: "Vercel AI SDK",
-    docs: { internal: "/docs/integrations/typescript/vercel-ai", external: "https://sdk.vercel.ai/docs" },
+    docs: { internal: "/integration/typescript/integrations/vercel-ai-sdk", external: "https://sdk.vercel.ai/docs" },
     icon: themedIcon(
       "/images/external-icons/vercel-lighttheme.svg",
       "/images/external-icons/vercel-darktheme.svg",
@@ -99,7 +99,7 @@ export const registry: IntegrationRegistry = [
     platform: "typescript",
     framework: "mastra",
     label: "Mastra",
-    docs: { internal: "/docs/integrations/typescript/mastra", external: "https://docs.mastra.ai/" },
+    docs: { internal: "/integration/typescript/integrations/mastra", external: "https://docs.mastra.ai/" },
     icon: themedIcon(
       "/images/external-icons/mastra-lighttheme.svg",
       "/images/external-icons/mastra-darktheme.svg",
@@ -119,7 +119,7 @@ export const registry: IntegrationRegistry = [
     platform: "typescript",
     framework: "langgraph",
     label: "LangGraph",
-    docs: { internal: "/docs/integrations/typescript/langgraph", external: "https://langchain-ai.github.io/langgraph/" },
+    docs: { internal: "/integration/typescript/integrations/langgraph", external: "https://langchain-ai.github.io/langgraph/" },
     icon: themedIcon(
       "/images/external-icons/langchain-lighttheme.svg",
       "/images/external-icons/langchain-darktheme.svg",
@@ -139,7 +139,7 @@ export const registry: IntegrationRegistry = [
     platform: "typescript",
     framework: "langchain",
     label: "LangChain",
-    docs: { internal: "/docs/integrations/typescript/langchain", external: "https://langchain-ai.github.io/langchain/" },
+    docs: { internal: "/integration/typescript/integrations/langchain", external: "https://langchain-ai.github.io/langchain/" },
     icon: themedIcon(
       "/images/external-icons/langchain-lighttheme.svg",
       "/images/external-icons/langchain-darktheme.svg",
@@ -159,7 +159,7 @@ export const registry: IntegrationRegistry = [
     platform: "typescript",
     framework: "openai",
     label: "OpenAI (Manual Instrumentation)",
-    docs: { internal: "/docs/integrations/typescript/openai" },
+    docs: { internal: "/integration/typescript/integrations/open-ai" },
     icon: themedIcon(
       "/images/external-icons/openai-lighttheme.svg",
       "/images/external-icons/openai-darktheme.svg",
@@ -181,7 +181,7 @@ export const registry: IntegrationRegistry = [
     platform: "python",
     framework: "agno",
     label: "Agno",
-    docs: { internal: "/docs/integrations/python/agno" },
+    docs: { internal: "/integration/python/integrations/agno", external: "https://docs.agno.com/introduction" },
     icon: singleIcon(
       "/images/external-icons/agno.png",
       "Agno",
@@ -198,7 +198,7 @@ export const registry: IntegrationRegistry = [
     platform: "python",
     framework: "dspy",
     label: "DSPy",
-    docs: { internal: "/docs/integrations/python/dspy" },
+    docs: { internal: "/integration/python/integrations/dspy", external: "https://dspy.ai/" },
     icon: singleIcon(
       "/images/external-icons/dspy.webp",
       "DSPy",
@@ -215,7 +215,7 @@ export const registry: IntegrationRegistry = [
     platform: "python",
     framework: "haystack",
     label: "Haystack",
-    docs: { internal: "/docs/integrations/python/haystack" },
+    docs: { internal: "/integration/python/integrations/haystack", external: "https://docs.haystack.deepset.ai/docs/intro" },
     icon: singleIcon(
       "/images/external-icons/haystack.png",
       "Haystack",
@@ -232,7 +232,7 @@ export const registry: IntegrationRegistry = [
     platform: "python",
     framework: "strands",
     label: "Strand Agents",
-    docs: { internal: "/docs/integrations/python/haystack" },
+    docs: { internal: "/integration/python/integrations/strand-agents", external: "https://strandsagents.com/latest/" },
     icon: singleIcon(
       "/images/external-icons/strands.svg",
       "Strands Agents",
@@ -249,7 +249,7 @@ export const registry: IntegrationRegistry = [
     platform: "python",
     framework: "anthropic",
     label: "Anthropic",
-    docs: { internal: "/docs/integrations/python/anthropic" },
+    docs: { internal: "/integration/python/integrations/anthropic", external: "https://docs.claude.com/en/home" },
     icon: themedIcon(
       "/images/external-icons/anthropic-lighttheme.svg",
       "/images/external-icons/anthropic-darktheme.svg",
@@ -267,7 +267,7 @@ export const registry: IntegrationRegistry = [
     platform: "python",
     framework: "litellm",
     label: "LiteLLM",
-    docs: { internal: "/integration/python/integrations/lite-llm" },
+    docs: { internal: "/integration/python/integrations/lite-llm", external: "https://docs.litellm.ai/docs/" },
     icon: singleIcon(
       "/images/external-icons/litellm.avif",
       "LiteLLM",
@@ -284,7 +284,7 @@ export const registry: IntegrationRegistry = [
     platform: "python",
     framework: "openai",
     label: "OpenAI",
-    docs: { internal: "/integration/python/integrations/open-ai" },
+    docs: { internal: "/integration/python/integrations/open-ai", external: "https://platform.openai.com/docs/overview" },
     icon: themedIcon(
       "/images/external-icons/openai-lighttheme.svg",
       "/images/external-icons/openai-darktheme.svg",
@@ -302,7 +302,7 @@ export const registry: IntegrationRegistry = [
     platform: "python",
     framework: "pydantic",
     label: "Pydantic AI",
-    docs: { internal: "/integration/python/integrations/pydantic-ai" },
+    docs: { internal: "/integration/python/integrations/pydantic-ai", external: "https://ai.pydantic.dev/" },
     icon: singleIcon(
       "/images/external-icons/pydanticai.svg",
       "Pydantic AI",
@@ -319,7 +319,7 @@ export const registry: IntegrationRegistry = [
     platform: "python",
     framework: "openai_agents",
     label: "OpenAI Agents",
-    docs: { internal: "/integration/python/integrations/openai-agents" },
+    docs: { internal: "/integration/python/integrations/openai-agents", external: "https://platform.openai.com/docs/guides/agents" },
     icon: themedIcon(
       "/images/external-icons/openai-lighttheme.svg",
       "/images/external-icons/openai-darktheme.svg",
@@ -339,7 +339,7 @@ export const registry: IntegrationRegistry = [
     platform: "go",
     framework: "openai",
     label: "OpenAI",
-    docs: { internal: "/docs/integrations/go/openai", external: "https://github.com/openai/openai-go" },
+    docs: { internal: "/integration/go/integrations/open-ai", external: "https://github.com/openai/openai-go" },
     icon: themedIcon(
       "/images/external-icons/openai-lighttheme.svg",
       "/images/external-icons/openai-darktheme.svg",
@@ -352,7 +352,7 @@ export const registry: IntegrationRegistry = [
     platform: "go",
     framework: "azure",
     label: "Azure OpenAI",
-    docs: { internal: "/docs/integrations/go/azure", external: "https://learn.microsoft.com/azure/ai-services/openai/" },
+    docs: { internal: "/integration/go/integrations/azure-openai", external: "https://learn.microsoft.com/azure/ai-services/openai/" },
     icon: singleIcon("/images/external-icons/azure.svg", "Azure OpenAI"),
     install: { go: { "go get": "go get github.com/langwatch/langwatch/sdk-go github.com/openai/openai-go" } },
     snippet: goRef(goAzureSource as unknown as string),
@@ -361,7 +361,7 @@ export const registry: IntegrationRegistry = [
     platform: "go",
     framework: "anthropic",
     label: "Anthropic",
-    docs: { internal: "/docs/integrations/go/anthropic", external: "https://docs.anthropic.com/" },
+    docs: { internal: "/integration/go/integrations/anthropic", external: "https://docs.claude.com/" },
     icon: themedIcon(
       "/images/external-icons/anthropic-lighttheme.svg",
       "/images/external-icons/anthropic-darktheme.svg",
@@ -374,7 +374,7 @@ export const registry: IntegrationRegistry = [
     platform: "go",
     framework: "gemini",
     label: "Gemini",
-    docs: { internal: "/docs/integrations/go/gemini", external: "https://ai.google.dev/" },
+    docs: { internal: "/integration/go/integrations/google-gemini", external: "https://ai.google.dev/" },
     icon: singleIcon("/images/external-icons/google.svg", "Gemini"),
     install: { go: { "go get": "go get github.com/langwatch/langwatch/sdk-go github.com/openai/openai-go" } },
     snippet: goRef(goGeminiSource as unknown as string),
@@ -383,7 +383,7 @@ export const registry: IntegrationRegistry = [
     platform: "go",
     framework: "grok",
     label: "Grok (xAI)",
-    docs: { internal: "/docs/integrations/go/grok", external: "https://x.ai/" },
+    docs: { external: "https://x.ai/" },
     icon: themedIcon(
       "/images/external-icons/grok-lighttheme.svg",
       "/images/external-icons/grok-darktheme.svg",
@@ -396,7 +396,7 @@ export const registry: IntegrationRegistry = [
     platform: "go",
     framework: "mistral",
     label: "Mistral",
-    docs: { internal: "/docs/integrations/go/mistral", external: "https://docs.mistral.ai/" },
+    docs: { external: "https://docs.mistral.ai/" },
     icon: singleIcon("/images/external-icons/mistral.svg", "Mistral"),
     install: { go: { "go get": "go get github.com/langwatch/langwatch/sdk-go github.com/openai/openai-go" } },
     snippet: goRef(goMistralSource as unknown as string),
@@ -405,7 +405,7 @@ export const registry: IntegrationRegistry = [
     platform: "go",
     framework: "ollama",
     label: "Ollama",
-    docs: { internal: "/docs/integrations/go/ollama", external: "https://github.com/ollama/ollama" },
+    docs: { internal: "/integration/go/integrations/ollama", external: "https://github.com/ollama/ollama" },
     icon: themedIcon(
       "/images/external-icons/ollama-lighttheme.svg",
       "/images/external-icons/ollama-darktheme.svg",
@@ -420,7 +420,7 @@ export const registry: IntegrationRegistry = [
     platform: "java",
     framework: "spring",
     label: "Spring Boot AI",
-    docs: { internal: "/integration/java/integrations/spring-ai" },
+    docs: { internal: "/integration/java/integrations/spring-ai", external: "https://spring.io/projects/spring-ai" },
     icon: singleIcon(
       "/images/external-icons/spring-boot.svg",
       "Spring Boot AI",
@@ -428,9 +428,10 @@ export const registry: IntegrationRegistry = [
     snippet: yamlRef(springAiYamlSource as unknown as string),
   },
 
+  // OpenTelemetry
   {
     platform: "opentelemetry",
-    docs: { internal: "/integration/opentelemetry/guide" },
+    docs: { internal: "/integration/opentelemetry/guide", external: "https://opentelemetry.io/docs/getting-started/dev/" },
     icon: singleIcon("/images/external-icons/opentelemetry.svg", "OpenTelemetry"),
     label: "OpenTelemetry",
     customComponent: OpenTelemetrySetup,
@@ -441,7 +442,7 @@ export const registry: IntegrationRegistry = [
     platform: "no_and_lo",
     framework: "n8n",
     label: "n8n",
-    docs: { internal: "/docs/integrations/no-lo/n8n", external: "https://docs.n8n.io/" },
+    docs: { internal: "/integration/n8n", external: "https://docs.n8n.io/" },
     icon: singleIcon("/images/external-icons/n8n.svg", "n8n"),
     install: {
       js: {
