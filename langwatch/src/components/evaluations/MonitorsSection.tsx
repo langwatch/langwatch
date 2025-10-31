@@ -53,8 +53,10 @@ export const MonitorsSection = ({ title, monitors }: MonitorsSectionProps) => {
 
   const experimentsSlugMap = useMemo(() => {
     return Object.fromEntries(
-      experiments.data?.map((experiment) => [experiment.id, experiment.slug]) ??
-        []
+      experiments.data?.experiments?.map((experiment) => [
+        experiment.id,
+        experiment.slug,
+      ]) ?? []
     );
   }, [experiments.data]);
 

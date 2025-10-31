@@ -113,7 +113,7 @@ export function MessagesList() {
   }, [traceGroups]);
 
   return (
-    <Container maxW={"calc(min(1440px, 100vw - 200px))"} padding={6}>
+    <Container maxW={"calc(min(1440px, 100vw - 200px))"} padding={6} flex="1">
       <HStack width="full" align="top" paddingBottom={6}>
         <HStack align="center" gap={6}>
           <Heading as={"h1"} size="lg" paddingTop={1}>
