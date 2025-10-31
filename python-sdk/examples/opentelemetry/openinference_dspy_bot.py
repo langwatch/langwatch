@@ -20,8 +20,6 @@ colbertv2_wiki17_abstracts = dspy.ColBERTv2(
     url="http://20.102.90.50:2017/wiki17_abstracts"
 )
 
-dspy.settings.configure(lm=llm, rm=colbertv2_wiki17_abstracts)
-
 
 class GenerateAnswer(dspy.Signature):
     """Answer questions with short factoid answers."""
@@ -50,9 +48,10 @@ async def main(message: cl.Message):
         content="",
     )
 
-    program = RAG()
-    program = program.reset_copy()
-    prediction = program(question=message.content)
+    with dspy.context(lm=llm, rm=colbertv2_wiki17_abstracts):
+        program = RAG()
+        program = program.reset_copy()
+        prediction = program(question=message.content)
 
     await msg.stream_token(prediction.answer)
     await msg.update()
