@@ -184,5 +184,153 @@ export class DatasetRecordRepository {
       return record;
     });
   }
+
+  /**
+   * Updates or creates a single dataset record.
+   * 
+   * @param input - Record update information
+   * @param options - Optional transaction client
+   */
+  async upsert(
+    input: {
+      recordId: string;
+      entry: any;
+      datasetId: string;
+      projectId: string;
+      useS3: boolean;
+    },
+    options?: {
+      tx?: Prisma.TransactionClient;
+    }
+  ): Promise<void> {
+    const { recordId, entry, datasetId, projectId, useS3 } = input;
+    const client = options?.tx ?? this.prisma;
+
+    if (useS3) {
+      const { records } = await this.storageService.getObject(projectId, datasetId);
+
+      const recordIndex = records.findIndex(
+        (record: any) => record.id === recordId
+      );
+      
+      if (recordIndex === -1) {
+        const newRecord = {
+          id: recordId,
+          entry,
+          datasetId,
+          projectId,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        };
+        records.push(newRecord);
+      } else {
+        records[recordIndex] = {
+          ...records[recordIndex],
+          entry,
+          updatedAt: new Date().toISOString(),
+        };
+      }
+
+      await this.storageService.putObject(
+        projectId,
+        datasetId,
+        JSON.stringify(records)
+      );
+
+      await client.dataset.update({
+        where: { id: datasetId, projectId },
+        data: { s3RecordCount: records.length },
+      });
+    } else {
+      const record = await client.datasetRecord.findUnique({
+        where: { id: recordId, projectId },
+      });
+
+      if (record) {
+        await client.datasetRecord.update({
+          where: { id: recordId, projectId },
+          data: { entry },
+        });
+      } else {
+        await client.datasetRecord.create({
+          data: {
+            id: recordId,
+            entry,
+            datasetId,
+            projectId,
+          },
+        });
+      }
+    }
+  }
+
+  /**
+   * Deletes multiple dataset records.
+   * 
+   * @param input - Record deletion information
+   * @param options - Optional transaction client
+   * @returns Number of deleted records
+   */
+  async batchDelete(
+    input: {
+      recordIds: string[];
+      datasetId: string;
+      projectId: string;
+      useS3: boolean;
+    },
+    options?: {
+      tx?: Prisma.TransactionClient;
+    }
+  ): Promise<{ deletedCount: number }> {
+    const { recordIds, datasetId, projectId, useS3 } = input;
+    const client = options?.tx ?? this.prisma;
+
+    if (useS3) {
+      let records: any[] = [];
+      try {
+        const { records: fetchedRecords } = await this.storageService.getObject(
+          projectId,
+          datasetId
+        );
+        records = fetchedRecords;
+      } catch (error) {
+        if ((error as any).name === "NoSuchKey") {
+          return { deletedCount: 0 };
+        }
+        Sentry.captureException(error);
+        throw error;
+      }
+
+      const initialLength = records.length;
+      records = records.filter((record) => !recordIds.includes(record.id));
+
+      if (records.length === initialLength) {
+        return { deletedCount: 0 };
+      }
+
+      await this.storageService.putObject(
+        projectId,
+        datasetId,
+        JSON.stringify(records)
+      );
+
+      await client.dataset.update({
+        where: { id: datasetId, projectId },
+        data: { s3RecordCount: records.length },
+      });
+
+      return { deletedCount: initialLength - records.length };
+    } else {
+      const { count } = await client.datasetRecord.deleteMany({
+        where: {
+          id: { in: recordIds },
+          datasetId,
+          projectId,
+        },
+      });
+
+      return { deletedCount: count };
+    }
+  }
 }
 

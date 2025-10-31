@@ -32,6 +32,25 @@ export type ValidateDatasetNameResult = {
   conflictsWith?: string;
 };
 
+export type CreateRecordsParams = {
+  projectId: string;
+  datasetId: string;
+  entries: DatasetRecordEntry[];
+};
+
+export type UpdateRecordParams = {
+  projectId: string;
+  datasetId: string;
+  recordId: string;
+  entry: any;
+};
+
+export type DeleteRecordsParams = {
+  projectId: string;
+  datasetId: string;
+  recordIds: string[];
+};
+
 /**
  * Service layer for dataset business logic.
  * Single Responsibility: Dataset lifecycle management and slug synchronization.
@@ -379,6 +398,76 @@ export class DatasetService {
 
       index++;
     }
+  }
+
+  /**
+   * Creates multiple dataset records for an existing dataset.
+   * 
+   * @throws {DatasetNotFoundError} if dataset doesn't exist
+   */
+  async createRecords(params: CreateRecordsParams): Promise<void> {
+    const { projectId, datasetId, entries } = params;
+
+    const dataset = await this.repository.findOne({ id: datasetId, projectId });
+    if (!dataset) {
+      throw new DatasetNotFoundError();
+    }
+
+    await this.recordRepository.batchCreate({
+      datasetId,
+      projectId,
+      datasetRecords: entries,
+      useS3: dataset.useS3,
+    });
+  }
+
+  /**
+   * Updates or creates a single dataset record.
+   * 
+   * @throws {DatasetNotFoundError} if dataset doesn't exist
+   */
+  async updateRecord(params: UpdateRecordParams): Promise<void> {
+    const { projectId, datasetId, recordId, entry } = params;
+
+    const dataset = await this.repository.findOne({ id: datasetId, projectId });
+    if (!dataset) {
+      throw new DatasetNotFoundError();
+    }
+
+    await this.recordRepository.upsert({
+      recordId,
+      entry,
+      datasetId,
+      projectId,
+      useS3: dataset.useS3,
+    });
+  }
+
+  /**
+   * Deletes multiple dataset records.
+   * 
+   * @throws {DatasetNotFoundError} if dataset doesn't exist or no records deleted
+   */
+  async deleteRecords(params: DeleteRecordsParams): Promise<{ deletedCount: number }> {
+    const { projectId, datasetId, recordIds } = params;
+
+    const dataset = await this.repository.findOne({ id: datasetId, projectId });
+    if (!dataset) {
+      throw new DatasetNotFoundError();
+    }
+
+    const result = await this.recordRepository.batchDelete({
+      recordIds,
+      datasetId,
+      projectId,
+      useS3: dataset.useS3,
+    });
+
+    if (result.deletedCount === 0) {
+      throw new DatasetNotFoundError();
+    }
+
+    return result;
   }
 }
 
