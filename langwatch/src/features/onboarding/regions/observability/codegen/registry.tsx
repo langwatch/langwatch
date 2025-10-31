@@ -25,6 +25,8 @@ import openaiAgentsPySource from "./snippets/python/openaiagents.snippet.py";
 import springAiYamlSource from "./snippets/java/springai.snippet.yaml?raw";
 import n8nBashSource from "./snippets/noandlo/n8n.snippet.sh?raw";
 import { OpenTelemetrySetup } from "../../../components/sections/observability/OpenTelemetrySetup";
+import { FlowiseSetup } from "../../../components/sections/observability/FlowiseSetup";
+import { LangflowSetup } from "../../../components/sections/observability/LangflowSetup";
 
 export interface InstallMatrix {
   js?: { npm: string; pnpm: string; yarn: string; bun: string };
@@ -453,6 +455,22 @@ export const registry: IntegrationRegistry = [
       },
     },
     snippet: bashRef(n8nBashSource as unknown as string),
+  },
+  {
+    platform: "no_and_lo",
+    framework: "flowise",
+    label: "Flowise",
+    docs: { internal: "/integration/flowise", external: "https://docs.flowiseai.com/" },
+    icon: singleIcon("/images/external-icons/flowise.svg", "Flowise"),
+    customComponent: FlowiseSetup,
+  },
+  {
+    platform: "no_and_lo",
+    framework: "langflow",
+    label: "Langflow",
+    docs: { internal: "/integration/langflow", external: "https://docs.langflow.org/" },
+    icon: singleIcon("/images/external-icons/langflow.svg", "Langflow"),
+    customComponent: LangflowSetup,
   },
 ];
 

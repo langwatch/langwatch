@@ -21,8 +21,7 @@ export function DocsLinks({ docs, label }: DocsLinksProps): React.ReactElement |
       fontSize="xs"
       justify="flex-start"
       align="center"
-      pt={0}
-      pl={3}
+      pt={2}
     >
       <Text fontWeight="medium" color="fg.muted">
         Documentation
