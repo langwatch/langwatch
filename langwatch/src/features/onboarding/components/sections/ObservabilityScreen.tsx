@@ -9,6 +9,7 @@ import { PLATFORM_OPTIONS, FRAMEWORKS_BY_PLATFORM } from "../../regions/observab
 import { InstallPreview } from "./observability/InstallPreview";
 import { getRegistryEntry } from "../../regions/observability/codegen/registry";
 import { FrameworkIntegrationCode } from "./observability/FrameworkIntegrationCode";
+import { DocsLinks } from "./observability/DocsLinks";
 
 export function ObservabilityScreen(): React.ReactElement {
   const [selectedPlatform, setSelectedPlatform] =
@@ -57,7 +58,10 @@ export function ObservabilityScreen(): React.ReactElement {
 
         <VStack align="stretch" gap={3} minW={0} w="full">
           {selectedEntry?.customComponent ? (
-            <selectedEntry.customComponent />
+            <>
+              <selectedEntry.customComponent />
+              <DocsLinks docs={selectedEntry?.docs} label={selectedEntry?.label ?? ""} />
+            </>
           ) : (
             <VStack align="stretch" gap={3} minW={0} w="full">
               <InstallPreview install={selectedEntry?.install} />
@@ -70,6 +74,7 @@ export function ObservabilityScreen(): React.ReactElement {
                   }
                 />
               </Box>
+              <DocsLinks docs={selectedEntry?.docs} label={selectedEntry?.label ?? ""} />
             </VStack>
           )}
         </VStack>
