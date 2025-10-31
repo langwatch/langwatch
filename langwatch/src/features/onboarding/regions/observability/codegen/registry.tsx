@@ -15,6 +15,15 @@ import goGrokSource from "./snippets/go/grok.snippet.go";
 import goMistralSource from "./snippets/go/mistral.snippet.go";
 import goOllamaSource from "./snippets/go/ollama.snippet.go";
 import agnoPySource from "./snippets/python/agno.snippet.py";
+import dspyPySource from "./snippets/python/dspy.snippet.py";
+import haystackPySource from "./snippets/python/haystack.snippet.py";
+import strandsPySource from "./snippets/python/strandsagents.snippet.py";
+import anthropicPySource from "./snippets/python/anthropic.snippet.py";
+import litellmPySource from "./snippets/python/litellm.snippet.py";
+import openaiPySource from "./snippets/python/openai.snippet.py";
+import pydanticPySource from "./snippets/python/pydanticai.snippet.py";
+import openaiAgentsPySource from "./snippets/python/openaiagents.snippet.py";
+import springAiYamlSource from "./snippets/java/springai.snippet.yaml?raw";
 
 export interface InstallMatrix {
   js?: { npm: string; pnpm: string; yarn: string; bun: string };
@@ -45,6 +54,7 @@ export type IntegrationRegistry = IntegrationSpec[];
 const tsRef = (file: string): SnippetRef => ({ file, language: "typescript", filename: "app.ts" });
 const goRef = (file: string): SnippetRef => ({ file, language: "go", filename: "main.go" });
 const pyRef = (file: string): SnippetRef => ({ file, language: "python", filename: "app.py" });
+const yamlRef = (file: string): SnippetRef => ({ file, language: "yaml", filename: "application.yaml" });
 
 function themedIcon(lightSrc: string, darkSrc: string, alt: string): React.ReactElement {
   const isDark = true;
@@ -182,6 +192,145 @@ export const registry: IntegrationRegistry = [
     },
     snippet: pyRef(agnoPySource as unknown as string),
   },
+  {
+    platform: "python",
+    framework: "dspy",
+    label: "DSPy",
+    docs: { internal: "/docs/integrations/python/dspy" },
+    icon: singleIcon(
+      "/images/external-icons/dspy.webp",
+      "DSPy",
+    ),
+    install: {
+      python: {
+        pip: "pip install langwatch dspy",
+        uv: "uv add langwatch dspy",
+      },
+    },
+    snippet: pyRef(dspyPySource as unknown as string),
+  },
+  {
+    platform: "python",
+    framework: "haystack",
+    label: "Haystack",
+    docs: { internal: "/docs/integrations/python/haystack" },
+    icon: singleIcon(
+      "/images/external-icons/haystack.png",
+      "Haystack",
+    ),
+    install: {
+      python: {
+        pip: "pip install langwatch openinference-instrumentation-haystack haystack-ai",
+        uv: "uv add langwatch openinference-instrumentation-haystack haystack-ai",
+      },
+    },
+    snippet: pyRef(haystackPySource as unknown as string),
+  },
+  {
+    platform: "python",
+    framework: "strands",
+    label: "Strand Agents",
+    docs: { internal: "/docs/integrations/python/haystack" },
+    icon: singleIcon(
+      "/images/external-icons/strands.svg",
+      "Strands Agents",
+    ),
+    install: {
+      python: {
+        pip: "pip install langwatch strands-agents strands-agents-tools",
+        uv: "uv add langwatch strands-agents strands-agents-tools",
+      },
+    },
+    snippet: pyRef(strandsPySource as unknown as string),
+  },
+  {
+    platform: "python",
+    framework: "anthropic",
+    label: "Anthropic",
+    docs: { internal: "/docs/integrations/python/anthropic" },
+    icon: themedIcon(
+      "/images/external-icons/anthropic-lighttheme.svg",
+      "/images/external-icons/anthropic-darktheme.svg",
+      "Anthropic",
+    ),
+    install: {
+      python: {
+        pip: "pip install langwatch anthropic openinference-instrumentation-anthropic",
+        uv: "uv add langwatch anthropic openinference-instrumentation-anthropic",
+      },
+    },
+    snippet: pyRef(anthropicPySource as unknown as string),
+  },
+  {
+    platform: "python",
+    framework: "litellm",
+    label: "LiteLLM",
+    docs: { internal: "/integration/python/integrations/lite-llm" },
+    icon: singleIcon(
+      "/images/external-icons/litellm.avif",
+      "LiteLLM",
+    ),
+    install: {
+      python: {
+        pip: "pip install langwatch litellm",
+        uv: "uv add langwatch litellm",
+      },
+    },
+    snippet: pyRef(litellmPySource as unknown as string),
+  },
+  {
+    platform: "python",
+    framework: "openai",
+    label: "OpenAI",
+    docs: { internal: "/integration/python/integrations/open-ai" },
+    icon: themedIcon(
+      "/images/external-icons/openai-lighttheme.svg",
+      "/images/external-icons/openai-darktheme.svg",
+      "OpenAI",
+    ),
+    install: {
+      python: {
+        pip: "pip install langwatch openai",
+        uv: "uv add langwatch openai",
+      },
+    },
+    snippet: pyRef(openaiPySource as unknown as string),
+  },
+  {
+    platform: "python",
+    framework: "pydantic",
+    label: "Pydantic AI",
+    docs: { internal: "/integration/python/integrations/pydantic-ai" },
+    icon: singleIcon(
+      "/images/external-icons/pydanticai.svg",
+      "Pydantic AI",
+    ),
+    install: {
+      python: {
+        pip: "pip install langwatch pydantic-ai",
+        uv: "uv add langwatch pydantic-ai",
+      },
+    },
+    snippet: pyRef(pydanticPySource as unknown as string),
+  },
+  {
+    platform: "python",
+    framework: "openai_agents",
+    label: "OpenAI Agents",
+    docs: { internal: "/integration/python/integrations/openai-agents" },
+    icon: themedIcon(
+      "/images/external-icons/openai-lighttheme.svg",
+      "/images/external-icons/openai-darktheme.svg",
+      "OpenAI Agents",
+    ),
+    install: {
+      python: {
+        pip: "pip install langwatch openai-agents openinference-instrumentation-openai-agents",
+        uv: "uv add langwatch openai-agents openinference-instrumentation-openai-agents",
+      },
+    },
+    snippet: pyRef(openaiAgentsPySource as unknown as string),
+  },
 
   // Go
   {
@@ -264,6 +413,19 @@ export const registry: IntegrationRegistry = [
     snippet: goRef(goOllamaSource as unknown as string),
   },
 
+  // Java
+  {
+    platform: "java",
+    framework: "spring",
+    label: "Spring Boot AI",
+    docs: { internal: "/integration/java/integrations/spring-ai" },
+    icon: singleIcon(
+      "/images/external-icons/spring-boot.svg",
+      "Spring Boot AI",
+    ),
+    snippet: yamlRef(springAiYamlSource as unknown as string),
+  },
+
   // No/Lo
   {
     platform: "no_and_lo",
@@ -287,11 +449,9 @@ export function getRegistryEntry(platform: PlatformKey, framework: FrameworkKey)
   return registry.find((r) => r.platform === platform && r.framework === framework);
 }
 
-// derivePlatformOptions removed; platform options are sourced from constants.tsx
-
 export function deriveFrameworksByPlatform(): Record<PlatformKey, { key: FrameworkKey; label: string; icon?: React.ReactNode }[]> {
   const out: Record<PlatformKey, { key: FrameworkKey; label: string; icon?: React.ReactNode }[]> = {
-    typescript: [], python: [], go: [], opentelemetry: [], no_and_lo: [], other: [],
+    typescript: [], python: [], go: [], java: [], opentelemetry: [], no_and_lo: [], other: [],
   };
   for (const r of registry) {
     out[r.platform].push({ key: r.framework, label: r.label, icon: r.icon });
