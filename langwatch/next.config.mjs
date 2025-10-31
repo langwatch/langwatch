@@ -55,6 +55,7 @@ const config = {
             "*.snippet.go": { loaders: ["raw-loader"], as: "*.js" },
             "*.snippet.sh": { loaders: ["raw-loader"], as: "*.js" },
             "*.snippet.py": { loaders: ["raw-loader"], as: "*.js" },
+            "*.snippet.yaml": { loaders: ["raw-loader"], as: "*.js" },
         },
         resolveAlias: {
             "@injected-dependencies.client": path.join(
@@ -170,7 +171,7 @@ const config = {
         config.module.rules.push({ resourceQuery: /snippet/, type: "asset/source" });
 
         // Treat any *.snippet.* files as source assets to avoid resolution inside snippets
-        config.module.rules.push({ test: /\.snippet\.(txt|ts|tsx|js|go|sh|py)$/i, type: "asset/source" });
+        config.module.rules.push({ test: /\.snippet\.(txt|ts|tsx|js|go|sh|py|yaml)$/i, type: "asset/source" });
 
         // eslint-disable-next-line @typescript-eslint/no-unsafe-return
         return config;
