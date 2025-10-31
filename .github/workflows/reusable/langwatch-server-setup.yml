@@ -1,0 +1,86 @@
+name: LangWatch Server Setup
+
+on:
+  workflow_call:
+    inputs:
+      working-directory:
+        description: 'Working directory for the project'
+        required: false
+        default: 'langwatch'
+        type: string
+      port:
+        description: 'Port the server should run on'
+        required: false
+        default: '3000'
+        type: string
+      node-version:
+        description: 'Node.js version to use'
+        required: false
+        default: '20'
+        type: string
+      setup-database:
+        description: 'Whether to setup database and elasticsearch'
+        required: false
+        default: true
+        type: boolean
+      seed-project:
+        description: 'Whether to seed test project (for SDK CI)'
+        required: false
+        default: false
+        type: boolean
+
+jobs:
+  setup-langwatch-server:
+    runs-on: ubuntu-latest
+
+    services:
+      redis:
+        image: redis:alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+      elasticsearch:
+        image: docker.elastic.co/elasticsearch/elasticsearch:8.11.0
+        ports:
+          - 9200:9200
+        env:
+          discovery.type: single-node
+          xpack.security.enabled: false
+          ES_JAVA_OPTS: "-Xms512m -Xmx512m"
+        options: >-
+          --health-cmd "curl -f http://localhost:9200/_cluster/health || exit 1"
+          --health-interval 30s
+          --health-timeout 10s
+          --health-retries 5
+
+      postgres:
+        image: postgres:16
+        ports:
+          - 5432:5432
+        env:
+          POSTGRES_USER: langwatch_ci
+          POSTGRES_PASSWORD: ci_password
+          POSTGRES_DB: langwatch_test
+        options: >-
+          --health-cmd "pg_isready -U langwatch_ci"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup and start LangWatch server
+        uses: ./.github/actions/langwatch-server
+        with:
+          working-directory: ${{ inputs.working-directory }}
+          port: ${{ inputs.port }}
+          node-version: ${{ inputs.node-version }}
+          setup-database: ${{ inputs.setup-database }}
+          seed-project: ${{ inputs.seed-project }}
