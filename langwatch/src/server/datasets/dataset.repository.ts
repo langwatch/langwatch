@@ -76,15 +76,8 @@ export class DatasetRepository {
    * Creates a new dataset.
    */
   async create(input: CreateDatasetInput): Promise<Dataset> {
-    const { projectId, ...data } = input;
-
     return await this.prisma.dataset.create({
-      data: {
-        ...data,
-        project: {
-          connect: { id: projectId },
-        },
-      },
+      data: input
     });
   }
 

@@ -1,7 +1,16 @@
-import { Field, Text, VStack, Box, type BoxProps } from "@chakra-ui/react";
+import { useCallback } from "react";
+import {
+  Field,
+  Text,
+  VStack,
+  Box,
+  type BoxProps,
+  HStack,
+} from "@chakra-ui/react";
 import type { SlugValidationResult } from "./useDatasetSlugValidation";
 import { SlugChangeWarningAlert } from "./SlugChangeWarningAlert";
 import { SlugConflictAlert } from "./SlugConflictAlert";
+import { CopyButton } from "../CopyButton";
 
 /**
  * Props for DatasetSlugDisplay.
@@ -37,6 +46,19 @@ export function DatasetSlugDisplay({
   slugInfo,
   ...boxProps
 }: DatasetSlugDisplayProps) {
+  /**
+   * Renders the appropriate alert based on the slug info and slug will change.
+   */
+  const renderAlert = useCallback(() => {
+    if (slugInfo?.hasConflict && slugInfo.conflictsWith) {
+      return <SlugConflictAlert conflictsWith={slugInfo.conflictsWith} />;
+    }
+    if (!slugInfo?.hasConflict && slugWillChange) {
+      return <SlugChangeWarningAlert />;
+    }
+    return null;
+  }, [slugInfo, slugWillChange]);
+
   if (!displaySlug) {
     return null;
   }
@@ -45,22 +67,35 @@ export function DatasetSlugDisplay({
     <Box {...boxProps}>
       <Field.HelperText>
         <VStack align="start">
-          <Text fontSize="2xs" color="gray.600" textAlign="left">
-            slug: {slugWillChange ? (
-              <>
-                <Text as="span" textDecoration="line-through">{dbSlug}</Text>
-                {" -> "}
-                <b> {displaySlug}</b>
-              </>
-            ) : displaySlug}
-          </Text>
-          {slugWillChange && <SlugChangeWarningAlert />}
+          <HStack>
+            <Text
+              className="slug-text"
+              fontSize="2xs"
+              color="gray.600"
+              textAlign="left"
+              transition="opacity 0.2s"
+              minWidth={0}
+            >
+              slug:{" "}
+              {slugWillChange ? (
+                <>
+                  <Text as="span" textDecoration="line-through">
+                    {dbSlug}
+                  </Text>
+                  {" -> "}
+                  <b> {displaySlug}</b>
+                </>
+              ) : (
+                displaySlug
+              )}
+            </Text>
+            {!slugWillChange && displaySlug && (
+              <CopyButton value={displaySlug} label="Dataset slug" />
+            )}
+          </HStack>
+          {renderAlert()}
         </VStack>
       </Field.HelperText>
-
-      {slugInfo?.hasConflict && slugInfo.conflictsWith && (
-        <SlugConflictAlert conflictsWith={slugInfo.conflictsWith} />
-      )}
     </Box>
   );
 }
