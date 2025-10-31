@@ -7,7 +7,7 @@ import {
   datasetRecordEntrySchema,
   datasetRecordFormSchema,
 } from "../../datasets/types.generated";
-import { TeamRoleGroup, checkUserPermissionForProject } from "../permission";
+import { checkProjectPermission } from "../rbac";
 import { createManyDatasetRecords } from "./datasetRecord";
 import { tryToMapPreviousColumnsToNewColumns } from "../../../optimization_studio/utils/datasetUtils";
 import type { DatasetColumns, DatasetRecordEntry } from "../../datasets/types";
@@ -44,10 +44,10 @@ export const datasetRouter = createTRPCRouter({
             .extend({
               experimentId: z.string(),
             }),
-        ])
-      )
+        ]),
+      ),
     )
-    .use(checkUserPermissionForProject(TeamRoleGroup.DATASETS_MANAGE))
+    .use(checkProjectPermission("datasets:manage"))
     .mutation(async ({ ctx, input }) => {
       if ("datasetId" in input && input.datasetId) {
         const existingDataset = await ctx.prisma.dataset.findFirst({
@@ -78,7 +78,7 @@ export const datasetRouter = createTRPCRouter({
           const updatedEntries = tryToMapPreviousColumnsToNewColumns(
             datasetRecords.map((record) => record.entry as DatasetRecordEntry),
             existingDataset.columnTypes as DatasetColumns,
-            input.columnTypes
+            input.columnTypes,
           );
 
           await ctx.prisma.$transaction(
@@ -92,8 +92,8 @@ export const datasetRouter = createTRPCRouter({
                 data: {
                   entry: updatedEntries[index],
                 },
-              })
-            )
+              }),
+            ),
           );
         }
 
@@ -114,7 +114,7 @@ export const datasetRouter = createTRPCRouter({
           ? input.name
           : await findNextDatasetNameForExperiment(
               input.projectId,
-              input.experimentId
+              input.experimentId,
             );
 
       const slug = slugify(name.replace("_", "-"), {
@@ -161,7 +161,7 @@ export const datasetRouter = createTRPCRouter({
     }),
   getAll: protectedProcedure
     .input(z.object({ projectId: z.string() }))
-    .use(checkUserPermissionForProject(TeamRoleGroup.DATASETS_VIEW))
+    .use(checkProjectPermission("datasets:view"))
     .query(async ({ input, ctx }) => {
       const { projectId } = input;
       const prisma = ctx.prisma;
@@ -180,7 +180,7 @@ export const datasetRouter = createTRPCRouter({
     }),
   getById: protectedProcedure
     .input(z.object({ projectId: z.string(), datasetId: z.string() }))
-    .use(checkUserPermissionForProject(TeamRoleGroup.DATASETS_VIEW))
+    .use(checkProjectPermission("datasets:view"))
     .query(async ({ input, ctx }) => {
       const { projectId, datasetId } = input;
       const dataset = await ctx.prisma.dataset.findFirst({
@@ -194,9 +194,9 @@ export const datasetRouter = createTRPCRouter({
         projectId: z.string(),
         datasetId: z.string(),
         undo: z.boolean().optional(),
-      })
+      }),
     )
-    .use(checkUserPermissionForProject(TeamRoleGroup.DATASETS_MANAGE))
+    .use(checkProjectPermission("datasets:delete"))
     .mutation(async ({ ctx, input }) => {
       const datasetName = (
         await ctx.prisma.dataset.findFirst({
@@ -237,9 +237,9 @@ export const datasetRouter = createTRPCRouter({
             mapping: z.record(z.string(), z.any()),
           })
           .optional(),
-      })
+      }),
     )
-    .use(checkUserPermissionForProject(TeamRoleGroup.DATASETS_MANAGE))
+    .use(checkProjectPermission("datasets:update"))
     .mutation(async ({ ctx, input }) => {
       const { projectId, datasetId, mapping, threadMapping } = input;
 
@@ -268,7 +268,7 @@ export const datasetRouter = createTRPCRouter({
    */
   findNextName: protectedProcedure
     .input(z.object({ projectId: z.string(), proposedName: z.string() }))
-    .use(checkUserPermissionForProject(TeamRoleGroup.DATASETS_VIEW))
+    .use(checkProjectPermission("datasets:view"))
     .query(async ({ input }) => {
       const { projectId, proposedName } = input;
       return await findNextName(projectId, proposedName);
@@ -277,7 +277,7 @@ export const datasetRouter = createTRPCRouter({
 
 const findNextDatasetNameForExperiment = async (
   projectId: string,
-  experimentId: string
+  experimentId: string,
 ) => {
   const experiment = await prisma.experiment.findFirst({
     where: { id: experimentId, projectId },

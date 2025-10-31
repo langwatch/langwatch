@@ -7,10 +7,12 @@ import { api } from "~/utils/api";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import ScenarioInfoCard from "~/components/simulations/ScenarioInfoCard";
 import React, { useEffect, useMemo, useState } from "react";
+import { PermissionAlert } from "../../../components/PermissionAlert";
 
 export default function SimulationsPage() {
   const router = useRouter();
-  const { project } = useOrganizationTeamProject();
+  const { project, hasPermission } = useOrganizationTeamProject();
+  const hasScenariosViewPermission = hasPermission("scenarios:view");
   const [refetchInterval, setRefetchInterval] = useState(4000);
 
   // Refetch interval is set to 4 seconds when the window is focused and 30 seconds when the window is blurred.
@@ -36,8 +38,15 @@ export default function SimulationsPage() {
     {
       refetchInterval,
       enabled: !!project,
-    }
+    },
   );
+  if (!hasScenariosViewPermission) {
+    return (
+      <DashboardLayout>
+        <PermissionAlert permission="scenarios:view" />
+      </DashboardLayout>
+    );
+  }
 
   const sortedScenarioSetsData = useMemo(() => {
     if (!scenarioSetsData) {
@@ -63,10 +72,10 @@ export default function SimulationsPage() {
           {!isLoading &&
             sortedScenarioSetsData &&
             sortedScenarioSetsData.length > 0 && (
-            <HStack justify="space-between" align="center" w="full">
-              <PageLayout.Heading>Simulation Sets</PageLayout.Heading>
-            </HStack>
-          )}
+              <HStack justify="space-between" align="center" w="full">
+                <PageLayout.Heading>Simulation Sets</PageLayout.Heading>
+              </HStack>
+            )}
         </PageLayout.Header>
 
         {/* Show loading state */}

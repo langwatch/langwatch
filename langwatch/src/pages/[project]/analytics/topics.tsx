@@ -20,6 +20,8 @@ import {
 import { FilterSidebar } from "~/components/filters/FilterSidebar";
 import { AnalyticsHeader } from "../../../components/analytics/AnalyticsHeader";
 import { TopicsSelector } from "../../../components/filters/TopicsSelector";
+import { useOrganizationTeamProject } from "../../../hooks/useOrganizationTeamProject";
+import { withPermissionGuard } from "../../../components/WithPermissionGuard";
 
 // Time unit conversion constants
 const MINUTES_IN_DAY = 24 * 60; // 1440 minutes in a day
@@ -101,7 +103,7 @@ const inputSentiment = {
   height: 300,
 };
 
-export default function Topics() {
+function TopicsContent() {
   return (
     <GraphsLayout>
       <AnalyticsHeader title="Topics" />
@@ -176,3 +178,7 @@ export default function Topics() {
     </GraphsLayout>
   );
 }
+
+export default withPermissionGuard("analytics:view", {
+  layoutComponent: GraphsLayout,
+})(TopicsContent);

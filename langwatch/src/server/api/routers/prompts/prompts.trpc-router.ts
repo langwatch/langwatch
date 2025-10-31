@@ -2,8 +2,7 @@ import { PromptScope } from "@prisma/client";
 import { z } from "zod";
 
 import { PromptService } from "~/server/prompt-config";
-import { TeamRoleGroup } from "../../permission";
-import { checkUserPermissionForProject } from "../../permission";
+import { checkProjectPermission } from "../../rbac";
 import { createTRPCRouter, protectedProcedure } from "../../trpc";
 
 import {
@@ -27,7 +26,7 @@ export const promptsRouter = createTRPCRouter({
    */
   getAllPromptsForProject: protectedProcedure
     .input(z.object({ projectId: z.string() }))
-    .use(checkUserPermissionForProject(TeamRoleGroup.PROMPTS_VIEW))
+    .use(checkProjectPermission("prompts:view"))
     .query(async ({ ctx, input }) => {
       const service = new PromptService(ctx.prisma);
       return await service.getAllPrompts(input);
@@ -41,9 +40,9 @@ export const promptsRouter = createTRPCRouter({
       z.object({
         versionId: z.string(),
         projectId: z.string(),
-      })
+      }),
     )
-    .use(checkUserPermissionForProject(TeamRoleGroup.PROMPTS_MANAGE))
+    .use(checkProjectPermission("prompts:update"))
     .mutation(async ({ ctx, input }) => {
       const service = new PromptService(ctx.prisma);
       const authorId = ctx.session?.user?.id;
@@ -76,9 +75,9 @@ export const promptsRouter = createTRPCRouter({
           demonstrations: nodeDatasetSchema.optional(),
           handle: handleSchema,
         }),
-      })
+      }),
     )
-    .use(checkUserPermissionForProject(TeamRoleGroup.PROMPTS_MANAGE))
+    .use(checkProjectPermission("prompts:create"))
     .mutation(async ({ ctx, input }) => {
       const service = new PromptService(ctx.prisma);
       const authorId = ctx.session?.user?.id;
@@ -114,9 +113,9 @@ export const promptsRouter = createTRPCRouter({
           responseFormat: responseFormatSchema.optional(),
           demonstrations: nodeDatasetSchema.optional(),
         }),
-      })
+      }),
     )
-    .use(checkUserPermissionForProject(TeamRoleGroup.PROMPTS_MANAGE))
+    .use(checkProjectPermission("prompts:update"))
     .mutation(async ({ ctx, input }) => {
       const service = new PromptService(ctx.prisma);
       const authorId = ctx.session?.user?.id;
@@ -143,9 +142,9 @@ export const promptsRouter = createTRPCRouter({
           handle: handleSchema,
           scope: z.nativeEnum(PromptScope),
         }),
-      })
+      }),
     )
-    .use(checkUserPermissionForProject(TeamRoleGroup.PROMPTS_MANAGE))
+    .use(checkProjectPermission("prompts:update"))
     .mutation(async ({ ctx, input }) => {
       const service = new PromptService(ctx.prisma);
       return await service.updateHandle({
@@ -163,9 +162,9 @@ export const promptsRouter = createTRPCRouter({
       z.object({
         idOrHandle: z.string(),
         projectId: z.string(),
-      })
+      }),
     )
-    .use(checkUserPermissionForProject(TeamRoleGroup.PROMPTS_VIEW))
+    .use(checkProjectPermission("prompts:view"))
     .query(async ({ ctx, input }) => {
       const service = new PromptService(ctx.prisma);
       return await service.getPromptByIdOrHandle(input);
@@ -180,9 +179,9 @@ export const promptsRouter = createTRPCRouter({
         handle: handleSchema,
         projectId: z.string(),
         scope: z.nativeEnum(PromptScope),
-      })
+      }),
     )
-    .use(checkUserPermissionForProject(TeamRoleGroup.PROMPTS_VIEW))
+    .use(checkProjectPermission("prompts:view"))
     .query(async ({ ctx, input }) => {
       const service = new PromptService(ctx.prisma);
       return await service.checkHandleUniqueness(input);
@@ -196,9 +195,9 @@ export const promptsRouter = createTRPCRouter({
       z.object({
         idOrHandle: z.string(),
         projectId: z.string(),
-      })
+      }),
     )
-    .use(checkUserPermissionForProject(TeamRoleGroup.PROMPTS_VIEW))
+    .use(checkProjectPermission("prompts:view"))
     .query(async ({ ctx, input }) => {
       const service = new PromptService(ctx.prisma);
       return await service.getAllVersions(input);
@@ -212,9 +211,9 @@ export const promptsRouter = createTRPCRouter({
       z.object({
         idOrHandle: z.string(),
         projectId: z.string(),
-      })
+      }),
     )
-    .use(checkUserPermissionForProject(TeamRoleGroup.PROMPTS_MANAGE))
+    .use(checkProjectPermission("prompts:delete"))
     .mutation(async ({ ctx, input }) => {
       const service = new PromptService(ctx.prisma);
       return await service.deletePrompt(input);

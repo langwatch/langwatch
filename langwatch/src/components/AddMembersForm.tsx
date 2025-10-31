@@ -8,8 +8,7 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { OrganizationUserRole } from "@prisma/client";
-import { Select as MultiSelect, chakraComponents } from "chakra-react-select";
+import { Select as MultiSelect } from "chakra-react-select";
 import { Mail, Trash } from "react-feather";
 import {
   Controller,
@@ -23,7 +22,6 @@ type Option = { label: string; value: string; description?: string };
 type InviteData = {
   email: string;
   teamOptions: Option[];
-  role?: Option;
 };
 
 export type MembersForm = {
@@ -38,24 +36,6 @@ interface AddMembersFormProps {
   onClose?: () => void;
   onCloseText?: string;
 }
-
-const selectOptions = [
-  {
-    label: "Admin",
-    value: OrganizationUserRole.ADMIN,
-    description: "Can manage organization and add or remove members",
-  },
-  {
-    label: "Member",
-    value: OrganizationUserRole.MEMBER,
-    description: "Can manage their own projects and view other projects",
-  },
-  {
-    label: "External / Viewer",
-    value: OrganizationUserRole.EXTERNAL,
-    description: "Can only view projects they are invited to, cannot see costs",
-  },
-];
 
 /**
  * Reusable form component for adding members to an organization
@@ -104,9 +84,6 @@ export function AddMembersForm({
                 Email
               </Table.ColumnHeader>
               <Table.ColumnHeader paddingLeft={0} paddingTop={0}>
-                Role
-              </Table.ColumnHeader>
-              <Table.ColumnHeader paddingLeft={0} paddingTop={0}>
                 Teams
               </Table.ColumnHeader>
               <Table.ColumnHeader
@@ -129,54 +106,6 @@ export function AddMembersForm({
                     />
                     <Field.ErrorText>
                       {errors.invites?.[index]?.email && "Email is required"}
-                    </Field.ErrorText>
-                  </Field.Root>
-                </Table.Cell>
-                <Table.Cell width="24%" paddingLeft={0} paddingY={2}>
-                  <Field.Root>
-                    <Controller
-                      control={control}
-                      name={`invites.${index}.role`}
-                      rules={{ required: "User role is required" }}
-                      render={({ field }) => (
-                        <MultiSelect
-                          {...field}
-                          options={selectOptions}
-                          hideSelectedOptions={false}
-                          isSearchable={false}
-                          components={{
-                            Menu: ({ children, ...props }) => (
-                              <chakraComponents.Menu
-                                {...props}
-                                innerProps={{
-                                  ...props.innerProps,
-                                  style: { width: "300px" },
-                                }}
-                              >
-                                {children}
-                              </chakraComponents.Menu>
-                            ),
-                            Option: ({ children, ...props }) => (
-                              <chakraComponents.Option {...props}>
-                                <VStack align="start">
-                                  <Text>{children}</Text>
-                                  <Text
-                                    color={
-                                      props.isSelected ? "white" : "gray.500"
-                                    }
-                                    fontSize="13px"
-                                  >
-                                    {props.data.description}
-                                  </Text>
-                                </VStack>
-                              </chakraComponents.Option>
-                            ),
-                          }}
-                        />
-                      )}
-                    />
-                    <Field.ErrorText>
-                      {errors.invites?.[index]?.role && "Role is required"}
                     </Field.ErrorText>
                   </Field.Root>
                 </Table.Cell>

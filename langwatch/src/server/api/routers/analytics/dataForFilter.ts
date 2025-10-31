@@ -2,7 +2,7 @@ import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { esClient, TRACE_INDEX } from "../../../elasticsearch";
 import { filterFieldsEnum } from "../../../filters/types";
-import { TeamRoleGroup, checkUserPermissionForProject } from "../../permission";
+import { checkProjectPermission } from "../../rbac";
 import { protectedProcedure } from "../../trpc";
 import { availableFilters } from "../../../filters/registry";
 import { sharedFiltersInputSchema } from "../../../analytics/types";
@@ -18,7 +18,7 @@ export const dataForFilter = protectedProcedure
       query: z.string().optional(),
     })
   )
-  .use(checkUserPermissionForProject(TeamRoleGroup.ANALYTICS_VIEW))
+  .use(checkProjectPermission("analytics:view"))
   .query(async ({ input }) => {
     const { field, key, subkey } = input;
 

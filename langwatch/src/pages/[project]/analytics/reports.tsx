@@ -24,7 +24,8 @@ import {
   type CustomGraphInput,
 } from "~/components/analytics/CustomGraph";
 import { useFilterToggle } from "~/components/filters/FilterToggle";
-import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { useOrganizationTeamProject } from "../../../hooks/useOrganizationTeamProject";
+import { withPermissionGuard } from "../../../components/WithPermissionGuard";
 import type { FilterField } from "~/server/filters/types";
 import { api } from "~/utils/api";
 import { Link } from "../../../components/ui/link";
@@ -69,7 +70,7 @@ function GraphCard({
         typeof graph.filters === "object" &&
         Object.keys(graph.filters).length > 0
       ),
-    [graph.filters]
+    [graph.filters],
   );
 
   return (
@@ -126,7 +127,7 @@ function GraphCard({
                   value="edit"
                   onClick={() => {
                     void router.push(
-                      `/${projectSlug}/analytics/custom/${graph.id}`
+                      `/${projectSlug}/analytics/custom/${graph.id}`,
                     );
                   }}
                 >
@@ -153,7 +154,7 @@ function GraphCard({
   );
 }
 
-export default function Reports() {
+function ReportsContent() {
   const { project } = useOrganizationTeamProject();
   const { showFilters } = useFilterToggle();
 
@@ -177,7 +178,7 @@ export default function Reports() {
             },
           });
         },
-      }
+      },
     );
   };
 
@@ -238,3 +239,7 @@ export default function Reports() {
     </GraphsLayout>
   );
 }
+
+export default withPermissionGuard("analytics:view", {
+  layoutComponent: GraphsLayout,
+})(ReportsContent);

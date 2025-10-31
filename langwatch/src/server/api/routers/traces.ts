@@ -30,11 +30,8 @@ import { transformElasticSearchTraceToTrace } from "~/server/elasticsearch/trans
 import { sharedFiltersInputSchema } from "../../analytics/types";
 import { TRACE_INDEX, esClient } from "../../elasticsearch";
 import { type ElasticSearchTrace, type Trace } from "../../tracer/types";
-import {
-  TeamRoleGroup,
-  checkPermissionOrPubliclyShared,
-  checkUserPermissionForProject,
-} from "../permission";
+import { checkPermissionOrPubliclyShared } from "../permission";
+import { checkProjectPermission } from "../rbac";
 import { getUserProtectionsForProject } from "../utils";
 import { generateTracesPivotQueryConditions } from "./analytics/common";
 
@@ -53,20 +50,17 @@ export const getAllForProjectInput = tracesFilterInput.extend({
 export const tracesRouter = createTRPCRouter({
   getAllForProject: protectedProcedure
     .input(getAllForProjectInput)
-    .use(checkUserPermissionForProject(TeamRoleGroup.MESSAGES_VIEW))
+    .use(checkProjectPermission("traces:view"))
     .query(async ({ ctx, input }) => {
       return await getAllTracesForProject({ input, ctx });
     }),
   getById: publicProcedure
     .input(z.object({ projectId: z.string(), traceId: z.string() }))
     .use(
-      checkPermissionOrPubliclyShared(
-        checkUserPermissionForProject(TeamRoleGroup.MESSAGES_VIEW),
-        {
-          resourceType: PublicShareResourceTypes.TRACE,
-          resourceParam: "traceId",
-        }
-      )
+      checkPermissionOrPubliclyShared(checkProjectPermission("traces:view"), {
+        resourceType: PublicShareResourceTypes.TRACE,
+        resourceParam: "traceId",
+      }),
     )
     .query(async ({ ctx, input }) => {
       const trace = await getTraceById({
@@ -87,13 +81,10 @@ export const tracesRouter = createTRPCRouter({
   getEvaluations: publicProcedure
     .input(z.object({ projectId: z.string(), traceId: z.string() }))
     .use(
-      checkPermissionOrPubliclyShared(
-        checkUserPermissionForProject(TeamRoleGroup.MESSAGES_VIEW),
-        {
-          resourceType: PublicShareResourceTypes.TRACE,
-          resourceParam: "traceId",
-        }
-      )
+      checkPermissionOrPubliclyShared(checkProjectPermission("traces:view"), {
+        resourceType: PublicShareResourceTypes.TRACE,
+        resourceParam: "traceId",
+      }),
     )
     .query(async ({ input, ctx }) => {
       const protections = await getUserProtectionsForProject(ctx, {
@@ -112,9 +103,9 @@ export const tracesRouter = createTRPCRouter({
       z.object({
         projectId: z.string(),
         traceIds: z.array(z.string()),
-      })
+      }),
     )
-    .use(checkUserPermissionForProject(TeamRoleGroup.MESSAGES_VIEW))
+    .use(checkProjectPermission("traces:view"))
     .query(async ({ input, ctx }) => {
       const protections = await getUserProtectionsForProject(ctx, {
         projectId: input.projectId,
@@ -127,7 +118,7 @@ export const tracesRouter = createTRPCRouter({
     }),
   getTopicCounts: protectedProcedure
     .input(tracesFilterInput)
-    .use(checkUserPermissionForProject(TeamRoleGroup.MESSAGES_VIEW))
+    .use(checkProjectPermission("traces:view"))
     .query(async ({ input, ctx }) => {
       const { pivotIndexConditions } =
         generateTracesPivotQueryConditions(input);
@@ -169,12 +160,12 @@ export const tracesRouter = createTRPCRouter({
             },
             select: { id: true, name: true, parentId: true },
           })
-        ).map((topic) => [topic.id, topic])
+        ).map((topic) => [topic.id, topic]),
       );
 
       const mapBuckets = (
         buckets: Array<{ key: string; doc_count: number }>,
-        includeParent = false
+        includeParent = false,
       ) => {
         return buckets.reduce(
           (acc, bucket) => {
@@ -196,7 +187,7 @@ export const tracesRouter = createTRPCRouter({
             name: string;
             count: number;
             parentId?: string | null;
-          }[]
+          }[],
         );
       };
 
@@ -207,7 +198,7 @@ export const tracesRouter = createTRPCRouter({
     }),
   getCustomersAndLabels: protectedProcedure
     .input(tracesFilterInput)
-    .use(checkUserPermissionForProject(TeamRoleGroup.MESSAGES_VIEW))
+    .use(checkProjectPermission("traces:view"))
     .query(async ({ input, ctx }) => {
       const protections = await getUserProtectionsForProject(ctx, {
         projectId: input.projectId,
@@ -250,16 +241,13 @@ export const tracesRouter = createTRPCRouter({
         projectId: z.string(),
         threadId: z.string(),
         traceId: z.string(),
-      })
+      }),
     )
     .use(
-      checkPermissionOrPubliclyShared(
-        checkUserPermissionForProject(TeamRoleGroup.MESSAGES_VIEW),
-        {
-          resourceType: PublicShareResourceTypes.TRACE,
-          resourceParam: "traceId",
-        }
-      )
+      checkPermissionOrPubliclyShared(checkProjectPermission("traces:view"), {
+        resourceType: PublicShareResourceTypes.TRACE,
+        resourceParam: "traceId",
+      }),
     )
     .query(async ({ input, ctx }) => {
       const { projectId, threadId } = input;
@@ -290,8 +278,8 @@ export const tracesRouter = createTRPCRouter({
 
       const filteredTraces = tracesGrouped.filter((trace) =>
         publicSharedTraces.some(
-          (publicShare) => publicShare.resourceId === trace.trace_id
-        )
+          (publicShare) => publicShare.resourceId === trace.trace_id,
+        ),
       );
 
       return filteredTraces;
@@ -299,7 +287,7 @@ export const tracesRouter = createTRPCRouter({
 
   getTracesWithSpans: protectedProcedure
     .input(z.object({ projectId: z.string(), traceIds: z.array(z.string()) }))
-    .use(checkUserPermissionForProject(TeamRoleGroup.MESSAGES_VIEW))
+    .use(checkProjectPermission("traces:view"))
     .query(async ({ input, ctx }) => {
       const { projectId, traceIds } = input;
       const protections = await getUserProtectionsForProject(ctx, {
@@ -311,7 +299,7 @@ export const tracesRouter = createTRPCRouter({
 
   getTracesWithSpansByThreadIds: protectedProcedure
     .input(z.object({ projectId: z.string(), threadIds: z.array(z.string()) }))
-    .use(checkUserPermissionForProject(TeamRoleGroup.MESSAGES_VIEW))
+    .use(checkProjectPermission("traces:view"))
     .query(async ({ input, ctx }) => {
       const { projectId, threadIds } = input;
       const protections = await getUserProtectionsForProject(ctx, {
@@ -363,9 +351,9 @@ export const tracesRouter = createTRPCRouter({
         projectId: z.string(),
         query: z.string().optional(),
         sortBy: z.string().optional(),
-      })
+      }),
     )
-    .use(checkUserPermissionForProject(TeamRoleGroup.MESSAGES_VIEW))
+    .use(checkProjectPermission("traces:view"))
     .query(async ({ ctx, input }) => {
       const { groups } = await getAllTracesForProject({
         input: {
@@ -376,7 +364,7 @@ export const tracesRouter = createTRPCRouter({
         ctx,
       });
       const traceIds = groups.flatMap((group) =>
-        group.map((trace) => trace.trace_id)
+        group.map((trace) => trace.trace_id),
       );
 
       if (traceIds.length === 0) {
@@ -390,7 +378,7 @@ export const tracesRouter = createTRPCRouter({
       const traceWithSpans = await getTracesWithSpans(
         projectId,
         traceIds,
-        protections
+        protections,
       );
 
       return traceWithSpans;
@@ -406,9 +394,9 @@ export const tracesRouter = createTRPCRouter({
           .or(z.string().startsWith("custom/")),
         preconditions: z.array(checkPreconditionSchema),
         expectedResults: z.number(),
-      })
+      }),
     )
-    .use(checkUserPermissionForProject(TeamRoleGroup.MESSAGES_VIEW))
+    .use(checkProjectPermission("traces:view"))
     .query(async ({ ctx, input }) => {
       const { groups } = await getAllTracesForProject({
         input: {
@@ -419,7 +407,7 @@ export const tracesRouter = createTRPCRouter({
         ctx,
       });
       const traceIds = groups.flatMap((group) =>
-        group.map((trace) => trace.trace_id)
+        group.map((trace) => trace.trace_id),
       );
 
       if (traceIds.length === 0) {
@@ -435,7 +423,7 @@ export const tracesRouter = createTRPCRouter({
       const traceWithSpans = await getTracesWithSpans(
         projectId,
         traceIds,
-        protections
+        protections,
       );
 
       const passedPreconditions = traceWithSpans.filter(
@@ -445,11 +433,11 @@ export const tracesRouter = createTRPCRouter({
             evaluatorType,
             trace,
             trace.spans ?? [],
-            preconditions
-          )
+            preconditions,
+          ),
       );
       const passedPreconditionsTraceIds = passedPreconditions?.map(
-        (trace) => trace.trace_id
+        (trace) => trace.trace_id,
       );
 
       let samples = shuffle(passedPreconditions)
@@ -459,11 +447,11 @@ export const tracesRouter = createTRPCRouter({
         samples = samples.concat(
           shuffle(
             traceWithSpans.filter(
-              (trace) => !passedPreconditionsTraceIds?.includes(trace.trace_id)
-            )
+              (trace) => !passedPreconditionsTraceIds?.includes(trace.trace_id),
+            ),
           )
             .slice(0, expectedResults - samples.length)
-            .map((sample) => ({ ...sample, passesPreconditions: false }))
+            .map((sample) => ({ ...sample, passesPreconditions: false })),
         );
       }
 
@@ -475,9 +463,9 @@ export const tracesRouter = createTRPCRouter({
       getAllForProjectInput.extend({
         includeSpans: z.boolean(),
         scrollId: z.string().optional(),
-      })
+      }),
     )
-    .use(checkUserPermissionForProject(TeamRoleGroup.MESSAGES_VIEW))
+    .use(checkProjectPermission("traces:view"))
     .mutation(async ({ ctx, input }) => {
       return await getAllTracesForProject({
         input: {
@@ -528,7 +516,7 @@ export const getAllTracesForProject = async ({
       session: ctx.session,
       publiclyShared: ctx.publiclyShared,
     },
-    { projectId: input.projectId }
+    { projectId: input.projectId },
   );
 
   let tracesResult: SearchResponse<ElasticSearchTrace>;
@@ -632,7 +620,7 @@ export const getAllTracesForProject = async ({
         protections,
       });
       const filteredTracesByThreadId = tracesFromThreadId.filter(
-        (trace) => !existingTraceIds.has(trace.trace_id)
+        (trace) => !existingTraceIds.has(trace.trace_id),
       );
 
       traces.unshift(...filteredTracesByThreadId);
@@ -649,7 +637,7 @@ export const getAllTracesForProject = async ({
   totalHits = (tracesResult.hits?.total as SearchTotalHits)?.value || 0;
 
   const evaluations = Object.fromEntries(
-    traces.map((trace) => [trace.trace_id, trace.evaluations ?? []])
+    traces.map((trace) => [trace.trace_id, trace.evaluations ?? []]),
   );
 
   // TODO: Remove this cast once we have a way to include guardrails in the traces directly on ES
@@ -666,7 +654,7 @@ export const getAllTracesForProject = async ({
 export const getTracesWithSpans = async (
   projectId: string,
   traceIds: string[],
-  protections: Protections
+  protections: Protections,
 ) => {
   const traces = await searchTraces({
     connConfig: { projectId },
@@ -708,7 +696,7 @@ export const getTracesWithSpans = async (
 
 const groupTraces = <T extends Trace>(
   groupBy: string | undefined,
-  traces: T[]
+  traces: T[],
 ) => {
   const groups: T[][] = [];
 
@@ -789,7 +777,7 @@ export const getEvaluationsMultiple = async (input: {
   });
 
   return Object.fromEntries(
-    traces.map((trace) => [trace.trace_id, trace.evaluations ?? []])
+    traces.map((trace) => [trace.trace_id, trace.evaluations ?? []]),
   );
 };
 

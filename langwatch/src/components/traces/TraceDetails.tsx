@@ -17,7 +17,6 @@ import { Maximize2, Minimize2 } from "react-feather";
 import { useAnnotationCommentStore } from "../../hooks/useAnnotationCommentStore";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { useTraceDetailsState } from "../../hooks/useTraceDetailsState";
-import { TeamRoleGroup } from "../../server/api/permission";
 import { api } from "../../utils/api";
 import { AddAnnotationQueueDrawer } from "../AddAnnotationQueueDrawer";
 import { useDrawer } from "../CurrentDrawer";
@@ -50,7 +49,7 @@ export function TraceDetails(props: {
   showMessages?: boolean;
   onToggleView?: () => void;
 }) {
-  const { project, hasTeamPermission } = useOrganizationTeamProject();
+  const { project, hasPermission } = useOrganizationTeamProject();
   const [threadId, setThreadId] = useState<string | undefined>(undefined);
   const router = useRouter();
   const queryClient = api.useContext();
@@ -69,7 +68,7 @@ export function TraceDetails(props: {
       enabled: !!project,
       refetchInterval: evaluationsCheckInterval,
       refetchOnWindowFocus: false,
-    }
+    },
   );
 
   useEffect(() => {
@@ -78,7 +77,7 @@ export function TraceDetails(props: {
         (check) =>
           (check.status == "scheduled" || check.status == "in_progress") &&
           (check.timestamps.inserted_at ?? 0) >
-            new Date().getTime() - 1000 * 60 * 60 * 1
+            new Date().getTime() - 1000 * 60 * 60 * 1,
       );
       if (pendingChecks.length > 0) {
         setEvaluationsCheckInterval(2000);
@@ -114,20 +113,20 @@ export function TraceDetails(props: {
               {
                 ...Object.fromEntries(
                   Object.entries(router.query).filter(
-                    ([key]) => !key.startsWith("drawer.selectedTab")
-                  )
+                    ([key]) => !key.startsWith("drawer.selectedTab"),
+                  ),
                 ),
                 drawer: {
                   selectedTab: tab,
                 },
               },
-              { allowDots: true }
-            )
+              { allowDots: true },
+            ),
         );
       }, 100);
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [selectedTab]
+    [selectedTab],
   );
 
   useEffect(() => {
@@ -176,12 +175,12 @@ export function TraceDetails(props: {
             },
           });
         },
-      }
+      },
     );
   };
 
   const [annotators, setAnnotators] = useState<{ id: string; name: string }[]>(
-    []
+    [],
   );
 
   useEffect(() => {
@@ -236,7 +235,7 @@ export function TraceDetails(props: {
             </Text>
             <Spacer />
             <HStack>
-              {hasTeamPermission(TeamRoleGroup.ANNOTATIONS_MANAGE) && (
+              {hasPermission("annotations:manage") && (
                 <Button
                   variant="outline"
                   onClick={() => {
@@ -255,7 +254,7 @@ export function TraceDetails(props: {
                   Annotate
                 </Button>
               )}
-              {hasTeamPermission(TeamRoleGroup.ANNOTATIONS_MANAGE) && (
+              {hasPermission("annotations:manage") && (
                 <>
                   <Popover.Root
                     modal
@@ -283,7 +282,7 @@ export function TraceDetails(props: {
                   </Popover.Root>
                 </>
               )}
-              {hasTeamPermission(TeamRoleGroup.DATASETS_MANAGE) && (
+              {hasPermission("datasets:manage") && (
                 <Button
                   type="submit"
                   variant="outline"

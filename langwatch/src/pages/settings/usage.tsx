@@ -20,8 +20,9 @@ import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProje
 import { api } from "../../utils/api";
 import { camelCaseToTitleCase } from "../../utils/stringCasing";
 import { usePublicEnv } from "~/hooks/usePublicEnv";
+import { withPermissionGuard } from "../../components/WithPermissionGuard";
 
-export default function Usage() {
+function Usage() {
   const { organization } = useOrganizationTeamProject();
   const { period, setPeriod } = usePeriodSelector(30);
 
@@ -31,7 +32,7 @@ export default function Usage() {
     },
     {
       enabled: !!organization,
-    }
+    },
   );
 
   const aggregatedCosts = api.costs.getAggregatedCostsForOrganization.useQuery(
@@ -40,7 +41,7 @@ export default function Usage() {
       startDate: period.startDate.getTime(),
       endDate: period.endDate.getTime(),
     },
-    {}
+    {},
   );
 
   const usage = api.limits.getUsage.useQuery(
@@ -49,7 +50,7 @@ export default function Usage() {
       enabled: !!organization,
       refetchOnWindowFocus: false,
       refetchOnMount: false,
-    }
+    },
   );
 
   const publicEnv = usePublicEnv();
@@ -91,7 +92,7 @@ export default function Usage() {
                     max={usage.data?.activePlan.maxMessagesPerMonth}
                     value={Math.min(
                       usage.data?.currentMonthMessagesCount,
-                      usage.data?.activePlan.maxMessagesPerMonth
+                      usage.data?.activePlan.maxMessagesPerMonth,
                     )}
                     maxW="sm"
                     colorPalette="orange"
@@ -180,7 +181,7 @@ export default function Usage() {
                           <Table.Row key={`${cost.costType}-${cost.currency}`}>
                             <Table.Cell>
                               {camelCaseToTitleCase(
-                                cost.costType.toLowerCase()
+                                cost.costType.toLowerCase(),
                               )}
                               {cost.costType === "TRACE_CHECK" &&
                                 ` - ${cost.costName}`}
@@ -190,7 +191,7 @@ export default function Usage() {
                               {(cost._sum.amount ?? 0) < 0.01
                                 ? `< ${cost.currency} 0.01`
                                 : `${cost.currency} ${cost._sum.amount?.toFixed(
-                                    2
+                                    2,
                                   )}`}
                             </Table.Cell>
                           </Table.Row>
@@ -207,3 +208,7 @@ export default function Usage() {
     </SettingsLayout>
   );
 }
+
+export default withPermissionGuard("cost:view", {
+  layoutComponent: SettingsLayout,
+})(Usage);

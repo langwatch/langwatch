@@ -11,15 +11,18 @@ import {
 } from "@chakra-ui/react";
 import { MoreVertical, Plus } from "react-feather";
 import { Menu } from "../../components/ui/menu";
+import { Tooltip } from "../../components/ui/tooltip";
 import { toaster } from "../../components/ui/toaster";
 import { api } from "../../utils/api";
 import { useDrawer } from "../CurrentDrawer";
+import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 
 export function LLMModelCost(props: { projectId?: string }) {
   const { openDrawer } = useDrawer();
+  const { hasPermission } = useOrganizationTeamProject();
   const llmModelCosts = api.llmModelCost.getAllForProject.useQuery(
     { projectId: props.projectId ?? "" },
-    { enabled: !!props.projectId }
+    { enabled: !!props.projectId },
   );
 
   return (
@@ -37,14 +40,20 @@ export function LLMModelCost(props: { projectId?: string }) {
           </>
         )}
         <Spacer />
-        <Button
-          size="md"
-          colorPalette="orange"
-          onClick={() => openDrawer("llmModelCost", {})}
+        <Tooltip
+          content="You need project setup permissions to manage LLM model costs."
+          disabled={hasPermission("project:manage")}
         >
-          <Plus size={20} />
-          <Text>Add New Model</Text>
-        </Button>
+          <Button
+            size="md"
+            colorPalette="orange"
+            onClick={() => openDrawer("llmModelCost", {})}
+            disabled={!hasPermission("project:manage")}
+          >
+            <Plus size={20} />
+            <Text>Add New Model</Text>
+          </Button>
+        </Tooltip>
       </HStack>
       <Text>
         The cost per token will be calculated according to this table on the
@@ -173,7 +182,7 @@ function ActionsMenu({
   const { openDrawer } = useDrawer();
   const llmModelCosts = api.llmModelCost.getAllForProject.useQuery(
     { projectId: projectId ?? "" },
-    { enabled: !!projectId }
+    { enabled: !!projectId },
   );
   const deleteLLMModelCost = api.llmModelCost.delete.useMutation();
 
@@ -247,7 +256,7 @@ function ActionsMenu({
                       },
                     });
                   },
-                }
+                },
               );
             }}
           >

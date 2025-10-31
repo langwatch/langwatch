@@ -23,7 +23,6 @@ import { ChevronDown, Search, X } from "react-feather";
 import { useDebounceValue } from "usehooks-ts";
 
 import { useFilterParams, type FilterParam } from "../../hooks/useFilterParams";
-import { TeamRoleGroup } from "../../server/api/permission";
 import type { AppRouter } from "../../server/api/root";
 import { availableFilters } from "../../server/filters/registry";
 import type { FilterDefinition, FilterField } from "../../server/filters/types";
@@ -48,7 +47,7 @@ export function QueryStringFieldsFilters({
   const { nonEmptyFilters, setFilters } = useFilterParams();
 
   const { openDrawer } = useDrawer();
-  const { hasTeamPermission } = useOrganizationTeamProject();
+  const { hasPermission } = useOrganizationTeamProject();
 
   const hasAnyFilters = Object.keys(nonEmptyFilters).length > 0;
 
@@ -57,8 +56,7 @@ export function QueryStringFieldsFilters({
       filters={nonEmptyFilters}
       setFilters={(filters) => setFilters(filterOutEmptyFilters(filters))}
       actionButton={
-        hasTeamPermission(TeamRoleGroup.TRIGGERS_MANAGE) &&
-        !hideTriggerButton ? (
+        hasPermission("triggers:manage") && !hideTriggerButton ? (
           <Tooltip content="Create a filter to add a trigger.">
             <Button
               colorPalette="orange"
@@ -146,7 +144,7 @@ function FieldsFilter({
     (filterId: FilterField, values: FilterParam) => {
       setFilters({ ...filters, [filterId]: values });
     },
-    [setFilters, filters]
+    [setFilters, filters],
   );
 
   const searchRef = React.useRef<HTMLInputElement | null>(null);
@@ -393,7 +391,7 @@ function ListSelection({
       refetchOnWindowFocus: false,
       keepPreviousData: true,
       enabled: queryOpts.enabled,
-    }
+    },
   );
 
   const options = useMemo(() => {
@@ -486,7 +484,7 @@ function ListSelection({
 
             if (currentValues.includes(field.toString())) {
               onChange(
-                currentValues.filter((v) => v.toString() !== field.toString())
+                currentValues.filter((v) => v.toString() !== field.toString()),
               );
             } else {
               onChange([...currentValues, field]);
@@ -559,7 +557,7 @@ function ListSelection({
               >
                 <Skeleton height="12px" width="120px" />
               </Checkbox>
-            )
+            ),
           )}
       </VStack>
     </Box>
@@ -579,10 +577,10 @@ function RangeFilter({
   onChange: (value: string[]) => void;
 }) {
   let min = +numeral(
-    +(filterData.data?.options.find((o) => o.label === "min")?.field ?? 0)
+    +(filterData.data?.options.find((o) => o.label === "min")?.field ?? 0),
   ).format("0.[0]");
   let max = +numeral(
-    +(filterData.data?.options.find((o) => o.label === "max")?.field ?? 0)
+    +(filterData.data?.options.find((o) => o.label === "max")?.field ?? 0),
   ).format("0.[0]");
   if (isNaN(min)) {
     min = 0;

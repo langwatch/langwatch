@@ -1,13 +1,12 @@
 import { Card, Heading } from "@chakra-ui/react";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { analyticsMetrics } from "../../server/analytics/registry";
-import { TeamRoleGroup } from "../../server/api/permission";
 import { CustomGraph, type CustomGraphInput } from "./CustomGraph";
 import { usePublicEnv } from "../../hooks/usePublicEnv";
 
 export const LLMSummary = () => {
   const publicEnv = usePublicEnv();
-  const { hasTeamPermission } = useOrganizationTeamProject();
+  const { hasPermission } = useOrganizationTeamProject();
 
   const isQuickwit = publicEnv.data && publicEnv.data.IS_QUICKWIT;
   const isNotQuickwit = publicEnv.data && !publicEnv.data.IS_QUICKWIT;
@@ -26,22 +25,23 @@ export const LLMSummary = () => {
             },
           ] as CustomGraphInput["series"])
         : isQuickwit
-        ? ([
-            {
-              name: "Mean Prompt Tokens per Message",
-              metric: "performance.prompt_tokens",
-              aggregation: "avg",
-              colorSet: analyticsMetrics.performance.prompt_tokens.colorSet,
-            },
-            {
-              name: "Mean Completion Tokens per Message",
-              metric: "performance.completion_tokens",
-              aggregation: "avg",
-              colorSet: analyticsMetrics.performance.completion_tokens.colorSet,
-            },
-          ] as CustomGraphInput["series"])
-        : []),
-      ...(hasTeamPermission(TeamRoleGroup.COST_VIEW)
+          ? ([
+              {
+                name: "Mean Prompt Tokens per Message",
+                metric: "performance.prompt_tokens",
+                aggregation: "avg",
+                colorSet: analyticsMetrics.performance.prompt_tokens.colorSet,
+              },
+              {
+                name: "Mean Completion Tokens per Message",
+                metric: "performance.completion_tokens",
+                aggregation: "avg",
+                colorSet:
+                  analyticsMetrics.performance.completion_tokens.colorSet,
+              },
+            ] as CustomGraphInput["series"])
+          : []),
+      ...(hasPermission("cost:view")
         ? ([
             {
               name: "Mean Cost per Message",

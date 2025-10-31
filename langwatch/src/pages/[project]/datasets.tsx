@@ -31,17 +31,19 @@ import { Link } from "../../components/ui/link";
 import { Menu } from "../../components/ui/menu";
 import { toaster } from "../../components/ui/toaster";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
+import { PermissionAlert } from "../../components/PermissionAlert";
 
 export default function Datasets() {
   const addEditDatasetDrawer = useDisclosure();
   const uploadCSVModal = useDisclosure();
-  const { project } = useOrganizationTeamProject();
+  const { project, hasPermission } = useOrganizationTeamProject();
   const router = useRouter();
   const { openDrawer } = useDrawer();
+  const hasDatasetsViewPermission = hasPermission("datasets:view");
 
   const datasets = api.dataset.getAll.useQuery(
     { projectId: project?.id ?? "" },
-    { enabled: !!project }
+    { enabled: !!project && hasDatasetsViewPermission },
   );
 
   const datasetDelete = api.dataset.deleteById.useMutation();
@@ -53,6 +55,14 @@ export default function Datasets() {
       }
     | undefined
   >();
+
+  if (!hasDatasetsViewPermission) {
+    return (
+      <DashboardLayout>
+        <PermissionAlert permission="datasets:view" />
+      </DashboardLayout>
+    );
+  }
 
   const deleteDataset = (id: string, name: string) => {
     datasetDelete.mutate(
@@ -90,7 +100,7 @@ export default function Datasets() {
                           });
                           addEditDatasetDrawer.onClose();
                         },
-                      }
+                      },
                     );
                   }}
                 >
@@ -118,7 +128,7 @@ export default function Datasets() {
             },
           });
         },
-      }
+      },
     );
   };
 

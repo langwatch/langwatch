@@ -14,6 +14,8 @@ import {
 } from "~/components/analytics/CustomGraph";
 import { FilterSidebar } from "~/components/filters/FilterSidebar";
 import { AnalyticsHeader } from "../../../components/analytics/AnalyticsHeader";
+import { useOrganizationTeamProject } from "../../../hooks/useOrganizationTeamProject";
+import { withPermissionGuard } from "../../../components/WithPermissionGuard";
 
 // Time unit conversion constants
 const MINUTES_IN_DAY = 24 * 60; // 1440 minutes in a day
@@ -192,7 +194,7 @@ const averageTokensPerMessage = {
   height: 300,
 };
 
-export default function Users() {
+function MetricsContent() {
   return (
     <GraphsLayout>
       <AnalyticsHeader title="LLM Metrics" />
@@ -300,3 +302,7 @@ export default function Users() {
     </GraphsLayout>
   );
 }
+
+export default withPermissionGuard("analytics:view", {
+  layoutComponent: GraphsLayout,
+})(MetricsContent);
