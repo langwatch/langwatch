@@ -16,8 +16,6 @@ import { useCallback, useState } from "react";
 import {
   ArrowUp,
   ArrowUpCircle,
-  Box as BoxIcon,
-  CheckCircle,
   Code,
   Lock,
   Play,
@@ -50,13 +48,28 @@ import {
   datasetDatabaseRecordsToInMemoryDataset,
   inMemoryDatasetToNodeDataset,
 } from "../utils/datasetUtils";
-import { checkIsEvaluator, getEntryInputs } from "../utils/nodeUtils";
+import { getEntryInputs } from "../utils/nodeUtils";
 
 // Type with dataset property
 interface NodeDataWithDataset {
   dataset: any;
   [key: string]: any;
 }
+
+/**
+ * Generates a sanitized filename for workflow export.
+ * Strips the " - Workflow" suffix and converts to a filesystem-safe slug.
+ */
+const generateWorkflowExportFilename = (workflowName: string): string => {
+  const today = new Date();
+  const formattedDate = today.toISOString().split("T")[0];
+  const nameWithoutSuffix = workflowName.replace(/\s*-?\s*Workflow\s*$/i, "");
+  const slugifiedName = nameWithoutSuffix
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+  return `workflow--${slugifiedName}-${formattedDate}.json`;
+};
 
 export function Publish({ isDisabled }: { isDisabled: boolean }) {
   const publishModal = useDisclosure();
@@ -170,7 +183,7 @@ const exportWorkflow = async (
   publishedWorkflow: Workflow,
   datasetData?: Dataset & { datasetRecords: DatasetRecord[] }
 ) => {
-  let dsl = { ...publishedWorkflow };
+  const dsl = { ...publishedWorkflow };
   try {
     if (datasetData && datasetData.datasetRecords.length > 0) {
       const inMemoryDataset =
@@ -187,14 +200,11 @@ const exportWorkflow = async (
     dsl.experiment_id = "";
     dsl.state = {};
 
-    //Create and trigger download
     const url = window.URL.createObjectURL(new Blob([JSON.stringify(dsl)]));
     const link = document.createElement("a");
     link.href = url;
 
-    const today = new Date();
-    const formattedDate = today.toISOString().split("T")[0];
-    const fileName = `Workflow - ${formattedDate}.json`;
+    const fileName = generateWorkflowExportFilename(publishedWorkflow.name);
 
     link.setAttribute("download", fileName);
     document.body.appendChild(link);
