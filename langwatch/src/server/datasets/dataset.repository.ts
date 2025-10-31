@@ -104,26 +104,28 @@ export class DatasetRepository {
   ): Promise<Dataset> {
     const client = options?.tx ?? this.prisma;
 
-    // Verify dataset exists and belongs to project
-    const existing = await client.dataset.findFirst({
+    // Use updateMany to satisfy middleware projectId requirement
+    // updateMany accepts compound where clauses and validates ownership
+    const result = await client.dataset.updateMany({
       where: {
         id: input.id,
         projectId: input.projectId,
       },
+      data: input.data,
     });
 
-    if (!existing) {
+    if (result.count === 0) {
       throw new Error(
         `Dataset ${input.id} not found in project ${input.projectId}`
       );
     }
 
-    // Perform update (Prisma .update() with @id only accepts unique field)
-    return await client.dataset.update({
+    // Return the updated dataset
+    return await client.dataset.findFirstOrThrow({
       where: {
         id: input.id,
+        projectId: input.projectId,
       },
-      data: input.data,
     });
   }
 
