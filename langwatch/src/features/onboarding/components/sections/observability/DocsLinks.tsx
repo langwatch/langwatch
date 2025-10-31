@@ -21,11 +21,8 @@ export function DocsLinks({ docs, label }: DocsLinksProps): React.ReactElement |
       fontSize="xs"
       justify="flex-start"
       align="center"
-      pt={2}
+      pt={1}
     >
-      <Text fontWeight="medium" color="fg.muted">
-        Documentation
-      </Text>
       {docs.internal && (
         <Link href={`https://docs.langwatch.ai${docs.internal}`} isExternal>
           <HStack gap={1} _hover={{ color: "fg" }} transition="color 0.2s">
