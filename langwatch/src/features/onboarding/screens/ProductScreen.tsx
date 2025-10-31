@@ -14,6 +14,8 @@ export const ProductScreen: React.FC = () => {
   const {
     currentScreenIndex,
     flow,
+    navigation,
+    canGoBack,
     handleSelectProduct,
   } = useProductFlow();
   const { organization, isLoading } = useOrganizationTeamProject({
@@ -58,6 +60,8 @@ export const ProductScreen: React.FC = () => {
         loading={delayedLoading}
         compressedHeader
         widthVariant={currentScreen.widthVariant ?? "narrow"}
+        showBackButton={canGoBack}
+        onBack={() => navigation.prevScreen()}
       >
         <Box w="full" minH="100dvh" position="relative">
           <OnboardingMeshBackground opacity={0.22} blurPx={96} />

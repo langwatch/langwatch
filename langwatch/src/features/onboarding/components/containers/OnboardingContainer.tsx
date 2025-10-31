@@ -11,7 +11,7 @@ import { FullLogo } from "~/components/icons/FullLogo";
 import { motion } from "motion/react";
 import SpookyScarySkeleton from "../SpookyScarySkeleton";
 import { signOut } from "next-auth/react";
-import { LogOut } from "lucide-react";
+import { LogOut, ArrowLeft } from "lucide-react";
 import { Tooltip } from "~/components/ui/tooltip";
 import { useAnalytics } from "react-contextual-analytics";
 
@@ -31,16 +31,37 @@ interface OnboardingContainerProps extends React.PropsWithChildren {
    * Controls the maximum width of the container content. Single Responsibility: layout width.
    */
   widthVariant?: "narrow" | "full";
+  /**
+   * Whether to show the back button. Single Responsibility: navigation control.
+   */
+  showBackButton?: boolean;
+  /**
+   * Callback when back button is clicked. Single Responsibility: back navigation handler.
+   */
+  onBack?: () => void;
 }
 
 export const OnboardingContainer: React.FC<
   OnboardingContainerProps
-> = ({ children, title, subTitle, loading, compressedHeader, widthVariant = "narrow" }) => {
+> = ({ children, title, subTitle, loading, compressedHeader, widthVariant: _widthVariant = "narrow", showBackButton, onBack }) => {
   const { emit } = useAnalytics();
-  const containerSize = widthVariant === "full" ? "8xl" : "md";
 
   return (
     <Box w="full" minH="100dvh" background="bg.subtle">
+      {showBackButton && onBack && (
+        <HStack position="fixed" top={2} left={2} zIndex={99}>
+          <Tooltip content="Back">
+            <IconButton
+              variant="ghost"
+              _hover={{ bg: "bg.emphasized" }}
+              onClick={onBack}
+            >
+              <ArrowLeft />
+            </IconButton>
+          </Tooltip>
+        </HStack>
+      )}
+
       <HStack position="fixed" top={2} right={2} zIndex={99}>
         <Tooltip content="Sign out">
           <IconButton

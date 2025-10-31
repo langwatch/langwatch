@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect, useMemo } from "react";
 import { useRouter } from "next/router";
-import { ProductScreenIndex, type ProductSelection, type ProductFlowConfig } from "../types/types";
+import { ProductScreenIndex, OnboardingFlowDirection, type ProductSelection, type ProductFlowConfig } from "../types/types";
 import { PRODUCT_FLOW_CONFIG } from "../constants/product-flow";
 import { useGenericOnboardingFlow } from "./use-generic-onboarding-flow";
 
@@ -87,15 +87,18 @@ export function useProductFlow() {
   const canProceed = useCallback(() => true, []);
 
   // Use generic flow hook for navigation (with URL sync)
-  const { currentScreenIndex, direction, navigation, setCurrentScreenIndex } =
+  const { currentScreenIndex, direction, navigation, canGoBack, setCurrentScreenIndex } =
     useGenericOnboardingFlow(flowConfig, canProceed, {
       queryParamName: "step",
       screenIdMap,
+      firstScreenId: "product-selection",
     });
 
   // If product inferred but step missing, land on product screen and sync URL
   useEffect(() => {
     if (!selectedProduct) return;
+    // If user is navigating backward to the selection screen, do not auto-advance
+    if (direction === OnboardingFlowDirection.BACKWARD) return;
     if (typeof router.query.step === "string") return;
 
     const productScreenMap: Record<ProductSelection, ProductScreenIndex> = {
@@ -105,7 +108,7 @@ export function useProductFlow() {
       "agent-simulations": ProductScreenIndex.AGENT_SIMULATIONS,
     };
     setCurrentScreenIndex(productScreenMap[selectedProduct]);
-  }, [selectedProduct, router.query.step, setCurrentScreenIndex]);
+  }, [selectedProduct, router.query.step, direction, setCurrentScreenIndex]);
 
   // Handle product selection
   const handleSelectProduct = useCallback((product: ProductSelection) => {
@@ -113,7 +116,6 @@ export function useProductFlow() {
 
     // Update URL with product parameter
     const currentQuery = { ...router.query };
-    currentQuery.product = product;
     currentQuery.step = product; // Use product name as step ID
 
     void router.push(
@@ -142,6 +144,7 @@ export function useProductFlow() {
     direction,
     flow: flowConfig,
     navigation,
+    canGoBack,
     handleSelectProduct,
   };
 }

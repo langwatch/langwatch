@@ -1,6 +1,6 @@
 import { Box, Card, Grid, GridItem, Icon, Text, VStack } from "@chakra-ui/react";
 import { Telescope, Gavel, GraduationCap, HatGlasses } from "lucide-react";
-import type { ProductSelection } from "../../types/types";
+import { type ProductSelection } from "../../types/types";
 import React from "react";
 
 interface ProductOption {
@@ -8,6 +8,7 @@ interface ProductOption {
   title: string;
   description: string;
   icon: typeof Telescope;
+  url?: string;
 }
 
 const productOptions: ProductOption[] = [
@@ -22,18 +23,21 @@ const productOptions: ProductOption[] = [
     title: "Evaluations",
     description: "Create and run evaluations to measure quality.",
     icon: Gavel,
+    url: "/@project/evaluations",
   },
   {
     key: "prompt-management",
     title: "Prompt Management",
     description: "Organize, version, iterate, and optimize your prompts.",
     icon: GraduationCap,
+    url: "/@project/prompts",
   },
   {
     key: "agent-simulations",
     title: "Agent Simulations",
     description: "Simulate scenarios and test agent behavior.",
     icon: HatGlasses,
+    url: "/@project/simulations",
   },
 ];
 
@@ -44,11 +48,12 @@ interface ProductSelectionScreenProps {
 export const ProductSelectionScreen: React.FC<ProductSelectionScreenProps> = ({
   onSelectProduct,
 }) => {
+
   return (
     <Box position="relative" minH="60vh">
       <Grid
         pt={4}
-        templateColumns="repeat(2, 1fr)"
+        templateColumns={{ base: "repeat(1, 1fr)", lg: "repeat(2, 1fr)" }}
         gap={4}
         position="relative"
         zIndex={1}
@@ -74,7 +79,14 @@ export const ProductSelectionScreen: React.FC<ProductSelectionScreenProps> = ({
                   transform: "translateY(-2px)",
                   borderColor: "border.subtle/70",
                 }}
-                onClick={() => onSelectProduct(opt.key)}
+                onClick={() => {
+                  if (opt.url) {
+                    window.location.href = opt.url;
+                    return;
+                  }
+
+                  onSelectProduct(opt.key);
+                }}
               >
                 <VStack gap={3} align="center" h="full">
                   <Icon color="orange.500" size="2xl">
