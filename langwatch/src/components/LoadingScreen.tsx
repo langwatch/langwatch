@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from "motion/react";
 
 import { FullLogo } from "./icons/FullLogo";
 import { useEffect, useState } from "react";
+import { Provider } from "./ui/provider";
 
 let logoVisibleOnce = false;
 
@@ -19,31 +20,33 @@ export const LoadingScreen = () => {
   }, []);
 
   return (
-    <Box
-      width="full"
-      height="full"
-      minHeight="100vh"
-      backgroundColor="bg.emphasized"
-      paddingBottom={16}
-      display="flex"
-      alignItems="center"
-      justifyContent="center"
-    >
-      {!logoVisibleOnce ? (
-        <AnimatePresence>
-          {showLogo && (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-            >
-              <FullLogo />
-            </motion.div>
-          )}
-        </AnimatePresence>
-      ) : (
-        <FullLogo />
-      )}
-    </Box>
+    <Provider>
+      <Box
+        width="full"
+        height="full"
+        minHeight="100vh"
+        backgroundColor="bg.emphasized"
+        paddingBottom={16}
+        display="flex"
+        alignItems="center"
+        justifyContent="center"
+      >
+        {!logoVisibleOnce ? (
+          <AnimatePresence>
+            {showLogo && (
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+              >
+                <FullLogo />
+              </motion.div>
+            )}
+          </AnimatePresence>
+        ) : (
+          <FullLogo />
+        )}
+      </Box>
+    </Provider>
   );
 };
