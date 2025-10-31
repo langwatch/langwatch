@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.6.1](https://github.com/langwatch/langwatch/compare/python-sdk@v0.6.0...python-sdk@v0.6.1) (2025-10-31)
+
+
+### Bug Fixes
+
+* dataset slug name sync ([#759](https://github.com/langwatch/langwatch/issues/759)) ([d9f87e4](https://github.com/langwatch/langwatch/commit/d9f87e4dc4df610e876f931094d3e86f2c5254d1))
+
 ## [0.6.0](https://github.com/langwatch/langwatch/compare/python-sdk@v0.5.1...python-sdk@v0.6.0) (2025-10-31)
 
 
