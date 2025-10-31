@@ -3,6 +3,11 @@ import { useDebouncedCallback } from "use-debounce";
 import { api } from "../../utils/api";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 
+const DEBOUNCE_TIME = 500;
+const MAX_WAIT_TIME = 1000;
+const LEADING = true;
+const TRAILING = true;
+
 interface UseDatasetSlugValidationProps {
   name: string;
   datasetId?: string;
@@ -77,7 +82,11 @@ export function useDatasetSlugValidation({
         }
       });
     }
-  }, 500);
+  }, DEBOUNCE_TIME, {
+    leading: LEADING,
+    trailing: TRAILING,
+    maxWait: MAX_WAIT_TIME,
+  });
 
   // Trigger validation when name changes
   useEffect(() => {
