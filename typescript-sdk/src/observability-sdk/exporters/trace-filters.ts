@@ -256,4 +256,3 @@ export function isHttpRequestSpan(span: ReadableSpan): boolean {
   const verbMatch = /^(GET|POST|PUT|DELETE|PATCH|OPTIONS|HEAD)\b/i.test(name);
   return verbMatch;
 }
-

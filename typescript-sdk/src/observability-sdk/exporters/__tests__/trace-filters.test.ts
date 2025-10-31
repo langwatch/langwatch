@@ -295,7 +295,7 @@ describe("trace-filters", () => {
     it("should apply vercelAIOnly preset", () => {
       const result = applyPreset("vercelAIOnly", spans);
       expect(result).toHaveLength(1);
-      expect(result[0].instrumentationScope.name).toBe("ai");
+      expect(result[0]?.instrumentationScope?.name).toBe("ai");
     });
 
     it("should apply excludeHttpRequests preset", () => {
@@ -377,7 +377,7 @@ describe("trace-filters", () => {
       ];
       const result = applyFilters(filters, spans);
       expect(result).toHaveLength(1);
-      expect(result[0].name).toBe("chat.completion");
+      expect(result[0]?.name).toBe("chat.completion");
     });
 
     it("should narrow down results with each filter in pipeline", () => {
@@ -387,7 +387,7 @@ describe("trace-filters", () => {
       ];
       const result = applyFilters(filters, spans);
       expect(result).toHaveLength(1);
-      expect(result[0].name).toBe("chat.completion");
+      expect(result[0]?.name).toBe("chat.completion");
     });
 
     it("should handle complex filter pipelines", () => {
@@ -398,7 +398,7 @@ describe("trace-filters", () => {
       ];
       const result = applyFilters(filters, spans);
       expect(result).toHaveLength(1);
-      expect(result[0].name).toBe("chat.completion");
+      expect(result[0]?.name).toBe("chat.completion");
     });
 
     it("should return empty array when all spans are filtered out", () => {
