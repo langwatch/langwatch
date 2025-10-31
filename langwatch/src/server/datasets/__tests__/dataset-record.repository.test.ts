@@ -103,7 +103,10 @@ describe("DatasetRecordRepository", () => {
         await repository.batchCreate({
           datasetId: "ds-1",
           projectId: "proj-1",
-          datasetRecords: [{ field: "value1" }, { field: "value2" }],
+          datasetRecords: [
+            { id: "rec-1", field: "value1" },
+            { id: "rec-2", field: "value2" },
+          ],
           useS3: false,
         });
 
@@ -116,12 +119,13 @@ describe("DatasetRecordRepository", () => {
         await repository.batchCreate({
           datasetId: "ds-1",
           projectId: "proj-1",
-          datasetRecords: [{ field: "value" }],
+          datasetRecords: [{ id: "rec-1", field: "value" }],
           useS3: false,
         });
 
-        const callArgs = vi.mocked(prisma.datasetRecord.createMany).mock.calls[0][0];
-        expect(callArgs.data[0]).toMatchObject({
+        const callArgs = vi.mocked(prisma.datasetRecord.createMany).mock.calls[0]?.[0];
+        expect(callArgs?.data).toBeDefined();
+        expect(Array.isArray(callArgs?.data) ? callArgs.data[0] : callArgs?.data).toMatchObject({
           datasetId: "ds-1",
           projectId: "proj-1",
         });

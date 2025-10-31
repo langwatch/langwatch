@@ -106,6 +106,7 @@ describe("DatasetRepository", () => {
         slug: "test-slug",
         name: "Test",
         projectId: "proj-1",
+        columnTypes: [],
       });
 
       expect(result).toEqual(mockDataset);

@@ -15,6 +15,7 @@ import { StorageService } from "../../storage";
 import * as Sentry from "@sentry/nextjs";
 import { DatasetService } from "../../datasets/dataset.service";
 import { datasetErrorHandler } from "../../datasets/middleware";
+import type { DatasetRecordEntry } from "../../datasets/types";
 const storageService = new StorageService();
 
 export const datasetRecordRouter = createTRPCRouter({
@@ -318,4 +319,27 @@ const processBatchedRecords = ({
   }
 
   return { truncatedRecords, truncated, totalSize };
+};
+
+/**
+ * Exported helper function for creating dataset records.
+ * Used by cron triggers and API routes.
+ * @deprecated Use DatasetService.createRecords instead
+ */
+export const createManyDatasetRecords = async ({
+  datasetId,
+  projectId,
+  datasetRecords,
+}: {
+  datasetId: string;
+  projectId: string;
+  datasetRecords: DatasetRecordEntry[];
+}) => {
+  const datasetService = DatasetService.create(prisma);
+  await datasetService.createRecords({
+    projectId,
+    datasetId,
+    entries: datasetRecords,
+  });
+  return { success: true };
 };
