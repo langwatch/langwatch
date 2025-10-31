@@ -44,51 +44,21 @@ const blobConfigs = [
       y: [0, -14, 12, 0],
     },
   },
-  {
-    key: "amber",
-    style: {
-      bottom: "-8%",
-      left: "-6%",
-      width: "clamp(420px, 54vmax, 920px)",
-      height: "clamp(420px, 54vmax, 920px)",
-      background:
-        "radial-gradient(60% 60% at 30% 70%, rgba(255,180,102,0.48) 0%, rgba(255,180,102,0.32) 42%, rgba(255,180,102,0) 76%)",
-    },
-    animate: {
-      scale: [1, 1.07, 0.94, 1],
-      x: [0, -18, 18, 0],
-      y: [0, 18, -16, 0],
-    },
-  },
-  {
-    key: "embers",
-    style: {
-      bottom: "2%",
-      right: "-4%",
-      width: "clamp(360px, 46vmax, 820px)",
-      height: "clamp(360px, 46vmax, 820px)",
-      background:
-        "radial-gradient(52% 52% at 72% 72%, rgba(255,149,64,0.42) 0%, rgba(255,149,64,0.28) 40%, rgba(255,149,64,0) 74%)",
-    },
-    animate: {
-      scale: [1, 1.03, 0.92, 1.02, 1],
-      x: [0, 18, -16, 10, 0],
-      y: [0, 20, -12, 8, 0],
-    },
-  },
 ] as const;
 
 export const OnboardingMeshBackground: React.FC<{ opacity?: number; blurPx?: number }> = ({ opacity = 0.28, blurPx = 70 }) => (
   <Box
-    position="fixed"
+    position="absolute"
     inset={0}
-    w="100vw"
-    h="100dvh"
     pointerEvents="none"
     overflow="hidden"
     zIndex={0}
     opacity={opacity}
     filter={`blur(${blurPx}px)`}
+    style={{
+      contain: "layout paint",
+      backfaceVisibility: "hidden",
+    }}
   >
     {blobConfigs.map(({ key, style, animate }) => (
       <MotionBox
@@ -98,6 +68,7 @@ export const OnboardingMeshBackground: React.FC<{ opacity?: number; blurPx?: num
         style={{
           ...style,
           mixBlendMode: "screen",
+          willChange: "transform",
         }}
         initial={{ scale: 1 }}
         animate={{
