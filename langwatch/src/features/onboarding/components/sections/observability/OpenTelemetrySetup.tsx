@@ -1,26 +1,110 @@
-import React from "react";
-import { VStack, Text, Card, Alert } from "@chakra-ui/react";
+import React, { useState } from "react";
+import { VStack, Text, Separator } from "@chakra-ui/react";
+import { CodePreview } from "./CodePreview";
+import { useActiveProject } from "../../../contexts/ActiveProjectContext";
+import { usePublicEnv } from "~/hooks/usePublicEnv";
 
 export function OpenTelemetrySetup(): React.ReactElement {
+  const { project } = useActiveProject();
+  const publicEnv = usePublicEnv();
+  const [isVisible, setIsVisible] = useState(false);
+
+  const effectiveApiKey = project?.apiKey ?? "";
+  const effectiveEndpoint = publicEnv.data?.BASE_HOST ?? "";
+
+  function toggleVisibility(): void {
+    setIsVisible((prev) => !prev);
+  }
+
+  const envVarsCode = `# Set these environment variables in your application
+export OTEL_EXPORTER_OTLP_ENDPOINT="${effectiveEndpoint}/api/public/otel"
+export OTEL_EXPORTER_OTLP_HEADERS="Authorization=bearer ${effectiveApiKey}"
+
+# Or for trace-specific endpoint:
+# export OTEL_EXPORTER_OTLP_TRACES_ENDPOINT="${effectiveEndpoint}/api/public/otel/v1/traces"
+# export OTEL_EXPORTER_OTLP_HEADERS="Authorization=bearer ${effectiveApiKey}"`;
+
+  const collectorCode = `# OpenTelemetry Collector configuration (collector-config.yaml)
+receivers:
+  otlp:
+    protocols:
+      http:
+        endpoint: 0.0.0.0:4318
+      grpc:
+        endpoint: 0.0.0.0:4317
+
+processors:
+  batch:
+
+exporters:
+  otlphttp:
+    endpoint: ${effectiveEndpoint}/api/public/otel
+    headers:
+      Authorization: bearer ${effectiveApiKey}
+
+service:
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [otlphttp]`;
+
   return (
-    <VStack align="stretch" gap={3}>
-      <Card.Root>
-        <Card.Header>
-          <Text fontWeight="semibold">Instrument your services with OpenTelemetry</Text>
-        </Card.Header>
-        <Card.Body>
-          <VStack align="stretch" gap={2}>
-            <Text fontSize="sm">Use your existing OTel tracers and exporters. Then enable LangWatch ingestion by configuring the exporter endpoint and service name.</Text>
-            <Alert.Root borderStartWidth="4px" borderStartColor="colorPalette.solid">
-              <Alert.Content>
-                <Alert.Description>
-                  Configure the OTLP exporter to point to your LangWatch collector and set the <code>N8N_OTEL_SERVICE_NAME</code> (or equivalent) to your project name.
-                </Alert.Description>
-              </Alert.Content>
-            </Alert.Root>
-          </VStack>
-        </Card.Body>
-      </Card.Root>
+    <VStack align="stretch" gap={6} minW={0} w="full">
+      <VStack align="stretch" gap={0}>
+        <Text fontSize="md" fontWeight="semibold">
+          OpenTelemetry Integration
+        </Text>
+        <Text fontSize="xs" color="fg.muted">
+          Choose your preferred setup method below
+        </Text>
+      </VStack>
+
+      <VStack align="stretch" gap={3}>
+        <Text textStyle="md" fontWeight="semibold">
+          Environment Variables
+        </Text>
+        <Text textStyle="sm">
+          Configure your application to send traces directly to LangWatch by setting these environment variables.
+          This approach works with any OpenTelemetry SDK or library that supports OTLP HTTP export.
+        </Text>
+        <CodePreview
+          code={envVarsCode}
+          filename=".env"
+          codeLanguage="bash"
+          sensitiveValue={effectiveApiKey}
+          enableVisibilityToggle={true}
+          isVisible={isVisible}
+          onToggleVisibility={toggleVisibility}
+        />
+        <Text textStyle="xs" color="fg.muted">
+          Note: LangWatch supports all HTTP/protobuf, HTTP/JSON and gRPC protocols.
+        </Text>
+      </VStack>
+
+      <Separator />
+
+      <VStack align="stretch" gap={3}>
+        <Text textStyle="md" fontWeight="semibold">
+          OpenTelemetry Collector
+        </Text>
+        <Text textStyle="sm">
+          Use the OpenTelemetry Collector as an intermediary to receive traces from your application
+          and forward them to LangWatch. This is useful for complex deployments or when you need
+          additional processing.
+        </Text>
+        <CodePreview
+          code={collectorCode}
+          filename="collector-config.yaml"
+          // eslint-disable-next-line @next/next/no-img-element
+          languageIcon={<img src="/images/external-icons/otel.svg" alt="OpenTelemetry" />}
+          codeLanguage="yaml"
+          sensitiveValue={effectiveApiKey}
+          enableVisibilityToggle={true}
+          isVisible={isVisible}
+          onToggleVisibility={toggleVisibility}
+        />
+      </VStack>
     </VStack>
   );
 }

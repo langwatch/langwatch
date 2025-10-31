@@ -46,9 +46,9 @@ export function ApiIntegrationInfoCard(): React.ReactElement {
     }
   }
 
-  async function copyEndpoint(): Promise<void> {
+  async function copyEndpoint({ withBashPrefix }: { withBashPrefix?: boolean }): Promise<void> {
     try {
-      await navigator.clipboard.writeText(effectiveEndpoint);
+      await navigator.clipboard.writeText(withBashPrefix ? `LANGWATCH_ENDPOINT=${effectiveEndpoint}` : effectiveEndpoint);
       toaster.create({
         title: "Copied",
         description: "Endpoint copied to clipboard",
@@ -89,7 +89,7 @@ export function ApiIntegrationInfoCard(): React.ReactElement {
             >
               {isVisible ? <EyeOff /> : <Eye />}
             </IconButton>
-            <Tooltip content="Copy key">
+            <Tooltip content="Copy key" openDelay={0} showArrow>
               <IconButton
                 size="2xs"
                 variant="ghost"
@@ -99,7 +99,7 @@ export function ApiIntegrationInfoCard(): React.ReactElement {
                 <Clipboard />
               </IconButton>
             </Tooltip>
-            <Tooltip content="Copy key with environment variable prefix">
+            <Tooltip content="Copy key with environment variable prefix" openDelay={0} showArrow>
               <IconButton
                 size="2xs"
                 variant="ghost"
@@ -132,16 +132,26 @@ export function ApiIntegrationInfoCard(): React.ReactElement {
           endAddonProps={{ bg: "bg.muted/40", color: "fg.muted", border: "0" }}
           endAddon={
             <HStack gap="1">
-              <Tooltip content="Copy key">
+              <Tooltip content="Copy endpoint" openDelay={0} showArrow>
                 <IconButton
                   size="2xs"
                   variant="ghost"
-                  onClick={() => void copyEndpoint()}
+                  onClick={() => void copyEndpoint({ withBashPrefix: false })}
                   aria-label="Copy endpoint"
                 >
                   <Clipboard />
                 </IconButton>
               </Tooltip>
+              <Tooltip content="Copy endpoint with environment variable prefix" openDelay={0} showArrow>
+              <IconButton
+                size="2xs"
+                variant="ghost"
+                onClick={() => void copyEndpoint({ withBashPrefix: true })}
+                aria-label="Copy endpoint with bash prefix"
+              >
+                <ClipboardPlus />
+              </IconButton>
+            </Tooltip>
             </HStack>
           }
         >
