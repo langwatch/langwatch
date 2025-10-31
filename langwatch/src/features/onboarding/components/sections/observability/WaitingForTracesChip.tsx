@@ -81,7 +81,6 @@ export function WaitingForTracesChip(): React.ReactElement {
       bottom="24px"
       transform="translateX(-50%)"
       zIndex={10}
-      onClick={() => setDetected(true)}
     >
       <Box
         position="relative"
