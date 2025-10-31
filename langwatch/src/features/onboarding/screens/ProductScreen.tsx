@@ -64,7 +64,7 @@ export const ProductScreen: React.FC = () => {
         onBack={() => navigation.prevScreen()}
       >
         <Box w="full" minH="100dvh" position="relative">
-          <OnboardingMeshBackground opacity={0.22} blurPx={96} />
+          <OnboardingMeshBackground opacity={0.4} blurPx={90} />
           <ActiveProjectProvider value={{ project: activeProject, organization }}>
             {!isLoading && currentScreen.component ? <currentScreen.component /> : null}
           </ActiveProjectProvider>
@@ -74,4 +74,3 @@ export const ProductScreen: React.FC = () => {
   );
 };
 export default ProductScreen;
-
