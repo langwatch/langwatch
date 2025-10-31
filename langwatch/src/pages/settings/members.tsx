@@ -65,7 +65,7 @@ export default function Members() {
       {
         organizationId: organization?.id ?? "",
       },
-      { enabled: !!organization }
+      { enabled: !!organization },
     );
   const activePlan = api.plan.getActivePlan.useQuery(
     {
@@ -73,7 +73,7 @@ export default function Members() {
     },
     {
       enabled: !!organization,
-    }
+    },
   );
 
   if (!organization || !organizationWithMembers.data || !activePlan.data)
@@ -122,7 +122,7 @@ function MembersList({
       {
         organizationId: organization?.id ?? "",
       },
-      { enabled: !!organization }
+      { enabled: !!organization },
     );
   const createInvitesMutation = api.organization.createInvites.useMutation();
   const deleteMemberMutation = api.organization.deleteMember.useMutation();
@@ -168,7 +168,7 @@ function MembersList({
               }
               return acc;
             },
-            [] as { inviteCode: string; email: string }[]
+            [] as { inviteCode: string; email: string }[],
           );
 
           setSelectedInvites(newInvites);
@@ -202,7 +202,7 @@ function MembersList({
             },
           });
         },
-      }
+      },
     );
   };
 
@@ -249,7 +249,7 @@ function MembersList({
               error.message ?? "There was an error updating the member role",
           });
         },
-      }
+      },
     );
   };
 
@@ -293,7 +293,7 @@ function MembersList({
             },
           });
         },
-      }
+      },
     );
   };
 
@@ -323,16 +323,16 @@ function MembersList({
           });
           void pendingInvites.refetch();
         },
-      }
+      },
     );
   };
 
   const sortedMembers = useMemo(
     () =>
       [...organization.members].sort((a, b) =>
-        b.user.id.localeCompare(a.user.id)
+        b.user.id.localeCompare(a.user.id),
       ),
-    [organization.members]
+    [organization.members],
   );
 
   const currentUserIsAdmin = useMemo(
@@ -340,9 +340,9 @@ function MembersList({
       organization.members.some(
         (member) =>
           member.userId === user?.id &&
-          member.role === OrganizationUserRole.ADMIN
+          member.role === OrganizationUserRole.ADMIN,
       ),
-    [organization.members, user?.id]
+    [organization.members, user?.id],
   );
 
   return (
@@ -419,6 +419,8 @@ function MembersList({
                     updateOrganizationMemberRoleMutation.isLoading &&
                     relevantUpdateRoleMutation;
 
+                  const isDeleteDisabled = member.user.id === user?.id;
+
                   return (
                     <LinkBox as={Table.Row} key={member.userId}>
                       <Table.Cell>{member.user.name}</Table.Cell>
@@ -451,15 +453,32 @@ function MembersList({
                             </Button>
                           </Menu.Trigger>
                           <Menu.Content>
-                            <Menu.Item
-                              value="remove"
-                              color="red.600"
-                              disabled={organization.members.length === 1}
-                              onClick={() => deleteMember(member.userId)}
+                            <Tooltip
+                              content={
+                                isDeleteDisabled
+                                  ? "You can't remove yourself"
+                                  : undefined
+                              }
+                              positioning={{ placement: "right" }}
+                              openDelay={0}
+                              showArrow
                             >
-                              <Trash size={14} style={{ marginRight: "8px" }} />
-                              Remove Member
-                            </Menu.Item>
+                              <Menu.Item
+                                value="remove"
+                                color="red.600"
+                                disabled={isDeleteDisabled}
+                                onClick={() =>
+                                  !isDeleteDisabled &&
+                                  deleteMember(member.userId)
+                                }
+                              >
+                                <Trash
+                                  size={14}
+                                  style={{ marginRight: "8px" }}
+                                />
+                                Remove Member
+                              </Menu.Item>
+                            </Tooltip>
                           </Menu.Content>
                         </Menu.Root>
                       </Table.Cell>
@@ -468,13 +487,17 @@ function MembersList({
                 })}
               </Table.Body>
             </Table.Root>
+          </Card.Body>
+        </Card.Root>
 
-            {pendingInvites.data && pendingInvites.data.length > 0 && (
-              <>
-                <Heading size="sm" as="h2" paddingY={4} marginLeft={6}>
-                  Pending Invites
-                </Heading>
+        {pendingInvites.data && pendingInvites.data.length > 0 && (
+          <VStack align="start" gap={1} width="full">
+            <Heading size="md" as="h2" paddingY={4}>
+              Pending Invites
+            </Heading>
 
+            <Card.Root width="full">
+              <Card.Body width="full" paddingY={0} paddingX={0}>
                 <Table.Root>
                   <Table.Header>
                     <Table.Row>
@@ -490,7 +513,7 @@ function MembersList({
                         <Table.Cell>{invite.email}</Table.Cell>
                         <Table.Cell>
                           {selectOptions.find(
-                            (option) => option.value === invite.role
+                            (option) => option.value === invite.role,
                           )?.label ?? invite.role}
                         </Table.Cell>
                         <Table.Cell>
@@ -529,7 +552,7 @@ function MembersList({
                                 onClick={() =>
                                   viewInviteLink(
                                     invite.inviteCode,
-                                    invite.email
+                                    invite.email,
                                   )
                                 }
                               >
@@ -546,10 +569,10 @@ function MembersList({
                     ))}
                   </Table.Body>
                 </Table.Root>
-              </>
-            )}
-          </Card.Body>
-        </Card.Root>
+              </Card.Body>
+            </Card.Root>
+          </VStack>
+        )}
       </VStack>
 
       <Dialog.Root
@@ -703,7 +726,7 @@ const OrganizationMemberSelect = ({
       size={"sm"}
       options={selectOptions}
       defaultValue={selectOptions.find(
-        (option) => option.value === defaultValue
+        (option) => option.value === defaultValue,
       )}
       onChange={(value) => {
         onRoleChange?.(memberId ?? "", value!.value as OrganizationUserRole);
