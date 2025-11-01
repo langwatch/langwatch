@@ -1,5 +1,5 @@
 import { useOrganizationTeamProject } from "../../../hooks/useOrganizationTeamProject";
-import { OrganizationOnboardingContainer } from "../components/containers/OnboardingContainer";
+import { OnboardingContainer } from "../components/containers/OnboardingContainer";
 import { OnboardingNavigation } from "../components/navigation/OnboardingNavigation";
 import { useOnboardingFlow } from "../hooks/use-onboarding-flow";
 import { useCreateWelcomeScreens } from "./create-welcome-screens";
@@ -37,8 +37,8 @@ export const WelcomeScreen: React.FC = () => {
     navigation,
     getFormData,
     formContextValue,
+    isPublicEnvLoading,
   } = useOnboardingFlow();
-
 
   const screens = useCreateWelcomeScreens({ flow });
 
@@ -90,7 +90,10 @@ export const WelcomeScreen: React.FC = () => {
             category: "onboarding",
             label: "organization_onboarding_completed",
           });
-          window.location.href = `/${response.projectSlug}/messages`;
+
+          const params = new URLSearchParams({ projectSlug: response.projectSlug });
+
+          window.location.href = `/onboarding/product?${params.toString()}`;
         },
         onError: () => {
           toaster.create({
@@ -118,11 +121,17 @@ export const WelcomeScreen: React.FC = () => {
   const currentScreen =
     currentVisibleIndex >= 0 ? screens[currentVisibleIndex] : undefined;
 
+  const isFirstScreen = currentVisibleIndex <= 0;
+  const isLastScreen =
+    currentVisibleIndex >= 0 &&
+    currentVisibleIndex === flow.visibleScreens.length - 1 &&
+    (flow.variant !== "self_hosted" || !isPublicEnvLoading);
+
   const pendingOrSuccessful = initializeOrganization.isPending || initializeOrganization.isSuccess;
 
   return (
     <AnalyticsBoundary name="onboarding_welcome" sendViewedEvent>
-      <OrganizationOnboardingContainer
+      <OnboardingContainer
         title={currentScreen?.heading ?? "Welcome Aboard 👋"}
         subTitle={currentScreen?.subHeading}
       >
@@ -144,8 +153,8 @@ export const WelcomeScreen: React.FC = () => {
                   screenIndex: currentVisibleIndex,
                   variant: flow.variant,
                   total: flow.total,
-                  isFirst: flow.first === currentScreenIndex,
-                  isLast: flow.last === currentScreenIndex,
+                  isFirst: isFirstScreen,
+                  isLast: isLastScreen,
                 }}
                 sendViewedEvent
               >
@@ -167,11 +176,11 @@ export const WelcomeScreen: React.FC = () => {
             isSkippable={!currentScreen?.required}
             isSubmitting={pendingOrSuccessful}
             onFinish={handleFinalizeSubmit}
+            isFirstScreen={isFirstScreen}
+            isLastScreen={isLastScreen}
           />
         </VStack>
-      </OrganizationOnboardingContainer>
+      </OnboardingContainer>
     </AnalyticsBoundary>
   );
 };
-
-
