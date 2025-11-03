@@ -1,18 +1,35 @@
-import React from "react";
+import React, { useMemo } from "react";
 import type { FrameworkKey, PlatformKey } from "../../../regions/observability/model";
 import { useCodegen } from "../../../regions/observability/codegen";
+import { getRegistryEntry } from "../../../regions/observability/codegen/registry";
 import { CodePreview } from "./CodePreview";
 
 export function FrameworkIntegrationCode({
   platform,
   framework,
-  languageIcon,
+  languageIconUrl,
 }: {
   platform: PlatformKey;
   framework: FrameworkKey;
-  languageIcon?: React.ReactNode;
+  languageIconUrl?: string;
 }): React.ReactElement | null {
   const codegenResult = useCodegen(platform, framework);
+
+  const llmPrompt = useMemo(() => {
+    if (!codegenResult) return undefined;
+
+    const registryEntry = getRegistryEntry(platform, framework);
+    if (!registryEntry) return undefined;
+
+    return generateLLMIntegrationPrompt({
+      frameworkLabel: registryEntry.label,
+      install: registryEntry.install,
+      docs: registryEntry.docs,
+      code: codegenResult.code,
+      codeLanguage: codegenResult.codeLanguage,
+    });
+  }, [platform, framework, codegenResult]);
+
   if (!codegenResult) {
     console.error("No snippets found for platform and framework", platform, framework);
 
@@ -27,7 +44,8 @@ export function FrameworkIntegrationCode({
       filename={filename}
       codeLanguage={codeLanguage}
       highlightLines={highlightLines}
-      languageIcon={languageIcon}
+      languageIconUrl={languageIconUrl}
+      llmPrompt={llmPrompt}
     />
   );
 }
