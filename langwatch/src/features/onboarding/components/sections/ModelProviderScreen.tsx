@@ -1,29 +1,35 @@
-import React from "react";
-import { VStack, Grid, Box, Button, HStack, Text } from "@chakra-ui/react";
+import React, { useState } from "react";
+import { VStack, Box, Button, HStack, Text } from "@chakra-ui/react";
 import { Tooltip } from "../../../../components/ui/tooltip";
 import { useRouter } from "next/router";
 import { useActiveProject } from "../../contexts/ActiveProjectContext";
 import { ArrowRight } from "react-feather";
+import { ModelProviderGrid } from "./model-provider/ModelProviderGrid";
+import type { ModelProviderKey } from "../../regions/model-providers/types";
 
 export function ModelProviderScreen(): React.ReactElement {
   const router = useRouter();
   const { project } = useActiveProject();
+  const [modelProviderKey, setSelectedModelProviderKey] =
+    useState<ModelProviderKey>("open_ai");
 
   return (
     <>
-      <Grid templateColumns={{ base: "1fr", "xl": "1fr 1fr" }} gap={{ base: 6, "xl": 32 }} alignItems="start" mb={20}>
-        <VStack align="stretch" gap={6}>
-
-        </VStack>
-
-        <VStack align="stretch" gap={3} minW={0} w="full">
-
-        </VStack>
-      </Grid>
+      <VStack align="stretch" gap={6}>
+        <ModelProviderGrid
+          modelProviderKey={modelProviderKey}
+          onSelectModelProvider={setSelectedModelProviderKey}
+        />
+      </VStack>
 
       {project?.slug && (
         <Box position="fixed" right="24px" bottom="24px" zIndex={11}>
-          <Tooltip content="Continue to LangWatch — skip onboarding" positioning={{ placement: "left" }} showArrow openDelay={0}>
+          <Tooltip
+            content="Continue to LangWatch — skip onboarding"
+            positioning={{ placement: "left" }}
+            showArrow
+            openDelay={0}
+          >
             <Button
               onClick={() => void router.push(`/${project.slug}`)}
               aria-label="Continue to LangWatch"
@@ -41,7 +47,9 @@ export function ModelProviderScreen(): React.ReactElement {
               py={2}
             >
               <HStack gap={{ base: 0, md: 2 }}>
-                <Text display={{ base: "none", md: "inline" }}>Continue to LangWatch</Text>
+                <Text display={{ base: "none", md: "inline" }}>
+                  Continue to LangWatch
+                </Text>
                 <ArrowRight size={16} />
               </HStack>
             </Button>

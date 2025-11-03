@@ -23,14 +23,12 @@ const productOptions: ProductOption[] = [
     title: "Evaluations",
     description: "Create and run evaluations to measure quality.",
     icon: Gavel,
-    url: "/@project/evaluations",
   },
   {
     key: "prompt-management",
     title: "Prompt Management",
     description: "Organize, version, iterate, and optimize your prompts.",
     icon: GraduationCap,
-    url: "/@project/prompts",
   },
   {
     key: "agent-simulations",
