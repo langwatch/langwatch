@@ -39,15 +39,12 @@ export function GeneratePromptApiSnippetDialog({
 
   const description = (
     <VStack alignItems="flex-start" gap={3} marginBottom={4}>
-      <Text>
-        Use the following API code snippets to interact with the prompt.
-      </Text>
       <Link
         href="https://docs.langwatch.ai/api-reference/prompts/get-prompt"
         isExternal
         color="blue.500"
         _hover={{ textDecoration: "underline" }}
-        fontSize="sm"
+        fontSize="xs"
       >
         📖 View API documentation
       </Link>
