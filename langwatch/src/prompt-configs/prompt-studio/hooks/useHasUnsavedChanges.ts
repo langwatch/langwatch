@@ -9,7 +9,7 @@ import type { DeepPartial } from "react-hook-form";
 
 /**
  * Compare two form values for deep equality after JSON normalization.
-type formSchemaResponsibility: Normalize and compare form values to detect changes.
+ * Single Responsibility: Normalize and compare form values to detect changes.
  */
 function areFormValuesEqual(
   a?: DeepPartial<PromptConfigFormValues>,
@@ -28,6 +28,7 @@ export function useHasUnsavedChanges(tabId: string): boolean {
 
   const configId = tab?.data.form.currentValues.configId;
   const currentValues = tab?.data.form.currentValues;
+  const handle = tab?.data.form.currentValues.handle;
 
   const { data: savedPrompt, isLoading: isLoadingSavedPrompt } =
     api.prompts.getByIdOrHandle.useQuery(
@@ -43,6 +44,8 @@ export function useHasUnsavedChanges(tabId: string): boolean {
   return useMemo(() => {
     // Never been saved
     if (!configId) return true;
+    // No handle
+    if (!handle) return true;
     // Still loading the saved prompt
     if (isLoadingSavedPrompt) return false;
     // No saved prompt found, never been saved?
@@ -67,5 +70,6 @@ export function useHasUnsavedChanges(tabId: string): boolean {
     currentValues,
     project?.defaultModel,
     isLoadingSavedPrompt,
+    handle,
   ]);
 }

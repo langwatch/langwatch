@@ -17,7 +17,8 @@ import { useTabId } from "../components/prompt-browser/prompt-browser-window/Pro
  * Hook to handle the saving of a prompt in the prompt studio.
  */
 export function useHandleSavePrompt() {
-  const { triggerSaveVersion, triggerCreatePrompt } = usePromptConfigContext();
+  const { triggerSaveVersion, triggerCreatePrompt, triggerChangeHandle } =
+    usePromptConfigContext();
   const methods = useFormContext<PromptConfigFormValues>();
   const configId = methods.watch("configId");
   const { updateTabData } = useDraggableTabsBrowserStore();
@@ -25,6 +26,7 @@ export function useHandleSavePrompt() {
 
   const handleSaveVersion = useCallback(() => {
     const values = methods.getValues();
+    const handle = values.handle;
     const data = formValuesToTriggerSaveVersionParams(values);
     const onSuccess = (prompt: VersionedPrompt) => {
       const newSavedState =
@@ -48,6 +50,7 @@ export function useHandleSavePrompt() {
         meta: { closable: true },
       });
     };
+
     const onError = (error: Error) => {
       console.error(error);
       toaster.create({
@@ -58,7 +61,26 @@ export function useHandleSavePrompt() {
       });
     };
 
-    if (configId) {
+    /**
+     * There is possibly legacy prompts that don't have a handle at this point.
+     * So we trigger the change handle dialog to set the handle, and then trigger the save version.
+     */
+    if (!handle && configId) {
+      /**
+       * When the handle is changed, we need to save the prompt again to update the handle.
+       * @param prompt - The prompt that was changed
+       */
+      const onSuccessChangeHandle = (prompt: VersionedPrompt) => {
+        if (prompt.id !== configId) throw new Error("Prompt ID mismatch");
+        triggerSaveVersion({ id: prompt.id, data, onSuccess, onError });
+      };
+
+      void triggerChangeHandle({
+        id: configId,
+        onSuccess: onSuccessChangeHandle,
+        onError,
+      });
+    } else if (configId) {
       void triggerSaveVersion({ id: configId, data, onSuccess, onError });
     } else {
       void triggerCreatePrompt({ data, onSuccess, onError });
@@ -68,6 +90,7 @@ export function useHandleSavePrompt() {
     configId,
     methods,
     triggerCreatePrompt,
+    triggerChangeHandle,
     updateTabData,
     tabId,
   ]);

@@ -9,15 +9,27 @@ import { computeInitialFormValuesForPrompt } from "~/prompt-configs/utils/comput
 import { PublishedPromptContent } from "./PublishedPromptContent";
 import { SidebarEmptyState } from "./ui/SidebarEmptyState";
 
+/**
+ * Returns a display-friendly version of a prompt handle.
+ * Single Responsibility: Formats prompt handles for UI display by extracting folder-relative names or returning "Untitled".
+ * @param handle - The prompt handle (may include folder prefix separated by "/")
+ * @returns The display name (portion after "/" or full handle, or "Untitled" if empty)
+ */
 export function getDisplayHandle(handle?: string | null): string {
   if (!handle) return "Untitled";
   return handle?.includes("/") ? handle.split("/")[1]! : handle;
 }
 
+/**
+ * Displays a list of published prompts grouped by folder.
+ * Single Responsibility: Renders published prompts organized by folder with click-to-open functionality.
+ */
 export function PublishedPromptsList() {
   const { data } = useAllPromptsForProject();
   const { addTab } = useDraggableTabsBrowserStore();
   const { project } = useOrganizationTeamProject();
+
+  console.log("data", data);
 
   /**
    * Group the prompts by folder, derived from the handle prefix.

@@ -11,6 +11,10 @@ import { VersionHistoryButton } from "~/prompt-configs/forms/prompt-config-form/
 import type { VersionedPrompt } from "~/server/prompt-config/prompt.service";
 import { versionedPromptToPromptConfigFormValuesWithSystemMessage } from "~/prompt-configs/utils/llmPromptConfigUtils";
 
+/**
+ * Header bar for the prompt browser with handle, model selector, and action buttons.
+ * Single Responsibility: Renders the top control bar for editing and managing prompt configurations.
+ */
 export function PromptBrowserHeader() {
   const { project } = useOrganizationTeamProject();
   const formMethods = useFormContext<PromptConfigFormValues>();

@@ -3,10 +3,13 @@ import { PromptBrowserWindowContent } from "./prompt-browser-window/PromptBrowse
 import { PromptBrowserTab } from "./tab/PromptBrowserTab";
 import { useDraggableTabsBrowserStore } from "../../prompt-studio-store/DraggableTabsBrowserStore";
 import { DraggableTabsBrowser } from "./ui/DraggableTabsBrowser";
-import { SplitSquareHorizontal } from "lucide-react";
+import { Columns } from "react-feather";
 import { TabIdProvider } from "./ui/TabContext";
-import { useLoadSpanIntoPromptStudio } from "../../hooks/useLoadSpanIntoPromptStudio";
 
+/**
+ * Tabbed workspace for the prompt studio with draggable tabs and split-pane support.
+ * Single Responsibility: Manages the draggable tab interface for editing multiple prompts simultaneously.
+ */
 export function PromptStudioTabbedWorkspace() {
   const {
     windows,
@@ -70,13 +73,14 @@ export function PromptStudioTabbedWorkspace() {
             </HStack>
             <Spacer />
             {window.id === activeWindowId && (
-              <HStack flexShrink={0} paddingX={3}>
-                <SplitSquareHorizontal
+              <HStack flexShrink={0} paddingX={3} title="Split tab">
+                <Columns
                   size="18px"
                   cursor="pointer"
                   onClick={() =>
                     window.activeTabId && handleSplit(window.activeTabId)
                   }
+                  aria-label="Split tab"
                 />
               </HStack>
             )}

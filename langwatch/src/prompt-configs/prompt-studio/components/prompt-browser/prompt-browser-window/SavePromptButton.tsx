@@ -3,6 +3,10 @@ import { useHandleSavePrompt } from "~/prompt-configs/prompt-studio/hooks/useHan
 import { useTabId } from "../ui/TabContext";
 import { useHasUnsavedChanges } from "~/prompt-configs/prompt-studio/hooks/useHasUnsavedChanges";
 
+/**
+ * SavePromptButton
+ * Single Responsibility: Renders a save button that reflects and controls the save state of the current prompt.
+ */
 export function SavePromptButton() {
   const { handleSaveVersion } = useHandleSavePrompt();
   const tabId = useTabId();

@@ -1,7 +1,7 @@
 import { Button, HStack, Text, type StackProps } from "@chakra-ui/react";
 import clsx from "clsx";
 import { useFormContext } from "react-hook-form";
-import { LuPencil } from "react-icons/lu";
+import { Edit3 } from "react-feather";
 
 import { toaster } from "~/components/ui/toaster";
 import { Tooltip } from "~/components/ui/tooltip";
@@ -36,10 +36,10 @@ export function EditablePromptHandleField(
     },
     {
       enabled: !!configId && !!project?.id,
-    }
+    },
   );
 
-  const canEdit = permission?.hasPermission ?? true;
+  const canEdit = permission?.hasPermission ?? false;
 
   const handleTriggerChangeHandle = () => {
     const id = form.watch("configId");
@@ -145,7 +145,7 @@ export function EditablePromptHandleField(
               opacity={canEdit ? 1 : 0.5}
               cursor={canEdit ? "pointer" : "not-allowed"}
             >
-              <LuPencil />
+              <Edit3 />
             </Button>
           </Tooltip>
           <CopyButton value={handle} label="Prompt ID" />
