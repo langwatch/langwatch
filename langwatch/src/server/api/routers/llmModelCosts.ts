@@ -10,9 +10,9 @@ export const llmModelCostsRouter = createTRPCRouter({
     .input(
       z.object({
         projectId: z.string(),
-      })
+      }),
     )
-    .use(checkProjectPermission("project:update"))
+    .use(checkProjectPermission("project:view"))
     .query(async ({ input }) => {
       return await getLLMModelCosts(input);
     }),
@@ -28,7 +28,7 @@ export const llmModelCostsRouter = createTRPCRouter({
         regex: z.string().refine((value) => isValidRegex(value), {
           message: "Invalid regular expression",
         }),
-      })
+      }),
     )
     .use(checkProjectPermission("project:update"))
     .mutation(async ({ input }) => {
@@ -70,7 +70,7 @@ export const llmModelCostsRouter = createTRPCRouter({
 
   delete: protectedProcedure
     .input(z.object({ projectId: z.string(), id: z.string() }))
-    .use(checkProjectPermission("project:update"))
+    .use(checkProjectPermission("project:delete"))
     .mutation(async ({ input }) => {
       return await prisma.customLLMModelCost.delete({
         where: { id: input.id, projectId: input.projectId },

@@ -31,7 +31,7 @@ export const monitorsRouter = createTRPCRouter({
     .input(
       z.object({ id: z.string(), projectId: z.string(), enabled: z.boolean() }),
     )
-    .use(checkProjectPermission("evaluations:manage"))
+    .use(checkProjectPermission("evaluations:update"))
     .mutation(async ({ input, ctx }) => {
       const { id, enabled, projectId } = input;
       const prisma = ctx.prisma;
@@ -59,7 +59,7 @@ export const monitorsRouter = createTRPCRouter({
         ]),
       }),
     )
-    .use(checkProjectPermission("evaluations:manage"))
+    .use(checkProjectPermission("evaluations:create"))
     .mutation(async ({ input, ctx }) => {
       const {
         projectId,
@@ -111,7 +111,7 @@ export const monitorsRouter = createTRPCRouter({
         ]),
       }),
     )
-    .use(checkProjectPermission("evaluations:manage"))
+    .use(checkProjectPermission("evaluations:update"))
     .mutation(async ({ input, ctx }) => {
       const {
         id,
@@ -169,7 +169,7 @@ export const monitorsRouter = createTRPCRouter({
     }),
   delete: protectedProcedure
     .input(z.object({ id: z.string(), projectId: z.string() }))
-    .use(checkProjectPermission("evaluations:manage"))
+    .use(checkProjectPermission("evaluations:delete"))
     .mutation(async ({ input, ctx }) => {
       const { id, projectId } = input;
       const prisma = ctx.prisma;
