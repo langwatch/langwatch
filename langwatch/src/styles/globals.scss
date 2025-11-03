@@ -231,3 +231,8 @@ div input[type="number"] {
 .copilotKitMessages {
   overflow: unset !important;
 }
+
+// To fix bug in Chakra UI CodeBlock
+span[data-highlight]::after {
+    pointer-events: none;
+}
