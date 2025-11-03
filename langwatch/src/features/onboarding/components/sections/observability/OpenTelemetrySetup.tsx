@@ -96,8 +96,7 @@ service:
         <CodePreview
           code={collectorCode}
           filename="collector-config.yaml"
-          // eslint-disable-next-line @next/next/no-img-element
-          languageIcon={<img src="/images/external-icons/otel.svg" alt="OpenTelemetry" />}
+          languageIconUrl="/images/external-icons/otel.svg"
           codeLanguage="yaml"
           sensitiveValue={effectiveApiKey}
           enableVisibilityToggle={true}
