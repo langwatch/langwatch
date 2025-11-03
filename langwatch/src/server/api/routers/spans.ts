@@ -102,7 +102,7 @@ export const spansRouter = createTRPCRouter({
       });
 
       const trace = traces[0];
-      console.log("trace", JSON.stringify(trace?.spans, null, 2));
+
       if (!trace) {
         throw new TRPCError({ code: "NOT_FOUND", message: "Trace not found." });
       }

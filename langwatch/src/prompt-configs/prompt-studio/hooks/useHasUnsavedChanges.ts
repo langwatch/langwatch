@@ -20,6 +20,13 @@ function areFormValuesEqual(
   return isEqual(JSON.parse(JSON.stringify(a)), JSON.parse(JSON.stringify(b)));
 }
 
+/**
+ * Determines whether the prompt in the specified tab has unsaved changes.
+ * Single Responsibility: Compare current form values against saved prompt state to detect unsaved changes.
+ *
+ * @param tabId - The ID of the tab to check for unsaved changes
+ * @returns true if there are unsaved changes, false otherwise
+ */
 export function useHasUnsavedChanges(tabId: string): boolean {
   const { project } = useOrganizationTeamProject();
   const tab = useDraggableTabsBrowserStore((state) =>
