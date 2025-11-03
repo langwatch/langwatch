@@ -51,7 +51,7 @@ const config = {
     },
     turbopack: {
         rules: {
-            "*.snippet.ts": { loaders: ["raw-loader"], as: "*.js" },
+            "*.snippet.sts": { loaders: ["raw-loader"], as: "*.js" },
             "*.snippet.go": { loaders: ["raw-loader"], as: "*.js" },
             "*.snippet.sh": { loaders: ["raw-loader"], as: "*.js" },
             "*.snippet.py": { loaders: ["raw-loader"], as: "*.js" },
@@ -171,7 +171,7 @@ const config = {
         config.module.rules.push({ resourceQuery: /snippet/, type: "asset/source" });
 
         // Treat any *.snippet.* files as source assets to avoid resolution inside snippets
-        config.module.rules.push({ test: /\.snippet\.(txt|ts|tsx|js|go|sh|py|yaml)$/i, type: "asset/source" });
+        config.module.rules.push({ test: /\.snippet\.(txt|sts|ts|tsx|js|go|sh|py|yaml)$/i, type: "asset/source" });
 
         // eslint-disable-next-line @typescript-eslint/no-unsafe-return
         return config;
