@@ -24,13 +24,7 @@ export const roleRouter = createTRPCRouter({
     .use(async ({ ctx, input, next }) => {
       // Need to fetch role first to check organization permission
       const roleService = new RoleService(ctx.prisma);
-      let role;
-      try {
-        role = await roleService.getRoleById(input.roleId);
-      } catch (error) {
-        // Let service errors through (like NOT_FOUND)
-        throw error;
-      }
+      const role = await roleService.getRoleById(input.roleId);
 
       // Check if user has permission for this organization
       const hasPermission = await hasOrganizationPermission(
@@ -48,7 +42,7 @@ export const roleRouter = createTRPCRouter({
     })
     .query(async ({ ctx, input }) => {
       const roleService = new RoleService(ctx.prisma);
-      return roleService.getRoleById(input.roleId);
+      return await roleService.getRoleById(input.roleId);
     }),
 
   create: protectedProcedure
@@ -63,7 +57,7 @@ export const roleRouter = createTRPCRouter({
     .use(checkOrganizationPermission("organization:manage"))
     .mutation(async ({ ctx, input }) => {
       const roleService = new RoleService(ctx.prisma);
-      return roleService.createRole({
+      return await roleService.createRole({
         organizationId: input.organizationId,
         name: input.name,
         description: input.description,
@@ -83,12 +77,7 @@ export const roleRouter = createTRPCRouter({
     .use(async ({ ctx, input, next }) => {
       // Fetch role to get organizationId for permission check
       const roleService = new RoleService(ctx.prisma);
-      let role;
-      try {
-        role = await roleService.getRoleById(input.roleId);
-      } catch (error) {
-        throw error;
-      }
+      const role = await roleService.getRoleById(input.roleId);
 
       // Check if user has permission for this organization
       const hasPermission = await hasOrganizationPermission(
@@ -106,7 +95,7 @@ export const roleRouter = createTRPCRouter({
     })
     .mutation(async ({ ctx, input }) => {
       const roleService = new RoleService(ctx.prisma);
-      return roleService.updateRole(input.roleId, {
+      return await roleService.updateRole(input.roleId, {
         name: input.name,
         description: input.description,
         permissions: input.permissions,
@@ -116,14 +105,9 @@ export const roleRouter = createTRPCRouter({
   delete: protectedProcedure
     .input(z.object({ roleId: z.string() }))
     .use(async ({ ctx, input, next }) => {
-      // Fetch role to get organizationId and check usage
+      // Fetch role to get organizationId for permission check
       const roleService = new RoleService(ctx.prisma);
-      let role;
-      try {
-        role = await roleService.getRoleById(input.roleId);
-      } catch (error) {
-        throw error;
-      }
+      const role = await roleService.getRoleById(input.roleId);
 
       // Check if user has permission for this organization
       const hasPermission = await hasOrganizationPermission(
@@ -136,21 +120,12 @@ export const roleRouter = createTRPCRouter({
         throw new TRPCError({ code: "UNAUTHORIZED" });
       }
 
-      // Check if role is in use
-      const roleWithUsers = await roleService.getRoleWithUsers(input.roleId);
-      if (roleWithUsers && roleWithUsers.assignedUsers.length > 0) {
-        throw new TRPCError({
-          code: "PRECONDITION_FAILED",
-          message: `Cannot delete role that is assigned to ${roleWithUsers.assignedUsers.length} user(s)`,
-        });
-      }
-
       ctx.permissionChecked = true;
       return next();
     })
     .mutation(async ({ ctx, input }) => {
       const roleService = new RoleService(ctx.prisma);
-      return roleService.deleteRole(input.roleId);
+      return await roleService.deleteRole(input.roleId);
     }),
 
   assignToUser: protectedProcedure
@@ -161,10 +136,10 @@ export const roleRouter = createTRPCRouter({
         customRoleId: z.string(),
       }),
     )
-    .use(checkTeamPermission("team:manage"))
+    .use(checkTeamPermission("organization:manage"))
     .mutation(async ({ ctx, input }) => {
       const roleService = new RoleService(ctx.prisma);
-      return roleService.assignRoleToUser(
+      return await roleService.assignRoleToUser(
         input.userId,
         input.teamId,
         input.customRoleId,
@@ -179,9 +154,9 @@ export const roleRouter = createTRPCRouter({
         customRoleId: z.string(),
       }),
     )
-    .use(checkTeamPermission("team:manage"))
+    .use(checkTeamPermission("organization:manage"))
     .mutation(async ({ ctx, input }) => {
       const roleService = new RoleService(ctx.prisma);
-      return roleService.removeRoleFromUser(input.userId, input.teamId);
+      return await roleService.removeRoleFromUser(input.userId, input.teamId);
     }),
 });

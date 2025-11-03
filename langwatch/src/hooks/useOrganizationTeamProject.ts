@@ -244,7 +244,7 @@ export const useOrganizationTeamProject = (
     return {
       isLoading: true,
       project: publicShareProject.data,
-      // Legacy API
+      //@deprecated use hasPermission instead
       hasTeamPermission: () => false,
       hasOrganizationPermission: () => false,
       // New RBAC API
@@ -258,6 +258,7 @@ export const useOrganizationTeamProject = (
 
   const organizationRole = organization?.members[0]?.role;
 
+  //@deprecated use hasPermission instead
   const hasOrganizationPermission = (
     roleGroup: keyof typeof OrganizationRoleGroup,
   ) => {
@@ -269,6 +270,7 @@ export const useOrganizationTeamProject = (
     );
   };
 
+  //@deprecated use hasPermission instead
   const hasTeamPermission = (
     roleGroup: keyof typeof TeamRoleGroup,
     team_ = team,

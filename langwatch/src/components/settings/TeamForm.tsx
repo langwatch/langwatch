@@ -64,7 +64,7 @@ export const TeamForm = ({
   });
 
   const { hasOrgPermission } = useOrganizationTeamProject();
-  const canManageOrganization = hasOrgPermission("team:manage");
+  const canManageOrganization = hasOrgPermission("organization:manage");
 
   const users = api.organization.getAllOrganizationMembers.useQuery({
     organizationId: organizationId,

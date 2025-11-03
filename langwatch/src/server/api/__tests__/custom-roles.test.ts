@@ -472,7 +472,7 @@ describe("Custom Role Functionality Tests", () => {
       expect(result).toBe(true); // Falls back to built-in role
     });
 
-    it("should handle permission hierarchy with custom roles", () => {
+    describe("permission hierarchy with custom roles", () => {
       const customPermissions = [
         "workflows:manage",
         "datasets:view",
@@ -480,70 +480,131 @@ describe("Custom Role Functionality Tests", () => {
         "traces:share",
       ];
 
-      // Test hierarchy rules
-      expect(
-        hasPermissionWithHierarchy(customPermissions, "workflows:view"),
-      ).toBe(true);
-      expect(
-        hasPermissionWithHierarchy(customPermissions, "workflows:create"),
-      ).toBe(true);
-      expect(
-        hasPermissionWithHierarchy(customPermissions, "workflows:update"),
-      ).toBe(true);
-      expect(
-        hasPermissionWithHierarchy(customPermissions, "workflows:delete"),
-      ).toBe(true);
-      expect(
-        hasPermissionWithHierarchy(customPermissions, "workflows:manage"),
-      ).toBe(true);
+      const testCases: Array<{
+        permission: string;
+        expected: boolean;
+        reason: string;
+      }> = [
+        {
+          permission: "workflows:view",
+          expected: true,
+          reason: "manage includes view",
+        },
+        {
+          permission: "workflows:create",
+          expected: true,
+          reason: "manage includes create",
+        },
+        {
+          permission: "workflows:update",
+          expected: true,
+          reason: "manage includes update",
+        },
+        {
+          permission: "workflows:delete",
+          expected: true,
+          reason: "manage includes delete",
+        },
+        {
+          permission: "workflows:manage",
+          expected: true,
+          reason: "direct match",
+        },
+        {
+          permission: "datasets:view",
+          expected: true,
+          reason: "direct match",
+        },
+        {
+          permission: "datasets:create",
+          expected: false,
+          reason: "only has view, not create",
+        },
+        {
+          permission: "datasets:manage",
+          expected: false,
+          reason: "only has view, not manage",
+        },
+        {
+          permission: "analytics:view",
+          expected: false,
+          reason: "has create but not view",
+        },
+        {
+          permission: "analytics:create",
+          expected: true,
+          reason: "direct match",
+        },
+        {
+          permission: "analytics:manage",
+          expected: false,
+          reason: "only has create, not manage",
+        },
+        {
+          permission: "traces:view",
+          expected: false,
+          reason: "only has share, not view",
+        },
+        {
+          permission: "traces:share",
+          expected: true,
+          reason: "direct match",
+        },
+      ];
 
-      expect(
-        hasPermissionWithHierarchy(customPermissions, "datasets:view"),
-      ).toBe(true);
-      expect(
-        hasPermissionWithHierarchy(customPermissions, "datasets:create"),
-      ).toBe(false);
-      expect(
-        hasPermissionWithHierarchy(customPermissions, "datasets:manage"),
-      ).toBe(false);
-
-      expect(
-        hasPermissionWithHierarchy(customPermissions, "analytics:view"),
-      ).toBe(false);
-      expect(
-        hasPermissionWithHierarchy(customPermissions, "analytics:create"),
-      ).toBe(true);
-      expect(
-        hasPermissionWithHierarchy(customPermissions, "analytics:manage"),
-      ).toBe(false);
-
-      expect(hasPermissionWithHierarchy(customPermissions, "traces:view")).toBe(
-        false,
-      );
-      expect(
-        hasPermissionWithHierarchy(customPermissions, "traces:share"),
-      ).toBe(true);
+      testCases.forEach(({ permission, expected, reason }) => {
+        it(`should ${
+          expected ? "allow" : "deny"
+        } ${permission} (${reason})`, () => {
+          expect(
+            hasPermissionWithHierarchy(customPermissions, permission),
+          ).toBe(expected);
+        });
+      });
     });
 
-    it("should handle case sensitivity in custom role permissions", () => {
+    describe("case sensitivity in custom role permissions", () => {
       const customPermissions = ["Experiments:Manage", "DATASETS:VIEW"];
 
-      // Should be case sensitive
-      expect(
-        hasPermissionWithHierarchy(customPermissions, "workflows:manage"),
-      ).toBe(false);
-      expect(
-        hasPermissionWithHierarchy(customPermissions, "datasets:view"),
-      ).toBe(false);
-      expect(
-        hasPermissionWithHierarchy(customPermissions, "Experiments:Manage"),
-      ).toBe(true);
-      expect(
-        hasPermissionWithHierarchy(customPermissions, "DATASETS:VIEW"),
-      ).toBe(true);
+      const testCases: Array<{
+        permission: string;
+        expected: boolean;
+        reason: string;
+      }> = [
+        {
+          permission: "workflows:manage",
+          expected: false,
+          reason: "permission not granted",
+        },
+        {
+          permission: "datasets:view",
+          expected: false,
+          reason: "case mismatch (lowercase vs UPPERCASE)",
+        },
+        {
+          permission: "Experiments:Manage",
+          expected: true,
+          reason: "exact case match",
+        },
+        {
+          permission: "DATASETS:VIEW",
+          expected: true,
+          reason: "exact case match",
+        },
+      ];
+
+      testCases.forEach(({ permission, expected, reason }) => {
+        it(`should ${
+          expected ? "allow" : "deny"
+        } ${permission} (${reason})`, () => {
+          expect(
+            hasPermissionWithHierarchy(customPermissions, permission),
+          ).toBe(expected);
+        });
+      });
     });
 
-    it("should handle malformed permission strings in custom roles", () => {
+    describe("malformed permission strings in custom roles", () => {
       const customPermissions = [
         "workflows:manage",
         "invalid-permission",
@@ -552,23 +613,52 @@ describe("Custom Role Functionality Tests", () => {
         "workflows",
       ];
 
-      // Should only work with valid permissions
-      expect(
-        hasPermissionWithHierarchy(customPermissions, "workflows:view"),
-      ).toBe(true);
-      expect(
-        hasPermissionWithHierarchy(customPermissions, "workflows:manage"),
-      ).toBe(true);
-      expect(
-        hasPermissionWithHierarchy(customPermissions, "invalid-permission"),
-      ).toBe(true);
-      expect(hasPermissionWithHierarchy(customPermissions, ":view")).toBe(true);
-      expect(hasPermissionWithHierarchy(customPermissions, "workflows:")).toBe(
-        true,
-      );
-      expect(hasPermissionWithHierarchy(customPermissions, "workflows")).toBe(
-        true,
-      );
+      const testCases: Array<{
+        permission: string;
+        expected: boolean;
+        reason: string;
+      }> = [
+        {
+          permission: "workflows:view",
+          expected: true,
+          reason: "manage includes view",
+        },
+        {
+          permission: "workflows:manage",
+          expected: true,
+          reason: "direct match",
+        },
+        {
+          permission: "invalid-permission",
+          expected: true,
+          reason: "direct match (malformed but present)",
+        },
+        {
+          permission: ":view",
+          expected: true,
+          reason: "direct match (malformed but present)",
+        },
+        {
+          permission: "workflows:",
+          expected: true,
+          reason: "direct match (malformed but present)",
+        },
+        {
+          permission: "workflows",
+          expected: true,
+          reason: "direct match (malformed but present)",
+        },
+      ];
+
+      testCases.forEach(({ permission, expected, reason }) => {
+        it(`should ${
+          expected ? "allow" : "deny"
+        } ${permission} (${reason})`, () => {
+          expect(
+            hasPermissionWithHierarchy(customPermissions, permission),
+          ).toBe(expected);
+        });
+      });
     });
   });
 

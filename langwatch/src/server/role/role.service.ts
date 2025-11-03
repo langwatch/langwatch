@@ -1,19 +1,17 @@
-import { PrismaClient } from "@prisma/client";
-import { TRPCError } from "@trpc/server";
-import { RoleRepository } from "./repositories/role.repository";
-
-export type CreateRoleParams = {
-  organizationId: string;
-  name: string;
-  description?: string | null;
-  permissions: string[];
-};
-
-export type UpdateRoleParams = {
-  name?: string;
-  description?: string | null;
-  permissions?: string[];
-};
+import type { PrismaClient } from "@prisma/client";
+import {
+  RoleRepository,
+  type CreateRoleParams,
+  type UpdateRoleParams,
+} from "./repositories/role.repository";
+import {
+  RoleNotFoundError,
+  RoleDuplicateNameError,
+  RoleInUseError,
+  TeamNotFoundError,
+  RoleOrganizationMismatchError,
+  UserNotTeamMemberError,
+} from "./errors";
 
 /**
  * Service layer for custom role management
@@ -38,10 +36,7 @@ export class RoleService {
     const role = await this.repository.findById(roleId);
 
     if (!role) {
-      throw new TRPCError({
-        code: "NOT_FOUND",
-        message: "Role not found",
-      });
+      throw new RoleNotFoundError();
     }
 
     return {
@@ -58,10 +53,7 @@ export class RoleService {
     );
 
     if (existing) {
-      throw new TRPCError({
-        code: "CONFLICT",
-        message: "A role with this name already exists",
-      });
+      throw new RoleDuplicateNameError();
     }
 
     const role = await this.repository.create(params);
@@ -76,10 +68,7 @@ export class RoleService {
     // Business rule: Verify role exists
     const existing = await this.repository.findById(roleId);
     if (!existing) {
-      throw new TRPCError({
-        code: "NOT_FOUND",
-        message: "Role not found",
-      });
+      throw new RoleNotFoundError();
     }
 
     const updated = await this.repository.update(roleId, params);
@@ -95,17 +84,11 @@ export class RoleService {
     const role = await this.repository.findByIdWithUsers(roleId);
 
     if (!role) {
-      throw new TRPCError({
-        code: "NOT_FOUND",
-        message: "Role not found",
-      });
+      throw new RoleNotFoundError();
     }
 
     if (role.assignedUsers.length > 0) {
-      throw new TRPCError({
-        code: "PRECONDITION_FAILED",
-        message: `Cannot delete role that is assigned to ${role.assignedUsers.length} user(s)`,
-      });
+      throw new RoleInUseError(role.assignedUsers.length);
     }
 
     await this.repository.delete(roleId);
@@ -131,31 +114,19 @@ export class RoleService {
     ]);
 
     if (!customRole) {
-      throw new TRPCError({
-        code: "NOT_FOUND",
-        message: "Custom role not found",
-      });
+      throw new RoleNotFoundError("Custom role not found");
     }
 
     if (!team) {
-      throw new TRPCError({
-        code: "NOT_FOUND",
-        message: "Team not found",
-      });
+      throw new TeamNotFoundError();
     }
 
     if (customRole.organizationId !== team.organizationId) {
-      throw new TRPCError({
-        code: "FORBIDDEN",
-        message: "Custom role does not belong to team's organization",
-      });
+      throw new RoleOrganizationMismatchError();
     }
 
     if (!teamUser) {
-      throw new TRPCError({
-        code: "FORBIDDEN",
-        message: "User is not a member of the specified team",
-      });
+      throw new UserNotTeamMemberError();
     }
 
     await this.repository.assignToUser(userId, teamId, customRoleId);

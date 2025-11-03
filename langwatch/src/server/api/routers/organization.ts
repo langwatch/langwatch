@@ -820,7 +820,7 @@ export const organizationRouter = createTRPCRouter({
           }
         }),
     )
-    .use(checkTeamPermission("team:manage"))
+    .use(checkTeamPermission("organization:manage"))
     .mutation(async ({ input, ctx }) => {
       const prisma = ctx.prisma;
 

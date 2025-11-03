@@ -1,21 +1,24 @@
 import {
   type PrismaClient,
   type CustomRole,
+  type Prisma,
   TeamUserRole,
 } from "@prisma/client";
 
-export type CreateRoleParams = {
-  organizationId: string;
-  name: string;
-  description?: string | null;
-  permissions: string[];
-};
+/**
+ * Derives create params from Prisma schema, omitting auto-generated fields
+ */
+export type CreateRoleParams = Omit<
+  Prisma.CustomRoleUncheckedCreateInput,
+  "id" | "createdAt" | "updatedAt"
+>;
 
-export type UpdateRoleParams = {
-  name?: string;
-  description?: string | null;
-  permissions?: string[];
-};
+/**
+ * Derives update params from Prisma schema for selective field updates
+ */
+export type UpdateRoleParams = Partial<
+  Pick<CustomRole, "name" | "description" | "permissions">
+>;
 
 /**
  * Repository for custom role data access
@@ -24,14 +27,14 @@ export type UpdateRoleParams = {
 export class RoleRepository {
   constructor(private readonly prisma: PrismaClient) {}
 
-  async findAllByOrganization(organizationId: string): Promise<CustomRole[]> {
+  async findAllByOrganization(organizationId: string) {
     return this.prisma.customRole.findMany({
       where: { organizationId },
       orderBy: { createdAt: "desc" },
     });
   }
 
-  async findById(roleId: string): Promise<CustomRole | null> {
+  async findById(roleId: string) {
     return this.prisma.customRole.findUnique({
       where: { id: roleId },
     });
@@ -44,10 +47,7 @@ export class RoleRepository {
     });
   }
 
-  async findByNameAndOrganization(
-    name: string,
-    organizationId: string,
-  ): Promise<CustomRole | null> {
+  async findByNameAndOrganization(name: string, organizationId: string) {
     return this.prisma.customRole.findUnique({
       where: {
         organizationId_name: {
@@ -58,7 +58,7 @@ export class RoleRepository {
     });
   }
 
-  async create(params: CreateRoleParams): Promise<CustomRole> {
+  async create(params: CreateRoleParams) {
     return this.prisma.customRole.create({
       data: {
         organizationId: params.organizationId,
@@ -69,28 +69,24 @@ export class RoleRepository {
     });
   }
 
-  async update(roleId: string, params: UpdateRoleParams): Promise<CustomRole> {
+  async update(roleId: string, params: UpdateRoleParams) {
     return this.prisma.customRole.update({
       where: { id: roleId },
       data: {
         name: params.name,
         description: params.description,
-        permissions: params.permissions,
+        permissions: params.permissions as Prisma.InputJsonValue | undefined,
       },
     });
   }
 
-  async delete(roleId: string): Promise<void> {
+  async delete(roleId: string) {
     await this.prisma.customRole.delete({
       where: { id: roleId },
     });
   }
 
-  async assignToUser(
-    userId: string,
-    teamId: string,
-    customRoleId: string,
-  ): Promise<void> {
+  async assignToUser(userId: string, teamId: string, customRoleId: string) {
     await this.prisma.teamUser.update({
       where: {
         userId_teamId: {
@@ -105,7 +101,7 @@ export class RoleRepository {
     });
   }
 
-  async removeFromUser(userId: string, teamId: string): Promise<void> {
+  async removeFromUser(userId: string, teamId: string) {
     await this.prisma.teamUser.update({
       where: {
         userId_teamId: {

@@ -1,10 +1,8 @@
 import {
-  Badge,
   Box,
   Button,
   Card,
   Field,
-  Fieldset,
   Heading,
   HStack,
   Input,
@@ -15,25 +13,23 @@ import {
   VStack,
   useDisclosure,
 } from "@chakra-ui/react";
-import { Edit, Eye, Info, Plus, Shield, Trash2, Users } from "react-feather";
+import { Eye, Plus, Shield, Users } from "react-feather";
 import { ShieldUser } from "lucide-react";
 
 import { useForm } from "react-hook-form";
 import { useEffect, useState } from "react";
-import { Checkbox } from "../../components/ui/checkbox";
 import { Dialog } from "../../components/ui/dialog";
 import { Tooltip } from "../../components/ui/tooltip";
 import { toaster } from "../../components/ui/toaster";
 import SettingsLayout from "../../components/SettingsLayout";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { api } from "../../utils/api";
-import type { Permission, Resource, Action } from "../../server/api/rbac";
-import {
-  orderedResources,
-  getValidActionsForResource,
-} from "../../utils/permissionsConfig";
+import type { Permission } from "../../server/api/rbac";
 
 import { withPermissionGuard } from "../../components/WithPermissionGuard";
+import { RoleCard } from "./components/RoleCard";
+import { PermissionSelector } from "./components/PermissionSelector";
+import { PermissionViewer } from "./components/PermissionViewer";
 
 /**
  * Role Management Settings Page
@@ -606,337 +602,6 @@ function RolesManagement({
           <Dialog.CloseTrigger />
         </Dialog.Content>
       </Dialog.Root>
-    </VStack>
-  );
-}
-
-function RoleCard({
-  name,
-  description,
-  permissionCount,
-  isDefault = false,
-  icon: Icon = Shield, // Default to Shield if no icon provided
-  onDelete,
-  onEdit,
-  onViewPermissions,
-  hasPermission,
-}: {
-  name: string;
-  description: string;
-  permissionCount: string;
-  isDefault?: boolean;
-  icon?: React.ComponentType<{ size?: number }>; // Add icon prop
-  onDelete?: () => void;
-  onEdit?: () => void;
-  onViewPermissions?: () => void;
-  hasPermission: (permission: Permission) => boolean;
-}) {
-  return (
-    <Card.Root
-      width="100%"
-      height="100%"
-      borderWidth="1px"
-      borderColor="gray.200"
-      _hover={!isDefault ? { borderColor: "orange.400", shadow: "md" } : {}}
-      transition="all 0.2s"
-      display="flex"
-      flexDirection="column"
-    >
-      <Card.Header>
-        <HStack justify="space-between" align="start">
-          <VStack align="start" gap={1} flex={1}>
-            <HStack>
-              <Icon size={18} /> {/* Use the passed icon instead of Shield */}
-              <Text fontWeight="semibold">{name}</Text>
-            </HStack>
-            {isDefault && (
-              <Text fontSize="xs" color="gray.500">
-                Built-in Role
-              </Text>
-            )}
-          </VStack>
-          {!isDefault && (
-            <HStack gap={1}>
-              {onViewPermissions && (
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  colorPalette="blue"
-                  onClick={onViewPermissions}
-                  disabled={!hasPermission("organization:manage")}
-                >
-                  <Eye size={14} />
-                </Button>
-              )}
-              {onEdit && (
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  colorPalette="orange"
-                  onClick={onEdit}
-                  disabled={!hasPermission("organization:manage")}
-                >
-                  <Edit size={14} />
-                </Button>
-              )}
-              {onDelete && (
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  colorPalette="red"
-                  onClick={onDelete}
-                  disabled={!hasPermission("organization:manage")}
-                >
-                  <Trash2 size={14} />
-                </Button>
-              )}
-            </HStack>
-          )}
-        </HStack>
-      </Card.Header>
-      <Card.Body paddingTop={0} flex={1} display="flex" flexDirection="column">
-        <VStack align="start" gap={2} flex={1}>
-          <Text fontSize="sm" color="gray.600">
-            {description}
-          </Text>
-          {isDefault ? (
-            <Badge colorPalette="orange" size="sm">
-              {permissionCount}
-            </Badge>
-          ) : (
-            <Text fontSize="xs" color="orange.600" fontWeight="medium">
-              {permissionCount}
-            </Text>
-          )}
-        </VStack>
-      </Card.Body>
-    </Card.Root>
-  );
-}
-
-function PermissionSelector({
-  selectedPermissions,
-  onChange,
-}: {
-  selectedPermissions: Permission[];
-  onChange: (permissions: Permission[]) => void;
-}) {
-  // Helper function to safely create permission strings
-  const createPermission = (resource: Resource, action: Action): Permission => {
-    return `${resource}:${action}`;
-  };
-  const groupedPermissions: Record<Resource, Permission[]> = {} as Record<
-    Resource,
-    Permission[]
-  >;
-
-  // Use orderedResources from shared config (PLAYGROUND hidden, ORG/TEAM omitted)
-  const resourceOrder: Resource[] = orderedResources;
-
-  // Group permissions by resource using the correct valid actions
-  resourceOrder.forEach((resource) => {
-    const validActions = getValidActionsForResource(resource);
-    groupedPermissions[resource] = validActions.map((action) =>
-      createPermission(resource, action),
-    );
-  });
-
-  const togglePermission = (permission: Permission) => {
-    const [resource, action] = permission.split(":") as [Resource, Action];
-    const viewPermission = createPermission(resource, "view");
-
-    if (selectedPermissions.includes(permission)) {
-      // If removing a permission, remove it and any dependent permissions
-      let permissionsToRemove = [permission];
-
-      // If removing manage, also remove all other permissions for this resource
-      if (permission.endsWith(":manage")) {
-        const resourcePermissions = groupedPermissions[resource] || [];
-        permissionsToRemove = resourcePermissions;
-      }
-      // If removing view, also remove create/update/delete (can't use them without view)
-      else if (action === "view") {
-        const resourcePermissions = groupedPermissions[resource] || [];
-        const dependentActions = ["create", "update", "delete"];
-        const dependentPermissions = resourcePermissions.filter((p) =>
-          dependentActions.some((a) => p.endsWith(`:${a}`)),
-        );
-        permissionsToRemove = [...permissionsToRemove, ...dependentPermissions];
-      }
-
-      onChange(
-        selectedPermissions.filter((p) => !permissionsToRemove.includes(p)),
-      );
-    } else {
-      // If adding a permission, add it and handle hierarchy
-      let permissionsToAdd = [permission];
-
-      // If adding manage, add all permissions for this resource
-      if (permission.endsWith(":manage")) {
-        const resourcePermissions = groupedPermissions[resource] || [];
-        permissionsToAdd = resourcePermissions;
-      }
-      // If adding create/update/delete, also automatically add view
-      else if (
-        action === "create" ||
-        action === "update" ||
-        action === "delete"
-      ) {
-        permissionsToAdd.push(viewPermission);
-      }
-
-      // Add all permissions that aren't already selected
-      const newPermissions = [
-        ...selectedPermissions,
-        ...permissionsToAdd.filter((p) => !selectedPermissions.includes(p)),
-      ];
-      onChange(newPermissions);
-    }
-  };
-
-  return (
-    <VStack align="start" width="full" gap={4}>
-      {(Object.keys(groupedPermissions) as Resource[]).map((resource) => {
-        const validActions = getValidActionsForResource(resource);
-
-        return (
-          <Box key={resource} width="full">
-            <Fieldset.Root>
-              <Fieldset.Legend
-                fontSize="sm"
-                fontWeight="semibold"
-                textTransform="capitalize"
-                marginBottom={2}
-              >
-                <Text>{resource}</Text>
-              </Fieldset.Legend>
-              <Fieldset.Content>
-                <HStack gap={4} flexWrap="wrap" paddingLeft={6}>
-                  {validActions.map((action) => {
-                    const permission = createPermission(resource, action);
-                    const isChecked = selectedPermissions.includes(permission);
-
-                    // Check if this permission is implicitly checked due to manage being selected
-                    const managePermission = createPermission(
-                      resource,
-                      "manage",
-                    );
-                    const isImplicitlyChecked =
-                      action !== "manage" &&
-                      selectedPermissions.includes(managePermission);
-
-                    return (
-                      <Checkbox
-                        key={permission}
-                        checked={isChecked || isImplicitlyChecked}
-                        onChange={() => togglePermission(permission)}
-                        disabled={isImplicitlyChecked}
-                        opacity={isImplicitlyChecked ? 0.6 : 1}
-                      >
-                        {action === "manage" ? (
-                          <Tooltip
-                            content="Manage includes all permissions (view, create, update, delete) for this resource"
-                            positioning={{ placement: "top" }}
-                            showArrow
-                          >
-                            <HStack gap={1}>
-                              <Text fontSize="sm" textTransform="capitalize">
-                                {action}
-                              </Text>
-                              <Box color="gray.500">
-                                <Info size={14} />
-                              </Box>
-                            </HStack>
-                          </Tooltip>
-                        ) : (
-                          <Text fontSize="sm" textTransform="capitalize">
-                            {action}
-                          </Text>
-                        )}
-                      </Checkbox>
-                    );
-                  })}
-                </HStack>
-              </Fieldset.Content>
-            </Fieldset.Root>
-            <Separator marginY={3} />
-          </Box>
-        );
-      })}
-    </VStack>
-  );
-}
-
-/**
- * PermissionViewer component
- *
- * Single Responsibility: Displays permissions in a read-only, organized format
- */
-function PermissionViewer({ permissions }: { permissions: Permission[] }) {
-  // Helper function to safely create permission strings
-  const createPermission = (resource: Resource, action: Action): Permission => {
-    return `${resource}:${action}`;
-  };
-
-  const groupedPermissions: Record<Resource, Permission[]> = {} as Record<
-    Resource,
-    Permission[]
-  >;
-
-  // Use orderedResources from shared config (PLAYGROUND hidden, ORG/TEAM omitted)
-  const resourceOrder: Resource[] = orderedResources;
-
-  // Group permissions by resource using shared valid actions
-  resourceOrder.forEach((resource) => {
-    const validActions = getValidActionsForResource(resource);
-    groupedPermissions[resource] = validActions.map((action) =>
-      createPermission(resource, action),
-    );
-  });
-
-  // Reuse shared getValidActionsForResource
-
-  return (
-    <VStack align="start" width="full" gap={3}>
-      {(Object.keys(groupedPermissions) as Resource[]).map((resource) => {
-        const validActions = getValidActionsForResource(resource);
-        const hasAnyPermission = validActions.some((action) =>
-          permissions.includes(`${resource}:${action}`),
-        );
-
-        if (!hasAnyPermission) return null;
-
-        return (
-          <Box key={resource} width="full">
-            <VStack align="start" gap={2} width="full">
-              <Text fontWeight="semibold" textTransform="capitalize">
-                {resource}
-              </Text>
-              <HStack gap={3} flexWrap="wrap" paddingLeft={4}>
-                {validActions.map((action) => {
-                  const permission = createPermission(resource, action);
-                  const hasPermission = permissions.includes(permission);
-
-                  if (!hasPermission) return null;
-
-                  return (
-                    <Text
-                      key={permission}
-                      fontSize="sm"
-                      textTransform="capitalize"
-                      color="green.600"
-                      fontWeight="medium"
-                    >
-                      {action}
-                    </Text>
-                  );
-                })}
-              </HStack>
-            </VStack>
-            <Separator marginY={2} />
-          </Box>
-        );
-      })}
     </VStack>
   );
 }

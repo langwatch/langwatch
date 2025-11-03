@@ -19,6 +19,7 @@ export const orderedResources: Resource[] = [
   Resources.TRIGGERS,
   Resources.WORKFLOWS,
   Resources.PROMPTS,
+  Resources.TEAM,
   Resources.PROJECT,
   // Resources.PLAYGROUND, // Hidden intentionally
 ];
