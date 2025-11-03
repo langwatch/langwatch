@@ -1,31 +1,19 @@
-import React, { useState } from "react";
+import React from "react";
 import {
-  HStack,
-  IconButton,
-  Input,
   Text,
   VStack,
-
-  /* eslint-disable-next-line no-restricted-imports */
-  InputGroup,
 } from "@chakra-ui/react";
 import { toaster } from "../../../../../components/ui/toaster";
-import { Eye, EyeOff, Clipboard, ClipboardPlus } from "lucide-react";
-import { Tooltip } from "~/components/ui/tooltip";
 import { useActiveProject } from "../../../contexts/ActiveProjectContext";
 import { usePublicEnv } from "~/hooks/usePublicEnv";
+import { CopyableInputWithPrefix } from "./CopyableInputWithPrefix";
 
 export function ApiIntegrationInfoCard(): React.ReactElement {
-  const [isVisible, setIsVisible] = useState(false);
   const { project } = useActiveProject();
   const publicEnv = usePublicEnv();
 
   const effectiveApiKey = project?.apiKey ?? "";
   const effectiveEndpoint = publicEnv.data?.BASE_HOST ?? "";
-
-  function toggleVisibility(): void {
-    setIsVisible((prev) => !prev);
-  }
 
   async function copyApiKey({ withBashPrefix }: { withBashPrefix?: boolean }): Promise<void> {
     try {
@@ -74,98 +62,22 @@ export function ApiIntegrationInfoCard(): React.ReactElement {
           {"page."}
         </Text>
       </VStack>
-      <InputGroup
-        w="full"
-        startAddonProps={{ bg: "bg.muted/60", color: "fg.muted", border: "0"  }}
-        startAddon={<Text fontSize="xs">LANGWATCH_API_KEY=</Text>}
-        endAddonProps={{ bg: "bg.muted/40", color: "fg.muted", border: "0" }}
-        endAddon={
-          <HStack gap="1">
-            <IconButton
-              size="2xs"
-              variant="ghost"
-              onClick={toggleVisibility}
-              aria-label={isVisible ? "Hide key" : "Show key"}
-            >
-              {isVisible ? <EyeOff /> : <Eye />}
-            </IconButton>
-            <Tooltip content="Copy key" openDelay={0} showArrow>
-              <IconButton
-                size="2xs"
-                variant="ghost"
-                onClick={() => void copyApiKey({ withBashPrefix: false })}
-                aria-label="Copy key"
-              >
-                <Clipboard />
-              </IconButton>
-            </Tooltip>
-            <Tooltip content="Copy key with environment variable prefix" openDelay={0} showArrow>
-              <IconButton
-                size="2xs"
-                variant="ghost"
-                onClick={() => void copyApiKey({ withBashPrefix: true })}
-                aria-label="Copy key with bash prefix"
-              >
-                <ClipboardPlus />
-              </IconButton>
-            </Tooltip>
-          </HStack>
-        }
-      >
-        <Input
-          bg="bg.muted/40"
-          borderRight={0}
-          size="sm"
-          variant="subtle"
-          type={isVisible ? "text" : "password"}
-          value={effectiveApiKey}
-          readOnly
-          aria-label="Your API key"
-        />
-      </InputGroup>
+      <CopyableInputWithPrefix
+        prefix="LANGWATCH_API_KEY="
+        value={effectiveApiKey}
+        ariaLabel="Your API key"
+        showVisibilityToggle={true}
+        onCopy={copyApiKey}
+      />
 
       {effectiveEndpoint && effectiveEndpoint !== "https://app.langwatch.ai" && (
-        <InputGroup
-          w="full"
-          startAddonProps={{ bg: "bg.muted/60", color: "fg.muted", border: "0" }}
-          startAddon={<Text fontSize="xs">LANGWATCH_ENDPOINT=</Text>}
-          endAddonProps={{ bg: "bg.muted/40", color: "fg.muted", border: "0" }}
-          endAddon={
-            <HStack gap="1">
-              <Tooltip content="Copy endpoint" openDelay={0} showArrow>
-                <IconButton
-                  size="2xs"
-                  variant="ghost"
-                  onClick={() => void copyEndpoint({ withBashPrefix: false })}
-                  aria-label="Copy endpoint"
-                >
-                  <Clipboard />
-                </IconButton>
-              </Tooltip>
-              <Tooltip content="Copy endpoint with environment variable prefix" openDelay={0} showArrow>
-              <IconButton
-                size="2xs"
-                variant="ghost"
-                onClick={() => void copyEndpoint({ withBashPrefix: true })}
-                aria-label="Copy endpoint with bash prefix"
-              >
-                <ClipboardPlus />
-              </IconButton>
-            </Tooltip>
-            </HStack>
-          }
-        >
-          <Input
-            bg="bg.muted/40"
-            borderRight={0}
-            size="sm"
-            variant="subtle"
-            type={"text"}
-            value={effectiveEndpoint}
-            readOnly
-            aria-label="Your LangWatch Endpoint"
-          />
-        </InputGroup>
+        <CopyableInputWithPrefix
+          prefix="LANGWATCH_ENDPOINT="
+          value={effectiveEndpoint}
+          ariaLabel="Your LangWatch Endpoint"
+          showVisibilityToggle={false}
+          onCopy={copyEndpoint}
+        />
       )}
     </VStack>
   );
