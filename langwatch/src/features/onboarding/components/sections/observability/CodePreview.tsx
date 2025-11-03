@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from "react";
-import { CodeBlock, createShikiAdapter, Icon, IconButton, HStack } from "@chakra-ui/react";
+import { CodeBlock, createShikiAdapter, Icon, IconButton, HStack, ClientOnly } from "@chakra-ui/react";
 import type { HighlighterGeneric } from "shiki";
 import { useColorMode } from "../../../../../components/ui/color-mode";
 import { Eye, EyeOff } from "lucide-react";
@@ -60,53 +60,57 @@ export function CodePreview({ code, filename, codeLanguage: chakraLanguage, high
 
   return (
     <CodeBlock.AdapterProvider value={shikiAdapter}>
-      <CodeBlock.Root
-        size="sm"
-        code={displayCode}
-        language={chakraLanguage}
-        meta={{ highlightLines }}
-        transition="all 0.3s ease"
-      >
-        <CodeBlock.Header display="flex" justifyContent="space-between">
-          <CodeBlock.Title fontSize="xs" pt={2}>
-            {languageIcon ? <Icon size="xs">{languageIcon}</Icon> : null}
-            {filename}
-          </CodeBlock.Title>
+      <ClientOnly>
+        {() => (
+          <CodeBlock.Root
+            size="sm"
+            code={displayCode}
+            language={chakraLanguage}
+            meta={{ highlightLines, colorScheme: colorMode }}
+            transition="all 0.3s ease"
+          >
+            <CodeBlock.Header display="flex" justifyContent="space-between">
+              <CodeBlock.Title fontSize="xs" pt={2}>
+                {languageIcon ? <Icon size="xs">{languageIcon}</Icon> : null}
+                {filename}
+              </CodeBlock.Title>
 
-          <HStack gap="0" mr="-3px">
-            {enableVisibilityToggle && (
-              <Tooltip content={isVisible ? "Hide sensitive values" : "Show sensitive values"} openDelay={0} showArrow>
-                <IconButton
-                  size="2xs"
-                  variant="ghost"
-                  onClick={toggleVisibility}
-                  aria-label={isVisible ? "Hide sensitive values" : "Show sensitive values"}
-                >
-                  {isVisible ? <EyeOff /> : <Eye />}
-                </IconButton>
-              </Tooltip>
-            )}
-            <CodeBlock.CopyTrigger asChild>
-              <IconButton variant="ghost" size="2xs">
-                <CodeBlock.CopyIndicator copied={code} />
-              </IconButton>
-            </CodeBlock.CopyTrigger>
-          </HStack>
-        </CodeBlock.Header>
-        <CodeBlock.Content
-          transition="background-color 0.3s ease, color 0.3s ease"
-          css={{
-            '& pre, & code': {
-              transition: 'background-color 0.3s ease, color 0.3s ease',
-            },
-          }}
-          overflow="scroll"
-        >
-          <CodeBlock.Code>
-            <CodeBlock.CodeText />
-          </CodeBlock.Code>
-        </CodeBlock.Content>
-      </CodeBlock.Root>
+              <HStack gap="0" mr="-3px">
+                {enableVisibilityToggle && (
+                  <Tooltip content={isVisible ? "Hide sensitive values" : "Show sensitive values"} openDelay={0} showArrow>
+                    <IconButton
+                      size="2xs"
+                      variant="ghost"
+                      onClick={toggleVisibility}
+                      aria-label={isVisible ? "Hide sensitive values" : "Show sensitive values"}
+                    >
+                      {isVisible ? <EyeOff /> : <Eye />}
+                    </IconButton>
+                  </Tooltip>
+                )}
+                <CodeBlock.CopyTrigger asChild>
+                  <IconButton variant="ghost" size="2xs">
+                    <CodeBlock.CopyIndicator copied={code} />
+                  </IconButton>
+                </CodeBlock.CopyTrigger>
+              </HStack>
+            </CodeBlock.Header>
+            <CodeBlock.Content
+              transition="background-color 0.3s ease, color 0.3s ease"
+              css={{
+                '& pre, & code': {
+                  transition: 'background-color 0.3s ease, color 0.3s ease',
+                },
+              }}
+              overflow="scroll"
+            >
+              <CodeBlock.Code>
+                <CodeBlock.CodeText />
+              </CodeBlock.Code>
+            </CodeBlock.Content>
+          </CodeBlock.Root>
+        )}
+      </ClientOnly>
     </CodeBlock.AdapterProvider>
   );
 }

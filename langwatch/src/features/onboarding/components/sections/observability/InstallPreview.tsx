@@ -5,6 +5,7 @@ import {
   createShikiAdapter,
   IconButton,
   useTabs,
+  ClientOnly,
 } from "@chakra-ui/react";
 import type { HighlighterGeneric } from "shiki";
 import { useColorMode } from "../../../../../components/ui/color-mode";
@@ -55,50 +56,55 @@ export function InstallPreview({
   return (
     <Tabs.RootProvider value={tabs} size="sm" variant="line">
       <CodeBlock.AdapterProvider value={shikiAdapter}>
-        <CodeBlock.Root
-          code={activeTab.code}
-          language="bash"
-          size="sm"
-          transition="all 0.3s ease"
-          bg="bg.subtle/30"
-        >
-          <CodeBlock.Header borderBottomWidth="1px">
-            <Tabs.List w="full" border="0" ms="-1">
-              {tabItems.map((t) => (
-                <Tabs.Trigger
-                  colorPalette="teal"
-                  key={t.key}
-                  value={t.key}
-                  textStyle="xs"
-                >
-                  {t.title}
-                </Tabs.Trigger>
-              ))}
-            </Tabs.List>
-            <CodeBlock.CopyTrigger asChild>
-              <IconButton variant="ghost" size="2xs" mr={"-4px"}>
-                <CodeBlock.CopyIndicator />
-              </IconButton>
-            </CodeBlock.CopyTrigger>
-          </CodeBlock.Header>
-          <CodeBlock.Content
-            transition="background-color 0.3s ease, color 0.3s ease"
-            css={{
-              "& pre, & code": {
-                transition: "background-color 0.3s ease, color 0.3s ease",
-              },
-            }}
-          >
-            {otherTabs.map((t) => (
-              <Tabs.Content key={t.key} value={t.key} />
-            ))}
-            <Tabs.Content pt="1" value={activeTab.key}>
-              <CodeBlock.Code>
-                <CodeBlock.CodeText />
-              </CodeBlock.Code>
-            </Tabs.Content>
-          </CodeBlock.Content>
-        </CodeBlock.Root>
+        <ClientOnly>
+          {() => (
+            <CodeBlock.Root
+              code={activeTab.code}
+              language="bash"
+              size="sm"
+              transition="all 0.3s ease"
+              bg="bg.subtle/30"
+              meta={{ colorScheme: colorMode }}
+            >
+              <CodeBlock.Header borderBottomWidth="1px">
+                <Tabs.List w="full" border="0" ms="-1">
+                  {tabItems.map((t) => (
+                    <Tabs.Trigger
+                      colorPalette="teal"
+                      key={t.key}
+                      value={t.key}
+                      textStyle="xs"
+                    >
+                      {t.title}
+                    </Tabs.Trigger>
+                  ))}
+                </Tabs.List>
+                <CodeBlock.CopyTrigger asChild>
+                  <IconButton variant="ghost" size="2xs" mr={"-4px"}>
+                    <CodeBlock.CopyIndicator />
+                  </IconButton>
+                </CodeBlock.CopyTrigger>
+              </CodeBlock.Header>
+              <CodeBlock.Content
+                transition="background-color 0.3s ease, color 0.3s ease"
+                css={{
+                  "& pre, & code": {
+                    transition: "background-color 0.3s ease, color 0.3s ease",
+                  },
+                }}
+              >
+                {otherTabs.map((t) => (
+                  <Tabs.Content key={t.key} value={t.key} />
+                ))}
+                <Tabs.Content pt="1" value={activeTab.key}>
+                  <CodeBlock.Code>
+                    <CodeBlock.CodeText />
+                  </CodeBlock.Code>
+                </Tabs.Content>
+              </CodeBlock.Content>
+            </CodeBlock.Root>
+          )}
+        </ClientOnly>
       </CodeBlock.AdapterProvider>
     </Tabs.RootProvider>
   );
