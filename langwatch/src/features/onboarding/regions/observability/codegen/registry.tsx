@@ -1,5 +1,7 @@
 /* eslint-disable @next/next/no-img-element */
-import type { FrameworkKey, PlatformKey } from "../model";
+import type { FrameworkKey, PlatformKey } from "../types";
+import type { IconData, Docs } from "../../shared/types";
+import { themedIcon, singleIcon } from "../../shared/types";
 import vercelAiTsSource from "./snippets/typescript/vercelai.snippet.sts";
 import mastraTsSource from "./snippets/typescript/mastra.snippet.sts";
 import langgraphTsSource from "./snippets/typescript/langgraph.snippet.sts";
@@ -39,27 +41,12 @@ export interface SnippetRef {
   filename: string;
 }
 
-export interface ThemedIcon {
-  type: "themed";
-  lightSrc: string;
-  darkSrc: string;
-  alt: string;
-}
-
-export interface SingleIcon {
-  type: "single";
-  src: string;
-  alt: string;
-}
-
-export type IconData = ThemedIcon | SingleIcon;
-
 export interface IntegrationSpec {
   platform: PlatformKey;
   framework?: FrameworkKey;
   label: string;
   icon?: IconData;
-  docs: { internal?: string; external?: string };
+  docs: Docs;
   install?: InstallMatrix;
   snippet?: SnippetRef;
   customComponent?: React.ComponentType;
@@ -73,19 +60,6 @@ const goRef = (file: string): SnippetRef => ({ file, language: "go", filename: "
 const pyRef = (file: string): SnippetRef => ({ file, language: "python", filename: "app.py" });
 const yamlRef = (file: string): SnippetRef => ({ file, language: "yaml", filename: "application.yaml" });
 const bashRef = (file: string): SnippetRef => ({ file, language: "bash", filename: "run.sh" });
-
-// Helpers to build icon data
-const themedIcon = (lightSrc: string, darkSrc: string, alt: string): ThemedIcon => ({
-  type: "themed",
-  lightSrc,
-  darkSrc,
-  alt,
-});
-const singleIcon = (src: string, alt: string): SingleIcon => ({
-  type: "single",
-  src,
-  alt,
-});
 
 export const registry: IntegrationRegistry = [
   // TypeScript

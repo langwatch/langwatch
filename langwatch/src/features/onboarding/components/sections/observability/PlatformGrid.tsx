@@ -1,8 +1,8 @@
 import React from "react";
 import { HStack, Text, VStack } from "@chakra-ui/react";
 import { PLATFORM_OPTIONS } from "../../../regions/observability/ui-options";
-import type { PlatformKey } from "../../../regions/observability/model";
-import { SelectableIconCard } from "./SelectableIconCard";
+import type { PlatformKey } from "../../../regions/observability/types";
+import { SelectableIconCard } from "../shared/SelectableIconCard";
 
 interface PlatformGridProps {
   selectedLanguage: PlatformKey;
@@ -33,7 +33,7 @@ export const PlatformGrid: React.FC<PlatformGridProps> = ({
               src: lang.iconUrl ?? "",
               alt: lang.label,
             }}
-            size="lg"
+            iconSize="lg"
             selected={selectedLanguage === lang.key}
             onClick={() => onSelectLanguage(lang.key)}
             ariaLabel={`${lang.label} language`}
