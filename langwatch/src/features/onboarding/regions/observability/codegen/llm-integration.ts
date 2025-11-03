@@ -1,4 +1,4 @@
-import type { InstallMatrix } from "./codegen/registry";
+import type { InstallMatrix } from "./registry";
 
 interface LLMIntegrationPromptProps {
   frameworkLabel: string;

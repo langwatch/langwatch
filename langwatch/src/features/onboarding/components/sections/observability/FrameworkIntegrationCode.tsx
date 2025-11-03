@@ -3,6 +3,7 @@ import type { FrameworkKey, PlatformKey } from "../../../regions/observability/m
 import { useCodegen } from "../../../regions/observability/codegen";
 import { getRegistryEntry } from "../../../regions/observability/codegen/registry";
 import { CodePreview } from "./CodePreview";
+import { generateLLMIntegrationPrompt } from "../../../regions/observability/codegen/llm-integration";
 
 export function FrameworkIntegrationCode({
   platform,
@@ -16,10 +17,10 @@ export function FrameworkIntegrationCode({
   const codegenResult = useCodegen(platform, framework);
 
   const llmPrompt = useMemo(() => {
-    if (!codegenResult) return undefined;
+    if (!codegenResult) return void 0;
 
     const registryEntry = getRegistryEntry(platform, framework);
-    if (!registryEntry) return undefined;
+    if (!registryEntry) return void 0;
 
     return generateLLMIntegrationPrompt({
       frameworkLabel: registryEntry.label,
