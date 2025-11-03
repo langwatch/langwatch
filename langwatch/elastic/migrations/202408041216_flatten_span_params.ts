@@ -1,10 +1,8 @@
-import type { estypes } from "@elastic/elasticsearch";
+import type { MappingProperty } from "@elastic/elasticsearch/lib/api/types";
 import { TRACE_INDEX } from "../../src/server/elasticsearch";
 import { recreateIndexAndMigrate } from "../helpers";
 import { traceMapping } from "../schema";
 import { type Client as ElasticClient } from "@elastic/elasticsearch";
-
-type MappingProperty = estypes.MappingProperty;
 
 export const migrate = async (migrationKey: string, client: ElasticClient) => {
   await recreateIndexAndMigrate({

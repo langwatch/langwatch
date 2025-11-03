@@ -57,8 +57,6 @@ env.keep_trailing_newline = True
 def render_template(template_name: str, format=False, **kwargs) -> str:
     template = env.get_template(template_name)
     code = template.render(**kwargs)
-    # Fix emoji in system prompt utf-8 problem
-    code = code.encode("utf-8").decode("unicode_escape").encode("utf-16", "surrogatepass").decode("utf-16")
     code = re.sub(r"\n{4,}", "\n\n", code)
     try:
         code = isort.code(code, float_to_top=True)

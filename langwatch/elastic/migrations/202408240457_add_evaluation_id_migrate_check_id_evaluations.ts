@@ -1,10 +1,11 @@
-import { TRACE_INDEX } from "../../src/server/elasticsearch";
+import { esClient, TRACE_INDEX } from "../../src/server/elasticsearch";
 import { getCurrentWriteIndex } from "../helpers";
-import type { estypes } from "@elastic/elasticsearch";
-import { type Client as ElasticClient } from "@elastic/elasticsearch";
+import type {
+  QueryDslBoolQuery,
+  QueryDslQueryContainer,
+} from "@elastic/elasticsearch/lib/api/types";
 
-type QueryDslBoolQuery = estypes.QueryDslBoolQuery;
-type QueryDslQueryContainer = estypes.QueryDslQueryContainer;
+import { Client as ElasticClient } from "@elastic/elasticsearch";
 
 export const migrate = async (_migrationKey: string, client: ElasticClient) => {
   const currentIndex = await getCurrentWriteIndex({
@@ -74,7 +75,7 @@ export const migrate = async (_migrationKey: string, client: ElasticClient) => {
     process.stdout.write(
       `\rFetched ${results.length} out of ${totalHits}${
         totalHits >= 10_000 ? "+" : ""
-      } total hits`,
+      } total hits`
     );
     console.log("");
 
@@ -127,7 +128,7 @@ export const migrate = async (_migrationKey: string, client: ElasticClient) => {
       });
 
       process.stdout.write(
-        `\r${i + 1}/${results.length} records to be updated`,
+        `\r${i + 1}/${results.length} records to be updated`
       );
 
       if (bulkActions.length >= 1000) {
@@ -135,7 +136,7 @@ export const migrate = async (_migrationKey: string, client: ElasticClient) => {
         bulkActions = [];
         if (result.errors) {
           throw new Error(
-            "Error in bulk update:\n" + JSON.stringify(result, null, 2),
+            "Error in bulk update:\n" + JSON.stringify(result, null, 2)
           );
         }
       }
@@ -145,7 +146,7 @@ export const migrate = async (_migrationKey: string, client: ElasticClient) => {
       const result = await client.bulk({ body: bulkActions });
       if (result.errors) {
         throw new Error(
-          "Error in bulk update:\n" + JSON.stringify(result, null, 2),
+          "Error in bulk update:\n" + JSON.stringify(result, null, 2)
         );
       }
     }

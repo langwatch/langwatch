@@ -1,4 +1,7 @@
-import type { estypes } from "@elastic/elasticsearch";
+import {
+  type MappingDenseVectorProperty,
+  type MappingProperty,
+} from "@elastic/elasticsearch/lib/api/types";
 import { FLATENNED_TYPE } from "../src/server/elasticsearch";
 import type {
   DSPyStep,
@@ -10,9 +13,6 @@ import {
   type ElasticSearchTrace,
   type ElasticSearchEvaluation,
 } from "../src/server/tracer/types";
-
-type MappingProperty = estypes.MappingProperty;
-type MappingDenseVectorProperty = estypes.MappingDenseVectorProperty;
 
 export type NonNestedMappingProperty =
   | Omit<MappingProperty, "properties">
