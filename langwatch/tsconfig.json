@@ -46,5 +46,12 @@
     ".next/types/**/*.ts",
     ".next-saas/types/**/*.ts"
   ],
-  "exclude": ["node_modules", "saas-src/**/*", ".next", ".next-saas"]
+  "exclude": [
+    "node_modules",
+    "saas-src/**/*",
+    ".next",
+    ".next-saas",
+    "**/*.snippet.*",
+    "src/**/codegen/snippets/**/*",
+  ]
 }

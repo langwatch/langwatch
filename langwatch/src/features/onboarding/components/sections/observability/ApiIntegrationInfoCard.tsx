@@ -1,0 +1,172 @@
+import React, { useState } from "react";
+import {
+  HStack,
+  IconButton,
+  Input,
+  Text,
+  VStack,
+
+  /* eslint-disable-next-line no-restricted-imports */
+  InputGroup,
+} from "@chakra-ui/react";
+import { toaster } from "../../../../../components/ui/toaster";
+import { Eye, EyeOff, Clipboard, ClipboardPlus } from "lucide-react";
+import { Tooltip } from "~/components/ui/tooltip";
+import { useActiveProject } from "../../../contexts/ActiveProjectContext";
+import { usePublicEnv } from "~/hooks/usePublicEnv";
+
+export function ApiIntegrationInfoCard(): React.ReactElement {
+  const [isVisible, setIsVisible] = useState(false);
+  const { project } = useActiveProject();
+  const publicEnv = usePublicEnv();
+
+  const effectiveApiKey = project?.apiKey ?? "";
+  const effectiveEndpoint = publicEnv.data?.BASE_HOST ?? "";
+
+  function toggleVisibility(): void {
+    setIsVisible((prev) => !prev);
+  }
+
+  async function copyApiKey({ withBashPrefix }: { withBashPrefix?: boolean }): Promise<void> {
+    try {
+      await navigator.clipboard.writeText(withBashPrefix ? `LANGWATCH_API_KEY=${effectiveApiKey}` : effectiveApiKey);
+      toaster.create({
+        title: "Copied",
+        description: "API key copied to clipboard",
+        type: "success",
+        meta: { closable: true },
+      });
+    } catch {
+      toaster.create({
+        title: "Copy failed",
+        description: "Couldn't copy the API key. Please try again.",
+        type: "error",
+        meta: { closable: true },
+      });
+    }
+  }
+
+  async function copyEndpoint({ withBashPrefix }: { withBashPrefix?: boolean }): Promise<void> {
+    try {
+      await navigator.clipboard.writeText(withBashPrefix ? `LANGWATCH_ENDPOINT=${effectiveEndpoint}` : effectiveEndpoint);
+      toaster.create({
+        title: "Copied",
+        description: "Endpoint copied to clipboard",
+      });
+    } catch {
+      toaster.create({
+        title: "Copy failed",
+        description: "Couldn't copy the endpoint. Please try again.",
+        type: "error",
+        meta: { closable: true },
+      });
+    }
+  }
+
+  return (
+    <VStack align="stretch" gap={3}>
+      <VStack align="stretch" gap={0}>
+        <Text fontSize="md" fontWeight="semibold">
+          Your LangWatch Integration Info
+        </Text>
+        <Text fontSize="xs" color="fg.muted">
+          {"You can access your API key again anytime in the project's settings "}
+          {"page."}
+        </Text>
+      </VStack>
+      <InputGroup
+        w="full"
+        startAddonProps={{ bg: "bg.muted/60", color: "fg.muted", border: "0"  }}
+        startAddon={<Text fontSize="xs">LANGWATCH_API_KEY=</Text>}
+        endAddonProps={{ bg: "bg.muted/40", color: "fg.muted", border: "0" }}
+        endAddon={
+          <HStack gap="1">
+            <IconButton
+              size="2xs"
+              variant="ghost"
+              onClick={toggleVisibility}
+              aria-label={isVisible ? "Hide key" : "Show key"}
+            >
+              {isVisible ? <EyeOff /> : <Eye />}
+            </IconButton>
+            <Tooltip content="Copy key" openDelay={0} showArrow>
+              <IconButton
+                size="2xs"
+                variant="ghost"
+                onClick={() => void copyApiKey({ withBashPrefix: false })}
+                aria-label="Copy key"
+              >
+                <Clipboard />
+              </IconButton>
+            </Tooltip>
+            <Tooltip content="Copy key with environment variable prefix" openDelay={0} showArrow>
+              <IconButton
+                size="2xs"
+                variant="ghost"
+                onClick={() => void copyApiKey({ withBashPrefix: true })}
+                aria-label="Copy key with bash prefix"
+              >
+                <ClipboardPlus />
+              </IconButton>
+            </Tooltip>
+          </HStack>
+        }
+      >
+        <Input
+          bg="bg.muted/40"
+          borderRight={0}
+          size="sm"
+          variant="subtle"
+          type={isVisible ? "text" : "password"}
+          value={effectiveApiKey}
+          readOnly
+          aria-label="Your API key"
+        />
+      </InputGroup>
+
+      {effectiveEndpoint && effectiveEndpoint !== "https://app.langwatch.ai" && (
+        <InputGroup
+          w="full"
+          startAddonProps={{ bg: "bg.muted/60", color: "fg.muted", border: "0" }}
+          startAddon={<Text fontSize="xs">LANGWATCH_ENDPOINT=</Text>}
+          endAddonProps={{ bg: "bg.muted/40", color: "fg.muted", border: "0" }}
+          endAddon={
+            <HStack gap="1">
+              <Tooltip content="Copy endpoint" openDelay={0} showArrow>
+                <IconButton
+                  size="2xs"
+                  variant="ghost"
+                  onClick={() => void copyEndpoint({ withBashPrefix: false })}
+                  aria-label="Copy endpoint"
+                >
+                  <Clipboard />
+                </IconButton>
+              </Tooltip>
+              <Tooltip content="Copy endpoint with environment variable prefix" openDelay={0} showArrow>
+              <IconButton
+                size="2xs"
+                variant="ghost"
+                onClick={() => void copyEndpoint({ withBashPrefix: true })}
+                aria-label="Copy endpoint with bash prefix"
+              >
+                <ClipboardPlus />
+              </IconButton>
+            </Tooltip>
+            </HStack>
+          }
+        >
+          <Input
+            bg="bg.muted/40"
+            borderRight={0}
+            size="sm"
+            variant="subtle"
+            type={"text"}
+            value={effectiveEndpoint}
+            readOnly
+            aria-label="Your LangWatch Endpoint"
+          />
+        </InputGroup>
+      )}
+    </VStack>
+  );
+}
