@@ -49,7 +49,7 @@ export function GenerateApiSnippetDialog({
   const [selectedTarget, setSelectedTarget] =
     useState<Target>("python_python3");
   const [selectedSnippet, setSelectedSnippet] = useState<Snippet | undefined>(
-    snippets[0]
+    snippets[0],
   );
 
   const handleOpen = (e: React.MouseEvent<HTMLButtonElement>) => {
@@ -60,7 +60,7 @@ export function GenerateApiSnippetDialog({
   useEffect(() => {
     if (!selectedTarget) return;
     const snippet = snippets.find(
-      (snippet) => snippet.target === selectedTarget
+      (snippet) => snippet.target === selectedTarget,
     );
     if (snippet) {
       setSelectedSnippet(snippet);
@@ -85,39 +85,21 @@ export function GenerateApiSnippetDialog({
         <Dialog.Content>
           <Dialog.CloseTrigger />
           <Dialog.Header width="100%" marginTop={4}>
-            <HStack justifyContent="space-between" width="100%">
-              <Dialog.Title>{title ?? "API Usage"}</Dialog.Title>
+            <HStack
+              justifyContent="space-between"
+              width="100%"
+              alignItems="flex-start"
+            >
+              <VStack alignItems="flex-start" gap={2}>
+                <Dialog.Title>{title ?? "API Usage"}</Dialog.Title>
+                <Dialog.Description>{description}</Dialog.Description>
+              </VStack>
               <LanguageMenu
                 selectedTarget={selectedTarget}
                 setSelectedTarget={setSelectedTarget}
                 targets={targets}
               />
             </HStack>
-            <Dialog.Description>
-              <VStack alignItems="flex-start" gap={2}>
-                {description}
-                <HStack>
-                  <Text
-                    fontSize="sm"
-                    color="green.500"
-                    backgroundColor="gray.100"
-                    paddingX={2}
-                    paddingY={1}
-                    borderRadius={5}
-                  >
-                    {selectedSnippet.method}
-                  </Text>
-                  <Text
-                    fontSize="sm"
-                    color="gray.500"
-                    fontWeight="bold"
-                    fontFamily="monospace"
-                  >
-                    {selectedSnippet.path}
-                  </Text>
-                </HStack>
-              </VStack>
-            </Dialog.Description>
           </Dialog.Header>
           <Dialog.Body>
             <RenderCode
