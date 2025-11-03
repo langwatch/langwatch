@@ -1,3 +1,4 @@
+"use client";
 import { create } from "zustand";
 import { immer } from "zustand/middleware/immer";
 import { createJSONStorage, persist } from "zustand/middleware";
@@ -5,9 +6,9 @@ import { cloneDeep } from "lodash";
 import { createLogger } from "~/utils/logger";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { z } from "zod";
-import { Role } from "@copilotkit/runtime-client-gql";
-import { formSchema } from "~/prompt-configs/schemas";
-
+import { type PromptConfigFormValues } from "~/prompt-configs";
+import type { DeepPartial } from "react-hook-form";
+import { chatMessageSchema } from "~/server/tracer/types.generated";
 const logger = createLogger("DraggableTabsBrowserStore");
 
 /**
@@ -17,21 +18,18 @@ const logger = createLogger("DraggableTabsBrowserStore");
 export const TabDataSchema = z.object({
   chat: z
     .object({
-      initialMessages: z
-        .array(
-          z.object({
-            id: z.string(),
-            role: z.nativeEnum(Role),
-            content: z.string(),
-          }),
-        )
+      /**
+       * The initial messages to display in the chat. Comes from the span data.
+       */
+      initialMessagesFromSpanData: z
+        .array(chatMessageSchema.merge(z.object({ id: z.string() })))
         .default([]),
     })
     .default({
-      initialMessages: [],
+      initialMessagesFromSpanData: [],
     }),
   form: z.object({
-    currentValues: formSchema.deepPartial(),
+    currentValues: z.custom<DeepPartial<PromptConfigFormValues>>(),
   }),
   meta: z
     .object({
@@ -147,7 +145,7 @@ function createDraggableTabsBrowserStore(projectId: string) {
          */
         addTab: ({ data }) => {
           set((state) => {
-            const tabId = `tab-${Date.now()}`;
+            const tabId = `tab-${crypto.randomUUID()}`;
             const newTab: Tab = { id: tabId, data };
 
             let activeWindow = state.windows.find(
@@ -155,7 +153,7 @@ function createDraggableTabsBrowserStore(projectId: string) {
             );
 
             if (!activeWindow) {
-              const windowId = `window-${Date.now()}`;
+              const windowId = `window-${crypto.randomUUID()}`;
               activeWindow = { id: windowId, tabs: [], activeTabId: null };
               state.windows.push(activeWindow);
               state.activeWindowId = windowId;
@@ -221,14 +219,16 @@ function createDraggableTabsBrowserStore(projectId: string) {
                 {
                   id: newTabId,
                   data: {
+                    chat: {
+                      initialMessagesFromSpanData:
+                        sourceTab.data.chat.initialMessagesFromSpanData,
+                    },
                     form: {
                       currentValues: cloneDeep(
                         sourceTab.data.form.currentValues,
                       ),
                     },
-                    meta: {
-                      ...sourceTab.data.meta,
-                    },
+                    meta: sourceTab.data.meta,
                   },
                 },
               ],

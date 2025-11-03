@@ -16,6 +16,11 @@ import { useTabId } from "../ui/TabContext";
 
 export { useTabId } from "../ui/TabContext";
 
+/**
+ * Window content for a prompt tab.
+ * Single Responsibility: Initialize form for the active tab and render header, messages, and tabbed sections.
+ * @returns JSX element or null when no initial values.
+ */
 export function PromptBrowserWindowContent() {
   const tabId = useTabId();
   const { windows } = useDraggableTabsBrowserStore();
@@ -53,24 +58,24 @@ function PromptBrowserWindowInner(props: {
     [form.methods],
   );
 
-  form.methods.watch((values) => {
-    updateTabDataDebounced({
-      tabId: props.tabId,
-      updater: (data: TabData) => ({
-        ...data,
-        form: {
-          currentValues: cloneDeep(values),
-        },
-        meta: {
-          ...data.meta,
-          title: values.handle ?? null,
-          versionNumber: values.versionMetadata?.versionNumber,
-          scope: values.scope,
-        },
-      }),
+  useEffect(() => {
+    const sub = form.methods.watch((values) => {
+      updateTabDataDebounced({
+        tabId: props.tabId,
+        updater: (data: TabData) => ({
+          ...data,
+          form: { currentValues: cloneDeep(values) },
+          meta: {
+            ...data.meta,
+            title: values.handle ?? null,
+            versionNumber: values.versionMetadata?.versionNumber,
+            scope: values.scope,
+          },
+        }),
+      });
     });
-  });
-
+    return () => sub.unsubscribe();
+  }, [form.methods, props.tabId, updateTabDataDebounced]);
   // Handle syncing system message to prompt
   const messages = form.methods.watch("version.configData.messages");
   const systemMessage = useMemo(

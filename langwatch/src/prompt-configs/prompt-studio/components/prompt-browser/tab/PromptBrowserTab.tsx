@@ -14,6 +14,10 @@ type PromptBrowserTabControllerProps = ReturnType<
   typeof usePromptBrowserTabController
 >;
 
+/**
+ * PromptBrowserTabView
+ * Single Responsibility: Renders a browser tab with title, version badge, organization badge, unsaved changes indicator, and close button.
+ */
 function PromptBrowserTabView({
   tab,
   hasUnsavedChanges,
@@ -22,7 +26,7 @@ function PromptBrowserTabView({
   ...rest
 }: PromptBrowserTabProps & PromptBrowserTabControllerProps) {
   if (!tab) return null;
-  const meta = tab.data.meta ?? {};
+  const meta = tab.data.meta;
 
   return (
     <HStack gap={2} height="full" {...rest}>

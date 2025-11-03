@@ -74,7 +74,7 @@ export function PublishedPromptsList() {
                 addTab({
                   data: {
                     chat: {
-                      initialMessages: [],
+                      initialMessagesFromSpanData: [],
                     },
                     form: {
                       currentValues: defaultValues,

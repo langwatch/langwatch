@@ -4,9 +4,13 @@ import { useDraggableTabsBrowserStore } from "../prompt-studio-store/DraggableTa
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 import { computeInitialFormValuesForPrompt } from "~/prompt-configs/utils/computeInitialFormValuesForPrompt";
-import { type PromptConfigFormValues } from "~/prompt-configs/types";
+import { type PromptConfigFormValues } from "~/prompt-configs";
 import type { DeepPartial } from "react-hook-form";
 
+/**
+ * Compare two form values for deep equality after JSON normalization.
+type formSchemaResponsibility: Normalize and compare form values to detect changes.
+ */
 function areFormValuesEqual(
   a?: DeepPartial<PromptConfigFormValues>,
   b?: DeepPartial<PromptConfigFormValues>,
@@ -28,7 +32,7 @@ export function useHasUnsavedChanges(tabId: string): boolean {
   const { data: savedPrompt, isLoading: isLoadingSavedPrompt } =
     api.prompts.getByIdOrHandle.useQuery(
       {
-        idOrHandle: configId,
+        idOrHandle: configId ?? "",
         projectId: project?.id ?? "",
       },
       {

@@ -47,7 +47,7 @@ export function useUrlParamToOpenNewTab() {
       addTab({
         data: {
           chat: {
-            initialMessages: [],
+            initialMessagesFromSpanData: [],
           },
           form: {
             currentValues: defaultValues,

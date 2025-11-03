@@ -40,7 +40,7 @@ export function useCreateDraftPrompt() {
     addTab({
       data: {
         chat: {
-          initialMessages: [],
+          initialMessagesFromSpanData: [],
         },
         form: {
           currentValues: defaultValues,

@@ -3,10 +3,16 @@ import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useRouter } from "next/router";
 import { useSearchParams } from "next/navigation";
 import { useEffect, useRef } from "react";
-import { useDraggableTabsBrowserStore } from "../prompt-studio-store/DraggableTabsBrowserStore";
-import type { ChatMessage } from "~/server/tracer/types";
+import {
+  TabDataSchema,
+  useDraggableTabsBrowserStore,
+} from "../prompt-studio-store/DraggableTabsBrowserStore";
 import type { PromptConfigFormValues } from "~/prompt-configs/types";
-import { DEFAULT_MODEL } from "~/utils/constants";
+import { createLogger } from "~/utils/logger";
+import { toaster } from "~/components/ui/toaster";
+import type { ChatMessage } from "~/server/tracer/types";
+
+const logger = createLogger("useLoadSpanIntoPromptStudio");
 
 const QUERY_PARAM_PROMPT_PLAYGROUND_SPAN_ID = "promptPlaygroundSpanId";
 
@@ -83,18 +89,16 @@ function createDefaultPromptFormValues(
 }
 
 /**
- * Transforms span messages into chat messages format.
- * Single Responsibility: Convert span message data to chat UI format.
+ * Adds a unique ID to each message.
  */
-function transformSpanMessagesToChat(
-  messages: Array<{ role: string; content: string }>,
+function addIdToMessages(
+  messages: Array<ChatMessage>,
   traceId: string,
 ): Array<ChatMessage & { id: string }> {
   return messages.map((message) => ({
+    ...message,
     id: traceId,
-    role: message.role,
-    content: message.content ?? "",
-  })) as Array<ChatMessage & { id: string }>;
+  }));
 }
 
 /**
@@ -105,7 +109,7 @@ export function useLoadSpanIntoPromptStudio() {
   const loadedRef = useRef(false);
   const { project } = useOrganizationTeamProject();
   const { spanId, clearSpanIdFromUrl } = useSpanIdFromUrl();
-  const trpc = api.useUtils();
+  const trpc = api.useContext();
   const { addTab } = useDraggableTabsBrowserStore();
 
   useEffect(() => {
@@ -115,27 +119,36 @@ export function useLoadSpanIntoPromptStudio() {
     clearSpanIdFromUrl();
 
     void (async () => {
-      const spanData = await trpc.spans.getForPromptStudio.fetch({
-        projectId: project?.id ?? "",
-        spanId: spanId,
-      });
+      try {
+        const spanData = await trpc.spans.getForPromptStudio.fetch({
+          projectId: project?.id ?? "",
+          spanId: spanId,
+        });
 
-      if (spanData) {
-        const defaultValues = createDefaultPromptFormValues(spanData);
-        const chatMessages = transformSpanMessagesToChat(
-          spanData.messages,
-          spanData.traceId,
-        );
+        if (spanData) {
+          const defaultValues = createDefaultPromptFormValues(spanData);
+          const chatMessages = addIdToMessages(
+            spanData.messages,
+            spanData.traceId,
+          );
 
-        addTab({
-          data: {
-            form: {
-              currentValues: defaultValues,
-            },
-            chat: {
-              initialMessages: chatMessages,
-            },
-          },
+          addTab({
+            data: TabDataSchema.parse({
+              form: {
+                currentValues: defaultValues,
+              },
+              chat: {
+                initialMessagesFromSpanData: chatMessages,
+              },
+            }),
+          });
+        }
+      } catch (error) {
+        logger.error("Error loading span data into prompt studio", error);
+        toaster.create({
+          title: "Error loading span data into prompt studio",
+          description: (error as Error).message,
+          closable: true,
         });
       }
     })();

@@ -48,7 +48,7 @@ export function PromptStudioChat(props: PromptStudioChatProps) {
           console.error(error);
         }}
         disableSystemMessage
-        initialMessages={[
+        initialMessagesFromSpanData={[
           {
             id: "1",
             role: "user",
@@ -71,10 +71,10 @@ function PromptStudioChatInner() {
 
   useEffect(() => {
     const tab = getTabById(tabId);
-    const initialMessages = tab?.chat?.initialMessages;
-    if (initialMessages?.length) {
+    const initialMessagesFromSpanData = tab?.chat?.initialMessagesFromSpanData;
+    if (initialMessagesFromSpanData?.length) {
       void setMessages(
-        convertScenarioMessagesToCopilotKit(initialMessages as any),
+        convertScenarioMessagesToCopilotKit(initialMessagesFromSpanData as any),
       );
     }
   }, [setMessages, tabId, getTabById]);
