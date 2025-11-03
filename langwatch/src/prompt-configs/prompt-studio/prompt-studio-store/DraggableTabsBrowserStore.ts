@@ -9,6 +9,7 @@ import { z } from "zod";
 import { type PromptConfigFormValues } from "~/prompt-configs";
 import type { DeepPartial } from "react-hook-form";
 import { chatMessageSchema } from "~/server/tracer/types.generated";
+import { createTabId, createWindowId } from "./utils/id-generators";
 const logger = createLogger("DraggableTabsBrowserStore");
 
 /**
@@ -145,7 +146,7 @@ function createDraggableTabsBrowserStore(projectId: string) {
          */
         addTab: ({ data }) => {
           set((state) => {
-            const tabId = `tab-${crypto.randomUUID()}`;
+            const tabId = createTabId();
             const newTab: Tab = { id: tabId, data };
 
             let activeWindow = state.windows.find(
@@ -153,7 +154,7 @@ function createDraggableTabsBrowserStore(projectId: string) {
             );
 
             if (!activeWindow) {
-              const windowId = `window-${crypto.randomUUID()}`;
+              const windowId = createWindowId();
               activeWindow = { id: windowId, tabs: [], activeTabId: null };
               state.windows.push(activeWindow);
               state.activeWindowId = windowId;
@@ -210,26 +211,15 @@ function createDraggableTabsBrowserStore(projectId: string) {
             const sourceTab = tabWindow.tabs.find((t) => t.id === tabId);
             if (!sourceTab) return;
 
-            const newWindowId = `window-${Date.now()}`;
-            const newTabId = `tab-${Date.now()}`;
+            const newWindowId = createWindowId();
+            const newTabId = createTabId();
 
             const newWindow: Window = {
               id: newWindowId,
               tabs: [
                 {
                   id: newTabId,
-                  data: {
-                    chat: {
-                      initialMessagesFromSpanData:
-                        sourceTab.data.chat.initialMessagesFromSpanData,
-                    },
-                    form: {
-                      currentValues: cloneDeep(
-                        sourceTab.data.form.currentValues,
-                      ),
-                    },
-                    meta: sourceTab.data.meta,
-                  },
+                  data: cloneDeep(sourceTab.data),
                 },
               ],
               activeTabId: newTabId,

@@ -8,7 +8,6 @@
 import {
   CopilotRuntime,
   copilotRuntimeNodeHttpEndpoint,
-  ExperimentalEmptyAdapter,
 } from "@copilotkit/runtime";
 import type { Project } from "@prisma/client";
 import { Hono } from "hono";
@@ -24,7 +23,6 @@ import {
 
 import { createLogger } from "~/utils/logger";
 import { PromptStudioAdapter } from "./service-adapter";
-import { AbstractAgent, HttpAgent, type Message } from "@ag-ui/client";
 
 const logger = createLogger("langwatch:api:copilotkit");
 

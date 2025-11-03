@@ -12,6 +12,7 @@ import clsx from "clsx";
 import { useDraggableTabsBrowserStore } from "../../prompt-studio-store/DraggableTabsBrowserStore";
 import { useTabId } from "../prompt-browser/ui/TabContext";
 import { convertScenarioMessagesToCopilotKit } from "~/components/simulations/utils/convert-scenario-messages";
+import type { ChatMessage } from "~/server/tracer/types";
 
 interface PromptStudioChatProps extends BoxProps {
   formValues: PromptConfigFormValues;
@@ -67,7 +68,10 @@ function PromptStudioChatInner() {
   const { getTabById } = useDraggableTabsBrowserStore((state) => ({
     getTabById: state.getByTabId,
   }));
-  const { setMessages } = useCopilotChat({});
+  const { setMessages, visibleMessages } = useCopilotChat({});
+  const { updateTabData } = useDraggableTabsBrowserStore((state) => ({
+    updateTabData: state.updateTabData,
+  }));
 
   useEffect(() => {
     const tab = getTabById(tabId);
@@ -78,6 +82,33 @@ function PromptStudioChatInner() {
       );
     }
   }, [setMessages, tabId, getTabById]);
+
+  console.log("visibleMessages", visibleMessages);
+
+  /**
+   * Sync the visible messages to the tab data.
+   */
+  useEffect(() => {
+    const tab = getTabById(tabId);
+    if (tab) {
+      updateTabData({
+        tabId,
+        updater: (data) => ({
+          ...data,
+          chat: {
+            ...data.chat,
+            initialMessagesFromSpanData: visibleMessages
+              .filter((message) => message.isTextMessage())
+              .map((message) => ({
+                id: message.id,
+                role: message.role as ChatMessage["role"],
+                content: message.content.toString(),
+              })),
+          },
+        }),
+      });
+    }
+  }, [visibleMessages, getTabById, tabId, updateTabData]);
 
   return (
     <CopilotChat
