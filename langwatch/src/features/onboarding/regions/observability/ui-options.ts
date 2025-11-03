@@ -25,14 +25,14 @@ export const PLATFORM_OPTIONS: PlatformOption[] = [
     iconUrl: "/images/external-icons/java.svg",
   },
   {
-    key: "opentelemetry",
-    label: "OpenTelemetry",
-    iconUrl: "/images/external-icons/otel.svg",
-  },
-  {
     key: "no_and_lo",
     label: "No and Low Code",
     iconUrl: "/images/external-icons/no-and-lo.svg",
+  },
+  {
+    key: "opentelemetry",
+    label: "OpenTelemetry",
+    iconUrl: "/images/external-icons/otel.svg",
   },
 ];
 
