@@ -1,11 +1,10 @@
 /* eslint-disable @next/next/no-img-element */
-import React from "react";
 import type { FrameworkKey, PlatformKey } from "../model";
-import vercelAiTsSource from "./snippets/typescript/vercelai.snippet.ts?raw";
-import mastraTsSource from "./snippets/typescript/mastra.snippet.ts?raw";
-import langgraphTsSource from "./snippets/typescript/langgraph.snippet.ts?raw";
-import langchainTsSource from "./snippets/typescript/langchain.snippet.ts?raw";
-import openaiTsSource from "./snippets/typescript/openai.snippet.ts?raw";
+import vercelAiTsSource from "./snippets/typescript/vercelai.snippet.sts";
+import mastraTsSource from "./snippets/typescript/mastra.snippet.sts";
+import langgraphTsSource from "./snippets/typescript/langgraph.snippet.sts";
+import langchainTsSource from "./snippets/typescript/langchain.snippet.sts";
+import openaiTsSource from "./snippets/typescript/openai.snippet.sts";
 import goOpenaiSource from "./snippets/go/openai.snippet.go";
 import goAzureSource from "./snippets/go/azure.snippet.go";
 import goAnthropicSource from "./snippets/go/anthropic.snippet.go";
@@ -40,11 +39,26 @@ export interface SnippetRef {
   filename: string;
 }
 
+export interface ThemedIcon {
+  type: "themed";
+  lightSrc: string;
+  darkSrc: string;
+  alt: string;
+}
+
+export interface SingleIcon {
+  type: "single";
+  src: string;
+  alt: string;
+}
+
+export type IconData = ThemedIcon | SingleIcon;
+
 export interface IntegrationSpec {
   platform: PlatformKey;
   framework?: FrameworkKey;
   label: string;
-  icon?: React.ReactNode;
+  icon?: IconData;
   docs: { internal?: string; external?: string };
   install?: InstallMatrix;
   snippet?: SnippetRef;
@@ -60,20 +74,18 @@ const pyRef = (file: string): SnippetRef => ({ file, language: "python", filenam
 const yamlRef = (file: string): SnippetRef => ({ file, language: "yaml", filename: "application.yaml" });
 const bashRef = (file: string): SnippetRef => ({ file, language: "bash", filename: "run.sh" });
 
-function themedIcon(lightSrc: string, darkSrc: string, alt: string): React.ReactElement {
-  const isDark = true;
-
-  return (
-    <img
-      src={isDark ? darkSrc : lightSrc}
-      alt={alt}
-    />
-  );
-}
-
-function singleIcon(src: string, alt: string): React.ReactElement {
-  return <img src={src} alt={alt} />;
-}
+// Helpers to build icon data
+const themedIcon = (lightSrc: string, darkSrc: string, alt: string): ThemedIcon => ({
+  type: "themed",
+  lightSrc,
+  darkSrc,
+  alt,
+});
+const singleIcon = (src: string, alt: string): SingleIcon => ({
+  type: "single",
+  src,
+  alt,
+});
 
 export const registry: IntegrationRegistry = [
   // TypeScript
@@ -181,20 +193,57 @@ export const registry: IntegrationRegistry = [
   // Python
   {
     platform: "python",
-    framework: "agno",
-    label: "Agno",
-    docs: { internal: "/integration/python/integrations/agno", external: "https://docs.agno.com/introduction" },
-    icon: singleIcon(
-      "/images/external-icons/agno.png",
-      "Agno",
+    framework: "openai",
+    label: "OpenAI",
+    docs: { internal: "/integration/python/integrations/open-ai", external: "https://platform.openai.com/docs/overview" },
+    icon: themedIcon(
+      "/images/external-icons/openai-lighttheme.svg",
+      "/images/external-icons/openai-darktheme.svg",
+      "OpenAI",
     ),
     install: {
       python: {
-        pip: "pip install langwatch agno openai openinference-instrumentation-agno yfinance",
-        uv: "uv add langwatch agno openai openinference-instrumentation-agno yfinance",
+        pip: "pip install langwatch openai",
+        uv: "uv add langwatch openai",
       },
     },
-    snippet: pyRef(agnoPySource as unknown as string),
+    snippet: pyRef(openaiPySource as unknown as string),
+  },
+  {
+    platform: "python",
+    framework: "openai_agents",
+    label: "OpenAI Agents",
+    docs: { internal: "/integration/python/integrations/openai-agents", external: "https://platform.openai.com/docs/guides/agents" },
+    icon: themedIcon(
+      "/images/external-icons/openai-lighttheme.svg",
+      "/images/external-icons/openai-darktheme.svg",
+      "OpenAI Agents",
+    ),
+    install: {
+      python: {
+        pip: "pip install langwatch openai-agents openinference-instrumentation-openai-agents",
+        uv: "uv add langwatch openai-agents openinference-instrumentation-openai-agents",
+      },
+    },
+    snippet: pyRef(openaiAgentsPySource as unknown as string),
+  },
+
+  {
+    platform: "python",
+    framework: "litellm",
+    label: "LiteLLM",
+    docs: { internal: "/integration/python/integrations/lite-llm", external: "https://docs.litellm.ai/docs/" },
+    icon: singleIcon(
+      "/images/external-icons/litellm.avif",
+      "LiteLLM",
+    ),
+    install: {
+      python: {
+        pip: "pip install langwatch litellm",
+        uv: "uv add langwatch litellm",
+      },
+    },
+    snippet: pyRef(litellmPySource as unknown as string),
   },
   {
     platform: "python",
@@ -215,23 +264,6 @@ export const registry: IntegrationRegistry = [
   },
   {
     platform: "python",
-    framework: "haystack",
-    label: "Haystack",
-    docs: { internal: "/integration/python/integrations/haystack", external: "https://docs.haystack.deepset.ai/docs/intro" },
-    icon: singleIcon(
-      "/images/external-icons/haystack.png",
-      "Haystack",
-    ),
-    install: {
-      python: {
-        pip: "pip install langwatch openinference-instrumentation-haystack haystack-ai",
-        uv: "uv add langwatch openinference-instrumentation-haystack haystack-ai",
-      },
-    },
-    snippet: pyRef(haystackPySource as unknown as string),
-  },
-  {
-    platform: "python",
     framework: "strands",
     label: "Strand Agents",
     docs: { internal: "/integration/python/integrations/strand-agents", external: "https://strandsagents.com/latest/" },
@@ -246,6 +278,23 @@ export const registry: IntegrationRegistry = [
       },
     },
     snippet: pyRef(strandsPySource as unknown as string),
+  },
+  {
+    platform: "python",
+    framework: "agno",
+    label: "Agno",
+    docs: { internal: "/integration/python/integrations/agno", external: "https://docs.agno.com/introduction" },
+    icon: singleIcon(
+      "/images/external-icons/agno.png",
+      "Agno",
+    ),
+    install: {
+      python: {
+        pip: "pip install langwatch agno openai openinference-instrumentation-agno yfinance",
+        uv: "uv add langwatch agno openai openinference-instrumentation-agno yfinance",
+      },
+    },
+    snippet: pyRef(agnoPySource as unknown as string),
   },
   {
     platform: "python",
@@ -267,41 +316,6 @@ export const registry: IntegrationRegistry = [
   },
   {
     platform: "python",
-    framework: "litellm",
-    label: "LiteLLM",
-    docs: { internal: "/integration/python/integrations/lite-llm", external: "https://docs.litellm.ai/docs/" },
-    icon: singleIcon(
-      "/images/external-icons/litellm.avif",
-      "LiteLLM",
-    ),
-    install: {
-      python: {
-        pip: "pip install langwatch litellm",
-        uv: "uv add langwatch litellm",
-      },
-    },
-    snippet: pyRef(litellmPySource as unknown as string),
-  },
-  {
-    platform: "python",
-    framework: "openai",
-    label: "OpenAI",
-    docs: { internal: "/integration/python/integrations/open-ai", external: "https://platform.openai.com/docs/overview" },
-    icon: themedIcon(
-      "/images/external-icons/openai-lighttheme.svg",
-      "/images/external-icons/openai-darktheme.svg",
-      "OpenAI",
-    ),
-    install: {
-      python: {
-        pip: "pip install langwatch openai",
-        uv: "uv add langwatch openai",
-      },
-    },
-    snippet: pyRef(openaiPySource as unknown as string),
-  },
-  {
-    platform: "python",
     framework: "pydantic",
     label: "Pydantic AI",
     docs: { internal: "/integration/python/integrations/pydantic-ai", external: "https://ai.pydantic.dev/" },
@@ -319,21 +333,20 @@ export const registry: IntegrationRegistry = [
   },
   {
     platform: "python",
-    framework: "openai_agents",
-    label: "OpenAI Agents",
-    docs: { internal: "/integration/python/integrations/openai-agents", external: "https://platform.openai.com/docs/guides/agents" },
-    icon: themedIcon(
-      "/images/external-icons/openai-lighttheme.svg",
-      "/images/external-icons/openai-darktheme.svg",
-      "OpenAI Agents",
+    framework: "haystack",
+    label: "Haystack",
+    docs: { internal: "/integration/python/integrations/haystack", external: "https://docs.haystack.deepset.ai/docs/intro" },
+    icon: singleIcon(
+      "/images/external-icons/haystack.png",
+      "Haystack",
     ),
     install: {
       python: {
-        pip: "pip install langwatch openai-agents openinference-instrumentation-openai-agents",
-        uv: "uv add langwatch openai-agents openinference-instrumentation-openai-agents",
+        pip: "pip install langwatch openinference-instrumentation-haystack haystack-ai",
+        uv: "uv add langwatch openinference-instrumentation-haystack haystack-ai",
       },
     },
-    snippet: pyRef(openaiAgentsPySource as unknown as string),
+    snippet: pyRef(haystackPySource as unknown as string),
   },
 
   // Go
@@ -482,8 +495,8 @@ export function getRegistryEntry(platform: PlatformKey, framework?: FrameworkKey
   return registry.find((r) => r.platform === platform && r.framework === framework);
 }
 
-export function deriveFrameworksByPlatform(): Record<PlatformKey, { key: FrameworkKey; label: string; icon?: React.ReactNode }[]> {
-  const out: Record<PlatformKey, { key: FrameworkKey; label: string; icon?: React.ReactNode }[]> = {
+export function deriveFrameworksByPlatform(): Record<PlatformKey, { key: FrameworkKey; label: string; icon?: IconData }[]> {
+  const out: Record<PlatformKey, { key: FrameworkKey; label: string; icon?: IconData }[]> = {
     typescript: [], python: [], go: [], java: [], opentelemetry: [], no_and_lo: [],
   };
   for (const r of registry) {

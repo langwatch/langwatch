@@ -1,4 +1,4 @@
-declare module "*.snippet.ts" {
+declare module "*.snippet.sts" {
   const content: string;
   export default content;
 }

@@ -75,8 +75,8 @@ export function ObservabilityScreen(): React.ReactElement {
                 <FrameworkIntegrationCode
                   platform={selectedPlatform}
                   framework={selectedFramework}
-                  languageIcon={
-                    PLATFORM_OPTIONS.find((l) => l.key === selectedPlatform)?.icon
+                  languageIconUrl={
+                    PLATFORM_OPTIONS.find((l) => l.key === selectedPlatform)?.iconUrl
                   }
                 />
               </Box>
