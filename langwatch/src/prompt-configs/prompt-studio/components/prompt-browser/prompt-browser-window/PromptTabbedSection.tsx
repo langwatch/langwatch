@@ -1,12 +1,16 @@
-import { Box, HStack, Tabs } from "@chakra-ui/react";
-import { PromptStudioChat } from "../../chat/PromptStudioChat";
+import { Box, HStack, Tabs, IconButton } from "@chakra-ui/react";
+import {
+  PromptStudioChat,
+  type PromptStudioChatRef,
+} from "../../chat/PromptStudioChat";
 import { useFormContext } from "react-hook-form";
 import type { PromptConfigFormValues } from "~/prompt-configs/types";
 import { SettingsTabContent } from "./SettingsTabContent";
-import { useMemo, useState } from "react";
+import { useState, useRef } from "react";
 import { VariablesForm } from "./VariablesForm";
 import type { z } from "zod";
 import { type runtimeInputsSchema } from "~/prompt-configs/schemas/field-schemas";
+import { Edit3 } from "react-feather";
 
 enum PromptTab {
   Conversation = "conversation",
@@ -19,12 +23,13 @@ enum PromptTab {
  */
 export function PromptTabbedSection() {
   const form = useFormContext<PromptConfigFormValues>();
-  const inputs = form.getValues().version.configData.inputs ?? [];
+  const inputs = form.watch("version.configData.inputs") ?? [];
   const [variables, setVariables] = useState<
     z.infer<typeof runtimeInputsSchema>
   >([]);
-  const formValues = useMemo(() => form.getValues(), [form]);
+  const formValues = form.watch();
   const hasInputs = inputs.length > 0;
+  const chatRef = useRef<PromptStudioChatRef>(null);
 
   return (
     <Tabs.Root
@@ -34,12 +39,26 @@ export function PromptTabbedSection() {
       flex={1}
       width="full"
     >
-      <Tabs.List colorPalette="orange" paddingX={3}>
+      <Tabs.List
+        colorPalette="orange"
+        paddingX={3}
+        display="flex"
+        alignItems="center"
+      >
         <Tabs.Trigger value={PromptTab.Conversation}>Conversation</Tabs.Trigger>
         {hasInputs && (
           <Tabs.Trigger value={PromptTab.Variables}>Variables</Tabs.Trigger>
         )}
         <Tabs.Trigger value={PromptTab.Settings}>Settings</Tabs.Trigger>
+        <Box flex={1} />
+        <IconButton
+          size="sm"
+          variant="ghost"
+          onClick={() => chatRef.current?.resetChat()}
+          aria-label="Reset chat"
+        >
+          <Edit3 size={16} />
+        </IconButton>
       </Tabs.List>
       <HStack flex={1} width="full" margin="0 auto">
         <Tabs.Content
@@ -58,7 +77,11 @@ export function PromptTabbedSection() {
             height="full"
             maxHeight="full"
           >
-            <PromptStudioChat formValues={formValues} variables={variables} />
+            <PromptStudioChat
+              ref={chatRef}
+              formValues={formValues}
+              variables={variables}
+            />
           </Box>
         </Tabs.Content>
         <Tabs.Content value={PromptTab.Variables} height="full">

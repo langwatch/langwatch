@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, forwardRef, useImperativeHandle } from "react";
 import { CopilotKit, useCopilotChat } from "@copilotkit/react-core";
 import { AssistantMessage, CopilotChat } from "@copilotkit/react-ui";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
@@ -19,7 +19,14 @@ interface PromptStudioChatProps extends BoxProps {
   variables?: z.infer<typeof runtimeInputsSchema>;
 }
 
-export function PromptStudioChat(props: PromptStudioChatProps) {
+export interface PromptStudioChatRef {
+  resetChat: () => void;
+}
+
+export const PromptStudioChat = forwardRef<
+  PromptStudioChatRef,
+  PromptStudioChatProps
+>(function PromptStudioChat(props, ref) {
   const { formValues, variables, ...boxProps } = props;
   const { project } = useOrganizationTeamProject();
   const additionalParams = useMemo(() => {
@@ -57,70 +64,81 @@ export function PromptStudioChat(props: PromptStudioChatProps) {
           },
         ]}
       >
-        <PromptStudioChatInner />
+        <PromptStudioChatInner ref={ref} />
       </CopilotKit>
     </Box>
   );
-}
+});
 
-function PromptStudioChatInner() {
-  const tabId = useTabId();
-  const { getTabById } = useDraggableTabsBrowserStore((state) => ({
-    getTabById: state.getByTabId,
-  }));
-  const { setMessages, visibleMessages } = useCopilotChat({});
-  const { updateTabData } = useDraggableTabsBrowserStore((state) => ({
-    updateTabData: state.updateTabData,
-  }));
+const PromptStudioChatInner = forwardRef<PromptStudioChatRef, object>(
+  function PromptStudioChatInner(_props, ref) {
+    const tabId = useTabId();
+    const { getTabById } = useDraggableTabsBrowserStore((state) => ({
+      getTabById: state.getByTabId,
+    }));
+    const { setMessages, visibleMessages } = useCopilotChat({});
+    const { updateTabData } = useDraggableTabsBrowserStore((state) => ({
+      updateTabData: state.updateTabData,
+    }));
 
-  useEffect(() => {
-    const tab = getTabById(tabId);
-    const initialMessagesFromSpanData = tab?.chat?.initialMessagesFromSpanData;
-    if (initialMessagesFromSpanData?.length) {
-      void setMessages(
-        convertScenarioMessagesToCopilotKit(initialMessagesFromSpanData as any),
-      );
-    }
-  }, [setMessages, tabId, getTabById]);
+    useImperativeHandle(ref, () => ({
+      resetChat: () => {
+        void setMessages([]);
+      },
+    }));
 
-  /**
-   * Sync the visible messages to the tab data.
-   */
-  useEffect(() => {
-    const tab = getTabById(tabId);
-    if (tab) {
-      updateTabData({
-        tabId,
-        updater: (data) => ({
-          ...data,
-          chat: {
-            ...data.chat,
-            initialMessagesFromSpanData: visibleMessages
-              .filter((message) => message.isTextMessage())
-              .map((message) => ({
-                id: message.id,
-                role: message.role as ChatMessage["role"],
-                content: message.content.toString(),
-              })),
-          },
-        }),
-      });
-    }
-  }, [visibleMessages, getTabById, tabId, updateTabData]);
-
-  return (
-    <CopilotChat
-      Input={SyncedChatInput}
-      AssistantMessage={(props) => {
-        return (
-          <>
-            <AssistantMessage {...props} />
-            {!props.isLoading && !props.isGenerating && (
-              <TraceMessage traceId={props.rawData.id} marginTop={2} />
-            )}
-          </>
+    useEffect(() => {
+      const tab = getTabById(tabId);
+      const initialMessagesFromSpanData =
+        tab?.chat?.initialMessagesFromSpanData;
+      if (initialMessagesFromSpanData?.length) {
+        void setMessages(
+          convertScenarioMessagesToCopilotKit(
+            initialMessagesFromSpanData as any,
+          ),
         );
-      }}
-    />
-  );
-}
+      }
+    }, [setMessages, tabId, getTabById]);
+
+    /**
+     * Sync the visible messages to the tab data.
+     */
+    useEffect(() => {
+      const tab = getTabById(tabId);
+      if (tab) {
+        updateTabData({
+          tabId,
+          updater: (data) => ({
+            ...data,
+            chat: {
+              ...data.chat,
+              initialMessagesFromSpanData: visibleMessages
+                .filter((message) => message.isTextMessage())
+                .map((message) => ({
+                  id: message.id,
+                  role: message.role as ChatMessage["role"],
+                  content: message.content.toString(),
+                })),
+            },
+          }),
+        });
+      }
+    }, [visibleMessages, getTabById, tabId, updateTabData]);
+
+    return (
+      <CopilotChat
+        Input={SyncedChatInput}
+        AssistantMessage={(props) => {
+          return (
+            <>
+              <AssistantMessage {...props} />
+              {!props.isLoading && !props.isGenerating && (
+                <TraceMessage traceId={props.rawData.id} marginTop={2} />
+              )}
+            </>
+          );
+        }}
+      />
+    );
+  },
+);
