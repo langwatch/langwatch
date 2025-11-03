@@ -1,4 +1,4 @@
-import type { FrameworkKey, PlatformKey } from "../model.ts";
+import type { FrameworkKey, PlatformKey } from "../types.ts";
 import { useActiveProject } from "../../../contexts/ActiveProjectContext.tsx";
 import { parseSnippet } from "./snippets.ts";
 import { getRegistryEntry } from "./registry.tsx";

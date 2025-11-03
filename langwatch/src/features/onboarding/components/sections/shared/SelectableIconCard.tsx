@@ -2,19 +2,20 @@ import React from "react";
 import { Box, Card, Icon, Text, type IconProps } from "@chakra-ui/react";
 import { useColorModeValue } from "../../../../../components/ui/color-mode";
 import { Tooltip } from "../../../../../components/ui/tooltip";
-import type { IconData } from "../../../regions/observability/codegen/registry";
+import type { IconData } from "../../../regions/shared/types";
 
 interface SelectableIconCardProps {
   label: string;
+  size?: "sm" | "md";
   icon?: IconData;
-  size?: IconProps["size"];
+  iconSize?: IconProps["size"];
   selected: boolean;
   onClick: () => void;
   ariaLabel: string;
 }
 
 export function SelectableIconCard(props: SelectableIconCardProps): React.ReactElement {
-  const { label, icon, size, selected, onClick, ariaLabel } = props;
+  const { label, size, icon, iconSize, selected, onClick, ariaLabel } = props;
   const themedIconSrc = useColorModeValue(
     icon?.type === "themed" ? icon.lightSrc : "",
     icon?.type === "themed" ? icon.darkSrc : ""
@@ -37,8 +38,8 @@ export function SelectableIconCard(props: SelectableIconCardProps): React.ReactE
         transition="all 0.2s ease"
         aspectRatio="1 / 1"
         display="flex"
-        maxW="75px"
-        minW="65px"
+        maxW={size === "sm" ? "75px" : "100px"}
+        minW={size === "sm" ? "65px" : "90px"}
         alignItems="center"
         justifyContent="center"
       >
@@ -47,7 +48,7 @@ export function SelectableIconCard(props: SelectableIconCardProps): React.ReactE
           transition="filter 0.2s ease"
         >
           {icon ? (
-            <Icon size={size ?? "md"}>
+            <Icon size={iconSize ?? "md"}>
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={iconSrc} alt={iconAlt} />
             </Icon>
