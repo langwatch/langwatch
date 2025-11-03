@@ -1,4 +1,4 @@
-import { Button, HStack, Input } from "@chakra-ui/react";
+import { Button, HStack, Input, Text } from "@chakra-ui/react";
 import { Settings } from "react-feather";
 
 import { ConfigModal } from "../../optimization_studio/components/properties/modals/ConfigModal";
@@ -58,7 +58,7 @@ export function LLMConfigModal({
       </HorizontalFormControl>
       <HorizontalFormControl
         label="Temperature"
-        helper={"Controls randomness in the output"}
+        helper="Controls randomness in the output"
         inputWidth="55%"
       >
         <Input
@@ -67,10 +67,22 @@ export function LLMConfigModal({
           step={0.1}
           min={0}
           max={2}
+          disabled={values?.model?.includes("gpt-5")}
           onChange={(e) =>
             onChange({ ...values, temperature: Number(e.target.value) })
           }
         />
+        {values?.model?.includes("gpt-5") && (
+          <Text
+            fontSize="xs"
+            color="yellow.500"
+            fontStyle="italic"
+            marginTop={1}
+            marginLeft={2}
+          >
+            Temperature is fixed to 1 for GPT-5 models
+          </Text>
+        )}
       </HorizontalFormControl>
       <HorizontalFormControl
         label="Max Tokens"

@@ -2,7 +2,7 @@ import { useCallback } from "react";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { useDraggableTabsBrowserStore } from "../prompt-studio-store/DraggableTabsBrowserStore";
 import type { PromptConfigFormValues } from "~/prompt-configs/types";
-import { DEFAULT_MODEL } from "~/utils/constants";
+import { DEFAULT_MODEL, DEFAULT_MAX_TOKENS } from "~/utils/constants";
 
 /**
  * Hook to create a draft prompt in the database
@@ -27,6 +27,8 @@ export function useCreateDraftPrompt() {
           prompt: "You are a helpful assistant.",
           llm: {
             model: normalizedDefaultModel,
+            maxTokens: DEFAULT_MAX_TOKENS,
+            temperature: 1,
           },
           inputs: [],
           outputs: [{ identifier: "output", type: "str" }],
@@ -51,7 +53,7 @@ export function useCreateDraftPrompt() {
       },
     });
 
-    return { prompt: undefined as any, defaultValues };
+    return { defaultValues };
   }, [addTab, project?.defaultModel]);
 
   return { createDraftPrompt };

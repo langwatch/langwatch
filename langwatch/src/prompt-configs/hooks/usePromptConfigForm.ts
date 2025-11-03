@@ -1,6 +1,6 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import isEqual from "lodash-es/isEqual";
-import { useEffect, useMemo } from "react";
+import { useEffect } from "react";
 import { useForm, type DeepPartial } from "react-hook-form";
 
 import { formSchema, type PromptConfigFormValues } from "~/prompt-configs";
@@ -35,7 +35,9 @@ export const usePromptConfigForm = ({
 
   const formData = methods.watch();
   const messages = methods.watch("version.configData.messages");
-  const systemMessage = messages.find(({ role }) => role === "system")?.content;
+  // Messages should always be defined, but we're being defensive here.
+  const systemMessage = messages?.find(({ role }) => role === "system")
+    ?.content;
 
   /**
    * In the case that we're using system messages,
@@ -106,6 +108,15 @@ export const usePromptConfigForm = ({
       disableNodeSync = false;
     }, 1);
   }, [formData, onChange]);
+
+  /**
+   * Force temperature to be 1 when the model includes "gpt-5"
+   */
+  useEffect(() => {
+    if (formData.version?.configData.llm.model?.includes("gpt-5")) {
+      methods.setValue("version.configData.llm.temperature", 1);
+    }
+  }, [formData.version?.configData.llm.model, methods]);
 
   return {
     methods,

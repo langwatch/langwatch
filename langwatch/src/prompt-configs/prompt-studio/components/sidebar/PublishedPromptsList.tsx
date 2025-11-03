@@ -29,8 +29,6 @@ export function PublishedPromptsList() {
   const { addTab } = useDraggableTabsBrowserStore();
   const { project } = useOrganizationTeamProject();
 
-  console.log("data", data);
-
   /**
    * Group the prompts by folder, derived from the handle prefix.
    */

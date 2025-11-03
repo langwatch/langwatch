@@ -83,8 +83,6 @@ function PromptStudioChatInner() {
     }
   }, [setMessages, tabId, getTabById]);
 
-  console.log("visibleMessages", visibleMessages);
-
   /**
    * Sync the visible messages to the tab data.
    */
