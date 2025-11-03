@@ -7,32 +7,8 @@ import {
 } from "../types/types";
 import { ProductSelectionScreen } from "../components/sections/ProductSelectionScreen";
 import { ObservabilityScreen } from "../components/sections/ObservabilityScreen";
+import { ModelProviderScreen } from "../components/sections/ModelProviderScreen";
 import type { ProductFlowConfig } from "../types/types";
-
-// Module-scope screen components
-const EvaluationsScreen: React.FC = () => {
-  return (
-    <VStack gap={4} align="stretch">
-      <Text>Coming soon - Evaluations onboarding content.</Text>
-    </VStack>
-  );
-};
-
-const PromptManagementScreen: React.FC = () => {
-  return (
-    <VStack gap={4} align="stretch">
-      <Text>Coming soon - Prompt Management onboarding content.</Text>
-    </VStack>
-  );
-};
-
-const AgentSimulationsScreen: React.FC = () => {
-  return (
-    <VStack gap={4} align="stretch">
-      <Text>Coming soon - Agent Simulations onboarding content.</Text>
-    </VStack>
-  );
-};
 
 interface UseProductScreensProps {
   flow: ProductFlowConfig;
@@ -69,24 +45,18 @@ export const useCreateProductScreens = ({
         required: false,
         heading: "Evaluations",
         subHeading: "Create and run your first evaluation",
-        component: EvaluationsScreen,
+        component: ModelProviderScreen,
       },
       [ProductScreenIndex.PROMPT_MANAGEMENT]: {
         id: "prompt-management",
         required: false,
         heading: "Prompt Management",
         subHeading: "Organize and iterate on prompts",
-        component: PromptManagementScreen,
-      },
-      [ProductScreenIndex.AGENT_SIMULATIONS]: {
-        id: "agent-simulations",
-        required: false,
-        heading: "Agent Simulations",
-        subHeading: "Simulate scenarios and test agents",
-        component: AgentSimulationsScreen,
+        component: ModelProviderScreen,
       },
     }),
-    [onSelectProduct]
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [onSelectProduct],
   );
 
   return flow.visibleScreens.map((idx) => screensBase[idx]);
