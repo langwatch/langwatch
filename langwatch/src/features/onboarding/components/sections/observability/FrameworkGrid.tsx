@@ -3,6 +3,7 @@ import { HStack, Text, VStack } from "@chakra-ui/react";
 import { FRAMEWORKS_BY_PLATFORM } from "../../../regions/observability/ui-options";
 import type { FrameworkKey, PlatformKey } from "../../../regions/observability/model";
 import { SelectableIconCard } from "./SelectableIconCard";
+import { LARGE_FRAMEWORK_ICON_KEYS } from "../../../regions/observability/model";
 
 interface FrameworkGridProps {
   language: PlatformKey;
@@ -30,11 +31,12 @@ export function FrameworkGrid({ language, selectedFramework, onSelectFramework }
           Pick your model provider or framework to tailor setup guide.
         </Text>
       </VStack>
-      <HStack gap={3}>
+      <HStack gap={3} wrap="wrap">
         {frameworks.map((fw) => (
           <SelectableIconCard
             key={fw.key}
             label={fw.label}
+            size={LARGE_FRAMEWORK_ICON_KEYS.includes(fw.key) ? "2xl" : "lg"}
             icon={fw.icon}
             selected={currentFramework === fw.key}
             onClick={() => onSelectFramework(fw.key)}

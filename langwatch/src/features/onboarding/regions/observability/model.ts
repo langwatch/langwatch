@@ -38,6 +38,8 @@ export type FrameworkKey =
   | "smol_agents"
   | "dspy";
 
+export const LARGE_FRAMEWORK_ICON_KEYS: readonly FrameworkKey[] = ["mastra"] as const;
+
 export interface Option<T extends string> {
   key: T;
   label: string;

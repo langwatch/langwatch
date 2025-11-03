@@ -23,12 +23,17 @@ export const PlatformGrid: React.FC<PlatformGridProps> = ({
           Choose the platform or language you are using to see a guide on how to instrument it.
         </Text>
       </VStack>
-      <HStack gap={3}>
+      <HStack gap={3} wrap="wrap">
         {PLATFORM_OPTIONS.map((lang) => (
           <SelectableIconCard
             key={lang.key}
             label={lang.label}
-            icon={lang.icon}
+            icon={{
+              type: "single",
+              src: lang.iconUrl ?? "",
+              alt: lang.label,
+            }}
+            size="lg"
             selected={selectedLanguage === lang.key}
             onClick={() => onSelectLanguage(lang.key)}
             ariaLabel={`${lang.label} language`}

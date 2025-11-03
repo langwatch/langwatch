@@ -1,27 +1,49 @@
 import React, { useMemo, useState } from "react";
-import { CodeBlock, createShikiAdapter, Icon, IconButton, HStack, ClientOnly } from "@chakra-ui/react";
+import {
+  CodeBlock,
+  createShikiAdapter,
+  Icon,
+  IconButton,
+  HStack,
+  ClientOnly,
+} from "@chakra-ui/react";
 import type { HighlighterGeneric } from "shiki";
 import { useColorMode } from "../../../../../components/ui/color-mode";
 import { Eye, EyeOff } from "lucide-react";
 import { Tooltip } from "../../../../../components/ui/tooltip";
+import { toaster } from "../../../../../components/ui/toaster";
+import { WandSparkles } from "lucide-react";
 
 interface CodePreviewProps {
   code: string;
   filename: string;
   codeLanguage: string;
   highlightLines?: number[];
-  languageIcon?: React.ReactNode;
+  languageIconUrl?: string;
   sensitiveValue?: string;
   enableVisibilityToggle?: boolean;
   isVisible?: boolean;
   onToggleVisibility?: () => void;
+  llmPrompt?: string;
 }
 
-export function CodePreview({ code, filename, codeLanguage: chakraLanguage, highlightLines, languageIcon, sensitiveValue, enableVisibilityToggle, isVisible: controlledIsVisible, onToggleVisibility }: CodePreviewProps): React.ReactElement | null {
+export function CodePreview({
+  code,
+  filename,
+  codeLanguage: chakraLanguage,
+  highlightLines,
+  languageIconUrl,
+  sensitiveValue,
+  enableVisibilityToggle,
+  isVisible: controlledIsVisible,
+  onToggleVisibility,
+  llmPrompt,
+}: CodePreviewProps): React.ReactElement | null {
   const { colorMode } = useColorMode();
   const [internalIsVisible, setInternalIsVisible] = useState(false);
 
-  const isVisible = controlledIsVisible !== void 0 ? controlledIsVisible : internalIsVisible;
+  const isVisible =
+    controlledIsVisible !== void 0 ? controlledIsVisible : internalIsVisible;
 
   const shikiAdapter = useMemo(() => {
     return createShikiAdapter<HighlighterGeneric<any, any>>({
@@ -56,6 +78,31 @@ export function CodePreview({ code, filename, codeLanguage: chakraLanguage, high
     }
   }
 
+  async function copyLLMPrompt(): Promise<void> {
+    if (!llmPrompt) return;
+
+    try {
+      await navigator.clipboard.writeText(llmPrompt);
+      toaster.create({
+        title: "Copied LLM prompt",
+        description: "Integration prompt copied to clipboard",
+        type: "success",
+        meta: {
+          closable: true,
+        },
+      });
+    } catch (err) {
+      toaster.create({
+        title: "Failed to copy",
+        description: "Could not copy to clipboard",
+        type: "error",
+        meta: {
+          closable: true,
+        },
+      });
+    }
+  }
+
   if (!code) return null;
 
   return (
@@ -71,20 +118,53 @@ export function CodePreview({ code, filename, codeLanguage: chakraLanguage, high
           >
             <CodeBlock.Header display="flex" justifyContent="space-between">
               <CodeBlock.Title fontSize="xs" pt={2}>
-                {languageIcon ? <Icon size="xs">{languageIcon}</Icon> : null}
+                {languageIconUrl ? (
+                  <Icon size="xs">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={languageIconUrl} alt={filename} />
+                  </Icon>
+                ) : null}
                 {filename}
               </CodeBlock.Title>
 
               <HStack gap="0" mr="-3px">
                 {enableVisibilityToggle && (
-                  <Tooltip content={isVisible ? "Hide sensitive values" : "Show sensitive values"} openDelay={0} showArrow>
+                  <Tooltip
+                    content={
+                      isVisible
+                        ? "Hide sensitive values"
+                        : "Show sensitive values"
+                    }
+                    openDelay={0}
+                    showArrow
+                  >
                     <IconButton
                       size="2xs"
                       variant="ghost"
                       onClick={toggleVisibility}
-                      aria-label={isVisible ? "Hide sensitive values" : "Show sensitive values"}
+                      aria-label={
+                        isVisible
+                          ? "Hide sensitive values"
+                          : "Show sensitive values"
+                      }
                     >
                       {isVisible ? <EyeOff /> : <Eye />}
+                    </IconButton>
+                  </Tooltip>
+                )}
+                {llmPrompt && (
+                  <Tooltip
+                    content="Copy LLM-optimized integration prompt"
+                    openDelay={0}
+                    showArrow
+                  >
+                    <IconButton
+                      size="2xs"
+                      variant="ghost"
+                      onClick={() => void copyLLMPrompt()}
+                      aria-label="Copy LLM-optimized integration prompt"
+                    >
+                      <WandSparkles />
                     </IconButton>
                   </Tooltip>
                 )}
@@ -98,8 +178,8 @@ export function CodePreview({ code, filename, codeLanguage: chakraLanguage, high
             <CodeBlock.Content
               transition="background-color 0.3s ease, color 0.3s ease"
               css={{
-                '& pre, & code': {
-                  transition: 'background-color 0.3s ease, color 0.3s ease',
+                "& pre, & code": {
+                  transition: "background-color 0.3s ease, color 0.3s ease",
                 },
               }}
               overflow="scroll"

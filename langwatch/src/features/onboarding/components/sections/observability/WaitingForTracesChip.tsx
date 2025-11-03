@@ -15,11 +15,14 @@ export function WaitingForTracesChip(): React.ReactElement {
   const [detected, setDetected] = useState(false);
   const [secondsLeft, setSecondsLeft] = useState<number | null>(null);
   const [isVisible, setIsVisible] = useState<boolean>(
-    typeof document === "undefined" ? true : document.visibilityState === "visible"
+    typeof document === "undefined"
+      ? true
+      : document.visibilityState === "visible",
   );
 
   useEffect(() => {
-    const onVisibility = () => setIsVisible(document.visibilityState === "visible");
+    const onVisibility = () =>
+      setIsVisible(document.visibilityState === "visible");
     document.addEventListener("visibilitychange", onVisibility);
     return () => document.removeEventListener("visibilitychange", onVisibility);
   }, []);
@@ -44,7 +47,7 @@ export function WaitingForTracesChip(): React.ReactElement {
       enabled: !!project?.id && !detected,
       refetchInterval: isVisible ? 3000 : false,
       refetchOnWindowFocus: false,
-    }
+    },
   );
 
   useEffect(() => {
@@ -56,8 +59,37 @@ export function WaitingForTracesChip(): React.ReactElement {
 
   const goToTraces = useCallback((): void => {
     if (!project?.slug) return;
-    void router.push(`/${project.slug}/messages`);
-  }, [project?.slug, router]);
+
+    const traceId = tracesQuery.data?.groups?.flat().at(0)?.trace_id ?? void 0;
+    const firstSpanId =
+      tracesQuery.data?.groups?.flat().at(0)?.spans?.at(0)?.span_id ?? void 0;
+
+    if (!traceId) {
+      window.location.href = `/${project.slug}/messages`;
+      return;
+    }
+
+    const params = new URLSearchParams({
+      view: "table",
+      project: project.slug,
+      pageOffset: "0",
+      pageSize: "25",
+      "drawer.traceId": traceId,
+      "drawer.open": "traceDetails",
+      "drawer.selectedTab": "traceDetails",
+    });
+    if (firstSpanId) {
+      params.set("span", firstSpanId);
+    }
+
+    window.location.href = `/${project.slug}/messages?${params.toString()}`;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    project?.slug,
+    router,
+    tracesQuery.status,
+    tracesQuery.data?.groups?.length,
+  ]);
 
   useEffect(() => {
     if (!detected) return;
@@ -82,10 +114,7 @@ export function WaitingForTracesChip(): React.ReactElement {
       transform="translateX(-50%)"
       zIndex={10}
     >
-      <Box
-        position="relative"
-        display="inline-block"
-      >
+      <Box position="relative" display="inline-block">
         <HStack
           position="relative"
           bg="transparent"
@@ -118,7 +147,9 @@ export function WaitingForTracesChip(): React.ReactElement {
               </Box>
               <Text fontWeight="medium" fontSize="sm">
                 Traces detected —
-                {secondsLeft !== null && secondsLeft > 0 && ` redirecting in ${secondsLeft}..`}
+                {secondsLeft !== null &&
+                  secondsLeft > 0 &&
+                  ` redirecting in ${secondsLeft}..`}
                 {secondsLeft !== null && secondsLeft === 0 && ` redirecting...`}
               </Text>
             </>

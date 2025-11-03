@@ -5,7 +5,7 @@ import { motion } from "motion/react";
 const MotionBox = motion(Box);
 
 const blobTransitions = {
-  duration: 18,
+  duration: 20,
   repeat: Infinity,
   repeatType: "mirror" as const,
   ease: "easeInOut" as const,
@@ -20,10 +20,10 @@ const blobConfigs = [
       width: "clamp(440px, 56vmax, 960px)",
       height: "clamp(440px, 56vmax, 960px)",
       background:
-        "radial-gradient(58% 58% at 28% 32%, rgba(237,137,38,0.58) 0%, rgba(237,137,38,0.36) 40%, rgba(237,137,38,0) 74%)",
+        "radial-gradient(58% 58% at 28% 32%, rgba(237,137,38,0.48) 0%, rgba(237,137,38,1) 40%, rgba(237,137,38,0) 74%)",
     },
     animate: {
-      scale: [1, 1.1, 0.97, 1],
+      scale: [1, 1.8, 0.8, 1],
       x: [0, -24, 16, 0],
       y: [0, -18, 10, 0],
     },
@@ -36,10 +36,10 @@ const blobConfigs = [
       width: "clamp(400px, 50vmax, 880px)",
       height: "clamp(400px, 50vmax, 880px)",
       background:
-        "radial-gradient(56% 56% at 70% 28%, rgba(225,113,0,0.5) 0%, rgba(225,113,0,0.3) 36%, rgba(225,113,0,0) 70%)",
+        "radial-gradient(56% 56% at 70% 28%, rgba(225,113,0,0.45) 0%, rgba(225,113,0,1) 36%, rgba(225,113,0,0) 70%)",
     },
     animate: {
-      scale: [1, 0.95, 1.06, 1],
+      scale: [1, 0.9, 1.46, 1],
       x: [0, 22, -20, 0],
       y: [0, -14, 12, 0],
     },

@@ -1,10 +1,12 @@
 import React from "react";
 import { Box, Card, Icon, Text, type IconProps } from "@chakra-ui/react";
+import { useColorModeValue } from "../../../../../components/ui/color-mode";
 import { Tooltip } from "../../../../../components/ui/tooltip";
+import type { IconData } from "../../../regions/observability/codegen/registry";
 
 interface SelectableIconCardProps {
   label: string;
-  icon?: React.ReactNode;
+  icon?: IconData;
   size?: IconProps["size"];
   selected: boolean;
   onClick: () => void;
@@ -13,6 +15,14 @@ interface SelectableIconCardProps {
 
 export function SelectableIconCard(props: SelectableIconCardProps): React.ReactElement {
   const { label, icon, size, selected, onClick, ariaLabel } = props;
+  const themedIconSrc = useColorModeValue(
+    icon?.type === "themed" ? icon.lightSrc : "",
+    icon?.type === "themed" ? icon.darkSrc : ""
+  );
+
+  const iconSrc = icon?.type === "themed" ? themedIconSrc : icon?.src;
+  const iconAlt = icon?.alt;
+
   return (
     <Tooltip content={label} positioning={{ placement: "bottom" }} showArrow openDelay={0}>
       <Card.Root
@@ -22,7 +32,7 @@ export function SelectableIconCard(props: SelectableIconCardProps): React.ReactE
         onClick={onClick}
         cursor="pointer"
         borderWidth="1px"
-        borderColor={selected ? "border.inverted/20" : "border.inverted/05"}
+        borderColor={selected ? "border.inverted/30" : "border.inverted/10"}
         bg="bg.subtle/30"
         transition="all 0.2s ease"
         aspectRatio="1 / 1"
@@ -31,11 +41,16 @@ export function SelectableIconCard(props: SelectableIconCardProps): React.ReactE
         minW="65px"
         alignItems="center"
         justifyContent="center"
-        _hover={{ filter: "grayscale(0%)" }}
       >
-        <Box filter={selected ? "grayscale(0%)" : "grayscale(100%)"} transition="filter 0.2s ease">
+        <Box
+          filter={selected ? "grayscale(0%)" : "grayscale(100%)"}
+          transition="filter 0.2s ease"
+        >
           {icon ? (
-            <Icon size={size ?? "md"}>{icon}</Icon>
+            <Icon size={size ?? "md"}>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={iconSrc} alt={iconAlt} />
+            </Icon>
           ) : (
             <Text textStyle="sm" fontWeight="normal" color="CaptionText" textAlign="center">
               {label}
