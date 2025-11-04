@@ -11,7 +11,13 @@ export interface SingleIcon {
   alt: string;
 }
 
-export type IconData = ThemedIcon | SingleIcon;
+export interface IconWithLabel {
+  type: "with-label";
+  icon: ThemedIcon | SingleIcon;
+  label: string;
+}
+
+export type IconData = ThemedIcon | SingleIcon | IconWithLabel;
 
 export interface Docs {
   internal?: string;
@@ -41,3 +47,13 @@ export function singleIcon(src: string, alt: string): SingleIcon {
   };
 }
 
+/**
+ * Creates an icon with a label underneath
+ */
+export function iconWithLabel(icon: ThemedIcon | SingleIcon, label: string): IconWithLabel {
+  return {
+    type: "with-label",
+    icon,
+    label,
+  };
+}
