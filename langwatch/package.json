@@ -234,7 +234,6 @@
         "eslint-config-next": "15.1.5",
         "eslint-plugin-unused-imports": "^4.1.4",
         "fishery": "^2.2.3",
-        "happy-dom": "^20.0.8",
         "jest-mock-extended": "^4.0.0-beta1",
         "node-mocks-http": "^1.17.2",
         "prettier": "^3.0.3",

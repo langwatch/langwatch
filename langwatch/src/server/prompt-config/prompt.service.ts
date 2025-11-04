@@ -367,13 +367,19 @@ export class PromptService {
 
   /**
    * Updates a prompt configuration with the provided data.
-   * Creates a new version. Requires a commit message.
+   * Creates a new version with a commit message tracking the changes.
+   *
+   * Supports partial updates:
+   * - Metadata updates (handle, scope) are applied to the config
+   * - ConfigData updates (prompt, model, etc.) create a new version
+   * - Only provided fields are updated; others preserve existing values
+   * - A commit message is always required to track changes
    *
    * @param params - The parameters object
    * @param params.idOrHandle - The prompt configuration ID or handle
    * @param params.projectId - The project ID for authorization and context
    * @param params.data - The update data (must include commitMessage)
-   * @returns The updated prompt configuration
+   * @returns The updated prompt configuration with new version
    */
   async updatePrompt(params: {
     idOrHandle: string;
@@ -397,23 +403,30 @@ export class PromptService {
     >;
   }): Promise<VersionedPrompt> {
     const { idOrHandle, projectId, data } = params;
-    const { handle, scope, ...newVersionData } = data;
+    const { handle, scope, commitMessage, ...configDataUpdates } = data;
 
-    this.versionService.assertNoSystemPromptConflict(newVersionData);
+    this.versionService.assertNoSystemPromptConflict(configDataUpdates);
 
-    const normalizedUpdate = this.normalizeSystemMessage(newVersionData);
-    newVersionData.prompt = normalizedUpdate.prompt;
-    newVersionData.messages = normalizedUpdate.messages as unknown as
-      | Array<{
-          role: "user" | "assistant" | "system";
-          content: string;
-        }>
-      | undefined;
+    // Only normalize system messages if prompt or messages are being updated
+    // This prevents undefined values from overwriting existing database values
+    if (
+      configDataUpdates.prompt !== undefined ||
+      configDataUpdates.messages !== undefined
+    ) {
+      const normalizedUpdate = this.normalizeSystemMessage(configDataUpdates);
+      configDataUpdates.prompt = normalizedUpdate.prompt;
+      configDataUpdates.messages = normalizedUpdate.messages as unknown as
+        | Array<{
+            role: "user" | "assistant" | "system";
+            content: string;
+          }>
+        | undefined;
+    }
 
     // Handle in a transaction to ensure atomicity
     const result = await this.prisma.$transaction(
       async (tx: Prisma.TransactionClient) => {
-        // Update the config
+        // Update the config metadata (handle/scope)
         const updatedConfig = await this.repository.updateConfig(
           idOrHandle,
           projectId,
@@ -432,17 +445,19 @@ export class PromptService {
           { tx },
         )) as LatestConfigVersionSchema;
 
-        // Create the new version directly
+        // Create the new version with updated configData
+        // Note: Even if only metadata (handle/scope) changed, we create a version
+        // to track the change via commitMessage
         const updatedVersion: LlmPromptConfigVersion =
           await this.versionService.createVersion({
             db: tx,
             data: {
               configId: updatedConfig.id,
               projectId,
-              commitMessage: newVersionData.commitMessage,
+              commitMessage,
               configData: this.transformToDbFormat({
                 ...latestVersion.configData,
-                ...newVersionData,
+                ...configDataUpdates,
               }) as LatestConfigVersionSchema["configData"],
               schemaVersion: LATEST_SCHEMA_VERSION,
               version: latestVersion.version + 1,
@@ -842,7 +857,9 @@ export class PromptService {
     });
 
     if (!permission.hasPermission) {
-      throw new Error(permission.reason ?? "You don't have permission to modify this prompt");
+      throw new Error(
+        permission.reason ?? "You don't have permission to modify this prompt",
+      );
     }
   }
 
