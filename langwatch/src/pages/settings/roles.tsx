@@ -21,6 +21,8 @@ import SettingsLayout from "../../components/SettingsLayout";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { api } from "../../utils/api";
 import type { Permission } from "../../server/api/rbac";
+import { getTeamRolePermissions } from "../../server/api/rbac";
+import { TeamUserRole } from "@prisma/client";
 
 import { withPermissionGuard } from "../../components/WithPermissionGuard";
 import { RoleCard } from "../../components/settings/RoleCard";
@@ -84,6 +86,11 @@ function RolesManagement({
     onOpen: onViewOpen,
     onClose: onViewClose,
   } = useDisclosure();
+  const {
+    open: defaultViewOpen,
+    onOpen: onDefaultViewOpen,
+    onClose: onDefaultViewClose,
+  } = useDisclosure();
   const [editingRole, setEditingRole] = useState<{
     id: string;
     name: string;
@@ -92,6 +99,11 @@ function RolesManagement({
   } | null>(null);
   const [viewingRole, setViewingRole] = useState<{
     id: string;
+    name: string;
+    description: string;
+    permissions: Permission[];
+  } | null>(null);
+  const [viewingDefaultRole, setViewingDefaultRole] = useState<{
     name: string;
     description: string;
     permissions: Permission[];
@@ -193,6 +205,29 @@ function RolesManagement({
     }
   };
 
+  const handleViewDefaultRole = (roleName: string, role: TeamUserRole) => {
+    const permissions = getTeamRolePermissions(role);
+    setViewingDefaultRole({
+      name: roleName,
+      description: getDefaultRoleDescription(roleName),
+      permissions,
+    });
+    onDefaultViewOpen();
+  };
+
+  const getDefaultRoleDescription = (roleName: string): string => {
+    switch (roleName) {
+      case "Admin":
+        return "Full access to all features and settings";
+      case "Member":
+        return "Can create and modify most resources, view costs and debug info";
+      case "Viewer":
+        return "Read-only access to analytics, messages, and guardrails";
+      default:
+        return "";
+    }
+  };
+
   const handleCreateSubmit = async (data: RoleFormData) => {
     await createRole.mutateAsync({
       organizationId,
@@ -267,6 +302,7 @@ function RolesManagement({
             isDefault
             permissionCount="All Permissions"
             icon={ShieldUser}
+            onViewPermissions={() => handleViewDefaultRole("Admin", TeamUserRole.ADMIN)}
           />
           <RoleCard
             hasPermission={hasPermission}
@@ -275,6 +311,7 @@ function RolesManagement({
             isDefault
             permissionCount="Most Permissions"
             icon={Users}
+            onViewPermissions={() => handleViewDefaultRole("Member", TeamUserRole.MEMBER)}
           />
           <RoleCard
             hasPermission={hasPermission}
@@ -283,6 +320,7 @@ function RolesManagement({
             isDefault
             permissionCount="View Only"
             icon={Eye}
+            onViewPermissions={() => handleViewDefaultRole("Viewer", TeamUserRole.VIEWER)}
           />
         </Box>
       </VStack>
@@ -389,7 +427,6 @@ function RolesManagement({
         open={viewOpen}
         onOpenChange={({ open }) => !open && onViewClose()}
       >
-        <Dialog.Backdrop />
         <Dialog.Content maxWidth="600px" maxHeight="80vh" overflowY="auto">
           <Dialog.Header>
             <Dialog.Title>View Permissions - {viewingRole?.name}</Dialog.Title>
@@ -417,6 +454,52 @@ function RolesManagement({
           </Dialog.Body>
           <Dialog.Footer>
             <Button variant="outline" onClick={onViewClose}>
+              Close
+            </Button>
+          </Dialog.Footer>
+          <Dialog.CloseTrigger />
+        </Dialog.Content>
+      </Dialog.Root>
+
+      {/* View Default Role Permissions Dialog */}
+      <Dialog.Root
+        open={defaultViewOpen}
+        onOpenChange={({ open }) => !open && onDefaultViewClose()}
+      >
+        <Dialog.Backdrop zIndex={1000} />
+        <Dialog.Content 
+          maxWidth="600px" 
+          maxHeight="80vh" 
+          overflowY="auto"
+          backdrop={false}
+          zIndex={1001}
+        >
+          <Dialog.Header>
+            <Dialog.Title>View Permissions - {viewingDefaultRole?.name}</Dialog.Title>
+          </Dialog.Header>
+          <Dialog.Body>
+            {viewingDefaultRole && (
+              <VStack gap={4} align="start">
+                <VStack align="start" gap={2} width="full">
+                  <Text fontWeight="semibold">Description:</Text>
+                  <Text color="gray.600">
+                    {viewingDefaultRole.description}
+                  </Text>
+                </VStack>
+
+                <Separator />
+
+                <VStack align="start" gap={3} width="full">
+                  <Text fontWeight="semibold">
+                    Permissions ({viewingDefaultRole.permissions.length}):
+                  </Text>
+                  <PermissionViewer permissions={viewingDefaultRole.permissions} />
+                </VStack>
+              </VStack>
+            )}
+          </Dialog.Body>
+          <Dialog.Footer>
+            <Button variant="outline" onClick={onDefaultViewClose}>
               Close
             </Button>
           </Dialog.Footer>

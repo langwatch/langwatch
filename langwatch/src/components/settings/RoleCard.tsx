@@ -34,10 +34,14 @@ export function RoleCard({
       height="100%"
       borderWidth="1px"
       borderColor="gray.200"
-      _hover={!isDefault ? { borderColor: "orange.400", shadow: "md" } : {}}
+      _hover={
+        onViewPermissions ? { borderColor: "orange.400", shadow: "md" } : {}
+      }
       transition="all 0.2s"
       display="flex"
       flexDirection="column"
+      cursor={onViewPermissions ? "pointer" : "default"}
+      onClick={onViewPermissions ? onViewPermissions : undefined}
     >
       <Card.Header>
         <HStack justify="space-between" align="start">
@@ -53,13 +57,16 @@ export function RoleCard({
             )}
           </VStack>
           {!isDefault && (
-            <HStack gap={1}>
+            <HStack gap={1} onClick={(e) => e.stopPropagation()}>
               {onViewPermissions && (
                 <Button
                   size="sm"
                   variant="ghost"
                   colorPalette="blue"
-                  onClick={onViewPermissions}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onViewPermissions();
+                  }}
                   disabled={!hasPermission("organization:manage")}
                 >
                   <Eye size={14} />
@@ -70,7 +77,10 @@ export function RoleCard({
                   size="sm"
                   variant="ghost"
                   colorPalette="orange"
-                  onClick={onEdit}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onEdit();
+                  }}
                   disabled={!hasPermission("organization:manage")}
                 >
                   <Edit size={14} />
@@ -81,7 +91,10 @@ export function RoleCard({
                   size="sm"
                   variant="ghost"
                   colorPalette="red"
-                  onClick={onDelete}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onDelete();
+                  }}
                   disabled={!hasPermission("organization:manage")}
                 >
                   <Trash2 size={14} />
@@ -92,7 +105,7 @@ export function RoleCard({
         </HStack>
       </Card.Header>
       <Card.Body paddingTop={0} flex={1} display="flex" flexDirection="column">
-        <VStack align="start" gap={2} flex={1}>
+        <VStack align="start" gap={2} flex={1} width="full">
           <Text fontSize="sm" color="gray.600">
             {description}
           </Text>

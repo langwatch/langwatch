@@ -1,4 +1,5 @@
 import { Box, HStack, Separator, Text, VStack } from "@chakra-ui/react";
+import { Check } from "react-feather";
 import type { Permission, Resource, Action } from "../../server/api/rbac";
 import {
   orderedResources,
@@ -36,10 +37,8 @@ export function PermissionViewer({
     );
   });
 
-  // Reuse shared getValidActionsForResource
-
   return (
-    <VStack align="start" width="full" gap={3}>
+    <VStack align="start" width="full" gap={4}>
       {(Object.keys(groupedPermissions) as Resource[]).map((resource) => {
         const validActions = getValidActionsForResource(resource);
         const hasAnyPermission = validActions.some((action) =>
@@ -48,34 +47,45 @@ export function PermissionViewer({
 
         if (!hasAnyPermission) return null;
 
+        const grantedActions = validActions.filter((action) =>
+          permissions.includes(`${resource}:${action}`),
+        );
+
+        // If manage is present, filter out view, create, update, delete since manage includes them
+        const hasManage = grantedActions.includes("manage");
+        const displayActions = hasManage
+          ? grantedActions.filter((action) => action === "manage" || action === "share")
+          : grantedActions;
+
         return (
           <Box key={resource} width="full">
             <VStack align="start" gap={2} width="full">
-              <Text fontWeight="semibold" textTransform="capitalize">
+              <Text
+                fontWeight="semibold"
+                textTransform="capitalize"
+                fontSize="md"
+              >
                 {resource}
               </Text>
-              <HStack gap={3} flexWrap="wrap" paddingLeft={4}>
-                {validActions.map((action) => {
+              <VStack align="start" gap={1.5} paddingLeft={4} width="full">
+                {displayActions.map((action) => {
                   const permission = createPermission(resource, action);
-                  const hasPermission = permissions.includes(permission);
-
-                  if (!hasPermission) return null;
-
+                  const actionText =
+                    action === "manage"
+                      ? "Manage (Create, Update, Delete)"
+                      : action.charAt(0).toUpperCase() + action.slice(1);
                   return (
-                    <Text
-                      key={permission}
-                      fontSize="sm"
-                      textTransform="capitalize"
-                      color="green.600"
-                      fontWeight="medium"
-                    >
-                      {action}
-                    </Text>
+                    <HStack key={permission} gap={2} align="center">
+                      <Check size={14} color="var(--chakra-colors-green-500)" />
+                      <Text fontSize="sm" color="gray.700">
+                        {actionText}
+                      </Text>
+                    </HStack>
                   );
                 })}
-              </HStack>
+              </VStack>
             </VStack>
-            <Separator marginY={2} />
+            <Separator marginY={3} />
           </Box>
         );
       })}
