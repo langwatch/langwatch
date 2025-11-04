@@ -2,22 +2,18 @@ import {
   Box,
   Button,
   Card,
-  Field,
   Heading,
   HStack,
-  Input,
   Separator,
   Spinner,
   Text,
-  Textarea,
   VStack,
   useDisclosure,
 } from "@chakra-ui/react";
 import { Eye, Plus, Shield, Users } from "react-feather";
 import { ShieldUser } from "lucide-react";
 
-import { useForm } from "react-hook-form";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Dialog } from "../../components/ui/dialog";
 import { Tooltip } from "../../components/ui/tooltip";
 import { toaster } from "../../components/ui/toaster";
@@ -27,9 +23,9 @@ import { api } from "../../utils/api";
 import type { Permission } from "../../server/api/rbac";
 
 import { withPermissionGuard } from "../../components/WithPermissionGuard";
-import { RoleCard } from "./components/RoleCard";
-import { PermissionSelector } from "./components/PermissionSelector";
-import { PermissionViewer } from "./components/PermissionViewer";
+import { RoleCard } from "../../components/settings/RoleCard";
+import { PermissionViewer } from "../../components/settings/PermissionViewer";
+import { RoleFormDialog } from "../../components/settings/RoleFormDialog";
 
 /**
  * Role Management Settings Page
@@ -197,50 +193,16 @@ function RolesManagement({
     }
   };
 
-  const {
-    register,
-    handleSubmit,
-    reset,
-    formState: { errors, isSubmitting },
-    setValue,
-    watch,
-  } = useForm<RoleFormData>({
-    defaultValues: {
-      name: "",
-      description: "",
-      permissions: [],
-    },
-  });
-
-  const {
-    register: registerEdit,
-    handleSubmit: handleEditSubmit,
-    reset: resetEdit,
-    formState: { errors: editErrors, isSubmitting: isEditSubmitting },
-    setValue: setEditValue,
-    watch: watchEdit,
-  } = useForm<RoleFormData>({
-    defaultValues: {
-      name: "",
-      description: "",
-      permissions: [],
-    },
-  });
-
-  const selectedPermissions = watch("permissions") || [];
-  const selectedEditPermissions = watchEdit("permissions") || [];
-
-  const onSubmit = handleSubmit(async (data) => {
+  const handleCreateSubmit = async (data: RoleFormData) => {
     await createRole.mutateAsync({
       organizationId,
       name: data.name,
       description: data.description,
       permissions: data.permissions,
     });
-    reset();
-  });
+  };
 
-  const onEditSubmit = handleEditSubmit(async (data) => {
+  const handleEditSubmit = async (data: RoleFormData) => {
     if (!editingRole) return;
     await updateRole.mutateAsync({
       roleId: editingRole.id,
@@ -248,17 +210,7 @@ function RolesManagement({
       description: data.description,
       permissions: data.permissions,
     });
-    resetEdit();
-  });
-
-  // Update edit form when editingRole changes
-  useEffect(() => {
-    if (editingRole) {
-      setEditValue("name", editingRole.name);
-      setEditValue("description", editingRole.description);
-      setEditValue("permissions", editingRole.permissions);
-    }
-  }, [editingRole, setEditValue]);
+  };
 
   return (
     <VStack
@@ -401,167 +353,36 @@ function RolesManagement({
       </VStack>
 
       {/* Create Role Dialog */}
-      <Dialog.Root open={open} onOpenChange={({ open }) => !open && onClose()}>
-        <Dialog.Backdrop />
-        <Dialog.Content maxWidth="900px" maxHeight="90vh" overflowY="auto">
-          <Dialog.Header>
-            <Dialog.Title>Create Custom Role</Dialog.Title>
-          </Dialog.Header>
-          <Dialog.Body>
-            <form
-              id="create-role-form"
-              onSubmit={(e) => {
-                void onSubmit(e);
-              }}
-            >
-              <VStack gap={6} align="start">
-                <Field.Root invalid={!!errors.name}>
-                  <Field.Label>
-                    Role Name{" "}
-                    <Text as="span" color="red.500">
-                      *
-                    </Text>
-                  </Field.Label>
-                  <Input
-                    {...register("name", {
-                      required: "Role name is required",
-                    })}
-                    placeholder="e.g., Data Analyst"
-                  />
-                  {errors.name && (
-                    <Field.ErrorText>{errors.name.message}</Field.ErrorText>
-                  )}
-                </Field.Root>
-
-                <Field.Root>
-                  <Field.Label>Description</Field.Label>
-                  <Field.HelperText>
-                    Describe what this role is for
-                  </Field.HelperText>
-                  <Textarea
-                    {...register("description")}
-                    placeholder="e.g., Can view and analyze data but cannot modify settings"
-                    rows={3}
-                  />
-                </Field.Root>
-
-                <Separator />
-
-                <VStack align="start" width="full" gap={4}>
-                  <Heading size="sm">Permissions</Heading>
-                  <Text fontSize="sm" color="gray.600">
-                    Select the permissions this role should have
-                  </Text>
-
-                  <PermissionSelector
-                    selectedPermissions={selectedPermissions}
-                    onChange={(permissions) =>
-                      setValue("permissions", permissions)
-                    }
-                  />
-                </VStack>
-              </VStack>
-            </form>
-          </Dialog.Body>
-          <Dialog.Footer>
-            <Button variant="outline" onClick={onClose}>
-              Cancel
-            </Button>
-            <Button
-              type="submit"
-              form="create-role-form"
-              colorPalette="orange"
-              loading={isSubmitting}
-            >
-              Create Role
-            </Button>
-          </Dialog.Footer>
-          <Dialog.CloseTrigger />
-        </Dialog.Content>
-      </Dialog.Root>
+      <RoleFormDialog
+        open={open}
+        onClose={onClose}
+        onSubmit={handleCreateSubmit}
+        title="Create Custom Role"
+        submitLabel="Create Role"
+        isSubmitting={createRole.isLoading}
+      />
 
       {/* Edit Role Dialog */}
-      <Dialog.Root
+      <RoleFormDialog
         open={editOpen}
-        onOpenChange={({ open }) => !open && onEditClose()}
-      >
-        <Dialog.Backdrop />
-        <Dialog.Content maxWidth="900px" maxHeight="90vh" overflowY="auto">
-          <Dialog.Header>
-            <Dialog.Title>Edit Role</Dialog.Title>
-          </Dialog.Header>
-          <Dialog.Body>
-            <form
-              id="edit-role-form"
-              onSubmit={(e) => {
-                void onEditSubmit(e);
-              }}
-            >
-              <VStack gap={6} align="start">
-                <Field.Root invalid={!!editErrors.name}>
-                  <Field.Label>
-                    Role Name{" "}
-                    <Text as="span" color="red.500">
-                      *
-                    </Text>
-                  </Field.Label>
-                  <Input
-                    {...registerEdit("name", {
-                      required: "Role name is required",
-                    })}
-                    placeholder="e.g., Data Analyst"
-                  />
-                  {editErrors.name && (
-                    <Field.ErrorText>{editErrors.name.message}</Field.ErrorText>
-                  )}
-                </Field.Root>
-
-                <Field.Root>
-                  <Field.Label>Description</Field.Label>
-                  <Field.HelperText>
-                    Describe what this role is for
-                  </Field.HelperText>
-                  <Textarea
-                    {...registerEdit("description")}
-                    placeholder="e.g., Can view and analyze data but cannot modify settings"
-                    rows={3}
-                  />
-                </Field.Root>
-
-                <Separator />
-
-                <VStack align="start" width="full" gap={4}>
-                  <Heading size="sm">Permissions</Heading>
-                  <Text fontSize="sm" color="gray.600">
-                    Select the permissions this role should have
-                  </Text>
-
-                  <PermissionSelector
-                    selectedPermissions={selectedEditPermissions}
-                    onChange={(permissions) =>
-                      setEditValue("permissions", permissions)
-                    }
-                  />
-                </VStack>
-              </VStack>
-            </form>
-          </Dialog.Body>
-          <Dialog.Footer>
-            <Button variant="outline" onClick={onEditClose}>
-              Cancel
-            </Button>
-            <Button
-              type="submit"
-              form="edit-role-form"
-              colorPalette="orange"
-              loading={isEditSubmitting}
-            >
-              Update Role
-            </Button>
-          </Dialog.Footer>
-          <Dialog.CloseTrigger />
-        </Dialog.Content>
-      </Dialog.Root>
+        onClose={() => {
+          onEditClose();
+          setEditingRole(null);
+        }}
+        onSubmit={handleEditSubmit}
+        initialData={
+          editingRole
+            ? {
+                name: editingRole.name,
+                description: editingRole.description,
+                permissions: editingRole.permissions,
+              }
+            : undefined
+        }
+        title="Edit Role"
+        submitLabel="Update Role"
+        isSubmitting={updateRole.isLoading}
+      />
 
       {/* View Permissions Dialog */}
       <Dialog.Root

@@ -65,7 +65,7 @@ function memberToRoleFormOption(
       customRoleId: assignedRole.id,
     } as RoleOption;
   }
-  return teamRolesOptions[builtInRole];
+  return teamRolesOptions[builtInRole as keyof typeof teamRolesOptions];
 }
 
 // Helper function to convert team member to form member

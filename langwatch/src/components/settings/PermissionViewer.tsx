@@ -1,9 +1,9 @@
 import { Box, HStack, Separator, Text, VStack } from "@chakra-ui/react";
-import type { Permission, Resource, Action } from "../../../server/api/rbac";
+import type { Permission, Resource, Action } from "../../server/api/rbac";
 import {
   orderedResources,
   getValidActionsForResource,
-} from "../../../utils/permissionsConfig";
+} from "../../utils/permissionsConfig";
 
 /**
  * PermissionViewer component

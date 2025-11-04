@@ -7,13 +7,13 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { Info } from "react-feather";
-import { Checkbox } from "../../../components/ui/checkbox";
-import { Tooltip } from "../../../components/ui/tooltip";
-import type { Permission, Resource, Action } from "../../../server/api/rbac";
+import { Checkbox } from "../ui/checkbox";
+import { Tooltip } from "../ui/tooltip";
+import type { Permission, Resource, Action } from "../../server/api/rbac";
 import {
   orderedResources,
   getValidActionsForResource,
-} from "../../../utils/permissionsConfig";
+} from "../../utils/permissionsConfig";
 
 /**
  * PermissionSelector component
