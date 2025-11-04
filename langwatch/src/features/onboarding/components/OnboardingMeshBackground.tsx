@@ -5,7 +5,7 @@ import { motion } from "motion/react";
 const MotionBox = motion(Box);
 
 const blobTransitions = {
-  duration: 20,
+  duration: 14,
   repeat: Infinity,
   repeatType: "mirror" as const,
   ease: "easeInOut" as const,
