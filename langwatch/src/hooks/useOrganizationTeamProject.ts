@@ -1,4 +1,3 @@
-import type { OrganizationUserRole, TeamUserRole } from "@prisma/client";
 import { useRouter } from "next/router";
 import { useEffect, useMemo } from "react";
 import { useLocalStorage } from "usehooks-ts";
@@ -11,8 +10,15 @@ import {
 } from "../server/api/permission";
 import { api } from "../utils/api";
 
+import { type OrganizationUserRole } from "@prisma/client";
 import { usePublicEnv } from "./usePublicEnv";
 import { publicRoutes, useRequiredSession } from "./useRequiredSession";
+import {
+  teamRoleHasPermission,
+  organizationRoleHasPermission,
+  hasPermissionWithHierarchy,
+  type Permission,
+} from "../server/api/rbac";
 
 export const useOrganizationTeamProject = (
   {
@@ -27,7 +33,7 @@ export const useOrganizationTeamProject = (
     redirectToOnboarding: true,
     redirectToProjectOnboarding: true,
     keepFetching: false,
-  }
+  },
 ) => {
   const session = useRequiredSession();
 
@@ -38,19 +44,19 @@ export const useOrganizationTeamProject = (
   const shareId = typeof router.query.id === "string" ? router.query.id : "";
   const publicShare = api.share.getShared.useQuery(
     { id: shareId },
-    { enabled: !!shareId && !!isPublicRoute }
+    { enabled: !!shareId && !!isPublicRoute },
   );
   const publicShareProject = api.project.publicGetById.useQuery(
     {
       id: publicShare.data?.projectId ?? "",
       shareId: publicShare.data?.id ?? "",
     },
-    { enabled: !!publicShare.data?.projectId && !!publicShare.data?.id }
+    { enabled: !!publicShare.data?.projectId && !!publicShare.data?.id },
   );
 
   const isDemo = Boolean(
     publicEnv.data?.DEMO_PROJECT_SLUG &&
-      router.query.project === publicEnv.data.DEMO_PROJECT_SLUG
+      router.query.project === publicEnv.data.DEMO_PROJECT_SLUG,
   );
 
   const organizations = api.organization.getAll.useQuery(
@@ -59,21 +65,21 @@ export const useOrganizationTeamProject = (
       enabled: !!session.data || !isPublicRoute,
       staleTime: keepFetching ? undefined : Infinity,
       refetchInterval: keepFetching ? 5_000 : undefined,
-    }
+    },
   );
 
   const [localStorageOrganizationId, setLocalStorageOrganizationId] =
     useLocalStorage<string>("selectedOrganizationId", "");
   const [localStorageTeamId, setLocalStorageTeamId] = useLocalStorage<string>(
     "selectedTeamId",
-    ""
+    "",
   );
   const [localStorageProjectSlug, setLocalStorageProjectSlug] =
     useLocalStorage<string>("selectedProjectSlug", "");
 
   const reservedProjectSlugs = useMemo(
     () => ["analytics", "datasets", "evaluations", "experiments", "messages"],
-    []
+    [],
   );
 
   const projectQueryParam =
@@ -92,7 +98,7 @@ export const useOrganizationTeamProject = (
     ? organizations.data?.flatMap((organization) =>
         organization.teams
           .filter((team) => team.slug === teamSlug)
-          .map((team) => ({ organization, team }))
+          .map((team) => ({ organization, team })),
       )
     : undefined;
 
@@ -113,8 +119,8 @@ export const useOrganizationTeamProject = (
             if (a.team.id == localStorageTeamId) return -1;
             if (b.team.id == localStorageTeamId) return 1;
             return 0;
-          })
-      )
+          }),
+      ),
   );
 
   const organization = teamsMatchingSlug?.[0]
@@ -144,7 +150,7 @@ export const useOrganizationTeamProject = (
       enabled: !!project?.id,
       refetchOnMount: false,
       refetchOnWindowFocus: true,
-    }
+    },
   );
 
   useEffect(() => {
@@ -184,7 +190,7 @@ export const useOrganizationTeamProject = (
       : "";
 
     const teamsWithProjectsOnAnyOrg = organizations.data.flatMap((org) =>
-      org.teams.filter((team) => team.projects.length > 0)
+      org.teams.filter((team) => team.projects.length > 0),
     );
     if (!organization || !teamsWithProjectsOnAnyOrg.length) {
       void router.push(`/onboarding/welcome${returnTo}`);
@@ -192,7 +198,7 @@ export const useOrganizationTeamProject = (
     }
 
     const hasTeamsWithProjectsOnCurrentOrg = organization.teams.some(
-      (team) => team.projects.length > 0
+      (team) => team.projects.length > 0,
     );
     if (
       !hasTeamsWithProjectsOnCurrentOrg &&
@@ -238,8 +244,13 @@ export const useOrganizationTeamProject = (
     return {
       isLoading: true,
       project: publicShareProject.data,
+      //@deprecated use hasPermission instead
       hasTeamPermission: () => false,
       hasOrganizationPermission: () => false,
+      // New RBAC API
+      hasPermission: () => false,
+      hasOrgPermission: () => false,
+      hasAnyPermission: () => false,
       isPublicRoute,
       isOrganizationFeatureEnabled: () => false,
     };
@@ -247,10 +258,11 @@ export const useOrganizationTeamProject = (
 
   const organizationRole = organization?.members[0]?.role;
 
+  //@deprecated use hasPermission instead
   const hasOrganizationPermission = (
-    roleGroup: keyof typeof OrganizationRoleGroup
+    roleGroup: keyof typeof OrganizationRoleGroup,
   ) => {
-    return (
+    return !!(
       organizationRole &&
       (
         organizationRolePermissionMapping[roleGroup] as OrganizationUserRole[]
@@ -258,28 +270,105 @@ export const useOrganizationTeamProject = (
     );
   };
 
+  //@deprecated use hasPermission instead
   const hasTeamPermission = (
     roleGroup: keyof typeof TeamRoleGroup,
-    team_ = team
+    team_ = team,
   ) => {
     const teamRole = team_?.members[0]?.role;
-    return (
-      teamRole &&
-      (teamRolePermissionMapping[roleGroup] as TeamUserRole[]).includes(
-        teamRole
-      )
-    );
+    const allowedRoles = teamRolePermissionMapping[roleGroup];
+    return !!(teamRole && allowedRoles && allowedRoles.includes(teamRole));
   };
 
   const isOrganizationFeatureEnabled = (feature: string): boolean => {
     if (!organization?.features) return false;
     const trialFeature = organization.features.find(
-      (f) => f.feature === feature
+      (f) => f.feature === feature,
     );
     if (!trialFeature) return false;
 
     if (!trialFeature.trialEndDate) return true;
     return new Date(trialFeature.trialEndDate) > new Date();
+  };
+
+  // ============================================================================
+  // NEW RBAC SYSTEM - Preferred API going forward
+  // ============================================================================
+
+  /**
+   * Check if the user has a specific permission (new RBAC system)
+   * Automatically routes between organization and team permissions
+   * @example hasPermission("analytics:view")
+   * @example hasPermission("organization:manage")
+   */
+  const hasPermission = (permission: Permission) => {
+    // Check if this is an organization permission
+    const isOrgPermission = permission.startsWith("organization:");
+
+    if (isOrgPermission) {
+      // Only check organization role - team admins do NOT get automatic organization permissions
+      if (organizationRole) {
+        const orgResult = organizationRoleHasPermission(
+          organizationRole,
+          permission,
+        );
+        if (orgResult) return true;
+      }
+      return false;
+    }
+
+    // Team-level permission checking
+    const teamMember = team?.members[0];
+    if (!teamMember) return false;
+
+    // Check if user has custom role assignment
+    if (teamMember.assignedRole) {
+      // If user has custom role, ONLY use custom role permissions (no fallback)
+      const rawPermissions = teamMember.assignedRole.permissions as
+        | string[]
+        | null
+        | undefined;
+      const userPermissions = Array.isArray(rawPermissions)
+        ? rawPermissions
+        : [];
+
+      return hasPermissionWithHierarchy(userPermissions, permission);
+    }
+
+    // Only fall back to built-in team role if NO custom role exists
+    return teamRoleHasPermission(teamMember.role, permission);
+  };
+
+  /**
+   * Check if the user has an organization permission (new RBAC system)
+   * @example hasOrgPermission("organization:manage")
+   */
+  const hasOrgPermission = (permission: Permission) => {
+    // Only check organization role - team admins do NOT get automatic organization permissions
+    if (organizationRole) {
+      const orgResult = organizationRoleHasPermission(
+        organizationRole,
+        permission,
+      );
+
+      if (orgResult) return true;
+    }
+
+    return false;
+  };
+
+  /**
+   * Unified permission checker that automatically routes to org or team permissions
+   * This is the recommended API as it handles the routing logic automatically
+   * @example hasAnyPermission("analytics:view")
+   * @example hasAnyPermission("organization:manage")
+   */
+  const hasAnyPermission = (permission: Permission) => {
+    // Determine if this is an organization permission or team permission
+    const isOrgPermission = permission.startsWith("organization:");
+    return isOrgPermission
+      ? hasOrgPermission(permission)
+      : hasPermission(permission);
   };
 
   return {
@@ -290,8 +379,13 @@ export const useOrganizationTeamProject = (
     team,
     project: publicShareProject.data ?? project,
     projectId: project?.id,
+    // Legacy permission API (still supported)
     hasOrganizationPermission,
     hasTeamPermission,
+    // New RBAC permission API (preferred)
+    hasPermission,
+    hasOrgPermission,
+    hasAnyPermission, // Unified API that auto-routes between org and team permissions
     isPublicRoute,
     modelProviders: modelProviders.data,
     isOrganizationFeatureEnabled,

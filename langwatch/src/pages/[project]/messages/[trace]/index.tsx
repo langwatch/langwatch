@@ -11,7 +11,7 @@ import { Conversation } from "../../../../components/messages/Conversation";
 export default function TraceDetails() {
   const router = useRouter();
   const { traceId, trace } = useTraceDetailsState(
-    (router.query.trace as string) ?? ""
+    (router.query.trace as string) ?? "",
   );
 
   const [threadId, setThreadId] = useState<string | undefined>(undefined);

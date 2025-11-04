@@ -298,7 +298,7 @@ export function VersionHistoryListPopover({
             title: "Version restored successfully",
           });
         } catch (error) {
-          logger.error("Error restoring version", error);
+          logger.error({ error }, "Error restoring version");
           toaster.error({
             title: "Failed to restore version",
             description:

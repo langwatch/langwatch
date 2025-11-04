@@ -5,7 +5,7 @@ import { createTRPCRouter, protectedProcedure } from "../trpc";
 import { openai } from "@ai-sdk/openai";
 import { generateText } from "ai";
 
-import { TeamRoleGroup, checkUserPermissionForProject } from "../permission";
+import { checkProjectPermission } from "../rbac";
 
 export const translateRouter = createTRPCRouter({
   translate: protectedProcedure
@@ -13,9 +13,9 @@ export const translateRouter = createTRPCRouter({
       z.object({
         projectId: z.string(),
         textToTranslate: z.string(),
-      })
+      }),
     )
-    .use(checkUserPermissionForProject(TeamRoleGroup.TRIGGERS_MANAGE))
+    .use(checkProjectPermission("triggers:view"))
     .mutation(async ({ input }) => {
       try {
         const response: { text: string } = await generateText({

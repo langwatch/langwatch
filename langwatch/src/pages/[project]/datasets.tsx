@@ -29,14 +29,19 @@ import { useState } from "react";
 import { NoDataInfoBlock } from "~/components/NoDataInfoBlock";
 import { Link } from "../../components/ui/link";
 import { Menu } from "../../components/ui/menu";
+import { Tooltip } from "../../components/ui/tooltip";
 import { toaster } from "../../components/ui/toaster";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
-import { useDeleteDatasetConfirmation } from "../../hooks/useDeleteDatasetConfirmation";
+import { useDeleteDatasetConfirmation } from "~/hooks/useDeleteDatasetConfirmation";
+import { withPermissionGuard } from "~/components/WithPermissionGuard";
 
-export default function DatasetsPage() {
+function DatasetsPage() {
   const addEditDatasetDrawer = useDisclosure();
   const uploadCSVModal = useDisclosure();
-  const { project } = useOrganizationTeamProject();
+  const { project, hasPermission } = useOrganizationTeamProject();
+  const hasDatasetsCreatePermission = hasPermission("datasets:create");
+  const hasDatasetsUpdatePermission = hasPermission("datasets:update");
+  const hasDatasetsDeletePermission = hasPermission("datasets:delete");
   const router = useRouter();
   const { openDrawer } = useDrawer();
 
@@ -152,10 +157,24 @@ export default function DatasetsPage() {
           >
             <Play height={16} /> Batch Evaluation
           </PageLayout.HeaderButton>
-          <PageLayout.HeaderButton onClick={() => uploadCSVModal.onOpen()}>
-            <Upload height={17} width={17} strokeWidth={2.5} /> Upload or Create
-            Dataset
-          </PageLayout.HeaderButton>
+          <Tooltip
+            content={
+              !hasDatasetsCreatePermission
+                ? "You need datasets:create permission to create datasets"
+                : undefined
+            }
+            disabled={hasDatasetsCreatePermission}
+            positioning={{ placement: "bottom" }}
+            showArrow
+          >
+            <PageLayout.HeaderButton
+              onClick={() => uploadCSVModal.onOpen()}
+              disabled={!hasDatasetsCreatePermission}
+            >
+              <Upload height={17} width={17} strokeWidth={2.5} /> Upload or
+              Create Dataset
+            </PageLayout.HeaderButton>
+          </Tooltip>
         </PageLayout.Header>
         <PageLayout.Content>
           {datasets.data && datasets.data.length == 0 ? (
@@ -241,34 +260,62 @@ export default function DatasetsPage() {
                               </Button>
                             </Menu.Trigger>
                             <Menu.Content>
-                              <Menu.Item
-                                value="edit"
-                                onClick={(event) => {
-                                  event.stopPropagation();
-                                  setEditDataset({
-                                    datasetId: dataset.id,
-                                    name: dataset.name,
-                                    columnTypes:
-                                      dataset.columnTypes as DatasetColumns,
-                                  });
-                                  addEditDatasetDrawer.onOpen();
-                                }}
+                              <Tooltip
+                                content={
+                                  !hasDatasetsUpdatePermission
+                                    ? "You need datasets:update permission to edit datasets"
+                                    : undefined
+                                }
+                                disabled={hasDatasetsUpdatePermission}
+                                positioning={{ placement: "right" }}
+                                showArrow
                               >
-                                <Edit size={16} /> Edit dataset
-                              </Menu.Item>
-                              <Menu.Item
-                                value="delete"
-                                color="red.600"
-                                onClick={(event) => {
-                                  event.stopPropagation();
-                                  showDeleteDialog({
-                                    id: dataset.id,
-                                    name: dataset.name,
-                                  });
-                                }}
+                                <Menu.Item
+                                  value="edit"
+                                  onClick={(event) => {
+                                    event.stopPropagation();
+                                    if (hasDatasetsUpdatePermission) {
+                                      setEditDataset({
+                                        datasetId: dataset.id,
+                                        name: dataset.name,
+                                        columnTypes:
+                                          dataset.columnTypes as DatasetColumns,
+                                      });
+                                      addEditDatasetDrawer.onOpen();
+                                    }
+                                  }}
+                                  disabled={!hasDatasetsUpdatePermission}
+                                >
+                                  <Edit size={16} /> Edit dataset
+                                </Menu.Item>
+                              </Tooltip>
+                              <Tooltip
+                                content={
+                                  !hasDatasetsDeletePermission
+                                    ? "You need datasets:delete permission to delete datasets"
+                                    : undefined
+                                }
+                                disabled={hasDatasetsDeletePermission}
+                                positioning={{ placement: "right" }}
+                                showArrow
                               >
-                                <Trash2 size={16} /> Delete dataset
-                              </Menu.Item>
+                                <Menu.Item
+                                  value="delete"
+                                  color="red.600"
+                                  onClick={(event) => {
+                                    event.stopPropagation();
+                                    if (hasDatasetsDeletePermission) {
+                                      showDeleteDialog({
+                                        id: dataset.id,
+                                        name: dataset.name,
+                                      });
+                                    }
+                                  }}
+                                  disabled={!hasDatasetsDeletePermission}
+                                >
+                                  <Trash2 size={16} /> Delete dataset
+                                </Menu.Item>
+                              </Tooltip>
                             </Menu.Content>
                           </Menu.Root>
                         </Table.Cell>
@@ -310,3 +357,7 @@ export default function DatasetsPage() {
     </DashboardLayout>
   );
 }
+
+export default withPermissionGuard("datasets:view", {
+  layoutComponent: DashboardLayout,
+})(DatasetsPage);

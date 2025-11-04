@@ -3,7 +3,7 @@ import { z } from "zod";
 
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 
-import { TeamRoleGroup, checkUserPermissionForProject } from "../permission";
+import { checkProjectPermission } from "../rbac";
 
 import { ScenarioEventService } from "~/app/api/scenario-events/[[...route]]/scenario-event.service";
 
@@ -16,7 +16,7 @@ export const scenarioRouter = createTRPCRouter({
   // Get scenario sets data for a project
   getScenarioSetsData: protectedProcedure
     .input(projectSchema)
-    .use(checkUserPermissionForProject(TeamRoleGroup.SCENARIOS_VIEW))
+    .use(checkProjectPermission("scenarios:view"))
     .query(async ({ input, ctx }) => {
       const scenarioRunnerService = new ScenarioEventService();
       const data = await scenarioRunnerService.getScenarioSetsDataForProject({
@@ -34,7 +34,7 @@ export const scenarioRouter = createTRPCRouter({
         cursor: z.string().optional(), // Cursor for pagination
       })
     )
-    .use(checkUserPermissionForProject(TeamRoleGroup.SCENARIOS_VIEW))
+    .use(checkProjectPermission("scenarios:view"))
     .query(async ({ input, ctx }) => {
       const scenarioRunnerService = new ScenarioEventService();
       const data = await scenarioRunnerService.getRunDataForScenarioSet({
@@ -49,7 +49,7 @@ export const scenarioRouter = createTRPCRouter({
   // Get ALL run data for a scenario set without pagination
   getAllScenarioSetRunData: protectedProcedure
     .input(projectSchema.extend({ scenarioSetId: z.string() }))
-    .use(checkUserPermissionForProject(TeamRoleGroup.SCENARIOS_VIEW))
+    .use(checkProjectPermission("scenarios:view"))
     .query(async ({ input, ctx }) => {
       const scenarioRunnerService = new ScenarioEventService();
       const data = await scenarioRunnerService.getAllRunDataForScenarioSet({
@@ -66,7 +66,7 @@ export const scenarioRouter = createTRPCRouter({
         scenarioRunId: z.string(),
       })
     )
-    .use(checkUserPermissionForProject(TeamRoleGroup.SCENARIOS_VIEW))
+    .use(checkProjectPermission("scenarios:view"))
     .query(async ({ input, ctx }) => {
       const scenarioRunnerService = new ScenarioEventService();
       const data = await scenarioRunnerService.getScenarioRunData({
@@ -85,7 +85,7 @@ export const scenarioRouter = createTRPCRouter({
   // Get total count of batch runs for a scenario set (for pagination)
   getScenarioSetBatchRunCount: protectedProcedure
     .input(projectSchema.extend({ scenarioSetId: z.string() }))
-    .use(checkUserPermissionForProject(TeamRoleGroup.SCENARIOS_VIEW))
+    .use(checkProjectPermission("scenarios:view"))
     .query(async ({ input, ctx }) => {
       const scenarioRunnerService = new ScenarioEventService();
       const count = await scenarioRunnerService.getBatchRunCountForScenarioSet({
@@ -102,7 +102,7 @@ export const scenarioRouter = createTRPCRouter({
         scenarioId: z.string(),
       })
     )
-    .use(checkUserPermissionForProject(TeamRoleGroup.SCENARIOS_VIEW))
+    .use(checkProjectPermission("scenarios:view"))
     .query(async ({ input, ctx }) => {
       const scenarioRunnerService = new ScenarioEventService();
       const data = await scenarioRunnerService.getScenarioRunDataByScenarioId({
@@ -120,7 +120,7 @@ export const scenarioRouter = createTRPCRouter({
         batchRunId: z.string(),
       })
     )
-    .use(checkUserPermissionForProject(TeamRoleGroup.SCENARIOS_VIEW))
+    .use(checkProjectPermission("scenarios:view"))
     .query(async ({ input, ctx }) => {
       const scenarioRunnerService = new ScenarioEventService();
       const data = await scenarioRunnerService.getRunDataForBatchRun({

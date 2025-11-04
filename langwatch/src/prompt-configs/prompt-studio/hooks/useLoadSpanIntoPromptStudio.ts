@@ -68,9 +68,10 @@ function createDefaultPromptFormValues(
   spanData: RouterOutputs["spans"]["getForPromptStudio"],
 ): PromptConfigFormValues {
   if (!spanData.llmConfig?.model) {
-    logger.warn("Model is not available for span data. This is not expected.", {
-      spanData,
-    });
+    logger.warn(
+      { spanData },
+      "Model is not available for span data. This is not expected.",
+    );
   }
 
   return {
@@ -152,7 +153,7 @@ export function useLoadSpanIntoPromptStudio() {
           });
         }
       } catch (error) {
-        logger.error("Error loading span data into prompt studio", error);
+        logger.error({ error }, "Error loading span data into prompt studio");
         toaster.create({
           title: "Error loading span data into prompt studio",
           description: (error as Error).message,

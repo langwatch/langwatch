@@ -20,6 +20,7 @@ import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 import { AnalyticsHeader } from "../../../components/analytics/AnalyticsHeader";
 import { getEvaluatorDefinitions } from "../../../server/evaluations/getEvaluator";
+import { withPermissionGuard } from "../../../components/WithPermissionGuard";
 
 // Time unit conversion constants
 const MINUTES_IN_DAY = 24 * 60; // 1440 minutes in a day
@@ -151,13 +152,13 @@ const creatChecks = (checks: any) => {
   });
 };
 
-export default function Evaluations() {
+function EvaluationsContent() {
   const { project } = useOrganizationTeamProject();
   const checks = api.monitors.getAllForProject.useQuery(
     {
       projectId: project?.id ?? "",
     },
-    { enabled: !!project }
+    { enabled: !!project },
   );
 
   return (
@@ -192,7 +193,7 @@ export default function Evaluations() {
                   // Enabled items first (true > false when comparing booleans)
                   if (a.enabled === b.enabled) return 0;
                   return a.enabled ? -1 : 1;
-                })
+                }),
               )
             : null}
         </SimpleGrid>
@@ -203,3 +204,7 @@ export default function Evaluations() {
     </GraphsLayout>
   );
 }
+
+export default withPermissionGuard("analytics:view", {
+  layoutComponent: GraphsLayout,
+})(EvaluationsContent);

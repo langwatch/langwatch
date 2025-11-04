@@ -1,4 +1,4 @@
-import { estypes } from "@elastic/elasticsearch";
+import * as T from '@elastic/elasticsearch/lib/api/types'
 import { Client as ElasticClient } from "@elastic/elasticsearch";
 import {
   type ElasticSearchTrace,

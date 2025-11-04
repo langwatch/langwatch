@@ -33,7 +33,7 @@ import type {
   DSPyStepSummary,
   ESBatchEvaluation,
 } from "../../experiments/types";
-import { checkUserPermissionForProject, TeamRoleGroup } from "../permission";
+import { checkProjectPermission } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 import { saveOrCommitWorkflowVersion } from "./workflows";
 
@@ -48,7 +48,7 @@ export const experimentsRouter = createTRPCRouter({
         commitMessage: z.string().optional(),
       }),
     )
-    .use(checkUserPermissionForProject(TeamRoleGroup.EXPERIMENTS_MANAGE))
+    .use(checkProjectPermission("workflows:create"))
     .mutation(async ({ ctx, input }) => {
       let workflowId = input.dsl.workflow_id;
       const name =
@@ -190,7 +190,7 @@ export const experimentsRouter = createTRPCRouter({
         experimentId: z.string(),
       }),
     )
-    .use(checkUserPermissionForProject(TeamRoleGroup.EXPERIMENTS_MANAGE))
+    .use(checkProjectPermission("workflows:create"))
     .mutation(async ({ input }) => {
       const experiment = await prisma.experiment.findUnique({
         where: {
@@ -270,7 +270,7 @@ export const experimentsRouter = createTRPCRouter({
         experimentSlug: z.string().optional(),
       }),
     )
-    .use(checkUserPermissionForProject(TeamRoleGroup.EXPERIMENTS_VIEW))
+    .use(checkProjectPermission("workflows:view"))
     .query(async ({ input }) => {
       if (input.experimentId) {
         const experiment = await prisma.experiment.findFirst({
@@ -311,7 +311,7 @@ export const experimentsRouter = createTRPCRouter({
         randomSeed: z.number().optional(),
       }),
     )
-    .use(checkUserPermissionForProject(TeamRoleGroup.EXPERIMENTS_VIEW))
+    .use(checkProjectPermission("workflows:view"))
     .query(async ({ input }) => {
       const experiment = await getExperimentBySlug(
         input.projectId,
@@ -338,7 +338,7 @@ export const experimentsRouter = createTRPCRouter({
 
   getAllByProjectId: protectedProcedure
     .input(z.object({ projectId: z.string() }))
-    .use(checkUserPermissionForProject(TeamRoleGroup.EXPERIMENTS_VIEW))
+    .use(checkProjectPermission("workflows:view"))
     .query(async ({ input }) => {
       const experiments = await prisma.experiment.findMany({
         where: {
@@ -351,7 +351,7 @@ export const experimentsRouter = createTRPCRouter({
 
   getAllForEvaluationsList: protectedProcedure
     .input(z.object({ projectId: z.string() }))
-    .use(checkUserPermissionForProject(TeamRoleGroup.EXPERIMENTS_VIEW))
+    .use(checkProjectPermission("workflows:view"))
     .query(async ({ input }) => {
       const experiments = await prisma.experiment.findMany({
         where: { projectId: input.projectId },
@@ -434,7 +434,7 @@ export const experimentsRouter = createTRPCRouter({
 
   getExperimentDSPyRuns: protectedProcedure
     .input(z.object({ projectId: z.string(), experimentSlug: z.string() }))
-    .use(checkUserPermissionForProject(TeamRoleGroup.EXPERIMENTS_VIEW))
+    .use(checkProjectPermission("workflows:view"))
     .query(async ({ input }) => {
       const experiment = await getExperimentBySlug(
         input.projectId,
@@ -553,7 +553,7 @@ export const experimentsRouter = createTRPCRouter({
         index: z.string(),
       }),
     )
-    .use(checkUserPermissionForProject(TeamRoleGroup.EXPERIMENTS_VIEW))
+    .use(checkProjectPermission("workflows:view"))
     .query(async ({ input }) => {
       const experiment = await getExperimentBySlug(
         input.projectId,
@@ -591,7 +591,7 @@ export const experimentsRouter = createTRPCRouter({
 
   getExperimentBatchEvaluationRuns: protectedProcedure
     .input(z.object({ projectId: z.string(), experimentId: z.string() }))
-    .use(checkUserPermissionForProject(TeamRoleGroup.EXPERIMENTS_VIEW))
+    .use(checkProjectPermission("workflows:view"))
     .query(async ({ input }) => {
       const experiment = await getExperimentById(
         input.projectId,
@@ -614,7 +614,7 @@ export const experimentsRouter = createTRPCRouter({
         runId: z.string(),
       }),
     )
-    .use(checkUserPermissionForProject(TeamRoleGroup.EXPERIMENTS_VIEW))
+    .use(checkProjectPermission("workflows:view"))
     .query(async ({ input }) => {
       const experiment = await getExperimentById(
         input.projectId,
@@ -665,7 +665,7 @@ export const experimentsRouter = createTRPCRouter({
         experimentId: z.string(),
       }),
     )
-    .use(checkUserPermissionForProject(TeamRoleGroup.EXPERIMENTS_MANAGE))
+    .use(checkProjectPermission("workflows:delete"))
     .mutation(async ({ input }) => {
       // Verify the experiment exists and belongs to the project
       const experiment = await prisma.experiment.findUnique({
@@ -791,7 +791,7 @@ export const experimentsRouter = createTRPCRouter({
    */
   getLastExperiment: protectedProcedure
     .input(z.object({ projectId: z.string() }))
-    .use(checkUserPermissionForProject(TeamRoleGroup.EXPERIMENTS_VIEW))
+    .use(checkProjectPermission("workflows:view"))
     .query(async ({ input }) => {
       const experiment = await prisma.experiment.findFirst({
         where: { projectId: input.projectId },

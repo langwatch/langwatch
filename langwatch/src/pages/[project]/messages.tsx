@@ -8,8 +8,9 @@ import { api } from "../../utils/api";
 import { useEffect, useState } from "react";
 import { useFilterParams } from "../../hooks/useFilterParams";
 import { useFieldRedaction } from "../../hooks/useFieldRedaction";
+import { withPermissionGuard } from "../../components/WithPermissionGuard";
 
-export default function MessagesOrIntegrationGuide() {
+function MessagesOrIntegrationGuideContent() {
   const { project } = useOrganizationTeamProject();
 
   const { isTableView } = useTableView();
@@ -23,7 +24,7 @@ export default function MessagesOrIntegrationGuide() {
       filters: {},
       pageSize: 1,
     },
-    { enabled: !!project && waitingForFirstMessage }
+    { enabled: !!project && waitingForFirstMessage },
   );
 
   // Preload field redaction status to avoid cascading loading states
@@ -64,3 +65,7 @@ export default function MessagesOrIntegrationGuide() {
     </DashboardLayout>
   );
 }
+
+export default withPermissionGuard("traces:view", {
+  layoutComponent: DashboardLayout,
+})(MessagesOrIntegrationGuideContent);

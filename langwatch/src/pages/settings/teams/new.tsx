@@ -51,6 +51,7 @@ function NewTeam({ organization }: { organization: FullyLoadedOrganization }) {
           members: data.members.map((member) => ({
             userId: member.userId?.value ?? "",
             role: member.role.value,
+            customRoleId: member.role.customRoleId,
           })),
         },
         {
@@ -68,7 +69,8 @@ function NewTeam({ organization }: { organization: FullyLoadedOrganization }) {
           onError: () => {
             toaster.create({
               title: "Failed to create team",
-              description: "Please try again",
+              description:
+                "Please check your permissions if you have team:create permissions to create a team",
               type: "error",
               duration: 5000,
               meta: {
@@ -76,10 +78,10 @@ function NewTeam({ organization }: { organization: FullyLoadedOrganization }) {
               },
             });
           },
-        }
+        },
       );
     },
-    [createTeam, organization.id, router]
+    [createTeam, organization.id, router],
   );
 
   return (

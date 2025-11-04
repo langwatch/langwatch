@@ -85,6 +85,7 @@ enum TeamUserRole {
     ADMIN
     MEMBER
     VIEWER
+    CUSTOM
 }
 
 enum OrganizationUserRole {
@@ -94,17 +95,20 @@ enum OrganizationUserRole {
 }
 
 model TeamUser {
-    userId    String
-    teamId    String
-    role      TeamUserRole
-    user      User         @relation(fields: [userId], references: [id])
-    team      Team         @relation(fields: [teamId], references: [id])
-    createdAt DateTime     @default(now())
-    updatedAt DateTime     @default(now()) @updatedAt
+    userId         String
+    teamId         String
+    role           TeamUserRole
+    assignedRoleId String?
+    assignedRole   CustomRole?  @relation(fields: [assignedRoleId], references: [id])
+    user           User         @relation(fields: [userId], references: [id])
+    team           Team         @relation(fields: [teamId], references: [id])
+    createdAt      DateTime     @default(now())
+    updatedAt      DateTime     @default(now()) @updatedAt
 
     @@id([userId, teamId])
     @@index([teamId])
     @@index([userId])
+    @@index([assignedRoleId])
 }
 
 model OrganizationUser {
@@ -161,8 +165,9 @@ model Organization {
     ssoDomain              String?
     ssoProvider            String?
 
-    promoCode String?
-    features  OrganizationFeature[]
+    promoCode   String?
+    features    OrganizationFeature[]
+    CustomRoles CustomRole[]
 
     @@index([ssoDomain])
     @@index([ssoProvider])
@@ -797,4 +802,19 @@ model Analytics {
 
     @@index([createdAt, key, projectId, numericValue])
     @@index([projectId])
+}
+
+model CustomRole {
+    id             String       @id @default(nanoid())
+    organizationId String
+    organization   Organization @relation(fields: [organizationId], references: [id])
+    name           String
+    description    String?
+    permissions    Json // Array of Permission strings
+    createdAt      DateTime     @default(now())
+    updatedAt      DateTime     @default(now()) @updatedAt
+    assignedUsers  TeamUser[]
+
+    @@unique([organizationId, name])
+    @@index([organizationId])
 }

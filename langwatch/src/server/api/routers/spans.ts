@@ -1,11 +1,8 @@
 import { PublicShareResourceTypes } from "@prisma/client";
 import { z } from "zod";
 import { createTRPCRouter, publicProcedure } from "~/server/api/trpc";
-import {
-  TeamRoleGroup,
-  checkPermissionOrPubliclyShared,
-  checkUserPermissionForProject,
-} from "../permission";
+import { checkPermissionOrPubliclyShared } from "../permission";
+import { checkProjectPermission } from "../rbac";
 import { getUserProtectionsForProject } from "../utils";
 import { getTraceById, searchTraces } from "~/server/elasticsearch/traces";
 import { TRPCError } from "@trpc/server";
@@ -17,13 +14,10 @@ export const spansRouter = createTRPCRouter({
   getAllForTrace: publicProcedure
     .input(z.object({ projectId: z.string(), traceId: z.string() }))
     .use(
-      checkPermissionOrPubliclyShared(
-        checkUserPermissionForProject(TeamRoleGroup.SPANS_DEBUG),
-        {
-          resourceType: PublicShareResourceTypes.TRACE,
-          resourceParam: "traceId",
-        },
-      ),
+      checkPermissionOrPubliclyShared(checkProjectPermission("traces:view"), {
+        resourceType: PublicShareResourceTypes.TRACE,
+        resourceParam: "traceId",
+      }),
     )
     .query(async ({ input, ctx }) => {
       const protections = await getUserProtectionsForProject(ctx, {
@@ -64,7 +58,7 @@ export const spansRouter = createTRPCRouter({
         spanId: z.string(),
       }),
     )
-    .use(checkUserPermissionForProject(TeamRoleGroup.SPANS_DEBUG))
+    .use(checkProjectPermission("traces:view"))
     .query(async ({ input, ctx }) => {
       const { projectId, spanId } = input;
 

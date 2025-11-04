@@ -442,12 +442,12 @@ EOF`}
 }
 
 const customGraphInputToFormData = (
-  graphInput: CustomGraphInput
+  graphInput: CustomGraphInput,
 ): CustomGraphFormData => {
   return {
     title: graphInput.graphId === "custom" ? undefined : graphInput.graphId,
     graphType: chartOptions.find(
-      (option) => option.value === graphInput.graphType
+      (option) => option.value === graphInput.graphType,
     )!,
     series: graphInput.series.map((series) => ({
       name: series.name,
@@ -477,7 +477,7 @@ const customGraphInputToFormData = (
 };
 
 const customGraphFormToCustomGraphInput = (
-  formData: CustomGraphFormData
+  formData: CustomGraphFormData,
 ): CustomGraphInput | undefined => {
   for (const series of formData.series) {
     const metric = getMetric(series.metric);
@@ -523,7 +523,7 @@ const customGraphFormToCustomGraphInput = (
 
 const customAPIinput = (
   formData: CustomGraphFormData,
-  filterParams: SharedFiltersInput
+  filterParams: SharedFiltersInput,
 ): CustomAPICallData | undefined => {
   for (const series of formData.series) {
     const metric = getMetric(series.metric);
@@ -603,7 +603,7 @@ function CustomGraphForm({
 
   const addNewGraph = api.graphs.create.useMutation();
   const updateGraphById = api.graphs.updateById.useMutation();
-  const { project } = useOrganizationTeamProject();
+  const { project, hasPermission } = useOrganizationTeamProject();
   const router = useRouter();
   const trpc = api.useContext();
 
@@ -626,7 +626,7 @@ function CustomGraphForm({
           void trpc.graphs.getById.invalidate();
           void router.push(`/${project?.slug}/analytics/reports`);
         },
-      }
+      },
     );
   };
 
@@ -646,7 +646,7 @@ function CustomGraphForm({
           void trpc.graphs.getById.invalidate();
           void router.push(`/${project?.slug}/analytics/reports`);
         },
-      }
+      },
     );
   };
 
@@ -738,7 +738,7 @@ function CustomGraphForm({
                   aggregation: "avg",
                 },
               },
-              { shouldFocus: false }
+              { shouldFocus: false },
             );
             setTimeout(() => {
               form.resetField(`series.${index}.name`, {
@@ -804,27 +804,51 @@ function CustomGraphForm({
       <HStack width="full" gap={2}>
         <Spacer />
         {customId ? (
-          <Button
-            colorPalette="orange"
-            onClick={updateGraph}
-            loading={updateGraphById.isLoading}
-            marginX={2}
-            minWidth="fit-content"
+          <Tooltip
+            content={
+              !hasPermission("analytics:manage")
+                ? "You need analytics:manage permission to update graphs"
+                : undefined
+            }
+            disabled={hasPermission("analytics:manage")}
+            positioning={{ placement: "top" }}
+            showArrow
           >
-            Update
-          </Button>
+            <Button
+              colorPalette="orange"
+              onClick={updateGraph}
+              loading={updateGraphById.isLoading}
+              disabled={!hasPermission("analytics:manage")}
+              marginX={2}
+              minWidth="fit-content"
+            >
+              Update
+            </Button>
+          </Tooltip>
         ) : (
-          <Button
-            colorPalette="orange"
-            loading={addNewGraph.isLoading}
-            onClick={() => {
-              addGraph();
-            }}
-            marginX={2}
-            minWidth="fit-content"
+          <Tooltip
+            content={
+              !hasPermission("analytics:create")
+                ? "You need analytics:create permission to create graphs"
+                : undefined
+            }
+            disabled={hasPermission("analytics:create")}
+            positioning={{ placement: "top" }}
+            showArrow
           >
-            Save
-          </Button>
+            <Button
+              colorPalette="orange"
+              loading={addNewGraph.isLoading}
+              onClick={() => {
+                addGraph();
+              }}
+              disabled={!hasPermission("analytics:create")}
+              marginX={2}
+              minWidth="fit-content"
+            >
+              Save
+            </Button>
+          </Tooltip>
         )}
       </HStack>
     </VStack>
@@ -865,7 +889,7 @@ function SeriesFieldItem({
           groupBy.startsWith("evaluations") ||
           groupBy.includes("has_error")
           ? "positiveNegativeNeutral"
-          : "colors"
+          : "colors",
       );
     }
   }, [form, groupBy, index, seriesLength, customId]);
@@ -919,7 +943,7 @@ function SeriesFieldItem({
                         key as RotatingColorSet,
                         {
                           shouldTouch: true,
-                        }
+                        },
                       );
                     }}
                   >
@@ -1006,7 +1030,7 @@ function SeriesField({
   const key = form.watch(`series.${index}.key`);
   const pipelineField = form.watch(`series.${index}.pipeline.field`);
   const pipelineAggregation = form.watch(
-    `series.${index}.pipeline.aggregation`
+    `series.${index}.pipeline.aggregation`,
   );
   const filters = form.watch(`series.${index}.filters`);
   const nonEmptyFilters = filterOutEmptyFilters(filters);
@@ -1031,7 +1055,7 @@ function SeriesField({
     const name_ = uppercaseFirstLetterLowerCaseRest(
       [pipelineAggregation_, metric_?.label, aggregation_, pipeline_]
         .filter((x) => x)
-        .join(" ")
+        .join(" "),
     );
 
     if (
@@ -1074,7 +1098,7 @@ function SeriesField({
                 if (!metric_.allowedAggregations.includes(aggregation)) {
                   form.setValue(
                     `series.${index}.aggregation`,
-                    metric_.allowedAggregations[0]!
+                    metric_.allowedAggregations[0]!,
                   );
                 }
                 void metricField.onChange(e);
@@ -1145,7 +1169,7 @@ function SeriesField({
               <option value="">all</option>
               {Object.entries(analyticsPipelines)
                 .filter(([key]) =>
-                  metric.includes("trace_id") ? key !== "trace_id" : true
+                  metric.includes("trace_id") ? key !== "trace_id" : true,
                 )
                 .map(([key, { label }]) => (
                   <option key={key} value={key}>
@@ -1263,7 +1287,7 @@ function FilterSelectField<T extends FieldValues, U extends Path<T>>({
       refetchOnWindowFocus: false,
       keepPreviousData: true,
       enabled: queryOpts.enabled,
-    }
+    },
   );
 
   const emptyOption_ = emptyOption ? [{ value: "", label: emptyOption }] : [];
@@ -1272,7 +1296,7 @@ function FilterSelectField<T extends FieldValues, U extends Path<T>>({
     filterData.data?.options.map(({ field, label }) => ({
       value: field,
       label,
-    })) ?? []
+    })) ?? [],
   );
 
   if (
@@ -1374,7 +1398,7 @@ function GraphTypeField({
           value={[field.value!.value]}
           onValueChange={(change) => {
             const selectedOption = chartOptions.find(
-              (opt) => opt.value === change.value[0]
+              (opt) => opt.value === change.value[0],
             );
             field.onChange(selectedOption);
           }}

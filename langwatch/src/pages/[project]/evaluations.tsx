@@ -36,26 +36,26 @@ import { Link } from "../../components/ui/link";
 import { Menu } from "../../components/ui/menu";
 import { toaster } from "../../components/ui/toaster";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
-import { TeamRoleGroup } from "../../server/api/permission";
 import { api } from "../../utils/api";
 import { NewEvaluationButton } from "~/components/evaluations/NewEvaluationsButton";
+import { withPermissionGuard } from "../../components/WithPermissionGuard";
 
-export default function EvaluationsV2() {
-  const { project, hasTeamPermission } = useOrganizationTeamProject();
+function EvaluationsV2() {
+  const { project, hasPermission } = useOrganizationTeamProject();
   const router = useRouter();
 
   const monitors = api.monitors.getAllForProject.useQuery(
     {
       projectId: project?.id ?? "",
     },
-    { enabled: !!project }
+    { enabled: !!project },
   );
 
   const experiments = api.experiments.getAllForEvaluationsList.useQuery(
     {
       projectId: project?.id ?? "",
     },
-    { enabled: !!project }
+    { enabled: !!project },
   );
 
   const deleteExperimentMutation = api.experiments.deleteExperiment.useMutation(
@@ -82,16 +82,16 @@ export default function EvaluationsV2() {
           },
         });
       },
-    }
+    },
   );
 
   const handleDeleteExperiment = (
     experimentId: string,
-    experimentName: string
+    experimentName: string,
   ) => {
     if (
       confirm(
-        `Are you sure you want to delete the evaluation "${experimentName}"? This will also delete the workflow, monitor, and prompts associated with it. Datasets will be kept.`
+        `Are you sure you want to delete the evaluation "${experimentName}"? This will also delete the workflow, monitor, and prompts associated with it. Datasets will be kept.`,
       )
     ) {
       deleteExperimentMutation.mutate({
@@ -164,22 +164,19 @@ export default function EvaluationsV2() {
                         </EmptyState.Indicator>
                         <EmptyState.Title>No evaluations yet</EmptyState.Title>
                         <EmptyState.Description>
-                          {project &&
-                            hasTeamPermission(
-                              TeamRoleGroup.GUARDRAILS_MANAGE
-                            ) && (
-                              <>
-                                {" "}
-                                Click on{" "}
-                                <Link
-                                  textDecoration="underline"
-                                  href={`/${project.slug}/evaluations/wizard`}
-                                >
-                                  New Evaluation
-                                </Link>{" "}
-                                to get started.
-                              </>
-                            )}
+                          {project && hasPermission("evaluations:manage") && (
+                            <>
+                              {" "}
+                              Click on{" "}
+                              <Link
+                                textDecoration="underline"
+                                href={`/${project.slug}/evaluations/wizard`}
+                              >
+                                New Evaluation
+                              </Link>{" "}
+                              to get started.
+                            </>
+                          )}
                         </EmptyState.Description>
                       </EmptyState.Content>
                     </EmptyState.Root>
@@ -281,7 +278,7 @@ export default function EvaluationsV2() {
                                       <Text as="span" fontWeight="semibold">
                                         {formatEvaluationSummary(
                                           experiment.runsSummary.primaryMetric,
-                                          true
+                                          true,
                                         )}
                                       </Text>
                                     </>
@@ -299,7 +296,7 @@ export default function EvaluationsV2() {
                                       {getFinishedAt(
                                         experiment.runsSummary.latestRun
                                           .timestamps,
-                                        new Date().getTime()
+                                        new Date().getTime(),
                                       ) ? (
                                         <HStack color="green.500">
                                           <LuCircleCheckBig size={16} />
@@ -322,7 +319,7 @@ export default function EvaluationsV2() {
                                 </Table.Cell>
                                 <Table.Cell whiteSpace="nowrap">
                                   {new Date(
-                                    experiment.updatedAt
+                                    experiment.updatedAt,
                                   ).toLocaleString()}
                                 </Table.Cell>
                                 <Table.Cell>
@@ -346,7 +343,7 @@ export default function EvaluationsV2() {
                                           onClick={(e) => {
                                             e.stopPropagation();
                                             void router.push(
-                                              `/${project?.slug}/evaluations/wizard/${experiment.slug}`
+                                              `/${project?.slug}/evaluations/wizard/${experiment.slug}`,
                                             );
                                           }}
                                         >
@@ -360,7 +357,8 @@ export default function EvaluationsV2() {
                                             e.stopPropagation();
                                             handleDeleteExperiment(
                                               experiment.id,
-                                              experiment.name ?? experiment.slug
+                                              experiment.name ??
+                                                experiment.slug,
                                             );
                                           }}
                                         >
@@ -386,3 +384,7 @@ export default function EvaluationsV2() {
     </DashboardLayout>
   );
 }
+
+export default withPermissionGuard("evaluations:view", {
+  layoutComponent: DashboardLayout,
+})(EvaluationsV2);

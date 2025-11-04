@@ -35,6 +35,7 @@ import { triggerRouter } from "./routers/triggers";
 import { userRouter } from "./routers/user";
 import { workflowRouter } from "./routers/workflows";
 
+import { roleRouter } from "./routers/role";
 /**
  * This is the primary router for your server.
  *
@@ -72,6 +73,7 @@ export const appRouter = createTRPCRouter({
   integrationsChecks: integrationsChecksRouter,
   onboarding: onboardingRouter,
   scenarios: scenarioRouter,
+  role: roleRouter,
   prompts: promptsRouter,
   ...(dependencies.extraTRPCRoutes?.() ?? {}),
 });
