@@ -6,6 +6,7 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
+import { useMemo } from "react";
 import { Info } from "react-feather";
 import { Checkbox } from "../ui/checkbox";
 import { Tooltip } from "../ui/tooltip";
@@ -31,72 +32,128 @@ export function PermissionSelector({
   const createPermission = (resource: Resource, action: Action): Permission => {
     return `${resource}:${action}`;
   };
-  const groupedPermissions: Record<Resource, Permission[]> = {} as Record<
-    Resource,
-    Permission[]
-  >;
-
-  // Use orderedResources from shared config (PLAYGROUND hidden, ORG/TEAM omitted)
-  const resourceOrder: Resource[] = orderedResources;
 
   // Group permissions by resource using the correct valid actions
-  resourceOrder.forEach((resource) => {
-    const validActions = getValidActionsForResource(resource);
-    groupedPermissions[resource] = validActions.map((action) =>
-      createPermission(resource, action),
-    );
-  });
-
-  const togglePermission = (permission: Permission) => {
-    const [resource, action] = permission.split(":") as [Resource, Action];
-    const viewPermission = createPermission(resource, "view");
-
-    if (selectedPermissions.includes(permission)) {
-      // If removing a permission, remove it and any dependent permissions
-      let permissionsToRemove = [permission];
-
-      // If removing manage, also remove all other permissions for this resource
-      if (permission.endsWith(":manage")) {
-        const resourcePermissions = groupedPermissions[resource] || [];
-        permissionsToRemove = resourcePermissions;
-      }
-      // If removing view, also remove create/update/delete (can't use them without view)
-      else if (action === "view") {
-        const resourcePermissions = groupedPermissions[resource] || [];
-        const dependentActions = ["create", "update", "delete"];
-        const dependentPermissions = resourcePermissions.filter((p) =>
-          dependentActions.some((a) => p.endsWith(`:${a}`)),
-        );
-        permissionsToRemove = [...permissionsToRemove, ...dependentPermissions];
-      }
-
-      onChange(
-        selectedPermissions.filter((p) => !permissionsToRemove.includes(p)),
+  const groupedPermissions = useMemo(() => {
+    const grouped: Record<Resource, Permission[]> = {} as Record<
+      Resource,
+      Permission[]
+    >;
+    // Use orderedResources from shared config (PLAYGROUND hidden, ORG/TEAM omitted)
+    orderedResources.forEach((resource) => {
+      const validActions = getValidActionsForResource(resource);
+      grouped[resource] = validActions.map((action) =>
+        createPermission(resource, action),
       );
+    });
+    return grouped;
+  }, []);
+
+  /**
+   * Get permissions that should be removed when removing a given permission
+   *
+   * Permission hierarchy rules:
+   * - Removing "manage" removes all permissions for that resource
+   * - Removing "view" removes create/update/delete (they require view)
+   * - Removing other permissions only removes that specific permission
+   */
+  const getPermissionsToRemove = (
+    permission: Permission,
+    resource: Resource,
+  ): Permission[] => {
+    if (permission.endsWith(":manage")) {
+      // Removing manage removes all permissions for this resource
+      return groupedPermissions[resource] || [];
+    }
+
+    const [_, action] = permission.split(":") as [Resource, Action];
+    if (action === "view") {
+      // Removing view also removes create/update/delete (they require view)
+      const resourcePermissions = groupedPermissions[resource] || [];
+      const dependentActions = ["create", "update", "delete"];
+      const dependentPermissions = resourcePermissions.filter((p) =>
+        dependentActions.some((a) => p.endsWith(`:${a}`)),
+      );
+      return [permission, ...dependentPermissions];
+    }
+
+    // Removing other permissions only removes that specific permission
+    return [permission];
+  };
+
+  /**
+   * Get permissions that should be added when adding a given permission
+   *
+   * Permission hierarchy rules:
+   * - Adding "manage" adds all permissions for that resource
+   * - Adding create/update/delete automatically adds view (they require it)
+   * - Adding other permissions only adds that specific permission
+   */
+  const getPermissionsToAdd = (
+    permission: Permission,
+    resource: Resource,
+  ): Permission[] => {
+    if (permission.endsWith(":manage")) {
+      // Adding manage adds all permissions for this resource
+      return groupedPermissions[resource] || [];
+    }
+
+    const [_, action] = permission.split(":") as [Resource, Action];
+    if (action === "create" || action === "update" || action === "delete") {
+      // Adding create/update/delete automatically adds view
+      const viewPermission = createPermission(resource, "view");
+      return [permission, viewPermission];
+    }
+
+    // Adding other permissions only adds that specific permission
+    return [permission];
+  };
+
+  /**
+   * Remove a permission and all its dependent permissions
+   */
+  const removePermission = (permission: Permission): void => {
+    const [resource] = permission.split(":") as [Resource, Action];
+    const permissionsToRemove = getPermissionsToRemove(permission, resource);
+    const newPermissions = selectedPermissions.filter(
+      (p) => !permissionsToRemove.includes(p),
+    );
+    onChange(newPermissions);
+  };
+
+  /**
+   * Add a permission and all its required dependencies
+   */
+  const addPermission = (permission: Permission): void => {
+    const [resource] = permission.split(":") as [Resource, Action];
+    const permissionsToAdd = getPermissionsToAdd(permission, resource);
+    const newPermissions = [
+      ...selectedPermissions,
+      ...permissionsToAdd.filter((p) => !selectedPermissions.includes(p)),
+    ];
+    onChange(newPermissions);
+  };
+
+  /**
+   * Toggle a permission on or off, handling permission hierarchy rules
+   *
+   * Single Responsibility: Toggle a permission while maintaining proper
+   * permission dependencies (manage includes all, view required for CRUD)
+   */
+  const togglePermission = (permission: Permission): void => {
+    const [resource, action] = permission.split(":") as [Resource, Action];
+    const managePermission = createPermission(resource, "manage");
+    const hasManage = selectedPermissions.includes(managePermission);
+
+    // If manage is selected, the permission is implicitly included
+    // So we need to check if it's explicitly selected OR implicitly via manage
+    const isExplicitlySelected = selectedPermissions.includes(permission);
+    const isImplicitlySelected = hasManage && action !== "manage";
+
+    if (isExplicitlySelected || isImplicitlySelected) {
+      removePermission(permission);
     } else {
-      // If adding a permission, add it and handle hierarchy
-      let permissionsToAdd = [permission];
-
-      // If adding manage, add all permissions for this resource
-      if (permission.endsWith(":manage")) {
-        const resourcePermissions = groupedPermissions[resource] || [];
-        permissionsToAdd = resourcePermissions;
-      }
-      // If adding create/update/delete, also automatically add view
-      else if (
-        action === "create" ||
-        action === "update" ||
-        action === "delete"
-      ) {
-        permissionsToAdd.push(viewPermission);
-      }
-
-      // Add all permissions that aren't already selected
-      const newPermissions = [
-        ...selectedPermissions,
-        ...permissionsToAdd.filter((p) => !selectedPermissions.includes(p)),
-      ];
-      onChange(newPermissions);
+      addPermission(permission);
     }
   };
 
@@ -127,17 +184,27 @@ export function PermissionSelector({
                       resource,
                       "manage",
                     );
-                    const isImplicitlyChecked =
-                      action !== "manage" &&
+                    const hasManage =
                       selectedPermissions.includes(managePermission);
+                    const isImplicitlyChecked =
+                      action !== "manage" && hasManage;
+
+                    const handleToggle = () => {
+                      // If clicking on an implicitly checked permission, toggle manage instead
+                      if (isImplicitlyChecked) {
+                        togglePermission(managePermission);
+                      } else {
+                        togglePermission(permission);
+                      }
+                    };
 
                     return (
                       <Checkbox
                         key={permission}
                         checked={isChecked || isImplicitlyChecked}
-                        onChange={() => togglePermission(permission)}
-                        disabled={isImplicitlyChecked}
+                        onChange={handleToggle}
                         opacity={isImplicitlyChecked ? 0.6 : 1}
+                        cursor={isImplicitlyChecked ? "not-allowed" : "pointer"}
                       >
                         {action === "manage" ? (
                           <Tooltip
