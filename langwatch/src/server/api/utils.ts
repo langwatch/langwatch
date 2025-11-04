@@ -3,13 +3,12 @@ import {
   TeamUserRole,
   type PrismaClient,
 } from "@prisma/client";
-import { backendHasTeamProjectPermission, TeamRoleGroup } from "./permission";
+import { hasProjectPermission, isDemoProject } from "./rbac";
 import type { Protections } from "../elasticsearch/protections";
 import type { Session } from "next-auth";
-import { isDemoProject } from "./permission";
 
 export const extractCheckKeys = (
-  inputObject: Record<string, any>
+  inputObject: Record<string, any>,
 ): string[] => {
   const keys: string[] = [];
 
@@ -30,7 +29,7 @@ export const extractCheckKeys = (
 
 export const flattenObjectKeys = (
   obj: Record<string, any>,
-  prefix = ""
+  prefix = "",
 ): string[] => {
   return Object.entries(obj).reduce((acc: string[], [key, value]) => {
     const newKey = prefix ? `${prefix}.${key}` : key;
@@ -47,18 +46,18 @@ export const flattenObjectKeys = (
 
 export async function getProtectionsForProject(
   prisma: PrismaClient,
-  { projectId }: { projectId: string } & Record<string, unknown>
+  { projectId }: { projectId: string } & Record<string, unknown>,
 ): Promise<Protections> {
   return await getUserProtectionsForProject(
     { prisma, session: null, publiclyShared: false },
-    { projectId }
+    { projectId },
   );
 }
 
 // New function for internal operations that need full access
 export async function getInternalProtectionsForProject(
-  prisma: PrismaClient,
-  { projectId }: { projectId: string } & Record<string, unknown>
+  _prisma: PrismaClient,
+  { projectId: _projectId }: { projectId: string } & Record<string, unknown>,
 ): Promise<Protections> {
   return {
     canSeeCosts: true,
@@ -73,16 +72,13 @@ export async function getUserProtectionsForProject(
     session: Session | null;
     publiclyShared?: boolean;
   },
-  { projectId }: { projectId: string } & Record<string, unknown>
+  { projectId }: { projectId: string } & Record<string, unknown>,
 ): Promise<Protections> {
   // TODO(afr): Should we show cost if public? I would assume the opposite.
   const canSeeCosts =
+    // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
     ctx.publiclyShared ||
-    (await backendHasTeamProjectPermission(
-      ctx,
-      { projectId },
-      TeamRoleGroup.COST_VIEW
-    ));
+    (await hasProjectPermission(ctx, projectId, "cost:view"));
 
   const project = await ctx.prisma.project.findUniqueOrThrow({
     where: { id: projectId, archivedAt: null },
@@ -94,9 +90,10 @@ export async function getUserProtectionsForProject(
 
   // For public shares or non-signed in users, we only check project settings
   if (
+    // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
     ctx.publiclyShared ||
     !ctx.session?.user?.id ||
-    isDemoProject(projectId, TeamRoleGroup.MESSAGES_VIEW)
+    isDemoProject(projectId, "traces:view")
   ) {
     return {
       canSeeCosts,
@@ -127,12 +124,12 @@ export async function getUserProtectionsForProject(
   });
 
   const isAdminInAnyTeam = teamsWithAccess.some(
-    (team) => team.role === TeamUserRole.ADMIN
+    (team) => team.role === TeamUserRole.ADMIN,
   );
   const isMemberInAnyTeam = teamsWithAccess.length > 0;
 
   const obtainVisibilityLevel = (
-    visibility: ProjectSensitiveDataVisibilityLevel
+    visibility: ProjectSensitiveDataVisibilityLevel,
   ): boolean => {
     switch (true) {
       case !isMemberInAnyTeam:
@@ -153,7 +150,7 @@ export async function getUserProtectionsForProject(
     canSeeCosts,
     canSeeCapturedInput: obtainVisibilityLevel(project.capturedInputVisibility),
     canSeeCapturedOutput: obtainVisibilityLevel(
-      project.capturedOutputVisibility
+      project.capturedOutputVisibility,
     ),
   };
 }

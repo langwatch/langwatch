@@ -8,6 +8,7 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { Menu } from "../../../components/ui/menu";
+import { Tooltip } from "../../../components/ui/tooltip";
 import { WorkflowIcon } from "../ColorfulBlockIcons";
 import { MoreVertical } from "react-feather";
 import { api } from "../../../utils/api";
@@ -62,8 +63,9 @@ export function WorkflowCard({
   description?: string;
   children?: React.ReactNode;
 } & React.ComponentProps<typeof WorkflowCardBase>) {
-  const { project } = useOrganizationTeamProject();
+  const { project, hasPermission } = useOrganizationTeamProject();
   const archiveWorkflow = api.workflow.archive.useMutation();
+  const hasWorkflowsDeletePermission = hasPermission("workflows:delete");
 
   const onArchiveWorkflow = useCallback(() => {
     if (!workflowId || !project) return;
@@ -105,7 +107,7 @@ export function WorkflowCard({
                             },
                           });
                         },
-                      }
+                      },
                     );
                   }}
                 >
@@ -127,7 +129,7 @@ export function WorkflowCard({
             type: "error",
           });
         },
-      }
+      },
     );
   }, [archiveWorkflow, name, project, query, workflowId]);
 
@@ -145,13 +147,27 @@ export function WorkflowCard({
               <MoreVertical size={24} />
             </Menu.Trigger>
             <Menu.Content className="js-inner-menu">
-              <Menu.Item
-                value="delete"
-                color="red.500"
-                onClick={onArchiveWorkflow}
+              <Tooltip
+                content={
+                  !hasWorkflowsDeletePermission
+                    ? "You need workflows:delete permission to delete workflows"
+                    : undefined
+                }
+                disabled={hasWorkflowsDeletePermission}
+                positioning={{ placement: "right" }}
+                showArrow
               >
-                Delete
-              </Menu.Item>
+                <Menu.Item
+                  value="delete"
+                  color="red.500"
+                  onClick={
+                    hasWorkflowsDeletePermission ? onArchiveWorkflow : undefined
+                  }
+                  disabled={!hasWorkflowsDeletePermission}
+                >
+                  Delete
+                </Menu.Item>
+              </Tooltip>
             </Menu.Content>
           </Menu.Root>
         )}

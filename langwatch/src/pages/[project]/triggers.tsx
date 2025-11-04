@@ -41,8 +41,9 @@ import { Tooltip } from "../../components/ui/tooltip";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { api } from "../../utils/api";
 import { formatTimeAgo } from "../../utils/formatTimeAgo";
+import { withPermissionGuard } from "../../components/WithPermissionGuard";
 
-export default function Members() {
+function Triggers() {
   const { project, organizations } = useOrganizationTeamProject();
   const { open, onOpen, onClose } = useDisclosure();
   const { openDrawer } = useDrawer();
@@ -53,7 +54,7 @@ export default function Members() {
     },
     {
       enabled: !!project?.id,
-    }
+    },
   );
 
   const getDatasets = api.dataset.getAll.useQuery({
@@ -89,7 +90,7 @@ export default function Members() {
             },
           });
         },
-      }
+      },
     );
   };
 
@@ -99,7 +100,7 @@ export default function Members() {
         <Link href={`/${project?.slug}/datasets/${actionParams.datasetId}`}>
           {
             getDatasets.data?.find(
-              (dataset) => dataset.id === actionParams.datasetId
+              (dataset) => dataset.id === actionParams.datasetId,
             )?.name
           }
         </Link>
@@ -133,7 +134,7 @@ export default function Members() {
             },
           });
         },
-      }
+      },
     );
   };
 
@@ -207,7 +208,7 @@ export default function Members() {
     const text = String(children)
       .split(".")
       .filter(
-        (word, index) => index !== 0 || word.toLowerCase() === "evaluations"
+        (word, index) => index !== 0 || word.toLowerCase() === "evaluations",
       )
       .join(" ");
 
@@ -313,7 +314,7 @@ export default function Members() {
                           <Table.Cell>
                             {actionItems(
                               trigger.action,
-                              trigger.actionParams as ActionParams
+                              trigger.actionParams as ActionParams,
                             )}
                           </Table.Cell>
 
@@ -321,8 +322,8 @@ export default function Members() {
                             <VStack gap={2}>
                               {applyChecks(
                                 trigger.checks?.filter(
-                                  (check): check is Monitor => !!check
-                                ) ?? []
+                                  (check): check is Monitor => !!check,
+                                ) ?? [],
                               )}
 
                               {trigger.filters &&
@@ -343,7 +344,7 @@ export default function Members() {
                               onChange={() => {
                                 handleToggleTrigger(
                                   trigger.id,
-                                  !trigger.active
+                                  !trigger.active,
                                 );
                               }}
                             />
@@ -368,11 +369,11 @@ export default function Members() {
                                       setValue("triggerId", trigger.id);
                                       setValue(
                                         "customMessage",
-                                        trigger.message ?? ""
+                                        trigger.message ?? "",
                                       );
                                       setValue(
                                         "alertType",
-                                        trigger.alertType ?? ""
+                                        trigger.alertType ?? "",
                                       );
                                       setValue("name", trigger.name ?? "");
                                       onOpen();
@@ -464,6 +465,10 @@ export default function Members() {
   );
 }
 
+export default withPermissionGuard("triggers:view", {
+  layoutComponent: SettingsLayout,
+})(Triggers);
+
 const triggerFormSchema = z.object({
   alertType: z.enum(["CRITICAL", "WARNING", "INFO", ""]),
   customMessage: z.string().optional(),
@@ -516,7 +521,7 @@ const TriggerForm = ({
             },
           });
         },
-      }
+      },
     );
   };
 

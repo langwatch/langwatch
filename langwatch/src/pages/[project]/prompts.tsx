@@ -1,4 +1,5 @@
 import { Flex, Spacer, VStack, Tabs, Badge } from "@chakra-ui/react";
+import { Tooltip } from "~/components/ui/tooltip";
 import { useState, useMemo, useRef, useEffect, useCallback } from "react";
 import { Plus } from "react-feather";
 import { DeleteConfirmationDialog } from "~/components/annotations/DeleteConfirmationDialog";
@@ -13,7 +14,7 @@ import { PromptsList } from "~/prompt-configs/PromptsList";
 import { api } from "~/utils/api";
 import { usePrompts } from "~/prompt-configs/hooks";
 import type { VersionedPrompt } from "~/server/prompt-config/prompt.service";
-
+import { withPermissionGuard } from "../../components/WithPermissionGuard";
 /**
  * Custom hook for managing prompt configuration data operations and state.
  *
@@ -41,7 +42,7 @@ import type { VersionedPrompt } from "~/server/prompt-config/prompt.service";
 function usePromptConfigManagement(projectId: string | undefined) {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [configToDelete, setConfigToDelete] = useState<{ id: string } | null>(
-    null
+    null,
   );
   const { deletePrompt } = usePrompts();
 
@@ -61,7 +62,7 @@ function usePromptConfigManagement(projectId: string | undefined) {
             type: "error",
           });
         },
-      }
+      },
     );
 
   // Mutation for deleting a prompt config.
@@ -97,7 +98,7 @@ function usePromptConfigManagement(projectId: string | undefined) {
         });
       }
     },
-    [deletePrompt, projectId]
+    [deletePrompt, projectId],
   );
 
   /**
@@ -109,7 +110,7 @@ function usePromptConfigManagement(projectId: string | undefined) {
       setConfigToDelete(config);
       setIsDeleteDialogOpen(true);
     },
-    [setConfigToDelete, setIsDeleteDialogOpen]
+    [setConfigToDelete, setIsDeleteDialogOpen],
   );
 
   /**
@@ -145,7 +146,7 @@ function usePromptConfigManagement(projectId: string | undefined) {
       {
         publishedPrompts: [] as VersionedPrompt[],
         draftPrompts: [] as VersionedPrompt[],
-      }
+      },
     );
   }, [promptConfigs]);
 
@@ -173,9 +174,10 @@ function usePromptConfigManagement(projectId: string | undefined) {
  * - The table area is scrollable, and the panel expands/collapses based on selection.
  * - The delete dialog requires the user to type 'delete' to confirm.
  */
-export default function PromptConfigsPage() {
+function PromptConfigsPage() {
   // Get current project and prompt selection state from hooks.
-  const { project } = useOrganizationTeamProject();
+  const { project, hasPermission } = useOrganizationTeamProject();
+
   const { selectedPromptId, setSelectedPromptId, clearSelection } =
     usePromptIdQueryParam();
 
@@ -199,6 +201,8 @@ export default function PromptConfigsPage() {
       setIsPaneExpanded(true);
     }
   }, [selectedPromptId]);
+
+  const panelRef = useRef<HTMLDivElement>(null);
 
   /**
    * Deselects the current prompt config, closing the side panel.
@@ -254,10 +258,9 @@ export default function PromptConfigsPage() {
    *
    * @see https://github.com/langwatch/langwatch/pull/352#discussion_r2091220922
    */
-  const panelRef = useRef<HTMLDivElement>(null);
   const centerContentElementRef: HTMLDivElement | null =
     panelRef.current?.querySelector(
-      `#${CENTER_CONTENT_BOX_ID}`
+      `#${CENTER_CONTENT_BOX_ID}`,
     ) as HTMLDivElement | null;
 
   return (
@@ -288,11 +291,23 @@ export default function PromptConfigsPage() {
               <PageLayout.Header>
                 <PageLayout.Heading>Prompts</PageLayout.Heading>
                 <Spacer />
-                <PageLayout.HeaderButton
-                  onClick={() => void handleCreateButtonClick()}
+                <Tooltip
+                  content={
+                    !hasPermission("prompts:create")
+                      ? "You need prompts:create permission to create prompts"
+                      : undefined
+                  }
+                  disabled={hasPermission("prompts:create")}
+                  positioning={{ placement: "bottom" }}
+                  showArrow
                 >
-                  <Plus height={16} /> Create New
-                </PageLayout.HeaderButton>
+                  <PageLayout.HeaderButton
+                    onClick={() => void handleCreateButtonClick()}
+                    disabled={!hasPermission("prompts:create")}
+                  >
+                    <Plus height={16} /> Create New
+                  </PageLayout.HeaderButton>
+                </Tooltip>
               </PageLayout.Header>
               <Tabs.Root defaultValue="published" variant="enclosed">
                 <Tabs.List width="full">
@@ -371,3 +386,7 @@ export default function PromptConfigsPage() {
     </DashboardLayout>
   );
 }
+
+export default withPermissionGuard("prompts:view", {
+  layoutComponent: DashboardLayout,
+})(PromptConfigsPage);

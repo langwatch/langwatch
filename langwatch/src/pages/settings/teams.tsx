@@ -8,26 +8,25 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { Plus } from "react-feather";
+import { Archive, MoreVertical, Plus } from "react-feather";
+import { toaster } from "~/components/ui/toaster";
 import SettingsLayout from "../../components/SettingsLayout";
+import { Link } from "../../components/ui/link";
+import { Menu } from "../../components/ui/menu";
+import { Tooltip } from "../../components/ui/tooltip";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import type { TeamWithProjectsAndMembersAndUsers } from "../../server/api/routers/organization";
 import { api } from "../../utils/api";
-import { Link } from "../../components/ui/link";
-import { toaster } from "~/components/ui/toaster";
-import { Menu } from "../../components/ui/menu";
-import { TeamRoleGroup } from "~/server/api/permission";
-import { MoreVertical } from "react-feather";
-import { Archive } from "react-feather";
+import { withPermissionGuard } from "../../components/WithPermissionGuard";
 
-export default function Teams() {
-  const { organization, hasTeamPermission } = useOrganizationTeamProject();
+function Teams() {
+  const { organization } = useOrganizationTeamProject();
 
   const teams = api.team.getTeamsWithMembers.useQuery(
     {
       organizationId: organization?.id ?? "",
     },
-    { enabled: !!organization }
+    { enabled: !!organization },
   );
 
   if (!teams.data) return <SettingsLayout />;
@@ -35,12 +34,17 @@ export default function Teams() {
   return <TeamsList teams={teams.data} />;
 }
 
+export default withPermissionGuard("team:view", {
+  layoutComponent: SettingsLayout,
+})(Teams);
+
 function TeamsList({ teams }: { teams: TeamWithProjectsAndMembersAndUsers[] }) {
   const {
-    hasTeamPermission,
+    hasPermission,
     project,
     team: currentTeam,
   } = useOrganizationTeamProject();
+  const hasTeamManagePermission = hasPermission("team:manage");
   const queryClient = api.useContext();
   const archiveTeam = api.team.archiveById.useMutation({
     onSuccess: () => {
@@ -52,7 +56,7 @@ function TeamsList({ teams }: { teams: TeamWithProjectsAndMembersAndUsers[] }) {
     },
   });
   const onArchiveTeam = (teamId: string) => {
-    if (!hasTeamPermission(TeamRoleGroup.TEAM_ARCHIVE)) return;
+    if (!hasPermission("team:manage")) return;
     if (teams.length === 1) {
       toaster.create({
         title: "You cannot archive the last team",
@@ -62,7 +66,7 @@ function TeamsList({ teams }: { teams: TeamWithProjectsAndMembersAndUsers[] }) {
     }
     if (
       confirm(
-        "Are you sure you want to archive this team? This action cannot be undone."
+        "Are you sure you want to archive this team? This action cannot be undone.",
       )
     ) {
       archiveTeam.mutate({ teamId, projectId: project?.id ?? "" });
@@ -84,12 +88,30 @@ function TeamsList({ teams }: { teams: TeamWithProjectsAndMembersAndUsers[] }) {
             Teams
           </Heading>
           <Spacer />
-          <Link href={`/settings/teams/new`} asChild>
-            <Button size="sm" colorPalette="orange">
-              <Plus size={20} />
-              <Text>Add new team</Text>
-            </Button>
-          </Link>
+          <Tooltip
+            content={
+              !hasTeamManagePermission
+                ? "You need team:manage permission to create teams"
+                : undefined
+            }
+            disabled={hasTeamManagePermission}
+            positioning={{ placement: "bottom" }}
+            showArrow
+          >
+            {hasTeamManagePermission ? (
+              <Link href={`/settings/teams/new`} asChild>
+                <Button size="sm" colorPalette="orange">
+                  <Plus size={20} />
+                  <Text>Add new team</Text>
+                </Button>
+              </Link>
+            ) : (
+              <Button size="sm" colorPalette="orange" disabled>
+                <Plus size={20} />
+                <Text>Add new team</Text>
+              </Button>
+            )}
+          </Tooltip>
         </HStack>
         <Card.Root width="full">
           <Card.Body width="full" paddingY={0} paddingX={0}>
@@ -132,7 +154,7 @@ function TeamsList({ teams }: { teams: TeamWithProjectsAndMembersAndUsers[] }) {
                             color="red.500"
                             onClick={() => onArchiveTeam(team.id)}
                             disabled={
-                              !hasTeamPermission(TeamRoleGroup.TEAM_ARCHIVE) ||
+                              !hasPermission("team:manage") ||
                               archiveTeam.isPending
                             }
                           >

@@ -6,6 +6,7 @@ import NextLink from "next/link";
 export const MenuLink = ({
   paddingX = 4,
   href,
+  includePath,
   children,
   icon,
   menuEnd,
@@ -16,9 +17,12 @@ export const MenuLink = ({
   icon?: React.ReactNode;
   menuEnd?: React.ReactNode;
   isSelectedAnnotation?: boolean;
+  includePath?: string;
 }>) => {
   const pathname = usePathname();
-  const selected = isSelectedAnnotation ?? pathname === href;
+  const selected =
+    isSelectedAnnotation ??
+    (pathname === href || (includePath && pathname?.includes(includePath)));
 
   return (
     <Link

@@ -33,6 +33,7 @@ import {
   teamRolesOptions,
   type TeamUserRoleForm,
 } from "./TeamUserRoleField";
+import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 
 export type TeamFormData = {
   name: string;
@@ -61,6 +62,9 @@ export const TeamForm = ({
     control,
     name: "members",
   });
+
+  const { hasOrgPermission } = useOrganizationTeamProject();
+  const canManageOrganization = hasOrgPermission("organization:manage");
 
   const users = api.organization.getAllOrganizationMembers.useQuery({
     organizationId: organizationId,
@@ -152,7 +156,11 @@ export const TeamForm = ({
                       <HStack width="full">
                         {member.saved ? (
                           <>
-                            <Text>{member.userId?.label}</Text>
+                            <Link
+                              href={`/settings/members/${member.userId?.value}`}
+                            >
+                              {member.userId?.label}
+                            </Link>
                           </>
                         ) : (
                           <>
@@ -211,38 +219,51 @@ export const TeamForm = ({
                         control={control}
                         name={`members.${index}.role`}
                         rules={{ required: "User role is required" }}
-                        render={({ field }) => <TeamRoleSelect field={field} />}
+                        render={({ field }) =>
+                          canManageOrganization ? (
+                            <TeamRoleSelect
+                              organizationId={organizationId}
+                              field={field}
+                            />
+                          ) : (
+                            <Text>{field.value?.label ?? "—"}</Text>
+                          )
+                        }
                       />
                     </Table.Cell>
                     <Table.Cell paddingLeft={0} paddingRight={0} paddingY={2}>
-                      <Button
-                        type="button"
-                        colorPalette="red"
-                        disabled={members.fields.length === 1}
-                        onClick={() => members.remove(index)}
-                      >
-                        <Trash size={18} />
-                      </Button>
+                      {canManageOrganization && (
+                        <Button
+                          type="button"
+                          colorPalette="red"
+                          disabled={members.fields.length === 1}
+                          onClick={() => members.remove(index)}
+                        >
+                          <Trash size={18} />
+                        </Button>
+                      )}
                     </Table.Cell>
                   </Table.Row>
                 ))}
-                <Table.Row>
-                  <Table.Cell colSpan={4}>
-                    <Button
-                      type="button"
-                      onClick={() => {
-                        members.append({
-                          userId: undefined,
-                          role: teamRolesOptions[TeamUserRole.MEMBER],
-                          saved: false,
-                        });
-                      }}
-                      marginTop={2}
-                    >
-                      <Plus size={18} /> Add Another
-                    </Button>
-                  </Table.Cell>
-                </Table.Row>
+                {canManageOrganization && (
+                  <Table.Row>
+                    <Table.Cell colSpan={4}>
+                      <Button
+                        type="button"
+                        onClick={() => {
+                          members.append({
+                            userId: undefined,
+                            role: teamRolesOptions[TeamUserRole.MEMBER],
+                            saved: false,
+                          });
+                        }}
+                        marginTop={2}
+                      >
+                        <Plus size={18} /> Add Another
+                      </Button>
+                    </Table.Cell>
+                  </Table.Row>
+                )}
               </Table.Body>
             </Table.Root>
           </Card.Body>

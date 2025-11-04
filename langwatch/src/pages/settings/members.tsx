@@ -15,7 +15,6 @@ import {
 } from "@chakra-ui/react";
 import { Link } from "../../components/ui/link";
 import { OrganizationUserRole } from "@prisma/client";
-import { Select as MultiSelect, chakraComponents } from "chakra-react-select";
 import { Lock, Mail, MoreVertical, Plus, Trash } from "react-feather";
 import { CopyInput } from "../../components/CopyInput";
 import { AddMembersForm } from "../../components/AddMembersForm";
@@ -38,6 +37,7 @@ import { type PlanInfo } from "../../server/subscriptionHandler";
 import { api } from "../../utils/api";
 import * as Sentry from "@sentry/nextjs";
 import { usePublicEnv } from "../../hooks/usePublicEnv";
+import { withPermissionGuard } from "../../components/WithPermissionGuard";
 
 const selectOptions = [
   {
@@ -57,7 +57,12 @@ const selectOptions = [
   },
 ];
 
-export default function Members() {
+// Create a Map for fast O(1) lookups instead of O(n) .find() in render
+const roleLabelMap = new Map(
+  selectOptions.map((option) => [option.value, option.label]),
+);
+
+function Members() {
   const { organization } = useOrganizationTeamProject();
 
   const organizationWithMembers =
@@ -88,6 +93,10 @@ export default function Members() {
   );
 }
 
+export default withPermissionGuard("organization:view", {
+  layoutComponent: SettingsLayout,
+})(Members);
+
 function MembersList({
   organization,
   teams,
@@ -98,6 +107,8 @@ function MembersList({
   activePlan: PlanInfo;
 }) {
   const { data: session } = useRequiredSession();
+  const { hasPermission } = useOrganizationTeamProject();
+  const hasOrganizationManagePermission = hasPermission("organization:manage");
   const user = session?.user;
   const teamOptions = teams.map((team) => ({
     label: team.name,
@@ -127,8 +138,6 @@ function MembersList({
   const createInvitesMutation = api.organization.createInvites.useMutation();
   const deleteMemberMutation = api.organization.deleteMember.useMutation();
   const deleteInviteMutation = api.organization.deleteInvite.useMutation();
-  const updateOrganizationMemberRoleMutation =
-    api.organization.updateMemberRole.useMutation();
 
   const [selectedInvites, setSelectedInvites] = useState<
     { inviteCode: string; email: string }[]
@@ -150,7 +159,7 @@ function MembersList({
         organizationId: organization.id,
         invites: data.invites.map((invite) => ({
           email: invite.email.toLowerCase(),
-          role: invite.role!.value as OrganizationUserRole,
+          role: OrganizationUserRole.MEMBER,
           teamIds: invite.teamOptions
             .map((teamOption) => teamOption.value)
             .join(","),
@@ -200,53 +209,6 @@ function MembersList({
             meta: {
               closable: true,
             },
-          });
-        },
-      },
-    );
-  };
-
-  const onRoleChange = (userId: string, value: OrganizationUserRole) => {
-    updateOrganizationMemberRoleMutation.mutate(
-      {
-        userId: userId,
-        organizationId: organization.id,
-        role: value,
-      },
-      {
-        onSuccess: () => {
-          void queryClient.organization.getOrganizationWithMembersAndTheirTeams
-            .invalidate()
-            .catch((error) => {
-              Sentry.captureException(error, {
-                tags: {
-                  userId,
-                  organizationId: organization.id,
-                },
-              });
-            });
-          toaster.create({
-            title: "Member role updated successfully",
-            description: `The member role has been updated to ${
-              selectOptions.find((option) => option.value === value)?.label ??
-              value
-            }`,
-            type: "success",
-            duration: 5000,
-          });
-        },
-        onError: (error) => {
-          Sentry.captureException(error, {
-            tags: {
-              userId,
-              organizationId: organization.id,
-            },
-          });
-          toaster.create({
-            title: "Error updating member role",
-            type: "error",
-            description:
-              error.message ?? "There was an error updating the member role",
           });
         },
       },
@@ -352,7 +314,7 @@ function MembersList({
         paddingY={6}
         gap={6}
         width="full"
-        maxWidth="980px"
+        maxWidth="1200px"
         align="start"
       >
         <HStack width="full" marginTop={2}>
@@ -403,42 +365,28 @@ function MembersList({
                 <Table.Row>
                   <Table.ColumnHeader>Name</Table.ColumnHeader>
                   <Table.ColumnHeader>Email</Table.ColumnHeader>
-                  <Table.ColumnHeader w={"20%"}>Role</Table.ColumnHeader>
                   <Table.ColumnHeader>Teams</Table.ColumnHeader>
                   <Table.ColumnHeader>Actions</Table.ColumnHeader>
                 </Table.Row>
               </Table.Header>
               <Table.Body>
                 {sortedMembers.map((member) => {
-                  const relevantUpdateRoleMutation =
-                    updateOrganizationMemberRoleMutation.variables?.userId ===
-                      member.userId &&
-                    updateOrganizationMemberRoleMutation.variables
-                      ?.organizationId === organization.id;
-                  const roleUpdateLoading =
-                    updateOrganizationMemberRoleMutation.isLoading &&
-                    relevantUpdateRoleMutation;
-
+                  const roleLabel =
+                    roleLabelMap.get(member.role) ?? member.role;
                   const isDeleteDisabled = member.user.id === user?.id;
 
                   return (
                     <LinkBox as={Table.Row} key={member.userId}>
-                      <Table.Cell>{member.user.name}</Table.Cell>
-                      <Table.Cell>{member.user.email}</Table.Cell>
                       <Table.Cell>
-                        <OrganizationMemberSelect
-                          defaultValue={member.role}
-                          memberId={member.userId}
-                          onRoleChange={(_, value) => {
-                            // Only update the role if it's different
-                            if (member.role !== value) {
-                              onRoleChange(member.userId, value);
-                            }
-                          }}
-                          loading={roleUpdateLoading}
-                          disabled={roleUpdateLoading}
-                        />
+                        <Link href={`/settings/members/${member.userId}`}>
+                          {member.user.name}{" "}
+                          <Text
+                            as="span"
+                            whiteSpace="nowrap"
+                          >{`(Organization ${roleLabel})`}</Text>
+                        </Link>
                       </Table.Cell>
+                      <Table.Cell>{member.user.email}</Table.Cell>
                       <Table.Cell>
                         <TeamMembershipsDisplay
                           teamMemberships={member.user.teamMemberships}
@@ -446,41 +394,57 @@ function MembersList({
                         />
                       </Table.Cell>
                       <Table.Cell>
-                        <Menu.Root>
-                          <Menu.Trigger asChild>
-                            <Button variant={"ghost"}>
-                              <MoreVertical />
+                        <HStack gap={2}>
+                          <Link href={`/settings/members/${member.userId}`}>
+                            <Button size="sm" variant="outline">
+                              View
                             </Button>
-                          </Menu.Trigger>
-                          <Menu.Content>
-                            <Tooltip
-                              content={
-                                isDeleteDisabled
-                                  ? "You can't remove yourself"
-                                  : undefined
-                              }
-                              positioning={{ placement: "right" }}
-                              openDelay={0}
-                              showArrow
-                            >
-                              <Menu.Item
-                                value="remove"
-                                color="red.600"
-                                disabled={isDeleteDisabled}
-                                onClick={() =>
-                                  !isDeleteDisabled &&
-                                  deleteMember(member.userId)
+                          </Link>
+                          <Menu.Root>
+                            <Menu.Trigger asChild>
+                              <Button variant={"ghost"}>
+                                <MoreVertical />
+                              </Button>
+                            </Menu.Trigger>
+                            <Menu.Content>
+                              <Tooltip
+                                content={
+                                  !hasOrganizationManagePermission
+                                    ? "You need organization:manage permission to remove members"
+                                    : organization.members.length === 1
+                                    ? "Cannot remove the last member"
+                                    : undefined
                                 }
+                                disabled={
+                                  hasOrganizationManagePermission &&
+                                  organization.members.length > 1
+                                }
+                                positioning={{ placement: "right" }}
+                                showArrow
                               >
-                                <Trash
-                                  size={14}
-                                  style={{ marginRight: "8px" }}
-                                />
-                                Remove Member
-                              </Menu.Item>
-                            </Tooltip>
-                          </Menu.Content>
-                        </Menu.Root>
+                                <Menu.Item
+                                  value="remove"
+                                  color="red.600"
+                                  disabled={
+                                    !hasOrganizationManagePermission ||
+                                    organization.members.length === 1
+                                  }
+                                  onClick={() => {
+                                    if (hasOrganizationManagePermission) {
+                                      deleteMember(member.userId);
+                                    }
+                                  }}
+                                >
+                                  <Trash
+                                    size={14}
+                                    style={{ marginRight: "8px" }}
+                                  />
+                                  Remove Member
+                                </Menu.Item>
+                              </Tooltip>
+                            </Menu.Content>
+                          </Menu.Root>
+                        </HStack>
                       </Table.Cell>
                     </LinkBox>
                   );
@@ -536,17 +500,33 @@ function MembersList({
                               </Button>
                             </Menu.Trigger>
                             <Menu.Content>
-                              <Menu.Item
-                                value="delete"
-                                color="red.600"
-                                onClick={() => deleteInvite(invite.id)}
+                              <Tooltip
+                                content={
+                                  !hasOrganizationManagePermission
+                                    ? "You need organization:manage permission to delete invites"
+                                    : undefined
+                                }
+                                disabled={hasOrganizationManagePermission}
+                                positioning={{ placement: "right" }}
+                                showArrow
                               >
-                                <Trash
-                                  size={14}
-                                  style={{ marginRight: "8px" }}
-                                />
-                                Delete
-                              </Menu.Item>
+                                <Menu.Item
+                                  value="delete"
+                                  color="red.600"
+                                  onClick={() => {
+                                    if (hasOrganizationManagePermission) {
+                                      deleteInvite(invite.id);
+                                    }
+                                  }}
+                                  disabled={!hasOrganizationManagePermission}
+                                >
+                                  <Trash
+                                    size={14}
+                                    style={{ marginRight: "8px" }}
+                                  />
+                                  Delete
+                                </Menu.Item>
+                              </Tooltip>
                               <Menu.Item
                                 value="view"
                                 onClick={() =>
@@ -646,14 +626,6 @@ function MembersList({
   );
 }
 
-interface RoleSelectProps {
-  defaultValue?: OrganizationUserRole;
-  onRoleChange?: (userId: string, value: OrganizationUserRole) => void;
-  memberId?: string;
-  loading?: boolean;
-  disabled?: boolean;
-}
-
 interface TeamMembershipsDisplayProps {
   teamMemberships: Array<{
     team: { id: string; name: string; slug: string; organizationId: string };
@@ -711,56 +683,5 @@ const TeamIdsDisplay = ({ teamIds, teams }: TeamIdsDisplayProps) => {
         );
       })}
     </Flex>
-  );
-};
-
-const OrganizationMemberSelect = ({
-  defaultValue,
-  onRoleChange,
-  memberId,
-  loading,
-  disabled,
-}: RoleSelectProps) => {
-  return (
-    <MultiSelect
-      size={"sm"}
-      options={selectOptions}
-      defaultValue={selectOptions.find(
-        (option) => option.value === defaultValue,
-      )}
-      onChange={(value) => {
-        onRoleChange?.(memberId ?? "", value!.value as OrganizationUserRole);
-      }}
-      isLoading={loading}
-      isDisabled={disabled}
-      hideSelectedOptions={false}
-      isSearchable={false}
-      components={{
-        Menu: ({ children, ...props }) => (
-          <chakraComponents.Menu
-            {...props}
-            innerProps={{
-              ...props.innerProps,
-              style: { width: "350px", zIndex: 10 },
-            }}
-          >
-            {children}
-          </chakraComponents.Menu>
-        ),
-        Option: ({ children, ...props }) => (
-          <chakraComponents.Option {...props}>
-            <VStack align="start">
-              <Text>{children}</Text>
-              <Text
-                color={props.isSelected ? "white" : "gray.500"}
-                fontSize="13px"
-              >
-                {props.data.description}
-              </Text>
-            </VStack>
-          </chakraComponents.Option>
-        ),
-      }}
-    />
   );
 };

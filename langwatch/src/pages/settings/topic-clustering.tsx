@@ -8,16 +8,17 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { Spacer } from "@chakra-ui/react";
-import { TeamRoleGroup } from "~/server/api/permission";
 import { api } from "~/utils/api";
 import SettingsLayout from "../../components/SettingsLayout";
 import { toaster } from "../../components/ui/toaster";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { TopicClusteringModel } from "./model-providers";
 import { EmbeddingsModel } from "./model-providers";
+import { PermissionAlert } from "~/components/PermissionAlert";
+import { withPermissionGuard } from "~/components/WithPermissionGuard";
 
-export default function TopicClusteringSettings() {
-  const { project, hasTeamPermission } = useOrganizationTeamProject({
+function TopicClusteringSettings() {
+  const { project, hasPermission } = useOrganizationTeamProject({
     redirectToOnboarding: false,
   });
 
@@ -46,10 +47,11 @@ export default function TopicClusteringSettings() {
   );
 }
 
+export default withPermissionGuard("project:manage", {
+  layoutComponent: SettingsLayout,
+})(TopicClusteringSettings);
+
 function TopicClusteringCard({ project }: { project: { id: string } }) {
-  const { hasTeamPermission } = useOrganizationTeamProject({
-    redirectToOnboarding: false,
-  });
   const triggerClustering = api.project.triggerTopicClustering.useMutation({
     onSuccess: () => {
       toaster.create({
@@ -57,7 +59,6 @@ function TopicClusteringCard({ project }: { project: { id: string } }) {
         description:
           "The topic clustering job has been queued and will run shortly.",
         type: "success",
-
       });
     },
     onError: (error) => {
@@ -65,23 +66,9 @@ function TopicClusteringCard({ project }: { project: { id: string } }) {
         title: "Failed to trigger topic clustering",
         description: error.message,
         type: "error",
-
       });
     },
   });
-
-  // Only show to users with setup permissions
-  if (!hasTeamPermission(TeamRoleGroup.SETUP_PROJECT)) {
-    return (
-      <Card.Root>
-        <Card.Body>
-          <Text color="gray.600">
-            You need project setup permissions to manage topic clustering.
-          </Text>
-        </Card.Body>
-      </Card.Root>
-    );
-  }
 
   return (
     <VStack
