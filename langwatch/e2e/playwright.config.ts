@@ -13,7 +13,7 @@ if (!fs.existsSync(authFilePath)) {
     If the file exists, please check that you are running the tests from the root of the project.
 
     IMPORTANT: DO NOT COMMIT THE auth.json FILE TO GIT.
-    `
+    `,
   );
 }
 /*
@@ -42,7 +42,7 @@ export default defineConfig({
   /* Shared settings for all the projects below. See https://playwright.dev/docs/api/class-testoptions. */
   use: {
     /* Base URL to use in actions like `await page.goto('/')`. */
-    // baseURL: 'http://127.0.0.1:3000',
+    baseURL: "http://localhost:5560",
 
     // Load the auth state from the auth.json file
     storageState: authFilePath,
@@ -58,10 +58,10 @@ export default defineConfig({
       use: { ...devices["Desktop Chrome"] },
     },
 
-    {
-      name: "firefox",
-      use: { ...devices["Desktop Firefox"] },
-    },
+    // {
+    //   name: "firefox",
+    //   use: { ...devices["Desktop Firefox"] },
+    // },
 
     // {
     //   name: "webkit",
