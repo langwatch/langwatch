@@ -38,13 +38,11 @@ import { toaster } from "../../components/ui/toaster";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { api } from "../../utils/api";
 import { NewEvaluationButton } from "~/components/evaluations/NewEvaluationsButton";
-import { PermissionAlert } from "../../components/PermissionAlert";
+import { withPermissionGuard } from "../../components/WithPermissionGuard";
 
-export default function EvaluationsV2() {
+function EvaluationsV2() {
   const { project, hasPermission } = useOrganizationTeamProject();
   const router = useRouter();
-
-  const hasEvaluationsManagePermission = hasPermission("evaluations:manage");
 
   const monitors = api.monitors.getAllForProject.useQuery(
     {
@@ -102,14 +100,6 @@ export default function EvaluationsV2() {
       });
     }
   };
-
-  if (!hasEvaluationsManagePermission) {
-    return (
-      <DashboardLayout>
-        <PermissionAlert permission="evaluations:manage" />
-      </DashboardLayout>
-    );
-  }
 
   if (!project) return null;
 
@@ -394,3 +384,7 @@ export default function EvaluationsV2() {
     </DashboardLayout>
   );
 }
+
+export default withPermissionGuard("evaluations:view", {
+  layoutComponent: DashboardLayout,
+})(EvaluationsV2);
