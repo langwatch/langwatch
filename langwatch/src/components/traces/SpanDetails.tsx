@@ -75,7 +75,8 @@ export function SpanDetails({ span }: { project: Project; span: Span }) {
           </Text>
           {canOpenSpanInPromptStudio && (
             <Link
-              href={buildUrl(span.span_id).toString()}
+              // Potential nullability here is due to the buildUrl function returning null if the project slug is missing.
+              href={buildUrl(span.span_id)?.toString() ?? ""}
               target="_blank"
               rel="noopener noreferrer"
             >

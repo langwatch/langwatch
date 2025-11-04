@@ -97,9 +97,7 @@ const PromptStudioChatInner = forwardRef<PromptStudioChatRef, object>(
         tab?.chat?.initialMessagesFromSpanData;
       if (initialMessagesFromSpanData?.length) {
         void setMessages(
-          convertScenarioMessagesToCopilotKit(
-            initialMessagesFromSpanData as any,
-          ),
+          convertScenarioMessagesToCopilotKit(initialMessagesFromSpanData),
         );
       }
     }, [setMessages, tabId, getTabById]);

@@ -82,6 +82,12 @@ interface DraggableTabsBrowserProps {
   }) => void;
 }
 
+/**
+ * DraggableTabsBrowserRoot component
+ * Single Responsibility: Orchestrates drag-and-drop for tabs across groups
+ * @param children - Child group components
+ * @param onTabMove - Callback fired when a tab is moved
+ */
 function DraggableTabsBrowserRoot({
   children,
   onTabMove,
@@ -153,7 +159,6 @@ function DraggableTabsBrowserRoot({
     </DraggableTabsContext.Provider>
   );
 }
-
 /**
  * DragOverlayContent Component
  *
@@ -287,12 +292,7 @@ function DraggableTab({ id, children, ...rest }: DraggableTabTriggerProps) {
       tabId: id,
       label: (
         <TabIdProvider tabId={id}>
-          <PromptBrowserTab
-            onRemove={() => {
-              console.log("remove tab", id);
-            }}
-            dimmed={false}
-          />
+          <PromptBrowserTab dimmed={false} />
         </TabIdProvider>
       ),
     },

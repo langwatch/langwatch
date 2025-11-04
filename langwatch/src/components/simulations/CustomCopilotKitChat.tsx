@@ -1,4 +1,4 @@
-import { VStack, Button, HStack } from "@chakra-ui/react";
+import { VStack } from "@chakra-ui/react";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import type { ScenarioMessageSnapshotEvent } from "~/app/api/scenario-events/[[...route]]/types";
 import { CopilotKit, useCopilotChat } from "@copilotkit/react-core";
@@ -73,7 +73,7 @@ function CustomCopilotKitChatInner({
         "Failed to convert scenario messages to CopilotKit messages",
       );
     }
-  }, [messages]);
+  }, [messages, setMessages]);
 
   return (
     <CopilotChat

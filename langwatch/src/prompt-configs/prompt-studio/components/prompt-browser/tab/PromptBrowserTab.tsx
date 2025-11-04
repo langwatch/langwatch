@@ -6,7 +6,6 @@ import { withController } from "~/utils/withControllerHOC";
 import { usePromptBrowserTabController } from "./usePromptBrowserTabController";
 
 interface PromptBrowserTabProps extends StackProps {
-  onRemove: () => void;
   dimmed?: boolean;
 }
 

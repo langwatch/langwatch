@@ -1,4 +1,4 @@
-import { HStack, Spacer } from "@chakra-ui/react";
+import { HStack, IconButton, Spacer } from "@chakra-ui/react";
 import { PromptBrowserWindowContent } from "./prompt-browser-window/PromptBrowserWindowContent";
 import { PromptBrowserTab } from "./tab/PromptBrowserTab";
 import { useDraggableTabsBrowserStore } from "../../prompt-studio-store/DraggableTabsBrowserStore";
@@ -13,7 +13,6 @@ import { TabIdProvider } from "./ui/TabContext";
 export function PromptStudioTabbedWorkspace() {
   const {
     windows,
-    removeTab,
     splitTab,
     moveTab,
     setActiveTab,
@@ -43,19 +42,19 @@ export function PromptStudioTabbedWorkspace() {
 
   return (
     <DraggableTabsBrowser.Root onTabMove={handleTabMove}>
-      {windows.map((window) => (
+      {windows.map((tabbedWindow) => (
         <DraggableTabsBrowser.Group
-          key={window.id}
-          groupId={window.id}
-          activeTabId={window.activeTabId ?? undefined}
+          key={tabbedWindow.id}
+          groupId={tabbedWindow.id}
+          activeTabId={tabbedWindow.activeTabId ?? undefined}
           onTabChange={handleTabChange}
-          onClick={() => setActiveWindow({ windowId: window.id })}
+          onClick={() => setActiveWindow({ windowId: tabbedWindow.id })}
           borderRight="1px solid var(--chakra-colors-gray-350)"
           maxWidth={windows.length > 1 ? "50vw" : "auto"}
         >
           <DraggableTabsBrowser.TabBar>
             <HStack gap={0} overflowX="auto">
-              {window.tabs.map((tab) => (
+              {tabbedWindow.tabs.map((tab) => (
                 <TabIdProvider key={tab.id} tabId={tab.id}>
                   <DraggableTabsBrowser.Tab
                     id={tab.id}
@@ -63,8 +62,7 @@ export function PromptStudioTabbedWorkspace() {
                   >
                     <DraggableTabsBrowser.Trigger value={tab.id}>
                       <PromptBrowserTab
-                        onRemove={() => removeTab({ tabId: tab.id })}
-                        dimmed={window.id !== activeWindowId}
+                        dimmed={tabbedWindow.id !== activeWindowId}
                       />
                     </DraggableTabsBrowser.Trigger>
                   </DraggableTabsBrowser.Tab>
@@ -72,21 +70,21 @@ export function PromptStudioTabbedWorkspace() {
               ))}
             </HStack>
             <Spacer />
-            {window.id === activeWindowId && (
+            {tabbedWindow.id === activeWindowId && (
               <HStack flexShrink={0} paddingX={3} title="Split tab">
-                <Columns
-                  size="18px"
-                  cursor="pointer"
-                  onClick={() =>
-                    window.activeTabId && handleSplit(window.activeTabId)
-                  }
+                <IconButton
+                  size="sm"
+                  variant="ghost"
                   aria-label="Split tab"
-                />
+                  onClick={() => handleSplit(tabbedWindow.activeTabId)}
+                >
+                  <Columns size="18px" />
+                </IconButton>
               </HStack>
             )}
           </DraggableTabsBrowser.TabBar>
           <HStack width="full" flex={1}>
-            {window.tabs.map((tab) => (
+            {tabbedWindow.tabs.map((tab) => (
               <TabIdProvider key={tab.id} tabId={tab.id}>
                 <DraggableTabsBrowser.Content value={tab.id} height="full">
                   <PromptBrowserWindowContent />

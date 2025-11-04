@@ -2,10 +2,20 @@ import { Box, VStack, HStack, Text, type BoxProps } from "@chakra-ui/react";
 import { ChevronDown } from "react-feather";
 import { useState } from "react";
 
+/**
+ * Props for the SidebarRoot component
+ */
 interface SidebarRootProps {
+  /** The content to render inside the sidebar */
   children: React.ReactNode;
 }
 
+/**
+ * Root container for the sidebar navigation
+ *
+ * @param props - The component props
+ * @returns A styled navigation container with vertical scrolling
+ */
 function SidebarRoot({ children }: SidebarRootProps) {
   return (
     <Box
@@ -24,10 +34,20 @@ function SidebarRoot({ children }: SidebarRootProps) {
   );
 }
 
+/**
+ * Props for the SidebarHeader component
+ */
 interface SidebarHeaderProps {
+  /** The content to render in the header */
   children: React.ReactNode;
 }
 
+/**
+ * Header section for the sidebar with prominent styling
+ *
+ * @param props - The component props
+ * @returns A styled header with large, semibold text
+ */
 function SidebarHeader({ children }: SidebarHeaderProps) {
   return (
     <Box padding="4" fontSize="lg" fontWeight="semibold">
@@ -36,8 +56,17 @@ function SidebarHeader({ children }: SidebarHeaderProps) {
   );
 }
 
+/**
+ * Props for the SidebarSectionHeader component, extending BoxProps for additional styling
+ */
 type SidebarSectionHeaderProps = BoxProps;
 
+/**
+ * Header for a section within the sidebar
+ *
+ * @param props - The component props including children and any Box props
+ * @returns A styled section header with medium weight text
+ */
 function SidebarSectionHeader({
   children,
   ...props
@@ -59,20 +88,43 @@ function SidebarSectionHeader({
   );
 }
 
+/**
+ * Props for the SidebarSection component, extending BoxProps for additional styling
+ */
 type SidebarSectionProps = BoxProps;
 
+/**
+ * Generic section container for grouping sidebar content
+ *
+ * @param props - The component props including children
+ * @returns A basic Box container for section content
+ */
 function SidebarSection({ children }: SidebarSectionProps) {
   return <Box>{children}</Box>;
 }
 
+/**
+ * Props for the SidebarList component
+ */
 interface SidebarListProps {
+  /** The list items to render */
   children: React.ReactNode;
+  /** Optional title for the list section */
   title?: string;
+  /** Whether the list can be collapsed/expanded */
   collapsible?: boolean;
+  /** Whether the list is open by default when collapsible */
   defaultOpen?: boolean;
+  /** Optional action element (e.g., button) to display in the header */
   action?: React.ReactNode;
 }
 
+/**
+ * List container with optional collapsible functionality and section header
+ *
+ * @param props - The component props
+ * @returns A vertical stack of list items with optional collapsible header
+ */
 function SidebarList({
   children,
   title,
@@ -115,15 +167,30 @@ function SidebarList({
   );
 }
 
+/**
+ * Props for the SidebarItem component
+ */
 interface SidebarItemProps {
+  /** The content to render inside the item */
   children: React.ReactNode;
+  /** Click handler for the item */
   onClick?: () => void;
+  /** Whether the item is currently active/selected */
   active?: boolean;
+  /** Optional icon to display before the content */
   icon?: React.ReactNode;
+  /** Optional metadata text to display below the main content */
   meta?: string;
+  /** Visual variant of the item */
   variant?: "default" | "empty";
 }
 
+/**
+ * Individual item within a sidebar list with support for icons, metadata, and active states
+ *
+ * @param props - The component props
+ * @returns A clickable item with optional icon, content, and metadata
+ */
 function SidebarItem({
   children,
   onClick,
@@ -186,6 +253,20 @@ function SidebarItem({
   );
 }
 
+/**
+ * Compound component for building sidebar navigation interfaces
+ *
+ * @example
+ * ```tsx
+ * <Sidebar.Root>
+ *   <Sidebar.Header>My App</Sidebar.Header>
+ *   <Sidebar.List title="Navigation" collapsible>
+ *     <Sidebar.Item active icon={<HomeIcon />}>Home</Sidebar.Item>
+ *     <Sidebar.Item onClick={() => navigate('/settings')}>Settings</Sidebar.Item>
+ *   </Sidebar.List>
+ * </Sidebar.Root>
+ * ```
+ */
 export const Sidebar = {
   Root: SidebarRoot,
   Header: SidebarHeader,

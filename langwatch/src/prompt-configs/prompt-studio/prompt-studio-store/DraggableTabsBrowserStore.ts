@@ -57,37 +57,37 @@ export const TabSchema = z.object({
 export type Tab = z.infer<typeof TabSchema>;
 
 /**
- * Zod schema for a window containing multiple tabs.
+ * Zod schema for a tabbedWindow containing multiple tabs.
  * Single Responsibility: Container for managing a collection of tabs and their active state.
  */
 export const WindowSchema = z.object({
   id: z.string(),
   tabs: z.array(TabSchema),
-  activeTabId: z.string().nullable(),
+  activeTabId: z.string(),
 });
 export type Window = z.infer<typeof WindowSchema>;
 
 /**
  * State interface for the draggable tabs browser store.
- * Single Responsibility: Defines the complete state and actions for managing a multi-window, multi-tab browser interface.
+ * Single Responsibility: Defines the complete state and actions for managing a multi-tabbedWindow, multi-tab browser interface.
  */
 export interface DraggableTabsBrowserState {
   /** Array of all windows in the browser */
   windows: Window[];
-  /** ID of the currently active window, null if no windows */
+  /** ID of the currently active tabbedWindow, null if no windows */
   activeWindowId: string | null;
 
-  /** Add a new tab to the active window (or create a new window if none exists) */
+  /** Add a new tab to the active tabbedWindow (or create a new tabbedWindow if none exists) */
   addTab: (params: { data: TabData }) => void;
   /** Remove a tab by its ID, cleaning up empty windows */
   removeTab: (params: { tabId: string }) => void;
-  /** Split a tab into a new window */
+  /** Split a tab into a new tabbedWindow */
   splitTab: (params: { tabId: string }) => void;
-  /** Move a tab to a different window at a specific index */
+  /** Move a tab to a different tabbedWindow at a specific index */
   moveTab: (params: { tabId: string; windowId: string; index: number }) => void;
-  /** Set the active tab for a specific window */
+  /** Set the active tab for a specific tabbedWindow */
   setActiveTab: (params: { windowId: string; tabId: string }) => void;
-  /** Set the active window */
+  /** Set the active tabbedWindow */
   setActiveWindow: (params: { windowId: string }) => void;
   /** Update tab data using an updater function for flexible partial updates */
   updateTabData: (params: {
@@ -131,8 +131,8 @@ function createDraggableTabsBrowserStore(projectId: string) {
         ...initialState,
 
         /**
-         * Set the active window by ID.
-         * Single Responsibility: Updates the active window state.
+         * Set the active tabbedWindow by ID.
+         * Single Responsibility: Updates the active tabbedWindow state.
          */
         setActiveWindow: ({ windowId }) => {
           set((state) => {
@@ -141,7 +141,7 @@ function createDraggableTabsBrowserStore(projectId: string) {
         },
 
         /**
-         * Add a new tab to the active window, or create a new window if none exists.
+         * Add a new tab to the active tabbedWindow, or create a new tabbedWindow if none exists.
          * Single Responsibility: Creates and adds a new tab with the provided data.
          */
         addTab: ({ data }) => {
@@ -155,7 +155,7 @@ function createDraggableTabsBrowserStore(projectId: string) {
 
             if (!activeWindow) {
               const windowId = createWindowId();
-              activeWindow = { id: windowId, tabs: [], activeTabId: null };
+              activeWindow = { id: windowId, tabs: [], activeTabId: tabId };
               state.windows.push(activeWindow);
               state.activeWindowId = windowId;
             }
@@ -171,26 +171,35 @@ function createDraggableTabsBrowserStore(projectId: string) {
          */
         removeTab: ({ tabId }) => {
           set((state) => {
-            for (const window of state.windows) {
-              const tabIndex = window.tabs.findIndex((tab) => tab.id === tabId);
+            for (const tabbedWindow of state.windows) {
+              const tabIndex = tabbedWindow.tabs.findIndex(
+                (tab) => tab.id === tabId,
+              );
 
               if (tabIndex !== -1) {
-                window.tabs.splice(tabIndex, 1);
+                tabbedWindow.tabs.splice(tabIndex, 1);
 
-                if (window.activeTabId === tabId) {
-                  window.activeTabId = window.tabs[0]?.id ?? null;
-                }
-
-                if (window.tabs.length === 0) {
+                if (tabbedWindow.tabs.length === 0) {
                   const windowIndex = state.windows.findIndex(
-                    (w) => w.id === window.id,
+                    (w) => w.id === tabbedWindow.id,
                   );
                   state.windows.splice(windowIndex, 1);
 
-                  if (state.activeWindowId === window.id) {
+                  if (state.activeWindowId === tabbedWindow.id) {
                     state.activeWindowId = state.windows[0]?.id ?? null;
                   }
                 }
+
+                if (tabbedWindow.activeTabId === tabId) {
+                  const targetTab =
+                    tabbedWindow.tabs[tabIndex - 1] ?? tabbedWindow.tabs[0];
+                  if (!targetTab)
+                    throw new Error(
+                      "No target tab found. This should never happen.",
+                    );
+                  tabbedWindow.activeTabId = targetTab.id;
+                }
+
                 break;
               }
             }
@@ -198,22 +207,31 @@ function createDraggableTabsBrowserStore(projectId: string) {
         },
 
         /**
-         * Split a tab into a new window by duplicating it.
-         * Single Responsibility: Creates a new window with a copy of the specified tab.
+         * Split a tab into a new tabbedWindow by duplicating it.
+         * Single Responsibility: Creates a new tabbedWindow with a copy of the specified tab.
          */
         splitTab: ({ tabId }) => {
           set((state) => {
+            // Find the tabbedWindow that contains the source tab
             const tabWindowIndex = state.windows.findIndex((w) =>
               w.tabs.some((t) => t.id === tabId),
             );
             const tabWindow = state.windows[tabWindowIndex];
-            if (!tabWindow) return;
-            const sourceTab = tabWindow.tabs.find((t) => t.id === tabId);
-            if (!sourceTab) return;
+            if (!tabWindow) {
+              throw new Error(`Tab ${tabId} not found in any tabbedWindow.`);
+            }
 
+            // Find the source tab in the tabbedWindow
+            const sourceTab = tabWindow.tabs.find((t) => t.id === tabId);
+            if (!sourceTab) {
+              throw new Error(
+                `Source tab ${tabId} not found in tabbedWindow ${tabWindow.id}.`,
+              );
+            }
+
+            // Create a new tabbedWindow with a copy of the source tab
             const newWindowId = createWindowId();
             const newTabId = createTabId();
-
             const newWindow: Window = {
               id: newWindowId,
               tabs: [
@@ -225,29 +243,38 @@ function createDraggableTabsBrowserStore(projectId: string) {
               activeTabId: newTabId,
             };
 
-            // Insert new window directly after the source window
+            // Insert new tabbedWindow directly after the source tabbedWindow
             state.windows.splice(tabWindowIndex + 1, 0, newWindow);
             state.activeWindowId = newWindowId;
           });
         },
 
         /**
-         * Move a tab from one window to another at a specific index.
+         * Move a tab from one tabbedWindow to another at a specific index.
          * Single Responsibility: Handles tab drag-and-drop between windows with cleanup.
          */
         moveTab: ({ tabId, windowId, index }) => {
           set((state) => {
             let tabToMove: Tab | undefined;
 
-            // Remove tab from source window
-            for (const window of state.windows) {
-              const tabIndex = window.tabs.findIndex((tab) => tab.id === tabId);
+            // Remove tab from source tabbedWindow
+            for (const tabbedWindow of state.windows) {
+              const tabIndex = tabbedWindow.tabs.findIndex(
+                (tab) => tab.id === tabId,
+              );
 
               if (tabIndex !== -1) {
-                [tabToMove] = window.tabs.splice(tabIndex, 1);
+                [tabToMove] = tabbedWindow.tabs.splice(tabIndex, 1);
 
-                if (window.activeTabId === tabId) {
-                  window.activeTabId = window.tabs[0]?.id ?? null;
+                if (tabbedWindow.activeTabId === tabId) {
+                  const targetTab =
+                    tabbedWindow.tabs[tabIndex - 1] ?? tabbedWindow.tabs[0];
+                  if (!targetTab) {
+                    throw new Error(
+                      "No target tab found. This should never happen.",
+                    );
+                  }
+                  tabbedWindow.activeTabId = targetTab.id;
                 }
                 break;
               }
@@ -255,7 +282,7 @@ function createDraggableTabsBrowserStore(projectId: string) {
 
             if (!tabToMove) return;
 
-            // Add tab to target window
+            // Add tab to target tabbedWindow
             const targetWindow = state.windows.find((w) => w.id === windowId);
             if (!targetWindow) return;
 
@@ -265,10 +292,10 @@ function createDraggableTabsBrowserStore(projectId: string) {
 
             // Clean up empty windows
             state.windows = state.windows.filter(
-              (window) => window.tabs.length > 0,
+              (tabbedWindow) => tabbedWindow.tabs.length > 0,
             );
 
-            // Ensure we have a valid active window
+            // Ensure we have a valid active tabbedWindow
             if (!state.windows.find((w) => w.id === state.activeWindowId)) {
               state.activeWindowId = state.windows[0]?.id ?? null;
             }
@@ -276,14 +303,14 @@ function createDraggableTabsBrowserStore(projectId: string) {
         },
 
         /**
-         * Set the active tab for a specific window.
-         * Single Responsibility: Updates active tab and window state.
+         * Set the active tab for a specific tabbedWindow.
+         * Single Responsibility: Updates active tab and tabbedWindow state.
          */
         setActiveTab: ({ windowId, tabId }) => {
           set((state) => {
-            const window = state.windows.find((w) => w.id === windowId);
-            if (window?.tabs.some((tab) => tab.id === tabId)) {
-              window.activeTabId = tabId;
+            const tabbedWindow = state.windows.find((w) => w.id === windowId);
+            if (tabbedWindow?.tabs.some((tab) => tab.id === tabId)) {
+              tabbedWindow.activeTabId = tabId;
               state.activeWindowId = windowId;
             }
           });
@@ -324,7 +351,7 @@ function createDraggableTabsBrowserStore(projectId: string) {
 
         /**
          * Check if a tab ID is currently active.
-         * Single Responsibility: Determines if the given tab is the active tab in the active window.
+         * Single Responsibility: Determines if the given tab is the active tab in the active tabbedWindow.
          */
         isTabIdActive: (tabId) => {
           const state = get();

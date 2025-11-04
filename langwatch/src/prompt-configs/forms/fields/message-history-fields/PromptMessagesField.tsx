@@ -14,8 +14,6 @@ import {
   type UseFieldArrayReturn,
   Controller,
 } from "react-hook-form";
-// removed react-icons add/remove; handled by dedicated components
-
 import { PropertySectionTitle } from "../../../../optimization_studio/components/properties/BasePropertiesPanel";
 import {
   PromptTextArea,
@@ -36,6 +34,9 @@ type MessageError = {
   content?: { message?: string };
 };
 
+/**
+ * Single Responsibility: Render and manage the configurable prompt message list.
+ */
 export function PromptMessagesField({
   messageFields,
   availableFields,

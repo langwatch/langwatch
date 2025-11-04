@@ -25,6 +25,11 @@ export function useGoToSpanInPlaygroundTabUrlBuilder() {
   const { project } = useOrganizationTeamProject();
 
   const buildUrl = (spanId: string) => {
+    if (!project?.slug) {
+      logger.warn("Cannot build URL: project slug is missing");
+      return null;
+    }
+
     const url = new URL(
       `/${project?.slug}/prompt-studio`,
       window.location.origin,
@@ -34,6 +39,11 @@ export function useGoToSpanInPlaygroundTabUrlBuilder() {
   };
 
   return {
+    /**
+     * Build a URL to the prompt studio page with the given span ID.
+     * @param spanId - The ID of the span to load into the prompt studio.
+     * @returns A URL object if the project slug is available, otherwise null.
+     */
     buildUrl,
   };
 }
@@ -48,7 +58,6 @@ function useSpanIdFromUrl() {
   const router = useRouter();
 
   const clearSpanIdFromUrl = () => {
-    console.log("clearing span id from url", spanId);
     // Create a copy of router.query without the span ID param
     const { [QUERY_PARAM_PROMPT_PLAYGROUND_SPAN_ID]: _, ...query } =
       router.query;
@@ -74,15 +83,22 @@ function createDefaultPromptFormValues(
     );
   }
 
+  const systemPrompt = spanData.llmConfig?.systemPrompt
+    ? typeof spanData.llmConfig.systemPrompt === "string"
+      ? spanData.llmConfig.systemPrompt
+      : JSON.stringify(spanData.llmConfig.systemPrompt)
+    : "";
+
+  if (systemPrompt.length === 0) {
+    logger.warn({ spanData }, "System prompt is empty. This is not expected.");
+  }
+
   return {
     handle: null,
     scope: "PROJECT",
     version: {
       configData: {
-        prompt:
-          typeof spanData.llmConfig?.systemPrompt === "string"
-            ? spanData.llmConfig.systemPrompt
-            : JSON.stringify(spanData.llmConfig?.systemPrompt),
+        prompt: systemPrompt,
         llm: {
           // The model should always be available here, but we fall back to the default model if it's not.
           model: spanData.llmConfig.model ?? DEFAULT_MODEL,
@@ -91,7 +107,7 @@ function createDefaultPromptFormValues(
         },
         inputs: [],
         outputs: [{ identifier: "output", type: "str" }],
-        messages: [{ role: "system", content: "You are a helpful assistant." }],
+        messages: [{ role: "system", content: systemPrompt }],
       },
     },
   };
@@ -124,7 +140,6 @@ export function useLoadSpanIntoPromptStudio() {
   useEffect(() => {
     if (!spanId || loadedRef.current) return;
 
-    console.log("loading span data into prompt studio", spanId);
     clearSpanIdFromUrl();
 
     void (async () => {

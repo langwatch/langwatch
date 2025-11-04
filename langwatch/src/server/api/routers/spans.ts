@@ -117,13 +117,27 @@ export const spansRouter = createTRPCRouter({
       // Extract messages
       const messages: Array<ChatMessage> = [];
 
+      // Handle input: convert all input types to chat messages
       if (
         span.input?.type === "chat_messages" &&
         Array.isArray(span.input.value)
       ) {
+        // Input is already formatted as chat messages
         messages.push(...span.input.value);
+      } else if (typeof span.input?.value === "string") {
+        // Input is a plain string (type: "text", "raw", or undefined)
+        // Convert to a user message to preserve the prompt
+        messages.push({ role: "user", content: span.input.value });
+      } else if (span.input?.value != null) {
+        // Input is a structured object (type: "json" or other)
+        // Serialize to JSON and store as user message
+        messages.push({
+          role: "user",
+          content: JSON.stringify(span.input.value),
+        });
       }
 
+      // Handle output: convert all output types to chat messages
       if (
         span.output?.type === "chat_messages" &&
         Array.isArray(span.output.value)

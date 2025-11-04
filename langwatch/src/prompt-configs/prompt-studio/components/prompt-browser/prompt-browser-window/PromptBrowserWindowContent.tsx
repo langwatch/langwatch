@@ -4,7 +4,7 @@ import { PromptBrowserHeader } from "./PromptBrowserHeader";
 import { PromptMessagesEditor } from "./PromptMessagesEditor";
 import { PromptTabbedSection } from "./PromptTabbedSection";
 import { usePromptConfigForm } from "~/prompt-configs/hooks";
-import { FormProvider } from "react-hook-form";
+import { FormProvider, type DeepPartial } from "react-hook-form";
 import {
   useDraggableTabsBrowserStore,
   type TabData,
@@ -35,14 +35,14 @@ export function PromptBrowserWindowContent() {
 
   return (
     <PromptBrowserWindowInner
-      initialConfigValues={initialConfigValues as PromptConfigFormValues}
+      initialConfigValues={initialConfigValues}
       tabId={tabId}
     />
   );
 }
 
 function PromptBrowserWindowInner(props: {
-  initialConfigValues: PromptConfigFormValues;
+  initialConfigValues: DeepPartial<PromptConfigFormValues>;
   tabId: string;
 }) {
   const form = usePromptConfigForm(props);
