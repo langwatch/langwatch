@@ -52,7 +52,9 @@ export function PromptStudioTabbedWorkspace() {
           borderRight="1px solid var(--chakra-colors-gray-350)"
           maxWidth={windows.length > 1 ? "50vw" : "auto"}
         >
-          <DraggableTabsBrowser.TabBar>
+          <DraggableTabsBrowser.TabBar
+            tabIds={tabbedWindow.tabs.map((tab) => tab.id)}
+          >
             <HStack gap={0} overflowX="auto">
               {tabbedWindow.tabs.map((tab) => (
                 <TabIdProvider key={tab.id} tabId={tab.id}>

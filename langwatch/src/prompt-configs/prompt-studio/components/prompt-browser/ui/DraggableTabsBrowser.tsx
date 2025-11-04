@@ -108,7 +108,6 @@ function DraggableTabsBrowserRoot({
 
   function handleDragStart(event: any) {
     const { groupId, tabId, label } = event.active.data.current;
-    console.log("handleDragStart", groupId, tabId, label);
     setActiveDrag({ groupId, tabId, label });
   }
 
@@ -234,22 +233,10 @@ function DraggableTabsGroup({
  */
 interface DraggableTabsTabBarProps {
   children: React.ReactNode;
+  tabIds: string[];
 }
 
-function DraggableTabsTabBar({ children }: DraggableTabsTabBarProps) {
-  // Extract tab IDs directly from children
-  const tabIds = React.useMemo(() => {
-    return React.Children.map(children, (child) => {
-      if (React.isValidElement(child)) {
-        const props = child.props as { value?: string };
-        if (props.value) {
-          return props.value;
-        }
-      }
-      return null;
-    })?.filter(Boolean);
-  }, [children]);
-
+function DraggableTabsTabBar({ children, tabIds }: DraggableTabsTabBarProps) {
   return (
     <BrowserLikeTabs.Bar>
       <SortableContext
