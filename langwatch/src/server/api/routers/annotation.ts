@@ -6,6 +6,7 @@ import {
   PublicShareResourceTypes,
   type AnnotationQueueItem,
 } from "@prisma/client";
+import type { Session } from "next-auth";
 
 import { TRPCError } from "@trpc/server";
 import { nanoid } from "nanoid";
@@ -81,9 +82,9 @@ const enrichQueueItemsWithTracesAndAnnotations = async (
   // Enrich queue items with traces and annotations
   return queueItems.map((item) => ({
     ...item,
-    trace: traceMap.get(item.traceId) || null,
-    annotations: annotationMap.get(item.traceId) || [],
-    scoreOptions: (annotationMap.get(item.traceId) || []).flatMap(
+    trace: traceMap.get(item.traceId) ?? null,
+    annotations: annotationMap.get(item.traceId) ?? [],
+    scoreOptions: (annotationMap.get(item.traceId) ?? []).flatMap(
       (annotation) =>
         annotation.scoreOptions ? Object.keys(annotation.scoreOptions) : [],
     ),
@@ -486,7 +487,7 @@ export const annotationRouter = createTRPCRouter({
 
       return queueItems.map((item) => ({
         ...item,
-        trace: traceMap.get(item.traceId) || null,
+        trace: traceMap.get(item.traceId) ?? null,
       }));
     }),
   getPendingItemsCount: protectedProcedure

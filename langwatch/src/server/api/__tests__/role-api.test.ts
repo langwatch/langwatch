@@ -1,6 +1,13 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { TRPCError } from "@trpc/server";
+import { TeamUserRole } from "@prisma/client";
 import { RoleService } from "../../role";
+import {
+  RoleNotFoundError,
+  RoleDuplicateNameError,
+  RoleInUseError,
+  TeamNotFoundError,
+  UserNotTeamMemberError,
+} from "../../role/errors";
 
 // Mock Prisma client
 const mockPrisma = {
@@ -113,7 +120,7 @@ describe("RoleService Tests", () => {
       mockPrisma.customRole.findUnique.mockResolvedValue(null);
 
       await expect(roleService.getRoleById("nonexistent-role")).rejects.toThrow(
-        TRPCError,
+        RoleNotFoundError,
       );
       await expect(roleService.getRoleById("nonexistent-role")).rejects.toThrow(
         "Role not found",
@@ -168,6 +175,13 @@ describe("RoleService Tests", () => {
 
       mockPrisma.customRole.findUnique.mockResolvedValue(existingRole);
 
+      await expect(
+        roleService.createRole({
+          organizationId: "org-123",
+          name: "Data Analyst",
+          permissions: ["analytics:view"],
+        }),
+      ).rejects.toThrow(RoleDuplicateNameError);
       await expect(
         roleService.createRole({
           organizationId: "org-123",
@@ -265,6 +279,9 @@ describe("RoleService Tests", () => {
       mockPrisma.customRole.findUnique.mockResolvedValue(mockRoleWithUsers);
 
       await expect(roleService.deleteRole("role-1")).rejects.toThrow(
+        RoleInUseError,
+      );
+      await expect(roleService.deleteRole("role-1")).rejects.toThrow(
         "Cannot delete role that is assigned to 2 user(s)",
       );
     });
@@ -305,13 +322,23 @@ describe("RoleService Tests", () => {
             teamId: "team-123",
           },
         },
-        data: { assignedRoleId: "role-123" },
+        data: {
+          role: TeamUserRole.CUSTOM,
+          assignedRoleId: "role-123",
+        },
       });
     });
 
     it("should throw NOT_FOUND when custom role does not exist", async () => {
       mockPrisma.customRole.findUnique.mockResolvedValue(null);
 
+      await expect(
+        roleService.assignRoleToUser(
+          "user-123",
+          "team-123",
+          "nonexistent-role",
+        ),
+      ).rejects.toThrow(RoleNotFoundError);
       await expect(
         roleService.assignRoleToUser(
           "user-123",
@@ -330,6 +357,9 @@ describe("RoleService Tests", () => {
       mockPrisma.customRole.findUnique.mockResolvedValue(mockCustomRole);
       mockPrisma.team.findUnique.mockResolvedValue(null);
 
+      await expect(
+        roleService.assignRoleToUser("user-123", "team-123", "role-123"),
+      ).rejects.toThrow(TeamNotFoundError);
       await expect(
         roleService.assignRoleToUser("user-123", "team-123", "role-123"),
       ).rejects.toThrow("Team not found");
@@ -352,6 +382,9 @@ describe("RoleService Tests", () => {
 
       await expect(
         roleService.assignRoleToUser("user-123", "team-123", "role-123"),
+      ).rejects.toThrow(UserNotTeamMemberError);
+      await expect(
+        roleService.assignRoleToUser("user-123", "team-123", "role-123"),
       ).rejects.toThrow("User is not a member of the specified team");
     });
   });
@@ -371,7 +404,10 @@ describe("RoleService Tests", () => {
             teamId: "team-123",
           },
         },
-        data: { assignedRoleId: null },
+        data: {
+          role: TeamUserRole.VIEWER,
+          assignedRoleId: null,
+        },
       });
     });
   });

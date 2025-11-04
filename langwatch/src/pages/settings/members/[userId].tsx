@@ -219,16 +219,16 @@ export default function UserDetailsPage() {
                         </Field.Root>
                       ) : (
                         <Text>
-                          {tm.assignedRole
+                          {tm.role === "CUSTOM" && tm.assignedRole
                             ? tm.assignedRole.name
+                            : tm.role === "CUSTOM"
+                            ? "Custom"
                             : tm.role === "ADMIN"
                             ? "Admin"
                             : tm.role === "MEMBER"
                             ? "Member"
                             : tm.role === "VIEWER"
                             ? "Viewer"
-                            : tm.role === "CUSTOM"
-                            ? tm.assignedRole?.name ?? "Custom"
                             : tm.role}
                         </Text>
                       )}

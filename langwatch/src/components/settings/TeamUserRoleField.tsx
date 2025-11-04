@@ -14,9 +14,10 @@ export type RoleOption = {
   customRoleId?: string;
 };
 
-export const teamRolesOptions: {
-  [K in TeamUserRole]: RoleOption;
-} = {
+export const teamRolesOptions: Record<
+  "ADMIN" | "MEMBER" | "VIEWER",
+  RoleOption
+> = {
   [TeamUserRole.ADMIN]: {
     label: "Admin",
     value: TeamUserRole.ADMIN,
@@ -53,17 +54,18 @@ export const TeamUserRoleField = ({
     permissions: string[];
   };
 }) => {
-  const defaultRole = customRole
-    ? ({
-        label: customRole.name,
-        value: `custom:${customRole.id}`,
-        description:
-          customRole.description ??
-          `${customRole.permissions.length} permissions`,
-        isCustom: true,
-        customRoleId: customRole.id,
-      } as RoleOption)
-    : teamRolesOptions[member.role];
+  const defaultRole: RoleOption =
+    customRole ?? member.role === TeamUserRole.CUSTOM
+      ? ({
+          label: customRole?.name ?? "Custom Role",
+          value: `custom:${customRole?.id ?? ""}`,
+          description:
+            customRole?.description ??
+            `${customRole?.permissions.length ?? 0} permissions`,
+          isCustom: true,
+          customRoleId: customRole?.id,
+        } as RoleOption)
+      : teamRolesOptions[member.role];
 
   const {
     control,
