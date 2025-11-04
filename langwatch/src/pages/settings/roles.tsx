@@ -265,7 +265,7 @@ function RolesManagement({
           </Text>
         </VStack>
         <Tooltip
-          content="You need organization view permissions to create roles."
+          content="You need organization:manage permissions to create roles."
           disabled={hasPermission("organization:manage")}
         >
           <Button

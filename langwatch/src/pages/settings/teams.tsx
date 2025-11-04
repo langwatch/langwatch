@@ -13,6 +13,7 @@ import { toaster } from "~/components/ui/toaster";
 import SettingsLayout from "../../components/SettingsLayout";
 import { Link } from "../../components/ui/link";
 import { Menu } from "../../components/ui/menu";
+import { Tooltip } from "../../components/ui/tooltip";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import type { TeamWithProjectsAndMembersAndUsers } from "../../server/api/routers/organization";
 import { api } from "../../utils/api";
@@ -43,6 +44,7 @@ function TeamsList({ teams }: { teams: TeamWithProjectsAndMembersAndUsers[] }) {
     project,
     team: currentTeam,
   } = useOrganizationTeamProject();
+  const hasTeamManagePermission = hasPermission("team:manage");
   const queryClient = api.useContext();
   const archiveTeam = api.team.archiveById.useMutation({
     onSuccess: () => {
@@ -86,12 +88,30 @@ function TeamsList({ teams }: { teams: TeamWithProjectsAndMembersAndUsers[] }) {
             Teams
           </Heading>
           <Spacer />
-          <Link href={`/settings/teams/new`} asChild>
-            <Button size="sm" colorPalette="orange">
-              <Plus size={20} />
-              <Text>Add new team</Text>
-            </Button>
-          </Link>
+          <Tooltip
+            content={
+              !hasTeamManagePermission
+                ? "You need team:manage permission to create teams"
+                : undefined
+            }
+            disabled={hasTeamManagePermission}
+            positioning={{ placement: "bottom" }}
+            showArrow
+          >
+            {hasTeamManagePermission ? (
+              <Link href={`/settings/teams/new`} asChild>
+                <Button size="sm" colorPalette="orange">
+                  <Plus size={20} />
+                  <Text>Add new team</Text>
+                </Button>
+              </Link>
+            ) : (
+              <Button size="sm" colorPalette="orange" disabled>
+                <Plus size={20} />
+                <Text>Add new team</Text>
+              </Button>
+            )}
+          </Tooltip>
         </HStack>
         <Card.Root width="full">
           <Card.Body width="full" paddingY={0} paddingX={0}>
