@@ -13,22 +13,17 @@ export type ModelProviderKey =
   | "open_ai"
   | "vertex_ai";
 
-export interface FieldConfig {
+export interface FieldMetadata {
   label: string;
-  placeholder?: string;
-  required: boolean;
-  type?: "text" | "password" | "url";
+  description?: string;
 }
 
 export interface ModelProviderSpec {
+  backendKey: string;
   key: ModelProviderKey;
+  defaultModel?: string | null;
   label: string;
   icon: IconData;
   docs: Docs;
-  fields: {
-    apiKey?: FieldConfig;
-    baseUrl?: FieldConfig;
-    headers?: Record<string, FieldConfig>;
-  };
-  models: string[];
+  fieldMetadata?: Record<string, FieldMetadata>;
 }
