@@ -315,7 +315,7 @@ export function CSVReaderComponent({
                     .split("\n")
                     .filter((line) => line.trim() !== "")
                     .join(", ") +
-                  "]"
+                  "]",
               );
             }
             readString(jsonToCSV(jsonContents), {
@@ -382,11 +382,11 @@ function jsonToCSV(jsonContents: object[]): string {
           return [key, JSON.stringify(value)];
         }
         return [key, value];
-      })
+      }),
     );
   });
   const columns = new Set(
-    stringifiedNestedValues.flatMap((item) => Object.keys(item))
+    stringifiedNestedValues.flatMap((item) => Object.keys(item)),
   );
 
   return papaparseJsonToCSV(stringifiedNestedValues, {
