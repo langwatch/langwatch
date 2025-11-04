@@ -8,7 +8,7 @@ alwaysApply: false
 
 We use Chakra v3 in this repo, your knowledge cutoff might be outdated, so forgot what you know about Chakra v2 and focus on here when doing jsx frontend.
 
-We use react-feather icons, make sure to use react-feather icons instead of lucide and chakra ones.
+We use lucide-react icons, make sure to use lucide-react icons instead of feather, font awesome, etc.
 
 They removed support for configuring toast options. Pass it to the createToaster function in components/ui/toaster.tsx file instead.
 
