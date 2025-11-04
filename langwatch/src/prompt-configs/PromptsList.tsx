@@ -13,12 +13,12 @@ import { Edit, MoreVertical, Trash2 } from "react-feather";
 import { GeneratePromptApiSnippetDialog } from "./components/GeneratePromptApiSnippetDialog";
 
 import { Menu } from "~/components/ui/menu";
+import { Tooltip } from "~/components/ui/tooltip";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { formatTimeAgo } from "../utils/formatTimeAgo";
 import { CopyButton } from "../components/CopyButton";
 import { GenerateApiSnippetButton } from "../components/GenerateApiSnippetButton";
 import { LLMModelDisplay } from "../components/llmPromptConfigs/LLMModelDisplay";
-import { Tooltip } from "../components/ui/tooltip";
 import { LuBuilding } from "react-icons/lu";
 
 /**
@@ -57,7 +57,10 @@ export function PromptsList({
   onDelete,
   onEdit,
 }: PromptsListProps) {
-  const { project } = useOrganizationTeamProject();
+  const { project, hasPermission } = useOrganizationTeamProject();
+  const hasPromptsViewPermission = hasPermission("prompts:view");
+  const hasPromptsUpdatePermission = hasPermission("prompts:update");
+  const hasPromptsDeletePermission = hasPermission("prompts:delete");
 
   if (!project || isLoading) {
     return <Text>Loading prompts...</Text>;
@@ -91,13 +94,19 @@ export function PromptsList({
         >
           <Card.Root
             key={config.id}
-            cursor="pointer"
-            onClick={() => void onEdit(config)}
+            cursor={hasPromptsViewPermission ? "pointer" : "default"}
+            onClick={
+              hasPromptsViewPermission ? () => void onEdit(config) : undefined
+            }
             transition="all 0.2s"
-            _hover={{
-              transform: "translateY(-2px)",
-              shadow: "md",
-            }}
+            _hover={
+              hasPromptsViewPermission
+                ? {
+                    transform: "translateY(-2px)",
+                    shadow: "md",
+                  }
+                : {}
+            }
             borderWidth="1px"
             borderColor="gray.200"
             _dark={{
@@ -179,14 +188,28 @@ export function PromptsList({
                         event.stopPropagation();
                       }}
                     >
-                      <Menu.Item
-                        value="edit"
-                        onClick={(_event) => {
-                          void onEdit(config);
-                        }}
+                      <Tooltip
+                        content={
+                          !hasPromptsUpdatePermission
+                            ? "You need prompts:update permission to edit prompts"
+                            : undefined
+                        }
+                        disabled={hasPromptsUpdatePermission}
+                        positioning={{ placement: "right" }}
+                        showArrow
                       >
-                        <Edit size={16} /> Edit prompt
-                      </Menu.Item>
+                        <Menu.Item
+                          value="edit"
+                          onClick={(_event) => {
+                            if (hasPromptsUpdatePermission) {
+                              void onEdit(config);
+                            }
+                          }}
+                          disabled={!hasPromptsUpdatePermission}
+                        >
+                          <Edit size={16} /> Edit prompt
+                        </Menu.Item>
+                      </Tooltip>
                       <Menu.Item value="generate-api-snippet">
                         <GeneratePromptApiSnippetDialog.Trigger>
                           <HStack>
@@ -195,15 +218,29 @@ export function PromptsList({
                           </HStack>
                         </GeneratePromptApiSnippetDialog.Trigger>
                       </Menu.Item>
-                      <Menu.Item
-                        value="delete"
-                        color="red.600"
-                        onClick={(_event) => {
-                          void onDelete(config);
-                        }}
+                      <Tooltip
+                        content={
+                          !hasPromptsDeletePermission
+                            ? "You need prompts:delete permission to delete prompts"
+                            : undefined
+                        }
+                        disabled={hasPromptsDeletePermission}
+                        positioning={{ placement: "right" }}
+                        showArrow
                       >
-                        <Trash2 size={16} /> Delete prompt
-                      </Menu.Item>
+                        <Menu.Item
+                          value="delete"
+                          color="red.600"
+                          onClick={(_event) => {
+                            if (hasPromptsDeletePermission) {
+                              void onDelete(config);
+                            }
+                          }}
+                          disabled={!hasPromptsDeletePermission}
+                        >
+                          <Trash2 size={16} /> Delete prompt
+                        </Menu.Item>
+                      </Tooltip>
                     </Menu.Content>
                   </Menu.Root>
                 </Box>

@@ -13,7 +13,7 @@ import { PromptsList } from "~/prompt-configs/PromptsList";
 import { api } from "~/utils/api";
 import { usePrompts } from "~/prompt-configs/hooks";
 import type { VersionedPrompt } from "~/server/prompt-config/prompt.service";
-import { PermissionAlert } from "../../components/PermissionAlert";
+import { withPermissionGuard } from "../../components/WithPermissionGuard";
 /**
  * Custom hook for managing prompt configuration data operations and state.
  *
@@ -173,21 +173,12 @@ function usePromptConfigManagement(projectId: string | undefined) {
  * - The table area is scrollable, and the panel expands/collapses based on selection.
  * - The delete dialog requires the user to type 'delete' to confirm.
  */
-export default function PromptConfigsPage() {
+function PromptConfigsPage() {
   // Get current project and prompt selection state from hooks.
-  const { project, hasPermission } = useOrganizationTeamProject();
-  const hasPromptsViewPermission = hasPermission("prompts:view");
+  const { project } = useOrganizationTeamProject();
 
   const { selectedPromptId, setSelectedPromptId, clearSelection } =
     usePromptIdQueryParam();
-
-  if (!hasPromptsViewPermission) {
-    return (
-      <DashboardLayout>
-        <PermissionAlert permission="prompts:view" />
-      </DashboardLayout>
-    );
-  }
 
   // State for whether the prompt config panel is expanded (visible).
   const [isPaneExpanded, setIsPaneExpanded] = useState(true); // Start open
@@ -209,6 +200,8 @@ export default function PromptConfigsPage() {
       setIsPaneExpanded(true);
     }
   }, [selectedPromptId]);
+
+  const panelRef = useRef<HTMLDivElement>(null);
 
   /**
    * Deselects the current prompt config, closing the side panel.
@@ -264,7 +257,6 @@ export default function PromptConfigsPage() {
    *
    * @see https://github.com/langwatch/langwatch/pull/352#discussion_r2091220922
    */
-  const panelRef = useRef<HTMLDivElement>(null);
   const centerContentElementRef: HTMLDivElement | null =
     panelRef.current?.querySelector(
       `#${CENTER_CONTENT_BOX_ID}`,
@@ -381,3 +373,7 @@ export default function PromptConfigsPage() {
     </DashboardLayout>
   );
 }
+
+export default withPermissionGuard("prompts:view", {
+  layoutComponent: DashboardLayout,
+})(PromptConfigsPage);
