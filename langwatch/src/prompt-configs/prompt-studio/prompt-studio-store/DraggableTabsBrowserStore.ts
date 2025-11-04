@@ -6,10 +6,11 @@ import { cloneDeep } from "lodash";
 import { createLogger } from "~/utils/logger";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { z } from "zod";
-import { type PromptConfigFormValues } from "~/prompt-configs";
+import { type PromptConfigFormValues } from "~/prompt-configs/types";
 import type { DeepPartial } from "react-hook-form";
 import { chatMessageSchema } from "~/server/tracer/types.generated";
 import { createTabId, createWindowId } from "./utils/id-generators";
+
 const logger = createLogger("DraggableTabsBrowserStore");
 
 /**
@@ -115,6 +116,25 @@ const storeInstances = new Map<
 >();
 
 /**
+ * Get store instance for testing purposes.
+ * Single Responsibility: Provides access to store instances for unit tests.
+ */
+export function getStoreForTesting(projectId: string) {
+  if (!storeInstances.has(projectId)) {
+    storeInstances.set(projectId, createDraggableTabsBrowserStore(projectId));
+  }
+  return storeInstances.get(projectId)!;
+}
+
+/**
+ * Clear all store instances (for testing).
+ * Single Responsibility: Resets the singleton cache between tests.
+ */
+export function clearStoreInstances() {
+  storeInstances.clear();
+}
+
+/**
  * Schema for the persisted state (data only, no methods)
  */
 const PersistedStateSchema = z.object({
@@ -136,6 +156,11 @@ function createDraggableTabsBrowserStore(projectId: string) {
          */
         setActiveWindow: ({ windowId }) => {
           set((state) => {
+            const windowExists = state.windows.some((w) => w.id === windowId);
+            if (!windowExists) {
+              logger.warn({ windowId }, "Window not found, cannot set active");
+              return;
+            }
             state.activeWindowId = windowId;
           });
         },
@@ -171,37 +196,52 @@ function createDraggableTabsBrowserStore(projectId: string) {
          */
         removeTab: ({ tabId }) => {
           set((state) => {
-            for (const tabbedWindow of state.windows) {
-              const tabIndex = tabbedWindow.tabs.findIndex(
-                (tab) => tab.id === tabId,
-              );
+            // Find the window containing the tab
+            const windowIndex = state.windows.findIndex((w) =>
+              w.tabs.some((t) => t.id === tabId),
+            );
 
-              if (tabIndex !== -1) {
-                tabbedWindow.tabs.splice(tabIndex, 1);
+            if (windowIndex === -1) {
+              logger.warn({ tabId }, "Tab not found, cannot remove");
+              return;
+            }
 
-                if (tabbedWindow.tabs.length === 0) {
-                  const windowIndex = state.windows.findIndex(
-                    (w) => w.id === tabbedWindow.id,
-                  );
-                  state.windows.splice(windowIndex, 1);
+            const tabbedWindow = state.windows[windowIndex];
+            if (!tabbedWindow) {
+              logger.warn({ tabId }, "Tab not found, cannot remove");
+              return;
+            }
+            const tabIndex = tabbedWindow.tabs.findIndex(
+              (tab) => tab.id === tabId,
+            );
 
-                  if (state.activeWindowId === tabbedWindow.id) {
-                    state.activeWindowId = state.windows[0]?.id ?? null;
-                  }
-                }
+            // Remove the tab from the window
+            tabbedWindow.tabs.splice(tabIndex, 1);
 
-                if (tabbedWindow.activeTabId === tabId) {
-                  const targetTab =
-                    tabbedWindow.tabs[tabIndex - 1] ?? tabbedWindow.tabs[0];
-                  if (!targetTab)
-                    throw new Error(
-                      "No target tab found. This should never happen.",
-                    );
-                  tabbedWindow.activeTabId = targetTab.id;
-                }
+            // If window is now empty, remove it entirely
+            if (tabbedWindow.tabs.length === 0) {
+              state.windows.splice(windowIndex, 1);
 
-                break;
+              // If we removed the active window, activate the window at same index (next window shifts into position) or previous window if it was last
+              if (state.activeWindowId === tabbedWindow.id) {
+                const nextWindow =
+                  state.windows[windowIndex] ?? state.windows[windowIndex - 1];
+                state.activeWindowId = nextWindow?.id ?? null;
               }
+            } else if (tabbedWindow.activeTabId === tabId) {
+              // If the removed tab was the active tab, activate tab at same index (next tab shifts into position) or previous tab if it was last
+              const targetTab =
+                tabbedWindow.tabs[tabIndex] ?? tabbedWindow.tabs[tabIndex - 1];
+
+              if (!targetTab) {
+                logger.warn(
+                  { tabId },
+                  "No target tab found after removal. This should never happen.",
+                );
+                return;
+              }
+
+              tabbedWindow.activeTabId = targetTab.id;
             }
           });
         },
@@ -217,16 +257,23 @@ function createDraggableTabsBrowserStore(projectId: string) {
               w.tabs.some((t) => t.id === tabId),
             );
             const tabWindow = state.windows[tabWindowIndex];
+
             if (!tabWindow) {
-              throw new Error(`Tab ${tabId} not found in any tabbedWindow.`);
+              logger.warn(
+                { tabId },
+                "Tab not found in any window, cannot split",
+              );
+              return;
             }
 
             // Find the source tab in the tabbedWindow
             const sourceTab = tabWindow.tabs.find((t) => t.id === tabId);
             if (!sourceTab) {
-              throw new Error(
-                `Source tab ${tabId} not found in tabbedWindow ${tabWindow.id}.`,
+              logger.warn(
+                { tabId, windowId: tabWindow.id },
+                "Source tab not found in window, cannot split",
               );
+              return;
             }
 
             // Create a new tabbedWindow with a copy of the source tab
@@ -255,38 +302,65 @@ function createDraggableTabsBrowserStore(projectId: string) {
          */
         moveTab: ({ tabId, windowId, index }) => {
           set((state) => {
-            let tabToMove: Tab | undefined;
+            // Find the source window containing the tab
+            const sourceWindowIndex = state.windows.findIndex((w) =>
+              w.tabs.some((t) => t.id === tabId),
+            );
 
-            // Remove tab from source tabbedWindow
-            for (const tabbedWindow of state.windows) {
-              const tabIndex = tabbedWindow.tabs.findIndex(
-                (tab) => tab.id === tabId,
-              );
+            if (sourceWindowIndex === -1) {
+              logger.warn({ tabId }, "Tab not found, cannot move");
+              return;
+            }
 
-              if (tabIndex !== -1) {
-                [tabToMove] = tabbedWindow.tabs.splice(tabIndex, 1);
+            const sourceWindow = state.windows[sourceWindowIndex];
+            if (!sourceWindow) {
+              logger.warn({ tabId }, "Source window not found, cannot move");
+              return;
+            }
+            const tabIndex = sourceWindow.tabs.findIndex((t) => t.id === tabId);
+            const [tabToMove] = sourceWindow.tabs.splice(tabIndex, 1);
+            if (!tabToMove) {
+              logger.warn({ tabId }, "Tab not found, cannot move");
+              return;
+            }
 
-                if (tabbedWindow.activeTabId === tabId) {
-                  const targetTab =
-                    tabbedWindow.tabs[tabIndex - 1] ?? tabbedWindow.tabs[0];
-                  if (!targetTab) {
-                    throw new Error(
-                      "No target tab found. This should never happen.",
-                    );
-                  }
-                  tabbedWindow.activeTabId = targetTab.id;
-                }
-                break;
+            // Update source window's active tab if needed
+            if (
+              sourceWindow.activeTabId === tabId &&
+              sourceWindow.tabs.length > 0
+            ) {
+              const targetTab =
+                sourceWindow.tabs[tabIndex] ?? sourceWindow.tabs[tabIndex - 1];
+              if (targetTab) {
+                sourceWindow.activeTabId = targetTab.id;
               }
             }
 
-            if (!tabToMove) return;
-
             // Add tab to target tabbedWindow
             const targetWindow = state.windows.find((w) => w.id === windowId);
-            if (!targetWindow) return;
+            if (!targetWindow) {
+              logger.warn(
+                { windowId },
+                "Target window not found, cannot move tab",
+              );
+              // Restore tab to source window
+              sourceWindow.tabs.push(tabToMove);
+              return;
+            }
 
-            targetWindow.tabs.splice(index, 0, tabToMove);
+            // Clamp index to valid range
+            const clampedIndex = Math.max(
+              0,
+              Math.min(index, targetWindow.tabs.length),
+            );
+            if (clampedIndex !== index) {
+              logger.warn(
+                { tabId, windowId, requestedIndex: index, clampedIndex },
+                "Index out of bounds, clamping to valid range",
+              );
+            }
+
+            targetWindow.tabs.splice(clampedIndex, 0, tabToMove);
             targetWindow.activeTabId = tabId;
             state.activeWindowId = windowId;
 
@@ -309,10 +383,25 @@ function createDraggableTabsBrowserStore(projectId: string) {
         setActiveTab: ({ windowId, tabId }) => {
           set((state) => {
             const tabbedWindow = state.windows.find((w) => w.id === windowId);
-            if (tabbedWindow?.tabs.some((tab) => tab.id === tabId)) {
-              tabbedWindow.activeTabId = tabId;
-              state.activeWindowId = windowId;
+
+            if (!tabbedWindow) {
+              logger.warn(
+                { windowId, tabId },
+                "Window not found, cannot set active tab",
+              );
+              return;
             }
+
+            if (!tabbedWindow.tabs.some((tab) => tab.id === tabId)) {
+              logger.warn(
+                { windowId, tabId },
+                "Tab not found in window, cannot set active",
+              );
+              return;
+            }
+
+            tabbedWindow.activeTabId = tabId;
+            state.activeWindowId = windowId;
           });
         },
 
@@ -343,9 +432,12 @@ function createDraggableTabsBrowserStore(projectId: string) {
               .flatMap((w) => w.tabs)
               .find((t) => t.id === tabId);
 
-            if (tab) {
-              tab.data = updater(tab.data);
+            if (!tab) {
+              logger.warn({ tabId }, "Tab not found, cannot update data");
+              return;
             }
+
+            tab.data = updater(tab.data);
           });
         },
 
@@ -419,6 +511,69 @@ function createDraggableTabsBrowserStore(projectId: string) {
               }
               // Reset to initial state
               Object.assign(state, initialState);
+              return;
+            }
+
+            // Validate logical consistency
+            let hasInconsistency = false;
+
+            // Remove windows with no tabs
+            state.windows = state.windows.filter((w) => {
+              if (w.tabs.length === 0) {
+                logger.warn(
+                  { windowId: w.id },
+                  "Removing empty window during rehydration",
+                );
+                hasInconsistency = true;
+                return false;
+              }
+              return true;
+            });
+
+            // Validate each window's activeTabId exists in its tabs
+            state.windows.forEach((window) => {
+              const hasActiveTab = window.tabs.some(
+                (t) => t.id === window.activeTabId,
+              );
+              if (!hasActiveTab) {
+                logger.warn(
+                  { windowId: window.id, activeTabId: window.activeTabId },
+                  "Active tab not found in window, resetting to first tab",
+                );
+                window.activeTabId = window.tabs[0]?.id ?? "";
+                hasInconsistency = true;
+              }
+            });
+
+            // Validate activeWindowId exists in windows
+            if (state.activeWindowId) {
+              const hasActiveWindow = state.windows.some(
+                (w) => w.id === state.activeWindowId,
+              );
+              if (!hasActiveWindow) {
+                logger.warn(
+                  { activeWindowId: state.activeWindowId },
+                  "Active window not found, resetting to first window",
+                );
+                state.activeWindowId = state.windows[0]?.id ?? null;
+                hasInconsistency = true;
+              }
+            }
+
+            // If state is now empty after cleanup, reset completely
+            if (state.windows.length === 0) {
+              logger.warn(
+                "No valid windows after rehydration, resetting to initial state",
+              );
+              Object.assign(state, initialState);
+              try {
+                localStorage.removeItem(storageKey);
+              } catch (e) {
+                logger.error({ error: e }, "Failed to clear invalid storage");
+              }
+            } else if (hasInconsistency) {
+              // Log that we fixed inconsistencies
+              logger.info("Fixed state inconsistencies during rehydration");
             }
           }
         },

@@ -3,6 +3,7 @@ import { configDefaults, defineConfig } from "vitest/config";
 
 export default defineConfig({
   test: {
+    watch: false,
     setupFiles: ["./test-setup.ts"],
     exclude: [
       ...configDefaults.exclude,
@@ -13,6 +14,13 @@ export default defineConfig({
       "**/e2e/**/*",
       "saas-src/**/*",
     ],
+    env: {
+      /*
+       * @see src/server/redis.ts, lines 8-11
+       * This is to prevent the redis connection from being established during the test run.
+       */
+      BUILD_TIME: "1",
+    },
   },
   esbuild: {
     jsx: "automatic",
