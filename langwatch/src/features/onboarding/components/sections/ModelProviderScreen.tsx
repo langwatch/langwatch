@@ -22,7 +22,7 @@ export function ModelProviderScreen(): React.ReactElement {
           onSelectModelProvider={setSelectedModelProviderKey}
         />
 
-        <ModelProviderConfigFields modelProviderKey={modelProviderKey} />
+        <ModelProviderConfigFields key={modelProviderKey} modelProviderKey={modelProviderKey} />
       </VStack>
 
       {project?.slug && (
