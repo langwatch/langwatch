@@ -1,4 +1,4 @@
-import { Button, type ButtonProps } from "@chakra-ui/react";
+import { Button, Icon, type ButtonProps } from "@chakra-ui/react";
 import { Send } from "react-feather";
 
 /**
@@ -39,7 +39,7 @@ export function ChatSendButton({
       transition="all 0.2s"
       {...buttonProps}
     >
-      <Send size={16} />
+      <Icon as={Send} boxSize="16px" />
     </Button>
   );
 }

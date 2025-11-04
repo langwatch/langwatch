@@ -265,14 +265,27 @@ export function VersionHistoryListPopover({
   const { project } = useOrganizationTeamProject();
   const { restoreVersion } = usePrompts();
   const { data: prompts = [], isLoading } =
-    api.prompts.getAllVersionsForPrompt.useQuery({
-      idOrHandle: configId,
-      projectId: project?.id ?? "",
-    });
+    api.prompts.getAllVersionsForPrompt.useQuery(
+      {
+        idOrHandle: configId,
+        projectId: project?.id ?? "",
+      },
+      {
+        enabled: !!project?.id && !!configId,
+      },
+    );
 
   const handleRestore = useCallback(
     (params: { versionId: string }) => {
       void (async () => {
+        if (!project?.id) {
+          logger.error("Cannot restore version: project not loaded");
+          toaster.error({
+            title: "Failed to restore version",
+            description: "Project information is not available",
+          });
+          return;
+        }
         const { versionId } = params;
         try {
           const prompt = await restoreVersion({
