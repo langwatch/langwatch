@@ -69,7 +69,8 @@ function NewTeam({ organization }: { organization: FullyLoadedOrganization }) {
           onError: () => {
             toaster.create({
               title: "Failed to create team",
-              description: "Please try again",
+              description:
+                "Please check your permissions if you have team:create permissions to create a team",
               type: "error",
               duration: 5000,
               meta: {

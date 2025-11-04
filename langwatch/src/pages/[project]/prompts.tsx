@@ -1,4 +1,5 @@
 import { Flex, Spacer, VStack, Tabs, Badge } from "@chakra-ui/react";
+import { Tooltip } from "~/components/ui/tooltip";
 import { useState, useMemo, useRef, useEffect, useCallback } from "react";
 import { Plus } from "react-feather";
 import { DeleteConfirmationDialog } from "~/components/annotations/DeleteConfirmationDialog";
@@ -175,7 +176,7 @@ function usePromptConfigManagement(projectId: string | undefined) {
  */
 function PromptConfigsPage() {
   // Get current project and prompt selection state from hooks.
-  const { project } = useOrganizationTeamProject();
+  const { project, hasPermission } = useOrganizationTeamProject();
 
   const { selectedPromptId, setSelectedPromptId, clearSelection } =
     usePromptIdQueryParam();
@@ -290,11 +291,23 @@ function PromptConfigsPage() {
               <PageLayout.Header>
                 <PageLayout.Heading>Prompts</PageLayout.Heading>
                 <Spacer />
-                <PageLayout.HeaderButton
-                  onClick={() => void handleCreateButtonClick()}
+                <Tooltip
+                  content={
+                    !hasPermission("prompts:create")
+                      ? "You need prompts:create permission to create prompts"
+                      : undefined
+                  }
+                  disabled={hasPermission("prompts:create")}
+                  positioning={{ placement: "bottom" }}
+                  showArrow
                 >
-                  <Plus height={16} /> Create New
-                </PageLayout.HeaderButton>
+                  <PageLayout.HeaderButton
+                    onClick={() => void handleCreateButtonClick()}
+                    disabled={!hasPermission("prompts:create")}
+                  >
+                    <Plus height={16} /> Create New
+                  </PageLayout.HeaderButton>
+                </Tooltip>
               </PageLayout.Header>
               <Tabs.Root defaultValue="published" variant="enclosed">
                 <Tabs.List width="full">
