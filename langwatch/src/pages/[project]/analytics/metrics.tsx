@@ -195,6 +195,24 @@ const averageTokensPerMessage = {
 };
 
 function MetricsContent() {
+  const { hasPermission } = useOrganizationTeamProject();
+  const canViewCost = hasPermission("cost:view");
+
+  // Filter out cost metrics if user doesn't have cost:view permission
+  const LLMMetricsFiltered = {
+    ...LLMMetrics,
+    series: LLMMetrics.series.filter(
+      (s) => canViewCost || !s.metric?.includes("total_cost"),
+    ),
+  };
+
+  const LLMSummaryFiltered = {
+    ...LLMSummary,
+    series: LLMSummary.series.filter(
+      (s) => canViewCost || !s.metric?.includes("total_cost"),
+    ),
+  };
+
   return (
     <GraphsLayout>
       <AnalyticsHeader title="LLM Metrics" />
@@ -209,7 +227,7 @@ function MetricsContent() {
                 </HStack>
               </Card.Header>
               <Card.Body>
-                <CustomGraph input={LLMMetrics as CustomGraphInput} />
+                <CustomGraph input={LLMMetricsFiltered as CustomGraphInput} />
               </Card.Body>
             </Card.Root>
           </GridItem>
@@ -222,7 +240,7 @@ function MetricsContent() {
                 </HStack>
               </Card.Header>
               <Card.Body>
-                <CustomGraph input={LLMSummary as CustomGraphInput} />
+                <CustomGraph input={LLMSummaryFiltered as CustomGraphInput} />
               </Card.Body>
             </Card.Root>
           </GridItem>
@@ -266,19 +284,21 @@ function MetricsContent() {
               </Card.Body>
             </Card.Root>
           </GridItem>
-          <GridItem colSpan={2} display="inline-grid">
-            <Card.Root>
-              <Card.Header>
-                <HStack gap={2}>
-                  <BarChart2 color="orange" />
-                  <Heading size="sm">Average Cost Per Message</Heading>
-                </HStack>
-              </Card.Header>
-              <Card.Body>
-                <CustomGraph input={totalCostPerModel as CustomGraphInput} />
-              </Card.Body>
-            </Card.Root>
-          </GridItem>
+          {canViewCost && (
+            <GridItem colSpan={2} display="inline-grid">
+              <Card.Root>
+                <Card.Header>
+                  <HStack gap={2}>
+                    <BarChart2 color="orange" />
+                    <Heading size="sm">Average Cost Per Message</Heading>
+                  </HStack>
+                </Card.Header>
+                <Card.Body>
+                  <CustomGraph input={totalCostPerModel as CustomGraphInput} />
+                </Card.Body>
+              </Card.Root>
+            </GridItem>
+          )}
           <GridItem colSpan={2} display="inline-grid">
             <Card.Root>
               <Card.Header>
