@@ -40,6 +40,7 @@ import {
 } from "./span-event-processing/strands-agents";
 import { getLangWatchTracer } from "langwatch";
 import { SpanKind, SpanStatusCode } from "@opentelemetry/api";
+import Long from "long";
 
 const logger = createLogger("langwatch.tracer.otel.traces");
 const tracer = getLangWatchTracer("langwatch.tracer.otel.traces");
@@ -54,7 +55,7 @@ export type TraceForCollection = Pick<
 >;
 
 export const openTelemetryTraceRequestToTracesForCollection = async (
-  otelTrace: DeepPartial<IExportTraceServiceRequest>
+  otelTrace: DeepPartial<IExportTraceServiceRequest>,
 ): Promise<TraceForCollection[]> => {
   return await tracer.withActiveSpan(
     "openTelemetryTraceRequestToTracesForCollection",
@@ -72,29 +73,31 @@ export const openTelemetryTraceRequestToTracesForCollection = async (
                 resourceSpan?.scopeSpans?.flatMap((scopeSpan) => {
                   return (
                     scopeSpan?.spans?.flatMap(
-                      (span) => span?.traceId as string
+                      (span) => span?.traceId as string,
                     ) ?? []
                   );
                 }) ?? []
               );
-            }) ?? []
-          )
+            }) ?? [],
+          ),
         );
 
         span.setAttribute("trace.count", traceIds.length);
         span.setAttribute(
           "resourceSpans.count",
-          otelTrace.resourceSpans?.length ?? 0
+          otelTrace.resourceSpans?.length ?? 0,
         );
 
         const traces: TraceForCollection[] = traceIds.map((traceId) =>
           openTelemetryTraceRequestToTraceForCollection(traceId, {
-            resourceSpans: otelTrace.resourceSpans?.filter((resourceSpan) =>
-              resourceSpan?.scopeSpans?.some((scopeSpan) =>
-                scopeSpan?.spans?.some((span) => span?.traceId === traceId)
-              )
+            resourceSpans: otelTrace.resourceSpans?.filter(
+              (resourceSpan) =>
+                resourceSpan?.scopeSpans?.some(
+                  (scopeSpan) =>
+                    scopeSpan?.spans?.some((span) => span?.traceId === traceId),
+                ),
             ),
-          })
+          }),
         );
 
         span.setAttribute("processed.traces.count", traces.length);
@@ -105,16 +108,16 @@ export const openTelemetryTraceRequestToTracesForCollection = async (
           message: error instanceof Error ? error.message : "Unknown error",
         });
         span.recordException(
-          error instanceof Error ? error : new Error(String(error))
+          error instanceof Error ? error : new Error(String(error)),
         );
         throw error;
       }
-    }
+    },
   );
 };
 
 const decodeOpenTelemetryIds = (
-  otelTrace: DeepPartial<IExportTraceServiceRequest>
+  otelTrace: DeepPartial<IExportTraceServiceRequest>,
 ) => {
   try {
     for (const resourceSpan of otelTrace.resourceSpans ?? []) {
@@ -141,7 +144,7 @@ const decodeOpenTelemetryIds = (
                 ? Object.values(span.parentSpanId)
                 : span.parentSpanId;
             span.parentSpanId = Buffer.from(values as any, "base64").toString(
-              "hex"
+              "hex",
             );
           }
         }
@@ -156,7 +159,7 @@ const decodeOpenTelemetryIds = (
 
 const openTelemetryTraceRequestToTraceForCollection = (
   traceId: string,
-  otelTrace_: DeepPartial<IExportTraceServiceRequest>
+  otelTrace_: DeepPartial<IExportTraceServiceRequest>,
 ): TraceForCollection => {
   return tracer.withActiveSpan(
     "openTelemetryTraceRequestToTraceForCollection",
@@ -166,7 +169,7 @@ const openTelemetryTraceRequestToTraceForCollection = (
         span.setAttribute("trace.id", traceId);
         span.setAttribute(
           "resourceSpans.count",
-          otelTrace_.resourceSpans?.length ?? 0
+          otelTrace_.resourceSpans?.length ?? 0,
         );
         const otelTrace = cloneDeep(otelTrace_);
 
@@ -201,7 +204,7 @@ const openTelemetryTraceRequestToTraceForCollection = (
         span.setAttribute("evaluations.count", trace.evaluations?.length ?? 0);
         span.setAttribute(
           "customMetadata.keys",
-          Object.keys(trace.customMetadata).length
+          Object.keys(trace.customMetadata).length,
         );
 
         return trace;
@@ -211,25 +214,25 @@ const openTelemetryTraceRequestToTraceForCollection = (
           message: error instanceof Error ? error.message : "Unknown error",
         });
         span.recordException(
-          error instanceof Error ? error : new Error(String(error))
+          error instanceof Error ? error : new Error(String(error)),
         );
         throw error;
       }
-    }
+    },
   );
 };
 
 const allowedSpanTypes = spanTypesSchema.options.map((option) => option.value);
 
 const parseTimestamp = (
-  timestamp: DeepPartial<Fixed64> | undefined
+  timestamp: DeepPartial<Fixed64> | undefined,
 ): number | undefined => {
   const unixNano =
     typeof timestamp === "number"
       ? timestamp
       : typeof timestamp === "string"
-        ? parseInt(timestamp, 10)
-        : maybeConvertLongBits(timestamp);
+      ? parseInt(timestamp, 10)
+      : maybeConvertLongBits(timestamp);
 
   return unixNano ? Math.round(unixNano / 1000 / 1000) : undefined;
 };
@@ -237,7 +240,7 @@ const parseTimestamp = (
 const addOpenTelemetrySpanAsSpan = (
   trace: TraceForCollection,
   incomingSpan: DeepPartial<ISpan>,
-  incomingScope: DeepPartial<IInstrumentationScope> | undefined
+  incomingScope: DeepPartial<IInstrumentationScope> | undefined,
 ): void => {
   tracer.withActiveSpan(
     "addOpenTelemetrySpanAsSpan",
@@ -264,7 +267,7 @@ const addOpenTelemetrySpanAsSpan = (
           parseTimestamp(incomingSpan.endTimeUnixNano);
         let error: Span["error"] = null;
         const attributesMap = otelAttributesToNestedAttributes(
-          incomingSpan.attributes
+          incomingSpan.attributes,
         );
 
         // First token at
@@ -283,12 +286,12 @@ const addOpenTelemetrySpanAsSpan = (
             }
             case "langwatch.evaluation.custom": {
               const jsonPayload = event.attributes?.find(
-                (attr) => attr?.key === "json_encoded_event"
+                (attr) => attr?.key === "json_encoded_event",
               )?.value?.stringValue;
               if (!jsonPayload) {
                 logger.warn(
                   { event },
-                  "event for `langwatch.evaluation.custom` has no json_encoded_event"
+                  "event for `langwatch.evaluation.custom` has no json_encoded_event",
                 );
                 break;
               }
@@ -303,7 +306,7 @@ const addOpenTelemetrySpanAsSpan = (
               } catch (error) {
                 logger.error(
                   { error, jsonPayload },
-                  "error parsing json_encoded_event from `langwatch.evaluation.custom`, event discarded"
+                  "error parsing json_encoded_event from `langwatch.evaluation.custom`, event discarded",
                 );
               }
               break;
@@ -321,6 +324,12 @@ const addOpenTelemetrySpanAsSpan = (
             input = io.input;
             output = io.output;
           }
+        }
+
+        if (started_at && attributesMap.gen_ai?.server?.time_to_first_token) {
+          first_token_at =
+            started_at +
+            parseInt((attributesMap as any).gen_ai.server.time_to_first_token, 10);
         }
 
         if (started_at && attributesMap.ai?.response?.msToFirstChunk) {
@@ -404,8 +413,16 @@ const addOpenTelemetrySpanAsSpan = (
           }
         }
 
+        // Strands chat LLM calls
+        if (type == "span" && attributesMap.gen_ai?.operation?.name === "chat") {
+          type = "llm";
+        }
+
         // Extract metadata for agent spans from strands-agents
-        if (type === "agent" && isStrandsAgentsInstrumentation(incomingScope, incomingSpan)) {
+        if (
+          type === "agent" &&
+          isStrandsAgentsInstrumentation(incomingScope, incomingSpan)
+        ) {
           const strandsMetadata = extractStrandsAgentsMetadata(incomingSpan);
           if (Object.keys(strandsMetadata).length > 0) {
             metadata = {
@@ -458,7 +475,7 @@ const addOpenTelemetrySpanAsSpan = (
           const input_ = typedValueChatMessagesSchema.safeParse({
             type: "chat_messages",
             value: attributesMap.llm.input_messages.map(
-              (message: { message?: string }) => message.message
+              (message: { message?: string }) => message.message,
             ),
           });
 
@@ -613,7 +630,7 @@ const addOpenTelemetrySpanAsSpan = (
           const output_ = typedValueChatMessagesSchema.safeParse({
             type: "chat_messages",
             value: attributesMap.llm.output_messages.map(
-              (message: { message?: string }) => message.message
+              (message: { message?: string }) => message.message,
             ),
           });
 
@@ -745,7 +762,12 @@ const addOpenTelemetrySpanAsSpan = (
         if (!output) {
           if (Array.isArray(attributesMap?.events)) {
             // event && typeof event === "object" -> this is needed as `null` is typeof object!
-            const event = attributesMap.events.find((event) => event && typeof event === "object" && event["event.name"] === "gen_ai.choice");
+            const event = attributesMap.events.find(
+              (event) =>
+                event &&
+                typeof event === "object" &&
+                event["event.name"] === "gen_ai.choice",
+            );
             if (event?.message) {
               output = {
                 type: "chat_messages",
@@ -798,7 +820,7 @@ const addOpenTelemetrySpanAsSpan = (
             !isNaN(Number(attributesMap.gen_ai.usage.input_tokens))
           ) {
             metrics.prompt_tokens = Number(
-              attributesMap.gen_ai.usage.input_tokens
+              attributesMap.gen_ai.usage.input_tokens,
             );
             delete attributesMap.gen_ai.usage.input_tokens;
           }
@@ -807,7 +829,7 @@ const addOpenTelemetrySpanAsSpan = (
             !isNaN(Number(attributesMap.gen_ai.usage.output_tokens))
           ) {
             metrics.completion_tokens = Number(
-              attributesMap.gen_ai.usage.output_tokens
+              attributesMap.gen_ai.usage.output_tokens,
             );
             delete attributesMap.gen_ai.usage.output_tokens;
             delete attributesMap.gen_ai.usage.total_tokens;
@@ -885,7 +907,7 @@ const addOpenTelemetrySpanAsSpan = (
         for (const event of incomingSpan?.events ?? []) {
           if (event?.name === "exception") {
             const eventAttributes = otelAttributesToNestedAttributes(
-              event?.attributes
+              event?.attributes,
             );
 
             let errorMessage: string;
@@ -1021,7 +1043,7 @@ const addOpenTelemetrySpanAsSpan = (
               metrics = {
                 ...metrics,
                 ...spanMetricsSchema.parse(
-                  attributesMap.langwatch.metrics as any
+                  attributesMap.langwatch.metrics as any,
                 ),
               };
               delete (attributesMap as any).langwatch.metrics;
@@ -1035,7 +1057,7 @@ const addOpenTelemetrySpanAsSpan = (
               params = {
                 ...params,
                 ...reservedSpanParamsSchema.parse(
-                  attributesMap.langwatch.params as any
+                  attributesMap.langwatch.params as any,
                 ),
               };
               delete (attributesMap as any).langwatch.params;
@@ -1046,9 +1068,9 @@ const addOpenTelemetrySpanAsSpan = (
           // Timestamps
           if (attributesMap.langwatch.timestamps) {
             try {
-              const timestamps = spanTimestampsSchema.partial().parse(
-                attributesMap.langwatch.timestamps as any
-              );
+              const timestamps = spanTimestampsSchema
+                .partial()
+                .parse(attributesMap.langwatch.timestamps as any);
               if (timestamps.started_at) {
                 started_at = timestamps.started_at;
               }
@@ -1122,11 +1144,11 @@ const addOpenTelemetrySpanAsSpan = (
           message: error instanceof Error ? error.message : "Unknown error",
         });
         otelSpan.recordException(
-          error instanceof Error ? error : new Error(String(error))
+          error instanceof Error ? error : new Error(String(error)),
         );
         throw error;
       }
-    }
+    },
   );
 };
 
@@ -1137,7 +1159,7 @@ type RecursiveRecord = {
 const isNumeric = (n: any) => !isNaN(parseFloat(n)) && isFinite(n);
 
 export function otelAttributesToNestedAttributes(
-  attributes: DeepPartial<IKeyValue[]> | undefined
+  attributes: DeepPartial<IKeyValue[]> | undefined,
 ): RecursiveRecord {
   const resolveOtelAnyValue = (anyValuePair?: DeepPartial<IAnyValue>): any => {
     if (!anyValuePair) return void 0;
@@ -1153,8 +1175,14 @@ export function otelAttributesToNestedAttributes(
     }
 
     if (anyValuePair.boolValue != null) return anyValuePair.boolValue;
-    if (anyValuePair.intValue != null) return anyValuePair.intValue;
-    if (anyValuePair.doubleValue != null) return anyValuePair.doubleValue;
+    if (anyValuePair.intValue != null)
+      return Long.isLong(anyValuePair.intValue)
+        ? anyValuePair.intValue.toInt()
+        : anyValuePair.intValue;
+    if (anyValuePair.doubleValue != null)
+      return Long.isLong(anyValuePair.doubleValue)
+        ? anyValuePair.doubleValue.toNumber()
+        : anyValuePair.doubleValue;
     if (anyValuePair.bytesValue != null) return anyValuePair.bytesValue;
 
     if (anyValuePair.kvlistValue)
@@ -1269,7 +1297,7 @@ const applyMappingsToMetadata = (metadata: any) => {
       }
 
       return [langWatchKey, value];
-    })
+    }),
   );
 };
 
@@ -1288,13 +1316,13 @@ const extractReservedAndCustomMetadata = (metadata: any) => {
   }
   const reservedTraceMetadata = Object.fromEntries(
     Object.entries(reservedTraceMetadataSchema.parse(metadata)).filter(
-      ([_key, value]) => value !== null && value !== undefined
-    )
+      ([_key, value]) => value !== null && value !== undefined,
+    ),
   );
   const remainingMetadata = Object.fromEntries(
     Object.entries(metadata).filter(
-      ([key]) => !(key in reservedTraceMetadataSchema.shape)
-    )
+      ([key]) => !(key in reservedTraceMetadataSchema.shape),
+    ),
   );
   const customMetadata = customMetadataSchema.parse(remainingMetadata);
 

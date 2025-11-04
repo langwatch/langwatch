@@ -11,6 +11,7 @@ import { fromZodError } from "zod-validation-error";
 import type { DeepPartial } from "../../utils/types";
 import { openTelemetryTraceRequestToTracesForCollection } from "./otel.traces";
 import { spanSchema } from "./types.generated";
+import Long from "long";
 
 const openInferenceOpenAIRequest: DeepPartial<IExportTraceServiceRequest> = {
   resourceSpans: [
@@ -1018,7 +1019,7 @@ const springAITrace: DeepPartial<IExportTraceServiceRequest> = {
                 {
                   key: "gen_ai.response.finish_reasons",
                   value: {
-                    stringValue: "[\"STOP\"]",
+                    stringValue: '["STOP"]',
                   },
                 },
               ],
@@ -1034,7 +1035,7 @@ const springAITrace: DeepPartial<IExportTraceServiceRequest> = {
 describe("opentelemetry traces receiver", () => {
   it("receives a basic openai trace for openinference", async () => {
     const traces = await openTelemetryTraceRequestToTracesForCollection(
-      openInferenceOpenAIRequest
+      openInferenceOpenAIRequest,
     );
 
     expect(traces).toHaveLength(1);
@@ -1118,7 +1119,7 @@ describe("opentelemetry traces receiver", () => {
 
   it("receives a basic openai trace for openllmetry", async () => {
     const traces = await openTelemetryTraceRequestToTracesForCollection(
-      openllmetryOpenAIRequest
+      openllmetryOpenAIRequest,
     );
 
     expect(traces).toHaveLength(1);
@@ -1205,7 +1206,7 @@ describe("opentelemetry traces receiver", () => {
 
   it("receives traditional opentelemetry trace for fastapi", async () => {
     const traces = await openTelemetryTraceRequestToTracesForCollection(
-      fastApiOpenTelemetryRequest
+      fastApiOpenTelemetryRequest,
     );
 
     expect(traces).toHaveLength(1);
@@ -1304,9 +1305,8 @@ describe("opentelemetry traces receiver", () => {
   });
 
   it("receives a trace with an exception", async () => {
-    const traces = await openTelemetryTraceRequestToTracesForCollection(
-      traceWithException
-    );
+    const traces =
+      await openTelemetryTraceRequestToTracesForCollection(traceWithException);
 
     expect(traces).toHaveLength(1);
 
@@ -1418,7 +1418,7 @@ describe("opentelemetry traces receiver", () => {
 
   it("receives a langchain openlllmetry trace", async () => {
     const traces = await openTelemetryTraceRequestToTracesForCollection(
-      openllmetryLangChainRequest
+      openllmetryLangChainRequest,
     );
 
     expect(traces).toHaveLength(1);
@@ -1500,7 +1500,8 @@ describe("opentelemetry traces receiver", () => {
   });
 
   it("receives a strands trace", async () => {
-    const traces = await openTelemetryTraceRequestToTracesForCollection(strandsTrace);
+    const traces =
+      await openTelemetryTraceRequestToTracesForCollection(strandsTrace);
 
     expect(traces).toHaveLength(1);
 
@@ -1594,7 +1595,10 @@ describe("opentelemetry traces receiver", () => {
           resource: {
             attributes: [
               { key: "service.name", value: { stringValue: "strands-agents" } },
-              { key: "telemetry.sdk.language", value: { stringValue: "python" } },
+              {
+                key: "telemetry.sdk.language",
+                value: { stringValue: "python" },
+              },
             ],
           },
           scopeSpans: [
@@ -1609,23 +1613,35 @@ describe("opentelemetry traces receiver", () => {
                   startTimeUnixNano: "1723006472661658000",
                   endTimeUnixNano: "1723006473946042000",
                   attributes: [
-                    { key: "gen_ai.request.model", value: { stringValue: "openai/gpt-4.1-nano" } },
+                    {
+                      key: "gen_ai.request.model",
+                      value: { stringValue: "openai/gpt-4.1-nano" },
+                    },
                   ],
                   events: [
                     {
                       name: "gen_ai.tool.message",
                       attributes: [
                         { key: "role", value: { stringValue: "user" } },
-                        { key: "content", value: { stringValue: '[{"text": "yo"}]' } },
+                        {
+                          key: "content",
+                          value: { stringValue: '[{"text": "yo"}]' },
+                        },
                         { key: "id", value: { stringValue: "msg-1" } },
                       ],
                     },
                     {
                       name: "gen_ai.choice",
                       attributes: [
-                        { key: "message", value: { stringValue: '[{"text": "Hello!"}]' } },
+                        {
+                          key: "message",
+                          value: { stringValue: '[{"text": "Hello!"}]' },
+                        },
                         { key: "id", value: { stringValue: "choice-1" } },
-                        { key: "finish_reason", value: { stringValue: "end_turn" } },
+                        {
+                          key: "finish_reason",
+                          value: { stringValue: "end_turn" },
+                        },
                       ],
                     },
                   ],
@@ -1638,7 +1654,8 @@ describe("opentelemetry traces receiver", () => {
       ],
     };
 
-    const traces = await openTelemetryTraceRequestToTracesForCollection(strandsAgentsTrace);
+    const traces =
+      await openTelemetryTraceRequestToTracesForCollection(strandsAgentsTrace);
     expect(traces).toHaveLength(1);
     const trace = traces[0];
     if (!trace) {
@@ -1678,8 +1695,875 @@ describe("opentelemetry traces receiver", () => {
     });
   });
 
+  it("receives a strands-agents Python SDK trace v1.14", async () => {
+    const strandsAgentsTraceV1_14: DeepPartial<IExportTraceServiceRequest> = {
+      resourceSpans: [
+        {
+          resource: {
+            attributes: [
+              {
+                key: "telemetry.sdk.language",
+                value: {
+                  stringValue: "python",
+                },
+              },
+              {
+                key: "telemetry.sdk.name",
+                value: {
+                  stringValue: "opentelemetry",
+                },
+              },
+              {
+                key: "telemetry.sdk.version",
+                value: {
+                  stringValue: "1.36.0",
+                },
+              },
+              {
+                key: "langwatch.sdk.name",
+                value: {
+                  stringValue: "langwatch-observability-sdk",
+                },
+              },
+              {
+                key: "langwatch.sdk.version",
+                value: {
+                  stringValue: "0.6.1",
+                },
+              },
+              {
+                key: "langwatch.sdk.language",
+                value: {
+                  stringValue: "python",
+                },
+              },
+              {
+                key: "service.name",
+                value: {
+                  stringValue: "unknown_service",
+                },
+              },
+            ],
+          },
+          scopeSpans: [
+            {
+              scope: {
+                name: "strands.telemetry.tracer",
+              },
+              spans: [
+                {
+                  traceId: "QVLR+yxI/4fXWruWRwsT0w==",
+                  spanId: "EG+ZduvU5ew=",
+                  parentSpanId: "aLJ/OoH/T68=",
+                  name: "chat",
+                  kind: "SPAN_KIND_INTERNAL" as unknown as ESpanKind,
+                  startTimeUnixNano: "1762189175572292000",
+                  endTimeUnixNano: "1762189177628526000",
+                  attributes: [
+                    {
+                      key: "gen_ai.event.start_time",
+                      value: {
+                        stringValue: "2025-11-03T16:59:35.572293+00:00",
+                      },
+                    },
+                    {
+                      key: "gen_ai.operation.name",
+                      value: {
+                        stringValue: "chat",
+                      },
+                    },
+                    {
+                      key: "gen_ai.system",
+                      value: {
+                        stringValue: "strands-agents",
+                      },
+                    },
+                    {
+                      key: "gen_ai.request.model",
+                      value: {
+                        stringValue: "openai/gpt-5-mini",
+                      },
+                    },
+                    {
+                      key: "gen_ai.event.end_time",
+                      value: {
+                        stringValue: "2025-11-03T16:59:37.628502+00:00",
+                      },
+                    },
+                    {
+                      key: "gen_ai.usage.prompt_tokens",
+                      value: {
+                        intValue: Long.fromString("134") as unknown as number,
+                      },
+                    },
+                    {
+                      key: "gen_ai.usage.input_tokens",
+                      value: {
+                        intValue: Long.fromString("134") as unknown as number,
+                      },
+                    },
+                    {
+                      key: "gen_ai.usage.completion_tokens",
+                      value: {
+                        intValue: Long.fromString("84") as unknown as number,
+                      },
+                    },
+                    {
+                      key: "gen_ai.usage.output_tokens",
+                      value: {
+                        intValue: Long.fromString("84") as unknown as number,
+                      },
+                    },
+                    {
+                      key: "gen_ai.usage.total_tokens",
+                      value: {
+                        intValue: Long.fromString("218") as unknown as number,
+                      },
+                    },
+                    {
+                      key: "gen_ai.server.time_to_first_token",
+                      value: {
+                        intValue: Long.fromString("2046") as unknown as number,
+                      },
+                    },
+                  ],
+                  events: [
+                    {
+                      timeUnixNano: "1762189175572308000",
+                      name: "gen_ai.user.message",
+                      attributes: [
+                        {
+                          key: "content",
+                          value: {
+                            stringValue: '[{"text": "testing"}]',
+                          },
+                        },
+                      ],
+                    },
+                    {
+                      timeUnixNano: "1762189177628493000",
+                      name: "gen_ai.choice",
+                      attributes: [
+                        {
+                          key: "finish_reason",
+                          value: {
+                            stringValue: "tool_use",
+                          },
+                        },
+                        {
+                          key: "message",
+                          value: {
+                            stringValue:
+                              '[{"toolUse": {"toolUseId": "call_hdzL5ISsJA4mCJ1mWBGkqtzz", "name": "get_user_location", "input": {}}}]',
+                          },
+                        },
+                      ],
+                    },
+                  ],
+                  status: {
+                    code: "STATUS_CODE_OK" as unknown as EStatusCode,
+                  },
+                },
+                {
+                  traceId: "QVLR+yxI/4fXWruWRwsT0w==",
+                  spanId: "RH6yPQ9UCrU=",
+                  parentSpanId: "aLJ/OoH/T68=",
+                  name: "execute_tool get_user_location",
+                  kind: "SPAN_KIND_INTERNAL" as unknown as ESpanKind,
+                  startTimeUnixNano: "1762189177943905000",
+                  endTimeUnixNano: "1762189177948477000",
+                  attributes: [
+                    {
+                      key: "gen_ai.event.start_time",
+                      value: {
+                        stringValue: "2025-11-03T16:59:37.943913+00:00",
+                      },
+                    },
+                    {
+                      key: "gen_ai.operation.name",
+                      value: {
+                        stringValue: "execute_tool",
+                      },
+                    },
+                    {
+                      key: "gen_ai.system",
+                      value: {
+                        stringValue: "strands-agents",
+                      },
+                    },
+                    {
+                      key: "gen_ai.tool.name",
+                      value: {
+                        stringValue: "get_user_location",
+                      },
+                    },
+                    {
+                      key: "gen_ai.tool.call.id",
+                      value: {
+                        stringValue: "call_hdzL5ISsJA4mCJ1mWBGkqtzz",
+                      },
+                    },
+                    {
+                      key: "gen_ai.tool.description",
+                      value: {
+                        stringValue: "Get the user's location.",
+                      },
+                    },
+                    {
+                      key: "gen_ai.tool.json_schema",
+                      value: {
+                        stringValue:
+                          '{"properties": {}, "type": "object", "required": []}',
+                      },
+                    },
+                    {
+                      key: "gen_ai.event.end_time",
+                      value: {
+                        stringValue: "2025-11-03T16:59:37.948433+00:00",
+                      },
+                    },
+                    {
+                      key: "gen_ai.tool.status",
+                      value: {
+                        stringValue: "success" as unknown as string,
+                      },
+                    },
+                  ],
+                  events: [
+                    {
+                      timeUnixNano: "1762189177943953000",
+                      name: "gen_ai.tool.message",
+                      attributes: [
+                        {
+                          key: "role",
+                          value: {
+                            stringValue: "tool",
+                          },
+                        },
+                        {
+                          key: "content",
+                          value: {
+                            stringValue: "{}",
+                          },
+                        },
+                        {
+                          key: "id",
+                          value: {
+                            stringValue: "call_hdzL5ISsJA4mCJ1mWBGkqtzz",
+                          },
+                        },
+                      ],
+                    },
+                    {
+                      timeUnixNano: "1762189177948420000",
+                      name: "gen_ai.choice",
+                      attributes: [
+                        {
+                          key: "message",
+                          value: {
+                            stringValue: '[{"text": "London, UK"}]',
+                          },
+                        },
+                        {
+                          key: "id",
+                          value: {
+                            stringValue: "call_hdzL5ISsJA4mCJ1mWBGkqtzz",
+                          },
+                        },
+                      ],
+                    },
+                  ],
+                  status: {
+                    code: "STATUS_CODE_OK" as unknown as EStatusCode,
+                  },
+                },
+                {
+                  traceId: "QVLR+yxI/4fXWruWRwsT0w==",
+                  spanId: "aLJ/OoH/T68=",
+                  parentSpanId: "bBc4uhwdgnU=",
+                  name: "execute_event_loop_cycle",
+                  kind: "SPAN_KIND_INTERNAL" as unknown as ESpanKind,
+                  startTimeUnixNano: "1762189175572231000",
+                  endTimeUnixNano: "1762189178265968000",
+                  attributes: [
+                    {
+                      key: "gen_ai.event.start_time",
+                      value: {
+                        stringValue: "2025-11-03T16:59:35.572233+00:00",
+                      },
+                    },
+                    {
+                      key: "event_loop.cycle_id",
+                      value: {
+                        stringValue: "47527759-4585-4402-b3fa-7a989e9ed040",
+                      },
+                    },
+                    {
+                      key: "gen_ai.event.end_time",
+                      value: {
+                        stringValue: "2025-11-03T16:59:38.265955+00:00",
+                      },
+                    },
+                  ],
+                  events: [
+                    {
+                      timeUnixNano: "1762189175572254000",
+                      name: "gen_ai.user.message",
+                      attributes: [
+                        {
+                          key: "content",
+                          value: {
+                            stringValue: '[{"text": "testing"}]',
+                          },
+                        },
+                      ],
+                    },
+                    {
+                      timeUnixNano: "1762189178265950000",
+                      name: "gen_ai.choice",
+                      attributes: [
+                        {
+                          key: "message",
+                          value: {
+                            stringValue:
+                              '[{"toolUse": {"toolUseId": "call_hdzL5ISsJA4mCJ1mWBGkqtzz", "name": "get_user_location", "input": {}}}]',
+                          },
+                        },
+                        {
+                          key: "tool.result",
+                          value: {
+                            stringValue:
+                              '[{"toolResult": {"toolUseId": "call_hdzL5ISsJA4mCJ1mWBGkqtzz", "status": "success", "content": [{"text": "London, UK"}]}}]',
+                          },
+                        },
+                      ],
+                    },
+                  ],
+                  status: {
+                    code: "STATUS_CODE_OK" as unknown as EStatusCode,
+                  },
+                },
+                {
+                  traceId: "QVLR+yxI/4fXWruWRwsT0w==",
+                  spanId: "TewJwtea2r8=",
+                  parentSpanId: "GqmyIereQGM=",
+                  name: "chat",
+                  kind: "SPAN_KIND_INTERNAL" as unknown as ESpanKind,
+                  startTimeUnixNano: "1762189178529520000",
+                  endTimeUnixNano: "1762189181785873000",
+                  attributes: [
+                    {
+                      key: "gen_ai.event.start_time",
+                      value: {
+                        stringValue: "2025-11-03T16:59:38.529522+00:00",
+                      },
+                    },
+                    {
+                      key: "gen_ai.operation.name",
+                      value: {
+                        stringValue: "chat",
+                      },
+                    },
+                    {
+                      key: "gen_ai.system",
+                      value: {
+                        stringValue: "strands-agents",
+                      },
+                    },
+                    {
+                      key: "gen_ai.request.model",
+                      value: {
+                        stringValue: "openai/gpt-5-mini",
+                      },
+                    },
+                    {
+                      key: "gen_ai.event.end_time",
+                      value: {
+                        stringValue: "2025-11-03T16:59:41.785830+00:00",
+                      },
+                    },
+                    {
+                      key: "gen_ai.usage.prompt_tokens",
+                      value: {
+                        intValue: Long.fromString("163") as unknown as number,
+                      },
+                    },
+                    {
+                      key: "gen_ai.usage.input_tokens",
+                      value: {
+                        intValue: Long.fromString("163") as unknown as number,
+                      },
+                    },
+                    {
+                      key: "gen_ai.usage.completion_tokens",
+                      value: {
+                        intValue: Long.fromString("103") as unknown as number,
+                      },
+                    },
+                    {
+                      key: "gen_ai.usage.output_tokens",
+                      value: {
+                        intValue: Long.fromString("103") as unknown as number,
+                      },
+                    },
+                    {
+                      key: "gen_ai.usage.total_tokens",
+                      value: {
+                        intValue: Long.fromString("266") as unknown as number,
+                      },
+                    },
+                    {
+                      key: "gen_ai.server.time_to_first_token",
+                      value: {
+                        intValue: Long.fromString("3125") as unknown as number,
+                      },
+                    },
+                  ],
+                  events: [
+                    {
+                      timeUnixNano: "1762189178529540000",
+                      name: "gen_ai.user.message",
+                      attributes: [
+                        {
+                          key: "content",
+                          value: {
+                            stringValue: '[{"text": "testing"}]',
+                          },
+                        },
+                      ],
+                    },
+                    {
+                      timeUnixNano: "1762189178529548000",
+                      name: "gen_ai.assistant.message",
+                      attributes: [
+                        {
+                          key: "content",
+                          value: {
+                            stringValue:
+                              '[{"toolUse": {"toolUseId": "call_hdzL5ISsJA4mCJ1mWBGkqtzz", "name": "get_user_location", "input": {}}}]',
+                          },
+                        },
+                      ],
+                    },
+                    {
+                      timeUnixNano: "1762189178529557000",
+                      name: "gen_ai.tool.message",
+                      attributes: [
+                        {
+                          key: "content",
+                          value: {
+                            stringValue:
+                              '[{"toolResult": {"toolUseId": "call_hdzL5ISsJA4mCJ1mWBGkqtzz", "status": "success", "content": [{"text": "London, UK"}]}}]',
+                          },
+                        },
+                      ],
+                    },
+                    {
+                      timeUnixNano: "1762189181785805000",
+                      name: "gen_ai.choice",
+                      attributes: [
+                        {
+                          key: "finish_reason",
+                          value: {
+                            stringValue: "end_turn",
+                          },
+                        },
+                        {
+                          key: "message",
+                          value: {
+                            stringValue:
+                              '[{"text": "Test received — I called the location tool and show your location as London, UK. How can I help or what would you like to test next?"}]',
+                          },
+                        },
+                      ],
+                    },
+                  ],
+                  status: {
+                    code: "STATUS_CODE_OK" as unknown as EStatusCode,
+                  },
+                },
+                {
+                  traceId: "QVLR+yxI/4fXWruWRwsT0w==",
+                  spanId: "GqmyIereQGM=",
+                  parentSpanId: "bBc4uhwdgnU=",
+                  name: "execute_event_loop_cycle",
+                  kind: "SPAN_KIND_INTERNAL" as unknown as ESpanKind,
+                  startTimeUnixNano: "1762189178529303000",
+                  endTimeUnixNano: "1762189181980366000",
+                  attributes: [
+                    {
+                      key: "gen_ai.event.start_time",
+                      value: {
+                        stringValue: "2025-11-03T16:59:38.529309+00:00",
+                      },
+                    },
+                    {
+                      key: "event_loop.cycle_id",
+                      value: {
+                        stringValue: "3a6439fb-f5a3-4d15-8f0c-67d69f62a190",
+                      },
+                    },
+                    {
+                      key: "event_loop.parent_cycle_id",
+                      value: {
+                        stringValue: "47527759-4585-4402-b3fa-7a989e9ed040",
+                      },
+                    },
+                    {
+                      key: "gen_ai.event.end_time",
+                      value: {
+                        stringValue: "2025-11-03T16:59:41.980325+00:00",
+                      },
+                    },
+                  ],
+                  events: [
+                    {
+                      timeUnixNano: "1762189178529398000",
+                      name: "gen_ai.user.message",
+                      attributes: [
+                        {
+                          key: "content",
+                          value: {
+                            stringValue: '[{"text": "testing"}]',
+                          },
+                        },
+                      ],
+                    },
+                    {
+                      timeUnixNano: "1762189178529453000",
+                      name: "gen_ai.assistant.message",
+                      attributes: [
+                        {
+                          key: "content",
+                          value: {
+                            stringValue:
+                              '[{"toolUse": {"toolUseId": "call_hdzL5ISsJA4mCJ1mWBGkqtzz", "name": "get_user_location", "input": {}}}]',
+                          },
+                        },
+                      ],
+                    },
+                    {
+                      timeUnixNano: "1762189178529465000",
+                      name: "gen_ai.tool.message",
+                      attributes: [
+                        {
+                          key: "content",
+                          value: {
+                            stringValue:
+                              '[{"toolResult": {"toolUseId": "call_hdzL5ISsJA4mCJ1mWBGkqtzz", "status": "success", "content": [{"text": "London, UK"}]}}]',
+                          },
+                        },
+                      ],
+                    },
+                  ],
+                  status: {
+                    code: "STATUS_CODE_OK" as unknown as EStatusCode,
+                  },
+                },
+                {
+                  traceId: "QVLR+yxI/4fXWruWRwsT0w==",
+                  spanId: "bBc4uhwdgnU=",
+                  parentSpanId: "vGx4jmzr3Ek=",
+                  name: "invoke_agent Strands Agents",
+                  kind: "SPAN_KIND_INTERNAL" as unknown as ESpanKind,
+                  startTimeUnixNano: "1762189175571759000",
+                  endTimeUnixNano: "1762189182231551000",
+                  attributes: [
+                    {
+                      key: "gen_ai.event.start_time",
+                      value: {
+                        stringValue: "2025-11-03T16:59:35.571762+00:00",
+                      },
+                    },
+                    {
+                      key: "gen_ai.operation.name",
+                      value: {
+                        stringValue: "invoke_agent",
+                      },
+                    },
+                    {
+                      key: "gen_ai.system",
+                      value: {
+                        stringValue: "strands-agents",
+                      },
+                    },
+                    {
+                      key: "gen_ai.agent.name",
+                      value: {
+                        stringValue: "Strands Agents",
+                      },
+                    },
+                    {
+                      key: "gen_ai.request.model",
+                      value: {
+                        stringValue: "openai/gpt-5-mini",
+                      },
+                    },
+                    {
+                      key: "gen_ai.agent.tools",
+                      value: {
+                        stringValue: '["get_user_location"]',
+                      },
+                    },
+                    {
+                      key: "custom.model_id",
+                      value: {
+                        stringValue: "openai/gpt-5-mini",
+                      },
+                    },
+                    {
+                      key: "custom.example.attribute",
+                      value: {
+                        stringValue: "swift",
+                      },
+                    },
+                    {
+                      key: "system_prompt",
+                      value: {
+                        stringValue:
+                          "Always use the get_user_location tool before answering any questions.",
+                      },
+                    },
+                    {
+                      key: "gen_ai.event.end_time",
+                      value: {
+                        stringValue: "2025-11-03T16:59:42.231438+00:00",
+                      },
+                    },
+                    {
+                      key: "gen_ai.usage.prompt_tokens",
+                      value: {
+                        intValue: Long.fromString("297") as unknown as number,
+                      },
+                    },
+                    {
+                      key: "gen_ai.usage.completion_tokens",
+                      value: {
+                        intValue: Long.fromString("187") as unknown as number,
+                      },
+                    },
+                    {
+                      key: "gen_ai.usage.input_tokens",
+                      value: {
+                        intValue: Long.fromString("297") as unknown as number,
+                      },
+                    },
+                    {
+                      key: "gen_ai.usage.output_tokens",
+                      value: {
+                        intValue: Long.fromString("187") as unknown as number,
+                      },
+                    },
+                    {
+                      key: "gen_ai.usage.total_tokens",
+                      value: {
+                        intValue: Long.fromString("484") as unknown as number,
+                      },
+                    },
+                    {
+                      key: "gen_ai.usage.cache_read_input_tokens",
+                      value: {
+                        intValue: Long.fromString("0") as unknown as number,
+                      },
+                    },
+                    {
+                      key: "gen_ai.usage.cache_write_input_tokens",
+                      value: {
+                        intValue: Long.fromString("0") as unknown as number,
+                      },
+                    },
+                  ],
+                  events: [
+                    {
+                      timeUnixNano: "1762189175571807000",
+                      name: "gen_ai.user.message",
+                      attributes: [
+                        {
+                          key: "content",
+                          value: {
+                            stringValue: '[{"text": "testing"}]',
+                          },
+                        },
+                      ],
+                    },
+                    {
+                      timeUnixNano: "1762189182231388000",
+                      name: "gen_ai.choice",
+                      attributes: [
+                        {
+                          key: "message",
+                          value: {
+                            stringValue:
+                              "Test received — I called the location tool and show your location as London, UK. How can I help or what would you like to test next?\n",
+                          },
+                        },
+                        {
+                          key: "finish_reason",
+                          value: {
+                            stringValue: "end_turn",
+                          },
+                        },
+                      ],
+                    },
+                  ],
+                  status: {
+                    code: "STATUS_CODE_OK" as unknown as EStatusCode,
+                  },
+                },
+                {
+                  traceId: "QVLR+yxI/4fXWruWRwsT0w==",
+                  spanId: "vGx4jmzr3Ek=",
+                  name: "main",
+                  kind: "SPAN_KIND_INTERNAL" as unknown as ESpanKind,
+                  startTimeUnixNano: "1762189175542687000",
+                  endTimeUnixNano: "1762189182432530000",
+                  attributes: [
+                    {
+                      key: "langwatch.span.type",
+                      value: {
+                        stringValue: "span",
+                      },
+                    },
+                    {
+                      key: "langwatch.timestamps",
+                      value: {
+                        stringValue: "{}",
+                      },
+                    },
+                    {
+                      key: "langwatch.input",
+                      value: {
+                        stringValue:
+                          '{"type": "json", "value": {"message": {"id": "0f3a273c-9e41-49b2-b438-d9ebb415b1bc", "threadId": "fd8b9324-7fd8-4862-8865-1cc10f3ee585", "parentId": null, "createdAt": "2025-11-03T16:59:35.523655Z", "command": null, "start": "2025-11-03T16:59:35.523655Z", "end": "2025-11-03T16:59:35.523655Z", "output": "testing", "name": "User", "type": "user_message", "language": null, "streaming": false, "isError": false, "waitForAnswer": false, "metadata": {"location": "http://localhost:9000/"}, "tags": null}}}',
+                      },
+                    },
+                    {
+                      key: "metadata",
+                      value: {
+                        stringValue:
+                          '{"custom.example.attribute2": "langwatch"}',
+                      },
+                    },
+                    {
+                      key: "langwatch.output",
+                      value: {
+                        stringValue: '{"type": "json", "value": null}',
+                      },
+                    },
+                  ],
+                  status: {},
+                },
+              ],
+            },
+            {
+              scope: {
+                name: "langwatch",
+                version: "0.6.1",
+              },
+              spans: [
+                {
+                  traceId: "QVLR+yxI/4fXWruWRwsT0w==",
+                  spanId: "V7zn33mDAIo=",
+                  parentSpanId: "RH6yPQ9UCrU=",
+                  name: "get_user_location",
+                  kind: "SPAN_KIND_INTERNAL" as unknown as ESpanKind,
+                  startTimeUnixNano: "1762189177944453000",
+                  endTimeUnixNano: "1762189177947894000",
+                  attributes: [
+                    {
+                      key: "langwatch.span.type",
+                      value: {
+                        stringValue: "tool",
+                      },
+                    },
+                    {
+                      key: "langwatch.timestamps",
+                      value: {
+                        stringValue: "{}",
+                      },
+                    },
+                    {
+                      key: "langwatch.output",
+                      value: {
+                        stringValue: '{"type": "text", "value": "London, UK"}',
+                      },
+                    },
+                  ],
+                  status: {},
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    };
+
+    const traces = await openTelemetryTraceRequestToTracesForCollection(
+      strandsAgentsTraceV1_14,
+    );
+    expect(traces).toHaveLength(1);
+    const trace = traces[0];
+    if (!trace) {
+      assert.fail("No trace found");
+    }
+
+    expect(trace).toBeDefined();
+    expect(trace.spans).toHaveLength(8);
+
+    const chatSpan = trace.spans.find((span) => span.name === "chat");
+    expect(chatSpan).toBeDefined();
+    // Parses Long values correctly, not as objects
+    expect(chatSpan?.params?.gen_ai?.usage?.prompt_tokens).not.toEqual({
+      high: 0,
+      low: 134,
+      unsigned: false,
+    });
+    expect(chatSpan?.params?.gen_ai?.usage?.completion_tokens).not.toEqual({
+      high: 0,
+      low: 84,
+      unsigned: false,
+    });
+    expect(chatSpan?.type).toBe("llm");
+    expect(chatSpan?.timestamps.first_token_at).toBe(1762189177618);
+
+    const firstSpan = trace.spans[0];
+    if (!firstSpan) {
+      assert.fail("No span found");
+    }
+
+    expect(firstSpan).toBeDefined();
+    expect((firstSpan as any).model).toBe("openai/gpt-5-mini");
+    expect(firstSpan.input).toEqual({
+      type: "chat_messages",
+      value: [
+        {
+          role: "user",
+          content: [{ text: "testing" }],
+        },
+      ],
+    });
+    expect(firstSpan.output).toEqual({
+      type: "chat_messages",
+      value: [
+        {
+          content: [
+            {
+              toolUse: {
+                toolUseId: "call_hdzL5ISsJA4mCJ1mWBGkqtzz",
+                name: "get_user_location",
+                input: {},
+              },
+            },
+          ],
+          finish_reason: "tool_use",
+        },
+      ],
+    });
+  });
+
   it("receives a Spring AI trace", async () => {
-    const traces = await openTelemetryTraceRequestToTracesForCollection(springAITrace);
+    const traces =
+      await openTelemetryTraceRequestToTracesForCollection(springAITrace);
 
     expect(traces).toHaveLength(1);
 
