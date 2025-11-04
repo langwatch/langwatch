@@ -189,7 +189,7 @@ export const ModelProviderConfigFields: React.FC<ModelProviderConfigFieldsProps>
           Configure {meta.label}
         </Text>
         <Text fontSize="xs" color="fg.muted">
-          Enter your API credentials and allowlisted models for {meta.label}.
+          Enter your API credentials and allowed models for {meta.label}
         </Text>
       </VStack>
 

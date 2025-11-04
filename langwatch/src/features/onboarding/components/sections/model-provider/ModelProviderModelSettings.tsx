@@ -60,12 +60,6 @@ export const ModelProviderModelSettings: React.FC<ModelProviderModelSettingsProp
     filter: contains,
   });
 
-  React.useEffect(() => {
-    if (collection.setItems) {
-      collection.setItems(allChatModelItems);
-    }
-  }, [collection, allChatModelItems]);
-
   const handleTagsValueChange = React.useCallback(
     (details: { value: string[] }) => {
       onCustomModelsChange(

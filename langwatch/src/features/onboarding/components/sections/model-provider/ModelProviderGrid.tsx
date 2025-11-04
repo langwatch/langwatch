@@ -19,7 +19,7 @@ export function ModelProviderGrid({
     <VStack align="stretch" gap={3}>
       <VStack align="stretch" gap={0}>
         <Text fontSize="md" fontWeight="semibold">
-          Give LangWatch access to your {" "}
+          Give LangWatch access to {" "}
           {modelProvider?.label ?? "selected model provider"}
         </Text>
         <Text fontSize="xs" color="fg.muted">

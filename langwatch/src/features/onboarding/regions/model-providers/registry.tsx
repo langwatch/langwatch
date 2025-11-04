@@ -229,7 +229,7 @@ export const modelProviderRegistry: ModelProviderRegistry = [
   {
     key: "custom",
     backendKey: "custom",
-    label: "Custom (OpenAI-compatible)",
+    label: "Custom, OpenAI-compatible",
     icon: iconWithLabel(
       singleIcon("/images/external-icons/custom.svg", "Custom Provider"),
       "Custom"
