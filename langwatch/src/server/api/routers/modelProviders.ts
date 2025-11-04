@@ -50,10 +50,8 @@ export const modelProviderRouter = createTRPCRouter({
         customKeys: z.object({}).passthrough().optional().nullable(),
         customModels: z.array(z.string()).optional().nullable(),
         customEmbeddingsModels: z.array(z.string()).optional().nullable(),
-        extraHeaders: z
-          .array(z.object({ key: z.string(), value: z.string() }))
-          .optional()
-          .nullable(),
+        extraHeaders: z.array(z.object({ key: z.string(), value: z.string() })).optional().nullable(),
+        defaultModel: z.string().optional(),
       }),
     )
     .use(checkProjectPermission("project:update"))
@@ -67,6 +65,7 @@ export const modelProviderRouter = createTRPCRouter({
         customModels,
         customEmbeddingsModels,
         extraHeaders,
+        defaultModel,
       } = input;
 
       if (!(provider in modelProviders)) {
@@ -117,6 +116,8 @@ export const modelProviderRouter = createTRPCRouter({
             where: { provider, projectId },
           });
 
+      let modelProviderResult: Awaited<ReturnType<typeof ctx.prisma.modelProvider.update | typeof ctx.prisma.modelProvider.create>>;
+
       if (existingModelProvider) {
         // Smart merging: preserve masked standard keys, but replace extra headers completely
         let mergedCustomKeys: Record<string, any> | null = validatedKeys;
@@ -141,7 +142,7 @@ export const modelProviderRouter = createTRPCRouter({
             ...Object.fromEntries(
               Object.entries(existingKeys)
                 .filter(
-                  ([key, value]) =>
+                  ([key, _value]) =>
                     standardAzureKeys.has(key) &&
                     (validatedKeys as any)[key] ===
                       "HAS_KEY••••••••••••••••••••••••",
@@ -151,7 +152,7 @@ export const modelProviderRouter = createTRPCRouter({
           };
         }
 
-        return await ctx.prisma.modelProvider.update({
+        modelProviderResult = await ctx.prisma.modelProvider.update({
           where: { id: existingModelProvider.id, projectId },
           data: {
             ...data,
@@ -164,7 +165,7 @@ export const modelProviderRouter = createTRPCRouter({
           },
         });
       } else {
-        return await ctx.prisma.modelProvider.create({
+        modelProviderResult = await ctx.prisma.modelProvider.create({
           data: {
             ...data,
             customModels: customModels ?? undefined,
@@ -173,6 +174,16 @@ export const modelProviderRouter = createTRPCRouter({
           },
         });
       }
+
+      // Update project's default model if provided
+      if (defaultModel !== void 0) {
+        await ctx.prisma.project.update({
+          where: { id: projectId },
+          data: { defaultModel },
+        });
+      }
+
+      return modelProviderResult;
     }),
 
   delete: protectedProcedure
