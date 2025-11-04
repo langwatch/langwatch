@@ -212,8 +212,8 @@ function ModelProviderRow({
             <HStack gap={6}>
               <Field.Root>
                 <Switch
-                  onChange={(e) => {
-                    void actions.setEnabled(e.target.checked);
+                  onCheckedChange={(details) => {
+                    void actions.setEnabled(details.checked);
                   }}
                   checked={state.enabled}
                 >
@@ -225,8 +225,8 @@ function ModelProviderRow({
             {provider.provider === "azure" && state.enabled && (
               <Field.Root>
                 <Switch
-                  onChange={(e) => {
-                    actions.setUseApiGateway(e.target.checked);
+                  onCheckedChange={(details) => {
+                    actions.setUseApiGateway(details.checked);
                   }}
                   checked={state.useApiGateway}
                 >
