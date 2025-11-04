@@ -44,7 +44,6 @@ export const useCreateProductScreens = ({
         id: "evaluations",
         required: false,
         heading: "Eval yourself before you wreck yourself",
-        subHeading: "You'll need to connect LangWatch to your model provider to run evaluations",
         component: ModelProviderScreen,
       },
       [ProductScreenIndex.PROMPT_MANAGEMENT]: {
