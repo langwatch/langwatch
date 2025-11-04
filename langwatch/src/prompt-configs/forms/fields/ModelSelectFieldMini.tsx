@@ -5,6 +5,14 @@ import { HStack, useDisclosure } from "@chakra-ui/react";
 import { LLMModelDisplay } from "~/components/llmPromptConfigs/LLMModelDisplay";
 import { ChevronDown } from "react-feather";
 
+/**
+ * Model Select Field Mini
+ *
+ * Single Responsibility: Renders a compact LLM model selector field integrated with react-hook-form
+ * that displays the current model and opens a configuration modal on click.
+ *
+ * Can be used within a FormProvider context (uses react-hook-form Controller)
+ */
 export function ModelSelectFieldMini() {
   const { control } = useFormContext<PromptConfigFormValues>();
   const { open, onClose, onToggle } = useDisclosure();
@@ -30,13 +38,13 @@ export function ModelSelectFieldMini() {
                   <LLMModelDisplay model={field.value?.model ?? ""} />
                   <ChevronDown size={16} />
                 </HStack>
-                <LLMConfigModal
-                  open={open}
-                  onClose={onClose}
-                  values={field.value}
-                  onChange={field.onChange}
-                />
               </HStack>
+              <LLMConfigModal
+                open={open}
+                onClose={onClose}
+                values={field.value}
+                onChange={field.onChange}
+              />
             </>
           );
         }}

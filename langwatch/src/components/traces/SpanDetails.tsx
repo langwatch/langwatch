@@ -30,6 +30,14 @@ import { OverflownTextWithTooltip } from "../OverflownText";
 import { RedactedField } from "../ui/RedactedField";
 import { useGoToSpanInPlaygroundTabUrlBuilder } from "~/prompt-configs/prompt-studio/hooks/useLoadSpanIntoPromptStudio";
 
+/**
+ * Displays detailed information about a trace span, including metadata, timing, tokens, cost, and input/output.
+ * Single Responsibility: Render comprehensive span details with conditional playground navigation.
+ *
+ * @param props - Component props
+ * @param props.span - The span object containing trace data
+ * @param props.project - The project context (maintained for API compatibility)
+ */
 export function SpanDetails({ span }: { project: Project; span: Span }) {
   const estimatedCost = (
     <Tooltip content="When `metrics.completion_tokens` and `metrics.prompt_tokens` are not available, they are estimated based on input, output and the model for calculating costs.">
@@ -66,7 +74,11 @@ export function SpanDetails({ span }: { project: Project; span: Span }) {
             <b>Span ID:</b> <Text as="code">{span.span_id}</Text>
           </Text>
           {canOpenSpanInPromptStudio && (
-            <Link href={buildUrl(span.span_id).toString()} target="_blank" rel="noopener noreferrer">
+            <Link
+              href={buildUrl(span.span_id).toString()}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
               <Button size="xs" colorPalette="orange">
                 <Play size={16} />
                 Open in Playground
@@ -356,8 +368,8 @@ export const SpanTypeTag = ({ span }: { span: Span }) => {
                     ? evaluationStatusColor(evaluationResult).split(".")[0]
                     : "gray"
                   : evaluationPassed_
-                    ? "green"
-                    : "red",
+                  ? "green"
+                  : "red",
             }[span.type]
       }
       backgroundColor={evaluationPassed_ === true ? "#ccf6c6" : undefined}
@@ -384,7 +396,7 @@ export const SpanDuration = ({
 }) => {
   const startedAt = span.timestamps.started_at;
   const finishedAt = renderFirstTokenDuration
-    ? (span.timestamps.first_token_at ?? startedAt)
+    ? span.timestamps.first_token_at ?? startedAt
     : span.timestamps.finished_at;
   const duration = finishedAt - startedAt;
 

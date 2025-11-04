@@ -20,6 +20,12 @@ const logger = createLogger(
 
 type EditablePromptHandleFieldProps = StackProps;
 
+/**
+ * EditablePromptHandleField component
+ * Single Responsibility: Displays and allows editing of prompt handle with permission checks
+ * @param props - EditablePromptHandleFieldProps extending StackProps
+ * @returns JSX.Element - Renders an editable prompt handle display with edit and copy buttons
+ */
 export function EditablePromptHandleField(
   props: EditablePromptHandleFieldProps,
 ) {

@@ -20,7 +20,7 @@ let disableFormSyncTimeout: NodeJS.Timeout | null = null;
 export const usePromptConfigForm = ({
   configId,
   onChange,
-  initialConfigValues,
+  initialConfigValues = {},
 }: UsePromptConfigFormProps) => {
   const methods = useForm<PromptConfigFormValues>({
     /**

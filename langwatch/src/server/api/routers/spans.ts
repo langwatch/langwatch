@@ -11,6 +11,7 @@ import { getTraceById, searchTraces } from "~/server/elasticsearch/traces";
 import { TRPCError } from "@trpc/server";
 import { TRACE_INDEX } from "~/server/elasticsearch";
 import type { ChatMessage } from "~/server/tracer/types";
+import { type LLMSpan } from "~/server/tracer/types";
 
 export const spansRouter = createTRPCRouter({
   getAllForTrace: publicProcedure
@@ -157,7 +158,7 @@ export const spansRouter = createTRPCRouter({
       const params = span.params ?? {};
       const systemPrompt = messages.find((m) => m.role === "system")?.content;
       const llmConfig = {
-        model: (span as any).model ?? null,
+        model: (span as LLMSpan).model ?? null,
         systemPrompt,
         temperature: params.temperature ?? null,
         maxTokens: params.max_tokens ?? params.maxTokens ?? null,
@@ -185,7 +186,7 @@ export const spansRouter = createTRPCRouter({
         spanName: span.name ?? null,
         messages,
         llmConfig,
-        vendor: (span as any).vendor ?? null,
+        vendor: (span as LLMSpan).vendor ?? null,
         error: span.error ?? null,
         timestamps: span.timestamps,
         metrics: span.metrics ?? null,

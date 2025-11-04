@@ -131,18 +131,20 @@ export function PromptMessagesField({
           control={form.control}
           name={`version.configData.messages.${idx}.content`}
           render={({ field }) => (
-            <Box border="1px solid #E2E8F0" borderRadius={6} overflow="hidden">
+            <Box
+              border="1px solid"
+              borderColor={
+                getMessageError(idx, "content") ? "red.500" : "gray.200"
+              }
+              borderRadius={6}
+              overflow="hidden"
+            >
               <PromptTextArea
                 availableFields={availableFields}
                 otherNodesFields={otherNodesFields}
                 value={field.value}
                 onChange={field.onChange}
                 bg="white"
-                _invalid={
-                  getMessageError(idx, "content")
-                    ? { borderColor: "red.500" }
-                    : undefined
-                }
                 onAddEdge={(id, handle, content) => {
                   onAddEdge?.(id, handle, content, idx);
                 }}

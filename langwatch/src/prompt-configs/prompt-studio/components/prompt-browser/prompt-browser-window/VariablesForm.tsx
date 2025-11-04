@@ -1,7 +1,7 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { VStack, Textarea } from "@chakra-ui/react";
 import { useForm } from "react-hook-form";
-import { useMemo } from "react";
+import { useMemo, useEffect } from "react";
 import type { z } from "zod";
 import { runtimeInputsSchema } from "~/prompt-configs/schemas/field-schemas";
 
@@ -12,6 +12,13 @@ export type VariablesFormProps = {
   onChange: (values: RuntimeInputFormValues) => void;
 };
 
+/**
+ * VariablesForm component
+ * Single Responsibility: Renders a form for editing runtime input variables
+ * @param props - Component props
+ * @param props.inputs - Array of input field configurations
+ * @param props.onChange - Callback invoked when form values change
+ */
 export function VariablesForm({ inputs, onChange }: VariablesFormProps) {
   const defaultValues = useMemo(() => {
     return inputs.map((input) => ({
@@ -25,14 +32,22 @@ export function VariablesForm({ inputs, onChange }: VariablesFormProps) {
     resolver: zodResolver(runtimeInputsSchema),
   });
 
+  // Reset form when inputs/defaultValues change
+  useEffect(() => {
+    form.reset(defaultValues);
+  }, [form, defaultValues]);
+
   // Watch form state and call onChange when it updates
-  form.watch((values) => {
-    onChange(values as RuntimeInputFormValues);
-  });
+  useEffect(() => {
+    const subscription = form.watch((values) => {
+      onChange(values as RuntimeInputFormValues);
+    });
+    return () => subscription.unsubscribe();
+  }, [form, onChange]);
 
   return (
     <VStack align="start" gap={3} width="full">
-      {(inputs || []).map((input) => {
+      {(inputs || []).map((input, i) => {
         if (!input.identifier) return null;
         return (
           <div key={input.identifier} style={{ width: "100%" }}>
@@ -48,7 +63,7 @@ export function VariablesForm({ inputs, onChange }: VariablesFormProps) {
             </label>
             <Textarea
               id={input.identifier}
-              {...form.register(`${inputs.indexOf(input)}` as any)}
+              {...form.register(`${i}.value` as any)}
               placeholder={
                 input.type === "image"
                   ? "image url"

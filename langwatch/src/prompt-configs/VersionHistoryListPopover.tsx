@@ -10,17 +10,18 @@ import {
   useDisclosure,
 } from "@chakra-ui/react";
 import { Avatar } from "@chakra-ui/react";
-import { useMemo } from "react";
-
+import { useCallback } from "react";
+import { api } from "~/utils/api";
 import { HistoryIcon } from "~/components/icons/History";
 import { Popover } from "~/components/ui/popover";
 import { toaster } from "~/components/ui/toaster";
 import { Tooltip } from "~/components/ui/tooltip";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import { api } from "~/utils/api";
 import { usePrompts } from "./hooks";
 import type { VersionedPrompt } from "~/server/prompt-config";
-import { useAllPromptsForProject } from "./hooks/useAllPromptsForProject";
+import { createLogger } from "~/utils/logger";
+
+const logger = createLogger("VersionHistoryListPopover");
 
 /**
  * Minimal interface for version history display
@@ -263,40 +264,37 @@ export function VersionHistoryListPopover({
   const { open, setOpen, onClose } = useDisclosure();
   const { project } = useOrganizationTeamProject();
   const { restoreVersion } = usePrompts();
-  const { data: prompts, isLoading } = useAllPromptsForProject();
-  const handleRestore = async (params: {
-    versionId: string;
-    configId: string;
-  }) => {
-    const { versionId } = params;
-    try {
-      const prompt = await restoreVersion({
-        versionId,
-        projectId: project?.id ?? "",
-      });
-      await onRestoreSuccess?.(prompt);
-      onClose();
-      toaster.success({
-        title: "Version restored successfully",
-      });
-    } catch (error) {
-      console.error("Error restoring version", error);
-      toaster.error({
-        title: "Failed to restore version",
-      });
-    }
-  };
+  const { data: prompts = [], isLoading } =
+    api.prompts.getAllVersionsForPrompt.useQuery({
+      idOrHandle: configId,
+      projectId: project?.id ?? "",
+    });
 
-  const versions = useMemo(
-    () =>
-      prompts?.map((prompt) => ({
-        id: prompt.id,
-        versionId: prompt.versionId,
-        version: prompt.version,
-        commitMessage: prompt.commitMessage,
-        author: prompt.author,
-      })) ?? [],
-    [prompts],
+  const handleRestore = useCallback(
+    (params: { versionId: string }) => {
+      void (async () => {
+        const { versionId } = params;
+        try {
+          const prompt = await restoreVersion({
+            versionId,
+            projectId: project?.id ?? "",
+          });
+          await onRestoreSuccess?.(prompt);
+          onClose();
+          toaster.success({
+            title: "Version restored successfully",
+          });
+        } catch (error) {
+          logger.error("Error restoring version", error);
+          toaster.error({
+            title: "Failed to restore version",
+            description:
+              error instanceof Error ? error.message : "Unknown error",
+          });
+        }
+      })();
+    },
+    [restoreVersion, onRestoreSuccess, onClose, project?.id],
   );
 
   return (
@@ -305,8 +303,8 @@ export function VersionHistoryListPopover({
       onOpenChange={(open) => {
         setOpen(open);
       }}
-      onRestore={(params) => void handleRestore({ ...params, configId })}
-      versions={versions}
+      onRestore={handleRestore}
+      versions={prompts}
       isLoading={isLoading}
       label={label}
     />

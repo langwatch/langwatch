@@ -16,8 +16,6 @@ import {
 } from "~/prompt-configs/schemas/version-metadata-schema";
 import type { DatasetColumnType } from "~/server/datasets/types";
 import type { VersionedPrompt } from "~/server/prompt-config";
-import { type LatestConfigVersionSchema } from "~/server/prompt-config/repositories/llm-config-version-schema";
-import type { LlmConfigWithLatestVersion } from "~/server/prompt-config/repositories/llm-config.repository";
 import {
   LlmConfigInputTypes,
   LlmConfigOutputTypes,
@@ -337,10 +335,12 @@ export function versionedPromptToPromptConfigFormValuesWithSystemMessage(
 ): PromptConfigFormValues {
   const base = versionedPromptToPromptConfigFormValues(prompt);
 
-  base.version.configData.messages = [
-    { role: "system", content: prompt.prompt },
-    ...base.version.configData.messages,
-  ];
+  if (prompt.prompt) {
+    base.version.configData.messages = [
+      { role: "system", content: prompt.prompt },
+      ...base.version.configData.messages,
+    ];
+  }
 
   return base;
 }
