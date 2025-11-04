@@ -90,9 +90,8 @@ export function useModelProviderForm(
     return false;
   }, [provider.provider, provider.customKeys]);
 
-  const [useApiGateway, setUseApiGatewayState] = useState<boolean>(
-    initialUseApiGateway,
-  );
+  const [useApiGateway, setUseApiGatewayState] =
+    useState<boolean>(initialUseApiGateway);
 
   const displayKeys = useMemo(() => {
     if (provider.provider === "azure") {
@@ -142,16 +141,21 @@ export function useModelProviderForm(
   };
 
   const [customModels, setCustomModels] = useState<SelectOption[]>(
-    getStoredModelOptions(provider.models ?? undefined, provider.provider, "chat"),
+    getStoredModelOptions(
+      provider.models ?? undefined,
+      provider.provider,
+      "chat",
+    ),
   );
-  const [customEmbeddingsModels, setCustomEmbeddingsModels] =
-    useState<SelectOption[]>(
-      getStoredModelOptions(
-        provider.embeddingsModels ?? undefined,
-        provider.provider,
-        "embedding",
-      ),
-    );
+  const [customEmbeddingsModels, setCustomEmbeddingsModels] = useState<
+    SelectOption[]
+  >(
+    getStoredModelOptions(
+      provider.embeddingsModels ?? undefined,
+      provider.provider,
+      "embedding",
+    ),
+  );
 
   const chatModelOptions = useMemo(
     () => getProviderModelOptions(provider.provider, "chat"),
@@ -194,7 +198,17 @@ export function useModelProviderForm(
         setIsToggling(false);
       }
     },
-    [onSuccess, onError, provider.id, provider.provider, provider.customKeys, provider.models, provider.embeddingsModels, projectId, updateMutation],
+    [
+      onSuccess,
+      onError,
+      provider.id,
+      provider.provider,
+      provider.customKeys,
+      provider.models,
+      provider.embeddingsModels,
+      projectId,
+      updateMutation,
+    ],
   );
 
   const setUseApiGateway = useCallback(
@@ -213,7 +227,10 @@ export function useModelProviderForm(
   }, []);
 
   const addExtraHeader = useCallback(() => {
-    setExtraHeaders((prev) => [...prev, { key: "", value: "", concealed: false }]);
+    setExtraHeaders((prev) => [
+      ...prev,
+      { key: "", value: "", concealed: false },
+    ]);
   }, []);
 
   const removeExtraHeader = useCallback((index: number) => {
@@ -227,7 +244,9 @@ export function useModelProviderForm(
   }, []);
 
   const setExtraHeaderKey = useCallback((index: number, key: string) => {
-    setExtraHeaders((prev) => prev.map((h, i) => (i === index ? { ...h, key } : h)));
+    setExtraHeaders((prev) =>
+      prev.map((h, i) => (i === index ? { ...h, key } : h)),
+    );
   }, []);
 
   const setExtraHeaderValue = useCallback((index: number, value: string) => {
@@ -236,7 +255,10 @@ export function useModelProviderForm(
     );
   }, []);
 
-  const addFromCommaText = (text: string, current: SelectOption[]): SelectOption[] => {
+  const addFromCommaText = (
+    text: string,
+    current: SelectOption[],
+  ): SelectOption[] => {
     const tokens = text
       .split(",")
       .map((t) => t.trim())
@@ -286,7 +308,9 @@ export function useModelProviderForm(
         const headerMap: Record<string, string> = {};
         (extraHeaders ?? []).forEach((header) => {
           if (header.key.trim() && header.value.trim()) {
-            const sanitizedKey = header.key.trim().replace(/[^a-zA-Z0-9_-]/g, "_");
+            const sanitizedKey = header.key
+              .trim()
+              .replace(/[^a-zA-Z0-9_-]/g, "_");
             if (sanitizedKey) headerMap[sanitizedKey] = header.value.trim();
           }
         });
@@ -305,7 +329,9 @@ export function useModelProviderForm(
         enabled,
         customKeys: customKeysToSend,
         customModels: (customModels ?? []).map((m) => m.value),
-        customEmbeddingsModels: (customEmbeddingsModels ?? []).map((m) => m.value),
+        customEmbeddingsModels: (customEmbeddingsModels ?? []).map(
+          (m) => m.value,
+        ),
         extraHeaders: extraHeadersToSend,
       });
 
@@ -328,7 +354,20 @@ export function useModelProviderForm(
     } finally {
       setIsSaving(false);
     }
-  }, [customKeys, customModels, customEmbeddingsModels, enabled, extraHeaders, onError, onSuccess, projectId, providerDefinition?.keysSchema, provider.id, provider.provider, updateMutation]);
+  }, [
+    customKeys,
+    customModels,
+    customEmbeddingsModels,
+    enabled,
+    extraHeaders,
+    onError,
+    onSuccess,
+    projectId,
+    providerDefinition?.keysSchema,
+    provider.id,
+    provider.provider,
+    updateMutation,
+  ]);
 
   return [
     {
@@ -362,5 +401,3 @@ export function useModelProviderForm(
     },
   ];
 }
-
-

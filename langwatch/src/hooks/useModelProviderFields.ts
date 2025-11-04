@@ -46,20 +46,19 @@ function deriveTypeFromKey(key: string): DerivedFieldType {
 
 export interface UseModelProviderFieldsResult {
   fields: DerivedFieldMeta[];
+
   /** Keys in the order defined by the schema */
-  fieldKeys: string[];
+  orderedFieldKeys: string[];
+
   /** Build defaults for a given stored customKeys, only including known keys */
   buildDefaultValues: (
     stored?: Record<string, unknown> | null,
   ) => Record<string, string>;
 }
 
-/**
- * Derive model provider field metadata from server registry keysSchema.
- * Single Responsibility: expose presentational field metadata for forms without handling form state.
- */
 export function useModelProviderFields(
-  providerKey: ServerModelProviderKey | string,
+  // eslint-disable-next-line @typescript-eslint/ban-types
+  providerKey: ServerModelProviderKey | (string & {}),
 ): UseModelProviderFieldsResult {
   return useMemo(() => {
     const provider =
@@ -68,9 +67,9 @@ export function useModelProviderFields(
       ] as (typeof serverModelProviders)[keyof typeof serverModelProviders] | undefined;
 
     const shape = extractObjectShape(provider?.keysSchema);
-    const fieldKeys = Object.keys(shape ?? {});
+    const orderedFieldKeys = Object.keys(shape ?? {});
 
-    const fields: DerivedFieldMeta[] = fieldKeys.map((key) => {
+    const fields: DerivedFieldMeta[] = orderedFieldKeys.map((key) => {
       const zodType = (shape as any)[key];
       const optional = isOptionalZodType(zodType);
       return {
@@ -84,15 +83,13 @@ export function useModelProviderFields(
 
     const buildDefaultValues = (stored?: Record<string, unknown> | null) => {
       const result: Record<string, string> = {};
-      for (const key of fieldKeys) {
+      for (const key of orderedFieldKeys) {
         const value = stored?.[key];
         result[key] = typeof value === "string" ? value : "";
       }
       return result;
     };
 
-    return { fields, fieldKeys, buildDefaultValues };
+    return { fields, orderedFieldKeys, buildDefaultValues };
   }, [providerKey]);
 }
-
-
