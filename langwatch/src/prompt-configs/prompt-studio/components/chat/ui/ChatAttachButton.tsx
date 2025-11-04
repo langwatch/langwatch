@@ -1,4 +1,4 @@
-import { Box, type BoxProps } from "@chakra-ui/react";
+import { Box, Icon, type BoxProps } from "@chakra-ui/react";
 import { Paperclip } from "react-feather";
 
 /**
@@ -14,16 +14,27 @@ export function ChatAttachButton({
   onAttach,
   ...boxProps
 }: ChatAttachButtonProps) {
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (onAttach && (e.key === "Enter" || e.key === " ")) {
+      e.preventDefault();
+      onAttach();
+    }
+  };
+
   return (
     <Box
-      color="gray.500"
+      role="button"
+      aria-label="Attach file"
+      aria-disabled={!onAttach}
+      tabIndex={onAttach ? 0 : undefined}
+      color="fg.muted"
       cursor={onAttach ? "pointer" : "default"}
-      onClick={onAttach}
-      _hover={onAttach ? { color: "gray.700" } : undefined}
+      onClick={onAttach ? onAttach : undefined}
+      onKeyDown={handleKeyDown}
+      _hover={onAttach ? { color: "fg.emphasized" } : undefined}
       {...boxProps}
     >
-      <Paperclip size={18} />
+      <Icon as={Paperclip} boxSize="18px" />
     </Box>
   );
 }
-

@@ -19,6 +19,10 @@ interface PromptStudioChatProps extends BoxProps {
   variables?: z.infer<typeof runtimeInputsSchema>;
 }
 
+/**
+ * PromptStudioChatRef
+ * Single Responsibility: Exposes imperative methods to control the chat instance (e.g., reset).
+ */
 export interface PromptStudioChatRef {
   resetChat: () => void;
 }

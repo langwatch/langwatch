@@ -14,6 +14,10 @@ export interface ChatSyncCheckboxProps extends Omit<BoxProps, "onChange"> {
   visible?: boolean;
 }
 
+/**
+ * Checkbox component for syncing state across tabs in the prompt studio.
+ * Single Responsibility: Toggle sync behavior with optional visibility control via opacity.
+ */
 export function ChatSyncCheckbox({
   checked,
   onChange,
@@ -40,4 +44,3 @@ export function ChatSyncCheckbox({
     </Box>
   );
 }
-

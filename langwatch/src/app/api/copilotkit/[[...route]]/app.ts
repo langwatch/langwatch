@@ -50,11 +50,7 @@ app.post(
   }),
   async (c) => {
     const project = c.get("project");
-    const runtime = new CopilotRuntime({
-      // agents: {
-      //   prompt_execution: new PromptExecutionAgent(),
-      // },
-    });
+    const runtime = new CopilotRuntime();
 
     const handler = copilotRuntimeNodeHttpEndpoint({
       runtime,

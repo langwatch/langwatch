@@ -11,6 +11,7 @@ import type { PromptConfigFormValues } from "~/prompt-configs/types";
 import { createLogger } from "~/utils/logger";
 import { toaster } from "~/components/ui/toaster";
 import type { ChatMessage } from "~/server/tracer/types";
+import { DEFAULT_MODEL } from "~/utils/constants";
 
 const logger = createLogger("useLoadSpanIntoPromptStudio");
 
@@ -66,6 +67,12 @@ function useSpanIdFromUrl() {
 function createDefaultPromptFormValues(
   spanData: RouterOutputs["spans"]["getForPromptStudio"],
 ): PromptConfigFormValues {
+  if (!spanData.llmConfig?.model) {
+    logger.warn("Model is not available for span data. This is not expected.", {
+      spanData,
+    });
+  }
+
   return {
     handle: null,
     scope: "PROJECT",
@@ -76,7 +83,8 @@ function createDefaultPromptFormValues(
             ? spanData.llmConfig.systemPrompt
             : JSON.stringify(spanData.llmConfig?.systemPrompt),
         llm: {
-          model: spanData.llmConfig.model,
+          // The model should always be available here, but we fall back to the default model if it's not.
+          model: spanData.llmConfig.model ?? DEFAULT_MODEL,
           temperature: spanData.llmConfig.temperature ?? undefined,
           maxTokens: spanData.llmConfig.maxTokens,
         },
@@ -148,7 +156,9 @@ export function useLoadSpanIntoPromptStudio() {
         toaster.create({
           title: "Error loading span data into prompt studio",
           description: (error as Error).message,
-          closable: true,
+          meta: {
+            closable: true,
+          },
         });
       }
     })();

@@ -5,6 +5,10 @@ import { Box, HStack } from "@chakra-ui/react";
 import { PromptConfigProvider } from "~/prompt-configs/providers/PromptConfigProvider";
 import { PromptStudioChatProvider } from "./chat/PromptStudioChatContext";
 
+/**
+ * PromptStudioLayout
+ * Single Responsibility: Renders the main layout structure for the Prompt Studio feature with sidebar and main content.
+ */
 export function PromptStudioLayout() {
   return (
     <DashboardLayout position="relative">

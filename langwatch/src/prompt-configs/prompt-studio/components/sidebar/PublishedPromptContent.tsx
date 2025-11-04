@@ -7,6 +7,10 @@ interface PublishedPromptContentProps {
   promptHandle: string | null;
 }
 
+/**
+ * Renders a published prompt list item with handle and actions.
+ * Single Responsibility: Displays a single published prompt's handle and action menu in the sidebar.
+ */
 export function PublishedPromptContent({
   promptId,
   promptHandle,

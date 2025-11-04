@@ -53,11 +53,6 @@ function PromptBrowserWindowInner(props: {
     [updateTabData],
   );
 
-  const setValueDebounced = useMemo(
-    () => debounce(form.methods.setValue, 500),
-    [form.methods],
-  );
-
   useEffect(() => {
     const sub = form.methods.watch((values) => {
       updateTabDataDebounced({
@@ -76,19 +71,6 @@ function PromptBrowserWindowInner(props: {
     });
     return () => sub.unsubscribe();
   }, [form.methods, props.tabId, updateTabDataDebounced]);
-  // Handle syncing system message to prompt
-  const messages = form.methods.watch("version.configData.messages");
-  const systemMessage = useMemo(
-    () => messages.find(({ role }) => role === "system")?.content,
-    [messages],
-  );
-  useEffect(() => {
-    if (systemMessage) {
-      setValueDebounced("version.configData.prompt", systemMessage, {
-        shouldDirty: false,
-      });
-    }
-  }, [systemMessage, setValueDebounced]);
 
   return (
     <FormProvider {...form.methods}>

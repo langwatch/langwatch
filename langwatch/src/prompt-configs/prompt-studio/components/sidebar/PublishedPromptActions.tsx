@@ -15,6 +15,10 @@ interface PublishedPromptActionsProps {
   promptHandle: string | null;
 }
 
+/**
+ * PublishedPromptActions
+ * Single Responsibility: render per‑prompt actions (e.g., delete) with confirmation.
+ */
 export function PublishedPromptActions({
   promptId,
   promptHandle,
@@ -30,7 +34,7 @@ export function PublishedPromptActions({
     },
     {
       enabled: !!project?.id,
-    }
+    },
   );
 
   const canDelete = permission?.hasPermission ?? true;
@@ -51,7 +55,8 @@ export function PublishedPromptActions({
     } catch (error) {
       toaster.create({
         title: "Failed to delete prompt",
-        description: error instanceof Error ? error.message : "An unknown error occurred",
+        description:
+          error instanceof Error ? error.message : "An unknown error occurred",
         type: "error",
       });
     } finally {

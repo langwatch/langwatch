@@ -5,6 +5,10 @@ import {
 } from "~/prompt-configs/forms/fields/PromptConfigVersionFieldGroup";
 import { DemonstrationsField } from "~/prompt-configs/forms/fields/DemonstrationsField";
 
+/**
+ * SettingsTabContent
+ * Single Responsibility: Renders the Settings tab content with input, output, and demonstration fields.
+ */
 export function SettingsTabContent() {
   return (
     <VStack width="full" gap={6} p={3} align="start">

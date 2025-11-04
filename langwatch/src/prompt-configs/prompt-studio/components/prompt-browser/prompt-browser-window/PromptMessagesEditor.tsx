@@ -4,6 +4,10 @@ import { useFieldArray, useFormContext } from "react-hook-form";
 import type { PromptConfigFormValues } from "~/prompt-configs";
 import { useMemo } from "react";
 
+/**
+ * PromptMessagesEditor
+ * Single Responsibility: manage and render the message history fields within the Prompt Studio form.
+ */
 export function PromptMessagesEditor() {
   const form = useFormContext<PromptConfigFormValues>();
   const messageFields = useFieldArray({

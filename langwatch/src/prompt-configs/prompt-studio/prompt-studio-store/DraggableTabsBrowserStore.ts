@@ -414,6 +414,13 @@ export function useDraggableTabsBrowserStore<T>(
   const { projectId } = useOrganizationTeamProject();
   const key = projectId ?? "__default__";
 
+  if (!projectId && process.env.NODE_ENV === "development") {
+    console.warn(
+      `useDraggableTabsBrowserStore called without projectId.
+        This should not happen if used within DashboardLayout, guarantees projectId is available.`,
+    );
+  }
+
   if (!storeInstances.has(key)) {
     storeInstances.set(key, createDraggableTabsBrowserStore(key));
   }

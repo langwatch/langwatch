@@ -1,26 +1,32 @@
-import { Box, type BoxProps } from "@chakra-ui/react";
+import { Button, type ButtonProps } from "@chakra-ui/react";
 import { Send } from "react-feather";
 
 /**
  * Send button for chat input with disabled state handling.
  * Single Responsibility: Renders a clickable send button with visual feedback.
  */
-export interface ChatSendButtonProps extends BoxProps {
+export interface ChatSendButtonProps extends Omit<ButtonProps, "onClick"> {
   /** Whether the button is disabled (in progress or empty input) */
   disabled?: boolean;
   /** Click handler for send action */
   onSend: () => void;
 }
 
+/**
+ * Send button for chat input with disabled state handling.
+ */
 export function ChatSendButton({
   disabled = false,
   onSend,
-  ...boxProps
+  ...buttonProps
 }: ChatSendButtonProps) {
   return (
-    <Box
+    <Button
+      type="button"
+      unstyled
       cursor={disabled ? "not-allowed" : "pointer"}
-      onClick={disabled ? undefined : onSend}
+      onClick={() => onSend()}
+      disabled={disabled}
       bg={disabled ? "gray.300" : "orange.500"}
       color="white"
       borderRadius="md"
@@ -31,10 +37,9 @@ export function ChatSendButton({
       opacity={disabled ? 0.5 : 1}
       _hover={disabled ? undefined : { bg: "orange.600" }}
       transition="all 0.2s"
-      {...boxProps}
+      {...buttonProps}
     >
       <Send size={16} />
-    </Box>
+    </Button>
   );
 }
-

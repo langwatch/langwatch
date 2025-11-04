@@ -7,6 +7,12 @@ interface PromptBrowserTabControllerProps {
   dimmed?: boolean;
 }
 
+/**
+ * Manages tab state and provides close handler with unsaved changes confirmation.
+ * Single Responsibility: Control prompt browser tab behavior including unsaved changes detection.
+ * @param props - Controller properties including onRemove callback
+ * @returns Tab data, unsaved changes flag, and close handler
+ */
 export function usePromptBrowserTabController({
   onRemove,
 }: PromptBrowserTabControllerProps) {
