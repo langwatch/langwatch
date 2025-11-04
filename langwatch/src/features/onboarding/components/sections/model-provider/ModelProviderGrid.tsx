@@ -31,6 +31,7 @@ export function ModelProviderGrid({
           <SelectableIconCard
             key={mp.key}
             label={mp.label}
+            size="md"
             iconSize="2xl"
             icon={mp.icon}
             selected={mp.key === modelProviderKey}

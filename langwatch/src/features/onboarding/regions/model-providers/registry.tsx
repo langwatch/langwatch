@@ -1,12 +1,14 @@
 import type { ModelProviderKey, ModelProviderSpec } from "./types";
-import { themedIcon, singleIcon } from "../shared/types";
+import { themedIcon, singleIcon, iconWithLabel } from "../shared/types";
 
 export type ModelProviderRegistry = ModelProviderSpec[];
 
 export const modelProviderRegistry: ModelProviderRegistry = [
   {
     key: "open_ai",
+    backendKey: "openai",
     label: "OpenAI",
+    defaultModel: "gpt-5",
     icon: themedIcon(
       "/images/external-icons/openai-lighttheme.svg",
       "/images/external-icons/openai-darktheme.svg",
@@ -16,34 +18,22 @@ export const modelProviderRegistry: ModelProviderRegistry = [
       internal: "/settings/model-providers",
       external: "https://platform.openai.com/docs/overview",
     },
-    fields: {
-      apiKey: {
-        label: "OPENAI_API_KEY",
-        required: true,
-        type: "password",
+    fieldMetadata: {
+      OPENAI_API_KEY: {
+        label: "OpenAI API Key",
+        description: "Your OpenAI API key from platform.openai.com/api-keys",
       },
-      baseUrl: {
-        label: "OPENAI_BASE_URL",
-        placeholder: "optional",
-        required: false,
-        type: "url",
+      OPENAI_BASE_URL: {
+        label: "OpenAI Base URL",
+        description: "Optional: Custom API endpoint for OpenAI-compatible services (e.g., Azure OpenAI proxy)",
       },
     },
-    models: [
-      "gpt-4",
-      "gpt-4-turbo",
-      "gpt-4o",
-      "gpt-4o-mini",
-      "gpt-3.5-turbo",
-      "o1",
-      "o1-mini",
-      "o1-preview",
-      "o3-mini",
-    ],
   },
   {
     key: "anthropic",
+    backendKey: "anthropic",
     label: "Anthropic",
+    defaultModel: "claude-sonnet-4-5",
     icon: themedIcon(
       "/images/external-icons/anthropic-lighttheme.svg",
       "/images/external-icons/anthropic-darktheme.svg",
@@ -53,69 +43,129 @@ export const modelProviderRegistry: ModelProviderRegistry = [
       internal: "/settings/model-providers",
       external: "https://docs.anthropic.com/",
     },
-    fields: {
-      apiKey: {
-        label: "ANTHROPIC_API_KEY",
-        required: true,
-        type: "password",
+    fieldMetadata: {
+      ANTHROPIC_API_KEY: {
+        label: "Anthropic API Key",
+        description: "Your Anthropic API key from console.anthropic.com",
+      },
+      ANTHROPIC_BASE_URL: {
+        label: "Anthropic Base URL",
+        description: "Optional: Custom API endpoint for Anthropic-compatible services",
       },
     },
-    models: [
-      "claude-3-5-sonnet-20241022",
-      "claude-3-5-haiku-20241022",
-      "claude-3-opus-20240229",
-      "claude-3-sonnet-20240229",
-      "claude-3-haiku-20240307",
-    ],
   },
   {
     key: "gemini",
+    backendKey: "gemini",
     label: "Google Gemini",
+    defaultModel: "gemini-2.5-flash",
     icon: singleIcon("/images/external-icons/google.svg", "Google Gemini"),
     docs: {
       internal: "/settings/model-providers",
       external: "https://ai.google.dev/",
     },
-    fields: {
-      apiKey: {
-        label: "GEMINI_API_KEY",
-        required: true,
-        type: "password",
+    fieldMetadata: {
+      GEMINI_API_KEY: {
+        label: "Gemini API Key",
+        description: "Your Google AI Studio API key from aistudio.google.com/apikey",
       },
     },
-    models: [
-      "gemini-1.5-pro",
-      "gemini-1.5-flash",
-      "gemini-1.0-pro",
-      "gemini-2.0-flash-exp",
-    ],
   },
   {
     key: "open_ai_azure",
+    backendKey: "azure",
     label: "Azure OpenAI",
-    icon: singleIcon("/images/external-icons/azure.svg", "Azure OpenAI"),
+    defaultModel: "gpt-5",
+    icon: singleIcon("/images/external-icons/ms-azure.svg", "Azure OpenAI"),
     docs: {
       internal: "/settings/model-providers",
       external: "https://learn.microsoft.com/azure/ai-services/openai/",
     },
-    fields: {
-      apiKey: {
-        label: "AZURE_OPENAI_API_KEY",
-        required: true,
-        type: "password",
+    fieldMetadata: {
+      AZURE_OPENAI_API_KEY: {
+        label: "API Key",
+        description: "Your Azure OpenAI resource API key from Azure Portal",
       },
-      baseUrl: {
-        label: "AZURE_OPENAI_ENDPOINT",
-        placeholder: "https://your-resource.openai.azure.com",
-        required: true,
-        type: "url",
+      AZURE_OPENAI_ENDPOINT: {
+        label: "Endpoint",
+        description: "Your Azure OpenAI resource endpoint URL (e.g., https://your-resource.openai.azure.com)",
+      },
+      AZURE_API_GATEWAY_BASE_URL: {
+        label: "Base URL",
+        description: "Optional: Base URL for Azure API Management gateway if routing through APIM",
+      },
+      AZURE_API_GATEWAY_VERSION: {
+        label: "Version",
+        description: "Optional: API version for Azure API Management gateway",
       },
     },
-    models: ["gpt-4", "gpt-4-turbo", "gpt-4o", "gpt-35-turbo"],
+  },
+  {
+    key: "aws_bedrock",
+    backendKey: "bedrock",
+    label: "AWS Bedrock",
+    icon: themedIcon(
+      "/images/external-icons/aws-lighttheme.svg",
+      "/images/external-icons/aws-darktheme.svg",
+      "AWS Bedrock",
+    ),
+    docs: {
+      internal: "/settings/model-providers",
+      external: "https://aws.amazon.com/bedrock/",
+    },
+    fieldMetadata: {
+      AWS_ACCESS_KEY_ID: {
+        label: "Access Key ID",
+        description: "Your AWS IAM access key ID with Bedrock permissions",
+      },
+      AWS_SECRET_ACCESS_KEY: {
+        label: "Secret Access Key",
+        description: "Your AWS IAM secret access key",
+      },
+      AWS_REGION_NAME: {
+        label: "Region",
+        description: "The AWS region where Bedrock is available (e.g., us-east-1, us-west-2)",
+      },
+    },
+  },
+  {
+    key: "deepseek",
+    backendKey: "deepseek",
+    label: "DeepSeek",
+    defaultModel: "deepseek-r1",
+    icon: singleIcon("/images/external-icons/deepseek.svg", "DeepSeek"),
+    docs: {
+      internal: "/settings/model-providers",
+      external: "https://www.deepseek.com/",
+    },
+    fieldMetadata: {
+      DEEPSEEK_API_KEY: {
+        label: "API Key",
+        description: "Your DeepSeek API key from platform.deepseek.com",
+      },
+    },
+  },
+  {
+    key: "groq",
+    backendKey: "groq",
+    label: "Groq",
+    icon: singleIcon("/images/external-icons/groq.svg", "Groq"),
+    docs: {
+      internal: "/settings/model-providers",
+      external: "https://groq.com/",
+    },
+    fieldMetadata: {
+      GROQ_API_KEY: {
+        label: "API Key",
+        description: "Your Groq API key from console.groq.com",
+      },
+    },
   },
   {
     key: "grok_xai",
+    backendKey: "xai",
     label: "Grok (xAI)",
+    defaultModel: "grok-4",
     icon: themedIcon(
       "/images/external-icons/grok-lighttheme.svg",
       "/images/external-icons/grok-darktheme.svg",
@@ -125,157 +175,78 @@ export const modelProviderRegistry: ModelProviderRegistry = [
       internal: "/settings/model-providers",
       external: "https://x.ai/",
     },
-    fields: {
-      apiKey: {
-        label: "XAI_API_KEY",
-        required: true,
-        type: "password",
+    fieldMetadata: {
+      XAI_API_KEY: {
+        label: "API Key",
+        description: "Your xAI API key from x.ai",
       },
     },
-    models: ["grok-beta", "grok-vision-beta"],
-  },
-  {
-    key: "groq",
-    label: "Groq",
-    icon: singleIcon("/images/external-icons/groq.svg", "Groq"),
-    docs: {
-      internal: "/settings/model-providers",
-      external: "https://groq.com/",
-    },
-    fields: {
-      apiKey: {
-        label: "GROQ_API_KEY",
-        required: true,
-        type: "password",
-      },
-    },
-    models: [
-      "llama-3.1-70b-versatile",
-      "llama-3.1-8b-instant",
-      "llama-3.2-90b-vision-preview",
-      "mixtral-8x7b-32768",
-    ],
-  },
-  {
-    key: "aws_bedrock",
-    label: "AWS Bedrock",
-    icon: singleIcon("/images/external-icons/aws.svg", "AWS Bedrock"),
-    docs: {
-      internal: "/settings/model-providers",
-      external: "https://aws.amazon.com/bedrock/",
-    },
-    fields: {
-      apiKey: {
-        label: "AWS_ACCESS_KEY_ID",
-        required: true,
-        type: "password",
-      },
-      headers: {
-        AWS_SECRET_ACCESS_KEY: {
-          label: "AWS_SECRET_ACCESS_KEY",
-          required: true,
-          type: "password",
-        },
-        AWS_REGION: {
-          label: "AWS_REGION",
-          placeholder: "us-east-1",
-          required: true,
-          type: "text",
-        },
-      },
-    },
-    models: [
-      "anthropic.claude-3-5-sonnet-20241022-v2:0",
-      "anthropic.claude-3-opus-20240229-v1:0",
-      "meta.llama3-1-70b-instruct-v1:0",
-      "amazon.titan-text-premier-v1:0",
-    ],
   },
   {
     key: "vertex_ai",
+    backendKey: "vertex_ai",
     label: "Google Vertex AI",
     icon: singleIcon("/images/external-icons/gcloud.svg", "Google Vertex AI"),
     docs: {
       internal: "/settings/model-providers",
       external: "https://cloud.google.com/vertex-ai",
     },
-    fields: {
-      apiKey: {
-        label: "VERTEX_AI_PROJECT_ID",
-        required: true,
-        type: "text",
+    fieldMetadata: {
+      GOOGLE_APPLICATION_CREDENTIALS: {
+        label: "Google Service Account JSON",
+        description: "Paste the contents of your Google Cloud service account JSON file. Create one in GCP Console > IAM & Admin > Service Accounts with Vertex AI permissions.",
       },
-      headers: {
-        VERTEX_AI_LOCATION: {
-          label: "VERTEX_AI_LOCATION",
-          placeholder: "us-central1",
-          required: true,
-          type: "text",
-        },
+      VERTEXAI_PROJECT: {
+        label: "Vertex Project ID",
+        description: "Your Google Cloud project ID where Vertex AI is enabled",
       },
-    },
-    models: [
-      "gemini-1.5-pro",
-      "gemini-1.5-flash",
-      "claude-3-5-sonnet-v2",
-      "claude-3-opus",
-    ],
-  },
-  {
-    key: "deepseek",
-    label: "DeepSeek",
-    icon: singleIcon("/images/external-icons/deepseek.svg", "DeepSeek"),
-    docs: {
-      internal: "/settings/model-providers",
-      external: "https://www.deepseek.com/",
-    },
-    fields: {
-      apiKey: {
-        label: "DEEPSEEK_API_KEY",
-        required: true,
-        type: "password",
+      VERTEXAI_LOCATION: {
+        label: "Vertex Location",
+        description: "The GCP region for Vertex AI (e.g., us-central1, europe-west1)",
       },
     },
-    models: ["deepseek-chat", "deepseek-coder"],
   },
   {
     key: "cerebras",
+    backendKey: "cerebras",
     label: "Cerebras",
-    icon: singleIcon("/images/external-icons/cerebras.svg", "Cerebras"),
+    icon: themedIcon(
+      "/images/external-icons/cerebras-lighttheme.svg",
+      "/images/external-icons/cerebras-darktheme.svg",
+      "Cerebras",
+    ),
     docs: {
       internal: "/settings/model-providers",
       external: "https://cerebras.ai/",
     },
-    fields: {
-      apiKey: {
-        label: "CEREBRAS_API_KEY",
-        required: true,
-        type: "password",
+    fieldMetadata: {
+      CEREBRAS_API_KEY: {
+        label: "API Key",
+        description: "Your Cerebras API key from cloud.cerebras.ai",
       },
     },
-    models: ["llama3.1-8b", "llama3.1-70b"],
   },
   {
     key: "custom",
+    backendKey: "custom",
     label: "Custom (OpenAI-compatible)",
-    icon: singleIcon("/images/external-icons/custom.svg", "Custom Provider"),
+    icon: iconWithLabel(
+      singleIcon("/images/external-icons/custom.svg", "Custom Provider"),
+      "Custom"
+    ),
     docs: {
       internal: "/settings/model-providers",
     },
-    fields: {
-      apiKey: {
-        label: "CUSTOM_API_KEY",
-        required: true,
-        type: "password",
+    fieldMetadata: {
+      CUSTOM_API_KEY: {
+        label: "API Key",
+        description: "Optional: API key for your custom OpenAI-compatible endpoint",
       },
-      baseUrl: {
-        label: "CUSTOM_BASE_URL",
-        placeholder: "https://openai.inference.de-txl.cloud.ovh.net/v1",
-        required: true,
-        type: "url",
+      CUSTOM_BASE_URL: {
+        label: "Base URL",
+        description: "Your custom API endpoint URL (e.g., LiteLLM proxy, vLLM server, or any /chat/completions compatible service)",
       },
     },
-    models: [],
   },
 ];
 
