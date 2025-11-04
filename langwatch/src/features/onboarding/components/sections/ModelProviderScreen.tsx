@@ -5,6 +5,7 @@ import { useRouter } from "next/router";
 import { useActiveProject } from "../../contexts/ActiveProjectContext";
 import { ArrowRight } from "react-feather";
 import { ModelProviderGrid } from "./model-provider/ModelProviderGrid";
+import { ModelProviderConfigFields } from "./model-provider/ModelProviderConfigFields";
 import type { ModelProviderKey } from "../../regions/model-providers/types";
 
 export function ModelProviderScreen(): React.ReactElement {
@@ -15,11 +16,13 @@ export function ModelProviderScreen(): React.ReactElement {
 
   return (
     <>
-      <VStack align="stretch" gap={6}>
+      <VStack align="stretch" gap={6} mb={16}>
         <ModelProviderGrid
           modelProviderKey={modelProviderKey}
           onSelectModelProvider={setSelectedModelProviderKey}
         />
+
+        <ModelProviderConfigFields modelProviderKey={modelProviderKey} />
       </VStack>
 
       {project?.slug && (
