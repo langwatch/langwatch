@@ -107,6 +107,8 @@ function MembersList({
   activePlan: PlanInfo;
 }) {
   const { data: session } = useRequiredSession();
+  const { hasPermission } = useOrganizationTeamProject();
+  const hasOrganizationManagePermission = hasPermission("organization:manage");
   const user = session?.user;
   const teamOptions = teams.map((team) => ({
     label: team.name,
@@ -405,18 +407,41 @@ function MembersList({
                               </Button>
                             </Menu.Trigger>
                             <Menu.Content>
-                              <Menu.Item
-                                value="remove"
-                                color="red.600"
-                                disabled={organization.members.length === 1}
-                                onClick={() => deleteMember(member.userId)}
+                              <Tooltip
+                                content={
+                                  !hasOrganizationManagePermission
+                                    ? "You need organization:manage permission to remove members"
+                                    : organization.members.length === 1
+                                    ? "Cannot remove the last member"
+                                    : undefined
+                                }
+                                disabled={
+                                  hasOrganizationManagePermission &&
+                                  organization.members.length > 1
+                                }
+                                positioning={{ placement: "right" }}
+                                showArrow
                               >
-                                <Trash
-                                  size={14}
-                                  style={{ marginRight: "8px" }}
-                                />
-                                Remove Member
-                              </Menu.Item>
+                                <Menu.Item
+                                  value="remove"
+                                  color="red.600"
+                                  disabled={
+                                    !hasOrganizationManagePermission ||
+                                    organization.members.length === 1
+                                  }
+                                  onClick={() => {
+                                    if (hasOrganizationManagePermission) {
+                                      deleteMember(member.userId);
+                                    }
+                                  }}
+                                >
+                                  <Trash
+                                    size={14}
+                                    style={{ marginRight: "8px" }}
+                                  />
+                                  Remove Member
+                                </Menu.Item>
+                              </Tooltip>
                             </Menu.Content>
                           </Menu.Root>
                         </HStack>
@@ -475,17 +500,33 @@ function MembersList({
                               </Button>
                             </Menu.Trigger>
                             <Menu.Content>
-                              <Menu.Item
-                                value="delete"
-                                color="red.600"
-                                onClick={() => deleteInvite(invite.id)}
+                              <Tooltip
+                                content={
+                                  !hasOrganizationManagePermission
+                                    ? "You need organization:manage permission to delete invites"
+                                    : undefined
+                                }
+                                disabled={hasOrganizationManagePermission}
+                                positioning={{ placement: "right" }}
+                                showArrow
                               >
-                                <Trash
-                                  size={14}
-                                  style={{ marginRight: "8px" }}
-                                />
-                                Delete
-                              </Menu.Item>
+                                <Menu.Item
+                                  value="delete"
+                                  color="red.600"
+                                  onClick={() => {
+                                    if (hasOrganizationManagePermission) {
+                                      deleteInvite(invite.id);
+                                    }
+                                  }}
+                                  disabled={!hasOrganizationManagePermission}
+                                >
+                                  <Trash
+                                    size={14}
+                                    style={{ marginRight: "8px" }}
+                                  />
+                                  Delete
+                                </Menu.Item>
+                              </Tooltip>
                               <Menu.Item
                                 value="view"
                                 onClick={() =>
