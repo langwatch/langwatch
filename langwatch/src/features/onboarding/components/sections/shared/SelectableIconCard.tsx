@@ -1,5 +1,5 @@
 import React from "react";
-import { Box, Card, Icon, Text, type IconProps } from "@chakra-ui/react";
+import { Box, Card, Icon, Text, type IconProps, type CardRootProps, VStack } from "@chakra-ui/react";
 import { useColorModeValue } from "../../../../../components/ui/color-mode";
 import { Tooltip } from "../../../../../components/ui/tooltip";
 import type { IconData } from "../../../regions/shared/types";
@@ -14,26 +14,46 @@ interface SelectableIconCardProps {
   ariaLabel: string;
 }
 
-export function SelectableIconCard(props: SelectableIconCardProps): React.ReactElement {
-  const { label, size, icon, iconSize, selected, onClick, ariaLabel } = props;
+export function SelectableIconCard(
+  props: SelectableIconCardProps,
+): React.ReactElement {
+  const { label, size = "md", icon, iconSize, selected, onClick, ariaLabel } = props;
+
+  // Extract the actual icon from IconWithLabel if needed
+  const actualIcon = icon?.type === "with-label" ? icon.icon : icon;
+  const iconLabel = icon?.type === "with-label" ? icon.label : undefined;
+
   const themedIconSrc = useColorModeValue(
-    icon?.type === "themed" ? icon.lightSrc : "",
-    icon?.type === "themed" ? icon.darkSrc : ""
+    actualIcon?.type === "themed" ? actualIcon.lightSrc : "",
+    actualIcon?.type === "themed" ? actualIcon.darkSrc : "",
+  );
+  const borderColor = useColorModeValue<CardRootProps["borderColor"]>(
+    "border.inverted/10",
+    "border.inverted/30",
+  );
+  const selectedBorderColor = useColorModeValue(
+    "border.inverted/30",
+    "border.inverted/60",
   );
 
-  const iconSrc = icon?.type === "themed" ? themedIconSrc : icon?.src;
-  const iconAlt = icon?.alt;
+  const iconSrc = actualIcon?.type === "themed" ? themedIconSrc : actualIcon?.src;
+  const iconAlt = actualIcon?.alt;
 
   return (
-    <Tooltip content={label} positioning={{ placement: "bottom" }} showArrow openDelay={0}>
+    <Tooltip
+      content={label}
+      positioning={{ placement: "bottom" }}
+      showArrow
+      openDelay={0}
+    >
       <Card.Root
         role="button"
         aria-label={ariaLabel}
         aria-pressed={selected}
         onClick={onClick}
         cursor="pointer"
-        borderWidth="1px"
-        borderColor={selected ? "border.inverted/30" : "border.inverted/10"}
+        borderWidth={size === "sm" ? "1px" : "2px"}
+        borderColor={selected ? selectedBorderColor : borderColor}
         bg="bg.subtle/30"
         transition="all 0.2s ease"
         aspectRatio="1 / 1"
@@ -43,21 +63,42 @@ export function SelectableIconCard(props: SelectableIconCardProps): React.ReactE
         alignItems="center"
         justifyContent="center"
       >
-        <Box
+        <VStack
           filter={selected ? "grayscale(0%)" : "grayscale(100%)"}
           transition="filter 0.2s ease"
+          alignItems="center"
+          justifyContent="center"
+          gap={iconLabel ? "0px" : "0"}
         >
           {icon ? (
-            <Icon size={iconSize ?? "md"}>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={iconSrc} alt={iconAlt} />
-            </Icon>
+            <>
+              <Icon size={iconSize ?? "md"}>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={iconSrc} alt={iconAlt} />
+              </Icon>
+              {iconLabel && (
+                <Text
+                  textStyle={size === "sm" ? "2xs" : "xs"}
+                  fontWeight="medium"
+                  color="fg.muted"
+                  textAlign="center"
+                  lineHeight="tight"
+                >
+                  {iconLabel}
+                </Text>
+              )}
+            </>
           ) : (
-            <Text textStyle="sm" fontWeight="normal" color="CaptionText" textAlign="center">
+            <Text
+              textStyle="sm"
+              fontWeight="normal"
+              color="CaptionText"
+              textAlign="center"
+            >
               {label}
             </Text>
           )}
-        </Box>
+        </VStack>
       </Card.Root>
     </Tooltip>
   );

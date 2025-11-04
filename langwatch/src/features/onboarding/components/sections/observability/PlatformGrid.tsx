@@ -33,6 +33,7 @@ export const PlatformGrid: React.FC<PlatformGridProps> = ({
               src: lang.iconUrl ?? "",
               alt: lang.label,
             }}
+            size="sm"
             iconSize="lg"
             selected={selectedLanguage === lang.key}
             onClick={() => onSelectLanguage(lang.key)}
