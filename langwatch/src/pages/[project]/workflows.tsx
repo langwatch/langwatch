@@ -23,23 +23,15 @@ import { Tooltip } from "../../components/ui/tooltip";
 
 import { api } from "../../utils/api";
 import { trackEvent } from "../../utils/tracking";
-import { PermissionAlert } from "../../components/PermissionAlert";
+import { withPermissionGuard } from "../../components/WithPermissionGuard";
 
-export default function Workflows() {
+function Workflows() {
   const { project, isOrganizationFeatureEnabled, organization, hasPermission } =
     useOrganizationTeamProject();
 
-  const hasWorkflowsViewPermission = hasPermission("workflows:view");
+  const hasWorkflowsCreatePermission = hasPermission("workflows:create");
 
   const { open, onClose, onOpen } = useDisclosure();
-
-  if (!hasWorkflowsViewPermission) {
-    return (
-      <DashboardLayout>
-        <PermissionAlert permission="workflows:view" />
-      </DashboardLayout>
-    );
-  }
 
   const workflows = api.workflow.getAll.useQuery(
     { projectId: project?.id ?? "" },
@@ -98,6 +90,20 @@ export default function Workflows() {
                         </Text>
                       </HStack>
                     </Link>
+                  </Center>
+                </Tooltip>
+              </WorkflowCardBase>
+            ) : !hasWorkflowsCreatePermission ? (
+              <WorkflowCardBase opacity={0.5}>
+                <Tooltip content="You need workflows:create permission to create workflows">
+                  <Center width="full" height="full">
+                    <HStack gap={3}>
+                      <Lock size={14} color="#777" />
+
+                      <Text fontSize="18px" color="gray.600">
+                        Create new
+                      </Text>
+                    </HStack>
                   </Center>
                 </Tooltip>
               </WorkflowCardBase>
@@ -165,3 +171,7 @@ export default function Workflows() {
     </DashboardLayout>
   );
 }
+
+export default withPermissionGuard("workflows:view", {
+  layoutComponent: DashboardLayout,
+})(Workflows);
