@@ -13,12 +13,28 @@ export const loggerMiddleware = () => {
       await next();
     } catch (err) {
       error = err;
+      // Log error immediately before re-throwing
+      const status = (err as any)?.status ?? 500;
+      logger.error(
+        {
+          method: c.req.method,
+          url: c.req.url,
+          path: c.req.path,
+          status,
+          error: err instanceof Error ? {
+            name: err.name,
+            message: err.message,
+            stack: err.stack,
+          } : err,
+        },
+        `Request error [${status}]: ${err instanceof Error ? err.message : String(err)}`
+      );
       throw err; // Re-throw so Hono can handle the error downstream
     } finally {
       const duration = Date.now() - start;
       const { method } = c.req;
       const url = c.req.url;
-      const statusCode = c.res.status;
+      const statusCode = c.res.status || (error ? ((error as any)?.status ?? 500) : 200);
 
       const logData: Record<string, unknown> = {
         method,

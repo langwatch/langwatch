@@ -36,16 +36,7 @@
         { "type": "docs", "section": "Documentation", "hidden": false },
         { "type": "refactor", "section": "Code Refactoring", "hidden": false }
       ],
-      "extra-files": [
-        {
-          "type": "generic",
-          "path": "src/langwatch/__version__.py",
-          "updater": {
-            "search": "__version__ = \".*\"",
-            "replace": "__version__ = \"${version}\""
-          }
-        }
-      ]
+      "extra-files": ["src/langwatch/__version__.py"]
     },
     "mcp-server": {
       "release-type": "node",
@@ -76,6 +67,15 @@
       "component": "langwatch",
       "include-component-in-tag": true,
       "tag-separator": "@",
+      "exclude-paths": [
+        "typescript-sdk",
+        "sdk-go",
+        "mcp-server",
+        "charts",
+        ".github",
+        ".cursor",
+        "assets"
+      ],
       "changelog-sections": [
         { "type": "feat", "section": "Features" },
         { "type": "fix", "section": "Bug Fixes" },

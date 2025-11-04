@@ -174,19 +174,6 @@ export const NodeSelectionPanel = ({
           })}
 
           <Text fontWeight="500" padding={1}>
-            Retrievers
-          </Text>
-          {MODULES.retrievers.map((retriever) => {
-            return (
-              <NodeDraggable
-                key={retriever.name}
-                component={retriever}
-                type="retriever"
-              />
-            );
-          })}
-
-          <Text fontWeight="500" padding={1}>
             Evaluators
           </Text>
           {MODULES.evaluators.map((evaluator) => {

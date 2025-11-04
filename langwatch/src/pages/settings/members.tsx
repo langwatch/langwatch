@@ -371,6 +371,8 @@ function MembersList({
                 {sortedMembers.map((member) => {
                   const roleLabel =
                     roleLabelMap.get(member.role) ?? member.role;
+                  const isDeleteDisabled = member.user.id === user?.id;
+
                   return (
                     <LinkBox as={Table.Row} key={member.userId}>
                       <Table.Cell>
@@ -424,13 +426,17 @@ function MembersList({
                 })}
               </Table.Body>
             </Table.Root>
+          </Card.Body>
+        </Card.Root>
 
-            {pendingInvites.data && pendingInvites.data.length > 0 && (
-              <>
-                <Heading size="sm" as="h2" paddingY={4} marginLeft={6}>
-                  Pending Invites
-                </Heading>
+        {pendingInvites.data && pendingInvites.data.length > 0 && (
+          <VStack align="start" gap={1} width="full">
+            <Heading size="md" as="h2" paddingY={4}>
+              Pending Invites
+            </Heading>
 
+            <Card.Root width="full">
+              <Card.Body width="full" paddingY={0} paddingX={0}>
                 <Table.Root>
                   <Table.Header>
                     <Table.Row>
@@ -502,10 +508,10 @@ function MembersList({
                     ))}
                   </Table.Body>
                 </Table.Root>
-              </>
-            )}
-          </Card.Body>
-        </Card.Root>
+              </Card.Body>
+            </Card.Root>
+          </VStack>
+        )}
       </VStack>
 
       <Dialog.Root
@@ -638,3 +644,54 @@ const TeamIdsDisplay = ({ teamIds, teams }: TeamIdsDisplayProps) => {
     </Flex>
   );
 };
+
+// const OrganizationMemberSelect = ({
+//   defaultValue,
+//   onRoleChange,
+//   memberId,
+//   loading,
+//   disabled,
+// }: RoleSelectProps) => {
+//   return (
+//     <MultiSelect
+//       size={"sm"}
+//       options={selectOptions}
+//       defaultValue={selectOptions.find(
+//         (option) => option.value === defaultValue,
+//       )}
+//       onChange={(value) => {
+//         onRoleChange?.(memberId ?? "", value!.value as OrganizationUserRole);
+//       }}
+//       isLoading={loading}
+//       isDisabled={disabled}
+//       hideSelectedOptions={false}
+//       isSearchable={false}
+//       components={{
+//         Menu: ({ children, ...props }) => (
+//           <chakraComponents.Menu
+//             {...props}
+//             innerProps={{
+//               ...props.innerProps,
+//               style: { width: "350px", zIndex: 10 },
+//             }}
+//           >
+//             {children}
+//           </chakraComponents.Menu>
+//         ),
+//         Option: ({ children, ...props }) => (
+//           <chakraComponents.Option {...props}>
+//             <VStack align="start">
+//               <Text>{children}</Text>
+//               <Text
+//                 color={props.isSelected ? "white" : "gray.500"}
+//                 fontSize="13px"
+//               >
+//                 {props.data.description}
+//               </Text>
+//             </VStack>
+//           </chakraComponents.Option>
+//         ),
+//       }}
+//     />
+//   );
+// };

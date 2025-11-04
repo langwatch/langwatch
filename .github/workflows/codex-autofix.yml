@@ -1,0 +1,101 @@
+name: Codex Auto-Fix Python CI
+
+on:
+  workflow_run:
+    workflows: ["sdk-python-ci"]
+    types: [completed]
+  workflow_dispatch:  # Add this for manual testing
+    inputs:
+      test_branch:
+        description: 'Branch to test fixes on'
+        required: false
+        default: 'main' 
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  auto-fix:
+    if: ${{ github.event.workflow_run.conclusion == 'failure' }}
+    runs-on: ubuntu-latest
+    env:
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      FAILED_WORKFLOW_NAME: ${{ github.event.workflow_run.name }}
+      FAILED_RUN_URL: ${{ github.event.workflow_run.html_url }}
+      FAILED_HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
+      FAILED_HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+    steps:
+      - name: Check OpenAI API Key Set
+        run: |
+          if [ -z "$OPENAI_API_KEY" ]; then
+            echo "OPENAI_API_KEY secret is not set. Skipping auto-fix." >&2
+            exit 1
+          fi
+
+      - name: Checkout Failing Ref
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.FAILED_HEAD_SHA }}
+          fetch-depth: 0
+
+      - name: Setup UV
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+          cache-dependency-glob: "python-sdk/uv.lock"
+
+      - name: Setup Python Dependencies
+        working-directory: python-sdk
+        run: uv sync --all-groups --all-extras
+
+      - name: Run Codex
+        uses: openai/codex-action@main
+        id: codex
+        with:
+          openai_api_key: ${{ secrets.OPENAI_API_KEY }}
+          prompt: >-
+            You are working in a Python monorepo with pytest tests managed by uv.
+            The python-sdk directory contains the SDK with both unit tests (make test) and integration tests (make test-examples).
+            Read the repository, run both test suites, identify the minimal change needed to make all tests pass,
+            implement only that change, and stop. Do not refactor unrelated code or files. Keep changes small and surgical.
+          codex_args: '["--config","sandbox_mode=\"workspace-write\""]'
+
+      - name: Verify unit tests
+        working-directory: python-sdk
+        env:
+          LANGWATCH_DEBUG: "true"
+        run: make test
+
+      - name: Verify integration tests
+        working-directory: python-sdk
+        env:
+          LANGWATCH_DEBUG: "true"
+          LANGWATCH_API_KEY: ${{ secrets.PYTHON_SDK_LANGWATCH_API_KEY }}
+          LANGWATCH_PROMPT_ID: ${{ secrets.PYTHON_SDK_LANGWATCH_PROMPT_ID }}
+          AZURE_OPENAI_API_KEY: ${{ secrets.PYTHON_SDK_AZURE_OPENAI_API_KEY }}
+          AZURE_OPENAI_ENDPOINT: ${{ secrets.PYTHON_SDK_AZURE_OPENAI_ENDPOINT }}
+          GEMINI_API_KEY: ${{ secrets.PYTHON_SDK_GEMINI_API_KEY }}
+          GROQ_API_KEY: ${{ secrets.PYTHON_SDK_GROQ_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.PYTHON_SDK_OPENAI_API_KEY }}
+          CEREBRAS_API_KEY: ${{ secrets.PYTHON_SDK_CEREBRAS_API_KEY }}
+        run: make test-examples
+
+      - name: Create pull request with fixes
+        if: success()
+        uses: peter-evans/create-pull-request@v6
+        with:
+          commit-message: "fix(python-sdk): auto-fix failing tests via Codex"
+          branch: codex/auto-fix-python-${{ github.event.workflow_run.run_id }}
+          base: ${{ env.FAILED_HEAD_BRANCH }}
+          title: "Auto-fix failing Python SDK CI via Codex"
+          body: |
+            Codex automatically generated this PR in response to a CI failure on workflow `${{ env.FAILED_WORKFLOW_NAME }}`.
+            
+            Failed run: ${{ env.FAILED_RUN_URL }}
+            Head branch: `${{ env.FAILED_HEAD_BRANCH }}`
+            
+            This PR contains minimal changes intended solely to make the CI pass.
+            
+            ✅ Unit tests verified
+            ✅ Integration tests verified

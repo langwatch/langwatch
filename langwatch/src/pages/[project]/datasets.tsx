@@ -31,19 +31,19 @@ import { Link } from "../../components/ui/link";
 import { Menu } from "../../components/ui/menu";
 import { toaster } from "../../components/ui/toaster";
 import { PageLayout } from "~/components/ui/layouts/PageLayout";
-import { PermissionAlert } from "../../components/PermissionAlert";
+import { useDeleteDatasetConfirmation } from "~/hooks/useDeleteDatasetConfirmation";
+import { withPermissionGuard } from "~/components/WithPermissionGuard";
 
-export default function Datasets() {
+function DatasetsPage() {
   const addEditDatasetDrawer = useDisclosure();
   const uploadCSVModal = useDisclosure();
-  const { project, hasPermission } = useOrganizationTeamProject();
+  const { project } = useOrganizationTeamProject();
   const router = useRouter();
   const { openDrawer } = useDrawer();
-  const hasDatasetsViewPermission = hasPermission("datasets:view");
 
   const datasets = api.dataset.getAll.useQuery(
     { projectId: project?.id ?? "" },
-    { enabled: !!project && hasDatasetsViewPermission },
+    { enabled: !!project },
   );
 
   const datasetDelete = api.dataset.deleteById.useMutation();
@@ -56,15 +56,7 @@ export default function Datasets() {
     | undefined
   >();
 
-  if (!hasDatasetsViewPermission) {
-    return (
-      <DashboardLayout>
-        <PermissionAlert permission="datasets:view" />
-      </DashboardLayout>
-    );
-  }
-
-  const deleteDataset = (id: string, name: string) => {
+  const deleteDataset = ({ id, name }: { id: string; name: string }) => {
     datasetDelete.mutate(
       { projectId: project?.id ?? "", datasetId: id },
       {
@@ -131,6 +123,9 @@ export default function Datasets() {
       },
     );
   };
+
+  const { showDeleteDialog, DeleteDialog } =
+    useDeleteDatasetConfirmation(deleteDataset);
 
   const goToDataset = (id: string) => {
     void router.push({
@@ -267,7 +262,10 @@ export default function Datasets() {
                                 color="red.600"
                                 onClick={(event) => {
                                   event.stopPropagation();
-                                  deleteDataset(dataset.id, dataset.name);
+                                  showDeleteDialog({
+                                    id: dataset.id,
+                                    name: dataset.name,
+                                  });
                                 }}
                               >
                                 <Trash2 size={16} /> Delete dataset
@@ -309,6 +307,11 @@ export default function Datasets() {
           }, 100);
         }}
       />
+      <DeleteDialog />
     </DashboardLayout>
   );
 }
+
+export default withPermissionGuard("datasets:view", {
+  layoutComponent: DashboardLayout,
+})(DatasetsPage);

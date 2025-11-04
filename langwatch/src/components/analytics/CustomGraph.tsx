@@ -505,8 +505,9 @@ const CustomGraph_ = React.memo(
 
     const [GraphComponent, GraphElement] = GraphComponentMap[input.graphType]!;
 
-    const [XAxisComponent, YAxisComponent] =
-      input.graphType === "horizontal_bar" ? [YAxis, XAxis] : [XAxis, YAxis];
+    const [XAxisComponent, YAxisComponent] = (
+      input.graphType === "horizontal_bar" ? [YAxis, XAxis] : [XAxis, YAxis]
+    ) as [typeof XAxis, typeof YAxis];
 
     if (
       ["bar", "horizontal_bar"].includes(input.graphType) &&
@@ -562,7 +563,7 @@ const CustomGraph_ = React.memo(
               dataKey="value"
               domain={[0, "dataMax"]}
               tick={{ fill: gray400 }}
-              tickFormatter={(value) => {
+              tickFormatter={(value: number) => {
                 if (typeof yAxisValueFormat === "function") {
                   return yAxisValueFormat(value);
                 }
@@ -638,7 +639,7 @@ const CustomGraph_ = React.memo(
             tickMargin={20}
             domain={[0, "dataMax"]}
             tick={{ fill: gray400 }}
-            tickFormatter={(value) => {
+            tickFormatter={(value: number) => {
               if (typeof yAxisValueFormat === "function") {
                 return yAxisValueFormat(value);
               }

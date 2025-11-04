@@ -1,4 +1,6 @@
+import functools
 import time
+import types
 from typing import Any, Dict, Tuple, TypeVar
 import dspy
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -104,7 +106,8 @@ class LangWatchWorkflowModule(ReportingModule):
             self.forward = self.__forward_before_prevent_crashes__  # type: ignore
         self.__forward_before_prevent_crashes__ = self.forward  # type: ignore
 
-        def prevent_crashes_forward(*args, **kwargs):
+        @functools.wraps(self.__forward_before_prevent_crashes__)
+        def prevent_crashes_forward(self, *args, **kwargs):
             try:
                 return self.__forward_before_prevent_crashes__(*args, **kwargs)  # type: ignore
             except Exception as e:
@@ -114,5 +117,5 @@ class LangWatchWorkflowModule(ReportingModule):
                     error=e,
                 )
 
-        self.forward = prevent_crashes_forward  # type: ignore
+        self.forward = types.MethodType(prevent_crashes_forward, self)  # type: ignore
         return self

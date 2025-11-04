@@ -63,7 +63,7 @@ async function getAllProjectIds(): Promise<{ id: string }[]> {
     });
     return projects;
   } catch (error) {
-    logger.error("[Scenario Analytics] getAllProjectIds error:", error);
+    logger.error({ error }, "[Scenario Analytics] getAllProjectIds error");
     throw error;
   }
 }
@@ -236,10 +236,10 @@ async function saveAnalyticsAndLog(
     );
 
     logger.info(
+      { analyticsByType },
       `[Scenario Analytics] Created ${
         newAnalyticsToCreate.length
-      } entries for ${yesterday.toISOString().split("T")[0]}:`,
-      analyticsByType
+      } entries for ${yesterday.toISOString().split("T")[0]}`
     );
   } else {
     logger.info(
@@ -324,7 +324,7 @@ export default async function handler(
       analyticsCreated: result.analyticsCreated,
     });
   } catch (error) {
-    logger.error("[Scenario Analytics] Error:", error);
+    logger.error({ error }, "[Scenario Analytics] Error");
     return res
       .status(500)
       .json({ success: false, error: "Failed to process scenario analytics" });

@@ -995,6 +995,9 @@
                               "items": {
                                 "type": "object",
                                 "properties": {
+                                  "id": {
+                                    "type": "string"
+                                  },
                                   "name": {
                                     "type": "string"
                                   },
@@ -1043,6 +1046,10 @@
                                       {
                                         "type": "string",
                                         "const": "evaluations"
+                                      },
+                                      {
+                                        "type": "string",
+                                        "const": "image"
                                       }
                                     ]
                                   }
@@ -1098,6 +1105,9 @@
                                   "items": {
                                     "type": "object",
                                     "properties": {
+                                      "id": {
+                                        "type": "string"
+                                      },
                                       "name": {
                                         "type": "string"
                                       },
@@ -1146,6 +1156,10 @@
                                           {
                                             "type": "string",
                                             "const": "evaluations"
+                                          },
+                                          {
+                                            "type": "string",
+                                            "const": "image"
                                           }
                                         ]
                                       }
@@ -1268,6 +1282,27 @@
           },
           "404": {
             "description": "Prompt not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
             "content": {
               "application/json": {
                 "schema": {
@@ -1523,6 +1558,9 @@
                               "items": {
                                 "type": "object",
                                 "properties": {
+                                  "id": {
+                                    "type": "string"
+                                  },
                                   "name": {
                                     "type": "string"
                                   },
@@ -1571,6 +1609,10 @@
                                       {
                                         "type": "string",
                                         "const": "evaluations"
+                                      },
+                                      {
+                                        "type": "string",
+                                        "const": "image"
                                       }
                                     ]
                                   }
@@ -1626,6 +1668,9 @@
                                   "items": {
                                     "type": "object",
                                     "properties": {
+                                      "id": {
+                                        "type": "string"
+                                      },
                                       "name": {
                                         "type": "string"
                                       },
@@ -1674,6 +1719,10 @@
                                           {
                                             "type": "string",
                                             "const": "evaluations"
+                                          },
+                                          {
+                                            "type": "string",
+                                            "const": "image"
                                           }
                                         ]
                                       }
@@ -1898,10 +1947,6 @@
               "schema": {
                 "type": "object",
                 "properties": {
-                  "handle": {
-                    "type": "string",
-                    "pattern": "^[a-z0-9_-]+(?:\\/[a-z0-9_-]+)?$"
-                  },
                   "model": {
                     "type": "string"
                   },
@@ -2023,8 +2068,16 @@
                       "ORGANIZATION",
                       "PROJECT"
                     ]
+                  },
+                  "handle": {
+                    "type": "string",
+                    "pattern": "^[a-z0-9_-]+(?:\\/[a-z0-9_-]+)?$"
                   }
-                }
+                },
+                "required": [
+                  "commitMessage"
+                ],
+                "additionalProperties": false
               }
             }
           }
@@ -2094,6 +2147,27 @@
           },
           "404": {
             "description": "Prompt not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
             "content": {
               "application/json": {
                 "schema": {
@@ -2343,6 +2417,9 @@
                                 "items": {
                                   "type": "object",
                                   "properties": {
+                                    "id": {
+                                      "type": "string"
+                                    },
                                     "name": {
                                       "type": "string"
                                     },
@@ -2391,6 +2468,10 @@
                                         {
                                           "type": "string",
                                           "const": "evaluations"
+                                        },
+                                        {
+                                          "type": "string",
+                                          "const": "image"
                                         }
                                       ]
                                     }
@@ -2446,6 +2527,9 @@
                                     "items": {
                                       "type": "object",
                                       "properties": {
+                                        "id": {
+                                          "type": "string"
+                                        },
                                         "name": {
                                           "type": "string"
                                         },
@@ -2494,6 +2578,10 @@
                                             {
                                               "type": "string",
                                               "const": "evaluations"
+                                            },
+                                            {
+                                              "type": "string",
+                                              "const": "image"
                                             }
                                           ]
                                         }
@@ -2617,6 +2705,27 @@
           },
           "404": {
             "description": "Prompt not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
             "content": {
               "application/json": {
                 "schema": {
@@ -2876,6 +2985,9 @@
                                   "items": {
                                     "type": "object",
                                     "properties": {
+                                      "id": {
+                                        "type": "string"
+                                      },
                                       "name": {
                                         "type": "string"
                                       },
@@ -2924,6 +3036,10 @@
                                           {
                                             "type": "string",
                                             "const": "evaluations"
+                                          },
+                                          {
+                                            "type": "string",
+                                            "const": "image"
                                           }
                                         ]
                                       }
@@ -2979,6 +3095,9 @@
                                       "items": {
                                         "type": "object",
                                         "properties": {
+                                          "id": {
+                                            "type": "string"
+                                          },
                                           "name": {
                                             "type": "string"
                                           },
@@ -3027,6 +3146,10 @@
                                               {
                                                 "type": "string",
                                                 "const": "evaluations"
+                                              },
+                                              {
+                                                "type": "string",
+                                                "const": "image"
                                               }
                                             ]
                                           }
@@ -3253,6 +3376,9 @@
                                       "items": {
                                         "type": "object",
                                         "properties": {
+                                          "id": {
+                                            "type": "string"
+                                          },
                                           "name": {
                                             "type": "string"
                                           },
@@ -3301,6 +3427,10 @@
                                               {
                                                 "type": "string",
                                                 "const": "evaluations"
+                                              },
+                                              {
+                                                "type": "string",
+                                                "const": "image"
                                               }
                                             ]
                                           }
@@ -3356,6 +3486,9 @@
                                           "items": {
                                             "type": "object",
                                             "properties": {
+                                              "id": {
+                                                "type": "string"
+                                              },
                                               "name": {
                                                 "type": "string"
                                               },
@@ -3404,6 +3537,10 @@
                                                   {
                                                     "type": "string",
                                                     "const": "evaluations"
+                                                  },
+                                                  {
+                                                    "type": "string",
+                                                    "const": "image"
                                                   }
                                                 ]
                                               }
@@ -3508,6 +3645,27 @@
           },
           "401": {
             "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
             "content": {
               "application/json": {
                 "schema": {
@@ -3703,6 +3861,9 @@
                                 "items": {
                                   "type": "object",
                                   "properties": {
+                                    "id": {
+                                      "type": "string"
+                                    },
                                     "name": {
                                       "type": "string"
                                     },
@@ -3751,6 +3912,10 @@
                                         {
                                           "type": "string",
                                           "const": "evaluations"
+                                        },
+                                        {
+                                          "type": "string",
+                                          "const": "image"
                                         }
                                       ]
                                     }
@@ -3806,6 +3971,9 @@
                                     "items": {
                                       "type": "object",
                                       "properties": {
+                                        "id": {
+                                          "type": "string"
+                                        },
                                         "name": {
                                           "type": "string"
                                         },
@@ -3854,6 +4022,10 @@
                                             {
                                               "type": "string",
                                               "const": "evaluations"
+                                            },
+                                            {
+                                              "type": "string",
+                                              "const": "image"
                                             }
                                           ]
                                         }
@@ -4021,17 +4193,15 @@
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "status": {
-                      "type": "string",
-                      "default": "error"
+                    "error": {
+                      "type": "string"
                     },
                     "message": {
                       "type": "string"
                     }
                   },
                   "required": [
-                    "status",
-                    "message"
+                    "error"
                   ]
                 }
               }
@@ -4044,17 +4214,15 @@
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "status": {
-                      "type": "string",
-                      "default": "error"
+                    "error": {
+                      "type": "string"
                     },
                     "message": {
                       "type": "string"
                     }
                   },
                   "required": [
-                    "status",
-                    "message"
+                    "error"
                   ]
                 }
               }
@@ -4067,17 +4235,15 @@
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "status": {
-                      "type": "string",
-                      "default": "error"
+                    "error": {
+                      "type": "string"
                     },
                     "message": {
                       "type": "string"
                     }
                   },
                   "required": [
-                    "status",
-                    "message"
+                    "error"
                   ]
                 }
               }
@@ -4090,17 +4256,15 @@
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "status": {
-                      "type": "string",
-                      "default": "error"
+                    "error": {
+                      "type": "string"
                     },
                     "message": {
                       "type": "string"
                     }
                   },
                   "required": [
-                    "status",
-                    "message"
+                    "error"
                   ]
                 }
               }
@@ -4113,17 +4277,15 @@
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "status": {
-                      "type": "string",
-                      "default": "error"
+                    "error": {
+                      "type": "string"
                     },
                     "message": {
                       "type": "string"
                     }
                   },
                   "required": [
-                    "status",
-                    "message"
+                    "error"
                   ]
                 }
               }
@@ -4338,6 +4500,9 @@
                                 "items": {
                                   "type": "object",
                                   "properties": {
+                                    "id": {
+                                      "type": "string"
+                                    },
                                     "name": {
                                       "type": "string"
                                     },
@@ -4386,6 +4551,10 @@
                                         {
                                           "type": "string",
                                           "const": "evaluations"
+                                        },
+                                        {
+                                          "type": "string",
+                                          "const": "image"
                                         }
                                       ]
                                     }
@@ -4441,6 +4610,9 @@
                                     "items": {
                                       "type": "object",
                                       "properties": {
+                                        "id": {
+                                          "type": "string"
+                                        },
                                         "name": {
                                           "type": "string"
                                         },
@@ -4489,6 +4661,10 @@
                                             {
                                               "type": "string",
                                               "const": "evaluations"
+                                            },
+                                            {
+                                              "type": "string",
+                                              "const": "image"
                                             }
                                           ]
                                         }
@@ -4591,6 +4767,27 @@
           },
           "401": {
             "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
             "content": {
               "application/json": {
                 "schema": {
@@ -4827,6 +5024,9 @@
                               "items": {
                                 "type": "object",
                                 "properties": {
+                                  "id": {
+                                    "type": "string"
+                                  },
                                   "name": {
                                     "type": "string"
                                   },
@@ -4875,6 +5075,10 @@
                                       {
                                         "type": "string",
                                         "const": "evaluations"
+                                      },
+                                      {
+                                        "type": "string",
+                                        "const": "image"
                                       }
                                     ]
                                   }
@@ -4930,6 +5134,9 @@
                                   "items": {
                                     "type": "object",
                                     "properties": {
+                                      "id": {
+                                        "type": "string"
+                                      },
                                       "name": {
                                         "type": "string"
                                       },
@@ -4978,6 +5185,10 @@
                                           {
                                             "type": "string",
                                             "const": "evaluations"
+                                          },
+                                          {
+                                            "type": "string",
+                                            "const": "image"
                                           }
                                         ]
                                       }
@@ -5115,6 +5326,27 @@
                   "required": [
                     "error",
                     "message"
+                  ]
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
                   ]
                 }
               }
@@ -5336,6 +5568,27 @@
           },
           "401": {
             "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
             "content": {
               "application/json": {
                 "schema": {
@@ -5674,6 +5927,9 @@
                                         },
                                         "toolCallId": {
                                           "type": "string"
+                                        },
+                                        "error": {
+                                          "type": "string"
                                         }
                                       },
                                       "required": [
@@ -5993,6 +6249,27 @@
           },
           "401": {
             "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
             "content": {
               "application/json": {
                 "schema": {

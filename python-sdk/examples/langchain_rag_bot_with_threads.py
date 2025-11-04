@@ -227,6 +227,9 @@ class TestDataLayer(cl_data.base.BaseDataLayer):
     async def build_debug_url(self) -> str:
         return ""
 
+    async def close(self) -> None:
+        pass
+
 
 cl_data._data_layer = TestDataLayer()
 
