@@ -71,10 +71,6 @@ export const projectRoutes = {
     path: "/settings",
     title: "Settings",
   },
-  playground: {
-    path: "/[project]/playground",
-    title: "Playground",
-  },
   datasets: {
     path: "/[project]/datasets",
     title: "Datasets",
@@ -136,9 +132,9 @@ export type Route = {
 type RouteMap = Record<keyof typeof projectRoutes, Route>;
 
 export const findCurrentRoute = (
-  currentPathname: string
+  currentPathname: string,
 ): Route | undefined => {
   return Object.values(projectRoutes as RouteMap).find(
-    (route) => route.path === currentPathname
+    (route) => route.path === currentPathname,
   );
 };
