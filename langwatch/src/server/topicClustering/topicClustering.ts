@@ -1,7 +1,7 @@
-import { estypes } from "@elastic/elasticsearch";
-
-type QueryDslBoolQuery = estypes.QueryDslBoolQuery;
-type QueryDslQueryContainer = estypes.QueryDslQueryContainer;
+import type {
+  QueryDslBoolQuery,
+  QueryDslQueryContainer,
+} from "@elastic/elasticsearch/lib/api/types";
 import { CostReferenceType, CostType, type Project } from "@prisma/client";
 import { fetch as fetchHTTP2 } from "fetch-h2";
 import { nanoid } from "nanoid";

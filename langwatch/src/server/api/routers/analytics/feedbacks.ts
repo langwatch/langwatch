@@ -1,7 +1,7 @@
-import { estypes } from "@elastic/elasticsearch";
-
-type QueryDslBoolQuery = estypes.QueryDslBoolQuery;
-type QueryDslQueryContainer = estypes.QueryDslQueryContainer;
+import type {
+  QueryDslBoolQuery,
+  QueryDslQueryContainer,
+} from "@elastic/elasticsearch/lib/api/types";
 import { sharedFiltersInputSchema } from "../../../analytics/types";
 import { TRACE_INDEX, esClient } from "../../../elasticsearch";
 import {

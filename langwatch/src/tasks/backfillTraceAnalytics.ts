@@ -1,8 +1,6 @@
 import { prisma } from "~/server/db";
 import { esClient, TRACE_INDEX } from "~/server/elasticsearch";
-import { estypes } from "@elastic/elasticsearch";
-
-type AggregationsCalendarInterval = estypes.AggregationsCalendarInterval;
+import type { AggregationsCalendarInterval } from "@elastic/elasticsearch/lib/api/types";
 import { ANALYTICS_KEYS } from "~/types";
 
 interface DateHistogramBucket {

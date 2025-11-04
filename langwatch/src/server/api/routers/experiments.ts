@@ -1,8 +1,8 @@
-import { type estypes } from "@elastic/elasticsearch";
-
-type AggregationsAggregate = estypes.AggregationsAggregate;
-type QueryDslBoolQuery = estypes.QueryDslBoolQuery;
-type SearchResponse = estypes.SearchResponse;
+import type {
+  AggregationsAggregate,
+  QueryDslBoolQuery,
+  SearchResponse,
+} from "@elastic/elasticsearch/lib/api/types";
 import { EvaluationExecutionMode, ExperimentType } from "@prisma/client";
 import type { JsonValue } from "@prisma/client/runtime/library";
 import { TRPCError } from "@trpc/server";
@@ -628,7 +628,10 @@ export const experimentsRouter = createTRPCRouter({
       });
 
       const client = await esClient({ projectId: input.projectId });
-      let batchEvaluationRun: SearchResponse;
+      let batchEvaluationRun: SearchResponse<
+        ESBatchEvaluation,
+        Record<string, AggregationsAggregate>
+      >;
       let attempts = 0;
       while (attempts < 3) {
         batchEvaluationRun = await client.search<ESBatchEvaluation>({

@@ -5,9 +5,7 @@ import {
   checkUserPermissionForOrganization,
 } from "../permission";
 import { TRACE_INDEX, esClient } from "../../elasticsearch";
-import { estypes } from "@elastic/elasticsearch";
-
-type QueryDslBoolQuery = estypes.QueryDslBoolQuery;
+import type { QueryDslBoolQuery } from "@elastic/elasticsearch/lib/api/types";
 import { prisma } from "../../db";
 import { dependencies } from "../../../injection/dependencies.server";
 

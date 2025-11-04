@@ -1,8 +1,8 @@
-import { estypes, estypesWithBody } from "@elastic/elasticsearch";
-
-type AggregationsAggregationContainer = estypes.AggregationsAggregationContainer;
-type QueryDslBoolQuery = estypes.QueryDslBoolQuery;
-type SearchRequest = estypesWithBody.SearchRequest;
+import type {
+  AggregationsAggregationContainer,
+  QueryDslBoolQuery,
+} from "@elastic/elasticsearch/lib/api/types";
+import type { SearchRequest } from "@elastic/elasticsearch/lib/api/typesWithBodyKey";
 import { TRPCError } from "@trpc/server";
 import {
   getGroup,

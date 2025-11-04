@@ -1,7 +1,5 @@
 import { type Client as ElasticClient } from "@elastic/elasticsearch";
-import { estypes } from "@elastic/elasticsearch";
-
-type MappingProperty = estypes.MappingProperty;
+import type { MappingProperty } from "@elastic/elasticsearch/lib/api/types";
 import { TRACE_COLD_INDEX, esClient } from "../../server/elasticsearch";
 import { traceMapping } from "../../../elastic/schema";
 import { env } from "../../env.mjs";

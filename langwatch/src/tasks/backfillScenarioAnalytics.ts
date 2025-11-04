@@ -1,6 +1,4 @@
-import { estypes } from "@elastic/elasticsearch";
-
-type AggregationsCalendarInterval = estypes.AggregationsCalendarInterval;
+import type { AggregationsCalendarInterval } from "@elastic/elasticsearch/lib/api/types";
 import { prisma } from "~/server/db";
 import { esClient } from "~/server/elasticsearch";
 import { createScenarioAnalyticsQueriesForAllEventTypes } from "~/server/scenario-analytics";
