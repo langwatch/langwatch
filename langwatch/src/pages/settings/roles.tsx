@@ -302,7 +302,9 @@ function RolesManagement({
             isDefault
             permissionCount="All Permissions"
             icon={ShieldUser}
-            onViewPermissions={() => handleViewDefaultRole("Admin", TeamUserRole.ADMIN)}
+            onViewPermissions={() =>
+              handleViewDefaultRole("Admin", TeamUserRole.ADMIN)
+            }
           />
           <RoleCard
             hasPermission={hasPermission}
@@ -311,7 +313,9 @@ function RolesManagement({
             isDefault
             permissionCount="Most Permissions"
             icon={Users}
-            onViewPermissions={() => handleViewDefaultRole("Member", TeamUserRole.MEMBER)}
+            onViewPermissions={() =>
+              handleViewDefaultRole("Member", TeamUserRole.MEMBER)
+            }
           />
           <RoleCard
             hasPermission={hasPermission}
@@ -320,7 +324,9 @@ function RolesManagement({
             isDefault
             permissionCount="View Only"
             icon={Eye}
-            onViewPermissions={() => handleViewDefaultRole("Viewer", TeamUserRole.VIEWER)}
+            onViewPermissions={() =>
+              handleViewDefaultRole("Viewer", TeamUserRole.VIEWER)
+            }
           />
         </Box>
       </VStack>
@@ -467,24 +473,24 @@ function RolesManagement({
         onOpenChange={({ open }) => !open && onDefaultViewClose()}
       >
         <Dialog.Backdrop zIndex={1000} />
-        <Dialog.Content 
-          maxWidth="600px" 
-          maxHeight="80vh" 
+        <Dialog.Content
+          maxWidth="600px"
+          maxHeight="80vh"
           overflowY="auto"
           backdrop={false}
           zIndex={1001}
         >
           <Dialog.Header>
-            <Dialog.Title>View Permissions - {viewingDefaultRole?.name}</Dialog.Title>
+            <Dialog.Title>
+              View Permissions - {viewingDefaultRole?.name}
+            </Dialog.Title>
           </Dialog.Header>
           <Dialog.Body>
             {viewingDefaultRole && (
               <VStack gap={4} align="start">
                 <VStack align="start" gap={2} width="full">
                   <Text fontWeight="semibold">Description:</Text>
-                  <Text color="gray.600">
-                    {viewingDefaultRole.description}
-                  </Text>
+                  <Text color="gray.600">{viewingDefaultRole.description}</Text>
                 </VStack>
 
                 <Separator />
@@ -493,7 +499,9 @@ function RolesManagement({
                   <Text fontWeight="semibold">
                     Permissions ({viewingDefaultRole.permissions.length}):
                   </Text>
-                  <PermissionViewer permissions={viewingDefaultRole.permissions} />
+                  <PermissionViewer
+                    permissions={viewingDefaultRole.permissions}
+                  />
                 </VStack>
               </VStack>
             )}
