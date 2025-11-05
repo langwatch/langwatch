@@ -6,5 +6,4 @@ alwaysApply: false
 Typescript Development Guidelines:
 
 1. Documentation
-   - Add TSDoc style documentation when writing functions and classes.
-   - Always include "Single Responsibility" in the description
+   - Add TSDoc style documentation when writing functions, methods and classes.
