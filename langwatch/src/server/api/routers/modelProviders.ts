@@ -116,72 +116,76 @@ export const modelProviderRouter = createTRPCRouter({
             where: { provider, projectId },
           });
 
-      let modelProviderResult: Awaited<ReturnType<typeof ctx.prisma.modelProvider.update | typeof ctx.prisma.modelProvider.create>>;
+      const modelProviderResult = await ctx.prisma.$transaction(async (tx) => {
+        let result: Awaited<ReturnType<typeof tx.modelProvider.update | typeof tx.modelProvider.create>>;
 
-      if (existingModelProvider) {
-        // Smart merging: preserve masked standard keys, but replace extra headers completely
-        let mergedCustomKeys: Record<string, any> | null = validatedKeys;
-        if (validatedKeys && existingModelProvider.customKeys) {
-          const existingKeys = existingModelProvider.customKeys as Record<
-            string,
-            any
-          >;
+        if (existingModelProvider) {
+          // Smart merging: preserve masked standard keys, but replace extra headers completely
+          let mergedCustomKeys: Record<string, any> | null = validatedKeys;
+          if (validatedKeys && existingModelProvider.customKeys) {
+            const existingKeys = existingModelProvider.customKeys as Record<
+              string,
+              any
+            >;
 
-          // Standard Azure keys that should preserve masked values
-          const standardAzureKeys = new Set([
-            "AZURE_OPENAI_API_KEY",
-            "AZURE_OPENAI_ENDPOINT",
-            "AZURE_API_GATEWAY_BASE_URL",
-            "AZURE_API_GATEWAY_VERSION",
-          ]);
+            // Standard Azure keys that should preserve masked values
+            const standardAzureKeys = new Set([
+              "AZURE_OPENAI_API_KEY",
+              "AZURE_OPENAI_ENDPOINT",
+              "AZURE_API_GATEWAY_BASE_URL",
+              "AZURE_API_GATEWAY_VERSION",
+            ]);
 
-          mergedCustomKeys = {
-            // Start with new keys (includes all extra headers)
-            ...validatedKeys,
-            // Override with existing values for masked standard keys
-            ...Object.fromEntries(
-              Object.entries(existingKeys)
-                .filter(
-                  ([key, _value]) =>
-                    standardAzureKeys.has(key) &&
-                    (validatedKeys as any)[key] ===
-                      "HAS_KEY••••••••••••••••••••••••",
-                )
-                .map(([key, value]) => [key, value]),
-            ),
-          };
+            mergedCustomKeys = {
+              // Start with new keys (includes all extra headers)
+              ...validatedKeys,
+              // Override with existing values for masked standard keys
+              ...Object.fromEntries(
+                Object.entries(existingKeys)
+                  .filter(
+                    ([key, _value]) =>
+                      standardAzureKeys.has(key) &&
+                      (validatedKeys as any)[key] ===
+                        "HAS_KEY••••••••••••••••••••••••",
+                  )
+                  .map(([key, value]) => [key, value]),
+              ),
+            };
+          }
+
+          result = await tx.modelProvider.update({
+            where: { id: existingModelProvider.id, projectId },
+            data: {
+              ...data,
+              customKeys: mergedCustomKeys as any,
+              customModels: customModels ? customModels : [],
+              customEmbeddingsModels: customEmbeddingsModels
+                ? customEmbeddingsModels
+                : [],
+              extraHeaders: extraHeaders ? (extraHeaders as any) : [],
+            },
+          });
+        } else {
+          result = await tx.modelProvider.create({
+            data: {
+              ...data,
+              customModels: customModels ?? undefined,
+              customEmbeddingsModels: customEmbeddingsModels ?? undefined,
+              extraHeaders: extraHeaders ? (extraHeaders as any) : [],
+            },
+          });
         }
 
-        modelProviderResult = await ctx.prisma.modelProvider.update({
-          where: { id: existingModelProvider.id, projectId },
-          data: {
-            ...data,
-            customKeys: mergedCustomKeys as any,
-            customModels: customModels ? customModels : [],
-            customEmbeddingsModels: customEmbeddingsModels
-              ? customEmbeddingsModels
-              : [],
-            extraHeaders: extraHeaders ? (extraHeaders as any) : [],
-          },
-        });
-      } else {
-        modelProviderResult = await ctx.prisma.modelProvider.create({
-          data: {
-            ...data,
-            customModels: customModels ?? undefined,
-            customEmbeddingsModels: customEmbeddingsModels ?? undefined,
-            extraHeaders: extraHeaders ? (extraHeaders as any) : [],
-          },
-        });
-      }
+        // Update project's default model if provided
+        if (defaultModel !== void 0) {
+          await tx.project.update({
+            where: { id: projectId },
+            data: { defaultModel },
+          });
+        }
 
-      // Update project's default model if provided
-      if (defaultModel !== void 0) {
-        await ctx.prisma.project.update({
-          where: { id: projectId },
-          data: { defaultModel },
-        });
-      }
+        return result;
+      });
 
       return modelProviderResult;
     }),
