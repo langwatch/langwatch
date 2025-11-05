@@ -8,9 +8,9 @@ from langwatch.types import RAGChunk
 load_dotenv()
 
 import chainlit as cl
-from langchain.prompts import ChatPromptTemplate
-from langchain.schema import HumanMessage
-from langchain.schema.runnable.config import RunnableConfig
+from langchain_core.messages import HumanMessage
+from langchain_core.runnables import RunnableConfig
+from langchain.agents import create_agent
 
 import langwatch
 
@@ -19,7 +19,6 @@ from langchain_community.vectorstores.faiss import FAISS
 from langchain_openai import ChatOpenAI, OpenAIEmbeddings
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain.tools.retriever import create_retriever_tool
-from langchain.agents import AgentExecutor, create_tool_calling_agent
 from langchain.tools import BaseTool, StructuredTool, tool
 from langchain_google_vertexai import ChatVertexAI, VertexAI
 
@@ -67,24 +66,19 @@ async def on_chat_start():
         location=os.environ["VERTEXAI_LOCATION"],
         streaming=True,
     )
-    prompt = ChatPromptTemplate.from_messages(
-        [
-            (
-                "system",
-                "You are a helpful assistant that only reply in short tweet-like responses, using lots of emojis and use tools only once.\n\n{agent_scratchpad}",
-            ),
-            ("human", "{question}"),
-        ]
+    
+    agent = create_agent(
+        model=model,
+        tools=tools,
+        system_prompt="You are a helpful assistant that only reply in short tweet-like responses, using lots of emojis and use tools only once."
     )
-    agent = create_tool_calling_agent(model, tools, prompt)
-    executor = AgentExecutor(agent=agent, tools=tools, verbose=True)  # type: ignore
-    cl.user_session.set("agent", executor)
+    cl.user_session.set("agent", agent)
 
 
 @cl.on_message
 @langwatch.trace()
 async def main(message: cl.Message):
-    agent: AgentExecutor = cl.user_session.get("agent")  # type: ignore
+    agent = cl.user_session.get("agent")  # type: ignore
 
     msg = cl.Message(content="")
 
@@ -93,24 +87,18 @@ async def main(message: cl.Message):
     )
 
     async for chunk in agent.astream(
-        {
-            "question": message.content,
-            "messages": [HumanMessage(content="Hoi, dit is een test")],
-        },
+        {"messages": [HumanMessage(content=message.content)]},
         config=RunnableConfig(
             callbacks=[
-                cl.LangchainCallbackHandler(),
                 langwatch.get_current_trace().get_langchain_callback(),
             ]
         ),
     ):
-        if "output" in chunk:
-            await msg.stream_token(chunk["output"])
-        elif "actions" in chunk:
-            await msg.stream_token(chunk["actions"][0].log)
-        elif "steps" in chunk:
-            await msg.stream_token(chunk["steps"][0].observation + "\n\n")
-        else:
-            await msg.stream_token("<unammaped chunk>")
+        # In v1, create_agent streams message chunks differently
+        if "model" in chunk:
+            # This is the model response chunk
+            model_chunk = chunk["model"]
+            if hasattr(model_chunk, "content") and model_chunk.content:
+                await msg.stream_token(model_chunk.content)
 
     await msg.send()
