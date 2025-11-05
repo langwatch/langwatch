@@ -10,7 +10,17 @@ import { api } from "~/utils/api";
 
 import { useEffect, useMemo } from "react";
 
-// Main layout for a single Simulation Set page
+/**
+ * Simulation Set Page - Displays a grid of scenario runs for a specific batch run.
+ *
+ * Single Responsibility: Renders the simulation batch run viewer and handles auto-redirect
+ * to the most recent batch run when no batchRunId is provided in the URL.
+ *
+ * URL Structure: /[project]/simulations/[scenarioSetId]/[batchRunId]
+ *
+ * Auto-redirect behavior: If user navigates to /[project]/simulations/[scenarioSetId]
+ * (without batchRunId), this component automatically redirects to the most recent batch run.
+ */
 export default function SimulationSetPage() {
   const { scenarioSetId } = useSimulationRouter();
   const { project } = useOrganizationTeamProject();
@@ -23,7 +33,7 @@ export default function SimulationSetPage() {
       batchRunId: batchRunId ?? "",
     },
     {
-      enabled: !!project?.id && !!scenarioSetId && !!batchRunId,
+      enabled: !!scenarioSetId && !!batchRunId,
       refetchInterval: 1000,
     },
   );
@@ -39,6 +49,16 @@ export default function SimulationSetPage() {
     [sortedScenarioSetData],
   );
 
+  /**
+   * Auto-redirect to most recent batch run when batchRunId is missing from URL.
+   *
+   * This ensures users who navigate to /simulations/[scenarioSetId] (without a batchRunId)
+   * are automatically redirected to view the latest batch run. Uses replace: true to avoid
+   * polluting browser history with the incomplete URL.
+   *
+   * Note: Only triggers once when batchRunId is initially missing. Won't auto-navigate to
+   * newer runs as they complete (despite refetchInterval) since batchRunId will already be set.
+   */
   useEffect(() => {
     if (!scenarioSetId) return;
     if (!batchRunId) {
