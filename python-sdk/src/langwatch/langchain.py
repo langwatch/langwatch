@@ -11,20 +11,18 @@ from typing import (
     Union,
 )
 from warnings import warn
-from langchain.schema import (
-    LLMResult,
-    AgentAction,
-    AgentFinish,
+from langchain_core.messages import (
     BaseMessage,
     HumanMessage,
     AIMessage,
     SystemMessage,
     FunctionMessage,
-    ChatGeneration,
 )
+from langchain_core.outputs import LLMResult, ChatGeneration
+from langchain_core.agents import AgentAction, AgentFinish
 from langwatch.utils.initialization import ensure_setup
 from opentelemetry.trace import get_current_span, SpanContext
-from langchain.callbacks.base import BaseCallbackHandler
+from langchain_core.callbacks.base import BaseCallbackHandler
 from langwatch.telemetry.span import LangWatchSpan
 from langwatch.telemetry.tracing import LangWatchTrace
 from langwatch.utils.transformation import (
