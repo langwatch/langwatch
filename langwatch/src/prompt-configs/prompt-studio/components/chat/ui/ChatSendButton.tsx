@@ -1,5 +1,5 @@
 import { Button, Icon, type ButtonProps } from "@chakra-ui/react";
-import { Send } from "react-feather";
+import { LuSend } from "react-icons/lu";
 
 /**
  * Send button for chat input with disabled state handling.
@@ -39,7 +39,7 @@ export function ChatSendButton({
       transition="all 0.2s"
       {...buttonProps}
     >
-      <Icon as={Send} boxSize="16px" />
+      <Icon as={LuSend} boxSize="16px" />
     </Button>
   );
 }

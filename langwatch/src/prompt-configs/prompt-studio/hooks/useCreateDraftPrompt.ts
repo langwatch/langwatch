@@ -5,13 +5,19 @@ import type { PromptConfigFormValues } from "~/prompt-configs/types";
 import { DEFAULT_MODEL, DEFAULT_MAX_TOKENS } from "~/utils/constants";
 
 /**
- * Hook to create a draft prompt in the database
- * and add it to the prompt browser
+ * Hook to create a draft prompt in the database and add it to the prompt browser.
+ * Single Responsibility: Creates a new draft prompt tab with default values.
+ * @returns Object containing createDraftPrompt function
  */
 export function useCreateDraftPrompt() {
   const { project } = useOrganizationTeamProject();
   const { addTab } = useDraggableTabsBrowserStore();
 
+  /**
+   * createDraftPrompt
+   * Single Responsibility: Creates a new draft prompt tab with default configuration values.
+   * @returns Promise resolving to object with defaultValues
+   */
   const createDraftPrompt = useCallback(async () => {
     const projectDefaultModel = project?.defaultModel;
     const normalizedDefaultModel =

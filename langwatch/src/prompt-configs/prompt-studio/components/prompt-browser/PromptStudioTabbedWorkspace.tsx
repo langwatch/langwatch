@@ -3,7 +3,7 @@ import { PromptBrowserWindowContent } from "./prompt-browser-window/PromptBrowse
 import { PromptBrowserTab } from "./tab/PromptBrowserTab";
 import { useDraggableTabsBrowserStore } from "../../prompt-studio-store/DraggableTabsBrowserStore";
 import { DraggableTabsBrowser } from "./ui/DraggableTabsBrowser";
-import { Columns } from "react-feather";
+import { LuColumns2 } from "react-icons/lu";
 import { TabIdProvider } from "./ui/TabContext";
 
 /**
@@ -20,6 +20,10 @@ export function PromptStudioTabbedWorkspace() {
     setActiveWindow,
   } = useDraggableTabsBrowserStore();
 
+  /**
+   * handleTabMove
+   * Single Responsibility: Moves a tab to a new position/window when dragged.
+   */
   function handleTabMove(params: {
     tabId: string;
     from: { groupId: string; index: number };
@@ -32,10 +36,18 @@ export function PromptStudioTabbedWorkspace() {
     });
   }
 
+  /**
+   * handleTabChange
+   * Single Responsibility: Sets the active tab within a window group.
+   */
   function handleTabChange(groupId: string, tabId: string) {
     setActiveTab({ windowId: groupId, tabId });
   }
 
+  /**
+   * handleSplit
+   * Single Responsibility: Splits the current tab into a new window pane.
+   */
   function handleSplit(tabId: string) {
     splitTab({ tabId });
   }
@@ -78,9 +90,13 @@ export function PromptStudioTabbedWorkspace() {
                   size="sm"
                   variant="ghost"
                   aria-label="Split tab"
-                  onClick={() => handleSplit(tabbedWindow.activeTabId)}
+                  onClick={() =>
+                    tabbedWindow.activeTabId &&
+                    handleSplit(tabbedWindow.activeTabId)
+                  }
+                  disabled={!tabbedWindow.activeTabId}
                 >
-                  <Columns size="18px" />
+                  <LuColumns2 size="18px" />
                 </IconButton>
               </HStack>
             )}

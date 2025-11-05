@@ -75,6 +75,10 @@ export function SyncedChatInput({
     });
   }, [submitTrigger, isSynced, onSend, isTabActive]);
 
+  /**
+   * handleSend
+   * Single Responsibility: Sends message either locally or broadcasts to all synced chats.
+   */
   const handleSend = async () => {
     if (!currentInput.trim() || inProgress) return;
 
@@ -96,6 +100,10 @@ export function SyncedChatInput({
     }
   };
 
+  /**
+   * handleKeyDown
+   * Single Responsibility: Triggers send on Enter key (unless Shift held for new line).
+   */
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Enter" && (!e.shiftKey || e.ctrlKey)) {
       e.preventDefault();

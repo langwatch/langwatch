@@ -24,6 +24,12 @@ const QUERY_PARAM_PROMPT_PLAYGROUND_SPAN_ID = "promptPlaygroundSpanId";
 export function useGoToSpanInPlaygroundTabUrlBuilder() {
   const { project } = useOrganizationTeamProject();
 
+  /**
+   * buildUrl
+   * Single Responsibility: Constructs URL to prompt studio page with span ID query parameter.
+   * @param spanId - The ID of the span to load into the prompt studio
+   * @returns A URL object if the project slug is available, otherwise null
+   */
   const buildUrl = (spanId: string) => {
     if (!project?.slug) {
       logger.warn("Cannot build URL: project slug is missing");
@@ -51,12 +57,17 @@ export function useGoToSpanInPlaygroundTabUrlBuilder() {
 /**
  * Hook to read and clear URL query parameter for span ID.
  * Single Responsibility: Extract span ID from URL and clean up the URL.
+ * @returns Object with spanId and clearSpanIdFromUrl function
  */
 function useSpanIdFromUrl() {
   const searchParams = useSearchParams();
   const spanId = searchParams?.get(QUERY_PARAM_PROMPT_PLAYGROUND_SPAN_ID);
   const router = useRouter();
 
+  /**
+   * clearSpanIdFromUrl
+   * Single Responsibility: Removes span ID query parameter from URL without full page reload.
+   */
   const clearSpanIdFromUrl = () => {
     // Create a copy of router.query without the span ID param
     const { [QUERY_PARAM_PROMPT_PLAYGROUND_SPAN_ID]: _, ...query } =
@@ -71,7 +82,9 @@ function useSpanIdFromUrl() {
 
 /**
  * Creates default form values for a new prompt config.
- * Single Responsibility: Generate initial prompt configuration structure.
+ * Single Responsibility: Generate initial prompt configuration structure from span data.
+ * @param spanData - The span data containing LLM configuration
+ * @returns Initial form values for a new prompt
  */
 function createDefaultPromptFormValues(
   spanData: RouterOutputs["spans"]["getForPromptStudio"],
@@ -115,6 +128,10 @@ function createDefaultPromptFormValues(
 
 /**
  * Adds a unique ID to each message.
+ * Single Responsibility: Transforms message array by adding trace ID to each message.
+ * @param messages - Array of chat messages without IDs
+ * @param traceId - The trace ID to assign to messages
+ * @returns Array of messages with ID field added
  */
 function addIdToMessages(
   messages: Array<ChatMessage>,
@@ -138,14 +155,14 @@ export function useLoadSpanIntoPromptStudio() {
   const { addTab } = useDraggableTabsBrowserStore();
 
   useEffect(() => {
-    if (!spanId || loadedRef.current) return;
+    if (!spanId || loadedRef.current || !project?.id) return;
 
     clearSpanIdFromUrl();
 
     void (async () => {
       try {
         const spanData = await trpc.spans.getForPromptStudio.fetch({
-          projectId: project?.id ?? "",
+          projectId: project.id,
           spanId: spanId,
         });
 

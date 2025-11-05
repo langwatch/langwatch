@@ -1,5 +1,5 @@
 import { Box, Button, Text } from "@chakra-ui/react";
-import { MoreVertical, Trash2 } from "react-feather";
+import { LuMoreVertical, LuTrash2 } from "react-icons/lu";
 import { Menu } from "~/components/ui/menu";
 import { Tooltip } from "~/components/ui/tooltip";
 import { DeleteConfirmationDialog } from "~/components/annotations/DeleteConfirmationDialog";
@@ -79,7 +79,7 @@ export function PublishedPromptActions({
               size="sm"
               onClick={(event) => event.stopPropagation()}
             >
-              <MoreVertical size={14} />
+              <LuMoreVertical size={14} />
             </Button>
           </Menu.Trigger>
           <Menu.Content onClick={(event) => event.stopPropagation()}>
@@ -96,7 +96,7 @@ export function PublishedPromptActions({
                 opacity={canDelete ? 1 : 0.5}
                 cursor={canDelete ? "pointer" : "not-allowed"}
               >
-                <Trash2 size={16} />
+                <LuTrash2 size={16} />
                 <Text as="span" ml={2}>
                   Delete prompt
                 </Text>

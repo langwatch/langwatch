@@ -21,6 +21,11 @@ export function PromptBrowserHeader() {
   const handle = formMethods.watch("handle");
   const configId = formMethods.watch("configId");
 
+  /**
+   * handleOnRestore
+   * Single Responsibility: Restores form values when a version is selected from history.
+   * @param params - The versioned prompt data to restore
+   */
   const handleOnRestore = async (params: VersionedPrompt) => {
     const newFormValues =
       versionedPromptToPromptConfigFormValuesWithSystemMessage(params);

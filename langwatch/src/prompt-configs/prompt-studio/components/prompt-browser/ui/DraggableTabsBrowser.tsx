@@ -20,6 +20,10 @@ import { PromptBrowserTab } from "../tab/PromptBrowserTab";
 import { TabIdProvider } from "./TabContext";
 
 // Context for managing drag state and callbacks
+/**
+ * DraggableTabsContextValue interface
+ * Single Responsibility: Provides drag state and callbacks for tab movement.
+ */
 interface DraggableTabsContextValue {
   onTabMove: (params: {
     tabId: string;
@@ -39,6 +43,10 @@ interface DraggableTabsContextValue {
 const DraggableTabsContext =
   React.createContext<DraggableTabsContextValue | null>(null);
 
+/**
+ * useDraggableTabsContext
+ * Single Responsibility: Provides access to drag context; throws if used outside Root.
+ */
 export function useDraggableTabsContext() {
   const context = React.useContext(DraggableTabsContext);
   if (!context) {
@@ -50,6 +58,10 @@ export function useDraggableTabsContext() {
 }
 
 // Context for managing group state
+/**
+ * TabGroupContextValue interface
+ * Single Responsibility: Provides group-level tab state and callbacks.
+ */
 interface TabGroupContextValue {
   groupId: string;
   activeTabId?: string;
@@ -58,6 +70,10 @@ interface TabGroupContextValue {
 
 const TabGroupContext = React.createContext<TabGroupContextValue | null>(null);
 
+/**
+ * useTabGroupContext
+ * Single Responsibility: Provides access to group context; throws if used outside Group.
+ */
 function useTabGroupContext() {
   const context = React.useContext(TabGroupContext);
   if (!context) {
@@ -106,11 +122,19 @@ function DraggableTabsBrowserRoot({
     }),
   );
 
+  /**
+   * handleDragStart
+   * Single Responsibility: Sets active drag state when drag begins.
+   */
   function handleDragStart(event: any) {
     const { groupId, tabId, label } = event.active.data.current;
     setActiveDrag({ groupId, tabId, label });
   }
 
+  /**
+   * handleDragEnd
+   * Single Responsibility: Clears drag state and calls onTabMove when drag completes.
+   */
   function handleDragEnd(event: DragEndEvent) {
     setActiveDrag(null);
     const { active, over } = event;
@@ -198,6 +222,16 @@ interface DraggableTabsGroupProps
   onClick?: (groupId: string, tabId: string) => void;
 }
 
+/**
+ * DraggableTabsGroup component
+ * Single Responsibility: Manages a group of tabs with active state and tab change handler.
+ * @param children - Tab bar and content components
+ * @param groupId - Unique identifier for this tab group
+ * @param activeTabId - Currently active tab ID
+ * @param onTabChange - Callback fired when active tab changes
+ * @param onClick - Callback fired when group is clicked
+ * @param props - Additional stack props
+ */
 function DraggableTabsGroup({
   children,
   groupId,
@@ -236,6 +270,12 @@ interface DraggableTabsTabBarProps {
   tabIds: string[];
 }
 
+/**
+ * DraggableTabsTabBar component
+ * Single Responsibility: Provides sortable context and renders tab bar with drag-drop support.
+ * @param children - Tab trigger components
+ * @param tabIds - Array of tab IDs for sortable context
+ */
 function DraggableTabsTabBar({ children, tabIds }: DraggableTabsTabBarProps) {
   return (
     <BrowserLikeTabs.Bar>
@@ -261,6 +301,13 @@ interface DraggableTabTriggerProps extends BoxProps {
 
 const DraggableBrowserTabTrigger = BrowserLikeTabs.Trigger;
 
+/**
+ * DraggableTab component
+ * Single Responsibility: Renders a draggable tab with sortable behavior and styling.
+ * @param id - Unique tab identifier
+ * @param children - Tab content/trigger
+ * @param rest - Additional box props
+ */
 function DraggableTab({ id, children, ...rest }: DraggableTabTriggerProps) {
   const { groupId } = useTabGroupContext();
 
@@ -313,7 +360,24 @@ function DraggableTab({ id, children, ...rest }: DraggableTabTriggerProps) {
 
 const DraggableTabsContent = BrowserLikeTabs.Content;
 
-// Export compound component
+/**
+ * Compound component for draggable browser-like tabs.
+ * Provides drag-and-drop functionality for tabs across multiple groups.
+ *
+ * @example
+ * ```tsx
+ * <DraggableTabsBrowser.Root onTabMove={handleMove}>
+ *   <DraggableTabsBrowser.Group groupId="g1" activeTabId="tab1">
+ *     <DraggableTabsBrowser.TabBar tabIds={["tab1", "tab2"]}>
+ *       <DraggableTabsBrowser.Tab id="tab1">
+ *         <DraggableTabsBrowser.Trigger value="tab1">Tab 1</DraggableTabsBrowser.Trigger>
+ *       </DraggableTabsBrowser.Tab>
+ *     </DraggableTabsBrowser.TabBar>
+ *     <DraggableTabsBrowser.Content value="tab1">Content</DraggableTabsBrowser.Content>
+ *   </DraggableTabsBrowser.Group>
+ * </DraggableTabsBrowser.Root>
+ * ```
+ */
 export const DraggableTabsBrowser = {
   Root: DraggableTabsBrowserRoot,
   Group: DraggableTabsGroup,

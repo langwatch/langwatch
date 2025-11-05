@@ -22,6 +22,10 @@ export function useUrlParamToOpenNewTab() {
   const trpc = api.useContext();
 
   useEffect(() => {
+    /**
+     * openNewTab
+     * Single Responsibility: Fetches prompt data and creates a new tab with the prompt configuration.
+     */
     async function openNewTab() {
       if (!selectedPromptId) return;
 

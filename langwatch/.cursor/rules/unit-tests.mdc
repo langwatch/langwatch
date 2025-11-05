@@ -9,6 +9,8 @@ Stack:
 
 Rules:
 - All logic, and ONLY logic should be tested - "logic" is only if/else statements. Do not test interfaces, returns, etc.
+- Avoid testing internal implementation details
+- Avoid testing UI componentsa - business logic should be in hooks and testable.
 - One assertion per test.
 - The concept of "when" is a logical branch and should be its own describe block.
 - When writing tests, you should propose todo items only, until the user confirms the specifications are complete and correct, then you may ask to write the tests.

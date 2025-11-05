@@ -15,6 +15,8 @@ import { useTabId } from "../components/prompt-browser/prompt-browser-window/Pro
 
 /**
  * Hook to handle the saving of a prompt in the prompt studio.
+ * Single Responsibility: Orchestrates prompt save/create operations with proper validation and error handling.
+ * @returns Object containing handleSaveVersion function
  */
 export function useHandleSavePrompt() {
   const { triggerSaveVersion, triggerCreatePrompt, triggerChangeHandle } =
@@ -24,10 +26,19 @@ export function useHandleSavePrompt() {
   const { updateTabData } = useDraggableTabsBrowserStore();
   const tabId = useTabId();
 
+  /**
+   * handleSaveVersion
+   * Single Responsibility: Validates handle, triggers appropriate save operation, and updates UI state on success/error.
+   */
   const handleSaveVersion = useCallback(() => {
     const values = methods.getValues();
     const handle = values.handle;
     const data = formValuesToTriggerSaveVersionParams(values);
+    /**
+     * onSuccess
+     * Single Responsibility: Updates form state and displays success message after prompt is saved.
+     * @param prompt - The saved prompt with version information
+     */
     const onSuccess = (prompt: VersionedPrompt) => {
       const newSavedState =
         versionedPromptToPromptConfigFormValuesWithSystemMessage(prompt);
@@ -51,6 +62,11 @@ export function useHandleSavePrompt() {
       });
     };
 
+    /**
+     * onError
+     * Single Responsibility: Logs error and displays error message to user.
+     * @param error - The error that occurred during save
+     */
     const onError = (error: Error) => {
       console.error(error);
       toaster.create({

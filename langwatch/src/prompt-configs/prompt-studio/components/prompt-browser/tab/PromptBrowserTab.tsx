@@ -1,5 +1,5 @@
 import { Box, Circle, HStack, Text, type StackProps } from "@chakra-ui/react";
-import { X } from "react-feather";
+import { LuX } from "react-icons/lu";
 import { VersionBadge } from "~/prompt-configs/components/ui/VersionBadge";
 import { OrganizationBadge } from "~/prompt-configs/components/ui/OrganizationBadge";
 import { withController } from "~/utils/withControllerHOC";
@@ -53,7 +53,7 @@ function PromptBrowserTabView({
         }}
         onClick={handleClose}
       >
-        <X width="18px" />
+        <LuX width="18px" />
       </Box>
     </HStack>
   );

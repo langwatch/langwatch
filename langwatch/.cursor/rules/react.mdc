@@ -7,3 +7,6 @@ Typescript Development Guidelines:
 
 1. Documentation
    - Add TSDoc style documentation when writing functions, methods and classes.
+
+2. React Rules
+    - Keep business logic in hooks, not inline in the component markup.

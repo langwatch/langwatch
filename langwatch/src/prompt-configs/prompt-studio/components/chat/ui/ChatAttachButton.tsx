@@ -1,5 +1,5 @@
 import { Box, Icon, type BoxProps } from "@chakra-ui/react";
-import { Paperclip } from "react-feather";
+import { LuPaperclip } from "react-icons/lu";
 
 /**
  * Attach button for file uploads in chat input.
@@ -14,6 +14,10 @@ export function ChatAttachButton({
   onAttach,
   ...boxProps
 }: ChatAttachButtonProps) {
+  /**
+   * handleKeyDown
+   * Single Responsibility: Triggers attachment action on keyboard interaction (Enter/Space).
+   */
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (onAttach && (e.key === "Enter" || e.key === " ")) {
       e.preventDefault();
@@ -34,7 +38,7 @@ export function ChatAttachButton({
       _hover={onAttach ? { color: "fg.emphasized" } : undefined}
       {...boxProps}
     >
-      <Icon as={Paperclip} boxSize="18px" />
+      <Icon as={LuPaperclip} boxSize="18px" />
     </Box>
   );
 }

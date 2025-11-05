@@ -10,7 +10,7 @@ import { useState, useRef } from "react";
 import { VariablesForm } from "./VariablesForm";
 import type { z } from "zod";
 import { type runtimeInputsSchema } from "~/prompt-configs/schemas/field-schemas";
-import { Edit3 } from "react-feather";
+import { LuPencil } from "react-icons/lu";
 
 enum PromptTab {
   Conversation = "conversation",
@@ -57,7 +57,7 @@ export function PromptTabbedSection() {
           onClick={() => chatRef.current?.resetChat()}
           aria-label="Reset chat"
         >
-          <Edit3 size={16} />
+          <LuPencil size={16} />
         </IconButton>
       </Tabs.List>
       <HStack flex={1} width="full" margin="0 auto">

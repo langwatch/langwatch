@@ -1,5 +1,5 @@
 import { Box, VStack, HStack, Text, type BoxProps } from "@chakra-ui/react";
-import { ChevronDown } from "react-feather";
+import { LuChevronDown } from "react-icons/lu";
 import { useState } from "react";
 
 /**
@@ -151,7 +151,7 @@ function SidebarList({
               transform={isOpen ? "rotate(0deg)" : "rotate(-90deg)"}
               transition="transform 0.2s"
             >
-              <ChevronDown size={14} />
+              <LuChevronDown size={14} />
             </Box>
           )}
           <Text>{title}</Text>

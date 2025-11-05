@@ -1,11 +1,24 @@
 import { HStack, Tabs, VStack, type StackProps } from "@chakra-ui/react";
 
+/**
+ * Props for BrowserLikeTabsRoot component
+ */
 interface BrowserLikeTabsRootProps extends StackProps {
   value?: string;
   defaultValue?: string;
   onValueChange?: (value: string) => void;
 }
 
+/**
+ * BrowserLikeTabsRoot component
+ * Single Responsibility: Provides root container for browser-like tabs with Chakra Tabs integration.
+ * @param children - Child components (tab bar and content)
+ * @param value - Controlled tab value
+ * @param defaultValue - Default tab value
+ * @param onValueChange - Callback fired when tab changes
+ * @param colorPalette - Color scheme for tabs
+ * @param props - Additional stack props
+ */
 function BrowserLikeTabsRoot({
   children,
   value,
@@ -32,10 +45,18 @@ function BrowserLikeTabsRoot({
   );
 }
 
+/**
+ * Props for BrowserLikeTabsBar component
+ */
 interface BrowserLikeTabsBarProps {
   children: React.ReactNode;
 }
 
+/**
+ * BrowserLikeTabsBar component
+ * Single Responsibility: Renders the tab bar container.
+ * @param children - Tab list and additional controls
+ */
 function BrowserLikeTabsBar({ children }: BrowserLikeTabsBarProps) {
   return (
     <HStack gap={0} width="full" bg="gray.100">
@@ -44,6 +65,11 @@ function BrowserLikeTabsBar({ children }: BrowserLikeTabsBarProps) {
   );
 }
 
+/**
+ * BrowserLikeTabsList component
+ * Single Responsibility: Renders the scrollable list of tab triggers.
+ * @param children - Tab trigger components
+ */
 function BrowserLikeTabsList({ children }: { children: React.ReactNode }) {
   return (
     <Tabs.List width="full">
@@ -54,11 +80,20 @@ function BrowserLikeTabsList({ children }: { children: React.ReactNode }) {
   );
 }
 
+/**
+ * Props for BrowserLikeTabsTrigger component
+ */
 interface BrowserLikeTabsTriggerProps {
   value: string;
   children: React.ReactNode;
 }
 
+/**
+ * BrowserLikeTabsTrigger component
+ * Single Responsibility: Renders a single tab trigger with browser-like styling.
+ * @param value - Tab identifier
+ * @param children - Tab content/label
+ */
 function BrowserLikeTabsTrigger({
   value,
   children,
@@ -85,6 +120,21 @@ function BrowserLikeTabsTrigger({
 
 const BrowserLikeTabsContent = Tabs.Content;
 
+/**
+ * Compound component for browser-like tabs interface.
+ *
+ * @example
+ * ```tsx
+ * <BrowserLikeTabs.Root value="tab1" onValueChange={handleChange}>
+ *   <BrowserLikeTabs.Bar>
+ *     <BrowserLikeTabs.List>
+ *       <BrowserLikeTabs.Trigger value="tab1">Tab 1</BrowserLikeTabs.Trigger>
+ *     </BrowserLikeTabs.List>
+ *   </BrowserLikeTabs.Bar>
+ *   <BrowserLikeTabs.Content value="tab1">Content 1</BrowserLikeTabs.Content>
+ * </BrowserLikeTabs.Root>
+ * ```
+ */
 export const BrowserLikeTabs = {
   Root: BrowserLikeTabsRoot,
   Bar: BrowserLikeTabsBar,
