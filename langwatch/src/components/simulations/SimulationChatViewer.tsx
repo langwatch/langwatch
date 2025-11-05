@@ -1,32 +1,36 @@
 import { SimulationCard } from "./SimulationCard";
-import { useScenarioRunState } from "~/hooks/simulations/useSimulationQueries";
 import { convertScenarioMessagesToCopilotKit } from "./utils/convert-scenario-messages";
 import { createLogger } from "~/utils/logger";
 import { useMemo } from "react";
 import { SimpleChatUI } from "./simple-chat";
+import type { ScenarioRunData } from "~/app/api/scenario-events/[[...route]]/types";
 
 const logger = createLogger("SimulationChatViewer.tsx");
 
 interface SimulationChatViewerProps {
-  scenarioRunId: string;
+  runState?: ScenarioRunData;
 }
 
 /**
- * This component renders the chat history of a simulation.
- * Uses centralized query hook with automatic polling that stops when run completes.
+ * Renders the chat history of a simulation with per-card memoization.
+ *
+ * Single Responsibility: Display a single scenario run's chat interface with optimized message transformation.
+ *
+ * Message transformation is memoized per-card based on messages.length.
+ * This ensures only cards with changed conversations re-transform, not all cards on every update.
  */
-export function SimulationChatViewer({
-  scenarioRunId,
-}: SimulationChatViewerProps) {
-  const { data } = useScenarioRunState({
-    scenarioRunId,
-    enabled: !!scenarioRunId,
-  });
-
+export function SimulationChatViewer({ runState }: SimulationChatViewerProps) {
+  /**
+   * Per-card memoized message transformation.
+   * Only re-transforms when message count changes (append-only optimization).
+   * TanStack Query structural sharing ensures unchanged runStates keep same reference.
+   */
   const messages = useMemo(() => {
-    console.log(`scenario run id: ${scenarioRunId} messages rerendered`);
+    console.log(
+      `scenario run id: ${runState?.scenarioRunId} messages rerendered`,
+    );
     try {
-      return convertScenarioMessagesToCopilotKit(data?.messages ?? []);
+      return convertScenarioMessagesToCopilotKit(runState?.messages ?? []);
     } catch (error) {
       logger.error(
         {
@@ -37,17 +41,17 @@ export function SimulationChatViewer({
     }
     return [];
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [data?.messages.length]);
+  }, [runState?.messages?.length, runState?.scenarioRunId]);
 
   return (
     <SimulationCard
       title={
-        data?.name ??
-        data?.scenarioId ??
-        data?.timestamp.toString() ??
+        runState?.name ??
+        runState?.scenarioId ??
+        runState?.timestamp?.toString() ??
         "scenario"
       }
-      status={data?.status}
+      status={runState?.status}
     >
       <SimpleChatUI messages={messages} smallerView />
     </SimulationCard>

@@ -2,9 +2,10 @@ import React from "react";
 import { Box } from "@chakra-ui/react";
 import { SimulationChatViewer } from "../SimulationChatViewer";
 import { GRID_CONSTANTS } from "./constants";
+import type { ScenarioRunData } from "~/app/api/scenario-events/[[...route]]/types";
 
 interface SimulationGridCardProps {
-  scenarioRunId: string;
+  runState: ScenarioRunData;
   onClick: (id: string) => void;
 }
 
@@ -15,12 +16,12 @@ interface SimulationGridCardProps {
  * Uses React.memo to prevent unnecessary re-renders when parent grid resizes/zooms.
  */
 export const SimulationGridCard = React.memo<SimulationGridCardProps>(
-  ({ scenarioRunId, onClick }) => (
+  ({ runState, onClick }) => (
     <Box
       width="full"
       height={`${GRID_CONSTANTS.CARD_HEIGHT}px`}
       cursor="pointer"
-      onClick={() => onClick(scenarioRunId)}
+      onClick={() => onClick(runState.scenarioRunId)}
       overflow="auto"
       style={{
         minWidth: 0,
@@ -30,7 +31,7 @@ export const SimulationGridCard = React.memo<SimulationGridCardProps>(
         contain: "layout style paint", // Isolate rendering
       }}
     >
-      <SimulationChatViewer scenarioRunId={scenarioRunId} />
+      <SimulationChatViewer runState={runState} />
     </Box>
   ),
 );

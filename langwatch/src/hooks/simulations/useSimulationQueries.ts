@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 import { ScenarioRunStatus } from "~/app/api/scenario-events/[[...route]]/enums";
@@ -215,6 +215,63 @@ export function useScenarioRunState({
           data?.status === ScenarioRunStatus.IN_PROGRESS ||
           data?.status === ScenarioRunStatus.PENDING;
         return isRunning ? 1000 : false; // Stop polling when complete
+      },
+    },
+  );
+}
+
+/**
+ * Get all run states for a specific batch run (BATCH OPTIMIZED).
+ *
+ * Fetches complete run data for all scenario runs in a single query instead of N individual queries.
+ * Returns a map of scenarioRunId -> run state for O(1) lookups.
+ * Use this when you need all run data upfront (e.g., grid view with all cards visible).
+ *
+ * Polling: Adaptive - faster when many runs active, slower when few remaining, stops when all complete
+ * Use case: Grid view with pre-loaded data
+ *
+ * @param scenarioSetId - The scenario set ID
+ * @param batchRunId - The batch run ID
+ * @param enabled - Whether to enable the query (default: true)
+ */
+export function useBatchRunStates({
+  scenarioSetId,
+  batchRunId,
+  enabled = true,
+}: {
+  scenarioSetId?: string;
+  batchRunId?: string;
+  enabled?: boolean;
+}) {
+  const { project } = useOrganizationTeamProject();
+
+  return api.scenarios.getBatchRunStatesByBatchRunId.useQuery(
+    {
+      projectId: project?.id ?? "",
+      scenarioSetId: scenarioSetId ?? "",
+      batchRunId: batchRunId ?? "",
+    },
+    {
+      enabled: !!project?.id && !!scenarioSetId && !!batchRunId && enabled,
+      refetchInterval: (data) => {
+        if (!data) return 1000;
+
+        // Check if any run is still in progress
+        const values = Object.values(data);
+        const runningCount = values.filter(
+          (runState) =>
+            runState.status === ScenarioRunStatus.IN_PROGRESS ||
+            runState.status === ScenarioRunStatus.PENDING,
+        ).length;
+
+        // Stop polling when all complete
+        if (runningCount === 0) return false;
+
+        // Poll faster if many are running (active batch)
+        if (runningCount > values.length * 0.5) return 500; // 500ms
+
+        // Poll slower if only a few remaining
+        return 2000; // 2s
       },
     },
   );

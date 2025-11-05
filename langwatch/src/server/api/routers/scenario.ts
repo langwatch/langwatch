@@ -250,4 +250,52 @@ export const scenarioRouter = createTRPCRouter({
       });
       return data;
     }),
+
+  /**
+   * Get all run states for a specific batch run (BATCH OPTIMIZED)
+   *
+   * Returns complete run data (messages, status, results) for all scenario runs in a batch.
+   * This is optimized for batch fetching - single query returns all runs at once rather than
+   * N individual queries. Use this when rendering a grid that needs all run data upfront.
+   *
+   * Includes:
+   * - Execution status (pending, running, completed, failed)
+   * - Messages array for each run
+   * - Results (if completed)
+   * - Timestamps and metadata
+   *
+   * Returns data as a map (Record) for O(1) lookups by scenarioRunId.
+   *
+   * @param projectId - The project containing the scenario set
+   * @param scenarioSetId - The scenario set that was executed
+   * @param batchRunId - The specific batch execution to get all run states for
+   * @returns Map of scenarioRunId to complete run state data
+   */
+  getBatchRunStatesByBatchRunId: protectedProcedure
+    .input(
+      projectSchema.extend({
+        scenarioSetId: z.string(),
+        batchRunId: z.string(),
+      }),
+    )
+    .use(checkProjectPermission("scenarios:view"))
+    .query(async ({ input }) => {
+      const scenarioRunnerService = new ScenarioEventService();
+      const data = await scenarioRunnerService.getRunDataForBatchRun({
+        projectId: input.projectId,
+        scenarioSetId: input.scenarioSetId,
+        batchRunId: input.batchRunId,
+      });
+
+      // Convert array to map for O(1) lookups by scenarioRunId
+      const runStatesMap = data.reduce(
+        (acc, runData) => {
+          acc[runData.scenarioRunId] = runData;
+          return acc;
+        },
+        {} as Record<string, (typeof data)[0]>,
+      );
+
+      return runStatesMap;
+    }),
 });

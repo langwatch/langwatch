@@ -4,9 +4,10 @@ import { useSimulationRouter } from "~/hooks/simulations/useSimulationRouter";
 import { useZoomContext } from "./zoomContext";
 import { SimulationGridCard } from "./SimulationGridCard";
 import { GRID_CONSTANTS } from "./constants";
+import type { ScenarioRunData } from "~/app/api/scenario-events/[[...route]]/types";
 
 interface ZoomGridProps {
-  scenarioRunIds: string[];
+  runStatesMap: Record<string, ScenarioRunData>;
   onCardClick?: (id: string) => void;
   emptyMessage?: string;
 }
@@ -16,7 +17,7 @@ interface ZoomGridProps {
  * Single Responsibility: Manage responsive grid layout with zoom support.
  */
 export function ZoomGrid({
-  scenarioRunIds,
+  runStatesMap,
   onCardClick,
   emptyMessage = "No simulations to display",
 }: ZoomGridProps) {
@@ -25,6 +26,14 @@ export function ZoomGrid({
     useSimulationRouter();
 
   const [containerWidth, setContainerWidth] = useState(0);
+
+  /**
+   * Extract scenario run IDs from the map for consistent ordering.
+   */
+  const scenarioRunIds = useMemo(
+    () => Object.keys(runStatesMap),
+    [runStatesMap],
+  );
 
   /**
    * Calculate gap in pixels from Chakra spacing units.
@@ -143,7 +152,7 @@ export function ZoomGrid({
         {scenarioRunIds.map((scenarioRunId) => (
           <SimulationGridCard
             key={scenarioRunId}
-            scenarioRunId={scenarioRunId}
+            runState={runStatesMap[scenarioRunId]!}
             onClick={handleExpandToggle}
           />
         ))}

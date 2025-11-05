@@ -8,10 +8,7 @@ import {
   type TextMessage,
   type Message,
 } from "@copilotkit/runtime-client-gql";
-import {
-  CopilotChat,
-  UserMessage as CopilotKitUserMessage,
-} from "@copilotkit/react-ui";
+import { CopilotChat } from "@copilotkit/react-ui";
 import { ToolResultMessage } from "./messages/ToolResultMessage";
 import { ToolCallMessage } from "./messages/ToolCallMessage";
 import { LuListTree } from "react-icons/lu";
