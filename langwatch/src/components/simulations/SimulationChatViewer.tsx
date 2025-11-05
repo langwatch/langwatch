@@ -1,9 +1,9 @@
 import { SimulationCard } from "./SimulationCard";
-import { CustomCopilotKitChat } from "./CustomCopilotKitChat";
 import { useScenarioRunState } from "~/hooks/simulations/useSimulationQueries";
 import { convertScenarioMessagesToCopilotKit } from "./utils/convert-scenario-messages";
 import { createLogger } from "~/utils/logger";
 import { useMemo } from "react";
+import { SimpleChatUI } from "./simple-chat";
 
 const logger = createLogger("SimulationChatViewer.tsx");
 
@@ -24,6 +24,7 @@ export function SimulationChatViewer({
   });
 
   const messages = useMemo(() => {
+    console.log(`scenario run id: ${scenarioRunId} messages rerendered`);
     try {
       return convertScenarioMessagesToCopilotKit(data?.messages ?? []);
     } catch (error) {
@@ -36,7 +37,7 @@ export function SimulationChatViewer({
     }
     return [];
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [(data as any)?._messagesHash]);
+  }, [data?.messages.length]);
 
   return (
     <SimulationCard
@@ -48,7 +49,7 @@ export function SimulationChatViewer({
       }
       status={data?.status}
     >
-      <CustomCopilotKitChat messages={[]} smallerView />
+      <SimpleChatUI messages={messages} smallerView />
     </SimulationCard>
   );
 }

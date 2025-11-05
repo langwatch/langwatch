@@ -216,11 +216,6 @@ export function useScenarioRunState({
           data?.status === ScenarioRunStatus.PENDING;
         return isRunning ? 1000 : false; // Stop polling when complete
       },
-      // Stabilize messages reference to prevent unnecessary re-renders
-      select: (data) => ({
-        ...data,
-        _messagesHash: JSON.stringify(data.messages),
-      }),
     },
   );
 }
