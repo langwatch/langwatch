@@ -4,7 +4,6 @@ import type { InputProps } from "@copilotkit/react-ui";
 import { usePromptStudioChatSync } from "./PromptStudioChatContext";
 import { ChatSendButton } from "./ui/ChatSendButton";
 import { ChatSyncCheckbox } from "./ui/ChatSyncCheckbox";
-import { ChatAttachButton } from "./ui/ChatAttachButton";
 import { ChatTextArea } from "./ui/ChatTextArea";
 import { useIsTabActive } from "../../hooks/useIsTabActive";
 
@@ -23,7 +22,6 @@ export function SyncedChatInput({
   onSend,
   isVisible = true,
   onStop: _onStop,
-  onUpload,
 }: InputProps) {
   const {
     syncedInput,
@@ -148,14 +146,6 @@ export function SyncedChatInput({
           padding={2}
           position="relative"
         >
-          {/* Left icon - Paperclip */}
-          <ChatAttachButton
-            // position="absolute"
-            left={3}
-            bottom={2}
-            onAttach={onUpload}
-          />
-
           {/* Bottom left - Sync checkbox (shows on hover) */}
           <ChatSyncCheckbox
             position="absolute"
@@ -169,7 +159,6 @@ export function SyncedChatInput({
 
           {/* Right icon - Send button */}
           <ChatSendButton
-            // position="absolute"
             right={3}
             bottom={2}
             disabled={inProgress || !currentInput.trim()}

@@ -1,24 +1,9 @@
 import { useMemo } from "react";
-import { isEqual } from "lodash";
 import { useDraggableTabsBrowserStore } from "../prompt-studio-store/DraggableTabsBrowserStore";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 import { computeInitialFormValuesForPrompt } from "~/prompt-configs/utils/computeInitialFormValuesForPrompt";
-import { type PromptConfigFormValues } from "~/prompt-configs";
-import type { DeepPartial } from "react-hook-form";
-
-/**
- * Compare two form values for deep equality after JSON normalization.
- * Single Responsibility: Normalize and compare form values to detect changes.
- */
-function areFormValuesEqual(
-  a?: DeepPartial<PromptConfigFormValues>,
-  b?: DeepPartial<PromptConfigFormValues>,
-): boolean {
-  if (!a || !b) return false;
-  // Use JSON.stringify to normalize the objects for comparison (ie Dates, etc)
-  return isEqual(JSON.parse(JSON.stringify(a)), JSON.parse(JSON.stringify(b)));
-}
+import { areFormValuesEqual } from "~/prompt-configs/utils/areFormValuesEqual";
 
 /**
  * Determines whether the prompt in the specified tab has unsaved changes.

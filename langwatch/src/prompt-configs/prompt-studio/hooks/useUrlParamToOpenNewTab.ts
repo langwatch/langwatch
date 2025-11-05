@@ -28,10 +28,11 @@ export function useUrlParamToOpenNewTab() {
      */
     async function openNewTab() {
       if (!selectedPromptId) return;
+      if (!project?.id) return;
 
       const prompt = await trpc.prompts.getByIdOrHandle.fetch({
         idOrHandle: selectedPromptId,
-        projectId: project?.id ?? "",
+        projectId: project.id,
       });
 
       if (!prompt) return;
