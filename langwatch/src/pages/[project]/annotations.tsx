@@ -2,19 +2,10 @@ import { Box } from "@chakra-ui/react";
 
 import { AnnotationsTable } from "~/components/annotations/AnnotationsTable";
 import AnnotationsLayout from "~/components/AnnotationsLayout";
-import { PermissionAlert } from "../../components/PermissionAlert";
-import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { DashboardLayout } from "../../components/DashboardLayout";
-export default function Annotations() {
-  const { hasPermission } = useOrganizationTeamProject();
-  const hasAnnotationsViewPermission = hasPermission("annotations:view");
-  if (!hasAnnotationsViewPermission) {
-    return (
-      <DashboardLayout>
-        <PermissionAlert permission="annotations:view" />
-      </DashboardLayout>
-    );
-  }
+import { withPermissionGuard } from "~/components/WithPermissionGuard";
+
+function AnnotationsContent() {
   return (
     <AnnotationsLayout>
       <Box backgroundColor="white" width="full" overflowX="auto">
@@ -28,3 +19,7 @@ export default function Annotations() {
     </AnnotationsLayout>
   );
 }
+
+export default withPermissionGuard("annotations:view", {
+  layoutComponent: DashboardLayout,
+})(AnnotationsContent);
