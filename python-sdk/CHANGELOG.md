@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.7.0](https://github.com/langwatch/langwatch/compare/python-sdk@v0.6.1...python-sdk@v0.7.0) (2025-11-05)
+
+
+### Features
+
+* support langchain/langgraph 1.0.0 in python sdk ([#780](https://github.com/langwatch/langwatch/issues/780)) ([70d4814](https://github.com/langwatch/langwatch/commit/70d4814528465d8e58d1ab4f82849ea13d6f564d))
+
+
+### Bug Fixes
+
+* parsing of Long values comming from Strands, add support for gen_ai.server.time_to_first_token ([c060766](https://github.com/langwatch/langwatch/commit/c060766fa093a6c6a881244267c1ed9929c9246b))
+
 ## [0.6.1](https://github.com/langwatch/langwatch/compare/python-sdk@v0.6.0...python-sdk@v0.6.1) (2025-10-31)
 
 
