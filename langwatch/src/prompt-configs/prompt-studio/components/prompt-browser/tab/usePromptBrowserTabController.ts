@@ -18,6 +18,11 @@ export function usePromptBrowserTabController() {
 
   const isNewPrompt = !Boolean(tab?.data.form.currentValues?.configId);
 
+  /**
+   * handleClose
+   * Single Responsibility: Confirms unsaved changes before closing tab.
+   * @param e - Click event to stop propagation
+   */
   const handleClose = (e: React.MouseEvent) => {
     e.stopPropagation();
 
