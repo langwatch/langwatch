@@ -1,24 +1,42 @@
 import { SimulationCard } from "./SimulationCard";
 import { CustomCopilotKitChat } from "./CustomCopilotKitChat";
-import { api } from "~/utils/api";
-import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { useScenarioRunState } from "~/hooks/simulations/useSimulationQueries";
+import { convertScenarioMessagesToCopilotKit } from "./utils/convert-scenario-messages";
+import { createLogger } from "~/utils/logger";
+import { useMemo } from "react";
 
-// TODO: move this to hook wrapper
+const logger = createLogger("SimulationChatViewer.tsx");
+
+interface SimulationChatViewerProps {
+  scenarioRunId: string;
+}
+
+/**
+ * This component renders the chat history of a simulation.
+ * Uses centralized query hook with automatic polling that stops when run completes.
+ */
 export function SimulationChatViewer({
   scenarioRunId,
-}: {
-  scenarioRunId: string;
-}) {
-  const { project } = useOrganizationTeamProject();
-  const { data } = api.scenarios.getRunState.useQuery(
-    {
-      scenarioRunId,
-      projectId: project?.id ?? "",
-    },
-    {
-      enabled: !!project,
+}: SimulationChatViewerProps) {
+  const { data } = useScenarioRunState({
+    scenarioRunId,
+    enabled: !!scenarioRunId,
+  });
+
+  const messages = useMemo(() => {
+    try {
+      return convertScenarioMessagesToCopilotKit(data?.messages ?? []);
+    } catch (error) {
+      logger.error(
+        {
+          error,
+        },
+        "Failed to convert scenario messages to CopilotKit messages",
+      );
     }
-  );
+    return [];
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [(data as any)?._messagesHash]);
 
   return (
     <SimulationCard
@@ -30,7 +48,7 @@ export function SimulationChatViewer({
       }
       status={data?.status}
     >
-      <CustomCopilotKitChat messages={data?.messages ?? []} smallerView />
+      <CustomCopilotKitChat messages={[]} smallerView />
     </SimulationCard>
   );
 }

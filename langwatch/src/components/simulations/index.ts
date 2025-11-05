@@ -1,6 +1,6 @@
 export * from "./SetCard";
 export * from "./SimulationCard";
-export * from "./SimulationZoomGrid";
+export * from "./zoom-grid/SimulationZoomGrid";
 export * from "./CustomCopilotKitChat";
 export * from "./SimulationChatViewer";
 export * from "./SimulationResults";

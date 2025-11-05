@@ -1,7 +1,6 @@
-import { useMemo, useState, useEffect } from "react";
-import { api } from "~/utils/api";
-import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { useMemo, useEffect } from "react";
 import { useSimulationRouter } from "~/hooks/simulations/useSimulationRouter";
+import { usePaginatedBatchRuns } from "~/hooks/simulations/useSimulationQueries";
 import type { Run, RunItem } from "./types";
 import type { ScenarioRunData } from "~/app/api/scenario-events/[[...route]]/types";
 import { createLogger } from "~/utils/logger";
@@ -12,95 +11,58 @@ const logger = createLogger("useSetRunHistorySidebarController");
  * Custom hook that manages the state and behavior for the Set Run History Sidebar.
  *
  * This hook handles:
- * - Fetching scenario run data from the API with pagination
+ * - Fetching scenario run data via centralized pagination hook
  * - Transforming raw run data into grouped batch runs for display
  * - Providing navigation handlers for run selection
  * - Managing loading and error states
- * - Pagination state management
+ * - Auto-redirect to most recent batch run when no batchRunId in URL
  *
  * @returns Object containing runs data, click handlers, pagination controls, and state flags
  */
 export const useSetRunHistorySidebarController = () => {
-  const { goToSimulationBatchRuns, scenarioSetId, batchRunId } = useSimulationRouter();
-  const { project } = useOrganizationTeamProject();
+  const { goToSimulationBatchRuns, scenarioSetId, batchRunId } =
+    useSimulationRouter();
 
-  // Cursor-based pagination state
-  const [cursor, setCursor] = useState<string | undefined>();
-  const [cursorHistory, setCursorHistory] = useState<(string | undefined)[]>(
-    []
-  );
-  const limit = 8; // Fixed limit for now
-
-  // Reset cursor when navigating to a different scenario set
-  useEffect(() => {
-    setCursor(undefined);
-    setCursorHistory([]);
-  }, [scenarioSetId]);
-
-  // Fetch scenario run data with cursor-based pagination
+  // Use centralized paginated query hook (encapsulates all pagination logic)
   const {
-    data: runData,
-    error,
+    runs: rawRuns,
+    currentPage,
+    totalPages,
+    totalCount,
+    hasMore,
+    hasPrevious,
+    nextPage,
+    prevPage,
     isLoading,
-  } = api.scenarios.getScenarioSetRunData.useQuery(
-    {
-      projectId: project?.id ?? "",
-      scenarioSetId: scenarioSetId ?? "",
-      limit,
-      cursor,
-    },
-    {
-      // Only fetch when we have both required IDs to avoid unnecessary API calls
-      enabled: !!project?.id && !!scenarioSetId,
-      refetchInterval: 1000,
-    }
-  );
+    error,
+  } = usePaginatedBatchRuns({
+    scenarioSetId,
+    limit: 8,
+    enabled: !!scenarioSetId,
+  });
 
-  // Fetch total count for pagination info
-  const { data: countData } =
-    api.scenarios.getScenarioSetBatchRunCount.useQuery(
-      {
-        projectId: project?.id ?? "",
-        scenarioSetId: scenarioSetId ?? "",
-      },
-      {
-        enabled: !!project?.id && !!scenarioSetId,
-      }
-    );
-
-  const totalCount = countData?.count ?? 0;
-  const hasMore = runData?.hasMore ?? false;
-  const currentPage = cursorHistory.length + 1;
-  const totalPages = Math.ceil(totalCount / limit);
-
-  // Clamp cursor to valid range when total count changes
+  /**
+   * Auto-redirect to most recent batch run when batchRunId is missing from URL.
+   * This provides better UX by automatically showing the latest run.
+   */
   useEffect(() => {
-    if (totalCount === 0 && cursor) {
-      setCursor(undefined);
-      setCursorHistory([]);
-    }
-  }, [totalCount, cursor]);
+    if (scenarioSetId && !batchRunId && rawRuns?.length) {
+      const lastRun = rawRuns[rawRuns.length - 1];
 
-  useEffect(() => {
-    if (scenarioSetId && !batchRunId && runData?.runs?.length) {
-      const lastRun = runData.runs[runData.runs.length - 1];
       if (lastRun) {
-        goToSimulationBatchRuns(scenarioSetId, lastRun.batchRunId, { replace: true });
+        goToSimulationBatchRuns(scenarioSetId, lastRun.batchRunId, {
+          replace: true,
+        });
       }
     }
-  }, [scenarioSetId, batchRunId, runData?.runs, goToSimulationBatchRuns]);
+  }, [scenarioSetId, batchRunId, rawRuns, goToSimulationBatchRuns]);
 
   // Memoize the expensive data transformation to prevent unnecessary re-renders
   // This transforms raw API data into the UI-friendly Run format
   const runs = useMemo(() => {
-    if (!runData?.runs?.length) return [];
-    return transformRunDataToBatchRuns(
-      runData.runs,
-      currentPage,
-      limit,
-      totalCount
-    );
-  }, [runData?.runs, currentPage, limit, totalCount]);
+    if (!rawRuns?.length) return [];
+    return transformRunDataToBatchRuns(rawRuns, currentPage, 8, totalCount);
+  }, [rawRuns, currentPage, totalCount]);
 
   // Extract click handler for better testability and performance
   // Memoized to prevent child component re-renders when dependencies haven't changed
@@ -112,38 +74,13 @@ export const useSetRunHistorySidebarController = () => {
       }
       goToSimulationBatchRuns(scenarioSetId, batchRunId);
     },
-    [scenarioSetId, goToSimulationBatchRuns]
+    [scenarioSetId, goToSimulationBatchRuns],
   );
 
-  // Cursor-based pagination handlers
-  const handleNextPage = () => {
-    if (runData?.nextCursor) {
-      setCursorHistory((prev) => [...prev, cursor]);
-      setCursor(runData.nextCursor);
-    }
-  };
-
-  const handlePrevPage = () => {
-    if (cursorHistory.length > 0) {
-      const newHistory = [...cursorHistory];
-      const prevCursor = newHistory.pop();
-      setCursorHistory(newHistory);
-      setCursor(prevCursor);
-    }
-  };
-
   const handlePageChange = (newPage: number) => {
-    // For cursor-based pagination, we can't jump to arbitrary pages
-    // Reset to beginning and navigate forward
-    if (newPage === 1) {
-      setCursor(undefined);
-      setCursorHistory([]);
-    } else if (newPage > currentPage) {
-      // Navigate forward from current position
-      const stepsForward = newPage - currentPage;
-      // This is simplified - in practice you'd need to fetch each page
-      // For now, just allow forward navigation
-    }
+    // For cursor-based pagination, we can't jump to arbitrary pages easily
+    // This is a simplified implementation - could be enhanced in the future
+    logger.info("Page change requested to page", newPage);
   };
 
   return {
@@ -153,17 +90,17 @@ export const useSetRunHistorySidebarController = () => {
     isLoading,
     error, // Expose error state for better UX handling in components
 
-    // Pagination state and controls
+    // Pagination state and controls (delegated to centralized hook)
     pagination: {
       page: currentPage,
-      limit,
+      limit: 8,
       totalCount,
       totalPages,
-      hasNextPage: Boolean(runData?.nextCursor),
-      hasPrevPage: cursorHistory.length > 0,
+      hasNextPage: hasMore,
+      hasPrevPage: hasPrevious,
       onPageChange: handlePageChange,
-      onNextPage: handleNextPage,
-      onPrevPage: handlePrevPage,
+      onNextPage: nextPage,
+      onPrevPage: prevPage,
     },
   };
 };
@@ -184,7 +121,7 @@ const transformRunDataToBatchRuns = (
   runData: ScenarioRunData[],
   currentPage: number,
   limit: number,
-  totalCount: number
+  totalCount: number,
 ): Run[] => {
   // Group runs by batchRunId using a functional reduce approach
   // Each batch run contains metadata and an array of individual scenario runs
@@ -207,7 +144,7 @@ const transformRunDataToBatchRuns = (
       acc[batchRunId]!.items.push(createRunItem(run));
       return acc;
     },
-    {} as Record<string, Omit<Run, "label" | "date">>
+    {} as Record<string, Omit<Run, "label" | "date">>,
   );
 
   // Sort by timestamp (numerical) for accurate chronological ordering

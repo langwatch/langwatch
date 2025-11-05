@@ -205,9 +205,45 @@ export const scenarioRouter = createTRPCRouter({
       }),
     )
     .use(checkProjectPermission("scenarios:view"))
-    .query(async ({ input, ctx }) => {
+    .query(async ({ input }) => {
       const scenarioRunnerService = new ScenarioEventService();
       const data = await scenarioRunnerService.getRunDataForBatchRun({
+        projectId: input.projectId,
+        scenarioSetId: input.scenarioSetId,
+        batchRunId: input.batchRunId,
+      });
+      return data;
+    }),
+
+  /**
+   * Get lightweight scenario run IDs for a specific batch run (OPTIMIZED)
+   *
+   * Returns only scenario run IDs for all scenario runs in a batch.
+   * This is a performance-optimized alternative to getBatchRunData when you only
+   * need IDs and don't require the full run data (messages, results, status, etc.).
+   *
+   * Use this endpoint when:
+   * - Rendering lists/grids where individual components will fetch their own details
+   * - You need to poll frequently for run IDs without heavy data transfer
+   *
+   * Results are pre-sorted by timestamp (oldest first) for consistent ordering.
+   *
+   * @param projectId - The project containing the scenario set
+   * @param scenarioSetId - The scenario set that was executed
+   * @param batchRunId - The specific batch execution to get scenario run IDs for
+   * @returns Array of scenario run IDs (strings)
+   */
+  getScenarioRunIdsForBatchRun: protectedProcedure
+    .input(
+      projectSchema.extend({
+        scenarioSetId: z.string(),
+        batchRunId: z.string(),
+      }),
+    )
+    .use(checkProjectPermission("scenarios:view"))
+    .query(async ({ input }) => {
+      const scenarioRunnerService = new ScenarioEventService();
+      const data = await scenarioRunnerService.getScenarioRunIdsForBatchRun({
         projectId: input.projectId,
         scenarioSetId: input.scenarioSetId,
         batchRunId: input.batchRunId,
