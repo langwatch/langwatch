@@ -1,75 +1,126 @@
 import React, { useMemo, useState, useCallback, useEffect } from "react";
-import {
-  VStack,
-  HStack,
-  Button,
-  Text,
-  Field,
-  Spinner,
-} from "@chakra-ui/react";
+import { VStack, HStack, Button, Text, Field, Spinner } from "@chakra-ui/react";
 import { z } from "zod";
 import { Switch } from "../../../../../components/ui/switch";
-import { getModelProvider } from "../../../regions/model-providers/registry";
+import {
+  getModelProvider,
+  modelProviderRegistry,
+} from "../../../regions/model-providers/registry";
 import type { ModelProviderKey } from "../../../regions/model-providers/types";
 import { useOrganizationTeamProject } from "../../../../../hooks/useOrganizationTeamProject";
 import { useModelProvidersSettings } from "../../../../../hooks/useModelProvidersSettings";
 import { useModelProviderForm } from "../../../../../hooks/useModelProviderForm";
 import { useModelProviderFields } from "../../../../../hooks/useModelProviderFields";
 import { DocsLinks } from "../observability/DocsLinks";
-import { modelProviders as modelProvidersRegistry } from "../../../../../server/modelProviders/registry";
+import {
+  modelProviders as modelProvidersRegistry,
+  type MaybeStoredModelProvider,
+} from "../../../../../server/modelProviders/registry";
 import {
   parseZodFieldErrors,
   type ZodErrorStructure,
 } from "../../../../../utils/zod";
 import { ModelProviderCredentialFields } from "./ModelProviderCredentialFields";
 import { ModelProviderExtraHeaders } from "./ModelProviderExtraHeaders";
+import { easyCatch } from "../../../../../utils/easyCatch";
 import { ModelProviderModelSettings } from "./ModelProviderModelSettings";
 
-interface ModelProviderConfigFieldsProps {
+interface ModelProviderSetupProps {
   modelProviderKey: ModelProviderKey;
 }
 
 const OPENAI_DEFAULT_BASE_URL = "https://api.openai.com/v1";
 
-export const ModelProviderConfigFields: React.FC<ModelProviderConfigFieldsProps> = ({
+export const ModelProviderSetup: React.FC<ModelProviderSetupProps> = ({
   modelProviderKey,
 }) => {
-  const meta = getModelProvider(modelProviderKey);
+  const fallbackProviderMeta = useMemo(
+    () =>
+      modelProviderRegistry.find((providerMeta) =>
+        Boolean(providerMeta.backendModelProviderKey),
+      ),
+    [],
+  );
+
+  const meta = useMemo(() => {
+    const requestedMeta = getModelProvider(modelProviderKey);
+
+    if (requestedMeta?.backendModelProviderKey) {
+      return requestedMeta;
+    }
+
+    if (fallbackProviderMeta?.backendModelProviderKey) {
+      if (!requestedMeta) {
+        console.warn(
+          "Model provider metadata not found. Falling back to first available provider",
+          {
+            requestedKey: modelProviderKey,
+            fallbackKey: fallbackProviderMeta.key,
+          },
+        );
+      } else {
+        console.warn(
+          "Model provider metadata missing backend key. Falling back to first available provider",
+          {
+            requestedKey: requestedMeta.key,
+            fallbackKey: fallbackProviderMeta.key,
+          },
+        );
+      }
+    } else {
+      console.error(
+        "Model provider metadata missing and no fallback provider available",
+        {
+          requestedKey: modelProviderKey,
+        },
+      );
+    }
+
+    return fallbackProviderMeta ?? requestedMeta;
+  }, [fallbackProviderMeta, modelProviderKey]);
   const { project } = useOrganizationTeamProject();
   const projectId = project?.id;
 
-  const backendKey = meta?.backendKey;
+  const backendModelProviderKey = useMemo(() => {
+    if (meta?.backendModelProviderKey) {
+      return meta.backendModelProviderKey;
+    }
+
+    return fallbackProviderMeta?.backendModelProviderKey ?? "openai";
+  }, [fallbackProviderMeta?.backendModelProviderKey, meta?.backendModelProviderKey]);
   const { providers, isLoading, refetch } = useModelProvidersSettings({
     projectId,
   });
 
-  const provider = useMemo(() => {
-    if (!backendKey) return void 0;
-
-    const existing = providers?.[backendKey as keyof typeof providers];
+  const provider: MaybeStoredModelProvider = useMemo(() => {
+    const existing = providers
+      ? providers[backendModelProviderKey as keyof typeof providers]
+      : void 0;
     if (existing) return existing;
 
     return {
-      provider: backendKey,
+      provider: backendModelProviderKey,
       enabled: false,
       customKeys: null,
       models: null,
       embeddingsModels: null,
       disabledByDefault: true,
+      deploymentMapping: null,
       extraHeaders: [],
-    } as any;
-  }, [backendKey, providers]);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [backendModelProviderKey, providers]);
 
   const [state, actions] = useModelProviderForm({
     provider,
     projectId,
     projectDefaultModel: meta?.defaultModel ?? project?.defaultModel ?? null,
     onSuccess: () => {
-      void refetch();
+      refetch().catch(err => easyCatch(err, "ModelProviderSetup.onSuccess"));
     },
   });
 
-  const { fields: derivedFields } = useModelProviderFields(backendKey as any);
+  const { fields: derivedFields } = useModelProviderFields(backendModelProviderKey);
   const [openAiValidationError, setOpenAiValidationError] = useState<string>();
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
@@ -78,7 +129,7 @@ export const ModelProviderConfigFields: React.FC<ModelProviderConfigFieldsProps>
     setFieldErrors({});
   }, [modelProviderKey]);
 
-  const isOpenAiProvider = backendKey === "openai";
+  const isOpenAiProvider = backendModelProviderKey === "openai";
 
   const handleCustomKeyChange = useCallback(
     (key: string, value: string) => {
@@ -99,7 +150,7 @@ export const ModelProviderConfigFields: React.FC<ModelProviderConfigFieldsProps>
   }, []);
 
   const handleOpenAiValidationClear = useCallback(() => {
-    setOpenAiValidationError(undefined);
+    setOpenAiValidationError(void 0);
   }, []);
 
   const validateOpenAi = useCallback(() => {
@@ -110,9 +161,7 @@ export const ModelProviderConfigFields: React.FC<ModelProviderConfigFieldsProps>
 
     // Both empty
     if (!apiKey && !baseUrl) {
-      setOpenAiValidationError(
-        "Either API Key or Base URL must be provided",
-      );
+      setOpenAiValidationError("Either API Key or Base URL must be provided");
       return false;
     }
 
@@ -126,11 +175,7 @@ export const ModelProviderConfigFields: React.FC<ModelProviderConfigFieldsProps>
 
     handleOpenAiValidationClear();
     return true;
-  }, [
-    isOpenAiProvider,
-    state.customKeys,
-    handleOpenAiValidationClear,
-  ]);
+  }, [isOpenAiProvider, state.customKeys, handleOpenAiValidationClear]);
 
   const handleSaveAndContinue = useCallback(() => {
     if (!validateOpenAi()) {
@@ -142,9 +187,9 @@ export const ModelProviderConfigFields: React.FC<ModelProviderConfigFieldsProps>
     handleOpenAiValidationClear();
 
     // Validate keys according to schema before submitting
-    const providerDefinition = backendKey
-      ? modelProvidersRegistry[backendKey as keyof typeof modelProvidersRegistry]
-      : undefined;
+    const providerDefinition = backendModelProviderKey
+      ? modelProvidersRegistry[backendModelProviderKey]
+      : void 0;
 
     if (providerDefinition?.keysSchema) {
       const keysSchema = z.union([
@@ -157,22 +202,27 @@ export const ModelProviderConfigFields: React.FC<ModelProviderConfigFieldsProps>
 
       if (!result.success) {
         // Parse the Zod error to get field-specific errors
-        const parsedErrors = parseZodFieldErrors(result.error as ZodErrorStructure);
+        const parsedErrors = parseZodFieldErrors(
+          result.error as ZodErrorStructure,
+        );
         setFieldErrors(parsedErrors);
         return;
       }
     }
 
-    void actions.setEnabled(true).then(() => actions.submit());
+    void actions
+      .setEnabled(true)
+      .then(() => actions.submit())
+      .catch(err => easyCatch(err, "ModelProviderSetup.handleSaveAndContinue"));
   }, [
     validateOpenAi,
     actions,
-    backendKey,
+    backendModelProviderKey,
     state.customKeys,
     handleOpenAiValidationClear,
   ]);
 
-  if (!meta || !backendKey) return null;
+  if (!meta || !backendModelProviderKey) return null;
 
   if (isLoading || !provider) {
     return (
@@ -195,7 +245,7 @@ export const ModelProviderConfigFields: React.FC<ModelProviderConfigFieldsProps>
 
       <VStack align="stretch" gap={4}>
         <HStack gap={6}>
-          {backendKey === "azure" && (
+          {backendModelProviderKey === "azure" && (
             <Field.Root>
               <Switch
                 checked={state.useApiGateway}
@@ -223,7 +273,7 @@ export const ModelProviderConfigFields: React.FC<ModelProviderConfigFieldsProps>
             onOpenAiValidationClear={handleOpenAiValidationClear}
           />
 
-          {(backendKey === "azure" || backendKey === "custom") && (
+          {(backendModelProviderKey === "azure" || backendModelProviderKey === "custom") && (
             <ModelProviderExtraHeaders
               headers={state.extraHeaders}
               onHeaderKeyChange={actions.setExtraHeaderKey}
@@ -234,6 +284,7 @@ export const ModelProviderConfigFields: React.FC<ModelProviderConfigFieldsProps>
           )}
 
           <ModelProviderModelSettings
+            modelProviderKey={modelProviderKey}
             customModels={state.customModels}
             chatModelOptions={state.chatModelOptions}
             defaultModel={state.defaultModel}
@@ -258,4 +309,4 @@ export const ModelProviderConfigFields: React.FC<ModelProviderConfigFieldsProps>
       </VStack>
     </VStack>
   );
-}
+};

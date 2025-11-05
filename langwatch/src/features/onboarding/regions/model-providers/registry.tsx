@@ -6,7 +6,7 @@ export type ModelProviderRegistry = ModelProviderSpec[];
 export const modelProviderRegistry: ModelProviderRegistry = [
   {
     key: "open_ai",
-    backendKey: "openai",
+    backendModelProviderKey: "openai",
     label: "OpenAI",
     defaultModel: "gpt-5",
     icon: themedIcon(
@@ -31,7 +31,7 @@ export const modelProviderRegistry: ModelProviderRegistry = [
   },
   {
     key: "anthropic",
-    backendKey: "anthropic",
+    backendModelProviderKey: "anthropic",
     label: "Anthropic",
     defaultModel: "claude-sonnet-4-5",
     icon: themedIcon(
@@ -56,7 +56,7 @@ export const modelProviderRegistry: ModelProviderRegistry = [
   },
   {
     key: "gemini",
-    backendKey: "gemini",
+    backendModelProviderKey: "gemini",
     label: "Google Gemini",
     defaultModel: "gemini-2.5-flash",
     icon: singleIcon("/images/external-icons/google.svg", "Google Gemini"),
@@ -73,7 +73,7 @@ export const modelProviderRegistry: ModelProviderRegistry = [
   },
   {
     key: "open_ai_azure",
-    backendKey: "azure",
+    backendModelProviderKey: "azure",
     label: "Azure OpenAI",
     defaultModel: "gpt-5",
     icon: singleIcon("/images/external-icons/ms-azure.svg", "Azure OpenAI"),
@@ -102,7 +102,7 @@ export const modelProviderRegistry: ModelProviderRegistry = [
   },
   {
     key: "aws_bedrock",
-    backendKey: "bedrock",
+    backendModelProviderKey: "bedrock",
     label: "AWS Bedrock",
     icon: themedIcon(
       "/images/external-icons/aws-lighttheme.svg",
@@ -130,7 +130,7 @@ export const modelProviderRegistry: ModelProviderRegistry = [
   },
   {
     key: "deepseek",
-    backendKey: "deepseek",
+    backendModelProviderKey: "deepseek",
     label: "DeepSeek",
     defaultModel: "deepseek-r1",
     icon: singleIcon("/images/external-icons/deepseek.svg", "DeepSeek"),
@@ -147,7 +147,7 @@ export const modelProviderRegistry: ModelProviderRegistry = [
   },
   {
     key: "groq",
-    backendKey: "groq",
+    backendModelProviderKey: "groq",
     label: "Groq",
     icon: singleIcon("/images/external-icons/groq.svg", "Groq"),
     docs: {
@@ -163,7 +163,7 @@ export const modelProviderRegistry: ModelProviderRegistry = [
   },
   {
     key: "grok_xai",
-    backendKey: "xai",
+    backendModelProviderKey: "xai",
     label: "Grok (xAI)",
     defaultModel: "grok-4",
     icon: themedIcon(
@@ -184,7 +184,7 @@ export const modelProviderRegistry: ModelProviderRegistry = [
   },
   {
     key: "vertex_ai",
-    backendKey: "vertex_ai",
+    backendModelProviderKey: "vertex_ai",
     label: "Google Vertex AI",
     icon: singleIcon("/images/external-icons/gcloud.svg", "Google Vertex AI"),
     docs: {
@@ -208,7 +208,7 @@ export const modelProviderRegistry: ModelProviderRegistry = [
   },
   {
     key: "cerebras",
-    backendKey: "cerebras",
+    backendModelProviderKey: "cerebras",
     label: "Cerebras",
     icon: themedIcon(
       "/images/external-icons/cerebras-lighttheme.svg",
@@ -228,7 +228,7 @@ export const modelProviderRegistry: ModelProviderRegistry = [
   },
   {
     key: "custom",
-    backendKey: "custom",
+    backendModelProviderKey: "custom",
     label: "Custom, OpenAI-compatible",
     icon: iconWithLabel(
       singleIcon("/images/external-icons/custom.svg", "Custom Provider"),

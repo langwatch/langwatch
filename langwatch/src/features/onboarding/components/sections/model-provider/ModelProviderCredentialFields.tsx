@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useMemo } from "react";
 import { Field, HStack, VStack, IconButton } from "@chakra-ui/react";
 import type { FieldMetadata } from "../../../regions/model-providers/types";
 import type { DerivedFieldMeta } from "../../../../../hooks/useModelProviderFields";
@@ -31,7 +31,7 @@ export const ModelProviderCredentialFields: React.FC<ModelProviderCredentialFiel
   onFieldErrorClear,
   onOpenAiValidationClear,
 }: ModelProviderCredentialFieldsProps) => {
-  const credentialKeys = React.useMemo(
+  const credentialKeys = useMemo(
     () => Object.keys(displayKeys ?? {}),
     [displayKeys],
   );

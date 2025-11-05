@@ -1,4 +1,4 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useMemo, useCallback, useRef, useId } from "react";
 import {
   Combobox,
   Field,
@@ -10,10 +10,12 @@ import {
   useTagsInput,
   VStack,
 } from "@chakra-ui/react";
+import type { ModelProviderKey } from "../../../regions/model-providers/types";
 
 type ModelOption = { label: string; value: string };
 
 interface ModelProviderModelSettingsProps {
+  modelProviderKey: ModelProviderKey;
   customModels: ModelOption[];
   chatModelOptions?: ModelOption[];
   defaultModel: string | null;
@@ -22,16 +24,17 @@ interface ModelProviderModelSettingsProps {
 }
 
 export const ModelProviderModelSettings: React.FC<ModelProviderModelSettingsProps> = ({
+  modelProviderKey,
   customModels,
   chatModelOptions,
   defaultModel,
   onCustomModelsChange,
   onDefaultModelChange,
 }: ModelProviderModelSettingsProps) => {
-  const inputId = React.useId();
-  const controlRef = React.useRef<HTMLDivElement | null>(null);
+  const inputId = useId();
+  const controlRef = useRef<HTMLDivElement | null>(null);
 
-  const customModelValues = React.useMemo(
+  const customModelValues = useMemo(
     () => (customModels ?? []).map((model) => model.value),
     [customModels],
   );
@@ -42,7 +45,7 @@ export const ModelProviderModelSettings: React.FC<ModelProviderModelSettingsProp
     }
   }, [customModelValues, defaultModel, onDefaultModelChange]);
 
-  const allChatModelItems = React.useMemo(() => {
+  const allChatModelItems = useMemo(() => {
     const existing = new Set<string>();
     (chatModelOptions ?? []).forEach((option) => {
       if (option?.value) existing.add(option.value);
@@ -51,7 +54,11 @@ export const ModelProviderModelSettings: React.FC<ModelProviderModelSettingsProp
       if (value) existing.add(value);
     });
     return Array.from(existing);
-  }, [chatModelOptions, customModelValues]);
+  // We have the model provider key as a dependency because the chat model options are
+  // different for each model provider, and this forces a re-render when the provider
+  // changes.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [modelProviderKey, chatModelOptions, customModelValues]);
 
   // eslint-disable-next-line @typescript-eslint/unbound-method
   const { contains } = useFilter({ sensitivity: "base" });
@@ -60,7 +67,7 @@ export const ModelProviderModelSettings: React.FC<ModelProviderModelSettingsProp
     filter: contains,
   });
 
-  const handleTagsValueChange = React.useCallback(
+  const handleTagsValueChange = useCallback(
     (details: { value: string[] }) => {
       onCustomModelsChange(
         details.value.map((value) => ({ label: value, value })),
@@ -75,7 +82,7 @@ export const ModelProviderModelSettings: React.FC<ModelProviderModelSettingsProp
     onValueChange: handleTagsValueChange,
   });
 
-  React.useEffect(() => {
+  useEffect(() => {
     const differs =
       tags.value.length !== customModelValues.length ||
       tags.value.some((value, index) => value !== customModelValues[index]);
@@ -84,14 +91,14 @@ export const ModelProviderModelSettings: React.FC<ModelProviderModelSettingsProp
     }
   }, [customModelValues, tags]);
 
-  const handleComboboxInputChange = React.useCallback(
+  const handleComboboxInputChange = useCallback(
     (event: { inputValue: string }) => {
       filter(event.inputValue);
     },
     [filter],
   );
 
-  const handleComboboxValueChange = React.useCallback(
+  const handleComboboxValueChange = useCallback(
     (event: { value?: string[] }) => {
       const nextValue = event.value?.[0];
       if (!nextValue) return;
@@ -114,6 +121,11 @@ export const ModelProviderModelSettings: React.FC<ModelProviderModelSettingsProp
     onInputValueChange: handleComboboxInputChange,
     onValueChange: handleComboboxValueChange,
   });
+
+  const availableCollectionItems = useMemo(() => {
+    const items = (collection.items as string[] | undefined) ?? [];
+    return items.filter((item) => !tags.value.includes(item));
+  }, [collection.items, tags.value]);
 
   return (
     <VStack align="stretch" gap={4}>
@@ -151,22 +163,20 @@ export const ModelProviderModelSettings: React.FC<ModelProviderModelSettingsProp
                 borderRadius="md"
               >
                 <Combobox.Empty>No chat models found</Combobox.Empty>
-                {(collection.items as string[] | undefined)
-                  ?.filter((item) => !tags.value.includes(item))
-                  .map((item) => (
-                    <Combobox.Item
-                      item={item}
-                      key={item}
-                      borderRadius="md"
-                      bg="none"
-                      _hover={{
-                        bg: "bg.subtle/30",
-                      }}
-                    >
-                      <Combobox.ItemText>{item}</Combobox.ItemText>
-                      <Combobox.ItemIndicator />
-                    </Combobox.Item>
-                  ))}
+                {availableCollectionItems.map((item) => (
+                  <Combobox.Item
+                    item={item}
+                    key={item}
+                    borderRadius="md"
+                    bg="none"
+                    _hover={{
+                      bg: "bg.subtle/30",
+                    }}
+                  >
+                    <Combobox.ItemText>{item}</Combobox.ItemText>
+                    <Combobox.ItemIndicator />
+                  </Combobox.Item>
+                ))}
               </Combobox.Content>
             </Combobox.Positioner>
           </TagsInput.RootProvider>

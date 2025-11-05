@@ -1,3 +1,4 @@
+import type { ServerModelProviderKey } from "~/hooks/useModelProviderFields";
 import type { Docs, IconData } from "../shared/types";
 
 export type ModelProviderKey =
@@ -19,7 +20,8 @@ export interface FieldMetadata {
 }
 
 export interface ModelProviderSpec {
-  backendKey: string;
+  /* The key that the backend uses to identify the model provider. This is different from the key used by the frontend. */
+  backendModelProviderKey: ServerModelProviderKey;
   key: ModelProviderKey;
   defaultModel?: string | null;
   label: string;

@@ -121,7 +121,7 @@ export const modelProviderRouter = createTRPCRouter({
 
         if (existingModelProvider) {
           // Smart merging: preserve masked standard keys, but replace extra headers completely
-          let mergedCustomKeys: Record<string, any> | null = validatedKeys;
+          let mergedCustomKeys: Record<string, any> = validatedKeys ?? {};
           if (validatedKeys && existingModelProvider.customKeys) {
             const existingKeys = existingModelProvider.customKeys as Record<
               string,
@@ -157,12 +157,12 @@ export const modelProviderRouter = createTRPCRouter({
             where: { id: existingModelProvider.id, projectId },
             data: {
               ...data,
-              customKeys: mergedCustomKeys as any,
+              customKeys: mergedCustomKeys,
               customModels: customModels ? customModels : [],
               customEmbeddingsModels: customEmbeddingsModels
                 ? customEmbeddingsModels
                 : [],
-              extraHeaders: extraHeaders ? (extraHeaders as any) : [],
+              extraHeaders: extraHeaders ? extraHeaders : [],
             },
           });
         } else {
