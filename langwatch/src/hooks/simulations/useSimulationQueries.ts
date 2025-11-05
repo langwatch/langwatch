@@ -99,7 +99,7 @@ export function usePaginatedBatchRuns({
     },
     {
       enabled: !!project?.id && !!scenarioSetId && enabled,
-      refetchInterval: 1000,
+      refetchInterval: 10000,
     },
   );
 

@@ -16,12 +16,12 @@ export function MessageItem({ message, smallerView }: MessageItemProps) {
   const { openDrawer, drawerOpen } = useDrawer();
 
   // Handle ActionExecutionMessage
-  if (message.type === "ActionExecutionMessage") {
+  if (!smallerView && message.type === "ActionExecutionMessage") {
     return <ToolCallMessage message={message as any} />;
   }
 
   // Handle ResultMessage
-  if (message.type === "ResultMessage") {
+  if (!smallerView && message.type === "ResultMessage") {
     return <ToolResultMessage message={message as any} />;
   }
 

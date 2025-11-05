@@ -30,7 +30,10 @@ export function SimulationChatViewer({ runState }: SimulationChatViewerProps) {
       `scenario run id: ${runState?.scenarioRunId} messages rerendered`,
     );
     try {
-      return convertScenarioMessagesToCopilotKit(runState?.messages ?? []);
+      // Only show the last 3 messages to avoid overwhelming the UI in the small chat view
+      return convertScenarioMessagesToCopilotKit(
+        runState?.messages.slice(-3) ?? [],
+      );
     } catch (error) {
       logger.error(
         {
@@ -41,7 +44,7 @@ export function SimulationChatViewer({ runState }: SimulationChatViewerProps) {
     }
     return [];
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [runState?.messages?.length, runState?.scenarioRunId]);
+  }, [runState?.messages?.length, runState?.scenarioRunId, 0]);
 
   return (
     <SimulationCard
