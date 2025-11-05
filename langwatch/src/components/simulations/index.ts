@@ -5,7 +5,6 @@ export * from "./CustomCopilotKitChat";
 export * from "./SimulationChatViewer";
 export * from "./SimulationResults";
 export * from "./simulation-console/SimulationConsole";
-export * from "./SimulationChatWrapper";
 export * from "./SimulationChatFadeOverlay";
 export * from "./SimulationLayout";
 export * from "./set-run-history-sidebar";
