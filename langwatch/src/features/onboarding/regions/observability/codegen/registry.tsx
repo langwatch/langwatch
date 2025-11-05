@@ -23,6 +23,8 @@ import pydanticPySource from "./snippets/python/pydanticai.snippet.py";
 import openaiAgentsPySource from "./snippets/python/openaiagents.snippet.py";
 import springAiYamlSource from "./snippets/java/springai.snippet.yaml";
 import n8nBashSource from "./snippets/noandlo/n8n.snippet.sh";
+import langchainPySource from "./snippets/python/langchain.snippet.py";
+import langgraphPySource from "./snippets/python/langgraph.snippet.py";
 import { OpenTelemetrySetup } from "../../../components/sections/observability/OpenTelemetrySetup";
 import { FlowiseSetup } from "../../../components/sections/observability/FlowiseSetup";
 import { LangflowSetup } from "../../../components/sections/observability/LangflowSetup";
@@ -131,26 +133,6 @@ export const registry: IntegrationRegistry = [
   },
   {
     platform: "typescript",
-    framework: "langgraph",
-    label: "LangGraph",
-    docs: { internal: "/integration/typescript/integrations/langgraph", external: "https://langchain-ai.github.io/langgraph/" },
-    icon: themedIcon(
-      "/images/external-icons/langchain-lighttheme.svg",
-      "/images/external-icons/langchain-darktheme.svg",
-      "LangGraph",
-    ),
-    install: {
-      js: {
-        npm: "npm i langwatch @langchain/openai @langchain/core @langchain/langgraph zod",
-        pnpm: "pnpm add langwatch @langchain/openai @langchain/core @langchain/langgraph zod",
-        yarn: "yarn add langwatch @langchain/openai @langchain/core @langchain/langgraph zod",
-        bun: "bun add langwatch @langchain/openai @langchain/core @langchain/langgraph zod",
-      },
-    },
-    snippet: tsRef(langgraphTsSource as unknown as string),
-  },
-  {
-    platform: "typescript",
     framework: "langchain",
     label: "LangChain",
     docs: { internal: "/integration/typescript/integrations/langchain", external: "https://langchain-ai.github.io/langchain/" },
@@ -168,6 +150,26 @@ export const registry: IntegrationRegistry = [
       },
     },
     snippet: tsRef(langchainTsSource as unknown as string),
+  },
+  {
+    platform: "typescript",
+    framework: "langgraph",
+    label: "LangGraph",
+    docs: { internal: "/integration/typescript/integrations/langgraph", external: "https://langchain-ai.github.io/langgraph/" },
+    icon: themedIcon(
+      "/images/external-icons/langgraph-lighttheme.svg",
+      "/images/external-icons/langgraph-darktheme.svg",
+      "LangGraph",
+    ),
+    install: {
+      js: {
+        npm: "npm i langwatch @langchain/openai @langchain/core @langchain/langgraph zod",
+        pnpm: "pnpm add langwatch @langchain/openai @langchain/core @langchain/langgraph zod",
+        yarn: "yarn add langwatch @langchain/openai @langchain/core @langchain/langgraph zod",
+        bun: "bun add langwatch @langchain/openai @langchain/core @langchain/langgraph zod",
+      },
+    },
+    snippet: tsRef(langgraphTsSource as unknown as string),
   },
   {
     platform: "typescript",
@@ -227,7 +229,42 @@ export const registry: IntegrationRegistry = [
     },
     snippet: pyRef(openaiAgentsPySource as unknown as string),
   },
-
+  {
+    platform: "python",
+    framework: "langchain",
+    label: "LangChain",
+    docs: { internal: "/integration/python/integrations/langchain", external: "https://docs.langchain.com/oss/python/langchain/quickstart/" },
+    icon: themedIcon(
+      "/images/external-icons/langchain-lighttheme.svg",
+      "/images/external-icons/langchain-darktheme.svg",
+      "LangChain",
+    ),
+    install: {
+      python: {
+        pip: "pip install langwatch langchain langchain-openai",
+        uv: "uv add langwatch langchain langchain-openai",
+      },
+    },
+    snippet: pyRef(langchainPySource as unknown as string),
+  },
+  {
+    platform: "python",
+    framework: "langgraph",
+    label: "LangGraph",
+    docs: { internal: "/integration/python/integrations/langgraph", external: "https://docs.langchain.com/oss/python/langgraph/quickstart" },
+    icon: themedIcon(
+      "/images/external-icons/langgraph-lighttheme.svg",
+      "/images/external-icons/langgraph-darktheme.svg",
+      "LangGraph",
+    ),
+    install: {
+      python: {
+        pip: "pip install langwatch langgraph langchain-openai",
+        uv: "uv add langwatch langgraph langchain-openai",
+      },
+    },
+    snippet: pyRef(langgraphPySource as unknown as string),
+  },
   {
     platform: "python",
     framework: "litellm",
@@ -290,8 +327,8 @@ export const registry: IntegrationRegistry = [
     ),
     install: {
       python: {
-        pip: "pip install langwatch agno openai openinference-instrumentation-agno yfinance",
-        uv: "uv add langwatch agno openai openinference-instrumentation-agno yfinance",
+        pip: "pip install langwatch agno openai openinference-instrumentation-agno",
+        uv: "uv add langwatch agno openai openinference-instrumentation-agno",
       },
     },
     snippet: pyRef(agnoPySource as unknown as string),
