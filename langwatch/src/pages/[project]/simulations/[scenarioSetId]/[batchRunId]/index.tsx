@@ -25,7 +25,7 @@ export default function SimulationSetPage() {
     {
       enabled: !!project?.id && !!scenarioSetId && !!batchRunId,
       refetchInterval: 1000,
-    }
+    },
   );
 
   const sortedScenarioSetData = useMemo(() => {
@@ -36,7 +36,7 @@ export default function SimulationSetPage() {
 
   const scenarioRunIds = useMemo(
     () => sortedScenarioSetData?.map((scenario) => scenario.scenarioRunId),
-    [sortedScenarioSetData]
+    [sortedScenarioSetData],
   );
 
   useEffect(() => {
@@ -47,7 +47,12 @@ export default function SimulationSetPage() {
       if (!batchRunId) return;
       goToSimulationBatchRuns(scenarioSetId, batchRunId, { replace: true });
     }
-  }, [scenarioSetData, scenarioSetId, batchRunId, goToSimulationBatchRuns]);
+  }, [
+    sortedScenarioSetData,
+    scenarioSetId,
+    batchRunId,
+    goToSimulationBatchRuns,
+  ]);
 
   return (
     <SimulationLayout>
