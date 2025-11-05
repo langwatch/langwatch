@@ -119,8 +119,11 @@ export function useModelProviderForm(
         previousKeys &&
         Object.prototype.hasOwnProperty.call(previousKeys, key)
       ) {
-        result[key] = previousKeys[key];
-        return;
+        const previousValue = previousKeys[key];
+        if (typeof previousValue === "string") {
+          result[key] = previousValue;
+          return;
+        }
       }
 
       const storedValue = storedKeys[key];

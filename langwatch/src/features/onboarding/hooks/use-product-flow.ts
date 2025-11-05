@@ -18,7 +18,6 @@ export function useProductFlow() {
       "observability",
       "evaluations",
       "prompt-management",
-      "agent-simulations",
     ];
 
     let inferred: ProductSelection | undefined = undefined;

@@ -114,8 +114,7 @@ export interface OnboardingFlowConfig {
 export type ProductSelection =
   | "observability"
   | "evaluations"
-  | "prompt-management"
-  | "agent-simulations";
+  | "prompt-management";
 
 export interface ProductFlowConfig {
   variant: "product";

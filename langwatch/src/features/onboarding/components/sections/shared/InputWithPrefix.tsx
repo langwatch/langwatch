@@ -29,7 +29,7 @@ interface InputWithPrefixProps {
 
 /**
  * A flexible input component with optional prefix, visibility toggle, and copy actions.
- * 
+ *
  * Single Responsibility: Provides a unified input field with configurable addons for prefixes and action buttons.
  */
 export function InputWithPrefix({
@@ -157,7 +157,7 @@ export function InputWithPrefix({
         readOnly={readOnly}
         autoComplete={autoComplete}
         aria-label={ariaLabel}
-        invalid={invalid}
+        aria-invalid={invalid ? true : undefined}
         _focus={{
           outline: "none",
           boxShadow: "none",

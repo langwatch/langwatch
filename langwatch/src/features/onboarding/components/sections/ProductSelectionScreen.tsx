@@ -4,7 +4,7 @@ import { type ProductSelection } from "../../types/types";
 import React from "react";
 
 interface ProductOption {
-  key: ProductSelection;
+  key: ProductSelection | "agent-simulations";
   title: string;
   description: string;
   icon: typeof Telescope;
@@ -83,7 +83,9 @@ export const ProductSelectionScreen: React.FC<ProductSelectionScreenProps> = ({
                     return;
                   }
 
-                  onSelectProduct(opt.key);
+                  if (opt.key !== "agent-simulations") {
+                    onSelectProduct(opt.key);
+                  }
                 }}
               >
                 <VStack gap={3} align="center" h="full">
