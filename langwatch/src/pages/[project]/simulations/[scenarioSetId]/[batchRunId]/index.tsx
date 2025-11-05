@@ -5,49 +5,32 @@ import { PageLayout } from "~/components/ui/layouts/PageLayout";
 import "@copilotkit/react-ui/styles.css";
 import "../../simulations.css";
 import { useSimulationRouter } from "~/hooks/simulations/useSimulationRouter";
-import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import { api } from "~/utils/api";
+import { useBatchRunStates } from "~/hooks/simulations/useSimulationQueries";
 
-import { useEffect, useMemo } from "react";
-
-// Main layout for a single Simulation Set page
+/**
+ * Simulation Set Page - Displays a grid of scenario runs for a specific batch run.
+ *
+ * Single Responsibility: Renders the simulation batch run viewer with batch-optimized data fetching.
+ *
+ * URL Structure: /[project]/simulations/[scenarioSetId]/[batchRunId]
+ *
+ * Note: Auto-redirect to most recent batch run is handled by the sidebar
+ * (see useSetRunHistorySidebarController lines 86-94)
+ */
 export default function SimulationSetPage() {
-  const { scenarioSetId } = useSimulationRouter();
-  const { project } = useOrganizationTeamProject();
-  const { batchRunId, goToSimulationBatchRuns } = useSimulationRouter();
+  const { scenarioSetId, batchRunId } = useSimulationRouter();
 
-  const { data: scenarioSetData } = api.scenarios.getBatchRunData.useQuery(
-    {
-      projectId: project?.id ?? "",
-      scenarioSetId: scenarioSetId ?? "",
-      batchRunId: batchRunId ?? "",
-    },
-    {
-      enabled: !!project?.id && !!scenarioSetId && !!batchRunId,
-      refetchInterval: 1000,
-    }
-  );
-
-  const sortedScenarioSetData = useMemo(() => {
-    return [...(scenarioSetData ?? [])].sort((a, b) => {
-      return a.timestamp - b.timestamp;
-    });
-  }, [scenarioSetData]);
-
-  const scenarioRunIds = useMemo(
-    () => sortedScenarioSetData?.map((scenario) => scenario.scenarioRunId),
-    [sortedScenarioSetData]
-  );
-
-  useEffect(() => {
-    if (!scenarioSetId) return;
-    if (!batchRunId) {
-      const length = sortedScenarioSetData?.length ?? 0;
-      const batchRunId = sortedScenarioSetData?.[length - 1]?.batchRunId;
-      if (!batchRunId) return;
-      goToSimulationBatchRuns(scenarioSetId, batchRunId, { replace: true });
-    }
-  }, [scenarioSetData, scenarioSetId, batchRunId, goToSimulationBatchRuns]);
+  /**
+   * Fetch all run states in a single batch query.
+   * Returns a map of scenarioRunId -> complete run state data.
+   * Adaptive polling: faster when many active, slower when few remaining, stops when all complete.
+   *
+   * Message transformation is handled per-card for optimal granular memoization.
+   */
+  const { data: runStatesMap } = useBatchRunStates({
+    scenarioSetId,
+    batchRunId,
+  });
 
   return (
     <SimulationLayout>
@@ -63,8 +46,8 @@ export default function SimulationSetPage() {
             <Box mb={4}>
               <SimulationZoomGrid.Controls />
             </Box>
-            {scenarioRunIds && scenarioRunIds.length > 0 && (
-              <SimulationZoomGrid.Grid scenarioRunIds={scenarioRunIds} />
+            {runStatesMap && Object.keys(runStatesMap).length > 0 && (
+              <SimulationZoomGrid.Grid runStatesMap={runStatesMap} />
             )}
           </Box>
         </SimulationZoomGrid.Root>

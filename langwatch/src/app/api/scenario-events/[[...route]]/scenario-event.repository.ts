@@ -471,7 +471,7 @@ export class ScenarioEventRepository {
           : String(keyA) > String(keyB)
           ? 1
           : 0;
-      }
+      },
     );
 
     // Determine if there are more results
@@ -496,7 +496,7 @@ export class ScenarioEventRepository {
         ) {
           // Encode cursor as base64 for stability and compactness
           nextCursor = Buffer.from(JSON.stringify(searchAfterValues)).toString(
-            "base64"
+            "base64",
           );
         }
       }
@@ -613,6 +613,65 @@ export class ScenarioEventRepository {
   }
 
   /**
+   * Retrieves lightweight scenario run IDs for a specific batch run (OPTIMIZED).
+   *
+   * Returns only scenario run IDs without loading full document data from Elasticsearch.
+   * This significantly reduces payload size (~95% smaller) and is ideal for:
+   * - Frequent polling (1s intervals)
+   * - Rendering lists/grids where components fetch their own details
+   *
+   * Performance: Only fetches scenario_run_id field instead of entire documents
+   * with messages, results, status, etc. Results are pre-sorted by timestamp.
+   *
+   * @param projectId - The project identifier
+   * @param scenarioSetId - The scenario set identifier
+   * @param batchRunId - The specific batch run ID to search for
+   * @returns Array of scenario run IDs, pre-sorted by timestamp ascending (oldest first)
+   * @throws {z.ZodError} If validation fails for projectId, scenarioSetId, or batchRunId
+   */
+  async getScenarioRunIdsWithTimestampsForBatchRun({
+    projectId,
+    scenarioSetId,
+    batchRunId,
+  }: {
+    projectId: string;
+    scenarioSetId: string;
+    batchRunId: string;
+  }): Promise<string[]> {
+    const validatedProjectId = projectIdSchema.parse(projectId);
+    const validatedScenarioSetId = scenarioIdSchema.parse(scenarioSetId);
+    const validatedBatchRunId = batchRunIdSchema.parse(batchRunId);
+    const client = await this.getClient();
+
+    const response = await client.search({
+      index: SCENARIO_EVENTS_INDEX.alias,
+      body: {
+        query: {
+          bool: {
+            filter: [
+              { term: { [ES_FIELDS.projectId]: validatedProjectId } },
+              { term: { [ES_FIELDS.scenarioSetId]: validatedScenarioSetId } },
+              { term: { [ES_FIELDS.batchRunId]: validatedBatchRunId } },
+            ],
+          },
+        },
+        // Only fetch the scenario_run_id field
+        _source: [ES_FIELDS.scenarioRunId],
+        size: 10000, // Large size to get all scenario runs for this batch
+        sort: [{ timestamp: { order: "asc" } }], // Sort by timestamp for consistent ordering
+      },
+    });
+
+    const hits = response.hits?.hits ?? [];
+    return hits
+      .map((hit) => {
+        const source = hit._source as Record<string, any>;
+        return source?.scenario_run_id as string;
+      })
+      .filter(Boolean);
+  }
+
+  /**
    * Retrieves all scenario run IDs associated with a list of batch runs.
    * Used to find all scenario runs that were part of specific batch executions.
    *
@@ -634,7 +693,7 @@ export class ScenarioEventRepository {
 
     // Validate that all batchRunIds are valid strings
     const validBatchRunIds = batchRunIds.filter(
-      (id) => typeof id === "string" && id.length > 0
+      (id) => typeof id === "string" && id.length > 0,
     );
     if (validBatchRunIds.length !== batchRunIds.length) {
       Sentry.captureException({
@@ -751,7 +810,7 @@ export class ScenarioEventRepository {
 
     const validatedProjectId = projectIdSchema.parse(projectId);
     const validatedScenarioRunIds = Array.from(
-      new Set(scenarioRunIds.map((id) => scenarioRunIdSchema.parse(id)))
+      new Set(scenarioRunIds.map((id) => scenarioRunIdSchema.parse(id))),
     );
 
     const client = await this.getClient();
@@ -799,7 +858,7 @@ export class ScenarioEventRepository {
         const rawResult = hit._source as Record<string, unknown>;
         if (rawResult) {
           const event = transformFromElasticsearch(
-            rawResult
+            rawResult,
           ) as ScenarioRunStartedEvent;
           const scenarioRunId = event.scenarioRunId;
           results.set(scenarioRunId, event);
@@ -831,7 +890,7 @@ export class ScenarioEventRepository {
 
     const validatedProjectId = projectIdSchema.parse(projectId);
     const validatedScenarioRunIds = Array.from(
-      new Set(scenarioRunIds.map((id) => scenarioRunIdSchema.parse(id)))
+      new Set(scenarioRunIds.map((id) => scenarioRunIdSchema.parse(id))),
     );
 
     const client = await this.getClient();
@@ -879,7 +938,7 @@ export class ScenarioEventRepository {
         const rawResult = hit._source as Record<string, unknown>;
         if (rawResult) {
           const event = transformFromElasticsearch(
-            rawResult
+            rawResult,
           ) as ScenarioMessageSnapshotEvent;
           const scenarioRunId = event.scenarioRunId;
           results.set(scenarioRunId, event);
@@ -911,7 +970,7 @@ export class ScenarioEventRepository {
 
     const validatedProjectId = projectIdSchema.parse(projectId);
     const validatedScenarioRunIds = Array.from(
-      new Set(scenarioRunIds.map((id) => scenarioRunIdSchema.parse(id)))
+      new Set(scenarioRunIds.map((id) => scenarioRunIdSchema.parse(id))),
     );
 
     const client = await this.getClient();
@@ -959,7 +1018,7 @@ export class ScenarioEventRepository {
         const rawResult = hit._source as Record<string, unknown>;
         if (rawResult) {
           const event = transformFromElasticsearch(
-            rawResult
+            rawResult,
           ) as ScenarioRunFinishedEvent;
           const scenarioRunId = event.scenarioRunId;
           results.set(scenarioRunId, event);

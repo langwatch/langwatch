@@ -252,7 +252,7 @@ export class ScenarioEventService {
     if (truncated) {
       throw new Error(
         `Too many runs to fetch exhaustively (cap ${maxPages * pageLimit}). ` +
-          "Refine filters or use the paginated API."
+          "Refine filters or use the paginated API.",
       );
     }
 
@@ -297,6 +297,38 @@ export class ScenarioEventService {
     });
 
     return runs;
+  }
+
+  /**
+   * Retrieves lightweight scenario run IDs for a specific batch run (OPTIMIZED).
+   *
+   * Returns only scenario run IDs without fetching full run data (messages, results, status).
+   * This is ~95% smaller payload than getRunDataForBatchRun, ideal for polling and list rendering
+   * where individual components fetch their own details.
+   *
+   * @param {Object} params - The parameters for retrieving scenario run IDs
+   * @param {string} params.projectId - The ID of the project
+   * @param {string} params.scenarioSetId - The ID of the scenario set
+   * @param {string} params.batchRunId - The ID of the specific batch run
+   * @returns {Promise<string[]>} Array of scenario run IDs, pre-sorted by timestamp
+   */
+  async getScenarioRunIdsForBatchRun({
+    projectId,
+    scenarioSetId,
+    batchRunId,
+  }: {
+    projectId: string;
+    scenarioSetId: string;
+    batchRunId: string;
+  }) {
+    const runIds =
+      await this.eventRepository.getScenarioRunIdsWithTimestampsForBatchRun({
+        projectId,
+        scenarioSetId,
+        batchRunId,
+      });
+
+    return runIds;
   }
 
   /**
@@ -398,7 +430,7 @@ export class ScenarioEventService {
           runStartedEvent?.timestamp && runFinishedEvent?.timestamp
             ? Math.max(
                 0,
-                runFinishedEvent.timestamp - runStartedEvent.timestamp
+                runFinishedEvent.timestamp - runStartedEvent.timestamp,
               )
             : 0,
       });
