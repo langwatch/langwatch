@@ -18,7 +18,7 @@ from langchain_community.document_loaders import WebBaseLoader
 from langchain_community.vectorstores.faiss import FAISS
 from langchain_openai import ChatOpenAI, OpenAIEmbeddings
 from langchain_text_splitters import RecursiveCharacterTextSplitter
-from langchain.tools.retriever import create_retriever_tool
+from langchain_core.tools import create_retriever_tool
 from langchain.tools import BaseTool, StructuredTool, tool
 from langchain_google_vertexai import ChatVertexAI, VertexAI
 
