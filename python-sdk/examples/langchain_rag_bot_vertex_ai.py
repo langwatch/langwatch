@@ -19,7 +19,6 @@ from langchain_community.vectorstores.faiss import FAISS
 from langchain_openai import ChatOpenAI, OpenAIEmbeddings
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_core.tools import create_retriever_tool
-from langchain.tools import BaseTool, StructuredTool, tool
 from langchain_google_vertexai import ChatVertexAI, VertexAI
 
 loader = WebBaseLoader("https://docs.langwatch.ai")
@@ -66,7 +65,7 @@ async def on_chat_start():
         location=os.environ["VERTEXAI_LOCATION"],
         streaming=True,
     )
-    
+
     agent = create_agent(
         model=model,
         tools=tools,

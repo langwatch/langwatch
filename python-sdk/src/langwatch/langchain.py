@@ -47,7 +47,7 @@ from langwatch.domain import (
 )
 
 from uuid import UUID
-from langchain.tools import BaseTool
+from langchain_core.tools import BaseTool
 import logging
 
 

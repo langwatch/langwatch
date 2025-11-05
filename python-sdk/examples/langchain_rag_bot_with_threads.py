@@ -26,7 +26,6 @@ from langchain_community.vectorstores.faiss import FAISS
 from langchain_openai import ChatOpenAI, OpenAIEmbeddings
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_core.tools import create_retriever_tool
-from langchain.tools import BaseTool, StructuredTool, tool
 import chainlit as cl
 import chainlit.data as cl_data
 from chainlit.data.utils import queue_until_user_message
