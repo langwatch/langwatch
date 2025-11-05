@@ -7,7 +7,7 @@
  */
 export function easyCatch(error: unknown, name?: string): void {
   if (name) {
-    console.error(`[${name}]}`, error);
+    console.error(`[${name}]`, error);
   } else {
     console.error(error);
   }
