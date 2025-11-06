@@ -54,7 +54,6 @@ export const OnboardingMeshBackground: React.FC<{ opacity?: number; blurPx?: num
     overflow="hidden"
     zIndex={0}
     opacity={opacity}
-    isolation="isolate"
     filter={`blur(${blurPx}px)`}
     style={{
       contain: "layout paint",
@@ -70,6 +69,7 @@ export const OnboardingMeshBackground: React.FC<{ opacity?: number; blurPx?: num
           ...style,
           mixBlendMode: "screen",
           willChange: "transform",
+          transform: "translateZ(0)",
         }}
         initial={{ scale: 1 }}
         animate={{
