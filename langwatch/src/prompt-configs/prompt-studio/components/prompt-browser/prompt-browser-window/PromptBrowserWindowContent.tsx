@@ -13,6 +13,7 @@ import type { PromptConfigFormValues } from "~/prompt-configs/types";
 import debounce from "lodash/debounce";
 import { cloneDeep } from "lodash";
 import { useTabId } from "../ui/TabContext";
+import { formSchema } from "~/prompt-configs/schemas/form-schema";
 
 export { useTabId } from "../ui/TabContext";
 

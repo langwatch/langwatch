@@ -1,6 +1,6 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import isEqual from "lodash-es/isEqual";
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import { useForm, type DeepPartial } from "react-hook-form";
 
 import { formSchema, type PromptConfigFormValues } from "~/prompt-configs";
@@ -22,12 +22,21 @@ export const usePromptConfigForm = ({
   onChange,
   initialConfigValues = {},
 }: UsePromptConfigFormProps) => {
+  /**
+   * Parse initial values once with schema defaults applied.
+   * Memoized to avoid re-parsing on every render.
+   */
+  const parsedInitialValues = useMemo(
+    () => formSchema.parse(initialConfigValues),
+    [initialConfigValues],
+  );
+
   const methods = useForm<PromptConfigFormValues>({
     /**
-     * Don't pass undefined as defaultValue
+     * Use parsed values with defaults applied
      * @see https://react-hook-form.com/docs/useform#defaultValues
      */
-    defaultValues: initialConfigValues,
+    defaultValues: parsedInitialValues,
     resolver: (data, ...args) => {
       return zodResolver(formSchema)(data, ...args);
     },
@@ -81,8 +90,9 @@ export const usePromptConfigForm = ({
   useEffect(() => {
     if (disableNodeSync) return;
     disableOnChange = true;
+    // Use parsed values to ensure defaults are applied
     for (const [key, value] of Object.entries(
-      initialConfigValues?.version?.configData ?? {},
+      parsedInitialValues?.version?.configData ?? {},
     )) {
       const currentValue = methods.getValues(
         `version.configData.${key}` as any,
@@ -94,7 +104,7 @@ export const usePromptConfigForm = ({
     setTimeout(() => {
       disableOnChange = false;
     }, 1);
-  }, [initialConfigValues, methods]);
+  }, [parsedInitialValues, methods]);
 
   // Provides reverse sync of form values to the parent component
   useEffect(() => {

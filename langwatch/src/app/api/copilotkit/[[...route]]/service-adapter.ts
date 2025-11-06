@@ -166,7 +166,7 @@ export class PromptStudioAdapter implements CopilotServiceAdapter {
         }
         eventStream$.sendTextMessageContent({
           messageId,
-          content: `❌ ${message}`,
+          content: `❌ ${message.replace(/`/g, "'")}`, // Otherwise we'll get code blocks in the message
         });
         finishIfNeeded();
       };

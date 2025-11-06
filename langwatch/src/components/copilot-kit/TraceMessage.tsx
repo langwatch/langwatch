@@ -7,7 +7,7 @@ import {
   Text,
 } from "@chakra-ui/react";
 import { useDrawer } from "../CurrentDrawer";
-import { LuListTree, LuTriangleAlert } from "react-icons/lu";
+import { LuListTree } from "react-icons/lu";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
 import { api } from "../../utils/api";
 
