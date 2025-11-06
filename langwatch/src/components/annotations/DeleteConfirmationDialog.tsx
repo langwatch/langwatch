@@ -29,7 +29,6 @@ export function DeleteConfirmationDialog({
       placement="center"
       initialFocusEl={() => inputRef.current}
     >
-      <Dialog.Backdrop />
       <Dialog.Content>
         <Dialog.CloseTrigger />
         <Dialog.Header>
