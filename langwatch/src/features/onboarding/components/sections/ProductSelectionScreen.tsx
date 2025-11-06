@@ -3,12 +3,17 @@ import { Telescope, Gavel, GraduationCap, HatGlasses } from "lucide-react";
 import { type ProductSelection } from "../../types/types";
 import React from "react";
 
-interface ProductOption {
+type ProductOption = {
   key: ProductSelection;
   title: string;
   description: string;
   icon: typeof Telescope;
-  url?: string;
+} | {
+  key: "agent-simulations";
+  title: string;
+  description: string;
+  icon: typeof HatGlasses;
+  url: string;
 }
 
 const productOptions: ProductOption[] = [
@@ -23,14 +28,12 @@ const productOptions: ProductOption[] = [
     title: "Evaluations",
     description: "Create and run evaluations to measure quality.",
     icon: Gavel,
-    url: "/@project/evaluations",
   },
   {
     key: "prompt-management",
     title: "Prompt Management",
     description: "Organize, version, iterate, and optimize your prompts.",
     icon: GraduationCap,
-    url: "/@project/prompts",
   },
   {
     key: "agent-simulations",
@@ -74,13 +77,14 @@ export const ProductSelectionScreen: React.FC<ProductSelectionScreenProps> = ({
                 cursor="pointer"
                 transition="all 0.2s"
                 position="relative"
+                willChange="transform, background-color"
                 _hover={{
-                  bg: "bg.subtle/70",
-                  transform: "translateY(-2px)",
-                  borderColor: "border.subtle/70",
+                  transform: "translateY(-4px)",
                 }}
+                role="button"
+                tabIndex={0}
                 onClick={() => {
-                  if (opt.url) {
+                  if (opt.key === "agent-simulations") {
                     window.location.href = opt.url;
                     return;
                   }

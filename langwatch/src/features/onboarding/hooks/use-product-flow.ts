@@ -18,7 +18,6 @@ export function useProductFlow() {
       "observability",
       "evaluations",
       "prompt-management",
-      "agent-simulations",
     ];
 
     let inferred: ProductSelection | undefined = undefined;
@@ -49,7 +48,6 @@ export function useProductFlow() {
       [ProductScreenIndex.OBSERVABILITY, "observability"],
       [ProductScreenIndex.EVALUATIONS, "evaluations"],
       [ProductScreenIndex.PROMPT_MANAGEMENT, "prompt-management"],
-      [ProductScreenIndex.AGENT_SIMULATIONS, "agent-simulations"],
     ]);
 
     const idToIndex = new Map<string, ProductScreenIndex>();
@@ -67,7 +65,6 @@ export function useProductFlow() {
         observability: ProductScreenIndex.OBSERVABILITY,
         evaluations: ProductScreenIndex.EVALUATIONS,
         "prompt-management": ProductScreenIndex.PROMPT_MANAGEMENT,
-        "agent-simulations": ProductScreenIndex.AGENT_SIMULATIONS,
       };
 
       const productScreen = productScreenMap[selectedProduct];
@@ -105,7 +102,6 @@ export function useProductFlow() {
       observability: ProductScreenIndex.OBSERVABILITY,
       evaluations: ProductScreenIndex.EVALUATIONS,
       "prompt-management": ProductScreenIndex.PROMPT_MANAGEMENT,
-      "agent-simulations": ProductScreenIndex.AGENT_SIMULATIONS,
     };
     setCurrentScreenIndex(productScreenMap[selectedProduct]);
   }, [selectedProduct, router.query.step, direction, setCurrentScreenIndex]);
@@ -132,7 +128,6 @@ export function useProductFlow() {
       observability: ProductScreenIndex.OBSERVABILITY,
       evaluations: ProductScreenIndex.EVALUATIONS,
       "prompt-management": ProductScreenIndex.PROMPT_MANAGEMENT,
-      "agent-simulations": ProductScreenIndex.AGENT_SIMULATIONS,
     };
 
     setCurrentScreenIndex(productScreenMap[product]);

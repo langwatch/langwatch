@@ -1,5 +1,5 @@
 ---
-description: 
+description:
 globs: *.tsx
 alwaysApply: false
 ---
@@ -8,3 +8,7 @@ Typescript Development Guidelines:
 1. Documentation
    - Add TSDoc style documentation when write functions and components.
    - Always include "Single Responsibility" in the description
+
+2. Imports
+   - Always use named imports for React components and hooks.
+   - Never use non-destructured imports, such as `React.useMemo` or `React.useCallback`.
