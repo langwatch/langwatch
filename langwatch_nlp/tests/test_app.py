@@ -14,18 +14,11 @@ client = TestClient(app)
 )
 def test_sentiment_analysis():
     text = "no, this is not what I wanted"
-    embedding = get_embedding(
-        text,
-        embeddings_litellm_params={
-            "api_key": os.environ["OPENAI_API_KEY"],
-            "model": "text-embedding-3-small",
-        },
-    )
 
     response = client.post(
         "/sentiment",
         json={
-            "vector": embedding,
+            "text": text,
             "embeddings_litellm_params": {
                 "api_key": os.environ["OPENAI_API_KEY"],
                 "model": "text-embedding-3-small",
