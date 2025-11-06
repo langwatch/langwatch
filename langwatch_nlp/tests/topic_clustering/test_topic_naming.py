@@ -13,6 +13,10 @@ load_dotenv()
 
 class TopicClusteringTopicNamingTestCase(unittest.IsolatedAsyncioTestCase):
     @pytest.mark.integration
+    @pytest.mark.skipif(
+        not os.getenv("AZURE_OPENAI_ENDPOINT"),
+        reason="AZURE_OPENAI_ENDPOINT environment variable not set"
+    )
     async def test_it_generates_topic_names(self):
         topic_names, _cost = generate_topic_names(
             {
@@ -51,6 +55,10 @@ class TopicClusteringTopicNamingTestCase(unittest.IsolatedAsyncioTestCase):
         assert type(topic_names[1]) == str
 
     @pytest.mark.integration
+    @pytest.mark.skipif(
+        not os.getenv("AZURE_OPENAI_ENDPOINT"),
+        reason="AZURE_OPENAI_ENDPOINT environment variable not set"
+    )
     async def test_it_avoid_already_existing_topic_names(self):
         topic_names = generate_topic_names(
             {
