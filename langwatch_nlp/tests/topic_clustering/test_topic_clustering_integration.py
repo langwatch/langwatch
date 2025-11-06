@@ -15,10 +15,13 @@ import langwatch_nlp.topic_clustering.incremental_clustering as incremental_clus
 from langwatch_nlp.topic_clustering.types import TopicClusteringResponse, Trace
 
 
-app = FastAPI()
-client = TestClient(app)
-batch_clustering.setup_endpoints(app)
-incremental_clustering.setup_endpoints(app)
+@pytest.fixture(scope="module")
+def client():
+    app = FastAPI()
+    batch_clustering.setup_endpoints(app)
+    incremental_clustering.setup_endpoints(app)
+    return TestClient(app)
+
 
 CSV_DATA_PATH = Path("notebooks/data/traces_for_topics_KAXYxPR8MUgTcP8CF193y.csv")
 
@@ -31,7 +34,7 @@ class TestTopicClusteringIntegration:
         reason="Test data CSV file not available (notebooks/data/traces_for_topics_KAXYxPR8MUgTcP8CF193y.csv)"
     )
     # NOTE: disable httpx_mock to see it working fully integrated
-    async def test_it_does_batch_clustering(self):
+    async def test_it_does_batch_clustering(self, client):
         # Look at the jupyter notebook to see how to download this data
         df = pd.read_csv(CSV_DATA_PATH)
         df["embeddings"] = df["embeddings"].apply(

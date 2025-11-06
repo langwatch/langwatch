@@ -16,16 +16,18 @@ from langwatch_nlp.topic_clustering.types import TopicClusteringResponse, Trace
 from pytest_httpx import HTTPXMock
 
 
-app = FastAPI()
-client = TestClient(app)
-batch_clustering.setup_endpoints(app)
-incremental_clustering.setup_endpoints(app)
+@pytest.fixture(scope="module")
+def client():
+    app = FastAPI()
+    batch_clustering.setup_endpoints(app)
+    incremental_clustering.setup_endpoints(app)
+    return TestClient(app)
 
 
 @pytest.mark.integration
 class TestTopicClusteringIntegration:
     @pytest.mark.asyncio
-    async def test_it_does_batch_clustering(self, httpx_mock: HTTPXMock):
+    async def test_it_does_batch_clustering(self, client, httpx_mock: HTTPXMock):
         # Look at the jupyter notebook to see how to download this data
         df = pd.read_csv(f"notebooks/data/traces_for_topics_KAXYxPR8MUgTcP8CF193y.csv")
         df["embeddings"] = df["embeddings"].apply(
@@ -120,7 +122,7 @@ class TestTopicClusteringIntegration:
     @pytest.mark.asyncio
     @pytest.mark.skip  # uncomment to run this test, it intentionally throws errors multiple times before succeeding to test retry and error handling
     async def test_it_works_even_if_azure_throws_error_for_certain_requests(
-        self, httpx_mock: HTTPXMock
+        self, client, httpx_mock: HTTPXMock
     ):
         # Look at the jupyter notebook to see how to download this data
         df = pd.read_csv(f"notebooks/data/traces_for_topics_KAXYxPR8MUgTcP8CF193y.csv")
