@@ -1,17 +1,21 @@
 import os
 import pytest
 from fastapi.testclient import TestClient
-from langwatch_nlp.main import app
 
-client = TestClient(app)
-
-
-@pytest.mark.integration
-@pytest.mark.skipif(
+# Only import and create client if we have API keys (to avoid dummy key issues during collection)
+pytestmark = pytest.mark.skipif(
     not os.getenv("OPENAI_API_KEY"),
     reason="OPENAI_API_KEY environment variable not set"
 )
-def test_sentiment_analysis():
+
+@pytest.fixture(scope="module")
+def client():
+    from langwatch_nlp.main import app
+    return TestClient(app)
+
+
+@pytest.mark.integration
+def test_sentiment_analysis(client):
     text = "no, this is not what I wanted"
 
     response = client.post(
