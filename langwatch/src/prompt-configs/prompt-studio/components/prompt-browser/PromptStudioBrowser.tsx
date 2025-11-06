@@ -7,10 +7,10 @@ import { LuColumns2 } from "react-icons/lu";
 import { TabIdProvider } from "./ui/TabContext";
 
 /**
- * Tabbed workspace for the prompt studio with draggable tabs and split-pane support.
- * Single Responsibility: Manages the draggable tab interface for editing multiple prompts simultaneously.
+ * Tabbed browser for the prompt studio with draggable tabs and split-pane support.
+ * Single Responsibility: Manages the browser-like tab interface for editing multiple prompts simultaneously.
  */
-export function PromptStudioTabbedWorkspace() {
+export function PromptStudioBrowser() {
   const {
     windows,
     splitTab,
@@ -67,12 +67,13 @@ export function PromptStudioTabbedWorkspace() {
           <DraggableTabsBrowser.TabBar
             tabIds={tabbedWindow.tabs.map((tab) => tab.id)}
           >
-            <HStack gap={0} overflowX="auto">
+            <HStack gap={0} overflow="hidden" height="full">
               {tabbedWindow.tabs.map((tab) => (
                 <TabIdProvider key={tab.id} tabId={tab.id}>
                   <DraggableTabsBrowser.Tab
                     id={tab.id}
                     borderRight="1px solid var(--chakra-colors-gray-350)"
+                    height="full"
                   >
                     <DraggableTabsBrowser.Trigger value={tab.id}>
                       <PromptBrowserTab

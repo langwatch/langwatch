@@ -1,5 +1,5 @@
 import { HStack } from "@chakra-ui/react";
-import { PromptStudioTabbedWorkspace } from "./prompt-browser/PromptStudioTabbedWorkspace";
+import { PromptStudioBrowser } from "./prompt-browser/PromptStudioBrowser";
 import { useDraggableTabsBrowserStore } from "../prompt-studio-store/DraggableTabsBrowserStore";
 import { MainContentEmptyState } from "./sidebar/ui/MainContentEmptyState";
 import { useLoadSpanIntoPromptStudio } from "../hooks/useLoadSpanIntoPromptStudio";
@@ -25,7 +25,7 @@ export function PromptStudioMainContent() {
 
   return (
     <HStack width="full" height="full" gap={0} overflowX="scroll" bg="white">
-      <PromptStudioTabbedWorkspace />
+      <PromptStudioBrowser />
     </HStack>
   );
 }

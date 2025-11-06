@@ -72,10 +72,8 @@ function BrowserLikeTabsBar({ children }: BrowserLikeTabsBarProps) {
  */
 function BrowserLikeTabsList({ children }: { children: React.ReactNode }) {
   return (
-    <Tabs.List width="full">
-      <HStack gap={0} overflowX="auto" width="full">
-        {children}
-      </HStack>
+    <Tabs.List width="full" gap={0} height="full">
+      {children}
     </Tabs.List>
   );
 }
