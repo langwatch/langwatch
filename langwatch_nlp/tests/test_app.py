@@ -2,7 +2,6 @@ import os
 import pytest
 from fastapi.testclient import TestClient
 from langwatch_nlp.main import app
-from langwatch_nlp.sentiment_analysis import get_embedding
 
 client = TestClient(app)
 
