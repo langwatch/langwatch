@@ -7,10 +7,8 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 import pandas as pd
 import pytest
-from dotenv import load_dotenv
 from pathlib import Path
 
-load_dotenv()
 import langwatch_nlp.topic_clustering.batch_clustering as batch_clustering
 import langwatch_nlp.topic_clustering.incremental_clustering as incremental_clustering
 

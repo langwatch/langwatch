@@ -8,9 +8,7 @@ from fastapi.testclient import TestClient
 import httpx
 import pandas as pd
 import pytest
-from dotenv import load_dotenv
 
-load_dotenv()
 import langwatch_nlp.topic_clustering.batch_clustering as batch_clustering
 import langwatch_nlp.topic_clustering.incremental_clustering as incremental_clustering
 
@@ -24,6 +22,7 @@ batch_clustering.setup_endpoints(app)
 incremental_clustering.setup_endpoints(app)
 
 
+@pytest.mark.integration
 class TestTopicClusteringIntegration:
     @pytest.mark.asyncio
     async def test_it_does_batch_clustering(self, httpx_mock: HTTPXMock):
@@ -81,7 +80,7 @@ class TestTopicClusteringIntegration:
                 "litellm_params": {},
                 "embeddings_litellm_params": {
                     "model": "openai/text-embedding-3-small",
-                    "api_key": os.environ["OPENAI_API_KEY"],
+                    "api_key": os.getenv("OPENAI_API_KEY", "dummy-key-for-mocked-tests"),
                 },
                 "traces": traces,
             },
@@ -102,7 +101,7 @@ class TestTopicClusteringIntegration:
                 "litellm_params": {},
                 "embeddings_litellm_params": {
                     "model": "openai/text-embedding-3-small",
-                    "api_key": os.environ["OPENAI_API_KEY"],
+                    "api_key": os.getenv("OPENAI_API_KEY", "dummy-key-for-mocked-tests"),
                 },
                 "topics": result["topics"],
                 "subtopics": result["subtopics"],
@@ -185,7 +184,7 @@ class TestTopicClusteringIntegration:
                 "litellm_params": {},
                 "embeddings_litellm_params": {
                     "model": "openai/text-embedding-3-small",
-                    "api_key": os.environ["OPENAI_API_KEY"],
+                    "api_key": os.getenv("OPENAI_API_KEY", "dummy-key-for-mocked-tests"),
                 },
                 "traces": traces,
             },
