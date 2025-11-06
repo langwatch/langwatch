@@ -30,17 +30,27 @@ type PromptStudioAdapterParams = {
   projectId: string;
 };
 
+/**
+ * Adapter for executing prompt configurations through CopilotKit runtime.
+ * Converts prompt form values and variables into workflow execution events,
+ * streams LLM responses, and handles errors during execution.
+ */
 export class PromptStudioAdapter implements CopilotServiceAdapter {
   private projectId: string;
 
+  /**
+   * Creates a new PromptStudioAdapter instance.
+   * @param params - Configuration parameters including projectId
+   */
   constructor(params: PromptStudioAdapterParams) {
     this.projectId = params.projectId;
   }
 
   /**
-   * Process with direct call
-   * @param request
-   * @returns
+   * Processes a chat completion request by executing a prompt workflow and streaming the response.
+   * Prepares workflow from form values, executes component, and streams incremental output deltas.
+   * @param request - CopilotKit runtime chat completion request containing messages and parameters
+   * @returns Promise resolving to chat completion response with threadId
    */
   async process(
     request: CopilotRuntimeChatCompletionRequest,
@@ -136,7 +146,7 @@ export class PromptStudioAdapter implements CopilotServiceAdapter {
       let lastOutput = "";
 
       /**
-       * Ends the message stream if it was started and not already ended
+       * Ends the message stream if it was started and not already ended.
        */
       const finishIfNeeded = () => {
         if (started && !ended) {
@@ -146,7 +156,7 @@ export class PromptStudioAdapter implements CopilotServiceAdapter {
       };
 
       /**
-       * Sends an error message to the client and finishes the stream
+       * Sends an error message to the client and finishes the stream.
        * @param message - Error message to display (without ❌ prefix)
        */
       const sendError = (message: string) => {
@@ -231,6 +241,12 @@ export class PromptStudioAdapter implements CopilotServiceAdapter {
     return { threadId };
   }
 
+  /**
+   * Creates a workflow definition from prompt configuration and message history.
+   * Builds a single-node workflow with LLM signature component for execution.
+   * @param params - Workflow configuration including IDs, form values, and messages
+   * @returns Complete workflow object ready for execution
+   */
   private createWorkflow(params: {
     workflowId: string;
     nodeId: string;
@@ -271,6 +287,12 @@ export class PromptStudioAdapter implements CopilotServiceAdapter {
     };
   }
 
+  /**
+   * Builds node data configuration for LLM prompt component from form values.
+   * Converts form configuration into component parameters including LLM settings, instructions, and messages.
+   * @param params - Form values and message history to convert
+   * @returns LLM prompt component configuration without configId
+   */
   private buildNodeData(params: {
     formValues: PromptConfigFormValues;
     messagesHistory: ChatMessage[];
