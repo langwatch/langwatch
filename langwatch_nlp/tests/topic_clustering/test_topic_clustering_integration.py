@@ -8,6 +8,7 @@ from fastapi.testclient import TestClient
 import pandas as pd
 import pytest
 from dotenv import load_dotenv
+from pathlib import Path
 
 load_dotenv()
 import langwatch_nlp.topic_clustering.batch_clustering as batch_clustering
@@ -21,14 +22,20 @@ client = TestClient(app)
 batch_clustering.setup_endpoints(app)
 incremental_clustering.setup_endpoints(app)
 
+CSV_DATA_PATH = Path("notebooks/data/traces_for_topics_KAXYxPR8MUgTcP8CF193y.csv")
+
 
 class TestTopicClusteringIntegration:
     @pytest.mark.integration
     @pytest.mark.asyncio
+    @pytest.mark.skipif(
+        not CSV_DATA_PATH.exists(),
+        reason="Test data CSV file not available (notebooks/data/traces_for_topics_KAXYxPR8MUgTcP8CF193y.csv)"
+    )
     # NOTE: disable httpx_mock to see it working fully integrated
     async def test_it_does_batch_clustering(self):
         # Look at the jupyter notebook to see how to download this data
-        df = pd.read_csv(f"notebooks/data/traces_for_topics_KAXYxPR8MUgTcP8CF193y.csv")
+        df = pd.read_csv(CSV_DATA_PATH)
         df["embeddings"] = df["embeddings"].apply(
             lambda x: list(map(float, x[1:-1].split(", ")))
         )
