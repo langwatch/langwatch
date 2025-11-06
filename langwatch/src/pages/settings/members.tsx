@@ -322,8 +322,20 @@ function MembersList({
             Organization Members
           </Heading>
           <Spacer />
-          {!activePlan.overrideAddingLimitations &&
+          {activePlan.overrideAddingLimitations &&
           organization.members.length >= activePlan.maxMembers ? (
+            <Button
+              size="sm"
+              colorPalette="orange"
+              onClick={() => onAddMembersOpen()}
+            >
+              <HStack gap={2}>
+                <Plus size={20} />
+                <Text>(Admin Override) Add members</Text>
+              </HStack>
+            </Button>
+          ) : null}
+          {organization.members.length >= activePlan.maxMembers ? (
             <Tooltip
               content="Upgrade your plan to add more members"
               positioning={{ placement: "top" }}

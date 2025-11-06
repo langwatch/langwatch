@@ -5,7 +5,7 @@ import { motion } from "motion/react";
 const MotionBox = motion(Box);
 
 const blobTransitions = {
-  duration: 20,
+  duration: 14,
   repeat: Infinity,
   repeatType: "mirror" as const,
   ease: "easeInOut" as const,
@@ -69,6 +69,7 @@ export const OnboardingMeshBackground: React.FC<{ opacity?: number; blurPx?: num
           ...style,
           mixBlendMode: "screen",
           willChange: "transform",
+          transform: "translateZ(0)",
         }}
         initial={{ scale: 1 }}
         animate={{

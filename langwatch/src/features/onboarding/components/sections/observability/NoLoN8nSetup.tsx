@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useMemo } from "react";
 import {
   Card,
   VStack,
@@ -13,10 +13,10 @@ import type { HighlighterGeneric } from "shiki";
 import { useColorMode } from "../../../../../components/ui/color-mode";
 import bashSnippet from "../../../regions/observability/codegen/snippets/noandlo/n8n.snippet.sh";
 
-export function NoLoN8nSetup(): React.ReactElement {
+export const NoLoN8nSetup: React.FC = () => {
   const { colorMode } = useColorMode();
 
-  const shikiAdapter = React.useMemo(() => {
+  const shikiAdapter = useMemo(() => {
     return createShikiAdapter<HighlighterGeneric<any, any>>({
       async load() {
         const { createHighlighter } = await import("shiki");

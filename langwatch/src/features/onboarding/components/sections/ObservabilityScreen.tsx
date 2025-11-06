@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from "react";
 import { VStack, Grid, Box, Button, HStack, Text } from "@chakra-ui/react";
 import { WaitingForTracesChip } from "./observability/WaitingForTracesChip";
-import type { FrameworkKey, PlatformKey } from "../../regions/observability/model";
+import type { FrameworkKey, PlatformKey } from "../../regions/observability/types";
 import { ApiIntegrationInfoCard } from "./observability/ApiIntegrationInfoCard";
 import { FrameworkGrid } from "./observability/FrameworkGrid";
 import { PlatformGrid } from "./observability/PlatformGrid";

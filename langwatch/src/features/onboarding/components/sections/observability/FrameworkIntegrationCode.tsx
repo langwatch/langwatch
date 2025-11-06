@@ -1,5 +1,5 @@
 import React, { useMemo } from "react";
-import type { FrameworkKey, PlatformKey } from "../../../regions/observability/model";
+import type { FrameworkKey, PlatformKey } from "../../../regions/observability/types";
 import { useCodegen } from "../../../regions/observability/codegen";
 import { getRegistryEntry } from "../../../regions/observability/codegen/registry";
 import { CodePreview } from "./CodePreview";

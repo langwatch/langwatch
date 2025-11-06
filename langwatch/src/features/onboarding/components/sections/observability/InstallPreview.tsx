@@ -63,7 +63,7 @@ export function InstallPreview({
               language="bash"
               size="sm"
               transition="all 0.3s ease"
-              bg="bg.subtle/30"
+              bg="bg.subtle/20"
               meta={{ colorScheme: colorMode }}
             >
               <CodeBlock.Header borderBottomWidth="1px">

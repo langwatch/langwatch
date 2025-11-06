@@ -3,6 +3,7 @@ import { VStack, Text, Separator } from "@chakra-ui/react";
 import { CodePreview } from "./CodePreview";
 import { useActiveProject } from "../../../contexts/ActiveProjectContext";
 import { usePublicEnv } from "~/hooks/usePublicEnv";
+import { parseSnippet } from "~/features/onboarding/regions/observability/codegen/snippets";
 
 export function OpenTelemetrySetup(): React.ReactElement {
   const { project } = useActiveProject();
@@ -20,12 +21,10 @@ export function OpenTelemetrySetup(): React.ReactElement {
 export OTEL_EXPORTER_OTLP_ENDPOINT="${effectiveEndpoint}/api/public/otel"
 export OTEL_EXPORTER_OTLP_HEADERS="Authorization=bearer ${effectiveApiKey}"
 
-# Or for trace-specific endpoint:
-# export OTEL_EXPORTER_OTLP_TRACES_ENDPOINT="${effectiveEndpoint}/api/public/otel/v1/traces"
-# export OTEL_EXPORTER_OTLP_HEADERS="Authorization=bearer ${effectiveApiKey}"`;
+# Or for the trace-specific endpoint:
+# export OTEL_EXPORTER_OTLP_TRACES_ENDPOINT="${effectiveEndpoint}/api/public/otel/v1/traces"`;
 
-  const collectorCode = `# OpenTelemetry Collector configuration (collector-config.yaml)
-receivers:
+  const { code: collectorCode, highlightLines } = parseSnippet(`receivers:
   otlp:
     protocols:
       http:
@@ -38,16 +37,17 @@ processors:
 
 exporters:
   otlphttp:
-    endpoint: ${effectiveEndpoint}/api/public/otel
+    endpoint: ${effectiveEndpoint}/api/public/otel # +
     headers:
-      Authorization: bearer ${effectiveApiKey}
+      Authorization: bearer ${effectiveApiKey} # +
 
 service:
   pipelines:
     traces:
       receivers: [otlp]
       processors: [batch]
-      exporters: [otlphttp]`;
+      exporters: [otlphttp]
+`);
 
   return (
     <VStack align="stretch" gap={6} minW={0} w="full">
@@ -101,6 +101,7 @@ service:
           sensitiveValue={effectiveApiKey}
           enableVisibilityToggle={true}
           isVisible={isVisible}
+          highlightLines={highlightLines}
           onToggleVisibility={toggleVisibility}
         />
       </VStack>
