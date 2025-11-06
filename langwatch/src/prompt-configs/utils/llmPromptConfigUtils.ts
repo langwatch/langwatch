@@ -8,7 +8,7 @@ import type {
   NodeDataset,
   Signature,
 } from "~/optimization_studio/types/dsl";
-import type { PromptConfigFormValues } from "~/prompt-configs";
+import { formSchema, type PromptConfigFormValues } from "~/prompt-configs";
 import { type SaveVersionParams } from "~/prompt-configs/providers/types";
 import {
   versionMetadataToFormFormat,
@@ -296,7 +296,7 @@ export function formValuesToTriggerSaveVersionParams(
 export function versionedPromptToPromptConfigFormValues(
   prompt: VersionedPrompt,
 ): PromptConfigFormValues {
-  return {
+  return formSchema.parse({
     configId: prompt.id,
     versionMetadata: {
       versionId: prompt.versionId,
@@ -323,7 +323,7 @@ export function versionedPromptToPromptConfigFormValues(
         },
       },
     },
-  };
+  });
 }
 
 /**

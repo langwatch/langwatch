@@ -13,6 +13,7 @@ import { toaster } from "~/components/ui/toaster";
 import type { ChatMessage } from "~/server/tracer/types";
 import { DEFAULT_MODEL } from "~/utils/constants";
 import { getRoutePath } from "~/utils/routes";
+import { formSchema } from "~/prompt-configs/schemas";
 
 const logger = createLogger("useLoadSpanIntoPromptStudio");
 
@@ -107,7 +108,7 @@ function createDefaultPromptFormValues(
     logger.warn({ spanData }, "System prompt is empty. This is not expected.");
   }
 
-  return {
+  return formSchema.parse({
     handle: null,
     scope: "PROJECT",
     version: {
@@ -124,7 +125,7 @@ function createDefaultPromptFormValues(
         messages: [{ role: "system", content: systemPrompt }],
       },
     },
-  };
+  });
 }
 
 /**
