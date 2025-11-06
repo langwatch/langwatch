@@ -32,7 +32,6 @@ class TopicClusteringTopicNamingTestCase(unittest.IsolatedAsyncioTestCase):
         assert type(topic_names[1]) == str
 
         topic_names, _cost = improve_similar_names(
-            model="azure/gpt-4-1106-preview",
             litellm_params={
                 "model": "azure/gpt-4-1106-preview",
                 "api_base": os.environ["AZURE_OPENAI_ENDPOINT"],

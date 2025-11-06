@@ -38,7 +38,7 @@ llm_field = Field(
     type=FieldType.llm,
     optional=None,
     value=LLMConfig(
-        model="gpt-5",
+        model="gpt-4o",
         temperature=0.0,
         max_tokens=100,
     ),
@@ -976,7 +976,7 @@ def test_parse_workflow_with_default_llm():
 
     workflow = copy.deepcopy(simple_workflow)
     workflow.default_llm = LLMConfig(
-        model="gpt-5", temperature=0.0, max_tokens=100
+        model="gpt-4o", temperature=0.0, max_tokens=100
     )
 
     generate_query_node = next(
@@ -1293,7 +1293,7 @@ def test_proposes_instructions_with_grounded_proposer():
         from dspy.propose.grounded_proposer import GroundedProposer
 
         proposer = GroundedProposer(
-            prompt_model=dspy.LM(model="openai/gpt-5"),
+            prompt_model=dspy.LM(model="openai/gpt-4o"),
             program=instance,
             trainset=[],
         )
