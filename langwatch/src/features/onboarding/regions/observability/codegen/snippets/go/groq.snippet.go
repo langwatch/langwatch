@@ -17,7 +17,6 @@ func main() {
 		oaioption.WithBaseURL("https://api.groq.com/openai/v1"),
 		oaioption.WithAPIKey(os.Getenv("GROQ_API_KEY")),
 		oaioption.WithMiddleware(otelopenai.Middleware("<project_name>",
-			otelopenai.WithGenAISystem("groq"),
 			otelopenai.WithCaptureInput(),
 			otelopenai.WithCaptureOutput(),
 		)),
