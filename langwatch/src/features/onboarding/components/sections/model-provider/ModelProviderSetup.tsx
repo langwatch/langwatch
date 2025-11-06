@@ -34,6 +34,11 @@ interface ModelProviderSetupProps {
 
 const OPENAI_DEFAULT_BASE_URL = "https://api.openai.com/v1";
 
+const variantToDocsMapping: Record<"evaluations" | "prompts", string> = {
+  evaluations: "/llm-evaluation/overview",
+  prompts: "/prompt-management/overview",
+};
+
 export const ModelProviderSetup: React.FC<ModelProviderSetupProps> = ({
   modelProviderKey,
   variant,
@@ -302,7 +307,10 @@ export const ModelProviderSetup: React.FC<ModelProviderSetupProps> = ({
             onDefaultModelChange={actions.setDefaultModel}
           />
 
-          <DocsLinks docs={meta.docs} label={meta.label} />
+          <DocsLinks docs={{
+            external: meta.externalDocsUrl,
+            internal: variantToDocsMapping[variant],
+          }} label={meta.label} />
 
           <HStack justify="end">
             <Button

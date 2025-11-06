@@ -26,6 +26,6 @@ export interface ModelProviderSpec {
   defaultModel?: string | null;
   label: string;
   icon: IconData;
-  docs: Docs;
+  externalDocsUrl?: string;
   fieldMetadata?: Record<string, FieldMetadata>;
 }

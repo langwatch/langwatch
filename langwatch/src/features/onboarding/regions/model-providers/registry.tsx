@@ -14,10 +14,7 @@ export const modelProviderRegistry: ModelProviderRegistry = [
       "/images/external-icons/openai-darktheme.svg",
       "OpenAI"
     ),
-    docs: {
-      internal: "/settings/model-providers",
-      external: "https://platform.openai.com/docs/overview",
-    },
+    externalDocsUrl: "https://platform.openai.com/docs/overview",
     fieldMetadata: {
       OPENAI_API_KEY: {
         label: "OpenAI API Key",
@@ -39,10 +36,7 @@ export const modelProviderRegistry: ModelProviderRegistry = [
       "/images/external-icons/anthropic-darktheme.svg",
       "Anthropic"
     ),
-    docs: {
-      internal: "/settings/model-providers",
-      external: "https://docs.anthropic.com/",
-    },
+    externalDocsUrl: "https://docs.anthropic.com/",
     fieldMetadata: {
       ANTHROPIC_API_KEY: {
         label: "Anthropic API Key",
@@ -60,10 +54,7 @@ export const modelProviderRegistry: ModelProviderRegistry = [
     label: "Google Gemini",
     defaultModel: "gemini-2.5-flash",
     icon: singleIcon("/images/external-icons/google.svg", "Google Gemini"),
-    docs: {
-      internal: "/settings/model-providers",
-      external: "https://ai.google.dev/",
-    },
+    externalDocsUrl: "https://ai.google.dev/",
     fieldMetadata: {
       GEMINI_API_KEY: {
         label: "Gemini API Key",
@@ -77,10 +68,7 @@ export const modelProviderRegistry: ModelProviderRegistry = [
     label: "Azure OpenAI",
     defaultModel: "gpt-5",
     icon: singleIcon("/images/external-icons/ms-azure.svg", "Azure OpenAI"),
-    docs: {
-      internal: "/settings/model-providers",
-      external: "https://learn.microsoft.com/azure/ai-services/openai/",
-    },
+    externalDocsUrl: "https://learn.microsoft.com/azure/ai-services/openai/",
     fieldMetadata: {
       AZURE_OPENAI_API_KEY: {
         label: "API Key",
@@ -109,10 +97,7 @@ export const modelProviderRegistry: ModelProviderRegistry = [
       "/images/external-icons/aws-darktheme.svg",
       "AWS Bedrock",
     ),
-    docs: {
-      internal: "/settings/model-providers",
-      external: "https://aws.amazon.com/bedrock/",
-    },
+    externalDocsUrl: "https://aws.amazon.com/bedrock/",
     fieldMetadata: {
       AWS_ACCESS_KEY_ID: {
         label: "Access Key ID",
@@ -134,10 +119,7 @@ export const modelProviderRegistry: ModelProviderRegistry = [
     label: "DeepSeek",
     defaultModel: "deepseek-r1",
     icon: singleIcon("/images/external-icons/deepseek.svg", "DeepSeek"),
-    docs: {
-      internal: "/settings/model-providers",
-      external: "https://www.deepseek.com/",
-    },
+    externalDocsUrl: "https://www.deepseek.com/",
     fieldMetadata: {
       DEEPSEEK_API_KEY: {
         label: "API Key",
@@ -150,10 +132,7 @@ export const modelProviderRegistry: ModelProviderRegistry = [
     backendModelProviderKey: "groq",
     label: "Groq",
     icon: singleIcon("/images/external-icons/groq.svg", "Groq"),
-    docs: {
-      internal: "/settings/model-providers",
-      external: "https://groq.com/",
-    },
+    externalDocsUrl: "https://groq.com/",
     fieldMetadata: {
       GROQ_API_KEY: {
         label: "API Key",
@@ -171,10 +150,7 @@ export const modelProviderRegistry: ModelProviderRegistry = [
       "/images/external-icons/grok-darktheme.svg",
       "Grok"
     ),
-    docs: {
-      internal: "/settings/model-providers",
-      external: "https://x.ai/",
-    },
+    externalDocsUrl: "https://x.ai/",
     fieldMetadata: {
       XAI_API_KEY: {
         label: "API Key",
@@ -187,10 +163,7 @@ export const modelProviderRegistry: ModelProviderRegistry = [
     backendModelProviderKey: "vertex_ai",
     label: "Google Vertex AI",
     icon: singleIcon("/images/external-icons/gcloud.svg", "Google Vertex AI"),
-    docs: {
-      internal: "/settings/model-providers",
-      external: "https://cloud.google.com/vertex-ai",
-    },
+    externalDocsUrl: "https://cloud.google.com/vertex-ai",
     fieldMetadata: {
       GOOGLE_APPLICATION_CREDENTIALS: {
         label: "Google Service Account JSON",
@@ -215,10 +188,7 @@ export const modelProviderRegistry: ModelProviderRegistry = [
       "/images/external-icons/cerebras-darktheme.svg",
       "Cerebras",
     ),
-    docs: {
-      internal: "/settings/model-providers",
-      external: "https://cerebras.ai/",
-    },
+    externalDocsUrl: "https://cerebras.ai/",
     fieldMetadata: {
       CEREBRAS_API_KEY: {
         label: "API Key",
@@ -234,9 +204,6 @@ export const modelProviderRegistry: ModelProviderRegistry = [
       singleIcon("/images/external-icons/custom.svg", "Custom Provider"),
       "Custom"
     ),
-    docs: {
-      internal: "/settings/model-providers",
-    },
     fieldMetadata: {
       CUSTOM_API_KEY: {
         label: "API Key",
