@@ -137,7 +137,8 @@ export const ModelProviderModelSettings: React.FC<ModelProviderModelSettingsProp
               {tags.value.map((tag, index) => (
                 <TagsInput.Item key={index} index={index} value={tag}>
                   <TagsInput.ItemPreview
-                    bg="bg.subtle/60"
+                    bg="bg.emphasized/40"
+                    backdropBlur="md"
                     border="border.subtle"
                     borderRadius="md"
                   >

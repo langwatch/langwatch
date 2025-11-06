@@ -9,11 +9,11 @@ import { ModelProviderSetup } from "./model-provider/ModelProviderSetup";
 import type { ModelProviderKey } from "../../regions/model-providers/types";
 
 interface ModelProviderScreenProps {
-  redirectTarget: "evaluations" | "prompts";
+  variant: "evaluations" | "prompts";
 }
 
 export const ModelProviderScreen: React.FC<ModelProviderScreenProps> = ({
-  redirectTarget,
+  variant,
 }) => {
   const router = useRouter();
   const { project } = useActiveProject();
@@ -24,6 +24,7 @@ export const ModelProviderScreen: React.FC<ModelProviderScreenProps> = ({
     <>
       <VStack align="stretch" gap={6} mb={20}>
         <ModelProviderGrid
+          variant={variant}
           modelProviderKey={modelProviderKey}
           onSelectModelProvider={setSelectedModelProviderKey}
         />
@@ -31,7 +32,7 @@ export const ModelProviderScreen: React.FC<ModelProviderScreenProps> = ({
         <ModelProviderSetup
           key={modelProviderKey}
           modelProviderKey={modelProviderKey}
-          redirectTarget={redirectTarget}
+          variant={variant}
         />
       </VStack>
 

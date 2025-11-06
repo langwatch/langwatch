@@ -29,14 +29,14 @@ const logger = createLogger("ModelProviderSetup");
 
 interface ModelProviderSetupProps {
   modelProviderKey: ModelProviderKey;
-  redirectTarget: "evaluations" | "prompts";
+  variant: "evaluations" | "prompts";
 }
 
 const OPENAI_DEFAULT_BASE_URL = "https://api.openai.com/v1";
 
 export const ModelProviderSetup: React.FC<ModelProviderSetupProps> = ({
   modelProviderKey,
-  redirectTarget,
+  variant,
 }) => {
   const fallbackProviderMeta = useMemo(
     () =>
@@ -120,9 +120,9 @@ export const ModelProviderSetup: React.FC<ModelProviderSetupProps> = ({
     projectId,
     projectDefaultModel: meta?.defaultModel ?? project?.defaultModel ?? null,
     onSuccess: () => {
-      if (redirectTarget === "evaluations") {
+      if (variant === "evaluations") {
         window.location.href = "/@project/evaluations";
-      } else if (redirectTarget === "prompts") {
+      } else if (variant === "prompts") {
         window.location.href = "/@project/prompts";
       } else {
         window.location.href = "/";

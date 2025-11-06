@@ -5,11 +5,18 @@ import { getModelProvider, modelProviderRegistry } from "~/features/onboarding/r
 import type { ModelProviderKey } from "~/features/onboarding/regions/model-providers/types";
 
 interface ModelProviderGridProps {
+  variant: "evaluations" | "prompts";
   modelProviderKey: ModelProviderKey;
   onSelectModelProvider: (modelProvider: ModelProviderKey) => void;
 }
 
+const variantDescriptions: Record<"evaluations" | "prompts", string> = {
+  evaluations: "We'll use this model to run your evaluations, and show you where your interactions shines, and where it doesn't.",
+  prompts: "We'll use this model when you run evaluations on your datasets, in your traces, or analyze responses after they happen.",
+};
+
 export function ModelProviderGrid({
+  variant,
   modelProviderKey,
   onSelectModelProvider,
 }: ModelProviderGridProps): React.ReactElement | null {
@@ -23,7 +30,7 @@ export function ModelProviderGrid({
           {modelProvider?.label ?? "selected model provider"}
         </Text>
         <Text fontSize="xs" color="fg.muted">
-          Pick the relevant model provider. You can add more later in the project settings.
+          {variantDescriptions[variant]}
         </Text>
       </VStack>
       <HStack gap={3} wrap="wrap">

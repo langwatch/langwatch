@@ -50,7 +50,6 @@ export const useCreateProductScreens = ({
         id: "prompt-management",
         required: false,
         heading: "With great prompts comes great responses",
-        subHeading: "Enhance",
         component: ModelProviderScreen,
       },
     }),
