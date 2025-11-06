@@ -15,9 +15,8 @@ from langwatch.types import RAGChunk
 load_dotenv()
 
 import chainlit as cl
-from langchain.prompts import ChatPromptTemplate
-from langchain.schema import HumanMessage
-from langchain.schema.runnable.config import RunnableConfig
+from langchain_core.messages import HumanMessage
+from langchain_core.runnables import RunnableConfig
 
 import langwatch
 
@@ -25,9 +24,7 @@ from langchain_community.document_loaders import WebBaseLoader
 from langchain_community.vectorstores.faiss import FAISS
 from langchain_openai import ChatOpenAI, OpenAIEmbeddings
 from langchain_text_splitters import RecursiveCharacterTextSplitter
-from langchain.tools.retriever import create_retriever_tool
-from langchain.agents import AgentExecutor, create_tool_calling_agent
-from langchain.tools import BaseTool, StructuredTool, tool
+from langchain_core.tools import create_retriever_tool
 import chainlit as cl
 import chainlit.data as cl_data
 from chainlit.data.utils import queue_until_user_message
@@ -300,7 +297,6 @@ async def main(message: cl.Message):
         {"messages": [HumanMessage(content=message.content)]},
         config=RunnableConfig(
             callbacks=[
-                cl.LangchainCallbackHandler(),
                 langwatch.get_current_trace().get_langchain_callback(),
             ]
         ),

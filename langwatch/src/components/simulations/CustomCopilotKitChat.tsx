@@ -98,12 +98,16 @@ function CustomCopilotKitChatInner({
           </VStack>
         );
       }}
-      RenderActionExecutionMessage={({ message }) => (
-        <ToolCallMessage message={message as ActionExecutionMessage} />
-      )}
-      RenderResultMessage={({ message }) => (
-        <ToolResultMessage message={message as ResultMessage} />
-      )}
+      RenderActionExecutionMessage={({ message }) =>
+        !smallerView ? (
+          <ToolCallMessage message={message as ActionExecutionMessage} />
+        ) : null
+      }
+      RenderResultMessage={({ message }) =>
+        !smallerView ? (
+          <ToolResultMessage message={message as ResultMessage} />
+        ) : null
+      }
       Input={hideInput ? () => <div></div> : undefined}
     />
   );

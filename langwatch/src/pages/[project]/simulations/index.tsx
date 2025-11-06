@@ -7,12 +7,11 @@ import { api } from "~/utils/api";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import ScenarioInfoCard from "~/components/simulations/ScenarioInfoCard";
 import React, { useEffect, useMemo, useState } from "react";
-import { PermissionAlert } from "../../../components/PermissionAlert";
+import { withPermissionGuard } from "~/components/WithPermissionGuard";
 
-export default function SimulationsPage() {
+function SimulationsPageContent() {
   const router = useRouter();
-  const { project, hasPermission } = useOrganizationTeamProject();
-  const hasScenariosViewPermission = hasPermission("scenarios:view");
+  const { project } = useOrganizationTeamProject();
   const [refetchInterval, setRefetchInterval] = useState(4000);
 
   // Refetch interval is set to 4 seconds when the window is focused and 30 seconds when the window is blurred.
@@ -40,13 +39,6 @@ export default function SimulationsPage() {
       enabled: !!project,
     },
   );
-  if (!hasScenariosViewPermission) {
-    return (
-      <DashboardLayout>
-        <PermissionAlert permission="scenarios:view" />
-      </DashboardLayout>
-    );
-  }
 
   const sortedScenarioSetsData = useMemo(() => {
     if (!scenarioSetsData) {
@@ -122,3 +114,7 @@ export default function SimulationsPage() {
     </DashboardLayout>
   );
 }
+
+export default withPermissionGuard("scenarios:view", {
+  layoutComponent: DashboardLayout,
+})(SimulationsPageContent);
