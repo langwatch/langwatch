@@ -252,8 +252,7 @@
     "glob": "^11.0.1",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
-    "react-is": "19.0.0",
-    "nodemailer": "^7.0.7"
+    "react-is": "19.0.0"
   },
   "ct3aMetadata": {
     "initVersion": "7.19.0"
