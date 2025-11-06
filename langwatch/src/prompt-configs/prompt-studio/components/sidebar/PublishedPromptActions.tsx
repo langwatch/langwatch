@@ -1,5 +1,5 @@
 import { Box, Button, Text } from "@chakra-ui/react";
-import { LuMoreVertical, LuTrash2 } from "react-icons/lu";
+import { LuEllipsisVertical, LuTrash2 } from "react-icons/lu";
 import { Menu } from "~/components/ui/menu";
 import { Tooltip } from "~/components/ui/tooltip";
 import { DeleteConfirmationDialog } from "~/components/annotations/DeleteConfirmationDialog";
@@ -79,7 +79,7 @@ export function PublishedPromptActions({
               size="sm"
               onClick={(event) => event.stopPropagation()}
             >
-              <LuMoreVertical size={14} />
+              <LuEllipsisVertical size={14} />
             </Button>
           </Menu.Trigger>
           <Menu.Content onClick={(event) => event.stopPropagation()}>
