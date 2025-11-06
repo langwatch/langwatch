@@ -9,6 +9,7 @@ import goOpenaiSource from "./snippets/go/openai.snippet.go";
 import goAzureSource from "./snippets/go/azure.snippet.go";
 import goAnthropicSource from "./snippets/go/anthropic.snippet.go";
 import goGeminiSource from "./snippets/go/gemini.snippet.go";
+import goGroqSource from "./snippets/go/groq.snippet.go";
 import goGrokSource from "./snippets/go/grok.snippet.go";
 import goMistralSource from "./snippets/go/mistral.snippet.go";
 import goOllamaSource from "./snippets/go/ollama.snippet.go";
@@ -433,9 +434,18 @@ export const registry: IntegrationRegistry = [
   },
   {
     platform: "go",
+    framework: "groq",
+    label: "Groq",
+    docs: { internal: "/integration/go/integrations/groq", external: "https://console.groq.com/docs" },
+    icon: singleIcon("/images/external-icons/groq.svg", "Groq"),
+    install: { go: { "go get": "go get github.com/langwatch/langwatch/sdk-go github.com/openai/openai-go" } },
+    snippet: goRef(goGroqSource as unknown as string),
+  },
+  {
+    platform: "go",
     framework: "grok",
     label: "Grok (xAI)",
-    docs: { external: "https://x.ai/" },
+    docs: { internal: "/integration/go/integrations/grok", external: "https://x.ai/" },
     icon: themedIcon(
       "/images/external-icons/grok-lighttheme.svg",
       "/images/external-icons/grok-darktheme.svg",
