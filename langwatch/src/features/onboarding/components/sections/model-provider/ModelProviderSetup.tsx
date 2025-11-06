@@ -60,7 +60,7 @@ export const ModelProviderSetup: React.FC<ModelProviderSetupProps> = ({
 
     if (fallbackProviderMeta?.backendModelProviderKey) {
       if (!requestedMeta) {
-        console.warn(
+        logger.warn(
           "Model provider metadata not found. Falling back to first available provider",
           {
             requestedKey: modelProviderKey,
@@ -68,7 +68,7 @@ export const ModelProviderSetup: React.FC<ModelProviderSetupProps> = ({
           },
         );
       } else {
-        console.warn(
+        logger.warn(
           "Model provider metadata missing backend key. Falling back to first available provider",
           {
             requestedKey: requestedMeta.key,
@@ -77,14 +77,13 @@ export const ModelProviderSetup: React.FC<ModelProviderSetupProps> = ({
         );
       }
     } else {
-      console.error(
+      logger.error(
         "Model provider metadata missing and no fallback provider available",
         {
           requestedKey: modelProviderKey,
         },
       );
     }
-
     return fallbackProviderMeta ?? requestedMeta;
   }, [fallbackProviderMeta, modelProviderKey]);
   const { project } = useOrganizationTeamProject();
