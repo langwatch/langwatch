@@ -159,6 +159,7 @@ export function SyncedChatInput({
 
           {/* Right icon - Send button */}
           <ChatSendButton
+            position="absolute"
             right={3}
             bottom={2}
             disabled={inProgress || !currentInput.trim()}
