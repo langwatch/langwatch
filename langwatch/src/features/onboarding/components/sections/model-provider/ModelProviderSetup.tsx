@@ -22,17 +22,21 @@ import {
 } from "../../../../../utils/zod";
 import { ModelProviderCredentialFields } from "./ModelProviderCredentialFields";
 import { ModelProviderExtraHeaders } from "./ModelProviderExtraHeaders";
-import { easyCatch } from "../../../../../utils/easyCatch";
 import { ModelProviderModelSettings } from "./ModelProviderModelSettings";
+import { createLogger } from "../../../../../utils/logger";
+
+const logger = createLogger("ModelProviderSetup");
 
 interface ModelProviderSetupProps {
   modelProviderKey: ModelProviderKey;
+  redirectTarget: "evaluations" | "prompts";
 }
 
 const OPENAI_DEFAULT_BASE_URL = "https://api.openai.com/v1";
 
 export const ModelProviderSetup: React.FC<ModelProviderSetupProps> = ({
   modelProviderKey,
+  redirectTarget,
 }) => {
   const fallbackProviderMeta = useMemo(
     () =>
@@ -88,7 +92,7 @@ export const ModelProviderSetup: React.FC<ModelProviderSetupProps> = ({
 
     return fallbackProviderMeta?.backendModelProviderKey ?? "openai";
   }, [fallbackProviderMeta?.backendModelProviderKey, meta?.backendModelProviderKey]);
-  const { providers, isLoading, refetch } = useModelProvidersSettings({
+  const { providers, isLoading } = useModelProvidersSettings({
     projectId,
   });
 
@@ -116,7 +120,13 @@ export const ModelProviderSetup: React.FC<ModelProviderSetupProps> = ({
     projectId,
     projectDefaultModel: meta?.defaultModel ?? project?.defaultModel ?? null,
     onSuccess: () => {
-      refetch().catch(err => easyCatch(err, "ModelProviderSetup.onSuccess"));
+      if (redirectTarget === "evaluations") {
+        window.location.href = "/@project/evaluations";
+      } else if (redirectTarget === "prompts") {
+        window.location.href = "/@project/prompts";
+      } else {
+        window.location.href = "/";
+      }
     },
   });
 
@@ -213,7 +223,7 @@ export const ModelProviderSetup: React.FC<ModelProviderSetupProps> = ({
     void actions
       .setEnabled(true)
       .then(() => actions.submit())
-      .catch(err => easyCatch(err, "ModelProviderSetup.handleSaveAndContinue"));
+      .catch(err => logger.error(err, "failed to submit model provider settings"));
   }, [
     validateOpenAi,
     actions,

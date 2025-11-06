@@ -8,7 +8,13 @@ import { ModelProviderGrid } from "./model-provider/ModelProviderGrid";
 import { ModelProviderSetup } from "./model-provider/ModelProviderSetup";
 import type { ModelProviderKey } from "../../regions/model-providers/types";
 
-export function ModelProviderScreen(): React.ReactElement {
+interface ModelProviderScreenProps {
+  redirectTarget: "evaluations" | "prompts";
+}
+
+export const ModelProviderScreen: React.FC<ModelProviderScreenProps> = ({
+  redirectTarget,
+}) => {
   const router = useRouter();
   const { project } = useActiveProject();
   const [modelProviderKey, setSelectedModelProviderKey] =
@@ -25,6 +31,7 @@ export function ModelProviderScreen(): React.ReactElement {
         <ModelProviderSetup
           key={modelProviderKey}
           modelProviderKey={modelProviderKey}
+          redirectTarget={redirectTarget}
         />
       </VStack>
 
