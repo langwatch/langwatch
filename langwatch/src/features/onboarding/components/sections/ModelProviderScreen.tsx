@@ -22,7 +22,7 @@ export const ModelProviderScreen: React.FC<ModelProviderScreenProps> = ({
 
   return (
     <>
-      <VStack align="stretch" gap={6} mb={16}>
+      <VStack align="stretch" gap={6} mb={20}>
         <ModelProviderGrid
           modelProviderKey={modelProviderKey}
           onSelectModelProvider={setSelectedModelProviderKey}
@@ -49,10 +49,10 @@ export const ModelProviderScreen: React.FC<ModelProviderScreenProps> = ({
               borderRadius="full"
               variant="ghost"
               colorPalette="gray"
-              bg="whiteAlpha.50"
+              bg="bg.emphasized/20"
               _hover={{ bg: "whiteAlpha.100", transform: "translateY(-1px)" }}
               borderWidth="1px"
-              borderColor="whiteAlpha.200"
+              borderColor="border.subtle/20"
               backdropFilter="blur(10px)"
               style={{ WebkitBackdropFilter: "blur(10px)" }}
               boxShadow="0 4px 18px rgba(2, 1, 1, 0.14), inset 0 1px 0 rgba(255,255,255,0.18)"
