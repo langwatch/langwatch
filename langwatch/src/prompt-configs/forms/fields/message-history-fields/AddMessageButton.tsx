@@ -13,7 +13,7 @@ export function AddMessageButton(props: {
 
   return (
     <Menu.Root>
-      <Menu.Trigger>
+      <Menu.Trigger asChild>
         <Button size="xs" variant="ghost" type="button">
           <Plus size={16} />
         </Button>
