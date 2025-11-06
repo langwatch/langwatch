@@ -5,12 +5,14 @@ from fastapi.testclient import TestClient
 # Only import and create client if we have API keys (to avoid dummy key issues during collection)
 pytestmark = pytest.mark.skipif(
     not os.getenv("OPENAI_API_KEY"),
-    reason="OPENAI_API_KEY environment variable not set"
+    reason="OPENAI_API_KEY environment variable not set",
 )
+
 
 @pytest.fixture(scope="module")
 def client():
     from langwatch_nlp.main import app
+
     return TestClient(app)
 
 
