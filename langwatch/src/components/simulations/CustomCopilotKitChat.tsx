@@ -74,7 +74,7 @@ function CustomCopilotKitChatInner({
         {
           error,
         },
-        "Failed to convert scenario messages to CopilotKit messages"
+        "Failed to convert scenario messages to CopilotKit messages",
       );
     }
   }, [messages]);
@@ -107,7 +107,7 @@ function CustomCopilotKitChatInner({
                             traceId: message_.traceId ?? "",
                             selectedTab: "traceDetails",
                           },
-                          { replace: true }
+                          { replace: true },
                         );
                       } else {
                         openDrawer("traceDetails", {
@@ -125,12 +125,16 @@ function CustomCopilotKitChatInner({
           </VStack>
         );
       }}
-      RenderActionExecutionMessage={({ message }) => (
-        <ToolCallMessage message={message as ActionExecutionMessage} />
-      )}
-      RenderResultMessage={({ message }) => (
-        <ToolResultMessage message={message as ResultMessage} />
-      )}
+      RenderActionExecutionMessage={({ message }) =>
+        !smallerView ? (
+          <ToolCallMessage message={message as ActionExecutionMessage} />
+        ) : null
+      }
+      RenderResultMessage={({ message }) =>
+        !smallerView ? (
+          <ToolResultMessage message={message as ResultMessage} />
+        ) : null
+      }
       Input={() => <div></div>}
     />
   );
