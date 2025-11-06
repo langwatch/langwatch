@@ -12,6 +12,7 @@ import { createLogger } from "~/utils/logger";
 import { toaster } from "~/components/ui/toaster";
 import type { ChatMessage } from "~/server/tracer/types";
 import { DEFAULT_MODEL } from "~/utils/constants";
+import { getRoutePath } from "~/utils/routes";
 
 const logger = createLogger("useLoadSpanIntoPromptStudio");
 
@@ -37,7 +38,7 @@ export function useGoToSpanInPlaygroundTabUrlBuilder() {
     }
 
     const url = new URL(
-      `/${project?.slug}/prompt-studio`,
+      getRoutePath({ projectSlug: project.slug, route: "prompts" }),
       window.location.origin,
     );
     url.searchParams.set(QUERY_PARAM_PROMPT_PLAYGROUND_SPAN_ID, spanId);

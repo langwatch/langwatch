@@ -82,7 +82,7 @@ export function SpanDetails({ span }: { project: Project; span: Span }) {
             >
               <Button size="xs" colorPalette="orange">
                 <Play size={16} />
-                Open in Playground
+                Open in Prompts
               </Button>
             </Link>
           )}
