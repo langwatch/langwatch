@@ -57,16 +57,9 @@ export const PromptStudioChat = forwardRef<
           model: additionalParams,
         }}
         onError={(error: Error) => {
-          console.error(error);
+          console.error("CopilotKit error:", error);
         }}
         disableSystemMessage
-        initialMessagesFromSpanData={[
-          {
-            id: "1",
-            role: "user",
-            content: "Hello, how are you?",
-          },
-        ]}
       >
         <PromptStudioChatInner ref={ref} />
       </CopilotKit>

@@ -22,6 +22,9 @@ import type { PromptConfigFormValues } from "~/prompt-configs/types";
 import type { runtimeInputsSchema } from "~/prompt-configs/schemas";
 import type z from "zod";
 import { generateOtelTraceId } from "~/utils/trace";
+import { createLogger } from "~/utils/logger";
+
+const logger = createLogger("PromptStudioAdapter");
 
 type PromptStudioAdapterParams = {
   projectId: string;
@@ -49,55 +52,81 @@ export class PromptStudioAdapter implements CopilotServiceAdapter {
       threadId: threadIdFromRequest,
     } = request;
 
-    // @ts-expect-error - Total hack
-    const { model: additionalParams } = forwardedParameters;
-    const { formValues, variables } = JSON.parse(additionalParams) as {
-      formValues: PromptConfigFormValues;
-      variables: z.infer<typeof runtimeInputsSchema>;
-    };
-    const threadId = threadIdFromRequest ?? randomUUID();
-    const nodeId = "prompt_node";
-    const traceId = generateOtelTraceId();
-    const workflowId = `prompt_execution_${randomUUID().slice(0, 6)}`;
+    const fallbackThreadId = threadIdFromRequest ?? randomUUID();
 
-    // Prepend form messages (excluding system) to Copilot messages
-    const formMsgs = (formValues.version.configData.messages ?? []).filter(
-      (m) => m.role !== "system",
-    );
-    const messagesHistory = [...formMsgs, ...messages]
-      .map((message: any) => ({
-        role: message.role,
-        content: message.content,
-      }))
-      .filter((message) => message.role !== "system");
+    // Try to prepare the workflow; if it fails, stream error to chat
+    let preparedEvent: StudioClientEvent;
+    let nodeId: string;
+    let traceId: string;
+    let threadId: string;
 
-    const workflow = this.createWorkflow({
-      workflowId,
-      nodeId,
-      formValues,
-      messagesHistory,
-    });
+    try {
+      // @ts-expect-error - Total hack
+      const { model: additionalParams } = forwardedParameters;
+      const { formValues, variables } = JSON.parse(additionalParams) as {
+        formValues: PromptConfigFormValues;
+        variables: z.infer<typeof runtimeInputsSchema>;
+      };
+      threadId = fallbackThreadId;
+      nodeId = "prompt_node";
+      traceId = generateOtelTraceId();
+      const workflowId = `prompt_execution_${randomUUID().slice(0, 6)}`;
 
-    // Build execute_flow event (inputs must be an array)
-    const rawEvent: StudioClientEvent = {
-      type: "execute_component",
-      payload: {
-        enable_tracing: true,
-        trace_id: traceId,
-        workflow,
-        node_id: nodeId,
-        inputs: {
-          ...variables,
-          messages: messagesHistory,
+      // Prepend form messages (excluding system) to Copilot messages
+      const formMsgs = (formValues.version.configData.messages ?? []).filter(
+        (m) => m.role !== "system",
+      );
+      const messagesHistory = [...formMsgs, ...messages]
+        .map((message: any) => ({
+          role: message.role,
+          content: message.content,
+        }))
+        .filter((message) => message.role !== "system");
+
+      const workflow = this.createWorkflow({
+        workflowId,
+        nodeId,
+        formValues,
+        messagesHistory,
+      });
+
+      // Build execute_flow event (inputs must be an array)
+      const rawEvent: StudioClientEvent = {
+        type: "execute_component",
+        payload: {
+          enable_tracing: true,
+          trace_id: traceId,
+          workflow,
+          node_id: nodeId,
+          inputs: {
+            ...variables,
+            messages: messagesHistory,
+          },
         },
-      },
-    } as StudioClientEvent;
+      } as StudioClientEvent;
 
-    // Enrich with envs and datasets to match server route behavior
-    const preparedEvent = await loadDatasets(
-      await addEnvs(rawEvent, this.projectId),
-      this.projectId,
-    );
+      // Enrich with envs and datasets to match server route behavior
+      preparedEvent = await loadDatasets(
+        await addEnvs(rawEvent, this.projectId),
+        this.projectId,
+      );
+    } catch (earlyError: any) {
+      logger.error({ earlyError }, "error");
+      // Handle errors that occur before streaming starts
+      const messageId = generateOtelTraceId();
+      void eventSource.stream(async (eventStream$) => {
+        eventStream$.sendTextMessageStart({ messageId });
+        eventStream$.sendTextMessageContent({
+          messageId,
+          content: `❌ Configuration Error: ${
+            earlyError?.message ?? "Unknown error"
+          }`,
+        });
+        eventStream$.sendTextMessageEnd({ messageId });
+        eventStream$.complete();
+      });
+      return { threadId: fallbackThreadId };
+    }
 
     // Stream workflow server events into CopilotKit runtime events
     void eventSource.stream(async (eventStream$) => {
@@ -106,6 +135,9 @@ export class PromptStudioAdapter implements CopilotServiceAdapter {
       const messageId = traceId;
       let lastOutput = "";
 
+      /**
+       * Ends the message stream if it was started and not already ended
+       */
       const finishIfNeeded = () => {
         if (started && !ended) {
           ended = true;
@@ -113,80 +145,84 @@ export class PromptStudioAdapter implements CopilotServiceAdapter {
         }
       };
 
-      try {
-        await studioBackendPostEvent({
-          projectId: this.projectId,
-          message: preparedEvent,
-          onEvent: (serverEvent: StudioServerEvent) => {
-            try {
-              if (
-                serverEvent.type === "component_state_change" &&
-                serverEvent.payload?.component_id === nodeId
-              ) {
-                const state = serverEvent.payload.execution_state;
-
-                if (!state) return;
-
-                // Start on first state notification
-                if (!started) {
-                  started = true;
-                  eventStream$.sendTextMessageStart({
-                    messageId,
-                  });
-                }
-
-                const current =
-                  typeof state.outputs?.output === "string"
-                    ? state.outputs.output
-                    : undefined;
-                if (current && current.length >= lastOutput.length) {
-                  const delta = current.slice(lastOutput.length);
-                  if (delta) {
-                    eventStream$.sendTextMessageContent({
-                      messageId,
-                      content: String(delta),
-                      // @ts-expect-error - Total hack
-                      traceId,
-                    });
-                  }
-                  lastOutput = current;
-                }
-
-                if (state.status === "success" || state.status === "error") {
-                  finishIfNeeded();
-                }
-              } else if (serverEvent.type === "error") {
-                console.error(serverEvent);
-                if (!started) {
-                  started = true;
-                  eventStream$.sendTextMessageStart({ messageId });
-                }
-                const msg = serverEvent.payload?.message ?? "An error occurred";
-                eventStream$.sendTextMessageContent({
-                  messageId,
-                  content: `❌ ${msg}`,
-                });
-                finishIfNeeded();
-              } else if (serverEvent.type === "done") {
-                finishIfNeeded();
-              }
-            } catch (error) {
-              console.error(error);
-              throw error;
-            }
-          },
-        });
-      } catch (err: any) {
-        console.error(err);
+      /**
+       * Sends an error message to the client and finishes the stream
+       * @param message - Error message to display (without ❌ prefix)
+       */
+      const sendError = (message: string) => {
         if (!started) {
           started = true;
           eventStream$.sendTextMessageStart({ messageId });
         }
         eventStream$.sendTextMessageContent({
           messageId,
-          content: `❌ ${err?.message ?? "Unexpected error"}`,
+          content: `❌ ${message}`,
         });
         finishIfNeeded();
+      };
+
+      try {
+        await studioBackendPostEvent({
+          projectId: this.projectId,
+          message: preparedEvent,
+          onEvent: (serverEvent: StudioServerEvent) => {
+            // Handle component state updates
+            if (
+              serverEvent.type === "component_state_change" &&
+              serverEvent.payload?.component_id === nodeId
+            ) {
+              const state = serverEvent.payload.execution_state;
+              if (!state) return;
+
+              // Initialize stream on first state notification
+              if (!started) {
+                started = true;
+                eventStream$.sendTextMessageStart({
+                  messageId,
+                });
+              }
+
+              // Stream incremental output deltas
+              const current =
+                typeof state.outputs?.output === "string"
+                  ? state.outputs.output
+                  : undefined;
+              if (current && current.length >= lastOutput.length) {
+                const delta = current.slice(lastOutput.length);
+                if (delta) {
+                  eventStream$.sendTextMessageContent({
+                    messageId,
+                    content: String(delta),
+                    // @ts-expect-error - Total hack
+                    traceId,
+                  });
+                }
+                lastOutput = current;
+              }
+
+              // Handle completion
+              if (state.status === "success") {
+                finishIfNeeded();
+              }
+
+              // Propagate errors to outer catch
+              if (state.error) {
+                throw new Error(state.error);
+              }
+            } else if (serverEvent.type === "error") {
+              logger.error({ serverEvent }, "error");
+              throw new Error(
+                serverEvent.payload?.message ?? "An error occurred",
+              );
+            } else if (serverEvent.type === "done") {
+              finishIfNeeded();
+            }
+          },
+        });
+      } catch (err: any) {
+        // Centralized error handling: log and stream to client
+        logger.error({ err }, "error");
+        sendError(err?.message ?? "Unexpected error");
       } finally {
         eventStream$.complete();
       }
