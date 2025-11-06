@@ -1,14 +1,11 @@
 import os
 import unittest
 import pytest
-from dotenv import load_dotenv
 
 from langwatch_nlp.topic_clustering.topic_naming import (
     generate_topic_names,
     improve_similar_names,
 )
-
-load_dotenv()
 
 
 class TopicClusteringTopicNamingTestCase(unittest.IsolatedAsyncioTestCase):

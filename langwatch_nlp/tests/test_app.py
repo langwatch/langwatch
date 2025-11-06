@@ -8,6 +8,10 @@ client = TestClient(app)
 
 
 @pytest.mark.integration
+@pytest.mark.skipif(
+    not os.getenv("OPENAI_API_KEY"),
+    reason="OPENAI_API_KEY environment variable not set"
+)
 def test_sentiment_analysis():
     text = "no, this is not what I wanted"
     embedding = get_embedding(
