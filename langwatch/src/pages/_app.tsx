@@ -11,6 +11,7 @@ import {
   defineRecipe,
   defineSlotRecipe,
 } from "@chakra-ui/react";
+import "~/observability/instrumentation.web";
 import "~/styles/globals.scss";
 import "~/styles/markdown.scss";
 
