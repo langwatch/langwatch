@@ -7,6 +7,7 @@ import { prisma } from "../../../../server/db";
 import { describeRoute } from "hono-openapi";
 import { patchZodOpenapi } from "../../../../utils/extend-zod-openapi";
 import { loggerMiddleware } from "../../middleware/logger";
+import { tracerMiddleware } from "../../middleware";
 import {
   UnauthorizedError,
   NotFoundError,
@@ -23,6 +24,7 @@ patchZodOpenapi();
 
 export const app = new Hono()
   .basePath("/api/dataset")
+  .use(tracerMiddleware({ name: "dataset" }))
   .use(loggerMiddleware())
   .onError(handleDatasetError)
 
