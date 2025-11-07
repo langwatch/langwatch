@@ -1,0 +1,28 @@
+apiVersion: 1
+
+datasources:
+  # 🔹 Prometheus – span metrics + service graph metrics
+  - name: Prometheus
+    type: prometheus
+    uid: prometheus            # 👈 THIS is what Tempo will point at
+    access: proxy
+    url: http://prometheus:9090
+    isDefault: false
+
+  # 🔹 Tempo – traces backend
+  - name: Tempo
+    type: tempo
+    uid: tempo
+    access: proxy
+    url: http://tempo:3200
+    isDefault: true
+    jsonData:
+      httpMethod: GET
+
+      # Service graph config – tells Grafana which Prometheus to use
+      serviceMap:
+        datasourceUid: prometheus
+
+      # Optional but nice: traces → metrics and span metrics panels
+      tracesToMetrics:
+        datasourceUid: prometheus
