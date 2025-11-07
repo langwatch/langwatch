@@ -3,13 +3,14 @@ import { DashboardLayout } from "../DashboardLayout";
 import { SetRunHistorySidebar } from "./set-run-history-sidebar";
 import { useSimulationRouter } from "~/hooks/simulations";
 import { LuPanelLeftClose, LuPanelLeftOpen } from "react-icons/lu";
+import { useOtel } from "~/observability/react-otel/useOtel";
 
 // TODO: This file could be better organized.
-export const SimulationLayout = ({
+export function SimulationLayout({
   children,
 }: {
   children: React.ReactNode;
-}) => {
+}) {
   const { open: isHistorySidebarOpen, onToggle } = useDisclosure({
     defaultOpen: true,
   });
@@ -43,7 +44,7 @@ export const SimulationLayout = ({
       </HStack>
     </DashboardLayout>
   );
-};
+}
 
 const Header = ({
   isHistorySidebarOpen,
@@ -53,13 +54,21 @@ const Header = ({
   onHistorySidebarOpenChange: (open: boolean) => void;
 }) => {
   const { scenarioSetId } = useSimulationRouter();
+  const { addEvent } = useOtel();
+
+  const handleToggleSidebar = () => {
+    const newState = !isHistorySidebarOpen;
+    addEvent("History Sidebar Toggled", { open: newState });
+    onHistorySidebarOpenChange(newState);
+  };
+
   return (
     <Box w="full" p={4} borderBottom="1px" bg="white" borderColor="gray.200">
       <HStack>
         <Button
           size="sm"
           bg={isHistorySidebarOpen ? "gray.200" : "gray.100"}
-          onClick={() => onHistorySidebarOpenChange(!isHistorySidebarOpen)}
+          onClick={handleToggleSidebar}
           title={isHistorySidebarOpen ? "Close History" : "Open History"}
         >
           {isHistorySidebarOpen ? (

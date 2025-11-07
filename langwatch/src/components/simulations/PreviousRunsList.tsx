@@ -16,12 +16,15 @@ import { LuCircleOff } from "react-icons/lu";
 import { useSimulationRouter } from "~/hooks/simulations";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
+import { ScenarioRunStatus } from "~/app/api/scenario-events/[[...route]]/enums";
+import { useOtel } from "~/observability/react-otel/useOtel";
 
 // Previous Runs List Component
 export function PreviousRunsList({ scenarioId }: { scenarioId?: string }) {
   const { project } = useOrganizationTeamProject();
   const { goToSimulationRun, scenarioSetId, batchRunId } =
     useSimulationRouter();
+  const { addEvent } = useOtel();
 
   const { data: scenarioRunData, isLoading } =
     api.scenarios.getRunDataByScenarioId.useQuery(
@@ -72,6 +75,7 @@ export function PreviousRunsList({ scenarioId }: { scenarioId?: string }) {
           cursor="pointer"
           _hover={{ bg: "gray.100" }}
           onClick={() => {
+            addEvent("Run Selected", { runId: run.scenarioRunId });
             if (scenarioSetId && batchRunId) {
               goToSimulationRun({
                 scenarioSetId,
@@ -90,9 +94,11 @@ export function PreviousRunsList({ scenarioId }: { scenarioId?: string }) {
               gap={2}
               alignItems="center"
             >
-              {run.status === "SUCCESS" && <Check size={12} />}
+              {run.status === ScenarioRunStatus.SUCCESS && <Check size={12} />}
               <Badge
-                colorScheme={run.status === "SUCCESS" ? "green" : "orange"}
+                colorScheme={
+                  run.status === ScenarioRunStatus.SUCCESS ? "green" : "orange"
+                }
                 variant="subtle"
                 display="flex"
                 alignItems="center"
@@ -102,7 +108,9 @@ export function PreviousRunsList({ scenarioId }: { scenarioId?: string }) {
                 borderRadius="md"
               >
                 <Text fontSize="xs" fontWeight="medium">
-                  {run.status === "SUCCESS" ? "completed" : "running"}
+                  {run.status === ScenarioRunStatus.SUCCESS
+                    ? "completed"
+                    : "running"}
                 </Text>
               </Badge>
             </Flex>

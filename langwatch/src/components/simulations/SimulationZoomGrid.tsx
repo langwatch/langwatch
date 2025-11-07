@@ -9,6 +9,7 @@ import { ZoomIn, ZoomOut } from "react-feather";
 import { SimulationChatViewer } from "./SimulationChatViewer";
 import { useSimulationRouter } from "~/hooks/simulations/useSimulationRouter";
 import { useZoom } from "~/hooks/useZoom";
+import { useOtel } from "~/observability/react-otel/useOtel";
 
 const ZoomContext = createContext<ReturnType<typeof useZoom> | null>(null);
 
@@ -40,13 +41,34 @@ interface ControlsProps {
 
 function Controls({ showScale = true }: ControlsProps) {
   const { scale, zoomIn, zoomOut } = useZoomContext();
+  const { addEvent } = useOtel();
+
+  const handleZoomOut = () => {
+    addEvent("Zoom Changed", { direction: "out", level: scale });
+    zoomOut();
+  };
+
+  const handleZoomIn = () => {
+    addEvent("Zoom Changed", { direction: "in", level: scale });
+    zoomIn();
+  };
 
   return (
     <HStack gap={2}>
-      <Button bgColor="white" size="sm" variant="outline" onClick={zoomOut}>
+      <Button
+        bgColor="white"
+        size="sm"
+        variant="outline"
+        onClick={handleZoomOut}
+      >
         Zoom Out <ZoomOut size={16} />
       </Button>
-      <Button bgColor="white" size="sm" variant="outline" onClick={zoomIn}>
+      <Button
+        bgColor="white"
+        size="sm"
+        variant="outline"
+        onClick={handleZoomIn}
+      >
         Zoom In <ZoomIn size={16} />
       </Button>
       {showScale && (

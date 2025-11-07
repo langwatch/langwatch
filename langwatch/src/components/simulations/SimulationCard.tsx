@@ -61,7 +61,7 @@ function SimulationCardHeader({
 // Component for the chat content area
 function SimulationCardContent({
   children,
-  status,
+  status: _status,
 }: {
   children: React.ReactNode;
   status?: ScenarioRunStatus;
