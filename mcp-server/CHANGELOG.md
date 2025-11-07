@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.0](https://github.com/langwatch/langwatch/compare/mcp-server@v0.1.0...mcp-server@v0.2.0) (2025-11-07)
+
+
+### Features
+
+* add scenario docs fetching to mcp ([e630206](https://github.com/langwatch/langwatch/commit/e63020622ca192bf5801d4dbdd2744fb755075ed))
+
 ## [0.1.0](https://github.com/langwatch/langwatch/compare/mcp-server@v0.0.5...mcp-server@v0.1.0) (2025-09-19)
 
 

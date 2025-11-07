@@ -1,5 +1,26 @@
 # Changelog
 
+## [1.7.0](https://github.com/langwatch/langwatch/compare/langwatch@v1.6.0...langwatch@v1.7.0) (2025-11-07)
+
+
+### Features
+
+* add password change from settings for email auth ([#789](https://github.com/langwatch/langwatch/issues/789)) ([c91e114](https://github.com/langwatch/langwatch/commit/c91e11458d8f987c327ce99d0ad526addf33c95a))
+* added langchain and langgraph to python onboarding + improvements from testing ([#782](https://github.com/langwatch/langwatch/issues/782)) ([99b2f25](https://github.com/langwatch/langwatch/commit/99b2f25654b0c6b440a4680ffe36b37a7579d1d1))
+* evaluation and prompt onboarding flows ([#775](https://github.com/langwatch/langwatch/issues/775)) ([094831d](https://github.com/langwatch/langwatch/commit/094831d79444bf435f1d289482ac751a2830b808))
+
+
+### Bug Fixes
+
+* **langwatch_nlp:** remove unused langchain-community dependency ([9ad61f7](https://github.com/langwatch/langwatch/commit/9ad61f7e2d7ef3e06de27f24adad326b56969f17))
+* remove unused langchain-community dependency ([#787](https://github.com/langwatch/langwatch/issues/787)) ([9ad61f7](https://github.com/langwatch/langwatch/commit/9ad61f7e2d7ef3e06de27f24adad326b56969f17))
+* simulations page crashing browser ([#784](https://github.com/langwatch/langwatch/issues/784)) ([e731a5f](https://github.com/langwatch/langwatch/commit/e731a5ff366b8bbc497c88888f38b8bfaf690ddb))
+
+
+### Miscellaneous
+
+* separate the admin override add memebers button so we can see like the users see it ([b6e06d7](https://github.com/langwatch/langwatch/commit/b6e06d75e2b2e6ae83cd790cc18e0fe4f5299404))
+
 ## [1.6.0](https://github.com/langwatch/langwatch/compare/langwatch@v1.5.1...langwatch@v1.6.0) (2025-11-05)
 
 
