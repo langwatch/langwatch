@@ -29,6 +29,7 @@ import { usePostHog } from "../hooks/usePostHog";
 import { AnalyticsProvider } from "react-contextual-analytics";
 import { createAppAnalyticsClient } from "~/utils/analyticsClient";
 import { usePublicEnv } from "~/hooks/usePublicEnv";
+import SpansProvider from "~/observability/react-otel/SpansProvider";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -600,7 +601,8 @@ const LangWatch: AppType<{
       refetchInterval={0}
       refetchOnWindowFocus={false}
     >
-      <ChakraProvider value={system}>
+      <SpansProvider>
+        <ChakraProvider value={system}>
         <Head>
           <title>LangWatch</title>
         </Head>
@@ -623,7 +625,8 @@ const LangWatch: AppType<{
         {dependencies.ExtraFooterComponents && (
           <dependencies.ExtraFooterComponents />
         )}
-      </ChakraProvider>
+        </ChakraProvider>
+      </SpansProvider>
     </SessionProvider>
   );
 };

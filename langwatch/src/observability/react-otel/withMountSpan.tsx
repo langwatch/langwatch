@@ -1,5 +1,5 @@
-import { type ComponentType, createElement, useEffect } from "react";
-import { type SpanOptions } from "@opentelemetry/api";
+import { type ComponentType, createElement, useEffect, useMemo } from "react";
+import { context, trace, type SpanOptions } from "@opentelemetry/api";
 import { useSpans } from "./useSpans";
 import type { Attributes } from "@opentelemetry/api";
 
@@ -20,22 +20,32 @@ export function withMountSpan<P extends Record<string, unknown>>(
   const Wrapped: ComponentType<P> = (props) => {
     const { getOrCreateSpan, setAttributes, endSpan } = useSpans();
 
+    // Ensure span exists and attributes are set once on mount; end on unmount
     useEffect(() => {
       const [, created] = getOrCreateSpan(spanName, options);
       if (created) {
         const attrs =
           typeof attributes === "function" ? attributes(props) : attributes;
-        if (attrs) {
-          setAttributes(spanName, attrs);
-        }
+        if (attrs) setAttributes(spanName, attrs);
       }
-      return () => {
-        endSpan(spanName);
-      };
+      return () => endSpan(spanName);
       // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
-    return createElement(Component, props);
+    // Render subtree inside the span's active context so async work (fetch/XHR)
+    // auto-instrumentation links as children of this span.
+    const element = useMemo(() => {
+      const [span] = getOrCreateSpan(spanName, options);
+      const ctx = trace.setSpan(context.active(), span);
+      let rendered: ReturnType<typeof createElement> | null = null;
+      context.with(ctx, () => {
+        rendered = createElement(Component, props);
+      });
+      return rendered!;
+      // re-evaluate when props change so new callbacks are bound to context
+    }, [Component, getOrCreateSpan, options, props]);
+
+    return element;
   };
 
   Wrapped.displayName = `WithMountSpan(${Component.displayName ?? Component.name ?? "Component"})`;
