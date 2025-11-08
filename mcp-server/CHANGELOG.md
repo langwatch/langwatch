@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.1](https://github.com/langwatch/langwatch/compare/mcp-server@v0.2.0...mcp-server@v0.2.1) (2025-11-08)
+
+
+### Bug Fixes
+
+* force fetching of only md files ([c8a9baf](https://github.com/langwatch/langwatch/commit/c8a9baf12f375dd48970e0882cd69a029c6d338f))
+
 ## [0.2.0](https://github.com/langwatch/langwatch/compare/mcp-server@v0.1.0...mcp-server@v0.2.0) (2025-11-07)
 
 
