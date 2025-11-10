@@ -1,4 +1,5 @@
 import { Button, HStack, Input, Text, VStack } from "@chakra-ui/react";
+import { useCallback, useRef } from "react";
 import { Settings } from "react-feather";
 
 import { ConfigModal } from "../../optimization_studio/components/properties/modals/ConfigModal";
@@ -19,9 +20,37 @@ export type LlmConfigModalValues = {
 
 /**
  * Controlled LLM Config Modal
- * Accepts both snake_case (optimization studio) and camelCase (prompt-configs)
- * for backwards dsl compatibility
+ *
+ * Responsibilities:
+ * - Display and edit LLM configuration (model, temperature, max tokens)
+ * - Enforce GPT-5 constraints when model changes (temperature=1, min maxTokens=128k)
+ * - Support both snake_case and camelCase for backwards compatibility
+ *
+ * @param open - Whether the modal is open
+ * @param onClose - Callback when modal closes
+ * @param values - Current LLM configuration values
+ * @param onChange - Callback when values change
  */
+/**
+ * Ensures only one of maxTokens or max_tokens is set
+ */
+function normalizeMaxTokens(
+  values: Record<string, unknown>,
+  tokenValue: number,
+): LlmConfigModalValues {
+  const usesCamelCase = values.maxTokens !== undefined;
+
+  if (usesCamelCase) {
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { max_tokens, ...rest } = values;
+    return { ...rest, maxTokens: tokenValue } as LlmConfigModalValues;
+  } else {
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { maxTokens, ...rest } = values;
+    return { ...rest, max_tokens: tokenValue } as LlmConfigModalValues;
+  }
+}
+
 export function LLMConfigModal({
   open,
   onClose,
@@ -33,9 +62,67 @@ export function LLMConfigModal({
   values: LlmConfigModalValues;
   onChange: (params: LlmConfigModalValues) => void;
 }) {
-  // Normalize internally
   const maxTokens = values.maxTokens ?? values.max_tokens;
   const isGpt5 = values?.model?.includes("gpt-5");
+  const storedValuesRef = useRef<LlmConfigModalValues | null>(null);
+
+  /**
+   * Intelligent value change handler
+   *
+   * Responsibilities:
+   * - Enforces GPT-5 constraints when switching to GPT-5
+   * - Restores previous values when switching from GPT-5
+   * - Preserves snake_case vs camelCase format for maxTokens
+   */
+  const handleValueChange = useCallback(
+    (updates: Partial<LlmConfigModalValues>) => {
+      const newValues = { ...values, ...updates };
+      const newMaxTokens = newValues.maxTokens ?? newValues.max_tokens;
+      const newIsGpt5 = newValues.model?.includes("gpt-5");
+      const wasGpt5 = values.model?.includes("gpt-5");
+      const modelChanged =
+        updates.model !== undefined && newValues.model !== values.model;
+
+      // Switching TO GPT-5 - enforce constraints
+      if (modelChanged && newIsGpt5 && !wasGpt5) {
+        storedValuesRef.current = values;
+        const enforcedMaxTokens = Math.max(
+          newMaxTokens ?? 0,
+          DEFAULT_MAX_TOKENS,
+        );
+        onChange(
+          normalizeMaxTokens(
+            { ...newValues, temperature: 1 },
+            enforcedMaxTokens,
+          ),
+        );
+        return;
+      }
+
+      // Switching FROM GPT-5 - restore previous values
+      if (modelChanged && !newIsGpt5 && wasGpt5 && storedValuesRef.current) {
+        onChange({ ...storedValuesRef.current, model: newValues.model });
+        storedValuesRef.current = null;
+        return;
+      }
+
+      // Updating maxTokens - preserve format
+      if (updates.maxTokens !== undefined || updates.max_tokens !== undefined) {
+        const tokenValue = updates.maxTokens ?? updates.max_tokens!;
+        onChange(normalizeMaxTokens(newValues, tokenValue));
+        return;
+      }
+
+      // Simple update - preserve format
+      const currentMaxTokens = newValues.maxTokens ?? newValues.max_tokens;
+      if (currentMaxTokens !== undefined) {
+        onChange(normalizeMaxTokens(newValues, currentMaxTokens));
+      } else {
+        onChange(newValues as LlmConfigModalValues);
+      }
+    },
+    [values, onChange],
+  );
 
   return (
     <ConfigModal open={open} onClose={onClose} title="LLM Config">
@@ -48,7 +135,7 @@ export function LLMConfigModal({
           <ModelSelector
             model={values?.model ?? ""}
             options={allModelOptions}
-            onChange={(model) => onChange({ ...values, model })}
+            onChange={(model) => handleValueChange({ model })}
             mode="chat"
             size="full"
           />
@@ -79,7 +166,7 @@ export function LLMConfigModal({
           max={isGpt5 ? 1 : 2}
           placeholder="1"
           onChange={(e) =>
-            onChange({ ...values, temperature: Number(e.target.value) })
+            handleValueChange({ temperature: Number(e.target.value) })
           }
         />
         {isGpt5 && (
@@ -102,14 +189,11 @@ export function LLMConfigModal({
             max={1048576}
             onChange={(e) => {
               const newValue = Number(e.target.value);
-              // Return in same format as input, explicitly removing the other
-              if (values.maxTokens !== undefined) {
-                const { max_tokens: _, ...rest } = values;
-                onChange({ ...rest, maxTokens: newValue });
-              } else {
-                const { maxTokens: _, ...rest } = values;
-                onChange({ ...rest, max_tokens: newValue });
-              }
+              handleValueChange(
+                values.maxTokens !== undefined
+                  ? { maxTokens: newValue }
+                  : { max_tokens: newValue },
+              );
             }}
           />
           {isGpt5 && (
@@ -123,6 +207,13 @@ export function LLMConfigModal({
   );
 }
 
+/**
+ * WarningText
+ * Responsibilities:
+ * Display warning text with yellow styling
+ *
+ * TODO: Move to a separate file
+ */
 function WarningText({ children }: { children: React.ReactNode }) {
   return (
     <Text
