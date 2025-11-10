@@ -14,7 +14,9 @@ alwaysApply: false
      => if the function, method or component is more than one responsibility, suggest how to break it down into smaller functions, methods or components. Encourage the user to use the "Single Responsibility" principle
      and explain the benefits of doing so in this case.
 
-
 ### Imports
    - Always use named imports for React components and hooks.
    - Never use non-destructured imports, such as `React.useMemo` or `React.useCallback`.
+
+### Type Safety
+   - Never use the `any` type.
