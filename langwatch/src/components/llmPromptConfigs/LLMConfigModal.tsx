@@ -1,5 +1,5 @@
 import { Button, HStack, Input, Text, VStack } from "@chakra-ui/react";
-import { useCallback, useRef } from "react";
+import { useCallback } from "react";
 import { Settings } from "react-feather";
 
 import { ConfigModal } from "../../optimization_studio/components/properties/modals/ConfigModal";
@@ -7,11 +7,7 @@ import { HorizontalFormControl } from "../HorizontalFormControl";
 import { allModelOptions, ModelSelector } from "../ModelSelector";
 import { Link } from "../ui/link";
 import { Tooltip } from "../ui/tooltip";
-import {
-  DEFAULT_MAX_TOKENS,
-  MIN_MAX_TOKENS,
-  DEFAULT_TEMPERATURE,
-} from "~/utils/constants";
+import { DEFAULT_MAX_TOKENS, MIN_MAX_TOKENS } from "~/utils/constants";
 
 export type LlmConfigModalValues = {
   model: string;
@@ -28,12 +24,11 @@ export type LlmConfigModalValues = {
  * Responsibilities:
  * - Display and edit LLM configuration (model, temperature, max tokens)
  * - Enforce GPT-5 constraints when switching TO GPT-5 (temperature=1, min maxTokens=128k)
- * - Restore temperature when switching FROM GPT-5
  * - Support both snake_case and camelCase for backwards compatibility
  * - Normalize values to ensure consistency (defaults undefined maxTokens to MIN_MAX_TOKENS)
  *
  * Note: Form schema also enforces minimum constraints as data integrity layer:
- * - GPT-5: min 128k tokens, temperature=1
+ * - GPT-5: temperature=1, min 128k tokens
  * - Other models: min 256 tokens
  *
  * @param open - Whether the modal is open
@@ -74,14 +69,12 @@ export function LLMConfigModal({
 }) {
   const maxTokens = values.maxTokens ?? values.max_tokens;
   const isGpt5 = values?.model?.includes("gpt-5");
-  const storedValuesRef = useRef<LlmConfigModalValues | null>(null);
 
   /**
    * Intelligent value change handler
    *
    * Responsibilities:
-   * - When switching TO GPT-5: Store previous values, enforce temp=1 & min 128k tokens
-   * - When switching FROM GPT-5: Restore previous temperature (keep maxTokens as-is)
+   * - When switching TO GPT-5: Enforce temp=1 & min 128k tokens
    * - All changes: Normalize maxTokens format (snake_case vs camelCase) and default to MIN_MAX_TOKENS
    */
   const handleValueChange = useCallback(
@@ -95,7 +88,6 @@ export function LLMConfigModal({
 
       // Switching TO GPT-5 - enforce constraints
       if (modelChanged && newIsGpt5 && !wasGpt5) {
-        storedValuesRef.current = values;
         const enforcedMaxTokens = Math.max(
           newMaxTokens ?? MIN_MAX_TOKENS,
           DEFAULT_MAX_TOKENS,
@@ -107,11 +99,6 @@ export function LLMConfigModal({
           ),
         );
         return;
-      }
-
-      // Switching FROM GPT-5, we restore the previous temperature if not provided
-      if (modelChanged && !newIsGpt5 && wasGpt5 && storedValuesRef.current) {
-        newValues.temperature ??= storedValuesRef.current.temperature;
       }
 
       onChange(normalizeMaxTokens(newValues, newMaxTokens ?? MIN_MAX_TOKENS));

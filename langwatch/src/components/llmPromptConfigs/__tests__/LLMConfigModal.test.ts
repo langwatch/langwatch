@@ -5,8 +5,7 @@ import { describe, it } from "vitest";
  *
  * The handleValueChange function manages:
  * 1. GPT-5 constraint enforcement when switching TO GPT-5
- * 2. Temperature restoration when switching FROM GPT-5
- * 3. Format normalization (snake_case vs camelCase) for all changes
+ * 2. Format normalization (snake_case vs camelCase) for all changes
  */
 describe("LLMConfigModal handleValueChange", () => {
   describe("when switching TO GPT-5", () => {
@@ -26,21 +25,12 @@ describe("LLMConfigModal handleValueChange", () => {
       it.todo("still enforces constraints");
     });
 
-    it.todo("stores previous values in ref");
     it.todo("normalizes maxTokens format");
   });
 
-  describe("when switching FROM GPT-5", () => {
-    describe("when previous temperature was stored", () => {
-      it.todo("restores previous temperature");
-    });
-
-    describe("when previous maxTokens was stored", () => {
-      it.todo("does NOT restore maxTokens");
-    });
-
-    it.todo("keeps the new model value");
-    it.todo("clears stored values after restoration");
+  describe("when switching away from GPT-5", () => {
+    it.todo("does not modify temperature");
+    it.todo("does not modify maxTokens");
     it.todo("normalizes maxTokens format with MIN_MAX_TOKENS default");
   });
 
