@@ -1,5 +1,6 @@
 import { type Provider, createAnalyticsClient, providers } from "react-contextual-analytics";
 import type { PostHog } from "posthog-js";
+import { context, trace } from "@opentelemetry/api";
 
 interface CreateAppAnalyticsClientParams {
   isSaaS: boolean;
@@ -28,10 +29,17 @@ export function createAppAnalyticsClient(params: CreateAppAnalyticsClientParams)
             .filter(Boolean)
             .join(".");
 
+          const activeSpan = trace.getSpan(context.active());
+          const spanCtx = activeSpan?.spanContext();
+          const traceId = spanCtx?.traceId;
+          const spanId = spanCtx?.spanId;
+
           posthogClient.capture(name, {
             ...event.attributes,
             boundary: event.boundary,
             context: event.context,
+            ...(traceId && { trace_id: traceId }),
+            ...(spanId && { span_id: spanId }),
           });
         },
       } satisfies Provider);
