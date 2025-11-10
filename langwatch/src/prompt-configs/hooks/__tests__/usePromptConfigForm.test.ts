@@ -63,7 +63,7 @@ describe("usePromptConfigForm", () => {
       expect(result.handle).toBe("valid-handle");
       expect(result.version.configData.prompt).toBe("Valid prompt text");
       expect(result.version.configData.outputs).toHaveLength(1);
-      expect(result.version.configData.outputs[0].identifier).toBe("output");
+      expect(result.version.configData.outputs[0]?.identifier).toBe("output");
 
       // Should use defaults for invalid/missing parts
       expect(result.version.configData.llm).toBeDefined();
