@@ -75,9 +75,8 @@ export function LLMConfigModal({
           value={values?.temperature}
           type="number"
           step={0.1}
-          min={0}
-          max={2}
-          disabled={isGpt5}
+          min={isGpt5 ? 1 : 0}
+          max={isGpt5 ? 1 : 2}
           placeholder="1"
           onChange={(e) =>
             onChange({ ...values, temperature: Number(e.target.value) })
