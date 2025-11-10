@@ -1,52 +1,17 @@
 ---
-description: 
-globs: *.ts*
+description:
+globs: *.tsx
 alwaysApply: false
 ---
-React Component Development Guidelines:
+Typescript Development Guidelines:
 
-1. Component Structure
-   - Create smaller, focused components
-   - Compose larger components from smaller ones
-   - When prototyping, keep small components in the same file, but mark to be removed:
-   ie: 
+1. Documentation
+   - Add TSDoc style documentation when writing functions, methods and components.
+   - Always include "Single Responsibility" in the description
 
-/**
- * ExampleComponent
- * Responsibilities: 
- * To be an example component
- * 
- * TODO: Move to a separate file
- */
-function ExampleComponent() {
-  return <div>ExampleComponent</div>;
-}
+2. React Rules
+   - Keep business logic in hooks, not inline in the component markup.
 
-
-2. Hook Organization
-   - Break complex logic into smaller hooks
-   - Compose hooks when it makes sense
-   - Keep hooks in the same file as their components
-
-3. Code Separation
-   - Separate business logic from UI rendering
-   - Keep related code together
-   - Maintain clear boundaries between concerns
-
-4. Class Organization
-   - Place public methods first
-   - Place private methods at the bottom of the class
-   - Group related methods together
-   - Use clear method names that describe their purpose
-
-
-/**
- * Testing Guidelines
- * - Use Vite's built-in test runner (vitest)
- * - Place all test files in a `__tests__` directory adjacent to the code under test
- * - Name test files as `ComponentName.test.tsx` or `hookName.test.ts`
- * - Use descriptive test names and Given-When-Then structure in comments
- * - Prefer testing public behavior over implementation details
- * - Mock dependencies as needed, but avoid over-mocking
- * - Keep tests isolated and independent
- */
+3. Imports
+   - Always use named imports for React components and hooks.
+   - Never use non-destructured imports, such as `React.useMemo` or `React.useCallback`.

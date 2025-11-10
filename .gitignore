@@ -26,3 +26,6 @@ prompts/**
 # SpecStory
 .cursorindexingignore
 .specstory
+
+# Chainlit
+.chainlit
