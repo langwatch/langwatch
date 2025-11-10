@@ -34,13 +34,13 @@ const getWorkFlow = (state: Workflow) => {
 
 const checkForRequiredInputs = (
   publishedWorkflowVersion: Workflow,
-  body: Record<string, unknown>
+  body: Record<string, unknown>,
 ) => {
   const bodyInputs = Object.keys(body);
 
   const entryInputs = getEntryInputs(
     publishedWorkflowVersion?.edges,
-    publishedWorkflowVersion?.nodes
+    publishedWorkflowVersion?.nodes,
   );
 
   const requiredInputs: string[] = [];
@@ -60,7 +60,7 @@ const checkForRequiredInputs = (
 
 const checkForRequiredLLMKeys = (
   publishedWorkflowVersion: Workflow,
-  projectLLMKeys: MaybeStoredModelProvider[]
+  projectLLMKeys: MaybeStoredModelProvider[],
 ) => {
   const llmModelsNeeded: string[] = [];
   const projectLLKeysNotSet: string[] = [];
@@ -91,11 +91,11 @@ const checkForRequiredLLMKeys = (
   });
 
   const missingKey = projectLLKeysNotSet.find((key) =>
-    llmModelsNeeded.includes(key)
+    llmModelsNeeded.includes(key),
   );
   if (missingKey) {
     throw new Error(
-      `Missing required LLM key: ${missingKey}. Please set the LLM key in the project settings`
+      `Missing required LLM key: ${missingKey}. Please set the LLM key in the project settings`,
     );
   }
   return true;
@@ -105,7 +105,7 @@ export async function runEvaluationWorkflow(
   workflowId: string,
   projectId: string,
   inputs: Record<string, string>,
-  versionId?: string
+  versionId?: string,
 ): Promise<{
   result: SingleEvaluationResult;
   status: ExecutionStatus;
@@ -116,7 +116,7 @@ export async function runEvaluationWorkflow(
       projectId,
       inputs,
       versionId,
-      true
+      true,
     );
 
     // Process the result
@@ -158,7 +158,7 @@ export async function runWorkflow(
   projectId: string,
   inputs: Record<string, string>,
   versionId?: string,
-  do_not_trace?: boolean
+  do_not_trace?: boolean,
 ) {
   const workflow = await prisma.workflow.findUnique({
     where: { id: workflowId, projectId },
@@ -189,7 +189,7 @@ export async function runWorkflow(
   checkForRequiredInputs(workflowData, inputs);
   checkForRequiredLLMKeys(
     workflowData,
-    modelProviders as unknown as MaybeStoredModelProvider[]
+    modelProviders as unknown as MaybeStoredModelProvider[],
   );
 
   const trace_id = inputs.trace_id ?? `trace_${nanoid()}`;

@@ -1,0 +1,39 @@
+---
+alwaysApply: false
+---
+# Solve Full Ticket
+
+When implementing a feature or fixing a bug, follow this complete workflow:
+
+## Branch Management
+1. Create a new branch with a descriptive name using the format:
+   - `feature/description-of-feature` for new features
+   - `fix/description-of-bug` for bug fixes
+   - `refactor/description-of-change` for refactoring
+   - `docs/description-of-update` for documentation updates
+
+## Implementation
+2. Implement the complete solution, ensuring:
+   - All requirements are met
+   - Code follows existing patterns and conventions
+   - Proper error handling is included
+   - Edge cases are considered
+   - 
+
+## Commit Standards
+3. Make commits using conventional commit format
+
+## Quality Assurance
+4. Before pushing:
+   - Ensure code compiles without errors
+   - Run existing tests to verify no regressions
+   - Add new tests if applicable
+   - Review code for best practices
+   - Alert the user if there are any errors or warnings before pushing the branch.
+
+## Deployment
+5. Push the branch to remote repository for review and integration
+
+This ensures a complete, professional development workflow that maintains code quality and project standards.
+alwaysApply: true
+---
