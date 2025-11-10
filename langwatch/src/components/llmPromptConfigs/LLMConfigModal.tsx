@@ -7,7 +7,11 @@ import { HorizontalFormControl } from "../HorizontalFormControl";
 import { allModelOptions, ModelSelector } from "../ModelSelector";
 import { Link } from "../ui/link";
 import { Tooltip } from "../ui/tooltip";
-import { DEFAULT_MAX_TOKENS, MIN_MAX_TOKENS } from "~/utils/constants";
+import {
+  DEFAULT_MAX_TOKENS,
+  MIN_MAX_TOKENS,
+  DEFAULT_TEMPERATURE,
+} from "~/utils/constants";
 
 export type LlmConfigModalValues = {
   model: string;
@@ -23,8 +27,14 @@ export type LlmConfigModalValues = {
  *
  * Responsibilities:
  * - Display and edit LLM configuration (model, temperature, max tokens)
- * - Enforce GPT-5 constraints when model changes (temperature=1, min maxTokens=128k)
+ * - Enforce GPT-5 constraints when switching TO GPT-5 (temperature=1, min maxTokens=128k)
+ * - Restore temperature when switching FROM GPT-5
  * - Support both snake_case and camelCase for backwards compatibility
+ * - Normalize values to ensure consistency (defaults undefined maxTokens to MIN_MAX_TOKENS)
+ *
+ * Note: Form schema also enforces minimum constraints as data integrity layer:
+ * - GPT-5: min 128k tokens, temperature=1
+ * - Other models: min 256 tokens
  *
  * @param open - Whether the modal is open
  * @param onClose - Callback when modal closes
@@ -70,9 +80,9 @@ export function LLMConfigModal({
    * Intelligent value change handler
    *
    * Responsibilities:
-   * - Enforces GPT-5 constraints when switching to GPT-5
-   * - Restores previous values when switching from GPT-5
-   * - Preserves snake_case vs camelCase format for maxTokens
+   * - When switching TO GPT-5: Store previous values, enforce temp=1 & min 128k tokens
+   * - When switching FROM GPT-5: Restore previous temperature (keep maxTokens as-is)
+   * - All changes: Normalize maxTokens format (snake_case vs camelCase) and default to MIN_MAX_TOKENS
    */
   const handleValueChange = useCallback(
     (updates: Partial<LlmConfigModalValues>) => {
@@ -169,8 +179,10 @@ export function LLMConfigModal({
             value={maxTokens}
             type="number"
             step={64}
-            min={isGpt5 ? DEFAULT_MAX_TOKENS : 256}
-            placeholder={isGpt5 ? DEFAULT_MAX_TOKENS.toString() : "256"}
+            min={isGpt5 ? DEFAULT_MAX_TOKENS : MIN_MAX_TOKENS}
+            placeholder={
+              isGpt5 ? DEFAULT_MAX_TOKENS.toString() : MIN_MAX_TOKENS.toString()
+            }
             max={1048576}
             onChange={(e) => {
               const newValue = Number(e.target.value);
