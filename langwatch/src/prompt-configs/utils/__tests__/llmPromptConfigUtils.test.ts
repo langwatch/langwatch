@@ -34,8 +34,8 @@ describe("safeOptimizationStudioNodeDataToPromptConfigFormInitialValues", () => 
     });
   });
 
-  describe("when LLM value is a string", () => {
-    it("resets LLM value to empty object", () => {
+  describe("when LLM value is a string (legacy format)", () => {
+    it("migrates legacy format to object with model field", () => {
       const consoleWarnSpy = vi
         .spyOn(console, "warn")
         .mockImplementation(() => {});
@@ -44,7 +44,7 @@ describe("safeOptimizationStudioNodeDataToPromptConfigFormInitialValues", () => 
           {
             identifier: "llm",
             type: "llm" as const,
-            value: "corrupted-string-value",
+            value: "openai/gpt-4-0125-preview",
           },
         ],
         inputs: [],
@@ -54,7 +54,9 @@ describe("safeOptimizationStudioNodeDataToPromptConfigFormInitialValues", () => 
       const result =
         safeOptimizationStudioNodeDataToPromptConfigFormInitialValues(nodeData);
 
-      expect(result.version?.configData?.llm).toEqual({});
+      expect(result.version?.configData?.llm).toEqual({
+        model: "openai/gpt-4-0125-preview",
+      });
       consoleWarnSpy.mockRestore();
     });
   });

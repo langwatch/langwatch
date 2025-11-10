@@ -67,13 +67,14 @@ export function promptConfigFormValuesToOptimizationStudioNodeData(
 }
 
 /**
- * Safely converts node data to form initial values, handling corrupted data gracefully.
+ * Safely converts node data to form initial values, handling legacy formats and corrupted data.
  *
  * Auto-generates or provides defaults for missing or invalid data:
  * - Identifiers: Auto-generated for inputs/outputs via safeInputs/safeOutputs
  * - Handle: Defaults to null if missing
  * - Scope: Defaults to PROJECT if missing (required by schema)
- * - LLM config: Provides empty object if corrupted or missing (schema applies defaults)
+ * - LLM config: Migrates legacy string format (model name) to object { model }
+ * - LLM config: Provides empty object if missing (schema applies defaults)
  * - Prompt: Defaults to empty string if missing
  *
  * @param nodeData - Raw node data from the workflow
@@ -90,18 +91,22 @@ export function safeOptimizationStudioNodeDataToPromptConfigFormInitialValues(
   const outputs = safeOutputs(nodeData.outputs);
   const llmNode = nodeData as LlmPromptConfigComponent;
 
-  // Safely extract LLM config, defaulting to empty object if corrupted
-  // The schema will apply defaults (model, temperature, maxTokens) to the empty object
+  // Safely extract LLM config, handling legacy format where LLM was just a model string
+  // Legacy format: llm = "openai/gpt-4-0125-preview"
+  // New format: llm = { model: "openai/gpt-4-0125-preview", temperature: 0.7, maxTokens: 1000 }
   const rawLlmValue = llmParameter?.value;
   let llmValue: DeepPartial<
     PromptConfigFormValues["version"]["configData"]["llm"]
   >;
 
   if (rawLlmValue && typeof rawLlmValue === "string") {
+    // Migrate legacy format: string model name → object with model field
     console.warn(
-      "LLM parameter is a string instead of object, resetting to empty object",
+      `Migrating legacy LLM format: string "${String(
+        rawLlmValue,
+      )}" → object with model field`,
     );
-    llmValue = {};
+    llmValue = { model: rawLlmValue };
   } else if (rawLlmValue && typeof rawLlmValue === "object") {
     llmValue = rawLlmValue;
   } else {
