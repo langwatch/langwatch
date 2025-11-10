@@ -7,6 +7,7 @@ import { formSchema, type PromptConfigFormValues } from "~/prompt-configs";
 import { salvageValidData } from "~/utils/zodSalvage";
 
 import { inputsAndOutputsToDemostrationColumns } from "../utils/llmPromptConfigUtils";
+import { buildDefaultFormValues } from "../utils/buildDefaultFormValues";
 
 interface UsePromptConfigFormProps {
   configId?: string;
@@ -29,7 +30,8 @@ export const usePromptConfigForm = ({
    * Uses generic salvage utility to preserve valid parts of corrupted data.
    */
   const parsedInitialValues = useMemo(() => {
-    return salvageValidData(formSchema, initialConfigValues);
+    const defaults = buildDefaultFormValues();
+    return salvageValidData(formSchema, initialConfigValues, defaults);
   }, [initialConfigValues]);
 
   const methods = useForm<PromptConfigFormValues>({
