@@ -1,9 +1,8 @@
 import { WebTracerProvider } from "@opentelemetry/sdk-trace-web";
-import { BatchSpanProcessor, ConsoleSpanExporter, SimpleSpanProcessor } from "@opentelemetry/sdk-trace-base";
+import { BatchSpanProcessor, SimpleSpanProcessor } from "@opentelemetry/sdk-trace-base";
 import { registerInstrumentations } from "@opentelemetry/instrumentation";
 import { FetchInstrumentation } from "@opentelemetry/instrumentation-fetch";
 import { XMLHttpRequestInstrumentation } from "@opentelemetry/instrumentation-xml-http-request";
-import { UserInteractionInstrumentation } from "@opentelemetry/instrumentation-user-interaction";
 import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-http";
 import { metrics } from "@opentelemetry/api";
 import { resourceFromAttributes } from "@opentelemetry/resources";
@@ -21,7 +20,10 @@ if (typeof window !== "undefined") {
   const tracerProvider = new WebTracerProvider({
     spanProcessors: isProd
       ? [new BatchSpanProcessor(otlpTraceExporter)]
-      : [new SimpleSpanProcessor(otlpTraceExporter)],
+      : [
+        new SimpleSpanProcessor(otlpTraceExporter),
+        // new SimpleSpanProcessor(new ConsoleSpanExporter()),
+      ],
     resource: resourceFromAttributes({
       "service.name": "langwatch-frontend",
       "deployment.environment": process.env.NEXT_PUBLIC_NODE_ENV ?? process.env.NODE_ENV,
@@ -33,28 +35,36 @@ if (typeof window !== "undefined") {
   registerInstrumentations({
     instrumentations: [
       new FetchInstrumentation({
-        propagateTraceHeaderCorsUrls: /.*/,
+        propagateTraceHeaderCorsUrls: [],
+        // enabled: false,
+        measureRequestSize: true,
         ignoreUrls: [
+          /\/api/,
           /\/api\/otel-proxy\//,
           /\/_next\//,
           /\/__nextjs_/,
           /posthog\.com/,
           /pendo\.io/,
-          /crisp.chat/
+          /crisp.chat/,
+          /reo.dev/,
         ],
       }),
       new XMLHttpRequestInstrumentation({
-        propagateTraceHeaderCorsUrls: /.*/,
+        // propagateTraceHeaderCorsUrls: /.*/,
+        propagateTraceHeaderCorsUrls: [],
+        measureRequestSize: true,
+        // enabled: false,
         ignoreUrls: [
+          /\/api/,
           /^\/api\/otel-proxy\//,
           /^\/_next\//,
           /\/__nextjs_/,
           /posthog\.com/,
           /pendo\.io/,
-          /crisp.chat/
+          /crisp.chat/,
+          /reo.dev/,
         ],
       }),
-      new UserInteractionInstrumentation(),
     ],
   });
 
