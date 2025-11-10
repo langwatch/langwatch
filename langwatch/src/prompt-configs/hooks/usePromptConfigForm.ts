@@ -29,10 +29,10 @@ export const usePromptConfigForm = ({
    * Memoized to avoid re-parsing on every render.
    * Uses generic salvage utility to preserve valid parts of corrupted data.
    */
+  const defaults = useMemo(() => buildDefaultFormValues(), []);
   const parsedInitialValues = useMemo(() => {
-    const defaults = buildDefaultFormValues();
     return salvageValidData(formSchema, initialConfigValues, defaults);
-  }, [initialConfigValues]);
+  }, [initialConfigValues, defaults]);
 
   const methods = useForm<PromptConfigFormValues>({
     /**

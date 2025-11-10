@@ -111,5 +111,51 @@ describe("salvageValidData", () => {
       expect("extraKey" in result).toBe(false);
     });
   });
+
+  describe("when optional nested object has corrupted data", () => {
+    it("handles optional nested objects gracefully without crashing", () => {
+      const optionalNestedSchema = z.object({
+        name: z.string().default("default-name"),
+        optional: z
+          .object({
+            required: z.string(),
+            other: z.number().default(0),
+          })
+          .optional(),
+      });
+
+      const corruptedOptionalNested = {
+        name: "John",
+        optional: { required: "valid", other: "not-a-number" }, // other is invalid
+      };
+
+      const result = salvageValidData(optionalNestedSchema, corruptedOptionalNested);
+
+      expect(result.name).toBe("John");
+      expect(result.optional?.required).toBe("valid");
+      expect(result.optional?.other).toBe(0); // Default
+    });
+
+    it("falls back to undefined when optional nested object cannot be salvaged", () => {
+      const optionalNestedSchema = z.object({
+        name: z.string().default("default-name"),
+        optional: z
+          .object({
+            required: z.string(), // Required field
+          })
+          .optional(),
+      });
+
+      const missingRequiredNested = {
+        name: "John",
+        optional: { other: "unexpected field" }, // Missing required field
+      };
+
+      const result = salvageValidData(optionalNestedSchema, missingRequiredNested);
+
+      expect(result.name).toBe("John");
+      expect(result.optional).toBeUndefined(); // Falls back to undefined
+    });
+  });
 });
 
