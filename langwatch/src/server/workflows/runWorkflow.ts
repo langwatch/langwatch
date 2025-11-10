@@ -205,7 +205,7 @@ export async function runWorkflow(
           ? do_not_trace
           : typeof inputs.do_not_trace === "boolean"
           ? inputs.do_not_trace
-          : false,
+          : !workflowData.enable_tracing,
     },
   };
 
