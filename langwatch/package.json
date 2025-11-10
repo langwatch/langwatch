@@ -128,7 +128,6 @@
     "jsonwebtoken": "^9.0.2",
     "langwatch": "^0.4.2",
     "libphonenumber-js": "^1.12.24",
-    "@rollup/rollup-linux-x64-gnu": "^4.35.0",
     "lodash-es": "^4.17.21",
     "lodash.clonedeep": "^4.5.0",
     "lodash.debounce": "^4.0.8",
@@ -258,7 +257,8 @@
     "initVersion": "7.19.0"
   },
   "optionalDependencies": {
-    "bufferutil": "^4.0.8"
+    "bufferutil": "^4.0.8",
+    "@rollup/rollup-linux-x64-gnu": "^4.35.0"
   },
   "workspaces": [
     "saas-src/*"
