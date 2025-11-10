@@ -47,11 +47,11 @@ export function withSpan<P extends Record<string, unknown>>(
 ) {
   return function (Component: ComponentType<P>): ComponentType<P> {
     const Wrapped: ComponentType<P> = (props) => {
-      const tracer = useMemo(() => trace.getTracer("react-client"), []);
-      
+      const tracer = useMemo(() => trace.getTracer("langwatch-component"), []);
+
       // Get lightweight context data (no network requests)
       const { contextData, setCurrentSpan } = useOtelContext();
-      
+
       // Store span ref to keep it active throughout component lifecycle
       const spanRef = useRef<Span | null>(null);
       const [isSpanReady, setIsSpanReady] = useState(false);
@@ -61,34 +61,22 @@ export function withSpan<P extends Record<string, unknown>>(
         const span = tracer.startSpan(spanName, config?.options);
         spanRef.current = span;
         setCurrentSpan(span);
-        
+
         // Automatically set auth and context attributes from lightweight context
         if (contextData?.userId) {
           span.setAttribute("user.id", contextData.userId);
         }
-        if (contextData?.userEmail) {
-          span.setAttribute("user.email", contextData.userEmail);
-        }
         if (contextData?.organizationId) {
           span.setAttribute("organization.id", contextData.organizationId);
         }
-        if (contextData?.organizationName) {
-          span.setAttribute("organization.name", contextData.organizationName);
-        }
         if (contextData?.teamId) {
           span.setAttribute("team.id", contextData.teamId);
-        }
-        if (contextData?.teamName) {
-          span.setAttribute("team.name", contextData.teamName);
         }
         if (contextData?.projectId) {
           span.setAttribute("project.id", contextData.projectId);
         }
         if (contextData?.projectSlug) {
           span.setAttribute("project.slug", contextData.projectSlug);
-        }
-        if (contextData?.projectName) {
-          span.setAttribute("project.name", contextData.projectName);
         }
 
         // Set custom attributes if provided
@@ -101,7 +89,7 @@ export function withSpan<P extends Record<string, unknown>>(
             span.setAttribute(key, value as never);
           }
         }
-        
+
         setIsSpanReady(true);
 
         return () => {
@@ -137,4 +125,3 @@ export function withSpan<P extends Record<string, unknown>>(
     return Wrapped;
   };
 }
-

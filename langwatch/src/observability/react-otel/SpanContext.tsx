@@ -20,7 +20,7 @@ export function SpanProvider({ span, children }: { span: Span; children: ReactNo
   // Set this span as the active span in the OpenTelemetry context
   // This is picked up by the ZoneContextManager
   const ctx = trace.setSpan(context.active(), span);
-  
+
   // Render children within this context
   // All async operations started from children will inherit this span
   let rendered: ReactNode = null;
@@ -31,7 +31,6 @@ export function SpanProvider({ span, children }: { span: Span; children: ReactNo
       </SpanContext.Provider>
     );
   });
-  
+
   return <>{rendered}</>;
 }
-

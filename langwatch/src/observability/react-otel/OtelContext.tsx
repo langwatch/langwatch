@@ -1,5 +1,5 @@
 import { createContext, useContext } from "react";
-import type { Span } from "@opentelemetry/api";
+import { type Span } from "@opentelemetry/api";
 
 /**
  * Lightweight context data captured once at app level.
@@ -37,5 +37,6 @@ export function useOtelContext(): OtelContextValue {
   if (!context) {
     throw new Error(missingProviderMessage);
   }
-  return context;
+
+  return { ...context };
 }
