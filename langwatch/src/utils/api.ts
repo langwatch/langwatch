@@ -56,10 +56,32 @@ export const api = createTRPCNext<AppRouter>({
           // when condition is true, use normal request
           true: httpLink({
             url: `${getBaseUrl()}/api/trpc`,
+            headers: ({ op }) => ({
+              ...((op.context?.traceHeaders as Record<
+                string,
+                string
+              >) ?? {}),
+            }),
           }),
           // when condition is false, use batching
           false: httpBatchLink({
             url: `${getBaseUrl()}/api/trpc`,
+            headers: ({ opList }) => {
+              const merged = opList.reduce<Record<string, string>>(
+                (acc, op) => {
+                  const traceHeaders =
+                    (op.context?.traceHeaders as
+                      | Record<string, string>
+                      | undefined) ?? {};
+                  for (const [key, value] of Object.entries(traceHeaders)) {
+                    acc[key] = value;
+                  }
+                  return acc;
+                },
+                {},
+              );
+              return merged;
+            },
           }),
         }),
       ],
