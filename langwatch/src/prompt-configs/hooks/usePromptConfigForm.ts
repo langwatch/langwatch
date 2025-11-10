@@ -25,11 +25,19 @@ export const usePromptConfigForm = ({
   /**
    * Parse initial values once with schema defaults applied.
    * Memoized to avoid re-parsing on every render.
+   * Uses safeParse to salvage corrupted data instead of throwing.
    */
-  const parsedInitialValues = useMemo(
-    () => formSchema.parse(initialConfigValues),
-    [initialConfigValues],
-  );
+  const parsedInitialValues = useMemo(() => {
+    const result = formSchema.safeParse(initialConfigValues);
+    
+    if (!result.success) {
+      console.warn("Failed to parse initial config values, using defaults:", result.error);
+      // Return schema defaults by parsing empty object
+      return formSchema.parse({});
+    }
+    
+    return result.data;
+  }, [initialConfigValues]);
 
   const methods = useForm<PromptConfigFormValues>({
     /**

@@ -104,6 +104,21 @@ describe("safeOptimizationStudioNodeDataToPromptConfigFormInitialValues", () => 
     });
   });
 
+  describe("when prompt is missing", () => {
+    it("defaults prompt to empty string", () => {
+      const nodeData = {
+        parameters: [],
+        inputs: [],
+        outputs: [{ identifier: "output", type: "str" }],
+      } as any;
+
+      const result =
+        safeOptimizationStudioNodeDataToPromptConfigFormInitialValues(nodeData);
+
+      expect(result.version?.configData?.prompt).toBe("");
+    });
+  });
+
   describe("when input identifier is empty string", () => {
     it("generates unique identifier", () => {
       const consoleWarnSpy = vi

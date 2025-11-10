@@ -74,6 +74,7 @@ export function promptConfigFormValuesToOptimizationStudioNodeData(
  * - Handle: Defaults to null if missing
  * - Scope: Defaults to PROJECT if missing (required by schema)
  * - LLM config: Provides empty object if corrupted or missing (schema applies defaults)
+ * - Prompt: Defaults to empty string if missing
  *
  * @param nodeData - Raw node data from the workflow
  * @returns Partial form values with safe defaults for all required fields
@@ -91,28 +92,42 @@ export function safeOptimizationStudioNodeDataToPromptConfigFormInitialValues(
 
   // Safely extract LLM config, defaulting to empty object if corrupted
   // The schema will apply defaults (model, temperature, maxTokens) to the empty object
-  let llmValue = llmParameter?.value;
-  if (llmValue && typeof llmValue === "string") {
+  const rawLlmValue = llmParameter?.value;
+  let llmValue: DeepPartial<
+    PromptConfigFormValues["version"]["configData"]["llm"]
+  >;
+
+  if (rawLlmValue && typeof rawLlmValue === "string") {
     console.warn(
       "LLM parameter is a string instead of object, resetting to empty object",
     );
     llmValue = {};
+  } else if (rawLlmValue && typeof rawLlmValue === "object") {
+    llmValue = rawLlmValue;
+  } else {
+    llmValue = {};
+  }
+
+  // Extract scope safely - it may not exist on all node types
+  let scope: PromptScope | undefined = undefined;
+  if ("scope" in llmNode && typeof llmNode.scope === "string") {
+    scope = llmNode.scope as PromptScope;
   }
 
   return {
     configId: llmNode.configId,
     versionMetadata: versionMetadataToFormFormat(llmNode.versionMetadata),
     handle: llmNode.handle ?? null,
-    scope: (llmNode as any).scope ?? PromptScope.PROJECT,
+    scope: scope ?? PromptScope.PROJECT,
     version: {
       configData: {
         inputs,
         outputs,
-        llm: llmValue ?? {},
+        llm: llmValue,
         prompt:
           typeof parametersMap.instructions?.value === "string"
             ? parametersMap.instructions.value
-            : undefined,
+            : "",
         messages: Array.isArray(parametersMap.messages?.value)
           ? parametersMap.messages.value
           : [],
