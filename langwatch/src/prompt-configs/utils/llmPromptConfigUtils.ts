@@ -73,7 +73,7 @@ export function promptConfigFormValuesToOptimizationStudioNodeData(
  * - Identifiers: Auto-generated for inputs/outputs via safeInputs/safeOutputs
  * - Handle: Defaults to null if missing
  * - Scope: Defaults to PROJECT if missing (required by schema)
- * - LLM config: Provides empty object if corrupted or missing
+ * - LLM config: Provides empty object if corrupted or missing (schema applies defaults)
  *
  * @param nodeData - Raw node data from the workflow
  * @returns Partial form values with safe defaults for all required fields
@@ -89,13 +89,14 @@ export function safeOptimizationStudioNodeDataToPromptConfigFormInitialValues(
   const outputs = safeOutputs(nodeData.outputs);
   const llmNode = nodeData as LlmPromptConfigComponent;
 
-  // Safely extract LLM config, defaulting to undefined if corrupted
+  // Safely extract LLM config, defaulting to empty object if corrupted
+  // The schema will apply defaults (model, temperature, maxTokens) to the empty object
   let llmValue = llmParameter?.value;
   if (llmValue && typeof llmValue === "string") {
     console.warn(
-      "LLM parameter is a string instead of object, resetting to undefined",
+      "LLM parameter is a string instead of object, resetting to empty object",
     );
-    llmValue = undefined;
+    llmValue = {};
   }
 
   return {
@@ -107,7 +108,7 @@ export function safeOptimizationStudioNodeDataToPromptConfigFormInitialValues(
       configData: {
         inputs,
         outputs,
-        llm: llmValue,
+        llm: llmValue ?? {},
         prompt:
           typeof parametersMap.instructions?.value === "string"
             ? parametersMap.instructions.value

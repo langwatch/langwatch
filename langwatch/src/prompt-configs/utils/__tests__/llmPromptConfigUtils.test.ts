@@ -35,7 +35,7 @@ describe("safeOptimizationStudioNodeDataToPromptConfigFormInitialValues", () => 
   });
 
   describe("when LLM value is a string", () => {
-    it("resets LLM value to undefined", () => {
+    it("resets LLM value to empty object", () => {
       const consoleWarnSpy = vi
         .spyOn(console, "warn")
         .mockImplementation(() => {});
@@ -54,8 +54,23 @@ describe("safeOptimizationStudioNodeDataToPromptConfigFormInitialValues", () => 
       const result =
         safeOptimizationStudioNodeDataToPromptConfigFormInitialValues(nodeData);
 
-      expect(result.version?.configData?.llm).toBeUndefined();
+      expect(result.version?.configData?.llm).toEqual({});
       consoleWarnSpy.mockRestore();
+    });
+  });
+
+  describe("when LLM value is missing", () => {
+    it("defaults LLM value to empty object", () => {
+      const nodeData = {
+        parameters: [],
+        inputs: [],
+        outputs: [{ identifier: "output", type: "str" }],
+      } as any;
+
+      const result =
+        safeOptimizationStudioNodeDataToPromptConfigFormInitialValues(nodeData);
+
+      expect(result.version?.configData?.llm).toEqual({});
     });
   });
 
