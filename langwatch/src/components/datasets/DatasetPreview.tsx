@@ -94,11 +94,25 @@ export function DatasetPreview({
         </Center>
       )}
       <ErrorBoundary
-        fallback={
-          <Center width="full" height="full">
-            Error rendering the dataset, please refresh the page
-          </Center>
-        }
+        fallbackRender={({ error }) => {
+          return (
+            <Center width="full" height="full" padding={4}>
+              <Box textAlign="center">
+                <Text fontWeight="bold" marginBottom={2}>
+                  Error rendering the dataset, please refresh the page
+                </Text>
+                {process.env.NODE_ENV === "development" && (
+                  <Text fontSize="sm" color="red.600">
+                    {error.message}
+                  </Text>
+                )}
+              </Box>
+            </Center>
+          );
+        }}
+        onError={(error) => {
+          console.error("DatasetPreview Error", error);
+        }}
       >
         <DatasetGrid columnDefs={columnDefs} rowData={rows} />
       </ErrorBoundary>
