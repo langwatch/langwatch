@@ -31,7 +31,7 @@ describe("usePromptConfigForm", () => {
   });
 
   describe("when initialConfigValues are corrupted", () => {
-    it("falls back to schema defaults", () => {
+    it("salvages valid parts and uses defaults for invalid parts", () => {
       const consoleWarnSpy = vi
         .spyOn(console, "warn")
         .mockImplementation(() => {});
@@ -39,20 +39,31 @@ describe("usePromptConfigForm", () => {
       const { result } = renderHook(() =>
         usePromptConfigForm({
           initialConfigValues: {
-            // Missing required fields like scope
+            handle: "valid-handle", // This should be salvaged
+            // Missing required field: scope
             version: {
               configData: {
-                // Missing required fields
-                inputs: [{ identifier: "", type: "str" }], // Empty identifier
+                prompt: "Valid prompt text", // This should be salvaged
+                inputs: [{ identifier: "", type: "str" }], // Empty identifier - invalid
+                outputs: [{ identifier: "output", type: "str" }], // Valid - should be salvaged
               },
             },
           } as any,
         }),
       );
 
-      // Should not crash and should have default values
+      // Should not crash
       expect(result.current.methods.getValues("scope")).toBeDefined();
+      
+      // Should salvage valid parts
+      expect(result.current.methods.getValues("handle")).toBe("valid-handle");
+      expect(result.current.methods.getValues("version.configData.prompt")).toBe("Valid prompt text");
+      expect(result.current.methods.getValues("version.configData.outputs")).toHaveLength(1);
+      expect(result.current.methods.getValues("version.configData.outputs.0.identifier")).toBe("output");
+      
+      // Should use defaults for invalid/missing parts
       expect(result.current.methods.getValues("version.configData.llm")).toBeDefined();
+      expect(result.current.methods.getValues("version.configData.inputs")).toBeDefined();
       
       consoleWarnSpy.mockRestore();
     });
