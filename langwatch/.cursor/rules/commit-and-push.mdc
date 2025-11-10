@@ -2,10 +2,12 @@
 alwaysApply: false
 ---
 
-Write a conventional commit message. 
+Write a conventional commit message.
 
-CRITICAL: 
-- Only ADD changes for the files you've touched. 
-- Don't use the --all flag. 
+CRITICAL:
+- Only ADD changes for the files you've touched.
+- Don't use the --all flag.
 
 Combined the commit command && push command into a single command.
+
+- Important: Split updates into multiple commits so that the commit history is clean and easy to understand if the changes are not related.
