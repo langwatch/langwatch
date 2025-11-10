@@ -4,8 +4,10 @@ import { useEffect, useMemo } from "react";
 import { useForm, type DeepPartial } from "react-hook-form";
 
 import { formSchema, type PromptConfigFormValues } from "~/prompt-configs";
+import { salvageValidData } from "~/utils/zodSalvage";
 
 import { inputsAndOutputsToDemostrationColumns } from "../utils/llmPromptConfigUtils";
+import { buildDefaultFormValues } from "../utils/buildDefaultFormValues";
 
 interface UsePromptConfigFormProps {
   configId?: string;
@@ -25,11 +27,12 @@ export const usePromptConfigForm = ({
   /**
    * Parse initial values once with schema defaults applied.
    * Memoized to avoid re-parsing on every render.
+   * Uses generic salvage utility to preserve valid parts of corrupted data.
    */
-  const parsedInitialValues = useMemo(
-    () => formSchema.parse(initialConfigValues),
-    [initialConfigValues],
-  );
+  const defaults = useMemo(() => buildDefaultFormValues(), []);
+  const parsedInitialValues = useMemo(() => {
+    return salvageValidData(formSchema, initialConfigValues, defaults);
+  }, [initialConfigValues, defaults]);
 
   const methods = useForm<PromptConfigFormValues>({
     /**

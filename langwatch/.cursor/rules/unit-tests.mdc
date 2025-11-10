@@ -1,5 +1,5 @@
 ---
-description: When proposing/writing unit tests
+description: When writing unit tests
 alwaysApply: false
 ---
 
@@ -11,7 +11,7 @@ Rules:
 - Avoid testing internal implementation details; only test the public API.
 - One assertion per test.
 - Each logical branch ("when") should be a separate describe block.
-- When proposing tests, suggest todo items only. Write actual tests only after specs are confirmed.
+- Suggest todo items only. Write actual tests only after specs are confirmed.
 - Place tests in a `__tests__` directory as close as possible to the code under test.
 - Only test if/then logic.
 - Always flag any potential bugs found during logic assessment.
