@@ -1,11 +1,10 @@
 import { TRPCError } from "@trpc/server";
-import { hash } from "bcrypt";
+import { hash, compare } from "bcrypt";
 import { z } from "zod";
 import { createTRPCRouter, protectedProcedure, publicProcedure } from "../trpc";
 
 import { skipPermissionCheck } from "../permission";
 import { env } from "../../../env.mjs";
-import { usageStatsQueue } from "~/server/background/queues/usageStatsQueue";
 
 export const userRouter = createTRPCRouter({
   register: publicProcedure
@@ -124,6 +123,65 @@ export const userRouter = createTRPCRouter({
       await ctx.prisma.account.delete({
         where: {
           id: input.accountId,
+        },
+      });
+
+      return { success: true };
+    }),
+  changePassword: protectedProcedure
+    .input(
+      z.object({
+        currentPassword: z.string(),
+        newPassword: z.string().min(8, "Password must be at least 8 characters"),
+      })
+    )
+    .use(skipPermissionCheck)
+    .mutation(async ({ ctx, input }) => {
+      if (env.NEXTAUTH_PROVIDER !== "email") {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message:
+            "Password changes are not available for this auth provider",
+        });
+      }
+
+      // Get the user with their password
+      const user = await ctx.prisma.user.findUnique({
+        where: {
+          id: ctx.session.user.id,
+        },
+        select: {
+          id: true,
+          password: true,
+        },
+      });
+
+      if (!user?.password) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "User not found or password not set",
+        });
+      }
+
+      // Verify current password
+      const passwordMatch = await compare(input.currentPassword, user.password);
+      if (!passwordMatch) {
+        throw new TRPCError({
+          code: "UNAUTHORIZED",
+          message: "Current password is incorrect",
+        });
+      }
+
+      // Hash the new password
+      const hashedPassword = await hash(input.newPassword, 10);
+
+      // Update the password
+      await ctx.prisma.user.update({
+        where: {
+          id: ctx.session.user.id,
+        },
+        data: {
+          password: hashedPassword,
         },
       });
 

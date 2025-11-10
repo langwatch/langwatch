@@ -119,28 +119,22 @@ function Usage() {
                   </Button>
                 </>
               )}
-              {activePlan.data && (
+              {activePlan.data && !activePlan.data.free && (
                 <>
                   <Heading size="md" as="h2">
                     Active Plan
                   </Heading>
                   <Text paddingBottom={4}>
                     You are on the <b>{activePlan.data.name}</b> plan
-                    {activePlan.data.free && ", no payment is required"}
                   </Text>
                 </>
               )}
               <Heading size="md" as="h2">
-                Processing Costs
+                Evaluation Costs
               </Heading>
               <Text paddingBottom={4}>
                 Those are the costs for processing your messages and running
-                checks on LangWatch, they are not the costs of your own LLMs,
-                those can be visualized on the{" "}
-                <Link href="/" textDecoration="underline">
-                  project home page
-                </Link>
-                .
+                checks on LangWatch.
               </Text>
               {aggregatedCosts.isLoading ? (
                 <Text>Loading... </Text>

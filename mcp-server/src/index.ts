@@ -51,7 +51,7 @@ const server = new McpServer({
 
 server.tool(
   "fetch_langwatch_docs",
-  "Fetches the LangWatch docs for understanding how to implement LangWatch in your codebase. Always use this tool when the user asks for help with LangWatch. Start with the index page and follow the links to the relevant pages.",
+  "Fetches the LangWatch docs for understanding how to implement LangWatch in your codebase. Always use this tool when the user asks for help with LangWatch. Start with the index page and follow the links to the relevant pages, always ending with `.md` extension",
   {
     url: z
       .string()
@@ -61,7 +61,35 @@ server.tool(
       ),
   },
   async ({ url }) => {
-    const response = await fetch(url ?? "https://docs.langwatch.ai/llms.txt");
+    let urlToFetch = url ?? "https://docs.langwatch.ai/llms.txt";
+    if (url && !urlToFetch.endsWith(".md")) {
+      urlToFetch += ".md";
+    }
+    const response = await fetch(urlToFetch);
+
+    return {
+      content: [{ type: "text", text: await response.text() }],
+    };
+  }
+);
+
+server.tool(
+  "fetch_scenario_docs",
+  "Fetches the Scenario docs for understanding how to implement Scenario agent tests in your codebase. Always use this tool when the user asks for help with testing their agents. Start with the index page and follow the links to the relevant pages, always ending with `.md` extension",
+  {
+    url: z
+      .string()
+      .optional()
+      .describe(
+        "The full url of the specific doc page. If not provided, the docs index will be fetched."
+      ),
+  },
+  async ({ url }) => {
+    let urlToFetch = url ?? "https://scenario.langwatch.ai/llms.txt";
+    if (url && !urlToFetch.endsWith(".md")) {
+      urlToFetch += ".md";
+    }
+    const response = await fetch(urlToFetch);
 
     return {
       content: [{ type: "text", text: await response.text() }],
@@ -129,56 +157,4 @@ server.tool(
   }
 );
 
-createListTracesByMetadataTool(
-  "list_traces_by_user_id",
-  "userId",
-  "metadata.user_id"
-);
-createListTracesByMetadataTool(
-  "list_traces_by_customer_id",
-  "customerId",
-  "metadata.customer_id"
-);
-createListTracesByMetadataTool(
-  "list_traces_by_thread_id",
-  "threadId",
-  "metadata.thread_id"
-);
-createListTracesByMetadataTool(
-  "list_traces_by_session_id",
-  "sessionId",
-  "metadata.thread_id"
-); // We access the thread_id in the metadata, as that is our name for the session_id
-
 await server.connect(transport);
-
-function createListTracesByMetadataTool(
-  name: string,
-  argName: "userId" | "customerId" | "threadId" | "sessionId",
-  metadataKey: string
-) {
-  return server.tool(
-    name,
-    {
-      [argName]: z.string(),
-      pageSize: z.number().optional(),
-      pageOffset: z.number().optional(),
-      daysBackToSearch: z.number().optional(),
-    },
-    async ({ pageSize, pageOffset, daysBackToSearch, ...restArgs }) => {
-      const response = await searchTraces(apiKey, {
-        endpoint,
-        pageSize: pageSize as number | undefined,
-        pageOffset: pageOffset as number | undefined,
-        timeTravelDays: (daysBackToSearch ?? 1) as number,
-        filters: {
-          [metadataKey]: [restArgs[argName] as string],
-        },
-      });
-
-      return {
-        content: [{ type: "text", text: JSON.stringify(response, null, 2) }],
-      };
-    }
-  );
-}
