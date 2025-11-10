@@ -1,0 +1,26 @@
+---
+description: When proposing/writing unit tests
+alwaysApply: false
+---
+
+Stack:
+- Vitest
+
+Rules:
+- Only test logic (if/else statements); do not test interfaces, return values, or UI components directly. Business logic in hooks should be tested.
+- Avoid testing internal implementation details; only test the public API.
+- One assertion per test.
+- Each logical branch ("when") should be a separate describe block.
+- When proposing tests, suggest todo items only. Write actual tests only after specs are confirmed.
+- Place tests in a `__tests__` directory as close as possible to the code under test.
+- Only test if/then logic.
+- Always flag any potential bugs found during logic assessment.
+
+Example:
+```ts
+describe("Todo List", () => {
+    describe("when a todo is added", () => {
+        it.todo("adds a todo");
+    });
+});
+```

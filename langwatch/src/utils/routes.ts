@@ -48,10 +48,6 @@ export const projectRoutes = {
     title: "Experiment Details",
     parent: "experiments",
   },
-  prompts: {
-    path: "/[project]/prompts",
-    title: "Prompts",
-  },
   message: {
     path: "/[project]/messages/[trace]",
     title: "Trace",
@@ -70,10 +66,6 @@ export const projectRoutes = {
   settings: {
     path: "/settings",
     title: "Settings",
-  },
-  playground: {
-    path: "/[project]/playground",
-    title: "Playground",
   },
   datasets: {
     path: "/[project]/datasets",
@@ -112,7 +104,7 @@ export const projectRoutes = {
     path: "/[project]/triggers",
     title: "Triggers",
   },
-  promptConfigs: {
+  prompts: {
     path: "/[project]/prompts",
     title: "Prompts",
   },
@@ -125,7 +117,7 @@ export const projectRoutes = {
     title: "Simulations",
     parent: "simulations",
   },
-};
+} as const;
 
 export type Route = {
   path: string;
@@ -136,9 +128,18 @@ export type Route = {
 type RouteMap = Record<keyof typeof projectRoutes, Route>;
 
 export const findCurrentRoute = (
-  currentPathname: string
+  currentPathname: string,
 ): Route | undefined => {
   return Object.values(projectRoutes as RouteMap).find(
-    (route) => route.path === currentPathname
+    (route) => route.path === currentPathname,
   );
 };
+
+export function getRoutePath(params: {
+  projectSlug: string;
+  route: keyof typeof projectRoutes;
+}): string {
+  const { projectSlug, route } = params;
+  const path = projectRoutes[route].path.replace("[project]", projectSlug);
+  return path.replace(/\/\/+/g, "/");
+}

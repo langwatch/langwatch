@@ -1,18 +1,13 @@
 import type { Node } from "@xyflow/react";
 import { useMemo } from "react";
-import { useFormContext } from "react-hook-form";
 
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import type { LlmPromptConfigComponent } from "~/optimization_studio/types/dsl";
-import type { PromptConfigFormValues } from "~/prompt-configs";
 import {
   isNodeDataEqual,
   versionedPromptToOptimizationStudioNodeData,
 } from "~/prompt-configs/utils/llmPromptConfigUtils";
 import { api } from "~/utils/api";
-import { createLogger } from "~/utils/logger";
-
-const logger = createLogger("langwatch:optimization_studio:use-node-drift");
 
 /**
  * useNodeDrift hook provides drift detection and reload functionality for a node's prompt config.
@@ -35,9 +30,8 @@ export function useNodeDrift(node: Node<LlmPromptConfigComponent>) {
     },
     {
       enabled: !!idOrHandle && !!project?.id,
-    }
+    },
   );
-  const formProps = useFormContext<PromptConfigFormValues>();
   /**
    * If the node data (saved in the studio node array) is different from the latest prompt in the database,
    * show a warning and provide a button to reload the latest version into the form (which should update the node data)
@@ -47,7 +41,7 @@ export function useNodeDrift(node: Node<LlmPromptConfigComponent>) {
       return false;
     return !isNodeDataEqual(
       node.data,
-      versionedPromptToOptimizationStudioNodeData(latestPrompt)
+      versionedPromptToOptimizationStudioNodeData(latestPrompt),
     );
   }, [latestPrompt, node.data, isFetchingLatestPrompt, isLoadingPrompt]);
 

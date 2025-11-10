@@ -27,7 +27,7 @@ import {
 import { api } from "~/utils/api";
 
 import { useWizardContext } from "../../../../../components/evaluations/wizard/hooks/useWizardContext";
-import { PromptMessagesField } from "../../../../../prompt-configs/forms/fields/PromptMessagesField";
+import { PromptMessagesField } from "../../../../../prompt-configs/forms/fields/message-history-fields/PromptMessagesField";
 import { useWorkflowStore } from "../../../../hooks/useWorkflowStore";
 import type { LlmPromptConfigComponent } from "../../../../types/dsl";
 import { PromptSourceHeader } from "../promptSourceSelect/PromptSourceHeader";
@@ -65,7 +65,7 @@ export function SignaturePropertiesPanelForm({
       setNode: state.setNode,
       getWorkflow: state.getWorkflow,
       setNodeParameter: state.setNodeParameter,
-    }))
+    })),
   );
 
   const { isInsideWizard } = useWizardContext();
@@ -74,7 +74,7 @@ export function SignaturePropertiesPanelForm({
   const initialConfigValues = useMemo(
     () =>
       safeOptimizationStudioNodeDataToPromptConfigFormInitialValues(node.data),
-    [node.data]
+    [node.data],
   );
 
   /**
@@ -100,7 +100,7 @@ export function SignaturePropertiesPanelForm({
           },
         });
       }, 1000), // Lower than this slows down the UI significantly, since this will trigger a workspace/experiment save
-    [node.id, setNode, node.data.name]
+    [node.id, setNode, node.data.name],
   );
 
   const formProps = usePromptConfigForm({
@@ -172,23 +172,23 @@ export function SignaturePropertiesPanelForm({
       toVisit.push(
         ...edges
           .filter((edge) => edge.source === currentNode)
-          .map((edge) => edge.target)
+          .map((edge) => edge.target),
       );
     }
 
     return Object.fromEntries(
       nodes
         .filter(
-          (node) => !dependentNodes.includes(node.id) && node.id !== "end"
+          (node) => !dependentNodes.includes(node.id) && node.id !== "end",
         )
         .map((node) => [
           node.id,
           node.data.outputs
             ?.map((output) => output.identifier)
             .filter(
-              (id) => !currentConnections.includes(`${node.id}.outputs.${id}`)
+              (id) => !currentConnections.includes(`${node.id}.outputs.${id}`),
             ) ?? [],
-        ])
+        ]),
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [edges, nodes, node.id, JSON.stringify(node.data.outputs)]);
@@ -198,7 +198,7 @@ export function SignaturePropertiesPanelForm({
   const onAddEdge = (
     id: string,
     handle: string,
-    content: PromptTextAreaOnAddMention
+    content: PromptTextAreaOnAddMention,
   ) => {
     const newHandle = edgeConnectToNewHandle(id, handle, node.id);
     updateNodeInternals(node.id);
@@ -216,7 +216,7 @@ export function SignaturePropertiesPanelForm({
   const onAddPromptEdge = (
     id: string,
     handle: string,
-    content: PromptTextAreaOnAddMention
+    content: PromptTextAreaOnAddMention,
   ) => {
     const { node, newPrompt } = onAddEdge(id, handle, content);
 
@@ -231,11 +231,11 @@ export function SignaturePropertiesPanelForm({
     id: string,
     handle: string,
     content: PromptTextAreaOnAddMention,
-    idx: number
+    idx: number,
   ) => {
     const { node, newPrompt } = onAddEdge(id, handle, content);
     const messagesParam = node.data.parameters?.find(
-      (param) => param.identifier === "messages"
+      (param) => param.identifier === "messages",
     );
     if (!messagesParam) return;
 
@@ -243,7 +243,7 @@ export function SignaturePropertiesPanelForm({
       identifier: "messages",
       type: "chat_messages",
       value: (messagesParam.value as any[]).map((field, i) =>
-        i === idx ? { ...field, content: newPrompt } : field
+        i === idx ? { ...field, content: newPrompt } : field,
       ),
     });
   };

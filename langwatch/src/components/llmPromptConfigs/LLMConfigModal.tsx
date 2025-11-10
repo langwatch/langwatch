@@ -1,4 +1,4 @@
-import { Button, HStack, Input } from "@chakra-ui/react";
+import { Button, HStack, Input, Text, VStack } from "@chakra-ui/react";
 import { Settings } from "react-feather";
 
 import { ConfigModal } from "../../optimization_studio/components/properties/modals/ConfigModal";
@@ -6,22 +6,21 @@ import { HorizontalFormControl } from "../HorizontalFormControl";
 import { allModelOptions, ModelSelector } from "../ModelSelector";
 import { Link } from "../ui/link";
 import { Tooltip } from "../ui/tooltip";
+import { DEFAULT_MAX_TOKENS } from "~/utils/constants";
 
-interface LlmConfigModalValues  {
+export type LlmConfigModalValues = {
   model: string;
   temperature?: number;
   max_tokens?: number;
-}
+} & (
+  | { max_tokens?: number; maxTokens?: never }
+  | { maxTokens?: number; max_tokens?: never }
+);
 
 /**
  * Controlled LLM Config Modal
- * Can be used outside of the form context (does not use react-hook-form)
- * @param param0 - The props for the LLMConfigModal
- * @param param0.open - Whether the modal is open
- * @param param0.onClose - The function to close the modal
- * @param param0.values - The values for the LLM config
- * @param param0.onChange - The function to change the values
- * @returns 
+ * Accepts both snake_case (optimization studio) and camelCase (prompt-configs)
+ * for backwards dsl compatibility
  */
 export function LLMConfigModal({
   open,
@@ -34,6 +33,10 @@ export function LLMConfigModal({
   values: LlmConfigModalValues;
   onChange: (params: LlmConfigModalValues) => void;
 }) {
+  // Normalize internally
+  const maxTokens = values.maxTokens ?? values.max_tokens;
+  const isGpt5 = values?.model?.includes("gpt-5");
+
   return (
     <ConfigModal open={open} onClose={onClose} title="LLM Config">
       <HorizontalFormControl
@@ -64,36 +67,73 @@ export function LLMConfigModal({
       </HorizontalFormControl>
       <HorizontalFormControl
         label="Temperature"
-        helper={"Controls randomness in the output"}
+        helper="Controls randomness in the output"
         inputWidth="55%"
       >
         <Input
+          required
           value={values?.temperature}
           type="number"
           step={0.1}
           min={0}
           max={2}
+          disabled={isGpt5}
+          placeholder="1"
           onChange={(e) =>
             onChange({ ...values, temperature: Number(e.target.value) })
           }
         />
+        {isGpt5 && (
+          <WarningText>Temperature is fixed to 1 for GPT-5 models</WarningText>
+        )}
       </HorizontalFormControl>
       <HorizontalFormControl
         label="Max Tokens"
         helper={"Limit to avoid expensive outputs"}
         inputWidth="55%"
       >
-        <Input
-          value={values?.max_tokens}
-          type="number"
-          step={64}
-          min={256}
-          max={1048576}
-          onChange={(e) =>
-            onChange({ ...values, max_tokens: Number(e.target.value) })
-          }
-        />
+        <VStack align="stretch" gap={0}>
+          <Input
+            required
+            value={maxTokens}
+            type="number"
+            step={64}
+            min={isGpt5 ? DEFAULT_MAX_TOKENS : 256}
+            placeholder={isGpt5 ? DEFAULT_MAX_TOKENS.toString() : "256"}
+            max={1048576}
+            onChange={(e) => {
+              const newValue = Number(e.target.value);
+              // Return in same format as input, explicitly removing the other
+              if (values.maxTokens !== undefined) {
+                const { max_tokens: _, ...rest } = values;
+                onChange({ ...rest, maxTokens: newValue });
+              } else {
+                const { maxTokens: _, ...rest } = values;
+                onChange({ ...rest, max_tokens: newValue });
+              }
+            }}
+          />
+          {isGpt5 && (
+            <WarningText>
+              Max tokens must be at least {DEFAULT_MAX_TOKENS} for GPT-5 models
+            </WarningText>
+          )}
+        </VStack>
       </HorizontalFormControl>
     </ConfigModal>
+  );
+}
+
+function WarningText({ children }: { children: React.ReactNode }) {
+  return (
+    <Text
+      fontSize="xs"
+      color="yellow.500"
+      fontStyle="italic"
+      marginTop={1}
+      marginLeft={2}
+    >
+      {children}
+    </Text>
   );
 }

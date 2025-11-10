@@ -16,7 +16,6 @@ import type { Trace } from "../../server/tracer/types";
 
 import { CornerDownRight } from "react-feather";
 import { Annotations } from "../../components/Annotations";
-import { useDrawer } from "../../components/CurrentDrawer";
 import { EventsCounter } from "../../components/messages/EventsCounter";
 import {
   getSlicedExpectedOutput,
@@ -65,7 +64,6 @@ export const TraceMessages = React.forwardRef(function TraceMessages(
     action,
     conversationHasSomeComments,
     setConversationHasSomeComments,
-    expectedOutputAction,
   } = useAnnotationCommentStore();
 
   const translationState = useTranslationState();
@@ -90,8 +88,6 @@ export const TraceMessages = React.forwardRef(function TraceMessages(
       setConversationHasSomeComments(false);
     };
   }, [annotations.data]);
-
-  const commentState = useAnnotationCommentStore();
 
   return (
     <VStack ref={ref as any} align="start" width="full" gap={0}>

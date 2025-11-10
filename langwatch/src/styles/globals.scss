@@ -1,238 +1,257 @@
 html,
 body {
-  padding: 0;
-  margin: 0;
+    padding: 0;
+    margin: 0;
 }
 
 a {
-  color: inherit;
-  text-decoration: none;
+    color: inherit;
+    text-decoration: none;
 }
 
 * {
-  box-sizing: border-box;
+    box-sizing: border-box;
 }
 
 label {
-  cursor: auto !important;
+    cursor: auto !important;
 }
 
 // Override Chakra UI default annoying overrides
 label {
-  user-select: auto !important;
+    user-select: auto !important;
 }
 
 label {
-  cursor: auto !important;
+    cursor: auto !important;
 }
 
 .fade-in {
-  opacity: 1;
-  animation: fadeIn 0.1s ease-out;
+    opacity: 1;
+    animation: fadeIn 0.1s ease-out;
 }
 
 @keyframes fadeIn {
-  0% {
-    opacity: 0;
-  }
-  100% {
-    opacity: 1;
-  }
+    0% {
+        opacity: 0;
+    }
+    100% {
+        opacity: 1;
+    }
 }
 
 .debug {
-  border: 2px solid red;
-
-  & > * {
-    border: 2px dashed blue;
+    border: 2px solid red;
 
     & > * {
-      border: 2px solid green;
+        border: 2px dashed blue;
+
+        & > * {
+            border: 2px solid green;
+        }
     }
-  }
 }
 
 #nprogress .bar {
-  background: #ed8926;
+    background: #ed8926;
 }
 
 #nprogress .peg {
-  box-shadow:
-    0 0 10px #ed8926,
-    0 0 5px #ed8926;
+    box-shadow:
+        0 0 10px #ed8926,
+        0 0 5px #ed8926;
 }
 
 .markdown {
-  p {
-    padding: 6px 0;
-  }
-
-  ol,
-  ul {
-    padding-left: 40px;
-    &:dir(rtl) {
-      padding-right: 40px;
+    p {
+        padding: 6px 0;
     }
-  }
+
+    ol,
+    ul {
+        padding-left: 40px;
+        &:dir(rtl) {
+            padding-right: 40px;
+        }
+    }
 }
 
 div input[type="number"] {
-  appearance: auto;
+    appearance: auto;
 }
 
 /* Expanding card stack effect for grouped messages */
 
 .card-stack-content {
-  position: relative;
+    position: relative;
 }
 
 .card {
-  position: relative;
-  top: 0;
-  left: 0;
-  right: 0;
+    position: relative;
+    top: 0;
+    left: 0;
+    right: 0;
 
-  &:first-child {
-    z-index: 2;
-  }
+    &:first-child {
+        z-index: 2;
+    }
 
-  &:nth-child(2) {
-    z-index: 1;
-  }
+    &:nth-child(2) {
+        z-index: 1;
+    }
 
-  &:nth-child(n + 3) {
-    z-index: 0;
-  }
+    &:nth-child(n + 3) {
+        z-index: 0;
+    }
 }
 
 .card-stack-content:not(.expanded) .card {
-  &:nth-child(2) {
-    left: 8px;
-    top: 10px;
-  }
+    &:nth-child(2) {
+        left: 8px;
+        top: 10px;
+    }
 
-  &:nth-child(3) {
-    top: 20px;
-    left: 16px;
-  }
+    &:nth-child(3) {
+        top: 20px;
+        left: 16px;
+    }
 }
 
 .show-on-hover {
-  display: none;
+    display: none;
 }
 
 .content-hover:hover .show-on-hover {
-  display: block;
+    display: block;
 }
 
 .animation-spinning {
-  animation-name: spin;
-  animation-duration: 1s;
-  animation-iteration-count: infinite;
-  animation-timing-function: linear;
+    animation-name: spin;
+    animation-duration: 1s;
+    animation-iteration-count: infinite;
+    animation-timing-function: linear;
 }
 
 @keyframes spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
+    from {
+        transform: rotate(0deg);
+    }
+    to {
+        transform: rotate(360deg);
+    }
 }
 
 .show-on-hover {
-  display: none;
+    display: none;
 }
 
 .hide-refresh-on-hover:hover {
-  .refresh-icon {
-    display: none;
-  }
-  .show-on-hover {
-    display: block;
-  }
+    .refresh-icon {
+        display: none;
+    }
+    .show-on-hover {
+        display: block;
+    }
 }
 
 .multicheck-option {
-  background: none !important;
-  color: #333 !important;
-  border-bottom: 1px solid #f5f5f5 !important;
+    background: none !important;
+    color: #333 !important;
+    border-bottom: 1px solid #f5f5f5 !important;
 
-  &:last-child {
-    border-bottom: none !important;
-  }
+    &:last-child {
+        border-bottom: none !important;
+    }
 
-  &:hover {
-    background: #f5f5f5 !important;
-  }
+    &:hover {
+        background: #f5f5f5 !important;
+    }
 }
 
 .fix-hidden-inputs {
-  [inputmode="none"] {
-    position: absolute;
-    top: 0;
-  }
+    [inputmode="none"] {
+        position: absolute;
+        top: 0;
+    }
 }
 
 .chat-loading-circle {
-  display: inline-block;
-  margin-left: 4px;
-  margin-bottom: -4px;
-  background: #333;
-  border-radius: 100%;
-  width: 14px;
-  height: 14px;
-  animation: chat-loading-circle 1s infinite linear;
+    display: inline-block;
+    margin-left: 4px;
+    margin-bottom: -4px;
+    background: #333;
+    border-radius: 100%;
+    width: 14px;
+    height: 14px;
+    animation: chat-loading-circle 1s infinite linear;
 }
 
 @keyframes chat-loading-circle {
-  0% {
-    transform: scale(0.8);
-  }
-  50% {
-    transform: scale(1.2);
-  }
-  100% {
-    transform: scale(0.8);
-  }
+    0% {
+        transform: scale(0.8);
+    }
+    50% {
+        transform: scale(1.2);
+    }
+    100% {
+        transform: scale(0.8);
+    }
 }
 
 #crisp-chatbox {
-  position: absolute;
+    position: absolute;
 }
 
 .chakra-radio-group__itemText {
-  cursor: pointer;
+    cursor: pointer;
 }
 
 *:is([data-focus-visible-animated]) {
-  outline-offset: 2px;
-  animation: focus-visible-animation 1s ease-out;
-  animation-delay: 0.2s;
+    outline-offset: 2px;
+    animation: focus-visible-animation 1s ease-out;
+    animation-delay: 0.2s;
 }
 
 @keyframes focus-visible-animation {
-  0% {
-    outline-offset: 2px;
-    scale: 1;
-  }
-  50% {
-    outline-offset: 10px;
-    scale: 1.2;
-  }
-  100% {
-    outline-offset: 2px;
-    scale: 1;
-  }
+    0% {
+        outline-offset: 2px;
+        scale: 1;
+    }
+    50% {
+        outline-offset: 10px;
+        scale: 1.2;
+    }
+    100% {
+        outline-offset: 2px;
+        scale: 1;
+    }
 }
 
-.copilotKitChat,
-.copilotKitMessages {
-  overflow: unset !important;
+// .copilotKitChat,
+// .copilotKitMessages {
+//     overflow: unset !important;
+// }
+
+.copilotKitChat .poweredBy {
+    display: none !important;
 }
 
 // To fix bug in Chakra UI CodeBlock
 span[data-highlight]::after {
     pointer-events: none;
+    overflow: unset !important;
+}
+
+.prompt-studio-chat {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    .copilotKitChat {
+        height: 100%;
+    }
+    .copilotKitMessages {
+        width: 100%;
+        max-width: 768px;
+        margin: 0 auto;
+    }
 }

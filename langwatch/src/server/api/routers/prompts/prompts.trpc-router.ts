@@ -17,8 +17,6 @@ import { nodeDatasetSchema } from "~/optimization_studio/types/dsl";
 
 /**
  * Router for handling prompts - the business-facing interface
- * Currently only supports upsert operation
- * TODO: Add other operations as needed
  */
 export const promptsRouter = createTRPCRouter({
   /**
@@ -185,6 +183,22 @@ export const promptsRouter = createTRPCRouter({
     .query(async ({ ctx, input }) => {
       const service = new PromptService(ctx.prisma);
       return await service.checkHandleUniqueness(input);
+    }),
+
+  /**
+   * Check if user can modify/delete a prompt
+   */
+  checkModifyPermission: protectedProcedure
+    .input(
+      z.object({
+        idOrHandle: z.string(),
+        projectId: z.string(),
+      }),
+    )
+    .use(checkProjectPermission("prompts:view"))
+    .query(async ({ ctx, input }) => {
+      const service = new PromptService(ctx.prisma);
+      return await service.checkModifyPermission(input);
     }),
 
   /**

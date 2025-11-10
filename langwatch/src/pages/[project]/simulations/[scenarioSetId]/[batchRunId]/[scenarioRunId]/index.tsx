@@ -32,7 +32,7 @@ export default function IndividualScenarioRunPage() {
       {
         enabled: !!project?.id && !!scenarioRunId,
         refetchInterval: 1000,
-      }
+      },
     );
 
   const results = scenarioState?.results;
@@ -158,6 +158,7 @@ export default function IndividualScenarioRunPage() {
                       <VStack>
                         <CustomCopilotKitChat
                           messages={scenarioState?.messages ?? []}
+                          hideInput
                         />
                         {/* Console Area */}
                         <Box

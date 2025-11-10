@@ -1,0 +1,5 @@
+---
+description: Database commands: migrations, deploys, etc.
+alwaysApply: false
+---
+Always use the prisma cli to generate and apply migrations.

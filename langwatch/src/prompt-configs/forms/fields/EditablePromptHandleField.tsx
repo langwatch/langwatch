@@ -1,22 +1,51 @@
-import { Button, HStack, Text } from "@chakra-ui/react";
+import { Button, HStack, Text, type StackProps } from "@chakra-ui/react";
+import clsx from "clsx";
 import { useFormContext } from "react-hook-form";
-import { LuPencil } from "react-icons/lu";
+import { Edit3 } from "react-feather";
 
 import { toaster } from "~/components/ui/toaster";
+import { Tooltip } from "~/components/ui/tooltip";
 import type { PromptConfigFormValues } from "~/prompt-configs";
-import { versionedPromptToPromptConfigFormValues } from "~/prompt-configs/utils/llmPromptConfigUtils";
+import { versionedPromptToPromptConfigFormValuesWithSystemMessage } from "~/prompt-configs/utils/llmPromptConfigUtils";
 import { usePromptConfigContext } from "~/prompt-configs/providers/PromptConfigProvider";
 import type { VersionedPrompt } from "~/server/prompt-config";
 import { createLogger } from "~/utils/logger";
 import { CopyButton } from "../../../components/CopyButton";
+import { api } from "~/utils/api";
+import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 
 const logger = createLogger(
-  "langwatch:prompt-configs:editable-prompt-handle-field"
+  "langwatch:prompt-configs:editable-prompt-handle-field",
 );
 
-export function EditablePromptHandleField() {
+type EditablePromptHandleFieldProps = StackProps;
+
+/**
+ * EditablePromptHandleField component
+ * Single Responsibility: Displays and allows editing of prompt handle with permission checks
+ * @param props - EditablePromptHandleFieldProps extending StackProps
+ * @returns JSX.Element - Renders an editable prompt handle display with edit and copy buttons
+ */
+export function EditablePromptHandleField(
+  props: EditablePromptHandleFieldProps,
+) {
   const form = useFormContext<PromptConfigFormValues>();
   const { triggerChangeHandle } = usePromptConfigContext();
+  const { project } = useOrganizationTeamProject();
+
+  const configId = form.watch("configId");
+
+  const { data: permission } = api.prompts.checkModifyPermission.useQuery(
+    {
+      idOrHandle: configId ?? "",
+      projectId: project?.id ?? "",
+    },
+    {
+      enabled: !!configId && !!project?.id,
+    },
+  );
+
+  const canEdit = permission?.hasPermission ?? false;
 
   const handleTriggerChangeHandle = () => {
     const id = form.watch("configId");
@@ -31,7 +60,9 @@ export function EditablePromptHandleField() {
     }
 
     const onSuccess = (prompt: VersionedPrompt) => {
-      form.reset(versionedPromptToPromptConfigFormValues(prompt));
+      form.reset(
+        versionedPromptToPromptConfigFormValuesWithSystemMessage(prompt),
+      );
       toaster.create({
         title: "Prompt handle changed",
         description: `Prompt handle has been changed to ${prompt.handle}`,
@@ -43,7 +74,7 @@ export function EditablePromptHandleField() {
       console.error(error);
       toaster.create({
         title: "Error changing prompt handle",
-        description: "Failed to change prompt handle",
+        description: error.message,
         type: "error",
       });
     };
@@ -57,10 +88,9 @@ export function EditablePromptHandleField() {
     <HStack
       paddingX={1}
       gap={1}
-      className="group"
       width="full"
       position="relative"
-      minWidth={0}
+      minWidth="80px"
       _hover={{
         "& .handle-text": {
           opacity: 0.4,
@@ -69,6 +99,8 @@ export function EditablePromptHandleField() {
           opacity: 1,
         },
       }}
+      {...props}
+      className={clsx("group", props.className)}
     >
       {handle ? (
         <Text
@@ -80,6 +112,8 @@ export function EditablePromptHandleField() {
           minWidth={0}
           overflow="hidden"
           transition="opacity 0.2s"
+          textOverflow="ellipsis"
+          whiteSpace="nowrap"
         >
           {handle}
         </Text>
@@ -97,18 +131,29 @@ export function EditablePromptHandleField() {
           background="gray.50"
           paddingX={1}
         >
-          <Button
-            id="js-edit-prompt-handle"
-            onClick={handleTriggerChangeHandle}
-            variant="ghost"
-            _hover={{
-              backgroundColor: "gray.100",
-            }}
-            textTransform="uppercase"
-            size="xs"
+          <Tooltip
+            content={permission?.reason ?? "Edit prompt handle"}
+            disabled={canEdit}
+            positioning={{ placement: "top" }}
+            showArrow
+            portalled={false}
           >
-            <LuPencil />
-          </Button>
+            <Button
+              id="js-edit-prompt-handle"
+              onClick={handleTriggerChangeHandle}
+              variant="ghost"
+              _hover={{
+                backgroundColor: canEdit ? "gray.100" : undefined,
+              }}
+              textTransform="uppercase"
+              size="xs"
+              disabled={!canEdit}
+              opacity={canEdit ? 1 : 0.5}
+              cursor={canEdit ? "pointer" : "not-allowed"}
+            >
+              <Edit3 />
+            </Button>
+          </Tooltip>
           <CopyButton value={handle} label="Prompt ID" />
         </HStack>
       )}
