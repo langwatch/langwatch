@@ -1,3 +1,4 @@
+import { PromptScope } from "@prisma/client";
 import type { Node } from "@xyflow/react";
 import type { DeepPartial } from "react-hook-form";
 
@@ -23,6 +24,8 @@ import {
   type LlmConfigOutputType,
 } from "~/types";
 import { kebabCase } from "~/utils/stringCasing";
+
+import { generateUniqueIdentifier } from "./identifierUtils";
 
 export function promptConfigFormValuesToOptimizationStudioNodeData(
   formValues: PromptConfigFormValues,
@@ -63,6 +66,18 @@ export function promptConfigFormValuesToOptimizationStudioNodeData(
   };
 }
 
+/**
+ * Safely converts node data to form initial values, handling corrupted data gracefully.
+ *
+ * Auto-generates or provides defaults for missing or invalid data:
+ * - Identifiers: Auto-generated for inputs/outputs via safeInputs/safeOutputs
+ * - Handle: Defaults to null if missing
+ * - Scope: Defaults to PROJECT if missing (required by schema)
+ * - LLM config: Provides empty object if corrupted or missing
+ *
+ * @param nodeData - Raw node data from the workflow
+ * @returns Partial form values with safe defaults for all required fields
+ */
 export function safeOptimizationStudioNodeDataToPromptConfigFormInitialValues(
   nodeData: Node<Signature | LlmPromptConfigComponent>["data"],
 ): DeepPartial<PromptConfigFormValues> {
@@ -74,15 +89,25 @@ export function safeOptimizationStudioNodeDataToPromptConfigFormInitialValues(
   const outputs = safeOutputs(nodeData.outputs);
   const llmNode = nodeData as LlmPromptConfigComponent;
 
+  // Safely extract LLM config, defaulting to undefined if corrupted
+  let llmValue = llmParameter?.value;
+  if (llmValue && typeof llmValue === "string") {
+    console.warn(
+      "LLM parameter is a string instead of object, resetting to undefined",
+    );
+    llmValue = undefined;
+  }
+
   return {
     configId: llmNode.configId,
     versionMetadata: versionMetadataToFormFormat(llmNode.versionMetadata),
-    handle: llmNode.handle,
+    handle: llmNode.handle ?? null,
+    scope: (llmNode as any).scope ?? PromptScope.PROJECT,
     version: {
       configData: {
         inputs,
         outputs,
-        llm: llmParameter?.value,
+        llm: llmValue,
         prompt:
           typeof parametersMap.instructions?.value === "string"
             ? parametersMap.instructions.value
@@ -107,33 +132,85 @@ export function safeOptimizationStudioNodeDataToPromptConfigFormInitialValues(
   };
 }
 
+/**
+ * Safely converts node inputs to form values, auto-generating identifiers for corrupted data.
+ *
+ * If an input has an empty or missing identifier, generates a unique one automatically
+ * instead of throwing a validation error.
+ *
+ * @param inputs - Raw input data from the node
+ * @returns Validated inputs with guaranteed identifiers
+ */
 function safeInputs(
   inputs: Signature["inputs"],
 ): PromptConfigFormValues["version"]["configData"]["inputs"] {
+  const existingIdentifiers: string[] = [];
+
   return (
     inputs?.map((input) => {
+      let identifier = input.identifier?.trim();
+
+      // Auto-generate identifier if missing or empty
+      if (!identifier) {
+        identifier = generateUniqueIdentifier({
+          baseName: "input",
+          existingIdentifiers,
+        });
+        console.warn(
+          `Auto-generated identifier "${identifier}" for corrupted input`,
+        );
+      }
+
+      existingIdentifiers.push(identifier);
+
       if (LlmConfigInputTypes.includes(input.type as LlmConfigInputType)) {
         return {
-          identifier: input.identifier,
+          identifier,
           type: input.type as LlmConfigInputType,
         };
       }
       return {
-        identifier: input.identifier,
+        identifier,
         type: "str",
       };
     }) ?? []
   );
 }
 
+/**
+ * Safely converts node outputs to form values, auto-generating identifiers for corrupted data.
+ *
+ * If an output has an empty or missing identifier, generates a unique one automatically
+ * instead of throwing a validation error.
+ *
+ * @param outputs - Raw output data from the node
+ * @returns Validated outputs with guaranteed identifiers
+ */
 function safeOutputs(
   outputs: Signature["outputs"],
 ): PromptConfigFormValues["version"]["configData"]["outputs"] {
+  const existingIdentifiers: string[] = [];
+
   return (
     outputs?.map((output) => {
+      let identifier = output.identifier?.trim();
+
+      // Auto-generate identifier if missing or empty
+      if (!identifier) {
+        identifier = generateUniqueIdentifier({
+          baseName: "output",
+          existingIdentifiers,
+        });
+        console.warn(
+          `Auto-generated identifier "${identifier}" for corrupted output`,
+        );
+      }
+
+      existingIdentifiers.push(identifier);
+
       if (LlmConfigOutputTypes.includes(output.type as LlmConfigOutputType)) {
         return {
-          identifier: output.identifier,
+          identifier,
           type: output.type as LlmConfigOutputType,
           ...(output.json_schema && {
             json_schema:
@@ -142,7 +219,7 @@ function safeOutputs(
         };
       }
       return {
-        identifier: output.identifier,
+        identifier,
         type: "str",
       };
     }) ?? []

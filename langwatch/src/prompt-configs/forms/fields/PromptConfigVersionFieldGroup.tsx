@@ -14,6 +14,7 @@ import { useFieldArray, useFormContext } from "react-hook-form";
 import { PropertySectionTitle } from "~/optimization_studio/components/properties/BasePropertiesPanel";
 import type { PromptConfigFormValues } from "~/prompt-configs";
 import { TypeSelector } from "~/prompt-configs/components/ui/TypeSelector";
+import { generateUniqueIdentifier } from "~/prompt-configs/utils/identifierUtils";
 import { Tooltip } from "~/components/ui/tooltip";
 
 /**
@@ -58,18 +59,14 @@ function ConfigFieldGroup({
   const handleAddField = () => {
     const currentFields = getValues(fieldArrayName);
     const baseName = name === "inputs" ? "input" : "output";
+    const existingIdentifiers = Array.isArray(currentFields)
+      ? currentFields.map((f) => f.identifier)
+      : [];
 
-    // Find next available identifier
-    let counter = 1;
-    let identifier = baseName;
-
-    while (
-      Array.isArray(currentFields) &&
-      currentFields.some((f) => f.identifier === identifier)
-    ) {
-      identifier = `${baseName}_${counter}`;
-      counter++;
-    }
+    const identifier = generateUniqueIdentifier({
+      baseName,
+      existingIdentifiers,
+    });
 
     append({ identifier, type: "str" });
   };
