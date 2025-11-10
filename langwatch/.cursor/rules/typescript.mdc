@@ -3,15 +3,18 @@ description:
 globs: *.tsx
 alwaysApply: false
 ---
-Typescript Development Guidelines:
 
-1. Documentation
+## Typescript Development Guidelines:
+
+### Documentation
    - Add TSDoc style documentation when writing functions, methods and components.
-   - Always include "Single Responsibility" in the description
 
-2. React Rules
-   - Keep business logic in hooks, not inline in the component markup.
+### Single Responsibility
+    - SRP is a core principle of our codebase and should be followed in all functions, methods and components.
+     => if the function, method or component is more than one responsibility, suggest how to break it down into smaller functions, methods or components. Encourage the user to use the "Single Responsibility" principle
+     and explain the benefits of doing so in this case.
 
-3. Imports
+
+### Imports
    - Always use named imports for React components and hooks.
    - Never use non-destructured imports, such as `React.useMemo` or `React.useCallback`.
