@@ -7,7 +7,7 @@ import { HorizontalFormControl } from "../HorizontalFormControl";
 import { allModelOptions, ModelSelector } from "../ModelSelector";
 import { Link } from "../ui/link";
 import { Tooltip } from "../ui/tooltip";
-import { DEFAULT_MAX_TOKENS } from "~/utils/constants";
+import { DEFAULT_MAX_TOKENS, MIN_MAX_TOKENS } from "~/utils/constants";
 
 export type LlmConfigModalValues = {
   model: string;
@@ -87,7 +87,7 @@ export function LLMConfigModal({
       if (modelChanged && newIsGpt5 && !wasGpt5) {
         storedValuesRef.current = values;
         const enforcedMaxTokens = Math.max(
-          newMaxTokens ?? 0,
+          newMaxTokens ?? MIN_MAX_TOKENS,
           DEFAULT_MAX_TOKENS,
         );
         onChange(
@@ -99,27 +99,12 @@ export function LLMConfigModal({
         return;
       }
 
-      // Switching FROM GPT-5 - restore previous values
+      // Switching FROM GPT-5, we restore the previous temperature if not provided
       if (modelChanged && !newIsGpt5 && wasGpt5 && storedValuesRef.current) {
-        onChange({ ...storedValuesRef.current, model: newValues.model });
-        storedValuesRef.current = null;
-        return;
+        newValues.temperature ??= storedValuesRef.current.temperature;
       }
 
-      // Updating maxTokens - preserve format
-      if (updates.maxTokens !== undefined || updates.max_tokens !== undefined) {
-        const tokenValue = updates.maxTokens ?? updates.max_tokens!;
-        onChange(normalizeMaxTokens(newValues, tokenValue));
-        return;
-      }
-
-      // Simple update - preserve format
-      const currentMaxTokens = newValues.maxTokens ?? newValues.max_tokens;
-      if (currentMaxTokens !== undefined) {
-        onChange(normalizeMaxTokens(newValues, currentMaxTokens));
-      } else {
-        onChange(newValues as LlmConfigModalValues);
-      }
+      onChange(normalizeMaxTokens(newValues, newMaxTokens ?? MIN_MAX_TOKENS));
     },
     [values, onChange],
   );

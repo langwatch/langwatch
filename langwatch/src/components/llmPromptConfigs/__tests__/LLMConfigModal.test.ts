@@ -30,7 +30,7 @@ describe("LLMConfigModal handleValueChange", () => {
     });
 
     describe("when previous values were stored", () => {
-      it.todo("restores previous maxTokens");
+      it.todo("does not restore maxTokens");
     });
 
     describe("when previous values were stored", () => {
@@ -42,6 +42,7 @@ describe("LLMConfigModal handleValueChange", () => {
     });
 
     it.todo("clears stored values after restoration");
+    it.todo("normalizes maxTokens format");
   });
 
   describe("when updating maxTokens", () => {
