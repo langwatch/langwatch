@@ -22,3 +22,7 @@ langwatch_server/
 prompts-lock.json
 prompts.json
 prompts/**
+
+# SpecStory
+.cursorindexingignore
+.specstory
