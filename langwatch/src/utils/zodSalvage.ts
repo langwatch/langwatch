@@ -51,7 +51,11 @@ export function salvageValidData<T extends z.ZodObject<any>>(
 
     if (fieldResult.success) {
       salvaged[key] = fieldResult.data;
-    } else if (value && typeof value === "object" && fieldSchema instanceof z.ZodObject) {
+    } else if (
+      value &&
+      typeof value === "object" &&
+      fieldSchema instanceof z.ZodObject
+    ) {
       // If the field is itself an object schema, recursively salvage it
       salvaged[key] = salvageValidData(fieldSchema, value);
     }
@@ -61,4 +65,3 @@ export function salvageValidData<T extends z.ZodObject<any>>(
   // Merge salvaged values with defaults (salvaged takes precedence)
   return merge({}, defaults, salvaged);
 }
-
