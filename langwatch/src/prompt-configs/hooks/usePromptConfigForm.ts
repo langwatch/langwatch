@@ -122,15 +122,6 @@ export const usePromptConfigForm = ({
     }, 1);
   }, [formData, onChange]);
 
-  /**
-   * Force temperature to be 1 when the model includes "gpt-5"
-   */
-  useEffect(() => {
-    if (formData.version?.configData.llm.model?.includes("gpt-5")) {
-      methods.setValue("version.configData.llm.temperature", 1);
-    }
-  }, [formData.version?.configData.llm.model, methods]);
-
   return {
     methods,
     configId,
