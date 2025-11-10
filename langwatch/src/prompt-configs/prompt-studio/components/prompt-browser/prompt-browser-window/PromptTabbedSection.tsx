@@ -50,15 +50,23 @@ export function PromptTabbedSection() {
           <Tabs.Trigger value={PromptTab.Variables}>Variables</Tabs.Trigger>
         )}
         <Tabs.Trigger value={PromptTab.Settings}>Settings</Tabs.Trigger>
-        <Box flex={1} />
-        <IconButton
-          size="sm"
-          variant="ghost"
-          onClick={() => chatRef.current?.resetChat()}
-          aria-label="Reset chat"
-        >
-          <LuPencil size={16} />
-        </IconButton>
+        <Tabs.Context>
+          {(tabs) => (
+            <>
+              <Box flex={1} />
+              {tabs.value === PromptTab.Conversation && (
+                <IconButton
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => chatRef.current?.resetChat()}
+                  aria-label="Reset chat"
+                >
+                  <LuPencil size={16} />
+                </IconButton>
+              )}
+            </>
+          )}
+        </Tabs.Context>
       </Tabs.List>
       <HStack flex={1} width="full" margin="0 auto">
         <Tabs.Content
