@@ -31,7 +31,7 @@ export const formSchema = z.object({
               DEFAULT_MODEL,
             ),
           temperature: z.preprocess((v) => v ?? 0.7, z.number()),
-          maxTokens: z.preprocess((v) => v ?? DEFAULT_MAX_TOKENS, z.number()),
+          maxTokens: z.preprocess((v) => v ?? 1000, z.number()),
           // Additional params attached to the LLM config
           litellmParams: z.record(z.string()).optional(),
         })
@@ -39,8 +39,10 @@ export const formSchema = z.object({
           ...data,
           // Auto-fix: Force temperature to 1 for GPT-5 models
           temperature: data.model.includes("gpt-5") ? 1 : data.temperature,
-          // Auto-fix: Ensure maxTokens is at least DEFAULT_MAX_TOKENS
-          maxTokens: Math.max(data.maxTokens, DEFAULT_MAX_TOKENS),
+          // Auto-fix: Ensure maxTokens is at least DEFAULT_MAX_TOKENS for GPT-5
+          maxTokens: data.model.includes("gpt-5")
+            ? Math.max(data.maxTokens, DEFAULT_MAX_TOKENS)
+            : data.maxTokens,
         })),
       demonstrations:
         latestConfigVersionSchema.shape.configData.shape.demonstrations,
