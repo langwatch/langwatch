@@ -11,17 +11,25 @@ import { getLangWatchTracer } from "langwatch";
 import { SpanKind, SpanStatusCode } from "@opentelemetry/api";
 import { generateOtelSpanId, generateOtelTraceId } from "../../utils/trace";
 
-const springAIScopeNames = [
-  "org.springframework.ai.chat.observation.ChatModelCompletionObservationHandler",
-  "org.springframework.ai.chat.observation.ChatModelPromptContentObservationHandler",
-];
-const claudeCodeScopeNames = ["com.anthropic.claude_code.events"];
+// Move these inside the function OR make them lazy
+// const springAIScopeNames = [
+//   "org.springframework.ai.chat.observation.ChatModelCompletionObservationHandler",
+//   "org.springframework.ai.chat.observation.ChatModelPromptContentObservationHandler",
+// ];
+// const claudeCodeScopeNames = ["com.anthropic.claude_code.events"];
 
 export const openTelemetryLogsRequestToTracesForCollection = async (
   otelLogs: DeepPartial<IExportLogsServiceRequest>,
 ): Promise<TraceForCollection[]> => {
   const logger = createLogger("langwatch.tracer.otel.logs");
   const tracer = getLangWatchTracer("langwatch.tracer.otel.logs");
+
+  // Move constants inside function to avoid module-level evaluation
+  const springAIScopeNames = [
+    "org.springframework.ai.chat.observation.ChatModelCompletionObservationHandler",
+    "org.springframework.ai.chat.observation.ChatModelPromptContentObservationHandler",
+  ];
+  const claudeCodeScopeNames = ["com.anthropic.claude_code.events"];
 
   return await tracer.withActiveSpan(
     "openTelemetryLogsRequestToTracesForCollection",
