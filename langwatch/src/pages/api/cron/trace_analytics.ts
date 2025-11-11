@@ -194,6 +194,19 @@ export default async function handler(
             await getCurrentMonthMessagesCount(projectIds);
           const activePlan =
             await dependencies.subscriptionHandler.getActivePlan(org.id);
+
+          // Guard against null/undefined activePlan or invalid maxMessagesPerMonth
+          if (
+            !activePlan ||
+            typeof activePlan.maxMessagesPerMonth !== "number" ||
+            activePlan.maxMessagesPerMonth <= 0
+          ) {
+            console.log(
+              `[Trace Analytics] Organization ${org.id} has invalid or missing plan configuration, skipping`,
+            );
+            continue;
+          }
+
           const maxMessagesPerMonth = activePlan.maxMessagesPerMonth;
 
           const usagePercentage =

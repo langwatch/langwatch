@@ -54,37 +54,78 @@ const UsageLimitEmailTemplate = ({
 
   const progressBarWidth = Math.min(usagePercentage, 100);
 
-  // Build project table rows
-  const projectRows = projectUsageData
-    .map(
-      (project) => `
-      <tr style="border-bottom: 1px solid #e5e7eb;">
-        <td style="padding: 12px 16px; font-size: 14px; color: #1f2937;">
-          <span style="display: inline-block; width: 12px; height: 12px; background-color: #ED8926; border-radius: 2px; margin-right: 8px; vertical-align: middle;"></span>
-          <a href="${actionUrl}" style="color: #ED8926; text-decoration: none;">${
-            project.name
-          }</a>
-        </td>
-        <td style="padding: 12px 16px; font-size: 14px; color: #1f2937; text-align: right;">
-          ${project.messageCount.toLocaleString()}
-        </td>
-      </tr>
-    `,
-    )
-    .join("");
-
-  // Total row
-  const totalRow = `
-    <tr style="border-top: 2px solid #e5e7eb; background-color: #f9fafb;">
-      <td style="padding: 12px 16px; font-size: 14px; font-weight: 600; color: #1f2937;">
-        <span style="display: inline-block; width: 12px; height: 12px; background-color: #9ca3af; border-radius: 2px; margin-right: 8px; vertical-align: middle;"></span>
-        Total (${projectUsageData.length})
+  // Build project table rows as JSX elements
+  const projectRows = projectUsageData.map((project) => (
+    <tr key={project.id} style={{ borderBottom: "1px solid #e5e7eb" }}>
+      <td style={{ padding: "12px 16px", fontSize: "14px", color: "#1f2937" }}>
+        <span
+          style={{
+            display: "inline-block",
+            width: "12px",
+            height: "12px",
+            backgroundColor: "#ED8926",
+            borderRadius: "2px",
+            marginRight: "8px",
+            verticalAlign: "middle",
+          }}
+        />
+        <a
+          href={actionUrl}
+          style={{ color: "#ED8926", textDecoration: "none" }}
+        >
+          {project.name}
+        </a>
       </td>
-      <td style="padding: 12px 16px; font-size: 14px; font-weight: 600; color: #1f2937; text-align: right;">
-        ${currentMonthMessagesCount.toLocaleString()}
+      <td
+        style={{
+          padding: "12px 16px",
+          fontSize: "14px",
+          color: "#1f2937",
+          textAlign: "right",
+        }}
+      >
+        {project.messageCount.toLocaleString()}
       </td>
     </tr>
-  `;
+  ));
+
+  // Total row as JSX element
+  const totalRow = (
+    <tr style={{ borderTop: "2px solid #e5e7eb", backgroundColor: "#f9fafb" }}>
+      <td
+        style={{
+          padding: "12px 16px",
+          fontSize: "14px",
+          fontWeight: 600,
+          color: "#1f2937",
+        }}
+      >
+        <span
+          style={{
+            display: "inline-block",
+            width: "12px",
+            height: "12px",
+            backgroundColor: "#9ca3af",
+            borderRadius: "2px",
+            marginRight: "8px",
+            verticalAlign: "middle",
+          }}
+        />
+        Total ({projectUsageData.length})
+      </td>
+      <td
+        style={{
+          padding: "12px 16px",
+          fontSize: "14px",
+          fontWeight: 600,
+          color: "#1f2937",
+          textAlign: "right",
+        }}
+      >
+        {currentMonthMessagesCount.toLocaleString()}
+      </td>
+    </tr>
+  );
 
   return (
     <Html lang="en" dir="ltr">
@@ -188,11 +229,10 @@ const UsageLimitEmailTemplate = ({
                 </th>
               </tr>
             </thead>
-            <tbody
-              dangerouslySetInnerHTML={{
-                __html: projectRows + totalRow,
-              }}
-            />
+            <tbody>
+              {projectRows}
+              {totalRow}
+            </tbody>
           </table>
         </Section>
 
