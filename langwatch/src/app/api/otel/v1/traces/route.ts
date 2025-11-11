@@ -203,7 +203,10 @@ async function handleTracesRequest(req: NextRequest) {
               traceForCollection.traceId,
               project.id,
             );
-            if (existingTrace?.indexing_md5s?.includes(paramsMD5)) {
+            if (
+              existingTrace?.indexing_md5s &&
+              existingTrace.indexing_md5s.includes(paramsMD5)
+            ) {
               continue;
             }
 

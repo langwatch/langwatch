@@ -164,6 +164,7 @@
     "qs": "^6.12.0",
     "random-word-slugs": "^0.1.7",
     "react": "^19.0.0",
+    "request": "^2.88.2",
     "react-admin": "^5.1.1",
     "react-contextual-analytics": "^1.1.2",
     "react-dnd": "^16.0.1",
