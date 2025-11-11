@@ -233,6 +233,7 @@ model Project {
     analytics                Analytics[]
     archivedAt               DateTime?
     notifications            Notification[]
+    featureClickHouse        Boolean                             @default(false)
 
     @@index([teamId])
 }
