@@ -1,5 +1,4 @@
-import type { PrismaClient, Notification } from "@prisma/client";
-import { prisma } from "../db";
+import type { PrismaClient } from "@prisma/client";
 import { sendUsageLimitEmail } from "../mailer/usageLimitEmail";
 import { createLogger } from "../../utils/logger";
 import { env } from "../../env.mjs";
@@ -97,9 +96,7 @@ export class UsageLimitService {
    * @param data Usage limit data including organization ID, current usage, and limit
    * @returns The created notification record, or null if no notification was sent
    */
-  async checkAndSendWarning(
-    data: UsageLimitData,
-  ): Promise<Notification | null> {
+  async checkAndSendWarning(data: UsageLimitData) {
     const { organizationId, currentMonthMessagesCount, maxMonthlyUsageLimit } =
       data;
 
@@ -146,7 +143,10 @@ export class UsageLimitService {
     }
 
     if (organization.members.length === 0) {
-      logger.warn({ organizationId }, "No admin members found for organization");
+      logger.warn(
+        { organizationId },
+        "No admin members found for organization",
+      );
       return null;
     }
 
@@ -236,19 +236,45 @@ export class UsageLimitService {
     }
 
     try {
-      // Send emails to all admins
-      const emailResults = await Promise.allSettled(
-        organization.members.map(async (member) => {
-          if (!member.user.email) {
-            logger.warn(
-              { userId: member.user.id },
-              "Admin user has no email, skipping",
-            );
-            return;
-          }
+      // Filter to only admins with email addresses (deliverable recipients)
+      const deliverableAdmins = organization.members.filter(
+        (member) => member.user.email,
+      );
 
+      // Short-circuit if there are no deliverable recipients
+      if (deliverableAdmins.length === 0) {
+        logger.info(
+          {
+            organizationId,
+            totalAdmins: organization.members.length,
+            usagePercentage: usagePercentage.toFixed(2),
+            threshold: crossedThreshold,
+          },
+          "No admins with email addresses found, skipping notification (no deliverable recipients)",
+        );
+        return null;
+      }
+
+      // Log any admins without emails for visibility
+      const adminsWithoutEmail = organization.members.filter(
+        (member) => !member.user.email,
+      );
+      if (adminsWithoutEmail.length > 0) {
+        logger.debug(
+          {
+            organizationId,
+            adminsWithoutEmailCount: adminsWithoutEmail.length,
+            adminsWithoutEmailIds: adminsWithoutEmail.map((m) => m.user.id),
+          },
+          "Some admins lack email addresses and will not receive notifications",
+        );
+      }
+
+      // Send emails to all deliverable admins
+      const emailResults = await Promise.allSettled(
+        deliverableAdmins.map(async (member) => {
           await sendUsageLimitEmail({
-            to: member.user.email,
+            to: member.user.email!,
             organizationName: organization.name,
             usagePercentage,
             usagePercentageFormatted,
@@ -273,16 +299,12 @@ export class UsageLimitService {
       }> = [];
 
       emailResults.forEach((result, index) => {
-        const member = organization.members[index];
+        const member = deliverableAdmins[index];
         if (!member) {
           logger.warn(
             { index, organizationId },
             "Member not found at index, skipping",
           );
-          return;
-        }
-        if (!member.user.email) {
-          // Already logged as warning above, skip counting
           return;
         }
 
@@ -312,6 +334,7 @@ export class UsageLimitService {
       });
 
       // Only create notification if at least one email succeeded
+      // This error should only occur if there were deliverable recipients but all sends failed
       if (recipientsSuccessCount === 0) {
         logger.error(
           {
@@ -338,9 +361,7 @@ export class UsageLimitService {
           limit: maxMonthlyUsageLimit,
           percentage: usagePercentage,
           threshold: crossedThreshold,
-          recipientsCount: organization.members.filter(
-            (member) => member.user.email,
-          ).length,
+          recipientsCount: deliverableAdmins.length,
           recipientsSuccessCount,
           recipientsFailureCount,
           ...(recipientsFailureCount > 0 && {
@@ -357,9 +378,7 @@ export class UsageLimitService {
         {
           organizationId,
           notificationId: notification.id,
-          recipientsCount: organization.members.filter(
-            (member) => member.user.email,
-          ).length,
+          recipientsCount: deliverableAdmins.length,
           recipientsSuccessCount,
           recipientsFailureCount,
           ...(recipientsFailureCount > 0 && { failedRecipients }),
@@ -379,4 +398,3 @@ export class UsageLimitService {
     }
   }
 }
-
