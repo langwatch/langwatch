@@ -112,7 +112,7 @@ describe("usageLimitEmail", () => {
       const html = call![0].html;
 
       expect(html).toContain(
-        "To continue using LangWatch after reaching your limit, please upgrade your plan.",
+        "New traces are going to get dropped soon, evaluations and simulations will be blocked. To continue using LangWatch with a bigger limit, please upgrade your plan.",
       );
     });
 

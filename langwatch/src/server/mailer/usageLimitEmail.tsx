@@ -180,7 +180,7 @@ const UsageLimitEmailTemplate = ({
             {usagePercentageFormatted}% of its monthly message limit.{" "}
             {crossedThreshold >= 100
               ? "To continue using LangWatch, please upgrade your plan."
-              : "To continue using LangWatch after reaching your limit, please upgrade your plan."}
+              : "New traces are going to get dropped soon, evaluations and simulations will be blocked. To continue using LangWatch with a bigger limit, please upgrade your plan."}
           </Text>
         </Section>
 
