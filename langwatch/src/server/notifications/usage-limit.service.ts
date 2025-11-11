@@ -11,22 +11,15 @@ import {
   getSeverityLevel,
   type UsageThreshold,
 } from "./helpers/usage-calculations";
-import {
-  NotificationEmailService,
-  type ProjectUsageData,
-} from "./services/notification-email.service";
+import { NotificationEmailService } from "./services/notification-email.service";
 import type {
   WarningDecisionResult,
   WarningDecisionToSend,
 } from "./types/warning-decision";
+import type { UsageLimitData } from "./types/usage-limit-data";
+import type { ProjectUsageData } from "./types/email-params";
 
 const logger = createLogger("langwatch:notifications:usageLimit");
-
-export interface UsageLimitData {
-  organizationId: string;
-  currentMonthMessagesCount: number;
-  maxMonthlyUsageLimit: number;
-}
 
 /**
  * Service layer for usage limit notification business logic
@@ -41,7 +34,7 @@ export class UsageLimitService {
 
   constructor(private readonly prisma: PrismaClient) {
     this.notificationRepository = new NotificationRepository(prisma);
-    this.messageCountRepository = new MessageCountRepository();
+    this.messageCountRepository = new MessageCountRepository(prisma);
     this.organizationRepository = new OrganizationRepository(prisma);
     this.projectRepository = new ProjectRepository(prisma);
     this.emailService = new NotificationEmailService();

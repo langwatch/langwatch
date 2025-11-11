@@ -1,34 +1,12 @@
 import { sendUsageLimitEmail } from "../../mailer/usageLimitEmail";
 import { createLogger } from "../../../utils/logger";
-import type { UsageThreshold } from "../helpers/usage-calculations";
 import { EMAIL_CONFIG } from "../../mailer/config/email-constants";
+import type {
+  SendUsageLimitEmailsParams,
+  EmailSendResult,
+} from "../types/email-params";
 
 const logger = createLogger("langwatch:notifications:email");
-
-export interface ProjectUsageData {
-  id: string;
-  name: string;
-  messageCount: number;
-}
-
-export interface SendUsageLimitEmailsParams {
-  organizationId: string;
-  organizationName: string;
-  adminEmails: Array<{ userId: string; email: string }>;
-  usagePercentage: number;
-  currentMonthMessagesCount: number;
-  maxMonthlyUsageLimit: number;
-  crossedThreshold: UsageThreshold;
-  projectUsageData: ProjectUsageData[];
-  severity: string;
-  actionUrl: string;
-}
-
-export interface EmailSendResult {
-  successCount: number;
-  failureCount: number;
-  failedRecipients: Array<{ userId: string; email: string; error: string }>;
-}
 
 /**
  * Service for sending notification emails

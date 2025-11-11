@@ -34,7 +34,7 @@ export const limitsRouter = createTRPCRouter({
     .query(async ({ input, ctx }) => {
       const { organizationId } = input;
 
-      const messageCountRepo = new MessageCountRepository();
+      const messageCountRepo = new MessageCountRepository(prisma);
       
       const projectsCount = await getOrganizationProjectsCount(organizationId);
       const currentMonthMessagesCount = await messageCountRepo.getCurrentMonthCount({

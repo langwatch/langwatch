@@ -50,7 +50,7 @@ export class OrganizationUsageCheckerService {
     const { MessageCountRepository } = await import(
       "../../repositories/message-count.repository"
     );
-    const repo = new MessageCountRepository();
+    const repo = new MessageCountRepository(this.prisma);
     return repo.getCurrentMonthCount({ projectIds });
   }
 

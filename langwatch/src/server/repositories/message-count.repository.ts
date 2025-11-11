@@ -1,6 +1,6 @@
 import type { QueryDslBoolQuery } from "@elastic/elasticsearch/lib/api/types";
+import type { PrismaClient } from "@prisma/client";
 import { esClient, TRACE_INDEX } from "../elasticsearch";
-import { prisma } from "../db";
 
 interface CacheEntry {
   count: number;
@@ -15,6 +15,8 @@ const messageCountCache = new Map<string, CacheEntry>();
  * Single Responsibility: Query and cache message counts
  */
 export class MessageCountRepository {
+  constructor(private readonly prisma: PrismaClient) {}
+
   /**
    * Get the start of the current calendar month
    */
@@ -26,7 +28,7 @@ export class MessageCountRepository {
    * Get project IDs for an organization
    */
   private async getProjectIds(organizationId: string): Promise<string[]> {
-    const projects = await prisma.project.findMany({
+    const projects = await this.prisma.project.findMany({
       where: {
         team: { organizationId },
       },
