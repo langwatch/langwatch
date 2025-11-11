@@ -821,13 +821,8 @@ model CustomRole {
     @@index([organizationId])
 }
 
-enum NotificationType {
-    USAGE_LIMIT_WARNING // User is approaching their usage limit (e.g., 80% of limit)
-}
-
 model Notification {
-    id   String           @id @default(nanoid())
-    type NotificationType
+    id String @id @default(nanoid())
 
     // Optional context - notifications can be at user, organization, or project level
     organizationId String?
@@ -837,8 +832,7 @@ model Notification {
 
     // Flexible metadata to store notification-specific data
     // For usage limit: { currentUsage: number, limit: number, percentage: number, threshold: number }
-    // For rate limit: { rate: number, limit: number, window: string }
-    metadata Json?
+    metadata Json
 
     // Timestamps
     createdAt DateTime @default(now())
@@ -847,7 +841,6 @@ model Notification {
 
     @@index([organizationId])
     @@index([projectId])
-    @@index([type])
     @@index([createdAt])
     @@index([sentAt])
 }

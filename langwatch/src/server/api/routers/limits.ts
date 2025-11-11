@@ -8,7 +8,7 @@ import { TRACE_INDEX, esClient } from "../../elasticsearch";
 import type { QueryDslBoolQuery } from "@elastic/elasticsearch/lib/api/types";
 import { prisma } from "../../db";
 import { dependencies } from "../../../injection/dependencies.server";
-import { checkAndSendUsageLimitWarning } from "../../notifications/usageLimitNotification";
+import { UsageLimitService } from "../../notifications/usage-limit.service";
 
 export const getProjectIdsForOrganization = async (
   organizationId: string,
@@ -68,7 +68,8 @@ export const limitsRouter = createTRPCRouter({
       ),
     )
     .mutation(async ({ input }) => {
-      const notification = await checkAndSendUsageLimitWarning({
+      const service = UsageLimitService.create(prisma);
+      const notification = await service.checkAndSendWarning({
         organizationId: input.organizationId,
         currentMonthMessagesCount: input.currentMonthMessagesCount,
         maxMonthlyUsageLimit: input.maxMonthlyUsageLimit,

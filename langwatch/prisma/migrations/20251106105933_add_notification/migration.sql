@@ -1,10 +1,8 @@
 -- CreateEnum
-CREATE TYPE "NotificationType" AS ENUM ('USAGE_LIMIT_WARNING');
 
 -- CreateTable
 CREATE TABLE "Notification" (
     "id" TEXT NOT NULL,
-    "type" "NotificationType" NOT NULL,
     "organizationId" TEXT,
     "projectId" TEXT,
     "metadata" JSONB,
@@ -21,8 +19,6 @@ CREATE INDEX "Notification_organizationId_idx" ON "Notification"("organizationId
 -- CreateIndex
 CREATE INDEX "Notification_projectId_idx" ON "Notification"("projectId");
 
--- CreateIndex
-CREATE INDEX "Notification_type_idx" ON "Notification"("type");
 
 -- CreateIndex
 CREATE INDEX "Notification_createdAt_idx" ON "Notification"("createdAt");

@@ -3,7 +3,7 @@ import { prisma } from "~/server/db";
 import { esClient, TRACE_INDEX } from "~/server/elasticsearch";
 import { type Prisma } from "@prisma/client";
 import { ANALYTICS_KEYS } from "~/types";
-import { checkAndSendUsageLimitWarning } from "~/server/notifications/usageLimitNotification";
+import { UsageLimitService } from "~/server/notifications/usage-limit.service";
 import {
   getCurrentMonthMessagesCount,
   getProjectIdsForOrganization,
@@ -224,7 +224,8 @@ export default async function handler(
             );
           }
 
-          await checkAndSendUsageLimitWarning({
+          const service = UsageLimitService.create(prisma);
+          await service.checkAndSendWarning({
             organizationId: org.id,
             currentMonthMessagesCount,
             maxMonthlyUsageLimit: maxMessagesPerMonth,
