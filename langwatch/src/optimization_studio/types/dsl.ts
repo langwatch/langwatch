@@ -193,7 +193,7 @@ export const nodeDatasetSchema = z.object({
           id: z.string().optional(),
           name: z.string(),
           type: datasetColumnTypeSchema,
-        })
+        }),
       ),
     })
     .optional(),
@@ -251,7 +251,7 @@ export const workflowJsonSchema = z
       .string()
       .regex(
         /^\d+(\.\d+)?$/,
-        "Version must be in the format 'number.number' (e.g. 1.0)"
+        "Version must be in the format 'number.number' (e.g. 1.0)",
       ),
     nodes: z.array(z.any()),
     edges: z.array(z.any()),

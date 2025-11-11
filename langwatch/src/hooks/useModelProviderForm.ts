@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { z } from "zod";
 import { toaster } from "../components/ui/toaster";
 import {
@@ -15,6 +15,7 @@ export type ExtraHeader = { key: string; value: string; concealed?: boolean };
 export type UseModelProviderFormParams = {
   provider: MaybeStoredModelProvider;
   projectId: string | undefined;
+  projectDefaultModel?: string | null;
   onSuccess?: () => void;
   onError?: (error: unknown) => void;
 };
@@ -29,6 +30,7 @@ export type UseModelProviderFormState = {
   customEmbeddingsModels: SelectOption[];
   chatModelOptions: SelectOption[];
   embeddingModelOptions: SelectOption[];
+  defaultModel: string | null;
   isSaving: boolean;
   isToggling: boolean;
   errors: {
@@ -49,13 +51,14 @@ export type UseModelProviderFormActions = {
   addCustomModelsFromText: (text: string) => void;
   setCustomEmbeddingsModels: (options: SelectOption[]) => void;
   addCustomEmbeddingsFromText: (text: string) => void;
+  setDefaultModel: (model: string | null) => void;
   submit: () => Promise<void>;
 };
 
 export function useModelProviderForm(
   params: UseModelProviderFormParams,
 ): [UseModelProviderFormState, UseModelProviderFormActions] {
-  const { provider, projectId, onSuccess, onError } = params;
+  const { provider, projectId, projectDefaultModel, onSuccess, onError } = params;
 
   const updateMutation = api.modelProvider.update.useMutation();
 
@@ -69,10 +72,65 @@ export function useModelProviderForm(
     (provider.customKeys as Record<string, unknown>) || {},
   );
 
+  /**
+   * Single Responsibility: Extract the underlying shape from a Zod schema to list credential keys.
+   */
   const getSchemaShape = (schema: any) => {
     if (schema?.shape) return schema.shape;
     if (schema?._def?.schema) return schema._def.schema.shape;
     return {} as Record<string, any>;
+  };
+
+  /**
+   * Single Responsibility: Determine which credential keys should be visible for the active provider and mode.
+   */
+  const getDisplayKeysForProvider = (
+    providerName: string,
+    useProviderApiGateway: boolean,
+    schemaShape: Record<string, any>,
+  ) => {
+    if (providerName === "azure") {
+      if (useProviderApiGateway) {
+        return {
+          AZURE_API_GATEWAY_BASE_URL: schemaShape.AZURE_API_GATEWAY_BASE_URL,
+          AZURE_API_GATEWAY_VERSION: schemaShape.AZURE_API_GATEWAY_VERSION,
+        } as Record<string, any>;
+      }
+      return {
+        AZURE_OPENAI_API_KEY: schemaShape.AZURE_OPENAI_API_KEY,
+        AZURE_OPENAI_ENDPOINT: schemaShape.AZURE_OPENAI_ENDPOINT,
+      } as Record<string, any>;
+    }
+
+    return schemaShape;
+  };
+
+  /**
+   * Single Responsibility: Build the credential form state while preserving prior user input when applicable.
+   */
+  const buildCustomKeyState = (
+    displayKeyMap: Record<string, any>,
+    storedKeys: Record<string, unknown>,
+    previousKeys?: Record<string, string>,
+  ) => {
+    const result: Record<string, string> = {};
+    Object.keys(displayKeyMap ?? {}).forEach((key) => {
+      if (
+        previousKeys &&
+        Object.prototype.hasOwnProperty.call(previousKeys, key)
+      ) {
+        const previousValue = previousKeys[key];
+        if (typeof previousValue === "string") {
+          result[key] = previousValue;
+          return;
+        }
+      }
+
+      const storedValue = storedKeys[key];
+      result[key] = typeof storedValue === "string" ? storedValue : "";
+    });
+
+    return result;
   };
 
   const originalSchemaShape = useMemo<Record<string, any>>(() => {
@@ -94,32 +152,16 @@ export function useModelProviderForm(
     useState<boolean>(initialUseApiGateway);
 
   const displayKeys = useMemo(() => {
-    if (provider.provider === "azure") {
-      if (useApiGateway) {
-        return {
-          AZURE_API_GATEWAY_BASE_URL:
-            originalSchemaShape.AZURE_API_GATEWAY_BASE_URL,
-          AZURE_API_GATEWAY_VERSION:
-            originalSchemaShape.AZURE_API_GATEWAY_VERSION,
-        } as Record<string, any>;
-      }
-      return {
-        AZURE_OPENAI_API_KEY: originalSchemaShape.AZURE_OPENAI_API_KEY,
-        AZURE_OPENAI_ENDPOINT: originalSchemaShape.AZURE_OPENAI_ENDPOINT,
-      } as Record<string, any>;
-    }
-    return originalSchemaShape;
+    return getDisplayKeysForProvider(
+      provider.provider,
+      useApiGateway,
+      originalSchemaShape,
+    );
   }, [provider.provider, useApiGateway, originalSchemaShape]);
 
-  const [customKeys, setCustomKeys] = useState<Record<string, string>>(() => {
-    const stored = originalStoredKeysRef.current || {};
-    const result: Record<string, string> = {};
-    Object.keys(displayKeys).forEach((key) => {
-      const v = (stored as any)[key];
-      result[key] = typeof v === "string" ? v : "";
-    });
-    return result;
-  });
+  const [customKeys, setCustomKeys] = useState<Record<string, string>>(() =>
+    buildCustomKeyState(displayKeys, originalStoredKeysRef.current ?? {}),
+  );
 
   const [extraHeaders, setExtraHeaders] = useState<ExtraHeader[]>(
     (provider.extraHeaders ?? []).map((h) => ({
@@ -166,9 +208,81 @@ export function useModelProviderForm(
     [provider.provider],
   );
 
+  const [defaultModel, setDefaultModel] = useState<string | null>(
+    projectDefaultModel ?? null,
+  );
+
   const [isSaving, setIsSaving] = useState(false);
   const [isToggling, setIsToggling] = useState(false);
   const [errors, setErrors] = useState<{ customKeysRoot?: string }>({});
+
+  useEffect(() => {
+    const storedKeys = (provider.customKeys as Record<string, unknown>) ?? {};
+    originalStoredKeysRef.current = storedKeys;
+
+    const nextUseApiGateway =
+      provider.provider === "azure" && provider.customKeys
+        ? !!(provider.customKeys as any).AZURE_API_GATEWAY_BASE_URL
+        : false;
+
+    setEnabledState(provider.enabled);
+    setUseApiGatewayState(nextUseApiGateway);
+
+    const nextDisplayKeys = getDisplayKeysForProvider(
+      provider.provider,
+      nextUseApiGateway,
+      originalSchemaShape,
+    );
+
+    setCustomKeys(() => buildCustomKeyState(nextDisplayKeys, storedKeys));
+
+    let nextExtraHeaders = (provider.extraHeaders ?? []).map((header) => ({
+      key: header.key,
+      value: header.value,
+      concealed: !!header.value,
+    }));
+
+    if (
+      provider.provider === "azure" &&
+      nextUseApiGateway &&
+      nextExtraHeaders.length === 0
+    ) {
+      nextExtraHeaders = [{ key: "api-key", value: "", concealed: false }];
+    }
+
+    setExtraHeaders(nextExtraHeaders);
+
+    setCustomModels(
+      getStoredModelOptions(
+        provider.models ?? undefined,
+        provider.provider,
+        "chat",
+      ),
+    );
+
+    setCustomEmbeddingsModels(
+      getStoredModelOptions(
+        provider.embeddingsModels ?? undefined,
+        provider.provider,
+        "embedding",
+      ),
+    );
+
+    setDefaultModel(projectDefaultModel ?? null);
+    setErrors({});
+    setIsSaving(false);
+    setIsToggling(false);
+  }, [
+    provider.provider,
+    provider.id,
+    provider.enabled,
+    provider.customKeys,
+    provider.models,
+    provider.embeddingsModels,
+    provider.extraHeaders,
+    originalSchemaShape,
+    projectDefaultModel,
+  ]);
 
   const setEnabled = useCallback(
     async (newEnabled: boolean) => {
@@ -214,16 +328,41 @@ export function useModelProviderForm(
   const setUseApiGateway = useCallback(
     (use: boolean) => {
       setUseApiGatewayState(use);
+      setCustomKeys((previousKeys) => {
+        originalStoredKeysRef.current = {
+          ...originalStoredKeysRef.current,
+          ...previousKeys,
+        };
+
+        const nextDisplayKeys = getDisplayKeysForProvider(
+          provider.provider,
+          use,
+          originalSchemaShape,
+        );
+
+        return buildCustomKeyState(
+          nextDisplayKeys,
+          originalStoredKeysRef.current,
+          previousKeys,
+        );
+      });
+
       if (provider.provider === "azure" && use && extraHeaders.length === 0) {
         setExtraHeaders([{ key: "api-key", value: "", concealed: false }]);
       }
-      // Keep existing customKeys; the visible keys are filtered by displayKeys
     },
-    [provider.provider, extraHeaders.length],
+    [provider.provider, extraHeaders.length, originalSchemaShape],
   );
 
   const setCustomKey = useCallback((key: string, value: string) => {
-    setCustomKeys((prev) => ({ ...prev, [key]: value }));
+    setCustomKeys((prev) => {
+      const next = { ...prev, [key]: value };
+      originalStoredKeysRef.current = {
+        ...originalStoredKeysRef.current,
+        [key]: value,
+      };
+      return next;
+    });
   }, []);
 
   const addExtraHeader = useCallback(() => {
@@ -333,6 +472,7 @@ export function useModelProviderForm(
           (m) => m.value,
         ),
         extraHeaders: extraHeadersToSend,
+        defaultModel: defaultModel ?? undefined,
       });
 
       toaster.create({
@@ -358,6 +498,7 @@ export function useModelProviderForm(
     customKeys,
     customModels,
     customEmbeddingsModels,
+    defaultModel,
     enabled,
     extraHeaders,
     onError,
@@ -380,6 +521,7 @@ export function useModelProviderForm(
       customEmbeddingsModels,
       chatModelOptions,
       embeddingModelOptions,
+      defaultModel,
       isSaving,
       isToggling,
       errors,
@@ -397,6 +539,7 @@ export function useModelProviderForm(
       addCustomModelsFromText,
       setCustomEmbeddingsModels,
       addCustomEmbeddingsFromText,
+      setDefaultModel,
       submit,
     },
   ];

@@ -1,11 +1,13 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import isEqual from "lodash-es/isEqual";
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import { useForm, type DeepPartial } from "react-hook-form";
 
 import { formSchema, type PromptConfigFormValues } from "~/prompt-configs";
+import { salvageValidData } from "~/utils/zodSalvage";
 
 import { inputsAndOutputsToDemostrationColumns } from "../utils/llmPromptConfigUtils";
+import { buildDefaultFormValues } from "../utils/buildDefaultFormValues";
 
 interface UsePromptConfigFormProps {
   configId?: string;
@@ -22,18 +24,48 @@ export const usePromptConfigForm = ({
   onChange,
   initialConfigValues = {},
 }: UsePromptConfigFormProps) => {
+  /**
+   * Parse initial values once with schema defaults applied.
+   * Memoized to avoid re-parsing on every render.
+   * Uses generic salvage utility to preserve valid parts of corrupted data.
+   */
+  const defaults = useMemo(() => buildDefaultFormValues(), []);
+  const parsedInitialValues = useMemo(() => {
+    return salvageValidData(formSchema, initialConfigValues, defaults);
+  }, [initialConfigValues, defaults]);
+
   const methods = useForm<PromptConfigFormValues>({
     /**
-     * Don't pass undefined as defaultValue
+     * Use parsed values with defaults applied
      * @see https://react-hook-form.com/docs/useform#defaultValues
      */
-    defaultValues: initialConfigValues,
+    defaultValues: parsedInitialValues,
     resolver: (data, ...args) => {
       return zodResolver(formSchema)(data, ...args);
     },
   });
 
   const formData = methods.watch();
+  const messages = methods.watch("version.configData.messages");
+  // Messages should always be defined, but we're being defensive here.
+  const systemMessage = messages?.find(({ role }) => role === "system")
+    ?.content;
+
+  /**
+   * In the case that we're using system messages,
+   * make sure to keep the prompt synced
+   */
+  useEffect(() => {
+    if (systemMessage) {
+      const currentPrompt = methods.getValues("version.configData.prompt");
+      // Only sync when value differs; do not mark dirty for this derived update
+      if (currentPrompt !== systemMessage) {
+        methods.setValue("version.configData.prompt", systemMessage, {
+          shouldDirty: false,
+        });
+      }
+    }
+  }, [systemMessage, methods]);
 
   // Handle syncing the inputs/outputs with the demonstrations columns
   useEffect(() => {
@@ -48,11 +80,11 @@ export const usePromptConfigForm = ({
     if (!isEqual(newColumns, currentColumns)) {
       methods.setValue(
         "version.configData.demonstrations.inline.columnTypes",
-        newColumns
+        newColumns,
       );
       methods.setValue(
         "version.configData.demonstrations.inline.records",
-        currentRecords
+        currentRecords,
       );
     }
   }, [formData, methods]);
@@ -61,11 +93,12 @@ export const usePromptConfigForm = ({
   useEffect(() => {
     if (disableNodeSync) return;
     disableOnChange = true;
+    // Use parsed values to ensure defaults are applied
     for (const [key, value] of Object.entries(
-      initialConfigValues?.version?.configData ?? {}
+      parsedInitialValues?.version?.configData ?? {},
     )) {
       const currentValue = methods.getValues(
-        `version.configData.${key}` as any
+        `version.configData.${key}` as any,
       );
       if (!isEqual(currentValue, value)) {
         methods.setValue(`version.configData.${key}` as any, value as any);
@@ -74,7 +107,7 @@ export const usePromptConfigForm = ({
     setTimeout(() => {
       disableOnChange = false;
     }, 1);
-  }, [initialConfigValues, methods]);
+  }, [parsedInitialValues, methods]);
 
   // Provides reverse sync of form values to the parent component
   useEffect(() => {

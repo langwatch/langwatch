@@ -1,0 +1,12 @@
+---
+description: When creating files
+alwaysApply: false
+---
+
+We want thin files that aim to have a single responsibility and a single export.
+We should have a single export per file.
+
+Specific directories:
+- hooks: for hooks
+- components: for components
+- pages: for pages

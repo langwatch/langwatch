@@ -19,7 +19,7 @@ export const usePrompts = () => {
     Promise.all([await trpc.prompts.invalidate()]);
 
   const wrappedCreatePrompt: typeof createPrompt.mutateAsync = async (
-    params
+    params,
   ) => {
     const prompt = await createPrompt.mutateAsync(params);
     await invalidateAll();
@@ -27,7 +27,7 @@ export const usePrompts = () => {
   };
 
   const wrappedUpdatePrompt: typeof updatePrompt.mutateAsync = async (
-    params
+    params,
   ) => {
     const prompt = await updatePrompt.mutateAsync(params);
     await invalidateAll();
@@ -35,7 +35,7 @@ export const usePrompts = () => {
   };
 
   const wrappedUpdateHandle: typeof updateHandle.mutateAsync = async (
-    params
+    params,
   ) => {
     const prompt = await updateHandle.mutateAsync(params);
     await invalidateAll();
@@ -55,7 +55,7 @@ export const usePrompts = () => {
   };
 
   const wrappedRestoreVersion: typeof restoreVersion.mutateAsync = async (
-    params
+    params,
   ) => {
     const prompt = await restoreVersion.mutateAsync(params);
     await invalidateAll();
@@ -63,7 +63,7 @@ export const usePrompts = () => {
   };
 
   const wrappedDeletePrompt: typeof deletePrompt.mutateAsync = async (
-    params
+    params,
   ) => {
     const prompt = await deletePrompt.mutateAsync(params);
     await invalidateAll();

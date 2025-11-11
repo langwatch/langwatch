@@ -10,7 +10,6 @@ export enum ProductScreenIndex {
   OBSERVABILITY = 1,
   EVALUATIONS = 2,
   PROMPT_MANAGEMENT = 3,
-  AGENT_SIMULATIONS = 4,
 }
 
 export enum OnboardingFlowDirection {
@@ -115,8 +114,7 @@ export interface OnboardingFlowConfig {
 export type ProductSelection =
   | "observability"
   | "evaluations"
-  | "prompt-management"
-  | "agent-simulations";
+  | "prompt-management";
 
 export interface ProductFlowConfig {
   variant: "product";

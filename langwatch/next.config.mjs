@@ -30,7 +30,7 @@ const cspHeader = `
 `;
 
 const existingNodeModules = new Set(
-    fs.readdirSync(path.join(__dirname, "node_modules"))
+    fs.readdirSync(path.join(__dirname, "node_modules")),
 );
 
 /**
@@ -60,24 +60,26 @@ const config = {
         resolveAlias: {
             "@injected-dependencies.client": path.join(
                 aliasPath,
-                "injection.client.ts"
+                "injection.client.ts",
             ),
             "@injected-dependencies.server": path.join(
                 aliasPath,
-                "injection.server.ts"
+                "injection.server.ts",
             ),
 
             // read all folders from ./saas-src/node_modules and create a map like the above
             ...(fs.existsSync(path.join(__dirname, "saas-src", "node_modules"))
                 ? Object.fromEntries(
-                    fs
-                        .readdirSync(path.join(__dirname, "saas-src", "node_modules"))
-                        .filter((key) => !existingNodeModules.has(key))
-                        .flatMap((key) => [
-                            [key, `./saas-src/node_modules/${key}`],
-                            [`${key}/*`, `./saas-src/node_modules/${key}/*`],
-                        ]),
-                )
+                      fs
+                          .readdirSync(
+                              path.join(__dirname, "saas-src", "node_modules"),
+                          )
+                          .filter((key) => !existingNodeModules.has(key))
+                          .flatMap((key) => [
+                              [key, `./saas-src/node_modules/${key}`],
+                              [`${key}/*`, `./saas-src/node_modules/${key}/*`],
+                          ]),
+                  )
                 : {}),
         },
     },
@@ -121,29 +123,37 @@ const config = {
     webpack: (config) => {
         config.resolve.alias["@injected-dependencies.client"] = path.join(
             aliasPath,
-            "injection.client.ts"
+            "injection.client.ts",
         );
         config.resolve.alias["@injected-dependencies.server"] = path.join(
             aliasPath,
-            "injection.server.ts"
+            "injection.server.ts",
         );
 
         // Ensures that only a single version of those are ever loaded
         // eslint-disable-next-line @typescript-eslint/dot-notation
         config.resolve.alias["react"] = `${__dirname}/node_modules/react`;
-        config.resolve.alias["react-dom"] = `${__dirname}/node_modules/react-dom`;
+        config.resolve.alias["react-dom"] =
+            `${__dirname}/node_modules/react-dom`;
         // eslint-disable-next-line @typescript-eslint/dot-notation
         config.resolve.alias["next"] = `${__dirname}/node_modules/next`;
-        config.resolve.alias["next-auth"] = `${__dirname}/node_modules/next-auth`;
+        config.resolve.alias["next-auth"] =
+            `${__dirname}/node_modules/next-auth`;
         // eslint-disable-next-line @typescript-eslint/dot-notation
         config.resolve.alias["zod"] = `${__dirname}/node_modules/zod`;
 
         // Add fallback for pino logger requirements
-        config.resolve.fallback = {
-            ...config.resolve.fallback,
-            worker_threads: false,
-            fs: false,
-        };
+        if (!config.isServer) {
+            config.resolve.fallback = {
+                ...config.resolve.fallback,
+                "pino-pretty": false,
+                fs: false,
+                stream: false,
+                "node:stream": false,
+                worker_threads: false,
+                "node:worker_threads": false,
+            };
+        }
 
         config.module.rules.push({
             test: /\.(js|jsx|ts|tsx)$/,
@@ -168,10 +178,16 @@ const config = {
         });
 
         // Support importing files with `?snippet` to get source content for IDE-highlighted snippets
-        config.module.rules.push({ resourceQuery: /snippet/, type: "asset/source" });
+        config.module.rules.push({
+            resourceQuery: /snippet/,
+            type: "asset/source",
+        });
 
         // Treat any *.snippet.* files as source assets to avoid resolution inside snippets
-        config.module.rules.push({ test: /\.snippet\.(txt|sts|ts|tsx|js|go|sh|py|yaml)$/i, type: "asset/source" });
+        config.module.rules.push({
+            test: /\.snippet\.(txt|sts|ts|tsx|js|go|sh|py|yaml)$/i,
+            type: "asset/source",
+        });
 
         // eslint-disable-next-line @typescript-eslint/no-unsafe-return
         return config;
@@ -195,5 +211,5 @@ export default bundleAnalyser({ enabled: process.env.ANALYZE === "true" })(
             deleteSourcemapsAfterUpload: true,
         },
         disableLogger: true,
-    })
+    }),
 );

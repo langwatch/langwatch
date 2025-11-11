@@ -58,12 +58,10 @@ export const studioBackendPostEvent = async ({
               return;
             }
           } catch (error) {
-            logger.error({ error, event }, "Failed to parse event");
-            const error_ = new Error(
-              `Failed to parse server event, please contact support`
-            );
-            Sentry.captureException(error_, { extra: { event } });
-            throw error_;
+            const message =
+              (error as Error).message ?? "Failed to parse server event";
+            logger.error({ error, event }, message);
+            throw error;
           }
         }
       }

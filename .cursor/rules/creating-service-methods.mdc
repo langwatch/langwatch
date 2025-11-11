@@ -1,0 +1,7 @@
+---
+alwaysApply: true
+---
+
+When creating service methods that are only wrappers around repository methods, use the `get` keyword to create a method that returns the repository method bound to the repository instance.
+
+Don't use the `bind` function to create these methods.

@@ -8,7 +8,6 @@
 import {
   CopilotRuntime,
   copilotRuntimeNodeHttpEndpoint,
-  ExperimentalEmptyAdapter,
 } from "@copilotkit/runtime";
 import type { Project } from "@prisma/client";
 import { Hono } from "hono";
@@ -23,6 +22,7 @@ import {
 } from "../../middleware";
 
 import { createLogger } from "~/utils/logger";
+import { PromptStudioAdapter } from "./service-adapter";
 
 const logger = createLogger("langwatch:api:copilotkit");
 
@@ -54,12 +54,14 @@ app.post(
 
     const handler = copilotRuntimeNodeHttpEndpoint({
       runtime,
-      serviceAdapter: new ExperimentalEmptyAdapter(),
+      serviceAdapter: new PromptStudioAdapter({
+        projectId: project.id,
+      }),
       endpoint: "/api/copilotkit",
     });
 
     logger.info({ projectId: project.id }, "Creating simulation thread");
 
     return handler(c.req.raw);
-  }
+  },
 );

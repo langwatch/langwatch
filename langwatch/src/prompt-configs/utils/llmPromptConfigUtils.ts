@@ -1,3 +1,4 @@
+import { PromptScope } from "@prisma/client";
 import type { Node } from "@xyflow/react";
 import type { DeepPartial } from "react-hook-form";
 
@@ -8,7 +9,7 @@ import type {
   NodeDataset,
   Signature,
 } from "~/optimization_studio/types/dsl";
-import type { PromptConfigFormValues } from "~/prompt-configs";
+import { formSchema, type PromptConfigFormValues } from "~/prompt-configs";
 import { type SaveVersionParams } from "~/prompt-configs/providers/types";
 import {
   versionMetadataToFormFormat,
@@ -16,8 +17,6 @@ import {
 } from "~/prompt-configs/schemas/version-metadata-schema";
 import type { DatasetColumnType } from "~/server/datasets/types";
 import type { VersionedPrompt } from "~/server/prompt-config";
-import { type LatestConfigVersionSchema } from "~/server/prompt-config/repositories/llm-config-version-schema";
-import type { LlmConfigWithLatestVersion } from "~/server/prompt-config/repositories/llm-config.repository";
 import {
   LlmConfigInputTypes,
   LlmConfigOutputTypes,
@@ -26,8 +25,10 @@ import {
 } from "~/types";
 import { kebabCase } from "~/utils/stringCasing";
 
+import { generateUniqueIdentifier } from "./identifierUtils";
+
 export function promptConfigFormValuesToOptimizationStudioNodeData(
-  formValues: PromptConfigFormValues
+  formValues: PromptConfigFormValues,
 ): Node<LlmPromptConfigComponent>["data"] {
   return {
     configId: formValues.configId,
@@ -65,8 +66,22 @@ export function promptConfigFormValuesToOptimizationStudioNodeData(
   };
 }
 
+/**
+ * Safely converts node data to form initial values, handling legacy formats and corrupted data.
+ *
+ * Auto-generates or provides defaults for missing or invalid data:
+ * - Identifiers: Auto-generated for inputs/outputs via safeInputs/safeOutputs
+ * - Handle: Defaults to null if missing
+ * - Scope: Defaults to PROJECT if missing (required by schema)
+ * - LLM config: Migrates legacy string format (model name) to object { model }
+ * - LLM config: Provides empty object if missing (schema applies defaults)
+ * - Prompt: Defaults to empty string if missing
+ *
+ * @param nodeData - Raw node data from the workflow
+ * @returns Partial form values with safe defaults for all required fields
+ */
 export function safeOptimizationStudioNodeDataToPromptConfigFormInitialValues(
-  nodeData: Node<Signature | LlmPromptConfigComponent>["data"]
+  nodeData: Node<Signature | LlmPromptConfigComponent>["data"],
 ): DeepPartial<PromptConfigFormValues> {
   const parametersMap = nodeData.parameters
     ? Object.fromEntries(nodeData.parameters.map((p) => [p.identifier, p]))
@@ -76,19 +91,48 @@ export function safeOptimizationStudioNodeDataToPromptConfigFormInitialValues(
   const outputs = safeOutputs(nodeData.outputs);
   const llmNode = nodeData as LlmPromptConfigComponent;
 
+  // Safely extract LLM config, handling legacy format where LLM was just a model string
+  // Legacy format: llm = "openai/gpt-4-0125-preview"
+  // New format: llm = { model: "openai/gpt-4-0125-preview", temperature: 0.7, maxTokens: 1000 }
+  const rawLlmValue = llmParameter?.value;
+  let llmValue: DeepPartial<
+    PromptConfigFormValues["version"]["configData"]["llm"]
+  >;
+
+  if (rawLlmValue && typeof rawLlmValue === "string") {
+    // Migrate legacy format: string model name → object with model field
+    console.warn(
+      `Migrating legacy LLM format: string "${String(
+        rawLlmValue,
+      )}" → object with model field`,
+    );
+    llmValue = { model: rawLlmValue };
+  } else if (rawLlmValue && typeof rawLlmValue === "object") {
+    llmValue = rawLlmValue;
+  } else {
+    llmValue = {};
+  }
+
+  // Extract scope safely - it may not exist on all node types
+  let scope: PromptScope | undefined = undefined;
+  if ("scope" in llmNode && typeof llmNode.scope === "string") {
+    scope = llmNode.scope as PromptScope;
+  }
+
   return {
     configId: llmNode.configId,
     versionMetadata: versionMetadataToFormFormat(llmNode.versionMetadata),
-    handle: llmNode.handle,
+    handle: llmNode.handle ?? null,
+    scope: scope ?? PromptScope.PROJECT,
     version: {
       configData: {
         inputs,
         outputs,
-        llm: llmParameter?.value,
+        llm: llmValue,
         prompt:
           typeof parametersMap.instructions?.value === "string"
             ? parametersMap.instructions.value
-            : undefined,
+            : "",
         messages: Array.isArray(parametersMap.messages?.value)
           ? parametersMap.messages.value
           : [],
@@ -109,33 +153,85 @@ export function safeOptimizationStudioNodeDataToPromptConfigFormInitialValues(
   };
 }
 
+/**
+ * Safely converts node inputs to form values, auto-generating identifiers for corrupted data.
+ *
+ * If an input has an empty or missing identifier, generates a unique one automatically
+ * instead of throwing a validation error.
+ *
+ * @param inputs - Raw input data from the node
+ * @returns Validated inputs with guaranteed identifiers
+ */
 function safeInputs(
-  inputs: Signature["inputs"]
+  inputs: Signature["inputs"],
 ): PromptConfigFormValues["version"]["configData"]["inputs"] {
+  const existingIdentifiers: string[] = [];
+
   return (
     inputs?.map((input) => {
+      let identifier = input.identifier?.trim();
+
+      // Auto-generate identifier if missing or empty
+      if (!identifier) {
+        identifier = generateUniqueIdentifier({
+          baseName: "input",
+          existingIdentifiers,
+        });
+        console.warn(
+          `Auto-generated identifier "${identifier}" for corrupted input`,
+        );
+      }
+
+      existingIdentifiers.push(identifier);
+
       if (LlmConfigInputTypes.includes(input.type as LlmConfigInputType)) {
         return {
-          identifier: input.identifier,
+          identifier,
           type: input.type as LlmConfigInputType,
         };
       }
       return {
-        identifier: input.identifier,
+        identifier,
         type: "str",
       };
     }) ?? []
   );
 }
 
+/**
+ * Safely converts node outputs to form values, auto-generating identifiers for corrupted data.
+ *
+ * If an output has an empty or missing identifier, generates a unique one automatically
+ * instead of throwing a validation error.
+ *
+ * @param outputs - Raw output data from the node
+ * @returns Validated outputs with guaranteed identifiers
+ */
 function safeOutputs(
-  outputs: Signature["outputs"]
+  outputs: Signature["outputs"],
 ): PromptConfigFormValues["version"]["configData"]["outputs"] {
+  const existingIdentifiers: string[] = [];
+
   return (
     outputs?.map((output) => {
+      let identifier = output.identifier?.trim();
+
+      // Auto-generate identifier if missing or empty
+      if (!identifier) {
+        identifier = generateUniqueIdentifier({
+          baseName: "output",
+          existingIdentifiers,
+        });
+        console.warn(
+          `Auto-generated identifier "${identifier}" for corrupted output`,
+        );
+      }
+
+      existingIdentifiers.push(identifier);
+
       if (LlmConfigOutputTypes.includes(output.type as LlmConfigOutputType)) {
         return {
-          identifier: output.identifier,
+          identifier,
           type: output.type as LlmConfigOutputType,
           ...(output.json_schema && {
             json_schema:
@@ -144,7 +240,7 @@ function safeOutputs(
         };
       }
       return {
-        identifier: output.identifier,
+        identifier,
         type: "str",
       };
     }) ?? []
@@ -153,7 +249,7 @@ function safeOutputs(
 
 export function inputsAndOutputsToDemostrationColumns(
   inputs: PromptConfigFormValues["version"]["configData"]["inputs"],
-  outputs: PromptConfigFormValues["version"]["configData"]["outputs"]
+  outputs: PromptConfigFormValues["version"]["configData"]["outputs"],
 ): { name: string; type: DatasetColumnType; id: string }[] {
   return [
     ...inputs
@@ -172,7 +268,7 @@ export function inputsAndOutputsToDemostrationColumns(
 }
 
 function inputOutputTypeToDatasetColumnType(
-  type_: LlmConfigInputType | LlmConfigOutputType
+  type_: LlmConfigInputType | LlmConfigOutputType,
 ): DatasetColumnType {
   switch (type_) {
     case "str":
@@ -204,21 +300,21 @@ function inputOutputTypeToDatasetColumnType(
 
 export function createNewOptimizationStudioPromptName(
   workflowName: string,
-  nodes: Node<Component>[]
+  nodes: Node<Component>[],
 ) {
   const nodesWithSameName = nodes.filter(
-    (node) => node.data.name?.startsWith(kebabCase(workflowName))
+    (node) => node.data.name?.startsWith(kebabCase(workflowName)),
   ).length;
 
   const promptName = kebabCase(
-    `${workflowName}-new-prompt-${nodesWithSameName + 1}`
+    `${workflowName}-new-prompt-${nodesWithSameName + 1}`,
   );
 
   return promptName;
 }
 
 export function versionedPromptToLlmPromptConfigComponentNodeData(
-  prompt: VersionedPrompt
+  prompt: VersionedPrompt,
 ): Node<LlmPromptConfigComponent>["data"] {
   return {
     configId: prompt.id,
@@ -268,14 +364,14 @@ export function versionedPromptToLlmPromptConfigComponentNodeData(
  * @returns
  */
 export function formValuesToTriggerSaveVersionParams(
-  formValues: PromptConfigFormValues
+  formValues: PromptConfigFormValues,
 ): Omit<Omit<SaveVersionParams, "projectId">["data"], "commitMessage"> {
   const systemPrompt =
     formValues.version.configData.prompt ??
     formValues.version.configData.messages?.find((msg) => msg.role === "system")
       ?.content;
   const messages = formValues.version.configData.messages?.filter(
-    (msg) => msg.role !== "system"
+    (msg) => msg.role !== "system",
   );
 
   return {
@@ -292,10 +388,13 @@ export function formValuesToTriggerSaveVersionParams(
   };
 }
 
+/**
+ * Converts the versioned prompt to form values without the system message.
+ */
 export function versionedPromptToPromptConfigFormValues(
-  prompt: VersionedPrompt
+  prompt: VersionedPrompt,
 ): PromptConfigFormValues {
-  return {
+  return formSchema.parse({
     configId: prompt.id,
     versionMetadata: {
       versionId: prompt.versionId,
@@ -307,6 +406,8 @@ export function versionedPromptToPromptConfigFormValues(
     version: {
       configData: {
         prompt: prompt.prompt,
+        // The system message should be stored in the prompt field in the DB,
+        // so this shouldn't be necessary, but it's a precaution.
         messages: prompt.messages.filter((msg) => msg.role !== "system"),
         inputs: prompt.inputs,
         outputs: prompt.outputs,
@@ -320,11 +421,30 @@ export function versionedPromptToPromptConfigFormValues(
         },
       },
     },
-  };
+  });
+}
+
+/**
+ * Converts the versioned prompt to form values with the system message.
+ * The system message is added to the messages array.
+ */
+export function versionedPromptToPromptConfigFormValuesWithSystemMessage(
+  prompt: VersionedPrompt,
+): PromptConfigFormValues {
+  const base = versionedPromptToPromptConfigFormValues(prompt);
+
+  if (prompt.prompt) {
+    base.version.configData.messages = [
+      { role: "system", content: prompt.prompt },
+      ...base.version.configData.messages,
+    ];
+  }
+
+  return base;
 }
 
 export function versionedPromptToOptimizationStudioNodeData(
-  prompt: VersionedPrompt
+  prompt: VersionedPrompt,
 ): Required<
   Omit<
     LlmPromptConfigComponent,

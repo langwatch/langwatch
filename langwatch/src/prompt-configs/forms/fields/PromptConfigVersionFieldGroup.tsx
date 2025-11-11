@@ -14,9 +14,19 @@ import { useFieldArray, useFormContext } from "react-hook-form";
 import { PropertySectionTitle } from "~/optimization_studio/components/properties/BasePropertiesPanel";
 import type { PromptConfigFormValues } from "~/prompt-configs";
 import { TypeSelector } from "~/prompt-configs/components/ui/TypeSelector";
+import { generateUniqueIdentifier } from "~/prompt-configs/utils/identifierUtils";
+import { Tooltip } from "~/components/ui/tooltip";
 
 /**
- * Reusable component for a group of fields (inputs, outputs)
+ * ConfigFieldGroup
+ * Single Responsibility: Manages a dynamic list of input or output field configurations.
+ *
+ * Handles adding, removing, and validating field identifiers for prompt configuration.
+ * Generates unique default identifiers to prevent schema validation errors.
+ *
+ * @param title - Display title for the field group (e.g., "Inputs", "Outputs")
+ * @param name - Field type: "inputs" or "outputs"
+ * @param readOnly - If true, prevents editing/adding/removing fields
  */
 function ConfigFieldGroup({
   title,
@@ -37,14 +47,41 @@ function ConfigFieldGroup({
     name: fieldArrayName,
   });
 
+  /**
+   * Adds a new field with a unique default identifier.
+   *
+   * Generates identifiers following the pattern:
+   * - First field: "input" or "output"
+   * - Subsequent fields: "input_1", "input_2", etc.
+   *
+   * This prevents Zod validation errors that require non-empty identifiers.
+   */
   const handleAddField = () => {
-    append({ identifier: "", type: "str" });
+    const currentFields = getValues(fieldArrayName);
+    const baseName = name === "inputs" ? "input" : "output";
+    const existingIdentifiers = Array.isArray(currentFields)
+      ? currentFields.map((f) => f.identifier)
+      : [];
+
+    const identifier = generateUniqueIdentifier({
+      baseName,
+      existingIdentifiers,
+    });
+
+    append({ identifier, type: "str" });
   };
 
   const handleSetValue = (path: string, value: any) => {
     setValue(path as any, value, { shouldValidate: false });
   };
 
+  /**
+   * Validates that field identifiers are unique within the field group.
+   *
+   * @param index - Index of the field being validated
+   * @param value - Identifier value to check for duplicates
+   * @returns true if valid, or error message string if duplicate found
+   */
   const validateIdentifier = (index: number, value: string) => {
     const currentFields = getValues(fieldArrayName);
     const fieldArrayIdentifierPath =
@@ -52,7 +89,7 @@ function ConfigFieldGroup({
 
     if (Array.isArray(currentFields)) {
       const identifierCount = currentFields.filter(
-        (f, i) => f.identifier === value && i !== index
+        (f, i) => f.identifier === value && i !== index,
       ).length;
 
       if (identifierCount > 0) {
@@ -83,6 +120,7 @@ function ConfigFieldGroup({
           onChange={handleSetValue}
           onRemove={() => remove(index)}
           readOnly={readOnly}
+          totalFields={fields.length}
           // error={errors[`version.${name}`]?.[index]?.identifier}
           validateIdentifier={(value) => validateIdentifier(index, value)}
         />
@@ -92,7 +130,12 @@ function ConfigFieldGroup({
 }
 
 /**
- * Header for a field group with title and add button
+ * FieldGroupHeader
+ * Single Responsibility: Renders the header section with title and add button for a field group.
+ *
+ * @param title - Display title for the field group
+ * @param onAdd - Callback to add a new field
+ * @param readOnly - If true, hides the add button
  */
 function FieldGroupHeader({
   title,
@@ -117,7 +160,23 @@ function FieldGroupHeader({
 }
 
 /**
- * A single field row with identifier and type
+ * FieldRow
+ * Single Responsibility: Renders a single field row with identifier input, type selector, and delete button.
+ *
+ * Implements business logic to prevent deleting the last output field:
+ * - Outputs require at least one field (schema: min(1))
+ * - Inputs can be deleted freely (no minimum requirement)
+ * - Delete button is disabled (not hidden) for discoverability with tooltip explanation
+ *
+ * @param field - Field data from react-hook-form's useFieldArray
+ * @param index - Position in the field array
+ * @param name - Field type: "inputs" or "outputs"
+ * @param onChange - Callback to update field values
+ * @param onRemove - Callback to remove this field
+ * @param readOnly - If true, shows read-only view and hides delete button
+ * @param error - Validation error to display
+ * @param validateIdentifier - Function to check for duplicate identifiers
+ * @param totalFields - Total number of fields in the group (used for delete button logic)
  */
 function FieldRow({
   field,
@@ -128,6 +187,7 @@ function FieldRow({
   readOnly,
   error,
   validateIdentifier,
+  totalFields,
 }: {
   field: { id: string; identifier: string; type: string };
   index: number;
@@ -137,6 +197,7 @@ function FieldRow({
   readOnly?: boolean;
   error?: { message?: string };
   validateIdentifier: (value: string) => true | string;
+  totalFields: number;
 }) {
   const { getValues } = useFormContext();
   const fieldIdBase = `version.configData.${name}.${index}`;
@@ -202,14 +263,26 @@ function FieldRow({
           />
         </HStack>
         {!readOnly && (
-          <Button
-            colorPalette="gray"
-            size="sm"
-            height="40px"
-            onClick={onRemove}
+          <Tooltip
+            content={
+              name === "outputs" && totalFields === 1
+                ? "At least one output is required"
+                : undefined
+            }
+            disabled={!(name === "outputs" && totalFields === 1)}
+            positioning={{ placement: "top" }}
+            showArrow
           >
-            <Trash2 size={18} />
-          </Button>
+            <Button
+              colorPalette="gray"
+              size="sm"
+              height="40px"
+              onClick={onRemove}
+              disabled={name === "outputs" && totalFields === 1}
+            >
+              <Trash2 size={18} />
+            </Button>
+          </Tooltip>
         )}
       </HStack>
       {error?.message && <Field.ErrorText>{error.message}</Field.ErrorText>}

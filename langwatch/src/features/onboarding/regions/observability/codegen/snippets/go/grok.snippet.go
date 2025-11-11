@@ -23,10 +23,10 @@ func main() {
 	)
 
 	response, err := client.Chat.Completions.New(ctx, openai.ChatCompletionNewParams{
-		Model: openai.ChatModelGPT5,
+		Model: "grok-4-latest",
 		Messages: []openai.ChatCompletionMessageParamUnion{
 			openai.SystemMessage("You are a helpful assistant."),
-			openai.UserMessage("Hello, OpenAI!"),
+			openai.UserMessage("Hello, Grok!"),
 		},
 	})
 	if err != nil {

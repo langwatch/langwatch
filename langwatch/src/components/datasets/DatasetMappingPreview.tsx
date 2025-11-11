@@ -297,6 +297,9 @@ export function DatasetMappingPreview({
                   Error rendering the dataset, please refresh the page
                 </Center>
               }
+              onError={(error) => {
+                console.error(error);
+              }}
             >
               <DatasetGrid
                 columnDefs={columnDefs}
