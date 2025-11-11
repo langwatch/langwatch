@@ -85,7 +85,10 @@ export class UsageLimitService {
         { error, projectId, organizationId },
         "Error getting project message count",
       );
-      return 0;
+      throw new Error(
+        `Failed to get message count for project ${projectId} in organization ${organizationId}`,
+        { cause: error },
+      );
     }
   }
 
@@ -222,10 +225,8 @@ export class UsageLimitService {
     const usagePercentageFormatted = usagePercentage.toFixed(1);
 
     // Determine severity based on threshold
-    let severity = "Warning";
-    if (crossedThreshold >= 100) {
-      severity = "Critical";
-    } else if (crossedThreshold >= 95) {
+    let severity: string;
+    if (crossedThreshold >= 95) {
       severity = "Critical";
     } else if (crossedThreshold >= 90) {
       severity = "High";
