@@ -8,9 +8,10 @@ import { TRACE_INDEX, esClient } from "../../elasticsearch";
 import type { QueryDslBoolQuery } from "@elastic/elasticsearch/lib/api/types";
 import { prisma } from "../../db";
 import { dependencies } from "../../../injection/dependencies.server";
+import { checkAndSendUsageLimitWarning } from "../../notifications/usageLimitNotification";
 
 export const getProjectIdsForOrganization = async (
-  organizationId: string
+  organizationId: string,
 ): Promise<string[]> => {
   return (
     await prisma.project.findMany({
@@ -27,8 +28,8 @@ export const limitsRouter = createTRPCRouter({
     .input(z.object({ organizationId: z.string() }))
     .use(
       checkUserPermissionForOrganization(
-        OrganizationRoleGroup.ORGANIZATION_USAGE
-      )
+        OrganizationRoleGroup.ORGANIZATION_USAGE,
+      ),
     )
     .query(async ({ input, ctx }) => {
       const { organizationId } = input;
@@ -41,7 +42,7 @@ export const limitsRouter = createTRPCRouter({
       const currentMonthCost = await getCurrentMonthCostForProjects(projectIds);
       const activePlan = await dependencies.subscriptionHandler.getActivePlan(
         organizationId,
-        ctx.session.user
+        ctx.session.user,
       );
       const maxMonthlyUsageLimit_ = await maxMonthlyUsageLimit(organizationId);
 
@@ -51,6 +52,32 @@ export const limitsRouter = createTRPCRouter({
         currentMonthCost,
         activePlan,
         maxMonthlyUsageLimit: maxMonthlyUsageLimit_,
+      };
+    }),
+  checkAndSendUsageLimitNotification: protectedProcedure
+    .input(
+      z.object({
+        organizationId: z.string(),
+        currentMonthMessagesCount: z.number(),
+        maxMonthlyUsageLimit: z.number(),
+      }),
+    )
+    .use(
+      checkUserPermissionForOrganization(
+        OrganizationRoleGroup.ORGANIZATION_USAGE,
+      ),
+    )
+    .mutation(async ({ input }) => {
+      const notification = await checkAndSendUsageLimitWarning({
+        organizationId: input.organizationId,
+        currentMonthMessagesCount: input.currentMonthMessagesCount,
+        maxMonthlyUsageLimit: input.maxMonthlyUsageLimit,
+      });
+
+      return {
+        sent: notification !== null,
+        notificationId: notification?.id,
+        sentAt: notification?.sentAt,
       };
     }),
 });
@@ -77,7 +104,7 @@ const messageCountCache = new Map<string, CacheEntry>();
 
 export const getCurrentMonthMessagesCount = async (
   projectIds: string[],
-  organizationId?: string
+  organizationId?: string,
 ) => {
   const cacheKey = organizationId
     ? `org:${organizationId}`
