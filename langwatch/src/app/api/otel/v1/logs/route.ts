@@ -54,7 +54,7 @@ async function handleLogsRequest(req: NextRequest) {
             message:
               "Authentication token is required. Use X-Auth-Token header or Authorization: Bearer token.",
           },
-          { status: 401 }
+          { status: 401 },
         );
       }
 
@@ -73,7 +73,7 @@ async function handleLogsRequest(req: NextRequest) {
 
         return NextResponse.json(
           { message: "Invalid auth token." },
-          { status: 401 }
+          { status: 401 },
         );
       }
 
@@ -91,7 +91,7 @@ async function handleLogsRequest(req: NextRequest) {
         try {
           const json = JSON.parse(Buffer.from(body).toString("utf-8"));
           logRequest = logRequestType.decode(
-            new Uint8Array(logRequestType.encode(json).finish())
+            new Uint8Array(logRequestType.encode(json).finish()),
           );
         } catch (jsonError) {
           span.setStatus({
@@ -101,7 +101,7 @@ async function handleLogsRequest(req: NextRequest) {
           span.recordException(
             jsonError instanceof Error
               ? jsonError
-              : new Error(String(jsonError))
+              : new Error(String(jsonError)),
           );
 
           logger.error(
@@ -109,7 +109,7 @@ async function handleLogsRequest(req: NextRequest) {
               error: jsonError,
               logRequest: Buffer.from(body).toString("base64"),
             },
-            "error parsing logs"
+            "error parsing logs",
           );
 
           Sentry.captureException(error, {
@@ -122,7 +122,7 @@ async function handleLogsRequest(req: NextRequest) {
 
           return NextResponse.json(
             { error: "Failed to parse logs" },
-            { status: 400 }
+            { status: 400 },
           );
         }
       }
@@ -132,7 +132,7 @@ async function handleLogsRequest(req: NextRequest) {
         await openTelemetryLogsRequestToTracesForCollection(logRequest);
       console.log(
         "tracesGeneratedFromLogs",
-        JSON.stringify(tracesGeneratedFromLogs, undefined, 2)
+        JSON.stringify(tracesGeneratedFromLogs, undefined, 2),
       );
 
       const promises = await tracer.withActiveSpan(
@@ -140,6 +140,9 @@ async function handleLogsRequest(req: NextRequest) {
         { kind: SpanKind.INTERNAL },
         async () => {
           const promises: Promise<void>[] = [];
+          if (!Array.isArray(tracesGeneratedFromLogs)) {
+            return promises;
+          }
           for (const traceForCollection of tracesGeneratedFromLogs) {
             const paramsMD5 = crypto
               .createHash("md5")
@@ -147,15 +150,19 @@ async function handleLogsRequest(req: NextRequest) {
               .digest("hex");
             const existingTrace = await fetchExistingMD5s(
               traceForCollection.traceId,
-              project.id
+              project.id,
             );
-            if (existingTrace?.indexing_md5s?.includes(paramsMD5)) {
+            if (
+              existingTrace?.indexing_md5s &&
+              Array.isArray(existingTrace.indexing_md5s) &&
+              existingTrace.indexing_md5s.includes(paramsMD5)
+            ) {
               continue;
             }
 
             logger.info(
               { traceId: traceForCollection.traceId },
-              "collecting traces from logs"
+              "collecting traces from logs",
             );
 
             promises.push(
@@ -167,11 +174,11 @@ async function handleLogsRequest(req: NextRequest) {
                 expectedOutput: void 0,
                 evaluations: void 0,
                 collectedAt: Date.now(),
-              })
+              }),
             );
           }
           return promises;
-        }
+        },
       );
 
       if (promises.length === 0) {
@@ -183,11 +190,11 @@ async function handleLogsRequest(req: NextRequest) {
         { kind: SpanKind.PRODUCER },
         async () => {
           await Promise.all(promises);
-        }
+        },
       );
 
       return NextResponse.json({ message: "OK" }, { status: 200 });
-    }
+    },
   );
 }
 
