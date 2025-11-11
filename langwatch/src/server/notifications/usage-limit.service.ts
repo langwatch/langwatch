@@ -2,7 +2,7 @@ import type { PrismaClient, Notification } from "@prisma/client";
 import { createLogger } from "../../utils/logger";
 import { NOTIFICATION_TYPES } from "./types";
 import { NotificationRepository } from "./repositories/notification.repository";
-import { MessageCountRepository } from "./repositories/message-count.repository";
+import { MessageCountRepository } from "../repositories/message-count.repository";
 import { OrganizationRepository } from "./repositories/organization.repository";
 import { ProjectRepository } from "./repositories/project.repository";
 import {
@@ -103,7 +103,7 @@ export class UsageLimitService {
       projects.map(async (project) => ({
         id: project.id,
         name: project.name,
-        messageCount: await this.messageCountRepository.getProjectMessageCount({
+        messageCount: await this.messageCountRepository.getProjectCurrentMonthCount({
           projectId: project.id,
           organizationId,
         }),
@@ -267,6 +267,9 @@ export class UsageLimitService {
     const sentAt = new Date();
 
     try {
+      const baseUrl = process.env.BASE_HOST ?? "https://app.langwatch.ai";
+      const actionUrl = `${baseUrl}/settings/usage`;
+
       const { successCount, failureCount, failedRecipients } =
         await this.emailService.sendUsageLimitEmails({
           organizationId,
@@ -278,6 +281,7 @@ export class UsageLimitService {
           crossedThreshold,
           projectUsageData,
           severity,
+          actionUrl,
         });
 
       // Only create notification if at least one email succeeded

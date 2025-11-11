@@ -34,12 +34,13 @@ export const limitsRouter = createTRPCRouter({
     .query(async ({ input, ctx }) => {
       const { organizationId } = input;
 
-      const projectIds = await getProjectIdsForOrganization(organizationId);
-
-      const projectsCount = projectIds.length;
-      const currentMonthMessagesCount =
-        await getCurrentMonthMessagesCount(projectIds);
-      const currentMonthCost = await getCurrentMonthCostForProjects(projectIds);
+      const messageCountRepo = new MessageCountRepository();
+      
+      const projectsCount = await getOrganizationProjectsCount(organizationId);
+      const currentMonthMessagesCount = await messageCountRepo.getCurrentMonthCount({
+        organizationId,
+      });
+      const currentMonthCost = await getCurrentMonthCost(organizationId);
       const activePlan = await dependencies.subscriptionHandler.getActivePlan(
         organizationId,
         ctx.session.user,

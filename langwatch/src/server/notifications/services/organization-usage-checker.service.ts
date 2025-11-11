@@ -47,12 +47,11 @@ export class OrganizationUsageCheckerService {
   private async getCurrentMonthMessagesCount(
     projectIds: string[],
   ): Promise<number> {
-    // This is imported from limits.ts router - ideally should be in a shared service
-    // but for now we'll keep the dependency
-    const { getCurrentMonthMessagesCount } = await import(
-      "../../api/routers/limits"
+    const { MessageCountRepository } = await import(
+      "../../repositories/message-count.repository"
     );
-    return getCurrentMonthMessagesCount(projectIds);
+    const repo = new MessageCountRepository();
+    return repo.getCurrentMonthCount({ projectIds });
   }
 
   /**
