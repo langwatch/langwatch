@@ -5,6 +5,7 @@ import { useSimulationRouter } from "~/hooks/simulations/useSimulationRouter";
 import type { Run, RunItem } from "./types";
 import type { ScenarioRunData } from "~/app/api/scenario-events/[[...route]]/types";
 import { createLogger } from "~/utils/logger";
+import { useTracedQuery } from "~/observability/react-otel/useTracedQuery";
 
 const logger = createLogger("useSetRunHistorySidebarController");
 
@@ -42,7 +43,7 @@ export const useSetRunHistorySidebarController = () => {
     data: runData,
     error,
     isLoading,
-  } = api.scenarios.getScenarioSetRunData.useQuery(
+  } = useTracedQuery(api.scenarios.getScenarioSetRunData,
     {
       projectId: project?.id ?? "",
       scenarioSetId: scenarioSetId ?? "",
@@ -58,7 +59,7 @@ export const useSetRunHistorySidebarController = () => {
 
   // Fetch total count for pagination info
   const { data: countData } =
-    api.scenarios.getScenarioSetBatchRunCount.useQuery(
+    useTracedQuery(api.scenarios.getScenarioSetBatchRunCount,
       {
         projectId: project?.id ?? "",
         scenarioSetId: scenarioSetId ?? "",
@@ -69,7 +70,6 @@ export const useSetRunHistorySidebarController = () => {
     );
 
   const totalCount = countData?.count ?? 0;
-  const hasMore = runData?.hasMore ?? false;
   const currentPage = cursorHistory.length + 1;
   const totalPages = Math.ceil(totalCount / limit);
 
@@ -140,7 +140,7 @@ export const useSetRunHistorySidebarController = () => {
       setCursorHistory([]);
     } else if (newPage > currentPage) {
       // Navigate forward from current position
-      const stepsForward = newPage - currentPage;
+      // const stepsForward = newPage - currentPage;
       // This is simplified - in practice you'd need to fetch each page
       // For now, just allow forward navigation
     }

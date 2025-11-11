@@ -1,6 +1,7 @@
 import { Card, Badge, Box, HStack, VStack, Text } from "@chakra-ui/react";
 import { ScenarioRunStatus } from "~/app/api/scenario-events/[[...route]]/enums";
 import { SimulationStatusOverlay } from "./SimulationStatusOverlay";
+import { AnalyticsBoundary } from "react-contextual-analytics";
 
 // Card props: title, status, messages
 export interface SimulationCardMessage {
@@ -112,20 +113,26 @@ export function SimulationCard({
   children,
 }: SimulationCardProps) {
   return (
-    <Card.Root
-      height="100%"
-      borderWidth={1}
-      borderColor="gray.200"
-      borderRadius="lg"
-      overflow="hidden"
+    <AnalyticsBoundary
+      name="simulation_card"
+      attributes={{ status: status ?? "unknown", title }}
+      sendViewedEvent
     >
-      <VStack height="100%" gap={0}>
-        <SimulationCardHeader title={title} status={status} />
-        <SimulationCardContent status={status}>
-          {children}
-          {status && <SimulationStatusOverlay status={status} />}
-        </SimulationCardContent>
-      </VStack>
-    </Card.Root>
+      <Card.Root
+        height="100%"
+        borderWidth={1}
+        borderColor="gray.200"
+        borderRadius="lg"
+        overflow="hidden"
+      >
+        <VStack height="100%" gap={0}>
+          <SimulationCardHeader title={title} status={status} />
+          <SimulationCardContent status={status}>
+            {children}
+            {status && <SimulationStatusOverlay status={status} />}
+          </SimulationCardContent>
+        </VStack>
+      </Card.Root>
+    </AnalyticsBoundary>
   );
 }

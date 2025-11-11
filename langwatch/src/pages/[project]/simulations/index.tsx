@@ -8,6 +8,8 @@ import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import ScenarioInfoCard from "~/components/simulations/ScenarioInfoCard";
 import React, { useEffect, useMemo, useState } from "react";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
+import { useTracedQuery } from "~/observability/react-otel/useTracedQuery";
+import { withSpan } from "~/observability/react-otel";
 
 function SimulationsPageContent() {
   const router = useRouter();
@@ -32,7 +34,8 @@ function SimulationsPageContent() {
     data: scenarioSetsData,
     isLoading,
     error,
-  } = api.scenarios.getScenarioSetsData.useQuery(
+  } = useTracedQuery(
+    api.scenarios.getScenarioSetsData,
     { projectId: project?.id ?? "" },
     {
       refetchInterval,
@@ -117,4 +120,4 @@ function SimulationsPageContent() {
 
 export default withPermissionGuard("scenarios:view", {
   layoutComponent: DashboardLayout,
-})(SimulationsPageContent);
+})(withSpan("SimulationsPageContent")(SimulationsPageContent));

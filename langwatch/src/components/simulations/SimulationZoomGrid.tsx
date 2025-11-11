@@ -1,5 +1,6 @@
 import React, {
   createContext,
+  useCallback,
   useContext,
   useLayoutEffect,
   useState,
@@ -10,6 +11,7 @@ import { SimulationChatViewer } from "./SimulationChatViewer";
 import { useSimulationRouter } from "~/hooks/simulations/useSimulationRouter";
 import { useZoom } from "~/hooks/useZoom";
 import { useOtel } from "~/observability/react-otel/useOtel";
+import { AnalyticsBoundary, type AnalyticsEmitter } from "react-contextual-analytics";
 
 const ZoomContext = createContext<ReturnType<typeof useZoom> | null>(null);
 
@@ -43,48 +45,57 @@ function Controls({ showScale = true }: ControlsProps) {
   const { scale, zoomIn, zoomOut } = useZoomContext();
   const { addEvent } = useOtel();
 
-  const handleZoomOut = () => {
+  const handleZoomOut = (emitter: AnalyticsEmitter) => () => {
     addEvent("Zoom Changed", { direction: "out", level: scale });
+    emitter("clicked", "zoom-out", { level: scale });
     zoomOut();
   };
 
-  const handleZoomIn = () => {
+  const handleZoomIn = (emitter: AnalyticsEmitter) => () => {
     addEvent("Zoom Changed", { direction: "in", level: scale });
+    emitter("clicked", "zoom-in", { level: scale });
     zoomIn();
   };
 
   return (
-    <HStack gap={2}>
-      <Button
-        bgColor="white"
-        size="sm"
-        variant="outline"
-        onClick={handleZoomOut}
-      >
-        Zoom Out <ZoomOut size={16} />
-      </Button>
-      <Button
-        bgColor="white"
-        size="sm"
-        variant="outline"
-        onClick={handleZoomIn}
-      >
-        Zoom In <ZoomIn size={16} />
-      </Button>
-      {showScale && (
-        <Box
-          px={2}
-          py={1}
-          bg="gray.200"
-          borderRadius="full"
-          fontSize="xs"
-          fontFamily="mono"
-          fontWeight="bold"
+    <AnalyticsBoundary
+      name="zoom_grid"
+      attributes={{ scale: Math.round(scale * 100) }}
+    >
+      {(emitter) => (
+        <HStack gap={2}>
+          <Button
+            bgColor="white"
+            size="sm"
+            variant="outline"
+          onClick={() => handleZoomOut(emitter)}
         >
-          {Math.round(scale * 100)}%
-        </Box>
+          Zoom Out <ZoomOut size={16} />
+        </Button>
+        <Button
+          bgColor="white"
+          size="sm"
+          variant="outline"
+          onClick={() => handleZoomIn(emitter)}
+          >
+            Zoom In <ZoomIn size={16} />
+          </Button>
+          {showScale && (
+            <Box
+              px={2}
+              py={1}
+              bg="gray.200"
+              borderRadius="full"
+              fontSize="xs"
+              fontFamily="mono"
+              fontWeight="bold"
+            >
+              {Math.round(scale * 100)}%
+            </Box>
+          )}
+        </HStack>
       )}
-    </HStack>
+    </AnalyticsBoundary>
   );
 }
 
@@ -106,7 +117,8 @@ function GridComponent({ scenarioRunIds }: GridProps) {
   const TARGET_CARD_WIDTH = 320; // Target width for cards at 100% scale
   const GRID_GAP = 24; // 6 * 4px from gap={6} in Chakra UI
 
-  const handleExpandToggle = (simulationId: string) => {
+  const handleExpandToggle = (emitter: (action: string, name?: string, attributes?: Record<string, any>) => void) => (simulationId: string) => {
+    emitter("clicked", "open-run", { scenarioRunId: simulationId });
     if (scenarioSetId && batchRunId) {
       goToSimulationRun({
         scenarioSetId,
@@ -119,7 +131,7 @@ function GridComponent({ scenarioRunIds }: GridProps) {
   };
 
   // Calculate optimal column count based on container width and scale
-  const calculateColsCount = () => {
+  const calculateColsCount = useCallback(() => {
     if (containerWidth === 0) return 3; // fallback while measuring
 
     // Calculate effective card width considering current scale
@@ -132,7 +144,7 @@ function GridComponent({ scenarioRunIds }: GridProps) {
     );
 
     return Math.max(1, maxColumns);
-  };
+  }, [containerWidth, scale]);
 
   // Measure container width using ResizeObserver for accuracy
   useLayoutEffect(() => {
@@ -157,46 +169,58 @@ function GridComponent({ scenarioRunIds }: GridProps) {
   useLayoutEffect(() => {
     const newColsCount = calculateColsCount();
     setColsCount(newColsCount);
-  }, [containerWidth, scale]);
+  }, [calculateColsCount]);
 
   return (
-    <Box
-      ref={containerRef}
-      overflow="hidden"
-      style={{
-        touchAction: "none",
-        userSelect: "none",
-        WebkitUserSelect: "none",
+    <AnalyticsBoundary
+      name="grid"
+      attributes={{
+        scale: Math.round(scale * 100),
+        colsCount,
+        scenarioSetId: scenarioSetId ?? "unknown",
+        batchRunId: batchRunId ?? "unknown"
       }}
     >
-      <Grid
-        templateColumns={`repeat(${colsCount}, 1fr)`}
-        gap={6}
-        style={{
-          transform: `scale(${scale})`,
-          transformOrigin: "top left",
-          width: `${100 / scale}%`,
-          height: `${100 / scale}%`,
-        }}
-      >
-        {scenarioRunIds?.map((scenarioRunId) => (
-          <Box
-            key={scenarioRunId}
-            width="full"
-            height="400px"
-            cursor="pointer"
-            onClick={() => handleExpandToggle(scenarioRunId)}
-            overflow="auto"
+      {(emitter) => (
+        <Box
+          ref={containerRef}
+          overflow="hidden"
+          style={{
+            touchAction: "none",
+            userSelect: "none",
+            WebkitUserSelect: "none",
+          }}
+        >
+          <Grid
+            templateColumns={`repeat(${colsCount}, 1fr)`}
+            gap={6}
             style={{
-              minWidth: 0,
-              minHeight: 0,
+              transform: `scale(${scale})`,
+              transformOrigin: "top left",
+              width: `${100 / scale}%`,
+              height: `${100 / scale}%`,
             }}
           >
-            <SimulationChatViewer scenarioRunId={scenarioRunId} />
-          </Box>
-        ))}
-      </Grid>
-    </Box>
+            {scenarioRunIds?.map((scenarioRunId) => (
+              <Box
+                key={scenarioRunId}
+                width="full"
+                height="400px"
+                cursor="pointer"
+                onClick={() => handleExpandToggle(emitter)(scenarioRunId)}
+                overflow="auto"
+                style={{
+                  minWidth: 0,
+                  minHeight: 0,
+                }}
+              >
+                <SimulationChatViewer scenarioRunId={scenarioRunId} />
+              </Box>
+            ))}
+          </Grid>
+        </Box>
+      )}
+    </AnalyticsBoundary>
   );
 }
 
