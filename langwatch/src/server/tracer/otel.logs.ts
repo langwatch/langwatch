@@ -2,14 +2,14 @@ import type { DeepPartial } from "~/utils/types";
 import type { SpanInputOutput } from "./types";
 import type { IExportLogsServiceRequest } from "@opentelemetry/otlp-transformer";
 import { createLogger } from "~/utils/logger";
-import { otelAttributesToNestedAttributes, type TraceForCollection } from "./otel.traces";
+import {
+  otelAttributesToNestedAttributes,
+  type TraceForCollection,
+} from "./otel.traces";
 import { decodeOpenTelemetryId, convertFromUnixNano } from "./utils";
 import { getLangWatchTracer } from "langwatch";
 import { SpanKind, SpanStatusCode } from "@opentelemetry/api";
 import { generateOtelSpanId, generateOtelTraceId } from "../../utils/trace";
-
-const logger = createLogger("langwatch.tracer.otel.logs");
-const tracer = getLangWatchTracer("langwatch.tracer.otel.logs");
 
 const springAIScopeNames = [
   "org.springframework.ai.chat.observation.ChatModelCompletionObservationHandler",
@@ -18,8 +18,11 @@ const springAIScopeNames = [
 const claudeCodeScopeNames = ["com.anthropic.claude_code.events"];
 
 export const openTelemetryLogsRequestToTracesForCollection = async (
-  otelLogs: DeepPartial<IExportLogsServiceRequest>
+  otelLogs: DeepPartial<IExportLogsServiceRequest>,
 ): Promise<TraceForCollection[]> => {
+  const logger = createLogger("langwatch.tracer.otel.logs");
+  const tracer = getLangWatchTracer("langwatch.tracer.otel.logs");
+
   return await tracer.withActiveSpan(
     "openTelemetryLogsRequestToTracesForCollection",
     { kind: SpanKind.INTERNAL },
@@ -77,7 +80,7 @@ export const openTelemetryLogsRequestToTracesForCollection = async (
 
                 if (!identifier || !content) {
                   logger.info(
-                    "received log with no identifier or content, rejecting"
+                    "received log with no identifier or content, rejecting",
                   );
                   continue;
                 }
@@ -104,7 +107,7 @@ export const openTelemetryLogsRequestToTracesForCollection = async (
 
               if (claudeCodeScopeNames.includes(scopeLog.scope?.name ?? "")) {
                 const promptAttribute = logRecord.attributes?.find(
-                  (attribute) => attribute?.key === "prompt"
+                  (attribute) => attribute?.key === "prompt",
                 );
                 if (promptAttribute) {
                   input = {
@@ -127,7 +130,7 @@ export const openTelemetryLogsRequestToTracesForCollection = async (
               }
 
               let existingSpan = trace.spans.find(
-                (span) => span.span_id === spanId
+                (span) => span.span_id === spanId,
               );
               if (!existingSpan) {
                 existingSpan = {
@@ -137,7 +140,9 @@ export const openTelemetryLogsRequestToTracesForCollection = async (
                   type: "llm",
                   input: input,
                   output: output,
-                  params: otelAttributesToNestedAttributes(logRecord.attributes ?? []),
+                  params: otelAttributesToNestedAttributes(
+                    logRecord.attributes ?? [],
+                  ),
                   timestamps: {
                     ignore_timestamps_on_write: true,
                     started_at: convertFromUnixNano(logRecord.timeUnixNano),
@@ -170,11 +175,10 @@ export const openTelemetryLogsRequestToTracesForCollection = async (
           message: error instanceof Error ? error.message : "Unknown error",
         });
         span.recordException(
-          error instanceof Error ? error : new Error(String(error))
+          error instanceof Error ? error : new Error(String(error)),
         );
         throw error;
       }
-    }
+    },
   );
 };
-
