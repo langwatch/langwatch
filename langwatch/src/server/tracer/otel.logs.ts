@@ -68,9 +68,7 @@ export const openTelemetryLogsRequestToTracesForCollection = async (
               let input: SpanInputOutput | null = null;
               let output: SpanInputOutput | null = null;
 
-              // Add defensive check for scopeLog and arrays
-              const scopeName = scopeLog?.scope?.name ?? "";
-              if (springAIScopeNames && Array.isArray(springAIScopeNames) && springAIScopeNames.includes(scopeName)) {
+              if (springAIScopeNames.includes(scopeLog.scope?.name ?? "")) {
                 const logString = logRecord.body.stringValue;
                 const [springIdentifier, ...contentParts] =
                   logString.split("\n");
@@ -104,7 +102,7 @@ export const openTelemetryLogsRequestToTracesForCollection = async (
                 }
               }
 
-              if (claudeCodeScopeNames && Array.isArray(claudeCodeScopeNames) && claudeCodeScopeNames.includes(scopeName)) {
+              if (claudeCodeScopeNames.includes(scopeLog.scope?.name ?? "")) {
                 const promptAttribute = logRecord.attributes?.find(
                   (attribute) => attribute?.key === "prompt"
                 );
