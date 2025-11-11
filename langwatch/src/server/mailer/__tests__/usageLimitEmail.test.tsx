@@ -1,5 +1,4 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render } from "@react-email/render";
 import { sendUsageLimitEmail } from "../usageLimitEmail";
 import { sendEmail } from "../emailSender";
 
@@ -49,8 +48,10 @@ describe("usageLimitEmail", () => {
     it("should include organization name in email HTML", async () => {
       await sendUsageLimitEmail(baseProps);
 
+      expect(sendEmail).toHaveBeenCalled();
       const call = vi.mocked(sendEmail).mock.calls[0];
-      const html = call[0].html;
+      expect(call).toBeDefined();
+      const html = call![0].html;
 
       expect(html).toContain("Test Organization");
     });
@@ -58,8 +59,10 @@ describe("usageLimitEmail", () => {
     it("should include usage percentage in email HTML", async () => {
       await sendUsageLimitEmail(baseProps);
 
+      expect(sendEmail).toHaveBeenCalled();
       const call = vi.mocked(sendEmail).mock.calls[0];
-      const html = call[0].html;
+      expect(call).toBeDefined();
+      const html = call![0].html;
 
       expect(html).toContain("75.5%");
       // React Email renders apostrophes as HTML entities
@@ -70,8 +73,10 @@ describe("usageLimitEmail", () => {
     it("should display all projects in the table", async () => {
       await sendUsageLimitEmail(baseProps);
 
+      expect(sendEmail).toHaveBeenCalled();
       const call = vi.mocked(sendEmail).mock.calls[0];
-      const html = call[0].html;
+      expect(call).toBeDefined();
+      const html = call![0].html;
 
       expect(html).toContain("Project Alpha");
       expect(html).toContain("Project Beta");
@@ -84,8 +89,10 @@ describe("usageLimitEmail", () => {
     it("should display total message count", async () => {
       await sendUsageLimitEmail(baseProps);
 
+      expect(sendEmail).toHaveBeenCalled();
       const call = vi.mocked(sendEmail).mock.calls[0];
-      const html = call[0].html;
+      expect(call).toBeDefined();
+      const html = call![0].html;
 
       expect(html).toContain("10,000");
       expect(html).toContain("Total (3)");
@@ -99,8 +106,10 @@ describe("usageLimitEmail", () => {
         usagePercentageFormatted: "92.5",
       });
 
+      expect(sendEmail).toHaveBeenCalled();
       const call = vi.mocked(sendEmail).mock.calls[0];
-      const html = call[0].html;
+      expect(call).toBeDefined();
+      const html = call![0].html;
 
       expect(html).toContain(
         "To continue using LangWatch after reaching your limit, please upgrade your plan.",
@@ -115,8 +124,10 @@ describe("usageLimitEmail", () => {
         usagePercentageFormatted: "100.0",
       });
 
+      expect(sendEmail).toHaveBeenCalled();
       const call = vi.mocked(sendEmail).mock.calls[0];
-      const html = call[0].html;
+      expect(call).toBeDefined();
+      const html = call![0].html;
 
       expect(html).toContain(
         "To continue using LangWatch, please upgrade your plan.",
@@ -131,10 +142,12 @@ describe("usageLimitEmail", () => {
         crossedThreshold: 100,
       });
 
+      expect(sendEmail).toHaveBeenCalled();
       let call = vi.mocked(sendEmail).mock.calls[0];
-      let html = call[0].html;
+      expect(call).toBeDefined();
+      let html = call![0].html;
       // React Email renders styles without spaces after colons
-      expect(html).toContain('background-color:#dc2626'); // red
+      expect(html).toContain("background-color:#dc2626"); // red
 
       vi.clearAllMocks();
 
@@ -145,10 +158,12 @@ describe("usageLimitEmail", () => {
         crossedThreshold: 90,
       });
 
+      expect(sendEmail).toHaveBeenCalled();
       call = vi.mocked(sendEmail).mock.calls[0];
-      html = call[0].html;
+      expect(call).toBeDefined();
+      html = call![0].html;
       // React Email renders styles without spaces after colons
-      expect(html).toContain('background-color:#f59e0b'); // orange
+      expect(html).toContain("background-color:#f59e0b"); // orange
 
       vi.clearAllMocks();
 
@@ -159,17 +174,21 @@ describe("usageLimitEmail", () => {
         crossedThreshold: 50,
       });
 
+      expect(sendEmail).toHaveBeenCalled();
       call = vi.mocked(sendEmail).mock.calls[0];
-      html = call[0].html;
+      expect(call).toBeDefined();
+      html = call![0].html;
       // React Email renders styles without spaces after colons
-      expect(html).toContain('background-color:#10b981'); // green
+      expect(html).toContain("background-color:#10b981"); // green
     });
 
     it("should include action URL in button and project links", async () => {
       await sendUsageLimitEmail(baseProps);
 
+      expect(sendEmail).toHaveBeenCalled();
       const call = vi.mocked(sendEmail).mock.calls[0];
-      const html = call[0].html;
+      expect(call).toBeDefined();
+      const html = call![0].html;
 
       expect(html).toContain('href="https://app.langwatch.ai/settings/usage"');
     });
@@ -184,8 +203,10 @@ describe("usageLimitEmail", () => {
         ],
       });
 
+      expect(sendEmail).toHaveBeenCalled();
       const call = vi.mocked(sendEmail).mock.calls[0];
-      const html = call[0].html;
+      expect(call).toBeDefined();
+      const html = call![0].html;
 
       expect(html).toContain("1,234,567");
       expect(html).toContain("2,000,000");
@@ -198,32 +219,37 @@ describe("usageLimitEmail", () => {
         crossedThreshold: 100,
       });
 
+      expect(sendEmail).toHaveBeenCalled();
       const call = vi.mocked(sendEmail).mock.calls[0];
-      const html = call[0].html;
+      expect(call).toBeDefined();
+      const html = call![0].html;
 
       // Progress bar width should be capped at 100%
       // React Email renders styles without spaces after colons
-      expect(html).toContain('width:100%');
+      expect(html).toContain("width:100%");
     });
 
     it("should include logo URL in email", async () => {
       await sendUsageLimitEmail(baseProps);
 
+      expect(sendEmail).toHaveBeenCalled();
       const call = vi.mocked(sendEmail).mock.calls[0];
-      const html = call[0].html;
+      expect(call).toBeDefined();
+      const html = call![0].html;
 
-      expect(html).toContain('https://example.com/logo.png');
+      expect(html).toContain("https://example.com/logo.png");
     });
 
     it("should include help center link", async () => {
       await sendUsageLimitEmail(baseProps);
 
+      expect(sendEmail).toHaveBeenCalled();
       const call = vi.mocked(sendEmail).mock.calls[0];
-      const html = call[0].html;
+      expect(call).toBeDefined();
+      const html = call![0].html;
 
       expect(html).toContain('href="https://docs.langwatch.ai"');
       expect(html).toContain("Help Center");
     });
   });
 });
-
