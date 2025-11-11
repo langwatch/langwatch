@@ -149,6 +149,11 @@ async function handleLogsRequest(req: NextRequest) {
         async () => {
           const promises: Promise<void>[] = [];
           for (const traceForCollection of tracesGeneratedFromLogs) {
+            // Add defensive check for traceForCollection
+            if (!traceForCollection?.traceId) {
+              continue;
+            }
+
             const paramsMD5 = crypto
               .createHash("md5")
               .update(JSON.stringify({ ...traceForCollection }))
