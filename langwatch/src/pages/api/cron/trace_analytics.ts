@@ -3,13 +3,7 @@ import { prisma } from "~/server/db";
 import { esClient, TRACE_INDEX } from "~/server/elasticsearch";
 import { type Prisma } from "@prisma/client";
 import { ANALYTICS_KEYS } from "~/types";
-import { UsageLimitService } from "~/server/notifications/usage-limit.service";
-import {
-  getCurrentMonthMessagesCount,
-  getProjectIdsForOrganization,
-} from "~/server/api/routers/limits";
-import { dependencies } from "~/injection/dependencies.server";
-import * as Sentry from "@sentry/nextjs";
+import { OrganizationUsageCheckerService } from "~/server/notifications/services/organization-usage-checker.service";
 import { env } from "~/env.mjs";
 
 export default async function handler(
@@ -172,82 +166,9 @@ export default async function handler(
   }
 
   // Check usage limits for all organizations and send notifications if needed
-  // Only run in SaaS environment
   if (env.IS_SAAS) {
-    try {
-      const organizations = await prisma.organization.findMany({
-        select: {
-          id: true,
-        },
-      });
-
-      for (const org of organizations) {
-        try {
-          const projectIds = await getProjectIdsForOrganization(org.id);
-          if (projectIds.length === 0) {
-            console.log(
-              `[Trace Analytics] Organization ${org.id} has no projects, skipping`,
-            );
-            continue;
-          }
-          const currentMonthMessagesCount =
-            await getCurrentMonthMessagesCount(projectIds);
-          const activePlan =
-            await dependencies.subscriptionHandler.getActivePlan(org.id);
-
-          // Guard against null/undefined activePlan or invalid maxMessagesPerMonth
-          if (
-            !activePlan ||
-            typeof activePlan.maxMessagesPerMonth !== "number" ||
-            activePlan.maxMessagesPerMonth <= 0
-          ) {
-            console.log(
-              `[Trace Analytics] Organization ${org.id} has invalid or missing plan configuration, skipping`,
-            );
-            continue;
-          }
-
-          const maxMessagesPerMonth = activePlan.maxMessagesPerMonth;
-
-          const usagePercentage =
-            maxMessagesPerMonth > 0
-              ? (currentMonthMessagesCount / maxMessagesPerMonth) * 100
-              : 0;
-
-          if (currentMonthMessagesCount > 1) {
-            console.log(
-              `[Trace Analytics] Organization ${
-                org.id
-              }: ${currentMonthMessagesCount.toLocaleString()} / ${maxMessagesPerMonth.toLocaleString()} messages (${usagePercentage.toFixed(
-                1,
-              )}%) - ${projectIds.length} project(s)`,
-            );
-          }
-
-          const service = UsageLimitService.create(prisma);
-          await service.checkAndSendWarning({
-            organizationId: org.id,
-            currentMonthMessagesCount,
-            maxMonthlyUsageLimit: maxMessagesPerMonth,
-          });
-        } catch (error) {
-          console.error(
-            `[Trace Analytics] Error checking usage limits for organization ${org.id}:`,
-            error,
-          );
-          Sentry.captureException(error, {
-            extra: { organizationId: org.id },
-          });
-        }
-      }
-    } catch (error) {
-      console.error("[Trace Analytics] Error checking usage limits:", error);
-      Sentry.captureException(error);
-    }
-  } else {
-    console.log(
-      "[Trace Analytics] Skipping usage limit notifications (not SaaS)",
-    );
+    const usageChecker = new OrganizationUsageCheckerService(prisma);
+    await usageChecker.checkAllOrganizations();
   }
 
   return res.status(200).json({ success: true });

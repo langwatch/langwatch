@@ -1,0 +1,13 @@
+---
+alwaysApply: true
+---
+# Controller-Service-Repository Rule
+
+**Controllers** handle HTTP requests and responses (Hono App Router, tRPC Router, etc.).
+**Services** encapsulate business logic and orchestrate repositories/models.
+**Repositories** abstract data persistence and direct database or source access.
+
+* Do not put business logic in controllers or repositories.
+* Controllers call services only. Services call repositories.
+* Each layer has a single, clear responsibility.
+* Dependencies always point down: Controller → Service → Repository (never the reverse).
