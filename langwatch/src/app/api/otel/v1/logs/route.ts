@@ -14,11 +14,6 @@ import { withAppRouterLogger } from "../../../../../middleware/app-router-logger
 import { getLangWatchTracer } from "langwatch";
 import { SpanKind, SpanStatusCode } from "@opentelemetry/api";
 
-// CRITICAL: Tell Next.js to skip static analysis of this route
-// Without this, Next.js tries to collect page data at build time and hits circular dependency
-export const dynamic = "force-dynamic";
-export const runtime = "nodejs";
-
 const tracer = getLangWatchTracer("langwatch.otel.logs");
 const logger = createLogger("langwatch:otel:v1:logs");
 

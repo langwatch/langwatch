@@ -2,7 +2,6 @@ import type { PrismaClient } from "@prisma/client";
 import { sendUsageLimitEmail } from "../mailer/usageLimitEmail";
 import { createLogger } from "../../utils/logger";
 import { env } from "../../env.mjs";
-import { esClient, TRACE_INDEX } from "../elasticsearch";
 import type { QueryDslBoolQuery } from "@elastic/elasticsearch/lib/api/types";
 import { NOTIFICATION_TYPES } from "./types";
 import { NotificationRepository } from "./repositories/notification.repository";
@@ -52,6 +51,8 @@ export class UsageLimitService {
     organizationId: string,
   ): Promise<number> {
     try {
+      // Dynamic import to avoid circular dependency
+      const { esClient, TRACE_INDEX } = await import("../elasticsearch");
       const client = await esClient({ organizationId });
       const currentMonthStart = this.getCurrentMonth().getTime();
 

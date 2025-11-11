@@ -14,11 +14,6 @@ import { withAppRouterLogger } from "../../../../../middleware/app-router-logger
 import { getLangWatchTracer } from "langwatch";
 import { SpanKind, SpanStatusCode } from "@opentelemetry/api";
 
-// CRITICAL: Tell Next.js to skip static analysis of this route
-// Without this, Next.js tries to collect page data at build time and hits circular dependency
-export const dynamic = "force-dynamic";
-export const runtime = "nodejs";
-
 const tracer = getLangWatchTracer("langwatch.otel.metrics");
 const logger = createLogger("langwatch:otel:v1:metrics");
 
@@ -131,6 +126,13 @@ async function handleMetricsRequest(req: NextRequest) {
           );
         }
       }
+
+      // CRITICAL: Dynamic import to prevent webpack from bundling at build time
+      const { openTelemetryMetricsRequestToTracesForCollection } = await import(
+        "~/server/tracer/otel.metrics"
+      );
+      const { fetchExistingMD5s, scheduleTraceCollectionWithFallback } =
+        await import("~/server/background/workers/collectorWorker");
 
       const tracesGeneratedFromMetrics =
         await openTelemetryMetricsRequestToTracesForCollection(metricsRequest);
