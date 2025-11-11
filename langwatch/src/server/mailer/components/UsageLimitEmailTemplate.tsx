@@ -8,10 +8,13 @@ import { Text } from "@react-email/text";
 import { Section } from "@react-email/section";
 import type { UsageLimitEmailProps } from "../types/usage-limit-email.types";
 import { getProgressBarColor } from "./helpers/get-progress-bar-color";
+import { ProjectUsageTable } from "./usage-limit/ProjectUsageTable";
+import { UsageProgressBar } from "./usage-limit/UsageProgressBar";
+import { EMAIL_CONFIG } from "../config/email-constants";
 
 /**
  * Email template for usage limit warnings
- * Single Responsibility: Render the usage limit warning email HTML
+ * Single Responsibility: Compose email layout from smaller components
  */
 export function UsageLimitEmailTemplate({
   organizationName,
@@ -26,79 +29,6 @@ export function UsageLimitEmailTemplate({
 }: UsageLimitEmailProps) {
   const progressBarColor = getProgressBarColor(usagePercentage);
   const progressBarWidth = Math.min(usagePercentage, 100);
-
-  // Build project table rows as JSX elements
-  const projectRows = projectUsageData.map((project) => (
-    <tr key={project.id} style={{ borderBottom: "1px solid #e5e7eb" }}>
-      <td style={{ padding: "12px 16px", fontSize: "14px", color: "#1f2937" }}>
-        <span
-          style={{
-            display: "inline-block",
-            width: "12px",
-            height: "12px",
-            backgroundColor: "#ED8926",
-            borderRadius: "2px",
-            marginRight: "8px",
-            verticalAlign: "middle",
-          }}
-        />
-        <a
-          href={actionUrl}
-          style={{ color: "#ED8926", textDecoration: "none" }}
-        >
-          {project.name}
-        </a>
-      </td>
-      <td
-        style={{
-          padding: "12px 16px",
-          fontSize: "14px",
-          color: "#1f2937",
-          textAlign: "right",
-        }}
-      >
-        {project.messageCount.toLocaleString()}
-      </td>
-    </tr>
-  ));
-
-  // Total row as JSX element
-  const totalRow = (
-    <tr style={{ borderTop: "2px solid #e5e7eb", backgroundColor: "#f9fafb" }}>
-      <td
-        style={{
-          padding: "12px 16px",
-          fontSize: "14px",
-          fontWeight: 600,
-          color: "#1f2937",
-        }}
-      >
-        <span
-          style={{
-            display: "inline-block",
-            width: "12px",
-            height: "12px",
-            backgroundColor: "#9ca3af",
-            borderRadius: "2px",
-            marginRight: "8px",
-            verticalAlign: "middle",
-          }}
-        />
-        {`Total (${projectUsageData.length})`}
-      </td>
-      <td
-        style={{
-          padding: "12px 16px",
-          fontSize: "14px",
-          fontWeight: 600,
-          color: "#1f2937",
-          textAlign: "right",
-        }}
-      >
-        {currentMonthMessagesCount.toLocaleString()}
-      </td>
-    </tr>
-  );
 
   return (
     <Html lang="en" dir="ltr">
@@ -166,144 +96,26 @@ export function UsageLimitEmailTemplate({
             overflow: "hidden",
           }}
         >
-          <table style={{ width: "100%", borderCollapse: "collapse" }}>
-            <thead>
-              <tr
-                style={{
-                  backgroundColor: "#f9fafb",
-                  borderBottom: "1px solid #e5e7eb",
-                }}
-              >
-                <th
-                  style={{
-                    padding: "12px 16px",
-                    textAlign: "left",
-                    fontSize: "12px",
-                    fontWeight: 600,
-                    color: "#6b7280",
-                    textTransform: "uppercase",
-                    letterSpacing: "0.5px",
-                  }}
-                >
-                  PROJECT
-                </th>
-                <th
-                  style={{
-                    padding: "12px 16px",
-                    textAlign: "right",
-                    fontSize: "12px",
-                    fontWeight: 600,
-                    color: "#6b7280",
-                    textTransform: "uppercase",
-                    letterSpacing: "0.5px",
-                  }}
-                >
-                  MESSAGES
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {projectRows}
-              {totalRow}
-            </tbody>
-          </table>
+          <ProjectUsageTable
+            projectUsageData={projectUsageData}
+            currentMonthMessagesCount={currentMonthMessagesCount}
+            actionUrl={actionUrl}
+          />
         </Section>
 
-        <Section
-          style={{
-            backgroundColor: "#f9fafb",
-            borderRadius: "8px",
-            padding: "24px",
-            marginBottom: "24px",
-          }}
-        >
-          <Section style={{ marginBottom: "16px" }}>
-            <Section
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-                marginBottom: "8px",
-              }}
-            >
-              <Text
-                style={{
-                  fontSize: "14px",
-                  fontWeight: 500,
-                  color: "#374151",
-                  margin: 0,
-                }}
-              >
-                Messages{" "}
-              </Text>
-              <Text
-                style={{
-                  fontSize: "14px",
-                  fontWeight: 600,
-                  color: progressBarColor,
-                  margin: 0,
-                }}
-              >
-                {currentMonthMessagesCount.toLocaleString()} /{" "}
-                {maxMonthlyUsageLimit.toLocaleString()}
-              </Text>
-            </Section>
-            <div
-              style={{
-                backgroundColor: "#e5e7eb",
-                borderRadius: "4px",
-                height: "8px",
-                overflow: "hidden",
-                position: "relative",
-              }}
-            >
-              <div
-                style={{
-                  backgroundColor: progressBarColor,
-                  height: "100%",
-                  width: `${progressBarWidth}%`,
-                  borderRadius: "4px",
-                  transition: "width 0.3s ease",
-                }}
-              />
-            </div>
-          </Section>
-          <Section
-            style={{
-              marginTop: "16px",
-              paddingTop: "16px",
-              borderTop: "1px solid #e5e7eb",
-            }}
-          >
-            <Section
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-              }}
-            >
-              <Text style={{ fontSize: "14px", color: "#6b7280", margin: 0 }}>
-                Usage Percentage{" "}
-              </Text>
-              <Text
-                style={{
-                  fontSize: "16px",
-                  fontWeight: 600,
-                  color: progressBarColor,
-                  margin: 0,
-                }}
-              >
-                {usagePercentageFormatted}%
-              </Text>
-            </Section>
-          </Section>
-        </Section>
+        <UsageProgressBar
+          currentMonthMessagesCount={currentMonthMessagesCount}
+          maxMonthlyUsageLimit={maxMonthlyUsageLimit}
+          usagePercentageFormatted={usagePercentageFormatted}
+          progressBarColor={progressBarColor}
+          progressBarWidth={progressBarWidth}
+        />
 
         <Section style={{ textAlign: "center", marginBottom: "32px" }}>
           <Button
             href={actionUrl}
             style={{
-              backgroundColor: "#ED8926",
+              backgroundColor: EMAIL_CONFIG.BRAND_COLOR,
               color: "white",
               padding: "12px 24px",
               textDecoration: "none",
@@ -344,8 +156,8 @@ export function UsageLimitEmailTemplate({
           >
             Questions? Visit the{" "}
             <a
-              href="https://docs.langwatch.ai"
-              style={{ color: "#ED8926", textDecoration: "none" }}
+              href={EMAIL_CONFIG.HELP_CENTER_URL}
+              style={{ color: EMAIL_CONFIG.BRAND_COLOR, textDecoration: "none" }}
             >
               Help Center
             </a>{" "}
