@@ -215,7 +215,7 @@ export async function checkAndSendUsageLimitWarning(data: UsageLimitData) {
 
   try {
     // Send emails to all admins
-    await Promise.allSettled(
+    const emailResults = await Promise.allSettled(
       organization.members.map(async (member) => {
         if (!member.user.email) {
           logger.warn(
@@ -241,6 +241,64 @@ export async function checkAndSendUsageLimitWarning(data: UsageLimitData) {
       }),
     );
 
+    // Process results: count successes and failures
+    let recipientsSuccessCount = 0;
+    let recipientsFailureCount = 0;
+    const failedRecipients: Array<{
+      userId: string;
+      email: string | null;
+      error: string;
+    }> = [];
+
+    emailResults.forEach((result, index) => {
+      const member = organization.members[index];
+      if (!member.user.email) {
+        // Already logged as warning above, skip counting
+        return;
+      }
+
+      if (result.status === "fulfilled") {
+        recipientsSuccessCount++;
+      } else {
+        recipientsFailureCount++;
+        const errorMessage =
+          result.reason instanceof Error
+            ? result.reason.message
+            : String(result.reason);
+        failedRecipients.push({
+          userId: member.user.id,
+          email: member.user.email,
+          error: errorMessage,
+        });
+        logger.error(
+          {
+            userId: member.user.id,
+            email: member.user.email,
+            error: result.reason,
+            organizationId,
+          },
+          "Failed to send usage limit warning email",
+        );
+      }
+    });
+
+    // Only create notification if at least one email succeeded
+    if (recipientsSuccessCount === 0) {
+      logger.error(
+        {
+          organizationId,
+          recipientsFailureCount,
+          failedRecipients,
+          usagePercentage: usagePercentage.toFixed(2),
+          threshold: crossedThreshold,
+        },
+        "All usage limit warning emails failed to send, aborting notification creation to allow retries",
+      );
+      throw new Error(
+        `All ${recipientsFailureCount} usage limit warning emails failed to send`,
+      );
+    }
+
     // Create a single notification record for the organization
     const notification = await prisma.notification.create({
       data: {
@@ -255,6 +313,15 @@ export async function checkAndSendUsageLimitWarning(data: UsageLimitData) {
           recipientsCount: organization.members.filter(
             (member) => member.user.email,
           ).length,
+          recipientsSuccessCount,
+          recipientsFailureCount,
+          ...(recipientsFailureCount > 0 && {
+            failedRecipients: failedRecipients.map((f) => ({
+              userId: f.userId,
+              email: f.email,
+              error: f.error,
+            })),
+          }),
         },
       },
     });
@@ -266,6 +333,9 @@ export async function checkAndSendUsageLimitWarning(data: UsageLimitData) {
         recipientsCount: organization.members.filter(
           (member) => member.user.email,
         ).length,
+        recipientsSuccessCount,
+        recipientsFailureCount,
+        ...(recipientsFailureCount > 0 && { failedRecipients }),
         usagePercentage: usagePercentage.toFixed(2),
         threshold: crossedThreshold,
       },
