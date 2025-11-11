@@ -15,6 +15,10 @@ import {
   NotificationEmailService,
   type ProjectUsageData,
 } from "./services/notification-email.service";
+import type {
+  WarningDecisionResult,
+  WarningDecisionToSend,
+} from "./types/warning-decision";
 
 const logger = createLogger("langwatch:notifications:usageLimit");
 
@@ -157,15 +161,15 @@ export class UsageLimitService {
   }
 
   /**
-   * Checks if a usage limit warning notification should be sent and sends it if needed
-   * Creates a notification record in the database after successfully sending the email
+   * Query: Determine if a usage warning should be sent
+   * Single Responsibility: Make decision based on current state
    *
    * @param data Usage limit data including organization ID, current usage, and limit
-   * @returns The created notification record, or null if no notification was sent
+   * @returns Decision object with all necessary data for sending
    */
-  async checkAndSendWarning(
+  async shouldSendWarning(
     data: UsageLimitData,
-  ): Promise<Notification | null> {
+  ): Promise<WarningDecisionResult> {
     const { organizationId, currentMonthMessagesCount, maxMonthlyUsageLimit } =
       data;
 
@@ -180,9 +184,9 @@ export class UsageLimitService {
     if (!crossedThreshold) {
       logger.debug(
         { organizationId, usagePercentage },
-        "Usage below all warning thresholds, skipping notification",
+        "Usage below all warning thresholds",
       );
-      return null;
+      return { shouldSend: false, reason: "below_threshold" };
     }
 
     // Get organization with admin members
@@ -193,7 +197,7 @@ export class UsageLimitService {
 
     if (!orgWithAdmins) {
       logger.warn({ organizationId }, "Organization not found");
-      return null;
+      return { shouldSend: false, reason: "organization_not_found" };
     }
 
     if (orgWithAdmins.admins.length === 0) {
@@ -203,9 +207,9 @@ export class UsageLimitService {
           usagePercentage: usagePercentage.toFixed(2),
           threshold: crossedThreshold,
         },
-        "No admins with email addresses found, skipping notification",
+        "No admins with email addresses found",
       );
-      return null;
+      return { shouldSend: false, reason: "no_admins" };
     }
 
     // Check if we've sent a notification for this specific threshold
@@ -217,22 +221,57 @@ export class UsageLimitService {
     if (alreadySent) {
       logger.debug(
         { organizationId, threshold: crossedThreshold },
-        "Notification already sent for this threshold, skipping duplicate",
+        "Notification already sent for this threshold",
       );
-      return null;
+      return { shouldSend: false, reason: "already_sent" };
     }
 
-    // Fetch project usage data and send emails
+    // Fetch project usage data for the email
     const projectUsageData = await this.getProjectUsageData(organizationId);
     const severity = getSeverityLevel(crossedThreshold);
+
+    return {
+      shouldSend: true,
+      organizationId,
+      organization: orgWithAdmins,
+      usagePercentage,
+      currentMonthMessagesCount,
+      maxMonthlyUsageLimit,
+      crossedThreshold,
+      projectUsageData,
+      severity,
+    };
+  }
+
+  /**
+   * Command: Send usage warning notification
+   * Single Responsibility: Execute the sending action
+   *
+   * @param decision Decision object from shouldSendWarning
+   * @returns The created notification record
+   */
+  async sendWarning(
+    decision: WarningDecisionToSend,
+  ): Promise<Notification> {
+    const {
+      organizationId,
+      organization,
+      usagePercentage,
+      currentMonthMessagesCount,
+      maxMonthlyUsageLimit,
+      crossedThreshold,
+      projectUsageData,
+      severity,
+    } = decision;
+
     const sentAt = new Date();
 
     try {
       const { successCount, failureCount, failedRecipients } =
         await this.emailService.sendUsageLimitEmails({
           organizationId,
-          organizationName: orgWithAdmins.name,
-          adminEmails: orgWithAdmins.admins,
+          organizationName: organization.name,
+          adminEmails: organization.admins,
           usagePercentage,
           currentMonthMessagesCount,
           maxMonthlyUsageLimit,
@@ -251,7 +290,7 @@ export class UsageLimitService {
             usagePercentage: usagePercentage.toFixed(2),
             threshold: crossedThreshold,
           },
-          "All usage limit warning emails failed to send, aborting notification creation",
+          "All usage limit warning emails failed to send",
         );
         throw new Error(
           `All ${failureCount} usage limit warning emails failed to send`,
@@ -266,7 +305,7 @@ export class UsageLimitService {
         maxMonthlyUsageLimit,
         usagePercentage,
         crossedThreshold,
-        recipientsCount: orgWithAdmins.admins.length,
+        recipientsCount: organization.admins.length,
         successCount,
         failureCount,
         failedRecipients,
@@ -276,7 +315,7 @@ export class UsageLimitService {
         {
           organizationId,
           notificationId: notification.id,
-          recipientsCount: orgWithAdmins.admins.length,
+          recipientsCount: organization.admins.length,
           successCount,
           failureCount,
           ...(failureCount > 0 && { failedRecipients }),
@@ -294,5 +333,24 @@ export class UsageLimitService {
       );
       throw error;
     }
+  }
+
+  /**
+   * Convenience method: Check and send if needed
+   * Maintains backward compatibility
+   *
+   * @param data Usage limit data
+   * @returns The created notification record, or null if not sent
+   */
+  async checkAndSendWarning(
+    data: UsageLimitData,
+  ): Promise<Notification | null> {
+    const decision = await this.shouldSendWarning(data);
+    
+    if (!decision.shouldSend) {
+      return null;
+    }
+
+    return this.sendWarning(decision);
   }
 }
