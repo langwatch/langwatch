@@ -2,7 +2,6 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { sendUsageLimitEmail } from "../usageLimitEmail";
 import { sendEmail } from "../emailSender";
 
-// Mock the email sender
 vi.mock("../emailSender", () => ({
   sendEmail: vi.fn(),
 }));
