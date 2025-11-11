@@ -43,7 +43,7 @@ export class NotificationRepository {
     });
   }
 
-  async findById(id: string) {
+  async findById(id: string): Promise<Notification | null> {
     return this.prisma.notification.findUnique({
       where: { id },
     });
