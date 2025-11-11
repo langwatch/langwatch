@@ -222,7 +222,9 @@ const openTelemetryTraceRequestToTraceForCollection = (
   );
 };
 
-const allowedSpanTypes = spanTypesSchema.options.map((option) => option.value);
+const allowedSpanTypes = (spanTypesSchema.options?.map(
+  (option) => option.value,
+) ?? []) as SpanTypes[];
 
 const parseTimestamp = (
   timestamp: DeepPartial<Fixed64> | undefined,
@@ -329,7 +331,10 @@ const addOpenTelemetrySpanAsSpan = (
         if (started_at && attributesMap.gen_ai?.server?.time_to_first_token) {
           first_token_at =
             started_at +
-            parseInt((attributesMap as any).gen_ai.server.time_to_first_token, 10);
+            parseInt(
+              (attributesMap as any).gen_ai.server.time_to_first_token,
+              10,
+            );
         }
 
         if (started_at && attributesMap.ai?.response?.msToFirstChunk) {
@@ -414,7 +419,10 @@ const addOpenTelemetrySpanAsSpan = (
         }
 
         // Strands chat LLM calls
-        if (type == "span" && attributesMap.gen_ai?.operation?.name === "chat") {
+        if (
+          type == "span" &&
+          attributesMap.gen_ai?.operation?.name === "chat"
+        ) {
           type = "llm";
         }
 
