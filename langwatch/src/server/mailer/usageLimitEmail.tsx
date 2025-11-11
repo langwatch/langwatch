@@ -111,7 +111,7 @@ const UsageLimitEmailTemplate = ({
             verticalAlign: "middle",
           }}
         />
-        Total ({projectUsageData.length})
+        {`Total (${projectUsageData.length})`}
       </td>
       <td
         style={{

@@ -252,6 +252,13 @@ export async function checkAndSendUsageLimitWarning(data: UsageLimitData) {
 
     emailResults.forEach((result, index) => {
       const member = organization.members[index];
+      if (!member) {
+        logger.warn(
+          { index, organizationId },
+          "Member not found at index, skipping",
+        );
+        return;
+      }
       if (!member.user.email) {
         // Already logged as warning above, skip counting
         return;
