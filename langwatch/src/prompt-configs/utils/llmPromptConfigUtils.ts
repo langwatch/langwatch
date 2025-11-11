@@ -401,7 +401,7 @@ export function versionedPromptToPromptConfigFormValues(
       versionNumber: prompt.version,
       versionCreatedAt: prompt.versionCreatedAt,
     },
-    handle: prompt.handle,
+    handle: prompt.handle || null,
     scope: prompt.scope,
     version: {
       configData: {
