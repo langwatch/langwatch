@@ -159,10 +159,8 @@ function MembersList({
         organizationId: organization.id,
         invites: data.invites.map((invite) => ({
           email: invite.email.toLowerCase(),
-          role: OrganizationUserRole.MEMBER,
-          teamIds: invite.teamOptions
-            .map((teamOption) => teamOption.value)
-            .join(","),
+          role: invite.orgRole,
+          teamIds: invite.teams.map((team) => team.teamId).join(","),
         })),
       },
       {
@@ -571,8 +569,8 @@ function MembersList({
         open={isInviteLinkOpen}
         onOpenChange={({ open }) => (open ? undefined : onInviteModalClose())}
       >
-        <Dialog.Backdrop />
-        <Dialog.Content>
+        <Dialog.Backdrop zIndex={1000} />
+        <Dialog.Content backdrop={false} zIndex={1001}>
           <Dialog.Header>
             <Dialog.Title>
               <HStack>
@@ -617,8 +615,13 @@ function MembersList({
           open ? onAddMembersOpen() : onAddMembersClose()
         }
       >
-        <Dialog.Backdrop />
-        <Dialog.Content width="100%" maxWidth="1024px">
+        <Dialog.Backdrop zIndex={1000} />
+        <Dialog.Content
+          backdrop={false}
+          zIndex={1001}
+          width="100%"
+          maxWidth="1024px"
+        >
           <Dialog.Header>
             <Dialog.Title>Add members</Dialog.Title>
           </Dialog.Header>
@@ -626,6 +629,7 @@ function MembersList({
           <Dialog.Body>
             <AddMembersForm
               teamOptions={teamOptions}
+              orgRoleOptions={selectOptions}
               onSubmit={onSubmit}
               isLoading={createInvitesMutation.isLoading}
               hasEmailProvider={hasEmailProvider ?? false}

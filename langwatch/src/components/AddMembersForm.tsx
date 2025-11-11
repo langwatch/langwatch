@@ -3,25 +3,32 @@ import {
   Field,
   HStack,
   Input,
+  NativeSelect,
   Spinner,
   Table,
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { Select as MultiSelect } from "chakra-react-select";
-import { Mail, Trash } from "react-feather";
+import { Mail, Plus, Trash } from "react-feather";
 import {
   Controller,
   useFieldArray,
   useForm,
   type SubmitHandler,
 } from "react-hook-form";
+import { OrganizationUserRole, TeamUserRole } from "@prisma/client";
 
 type Option = { label: string; value: string; description?: string };
 
+type TeamAssignment = {
+  teamId: string;
+  role: TeamUserRole;
+};
+
 type InviteData = {
   email: string;
-  teamOptions: Option[];
+  orgRole: OrganizationUserRole;
+  teams: TeamAssignment[];
 };
 
 export type MembersForm = {
@@ -30,6 +37,7 @@ export type MembersForm = {
 
 interface AddMembersFormProps {
   teamOptions: Option[];
+  orgRoleOptions: Option[];
   onSubmit: SubmitHandler<MembersForm>;
   isLoading?: boolean;
   hasEmailProvider?: boolean;
@@ -43,6 +51,7 @@ interface AddMembersFormProps {
  */
 export function AddMembersForm({
   teamOptions,
+  orgRoleOptions,
   onSubmit,
   isLoading = false,
   hasEmailProvider = false,
@@ -56,7 +65,13 @@ export function AddMembersForm({
     formState: { errors },
   } = useForm<MembersForm>({
     defaultValues: {
-      invites: [{ email: "", teamOptions: teamOptions }],
+      invites: [
+        {
+          email: "",
+          orgRole: OrganizationUserRole.MEMBER,
+          teams: [],
+        },
+      ],
     },
   });
 
@@ -66,7 +81,11 @@ export function AddMembersForm({
   });
 
   const onAddField = () => {
-    append({ email: "", teamOptions });
+    append({
+      email: "",
+      orgRole: OrganizationUserRole.MEMBER,
+      teams: [],
+    });
   };
 
   const handleFormSubmit = (e: React.FormEvent) => {
@@ -84,67 +103,27 @@ export function AddMembersForm({
                 Email
               </Table.ColumnHeader>
               <Table.ColumnHeader paddingLeft={0} paddingTop={0}>
-                Teams
+                Org Role
               </Table.ColumnHeader>
-              <Table.ColumnHeader
-                paddingLeft={0}
-                paddingRight={0}
-                paddingTop={0}
-              ></Table.ColumnHeader>
             </Table.Row>
           </Table.Header>
           <Table.Body>
             {fields.map((field, index) => (
-              <Table.Row key={field.id}>
-                <Table.Cell paddingLeft={0} paddingY={2}>
-                  <Field.Root>
-                    <Input
-                      placeholder="Enter email address"
-                      {...register(`invites.${index}.email`, {
-                        required: "Email is required",
-                      })}
-                    />
-                    <Field.ErrorText>
-                      {errors.invites?.[index]?.email && "Email is required"}
-                    </Field.ErrorText>
-                  </Field.Root>
-                </Table.Cell>
-                <Table.Cell width="35%" paddingLeft={0} paddingY={2}>
-                  <Field.Root>
-                    <Controller
-                      control={control}
-                      name={`invites.${index}.teamOptions`}
-                      rules={{
-                        required: "At least one team is required",
-                      }}
-                      render={({ field }) => (
-                        <MultiSelect
-                          {...field}
-                          options={teamOptions}
-                          isMulti
-                          closeMenuOnSelect={false}
-                          selectedOptionStyle="check"
-                          hideSelectedOptions={false}
-                        />
-                      )}
-                    />
-                  </Field.Root>
-                </Table.Cell>
-                <Table.Cell paddingLeft={0} paddingRight={0} paddingY={2}>
-                  <Button
-                    type="button"
-                    colorPalette="red"
-                    onClick={() => remove(index)}
-                  >
-                    <Trash size={18} />
-                  </Button>
-                </Table.Cell>
-              </Table.Row>
+              <MemberRow
+                key={field.id}
+                index={index}
+                control={control}
+                register={register}
+                errors={errors}
+                teamOptions={teamOptions}
+                orgRoleOptions={orgRoleOptions}
+                onRemove={() => remove(index)}
+              />
             ))}
           </Table.Body>
         </Table.Root>
         <Button type="button" onClick={onAddField} marginTop={2}>
-          + Add Another
+          <Plus size={16} /> Add another
         </Button>
 
         <HStack justify="end" width="100%" marginTop={4}>
@@ -171,5 +150,199 @@ export function AddMembersForm({
         </HStack>
       </VStack>
     </form>
+  );
+}
+
+/**
+ * MemberRow component - renders a single member row with nested teams table
+ */
+function MemberRow({
+  index,
+  control,
+  register,
+  errors,
+  teamOptions,
+  orgRoleOptions,
+  onRemove,
+}: {
+  index: number;
+  control: any;
+  register: any;
+  errors: any;
+  teamOptions: Option[];
+  orgRoleOptions: Option[];
+  onRemove: () => void;
+}) {
+  const {
+    fields: teamFields,
+    append: appendTeam,
+    remove: removeTeam,
+  } = useFieldArray({
+    control,
+    name: `invites.${index}.teams`,
+  });
+
+  const handleAddTeam = () => {
+    appendTeam({
+      teamId: teamOptions[0]?.value ?? "",
+      role: TeamUserRole.MEMBER,
+    });
+  };
+
+  return (
+    <>
+      <Table.Row>
+        <Table.Cell paddingLeft={0} paddingY={2} verticalAlign="top">
+          <Field.Root>
+            <Input
+              placeholder="Enter email address"
+              {...register(`invites.${index}.email`, {
+                required: "Email is required",
+              })}
+            />
+            <Field.ErrorText>
+              {errors.invites?.[index]?.email?.message}
+            </Field.ErrorText>
+          </Field.Root>
+        </Table.Cell>
+        <Table.Cell paddingLeft={0} paddingY={2} verticalAlign="top">
+          <Field.Root>
+            <Controller
+              control={control}
+              name={`invites.${index}.orgRole`}
+              render={({ field }) => (
+                <NativeSelect.Root>
+                  <NativeSelect.Field {...field}>
+                    {orgRoleOptions.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </NativeSelect.Field>
+                </NativeSelect.Root>
+              )}
+            />
+          </Field.Root>
+        </Table.Cell>
+      </Table.Row>
+      {teamFields.length > 0 && (
+        <Table.Row>
+          <Table.Cell colSpan={2} paddingLeft={0} paddingY={2}>
+            <VStack align="start" gap={2} width="100%">
+              <Table.Root variant="line" size="sm" width="100%">
+                <Table.Header>
+                  <Table.Row>
+                    <Table.ColumnHeader paddingLeft={0} paddingTop={0}>
+                      Team
+                    </Table.ColumnHeader>
+                    <Table.ColumnHeader paddingLeft={0} paddingTop={0}>
+                      Role
+                    </Table.ColumnHeader>
+                    <Table.ColumnHeader
+                      paddingLeft={0}
+                      paddingRight={0}
+                      paddingTop={0}
+                    >
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="ghost"
+                        onClick={handleAddTeam}
+                      >
+                        <Plus size={14} /> Add team
+                      </Button>
+                    </Table.ColumnHeader>
+                  </Table.Row>
+                </Table.Header>
+                <Table.Body>
+                  {teamFields.map((teamField, teamIndex) => (
+                    <Table.Row key={teamField.id}>
+                      <Table.Cell paddingLeft={0} paddingY={2}>
+                        <Controller
+                          control={control}
+                          name={`invites.${index}.teams.${teamIndex}.teamId`}
+                          rules={{ required: "Team is required" }}
+                          render={({ field }) => (
+                            <NativeSelect.Root>
+                              <NativeSelect.Field {...field}>
+                                {teamOptions.map((option) => (
+                                  <option
+                                    key={option.value}
+                                    value={option.value}
+                                  >
+                                    {option.label}
+                                  </option>
+                                ))}
+                              </NativeSelect.Field>
+                            </NativeSelect.Root>
+                          )}
+                        />
+                      </Table.Cell>
+                      <Table.Cell paddingLeft={0} paddingY={2}>
+                        <Controller
+                          control={control}
+                          name={`invites.${index}.teams.${teamIndex}.role`}
+                          render={({ field }) => (
+                            <NativeSelect.Root>
+                              <NativeSelect.Field {...field}>
+                                <option value={TeamUserRole.ADMIN}>
+                                  Admin
+                                </option>
+                                <option value={TeamUserRole.MEMBER}>
+                                  Member
+                                </option>
+                                <option value={TeamUserRole.VIEWER}>
+                                  Viewer
+                                </option>
+                              </NativeSelect.Field>
+                            </NativeSelect.Root>
+                          )}
+                        />
+                      </Table.Cell>
+                      <Table.Cell paddingLeft={0} paddingRight={0} paddingY={2}>
+                        <Button
+                          type="button"
+                          size="sm"
+                          colorPalette="red"
+                          variant="ghost"
+                          onClick={() => removeTeam(teamIndex)}
+                        >
+                          <Text fontSize="sm">remove</Text>
+                        </Button>
+                      </Table.Cell>
+                    </Table.Row>
+                  ))}
+                </Table.Body>
+              </Table.Root>
+            </VStack>
+          </Table.Cell>
+        </Table.Row>
+      )}
+      {teamFields.length === 0 && (
+        <Table.Row>
+          <Table.Cell colSpan={2} paddingLeft={0} paddingY={2}>
+            <HStack gap={2}>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={handleAddTeam}
+              >
+                <Plus size={14} /> Add team
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                colorPalette="red"
+                variant="ghost"
+                onClick={onRemove}
+              >
+                <Trash size={14} />
+              </Button>
+            </HStack>
+          </Table.Cell>
+        </Table.Row>
+      )}
+    </>
   );
 }
