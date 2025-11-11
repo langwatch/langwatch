@@ -93,7 +93,7 @@ export function PromptTabbedSection() {
           </Box>
         </Tabs.Content>
         <Tabs.Content value={PromptTab.Variables} height="full">
-          <Box height="full" width="full">
+          <Box height="full" width="full" maxWidth="768px" margin="0 auto">
             <VariablesForm inputs={inputs} onChange={setVariables} />
           </Box>
         </Tabs.Content>
@@ -103,7 +103,7 @@ export function PromptTabbedSection() {
           width="full"
           height="full"
         >
-          <Box height="full" width="full">
+          <Box height="full" width="full" maxWidth="768px" margin="0 auto">
             <SettingsTabContent />
           </Box>
         </Tabs.Content>
