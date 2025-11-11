@@ -231,6 +231,7 @@ model Project {
     llmPromptConfigs         LlmPromptConfig[]
     analytics                Analytics[]
     archivedAt               DateTime?
+    featureClickHouse        Boolean                             @default(false)
 
     @@index([teamId])
 }
