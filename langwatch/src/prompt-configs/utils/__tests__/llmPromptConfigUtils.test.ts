@@ -2,7 +2,10 @@
 import { PromptScope } from "@prisma/client";
 import { describe, expect, it, vi } from "vitest";
 
-import { safeOptimizationStudioNodeDataToPromptConfigFormInitialValues } from "../llmPromptConfigUtils";
+import {
+  safeOptimizationStudioNodeDataToPromptConfigFormInitialValues,
+  versionedPromptToPromptConfigFormValues,
+} from "../llmPromptConfigUtils";
 
 describe("safeOptimizationStudioNodeDataToPromptConfigFormInitialValues", () => {
   describe("when LLM value is an object", () => {
@@ -255,5 +258,19 @@ describe("safeOptimizationStudioNodeDataToPromptConfigFormInitialValues", () => 
       );
       consoleWarnSpy.mockRestore();
     });
+  });
+});
+
+describe("versionedPromptToPromptConfigFormValues", () => {
+  describe("when prompt handle is empty string", () => {
+    it.todo("converts empty string to null");
+  });
+
+  describe("when prompt handle is null", () => {
+    it.todo("keeps handle as null");
+  });
+
+  describe("when prompt handle is valid", () => {
+    it.todo("keeps valid handle unchanged");
   });
 });
