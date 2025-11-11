@@ -10,7 +10,7 @@ process.env.SENTRY_IGNORE_API_RESOLUTION_ERROR = "1";
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
 const aliasPath =
-  process.env.DEPENDENCY_INJECTION_DIR ?? path.join("src", "injection");
+    process.env.DEPENDENCY_INJECTION_DIR ?? path.join("src", "injection");
 
 const cspHeader = `
     default-src 'self';
@@ -30,7 +30,7 @@ const cspHeader = `
 `;
 
 const existingNodeModules = new Set(
-  fs.readdirSync(path.join(__dirname, "node_modules")),
+    fs.readdirSync(path.join(__dirname, "node_modules")),
 );
 
 /**
@@ -41,187 +41,175 @@ await import("./src/env.mjs");
 
 /** @type {import("next").NextConfig} */
 const config = {
-  reactStrictMode: true,
-  logging: false,
-  distDir: process.env.NEXTJS_DIST_DIR ?? ".next",
+    reactStrictMode: true,
+    logging: false,
+    distDir: process.env.NEXTJS_DIST_DIR ?? ".next",
 
-  typescript: {
-    // Typechecking here is slow, and is now handled by a dedicated CI job using tsgo!
-    ignoreBuildErrors: true,
-  },
-  turbopack: {
-    rules: {
-      "*.snippet.sts": { loaders: ["raw-loader"], as: "*.js" },
-      "*.snippet.go": { loaders: ["raw-loader"], as: "*.js" },
-      "*.snippet.sh": { loaders: ["raw-loader"], as: "*.js" },
-      "*.snippet.py": { loaders: ["raw-loader"], as: "*.js" },
-      "*.snippet.yaml": { loaders: ["raw-loader"], as: "*.js" },
+    typescript: {
+        // Typechecking here is slow, and is now handled by a dedicated CI job using tsgo!
+        ignoreBuildErrors: true,
     },
-    resolveAlias: {
-      "@injected-dependencies.client": path.join(
-        aliasPath,
-        "injection.client.ts",
-      ),
-      "@injected-dependencies.server": path.join(
-        aliasPath,
-        "injection.server.ts",
-      ),
+    turbopack: {
+        rules: {
+            "*.snippet.sts": { loaders: ["raw-loader"], as: "*.js" },
+            "*.snippet.go": { loaders: ["raw-loader"], as: "*.js" },
+            "*.snippet.sh": { loaders: ["raw-loader"], as: "*.js" },
+            "*.snippet.py": { loaders: ["raw-loader"], as: "*.js" },
+            "*.snippet.yaml": { loaders: ["raw-loader"], as: "*.js" },
+        },
+        resolveAlias: {
+            "@injected-dependencies.client": path.join(
+                aliasPath,
+                "injection.client.ts",
+            ),
+            "@injected-dependencies.server": path.join(
+                aliasPath,
+                "injection.server.ts",
+            ),
 
-      // read all folders from ./saas-src/node_modules and create a map like the above
-      ...(fs.existsSync(path.join(__dirname, "saas-src", "node_modules"))
-        ? Object.fromEntries(
-            fs
-              .readdirSync(path.join(__dirname, "saas-src", "node_modules"))
-              .filter((key) => !existingNodeModules.has(key))
-              .flatMap((key) => [
-                [key, `./saas-src/node_modules/${key}`],
-                [`${key}/*`, `./saas-src/node_modules/${key}/*`],
-              ]),
-          )
-        : {}),
+            // read all folders from ./saas-src/node_modules and create a map like the above
+            ...(fs.existsSync(path.join(__dirname, "saas-src", "node_modules"))
+                ? Object.fromEntries(
+                      fs
+                          .readdirSync(
+                              path.join(__dirname, "saas-src", "node_modules"),
+                          )
+                          .filter((key) => !existingNodeModules.has(key))
+                          .flatMap((key) => [
+                              [key, `./saas-src/node_modules/${key}`],
+                              [`${key}/*`, `./saas-src/node_modules/${key}/*`],
+                          ]),
+                  )
+                : {}),
+        },
     },
-  },
 
-  experimental: {
-    scrollRestoration: true,
-    optimizePackageImports: [
-      "@chakra-ui/react",
-      "react-feather",
-      "@zag-js",
-      "@mui",
-    ],
-  },
-
-  async headers() {
-    return [
-      {
-        source: "/(.*)",
-        headers: [
-          {
-            key: "Referrer-Policy",
-            value: "no-referrer",
-          },
-          {
-            key: "Strict-Transport-Security",
-            value: "max-age=31536000; includeSubDomains",
-          },
-          {
-            key: "Content-Security-Policy",
-            value: cspHeader.replace(/\n/g, ""),
-          },
-          {
-            key: "X-Content-Type-Options",
-            value: "nosniff",
-          },
+    experimental: {
+        scrollRestoration: true,
+        optimizePackageImports: [
+            "@chakra-ui/react",
+            "react-feather",
+            "@zag-js",
+            "@mui",
         ],
-      },
-    ];
-  },
+    },
 
-  webpack: (config, { isServer }) => {
-    config.resolve.alias["@injected-dependencies.client"] = path.join(
-      aliasPath,
-      "injection.client.ts",
-    );
-    config.resolve.alias["@injected-dependencies.server"] = path.join(
-      aliasPath,
-      "injection.server.ts",
-    );
+    async headers() {
+        return [
+            {
+                source: "/(.*)",
+                headers: [
+                    {
+                        key: "Referrer-Policy",
+                        value: "no-referrer",
+                    },
+                    {
+                        key: "Strict-Transport-Security",
+                        value: "max-age=31536000; includeSubDomains",
+                    },
+                    {
+                        key: "Content-Security-Policy",
+                        value: cspHeader.replace(/\n/g, ""),
+                    },
+                    {
+                        key: "X-Content-Type-Options",
+                        value: "nosniff",
+                    },
+                ],
+            },
+        ];
+    },
 
-    // Ensures that only a single version of those are ever loaded
-    // eslint-disable-next-line @typescript-eslint/dot-notation
-    config.resolve.alias["react"] = `${__dirname}/node_modules/react`;
-    config.resolve.alias["react-dom"] = `${__dirname}/node_modules/react-dom`;
-    // eslint-disable-next-line @typescript-eslint/dot-notation
-    config.resolve.alias["next"] = `${__dirname}/node_modules/next`;
-    config.resolve.alias["next-auth"] = `${__dirname}/node_modules/next-auth`;
-    // eslint-disable-next-line @typescript-eslint/dot-notation
-    config.resolve.alias["zod"] = `${__dirname}/node_modules/zod`;
+    webpack: (config) => {
+        config.resolve.alias["@injected-dependencies.client"] = path.join(
+            aliasPath,
+            "injection.client.ts",
+        );
+        config.resolve.alias["@injected-dependencies.server"] = path.join(
+            aliasPath,
+            "injection.server.ts",
+        );
 
-    // FIX: Prevent webpack from bundling these modules on server to avoid circular dependency
-    // Issue: Notification service → elasticsearch → (circular) → otel routes
-    // Solution: Mark these as external so they're required at runtime, not bundled at build time
-    if (isServer) {
-      // Get existing externals or initialize empty array
-      const existingExternals = config.externals || [];
+        // Ensures that only a single version of those are ever loaded
+        // eslint-disable-next-line @typescript-eslint/dot-notation
+        config.resolve.alias["react"] = `${__dirname}/node_modules/react`;
+        config.resolve.alias["react-dom"] =
+            `${__dirname}/node_modules/react-dom`;
+        // eslint-disable-next-line @typescript-eslint/dot-notation
+        config.resolve.alias["next"] = `${__dirname}/node_modules/next`;
+        config.resolve.alias["next-auth"] =
+            `${__dirname}/node_modules/next-auth`;
+        // eslint-disable-next-line @typescript-eslint/dot-notation
+        config.resolve.alias["zod"] = `${__dirname}/node_modules/zod`;
 
-      // Add problematic modules as externals
-      config.externals = [
-        ...existingExternals,
-        // These modules cause circular dependency during webpack bundling
-        "~/server/tracer/otel.logs",
-        "~/server/tracer/otel.metrics",
-      ];
-    }
+        // Add fallback for pino logger requirements
+        if (!config.isServer) {
+            config.resolve.fallback = {
+                ...config.resolve.fallback,
+                "pino-pretty": false,
+                fs: false,
+                stream: false,
+                "node:stream": false,
+                worker_threads: false,
+                "node:worker_threads": false,
+            };
+        }
 
-    // Add fallback for pino logger requirements
-    if (!config.isServer) {
-      config.resolve.fallback = {
-        ...config.resolve.fallback,
-        "pino-pretty": false,
-        fs: false,
-        stream: false,
-        "node:stream": false,
-        worker_threads: false,
-        "node:worker_threads": false,
-      };
-    }
+        config.module.rules.push({
+            test: /\.(js|jsx|ts|tsx)$/,
+            use: [
+                {
+                    loader: "string-replace-loader",
+                    options: {
+                        search: /@langwatch-oss\/node_modules\//g,
+                        replace: "",
+                        flags: "g",
+                    },
+                },
+                {
+                    loader: "string-replace-loader",
+                    options: {
+                        search: /@langwatch-oss\/src\//g,
+                        replace: "~/",
+                        flags: "g",
+                    },
+                },
+            ],
+        });
 
-    config.module.rules.push({
-      test: /\.(js|jsx|ts|tsx)$/,
-      use: [
-        {
-          loader: "string-replace-loader",
-          options: {
-            search: /@langwatch-oss\/node_modules\//g,
-            replace: "",
-            flags: "g",
-          },
-        },
-        {
-          loader: "string-replace-loader",
-          options: {
-            search: /@langwatch-oss\/src\//g,
-            replace: "~/",
-            flags: "g",
-          },
-        },
-      ],
-    });
+        // Support importing files with `?snippet` to get source content for IDE-highlighted snippets
+        config.module.rules.push({
+            resourceQuery: /snippet/,
+            type: "asset/source",
+        });
 
-    // Support importing files with `?snippet` to get source content for IDE-highlighted snippets
-    config.module.rules.push({
-      resourceQuery: /snippet/,
-      type: "asset/source",
-    });
+        // Treat any *.snippet.* files as source assets to avoid resolution inside snippets
+        config.module.rules.push({
+            test: /\.snippet\.(txt|sts|ts|tsx|js|go|sh|py|yaml)$/i,
+            type: "asset/source",
+        });
 
-    // Treat any *.snippet.* files as source assets to avoid resolution inside snippets
-    config.module.rules.push({
-      test: /\.snippet\.(txt|sts|ts|tsx|js|go|sh|py|yaml)$/i,
-      type: "asset/source",
-    });
-
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-return
-    return config;
-  },
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-return
+        return config;
+    },
 };
 
 export default bundleAnalyser({ enabled: process.env.ANALYZE === "true" })(
-  withSentryConfig(config, {
-    // For all available options, see:
-    // https://github.com/getsentry/sentry-webpack-plugin#options
+    withSentryConfig(config, {
+        // For all available options, see:
+        // https://github.com/getsentry/sentry-webpack-plugin#options
 
-    // Suppresses source map uploading logs during build
-    silent: true,
-    org: "langwatch",
-    project: "langwatch",
+        // Suppresses source map uploading logs during build
+        silent: true,
+        org: "langwatch",
+        project: "langwatch",
 
-    widenClientFileUpload: true,
-    tunnelRoute: "/monitoring",
-    sourcemaps: {
-      disable: false,
-      deleteSourcemapsAfterUpload: true,
-    },
-    disableLogger: true,
-  }),
+        widenClientFileUpload: true,
+        tunnelRoute: "/monitoring",
+        sourcemaps: {
+            disable: false,
+            deleteSourcemapsAfterUpload: true,
+        },
+        disableLogger: true,
+    }),
 );
