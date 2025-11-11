@@ -5,12 +5,11 @@ import crypto from "node:crypto";
 import { NextResponse, type NextRequest } from "next/server";
 import { prisma } from "../../../../../server/db";
 import { createLogger } from "../../../../../utils/logger";
-// TEMPORARY: Comment out to isolate issue
-// import { openTelemetryLogsRequestToTracesForCollection } from "~/server/tracer/otel.logs";
-// import {
-//   fetchExistingMD5s,
-//   scheduleTraceCollectionWithFallback,
-// } from "~/server/background/workers/collectorWorker";
+import { openTelemetryLogsRequestToTracesForCollection } from "~/server/tracer/otel.logs";
+import {
+  fetchExistingMD5s,
+  scheduleTraceCollectionWithFallback,
+} from "~/server/background/workers/collectorWorker";
 import { withAppRouterLogger } from "../../../../../middleware/app-router-logger";
 import { getLangWatchTracer } from "langwatch";
 import { SpanKind, SpanStatusCode } from "@opentelemetry/api";
@@ -30,64 +29,12 @@ export const config = {
 };
 
 async function handleLogsRequest(req: NextRequest) {
-  // TEMPORARY: Simplified version without problematic imports
-  return await tracer.withActiveSpan(
-    "[POST] /api/otel/v1/logs",
-    { kind: SpanKind.SERVER },
-    async (span) => {
-      const xAuthToken = req.headers.get("x-auth-token");
-      const authHeader = req.headers.get("authorization");
-
-      const authToken =
-        xAuthToken ??
-        (authHeader?.toLowerCase().startsWith("bearer ")
-          ? authHeader.slice(7)
-          : null);
-
-      if (!authToken) {
-        span.setStatus({
-          code: SpanStatusCode.ERROR,
-          message: "No auth token provided.",
-        });
-
-        return NextResponse.json(
-          {
-            message:
-              "Authentication token is required. Use X-Auth-Token header or Authorization: Bearer token.",
-          },
-          { status: 401 },
-        );
-      }
-
-      const project = await prisma.project.findUnique({
-        where: { apiKey: authToken },
-        include: {
-          team: true,
-        },
-      });
-
-      if (!project) {
-        span.setStatus({
-          code: SpanStatusCode.ERROR,
-          message: "Invalid auth token.",
-        });
-
-        return NextResponse.json(
-          { message: "Invalid auth token." },
-          { status: 401 },
-        );
-      }
-
-      span.setAttribute("langwatch.project.id", project.id);
-
-      // TODO: Re-enable actual log processing once we identify the build issue
-      return NextResponse.json({
-        message: "Logs processing temporarily simplified",
-      });
-    },
+  // TEMPORARY: Disabled to isolate CI build issue
+  return NextResponse.json(
+    { error: "Temporarily disabled for debugging" },
+    { status: 503 },
   );
 
-  // OLD CODE BELOW - commented out to test imports
   // return await tracer.withActiveSpan(
   //   "[POST] /api/otel/v1/logs",
   //   { kind: SpanKind.SERVER },
