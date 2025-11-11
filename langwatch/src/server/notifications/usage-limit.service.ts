@@ -1,23 +1,20 @@
 import type { PrismaClient, Notification } from "@prisma/client";
 import { createLogger } from "../../utils/logger";
-import { NOTIFICATION_TYPES } from "./types";
+import { NOTIFICATION_TYPES } from "./types/notification-types-constant";
 import { NotificationRepository } from "./repositories/notification.repository";
 import { MessageCountRepository } from "../repositories/message-count.repository";
 import { OrganizationRepository } from "./repositories/organization.repository";
 import { ProjectRepository } from "./repositories/project.repository";
-import {
-  calculateUsagePercentage,
-  findCrossedThreshold,
-  getSeverityLevel,
-  type UsageThreshold,
-} from "./helpers/usage-calculations";
+import { calculateUsagePercentage } from "./helpers/usage-calculations/calculate-usage-percentage";
+import { findCrossedThreshold } from "./helpers/usage-calculations/find-crossed-threshold";
+import { getSeverityLevel } from "./helpers/usage-calculations/get-severity-level";
+import type { UsageThreshold } from "./helpers/usage-calculations/usage-threshold.type";
 import { NotificationEmailService } from "./services/notification-email.service";
-import type {
-  WarningDecisionResult,
-  WarningDecisionToSend,
-} from "./types/warning-decision";
+import type { WarningDecisionResult } from "./types/warning-decision/warning-decision-result";
+import type { WarningDecisionToSend } from "./types/warning-decision/warning-decision-to-send";
 import type { UsageLimitData } from "./types/usage-limit-data";
-import type { ProjectUsageData } from "./types/email-params";
+import type { ProjectUsageData } from "./types/email-params/project-usage-data";
+import type { OrganizationWithAdmins } from "./types/organization-repository.types/organization-with-admins";
 
 const logger = createLogger("langwatch:notifications:usageLimit");
 
@@ -333,17 +330,66 @@ export class UsageLimitService {
   }
 
   /**
-   * Convenience method: Check and send if needed
-   * Maintains backward compatibility
+   * Fetch usage data and plan limits for an organization
+   * Single Responsibility: Data aggregation
+   */
+  private async fetchUsageLimitData(
+    organizationId: string,
+  ): Promise<UsageLimitData | null> {
+    const currentMonthMessagesCount =
+      await this.messageCountRepository.getCurrentMonthCount({ organizationId });
+
+    // No usage - skip
+    if (currentMonthMessagesCount === 0) {
+      logger.debug({ organizationId }, "No messages, skipping");
+      return null;
+    }
+
+    // Use dependencies to get subscription info
+    const { dependencies } = await import("../../injection/dependencies.server");
+    const activePlan =
+      await dependencies.subscriptionHandler.getActivePlan(organizationId);
+
+    if (
+      !activePlan ||
+      typeof activePlan.maxMessagesPerMonth !== "number" ||
+      activePlan.maxMessagesPerMonth <= 0
+    ) {
+      logger.debug({ organizationId }, "Invalid plan configuration, skipping");
+      return null;
+    }
+
+    return {
+      organizationId,
+      currentMonthMessagesCount,
+      maxMonthlyUsageLimit: activePlan.maxMessagesPerMonth,
+    };
+  }
+
+  /**
+   * Convenience method: Check and send if needed (with explicit data)
+   * Used by: Router endpoints that already have usage data
    *
    * @param data Usage limit data
    * @returns The created notification record, or null if not sent
    */
   async checkAndSendWarning(
-    data: UsageLimitData,
+    data: UsageLimitData | { organizationId: string },
   ): Promise<Notification | null> {
-    const decision = await this.shouldSendWarning(data);
-    
+    // Overload: if only organizationId provided, fetch data
+    let usageData: UsageLimitData;
+    if ("currentMonthMessagesCount" in data) {
+      usageData = data;
+    } else {
+      const fetchedData = await this.fetchUsageLimitData(data.organizationId);
+      if (!fetchedData) {
+        return null;
+      }
+      usageData = fetchedData;
+    }
+
+    const decision = await this.shouldSendWarning(usageData);
+
     if (!decision.shouldSend) {
       return null;
     }

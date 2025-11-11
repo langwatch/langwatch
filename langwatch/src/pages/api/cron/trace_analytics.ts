@@ -3,8 +3,19 @@ import { prisma } from "~/server/db";
 import { esClient, TRACE_INDEX } from "~/server/elasticsearch";
 import { type Prisma } from "@prisma/client";
 import { ANALYTICS_KEYS } from "~/types";
-import { OrganizationUsageCheckerService } from "~/server/notifications/services/organization-usage-checker.service";
+import { OrganizationUsageProcessorService } from "~/server/notifications/services/organization-usage-processor.service";
 import { env } from "~/env.mjs";
+
+/**
+ * Cron job: Daily trace analytics and automated usage notifications
+ * 
+ * Responsibilities:
+ * 1. Aggregate trace analytics for yesterday
+ * 2. Automatically check ALL organizations for usage limit warnings (SaaS only)
+ * 
+ * Runs: Daily via cron
+ * Auth: Requires valid cron secret token
+ */"
 
 export default async function handler(
   req: NextApiRequest,
@@ -165,10 +176,11 @@ export default async function handler(
     console.error("[Trace Analytics] Error:", error);
   }
 
-  // Check usage limits for all organizations and send notifications if needed
+  // Automated usage limit checking (SaaS only)
+  // Processes all organizations and sends notifications as needed
   if (env.IS_SAAS) {
-    const usageChecker = new OrganizationUsageCheckerService(prisma);
-    await usageChecker.checkAllOrganizations();
+    const processor = new OrganizationUsageProcessorService(prisma);
+    await processor.processAllOrganizations();
   }
 
   return res.status(200).json({ success: true });

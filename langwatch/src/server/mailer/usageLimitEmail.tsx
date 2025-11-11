@@ -1,7 +1,7 @@
 import { render } from "@react-email/render";
 import { sendEmail } from "./emailSender";
 import { UsageLimitEmailTemplate } from "./components/UsageLimitEmailTemplate";
-import type { SendUsageLimitEmailParams } from "./types/usage-limit-email.types";
+import type { SendUsageLimitEmailParams } from "./types/usage-limit-email/send-params";
 
 /**
  * Send usage limit warning email

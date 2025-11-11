@@ -1,12 +1,5 @@
-import type { PrismaClient, Prisma, Notification } from "@prisma/client";
-
-/**
- * Derives create params from Prisma schema, omitting auto-generated fields
- */
-export type CreateNotificationParams = Omit<
-  Prisma.NotificationUncheckedCreateInput,
-  "id" | "createdAt" | "updatedAt"
->;
+import type { PrismaClient, Notification } from "@prisma/client";
+import type { CreateNotificationParams } from "../types/notification-repository.types";
 
 /**
  * Repository for notification data access
@@ -15,6 +8,9 @@ export type CreateNotificationParams = Omit<
 export class NotificationRepository {
   constructor(private readonly prisma: PrismaClient) {}
 
+  /**
+   * Find notifications for an organization since a given date
+   */
   async findRecentByOrganization(
     organizationId: string,
     since: Date,
@@ -32,6 +28,9 @@ export class NotificationRepository {
     });
   }
 
+  /**
+   * Create a new notification record
+   */
   async create(params: CreateNotificationParams): Promise<Notification> {
     return this.prisma.notification.create({
       data: {
@@ -43,6 +42,9 @@ export class NotificationRepository {
     });
   }
 
+  /**
+   * Find a notification by ID
+   */
   async findById(id: string): Promise<Notification | null> {
     return this.prisma.notification.findUnique({
       where: { id },

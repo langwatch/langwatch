@@ -1,5 +1,5 @@
 import React from "react";
-import type { ProjectUsageData } from "../../types/usage-limit-email.types";
+import type { ProjectUsageData } from "../../types/usage-limit-email/project-usage-data";
 import { EMAIL_CONFIG } from "../../config/email-constants";
 
 interface ProjectUsageTableProps {

@@ -1,10 +1,8 @@
 import { describe, it, expect } from "vitest";
-import {
-  calculateUsagePercentage,
-  findCrossedThreshold,
-  getSeverityLevel,
-  USAGE_WARNING_THRESHOLDS,
-} from "../usage-calculations";
+import { calculateUsagePercentage } from "../usage-calculations/calculate-usage-percentage";
+import { findCrossedThreshold } from "../usage-calculations/find-crossed-threshold";
+import { getSeverityLevel } from "../usage-calculations/get-severity-level";
+import { USAGE_WARNING_THRESHOLDS } from "../usage-calculations/usage-warning-thresholds";
 
 describe("usage-calculations", () => {
   describe("calculateUsagePercentage", () => {

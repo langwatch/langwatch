@@ -55,6 +55,14 @@ export const limitsRouter = createTRPCRouter({
         maxMonthlyUsageLimit: maxMonthlyUsageLimit_,
       };
     }),
+  /**
+   * Manual trigger: Admin manually sends usage limit notification
+   * 
+   * Use case: Admin wants to immediately notify about current usage
+   * Differs from cron: This is on-demand, cron is automated daily check
+   * 
+   * Controller responsibility: Validate permissions, delegate to service
+   */
   checkAndSendUsageLimitNotification: protectedProcedure
     .input(
       z.object({
@@ -104,7 +112,7 @@ type CacheEntry = {
 const FIVE_MINUTES = 5 * 60 * 1000;
 const messageCountCache = new Map<string, CacheEntry>();
 
-export const getCurrentMonthMessagesCount = async (
+const getCurrentMonthMessagesCount = async (
   projectIds: string[],
   organizationId?: string,
 ) => {

@@ -1,10 +1,8 @@
 import { sendUsageLimitEmail } from "../../mailer/usageLimitEmail";
 import { createLogger } from "../../../utils/logger";
 import { EMAIL_CONFIG } from "../../mailer/config/email-constants";
-import type {
-  SendUsageLimitEmailsParams,
-  EmailSendResult,
-} from "../types/email-params";
+import type { SendUsageLimitEmailsParams } from "../types/email-params/send-params";
+import type { EmailSendResult } from "../types/email-params/send-result";
 
 const logger = createLogger("langwatch:notifications:email");
 

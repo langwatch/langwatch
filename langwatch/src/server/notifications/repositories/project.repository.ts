@@ -1,9 +1,5 @@
 import type { PrismaClient } from "@prisma/client";
-
-export interface ProjectInfo {
-  id: string;
-  name: string;
-}
+import type { ProjectInfo } from "../types/project-repository.types";
 
 /**
  * Repository for project data access

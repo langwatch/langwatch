@@ -4,7 +4,7 @@ import { type NextApiRequest, type NextApiResponse } from "next";
 import type { ZodError } from "zod";
 import { fromZodError } from "zod-validation-error";
 import { dependencies } from "../../injection/dependencies.server";
-import { getCurrentMonthMessagesCount } from "../../server/api/routers/limits";
+import { MessageCountRepository } from "../../server/repositories/message-count.repository";
 import { maybeAddIdsToContextList } from "../../server/background/workers/collector/rag";
 import {
   fetchExistingMD5s,
@@ -89,10 +89,10 @@ async function handleCollectorRequest(
   logger.info({ projectId: project.id }, "collector request being processed");
 
   try {
-    const currentMonthMessagesCount = await getCurrentMonthMessagesCount(
-      [project.id],
-      project.team.organizationId
-    );
+    const messageCountRepo = new MessageCountRepository(prisma);
+    const currentMonthMessagesCount = await messageCountRepo.getCurrentMonthCount({
+      organizationId: project.team.organizationId,
+    });
 
     const activePlan = await dependencies.subscriptionHandler.getActivePlan(
       project.team.organizationId

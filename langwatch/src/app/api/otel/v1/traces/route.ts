@@ -16,7 +16,7 @@ import { createLogger } from "../../../../../utils/logger";
 import { withAppRouterLogger } from "../../../../../middleware/app-router-logger";
 import { getLangWatchTracer } from "langwatch";
 import { SpanKind, SpanStatusCode } from "@opentelemetry/api";
-import { getCurrentMonthMessagesCount } from "../../../../../server/api/routers/limits";
+import { MessageCountRepository } from "../../../../../server/repositories/message-count.repository";
 import { dependencies } from "../../../../../injection/dependencies.server";
 
 const tracer = getLangWatchTracer("langwatch.otel.traces");
@@ -83,10 +83,11 @@ async function handleTracesRequest(req: NextRequest) {
       }
 
       try {
-        const currentMonthMessagesCount = await getCurrentMonthMessagesCount(
-          [project.id],
-          project.team.organizationId,
-        );
+        const messageCountRepo = new MessageCountRepository(prisma);
+        const currentMonthMessagesCount =
+          await messageCountRepo.getCurrentMonthCount({
+            organizationId: project.team.organizationId,
+          });
 
         const activePlan = await dependencies.subscriptionHandler.getActivePlan(
           project.team.organizationId,

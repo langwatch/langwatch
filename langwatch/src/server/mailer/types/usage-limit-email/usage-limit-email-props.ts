@@ -1,13 +1,8 @@
+import type { ProjectUsageData } from "./project-usage-data";
+
 /**
- * Types for usage limit email
+ * Props for UsageLimitEmailTemplate component
  */
-
-export interface ProjectUsageData {
-  id: string;
-  name: string;
-  messageCount: number;
-}
-
 export interface UsageLimitEmailProps {
   organizationName: string;
   usagePercentage: number;
@@ -18,10 +13,5 @@ export interface UsageLimitEmailProps {
   projectUsageData: ProjectUsageData[];
   actionUrl: string;
   logoUrl: string;
-}
-
-export interface SendUsageLimitEmailParams extends UsageLimitEmailProps {
-  to: string;
-  severity: string;
 }
 

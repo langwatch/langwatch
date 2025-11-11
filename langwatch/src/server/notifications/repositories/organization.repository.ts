@@ -1,15 +1,5 @@
 import type { PrismaClient } from "@prisma/client";
-
-export interface OrganizationAdmin {
-  userId: string;
-  email: string;
-}
-
-export interface OrganizationWithAdmins {
-  id: string;
-  name: string;
-  admins: OrganizationAdmin[];
-}
+import type { OrganizationWithAdmins } from "../types/organization-repository.types/organization-with-admins";
 
 /**
  * Repository for organization data access

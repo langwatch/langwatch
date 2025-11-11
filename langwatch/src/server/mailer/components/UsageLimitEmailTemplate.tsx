@@ -6,7 +6,7 @@ import { Heading } from "@react-email/heading";
 import { Img } from "@react-email/img";
 import { Text } from "@react-email/text";
 import { Section } from "@react-email/section";
-import type { UsageLimitEmailProps } from "../types/usage-limit-email.types";
+import type { UsageLimitEmailProps } from "../types/usage-limit-email/usage-limit-email-props";
 import { getProgressBarColor } from "./helpers/get-progress-bar-color";
 import { ProjectUsageTable } from "./usage-limit/ProjectUsageTable";
 import { UsageProgressBar } from "./usage-limit/UsageProgressBar";
