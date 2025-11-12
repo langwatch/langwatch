@@ -48,7 +48,7 @@ describe("SpanIngestionWriteProducerBullMq", () => {
 
     // Create producer after setting up mocks
     producer = new SpanIngestionWriteProducerBullMq();
-    mockQueueAdd = spanIngestionWriteQueue.add as Mock;
+    mockQueueAdd = spanIngestionWriteQueue.add.bind(spanIngestionWriteQueue) as Mock;
     mockTracerWithActiveSpan = vi.mocked(mockWithActiveSpan);
 
     // Setup tracer to call the callback
