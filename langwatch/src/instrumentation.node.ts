@@ -4,7 +4,7 @@ import {
   SimpleSpanProcessor,
 } from "@opentelemetry/sdk-trace-node";
 import { getNodeAutoInstrumentations } from "@opentelemetry/auto-instrumentations-node";
-import { OTLPTraceExporter as OTLPTraceExporterProto } from "@opentelemetry/exporter-trace-otlp-proto";
+import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-proto";
 import { detectResources } from "@opentelemetry/resources";
 import { awsEksDetector } from "@opentelemetry/resource-detector-aws";
 import {
@@ -21,15 +21,16 @@ if (explicitEndpoint) {
   if (isProd) {
     spanProcessors.push(
       new BatchSpanProcessor(
-        new OTLPTraceExporterProto({ url: `${explicitEndpoint}/v1/traces` }),
+        new OTLPTraceExporter({ url: `${explicitEndpoint}/v1/traces` }),
       ),
     );
   } else {
     spanProcessors.push(
       new SimpleSpanProcessor(
-        new OTLPTraceExporterProto({ url: `${explicitEndpoint}/v1/traces` }),
+        new OTLPTraceExporter({ url: `${explicitEndpoint}/v1/traces` }),
       ),
     );
+
   }
 }
 
@@ -55,8 +56,11 @@ if (spanProcessors.length > 0) {
         "@opentelemetry/instrumentation-aws-sdk": {
           enabled: false,
         },
-        // Disbale this until we kill Elastic Search
+        // Disable this until we kill Elastic Search
         "@opentelemetry/instrumentation-undici": {
+          enabled: false,
+        },
+        "@opentelemetry/instrumentation-http": {
           enabled: false,
         },
       }),
