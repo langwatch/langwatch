@@ -21,13 +21,13 @@ if (explicitEndpoint) {
   if (isProd) {
     spanProcessors.push(
       new BatchSpanProcessor(
-        new OTLPTraceExporterProto({ url: explicitEndpoint }),
+        new OTLPTraceExporterProto({ url: `${explicitEndpoint}/v1/traces` }),
       ),
     );
   } else {
     spanProcessors.push(
       new SimpleSpanProcessor(
-        new OTLPTraceExporterProto({ url: explicitEndpoint }),
+        new OTLPTraceExporterProto({ url: `${explicitEndpoint}/v1/traces` }),
       ),
     );
   }
