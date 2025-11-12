@@ -12,12 +12,13 @@ type EmailContent = {
   from?: string;
 };
 
-const DEFAULT_FROM =
+// Lazy-evaluate to avoid accessing env at module load time during builds
+const getDefaultFrom = () =>
   env.EMAIL_DEFAULT_FROM ??
-  (env.BASE_HOST.includes("app.langwatch.ai") ||
-  env.BASE_HOST.includes("localhost")
+  (env.BASE_HOST?.includes("app.langwatch.ai") ||
+  env.BASE_HOST?.includes("localhost")
     ? "LangWatch <contact@langwatch.ai>"
-    : `LangWatch <mailer@${env.BASE_HOST.split("://")[1].split("/")[0]}>`);
+    : `LangWatch <mailer@${env.BASE_HOST?.split("://")[1]?.split("/")[0] ?? "localhost"}>`);
 
 export const sendEmail = async (content: EmailContent) => {
   if (!env.SENDGRID_API_KEY && !(env.USE_AWS_SES && env.AWS_REGION)) {
@@ -54,7 +55,7 @@ const sendWithSES = async (content: EmailContent) => {
         Data: content.subject,
       },
     },
-    Source: content.from ?? DEFAULT_FROM,
+    Source: content.from ?? getDefaultFrom(),
   };
 
   try {
@@ -73,7 +74,7 @@ const sendWithSendGrid = async (content: EmailContent) => {
 
   const msg = {
     to: content.to,
-    from: content.from ?? DEFAULT_FROM,
+    from: content.from ?? getDefaultFrom(),
     subject: content.subject,
     html: content.html,
   };
