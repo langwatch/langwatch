@@ -11,11 +11,11 @@ import { createLogger } from "../../../../../utils/logger";
 import { withAppRouterLogger } from "../../../../../middleware/app-router-logger";
 import { getLangWatchTracer } from "langwatch";
 import { SpanKind, SpanStatusCode } from "@opentelemetry/api";
-import { getCurrentMonthMessagesCount } from "../../../../../server/api/routers/limits";
 import { dependencies } from "../../../../../injection/dependencies.server";
 
-// NOTE: otel.traces and collectorWorker must be dynamically imported
-// Webpack bundles them at build time otherwise, hitting circular dependency with elasticsearch
+// NOTE: otel.traces, collectorWorker, and limits must be dynamically imported
+// Webpack bundles them at build time otherwise, hitting circular dependency:
+// limits router → UsageLimitService → elasticsearch
 
 const tracer = getLangWatchTracer("langwatch.otel.traces");
 const logger = createLogger("langwatch:otel:v1:traces");
@@ -81,6 +81,11 @@ async function handleTracesRequest(req: NextRequest) {
       }
 
       try {
+        // Dynamic import to prevent webpack from bundling limits router at build time
+        const { getCurrentMonthMessagesCount } = await import(
+          "../../../../../server/api/routers/limits"
+        );
+
         const currentMonthMessagesCount = await getCurrentMonthMessagesCount(
           [project.id],
           project.team.organizationId,
