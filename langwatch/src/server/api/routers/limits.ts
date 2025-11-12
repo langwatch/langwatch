@@ -68,7 +68,7 @@ export const limitsRouter = createTRPCRouter({
       ),
     )
     .mutation(async ({ input }) => {
-      const service = UsageLimitService.create(prisma);
+      const service = await UsageLimitService.create(prisma);
       const notification = await service.checkAndSendWarning({
         organizationId: input.organizationId,
         currentMonthMessagesCount: input.currentMonthMessagesCount,

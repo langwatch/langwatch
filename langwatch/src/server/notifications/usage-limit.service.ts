@@ -5,6 +5,10 @@ import { env } from "../../env.mjs";
 import type { QueryDslBoolQuery } from "@elastic/elasticsearch/lib/api/types";
 import { NOTIFICATION_TYPES } from "./types";
 import { NotificationRepository } from "./repositories/notification.repository";
+import type {
+  esClient as EsClientType,
+  TRACE_INDEX as TraceIndexType,
+} from "../elasticsearch";
 
 const logger = createLogger("langwatch:notifications:usageLimit");
 
@@ -21,19 +25,26 @@ export interface UsageLimitData {
  * Single Responsibility: Handle business logic for usage limit warnings
  *
  * Framework-agnostic - no tRPC dependencies.
+ * Uses dependency injection for elasticsearch to avoid circular imports.
  */
 export class UsageLimitService {
   private readonly notificationRepository: NotificationRepository;
 
-  constructor(private readonly prisma: PrismaClient) {
+  constructor(
+    private readonly prisma: PrismaClient,
+    private readonly esClient: typeof EsClientType,
+    private readonly traceIndex: typeof TraceIndexType,
+  ) {
     this.notificationRepository = new NotificationRepository(prisma);
   }
 
   /**
-   * Static factory method for creating a UsageLimitService with proper DI.
+   * Static async factory method that dynamically imports elasticsearch dependencies.
+   * This avoids circular dependency at module load time.
    */
-  static create(prisma: PrismaClient): UsageLimitService {
-    return new UsageLimitService(prisma);
+  static async create(prisma: PrismaClient): Promise<UsageLimitService> {
+    const { esClient, TRACE_INDEX } = await import("../elasticsearch");
+    return new UsageLimitService(prisma, esClient, TRACE_INDEX);
   }
 
   /**
@@ -51,13 +62,11 @@ export class UsageLimitService {
     organizationId: string,
   ): Promise<number> {
     try {
-      // Dynamic import to avoid circular dependency
-      const { esClient, TRACE_INDEX } = await import("../elasticsearch");
-      const client = await esClient({ organizationId });
+      const client = await this.esClient({ organizationId });
       const currentMonthStart = this.getCurrentMonth().getTime();
 
       const result = await client.count({
-        index: TRACE_INDEX.alias,
+        index: this.traceIndex.alias,
         body: {
           query: {
             bool: {
