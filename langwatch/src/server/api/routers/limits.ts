@@ -4,7 +4,6 @@ import {
   OrganizationRoleGroup,
   checkUserPermissionForOrganization,
 } from "../permission";
-import { TRACE_INDEX, esClient } from "../../elasticsearch";
 import type { QueryDslBoolQuery } from "@elastic/elasticsearch/lib/api/types";
 import { prisma } from "../../db";
 import { dependencies } from "../../../injection/dependencies.server";
@@ -123,6 +122,9 @@ export const getCurrentMonthMessagesCount = async (
   if (organizationId) {
     projectIdsToUse = await getProjectIdsForOrganization(organizationId);
   }
+
+  // Lazy-load elasticsearch only when this function is called
+  const { esClient, TRACE_INDEX } = await import("../../elasticsearch");
 
   const client = await esClient({ projectId: projectIdsToUse[0] ?? "" });
   const messagesCount = await client.count({
