@@ -44,11 +44,12 @@ export class QueueWithFallback<
     opts?: JobsOptions,
   ): Promise<Job<DataType, ResultType, NameType>> {
     return await this.tracer.withActiveSpan(
-      "QueueWithFallback.add",
+      `FallbackQueue${this.name}.add`,
       {
         kind: SpanKind.INTERNAL,
         attributes: {
           "queue.name": name,
+          "queue.id": opts?.jobId,
         },
       },
       async () => {
@@ -63,7 +64,7 @@ export class QueueWithFallback<
             setTimeout(() => {
               if (timeoutState.state === "waiting") {
                 reject(
-                  new Error("Timed out after 3s trying to insert on the queue"),
+                  new Error(`Timed out after 3s trying to insert on the queue ${this.name}`),
                 );
               } else {
                 resolve(undefined);
@@ -83,7 +84,7 @@ export class QueueWithFallback<
         } catch (error) {
           logger.error(
             { error },
-            "failed sending to redis collector queue inserting trace directly, processing job synchronously",
+            `failed sending to redis ${this.name} inserting trace directly, attempting to process job synchronously`,
           );
 
           return await this.worker(new Job(this, name, data, opts));
@@ -96,7 +97,7 @@ export class QueueWithFallback<
     jobs: { name: NameType; data: DataType; opts?: JobsOptions }[],
   ): Promise<Job<DataType, ResultType, NameType>[]> {
     return await this.tracer.withActiveSpan(
-      "QueueWithFallback.addBulk",
+      `FallbackQueue${this.name}.addBulk`,
       {
         kind: SpanKind.INTERNAL,
         attributes: {
@@ -119,7 +120,7 @@ export class QueueWithFallback<
     id: string,
   ): Promise<Job<DataType, ResultType, NameType> | undefined> {
     return await this.tracer.withActiveSpan(
-      "QueueWithFallback.getJob",
+      `FallbackQueue${this.name}.getJob`,
       {
         kind: SpanKind.INTERNAL,
         attributes: {

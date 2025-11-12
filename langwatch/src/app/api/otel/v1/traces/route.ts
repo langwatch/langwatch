@@ -37,7 +37,7 @@ export const config = {
 
 async function handleTracesRequest(req: NextRequest) {
   return await tracer.withActiveSpan(
-    "handleTracesRequest",
+    "TracesV1.handleTracesRequest",
     { kind: SpanKind.SERVER },
     async (span) => {
       const xAuthToken = req.headers.get("x-auth-token");
@@ -193,7 +193,7 @@ async function handleTracesRequest(req: NextRequest) {
       const clickHouseTasks: Promise<void>[] = [];
 
       const promises = await tracer.withActiveSpan(
-        "check which traces have already been collected",
+        "TracesV1.duplicateTracesCheck",
         { kind: SpanKind.INTERNAL },
         async () => {
           const promises: Promise<void>[] = [];
@@ -231,7 +231,7 @@ async function handleTracesRequest(req: NextRequest) {
 
             if (project.featureClickHouse) {
               clickHouseTasks.push(
-                spanIngestionService.consumeSpansToBeIngested(
+                spanIngestionService.consumeSpans(
                   project.id,
                   traceForCollection,
                   traceRequest,
@@ -266,7 +266,7 @@ async function handleTracesRequest(req: NextRequest) {
       }
 
       await tracer.withActiveSpan(
-        "push pending traces to collector queue",
+        "TracesV1.enqueueTraces",
         { kind: SpanKind.PRODUCER },
         async () => {
           await Promise.all(promises);

@@ -27,6 +27,8 @@ import fs from "fs";
 import { workerRestartsCounter } from "../metrics";
 import { startUsageStatsWorker } from "./workers/usageStatsWorker";
 import { WorkersRestart } from "./errors";
+import type { SpanIngestionWriteJob } from "../features/span-ingestion/types";
+import { startSpanIngestionWriteWorker } from "./workers/spanIngestionWriteWorker";
 
 const logger = createLogger("langwatch:workers");
 
@@ -36,24 +38,29 @@ type Workers = {
   topicClusteringWorker: Worker<TopicClusteringJob, void, string> | undefined;
   trackEventsWorker: Worker<TrackEventJob, void, string> | undefined;
   usageStatsWorker: Worker<UsageStatsJob, void, string> | undefined;
+  spanIngestionWriteWorker:
+    | Worker<SpanIngestionWriteJob, void, string>
+    | undefined;
 };
 
 export const start = (
   runEvaluationMock:
     | ((
-        job: Job<EvaluationJob, any, EvaluatorTypes>
+        job: Job<EvaluationJob, any, EvaluatorTypes>,
       ) => Promise<SingleEvaluationResult>)
     | undefined = undefined,
-  maxRuntimeMs: number | undefined = undefined
+  maxRuntimeMs: number | undefined = undefined,
 ): Promise<Workers | undefined> => {
   return new Promise<Workers | undefined>((resolve, reject) => {
     const collectorWorker = startCollectorWorker();
     const evaluationsWorker = startEvaluationsWorker(
-      runEvaluationMock ?? runEvaluationJob
+      runEvaluationMock ?? runEvaluationJob,
     );
     const topicClusteringWorker = startTopicClusteringWorker();
     const trackEventsWorker = startTrackEventsWorker();
     const usageStatsWorker = startUsageStatsWorker();
+    const spanIngestionWriteWorker = startSpanIngestionWriteWorker();
+
     startMetricsServer();
     incrementWorkerRestartCount();
 
@@ -67,6 +74,7 @@ export const start = (
     topicClusteringWorker?.on("closing", closingListener);
     trackEventsWorker?.on("closing", closingListener);
     usageStatsWorker?.on("closing", closingListener);
+    spanIngestionWriteWorker?.on("closing", closingListener);
 
     if (maxRuntimeMs) {
       setTimeout(() => {
@@ -78,17 +86,19 @@ export const start = (
           topicClusteringWorker?.off("closing", closingListener);
           trackEventsWorker?.off("closing", closingListener);
           usageStatsWorker?.off("closing", closingListener);
+          spanIngestionWriteWorker?.off("closing", closingListener);
           await Promise.all([
             collectorWorker?.close(),
             evaluationsWorker?.close(),
             topicClusteringWorker?.close(),
             trackEventsWorker?.close(),
             usageStatsWorker?.close(),
+            spanIngestionWriteWorker?.close(),
           ]);
 
           setTimeout(() => {
             reject(
-              new WorkersRestart("Max runtime reached, restarting worker")
+              new WorkersRestart("Max runtime reached, restarting worker"),
             );
           }, 0);
         })();
@@ -100,6 +110,7 @@ export const start = (
         topicClusteringWorker,
         trackEventsWorker,
         usageStatsWorker,
+        spanIngestionWriteWorker,
       });
     }
   });
@@ -109,7 +120,7 @@ const incrementWorkerRestartCount = () => {
   try {
     const restartCountFile = path.join(
       "/tmp",
-      "langwatch-worker-restart-count"
+      "langwatch-worker-restart-count",
     );
     let restartCount = 0;
     if (fs.existsSync(restartCountFile)) {

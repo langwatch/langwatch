@@ -18,11 +18,11 @@ export class BullMQSpanIngestionWriteProducer {
     span: ReadableSpan,
   ): Promise<void> {
     await this.tracer.withActiveSpan(
-      "SpanIngestionProducer.enqueueSpanIngestionWriteJob",
+      "BullMQSpanIngestionWriteProducer.enqueueSpanIngestionWriteJob",
       {
         kind: SpanKind.PRODUCER,
         attributes: {
-          "project.id": tenantId,
+          "tenant_id": tenantId,
           "trace.id": span.spanContext().traceId,
           "span.id": span.spanContext().spanId,
         },

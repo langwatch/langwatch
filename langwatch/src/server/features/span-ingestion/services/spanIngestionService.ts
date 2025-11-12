@@ -24,13 +24,13 @@ export class SpanIngestionService {
    * @param traceRequest - The trace request.
    * @returns A promise that resolves when the spans have been consumed.
    */
-  async consumeSpansToBeIngested(
+  async consumeSpans(
     tenantId: string,
     traceForCollection: TraceForCollection,
     traceRequest: DeepPartial<IExportTraceServiceRequest>,
   ): Promise<void> {
     return await this.tracer.withActiveSpan(
-    "SpanIngestionService.consumeSpansToBeIngested",
+    "SpanIngestionService.consumeSpans",
       {
         kind: ApiSpanKind.PRODUCER,
         attributes: {
