@@ -12,30 +12,29 @@ type EmailContent = {
   from?: string;
 };
 
-// Lazy-evaluate to avoid accessing env at module load time during builds
-const getDefaultFrom = () =>
-  env.EMAIL_DEFAULT_FROM ??
-  (env.BASE_HOST?.includes("app.langwatch.ai") ||
-  env.BASE_HOST?.includes("localhost")
-    ? "LangWatch <contact@langwatch.ai>"
-    : `LangWatch <mailer@${env.BASE_HOST?.split("://")[1]?.split("/")[0] ?? "localhost"}>`);
-
 export const sendEmail = async (content: EmailContent) => {
   if (!env.SENDGRID_API_KEY && !(env.USE_AWS_SES && env.AWS_REGION)) {
     logger.error("No email sending method available. Skipping email sending.");
     throw new Error(
-      "No email sending method available. Skipping email sending."
+      "No email sending method available. Skipping email sending.",
     );
   }
 
+  const defaultFrom =
+    env.EMAIL_DEFAULT_FROM ??
+    (env.BASE_HOST.includes("app.langwatch.ai") ||
+    env.BASE_HOST.includes("localhost")
+      ? "LangWatch <contact@langwatch.ai>"
+      : `LangWatch <mailer@${env.BASE_HOST.split("://")[1].split("/")[0]}>`);
+
   if (env.USE_AWS_SES && env.AWS_REGION) {
-    return await sendWithSES(content);
+    return await sendWithSES(content, defaultFrom);
   } else if (env.SENDGRID_API_KEY) {
-    return await sendWithSendGrid(content);
+    return await sendWithSendGrid(content, defaultFrom);
   }
 };
 
-const sendWithSES = async (content: EmailContent) => {
+const sendWithSES = async (content: EmailContent, defaultFrom: string) => {
   logger.info("Sending email using AWS SES");
   const sesClient = new SESClient({ region: env.AWS_REGION });
 
@@ -55,7 +54,7 @@ const sendWithSES = async (content: EmailContent) => {
         Data: content.subject,
       },
     },
-    Source: content.from ?? getDefaultFrom(),
+    Source: content.from ?? defaultFrom,
   };
 
   try {
@@ -69,12 +68,12 @@ const sendWithSES = async (content: EmailContent) => {
   }
 };
 
-const sendWithSendGrid = async (content: EmailContent) => {
+const sendWithSendGrid = async (content: EmailContent, defaultFrom: string) => {
   sgMail.setApiKey(env.SENDGRID_API_KEY ?? "");
 
   const msg = {
     to: content.to,
-    from: content.from ?? getDefaultFrom(),
+    from: content.from ?? defaultFrom,
     subject: content.subject,
     html: content.html,
   };
