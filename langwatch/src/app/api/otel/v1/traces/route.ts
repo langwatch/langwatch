@@ -5,19 +5,17 @@ import {
 } from "@opentelemetry/otlp-transformer";
 import * as root from "@opentelemetry/otlp-transformer/build/src/generated/root";
 import { prisma } from "../../../../../server/db";
-import { openTelemetryTraceRequestToTracesForCollection } from "../../../../../server/tracer/otel.traces";
 import * as Sentry from "@sentry/nextjs";
 import * as crypto from "crypto";
-import {
-  fetchExistingMD5s,
-  scheduleTraceCollectionWithFallback,
-} from "../../../../../server/background/workers/collectorWorker";
 import { createLogger } from "../../../../../utils/logger";
 import { withAppRouterLogger } from "../../../../../middleware/app-router-logger";
 import { getLangWatchTracer } from "langwatch";
 import { SpanKind, SpanStatusCode } from "@opentelemetry/api";
 import { getCurrentMonthMessagesCount } from "../../../../../server/api/routers/limits";
 import { dependencies } from "../../../../../injection/dependencies.server";
+
+// NOTE: otel.traces and collectorWorker must be dynamically imported
+// Webpack bundles them at build time otherwise, hitting circular dependency with elasticsearch
 
 const tracer = getLangWatchTracer("langwatch.otel.traces");
 const logger = createLogger("langwatch:otel:v1:traces");
@@ -185,6 +183,15 @@ async function handleTracesRequest(req: NextRequest) {
           );
         }
       }
+
+      // Dynamic import to prevent webpack from bundling at build time
+      const [
+        { openTelemetryTraceRequestToTracesForCollection },
+        { fetchExistingMD5s, scheduleTraceCollectionWithFallback },
+      ] = await Promise.all([
+        import("../../../../../server/tracer/otel.traces"),
+        import("../../../../../server/background/workers/collectorWorker"),
+      ]);
 
       const tracesForCollection =
         await openTelemetryTraceRequestToTracesForCollection(traceRequest);
