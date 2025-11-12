@@ -5,12 +5,14 @@ import crypto from "node:crypto";
 import { NextResponse, type NextRequest } from "next/server";
 import { prisma } from "../../../../../server/db";
 import { createLogger } from "../../../../../utils/logger";
+import { openTelemetryMetricsRequestToTracesForCollection } from "~/server/tracer/otel.metrics";
+import {
+  fetchExistingMD5s,
+  scheduleTraceCollectionWithFallback,
+} from "~/server/background/workers/collectorWorker";
 import { withAppRouterLogger } from "../../../../../middleware/app-router-logger";
 import { getLangWatchTracer } from "langwatch";
 import { SpanKind, SpanStatusCode } from "@opentelemetry/api";
-
-// NOTE: otel.metrics and collectorWorker must be dynamically imported
-// Webpack bundles them at build time otherwise, hitting circular dependency with elasticsearch
 
 const tracer = getLangWatchTracer("langwatch.otel.metrics");
 const logger = createLogger("langwatch:otel:v1:metrics");
@@ -124,12 +126,6 @@ async function handleMetricsRequest(req: NextRequest) {
           );
         }
       }
-
-      // Dynamic import to prevent webpack from bundling at build time
-      const [{ openTelemetryMetricsRequestToTracesForCollection }, { fetchExistingMD5s, scheduleTraceCollectionWithFallback }] = await Promise.all([
-        import("~/server/tracer/otel.metrics"),
-        import("~/server/background/workers/collectorWorker")
-      ]);
 
       const tracesGeneratedFromMetrics =
         await openTelemetryMetricsRequestToTracesForCollection(metricsRequest);
