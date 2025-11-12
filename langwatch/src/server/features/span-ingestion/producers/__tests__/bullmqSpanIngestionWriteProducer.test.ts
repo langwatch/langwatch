@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { SpanKind } from "@opentelemetry/api";
-import { BullMQSpanIngestionWriteProducer } from "../bullmqSpanIngestionWriteProducer";
+import { SpanIngestionWriteProducerBullMq } from "../spanIngestionWriteProducerBullMq";
 import { createMockReadableSpan } from "../../services/__tests__/testDoubles/testDataFactories";
 
 // Mock the queue and tracer
@@ -8,7 +8,7 @@ vi.mock("../../../../background/queues/spanIngestionWriteQueue", () => ({
   spanIngestionWriteQueue: {
     add: vi.fn(),
   },
-  SPAN_INGESTION_WRITE_JOB_NAME: "span-ingestion-write",
+  SPAN_INGESTION_WRITE_JOB_NAME: "span_ingestion_write",
 }));
 
 vi.mock("langwatch", () => ({
@@ -26,18 +26,30 @@ vi.mock("../../../../utils/logger", () => ({
 }));
 
 import { spanIngestionWriteQueue, SPAN_INGESTION_WRITE_JOB_NAME } from "../../../../background/queues/spanIngestionWriteQueue";
+import type { Mock } from "vitest";
 import { getLangWatchTracer } from "langwatch";
 
-describe("BullMQSpanIngestionWriteProducer", () => {
-  let producer: BullMQSpanIngestionWriteProducer;
-  let mockQueueAdd: ReturnType<typeof vi.fn>;
+describe("SpanIngestionWriteProducerBullMq", () => {
+  let producer: SpanIngestionWriteProducerBullMq;
+  let mockQueueAdd: Mock;
   let mockTracerWithActiveSpan: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
+    // Create mock functions first
+    const mockWithActiveSpan = vi.fn();
+    const mockTracer = {
+      withActiveSpan: mockWithActiveSpan,
+      startSpan: vi.fn(),
+      startActiveSpan: vi.fn(),
+    };
+
+    // Mock the tracer before creating producer
+    vi.mocked(getLangWatchTracer).mockReturnValue(mockTracer);
+
     // Create producer after setting up mocks
-    producer = new BullMQSpanIngestionWriteProducer();
-    mockQueueAdd = vi.mocked(spanIngestionWriteQueue.add);
-    mockTracerWithActiveSpan = vi.mocked(producer.tracer.withActiveSpan);
+    producer = new SpanIngestionWriteProducerBullMq();
+    mockQueueAdd = spanIngestionWriteQueue.add as Mock;
+    mockTracerWithActiveSpan = vi.mocked(mockWithActiveSpan);
 
     // Setup tracer to call the callback
     mockTracerWithActiveSpan.mockImplementation(async (name, options, callback) => {
@@ -98,11 +110,11 @@ describe("BullMQSpanIngestionWriteProducer", () => {
       await producer.enqueueSpanIngestionWriteJob(tenantId, span);
 
       expect(mockTracerWithActiveSpan).toHaveBeenCalledWith(
-        "SpanIngestionProducer.enqueueSpanIngestionWriteJob",
+        "SpanIngestionWriteProducerBullMq.enqueueSpan",
         {
           kind: SpanKind.PRODUCER,
           attributes: {
-            "project.id": tenantId,
+            "tenant_id": tenantId,
             "trace.id": traceId,
             "span.id": spanId,
           },

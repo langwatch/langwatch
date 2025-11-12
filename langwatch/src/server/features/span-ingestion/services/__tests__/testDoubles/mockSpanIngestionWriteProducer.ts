@@ -1,5 +1,5 @@
 import type { ReadableSpan } from "@opentelemetry/sdk-trace-base";
-import type { SpanIngestionWriteProducer } from "../../producers/spanIngestionWriteProducer";
+import type { SpanIngestionWriteProducer } from "../../../producers/spanIngestionWriteProducer";
 
 export class MockSpanIngestionWriteProducer implements SpanIngestionWriteProducer {
   private calls: Array<{
@@ -17,7 +17,7 @@ export class MockSpanIngestionWriteProducer implements SpanIngestionWriteProduce
     this.calls.push({ tenantId, span });
 
     if (this.shouldThrowError) {
-      throw this.errorToThrow || new Error("Mock producer error");
+      throw this.errorToThrow ?? new Error("Mock producer error");
     }
   }
 

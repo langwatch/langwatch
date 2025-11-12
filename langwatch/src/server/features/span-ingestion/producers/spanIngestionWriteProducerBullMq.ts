@@ -18,7 +18,7 @@ export class SpanIngestionWriteProducerBullMq {
     span: ReadableSpan,
   ): Promise<void> {
     await this.tracer.withActiveSpan(
-      "SpanIngestionWriteProducerBullMq.enqueueSpanIngestionWriteJob",
+      "SpanIngestionWriteProducerBullMq.enqueueSpan",
       {
         kind: SpanKind.PRODUCER,
         attributes: {

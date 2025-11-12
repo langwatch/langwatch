@@ -48,7 +48,7 @@ describe("SpanIngestionService", () => {
 
         mockMapLangWatchSpansToOtelReadableSpans.mockReturnValue(mappedRecords);
 
-        await service.consumeSpansToBeIngested(tenantId, traceForCollection, traceRequest);
+        await service.consumeSpans(tenantId, traceForCollection, traceRequest);
 
         expect(mockProducer.getCallCount()).toBe(2);
         expect(mockProducer.getCalls()).toEqual([
@@ -66,7 +66,7 @@ describe("SpanIngestionService", () => {
 
         mockMapLangWatchSpansToOtelReadableSpans.mockReturnValue([]);
 
-        await service.consumeSpansToBeIngested(tenantId, traceForCollection, traceRequest);
+        await service.consumeSpans(tenantId, traceForCollection, traceRequest);
 
         expect(mockProducer.getCallCount()).toBe(0);
       });
@@ -88,7 +88,7 @@ describe("SpanIngestionService", () => {
         mockProducer.setShouldThrowError(true, producerError);
 
         await expect(
-          service.consumeSpansToBeIngested(tenantId, traceForCollection, traceRequest)
+          service.consumeSpans(tenantId, traceForCollection, traceRequest)
         ).rejects.toThrow("Queue is full");
       });
     });

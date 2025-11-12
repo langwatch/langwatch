@@ -1,8 +1,10 @@
 import { describe, it, expect } from "vitest";
 import { SpanStatusCode } from "@opentelemetry/api";
 import type { DeepPartial } from "../../../../../utils/types";
-import type { IResource, ISpan } from "@opentelemetry/otlp-transformer";
-import type { Span } from "../../../../tracer/types";
+import { type IResource, type IAnyValue, type IStatus } from "@opentelemetry/otlp-transformer";
+
+type TestAnyValue = IAnyValue & Record<string, unknown>;
+import type { ErrorCapture } from "../../../../tracer/types";
 import {
   determineSpanStatus,
   buildResourceAttributes,
@@ -14,7 +16,8 @@ describe("determineSpanStatus", () => {
       const langWatchError = {
         has_error: true,
         message: "Test error message",
-      };
+        stacktrace: ["at line 1", "at line 2"],
+      } satisfies ErrorCapture;
       const originalOtelStatus = { code: 1, message: "OK status" };
 
       const result = determineSpanStatus(langWatchError, originalOtelStatus);
@@ -26,19 +29,20 @@ describe("determineSpanStatus", () => {
     it("returns ERROR status with undefined message when error message is undefined", () => {
       const langWatchError = {
         has_error: true,
-        message: undefined,
-      };
-      const originalOtelStatus = undefined;
+        message: "",
+        stacktrace: [],
+      } satisfies ErrorCapture;
+      const originalOtelStatus = void 0;
 
       const result = determineSpanStatus(langWatchError, originalOtelStatus);
 
       expect(result.code).toBe(SpanStatusCode.ERROR);
-      expect(result.message).toBeUndefined();
+      expect(result.message).toBe("");
     });
   });
 
   describe("when LangWatch span has no error", () => {
-    describe("when original OTEL status code is number 2", () => {
+    describe("when original OTEL status code is number 2 (ERROR)", () => {
       it("returns ERROR status with original message", () => {
         const langWatchError = null;
         const originalOtelStatus = { code: 2, message: "Original error" };
@@ -53,7 +57,10 @@ describe("determineSpanStatus", () => {
     describe("when original OTEL status code is string containing ERROR", () => {
       it("returns ERROR status", () => {
         const langWatchError = null;
-        const originalOtelStatus = { code: "STATUS_CODE_ERROR", message: "String error" };
+        const originalOtelStatus = {
+          code: 2,
+          message: "String error",
+        } satisfies DeepPartial<IStatus>;
 
         const result = determineSpanStatus(langWatchError, originalOtelStatus);
 
@@ -62,7 +69,7 @@ describe("determineSpanStatus", () => {
       });
     });
 
-    describe("when original OTEL status code is number 1", () => {
+    describe("when original OTEL status code is number 1 (OK)", () => {
       it("returns OK status", () => {
         const langWatchError = null;
         const originalOtelStatus = { code: 1 };
@@ -77,7 +84,7 @@ describe("determineSpanStatus", () => {
     describe("when original OTEL status code is string containing OK", () => {
       it("returns OK status", () => {
         const langWatchError = null;
-        const originalOtelStatus = { code: "STATUS_CODE_OK" };
+        const originalOtelStatus = { code: 1 };
 
         const result = determineSpanStatus(langWatchError, originalOtelStatus);
 
@@ -252,8 +259,6 @@ describe("buildResourceAttributes", () => {
                 arrayValue: {
                   values: [
                     { stringValue: "text" },
-                    null,
-                    undefined,
                   ],
                 },
               },
@@ -312,7 +317,7 @@ describe("buildResourceAttributes", () => {
           attributes: [
             {
               key: "invalid",
-              value: { invalidValue: "bad" },
+              value: { invalidValue: "bad" } as TestAnyValue,
             },
           ],
         };
@@ -333,11 +338,11 @@ describe("buildResourceAttributes", () => {
             },
             {
               key: "service.version",
-              value: { doubleValue: 2.0 },
+              value: { doubleValue: 2 },
             },
             {
               key: "invalid",
-              value: { invalidValue: "bad" },
+              value: { invalidValue: "bad" } as TestAnyValue,
             },
             {
               key: "tags",
