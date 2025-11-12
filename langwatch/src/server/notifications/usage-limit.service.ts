@@ -44,6 +44,38 @@ export class UsageLimitService {
   }
 
   /**
+   * Process projects in batches to get usage data with concurrency control
+   */
+  private async getProjectUsageDataInBatches(
+    projects: Array<{ id: string; name: string }>,
+    organizationId: string,
+  ): Promise<Array<{ id: string; name: string; messageCount: number }>> {
+    const BATCH_SIZE = 10; // Process 10 projects at a time
+    const results: Array<{ id: string; name: string; messageCount: number }> =
+      [];
+
+    // Process projects in batches
+    for (let i = 0; i < projects.length; i += BATCH_SIZE) {
+      const batch = projects.slice(i, i + BATCH_SIZE);
+
+      const batchResults = await Promise.all(
+        batch.map(async (project) => ({
+          id: project.id,
+          name: project.name,
+          messageCount: await this.getProjectMessageCount(
+            project.id,
+            organizationId,
+          ),
+        })),
+      );
+
+      results.push(...batchResults);
+    }
+
+    return results;
+  }
+
+  /**
    * Get message count for a single project in the current month
    */
   private async getProjectMessageCount(
@@ -203,16 +235,11 @@ export class UsageLimitService {
       },
     });
 
-    // Get message counts per project
-    const projectUsageData = await Promise.all(
-      projects.map(async (project) => ({
-        id: project.id,
-        name: project.name,
-        messageCount: await this.getProjectMessageCount(
-          project.id,
-          organizationId,
-        ),
-      })),
+    // Get message counts per project with concurrency control
+    // Process projects in batches to avoid overwhelming Elasticsearch
+    const projectUsageData = await this.getProjectUsageDataInBatches(
+      projects,
+      organizationId,
     );
 
     // Send email to all admin members
