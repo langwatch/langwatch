@@ -6,8 +6,3 @@ export interface SpanIngestionWriteProducer {
     span: ReadableSpan,
   ): Promise<void>;
 }
-
-export {
-  BullMQSpanIngestionWriteProducer,
-  spanIngestionWriteProducer,
-} from "./bullmqSpanIngestionWriteProducer";

@@ -9,7 +9,7 @@ import type { SpanIngestionWriteJob } from "../types";
 import type { ReadableSpan } from "@opentelemetry/sdk-trace-base";
 import { createLogger } from "../../../../utils/logger";
 
-export class BullMQSpanIngestionWriteProducer {
+export class SpanIngestionWriteProducerBullMq {
   tracer = getLangWatchTracer("langwatch.span-ingestion.write.producer");
   logger = createLogger("langwatch.span-ingestion.write.producer");
 
@@ -18,7 +18,7 @@ export class BullMQSpanIngestionWriteProducer {
     span: ReadableSpan,
   ): Promise<void> {
     await this.tracer.withActiveSpan(
-      "BullMQSpanIngestionWriteProducer.enqueueSpanIngestionWriteJob",
+      "SpanIngestionWriteProducerBullMq.enqueueSpanIngestionWriteJob",
       {
         kind: SpanKind.PRODUCER,
         attributes: {
@@ -57,4 +57,4 @@ export class BullMQSpanIngestionWriteProducer {
   }
 }
 
-export const spanIngestionWriteProducer = new BullMQSpanIngestionWriteProducer();
+export const spanIngestionWriteProducerBullMq = new SpanIngestionWriteProducerBullMq();

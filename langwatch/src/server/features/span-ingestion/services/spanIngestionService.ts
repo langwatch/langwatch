@@ -7,8 +7,8 @@ import type { IExportTraceServiceRequest } from "@opentelemetry/otlp-transformer
 import { mapLangWatchSpansToOtelReadableSpans } from "../mapper/mapLangWatchToOtelGenAi";
 import {
   type SpanIngestionWriteProducer,
-  spanIngestionWriteProducer,
-} from "../producers/spanIngestionWriteProducer";
+  spanIngestionWriteProducerBullMq,
+} from "../producers";
 import { createLogger } from "../../../../utils/logger";
 
 export class SpanIngestionService {
@@ -76,5 +76,5 @@ export class SpanIngestionService {
 }
 
 export const spanIngestionService = new SpanIngestionService(
-  spanIngestionWriteProducer,
+  spanIngestionWriteProducerBullMq,
 );
