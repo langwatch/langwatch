@@ -5,35 +5,34 @@ import {
   spanIngestionWriteQueue,
   SPAN_INGESTION_WRITE_JOB_NAME,
 } from "../../../background/queues/spanIngestionWriteQueue";
-import type { SpanIngestionWriteJob, SpanIngestionWriteRecord, IngestedSpan } from "../types";
-import { createLogger } from "../../../utils/logging";
+import type { SpanIngestionWriteJob } from "../types";
+import type { ReadableSpan } from "@opentelemetry/sdk-trace-base";
+import { createLogger } from "../../../../utils/logger";
 
 export class SpanIngestionWriteProducer {
   tracer = getLangWatchTracer("langwatch.span-ingestion.write.producer");
   logger = createLogger("langwatch.span-ingestion.write.producer");
 
-  async enqueueSpanWriteJob(
+  async enqueueSpanIngestionWriteJob(
     tenantId: string,
-    traceId: string,
-    span: IngestedSpan,
-    collectedAt: number,
+    span: ReadableSpan,
   ): Promise<void> {
     await this.tracer.withActiveSpan(
-      "SpanIngestionProducer.enqueueClickHouseJob",
+      "SpanIngestionProducer.enqueueSpanIngestionWriteJob",
       {
         kind: SpanKind.PRODUCER,
         attributes: {
           "project.id": tenantId,
-          "trace.id": traceId,
-          "span.id": span.spanId,
+          "trace.id": span.spanContext().traceId,
+          "span.id": span.spanContext().spanId,
         },
       },
       async () => {
         await spanIngestionWriteQueue.add(
           SPAN_INGESTION_WRITE_JOB_NAME,
-          this.buildJobPayload(tenantId, traceId, span, collectedAt),
+          this.buildJobPayload(tenantId, span),
           {
-            jobId: this.buildJobId(tenantId, span.spanId),
+            jobId: this.buildJobId(tenantId, span.spanContext().spanId),
             removeOnComplete: true,
             removeOnFail: false,
           },
@@ -48,16 +47,12 @@ export class SpanIngestionWriteProducer {
 
   private buildJobPayload(
     tenantId: string,
-    traceId: string,
-    span: IngestedSpan,
-    collectedAt: number,
+    spanData: ReadableSpan,
   ): SpanIngestionWriteJob {
     return {
       tenantId,
-      traceId,
-      spanId: span.spanId,
-      spanData: span,
-      collectedAt,
+      spanData,
+      collectedAtUnixMs: new Date().getTime(),
     } satisfies SpanIngestionWriteJob;
   }
 }

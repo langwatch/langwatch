@@ -24,35 +24,29 @@ export interface IngestedSpan {
   statusCode: string;
   statusMessage: string | null;
 
-  eventsTimestamp: string[];
-  eventsName: string[];
-  eventsAttributes: Record<string, string>[];
+  events: {
+    timestamp: string;
+    name: string;
+    attributes: Record<string, string>;
+  };
 
-  linksTraceId: string[];
-  linksSpanId: string[];
-  linksTraceState: string[];
-  linksAttributes: Record<string, string>[];
+  links: {
+    traceId: string;
+    spanId: string;
+    traceState: string;
+    attributes: Record<string, string>;
+  }[];
 
   langWatchTenantId: string;
 }
 
-export interface ClickHouseSpanPayload {
-  tenantId: string;
-  traceId: string;
-  span: IngestedSpan;
-}
-
 export interface SpanIngestionWriteJob {
   tenantId: string;
-  traceId: string;
-  spanId: string;
-  spanData: IngestedSpan;
-  collectedAt: number;
+  spanData: ReadableSpan;
+  collectedAtUnixMs: number;
 }
 
 export interface SpanIngestionWriteRecord {
   readableSpan: ReadableSpan;
-  originalSpan: Span;
   tenantId: string;
-  traceState: string | null;
 }

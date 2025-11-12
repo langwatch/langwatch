@@ -231,7 +231,7 @@ async function handleTracesRequest(req: NextRequest) {
 
             if (project.featureClickHouse) {
               clickHouseTasks.push(
-                spanIngestionService.queueIngestedSpan(
+                spanIngestionService.consumeSpansToBeIngested(
                   project.id,
                   traceForCollection,
                   traceRequest,

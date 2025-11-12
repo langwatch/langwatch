@@ -8,7 +8,8 @@ import {
 import { EventEmitter } from "events";
 import { connection } from "../../redis";
 import { createLogger } from "../../../utils/logger";
-import * as Sentry from "@sentry/nextjs";
+import { getLangWatchTracer } from "langwatch";
+import { SpanKind } from "@opentelemetry/api";
 
 const logger = createLogger("langwatch:queueWithFallback");
 
@@ -26,11 +27,12 @@ export class QueueWithFallback<
   NameType
 > {
   private worker: (job: Job<DataType, ResultType, NameType>) => Promise<any>;
+  private tracer = getLangWatchTracer("langwatch.queueWithFallback");
 
   constructor(
     name: string,
     worker: (job: Job<DataType, ResultType, NameType>) => Promise<any>,
-    opts?: QueueOptions
+    opts?: QueueOptions,
   ) {
     super(name, opts, connection ? undefined : (NoOpConnection as any));
     this.worker = worker;
@@ -39,93 +41,125 @@ export class QueueWithFallback<
   async add(
     name: NameType,
     data: DataType,
-    opts?: JobsOptions
+    opts?: JobsOptions,
   ): Promise<Job<DataType, ResultType, NameType>> {
-    if (!connection) {
-      await new Promise((resolve) => setTimeout(resolve, opts?.delay ?? 0));
-      await this.worker(new Job(this, name, data, opts));
-    }
-
-    try {
-      const timeoutState = { state: "waiting" };
-      const timeoutPromise = new Promise((resolve, reject) => {
-        setTimeout(() => {
-          if (timeoutState.state === "waiting") {
-            reject(
-              new Error("Timed out after 3s trying to insert on the queue")
-            );
-          } else {
-            resolve(undefined);
-          }
-        }, 3000);
-      });
-
-      const job = await Promise.race([
-        timeoutPromise,
-        super.add(name, data, opts).then((job) => {
-          timeoutState.state = "resolved";
-          return job;
-        }),
-      ]);
-
-      return job as Job<DataType, ResultType, NameType>;
-    } catch (error) {
-      logger.error({ error }, "failed sending to redis collector queue inserting trace directly, processing job synchronously");
-      Sentry.captureException(error, {
-        extra: {
-          message:
-            "Failed sending to redis collector queue inserting trace directly, processing job synchronously",
-          projectId: (data as any)?.projectId,
+    return await this.tracer.withActiveSpan(
+      "QueueWithFallback.add",
+      {
+        kind: SpanKind.INTERNAL,
+        attributes: {
+          "queue.name": name,
         },
-      });
+      },
+      async () => {
+        if (!connection) {
+          await new Promise((resolve) => setTimeout(resolve, opts?.delay ?? 0));
+          await this.worker(new Job(this, name, data, opts));
+        }
 
-      return await this.worker(new Job(this, name, data, opts));
-    }
+        try {
+          const timeoutState = { state: "waiting" };
+          const timeoutPromise = new Promise((resolve, reject) => {
+            setTimeout(() => {
+              if (timeoutState.state === "waiting") {
+                reject(
+                  new Error("Timed out after 3s trying to insert on the queue"),
+                );
+              } else {
+                resolve(undefined);
+              }
+            }, 3000);
+          });
+
+          const job = await Promise.race([
+            timeoutPromise,
+            super.add(name, data, opts).then((job) => {
+              timeoutState.state = "resolved";
+              return job;
+            }),
+          ]);
+
+          return job as Job<DataType, ResultType, NameType>;
+        } catch (error) {
+          logger.error(
+            { error },
+            "failed sending to redis collector queue inserting trace directly, processing job synchronously",
+          );
+
+          return await this.worker(new Job(this, name, data, opts));
+        }
+      },
+    );
   }
 
   async addBulk(
-    jobs: { name: NameType; data: DataType; opts?: JobsOptions }[]
+    jobs: { name: NameType; data: DataType; opts?: JobsOptions }[],
   ): Promise<Job<DataType, ResultType, NameType>[]> {
-    if (!connection) {
-      await Promise.all(
-        jobs.map(async (job) => this.add(job.name, job.data, job.opts))
-      );
-    }
-    return await super.addBulk(jobs);
+    return await this.tracer.withActiveSpan(
+      "QueueWithFallback.addBulk",
+      {
+        kind: SpanKind.INTERNAL,
+        attributes: {
+          "queue.name": jobs.map((job) => job.name).join(","),
+        },
+      },
+      async () => {
+        if (!connection) {
+          await Promise.all(
+            jobs.map(async (job) => this.add(job.name, job.data, job.opts)),
+          );
+        }
+        return await super.addBulk(jobs);
+      },
+    );
   }
 
   // @ts-ignore
   async getJob(
-    id: string
+    id: string,
   ): Promise<Job<DataType, ResultType, NameType> | undefined> {
-    if (!connection) {
-      return undefined;
-    }
-    const timeoutState = { state: "waiting" };
-    const timeoutPromise = new Promise((resolve, reject) => {
-      setTimeout(() => {
-        if (timeoutState.state === "waiting") {
-          reject(new Error("Timed out after 3s trying to get job from redis"));
-        } else {
-          resolve(undefined);
+    return await this.tracer.withActiveSpan(
+      "QueueWithFallback.getJob",
+      {
+        kind: SpanKind.INTERNAL,
+        attributes: {
+          "queue.name": id,
+        },
+      },
+      async () => {
+        if (!connection) {
+          return undefined;
         }
-      }, 3000);
-    });
 
-    try {
-      const job = await Promise.race([
-        timeoutPromise,
-        super.getJob(id).then((job) => {
-          timeoutState.state = "resolved";
-          return job;
-        }),
-      ]);
+        const timeoutState = { state: "waiting" };
+        const timeoutPromise = new Promise((resolve, reject) => {
+          setTimeout(() => {
+            if (timeoutState.state === "waiting") {
+              reject(
+                new Error("Timed out after 3s trying to get job from redis"),
+              );
+            } else {
+              resolve(undefined);
+            }
+          }, 3000);
+        });
 
-      return job as Job<DataType, ResultType, NameType>;
-    } catch (error) {
-      logger.error({ error }, "failed getting job from redis");
-      return undefined;
-    }
+        try {
+          const job = await Promise.race([
+            timeoutPromise,
+            super.getJob(id).then((job) => {
+              timeoutState.state = "resolved";
+              return job;
+            }),
+          ]);
+
+          return job as Job<DataType, ResultType, NameType>;
+        } catch (error) {
+          logger.error({ error }, "failed getting job from redis");
+          return undefined;
+        }
+      },
+    );
   }
 }
 
