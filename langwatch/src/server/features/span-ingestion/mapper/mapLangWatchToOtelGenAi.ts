@@ -367,7 +367,7 @@ const mapLangWatchAttributes = (langWatchSpan: Span): Attributes => ({
 /**
  * Determines the span status based on LangWatch span error and original OTEL status
  */
-function determineSpanStatus(
+export function determineSpanStatus(
   langWatchError: Span["error"],
   originalOtelStatus: DeepPartial<ISpan>["status"],
 ): SpanStatus {
@@ -412,7 +412,7 @@ function determineSpanStatus(
 /**
  * Builds resource attributes from original OTEL resource
  */
-function buildResourceAttributes(
+export function buildResourceAttributes(
   originalResource: DeepPartial<IResource> | undefined,
 ): Attributes {
   const resourceAttributes: Attributes = {};
