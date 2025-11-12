@@ -1,10 +1,10 @@
+import { TRACE_INDEX, esClient } from "../../elasticsearch";
 import type { QueryDslBoolQuery } from "@elastic/elasticsearch/lib/api/types";
 import { prisma } from "../../db";
 import { dependencies } from "../../../injection/dependencies.server";
 
 // Utility functions extracted from limits router to avoid circular dependencies
-// NOTE: These functions use lazy loading for elasticsearch to avoid circular imports
-// The esClient is only imported when functions are actually called, not at module load time
+// These don't depend on UsageLimitService, so they can be imported by otel routes safely
 
 type CacheEntry = {
   count: number;
@@ -52,9 +52,6 @@ export const getCurrentMonthMessagesCount = async (
     projectIdsToUse = await getProjectIdsForOrganization(organizationId);
   }
 
-  // Lazy load elasticsearch to avoid circular dependency at module level
-  const { esClient, TRACE_INDEX } = await import("../../elasticsearch");
-  
   const client = await esClient({ projectId: projectIdsToUse[0] ?? "" });
   const messagesCount = await client.count({
     index: TRACE_INDEX.alias,
