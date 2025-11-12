@@ -16,7 +16,7 @@ import { createLogger } from "../../../../../utils/logger";
 import { withAppRouterLogger } from "../../../../../middleware/app-router-logger";
 import { getLangWatchTracer } from "langwatch";
 import { SpanKind, SpanStatusCode } from "@opentelemetry/api";
-import { getCurrentMonthMessagesCount } from "../../../../../server/api/routers/limits";
+import { getCurrentMonthMessagesCount } from "../../../../../server/api/routers/limits.utils";
 import { dependencies } from "../../../../../injection/dependencies.server";
 
 const tracer = getLangWatchTracer("langwatch.otel.traces");
