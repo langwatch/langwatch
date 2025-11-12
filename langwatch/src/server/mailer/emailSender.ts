@@ -12,6 +12,19 @@ type EmailContent = {
   from?: string;
 };
 
+const extractHostname = (baseHost: string): string => {
+  // Try to parse as URL first
+  try {
+    const url = new URL(baseHost);
+    return url.hostname;
+  } catch {
+    // Fallback: strip protocol and extract hostname manually
+    const withoutProtocol = baseHost.replace(/^[a-z]+:\/\//i, "");
+    const hostname = withoutProtocol.split("/")[0]?.trim() ?? "";
+    return hostname !== "" ? hostname : "localhost";
+  }
+};
+
 export const sendEmail = async (content: EmailContent) => {
   if (!env.SENDGRID_API_KEY && !(env.USE_AWS_SES && env.AWS_REGION)) {
     logger.error("No email sending method available. Skipping email sending.");
@@ -22,10 +35,16 @@ export const sendEmail = async (content: EmailContent) => {
 
   const defaultFrom =
     env.EMAIL_DEFAULT_FROM ??
-    (env.BASE_HOST.includes("app.langwatch.ai") ||
-    env.BASE_HOST.includes("localhost")
-      ? "LangWatch <contact@langwatch.ai>"
-      : `LangWatch <mailer@${env.BASE_HOST.split("://")[1].split("/")[0]}>`);
+    (() => {
+      const hostname = extractHostname(env.BASE_HOST);
+      if (
+        hostname.includes("app.langwatch.ai") ||
+        hostname.includes("localhost")
+      ) {
+        return "LangWatch <contact@langwatch.ai>";
+      }
+      return `LangWatch <mailer@${hostname}>`;
+    })();
 
   if (env.USE_AWS_SES && env.AWS_REGION) {
     return await sendWithSES(content, defaultFrom);
