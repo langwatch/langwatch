@@ -1,6 +1,6 @@
 import { type NextApiRequest, type NextApiResponse } from "next";
 import { createLogger } from "../utils/logger";
-import * as Sentry from "@sentry/nextjs";
+import { context as otContext, trace } from "@opentelemetry/api";
 
 const logger = createLogger("langwatch:pages-router:logger");
 
@@ -9,12 +9,12 @@ export function withPagesRouterLogger(
 ) {
   return async (req: NextApiRequest, res: NextApiResponse) => {
     const startTime = Date.now();
-    
+
     // Extract basic request info
     const method = req.method ?? "UNKNOWN";
     const url = req.url ?? "";
     const userAgent = req.headers["user-agent"] ?? "unknown";
-    
+
     // Extract additional context based on path
     const additionalContext = extractContextFromPath(req);
 
@@ -30,7 +30,7 @@ export function withPagesRouterLogger(
     } finally {
       const duration = Date.now() - startTime;
       const status = res.statusCode ?? 500;
-      
+
       const logData: Record<string, unknown> = {
         method,
         url,
@@ -38,22 +38,19 @@ export function withPagesRouterLogger(
         duration,
         userAgent,
         ...additionalContext,
+        traceId: (() => {
+          const span = trace.getSpan(otContext.active());
+          return span?.spanContext().traceId ?? null;
+        })(),
+        spanId: (() => {
+          const span = trace.getSpan(otContext.active());
+          return span?.spanContext().spanId ?? null;
+        })(),
       };
 
       if (error) {
-        logData.error = error instanceof Error ? error : JSON.stringify(error);
+        logData.error = error;
         logger.error(logData, "error handling request");
-        
-        // Capture in Sentry
-        Sentry.captureException(error, {
-          extra: {
-            method,
-            url,
-            statusCode: status,
-            duration,
-            ...additionalContext,
-          },
-        });
       } else {
         logger.info(logData, "request handled");
       }
@@ -84,4 +81,4 @@ function extractContextFromPath(req: NextApiRequest): Record<string, unknown> {
   }
 
   return context;
-} 
+}
