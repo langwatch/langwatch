@@ -28,6 +28,16 @@ export function withPagesRouterTracer(
           spanName,
           { kind: SpanKind.SERVER, attributes: name ? { "service.name": name } : void 0 },
           async (span) => {
+            const carrier: Record<string, string> = {};
+            propagation.inject(otContext.active(), carrier);
+            for (const [key, value] of Object.entries(carrier)) {
+              try {
+                res.setHeader(key, value);
+              } catch {
+                // ignore if headers cannot be set
+              }
+            }
+
             try {
               await handler(req, res);
             } catch (err) {
@@ -35,15 +45,6 @@ export function withPagesRouterTracer(
               span.setStatus({ code: SpanStatusCode.ERROR });
               throw err;
             } finally {
-              const carrier: Record<string, string> = {};
-              propagation.inject(otContext.active(), carrier);
-              for (const [key, value] of Object.entries(carrier)) {
-                try {
-                  res.setHeader(key, value);
-                } catch {
-                  // ignore if headers cannot be set
-                }
-              }
               span.end();
             }
           }
