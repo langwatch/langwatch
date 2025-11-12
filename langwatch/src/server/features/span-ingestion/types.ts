@@ -1,5 +1,6 @@
 import type { ReadableSpan } from "@opentelemetry/sdk-trace-base";
 import type { Span } from "../../tracer/types";
+import type { SpanType, UnixNano, Milliseconds } from "./utils/otelConversions";
 
 export interface IngestedSpan {
   id: string;

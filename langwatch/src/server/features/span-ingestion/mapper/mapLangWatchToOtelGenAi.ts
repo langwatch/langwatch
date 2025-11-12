@@ -4,9 +4,6 @@ import {
   type ISpan,
   type IResource,
   type IInstrumentationScope,
-  type IKeyValue,
-  type IAnyValue,
-  ESpanKind,
 } from "@opentelemetry/otlp-transformer";
 import {
   SpanKind,
@@ -24,6 +21,16 @@ import type { TraceForCollection } from "../../../tracer/otel.traces";
 import type { Span, RAGSpan } from "../../../tracer/types";
 import type { DeepPartial } from "../../../../utils/types";
 import type { SpanIngestionWriteRecord } from "../types";
+import {
+  unixNanoToMs,
+  msToUnixNano,
+  convertSpanKind,
+  convertSpanTypeToGenAiOperationName,
+  otelAttributesToRecord,
+  otelValueToJs,
+  type SpanType,
+  type Milliseconds,
+} from "../utils/otelConversions";
 import { createLogger } from "../../../../utils/logger";
 import { getLangWatchTracer } from "langwatch";
 
@@ -125,54 +132,39 @@ export function mapLangWatchSpansToOtelReadableSpans(
 /**
  * Finds the original OTEL span from the trace request by matching spanId and traceId
  */
-function findOriginalOtelSpan(
+const findOriginalOtelSpan = (
   traceRequest: DeepPartial<IExportTraceServiceRequest>,
   spanId: string,
   traceId: string,
-): DeepPartial<ISpan> | undefined {
-  for (const resourceSpan of traceRequest.resourceSpans ?? []) {
-    for (const scopeSpan of resourceSpan?.scopeSpans ?? []) {
-      for (const span of scopeSpan?.spans ?? []) {
-        if (span?.spanId === spanId && span?.traceId === traceId) {
-          return span;
-        }
-      }
-    }
-  }
-
-  return void 0;
-}
+): DeepPartial<ISpan> | undefined =>
+  traceRequest.resourceSpans
+    ?.flatMap((resourceSpan) => resourceSpan?.scopeSpans ?? [])
+    .flatMap((scopeSpan) => scopeSpan?.spans ?? [])
+    .find((span) => span?.spanId === spanId && span?.traceId === traceId);
 
 /**
  * Finds the resource span that contains the given span
  */
-function findResourceSpanForSpan(
+const findResourceSpanForSpan = (
   traceRequest: DeepPartial<IExportTraceServiceRequest>,
   span: DeepPartial<ISpan>,
 ):
   | DeepPartial<
       NonNullable<IExportTraceServiceRequest["resourceSpans"]>[number]
     >
-  | undefined {
-  const resourceSpans = traceRequest.resourceSpans;
-  if (!resourceSpans) return void 0;
-
-  for (const resourceSpan of resourceSpans) {
-    if (!resourceSpan) continue;
-    for (const scopeSpan of resourceSpan?.scopeSpans ?? []) {
-      if (scopeSpan?.spans?.some((s) => s?.spanId === span?.spanId)) {
-        return resourceSpan;
-      }
-    }
-  }
-
-  return void 0;
-}
+  | undefined =>
+  traceRequest.resourceSpans?.find(
+    (resourceSpan) =>
+      resourceSpan?.scopeSpans?.some(
+        (scopeSpan) =>
+          scopeSpan?.spans?.some((s) => s?.spanId === span?.spanId),
+      ),
+  );
 
 /**
  * Finds the scope span that contains the given span
  */
-function findScopeSpanForSpan(
+const findScopeSpanForSpan = (
   traceRequest: DeepPartial<IExportTraceServiceRequest>,
   span: DeepPartial<ISpan>,
 ):
@@ -181,432 +173,274 @@ function findScopeSpanForSpan(
         NonNullable<IExportTraceServiceRequest["resourceSpans"]>[number]
       >["scopeSpans"]
     >[number]
-  | undefined {
-  const resourceSpans = traceRequest.resourceSpans;
-  if (!resourceSpans) return void 0;
+  | undefined =>
+  traceRequest.resourceSpans
+    ?.flatMap((resourceSpan) => resourceSpan?.scopeSpans ?? [])
+    .find(
+      (scopeSpan) => scopeSpan?.spans?.some((s) => s?.spanId === span?.spanId),
+    );
 
-  for (const resourceSpan of resourceSpans) {
-    if (!resourceSpan) continue;
-    for (const scopeSpan of resourceSpan?.scopeSpans ?? []) {
-      if (scopeSpan?.spans?.some((s) => s?.spanId === span?.spanId)) {
-        return scopeSpan;
-      }
-    }
+// Attribute mapping functions using functional composition
+const mapOperationName = (span: Span): Attributes => {
+  const operationName = convertSpanTypeToGenAiOperationName(
+    span.type as SpanType,
+  );
+  return operationName ? { "gen_ai.operation.name": operationName } : {};
+};
+
+const mapModelAttributes = (span: Span): Attributes => {
+  if (span.type === "llm" && "model" in span && span.model) {
+    return {
+      "gen_ai.request.model": span.model,
+      "gen_ai.response.model": span.model,
+    };
   }
+  return {};
+};
 
-  return void 0;
-}
+const mapInputAttributes = (span: Span): Attributes => {
+  if (!span.input) return {};
 
-/**
- * Converts Unix nanoseconds timestamp to milliseconds
- */
-function unixNanoToMs(
-  timestamp:
-    | DeepPartial<{ low: number; high: number }>
-    | number
-    | string
-    | undefined,
-): number | undefined {
-  if (timestamp === void 0 || timestamp === null) {
-    return void 0;
-  }
-
-  if (typeof timestamp === "number") {
-    return Math.round(timestamp / 1_000_000);
-  }
-
-  if (typeof timestamp === "string") {
-    const num = parseInt(timestamp, 10);
-    return isNaN(num) ? void 0 : Math.round(num / 1_000_000);
-  }
-
-  // Handle Long format (high/low bits)
-  if (
-    typeof timestamp === "object" &&
-    timestamp !== null &&
-    "high" in timestamp &&
-    "low" in timestamp
-  ) {
-    const { high, low } = timestamp as { high: number; low: number };
-    if (typeof high === "number" && typeof low === "number") {
-      const value = (BigInt(high) << 32n) | (BigInt(low) & 0xffffffffn);
-      return Math.round(Number(value) / 1_000_000);
-    }
-  }
-
-  return void 0;
-}
-
-/**
- * Converts milliseconds timestamp to Unix nanoseconds (hrtime format)
- */
-function msToUnixNano(
-  timestamp: number | undefined,
-): [number, number] | undefined {
-  if (timestamp === void 0) {
-    return void 0;
-  }
-
-  const nanoseconds = BigInt(timestamp) * 1_000_000n;
-  const seconds = Number(nanoseconds / 1_000_000_000n);
-  const nanos = Number(nanoseconds % 1_000_000_000n);
-
-  return [seconds, nanos];
-}
-
-/**
- * Converts LangWatch span kind to OpenTelemetry SpanKind
- */
-function convertSpanKind(
-  langWatchType: Span["type"],
-  originalKind: DeepPartial<ISpan>["kind"],
-): SpanKind {
-  // Try to preserve original kind if available
-  if (originalKind !== void 0 && originalKind !== null) {
-    if (originalKind === ESpanKind.SPAN_KIND_SERVER) {
-      return SpanKind.SERVER;
-    }
-    if (originalKind === ESpanKind.SPAN_KIND_CLIENT) {
-      return SpanKind.CLIENT;
-    }
-    if (originalKind === ESpanKind.SPAN_KIND_PRODUCER) {
-      return SpanKind.PRODUCER;
-    }
-    if (originalKind === ESpanKind.SPAN_KIND_CONSUMER) {
-      return SpanKind.CONSUMER;
-    }
-    if (originalKind === ESpanKind.SPAN_KIND_INTERNAL) {
-      return SpanKind.INTERNAL;
-    }
-  }
-
-  // Fallback to type-based mapping
-  switch (langWatchType) {
-    case "server":
-      return SpanKind.SERVER;
-    case "client":
-      return SpanKind.CLIENT;
-    case "producer":
-      return SpanKind.PRODUCER;
-    case "consumer":
-      return SpanKind.CONSUMER;
+  switch (span.input.type) {
+    case "chat_messages":
+      return { "gen_ai.prompt": JSON.stringify(span.input.value) };
+    case "text":
+      return { "gen_ai.prompt": span.input.value };
+    case "json":
+      return { "gen_ai.prompt": JSON.stringify(span.input.value) };
+    case "evaluation_result":
+    case "guardrail_result":
+    case "list":
+    case "raw":
     default:
-      return SpanKind.INTERNAL;
+      // For unsupported types, stringify the entire input
+      return { "gen_ai.prompt": JSON.stringify(span.input) };
   }
-}
+};
 
-/**
- * Converts LangWatch span type to GenAI operation name
- */
-function convertSpanTypeToGenAiOperationName(
-  type: Span["type"],
-): string | undefined {
-  switch (type) {
-    case "llm":
-      return "chat";
-    case "agent":
-      return "invoke_agent";
-    case "tool":
-      return "execute_tool";
-    case "rag":
-      return "embeddings"; // RAG typically involves embeddings
+const mapOutputAttributes = (span: Span): Attributes => {
+  if (!span.output) return {};
+
+  switch (span.output.type) {
+    case "chat_messages":
+      return { "gen_ai.completion": JSON.stringify(span.output.value) };
+    case "text":
+      return { "gen_ai.completion": span.output.value };
+    case "json":
+      return { "gen_ai.completion": JSON.stringify(span.output.value) };
+    case "evaluation_result":
+    case "guardrail_result":
+    case "list":
+    case "raw":
     default:
-      return void 0;
+      // For unsupported types, stringify the entire output
+      return { "gen_ai.completion": JSON.stringify(span.output) };
   }
-}
+};
+
+const mapMetricsAttributes = (span: Span): Attributes => {
+  if (!span.metrics) return {};
+
+  const attributes: Attributes = {};
+  const { prompt_tokens, completion_tokens } = span.metrics;
+
+  if (prompt_tokens != null) {
+    attributes["gen_ai.usage.input_tokens"] = prompt_tokens;
+  }
+  if (completion_tokens != null) {
+    attributes["gen_ai.usage.output_tokens"] = completion_tokens;
+  }
+
+  return attributes;
+};
+
+const mapParamsAttributes = (span: Span): Attributes => {
+  if (!span.params) return {};
+
+  const attributes: Attributes = {};
+  const params = span.params;
+
+  // Direct mappings
+  const paramMappings: Record<string, keyof typeof params> = {
+    "gen_ai.request.temperature": "temperature",
+    "gen_ai.request.max_tokens": "max_tokens",
+    "gen_ai.request.top_p": "top_p",
+    "gen_ai.request.frequency_penalty": "frequency_penalty",
+    "gen_ai.request.presence_penalty": "presence_penalty",
+    "gen_ai.request.seed": "seed",
+  };
+
+  for (const [attrKey, paramKey] of Object.entries(paramMappings)) {
+    if (params[paramKey] != null) {
+      attributes[attrKey] = params[paramKey];
+    }
+  }
+
+  // Special handling for stop sequences
+  if (params.stop != null) {
+    const stopSequences = Array.isArray(params.stop)
+      ? params.stop
+      : [params.stop];
+    attributes["gen_ai.request.stop_sequences"] = stopSequences;
+  }
+
+  // Special handling for choice count
+  if (params.n != null && params.n !== 1) {
+    attributes["gen_ai.request.choice.count"] = params.n;
+  }
+
+  return attributes;
+};
+
+const mapErrorAttributes = (span: Span): Attributes => {
+  if (span.error?.has_error) {
+    return { "error.type": span.error.message || "_OTHER" };
+  }
+  return {};
+};
 
 /**
  * Maps LangWatch span attributes to GenAI semantic convention attributes
+ * Uses functional composition for better maintainability
  */
-function mapGenAiAttributes(langWatchSpan: Span): Attributes {
-  const attributes: Attributes = {};
+const mapGenAiAttributes = (langWatchSpan: Span): Attributes => ({
+  ...mapOperationName(langWatchSpan),
+  ...mapModelAttributes(langWatchSpan),
+  ...mapInputAttributes(langWatchSpan),
+  ...mapOutputAttributes(langWatchSpan),
+  ...mapMetricsAttributes(langWatchSpan),
+  ...mapParamsAttributes(langWatchSpan),
+  ...mapErrorAttributes(langWatchSpan),
+});
 
-  // Map operation name
-  const operationName = convertSpanTypeToGenAiOperationName(langWatchSpan.type);
-  if (operationName) {
-    attributes["gen_ai.operation.name"] = operationName;
-  }
+// LangWatch-specific attribute mapping functions
+const mapSpanTypeAttribute = (span: Span): Attributes => ({
+  "langwatch.span.type": span.type,
+});
 
-  // Map model (for LLM spans)
-  if (
-    langWatchSpan.type === "llm" &&
-    "model" in langWatchSpan &&
-    langWatchSpan.model
-  ) {
-    attributes["gen_ai.request.model"] = langWatchSpan.model;
-    attributes["gen_ai.response.model"] = langWatchSpan.model;
-  }
-
-  // Map input (prompt)
-  if (langWatchSpan.input) {
-    if (langWatchSpan.input.type === "chat_messages") {
-      attributes["gen_ai.prompt"] = JSON.stringify(langWatchSpan.input.value);
-    } else if (langWatchSpan.input.type === "text") {
-      attributes["gen_ai.prompt"] = langWatchSpan.input.value;
-    } else if (langWatchSpan.input.type === "json") {
-      attributes["gen_ai.prompt"] = JSON.stringify(langWatchSpan.input.value);
+const mapRagContexts = (span: Span): Attributes => {
+  if (span.type === "rag") {
+    const ragSpan = span as RAGSpan;
+    if (ragSpan.contexts && ragSpan.contexts.length > 0) {
+      return { "langwatch.rag.contexts": JSON.stringify(ragSpan.contexts) };
     }
   }
+  return {};
+};
 
-  // Map output (completion)
-  if (langWatchSpan.output) {
-    if (langWatchSpan.output.type === "chat_messages") {
-      attributes["gen_ai.completion"] = JSON.stringify(
-        langWatchSpan.output.value,
-      );
-    } else if (langWatchSpan.output.type === "text") {
-      attributes["gen_ai.completion"] = langWatchSpan.output.value;
-    } else if (langWatchSpan.output.type === "json") {
-      attributes["gen_ai.completion"] = JSON.stringify(
-        langWatchSpan.output.value,
-      );
-    }
-  }
+const mapRemainingParams = (span: Span): Attributes => {
+  if (!span.params) return {};
 
-  // Map metrics
-  if (langWatchSpan.metrics) {
-    if (
-      langWatchSpan.metrics.prompt_tokens !== void 0 &&
-      langWatchSpan.metrics.prompt_tokens !== null
-    ) {
-      attributes["gen_ai.usage.input_tokens"] =
-        langWatchSpan.metrics.prompt_tokens;
-    }
-    if (
-      langWatchSpan.metrics.completion_tokens !== void 0 &&
-      langWatchSpan.metrics.completion_tokens !== null
-    ) {
-      attributes["gen_ai.usage.output_tokens"] =
-        langWatchSpan.metrics.completion_tokens;
-    }
-  }
+  const genAiParams = new Set([
+    "temperature",
+    "max_tokens",
+    "top_p",
+    "frequency_penalty",
+    "presence_penalty",
+    "stop",
+    "seed",
+    "n",
+  ]);
 
-  // Map parameters
-  if (langWatchSpan.params) {
-    if (
-      langWatchSpan.params.temperature !== void 0 &&
-      langWatchSpan.params.temperature !== null
-    ) {
-      attributes["gen_ai.request.temperature"] =
-        langWatchSpan.params.temperature;
-    }
-    if (
-      langWatchSpan.params.max_tokens !== void 0 &&
-      langWatchSpan.params.max_tokens !== null
-    ) {
-      attributes["gen_ai.request.max_tokens"] = langWatchSpan.params.max_tokens;
-    }
-    if (
-      langWatchSpan.params.top_p !== void 0 &&
-      langWatchSpan.params.top_p !== null
-    ) {
-      attributes["gen_ai.request.top_p"] = langWatchSpan.params.top_p;
-    }
-    if (
-      langWatchSpan.params.frequency_penalty !== void 0 &&
-      langWatchSpan.params.frequency_penalty !== null
-    ) {
-      attributes["gen_ai.request.frequency_penalty"] =
-        langWatchSpan.params.frequency_penalty;
-    }
-    if (
-      langWatchSpan.params.presence_penalty !== void 0 &&
-      langWatchSpan.params.presence_penalty !== null
-    ) {
-      attributes["gen_ai.request.presence_penalty"] =
-        langWatchSpan.params.presence_penalty;
-    }
-    if (
-      langWatchSpan.params.stop !== void 0 &&
-      langWatchSpan.params.stop !== null
-    ) {
-      const stopSequences = Array.isArray(langWatchSpan.params.stop)
-        ? langWatchSpan.params.stop
-        : [langWatchSpan.params.stop];
-      attributes["gen_ai.request.stop_sequences"] = stopSequences;
-    }
-    if (
-      langWatchSpan.params.seed !== void 0 &&
-      langWatchSpan.params.seed !== null
-    ) {
-      attributes["gen_ai.request.seed"] = langWatchSpan.params.seed;
-    }
-    if (
-      langWatchSpan.params.n !== void 0 &&
-      langWatchSpan.params.n !== null &&
-      langWatchSpan.params.n !== 1
-    ) {
-      attributes["gen_ai.request.choice.count"] = langWatchSpan.params.n;
-    }
-  }
+  const remainingParams = Object.entries(span.params)
+    .filter(([key]) => !genAiParams.has(key))
+    .reduce(
+      (acc, [key, value]) => ({ ...acc, [key]: value }),
+      {} as Attributes,
+    );
 
-  // Map error
-  if (langWatchSpan.error?.has_error) {
-    attributes["error.type"] = langWatchSpan.error.message || "_OTHER";
-  }
-
-  return attributes;
-}
+  return Object.keys(remainingParams).length > 0
+    ? { "langwatch.params": JSON.stringify(remainingParams) }
+    : {};
+};
 
 /**
  * Maps LangWatch-specific attributes that don't have GenAI equivalents
+ * Uses functional composition for better maintainability
  */
-function mapLangWatchAttributes(langWatchSpan: Span): Attributes {
-  const attributes: Attributes = {};
+const mapLangWatchAttributes = (langWatchSpan: Span): Attributes => ({
+  ...mapSpanTypeAttribute(langWatchSpan),
+  ...mapRagContexts(langWatchSpan),
+  ...mapRemainingParams(langWatchSpan),
+});
 
-  // Preserve original span type
-  attributes["langwatch.span.type"] = langWatchSpan.type;
+/**
+ * Determines the span status based on LangWatch span error and original OTEL status
+ */
+function determineSpanStatus(
+  langWatchError: Span["error"],
+  originalOtelStatus: DeepPartial<ISpan>["status"],
+): SpanStatus {
+  let status: SpanStatus = {
+    code: SpanStatusCode.OK,
+  };
 
-  // Preserve RAG contexts
-  if (langWatchSpan.type === "rag") {
-    const ragSpan = langWatchSpan as RAGSpan;
-    if (ragSpan.contexts && ragSpan.contexts.length > 0) {
-      attributes["langwatch.rag.contexts"] = JSON.stringify(ragSpan.contexts);
-    }
-  }
-
-  // Preserve any remaining params that weren't mapped to GenAI
-  if (langWatchSpan.params) {
-    const genAiParams = new Set([
-      "temperature",
-      "max_tokens",
-      "top_p",
-      "frequency_penalty",
-      "presence_penalty",
-      "stop",
-      "seed",
-      "n",
-    ]);
-
-    const remainingParams: Attributes = {};
-    for (const [key, value] of Object.entries(langWatchSpan.params)) {
-      if (!genAiParams.has(key)) {
-        remainingParams[key] = value;
+  if (langWatchError?.has_error) {
+    status = {
+      code: SpanStatusCode.ERROR,
+      message: langWatchError.message,
+    };
+  } else if (originalOtelStatus?.code !== void 0) {
+    const statusCode = originalOtelStatus.code;
+    // Compare with numeric values - STATUS_CODE_ERROR = 2, STATUS_CODE_OK = 1
+    let codeValue: number | undefined;
+    if (typeof statusCode === "number") {
+      codeValue = statusCode;
+    } else {
+      const codeStr = String(statusCode);
+      if (codeStr.includes("ERROR")) {
+        codeValue = 2;
+      } else if (codeStr.includes("OK")) {
+        codeValue = 1;
       }
     }
-
-    if (Object.keys(remainingParams).length > 0) {
-      attributes["langwatch.params"] = JSON.stringify(remainingParams);
+    if (codeValue === 2) {
+      status = {
+        code: SpanStatusCode.ERROR,
+        message: originalOtelStatus?.message,
+      };
+    } else if (codeValue === 1) {
+      status = {
+        code: SpanStatusCode.OK,
+      };
     }
   }
 
-  return attributes;
+  return status;
 }
 
 /**
- * Converts OTEL IAnyValue to a JavaScript value
- * Note: Returns a broader type than AttributeValue because OTEL can have nested structures.
- * The caller should handle conversion to valid AttributeValue types when needed.
+ * Builds resource attributes from original OTEL resource
  */
-function otelValueToJs(
-  value: DeepPartial<IAnyValue> | undefined,
-):
-  | string
-  | number
-  | boolean
-  | (string | number | boolean | null | undefined)[]
-  | Record<string, string | number | boolean>
-  | undefined {
-  if (!value) return void 0;
-
-  if (value.stringValue !== void 0 && value.stringValue !== null) {
-    return value.stringValue;
-  }
-  if (value.boolValue !== void 0 && value.boolValue !== null) {
-    return value.boolValue;
-  }
-  if (value.intValue !== void 0 && value.intValue !== null) {
-    // Check if it's a Long object with toInt method
-    if (
-      typeof value.intValue === "object" &&
-      value.intValue !== null &&
-      "toInt" in value.intValue
-    ) {
-      const longObj = value.intValue as { toInt: () => number };
-      if (typeof longObj.toInt === "function") {
-        return longObj.toInt();
-      }
-    }
-    return Number(value.intValue);
-  }
-
-  if (value.doubleValue !== void 0 && value.doubleValue !== null) {
-    // Check if it's a Long object with toNumber method
-    if (
-      typeof value.doubleValue === "object" &&
-      value.doubleValue !== null &&
-      "toNumber" in value.doubleValue
-    ) {
-      const longObj = value.doubleValue as { toNumber: () => number };
-      if (typeof longObj.toNumber === "function") {
-        return longObj.toNumber();
-      }
-    }
-    return Number(value.doubleValue);
-  }
-
-  if (value.arrayValue?.values) {
-    const arrayValues = value.arrayValue.values
-      .map(otelValueToJs)
-      .filter(
-        (v): v is string | number | boolean =>
-          typeof v === "string" ||
-          typeof v === "number" ||
-          typeof v === "boolean",
-      );
-    return arrayValues;
-  }
-  if (value.kvlistValue?.values) {
-    const result: Record<string, string | number | boolean> = {};
-    for (const kv of value.kvlistValue.values ?? []) {
-      if (kv?.key) {
-        const kvValue = otelValueToJs(kv.value);
-        // Only include primitive values in the result
+function buildResourceAttributes(
+  originalResource: DeepPartial<IResource> | undefined,
+): Attributes {
+  const resourceAttributes: Attributes = {};
+  if (originalResource?.attributes) {
+    for (const attr of originalResource.attributes) {
+      if (attr?.key) {
+        const value = otelValueToJs(attr.value);
+        // Only add valid AttributeValue types
         if (
-          typeof kvValue === "string" ||
-          typeof kvValue === "number" ||
-          typeof kvValue === "boolean"
+          typeof value === "string" ||
+          typeof value === "number" ||
+          typeof value === "boolean" ||
+          (Array.isArray(value) &&
+            value.every(
+              (v) =>
+                typeof v === "string" ||
+                typeof v === "number" ||
+                typeof v === "boolean" ||
+                v === null ||
+                v === void 0,
+            ))
         ) {
-          result[kv.key] = kvValue;
+          resourceAttributes[attr.key] = value as AttributeValue;
         }
       }
     }
-    return result;
   }
-
-  return void 0;
-}
-
-/**
- * Converts OTEL attributes to a flat record
- */
-function otelAttributesToRecord(
-  attributes: DeepPartial<IKeyValue[]> | undefined,
-): Attributes {
-  const result: Attributes = {};
-  for (const attr of attributes ?? []) {
-    if (attr?.key) {
-      const value = otelValueToJs(attr.value);
-      // Only add valid AttributeValue types
-      if (
-        typeof value === "string" ||
-        typeof value === "number" ||
-        typeof value === "boolean" ||
-        (Array.isArray(value) &&
-          value.every(
-            (v) =>
-              typeof v === "string" ||
-              typeof v === "number" ||
-              typeof v === "boolean" ||
-              v === null ||
-              v === void 0,
-          ))
-      ) {
-        result[attr.key] = value as AttributeValue;
-      }
-    }
-  }
-  return result;
+  return resourceAttributes;
 }
 
 /**
@@ -627,8 +461,10 @@ function buildReadableSpan(
     langWatchSpan.timestamps.finished_at;
 
   // Convert to hrtime format [seconds, nanoseconds]
-  const startTimeHr = msToUnixNano(startTime);
-  const endTimeHr = msToUnixNano(endTime);
+  const startTimeHr = startTime
+    ? msToUnixNano(startTime as Milliseconds)
+    : void 0;
+  const endTimeHr = endTime ? msToUnixNano(endTime as Milliseconds) : void 0;
 
   // Map GenAI attributes
   const genAiAttributes = mapGenAiAttributes(langWatchSpan);
@@ -681,68 +517,14 @@ function buildReadableSpan(
     };
   });
 
-  // Determine status
-  let status: SpanStatus = {
-    code: SpanStatusCode.OK,
-  };
+  // Determine status using extracted function
+  const status = determineSpanStatus(
+    langWatchSpan.error,
+    originalOtelSpan.status,
+  );
 
-  if (langWatchSpan.error?.has_error) {
-    status = {
-      code: SpanStatusCode.ERROR,
-      message: langWatchSpan.error.message,
-    };
-  } else if (originalOtelSpan.status?.code !== void 0) {
-    const statusCode = originalOtelSpan.status.code;
-    // Compare with numeric values - STATUS_CODE_ERROR = 2, STATUS_CODE_OK = 1
-    let codeValue: number | undefined;
-    if (typeof statusCode === "number") {
-      codeValue = statusCode;
-    } else {
-      const codeStr = String(statusCode);
-      if (codeStr.includes("ERROR")) {
-        codeValue = 2;
-      } else if (codeStr.includes("OK")) {
-        codeValue = 1;
-      }
-    }
-    if (codeValue === 2) {
-      status = {
-        code: SpanStatusCode.ERROR,
-        message: originalOtelSpan.status?.message,
-      };
-    } else if (codeValue === 1) {
-      status = {
-        code: SpanStatusCode.OK,
-      };
-    }
-  }
-
-  // Build resource attributes
-  const resourceAttributes: Attributes = {};
-  if (originalResource?.attributes) {
-    for (const attr of originalResource.attributes) {
-      if (attr?.key) {
-        const value = otelValueToJs(attr.value);
-        // Only add valid AttributeValue types
-        if (
-          typeof value === "string" ||
-          typeof value === "number" ||
-          typeof value === "boolean" ||
-          (Array.isArray(value) &&
-            value.every(
-              (v) =>
-                typeof v === "string" ||
-                typeof v === "number" ||
-                typeof v === "boolean" ||
-                v === null ||
-                v === void 0,
-            ))
-        ) {
-          resourceAttributes[attr.key] = value as AttributeValue;
-        }
-      }
-    }
-  }
+  // Build resource attributes using extracted function
+  const resourceAttributes = buildResourceAttributes(originalResource);
 
   // Build span context
   const spanContextObj: SpanContext = {
