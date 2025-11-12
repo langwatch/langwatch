@@ -11,6 +11,7 @@ import {
   scheduleTraceCollectionWithFallback,
 } from "~/server/background/workers/collectorWorker";
 import { withAppRouterLogger } from "../../../../../middleware/app-router-logger";
+import { withAppRouterTracer } from "../../../../../middleware/app-router-tracer";
 import { getLangWatchTracer } from "langwatch";
 import { SpanKind, SpanStatusCode } from "@opentelemetry/api";
 
@@ -192,4 +193,4 @@ async function handleLogsRequest(req: NextRequest) {
 }
 
 // Export the handler wrapped with logging middleware
-export const POST = withAppRouterLogger(handleLogsRequest);
+export const POST = withAppRouterTracer("langwatch.otel.v1.logs")(withAppRouterLogger(handleLogsRequest));
