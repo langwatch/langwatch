@@ -55,6 +55,10 @@ if (spanProcessors.length > 0) {
         "@opentelemetry/instrumentation-aws-sdk": {
           enabled: false,
         },
+        // Disbale this until we kill Elastic Search
+        "@opentelemetry/instrumentation-undici": {
+          enabled: false,
+        },
       }),
     ],
   });
