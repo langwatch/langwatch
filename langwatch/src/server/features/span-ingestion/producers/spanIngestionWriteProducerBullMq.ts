@@ -8,6 +8,7 @@ import {
 import type { SpanIngestionWriteJob } from "../types";
 import type { ReadableSpan } from "@opentelemetry/sdk-trace-base";
 import { createLogger } from "../../../../utils/logger";
+import { mapReadableSpanToSpanIngestionWriteJobData } from "../mapper/readableSpanToSpanIngestionWriteJobData";
 
 export class SpanIngestionWriteProducerBullMq {
   tracer = getLangWatchTracer("langwatch.span-ingestion.write.producer");
@@ -47,11 +48,11 @@ export class SpanIngestionWriteProducerBullMq {
 
   private buildJobPayload(
     tenantId: string,
-    spanData: ReadableSpan,
+    span: ReadableSpan,
   ): SpanIngestionWriteJob {
     return {
       tenantId,
-      spanData,
+      spanData: mapReadableSpanToSpanIngestionWriteJobData(span),
       collectedAtUnixMs: new Date().getTime(),
     } satisfies SpanIngestionWriteJob;
   }

@@ -1,5 +1,4 @@
 import type { ReadableSpan } from "@opentelemetry/sdk-trace-base";
-import type { SpanIngestionWriteJobData } from "./types";
 
 export interface SpanIngestionWriteRecord {
   readableSpan: ReadableSpan;
