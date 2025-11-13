@@ -1,4 +1,4 @@
-import type { SpanIngestionWriteJob } from "../../features/span-ingestion/types/spanIngestionWriteJob";
+import type { SpanIngestionWriteJob } from "../../features/span-ingestion/types/";
 import { handleSpanIngestionWriteJob } from "../../features/span-ingestion/workers/handleSpanIngestionWriteJob";
 
 import { connection } from "../../redis";

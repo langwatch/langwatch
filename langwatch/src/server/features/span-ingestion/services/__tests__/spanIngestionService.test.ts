@@ -6,7 +6,7 @@ import {
   createMockExportTraceServiceRequest,
   createMockReadableSpan,
 } from "./testDoubles/testDataFactories";
-import type { SpanIngestionWriteRecord } from "../../types/spanIngestionWriteRecord";
+import type { SpanIngestionWriteRecord } from "../../types/";
 
 // Mock the mapper function
 vi.mock("../../mapper/mapLangWatchToOtelGenAi", () => ({

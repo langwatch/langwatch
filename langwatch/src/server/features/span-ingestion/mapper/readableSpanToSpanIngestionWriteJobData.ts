@@ -1,5 +1,5 @@
 import type { ReadableSpan } from "@opentelemetry/sdk-trace-base";
-import type { SpanIngestionWriteJobData } from "../types/spanIngestionWriteJobData";
+import type { SpanIngestionWriteJobData } from "../types/";
 
 /**
  * Converts a ReadableSpan to a JSON-serializable DTO for job queuing.

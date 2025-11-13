@@ -20,7 +20,7 @@ import type { InstrumentationScope } from "@opentelemetry/core";
 import type { TraceForCollection } from "../../../tracer/otel.traces";
 import type { Span, RAGSpan } from "../../../tracer/types";
 import type { DeepPartial } from "../../../../utils/types";
-import type { SpanIngestionWriteRecord } from "../types/spanIngestionWriteRecord";
+import type { SpanIngestionWriteRecord } from "../types/";
 import {
   unixNanoToMs,
   msToUnixNano,

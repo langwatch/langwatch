@@ -5,7 +5,7 @@ import {
   spanIngestionWriteQueue,
   SPAN_INGESTION_WRITE_JOB_NAME,
 } from "../../../background/queues/spanIngestionWriteQueue";
-import type { SpanIngestionWriteJob } from "../types";
+import type { SpanIngestionWriteJob } from "../types/";
 import type { ReadableSpan } from "@opentelemetry/sdk-trace-base";
 import { createLogger } from "../../../../utils/logger";
 import { mapReadableSpanToSpanIngestionWriteJobData } from "../mapper/readableSpanToSpanIngestionWriteJobData";
