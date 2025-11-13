@@ -12,6 +12,7 @@ import {
   W3CTraceContextPropagator,
   W3CBaggagePropagator,
 } from "@opentelemetry/core";
+
 const explicitEndpoint = process.env.OTEL_EXPORTER_OTLP_ENDPOINT;
 const isProd = process.env.NODE_ENV === "production";
 
@@ -30,7 +31,6 @@ if (explicitEndpoint) {
         new OTLPTraceExporter({ url: `${explicitEndpoint}/v1/traces` }),
       ),
     );
-
   }
 }
 
