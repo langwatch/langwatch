@@ -244,17 +244,18 @@ enum INVITE_STATUS {
 }
 
 model OrganizationInvite {
-    id             String               @id @default(nanoid())
-    email          String
-    inviteCode     String               @unique
-    expiration     DateTime
-    status         INVITE_STATUS        @default(PENDING)
-    organizationId String
-    organization   Organization         @relation(fields: [organizationId], references: [id])
-    teamIds        String
-    role           OrganizationUserRole
-    createdAt      DateTime             @default(now())
-    updatedAt      DateTime             @default(now()) @updatedAt
+    id               String               @id @default(nanoid())
+    email            String
+    inviteCode       String               @unique
+    expiration       DateTime
+    status           INVITE_STATUS        @default(PENDING)
+    organizationId   String
+    organization     Organization         @relation(fields: [organizationId], references: [id])
+    teamIds          String
+    teamAssignments  Json?                // Array of {teamId: string, role: TeamUserRole, customRoleId?: string}
+    role             OrganizationUserRole
+    createdAt        DateTime             @default(now())
+    updatedAt        DateTime             @default(now()) @updatedAt
 
     @@index([organizationId])
 }

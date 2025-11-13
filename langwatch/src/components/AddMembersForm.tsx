@@ -15,15 +15,18 @@ import {
   useFieldArray,
   useForm,
   useWatch,
+  type UseFormSetValue,
   type SubmitHandler,
 } from "react-hook-form";
 import { OrganizationUserRole, TeamUserRole } from "@prisma/client";
+import { api } from "~/utils/api";
 
 type Option = { label: string; value: string; description?: string };
 
 type TeamAssignment = {
   teamId: string;
-  role: TeamUserRole;
+  role: TeamUserRole | string; // Can be TeamUserRole or "custom:{roleId}"
+  customRoleId?: string; // Required when role starts with "custom:"
 };
 
 type InviteData = {
@@ -39,6 +42,7 @@ export type MembersForm = {
 interface AddMembersFormProps {
   teamOptions: Option[];
   orgRoleOptions: Option[];
+  organizationId: string;
   onSubmit: SubmitHandler<MembersForm>;
   isLoading?: boolean;
   hasEmailProvider?: boolean;
@@ -53,6 +57,7 @@ interface AddMembersFormProps {
 export function AddMembersForm({
   teamOptions,
   orgRoleOptions,
+  organizationId,
   onSubmit,
   isLoading = false,
   hasEmailProvider = false,
@@ -63,6 +68,7 @@ export function AddMembersForm({
     register,
     control,
     handleSubmit,
+    setValue,
     formState: { errors },
   } = useForm<MembersForm>({
     defaultValues: {
@@ -118,6 +124,8 @@ export function AddMembersForm({
                 errors={errors}
                 teamOptions={teamOptions}
                 orgRoleOptions={orgRoleOptions}
+                organizationId={organizationId}
+                setValue={setValue}
                 onRemove={() => remove(index)}
               />
             ))}
@@ -164,6 +172,8 @@ function MemberRow({
   errors,
   teamOptions,
   orgRoleOptions,
+  organizationId,
+  setValue,
   onRemove,
 }: {
   index: number;
@@ -172,6 +182,8 @@ function MemberRow({
   errors: any;
   teamOptions: Option[];
   orgRoleOptions: Option[];
+  organizationId: string;
+  setValue: UseFormSetValue<MembersForm>;
   onRemove: () => void;
 }) {
   const {
@@ -322,24 +334,12 @@ function MemberRow({
                         />
                       </Table.Cell>
                       <Table.Cell paddingLeft={0} paddingY={2}>
-                        <Controller
+                        <TeamRoleSelect
+                          index={index}
+                          teamIndex={teamIndex}
                           control={control}
-                          name={`invites.${index}.teams.${teamIndex}.role`}
-                          render={({ field }) => (
-                            <NativeSelect.Root>
-                              <NativeSelect.Field {...field}>
-                                <option value={TeamUserRole.ADMIN}>
-                                  Admin
-                                </option>
-                                <option value={TeamUserRole.MEMBER}>
-                                  Member
-                                </option>
-                                <option value={TeamUserRole.VIEWER}>
-                                  Viewer
-                                </option>
-                              </NativeSelect.Field>
-                            </NativeSelect.Root>
-                          )}
+                          organizationId={organizationId}
+                          setValue={setValue}
                         />
                       </Table.Cell>
                       <Table.Cell paddingLeft={0} paddingRight={0} paddingY={2}>
@@ -388,5 +388,77 @@ function MemberRow({
         </Table.Row>
       )}
     </>
+  );
+}
+
+/**
+ * TeamRoleSelect component - renders a dropdown for team roles including custom roles
+ */
+function TeamRoleSelect({
+  index,
+  teamIndex,
+  control,
+  organizationId,
+  setValue,
+}: {
+  index: number;
+  teamIndex: number;
+  control: any;
+  organizationId: string;
+  setValue: UseFormSetValue<MembersForm>;
+}) {
+  const customRoles = api.role.getAll.useQuery({ organizationId });
+
+  // Build role options: built-in roles + custom roles
+  const roleOptions = [
+    { label: "Admin", value: TeamUserRole.ADMIN },
+    { label: "Member", value: TeamUserRole.MEMBER },
+    { label: "Viewer", value: TeamUserRole.VIEWER },
+    ...(customRoles.data ?? []).map((role: { id: string; name: string }) => ({
+      label: `${role.name} (Custom)`,
+      value: `custom:${role.id}`,
+      customRoleId: role.id,
+    })),
+  ];
+
+  return (
+    <Controller
+      control={control}
+      name={`invites.${index}.teams.${teamIndex}.role`}
+      render={({ field }) => {
+        // When a custom role is selected, also update customRoleId
+        const handleChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+          const selectedValue = e.target.value;
+          field.onChange(selectedValue);
+
+          // If it's a custom role, extract the roleId and set customRoleId
+          if (selectedValue.startsWith("custom:")) {
+            const customRoleId = selectedValue.replace("custom:", "");
+            setValue(
+              `invites.${index}.teams.${teamIndex}.customRoleId`,
+              customRoleId,
+            );
+          } else {
+            // Clear customRoleId for built-in roles
+            setValue(
+              `invites.${index}.teams.${teamIndex}.customRoleId`,
+              undefined,
+            );
+          }
+        };
+
+        return (
+          <NativeSelect.Root>
+            <NativeSelect.Field {...field} onChange={handleChange}>
+              {roleOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </NativeSelect.Field>
+          </NativeSelect.Root>
+        );
+      }}
+    />
   );
 }

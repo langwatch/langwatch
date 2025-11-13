@@ -160,7 +160,11 @@ function MembersList({
         invites: data.invites.map((invite) => ({
           email: invite.email.toLowerCase(),
           role: invite.orgRole,
-          teamIds: invite.teams.map((team) => team.teamId).join(","),
+          teams: invite.teams.map((team) => ({
+            teamId: team.teamId,
+            role: team.role,
+            customRoleId: team.customRoleId,
+          })),
         })),
       },
       {
@@ -630,6 +634,7 @@ function MembersList({
             <AddMembersForm
               teamOptions={teamOptions}
               orgRoleOptions={selectOptions}
+              organizationId={organization.id}
               onSubmit={onSubmit}
               isLoading={createInvitesMutation.isLoading}
               hasEmailProvider={hasEmailProvider ?? false}
