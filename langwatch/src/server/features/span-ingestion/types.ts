@@ -27,7 +27,7 @@ export interface IngestedSpan {
     timestamp: string;
     name: string;
     attributes: Record<string, string>;
-  };
+  }[];
 
   links: {
     traceId: string;
