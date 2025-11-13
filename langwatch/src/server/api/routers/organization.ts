@@ -339,7 +339,7 @@ export const organizationRouter = createTRPCRouter({
               );
 
               // Filter members to only include demo user and current user
-              // Permission checks handle demo projects separately, so no virtual members needed
+              // Permission checks handle demo projects separately
               team.members = team.members.filter(
                 (member) =>
                   member.userId === demoProjectUserId ||
