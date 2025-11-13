@@ -54,7 +54,9 @@ export function PermissionViewer({
         // If manage is present, filter out view, create, update, delete since manage includes them
         const hasManage = grantedActions.includes("manage");
         const displayActions = hasManage
-          ? grantedActions.filter((action) => action === "manage" || action === "share")
+          ? grantedActions.filter(
+              (action) => action === "manage" || action === "share",
+            )
           : grantedActions;
 
         return (

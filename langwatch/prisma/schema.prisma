@@ -165,9 +165,10 @@ model Organization {
     ssoDomain              String?
     ssoProvider            String?
 
-    promoCode   String?
-    features    OrganizationFeature[]
-    CustomRoles CustomRole[]
+    promoCode     String?
+    features      OrganizationFeature[]
+    CustomRoles   CustomRole[]
+    notifications Notification[]
 
     @@index([ssoDomain])
     @@index([ssoProvider])
@@ -231,6 +232,7 @@ model Project {
     llmPromptConfigs         LlmPromptConfig[]
     analytics                Analytics[]
     archivedAt               DateTime?
+    notifications            Notification[]
     featureClickHouse        Boolean                             @default(false)
 
     @@index([teamId])
@@ -818,4 +820,28 @@ model CustomRole {
 
     @@unique([organizationId, name])
     @@index([organizationId])
+}
+
+model Notification {
+    id String @id @default(nanoid())
+
+    // Optional context - notifications can be at user, organization, or project level
+    organizationId String?
+    organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+    projectId      String?
+    project        Project?      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+    // Flexible metadata to store notification-specific data
+    // For usage limit: { currentUsage: number, limit: number, percentage: number, threshold: number }
+    metadata Json
+
+    // Timestamps
+    createdAt DateTime @default(now())
+    updatedAt DateTime @default(now()) @updatedAt
+    sentAt    DateTime // When email was actually sent
+
+    @@index([organizationId])
+    @@index([projectId])
+    @@index([createdAt])
+    @@index([sentAt])
 }

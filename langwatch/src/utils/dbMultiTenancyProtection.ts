@@ -22,6 +22,10 @@ const EXEMPT_MODELS = [
    * Custom roles are organization-level, not project-level
    */
   "CustomRole",
+  /**
+   * Notifications can be at organization or project level
+   */
+  "Notification",
 ];
 
 const _guardProjectId = ({ params }: { params: Prisma.MiddlewareParams }) => {
