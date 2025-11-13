@@ -20,7 +20,7 @@ import { scheduleUsageStatsForOrganization } from "~/server/background/queues/us
 import { dependencies } from "../../../injection/dependencies.server";
 import { elasticsearchMigrate } from "../../../tasks/elasticMigrate";
 import { sendInviteEmail } from "../../mailer/inviteEmail";
-import { OrganizationRoleGroup, skipPermissionCheck } from "../permission";
+import { skipPermissionCheck } from "../permission";
 import { checkTeamPermission, checkOrganizationPermission } from "../rbac";
 
 import { signUpDataSchema } from "./onboarding";
@@ -616,8 +616,11 @@ export const organizationRouter = createTRPCRouter({
       const invites = await Promise.all(
         input.invites.map(async (invite) => {
           // Support both new teams array and legacy teamIds string
-          let teamAssignments: Array<{ teamId: string; role: TeamUserRole }> =
-            [];
+          let teamAssignments: Array<{
+            teamId: string;
+            role: TeamUserRole;
+            customRoleId?: string;
+          }> = [];
           let teamIdsString = "";
 
           if (invite.teams && invite.teams.length > 0) {
@@ -664,7 +667,7 @@ export const organizationRouter = createTRPCRouter({
               });
 
             teamIdsString = validTeamIds.join(",");
-          } else if (invite.teamIds && invite.teamIds.trim()) {
+          } else if (invite.teamIds?.trim()) {
             // Legacy format: comma-separated teamIds string
             const teamIdArray = invite.teamIds
               .split(",")
@@ -734,7 +737,7 @@ export const organizationRouter = createTRPCRouter({
               organizationId: input.organizationId,
               teamIds: teamIdsString,
               teamAssignments:
-                teamAssignments.length > 0 ? teamAssignments : null,
+                teamAssignments.length > 0 ? teamAssignments : undefined,
               role: invite.role,
             },
           });
@@ -901,7 +904,9 @@ export const organizationRouter = createTRPCRouter({
           // Create team memberships with built-in roles
           if (builtInRoles.length > 0) {
             await prisma.teamUser.createMany({
-              data: builtInRoles.map(({ customRoleId, ...data }) => data),
+              data: builtInRoles.map(
+                ({ customRoleId: _customRoleId, ...data }) => data,
+              ),
               skipDuplicates: true,
             });
           }
