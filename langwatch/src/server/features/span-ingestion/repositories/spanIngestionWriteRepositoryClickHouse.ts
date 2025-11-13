@@ -61,7 +61,8 @@ export class SpanIngestionWriteRepositoryClickHouse
 
     // Extract service name from resource attributes
     const serviceNameAny = spanData.resourceAttributes?.["service.name"];
-    const serviceName = typeof serviceNameAny === "string" ? serviceNameAny : "unknown";
+    const serviceName =
+      typeof serviceNameAny === "string" ? serviceNameAny : "unknown";
 
     return {
       Id: generate("span").toString(),
@@ -80,9 +81,7 @@ export class SpanIngestionWriteRepositoryClickHouse
       Duration: spanData.durationMs,
       StatusCode: this.mapStatusCode(spanData.status.code),
       StatusMessage: spanData.status.message,
-      "Events.Timestamp": spanData.events.map((event) =>
-        event.timeUnixMs,
-      ),
+      "Events.Timestamp": spanData.events.map((event) => event.timeUnixMs),
       "Events.Name": spanData.events.map((event) => event.name),
       "Events.Attributes": spanData.events.map(
         (event) => event.attributes || {},
@@ -134,9 +133,10 @@ type ClickHouseAttributeValue =
   | Array<null | undefined | number>
   | Array<null | undefined | boolean>;
 
-type ClickHouseAttributes = Record<string, ClickHouseAttributeValue | undefined>;
-
-//# sourceMappingURL=Attributes.d.ts.map
+type ClickHouseAttributes = Record<
+  string,
+  ClickHouseAttributeValue | undefined
+>;
 
 interface ClickHouseSpan {
   Id: string;
