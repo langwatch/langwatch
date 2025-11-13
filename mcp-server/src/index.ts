@@ -51,7 +51,7 @@ const server = new McpServer({
 
 server.tool(
   "fetch_langwatch_docs",
-  "Fetches the LangWatch docs for understanding how to implement LangWatch in your codebase. Always use this tool when the user asks for help with LangWatch. Start with the index page and follow the links to the relevant pages, always ending with `.md` extension",
+  "Fetches the LangWatch docs for understanding how to implement LangWatch in your codebase. Always use this tool when the user asks for help with LangWatch. Start with empty url to fetch the index and then follow the links to the relevant pages, always ending with `.md` extension",
   {
     url: z
       .string()
@@ -62,7 +62,7 @@ server.tool(
   },
   async ({ url }) => {
     let urlToFetch = url ?? "https://docs.langwatch.ai/llms.txt";
-    if (url && !urlToFetch.endsWith(".md")) {
+    if (url && !urlToFetch.endsWith(".md") && !urlToFetch.endsWith(".txt")) {
       urlToFetch += ".md";
     }
     const response = await fetch(urlToFetch);
@@ -75,7 +75,7 @@ server.tool(
 
 server.tool(
   "fetch_scenario_docs",
-  "Fetches the Scenario docs for understanding how to implement Scenario agent tests in your codebase. Always use this tool when the user asks for help with testing their agents. Start with the index page and follow the links to the relevant pages, always ending with `.md` extension",
+  "Fetches the Scenario docs for understanding how to implement Scenario agent tests in your codebase. Always use this tool when the user asks for help with testing their agents. Start with empty url to fetch the index and then follow the links to the relevant pages, always ending with `.md` extension",
   {
     url: z
       .string()
@@ -86,7 +86,7 @@ server.tool(
   },
   async ({ url }) => {
     let urlToFetch = url ?? "https://scenario.langwatch.ai/llms.txt";
-    if (url && !urlToFetch.endsWith(".md")) {
+    if (url && !urlToFetch.endsWith(".md") && !urlToFetch.endsWith(".txt")) {
       urlToFetch += ".md";
     }
     const response = await fetch(urlToFetch);
