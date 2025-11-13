@@ -281,10 +281,46 @@ export const organizationRouter = createTRPCRouter({
         }
       }
       for (const organization of organizations) {
-        organization.members = organization.members.filter(
-          (member) =>
-            member.userId === userId || member.userId === demoProjectUserId,
-        );
+        // For demo mode, ensure current user is added as virtual member if not present
+        const isDemoOrg =
+          isDemo &&
+          organization.teams.some((team) =>
+            team.projects.some((project) => project.id === demoProjectId),
+          );
+
+        if (isDemoOrg) {
+          const demoOrgMembers = organization.members.filter(
+            (member) => member.userId === demoProjectUserId,
+          );
+          const currentUserOrgMember = organization.members.find(
+            (member) => member.userId === userId,
+          );
+
+          // If current user is not an org member, add them as virtual MEMBER
+          if (!currentUserOrgMember && demoOrgMembers[0]) {
+            // Use existing member as type-safe template, just override id, userId, and role
+            const templateMember = demoOrgMembers[0];
+            organization.members = [
+              ...demoOrgMembers,
+              {
+                ...templateMember,
+                id: `virtual-org-${userId}`,
+                userId: userId,
+                role: "MEMBER" as const,
+              } as typeof templateMember,
+            ];
+          } else {
+            organization.members = organization.members.filter(
+              (member) =>
+                member.userId === userId || member.userId === demoProjectUserId,
+            );
+          }
+        } else {
+          organization.members = organization.members.filter(
+            (member) =>
+              member.userId === userId || member.userId === demoProjectUserId,
+          );
+        }
         if (organization.s3AccessKeyId) {
           organization.s3AccessKeyId = decrypt(organization.s3AccessKeyId);
         }
@@ -311,30 +347,54 @@ export const organizationRouter = createTRPCRouter({
           organization.members[0]?.role !== "ADMIN" &&
           organization.members[0]?.role !== "MEMBER";
 
+        // For demo orgs, skip the isExternal filtering since we'll add virtual members
         organization.teams = organization.teams.filter((team) => {
           team.members = team.members.filter(
             (member) =>
               member.userId === userId || member.userId === demoProjectUserId,
           );
+          // Skip isExternal check for demo orgs - we'll add virtual members below
+          if (isDemoOrg) return true;
           return isExternal
             ? team.members.some((member) => member.userId === userId)
             : true;
         });
 
-        if (
-          isDemo &&
-          organization.teams.some((team) =>
-            team.projects.some((project) => project.id === demoProjectId),
-          )
-        ) {
+        if (isDemoOrg) {
           organization.teams = organization.teams.flatMap((team) => {
             if (team.projects.some((project) => project.id === demoProjectId)) {
               team.projects = team.projects.filter(
                 (project) => project.id === demoProjectId,
               );
-              team.members = team.members.filter(
+
+              // Keep both demo user and current user as members for permissions
+              const demoMembers = team.members.filter(
                 (member) => member.userId === demoProjectUserId,
               );
+              const currentUserMember = team.members.find(
+                (member) => member.userId === userId,
+              );
+
+              // If current user is not a member, add them as virtual MEMBER
+              if (!currentUserMember && demoMembers[0]) {
+                // Use existing member as type-safe template, just override id, userId, and role
+                const templateMember = demoMembers[0];
+                team.members = [
+                  ...demoMembers,
+                  {
+                    ...templateMember,
+                    id: `virtual-${userId}`,
+                    userId: userId,
+                    role: "MEMBER" as const,
+                  } as typeof templateMember,
+                ];
+              } else {
+                team.members = team.members.filter(
+                  (member) =>
+                    member.userId === demoProjectUserId ||
+                    member.userId === userId,
+                );
+              }
               return [team];
             } else {
               return [];
