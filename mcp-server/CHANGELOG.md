@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.2](https://github.com/langwatch/langwatch/compare/mcp-server@v0.2.1...mcp-server@v0.2.2) (2025-11-13)
+
+
+### Bug Fixes
+
+* fix fetching llms txt for first request ([#813](https://github.com/langwatch/langwatch/issues/813)) ([cd8de19](https://github.com/langwatch/langwatch/commit/cd8de19b2a06556cd3b89b6cc868db7aac563efc))
+
 ## [0.2.1](https://github.com/langwatch/langwatch/compare/mcp-server@v0.2.0...mcp-server@v0.2.1) (2025-11-08)
 
 
