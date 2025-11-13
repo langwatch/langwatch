@@ -325,7 +325,6 @@ export const organizationRouter = createTRPCRouter({
             (member) =>
               member.userId === userId || member.userId === demoProjectUserId,
           );
-          // Skip isExternal check for demo orgs - we'll add virtual members below
           if (isDemoOrg) return true;
           return isExternal
             ? team.members.some((member) => member.userId === userId)
