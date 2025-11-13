@@ -123,7 +123,11 @@ export const useOrganizationTeamProject = (
       ),
   );
 
-  const organization = teamsMatchingSlug?.[0]
+  // For demo mode, backend already filters to only return demo org/team/project
+  // So we just take the first ones (which should be the demo ones)
+  const organization = isDemo
+    ? organizations.data?.[0] // Backend filters to only return demo org when isDemo=true
+    : teamsMatchingSlug?.[0]
     ? teamsMatchingSlug?.[0].organization
     : projectsTeamsOrganizationsMatchingSlug?.[0]
     ? projectsTeamsOrganizationsMatchingSlug?.[0].organization
@@ -132,7 +136,10 @@ export const useOrganizationTeamProject = (
       organizations.data[0]
     : undefined;
 
-  const team = projectsTeamsOrganizationsMatchingSlug?.[0]
+  const team = isDemo
+    ? organization?.teams.find((t) => t.projects.length > 0) ??
+      organization?.teams[0] // Find team with projects (backend should filter to demo project)
+    : projectsTeamsOrganizationsMatchingSlug?.[0]
     ? projectsTeamsOrganizationsMatchingSlug?.[0].team
     : organization
     ? organization.teams.find((team) => team.id == localStorageTeamId) ??
@@ -140,20 +147,35 @@ export const useOrganizationTeamProject = (
       organization.teams[0]
     : undefined;
 
-  const project = team
+  // For demo mode, backend already filters to only return the demo project
+  // So we just need to take the first (and only) project from the team
+  const project = isDemo
+    ? team?.projects[0] // Backend filters to only return demo project when isDemo=true
+    : team
     ? projectsTeamsOrganizationsMatchingSlug?.[0]?.project ?? team.projects[0]
     : undefined;
 
+  // Override project slug for demo projects so it matches the URL
+  const finalProject = useMemo(() => {
+    if (isDemo && project) {
+      return { ...project, slug: publicEnv.data?.DEMO_PROJECT_SLUG ?? "demo" };
+    }
+    return project;
+  }, [isDemo, project, publicEnv.data?.DEMO_PROJECT_SLUG]);
+
   const modelProviders = api.modelProvider.getAllForProject.useQuery(
-    { projectId: project?.id ?? "" },
+    { projectId: finalProject?.id ?? "" },
     {
-      enabled: !!project?.id,
+      enabled: !!finalProject?.id,
       refetchOnMount: false,
       refetchOnWindowFocus: true,
     },
   );
 
   useEffect(() => {
+    // Don't update localStorage for demo projects
+    if (isDemo) return;
+
     if (organization && organization.id !== localStorageOrganizationId) {
       setLocalStorageOrganizationId(organization.id);
     }
@@ -167,17 +189,20 @@ export const useOrganizationTeamProject = (
     // itself changes. This is because the user might have two tabs open in different projects,
     // and we don't want them fighting each other on who keeps localstorage in sync.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [organization, project, team]);
+  }, [isDemo, organization, project, team, router.query.project]);
 
   useEffect(() => {
     if (
       projectQueryParam &&
       reservedProjectSlugs.includes(projectQueryParam) &&
-      project
+      finalProject
     ) {
-      void router.push(`/${project.slug}/${projectQueryParam}`);
+      void router.push(`/${finalProject.slug}/${projectQueryParam}`);
       return;
     }
+
+    // Skip all redirect logic for demo projects
+    if (isDemo) return;
 
     if (publicRoutes.includes(router.route)) return;
     if (!redirectToOnboarding) return;
@@ -218,20 +243,21 @@ export const useOrganizationTeamProject = (
     }
 
     if (
-      project &&
+      finalProject &&
       typeof router.query.project == "string" &&
-      project.slug !== router.query.project
+      finalProject.slug !== router.query.project
     ) {
       const returnTo = router.query.return_to;
       const returnToParam = returnTo
         ? `?return_to=${encodeURIComponent(returnTo as string)}`
         : "";
-      void router.push(`/${project.slug}${returnToParam}`);
+      void router.push(`/${finalProject.slug}${returnToParam}`);
     }
   }, [
+    isDemo,
     organization,
     organizations.data,
-    project,
+    finalProject,
     projectQueryParam,
     redirectToOnboarding,
     redirectToProjectOnboarding,
@@ -253,6 +279,7 @@ export const useOrganizationTeamProject = (
       hasAnyPermission: () => false,
       isPublicRoute,
       isOrganizationFeatureEnabled: () => false,
+      isDemo,
     };
   }
 
@@ -377,8 +404,8 @@ export const useOrganizationTeamProject = (
     organizations: organizations.data,
     organization,
     team,
-    project: publicShareProject.data ?? project,
-    projectId: project?.id,
+    project: publicShareProject.data ?? finalProject,
+    projectId: finalProject?.id,
     // Legacy permission API (still supported)
     hasOrganizationPermission,
     hasTeamPermission,
@@ -389,5 +416,6 @@ export const useOrganizationTeamProject = (
     isPublicRoute,
     modelProviders: modelProviders.data,
     isOrganizationFeatureEnabled,
+    isDemo,
   };
 };

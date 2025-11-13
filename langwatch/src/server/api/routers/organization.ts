@@ -281,6 +281,14 @@ export const organizationRouter = createTRPCRouter({
         }
       }
       for (const organization of organizations) {
+        // For demo mode, just filter members (permission checks handle demo projects separately)
+        const isDemoOrg =
+          isDemo &&
+          organization.teams.some((team) =>
+            team.projects.some((project) => project.id === demoProjectId),
+          );
+
+        // Filter members to only include demo user and current user
         organization.members = organization.members.filter(
           (member) =>
             member.userId === userId || member.userId === demoProjectUserId,
@@ -311,29 +319,31 @@ export const organizationRouter = createTRPCRouter({
           organization.members[0]?.role !== "ADMIN" &&
           organization.members[0]?.role !== "MEMBER";
 
+        // For demo orgs, skip the isExternal filtering since we'll add virtual members
         organization.teams = organization.teams.filter((team) => {
           team.members = team.members.filter(
             (member) =>
               member.userId === userId || member.userId === demoProjectUserId,
           );
+          if (isDemoOrg) return true;
           return isExternal
             ? team.members.some((member) => member.userId === userId)
             : true;
         });
 
-        if (
-          isDemo &&
-          organization.teams.some((team) =>
-            team.projects.some((project) => project.id === demoProjectId),
-          )
-        ) {
+        if (isDemoOrg) {
           organization.teams = organization.teams.flatMap((team) => {
             if (team.projects.some((project) => project.id === demoProjectId)) {
               team.projects = team.projects.filter(
                 (project) => project.id === demoProjectId,
               );
+
+              // Filter members to only include demo user and current user
+              // Permission checks handle demo projects separately
               team.members = team.members.filter(
-                (member) => member.userId === demoProjectUserId,
+                (member) =>
+                  member.userId === demoProjectUserId ||
+                  member.userId === userId,
               );
               return [team];
             } else {
