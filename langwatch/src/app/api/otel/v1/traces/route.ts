@@ -12,6 +12,7 @@ import {
   fetchExistingMD5s,
   scheduleTraceCollectionWithFallback,
 } from "../../../../../server/background/workers/collectorWorker";
+import { spanIngestionService } from "../../../../../server/features/span-ingestion/services/spanIngestionService";
 import { createLogger } from "../../../../../utils/logger";
 import { withAppRouterLogger } from "../../../../../middleware/app-router-logger";
 import { withAppRouterTracer } from "../../../../../middleware/app-router-tracer";
@@ -36,7 +37,7 @@ export const config = {
 
 async function handleTracesRequest(req: NextRequest) {
   return await tracer.withActiveSpan(
-    "handleTracesRequest",
+    "TracesV1.handleTracesRequest",
     { kind: SpanKind.SERVER },
     async (span) => {
       const xAuthToken = req.headers.get("x-auth-token");
@@ -189,9 +190,10 @@ async function handleTracesRequest(req: NextRequest) {
 
       const tracesForCollection =
         await openTelemetryTraceRequestToTracesForCollection(traceRequest);
+      const clickHouseTasks: Promise<void>[] = [];
 
       const promises = await tracer.withActiveSpan(
-        "check which traces have already been collected",
+        "TracesV1.duplicateTracesCheck",
         { kind: SpanKind.INTERNAL },
         async () => {
           const promises: Promise<void>[] = [];
@@ -227,6 +229,16 @@ async function handleTracesRequest(req: NextRequest) {
               "collecting traces",
             );
 
+            if (project.featureClickHouse) {
+              clickHouseTasks.push(
+                spanIngestionService.consumeSpans(
+                  project.id,
+                  traceForCollection,
+                  traceRequest,
+                ),
+              );
+            }
+
             promises.push(
               scheduleTraceCollectionWithFallback({
                 ...traceForCollection,
@@ -245,16 +257,27 @@ async function handleTracesRequest(req: NextRequest) {
       );
 
       if (promises.length === 0) {
+        if (clickHouseTasks.length > 0) {
+          try {
+            await Promise.allSettled(clickHouseTasks);
+          } catch { /* ignore, errors non-blocking and caught by tracing layer */}
+        }
         return NextResponse.json({ message: "No changes" });
       }
 
       await tracer.withActiveSpan(
-        "push pending traces to collector queue",
+        "TracesV1.enqueueTraces",
         { kind: SpanKind.PRODUCER },
         async () => {
           await Promise.all(promises);
         },
       );
+
+      if (clickHouseTasks.length > 0) {
+        try {
+          await Promise.allSettled(clickHouseTasks);
+        } catch { /* ignore, errors non-blocking and caught by tracing layer */}
+      }
 
       return NextResponse.json({ message: "Trace received successfully." });
     },
