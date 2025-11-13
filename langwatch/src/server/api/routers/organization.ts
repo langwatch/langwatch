@@ -9,6 +9,7 @@ import {
   type CustomRole,
   TeamUserRole,
 } from "@prisma/client";
+import { PrismaClientKnownRequestError } from "@prisma/client/runtime/library";
 import { TRPCError } from "@trpc/server";
 import { nanoid } from "nanoid";
 import { z } from "zod";
@@ -913,24 +914,27 @@ export const organizationRouter = createTRPCRouter({
 
           // Create team memberships with custom roles (requires individual creates for assignedRoleId)
           for (const customRole of customRoles) {
-            await prisma.teamUser.upsert({
-              where: {
-                userId_teamId: {
+            try {
+              await prisma.teamUser.create({
+                data: {
                   userId: customRole.userId,
                   teamId: customRole.teamId,
+                  role: TeamUserRole.CUSTOM,
+                  assignedRoleId: customRole.customRoleId!,
                 },
-              },
-              create: {
-                userId: customRole.userId,
-                teamId: customRole.teamId,
-                role: TeamUserRole.CUSTOM,
-                assignedRoleId: customRole.customRoleId!,
-              },
-              update: {
-                role: TeamUserRole.CUSTOM,
-                assignedRoleId: customRole.customRoleId!,
-              },
-            });
+              });
+            } catch (error: unknown) {
+              // Ignore unique constraint violations (concurrent inserts)
+              if (
+                error instanceof PrismaClientKnownRequestError &&
+                error.code === "P2002"
+              ) {
+                // Swallow the error - record already exists
+                continue;
+              }
+              // Rethrow other errors
+              throw error;
+            }
           }
         }
 
