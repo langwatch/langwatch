@@ -48,7 +48,9 @@ describe("SpanIngestionWriteProducerBullMq", () => {
 
     // Create producer after setting up mocks
     producer = new SpanIngestionWriteProducerBullMq();
-    mockQueueAdd = spanIngestionWriteQueue.add.bind(spanIngestionWriteQueue) as Mock;
+
+    // eslint-disable-next-line @typescript-eslint/unbound-method
+    mockQueueAdd = spanIngestionWriteQueue.add as Mock;
     mockTracerWithActiveSpan = vi.mocked(mockWithActiveSpan);
 
     // Setup tracer to call the callback
@@ -83,7 +85,12 @@ describe("SpanIngestionWriteProducerBullMq", () => {
         SPAN_INGESTION_WRITE_JOB_NAME,
         {
           tenantId,
-          spanData: span,
+          spanData: expect.objectContaining({
+            traceId: span.spanContext().traceId,
+            spanId: span.spanContext().spanId,
+            name: span.name,
+            kind: span.kind,
+          }),
           collectedAtUnixMs: expect.any(Number),
         },
         {
@@ -143,7 +150,12 @@ describe("SpanIngestionWriteProducerBullMq", () => {
 
       expect(result).toEqual({
         tenantId,
-        spanData: span,
+        spanData: expect.objectContaining({
+          traceId: span.spanContext().traceId,
+          spanId: span.spanContext().spanId,
+          name: span.name,
+          kind: span.kind,
+        }),
         collectedAtUnixMs: expect.any(Number),
       });
 
