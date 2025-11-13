@@ -2,7 +2,7 @@ import type { ConnectionOptions } from "bullmq";
 
 import { connection } from "../../redis";
 import { QueueWithFallback } from "./queueWithFallback";
-import type { SpanIngestionWriteJob } from "../../features/span-ingestion/types";
+import type { SpanIngestionWriteJob } from "../../features/span-ingestion/types/spanIngestionWriteJob";
 import { handleSpanIngestionWriteJob } from "../../features/span-ingestion/workers/handleSpanIngestionWriteJob";
 
 export const SPAN_INGESTION_WRITE_QUEUE = "{span_ingestion_write}";

@@ -1,6 +1,6 @@
 import type { Job } from "bullmq";
 import { createLogger } from "../../../../utils/logger";
-import type { SpanIngestionWriteJob } from "../types";
+import type { SpanIngestionWriteJob } from "../types/spanIngestionWriteJob";
 
 const logger = createLogger("langwatch:features:span-ingestion:workers:handleSpanIngestionWriteJob");
 

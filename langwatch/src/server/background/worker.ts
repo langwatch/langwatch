@@ -27,7 +27,7 @@ import fs from "fs";
 import { workerRestartsCounter } from "../metrics";
 import { startUsageStatsWorker } from "./workers/usageStatsWorker";
 import { WorkersRestart } from "./errors";
-import type { SpanIngestionWriteJob } from "../features/span-ingestion/types";
+import type { SpanIngestionWriteJob } from "../features/span-ingestion/types/spanIngestionWriteJob";
 import { startSpanIngestionWriteWorker } from "./workers/spanIngestionWriteWorker";
 
 const logger = createLogger("langwatch:workers");
