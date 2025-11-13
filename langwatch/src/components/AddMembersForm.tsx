@@ -14,6 +14,7 @@ import {
   Controller,
   useFieldArray,
   useForm,
+  useWatch,
   type SubmitHandler,
 } from "react-hook-form";
 import { OrganizationUserRole, TeamUserRole } from "@prisma/client";
@@ -182,11 +183,44 @@ function MemberRow({
     name: `invites.${index}.teams`,
   });
 
+  // Watch the teams array for this specific member to track selected teams
+  const selectedTeams = useWatch({
+    control,
+    name: `invites.${index}.teams`,
+  });
+
+  /**
+   * Get available team options by filtering out already selected teams
+   * @param currentTeamIndex - The index of the team currently being edited (to exclude it from filtering)
+   * @returns Filtered array of team options
+   */
+  const getAvailableTeamOptions = (currentTeamIndex?: number) => {
+    const selectedTeamIds = selectedTeams
+      ?.map((team: TeamAssignment | undefined, idx: number) => {
+        // Include the current team being edited so it doesn't filter itself out
+        if (currentTeamIndex !== undefined && idx === currentTeamIndex) {
+          return null;
+        }
+        return team?.teamId;
+      })
+      .filter(
+        (id: string | null | undefined): id is string =>
+          id !== null && id !== "" && id !== undefined,
+      );
+
+    return teamOptions.filter(
+      (option) => !selectedTeamIds?.includes(option.value),
+    );
+  };
+
   const handleAddTeam = () => {
-    appendTeam({
-      teamId: teamOptions[0]?.value ?? "",
-      role: TeamUserRole.MEMBER,
-    });
+    const availableTeams = getAvailableTeamOptions();
+    if (availableTeams.length > 0) {
+      appendTeam({
+        teamId: availableTeams[0]?.value ?? "",
+        role: TeamUserRole.MEMBER,
+      });
+    }
   };
 
   return (
@@ -248,6 +282,7 @@ function MemberRow({
                         size="sm"
                         variant="ghost"
                         onClick={handleAddTeam}
+                        disabled={getAvailableTeamOptions().length === 0}
                       >
                         <Plus size={14} /> Add team
                       </Button>
@@ -262,20 +297,28 @@ function MemberRow({
                           control={control}
                           name={`invites.${index}.teams.${teamIndex}.teamId`}
                           rules={{ required: "Team is required" }}
-                          render={({ field }) => (
-                            <NativeSelect.Root>
-                              <NativeSelect.Field {...field}>
-                                {teamOptions.map((option) => (
-                                  <option
-                                    key={option.value}
-                                    value={option.value}
-                                  >
-                                    {option.label}
-                                  </option>
-                                ))}
-                              </NativeSelect.Field>
-                            </NativeSelect.Root>
-                          )}
+                          render={({ field }) => {
+                            const availableOptions =
+                              getAvailableTeamOptions(teamIndex);
+                            return (
+                              <NativeSelect.Root>
+                                <NativeSelect.Field {...field}>
+                                  {availableOptions.length === 0 ? (
+                                    <option value="">No teams available</option>
+                                  ) : (
+                                    availableOptions.map((option) => (
+                                      <option
+                                        key={option.value}
+                                        value={option.value}
+                                      >
+                                        {option.label}
+                                      </option>
+                                    ))
+                                  )}
+                                </NativeSelect.Field>
+                              </NativeSelect.Root>
+                            );
+                          }}
                         />
                       </Table.Cell>
                       <Table.Cell paddingLeft={0} paddingY={2}>
@@ -327,6 +370,7 @@ function MemberRow({
                 size="sm"
                 variant="outline"
                 onClick={handleAddTeam}
+                disabled={getAvailableTeamOptions().length === 0}
               >
                 <Plus size={14} /> Add team
               </Button>
