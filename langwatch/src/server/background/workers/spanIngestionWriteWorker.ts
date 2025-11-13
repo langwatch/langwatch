@@ -5,6 +5,7 @@ import { connection } from "../../redis";
 import { createLogger } from "../../../utils/logger";
 import { SPAN_INGESTION_WRITE_QUEUE } from "../queues/spanIngestionWriteQueue";
 import { Worker } from "bullmq";
+import os from "node:os";
 
 
 const logger = createLogger("langwatch:workers:spanIngestionWriteWorker");
@@ -20,7 +21,7 @@ export const startSpanIngestionWriteWorker = () => {
     handleSpanIngestionWriteJob,
     {
       connection,
-      concurrency: 1, // Only one job at a time since it's a daily task
+      concurrency: Math.min(15, Math.max(2, Math.floor(os.cpus().length * 0.75))),
     },
   );
 
