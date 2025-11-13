@@ -14,6 +14,7 @@ import {
 } from "../../../../../server/background/workers/collectorWorker";
 import { createLogger } from "../../../../../utils/logger";
 import { withAppRouterLogger } from "../../../../../middleware/app-router-logger";
+import { withAppRouterTracer } from "../../../../../middleware/app-router-tracer";
 import { getLangWatchTracer } from "langwatch";
 import { SpanKind, SpanStatusCode } from "@opentelemetry/api";
 import { getCurrentMonthMessagesCount } from "../../../../../server/api/routers/limits";
@@ -261,4 +262,4 @@ async function handleTracesRequest(req: NextRequest) {
 }
 
 // Export the handler wrapped with logging middleware
-export const POST = withAppRouterLogger(handleTracesRequest);
+export const POST = withAppRouterTracer("langwatch.otel.v1.traces")(withAppRouterLogger(handleTracesRequest));

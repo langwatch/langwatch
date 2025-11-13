@@ -77,6 +77,7 @@
     "@opentelemetry/exporter-trace-otlp-proto": "^0.204.0",
     "@opentelemetry/otlp-transformer": "0.55.0",
     "@opentelemetry/resource-detector-aws": "^2.3.0",
+    "@opentelemetry/resources": "^2.2.0",
     "@opentelemetry/sdk-node": "^0.203.0",
     "@opentelemetry/semantic-conventions": "^1.36.0",
     "@prisma/client": "5.7.0",
@@ -257,8 +258,8 @@
     "initVersion": "7.19.0"
   },
   "optionalDependencies": {
-    "bufferutil": "^4.0.8",
-    "@rollup/rollup-linux-x64-gnu": "^4.35.0"
+    "@rollup/rollup-linux-x64-gnu": "^4.35.0",
+    "bufferutil": "^4.0.8"
   },
   "workspaces": [
     "saas-src/*"

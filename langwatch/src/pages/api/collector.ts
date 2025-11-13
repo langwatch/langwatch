@@ -27,8 +27,9 @@ import {
 } from "../../server/tracer/types.generated";
 import { createLogger } from "../../utils/logger";
 import { withPagesRouterLogger } from "../../middleware/pages-router-logger";
+import { withPagesRouterTracer } from "../../middleware/pages-router-tracer";
 
-const logger = createLogger("langwatch:collector");
+const logger = createLogger("langwatch.collector");
 
 export const config = {
   api: {
@@ -498,4 +499,4 @@ async function handleCollectorRequest(
 }
 
 // Export the handler wrapped with logging middleware
-export default withPagesRouterLogger(handleCollectorRequest);
+export default withPagesRouterTracer("langwatch.collector")(withPagesRouterLogger(handleCollectorRequest));
