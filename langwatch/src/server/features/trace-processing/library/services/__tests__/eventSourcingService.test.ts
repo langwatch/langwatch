@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/unbound-method */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { EventSourcingService } from "../eventSourcingService";
 import type { EventStore } from "../../stores/eventStore";
@@ -6,9 +7,9 @@ import type { EventHandler } from "../../processing/eventHandler";
 import type { Event, Projection } from "../../core/types";
 
 describe("EventSourcingService", () => {
-  let mockEventStore: EventStore<string, Event>;
-  let mockProjectionStore: ProjectionStore<string, Projection>;
-  let mockEventHandler: EventHandler<string, Event, Projection>;
+  let mockEventStore: EventStore<string, Event<string>>;
+  let mockProjectionStore: ProjectionStore<string, Projection<string>>;
+  let mockEventHandler: EventHandler<string, Event<string>, Projection<string>>;
 
   beforeEach(() => {
     mockEventStore = {
@@ -29,10 +30,10 @@ describe("EventSourcingService", () => {
   describe("rebuildProjection", () => {
     describe("when events exist", () => {
       it("rebuilds projection and stores it", async () => {
-        const events: Event[] = [
+        const events: Event<string>[] = [
           { aggregateId: "test-1", timestamp: 1000, type: "CREATE", data: {} },
         ];
-        const projection: Projection = {
+        const projection: Projection<string> = {
           id: "proj-1",
           aggregateId: "test-1",
           version: 1000,
@@ -56,10 +57,10 @@ describe("EventSourcingService", () => {
 
     describe("when hooks are configured", () => {
       it("calls beforeHandle hook", async () => {
-        const events: Event[] = [
+        const events: Event<string>[] = [
           { aggregateId: "test-1", timestamp: 1000, type: "CREATE", data: {} },
         ];
-        const projection: Projection = {
+        const projection: Projection<string> = {
           id: "proj-1",
           aggregateId: "test-1",
           version: 1000,
@@ -84,10 +85,10 @@ describe("EventSourcingService", () => {
       });
 
       it("calls afterHandle hook", async () => {
-        const events: Event[] = [
+        const events: Event<string>[] = [
           { aggregateId: "test-1", timestamp: 1000, type: "CREATE", data: {} },
         ];
-        const projection: Projection = {
+        const projection: Projection<string> = {
           id: "proj-1",
           aggregateId: "test-1",
           version: 1000,
@@ -112,10 +113,10 @@ describe("EventSourcingService", () => {
       });
 
       it("calls beforePersist hook", async () => {
-        const events: Event[] = [
+        const events: Event<string>[] = [
           { aggregateId: "test-1", timestamp: 1000, type: "CREATE", data: {} },
         ];
-        const projection: Projection = {
+        const projection: Projection<string> = {
           id: "proj-1",
           aggregateId: "test-1",
           version: 1000,
@@ -140,10 +141,10 @@ describe("EventSourcingService", () => {
       });
 
       it("calls afterPersist hook", async () => {
-        const events: Event[] = [
+        const events: Event<string>[] = [
           { aggregateId: "test-1", timestamp: 1000, type: "CREATE", data: {} },
         ];
-        const projection: Projection = {
+        const projection: Projection<string> = {
           id: "proj-1",
           aggregateId: "test-1",
           version: 1000,
@@ -168,10 +169,10 @@ describe("EventSourcingService", () => {
       });
 
       it("calls hooks in correct order", async () => {
-        const events: Event[] = [
+        const events: Event<string>[] = [
           { aggregateId: "test-1", timestamp: 1000, type: "CREATE", data: {} },
         ];
-        const projection: Projection = {
+        const projection: Projection<string> = {
           id: "proj-1",
           aggregateId: "test-1",
           version: 1000,
@@ -179,10 +180,18 @@ describe("EventSourcingService", () => {
         };
 
         const callOrder: string[] = [];
-        const beforeHandle = vi.fn(() => callOrder.push("beforeHandle"));
-        const afterHandle = vi.fn(() => callOrder.push("afterHandle"));
-        const beforePersist = vi.fn(() => callOrder.push("beforePersist"));
-        const afterPersist = vi.fn(() => callOrder.push("afterPersist"));
+        const beforeHandle = vi.fn(() => {
+          callOrder.push("beforeHandle");
+        });
+        const afterHandle = vi.fn(() => {
+          callOrder.push("afterHandle");
+        });
+        const beforePersist = vi.fn(() => {
+          callOrder.push("beforePersist");
+        });
+        const afterPersist = vi.fn(() => {
+          callOrder.push("afterPersist");
+        });
 
         vi.mocked(mockEventStore.getEvents).mockResolvedValue(events);
         vi.mocked(mockEventHandler.handle).mockImplementation(() => {
@@ -216,7 +225,7 @@ describe("EventSourcingService", () => {
 
     describe("when eventHandler throws", () => {
       it("propagates error", async () => {
-        const events: Event[] = [
+        const events: Event<string>[] = [
           { aggregateId: "test-1", timestamp: 1000, type: "CREATE", data: {} },
         ];
 
@@ -241,7 +250,7 @@ describe("EventSourcingService", () => {
   describe("getProjection", () => {
     describe("when projection exists", () => {
       it("returns existing projection", async () => {
-        const projection: Projection = {
+        const projection: Projection<string> = {
           id: "proj-1",
           aggregateId: "test-1",
           version: 1000,
@@ -266,10 +275,10 @@ describe("EventSourcingService", () => {
 
     describe("when projection does not exist", () => {
       it("rebuilds and returns new projection", async () => {
-        const events: Event[] = [
+        const events: Event<string>[] = [
           { aggregateId: "test-1", timestamp: 1000, type: "CREATE", data: {} },
         ];
-        const projection: Projection = {
+        const projection: Projection<string> = {
           id: "proj-1",
           aggregateId: "test-1",
           version: 1000,
@@ -296,7 +305,7 @@ describe("EventSourcingService", () => {
   describe("hasProjection", () => {
     describe("when projection exists", () => {
       it("returns true", async () => {
-        const projection: Projection = {
+        const projection: Projection<string> = {
           id: "proj-1",
           aggregateId: "test-1",
           version: 1000,
@@ -339,10 +348,10 @@ describe("EventSourcingService", () => {
   describe("forceRebuildProjection", () => {
     describe("when called", () => {
       it("always rebuilds regardless of existing projection", async () => {
-        const events: Event[] = [
+        const events: Event<string>[] = [
           { aggregateId: "test-1", timestamp: 1000, type: "CREATE", data: {} },
         ];
-        const projection: Projection = {
+        const projection: Projection<string> = {
           id: "proj-1",
           aggregateId: "test-1",
           version: 1000,
@@ -365,4 +374,3 @@ describe("EventSourcingService", () => {
     });
   });
 });
-
