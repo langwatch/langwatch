@@ -6,7 +6,7 @@ export interface ProjectionStoreReadContext {
   raw?: Record<string, unknown>;
 }
 
-export type ProjectionStoreWriteContext = ProjectionStoreReadContext
+export type ProjectionStoreWriteContext = ProjectionStoreReadContext;
 
 export interface ProjectionStore<
   AggregateId = string,
