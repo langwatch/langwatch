@@ -113,7 +113,7 @@ export function buildProjectionMetadata<
 
 /**
  * Utility function to validate an event structure.
- * 
+ *
  * @example
  * ```typescript
  * // Validate events from untrusted sources (e.g., external APIs)
@@ -125,7 +125,7 @@ export function buildProjectionMetadata<
  *   throw new Error("Invalid event structure");
  * }
  * ```
- * 
+ *
  * @example
  * ```typescript
  * // Filter out invalid events from a batch
@@ -144,7 +144,7 @@ export function isValidEvent(event: any): event is Event {
 
 /**
  * Utility function to validate a projection structure.
- * 
+ *
  * @example
  * ```typescript
  * // Validate projection from cache or external storage
@@ -157,7 +157,7 @@ export function isValidEvent(event: any): event is Event {
  *   return await rebuildProjection(aggregateId);
  * }
  * ```
- * 
+ *
  * @example
  * ```typescript
  * // Validate projections before batch operations
@@ -167,10 +167,10 @@ export function isValidEvent(event: any): event is Event {
  */
 export function isValidProjection(projection: any): projection is Projection {
   return (
-    projection &&
+    Boolean(projection) &&
     typeof projection.id === 'string' &&
     typeof projection.aggregateId !== 'undefined' &&
     typeof projection.version === 'number' &&
-    projection.data !== undefined
+    projection.data !== void 0
   );
 }
