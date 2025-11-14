@@ -1,0 +1,3272 @@
+Monday, October 20, 2025 (2025-10-20)
+
+Start time today: 12:25 PM (2025-10-20T10:25:54.000Z)
+
+Monday, October 20, 2025 (2025-10-20)
+Branch: langwatch/prompt-studio,langwatch/prompt-studio--playwright
+Commit Date: 2025-10-20
+Commit Message: WIP: Sidebar
+Commit Hash: 89f0dc9a
+Commit Timestamp: 2025-10-20T10:25:54.000Z
+Files:
+     langwatch/src/pages/[project]/prompt-studio.tsx
+     langwatch/src/prompt-configs/components/prompt-studio/PromptStudioLayout.tsx
+     langwatch/src/prompt-configs/components/prompt-studio/PromptStudioMainContent.tsx
+     langwatch/src/prompt-configs/components/prompt-studio/sidebar/PromptStudioSidebar.tsx
+     langwatch/src/prompt-configs/components/prompt-studio/sidebar/SidebarHeader.tsx
+     langwatch/src/prompt-configs/components/prompt-studio/sidebar/ui/Sidebar.tsx
+
+------
+Monday, October 20, 2025 (2025-10-20)
+Branch: langwatch/prompt-studio,langwatch/prompt-studio--playwright
+Commit Date: 2025-10-20
+Commit Message: sidebar components in place
+Commit Hash: ea1c8fe4
+Commit Timestamp: 2025-10-20T10:52:25.000Z
+Files:
+     langwatch/src/prompt-configs/components/prompt-studio/sidebar/AddPromptButton.tsx
+     langwatch/src/prompt-configs/components/prompt-studio/sidebar/ConversationHistoryList.tsx
+     langwatch/src/prompt-configs/components/prompt-studio/sidebar/DraftPromptsList.tsx
+     langwatch/src/prompt-configs/components/prompt-studio/sidebar/PromptStudioSidebar.tsx
+     langwatch/src/prompt-configs/components/prompt-studio/sidebar/PublishedPromptsList.tsx
+     langwatch/src/prompt-configs/components/prompt-studio/sidebar/SessionSnapshotsList.tsx
+     langwatch/src/prompt-configs/components/prompt-studio/sidebar/ui/Sidebar.tsx
+
+------
+Monday, October 20, 2025 (2025-10-20)
+Branch: langwatch/prompt-studio,langwatch/prompt-studio--playwright
+Commit Date: 2025-10-20
+Commit Message: create base for workspace
+Commit Hash: d358fcdc
+Commit Timestamp: 2025-10-20T11:10:47.000Z
+Files:
+     langwatch/src/prompt-configs/components/prompt-studio/tabbed-workspace/PromptStudioTabbedWorkSpace.tsx
+     langwatch/src/prompt-configs/components/prompt-studio/tabbed-workspace/prompt-tab/PromptTab.tsx
+     langwatch/src/prompt-configs/components/prompt-studio/tabbed-workspace/ui/BrowserLikeTabs.tsx
+     langwatch/src/prompt-configs/components/prompt-studio/tabbed-workspace/ui/index.ts
+
+------
+Monday, October 20, 2025 (2025-10-20)
+Branch: langwatch/prompt-studio,langwatch/prompt-studio--playwright
+Commit Date: 2025-10-20
+Commit Message: studio loads in browser with base layout
+Commit Hash: 0c4f90fd
+Commit Timestamp: 2025-10-20T11:17:56.000Z
+Files:
+     langwatch/src/pages/[project]/prompt-studio.tsx
+     langwatch/src/prompt-configs/components/prompt-studio/PromptStudioLayout.tsx
+     langwatch/src/prompt-configs/components/prompt-studio/PromptStudioMainContent.tsx
+
+------
+Monday, October 20, 2025 (2025-10-20)
+Branch: langwatch/prompt-studio,langwatch/prompt-studio--playwright
+Commit Date: 2025-10-20
+Commit Message: update prompt browser tab style
+Commit Hash: c5fe3747
+Commit Timestamp: 2025-10-20T11:53:04.000Z
+Files:
+     langwatch/src/prompt-configs/components/prompt-studio/PromptStudioLayout.tsx
+     langwatch/src/prompt-configs/components/prompt-studio/PromptStudioMainContent.tsx
+     langwatch/src/prompt-configs/components/prompt-studio/sidebar/PublishedPromptsList.tsx
+     langwatch/src/prompt-configs/components/prompt-studio/sidebar/ui/Sidebar.tsx
+     langwatch/src/prompt-configs/components/prompt-studio/tabbed-workspace/PromptStudioTabbedWorkSpace.tsx
+     langwatch/src/prompt-configs/components/prompt-studio/tabbed-workspace/ui/BrowserLikeTabs.tsx
+     langwatch/src/prompt-configs/components/prompt-studio/tabbed-workspace/ui/PromptBrowserTab.tsx
+
+------
+Monday, October 20, 2025 (2025-10-20)
+Branch: langwatch/prompt-studio,langwatch/prompt-studio--playwright
+Commit Date: 2025-10-20
+Commit Message: clean up layout/scrolling
+Commit Hash: e8db0187
+Commit Timestamp: 2025-10-20T12:04:56.000Z
+Files:
+     langwatch/src/prompt-configs/components/prompt-studio/PromptStudioLayout.tsx
+     langwatch/src/prompt-configs/components/prompt-studio/PromptStudioMainContent.tsx
+     langwatch/src/prompt-configs/components/prompt-studio/sidebar/ui/Sidebar.tsx
+     langwatch/src/prompt-configs/components/prompt-studio/tabbed-workspace/PromptStudioTabbedWorkSpace.tsx
+
+------
+Monday, October 20, 2025 (2025-10-20)
+Branch: langwatch/prompt-studio,langwatch/prompt-studio--playwright
+Commit Date: 2025-10-20
+Commit Message: rename dir, add window component
+Commit Hash: ff4383ef
+Commit Timestamp: 2025-10-20T12:10:22.000Z
+Files:
+     langwatch/src/prompt-configs/components/prompt-studio/prompt-browser/PromptStudioTabbedWorkSpace.tsx
+     langwatch/src/prompt-configs/components/prompt-studio/prompt-browser/prompt-browser-window/PromptBrowserWindow.tsx
+     langwatch/src/prompt-configs/components/prompt-studio/prompt-browser/ui/BrowserLikeTabs.tsx
+     langwatch/src/prompt-configs/components/prompt-studio/prompt-browser/ui/PromptBrowserTab.tsx
+     langwatch/src/prompt-configs/components/prompt-studio/prompt-browser/ui/index.ts
+     langwatch/src/prompt-configs/components/prompt-studio/tabbed-workspace/prompt-tab/PromptTab.tsx
+
+------
+Monday, October 20, 2025 (2025-10-20)
+Branch: langwatch/prompt-studio,langwatch/prompt-studio--playwright
+Commit Date: 2025-10-20
+Commit Message: wire in prompt querying and form creation
+Commit Hash: 581d2062
+Commit Timestamp: 2025-10-20T13:06:34.000Z
+Files:
+     langwatch/src/prompt-configs/components/prompt-studio/PromptStudioMainContent.tsx
+     langwatch/src/prompt-configs/components/prompt-studio/prompt-browser/PromptStudioTabbedWorkSpace.tsx
+     langwatch/src/prompt-configs/components/prompt-studio/prompt-browser/prompt-browser-window/PromptBrowserHeader.tsx
+     langwatch/src/prompt-configs/components/prompt-studio/prompt-browser/prompt-browser-window/PromptBrowserWindow.tsx
+     langwatch/src/prompt-configs/components/prompt-studio/prompt-browser/prompt-browser-window/PromptMessagesEditor.tsx
+     langwatch/src/prompt-configs/components/prompt-studio/prompt-browser/prompt-browser-window/PromptTabbedSection.tsx
+     langwatch/src/prompt-configs/forms/fields/PromptMessagesField.tsx
+     langwatch/src/prompt-configs/hooks/usePromptConfigForm.ts
+     langwatch/src/prompt-configs/hooks/usePromptQueryForFormValues.ts
+     langwatch/src/prompt-configs/utils/llmPromptConfigUtils.ts
+
+------
+Monday, October 20, 2025 (2025-10-20)
+Branch: langwatch/prompt-studio,langwatch/prompt-studio--playwright
+Commit Date: 2025-10-20
+Commit Message: simplify browser tabs logic
+Commit Hash: d4cec3c2
+Commit Timestamp: 2025-10-20T15:34:16.000Z
+Files:
+     langwatch/src/components/llmPromptConfigs/LLMModelDisplay.tsx
+     langwatch/src/optimization_studio/components/properties/modals/ConfigModal.tsx
+     langwatch/src/prompt-configs/components/prompt-studio/prompt-browser/PromptStudioTabbedWorkSpace.tsx
+     langwatch/src/prompt-configs/components/prompt-studio/prompt-browser/prompt-browser-window/PromptBrowserHeader.tsx
+     langwatch/src/prompt-configs/components/prompt-studio/prompt-browser/prompt-browser-window/PromptBrowserWindow.tsx
+     langwatch/src/prompt-configs/components/prompt-studio/prompt-browser/prompt-browser-window/PromptTabbedSection.tsx
+     langwatch/src/prompt-configs/components/prompt-studio/prompt-browser/ui/BrowserLikeTabs.tsx
+     langwatch/src/prompt-configs/components/prompt-studio/prompt-browser/ui/PromptBrowserTab.tsx
+     langwatch/src/prompt-configs/components/prompt-studio/prompt-browser/ui/index.ts
+     langwatch/src/prompt-configs/forms/fields/ModelSelectField.tsx
+     langwatch/src/prompt-configs/forms/fields/ModelSelectFieldMini.tsx
+
+------
+Monday, October 20, 2025 (2025-10-20)
+Branch: langwatch/prompt-studio,langwatch/prompt-studio--playwright
+Commit Date: 2025-10-20
+Commit Message: update the prompt lists
+Commit Hash: 2bf70293
+Commit Timestamp: 2025-10-20T16:24:21.000Z
+Files:
+     langwatch/src/app/api/copilotkit/[[...route]]/service-adapter.ts
+     langwatch/src/components/simulations/CustomCopilotKitChat.tsx
+     langwatch/src/pages/[project]/simulations/simulations.css
+     langwatch/src/prompt-configs/components/prompt-studio/chat/PromptStudioChat.tsx
+     langwatch/src/prompt-configs/components/prompt-studio/prompt-browser/prompt-browser-window/PromptTabbedSection.tsx
+     langwatch/src/prompt-configs/components/prompt-studio/sidebar/DraftPromptsList.tsx
+     langwatch/src/prompt-configs/components/prompt-studio/sidebar/PublishedPromptsList.tsx
+     langwatch/src/prompt-configs/components/prompt-studio/sidebar/ui/Sidebar.tsx
+     langwatch/src/styles/globals.scss
+
+------
+Monday, October 20, 2025 (2025-10-20)
+Branch: langwatch/prompt-studio,langwatch/prompt-studio--playwright
+Commit Date: 2025-10-20
+Commit Message: clean up styles for prompt manager
+Commit Hash: e298fc4e
+Commit Timestamp: 2025-10-20T16:30:54.000Z
+Files:
+     langwatch/src/prompt-configs/components/prompt-studio/prompt-browser/ui/BrowserLikeTabs.tsx
+     langwatch/src/prompt-configs/components/prompt-studio/prompt-browser/ui/PromptBrowserTab.tsx
+
+------
+Monday, October 20, 2025 (2025-10-20)
+Branch: langwatch/prompt-studio,langwatch/prompt-studio--playwright
+Commit Date: 2025-10-20
+Commit Message: fix adapter
+Commit Hash: 1e2b93a2
+Commit Timestamp: 2025-10-20T16:37:41.000Z
+Files:
+     langwatch/src/app/api/copilotkit/[[...route]]/app.ts
+     langwatch/src/app/api/copilotkit/[[...route]]/service-adapter.ts
+
+------
+Monday, October 20, 2025 (2025-10-20)
+Branch: langwatch/prompt-studio,langwatch/prompt-studio--playwright
+Commit Date: 2025-10-20
+Commit Message: create separate dir for studio and create store:
+Commit Hash: 5fa97864
+Commit Timestamp: 2025-10-20T17:38:39.000Z
+Files:
+     langwatch/package-lock.json
+     langwatch/package.json
+     langwatch/src/pages/[project]/prompt-studio.tsx
+     langwatch/src/prompt-configs/components/prompt-studio/PromptStudioMainContent.tsx
+     langwatch/src/prompt-configs/components/prompt-studio/prompt-browser/PromptStudioTabbedWorkSpace.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/PromptStudioLayout.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/PromptStudioMainContent.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/chat/PromptStudioChat.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/prompt-browser/PromptStudioTabbedWorkSpace.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/prompt-browser/prompt-browser-window/PromptBrowserHeader.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/prompt-browser/prompt-browser-window/PromptBrowserWindow.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/prompt-browser/prompt-browser-window/PromptMessagesEditor.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/prompt-browser/prompt-browser-window/PromptTabbedSection.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/prompt-browser/ui/BrowserLikeTabs.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/prompt-browser/ui/PromptBrowserTab.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/sidebar/AddPromptButton.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/sidebar/ConversationHistoryList.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/sidebar/DraftPromptsList.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/sidebar/PromptStudioSidebar.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/sidebar/PublishedPromptsList.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/sidebar/SessionSnapshotsList.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/sidebar/SidebarHeader.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/sidebar/ui/Sidebar.tsx
+     langwatch/src/prompt-configs/prompt-studio/prompt-studio-store/slices/index.ts
+     langwatch/src/prompt-configs/prompt-studio/prompt-studio-store/slices/workspaceDataSlice.ts
+     langwatch/src/prompt-configs/prompt-studio/prompt-studio-store/slices/workspaceSlice.ts
+     langwatch/src/prompt-configs/prompt-studio/prompt-studio-store/store.ts
+
+------
+
+Tuesday, October 21, 2025 (2025-10-21)
+
+Start time today: 10:23 AM (2025-10-21T08:23:15.000Z)
+
+Tuesday, October 21, 2025 (2025-10-21)
+Branch: langwatch/prompt-studio,langwatch/prompt-studio--playwright
+Commit Date: 2025-10-21
+Commit Message: simplify workspace store
+Commit Hash: ce3739c4
+Commit Timestamp: 2025-10-21T08:23:15.000Z
+Files:
+     langwatch/src/app/api/copilotkit/[[...route]]/service-adapter.ts
+     langwatch/src/prompt-configs/hooks/useAllPromptsForProject.ts
+     langwatch/src/prompt-configs/prompt-studio/components/PromptStudioMainContent.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/prompt-browser/PromptStudioTabbedWorkSpace.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/sidebar/DraftPromptsList.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/sidebar/PublishedPromptsList.tsx
+     langwatch/src/prompt-configs/prompt-studio/prompt-studio-store/slices/index.ts
+     langwatch/src/prompt-configs/prompt-studio/prompt-studio-store/slices/workspaceDataSlice.ts
+     langwatch/src/prompt-configs/prompt-studio/prompt-studio-store/slices/workspaceSlice.ts
+     langwatch/src/prompt-configs/prompt-studio/prompt-studio-store/store.ts
+
+------
+Tuesday, October 21, 2025 (2025-10-21)
+Branch: langwatch/prompt-studio,langwatch/prompt-studio--playwright
+Commit Date: 2025-10-21
+Commit Message: create draggable tabs browser
+Commit Hash: 04fe933e
+Commit Timestamp: 2025-10-21T11:30:19.000Z
+Files:
+     langwatch/src/prompt-configs/prompt-studio/components/prompt-browser/ui/DraggableTabsBrowser.tsx
+
+------
+Tuesday, October 21, 2025 (2025-10-21)
+Branch: langwatch/prompt-studio,langwatch/prompt-studio--playwright
+Commit Date: 2025-10-21
+Commit Message: Base works
+Commit Hash: a51357a7
+Commit Timestamp: 2025-10-21T11:49:10.000Z
+Files:
+     langwatch/src/prompt-configs/prompt-studio/components/PromptStudioMainContent.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/prompt-browser/PromptStudioTabbedWorkSpace.tsx
+
+------
+Tuesday, October 21, 2025 (2025-10-21)
+Branch: langwatch/prompt-studio,langwatch/prompt-studio--playwright
+Commit Date: 2025-10-21
+Commit Message: most logic works
+Commit Hash: abfd64cf
+Commit Timestamp: 2025-10-21T13:25:43.000Z
+Files:
+     langwatch/src/prompt-configs/prompt-studio/components/PromptStudioMainContent.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/prompt-browser/PromptStudioTabbedWorkSpace.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/prompt-browser/ui/BrowserLikeTabs.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/prompt-browser/ui/DraggableTabsBrowser.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/prompt-browser/ui/PromptBrowserTab.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/sidebar/DraftPromptsList.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/sidebar/PublishedPromptsList.tsx
+     langwatch/src/prompt-configs/prompt-studio/prompt-studio-store/DraggableTabsBrowserStore.ts
+     langwatch/src/prompt-configs/prompt-studio/prompt-studio-store/store.ts
+
+------
+Tuesday, October 21, 2025 (2025-10-21)
+Branch: langwatch/prompt-studio,langwatch/prompt-studio--playwright
+Commit Date: 2025-10-21
+Commit Message: drag/click/select works great
+Commit Hash: dc4c9321
+Commit Timestamp: 2025-10-21T13:38:48.000Z
+Files:
+     langwatch/src/prompt-configs/prompt-studio/components/prompt-browser/PromptStudioTabbedWorkSpace.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/prompt-browser/ui/BrowserLikeTabs.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/prompt-browser/ui/DraggableTabsBrowser.tsx
+     langwatch/src/prompt-configs/prompt-studio/prompt-studio-store/DraggableTabsBrowserStore.ts
+
+------
+Tuesday, October 21, 2025 (2025-10-21)
+Branch: langwatch/prompt-studio,langwatch/prompt-studio--playwright
+Commit Date: 2025-10-21
+Commit Message: styling
+Commit Hash: 65423959
+Commit Timestamp: 2025-10-21T13:52:37.000Z
+Files:
+     langwatch/src/prompt-configs/prompt-studio/components/prompt-browser/PromptStudioTabbedWorkSpace.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/prompt-browser/ui/BrowserLikeTabs.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/prompt-browser/ui/DraggableTabsBrowser.tsx
+     langwatch/src/prompt-configs/prompt-studio/prompt-studio-store/DraggableTabsBrowserStore.ts
+
+------
+Tuesday, October 21, 2025 (2025-10-21)
+Branch: langwatch/prompt-studio,langwatch/prompt-studio--playwright
+Commit Date: 2025-10-21
+Commit Message: rename
+Commit Hash: 7ee23c71
+Commit Timestamp: 2025-10-21T14:06:35.000Z
+Files:
+     langwatch/src/prompt-configs/prompt-studio/components/PromptStudioMainContent.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/prompt-browser/PromptStudioTabbedWorkspace1.tsx
+
+------
+Tuesday, October 21, 2025 (2025-10-21)
+Branch: langwatch/prompt-studio,langwatch/prompt-studio--playwright
+Commit Date: 2025-10-21
+Commit Message: rename 2
+Commit Hash: db45cbbb
+Commit Timestamp: 2025-10-21T14:07:01.000Z
+Files:
+     langwatch/src/prompt-configs/prompt-studio/components/prompt-browser/PromptStudioTabbedWorkspace.tsx
+
+------
+Tuesday, October 21, 2025 (2025-10-21)
+Branch: langwatch/prompt-studio,langwatch/prompt-studio--playwright
+Commit Date: 2025-10-21
+Commit Message: add grouped handles
+Commit Hash: 099afc58
+Commit Timestamp: 2025-10-21T14:24:23.000Z
+Files:
+     langwatch/src/prompt-configs/prompt-studio/components/sidebar/PublishedPromptsList.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/sidebar/ui/Sidebar.tsx
+
+------
+Tuesday, October 21, 2025 (2025-10-21)
+Branch: langwatch/prompt-studio,langwatch/prompt-studio--playwright
+Commit Date: 2025-10-21
+Commit Message: handle handle tab size
+Commit Hash: ae7990ea
+Commit Timestamp: 2025-10-21T14:27:01.000Z
+Files:
+     langwatch/src/prompt-configs/prompt-studio/components/prompt-browser/ui/PromptBrowserTab.tsx
+
+------
+Tuesday, October 21, 2025 (2025-10-21)
+Branch: langwatch/prompt-studio,langwatch/prompt-studio--playwright
+Commit Date: 2025-10-21
+Commit Message: add saving of prompts
+Commit Hash: 4452d0c4
+Commit Timestamp: 2025-10-21T15:41:02.000Z
+Files:
+     langwatch/src/prompt-configs/forms/fields/EditablePromptHandleField.tsx
+     langwatch/src/prompt-configs/forms/prompt-config-form/components/VersionSaveButton.tsx
+     langwatch/src/prompt-configs/hooks/usePromptConfigForm.ts
+     langwatch/src/prompt-configs/hooks/usePromptQueryForFormValues.ts
+     langwatch/src/prompt-configs/prompt-studio/components/PromptStudioLayout.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/prompt-browser/PromptStudioTabbedWorkspace.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/prompt-browser/prompt-browser-window/PromptBrowserHeader.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/prompt-browser/prompt-browser-window/PromptBrowserWindowContent.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/prompt-browser/prompt-browser-window/SavePromptButton.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/sidebar/PublishedPromptsList.tsx
+     langwatch/src/prompt-configs/prompt-studio/hooks/useHandleSavePrompt.ts
+     langwatch/src/prompt-configs/prompt-studio/prompt-studio-store/DraggableTabsBrowserStore.ts
+
+------
+Tuesday, October 21, 2025 (2025-10-21)
+Branch: langwatch/prompt-studio,langwatch/prompt-studio--playwright
+Commit Date: 2025-10-21
+Commit Message: use store for default values and tab ui data
+Commit Hash: f463dd3d
+Commit Timestamp: 2025-10-21T16:44:32.000Z
+Files:
+     langwatch/src/prompt-configs/VersionHistoryListPopover.tsx
+     langwatch/src/prompt-configs/hooks/usePromptConfigForm.ts
+     langwatch/src/prompt-configs/prompt-studio/components/prompt-browser/PromptStudioTabbedWorkspace.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/prompt-browser/prompt-browser-window/PromptBrowserHeader.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/prompt-browser/prompt-browser-window/PromptBrowserWindowContent.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/prompt-browser/prompt-browser-window/SavePromptButton.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/sidebar/DraftPromptsList.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/sidebar/PublishedPromptsList.tsx
+     langwatch/src/prompt-configs/prompt-studio/prompt-studio-store/DraggableTabsBrowserStore.ts
+     langwatch/src/prompt-configs/utils/computeInitialFormValuesForPrompt.ts
+
+------
+Tuesday, October 21, 2025 (2025-10-21)
+Branch: langwatch/prompt-studio,langwatch/prompt-studio--playwright
+Commit Date: 2025-10-21
+Commit Message: update styles
+Commit Hash: d2e13dc1
+Commit Timestamp: 2025-10-21T16:57:29.000Z
+Files:
+     langwatch/src/prompt-configs/forms/fields/EditablePromptHandleField.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/prompt-browser/PromptStudioTabbedWorkspace.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/prompt-browser/ui/BrowserLikeTabs.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/prompt-browser/ui/DraggableTabsBrowser.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/sidebar/ui/Sidebar.tsx
+
+------
+
+Wednesday, October 22, 2025 (2025-10-22)
+
+Start time today: 11:23 AM (2025-10-22T09:23:37.000Z)
+
+Wednesday, October 22, 2025 (2025-10-22)
+Branch: langwatch/prompt-studio,langwatch/prompt-studio--playwright
+Commit Date: 2025-10-22
+Commit Message: copilot kit works
+Commit Hash: 4acc3743
+Commit Timestamp: 2025-10-22T09:23:37.000Z
+Files:
+     langwatch/src/app/api/copilotkit/[[...route]]/app.ts
+     langwatch/src/app/api/copilotkit/[[...route]]/service-adapter.ts
+     langwatch/src/pages/[project]/prompt-studio.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/chat/PromptStudioChat.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/prompt-browser/prompt-browser-window/PromptTabbedSection.tsx
+
+------
+Wednesday, October 22, 2025 (2025-10-22)
+Branch: langwatch/prompt-studio,langwatch/prompt-studio--playwright
+Commit Date: 2025-10-22
+Commit Message: message history working
+Commit Hash: c93223a3
+Commit Timestamp: 2025-10-22T09:53:24.000Z
+Files:
+     langwatch/src/app/api/copilotkit/[[...route]]/service-adapter.ts
+
+------
+Wednesday, October 22, 2025 (2025-10-22)
+Branch: langwatch/prompt-studio,langwatch/prompt-studio--playwright
+Commit Date: 2025-10-22
+Commit Message: hack to get all of form values to service provider
+Commit Hash: 92fa0a8e
+Commit Timestamp: 2025-10-22T10:27:00.000Z
+Files:
+     langwatch/src/app/api/copilotkit/[[...route]]/app.ts
+     langwatch/src/app/api/copilotkit/[[...route]]/service-adapter.ts
+     langwatch/src/prompt-configs/prompt-studio/components/chat/PromptStudioChat.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/prompt-browser/prompt-browser-window/PromptTabbedSection.tsx
+
+------
+Wednesday, October 22, 2025 (2025-10-22)
+Branch: langwatch/prompt-studio,langwatch/prompt-studio--playwright
+Commit Date: 2025-10-22
+Commit Message: handle keeping system message in sync
+Commit Hash: 66f952f7
+Commit Timestamp: 2025-10-22T10:44:21.000Z
+Files:
+     langwatch/src/prompt-configs/prompt-studio/components/prompt-browser/prompt-browser-window/PromptBrowserWindowContent.tsx
+
+------
+Wednesday, October 22, 2025 (2025-10-22)
+Branch: langwatch/prompt-studio,langwatch/prompt-studio--playwright
+Commit Date: 2025-10-22
+Commit Message: fix sizing issue
+Commit Hash: 1e6753b3
+Commit Timestamp: 2025-10-22T10:49:58.000Z
+Files:
+     langwatch/src/prompt-configs/prompt-studio/components/prompt-browser/PromptStudioTabbedWorkspace.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/prompt-browser/ui/BrowserLikeTabs.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/prompt-browser/ui/DraggableTabsBrowser.tsx
+
+------
+Wednesday, October 22, 2025 (2025-10-22)
+Branch: langwatch/prompt-studio,langwatch/prompt-studio--playwright
+Commit Date: 2025-10-22
+Commit Message: sidebar styling
+Commit Hash: 328036a4
+Commit Timestamp: 2025-10-22T11:05:52.000Z
+Files:
+     langwatch/src/prompt-configs/prompt-studio/components/PromptStudioLayout.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/prompt-browser/prompt-browser-window/PromptTabbedSection.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/prompt-browser/ui/BrowserLikeTabs.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/sidebar/DraftPromptsList.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/sidebar/PublishedPromptsList.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/sidebar/ui/Sidebar.tsx
+
+------
+Wednesday, October 22, 2025 (2025-10-22)
+Branch: langwatch/prompt-studio,langwatch/prompt-studio--playwright
+Commit Date: 2025-10-22
+Commit Message: Add settings fields
+Commit Hash: b8917ef0
+Commit Timestamp: 2025-10-22T11:16:34.000Z
+Files:
+     langwatch/src/prompt-configs/prompt-studio/components/prompt-browser/prompt-browser-window/PromptMessagesEditor.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/prompt-browser/prompt-browser-window/PromptTabbedSection.tsx
+
+------
+Wednesday, October 22, 2025 (2025-10-22)
+Branch: langwatch/prompt-studio,langwatch/prompt-studio--playwright
+Commit Date: 2025-10-22
+Commit Message: clean up cruft, refactor messages
+Commit Hash: 7458cc6b
+Commit Timestamp: 2025-10-22T13:36:16.000Z
+Files:
+     langwatch/src/optimization_studio/components/properties/llm-configs/signature-properties-panel/SignaturePropertiesPanelForm.tsx
+     langwatch/src/prompt-configs/forms/fields/PromptField.tsx
+     langwatch/src/prompt-configs/forms/fields/message-history-fields/AddMessageButton.tsx
+     langwatch/src/prompt-configs/forms/fields/message-history-fields/AddRemoveMessageFieldButton.tsx
+     langwatch/src/prompt-configs/forms/fields/message-history-fields/MessageRoleLabel.tsx
+     langwatch/src/prompt-configs/forms/fields/message-history-fields/PromptMessagesField.tsx
+     langwatch/src/prompt-configs/forms/fields/message-history-fields/RemoveMessageButton.tsx
+     langwatch/src/prompt-configs/forms/prompt-config-form/PromptConfigForm.tsx
+     langwatch/src/prompt-configs/hooks/usePrompts.ts
+     langwatch/src/prompt-configs/prompt-studio/components/prompt-browser/prompt-browser-window/PromptMessagesEditor.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/prompt-browser/prompt-browser-window/PromptTabbedSection.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/prompt-browser/prompt-browser-window/SettingsTab.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/sidebar/AddPromptButton.tsx
+     langwatch/src/prompt-configs/prompt-studio/hooks/useCreateDraftPrompt.ts
+     langwatch/src/prompt-configs/utils/computeInitialFormValuesForPrompt.ts
+     langwatch/src/server/api/routers/prompts/prompts.trpc-router.ts
+     langwatch/src/server/prompt-config/prompt.service.ts
+     langwatch/src/server/prompt-config/repositories/llm-config.repository.ts
+
+------
+Wednesday, October 22, 2025 (2025-10-22)
+Branch: langwatch/prompt-studio,langwatch/prompt-studio--playwright
+Commit Date: 2025-10-22
+Commit Message: fix window sizing
+Commit Hash: 2cf8eb16
+Commit Timestamp: 2025-10-22T13:37:04.000Z
+Files:
+     langwatch/src/prompt-configs/prompt-studio/components/prompt-browser/PromptStudioTabbedWorkspace.tsx
+
+------
+Wednesday, October 22, 2025 (2025-10-22)
+Branch: langwatch/prompt-studio,langwatch/prompt-studio--playwright
+Commit Date: 2025-10-22
+Commit Message: fix default add
+Commit Hash: c4e667e3
+Commit Timestamp: 2025-10-22T13:42:56.000Z
+Files:
+     langwatch/src/prompt-configs/prompt-studio/components/prompt-browser/PromptStudioTabbedWorkspace.tsx
+     langwatch/src/prompt-configs/prompt-studio/hooks/useCreateDraftPrompt.ts
+
+------
+Wednesday, October 22, 2025 (2025-10-22)
+Branch: langwatch/prompt-studio,langwatch/prompt-studio--playwright
+Commit Date: 2025-10-22
+Commit Message: styles
+Commit Hash: 2191334d
+Commit Timestamp: 2025-10-22T14:21:53.000Z
+Files:
+     langwatch/src/prompt-configs/prompt-studio/components/PromptStudioLayout.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/PromptStudioMainContent.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/chat/PromptStudioChat.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/prompt-browser/PromptStudioTabbedWorkspace.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/prompt-browser/prompt-browser-window/PromptTabbedSection.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/prompt-browser/prompt-browser-window/SettingsTabContent.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/prompt-browser/ui/BrowserLikeTabs.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/prompt-browser/ui/DraggableTabsBrowser.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/prompt-browser/ui/PromptBrowserTab.tsx
+
+------
+Wednesday, October 22, 2025 (2025-10-22)
+Branch: langwatch/prompt-studio,langwatch/prompt-studio--playwright
+Commit Date: 2025-10-22
+Commit Message: Add todo tests
+Commit Hash: f67b5df3
+Commit Timestamp: 2025-10-22T21:31:33.000Z
+Files:
+     langwatch/src/app/api/copilotkit/[[...route]]/service-adapter.ts
+     langwatch/src/prompt-configs/prompt-studio/components/chat/__tests__/PromptStudioChat.test.ts
+     langwatch/src/prompt-configs/prompt-studio/components/prompt-browser/__tests__/PromptStudioTabbedWorkspace.test.ts
+     langwatch/src/prompt-configs/prompt-studio/components/prompt-browser/prompt-browser-window/PromptTabbedSection.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/prompt-browser/prompt-browser-window/__tests__/PromptTabbedSection.test.ts
+     langwatch/src/prompt-configs/prompt-studio/components/prompt-browser/prompt-browser-window/__tests__/SavePromptButton.test.ts
+     langwatch/src/prompt-configs/prompt-studio/components/prompt-browser/ui/__tests__/DraggableTabsBrowser.test.ts
+     langwatch/src/prompt-configs/prompt-studio/components/sidebar/__tests__/ConversationHistoryList.test.ts
+     langwatch/src/prompt-configs/prompt-studio/components/sidebar/__tests__/DraftPromptsList.test.ts
+     langwatch/src/prompt-configs/prompt-studio/hooks/__tests__/useCreateDraftPrompt.test.ts
+     langwatch/src/prompt-configs/prompt-studio/hooks/__tests__/useHandleSavePrompt.test.ts
+     langwatch/src/prompt-configs/prompt-studio/prompt-studio-store/__tests__/DraggableTabsBrowserStore.test.ts
+
+------
+
+Thursday, October 23, 2025 (2025-10-23)
+
+Start time today: 11:57 AM (2025-10-23T09:57:10.000Z)
+
+Thursday, October 23, 2025 (2025-10-23)
+Branch: langwatch/prompt-studio,langwatch/prompt-studio--playwright
+Commit Date: 2025-10-23
+Commit Message: add variables tab
+Commit Hash: f5156607
+Commit Timestamp: 2025-10-23T09:57:10.000Z
+Files:
+     langwatch/package-lock.json
+     langwatch/package.json
+     langwatch/src/app/api/copilotkit/[[...route]]/service-adapter.ts
+     langwatch/src/prompt-configs/prompt-studio/components/chat/PromptStudioChat.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/prompt-browser/prompt-browser-window/PromptTabbedSection.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/prompt-browser/prompt-browser-window/VariablesForm.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/sidebar/PromptStudioSidebar.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/sidebar/PublishedPromptsList.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/sidebar/__tests__/PublishPromptsList.test.tsx
+     langwatch/src/prompt-configs/schemas/field-schemas.ts
+     langwatch/vitest.config.ts
+
+------
+Thursday, October 23, 2025 (2025-10-23)
+Branch: langwatch/prompt-studio,langwatch/prompt-studio--playwright
+Commit Date: 2025-10-23
+Commit Message: remove tests
+Commit Hash: 58d3725a
+Commit Timestamp: 2025-10-23T09:59:32.000Z
+Files:
+     langwatch/src/prompt-configs/prompt-studio/components/chat/__tests__/PromptStudioChat.test.ts
+     langwatch/src/prompt-configs/prompt-studio/components/prompt-browser/__tests__/PromptStudioTabbedWorkspace.test.ts
+     langwatch/src/prompt-configs/prompt-studio/components/prompt-browser/prompt-browser-window/__tests__/PromptTabbedSection.test.ts
+     langwatch/src/prompt-configs/prompt-studio/components/prompt-browser/prompt-browser-window/__tests__/SavePromptButton.test.ts
+     langwatch/src/prompt-configs/prompt-studio/components/prompt-browser/ui/__tests__/DraggableTabsBrowser.test.ts
+     langwatch/src/prompt-configs/prompt-studio/components/sidebar/ConversationHistoryList.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/sidebar/DraftPromptsList.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/sidebar/PromptStudioSidebar.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/sidebar/SessionSnapshotsList.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/sidebar/__tests__/ConversationHistoryList.test.ts
+     langwatch/src/prompt-configs/prompt-studio/components/sidebar/__tests__/DraftPromptsList.test.ts
+     langwatch/src/prompt-configs/prompt-studio/hooks/__tests__/useCreateDraftPrompt.test.ts
+     langwatch/src/prompt-configs/prompt-studio/hooks/__tests__/useHandleSavePrompt.test.ts
+     langwatch/src/prompt-configs/prompt-studio/prompt-studio-store/__tests__/DraggableTabsBrowserStore.test.ts
+
+------
+Thursday, October 23, 2025 (2025-10-23)
+Branch: langwatch/prompt-studio,langwatch/prompt-studio--playwright
+Commit Date: 2025-10-23
+Commit Message: update package
+Commit Hash: ebbd0ee5
+Commit Timestamp: 2025-10-23T11:36:03.000Z
+Files:
+     langwatch/package-lock.json
+
+------
+Thursday, October 23, 2025 (2025-10-23)
+Branch: langwatch/prompt-studio,langwatch/prompt-studio--playwright
+Commit Date: 2025-10-23
+Commit Message: update es type import
+Commit Hash: ec28cd69
+Commit Timestamp: 2025-10-23T12:03:18.000Z
+Files:
+     langwatch/elastic/helpers.ts
+     langwatch/elastic/mappings/scenario-events.ts
+     langwatch/elastic/schema.ts
+     langwatch/src/server/analytics/registry.ts
+     langwatch/src/server/analytics/timeseries.ts
+     langwatch/src/server/analytics/types.ts
+     langwatch/src/server/api/routers/experiments.ts
+     langwatch/src/server/api/routers/limits.ts
+     langwatch/src/server/api/routers/traces.ts
+     langwatch/src/server/background/workers/collectorWorker.ts
+     langwatch/src/server/elasticsearch/traces.ts
+     langwatch/src/server/filters/registry.ts
+     langwatch/src/server/filters/types.ts
+     langwatch/src/server/scenario-analytics.ts
+     langwatch/src/server/topicClustering/topicClustering.ts
+     langwatch/src/tasks/backfillScenarioAnalytics.ts
+     langwatch/src/tasks/backfillTraceAnalytics.ts
+     langwatch/src/tasks/cold/setupColdStorage.ts
+     langwatch/src/tasks/elasticMigrate.ts
+     langwatch/src/tasks/rerunChecks.ts
+
+------
+Thursday, October 23, 2025 (2025-10-23)
+Branch: langwatch/prompt-studio,langwatch/prompt-studio--playwright
+Commit Date: 2025-10-23
+Commit Message: add input form
+Commit Hash: bc97d14e
+Commit Timestamp: 2025-10-23T12:52:01.000Z
+Files:
+     langwatch/package-lock.json
+     langwatch/src/prompt-configs/forms/DynamicZodFormBuilder.tsx
+     langwatch/src/prompt-configs/forms/__tests__/DynamicZodFormBuilder.test.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/prompt-browser/prompt-browser-window/VariablesForm.tsx
+     langwatch/src/server/api/routers/analytics/common.ts
+     langwatch/src/server/api/routers/analytics/dataForFilter.ts
+     langwatch/src/server/api/routers/analytics/documents.ts
+     langwatch/src/server/api/routers/analytics/feedbacks.ts
+
+------
+Thursday, October 23, 2025 (2025-10-23)
+Branch: langwatch/prompt-studio,langwatch/prompt-studio--playwright
+Commit Date: 2025-10-23
+Commit Message: fix imports in es migrations
+Commit Hash: e7261c70
+Commit Timestamp: 2025-10-23T13:09:20.000Z
+Files:
+     langwatch/elastic/migrations/202408041216_flatten_span_params.ts
+     langwatch/elastic/migrations/202408240457_add_evaluation_id_migrate_check_id_evaluations.ts
+     langwatch/elastic/migrations/202409231217_create_batch_evaluation_index.ts
+     langwatch/elastic/migrations/202501111740_remove_embeddings.ts
+     langwatch/elastic/migrations/202504241534_flatten_examples_trace.ts
+     langwatch/elastic/migrations/202506280000_simulations_mappings.ts
+
+------
+Thursday, October 23, 2025 (2025-10-23)
+Branch: langwatch/prompt-studio,langwatch/prompt-studio--playwright
+Commit Date: 2025-10-23
+Commit Message: add variable sending/support
+Commit Hash: b5bbd3ba
+Commit Timestamp: 2025-10-23T13:15:06.000Z
+Files:
+     langwatch/elastic/migrations/202506280000_simulations_mappings.ts
+     langwatch/package-lock.json
+     langwatch/src/app/api/copilotkit/[[...route]]/service-adapter.ts
+     langwatch/src/prompt-configs/prompt-studio/components/prompt-browser/prompt-browser-window/PromptTabbedSection.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/prompt-browser/prompt-browser-window/VariablesForm.tsx
+
+------
+Thursday, October 23, 2025 (2025-10-23)
+Branch: langwatch/prompt-studio,langwatch/prompt-studio--playwright
+Commit Date: 2025-10-23
+Commit Message: wip
+Commit Hash: 38d90973
+Commit Timestamp: 2025-10-23T13:55:53.000Z
+Files:
+     langwatch/src/app/api/copilotkit/[[...route]]/service-adapter.ts
+     langwatch/src/prompt-configs/prompt-studio/components/chat/PromptStudioChat.tsx
+
+------
+Thursday, October 23, 2025 (2025-10-23)
+Branch: langwatch/prompt-studio,langwatch/prompt-studio--playwright
+Commit Date: 2025-10-23
+Commit Message: kind of working
+Commit Hash: 1c2cb9cf
+Commit Timestamp: 2025-10-23T14:02:45.000Z
+Files:
+     langwatch/src/app/api/copilotkit/[[...route]]/service-adapter.ts
+
+------
+Thursday, October 23, 2025 (2025-10-23)
+Branch: langwatch/prompt-studio,langwatch/prompt-studio--playwright
+Commit Date: 2025-10-23
+Commit Message: inputs work
+Commit Hash: 942b301e
+Commit Timestamp: 2025-10-23T14:12:48.000Z
+Files:
+     langwatch/src/app/api/copilotkit/[[...route]]/service-adapter.ts
+     langwatch/src/prompt-configs/prompt-studio/components/chat/PromptStudioChat.tsx
+
+------
+Thursday, October 23, 2025 (2025-10-23)
+Branch: langwatch/prompt-studio,langwatch/prompt-studio--playwright
+Commit Date: 2025-10-23
+Commit Message: correct mention highlighting
+Commit Hash: 9bd4b51d
+Commit Timestamp: 2025-10-23T15:04:16.000Z
+Files:
+     langwatch/src/prompt-configs/components/ui/PromptTextArea.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/prompt-browser/prompt-browser-window/PromptMessagesEditor.tsx
+
+------
+Thursday, October 23, 2025 (2025-10-23)
+Branch: langwatch/prompt-studio,langwatch/prompt-studio--playwright
+Commit Date: 2025-10-23
+Commit Message: remove consoles and update styling
+Commit Hash: 6780af7c
+Commit Timestamp: 2025-10-23T15:38:32.000Z
+Files:
+     langwatch/src/app/api/copilotkit/[[...route]]/service-adapter.ts
+     langwatch/src/prompt-configs/prompt-studio/components/chat/PromptStudioChat.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/prompt-browser/PromptStudioTabbedWorkspace.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/prompt-browser/prompt-browser-window/PromptBrowserHeader.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/prompt-browser/ui/BrowserLikeTabs.tsx
+
+------
+Thursday, October 23, 2025 (2025-10-23)
+Branch: langwatch/prompt-studio,langwatch/prompt-studio--playwright
+Commit Date: 2025-10-23
+Commit Message: update p nesting issue
+Commit Hash: 4d608069
+Commit Timestamp: 2025-10-23T15:41:24.000Z
+Files:
+     langwatch/src/prompt-configs/prompt-studio/components/sidebar/PublishedPromptsList.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/sidebar/ui/Sidebar.tsx
+
+------
+Thursday, October 23, 2025 (2025-10-23)
+Branch: langwatch/prompt-studio,langwatch/prompt-studio--playwright
+Commit Date: 2025-10-23
+Commit Message: start with more minimum default prompt
+Commit Hash: a3449fad
+Commit Timestamp: 2025-10-23T15:48:02.000Z
+Files:
+     langwatch/src/prompt-configs/prompt-studio/components/prompt-browser/prompt-browser-window/PromptTabbedSection.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/sidebar/AddPromptButton.tsx
+     langwatch/src/prompt-configs/prompt-studio/hooks/useCreateDraftPrompt.ts
+
+------
+Thursday, October 23, 2025 (2025-10-23)
+Branch: langwatch/prompt-studio,langwatch/prompt-studio--playwright
+Commit Date: 2025-10-23
+Commit Message: Add colored badges
+Commit Hash: 8794ebcb
+Commit Timestamp: 2025-10-23T16:13:56.000Z
+Files:
+     langwatch/src/prompt-configs/PromptConfigPanel.tsx
+     langwatch/src/prompt-configs/components/ui/OrganizationBadge.tsx
+     langwatch/src/prompt-configs/components/ui/VersionBadge.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/prompt-browser/PromptStudioTabbedWorkspace.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/prompt-browser/prompt-browser-window/PromptBrowserWindowContent.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/prompt-browser/ui/PromptBrowserTab.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/sidebar/AddPromptButton.tsx
+     langwatch/src/prompt-configs/prompt-studio/hooks/useCreateDraftPrompt.ts
+     langwatch/src/prompt-configs/prompt-studio/hooks/useHandleSavePrompt.ts
+     langwatch/src/server/prompt-config/repositories/llm-config-version-schema.ts
+
+------
+Thursday, October 23, 2025 (2025-10-23)
+Branch: langwatch/prompt-studio,langwatch/prompt-studio--playwright
+Commit Date: 2025-10-23
+Commit Message: Handle tab persistence
+Commit Hash: 48751d8b
+Commit Timestamp: 2025-10-23T16:25:46.000Z
+Files:
+     langwatch/src/prompt-configs/prompt-studio/components/prompt-browser/PromptStudioTabbedWorkspace.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/prompt-browser/prompt-browser-window/PromptBrowserWindowContent.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/prompt-browser/ui/PromptBrowserTab.tsx
+     langwatch/src/prompt-configs/prompt-studio/prompt-studio-store/DraggableTabsBrowserStore.ts
+
+------
+Thursday, October 23, 2025 (2025-10-23)
+Branch: langwatch/prompt-studio,langwatch/prompt-studio--playwright
+Commit Date: 2025-10-23
+Commit Message: solve the window size issue
+Commit Hash: ad933d86
+Commit Timestamp: 2025-10-23T16:49:01.000Z
+Files:
+     langwatch/src/prompt-configs/prompt-studio/components/prompt-browser/PromptStudioTabbedWorkspace.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/prompt-browser/ui/DraggableTabsBrowser.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/prompt-browser/ui/PromptBrowserTab.tsx
+     langwatch/src/prompt-configs/prompt-studio/prompt-studio-store/DraggableTabsBrowserStore.ts
+
+------
+Thursday, October 23, 2025 (2025-10-23)
+Branch: langwatch/prompt-studio,langwatch/prompt-studio--playwright
+Commit Date: 2025-10-23
+Commit Message: start with no inputs
+Commit Hash: 062376da
+Commit Timestamp: 2025-10-23T16:51:36.000Z
+Files:
+     langwatch/src/prompt-configs/prompt-studio/hooks/useCreateDraftPrompt.ts
+
+------
+Thursday, October 23, 2025 (2025-10-23)
+Branch: langwatch/prompt-studio,langwatch/prompt-studio--playwright
+Commit Date: 2025-10-23
+Commit Message: Add delete prompt feature
+Commit Hash: ba02a61f
+Commit Timestamp: 2025-10-23T17:05:40.000Z
+Files:
+     langwatch/src/prompt-configs/prompt-studio/components/sidebar/PublishedPromptActions.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/sidebar/PublishedPromptContent.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/sidebar/PublishedPromptsList.tsx
+
+------
+Thursday, October 23, 2025 (2025-10-23)
+Branch: langwatch/prompt-studio,langwatch/prompt-studio--playwright
+Commit Date: 2025-10-23
+Commit Message: confirm before closing tab
+Commit Hash: c1ce7ce9
+Commit Timestamp: 2025-10-23T17:11:55.000Z
+Files:
+     langwatch/src/prompt-configs/prompt-studio/components/prompt-browser/PromptStudioTabbedWorkspace.tsx
+
+------
+
+Friday, October 24, 2025 (2025-10-24)
+
+Start time today: 12:39 PM (2025-10-24T10:39:35.000Z)
+
+Friday, October 24, 2025 (2025-10-24)
+Branch: langwatch/prompt-studio,langwatch/prompt-studio--playwright
+Commit Date: 2025-10-24
+Commit Message: make full sidebar header clickable
+Commit Hash: 4d706fad
+Commit Timestamp: 2025-10-24T10:39:35.000Z
+Files:
+     langwatch/src/prompt-configs/prompt-studio/components/sidebar/ui/Sidebar.tsx
+
+------
+Friday, October 24, 2025 (2025-10-24)
+Branch: langwatch/prompt-studio,langwatch/prompt-studio--playwright
+Commit Date: 2025-10-24
+Commit Message: fix modal issue
+Commit Hash: 6df36f21
+Commit Timestamp: 2025-10-24T11:07:15.000Z
+Files:
+     langwatch/src/components/llmPromptConfigs/LLMModelDisplay.tsx
+     langwatch/src/prompt-configs/forms/fields/ModelSelectFieldMini.tsx
+
+------
+Friday, October 24, 2025 (2025-10-24)
+Branch: langwatch/prompt-studio,langwatch/prompt-studio--playwright
+Commit Date: 2025-10-24
+Commit Message: fix loosing system message bug
+Commit Hash: 273740fb
+Commit Timestamp: 2025-10-24T11:16:23.000Z
+Files:
+     langwatch/src/prompt-configs/forms/fields/ModelSelectFieldMini.tsx
+     langwatch/src/prompt-configs/prompt-studio/hooks/useHandleSavePrompt.ts
+
+------
+Friday, October 24, 2025 (2025-10-24)
+Branch: langwatch/prompt-studio,langwatch/prompt-studio--playwright
+Commit Date: 2025-10-24
+Commit Message: fix creating new versions at 1
+Commit Hash: 8b02dc24
+Commit Timestamp: 2025-10-24T11:39:55.000Z
+Files:
+     langwatch/src/pages/settings/model-providers.tsx
+     langwatch/src/prompt-configs/hooks/usePrompts.ts
+     langwatch/src/prompt-configs/prompt-studio/components/prompt-browser/PromptStudioTabbedWorkspace.tsx
+     langwatch/src/server/prompt-config/repositories/llm-config.repository.ts
+
+------
+Friday, October 24, 2025 (2025-10-24)
+Branch: langwatch/prompt-studio,langwatch/prompt-studio--playwright
+Commit Date: 2025-10-24
+Commit Message: Update message names
+Commit Hash: d6814548
+Commit Timestamp: 2025-10-24T11:41:40.000Z
+Files:
+     langwatch/src/prompt-configs/forms/fields/message-history-fields/AddMessageButton.tsx
+
+------
+Friday, October 24, 2025 (2025-10-24)
+Branch: langwatch/prompt-studio,langwatch/prompt-studio--playwright
+Commit Date: 2025-10-24
+Commit Message: fix import
+Commit Hash: c4202b5f
+Commit Timestamp: 2025-10-24T12:14:33.000Z
+Files:
+     langwatch/src/prompt-configs/forms/fields/PromptField.tsx
+
+------
+Friday, October 24, 2025 (2025-10-24)
+Branch: langwatch/prompt-studio,langwatch/prompt-studio--playwright
+Commit Date: 2025-10-24
+Commit Message: fix draggable type
+Commit Hash: b50b6903
+Commit Timestamp: 2025-10-24T13:03:23.000Z
+Files:
+     langwatch/package-lock.json
+     langwatch/src/prompt-configs/prompt-studio/prompt-studio-store/DraggableTabsBrowserStore.ts
+
+------
+Friday, October 24, 2025 (2025-10-24)
+Branch: langwatch/prompt-studio,langwatch/prompt-studio--playwright
+Commit Date: 2025-10-24
+Commit Message: type updates and params tab sync
+Commit Hash: 26355390
+Commit Timestamp: 2025-10-24T13:44:55.000Z
+Files:
+     langwatch/package-lock.json
+     langwatch/src/components/llmPromptConfigs/LLMConfigModal.tsx
+     langwatch/src/pages/settings/model-providers.tsx
+     langwatch/src/prompt-configs/PromptConfigPanel.tsx
+     langwatch/src/prompt-configs/forms/DynamicZodFormBuilder.tsx
+     langwatch/src/prompt-configs/forms/__tests__/DynamicZodFormBuilder.test.tsx
+     langwatch/src/prompt-configs/forms/fields/EditablePromptHandleField.tsx
+     langwatch/src/prompt-configs/hooks/usePrompts.ts
+     langwatch/src/prompt-configs/prompt-studio/components/chat/PromptStudioChat.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/prompt-browser/prompt-browser-window/VariablesForm.tsx
+     langwatch/src/prompt-configs/prompt-studio/hooks/useUrlParamToOpenNewTab.ts
+     langwatch/src/server/api/routers/experiments.ts
+     langwatch/src/server/api/routers/traces.ts
+
+------
+Friday, October 24, 2025 (2025-10-24)
+Branch: langwatch/prompt-studio,langwatch/prompt-studio--playwright
+Commit Date: 2025-10-24
+Commit Message: style tweaks
+Commit Hash: 7d913272
+Commit Timestamp: 2025-10-24T14:13:40.000Z
+Files:
+     langwatch/src/prompt-configs/forms/fields/ModelSelectFieldMini.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/prompt-browser/prompt-browser-window/PromptTabbedSection.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/sidebar/ui/Sidebar.tsx
+
+------
+Friday, October 24, 2025 (2025-10-24)
+Branch: langwatch/prompt-studio,langwatch/prompt-studio--playwright
+Commit Date: 2025-10-24
+Commit Message: fix saving prompt and storing in state
+Commit Hash: 56246120
+Commit Timestamp: 2025-10-24T15:01:46.000Z
+Files:
+     langwatch/src/prompt-configs/hooks/usePromptConfigForm.ts
+     langwatch/src/prompt-configs/prompt-studio/components/prompt-browser/prompt-browser-window/PromptBrowserWindowContent.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/sidebar/ui/Sidebar.tsx
+     langwatch/src/prompt-configs/prompt-studio/hooks/useHandleSavePrompt.ts
+     langwatch/src/prompt-configs/prompt-studio/prompt-studio-store/DraggableTabsBrowserStore.ts
+     langwatch/src/prompt-configs/utils/llmPromptConfigUtils.ts
+
+------
+Friday, October 24, 2025 (2025-10-24)
+Branch: langwatch/prompt-studio,langwatch/prompt-studio--playwright
+Commit Date: 2025-10-24
+Commit Message: style tweaks
+Commit Hash: d83fe0f7
+Commit Timestamp: 2025-10-24T15:26:26.000Z
+Files:
+     langwatch/src/prompt-configs/prompt-studio/components/prompt-browser/PromptStudioTabbedWorkspace.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/prompt-browser/ui/BrowserLikeTabs.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/prompt-browser/ui/DraggableTabsBrowser.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/prompt-browser/ui/PromptBrowserTab.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/sidebar/AddPromptButton.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/sidebar/PublishedPromptsList.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/sidebar/ui/Sidebar.tsx
+
+------
+Friday, October 24, 2025 (2025-10-24)
+Branch: langwatch/prompt-studio,langwatch/prompt-studio--playwright
+Commit Date: 2025-10-24
+Commit Message: styles
+Commit Hash: c459303b
+Commit Timestamp: 2025-10-24T16:05:11.000Z
+Files:
+     langwatch/src/optimization_studio/components/properties/BasePropertiesPanel.tsx
+     langwatch/src/prompt-configs/forms/fields/message-history-fields/MessageRoleLabel.tsx
+     langwatch/src/prompt-configs/forms/fields/message-history-fields/PromptMessagesField.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/PromptStudioLayout.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/prompt-browser/PromptStudioTabbedWorkspace.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/prompt-browser/prompt-browser-window/PromptBrowserWindowContent.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/prompt-browser/prompt-browser-window/PromptMessagesEditor.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/prompt-browser/prompt-browser-window/PromptTabbedSection.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/sidebar/ui/Sidebar.tsx
+
+------
+Friday, October 24, 2025 (2025-10-24)
+Branch: langwatch/prompt-studio,langwatch/prompt-studio--playwright
+Commit Date: 2025-10-24
+Commit Message: cruft
+Commit Hash: acfda27c
+Commit Timestamp: 2025-10-24T16:33:49.000Z
+Files:
+     langwatch/src/optimization_studio/components/properties/llm-configs/signature-properties-panel/hooks/useNodeDrift.ts
+     langwatch/src/prompt-configs/prompt-studio/prompt-studio-store/DraggableTabsBrowserStore.ts
+
+------
+Friday, October 24, 2025 (2025-10-24)
+Branch: langwatch/prompt-studio,langwatch/prompt-studio--playwright
+Commit Date: 2025-10-24
+Commit Message: refactor for unsaved changes
+Commit Hash: 68c748d2
+Commit Timestamp: 2025-10-24T17:05:58.000Z
+Files:
+     langwatch/src/optimization_studio/components/properties/llm-configs/signature-properties-panel/hooks/useNodeDrift.ts
+     langwatch/src/prompt-configs/prompt-studio/components/prompt-browser/PromptStudioTabbedWorkspace.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/prompt-browser/prompt-browser-window/PromptBrowserWindowContent.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/prompt-browser/prompt-browser-window/SavePromptButton.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/prompt-browser/tab/PromptBrowserTab.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/prompt-browser/tab/usePromptBrowserTabController.ts
+     langwatch/src/prompt-configs/prompt-studio/components/prompt-browser/ui/TabContext.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/sidebar/PublishedPromptsList.tsx
+     langwatch/src/prompt-configs/prompt-studio/hooks/useCreateDraftPrompt.ts
+     langwatch/src/prompt-configs/prompt-studio/hooks/useHandleSavePrompt.ts
+     langwatch/src/prompt-configs/prompt-studio/hooks/useHasUnsavedChanges.ts
+     langwatch/src/prompt-configs/prompt-studio/hooks/useUrlParamToOpenNewTab.ts
+     langwatch/src/prompt-configs/prompt-studio/prompt-studio-store/DraggableTabsBrowserStore.ts
+
+------
+Friday, October 24, 2025 (2025-10-24)
+Branch: langwatch/prompt-studio,langwatch/prompt-studio--playwright
+Commit Date: 2025-10-24
+Commit Message: fix backdrop and other issues
+Commit Hash: e0bc7f77
+Commit Timestamp: 2025-10-24T19:21:10.000Z
+Files:
+     langwatch/src/prompt-configs/components/ui/PromptTextArea.tsx
+     langwatch/src/prompt-configs/forms/ChangeHandleDialog.tsx
+     langwatch/src/prompt-configs/forms/SaveVersionDialog.tsx
+     langwatch/src/prompt-configs/forms/fields/message-history-fields/PromptMessagesField.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/sidebar/ui/Sidebar.tsx
+     langwatch/src/prompt-configs/prompt-studio/hooks/useHasUnsavedChanges.ts
+
+------
+
+Monday, October 27, 2025 (2025-10-27)
+
+Start time today: 9:23 AM (2025-10-27T08:23:14.000Z)
+
+Monday, October 27, 2025 (2025-10-27)
+Branch: langwatch/prompt-studio,langwatch/prompt-studio--playwright
+Commit Date: 2025-10-27
+Commit Message: sync across inputs
+Commit Hash: 3efa3cc8
+Commit Timestamp: 2025-10-27T08:23:14.000Z
+Files:
+     langwatch/src/prompt-configs/prompt-studio/components/PromptStudioLayout.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/chat/PromptStudioChat.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/chat/PromptStudioChatContext.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/chat/SyncedChatInput.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/chat/ui/ChatAttachButton.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/chat/ui/ChatSendButton.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/chat/ui/ChatSyncCheckbox.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/chat/ui/ChatTextArea.tsx
+
+------
+Monday, October 27, 2025 (2025-10-27)
+Branch: langwatch/prompt-studio,langwatch/prompt-studio--playwright
+Commit Date: 2025-10-27
+Commit Message: dont have conversations in the background
+Commit Hash: 94e9e217
+Commit Timestamp: 2025-10-27T09:04:20.000Z
+Files:
+     langwatch/src/prompt-configs/prompt-studio/components/chat/SyncedChatInput.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/chat/ui/ChatTextArea.tsx
+     langwatch/src/prompt-configs/prompt-studio/hooks/useIsTabActive.ts
+     langwatch/src/prompt-configs/prompt-studio/prompt-studio-store/DraggableTabsBrowserStore.ts
+
+------
+Monday, October 27, 2025 (2025-10-27)
+Branch: langwatch/prompt-studio,langwatch/prompt-studio--playwright
+Commit Date: 2025-10-27
+Commit Message: normalize is equal comparison
+Commit Hash: 7f86f2d7
+Commit Timestamp: 2025-10-27T09:30:49.000Z
+Files:
+     langwatch/src/prompt-configs/prompt-studio/hooks/useHasUnsavedChanges.ts
+
+------
+Monday, October 27, 2025 (2025-10-27)
+Branch: langwatch/prompt-studio,langwatch/prompt-studio--playwright
+Commit Date: 2025-10-27
+Commit Message: styling for chat
+Commit Hash: f9896400
+Commit Timestamp: 2025-10-27T10:34:49.000Z
+Files:
+     langwatch/src/components/simulations/CustomCopilotKitChat.tsx
+     langwatch/src/components/simulations/SimulationChatViewer.tsx
+     langwatch/src/pages/[project]/prompt-studio/index.tsx
+     langwatch/src/pages/[project]/prompt-studio/styles.css
+     langwatch/src/pages/[project]/simulations/[scenarioSetId]/[batchRunId]/[scenarioRunId]/index.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/PromptStudioLayout.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/chat/PromptStudioChat.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/chat/PromptStudioChatContext.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/chat/SyncedChatInput.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/chat/ui/ChatTextArea.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/prompt-browser/prompt-browser-window/PromptTabbedSection.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/sidebar/ui/Sidebar.tsx
+     langwatch/src/styles/globals.scss
+
+------
+Monday, October 27, 2025 (2025-10-27)
+Branch: langwatch/prompt-studio,langwatch/prompt-studio--playwright
+Commit Date: 2025-10-27
+Commit Message: split correctly
+Commit Hash: 1707b506
+Commit Timestamp: 2025-10-27T10:55:40.000Z
+Files:
+     langwatch/src/app/api/copilotkit/[[...route]]/service-adapter.ts
+     langwatch/src/prompt-configs/prompt-studio/prompt-studio-store/DraggableTabsBrowserStore.ts
+
+------
+Monday, October 27, 2025 (2025-10-27)
+Branch: langwatch/prompt-studio,langwatch/prompt-studio--playwright
+Commit Date: 2025-10-27
+Commit Message: correctly generate traces
+Commit Hash: 91a07cf3
+Commit Timestamp: 2025-10-27T10:58:47.000Z
+Files:
+     langwatch/src/app/api/copilotkit/[[...route]]/service-adapter.ts
+
+------
+Monday, October 27, 2025 (2025-10-27)
+Branch: langwatch/prompt-studio,langwatch/prompt-studio--playwright
+Commit Date: 2025-10-27
+Commit Message: Add trace button to chat
+Commit Hash: edee8c88
+Commit Timestamp: 2025-10-27T11:38:37.000Z
+Files:
+     langwatch/src/app/api/copilotkit/[[...route]]/service-adapter.ts
+     langwatch/src/components/copilot-kit/TraceMessage.tsx
+     langwatch/src/components/simulations/CustomCopilotKitChat.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/chat/PromptStudioChat.tsx
+
+------
+Monday, October 27, 2025 (2025-10-27)
+Branch: langwatch/prompt-studio,langwatch/prompt-studio--playwright
+Commit Date: 2025-10-27
+Commit Message: handle project switching and corruption
+Commit Hash: fe66eb96
+Commit Timestamp: 2025-10-27T15:07:57.000Z
+Files:
+     langwatch/src/prompt-configs/prompt-studio/prompt-studio-store/DraggableTabsBrowserStore.ts
+
+------
+Monday, October 27, 2025 (2025-10-27)
+Branch: langwatch/prompt-studio,langwatch/prompt-studio--playwright
+Commit Date: 2025-10-27
+Commit Message: styles
+Commit Hash: a3761f30
+Commit Timestamp: 2025-10-27T18:19:16.000Z
+Files:
+     langwatch/src/app/api/copilotkit/[[...route]]/app.ts
+     langwatch/src/app/api/copilotkit/[[...route]]/service-adapter.ts
+     langwatch/src/components/copilot-kit/TraceMessage.tsx
+     langwatch/src/components/icons/History.tsx
+     langwatch/src/components/messages/TraceMessages.tsx
+     langwatch/src/pages/[project]/prompt-studio/index.tsx
+     langwatch/src/pages/[project]/prompt-studio/styles.css
+     langwatch/src/prompt-configs/forms/fields/EditablePromptHandleField.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/chat/PromptStudioChat.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/chat/SyncedChatInput.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/prompt-browser/prompt-browser-window/PromptTabbedSection.tsx
+     langwatch/src/prompt-configs/prompt-studio/hooks/useHandleSavePrompt.ts
+     langwatch/src/prompt-configs/prompt-studio/hooks/useHasUnsavedChanges.ts
+     langwatch/src/prompt-configs/prompt-studio/prompt-studio-store/DraggableTabsBrowserStore.ts
+     langwatch/src/styles/globals.scss
+
+------
+Monday, October 27, 2025 (2025-10-27)
+Branch: langwatch/prompt-studio,langwatch/prompt-studio--playwright
+Commit Date: 2025-10-27
+Commit Message: traces for multiple messages works
+Commit Hash: 64849176
+Commit Timestamp: 2025-10-27T18:22:35.000Z
+Files:
+     langwatch/src/app/api/copilotkit/[[...route]]/prompt-execution-agent.ts
+     langwatch/src/app/api/copilotkit/[[...route]]/service-adapter.ts
+     langwatch/src/prompt-configs/prompt-studio/components/chat/PromptStudioChat.tsx
+
+------
+Monday, October 27, 2025 (2025-10-27)
+Branch: langwatch/prompt-studio,langwatch/prompt-studio--playwright
+Commit Date: 2025-10-27
+Commit Message: fix tab rendering on drag
+Commit Hash: 1b622838
+Commit Timestamp: 2025-10-27T18:44:42.000Z
+Files:
+     langwatch/src/prompt-configs/prompt-studio/components/prompt-browser/ui/DraggableTabsBrowser.tsx
+
+------
+Monday, October 27, 2025 (2025-10-27)
+Branch: langwatch/prompt-studio,langwatch/prompt-studio--playwright
+Commit Date: 2025-10-27
+Commit Message: remove console
+Commit Hash: e3cc3e31
+Commit Timestamp: 2025-10-27T19:09:11.000Z
+Files:
+     langwatch/src/prompt-configs/prompt-studio/components/chat/PromptStudioChat.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/prompt-browser/ui/DraggableTabsBrowser.tsx
+
+------
+
+Tuesday, October 28, 2025 (2025-10-28)
+
+Start time today: 11:05 AM (2025-10-28T10:05:19.000Z)
+
+Tuesday, October 28, 2025 (2025-10-28)
+Branch: langwatch/prompt-studio,langwatch/prompt-studio--playwright
+Commit Date: 2025-10-28
+Commit Message: package-lock update after rebase
+Commit Hash: 6487d915
+Commit Timestamp: 2025-10-28T10:05:19.000Z
+Files:
+     langwatch/package-lock.json
+     langwatch/package.json
+
+------
+Tuesday, October 28, 2025 (2025-10-28)
+Branch: langwatch/prompt-studio,langwatch/prompt-studio--playwright
+Commit Date: 2025-10-28
+Commit Message: commit add tab from span
+Commit Hash: 8adef623
+Commit Timestamp: 2025-10-28T15:20:40.000Z
+Files:
+     langwatch/package-lock.json
+     langwatch/src/components/simulations/utils/convert-scenario-messages.ts
+     langwatch/src/prompt-configs/prompt-studio/components/chat/PromptStudioChat.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/prompt-browser/PromptStudioTabbedWorkspace.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/prompt-browser/tab/PromptBrowserTab.tsx
+     langwatch/src/prompt-configs/prompt-studio/hooks/useGetTraceForTab.ts
+     langwatch/src/prompt-configs/prompt-studio/prompt-studio-store/DraggableTabsBrowserStore.ts
+     langwatch/src/server/api/routers/spans.ts
+     langwatch/src/server/api/routers/traces.ts
+
+------
+Tuesday, October 28, 2025 (2025-10-28)
+Branch: langwatch/prompt-studio,langwatch/prompt-studio--playwright
+Commit Date: 2025-10-28
+Commit Message: add button with link back to studio
+Commit Hash: 321842d9
+Commit Timestamp: 2025-10-28T19:21:58.000Z
+Files:
+     langwatch/package-lock.json
+     langwatch/src/components/messages/Conversation.tsx
+     langwatch/src/components/traces/SpanDetails.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/chat/PromptStudioChat.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/prompt-browser/PromptStudioTabbedWorkspace.tsx
+     langwatch/src/prompt-configs/prompt-studio/hooks/useGetTraceForTab.ts
+     langwatch/src/prompt-configs/prompt-studio/hooks/useLoadSpanIntoPromptStudio.ts
+
+------
+Tuesday, October 28, 2025 (2025-10-28)
+Branch: langwatch/prompt-studio,langwatch/prompt-studio--playwright
+Commit Date: 2025-10-28
+Commit Message: linking in studio works
+Commit Hash: 69a4d400
+Commit Timestamp: 2025-10-28T19:51:18.000Z
+Files:
+     langwatch/src/components/traces/SpanDetails.tsx
+     langwatch/src/prompt-configs/prompt-studio/hooks/useLoadSpanIntoPromptStudio.ts
+     langwatch/src/server/api/routers/spans.ts
+
+------
+
+Wednesday, October 29, 2025 (2025-10-29)
+
+Start time today: 10:02 AM (2025-10-29T09:02:24.000Z)
+
+Wednesday, October 29, 2025 (2025-10-29)
+Branch: langwatch/prompt-studio,langwatch/prompt-studio--playwright
+Commit Date: 2025-10-29
+Commit Message: pull and merge span linking
+Commit Hash: 3508983b
+Commit Timestamp: 2025-10-29T09:02:24.000Z
+
+------
+Wednesday, October 29, 2025 (2025-10-29)
+Branch: langwatch/prompt-studio,langwatch/prompt-studio--playwright
+Commit Date: 2025-10-29
+Commit Message: add empty state and other small updates
+Commit Hash: 3bd864d9
+Commit Timestamp: 2025-10-29T09:26:30.000Z
+Files:
+     langwatch/src/app/api/copilotkit/[[...route]]/prompt-execution-agent.ts
+     langwatch/src/components/traces/SpanDetails.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/PromptStudioMainContent.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/sidebar/PublishedPromptsList.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/sidebar/ui/MainContentEmptyState.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/sidebar/ui/SidebarEmptyState.tsx
+     langwatch/src/prompt-configs/prompt-studio/hooks/useCreateDraftPrompt.ts
+     langwatch/src/prompt-configs/prompt-studio/hooks/useUrlParamToOpenNewTab.ts
+
+------
+Wednesday, October 29, 2025 (2025-10-29)
+Branch: langwatch/prompt-studio,langwatch/prompt-studio--playwright
+Commit Date: 2025-10-29
+Commit Message: move span initialization higher in tree
+Commit Hash: d417f5ed
+Commit Timestamp: 2025-10-29T11:59:59.000Z
+Files:
+     langwatch/src/prompt-configs/prompt-studio/components/PromptStudioMainContent.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/prompt-browser/PromptStudioTabbedWorkspace.tsx
+
+------
+Wednesday, October 29, 2025 (2025-10-29)
+Branch: langwatch/prompt-studio,langwatch/prompt-studio--playwright
+Commit Date: 2025-10-29
+Commit Message: update empty state
+Commit Hash: c9352db9
+Commit Timestamp: 2025-10-29T12:11:48.000Z
+Files:
+     langwatch/src/prompt-configs/prompt-studio/components/sidebar/ui/MainContentEmptyState.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/sidebar/ui/NoPromptsOnboardingState.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/sidebar/ui/NoTabsOpenState.tsx
+
+------
+Wednesday, October 29, 2025 (2025-10-29)
+Branch: langwatch/prompt-studio,langwatch/prompt-studio--playwright
+Commit Date: 2025-10-29
+Commit Message: better error handling on delete permission for prompt
+Commit Hash: d26242d1
+Commit Timestamp: 2025-10-29T12:29:45.000Z
+Files:
+     langwatch/src/server/prompt-config/prompt.service.ts
+     langwatch/src/server/prompt-config/repositories/llm-config.repository.ts
+
+------
+Wednesday, October 29, 2025 (2025-10-29)
+Branch: langwatch/prompt-studio,langwatch/prompt-studio--playwright
+Commit Date: 2025-10-29
+Commit Message: udpate permission handling
+Commit Hash: 0a8a858c
+Commit Timestamp: 2025-10-29T12:37:07.000Z
+Files:
+     langwatch/src/prompt-configs/forms/fields/EditablePromptHandleField.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/sidebar/PublishedPromptActions.tsx
+     langwatch/src/server/prompt-config/prompt.service.ts
+
+------
+Wednesday, October 29, 2025 (2025-10-29)
+Branch: langwatch/prompt-studio,langwatch/prompt-studio--playwright
+Commit Date: 2025-10-29
+Commit Message: provide ui support for delete block
+Commit Hash: f1a9b3e3
+Commit Timestamp: 2025-10-29T12:48:38.000Z
+Files:
+     langwatch/src/prompt-configs/prompt-studio/components/sidebar/PublishedPromptActions.tsx
+     langwatch/src/server/api/routers/prompts/prompts.trpc-router.ts
+     langwatch/src/server/prompt-config/prompt.service.ts
+
+------
+Wednesday, October 29, 2025 (2025-10-29)
+Branch: langwatch/prompt-studio,langwatch/prompt-studio--playwright
+Commit Date: 2025-10-29
+Commit Message: WIP: tool tips for project permissions
+Commit Hash: 3ccb5b83
+Commit Timestamp: 2025-10-29T13:01:47.000Z
+Files:
+     langwatch/src/components/ui/tooltip.tsx
+     langwatch/src/prompt-configs/PromptConfigPanel.tsx
+     langwatch/src/prompt-configs/forms/fields/EditablePromptHandleField.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/sidebar/PublishedPromptActions.tsx
+
+------
+
+Monday, November 3, 2025 (2025-11-03)
+
+Start time today: 12:21 PM (2025-11-03T11:21:22.000Z)
+
+Monday, November 3, 2025 (2025-11-03)
+Branch: langwatch/fix/api-header
+Commit Date: 2025-11-03
+Commit Message: fix: api snipper dialog header
+Commit Hash: 2bb49d70
+Commit Timestamp: 2025-11-03T11:21:22.000Z
+Files:
+     langwatch/src/components/GenerateApiSnippetDialog.tsx
+     langwatch/src/prompt-configs/components/GeneratePromptApiSnippetDialog.tsx
+
+------
+Monday, November 3, 2025 (2025-11-03)
+Branch: chore/add-tests-to-pipeline,custom-roles,feat/better-error-visibility,fix/bug-with-demonstrations,fix/codex-autofix
+Commit Date: 2025-11-03
+Commit Message: fix: api snipper dialog header (#772)
+Commit Hash: d4720653
+Commit Timestamp: 2025-11-03T12:30:26.000Z
+Files:
+     langwatch/src/components/GenerateApiSnippetDialog.tsx
+     langwatch/src/prompt-configs/components/GeneratePromptApiSnippetDialog.tsx
+
+------
+Monday, November 3, 2025 (2025-11-03)
+Branch: langwatch/fix/grid-layout-in-optimization
+Commit Date: 2025-11-03
+Commit Message: fix: grid layout in optimization modal
+Commit Hash: a440a2f3
+Commit Timestamp: 2025-11-03T12:56:46.000Z
+Files:
+     langwatch/src/optimization_studio/components/Optimize.tsx
+
+------
+Monday, November 3, 2025 (2025-11-03)
+Branch: chore/add-tests-to-pipeline,custom-roles,feat/better-error-visibility,fix/bug-with-demonstrations,fix/codex-autofix
+Commit Date: 2025-11-03
+Commit Message: fix: grid layout in optimization modal (#773)
+Commit Hash: e5cd90e7
+Commit Timestamp: 2025-11-03T13:54:56.000Z
+Files:
+     langwatch/src/optimization_studio/components/Optimize.tsx
+
+------
+Monday, November 3, 2025 (2025-11-03)
+Branch: langwatch/prompt-studio,langwatch/prompt-studio--playwright
+Commit Date: 2025-11-03
+Commit Message: fix: packages
+Commit Hash: 655dc0b4
+Commit Timestamp: 2025-11-03T15:38:42.000Z
+Files:
+     langwatch/package-lock.json
+
+------
+Monday, November 3, 2025 (2025-11-03)
+Branch: langwatch/prompt-studio,langwatch/prompt-studio--playwright
+Commit Date: 2025-11-03
+Commit Message: resert elastic files back to origin/main
+Commit Hash: 0249161f
+Commit Timestamp: 2025-11-03T15:42:42.000Z
+Files:
+     langwatch/elastic/helpers.ts
+     langwatch/elastic/mappings/scenario-events.ts
+     langwatch/elastic/migrations/202408041216_flatten_span_params.ts
+     langwatch/elastic/migrations/202408240457_add_evaluation_id_migrate_check_id_evaluations.ts
+     langwatch/elastic/migrations/202409231217_create_batch_evaluation_index.ts
+     langwatch/elastic/migrations/202501111740_remove_embeddings.ts
+     langwatch/elastic/migrations/202504241534_flatten_examples_trace.ts
+     langwatch/elastic/migrations/202506280000_simulations_mappings.ts
+     langwatch/elastic/schema.ts
+     langwatch/package-lock.json
+     langwatch_nlp/langwatch_nlp/studio/parser.py
+
+------
+Monday, November 3, 2025 (2025-11-03)
+Branch: langwatch/prompt-studio,langwatch/prompt-studio--playwright
+Commit Date: 2025-11-03
+Commit Message: bug bash: types
+Commit Hash: edca74f1
+Commit Timestamp: 2025-11-03T16:35:12.000Z
+Files:
+     langwatch/src/prompt-configs/prompt-studio/components/chat/PromptStudioChat.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/prompt-browser/prompt-browser-window/PromptBrowserWindowContent.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/prompt-browser/tab/PromptBrowserTab.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/sidebar/PublishedPromptsList.tsx
+     langwatch/src/prompt-configs/prompt-studio/hooks/useCreateDraftPrompt.ts
+     langwatch/src/prompt-configs/prompt-studio/hooks/useHasUnsavedChanges.ts
+     langwatch/src/prompt-configs/prompt-studio/hooks/useLoadSpanIntoPromptStudio.ts
+     langwatch/src/prompt-configs/prompt-studio/hooks/useUrlParamToOpenNewTab.ts
+     langwatch/src/prompt-configs/prompt-studio/prompt-studio-store/DraggableTabsBrowserStore.ts
+
+------
+Monday, November 3, 2025 (2025-11-03)
+Branch: langwatch/prompt-studio,langwatch/prompt-studio--playwright
+Commit Date: 2025-11-03
+Commit Message: handle legacy edge case
+Commit Hash: 13079e12
+Commit Timestamp: 2025-11-03T17:41:50.000Z
+Files:
+     langwatch/package-lock.json
+     langwatch/src/prompt-configs/forms/fields/EditablePromptHandleField.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/prompt-browser/PromptStudioTabbedWorkspace.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/prompt-browser/prompt-browser-window/PromptBrowserHeader.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/prompt-browser/prompt-browser-window/SavePromptButton.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/sidebar/PublishedPromptsList.tsx
+     langwatch/src/prompt-configs/prompt-studio/hooks/useHandleSavePrompt.ts
+     langwatch/src/prompt-configs/prompt-studio/hooks/useHasUnsavedChanges.ts
+
+------
+Monday, November 3, 2025 (2025-11-03)
+Branch: langwatch/prompt-studio,langwatch/prompt-studio--playwright
+Commit Date: 2025-11-03
+Commit Message: persist chat messages in tabs
+Commit Hash: c964aaa3
+Commit Timestamp: 2025-11-03T18:11:09.000Z
+Files:
+     langwatch/.cursor/rules/react.mdc
+     langwatch/src/app/api/copilotkit/[[...route]]/app.ts
+     langwatch/src/prompt-configs/prompt-studio/components/chat/PromptStudioChat.tsx
+     langwatch/src/prompt-configs/prompt-studio/prompt-studio-store/DraggableTabsBrowserStore.ts
+     langwatch/src/prompt-configs/prompt-studio/prompt-studio-store/utils/id-generators.ts
+
+------
+Monday, November 3, 2025 (2025-11-03)
+Branch: langwatch/prompt-studio,langwatch/prompt-studio--playwright
+Commit Date: 2025-11-03
+Commit Message: fix conversation
+Commit Hash: bbced71b
+Commit Timestamp: 2025-11-03T18:21:41.000Z
+Files:
+     langwatch/src/components/llmPromptConfigs/LLMConfigModal.tsx
+     langwatch/src/optimization_studio/utils/registryUtils.ts
+     langwatch/src/prompt-configs/hooks/usePromptConfigForm.ts
+     langwatch/src/prompt-configs/prompt-studio/components/chat/PromptStudioChat.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/sidebar/PublishedPromptsList.tsx
+     langwatch/src/prompt-configs/prompt-studio/hooks/useCreateDraftPrompt.ts
+     langwatch/src/utils/constants.ts
+
+------
+Monday, November 3, 2025 (2025-11-03)
+Branch: langwatch/prompt-studio,langwatch/prompt-studio--playwright
+Commit Date: 2025-11-03
+Commit Message: Allow messages reset
+Commit Hash: aada8691
+Commit Timestamp: 2025-11-03T18:42:38.000Z
+Files:
+     langwatch/src/prompt-configs/prompt-studio/components/chat/PromptStudioChat.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/prompt-browser/prompt-browser-window/PromptTabbedSection.tsx
+
+------
+Monday, November 3, 2025 (2025-11-03)
+Branch: langwatch/prompt-studio,langwatch/prompt-studio--playwright
+Commit Date: 2025-11-03
+Commit Message: fixes from CR
+Commit Hash: 75e1a660
+Commit Timestamp: 2025-11-03T18:56:38.000Z
+Files:
+     langwatch/src/prompt-configs/prompt-studio/hooks/useHasUnsavedChanges.ts
+     langwatch/src/prompt-configs/prompt-studio/prompt-studio-store/utils/id-generators.ts
+     langwatch/src/server/api/routers/spans.ts
+
+------
+
+Tuesday, November 4, 2025 (2025-11-04)
+
+Start time today: 12:32 PM (2025-11-04T11:32:29.000Z)
+
+Tuesday, November 4, 2025 (2025-11-04)
+Branch: langwatch/prompt-studio,langwatch/prompt-studio--playwright
+Commit Date: 2025-11-04
+Commit Message: replace old prompts with new studio
+Commit Hash: 8603cbbb
+Commit Timestamp: 2025-11-04T11:32:29.000Z
+Files:
+     langwatch/src/components/playground/ChatWindow.tsx
+     langwatch/src/components/playground/Messages.tsx
+     langwatch/src/components/playground/PlaygroundTab.tsx
+     langwatch/src/pages/[project]/playground.tsx
+     langwatch/src/pages/[project]/prompt-studio/index.tsx
+     langwatch/src/pages/[project]/prompts.tsx
+     langwatch/src/prompt-configs/PromptConfigPanel.tsx
+     langwatch/src/prompt-configs/PromptsList.tsx
+     langwatch/src/utils/routes.ts
+
+------
+Tuesday, November 4, 2025 (2025-11-04)
+Branch: langwatch/prompt-studio,langwatch/prompt-studio--playwright
+Commit Date: 2025-11-04
+Commit Message: coderabbit suggestions
+Commit Hash: 8bac9268
+Commit Timestamp: 2025-11-04T12:00:27.000Z
+Files:
+     langwatch/src/components/traces/SpanDetails.tsx
+     langwatch/src/prompt-configs/VersionHistoryListPopover.tsx
+     langwatch/src/prompt-configs/components/ui/OrganizationBadge.tsx
+     langwatch/src/prompt-configs/components/ui/VersionBadge.tsx
+     langwatch/src/prompt-configs/forms/fields/EditablePromptHandleField.tsx
+     langwatch/src/prompt-configs/forms/fields/ModelSelectFieldMini.tsx
+     langwatch/src/prompt-configs/forms/fields/message-history-fields/PromptMessagesField.tsx
+     langwatch/src/prompt-configs/forms/prompt-config-form/components/VersionSaveButton.tsx
+     langwatch/src/prompt-configs/hooks/usePromptConfigForm.ts
+     langwatch/src/prompt-configs/prompt-studio/components/prompt-browser/prompt-browser-window/VariablesForm.tsx
+     langwatch/src/prompt-configs/utils/llmPromptConfigUtils.ts
+     langwatch/src/server/api/routers/spans.ts
+
+------
+Tuesday, November 4, 2025 (2025-11-04)
+Branch: langwatch/prompt-studio,langwatch/prompt-studio--playwright
+Commit Date: 2025-11-04
+Commit Message: remove cruft
+Commit Hash: 7338c55c
+Commit Timestamp: 2025-11-04T12:11:25.000Z
+Files:
+     langwatch/src/prompt-configs/hooks/usePromptQueryForFormValues.ts
+
+------
+Tuesday, November 4, 2025 (2025-11-04)
+Branch: langwatch/prompt-studio,langwatch/prompt-studio--playwright
+Commit Date: 2025-11-04
+Commit Message: cr suggestions
+Commit Hash: 61c87434
+Commit Timestamp: 2025-11-04T12:22:05.000Z
+Files:
+     langwatch/src/app/api/copilotkit/[[...route]]/app.ts
+     langwatch/src/prompt-configs/prompt-studio/components/PromptStudioLayout.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/PromptStudioMainContent.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/chat/PromptStudioChat.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/chat/ui/ChatAttachButton.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/chat/ui/ChatSendButton.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/chat/ui/ChatSyncCheckbox.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/chat/ui/ChatTextArea.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/prompt-browser/prompt-browser-window/PromptBrowserWindowContent.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/prompt-browser/prompt-browser-window/PromptMessagesEditor.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/prompt-browser/prompt-browser-window/SettingsTabContent.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/prompt-browser/tab/usePromptBrowserTabController.ts
+     langwatch/src/prompt-configs/prompt-studio/components/prompt-browser/ui/TabContext.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/sidebar/PublishedPromptActions.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/sidebar/PublishedPromptContent.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/sidebar/SidebarHeader.tsx
+     langwatch/src/prompt-configs/prompt-studio/hooks/useLoadSpanIntoPromptStudio.ts
+     langwatch/src/prompt-configs/prompt-studio/prompt-studio-store/DraggableTabsBrowserStore.ts
+
+------
+Tuesday, November 4, 2025 (2025-11-04)
+Branch: langwatch/prompt-studio,langwatch/prompt-studio--playwright
+Commit Date: 2025-11-04
+Commit Message: cr suggestions
+Commit Hash: 1225474e
+Commit Timestamp: 2025-11-04T14:18:40.000Z
+Files:
+     langwatch/src/prompt-configs/VersionHistoryListPopover.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/chat/ui/ChatSendButton.tsx
+
+------
+Tuesday, November 4, 2025 (2025-11-04)
+Branch: langwatch/prompt-studio,langwatch/prompt-studio--playwright
+Commit Date: 2025-11-04
+Commit Message: fix package after rebase
+Commit Hash: 11446505
+Commit Timestamp: 2025-11-04T14:36:33.000Z
+Files:
+     langwatch/package-lock.json
+     langwatch/package.json
+
+------
+Tuesday, November 4, 2025 (2025-11-04)
+Branch: langwatch/prompt-studio,langwatch/prompt-studio--playwright
+Commit Date: 2025-11-04
+Commit Message: fallbacks for pino
+Commit Hash: d410bd5d
+Commit Timestamp: 2025-11-04T15:30:47.000Z
+Files:
+     langwatch/next.config.mjs
+     langwatch/src/components/datasets/UploadCSVModal.tsx
+     langwatch/src/utils/logger.ts
+
+------
+Tuesday, November 4, 2025 (2025-11-04)
+Branch: langwatch/prompt-studio,langwatch/prompt-studio--playwright
+Commit Date: 2025-11-04
+Commit Message: reset experiment files to main
+Commit Hash: 04994891
+Commit Timestamp: 2025-11-04T16:14:47.000Z
+Files:
+     langwatch/src/server/analytics/registry.ts
+     langwatch/src/server/analytics/timeseries.ts
+     langwatch/src/server/analytics/types.ts
+     langwatch/src/server/api/routers/analytics/common.ts
+     langwatch/src/server/api/routers/analytics/dataForFilter.ts
+     langwatch/src/server/api/routers/analytics/documents.ts
+     langwatch/src/server/api/routers/analytics/feedbacks.ts
+     langwatch/src/server/api/routers/experiments.ts
+     langwatch/src/server/api/routers/limits.ts
+     langwatch/src/server/api/routers/traces.ts
+     langwatch/src/server/filters/registry.ts
+     langwatch/src/server/filters/types.ts
+     langwatch/src/server/scenario-analytics.ts
+     langwatch/src/server/topicClustering/topicClustering.ts
+     langwatch/src/tasks/backfillScenarioAnalytics.ts
+     langwatch/src/tasks/backfillTraceAnalytics.ts
+     langwatch/src/tasks/cold/setupColdStorage.ts
+     langwatch/src/tasks/elasticMigrate.ts
+     langwatch/src/tasks/rerunChecks.ts
+
+------
+Tuesday, November 4, 2025 (2025-11-04)
+Branch: langwatch/prompt-studio,langwatch/prompt-studio--playwright
+Commit Date: 2025-11-04
+Commit Message: CR suggestions
+Commit Hash: 8cdb46fb
+Commit Timestamp: 2025-11-04T16:31:36.000Z
+Files:
+     langwatch/src/components/simulations/CustomCopilotKitChat.tsx
+     langwatch/src/components/traces/SpanDetails.tsx
+     langwatch/src/prompt-configs/forms/fields/message-history-fields/PromptMessagesField.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/chat/PromptStudioChat.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/prompt-browser/PromptStudioTabbedWorkspace.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/prompt-browser/prompt-browser-window/PromptBrowserWindowContent.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/prompt-browser/tab/PromptBrowserTab.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/prompt-browser/tab/usePromptBrowserTabController.ts
+     langwatch/src/prompt-configs/prompt-studio/components/prompt-browser/ui/DraggableTabsBrowser.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/sidebar/ui/Sidebar.tsx
+     langwatch/src/prompt-configs/prompt-studio/hooks/useLoadSpanIntoPromptStudio.ts
+     langwatch/src/prompt-configs/prompt-studio/prompt-studio-store/DraggableTabsBrowserStore.ts
+     langwatch/src/server/api/routers/spans.ts
+     langwatch/src/utils/withControllerHOC.tsx
+
+------
+Tuesday, November 4, 2025 (2025-11-04)
+Branch: langwatch/prompt-studio,langwatch/prompt-studio--playwright
+Commit Date: 2025-11-04
+Commit Message: fix tests
+Commit Hash: ddc8abac
+Commit Timestamp: 2025-11-04T17:59:07.000Z
+Files:
+     langwatch/package-lock.json
+     langwatch/package.json
+     langwatch/src/app/api/prompts/[[...route]]/app.v1.ts
+     langwatch/src/components/datasets/UploadCSVModal.tsx
+     langwatch/src/server/prompt-config/__tests__/prompt.service.test.ts
+     langwatch/src/server/prompt-config/prompt.service.ts
+     langwatch/vitest.config.ts
+
+------
+Tuesday, November 4, 2025 (2025-11-04)
+Branch: langwatch/prompt-studio--playwright
+Commit Date: 2025-11-04
+Commit Message: WIP: Playwright testing
+Commit Hash: 3d4d9d64
+Commit Timestamp: 2025-11-04T19:59:32.000Z
+Files:
+     "langwatch/.github/chatmodes/ \360\237\216\255 planner.chatmode.md"
+     "langwatch/.github/chatmodes/\360\237\216\255 generator.chatmode.md"
+     "langwatch/.github/chatmodes/\360\237\216\255 healer.chatmode.md"
+     langwatch/e2e/happy-paths/create-workflow.spec.ts
+     langwatch/e2e/happy-paths/prompt-management-from-workflow.spec.ts
+     langwatch/e2e/happy-paths/prompt-management.spec.ts
+     langwatch/e2e/happy-paths/update-demonstrations.spec.ts
+     langwatch/e2e/playwright.config.ts
+     langwatch/e2e/seed.spec.ts
+     langwatch/e2e/specs/prompts-comprehensive-test-plan.md
+     langwatch/e2e/tests/prompts/1-1-create-first-prompt.spec.ts
+     langwatch/e2e/tests/prompts/2-1-save-prompt-with-identifier.spec.ts
+     langwatch/e2e/tests/prompts/3-1-modify-system-prompt.spec.ts
+     langwatch/e2e/tests/prompts/3-2-add-user-message.spec.ts
+     langwatch/e2e/tests/prompts/3-3-add-assistant-message.spec.ts
+     langwatch/e2e/tests/prompts/3-4-delete-message.spec.ts
+     langwatch/e2e/tests/prompts/4-1-open-model-config-dialog.spec.ts
+     langwatch/package-lock.json
+     langwatch/package.json
+     langwatch_nlp/uv.lock
+
+------
+Tuesday, November 4, 2025 (2025-11-04)
+Branch: langwatch/prompt-studio
+Commit Date: 2025-11-04
+Commit Message: add tests for store
+Commit Hash: 7272e9fb
+Commit Timestamp: 2025-11-04T21:46:29.000Z
+Files:
+     langwatch/src/prompt-configs/prompt-studio/components/prompt-browser/tab/usePromptBrowserTabController.ts
+     langwatch/src/prompt-configs/prompt-studio/prompt-studio-store/DraggableTabsBrowserStore.ts
+     langwatch/src/prompt-configs/prompt-studio/prompt-studio-store/__tests__/DraggableTabsBrowserStore.test.ts
+     langwatch/src/utils/api.ts
+     langwatch/vitest.config.ts
+
+------
+Tuesday, November 4, 2025 (2025-11-04)
+Branch: langwatch/prompt-studio
+Commit Date: 2025-11-04
+Commit Message: fix sortable issue
+Commit Hash: 5e4ff54d
+Commit Timestamp: 2025-11-04T22:27:18.000Z
+Files:
+     langwatch/src/prompt-configs/prompt-studio/components/prompt-browser/PromptStudioTabbedWorkspace.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/prompt-browser/ui/DraggableTabsBrowser.tsx
+
+------
+
+Wednesday, November 5, 2025 (2025-11-05)
+
+Start time today: 11:34 AM (2025-11-05T10:34:52.000Z)
+
+Wednesday, November 5, 2025 (2025-11-05)
+Branch: langwatch/prompt-studio
+Commit Date: 2025-11-05
+Commit Message: update docs on feather => lucide
+Commit Hash: 4b73bb9e
+Commit Timestamp: 2025-11-05T10:34:52.000Z
+Files:
+     langwatch/.cursor/rules/frontend.mdc
+
+------
+Wednesday, November 5, 2025 (2025-11-05)
+Branch: langwatch/prompt-studio
+Commit Date: 2025-11-05
+Commit Message: update rules
+Commit Hash: 50620701
+Commit Timestamp: 2025-11-05T10:44:05.000Z
+Files:
+     langwatch/.cursor/rules/react.mdc
+     langwatch/.cursor/rules/unit-tests.mdc
+
+------
+Wednesday, November 5, 2025 (2025-11-05)
+Branch: langwatch/prompt-studio
+Commit Date: 2025-11-05
+Commit Message: clean up
+Commit Hash: c70e68b4
+Commit Timestamp: 2025-11-05T11:01:33.000Z
+Files:
+     langwatch/.cursor/rules/react.mdc
+     langwatch/.cursor/rules/unit-tests.mdc
+     langwatch/src/prompt-configs/hooks/useAllPromptsForProject.ts
+     langwatch/src/prompt-configs/prompt-studio/components/chat/SyncedChatInput.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/chat/ui/ChatAttachButton.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/chat/ui/ChatSendButton.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/prompt-browser/PromptStudioTabbedWorkspace.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/prompt-browser/prompt-browser-window/PromptBrowserHeader.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/prompt-browser/prompt-browser-window/PromptBrowserWindowContent.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/prompt-browser/prompt-browser-window/PromptTabbedSection.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/prompt-browser/tab/PromptBrowserTab.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/prompt-browser/ui/BrowserLikeTabs.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/prompt-browser/ui/DraggableTabsBrowser.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/sidebar/AddPromptButton.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/sidebar/PublishedPromptActions.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/sidebar/ui/Sidebar.tsx
+     langwatch/src/prompt-configs/prompt-studio/hooks/useCreateDraftPrompt.ts
+     langwatch/src/prompt-configs/prompt-studio/hooks/useHandleSavePrompt.ts
+     langwatch/src/prompt-configs/prompt-studio/hooks/useIsTabActive.ts
+     langwatch/src/prompt-configs/prompt-studio/hooks/useLoadSpanIntoPromptStudio.ts
+     langwatch/src/prompt-configs/prompt-studio/hooks/useUrlParamToOpenNewTab.ts
+
+------
+Wednesday, November 5, 2025 (2025-11-05)
+Branch: langwatch/prompt-studio
+Commit Date: 2025-11-05
+Commit Message: clean up
+Commit Hash: ded8a78b
+Commit Timestamp: 2025-11-05T11:23:23.000Z
+Files:
+     langwatch/src/prompt-configs/prompt-studio/components/prompt-browser/tab/usePromptBrowserTabController.ts
+
+------
+Wednesday, November 5, 2025 (2025-11-05)
+Branch: langwatch/prompt-studio
+Commit Date: 2025-11-05
+Commit Message: tests
+Commit Hash: 88d64303
+Commit Timestamp: 2025-11-05T11:43:53.000Z
+Files:
+     langwatch/src/prompt-configs/prompt-studio/components/chat/SyncedChatInput.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/chat/__tests__/SyncedChatInput.test.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/chat/ui/ChatAttachButton.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/prompt-browser/prompt-browser-window/__tests__/VariablesForm.test.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/prompt-browser/tab/__tests__/usePromptBrowserTabController.test.ts
+     langwatch/src/prompt-configs/prompt-studio/components/sidebar/__tests__/MainContentEmptyState.test.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/sidebar/__tests__/PublishedPromptsList.test.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/sidebar/ui/__tests__/Sidebar.test.tsx
+     langwatch/src/prompt-configs/prompt-studio/hooks/__tests__/useLoadSpanIntoPromptStudio.test.ts
+     langwatch/src/prompt-configs/prompt-studio/hooks/useHasUnsavedChanges.ts
+     langwatch/src/prompt-configs/prompt-studio/hooks/useUrlParamToOpenNewTab.ts
+     langwatch/src/prompt-configs/utils/__tests__/areFormValuesEqual.test.ts
+     langwatch/src/prompt-configs/utils/areFormValuesEqual.ts
+     langwatch/src/server/prompt-config/__tests__/prompt.service.logic.test.ts
+     langwatch/src/server/prompt-config/repositories/__tests__/llm-config.repository.logic.test.ts
+
+------
+Wednesday, November 5, 2025 (2025-11-05)
+Branch: simulations/performance
+Commit Date: 2025-11-05
+Commit Message: initial commit
+Commit Hash: 145d6ccf
+Commit Timestamp: 2025-11-05T12:06:55.000Z
+
+------
+Wednesday, November 5, 2025 (2025-11-05)
+Branch: simulations/performance
+Commit Date: 2025-11-05
+Commit Message: remove memory leak on useZoom
+Commit Hash: 4faa1e3a
+Commit Timestamp: 2025-11-05T16:03:16.000Z
+Files:
+     langwatch/src/hooks/useZoom.ts
+
+------
+Wednesday, November 5, 2025 (2025-11-05)
+Branch: simulations/performance
+Commit Date: 2025-11-05
+Commit Message: memoize router callbacks
+Commit Hash: be57e8e6
+Commit Timestamp: 2025-11-05T16:05:02.000Z
+Files:
+     langwatch/src/hooks/simulations/useSimulationRouter.ts
+
+------
+Wednesday, November 5, 2025 (2025-11-05)
+Branch: simulations/performance
+Commit Date: 2025-11-05
+Commit Message: fix useEffect deps array
+Commit Hash: 90073caf
+Commit Timestamp: 2025-11-05T16:06:28.000Z
+Files:
+     langwatch/src/pages/[project]/simulations/[scenarioSetId]/[batchRunId]/index.tsx
+
+------
+Wednesday, November 5, 2025 (2025-11-05)
+Branch: simulations/performance
+Commit Date: 2025-11-05
+Commit Message: fix rerenders at chat view level
+Commit Hash: 98cd7a9d
+Commit Timestamp: 2025-11-05T16:37:24.000Z
+Files:
+     langwatch/src/components/simulations/CustomCopilotKitChat.tsx
+     langwatch/src/components/simulations/SimulationChatViewer.tsx
+     langwatch/src/components/simulations/SimulationChatWrapper.tsx
+     langwatch/src/components/simulations/index.ts
+     langwatch/src/components/simulations/utils/convert-scenario-messages.ts
+
+------
+Wednesday, November 5, 2025 (2025-11-05)
+Branch: simulations/performance
+Commit Date: 2025-11-05
+Commit Message: zoom grid perf improvements
+Commit Hash: 97b8e002
+Commit Timestamp: 2025-11-05T20:47:26.000Z
+Files:
+     langwatch/src/components/simulations/CustomCopilotKitChat.tsx
+     langwatch/src/components/simulations/SimulationChatViewer.tsx
+     langwatch/src/components/simulations/SimulationZoomGrid.tsx
+     langwatch/src/components/simulations/zoom-grid/SimulationGridCard.tsx
+     langwatch/src/components/simulations/zoom-grid/SimulationZoomGrid.tsx
+     langwatch/src/components/simulations/zoom-grid/ZoomControls.tsx
+     langwatch/src/components/simulations/zoom-grid/ZoomGrid.tsx
+     langwatch/src/components/simulations/zoom-grid/ZoomRoot.tsx
+     langwatch/src/components/simulations/zoom-grid/constants.ts
+     langwatch/src/components/simulations/zoom-grid/zoomContext.ts
+
+------
+Wednesday, November 5, 2025 (2025-11-05)
+Branch: simulations/performance
+Commit Date: 2025-11-05
+Commit Message: improve docs on router
+Commit Hash: 1d3fe6e9
+Commit Timestamp: 2025-11-05T20:52:53.000Z
+Files:
+     langwatch/src/server/api/routers/scenario.ts
+
+------
+Wednesday, November 5, 2025 (2025-11-05)
+Branch: simulations/performance
+Commit Date: 2025-11-05
+Commit Message: update docs on page and routing
+Commit Hash: 9272ee9d
+Commit Timestamp: 2025-11-05T21:01:13.000Z
+Files:
+     langwatch/src/pages/[project]/simulations/[scenarioSetId]/[batchRunId]/index.tsx
+
+------
+Wednesday, November 5, 2025 (2025-11-05)
+Branch: simulations/performance
+Commit Date: 2025-11-05
+Commit Message: clean up hooks and simplify query
+Commit Hash: 64f84dc8
+Commit Timestamp: 2025-11-05T21:55:53.000Z
+Files:
+     langwatch/src/app/api/scenario-events/[[...route]]/scenario-event.repository.ts
+     langwatch/src/app/api/scenario-events/[[...route]]/scenario-event.service.ts
+     langwatch/src/components/simulations/CustomCopilotKitChat.tsx
+     langwatch/src/components/simulations/SimulationChatViewer.tsx
+     langwatch/src/components/simulations/index.ts
+     langwatch/src/components/simulations/set-run-history-sidebar/useSetRunHistorySidebarController.ts
+     langwatch/src/hooks/simulations/README.md
+     langwatch/src/hooks/simulations/useSimulationQueries.ts
+     langwatch/src/pages/[project]/simulations/[scenarioSetId]/[batchRunId]/index.tsx
+     langwatch/src/server/api/routers/scenario.ts
+
+------
+Wednesday, November 5, 2025 (2025-11-05)
+Branch: simulations/performance
+Commit Date: 2025-11-05
+Commit Message: create simple chat
+Commit Hash: c11fc89b
+Commit Timestamp: 2025-11-05T22:56:09.000Z
+Files:
+     langwatch/src/components/simulations/CustomCopilotKitChat.tsx
+     langwatch/src/components/simulations/SimulationChatViewer.tsx
+     langwatch/src/components/simulations/simple-chat/MessageItem.tsx
+     langwatch/src/components/simulations/simple-chat/MessageViewer.tsx
+     langwatch/src/components/simulations/simple-chat/SimpleChatUI.tsx
+     langwatch/src/components/simulations/simple-chat/index.ts
+     langwatch/src/components/simulations/simple-chat/types.ts
+     langwatch/src/hooks/simulations/useSimulationQueries.ts
+
+------
+Wednesday, November 5, 2025 (2025-11-05)
+Branch: simulations/performance
+Commit Date: 2025-11-05
+Commit Message: batch get run states
+Commit Hash: 650bfd78
+Commit Timestamp: 2025-11-05T23:30:56.000Z
+Files:
+     langwatch/src/app/api/scenario-events/[[...route]]/types.ts
+     langwatch/src/components/simulations/CustomCopilotKitChat.tsx
+     langwatch/src/components/simulations/SimulationChatViewer.tsx
+     langwatch/src/components/simulations/zoom-grid/SimulationGridCard.tsx
+     langwatch/src/components/simulations/zoom-grid/ZoomGrid.tsx
+     langwatch/src/hooks/simulations/useSimulationQueries.ts
+     langwatch/src/pages/[project]/simulations/[scenarioSetId]/[batchRunId]/index.tsx
+     langwatch/src/server/api/routers/scenario.ts
+
+------
+Wednesday, November 5, 2025 (2025-11-05)
+Branch: simulations/performance
+Commit Date: 2025-11-05
+Commit Message: only render messages in mini preview
+Commit Hash: 172a7b36
+Commit Timestamp: 2025-11-05T23:52:08.000Z
+Files:
+     langwatch/src/components/simulations/SimulationChatViewer.tsx
+     langwatch/src/components/simulations/simple-chat/MessageItem.tsx
+     langwatch/src/hooks/simulations/useSimulationQueries.ts
+
+------
+
+Thursday, November 6, 2025 (2025-11-06)
+
+Start time today: 1:05 AM (2025-11-06T00:05:09.000Z)
+
+Thursday, November 6, 2025 (2025-11-06)
+Branch: simulations-quick-fix
+Commit Date: 2025-11-06
+Commit Message: fix: simulations page crashing browser
+Commit Hash: 97667b5f
+Commit Timestamp: 2025-11-06T00:05:09.000Z
+Files:
+     langwatch/src/components/simulations/CustomCopilotKitChat.tsx
+
+------
+Thursday, November 6, 2025 (2025-11-06)
+Branch: chore/add-tests-to-pipeline,feat/better-error-visibility,fix/bug-with-demonstrations,fix/corrupted-workflow-bug,fix/empty-handle-validation
+Commit Date: 2025-11-06
+Commit Message: fix: simulations page crashing browser (#784)
+Commit Hash: e731a5ff
+Commit Timestamp: 2025-11-06T06:15:16.000Z
+Files:
+     langwatch/src/components/simulations/CustomCopilotKitChat.tsx
+
+------
+Thursday, November 6, 2025 (2025-11-06)
+Branch: fix/codex-autofix
+Commit Date: 2025-11-06
+Commit Message: fix: codex autofix workflow
+Commit Hash: aeb06a5f
+Commit Timestamp: 2025-11-06T10:21:25.000Z
+Files:
+     .github/workflows/codex-autofix.yml
+
+------
+Thursday, November 6, 2025 (2025-11-06)
+Branch: chore/add-tests-to-pipeline,feat/better-error-visibility,fix/bug-with-demonstrations,fix/corrupted-workflow-bug,fix/empty-handle-validation
+Commit Date: 2025-11-06
+Commit Message: fix: codex auto-fix workflow (#786)
+Commit Hash: bdf82a7f
+Commit Timestamp: 2025-11-06T10:28:38.000Z
+Files:
+     .github/workflows/codex-autofix.yml
+
+------
+Thursday, November 6, 2025 (2025-11-06)
+Branch: langwatch/prompt-studio
+Commit Date: 2025-11-06
+Commit Message: fix: icon
+Commit Hash: c2014633
+Commit Timestamp: 2025-11-06T10:54:38.000Z
+Files:
+     langwatch/src/prompt-configs/prompt-studio/components/sidebar/PublishedPromptActions.tsx
+
+------
+Thursday, November 6, 2025 (2025-11-06)
+Branch: langwatch/prompt-studio
+Commit Date: 2025-11-06
+Commit Message: fix: permission layout
+Commit Hash: 16fb9117
+Commit Timestamp: 2025-11-06T10:56:01.000Z
+Files:
+     langwatch/src/pages/[project]/prompts.tsx
+
+------
+Thursday, November 6, 2025 (2025-11-06)
+Branch: langwatch/prompt-studio
+Commit Date: 2025-11-06
+Commit Message: fix: tooltip bug
+Commit Hash: bfa93ef6
+Commit Timestamp: 2025-11-06T10:57:55.000Z
+Files:
+     langwatch/src/components/ui/tooltip.tsx
+
+------
+Thursday, November 6, 2025 (2025-11-06)
+Branch: langwatch/prompt-studio
+Commit Date: 2025-11-06
+Commit Message: fix: button nesting
+Commit Hash: 35325890
+Commit Timestamp: 2025-11-06T11:23:13.000Z
+Files:
+     langwatch/package-lock.json
+     langwatch/src/prompt-configs/forms/fields/message-history-fields/AddMessageButton.tsx
+
+------
+Thursday, November 6, 2025 (2025-11-06)
+Branch: langwatch/prompt-studio
+Commit Date: 2025-11-06
+Commit Message: Improve error handling for service adapter
+Commit Hash: 2934ad70
+Commit Timestamp: 2025-11-06T11:55:06.000Z
+Files:
+     langwatch/src/app/api/copilotkit/[[...route]]/service-adapter.ts
+     langwatch/src/prompt-configs/prompt-studio/components/chat/PromptStudioChat.tsx
+
+------
+Thursday, November 6, 2025 (2025-11-06)
+Branch: langwatch/prompt-studio
+Commit Date: 2025-11-06
+Commit Message: fix input
+Commit Hash: c81a205b
+Commit Timestamp: 2025-11-06T11:58:54.000Z
+Files:
+     langwatch/src/prompt-configs/prompt-studio/components/chat/SyncedChatInput.tsx
+
+------
+Thursday, November 6, 2025 (2025-11-06)
+Branch: fix/remove-langchain-community-dep
+Commit Date: 2025-11-06
+Commit Message: fix(langwatch_nlp): remove unused langchain-community dependency
+Commit Hash: e780df76
+Commit Timestamp: 2025-11-06T12:08:49.000Z
+Files:
+     langwatch_nlp/pyproject.toml
+     langwatch_nlp/uv.lock
+
+------
+Thursday, November 6, 2025 (2025-11-06)
+Branch: chore/add-tests-to-pipeline,feat/better-error-visibility,fix/bug-with-demonstrations,fix/corrupted-workflow-bug,fix/empty-handle-validation
+Commit Date: 2025-11-06
+Commit Message: fix: remove unused langchain-community dependency (#787)
+Commit Hash: 9ad61f7e
+Commit Timestamp: 2025-11-06T12:27:37.000Z
+Files:
+     langwatch_nlp/pyproject.toml
+     langwatch_nlp/uv.lock
+
+------
+Thursday, November 6, 2025 (2025-11-06)
+Branch: chore/add-tests-to-pipeline
+Commit Date: 2025-11-06
+Commit Message: fix: remove unused langchain-community dependency and add CI
+Commit Hash: 9ec4c202
+Commit Timestamp: 2025-11-06T12:43:31.000Z
+Files:
+     .github/workflows/langwatch-nlp-ci.yml
+     langwatch_nlp/Makefile
+     langwatch_nlp/pyproject.toml
+     langwatch_nlp/tests/topic_clustering/test_topic_clustering_integration.py
+     langwatch_nlp/tests/topic_clustering/test_topic_naming.py
+     langwatch_nlp/uv.lock
+
+------
+Thursday, November 6, 2025 (2025-11-06)
+Branch: chore/add-tests-to-pipeline
+Commit Date: 2025-11-06
+Commit Message: fix: mark test_topic_clustering as integration and add conftest for env loading
+Commit Hash: 7230da73
+Commit Timestamp: 2025-11-06T12:58:56.000Z
+Files:
+     langwatch_nlp/tests/conftest.py
+     langwatch_nlp/tests/test_app.py
+     langwatch_nlp/tests/topic_clustering/test_topic_clustering.py
+     langwatch_nlp/tests/topic_clustering/test_topic_clustering_integration.py
+     langwatch_nlp/tests/topic_clustering/test_topic_naming.py
+
+------
+Thursday, November 6, 2025 (2025-11-06)
+Branch: chore/add-tests-to-pipeline
+Commit Date: 2025-11-06
+Commit Message: fix: update integration tests to use gpt-4o and fix function signatures
+Commit Hash: 2014fc51
+Commit Timestamp: 2025-11-06T13:01:18.000Z
+Files:
+     langwatch_nlp/tests/studio/test_workflow_parse_and_execution.py
+     langwatch_nlp/tests/topic_clustering/test_topic_naming.py
+
+------
+Thursday, November 6, 2025 (2025-11-06)
+Branch: chore/add-tests-to-pipeline
+Commit Date: 2025-11-06
+Commit Message: fix: correct test_sentiment_analysis to send 'text' instead of 'vector'
+Commit Hash: 6df03d83
+Commit Timestamp: 2025-11-06T13:01:40.000Z
+Files:
+     langwatch_nlp/tests/test_app.py
+
+------
+Thursday, November 6, 2025 (2025-11-06)
+Branch: chore/add-tests-to-pipeline
+Commit Date: 2025-11-06
+Commit Message: fix: remove unused import from test_app.py
+Commit Hash: 0932dc2a
+Commit Timestamp: 2025-11-06T13:01:54.000Z
+Files:
+     langwatch_nlp/tests/test_app.py
+
+------
+Thursday, November 6, 2025 (2025-11-06)
+Branch: chore/add-tests-to-pipeline
+Commit Date: 2025-11-06
+Commit Message: fix: prevent test_app from importing main at module level
+Commit Hash: 95e864bd
+Commit Timestamp: 2025-11-06T13:10:36.000Z
+Files:
+     langwatch_nlp/tests/test_app.py
+
+------
+Thursday, November 6, 2025 (2025-11-06)
+Branch: chore/add-tests-to-pipeline
+Commit Date: 2025-11-06
+Commit Message: fix: use fixtures for test clients instead of module-level initialization
+Commit Hash: 517e2168
+Commit Timestamp: 2025-11-06T13:11:22.000Z
+Files:
+     langwatch_nlp/tests/test_app.py
+     langwatch_nlp/tests/topic_clustering/test_topic_clustering.py
+     langwatch_nlp/tests/topic_clustering/test_topic_clustering_integration.py
+
+------
+Thursday, November 6, 2025 (2025-11-06)
+Branch: langwatch/prompt-studio
+Commit Date: 2025-11-06
+Commit Message: fix: delete backdrop
+Commit Hash: 0e58c4b9
+Commit Timestamp: 2025-11-06T13:56:50.000Z
+Files:
+     langwatch/src/components/annotations/DeleteConfirmationDialog.tsx
+
+------
+Thursday, November 6, 2025 (2025-11-06)
+Branch: langwatch/prompt-studio
+Commit Date: 2025-11-06
+Commit Message: fix: routing
+Commit Hash: 2fba9acb
+Commit Timestamp: 2025-11-06T14:08:57.000Z
+Files:
+     langwatch/src/components/MainMenu.tsx
+     langwatch/src/components/traces/SpanDetails.tsx
+     langwatch/src/prompt-configs/prompt-studio/hooks/useLoadSpanIntoPromptStudio.ts
+     langwatch/src/utils/routes.ts
+
+------
+Thursday, November 6, 2025 (2025-11-06)
+Branch: langwatch/prompt-studio
+Commit Date: 2025-11-06
+Commit Message: fix: scrolling issue
+Commit Hash: d67804de
+Commit Timestamp: 2025-11-06T14:39:06.000Z
+Files:
+     langwatch/src/prompt-configs/prompt-studio/components/PromptStudioMainContent.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/prompt-browser/PromptStudioBrowser.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/prompt-browser/ui/BrowserLikeTabs.tsx
+
+------
+Thursday, November 6, 2025 (2025-11-06)
+Branch: langwatch/prompt-studio
+Commit Date: 2025-11-06
+Commit Message: add docs + todo test to service adapter
+Commit Hash: 19cad6e2
+Commit Timestamp: 2025-11-06T15:15:33.000Z
+Files:
+     langwatch/src/app/api/copilotkit/[[...route]]/__tests__/service-adapter.test.ts
+     langwatch/src/app/api/copilotkit/[[...route]]/service-adapter.ts
+
+------
+Thursday, November 6, 2025 (2025-11-06)
+Branch: langwatch/prompt-studio
+Commit Date: 2025-11-06
+Commit Message: refresh lock
+Commit Hash: 4e1b4517
+Commit Timestamp: 2025-11-06T15:18:41.000Z
+Files:
+     langwatch/package-lock.json
+
+------
+Thursday, November 6, 2025 (2025-11-06)
+Branch: langwatch/prompt-studio
+Commit Date: 2025-11-06
+Commit Message: add not found trace
+Commit Hash: c55ae7a8
+Commit Timestamp: 2025-11-06T15:32:54.000Z
+Files:
+     langwatch/src/components/copilot-kit/TraceMessage.tsx
+
+------
+Thursday, November 6, 2025 (2025-11-06)
+Branch: langwatch/prompt-studio
+Commit Date: 2025-11-06
+Commit Message: handle gpt-5 form issues
+Commit Hash: 7fa24e53
+Commit Timestamp: 2025-11-06T17:11:48.000Z
+Files:
+     langwatch/src/app/api/copilotkit/[[...route]]/service-adapter.ts
+     langwatch/src/app/api/workflows/post_event/post-event.ts
+     langwatch/src/components/copilot-kit/TraceMessage.tsx
+     langwatch/src/components/llmPromptConfigs/LLMConfigModal.tsx
+     langwatch/src/optimization_studio/types/dsl.ts
+     langwatch/src/prompt-configs/hooks/usePromptConfigForm.ts
+     langwatch/src/prompt-configs/prompt-studio/components/prompt-browser/prompt-browser-window/PromptBrowserWindowContent.tsx
+     langwatch/src/prompt-configs/schemas/form-schema.ts
+
+------
+Thursday, November 6, 2025 (2025-11-06)
+Branch: langwatch/prompt-studio
+Commit Date: 2025-11-06
+Commit Message: clean up
+Commit Hash: d15e5d21
+Commit Timestamp: 2025-11-06T18:24:38.000Z
+Files:
+     langwatch/src/prompt-configs/forms/fields/ModelSelectFieldMini.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/prompt-browser/prompt-browser-window/PromptBrowserWindowContent.tsx
+
+------
+Thursday, November 6, 2025 (2025-11-06)
+Branch: langwatch/prompt-studio
+Commit Date: 2025-11-06
+Commit Message: fix indentation
+Commit Hash: 8cfc44d9
+Commit Timestamp: 2025-11-06T18:40:15.000Z
+Files:
+     langwatch/package.json
+
+------
+Thursday, November 6, 2025 (2025-11-06)
+Branch: langwatch/prompt-studio
+Commit Date: 2025-11-06
+Commit Message: fix type errors
+Commit Hash: 3255d023
+Commit Timestamp: 2025-11-06T18:44:42.000Z
+Files:
+     langwatch/package-lock.json
+     langwatch/package.json
+     langwatch/src/prompt-configs/prompt-studio/hooks/useLoadSpanIntoPromptStudio.ts
+     langwatch/src/prompt-configs/utils/llmPromptConfigUtils.ts
+
+------
+
+Monday, November 10, 2025 (2025-11-10)
+
+Start time today: 9:07 AM (2025-11-10T08:07:03.000Z)
+
+Monday, November 10, 2025 (2025-11-10)
+Branch: langwatch/prompt-studio
+Commit Date: 2025-11-10
+Commit Message: hide spec story
+Commit Hash: baa9bced
+Commit Timestamp: 2025-11-10T08:07:03.000Z
+Files:
+     .gitignore
+
+------
+Monday, November 10, 2025 (2025-11-10)
+Branch: langwatch/prompt-studio
+Commit Date: 2025-11-10
+Commit Message: add new cursor rules
+Commit Hash: 718ed937
+Commit Timestamp: 2025-11-10T08:14:07.000Z
+Files:
+     .cursor/rules/commit-and-push.mdc
+     .cursor/rules/creating-service-methods.mdc
+     .cursor/rules/documentation.mdc
+     .cursor/rules/file-structure.mdc
+     .cursor/rules/initial-commit.mdc
+     .cursor/rules/migrations.mdc
+     .cursor/rules/unit-tests.mdc
+     .gitignore
+     langwatch/.cursor/rules/commit-and-push.mdc
+     langwatch/.cursor/rules/creating-service-methods.mdc
+     langwatch/.cursor/rules/documentation.mdc
+     langwatch/.cursor/rules/file-structure.mdc
+     langwatch/.cursor/rules/initial-commit.mdc
+     langwatch/.cursor/rules/migrations.mdc
+     langwatch/.cursor/rules/python.mdc
+     langwatch/.cursor/rules/react-tsx.mdc
+     langwatch/.cursor/rules/react.mdc
+     langwatch/.cursor/rules/typescript.mdc
+     langwatch/.cursor/rules/unit-tests.mdc
+
+------
+Monday, November 10, 2025 (2025-11-10)
+Branch: langwatch/prompt-studio
+Commit Date: 2025-11-10
+Commit Message: fix(ci): add rollup linux native module dependency
+Commit Hash: a79cb544
+Commit Timestamp: 2025-11-10T08:45:09.000Z
+Files:
+     langwatch/package-lock.json
+     langwatch/package.json
+
+------
+Monday, November 10, 2025 (2025-11-10)
+Branch: langwatch/prompt-studio
+Commit Date: 2025-11-10
+Commit Message: fix(ci): move rollup linux native module to optionalDependencies
+Commit Hash: 3ac23b57
+Commit Timestamp: 2025-11-10T09:15:23.000Z
+Files:
+     langwatch/package-lock.json
+     langwatch/package.json
+
+------
+Monday, November 10, 2025 (2025-11-10)
+Branch: langwatch/prompt-studio
+Commit Date: 2025-11-10
+Commit Message: docs: update commit-and-push rule
+Commit Hash: ca1ead05
+Commit Timestamp: 2025-11-10T09:19:08.000Z
+Files:
+     langwatch/.cursor/rules/commit-and-push.mdc
+
+------
+Monday, November 10, 2025 (2025-11-10)
+Branch: langwatch/prompt-studio
+Commit Date: 2025-11-10
+Commit Message: refactor: update SpanDetails component
+Commit Hash: d9b350a2
+Commit Timestamp: 2025-11-10T09:19:10.000Z
+Files:
+     langwatch/src/components/traces/SpanDetails.tsx
+
+------
+Monday, November 10, 2025 (2025-11-10)
+Branch: langwatch/prompt-studio
+Commit Date: 2025-11-10
+Commit Message: fix: restore PromptConfigPanel and PromptsList from main
+Commit Hash: bcb29f81
+Commit Timestamp: 2025-11-10T10:36:45.000Z
+Files:
+     langwatch/src/pages/[project]/prompts.tsx
+     langwatch/src/prompt-configs/PromptConfigPanel.tsx
+     langwatch/src/prompt-configs/PromptsList.tsx
+
+------
+Monday, November 10, 2025 (2025-11-10)
+Branch: langwatch/prompt-studio
+Commit Date: 2025-11-10
+Commit Message: fix: prevent version number collision in concurrent restore operations
+Commit Hash: b8689850
+Commit Timestamp: 2025-11-10T10:37:27.000Z
+Files:
+     langwatch/src/server/prompt-config/repositories/llm-config-versions.repository.ts
+
+------
+Monday, November 10, 2025 (2025-11-10)
+Branch: langwatch/prompt-studio
+Commit Date: 2025-11-10
+Commit Message: put back prompt page and add warn log
+Commit Hash: dffc7656
+Commit Timestamp: 2025-11-10T10:41:52.000Z
+Files:
+     langwatch/src/components/datasets/DatasetMappingPreview.tsx
+     langwatch/src/pages/[project]/prompt-studio.tsx
+
+------
+Monday, November 10, 2025 (2025-11-10)
+Branch: feat/better-error-visibility,fix/bug-with-demonstrations,fix/corrupted-workflow-bug,fix/empty-handle-validation,fix/hide-edit-on-other-tabs
+Commit Date: 2025-11-10
+Commit Message: feat: prompt studio (#734)
+Commit Hash: 3686d50e
+Commit Timestamp: 2025-11-10T10:52:05.000Z
+Files:
+     .cursor/rules/commit-and-push.mdc
+     .cursor/rules/creating-service-methods.mdc
+     .cursor/rules/documentation.mdc
+     .cursor/rules/file-structure.mdc
+     .cursor/rules/initial-commit.mdc
+     .cursor/rules/migrations.mdc
+     .cursor/rules/unit-tests.mdc
+     .gitignore
+     langwatch/.cursor/rules/commit-and-push.mdc
+     langwatch/.cursor/rules/creating-service-methods.mdc
+     langwatch/.cursor/rules/documentation.mdc
+     langwatch/.cursor/rules/file-structure.mdc
+     langwatch/.cursor/rules/initial-commit.mdc
+     langwatch/.cursor/rules/migrations.mdc
+     langwatch/.cursor/rules/python.mdc
+     langwatch/.cursor/rules/react-tsx.mdc
+     langwatch/.cursor/rules/react.mdc
+     langwatch/.cursor/rules/typescript.mdc
+     langwatch/.cursor/rules/unit-tests.mdc
+     langwatch/.editorconfig
+     langwatch/next.config.mjs
+     langwatch/package-lock.json
+     langwatch/package.json
+     langwatch/src/app/api/copilotkit/[[...route]]/__tests__/service-adapter.test.ts
+     langwatch/src/app/api/copilotkit/[[...route]]/app.ts
+     langwatch/src/app/api/copilotkit/[[...route]]/service-adapter.ts
+     langwatch/src/app/api/prompts/[[...route]]/app.v1.ts
+     langwatch/src/app/api/workflows/post_event/post-event.ts
+     langwatch/src/components/MainMenu.tsx
+     langwatch/src/components/annotations/DeleteConfirmationDialog.tsx
+     langwatch/src/components/copilot-kit/TraceMessage.tsx
+     langwatch/src/components/datasets/DatasetMappingPreview.tsx
+     langwatch/src/components/icons/History.tsx
+     langwatch/src/components/llmPromptConfigs/LLMConfigModal.tsx
+     langwatch/src/components/llmPromptConfigs/LLMModelDisplay.tsx
+     langwatch/src/components/messages/Conversation.tsx
+     langwatch/src/components/messages/TraceMessages.tsx
+     langwatch/src/components/playground/ChatWindow.tsx
+     langwatch/src/components/playground/Messages.tsx
+     langwatch/src/components/playground/PlaygroundTab.tsx
+     langwatch/src/components/simulations/CustomCopilotKitChat.tsx
+     langwatch/src/components/simulations/SimulationChatViewer.tsx
+     langwatch/src/components/simulations/utils/convert-scenario-messages.ts
+     langwatch/src/components/traces/SpanDetails.tsx
+     langwatch/src/components/ui/tooltip.tsx
+     langwatch/src/optimization_studio/components/properties/BasePropertiesPanel.tsx
+     langwatch/src/optimization_studio/components/properties/llm-configs/signature-properties-panel/SignaturePropertiesPanelForm.tsx
+     langwatch/src/optimization_studio/components/properties/llm-configs/signature-properties-panel/hooks/useNodeDrift.ts
+     langwatch/src/optimization_studio/components/properties/modals/ConfigModal.tsx
+     langwatch/src/optimization_studio/types/dsl.ts
+     langwatch/src/optimization_studio/utils/registryUtils.ts
+     langwatch/src/pages/[project]/playground.tsx
+     langwatch/src/pages/[project]/prompt-studio.tsx
+     langwatch/src/pages/[project]/simulations/[scenarioSetId]/[batchRunId]/[scenarioRunId]/index.tsx
+     langwatch/src/pages/[project]/simulations/simulations.css
+     langwatch/src/prompt-configs/VersionHistoryListPopover.tsx
+     langwatch/src/prompt-configs/components/ui/OrganizationBadge.tsx
+     langwatch/src/prompt-configs/components/ui/PromptTextArea.tsx
+     langwatch/src/prompt-configs/components/ui/VersionBadge.tsx
+     langwatch/src/prompt-configs/forms/ChangeHandleDialog.tsx
+     langwatch/src/prompt-configs/forms/SaveVersionDialog.tsx
+     langwatch/src/prompt-configs/forms/fields/EditablePromptHandleField.tsx
+     langwatch/src/prompt-configs/forms/fields/ModelSelectField.tsx
+     langwatch/src/prompt-configs/forms/fields/ModelSelectFieldMini.tsx
+     langwatch/src/prompt-configs/forms/fields/PromptField.tsx
+     langwatch/src/prompt-configs/forms/fields/PromptMessagesField.tsx
+     langwatch/src/prompt-configs/forms/fields/message-history-fields/AddMessageButton.tsx
+     langwatch/src/prompt-configs/forms/fields/message-history-fields/AddRemoveMessageFieldButton.tsx
+     langwatch/src/prompt-configs/forms/fields/message-history-fields/MessageRoleLabel.tsx
+     langwatch/src/prompt-configs/forms/fields/message-history-fields/PromptMessagesField.tsx
+     langwatch/src/prompt-configs/forms/fields/message-history-fields/RemoveMessageButton.tsx
+     langwatch/src/prompt-configs/forms/prompt-config-form/PromptConfigForm.tsx
+     langwatch/src/prompt-configs/forms/prompt-config-form/components/VersionSaveButton.tsx
+     langwatch/src/prompt-configs/hooks/useAllPromptsForProject.ts
+     langwatch/src/prompt-configs/hooks/usePromptConfigForm.ts
+     langwatch/src/prompt-configs/hooks/usePrompts.ts
+     langwatch/src/prompt-configs/prompt-studio/components/PromptStudioLayout.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/PromptStudioMainContent.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/chat/PromptStudioChat.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/chat/PromptStudioChatContext.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/chat/SyncedChatInput.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/chat/__tests__/SyncedChatInput.test.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/chat/ui/ChatSendButton.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/chat/ui/ChatSyncCheckbox.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/chat/ui/ChatTextArea.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/prompt-browser/PromptStudioBrowser.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/prompt-browser/prompt-browser-window/PromptBrowserHeader.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/prompt-browser/prompt-browser-window/PromptBrowserWindowContent.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/prompt-browser/prompt-browser-window/PromptMessagesEditor.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/prompt-browser/prompt-browser-window/PromptTabbedSection.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/prompt-browser/prompt-browser-window/SavePromptButton.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/prompt-browser/prompt-browser-window/SettingsTabContent.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/prompt-browser/prompt-browser-window/VariablesForm.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/prompt-browser/prompt-browser-window/__tests__/VariablesForm.test.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/prompt-browser/tab/PromptBrowserTab.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/prompt-browser/tab/__tests__/usePromptBrowserTabController.test.ts
+     langwatch/src/prompt-configs/prompt-studio/components/prompt-browser/tab/usePromptBrowserTabController.ts
+     langwatch/src/prompt-configs/prompt-studio/components/prompt-browser/ui/BrowserLikeTabs.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/prompt-browser/ui/DraggableTabsBrowser.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/prompt-browser/ui/TabContext.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/sidebar/AddPromptButton.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/sidebar/PromptStudioSidebar.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/sidebar/PublishedPromptActions.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/sidebar/PublishedPromptContent.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/sidebar/PublishedPromptsList.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/sidebar/SidebarHeader.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/sidebar/__tests__/MainContentEmptyState.test.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/sidebar/__tests__/PublishPromptsList.test.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/sidebar/__tests__/PublishedPromptsList.test.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/sidebar/ui/MainContentEmptyState.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/sidebar/ui/NoPromptsOnboardingState.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/sidebar/ui/NoTabsOpenState.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/sidebar/ui/Sidebar.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/sidebar/ui/SidebarEmptyState.tsx
+     langwatch/src/prompt-configs/prompt-studio/components/sidebar/ui/__tests__/Sidebar.test.tsx
+     langwatch/src/prompt-configs/prompt-studio/hooks/__tests__/useLoadSpanIntoPromptStudio.test.ts
+     langwatch/src/prompt-configs/prompt-studio/hooks/useCreateDraftPrompt.ts
+     langwatch/src/prompt-configs/prompt-studio/hooks/useHandleSavePrompt.ts
+     langwatch/src/prompt-configs/prompt-studio/hooks/useHasUnsavedChanges.ts
+     langwatch/src/prompt-configs/prompt-studio/hooks/useIsTabActive.ts
+     langwatch/src/prompt-configs/prompt-studio/hooks/useLoadSpanIntoPromptStudio.ts
+     langwatch/src/prompt-configs/prompt-studio/hooks/useUrlParamToOpenNewTab.ts
+     langwatch/src/prompt-configs/prompt-studio/prompt-studio-store/DraggableTabsBrowserStore.ts
+     langwatch/src/prompt-configs/prompt-studio/prompt-studio-store/__tests__/DraggableTabsBrowserStore.test.ts
+     langwatch/src/prompt-configs/prompt-studio/prompt-studio-store/utils/id-generators.ts
+     langwatch/src/prompt-configs/schemas/field-schemas.ts
+     langwatch/src/prompt-configs/schemas/form-schema.ts
+     langwatch/src/prompt-configs/utils/__tests__/areFormValuesEqual.test.ts
+     langwatch/src/prompt-configs/utils/areFormValuesEqual.ts
+     langwatch/src/prompt-configs/utils/computeInitialFormValuesForPrompt.ts
+     langwatch/src/prompt-configs/utils/llmPromptConfigUtils.ts
+     langwatch/src/server/api/routers/prompts/prompts.trpc-router.ts
+     langwatch/src/server/api/routers/spans.ts
+     langwatch/src/server/background/workers/collectorWorker.ts
+     langwatch/src/server/prompt-config/__tests__/prompt.service.logic.test.ts
+     langwatch/src/server/prompt-config/__tests__/prompt.service.test.ts
+     langwatch/src/server/prompt-config/prompt.service.ts
+     langwatch/src/server/prompt-config/repositories/__tests__/llm-config.repository.logic.test.ts
+     langwatch/src/server/prompt-config/repositories/llm-config-version-schema.ts
+     langwatch/src/server/prompt-config/repositories/llm-config-versions.repository.ts
+     langwatch/src/server/prompt-config/repositories/llm-config.repository.ts
+     langwatch/src/styles/globals.scss
+     langwatch/src/utils/api.ts
+     langwatch/src/utils/constants.ts
+     langwatch/src/utils/logger.ts
+     langwatch/src/utils/routes.ts
+     langwatch/src/utils/withControllerHOC.tsx
+     langwatch/vitest.config.ts
+
+------
+Monday, November 10, 2025 (2025-11-10)
+Branch: fix/bug-with-demonstrations
+Commit Date: 2025-11-10
+Commit Message: fix(prompt-studio): prevent zod errors when managing output fields
+Commit Hash: 2ab3cfbd
+Commit Timestamp: 2025-11-10T11:56:51.000Z
+Files:
+     langwatch/src/prompt-configs/forms/fields/PromptConfigVersionFieldGroup.tsx
+
+------
+Monday, November 10, 2025 (2025-11-10)
+Branch: fix/bug-with-demonstrations
+Commit Date: 2025-11-10
+Commit Message: chore: update docs and rules
+Commit Hash: a6f988d4
+Commit Timestamp: 2025-11-10T11:57:24.000Z
+Files:
+     langwatch/.cursor/docs/04-sequence-diagram-visualization.md
+     langwatch/.cursor/rules/typescript.mdc
+
+------
+Monday, November 10, 2025 (2025-11-10)
+Branch: fix/hide-edit-on-other-tabs
+Commit Date: 2025-11-10
+Commit Message: fix(prompt-configs): show new conversation button only on conversation tab
+Commit Hash: e8690c39
+Commit Timestamp: 2025-11-10T12:14:42.000Z
+Files:
+     langwatch/src/prompt-configs/prompt-studio/components/prompt-browser/prompt-browser-window/PromptTabbedSection.tsx
+
+------
+Monday, November 10, 2025 (2025-11-10)
+Branch: feat/better-error-visibility,fix/corrupted-workflow-bug,fix/empty-handle-validation,fix/hide-edit-on-other-tabs,fix/studio-not-using-gpt-5-validations
+Commit Date: 2025-11-10
+Commit Message: fix(prompt-studio): prevent zod errors when managing output fields  (#793)
+Commit Hash: 22c7148b
+Commit Timestamp: 2025-11-10T12:18:16.000Z
+Files:
+     langwatch/.cursor/docs/04-sequence-diagram-visualization.md
+     langwatch/.cursor/rules/typescript.mdc
+     langwatch/src/prompt-configs/forms/fields/PromptConfigVersionFieldGroup.tsx
+
+------
+Monday, November 10, 2025 (2025-11-10)
+Branch: unknown
+Commit Date: 2025-11-10
+Commit Message: fix: respect enable_tracing toggle in workflow execution
+Commit Hash: 6dd18947
+Commit Timestamp: 2025-11-10T12:30:07.000Z
+Files:
+     langwatch/src/server/workflows/runWorkflow.ts
+
+------
+Monday, November 10, 2025 (2025-11-10)
+Branch: unknown
+Commit Date: 2025-11-10
+Commit Message: test: add unit test specs for do_not_trace logic in runWorkflow
+Commit Hash: 8bd0b877
+Commit Timestamp: 2025-11-10T12:31:45.000Z
+Files:
+     langwatch/.cursor/rules/solve-full-ticket.mdc
+     langwatch/src/server/workflows/__tests__/runWorkflow.test.ts
+     langwatch/src/server/workflows/runWorkflow.ts
+
+------
+Monday, November 10, 2025 (2025-11-10)
+Branch: fix/corrupted-workflow-bug
+Commit Date: 2025-11-10
+Commit Message: fix: handle corrupted prompt node data gracefully
+Commit Hash: 869d8b8f
+Commit Timestamp: 2025-11-10T12:48:30.000Z
+Files:
+     langwatch/src/prompt-configs/forms/fields/PromptConfigVersionFieldGroup.tsx
+     langwatch/src/prompt-configs/utils/identifierUtils.ts
+     langwatch/src/prompt-configs/utils/llmPromptConfigUtils.ts
+
+------
+Monday, November 10, 2025 (2025-11-10)
+Branch: fix/corrupted-workflow-bug
+Commit Date: 2025-11-10
+Commit Message: test: add unit tests for identifier generation and corrupted data handling
+Commit Hash: f19ee354
+Commit Timestamp: 2025-11-10T12:48:58.000Z
+Files:
+     langwatch/.cursor/rules/unit-tests.mdc
+     langwatch/src/prompt-configs/utils/__tests__/identifierUtils.test.ts
+     langwatch/src/prompt-configs/utils/__tests__/llmPromptConfigUtils.test.ts
+
+------
+Monday, November 10, 2025 (2025-11-10)
+Branch: feat/better-error-visibility,fix/corrupted-workflow-bug,fix/empty-handle-validation,fix/studio-not-using-gpt-5-validations,fix/workflow-enable-tracing-toggle
+Commit Date: 2025-11-10
+Commit Message: fix(prompt-configs): hide new conversation button on other tabs (#794)
+Commit Hash: 1e457bf7
+Commit Timestamp: 2025-11-10T12:50:45.000Z
+Files:
+     langwatch/src/prompt-configs/prompt-studio/components/prompt-browser/prompt-browser-window/PromptTabbedSection.tsx
+
+------
+Monday, November 10, 2025 (2025-11-10)
+Branch: fix/corrupted-workflow-bug
+Commit Date: 2025-11-10
+Commit Message: fix: set LLM config to empty object instead of undefined
+Commit Hash: e52ccfb8
+Commit Timestamp: 2025-11-10T12:57:52.000Z
+Files:
+     langwatch/src/prompt-configs/utils/__tests__/llmPromptConfigUtils.test.ts
+     langwatch/src/prompt-configs/utils/llmPromptConfigUtils.ts
+
+------
+Monday, November 10, 2025 (2025-11-10)
+Branch: fix/corrupted-workflow-bug
+Commit Date: 2025-11-10
+Commit Message: refactor: remove any types and use safeParse for corrupted data
+Commit Hash: ca4e2345
+Commit Timestamp: 2025-11-10T13:03:40.000Z
+Files:
+     langwatch/src/prompt-configs/hooks/__tests__/usePromptConfigForm.test.ts
+     langwatch/src/prompt-configs/hooks/usePromptConfigForm.ts
+     langwatch/src/prompt-configs/utils/__tests__/llmPromptConfigUtils.test.ts
+     langwatch/src/prompt-configs/utils/llmPromptConfigUtils.ts
+
+------
+Monday, November 10, 2025 (2025-11-10)
+Branch: fix/corrupted-workflow-bug
+Commit Date: 2025-11-10
+Commit Message: feat: salvage valid parts of corrupted config data
+Commit Hash: 27dd1ece
+Commit Timestamp: 2025-11-10T13:06:35.000Z
+Files:
+     langwatch/src/prompt-configs/hooks/__tests__/usePromptConfigForm.test.ts
+     langwatch/src/prompt-configs/hooks/usePromptConfigForm.ts
+
+------
+Monday, November 10, 2025 (2025-11-10)
+Branch: fix/corrupted-workflow-bug
+Commit Date: 2025-11-10
+Commit Message: refactor: extract generic Zod salvage utility
+Commit Hash: 98f5e033
+Commit Timestamp: 2025-11-10T13:09:24.000Z
+Files:
+     langwatch/src/prompt-configs/hooks/usePromptConfigForm.ts
+     langwatch/src/utils/__tests__/zodSalvage.test.ts
+     langwatch/src/utils/zodSalvage.ts
+
+------
+Monday, November 10, 2025 (2025-11-10)
+Branch: fix/corrupted-workflow-bug
+Commit Date: 2025-11-10
+Commit Message: fix: migrate legacy LLM string format to object
+Commit Hash: 2d628d41
+Commit Timestamp: 2025-11-10T13:14:41.000Z
+Files:
+     langwatch/src/prompt-configs/utils/__tests__/llmPromptConfigUtils.test.ts
+     langwatch/src/prompt-configs/utils/llmPromptConfigUtils.ts
+
+------
+Monday, November 10, 2025 (2025-11-10)
+Branch: fix/corrupted-workflow-bug
+Commit Date: 2025-11-10
+Commit Message: docs: add no any type rule to typescript guidelines
+Commit Hash: 2ad3d39f
+Commit Timestamp: 2025-11-10T13:16:52.000Z
+Files:
+     langwatch/.cursor/rules/typescript.mdc
+
+------
+Monday, November 10, 2025 (2025-11-10)
+Branch: fix/corrupted-workflow-bug
+Commit Date: 2025-11-10
+Commit Message: style: format zodSalvage conditional
+Commit Hash: bc55d12f
+Commit Timestamp: 2025-11-10T13:17:08.000Z
+Files:
+     langwatch/src/utils/zodSalvage.ts
+
+------
+Monday, November 10, 2025 (2025-11-10)
+Branch: fix/corrupted-workflow-bug
+Commit Date: 2025-11-10
+Commit Message: fix: handle schemas with required fields in zodSalvage
+Commit Hash: 687c64f9
+Commit Timestamp: 2025-11-10T13:22:11.000Z
+Files:
+     langwatch/src/prompt-configs/hooks/__tests__/usePromptConfigForm.test.ts
+     langwatch/src/prompt-configs/hooks/usePromptConfigForm.ts
+     langwatch/src/utils/zodSalvage.ts
+
+------
+Monday, November 10, 2025 (2025-11-10)
+Branch: fix/corrupted-workflow-bug
+Commit Date: 2025-11-10
+Commit Message: fix type error
+Commit Hash: aaf4ef44
+Commit Timestamp: 2025-11-10T13:31:44.000Z
+Files:
+     langwatch/src/prompt-configs/hooks/__tests__/usePromptConfigForm.test.ts
+
+------
+Monday, November 10, 2025 (2025-11-10)
+Branch: fix/corrupted-workflow-bug
+Commit Date: 2025-11-10
+Commit Message: fix: handle optional nested objects in zodSalvage gracefully
+Commit Hash: 8a53843f
+Commit Timestamp: 2025-11-10T13:36:55.000Z
+Files:
+     langwatch/src/prompt-configs/hooks/usePromptConfigForm.ts
+     langwatch/src/utils/__tests__/zodSalvage.test.ts
+     langwatch/src/utils/zodSalvage.ts
+
+------
+Monday, November 10, 2025 (2025-11-10)
+Branch: feat/better-error-visibility,fix/empty-handle-validation,fix/studio-not-using-gpt-5-validations,fix/workflow-enable-tracing-toggle,main
+Commit Date: 2025-11-10
+Commit Message: fix: handle corrupted workflow data gracefully with intelligent salvage (#795)
+Commit Hash: fc967add
+Commit Timestamp: 2025-11-10T13:45:01.000Z
+Files:
+     langwatch/.cursor/rules/typescript.mdc
+     langwatch/.cursor/rules/unit-tests.mdc
+     langwatch/src/prompt-configs/forms/fields/PromptConfigVersionFieldGroup.tsx
+     langwatch/src/prompt-configs/hooks/__tests__/usePromptConfigForm.test.ts
+     langwatch/src/prompt-configs/hooks/usePromptConfigForm.ts
+     langwatch/src/prompt-configs/utils/__tests__/identifierUtils.test.ts
+     langwatch/src/prompt-configs/utils/__tests__/llmPromptConfigUtils.test.ts
+     langwatch/src/prompt-configs/utils/identifierUtils.ts
+     langwatch/src/prompt-configs/utils/llmPromptConfigUtils.ts
+     langwatch/src/utils/__tests__/zodSalvage.test.ts
+     langwatch/src/utils/zodSalvage.ts
+
+------
+Monday, November 10, 2025 (2025-11-10)
+Branch: fix/studio-not-using-gpt-5-validations
+Commit Date: 2025-11-10
+Commit Message: fix: llm config field
+Commit Hash: 5619b6d8
+Commit Timestamp: 2025-11-10T14:54:53.000Z
+Files:
+     langwatch/src/components/llmPromptConfigs/LLMConfigModal.tsx
+
+------
+Monday, November 10, 2025 (2025-11-10)
+Branch: fix/studio-not-using-gpt-5-validations
+Commit Date: 2025-11-10
+Commit Message: fix(llm-config): enforce GPT-5 constraints with intelligent value handler
+Commit Hash: ddca7f92
+Commit Timestamp: 2025-11-10T15:19:41.000Z
+Files:
+     langwatch/src/components/llmPromptConfigs/LLMConfigModal.tsx
+     langwatch/src/components/llmPromptConfigs/__tests__/LLMConfigModal.test.ts
+
+------
+Monday, November 10, 2025 (2025-11-10)
+Branch: fix/studio-not-using-gpt-5-validations
+Commit Date: 2025-11-10
+Commit Message: refactor(prompt-config): remove redundant GPT-5 enforcement
+Commit Hash: 1cc4fd96
+Commit Timestamp: 2025-11-10T15:22:06.000Z
+Files:
+     langwatch/src/prompt-configs/hooks/usePromptConfigForm.ts
+
+------
+Monday, November 10, 2025 (2025-11-10)
+Branch: fix/studio-not-using-gpt-5-validations
+Commit Date: 2025-11-10
+Commit Message: fix(schema): use reasonable default (1000) for maxTokens
+Commit Hash: 035a1596
+Commit Timestamp: 2025-11-10T15:24:29.000Z
+Files:
+     langwatch/src/prompt-configs/schemas/form-schema.ts
+
+------
+Monday, November 10, 2025 (2025-11-10)
+Branch: fix/studio-not-using-gpt-5-validations
+Commit Date: 2025-11-10
+Commit Message: fix(llm-config): only restore temperature when leaving GPT-5
+Commit Hash: 8a307395
+Commit Timestamp: 2025-11-10T15:25:06.000Z
+Files:
+     langwatch/src/components/llmPromptConfigs/LLMConfigModal.tsx
+     langwatch/src/components/llmPromptConfigs/__tests__/LLMConfigModal.test.ts
+     langwatch/src/prompt-configs/schemas/form-schema.ts
+     langwatch/src/utils/constants.ts
+
+------
+Monday, November 10, 2025 (2025-11-10)
+Branch: fix/studio-not-using-gpt-5-validations
+Commit Date: 2025-11-10
+Commit Message: docs: clarify GPT-5 constraint enforcement architecture
+Commit Hash: 77e8bcaa
+Commit Timestamp: 2025-11-10T15:42:04.000Z
+Files:
+     langwatch/src/components/llmPromptConfigs/LLMConfigModal.tsx
+     langwatch/src/components/llmPromptConfigs/__tests__/LLMConfigModal.test.ts
+     langwatch/src/prompt-configs/schemas/form-schema.ts
+     langwatch/src/utils/constants.ts
+
+------
+Monday, November 10, 2025 (2025-11-10)
+Branch: fix/studio-not-using-gpt-5-validations
+Commit Date: 2025-11-10
+Commit Message: refactor(llm-config): simplify by removing temperature restoration
+Commit Hash: e7067978
+Commit Timestamp: 2025-11-10T15:49:43.000Z
+Files:
+     langwatch/src/components/llmPromptConfigs/LLMConfigModal.tsx
+     langwatch/src/components/llmPromptConfigs/__tests__/LLMConfigModal.test.ts
+
+------
+Monday, November 10, 2025 (2025-11-10)
+Branch: fix/studio-not-using-gpt-5-validations
+Commit Date: 2025-11-10
+Commit Message: fix(studio): normalize LLM config to snake_case for DSL compatibility
+Commit Hash: a3e4f44b
+Commit Timestamp: 2025-11-10T15:57:34.000Z
+Files:
+     langwatch/src/optimization_studio/components/properties/llm-configs/OptimizationStudioLLMConfigField.tsx
+     langwatch/src/optimization_studio/components/properties/llm-configs/__tests__/OptimizationStudioLLMConfigField.test.ts
+
+------
+Monday, November 10, 2025 (2025-11-10)
+Branch: fix/studio-not-using-gpt-5-validations
+Commit Date: 2025-11-10
+Commit Message: fix(studio): normalize LLM configs at server layer before DSPy execution
+Commit Hash: a5234d36
+Commit Timestamp: 2025-11-10T16:09:54.000Z
+Files:
+     langwatch/src/optimization_studio/server/addEnvs.ts
+
+------
+Monday, November 10, 2025 (2025-11-10)
+Branch: feat/better-error-visibility,fix/empty-handle-validation,main,notification-service,notification-service-refactor
+Commit Date: 2025-11-10
+Commit Message: fix(studio): enforce GPT-5 constraints and normalize LLM config format for DSPy (#796)
+Commit Hash: f8274cff
+Commit Timestamp: 2025-11-10T16:29:08.000Z
+Files:
+     langwatch/src/components/llmPromptConfigs/LLMConfigModal.tsx
+     langwatch/src/components/llmPromptConfigs/__tests__/LLMConfigModal.test.ts
+     langwatch/src/optimization_studio/components/properties/llm-configs/OptimizationStudioLLMConfigField.tsx
+     langwatch/src/optimization_studio/components/properties/llm-configs/__tests__/OptimizationStudioLLMConfigField.test.ts
+     langwatch/src/optimization_studio/server/addEnvs.ts
+     langwatch/src/prompt-configs/hooks/usePromptConfigForm.ts
+     langwatch/src/prompt-configs/schemas/form-schema.ts
+     langwatch/src/utils/constants.ts
+
+------
+Monday, November 10, 2025 (2025-11-10)
+Branch: feat/better-error-visibility
+Commit Date: 2025-11-10
+Commit Message: feat: add dataset error visibly to frontend
+Commit Hash: 4dc82ad7
+Commit Timestamp: 2025-11-10T17:14:44.000Z
+Files:
+     langwatch/src/components/datasets/DatasetPreview.tsx
+
+------
+Monday, November 10, 2025 (2025-11-10)
+Branch: fix/empty-handle-validation,main,notification-service,notification-service-refactor,ui/prompt-tabs-consistent-width
+Commit Date: 2025-11-10
+Commit Message: feat: add dataset error visibly to frontend (#797)
+Commit Hash: 6515d544
+Commit Timestamp: 2025-11-10T17:27:46.000Z
+Files:
+     langwatch/src/components/datasets/DatasetPreview.tsx
+
+------
+Monday, November 10, 2025 (2025-11-10)
+Branch: ui/prompt-tabs-consistent-width
+Commit Date: 2025-11-10
+Commit Message: ui: apply consistent max-width to all prompt studio tabs
+Commit Hash: 0f35e92c
+Commit Timestamp: 2025-11-10T17:34:17.000Z
+Files:
+     langwatch/src/prompt-configs/prompt-studio/components/prompt-browser/prompt-browser-window/PromptTabbedSection.tsx
+
+------
+
+Tuesday, November 11, 2025 (2025-11-11)
+
+Start time today: 11:08 AM (2025-11-11T10:08:09.000Z)
+
+Tuesday, November 11, 2025 (2025-11-11)
+Branch: fix/empty-handle-validation,main,notification-service,notification-service-refactor
+Commit Date: 2025-11-11
+Commit Message: feat(ui): apply consistent max-width to all prompt studio tabs (#798)
+Commit Hash: 021021d1
+Commit Timestamp: 2025-11-11T10:08:09.000Z
+Files:
+     langwatch/src/prompt-configs/prompt-studio/components/prompt-browser/prompt-browser-window/PromptTabbedSection.tsx
+
+------
+Tuesday, November 11, 2025 (2025-11-11)
+Branch: unknown
+Commit Date: 2025-11-11
+Commit Message: fix: convert empty string handles to null in versionedPromptToPromptConfigFormValues
+Commit Hash: 13b1c798
+Commit Timestamp: 2025-11-11T10:21:08.000Z
+Files:
+     langwatch/src/prompt-configs/utils/__tests__/llmPromptConfigUtils.test.ts
+     langwatch/src/prompt-configs/utils/llmPromptConfigUtils.ts
+
+------
+Tuesday, November 11, 2025 (2025-11-11)
+Branch: fix/empty-handle-validation,main,notification-service,notification-service-refactor
+Commit Date: 2025-11-11
+Commit Message: fix: convert empty string handles to null (#800)
+Commit Hash: 9829e792
+Commit Timestamp: 2025-11-11T10:41:43.000Z
+Files:
+     langwatch/src/prompt-configs/utils/__tests__/llmPromptConfigUtils.test.ts
+     langwatch/src/prompt-configs/utils/llmPromptConfigUtils.ts
+
+------
+Tuesday, November 11, 2025 (2025-11-11)
+Branch: notification-service-refactor
+Commit Date: 2025-11-11
+Commit Message: refactor(notifications): extract message count repository
+Commit Hash: a4181d84
+Commit Timestamp: 2025-11-11T14:30:27.000Z
+Files:
+     langwatch/src/server/notifications/repositories/message-count.repository.ts
+     langwatch/src/server/notifications/repositories/notification.repository.ts
+
+------
+Tuesday, November 11, 2025 (2025-11-11)
+Branch: notification-service-refactor
+Commit Date: 2025-11-11
+Commit Message: refactor(notifications): extract usage calculation logic
+Commit Hash: ac4b0ffe
+Commit Timestamp: 2025-11-11T14:31:09.000Z
+Files:
+     langwatch/src/server/notifications/helpers/__tests__/usage-calculations.test.ts
+     langwatch/src/server/notifications/helpers/usage-calculations.ts
+
+------
+Tuesday, November 11, 2025 (2025-11-11)
+Branch: notification-service-refactor
+Commit Date: 2025-11-11
+Commit Message: refactor(mailer): split email template into focused components
+Commit Hash: 89a41d97
+Commit Timestamp: 2025-11-11T14:31:25.000Z
+Files:
+     langwatch/src/server/mailer/__tests__/usageLimitEmail.test.tsx
+     langwatch/src/server/mailer/components/UsageLimitEmailTemplate.tsx
+     langwatch/src/server/mailer/components/helpers/__tests__/get-progress-bar-color.test.ts
+     langwatch/src/server/mailer/components/helpers/get-progress-bar-color.ts
+     langwatch/src/server/mailer/types/usage-limit-email.types.ts
+     langwatch/src/server/mailer/usageLimitEmail.tsx
+
+------
+Tuesday, November 11, 2025 (2025-11-11)
+Branch: notification-service-refactor
+Commit Date: 2025-11-11
+Commit Message: refactor(notifications): simplify service to orchestration only
+Commit Hash: c5ab4e05
+Commit Timestamp: 2025-11-11T14:31:38.000Z
+Files:
+     langwatch/src/server/notifications/usage-limit.service.ts
+
+------
+Tuesday, November 11, 2025 (2025-11-11)
+Branch: notification-service-refactor
+Commit Date: 2025-11-11
+Commit Message: refactor(mailer): break email template into atomic components
+Commit Hash: 2508a652
+Commit Timestamp: 2025-11-11T14:37:23.000Z
+Files:
+     langwatch/src/server/mailer/components/UsageLimitEmailTemplate.tsx
+     langwatch/src/server/mailer/components/usage-limit/ProjectUsageTable.tsx
+     langwatch/src/server/mailer/components/usage-limit/UsageProgressBar.tsx
+     langwatch/src/server/mailer/config/email-constants.ts
+
+------
+Tuesday, November 11, 2025 (2025-11-11)
+Branch: notification-service-refactor
+Commit Date: 2025-11-11
+Commit Message: refactor(notifications): extract focused repository classes
+Commit Hash: 188be521
+Commit Timestamp: 2025-11-11T14:37:35.000Z
+Files:
+     langwatch/src/server/notifications/repositories/organization.repository.ts
+     langwatch/src/server/notifications/repositories/project.repository.ts
+
+------
+Tuesday, November 11, 2025 (2025-11-11)
+Branch: notification-service-refactor
+Commit Date: 2025-11-11
+Commit Message: refactor(notifications): extract email orchestration service
+Commit Hash: 46855e09
+Commit Timestamp: 2025-11-11T14:37:45.000Z
+Files:
+     langwatch/src/server/notifications/services/notification-email.service.ts
+
+------
+Tuesday, November 11, 2025 (2025-11-11)
+Branch: notification-service-refactor
+Commit Date: 2025-11-11
+Commit Message: refactor(notifications): simplify service to pure orchestration
+Commit Hash: ba3c358a
+Commit Timestamp: 2025-11-11T14:38:00.000Z
+Files:
+     langwatch/src/server/notifications/usage-limit.service.ts
+
+------
+Tuesday, November 11, 2025 (2025-11-11)
+Branch: notification-service-refactor
+Commit Date: 2025-11-11
+Commit Message: refactor(cron): extract usage checking to dedicated service
+Commit Hash: ef5b3ec8
+Commit Timestamp: 2025-11-11T14:53:04.000Z
+Files:
+     langwatch/.cursor/rules/controller-service-repository.mdc
+     langwatch/src/pages/api/cron/trace_analytics.ts
+     langwatch/src/server/notifications/services/organization-usage-checker.service.ts
+
+------
+Tuesday, November 11, 2025 (2025-11-11)
+Branch: notification-service-refactor
+Commit Date: 2025-11-11
+Commit Message: refactor(notifications): split check and send (command-query separation)
+Commit Hash: 7b8254f6
+Commit Timestamp: 2025-11-11T15:13:01.000Z
+Files:
+     langwatch/src/server/notifications/types/warning-decision.ts
+     langwatch/src/server/notifications/usage-limit.service.ts
+
+------
+Tuesday, November 11, 2025 (2025-11-11)
+Branch: notification-service-refactor
+Commit Date: 2025-11-11
+Commit Message: refactor: enforce controller-service-repository separation
+Commit Hash: 8025d16f
+Commit Timestamp: 2025-11-11T15:17:05.000Z
+Files:
+     langwatch/src/server/api/routers/limits.ts
+     langwatch/src/server/notifications/repositories/message-count.repository.ts
+     langwatch/src/server/notifications/services/notification-email.service.ts
+     langwatch/src/server/notifications/services/organization-usage-checker.service.ts
+     langwatch/src/server/notifications/usage-limit.service.ts
+     langwatch/src/server/repositories/message-count.repository.ts
+
+------
+Tuesday, November 11, 2025 (2025-11-11)
+Branch: notification-service-refactor
+Commit Date: 2025-11-11
+Commit Message: refactor: enforce single export and proper DI
+Commit Hash: b1103a4d
+Commit Timestamp: 2025-11-11T15:24:43.000Z
+Files:
+     langwatch/src/server/api/routers/limits.ts
+     langwatch/src/server/notifications/services/notification-email.service.ts
+     langwatch/src/server/notifications/services/organization-usage-checker.service.ts
+     langwatch/src/server/notifications/types/email-params.ts
+     langwatch/src/server/notifications/types/usage-limit-data.ts
+     langwatch/src/server/notifications/usage-limit.service.ts
+     langwatch/src/server/repositories/message-count.repository.ts
+
+------
+Tuesday, November 11, 2025 (2025-11-11)
+Branch: notification-service-refactor
+Commit Date: 2025-11-11
+Commit Message: refactor: fix processor SRP and controller logic violations
+Commit Hash: 70cbdec7
+Commit Timestamp: 2025-11-11T15:41:20.000Z
+Files:
+     langwatch/src/app/api/otel/v1/traces/route.ts
+     langwatch/src/pages/api/collector.ts
+     langwatch/src/pages/api/cron/trace_analytics.ts
+     langwatch/src/server/api/routers/limits.ts
+     langwatch/src/server/mailer/components/UsageLimitEmailTemplate.tsx
+     langwatch/src/server/mailer/components/usage-limit/ProjectUsageTable.tsx
+     langwatch/src/server/mailer/types/usage-limit-email/project-usage-data.ts
+     langwatch/src/server/mailer/types/usage-limit-email/send-params.ts
+     langwatch/src/server/mailer/types/usage-limit-email/usage-limit-email-props.ts
+     langwatch/src/server/mailer/usageLimitEmail.tsx
+     langwatch/src/server/notifications/helpers/__tests__/usage-calculations.test.ts
+     langwatch/src/server/notifications/helpers/usage-calculations.ts
+     langwatch/src/server/notifications/helpers/usage-calculations/calculate-usage-percentage.ts
+     langwatch/src/server/notifications/helpers/usage-calculations/find-crossed-threshold.ts
+     langwatch/src/server/notifications/helpers/usage-calculations/get-severity-level.ts
+     langwatch/src/server/notifications/helpers/usage-calculations/usage-threshold.type.ts
+     langwatch/src/server/notifications/helpers/usage-calculations/usage-warning-thresholds.ts
+     langwatch/src/server/notifications/repositories/notification.repository.ts
+     langwatch/src/server/notifications/repositories/organization.repository.ts
+     langwatch/src/server/notifications/repositories/project.repository.ts
+     langwatch/src/server/notifications/services/notification-email.service.ts
+     langwatch/src/server/notifications/services/organization-usage-checker.service.ts
+     langwatch/src/server/notifications/services/organization-usage-processor.service.ts
+     langwatch/src/server/notifications/types.ts
+     langwatch/src/server/notifications/types/email-params/project-usage-data.ts
+     langwatch/src/server/notifications/types/email-params/send-params.ts
+     langwatch/src/server/notifications/types/email-params/send-result.ts
+     langwatch/src/server/notifications/types/notification-repository.types.ts
+     langwatch/src/server/notifications/types/notification-type.ts
+     langwatch/src/server/notifications/types/notification-types-constant.ts
+     langwatch/src/server/notifications/types/organization-repository.types/organization-admin.ts
+     langwatch/src/server/notifications/types/organization-repository.types/organization-with-admins.ts
+     langwatch/src/server/notifications/types/process-result.ts
+     langwatch/src/server/notifications/types/project-repository.types.ts
+     langwatch/src/server/notifications/types/warning-decision.ts
+     langwatch/src/server/notifications/types/warning-decision/warning-decision-result.ts
+     langwatch/src/server/notifications/types/warning-decision/warning-decision-to-send.ts
+     langwatch/src/server/notifications/types/warning-decision/warning-decision.ts
+     langwatch/src/server/notifications/usage-limit.service.ts
+
+------
+

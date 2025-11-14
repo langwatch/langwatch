@@ -1,0 +1,23 @@
+{
+  "name": "langwatch-scripts",
+  "version": "1.0.0",
+  "description": "TypeScript scripts for LangWatch development",
+  "main": "index.ts",
+  "scripts": {
+    "git-activity-report": "tsx git-activity-report.ts",
+    "build": "tsc",
+    "start": "tsx"
+  },
+  "dependencies": {
+    "dotenv": "^17.2.3",
+    "openai": "^5.20.0"
+  },
+  "devDependencies": {
+    "@types/node": "^18.16.0",
+    "tsx": "^4.7.0",
+    "typescript": "^5.9.3"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
