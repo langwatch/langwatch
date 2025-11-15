@@ -92,5 +92,6 @@
       ]
     }
   },
-  "bootstrap-sha": "HEAD"
+  "bootstrap-sha": "HEAD",
+  "separate-pull-requests": true
 }
