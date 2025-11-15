@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.1](https://github.com/langwatch/langwatch/compare/mcp-server@v0.3.0...mcp-server@v0.3.1) (2025-11-15)
+
+
+### Bug Fixes
+
+* sometimes the initial forward slash / is not sent by the llm ([2d63409](https://github.com/langwatch/langwatch/commit/2d63409e59e714b1a05c951edb8582c9fc39479f))
+
 ## [0.3.0](https://github.com/langwatch/langwatch/compare/mcp-server@v0.2.2...mcp-server@v0.3.0) (2025-11-15)
 
 
