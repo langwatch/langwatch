@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.8.1](https://github.com/langwatch/langwatch/compare/typescript-sdk@v0.8.0...typescript-sdk@v0.8.1) (2025-11-15)
+
+
+### Bug Fixes
+
+* stop asking for gitignore so it doesn't stop llms from using the cli ([ecdfc6d](https://github.com/langwatch/langwatch/commit/ecdfc6d3b22a6a5a5927842855e1af71ee87c1b4))
+
 ## [0.8.0](https://github.com/langwatch/langwatch/compare/typescript-sdk@v0.7.4...typescript-sdk@v0.8.0) (2025-10-31)
 
 
