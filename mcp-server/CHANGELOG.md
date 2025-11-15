@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.0](https://github.com/langwatch/langwatch/compare/mcp-server@v0.2.2...mcp-server@v0.3.0) (2025-11-15)
+
+
+### Features
+
+* remove the need of passing a langwatch api key for using the mcp ([#817](https://github.com/langwatch/langwatch/issues/817)) ([66e49b5](https://github.com/langwatch/langwatch/commit/66e49b5c640d0c220aa08e198fb4dbf24681d567))
+
 ## [0.2.2](https://github.com/langwatch/langwatch/compare/mcp-server@v0.2.1...mcp-server@v0.2.2) (2025-11-13)
 
 
