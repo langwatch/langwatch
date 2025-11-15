@@ -32,6 +32,7 @@
     "@ai-sdk/anthropic": "^2.0.15",
     "@anthropic-ai/claude-code": "^1.0.111",
     "@eslint/js": "^9.4.0",
+    "@langwatch/scenario": "^0.3.0",
     "@types/debug": "^4.1.12",
     "@types/eslint__js": "^8.42.3",
     "@types/node": "^16.0.0",
@@ -47,13 +48,11 @@
     "typescript-eslint": "^7.11.0"
   },
   "dependencies": {
-    "@langwatch/scenario": "^0.3.0",
     "@modelcontextprotocol/sdk": "^1.7.0",
     "@opentelemetry/context-async-hooks": "^2.1.0",
     "@opentelemetry/sdk-node": "^0.204.0",
     "chalk": "^5.6.2",
     "date-fns": "^4.1.0",
-    "langwatch": "^0.1.6",
     "node-pty": "^1.0.0",
     "vitest": "^3.2.4",
     "yargs": "^17.7.2",
