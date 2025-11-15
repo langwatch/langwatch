@@ -46,15 +46,12 @@ Or ask it to write a scenario test:
 
 > "Can you implement a scenario test for my agent?"
 
-<picture>
-<source media="(prefers-color-scheme: dark)" srcset="../assets/mcp-server/cursor-example.dark.webp">
-<source media="(prefers-color-scheme: light)" srcset="../assets/mcp-server/cursor-example.light.webp">
-<img alt="LangWatch Logo" src="../assets/mcp-server/cursor-example.light.webp" width="900">
-</picture>
+<img alt="LangWatch MCP Cursor Example" src="../assets/mcp-server/cursor-example.png" width="900">
 
 ## 🛟 Support
 
 If you have questions or need help, join our community:
 
 - [Discord Community](https://discord.gg/kT4PhDS2gH)
+- [LangWatch Docs](https://docs.langwatch.ai/)
 - [Email Support](mailto:support@langwatch.ai)
