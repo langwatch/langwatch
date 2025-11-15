@@ -26,7 +26,10 @@ server.tool(
     if (url && !urlToFetch.endsWith(".md") && !urlToFetch.endsWith(".txt")) {
       urlToFetch += ".md";
     }
-    if (urlToFetch.startsWith("/")) {
+    if (!urlToFetch.startsWith("http")) {
+      if (!urlToFetch.startsWith("/")) {
+        urlToFetch = "/" + urlToFetch;
+      }
       urlToFetch = "https://docs.langwatch.ai" + urlToFetch;
     }
     const response = await fetch(urlToFetch);
@@ -53,7 +56,10 @@ server.tool(
     if (url && !urlToFetch.endsWith(".md") && !urlToFetch.endsWith(".txt")) {
       urlToFetch += ".md";
     }
-    if (urlToFetch.startsWith("/")) {
+    if (!urlToFetch.startsWith("http")) {
+      if (!urlToFetch.startsWith("/")) {
+        urlToFetch = "/" + urlToFetch;
+      }
       urlToFetch = "https://scenario.langwatch.ai" + urlToFetch;
     }
     const response = await fetch(urlToFetch);
