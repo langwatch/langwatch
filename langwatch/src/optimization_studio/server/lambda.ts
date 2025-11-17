@@ -12,7 +12,7 @@ import {
 } from "@aws-sdk/client-cloudwatch-logs";
 import type { FunctionConfiguration } from "@aws-sdk/client-lambda";
 import type { StudioClientEvent } from "../types/events";
-import { captureException } from "~/utils/posthogErrorCapture";
+import { captureException } from "../../utils/posthogErrorCapture";
 import { env } from "../../env.mjs";
 import { createLogger } from "../../utils/logger";
 
