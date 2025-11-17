@@ -3,7 +3,7 @@ import type {
   StudioServerEvent,
 } from "../../../../optimization_studio/types/events";
 import { getS3CacheKey } from "../../../../optimization_studio/server/addEnvs";
-import * as Sentry from "@sentry/node";
+import { captureException } from "~/utils/posthogErrorCapture";
 import { invokeLambda } from "../../../../optimization_studio/server/lambda";
 import { createLogger } from "../../../../utils/logger";
 

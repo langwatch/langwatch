@@ -15,7 +15,7 @@ import {
   transformFromElasticsearch,
   ES_FIELDS,
 } from "./utils/elastic-search-transformers";
-import * as Sentry from "@sentry/nextjs";
+import { captureException } from "~/utils/posthogErrorCapture";
 
 import { batchRunIdSchema, scenarioRunIdSchema } from "./schemas/event-schemas";
 
@@ -395,7 +395,7 @@ export class ScenarioEventRepository {
           searchAfter = cursorData;
         }
       } catch (e) {
-        Sentry.captureException({
+        captureException({
           message: "Malformed cursor",
           cursor,
           error: e,
@@ -637,7 +637,7 @@ export class ScenarioEventRepository {
       (id) => typeof id === "string" && id.length > 0
     );
     if (validBatchRunIds.length !== batchRunIds.length) {
-      Sentry.captureException({
+      captureException({
         message: "Invalid batchRunIds",
         batchRunIds,
       });

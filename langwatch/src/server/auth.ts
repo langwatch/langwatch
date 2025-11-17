@@ -25,7 +25,7 @@ import GitlabProvider from "next-auth/providers/gitlab";
 import GoogleProvider from "next-auth/providers/google";
 import OktaProvider from "next-auth/providers/okta";
 import type { Account, Organization } from "@prisma/client";
-import * as Sentry from "@sentry/nextjs";
+import { captureException } from "../utils/posthogErrorCapture";
 import { createLogger } from "../utils/logger";
 
 const logger = createLogger("langwatch:auth");
@@ -380,7 +380,7 @@ const linkExistingUserToOAuthProvider = async (
   } catch (error: any) {
     // Tying to link an account that already exists will throw a P2002 error, let's ignore it
     if (error.code === "P2002") {
-      Sentry.captureException(error);
+      captureException(error);
       return;
     } else {
       throw error;

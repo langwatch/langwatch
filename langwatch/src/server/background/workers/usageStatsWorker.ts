@@ -1,4 +1,4 @@
-import * as Sentry from "@sentry/nextjs";
+import { captureException, withScope } from "../../../utils/posthogErrorCapture";
 import { type Job, Worker } from "bullmq";
 import type { UsageStatsJob } from "~/server/background/types";
 import { createLogger } from "../../../utils/logger";
@@ -49,10 +49,10 @@ export async function runUsageStatsJob(job: Job<UsageStatsJob, void, string>) {
   } catch (error) {
     getJobProcessingCounter("usage_stats", "failed").inc();
     logger.error({ jobId: job.id, error }, "failed to process usage stats job");
-    Sentry.withScope((scope) => {
-      scope.setTag("worker", "usageStats");
-      scope.setExtra("job", job.data);
-      Sentry.captureException(error);
+    withScope((scope) => {
+      scope.setTag?.("worker", "usageStats");
+      scope.setExtra?.("job", job.data);
+      captureException(error);
     });
   }
 }
@@ -84,10 +84,10 @@ export const startUsageStatsWorker = () => {
   usageStatsWorker.on("failed", (job, err) => {
     logger.error({ jobId: job?.id, error: err.message }, "job failed");
     getJobProcessingCounter("usage_stats", "failed").inc();
-    Sentry.withScope((scope) => {
-      scope.setTag("worker", "usageStats");
-      scope.setExtra("job", job?.data);
-      Sentry.captureException(err);
+    withScope((scope) => {
+      scope.setTag?.("worker", "usageStats");
+      scope.setExtra?.("job", job?.data);
+      captureException(err);
     });
   });
 

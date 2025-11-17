@@ -15,7 +15,7 @@ import { checkProjectPermission } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 
 import { StorageService } from "../../storage";
-import * as Sentry from "@sentry/nextjs";
+import { captureException } from "~/utils/posthogErrorCapture";
 const storageService = new StorageService();
 
 export const datasetRecordRouter = createTRPCRouter({
@@ -214,7 +214,7 @@ const deleteManyDatasetRecords = async ({
           message: "No records found to delete",
         });
       }
-      Sentry.captureException(error);
+      captureException(error);
       throw error;
     }
 
@@ -412,7 +412,7 @@ export const createManyDatasetRecords = async ({
       existingRecords = fetchedRecords;
     } catch (error) {
       if ((error as any).name !== "NoSuchKey") {
-        Sentry.captureException(error);
+        captureException(error);
         throw error;
       }
     }
@@ -516,7 +516,7 @@ export const getFullDataset = async ({
         truncated,
       };
     } catch (error) {
-      Sentry.captureException(error);
+      captureException(error);
       throw error;
     }
   } else {
