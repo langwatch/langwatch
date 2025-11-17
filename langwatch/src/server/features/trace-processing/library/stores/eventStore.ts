@@ -83,18 +83,27 @@ export interface ReadOnlyEventStore<
    */
   getEvents(
     aggregateId: AggregateId,
-    context?: EventStoreReadContext<AggregateId, EventType>,
+    context: EventStoreReadContext<AggregateId, EventType>,
   ): Promise<readonly EventType[]>;
 
   /**
-   * Lists aggregate IDs that have events, optionally filtered by context.
+   * Lists aggregate IDs that have events, filtered by tenant context.
    * Implementations should return stable, deterministic ordering when used with cursors.
+   * 
+   * @param context - Security context with required tenantId
+   * @param cursor - Optional cursor to resume listing from
+   * @param limit - Optional limit on number of results to return
+   * @returns List of aggregate IDs and optional next cursor
+   * @throws {Error} If tenantId is missing or invalid
+   * 
+   * **Security:** Implementations MUST call validateTenantId(context, 'listAggregateIds')
+   * before executing the query to ensure tenant isolation.
    * 
    * **Concurrency Note:** This method may be called by multiple workers.
    * Consider adding distributed locking if rebuilds are parallelized.
    */
   listAggregateIds?(
-    context?: EventStoreReadContext<AggregateId, EventType>,
+    context: EventStoreReadContext<AggregateId, EventType>,
     cursor?: EventStoreListCursor,
     limit?: number,
   ): Promise<ListAggregateIdsResult<AggregateId>>;
@@ -119,11 +128,12 @@ export interface EventStore<
    * Stores one or more events atomically.
    * 
    * @param events - Events to store. Implementations MUST validate these before storage.
+   * @param context - Security context with required tenantId
    * @throws {Error} If events are malformed, tenantId is missing, or validation fails
    * 
    * **Security:** Implementations MUST:
-   * 1. Extract tenantId from event metadata or accept it as a parameter
-   * 2. Call validateTenantId() to ensure tenantId is present and non-empty
+   * 1. Call validateTenantId(context, 'storeEvents') to ensure tenantId is present
+   * 2. Verify all events belong to the same tenant as context
    * 3. Enforce that all events in the batch belong to the same tenant
    * 4. Filter queries by tenantId to prevent cross-tenant access
    * 
@@ -131,11 +141,18 @@ export interface EventStore<
    * 
    * @example
    * ```typescript
-   * async storeEvents(events: readonly Event[], context?: { tenantId: string }): Promise<void> {
+   * async storeEvents(
+   *   events: readonly Event[],
+   *   context: EventStoreReadContext
+   * ): Promise<void> {
    *   EventUtils.validateTenantId(context, 'EventStore.storeEvents');
-   *   // ... proceed with storage, filtering by context.tenantId
+   *   // Verify all events belong to context.tenantId
+   *   // ... proceed with storage
    * }
    * ```
    */
-  storeEvents(events: readonly EventType[]): Promise<void>;
+  storeEvents(
+    events: readonly EventType[],
+    context: EventStoreReadContext<AggregateId, EventType>,
+  ): Promise<void>;
 }

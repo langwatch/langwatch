@@ -85,9 +85,11 @@ describe("EventSourcingService - Batch Processing Failures", () => {
         eventHandler: mockEventHandler,
       });
 
-      await expect(service.rebuildProjectionsInBatches()).rejects.toThrow(
-        "Projection store write failed",
-      );
+      await expect(
+        service.rebuildProjectionsInBatches({
+          eventStoreContext: { tenantId: "test-tenant" },
+        }),
+      ).rejects.toThrow("Projection store write failed");
     });
 
     it("processes first aggregate successfully before failure", async () => {
@@ -117,7 +119,11 @@ describe("EventSourcingService - Batch Processing Failures", () => {
         eventHandler: mockEventHandler,
       });
 
-      await expect(service.rebuildProjectionsInBatches()).rejects.toThrow();
+      await expect(
+        service.rebuildProjectionsInBatches({
+          eventStoreContext: { tenantId: "test-tenant" },
+        }),
+      ).rejects.toThrow();
       // Store was called twice (once successfully, once failed)
       expect(mockProjectionStore.storeProjection).toHaveBeenCalledTimes(2);
     });

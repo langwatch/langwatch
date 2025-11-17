@@ -24,9 +24,9 @@ const DEFAULT_REBUILD_BATCH_SIZE = 100;
 
 /**
  * Hooks for extending the event sourcing pipeline.
- * 
+ *
  * **Execution Order:** beforeHandle → handle → afterHandle → beforePersist → persist → afterPersist
- * 
+ *
  * **Error Handling:**
  * - If beforeHandle throws: handler is not called, no persistence occurs
  * - If handler throws: afterHandle/beforePersist/persist/afterPersist are not called
@@ -34,10 +34,10 @@ const DEFAULT_REBUILD_BATCH_SIZE = 100;
  * - If beforePersist throws: projection is not persisted
  * - If persist fails: afterPersist is not called
  * - If afterPersist throws: projection WAS persisted (partial success state)
- * 
+ *
  * **Concurrency Note:** Hooks are called sequentially, not concurrently.
  * Each hook completes before the next begins.
- * 
+ *
  * **Best Practices:**
  * - Keep hooks fast and focused
  * - Avoid side effects in beforePersist/afterPersist that can't be rolled back
@@ -79,7 +79,7 @@ export interface EventSourcingHooks<
   ): Promise<void> | void;
   /**
    * Called after the projection has been successfully persisted.
-   * 
+   *
    * **WARNING:** The projection IS already persisted when this runs.
    * Throwing here leaves the system in a partial success state.
    * Consider carefully whether errors here should fail the operation.
@@ -221,9 +221,9 @@ export class EventSourcingService<
       },
       async (span) => {
         const startTime = Date.now();
-        
+
         this.logger?.info(
-          { 
+          {
             aggregateId: String(aggregateId),
             tenantId: options?.eventStoreContext?.tenantId ?? "missing",
           },
@@ -281,10 +281,17 @@ export class EventSourcingService<
           span.addEvent("hook.before_persist.complete");
         }
 
+        const projectionContext = options?.projectionStoreContext ?? options?.eventStoreContext;
+        if (!projectionContext) {
+          throw new Error(
+            "[SECURITY] rebuildProjection requires context with tenantId for tenant isolation",
+          );
+        }
+
         span.addEvent("projection_store.store.start");
         await this.projectionStore.storeProjection(
           projection,
-          options?.projectionStoreContext,
+          projectionContext,
         );
         span.addEvent("projection_store.store.complete");
 
@@ -295,7 +302,7 @@ export class EventSourcingService<
         }
 
         const durationMs = Date.now() - startTime;
-        
+
         this.logger?.info(
           {
             aggregateId: String(aggregateId),
@@ -315,6 +322,7 @@ export class EventSourcingService<
   /**
    * Gets the current projection for an aggregate, rebuilding if necessary.
    * @param aggregateId - The aggregate to get projection for
+   * @param options - Options including context with tenantId
    * @returns The current projection
    */
   async getProjection(
@@ -330,9 +338,16 @@ export class EventSourcingService<
         },
       },
       async (span) => {
+        const projectionContext = options?.projectionStoreContext ?? options?.eventStoreContext;
+        if (!projectionContext) {
+          throw new Error(
+            "[SECURITY] getProjection requires context with tenantId for tenant isolation",
+          );
+        }
+
         let projection = await this.projectionStore.getProjection(
           aggregateId,
-          options?.projectionStoreContext,
+          projectionContext,
         );
 
         if (!projection) {
@@ -350,10 +365,20 @@ export class EventSourcingService<
   /**
    * Checks if a projection exists for an aggregate without rebuilding.
    * @param aggregateId - The aggregate to check
+   * @param options - Options including projection store context with tenantId
    * @returns True if projection exists
    */
-  async hasProjection(aggregateId: AggregateId): Promise<boolean> {
-    const projection = await this.projectionStore.getProjection(aggregateId);
+  async hasProjection(
+    aggregateId: AggregateId,
+    options?: RebuildProjectionOptions<AggregateId, EventType>,
+  ): Promise<boolean> {
+    const context = options?.projectionStoreContext ?? options?.eventStoreContext;
+    if (!context) {
+      throw new Error(
+        "[SECURITY] hasProjection requires context with tenantId for tenant isolation",
+      );
+    }
+    const projection = await this.projectionStore.getProjection(aggregateId, context);
     return projection !== null;
   }
 
@@ -491,6 +516,18 @@ export class EventSourcingService<
                 await safeOptions.onProgress({ checkpoint });
               }
             } catch (error) {
+              // CURRENT: Fail-fast error handling
+              // When a single aggregate fails, we halt the entire batch operation.
+              // This ensures strict correctness and prevents partial state.
+              //
+              // FUTURE IMPROVEMENT: Consider implementing graceful degradation:
+              // - Collect per-aggregate errors instead of throwing immediately
+              // - Continue processing remaining aggregates in the batch
+              // - Return both the checkpoint and collected errors
+              // - Benefits: Better throughput, one bad aggregate doesn't block all others
+              // - Trade-offs: More complex error reporting, partial success states
+              //
+              // For now, callers can use resumeFrom to retry failed batches.
               this.logger?.error(
                 {
                   aggregateId: String(aggregateId),

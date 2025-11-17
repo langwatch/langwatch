@@ -51,7 +51,9 @@ describe("EventSourcingService", () => {
           eventHandler: mockEventHandler,
         });
 
-        const result = await service.rebuildProjection("test-1");
+        const result = await service.rebuildProjection("test-1", {
+          eventStoreContext: { tenantId: "test-tenant" },
+        });
 
         expect(result).toBe(projection);
       });
@@ -81,7 +83,9 @@ describe("EventSourcingService", () => {
           serviceOptions: { hooks: { beforeHandle } },
         });
 
-        await service.rebuildProjection("test-1");
+        await service.rebuildProjection("test-1", {
+          eventStoreContext: { tenantId: "test-tenant" },
+        });
 
         expect(beforeHandle).toHaveBeenCalled();
       });
@@ -109,7 +113,9 @@ describe("EventSourcingService", () => {
           serviceOptions: { hooks: { afterHandle } },
         });
 
-        await service.rebuildProjection("test-1");
+        await service.rebuildProjection("test-1", {
+          eventStoreContext: { tenantId: "test-tenant" },
+        });
 
         expect(afterHandle).toHaveBeenCalled();
       });
@@ -137,7 +143,9 @@ describe("EventSourcingService", () => {
           serviceOptions: { hooks: { beforePersist } },
         });
 
-        await service.rebuildProjection("test-1");
+        await service.rebuildProjection("test-1", {
+          eventStoreContext: { tenantId: "test-tenant" },
+        });
 
         expect(beforePersist).toHaveBeenCalled();
       });
@@ -165,7 +173,9 @@ describe("EventSourcingService", () => {
           serviceOptions: { hooks: { afterPersist } },
         });
 
-        await service.rebuildProjection("test-1");
+        await service.rebuildProjection("test-1", {
+          eventStoreContext: { tenantId: "test-tenant" },
+        });
 
         expect(afterPersist).toHaveBeenCalled();
       });
@@ -214,7 +224,9 @@ describe("EventSourcingService", () => {
           },
         });
 
-        await service.rebuildProjection("test-1");
+        await service.rebuildProjection("test-1", {
+          eventStoreContext: { tenantId: "test-tenant" },
+        });
 
         expect(callOrder).toEqual([
           "beforeHandle",
@@ -271,7 +283,9 @@ describe("EventSourcingService", () => {
           eventHandler: mockEventHandler,
         });
 
-        const result = await service.getProjection("test-1");
+        const result = await service.getProjection("test-1", {
+          eventStoreContext: { tenantId: "test-tenant" },
+        });
 
         expect(result).toBe(projection);
       });
@@ -299,7 +313,9 @@ describe("EventSourcingService", () => {
           eventHandler: mockEventHandler,
         });
 
-        const result = await service.getProjection("test-1");
+        const result = await service.getProjection("test-1", {
+          eventStoreContext: { tenantId: "test-tenant" },
+        });
 
         expect(result).toBe(projection);
       });
@@ -326,7 +342,9 @@ describe("EventSourcingService", () => {
           eventHandler: mockEventHandler,
         });
 
-        const result = await service.hasProjection("test-1");
+        const result = await service.hasProjection("test-1", {
+          eventStoreContext: { tenantId: "test-tenant" },
+        });
 
         expect(result).toBe(true);
       });
@@ -342,7 +360,9 @@ describe("EventSourcingService", () => {
           eventHandler: mockEventHandler,
         });
 
-        const result = await service.hasProjection("test-1");
+        const result = await service.hasProjection("test-1", {
+          eventStoreContext: { tenantId: "test-tenant" },
+        });
 
         expect(result).toBe(false);
       });
@@ -371,7 +391,9 @@ describe("EventSourcingService", () => {
           eventHandler: mockEventHandler,
         });
 
-        const result = await service.forceRebuildProjection("test-1");
+        const result = await service.forceRebuildProjection("test-1", {
+          eventStoreContext: { tenantId: "test-tenant" },
+        });
 
         expect(result).toBe(projection);
       });

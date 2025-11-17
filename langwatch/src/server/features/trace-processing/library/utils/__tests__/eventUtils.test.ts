@@ -43,6 +43,150 @@ describe("createEventWithProcessingTraceContext", () => {
       getSpanSpy.mockRestore();
     });
   });
+
+  describe("when active span exists but spanContext has missing traceId", () => {
+    it("does not set processingTraceparent", () => {
+      const mockSpan = {
+        spanContext: () => ({
+          traceId: "",
+          spanId: "valid-span-id-123",
+          traceFlags: 1,
+        }),
+      };
+
+      const getSpanSpy = vi
+        .spyOn(trace, "getSpan")
+        .mockReturnValue(mockSpan as any);
+
+      const event = EventUtils.createEventWithProcessingTraceContext("agg-1", "TEST", {
+        foo: "bar",
+      });
+
+      expect(event.metadata).toBeUndefined();
+
+      getSpanSpy.mockRestore();
+    });
+  });
+
+  describe("when active span exists but spanContext has missing spanId", () => {
+    it("does not set processingTraceparent", () => {
+      const mockSpan = {
+        spanContext: () => ({
+          traceId: "valid-trace-id-abc",
+          spanId: "",
+          traceFlags: 1,
+        }),
+      };
+
+      const getSpanSpy = vi
+        .spyOn(trace, "getSpan")
+        .mockReturnValue(mockSpan as any);
+
+      const event = EventUtils.createEventWithProcessingTraceContext("agg-1", "TEST", {
+        foo: "bar",
+      });
+
+      expect(event.metadata).toBeUndefined();
+
+      getSpanSpy.mockRestore();
+    });
+  });
+
+  describe("when active span exists but spanContext has null traceId", () => {
+    it("does not set processingTraceparent", () => {
+      const mockSpan = {
+        spanContext: () => ({
+          traceId: null as any,
+          spanId: "valid-span-id-123",
+          traceFlags: 1,
+        }),
+      };
+
+      const getSpanSpy = vi
+        .spyOn(trace, "getSpan")
+        .mockReturnValue(mockSpan as any);
+
+      const event = EventUtils.createEventWithProcessingTraceContext("agg-1", "TEST", {
+        foo: "bar",
+      });
+
+      expect(event.metadata).toBeUndefined();
+
+      getSpanSpy.mockRestore();
+    });
+  });
+
+  describe("when active span exists but spanContext has null spanId", () => {
+    it("does not set processingTraceparent", () => {
+      const mockSpan = {
+        spanContext: () => ({
+          traceId: "valid-trace-id-abc",
+          spanId: null as any,
+          traceFlags: 1,
+        }),
+      };
+
+      const getSpanSpy = vi
+        .spyOn(trace, "getSpan")
+        .mockReturnValue(mockSpan as any);
+
+      const event = EventUtils.createEventWithProcessingTraceContext("agg-1", "TEST", {
+        foo: "bar",
+      });
+
+      expect(event.metadata).toBeUndefined();
+
+      getSpanSpy.mockRestore();
+    });
+  });
+
+  describe("when active span exists but spanContext has undefined traceId", () => {
+    it("does not set processingTraceparent", () => {
+      const mockSpan = {
+        spanContext: () => ({
+          traceId: void 0 as any,
+          spanId: "valid-span-id-123",
+          traceFlags: 1,
+        }),
+      };
+
+      const getSpanSpy = vi
+        .spyOn(trace, "getSpan")
+        .mockReturnValue(mockSpan as any);
+
+      const event = EventUtils.createEventWithProcessingTraceContext("agg-1", "TEST", {
+        foo: "bar",
+      });
+
+      expect(event.metadata).toBeUndefined();
+
+      getSpanSpy.mockRestore();
+    });
+  });
+
+  describe("when active span exists but spanContext has undefined spanId", () => {
+    it("does not set processingTraceparent", () => {
+      const mockSpan = {
+        spanContext: () => ({
+          traceId: "valid-trace-id-abc",
+          spanId: void 0 as any,
+          traceFlags: 1,
+        }),
+      };
+
+      const getSpanSpy = vi
+        .spyOn(trace, "getSpan")
+        .mockReturnValue(mockSpan as any);
+
+      const event = EventUtils.createEventWithProcessingTraceContext("agg-1", "TEST", {
+        foo: "bar",
+      });
+
+      expect(event.metadata).toBeUndefined();
+
+      getSpanSpy.mockRestore();
+    });
+  });
 });
 
 describe("createProjection", () => {

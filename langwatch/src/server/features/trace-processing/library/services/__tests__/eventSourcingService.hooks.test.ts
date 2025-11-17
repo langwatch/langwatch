@@ -46,7 +46,9 @@ describe("EventSourcingService - Hook Error Recovery", () => {
         serviceOptions: { hooks: { beforeHandle } },
       });
 
-      await expect(service.rebuildProjection("test-1")).rejects.toThrow(
+      await expect(service.rebuildProjection("test-1", {
+        eventStoreContext: { tenantId: "test-tenant" },
+      })).rejects.toThrow(
         "beforeHandle failed",
       );
       expect(mockEventHandler.handle).not.toHaveBeenCalled();
@@ -70,7 +72,9 @@ describe("EventSourcingService - Hook Error Recovery", () => {
         serviceOptions: { hooks: { beforeHandle } },
       });
 
-      await expect(service.rebuildProjection("test-1")).rejects.toThrow();
+      await expect(service.rebuildProjection("test-1", {
+        eventStoreContext: { tenantId: "test-tenant" },
+      })).rejects.toThrow();
       expect(mockProjectionStore.storeProjection).not.toHaveBeenCalled();
     });
   });
@@ -101,7 +105,9 @@ describe("EventSourcingService - Hook Error Recovery", () => {
         serviceOptions: { hooks: { afterHandle } },
       });
 
-      await expect(service.rebuildProjection("test-1")).rejects.toThrow(
+      await expect(service.rebuildProjection("test-1", {
+        eventStoreContext: { tenantId: "test-tenant" },
+      })).rejects.toThrow(
         "afterHandle failed",
       );
       expect(mockProjectionStore.storeProjection).not.toHaveBeenCalled();
@@ -132,7 +138,9 @@ describe("EventSourcingService - Hook Error Recovery", () => {
         serviceOptions: { hooks: { afterHandle } },
       });
 
-      await expect(service.rebuildProjection("test-1")).rejects.toThrow();
+      await expect(service.rebuildProjection("test-1", {
+        eventStoreContext: { tenantId: "test-tenant" },
+      })).rejects.toThrow();
       expect(mockEventHandler.handle).toHaveBeenCalled();
     });
   });
@@ -163,7 +171,9 @@ describe("EventSourcingService - Hook Error Recovery", () => {
         serviceOptions: { hooks: { beforePersist } },
       });
 
-      await expect(service.rebuildProjection("test-1")).rejects.toThrow(
+      await expect(service.rebuildProjection("test-1", {
+        eventStoreContext: { tenantId: "test-tenant" },
+      })).rejects.toThrow(
         "beforePersist failed",
       );
       expect(mockProjectionStore.storeProjection).not.toHaveBeenCalled();
@@ -194,7 +204,9 @@ describe("EventSourcingService - Hook Error Recovery", () => {
         serviceOptions: { hooks: { beforePersist } },
       });
 
-      await expect(service.rebuildProjection("test-1")).rejects.toThrow();
+      await expect(service.rebuildProjection("test-1", {
+        eventStoreContext: { tenantId: "test-tenant" },
+      })).rejects.toThrow();
       expect(mockEventHandler.handle).toHaveBeenCalled();
     });
   });
@@ -225,13 +237,15 @@ describe("EventSourcingService - Hook Error Recovery", () => {
         serviceOptions: { hooks: { afterPersist } },
       });
 
-      await expect(service.rebuildProjection("test-1")).rejects.toThrow(
+      await expect(service.rebuildProjection("test-1", {
+        eventStoreContext: { tenantId: "test-tenant" },
+      })).rejects.toThrow(
         "afterPersist failed",
       );
       // Projection WAS stored despite the error
       expect(mockProjectionStore.storeProjection).toHaveBeenCalledWith(
         projection,
-        void 0,
+        { tenantId: "test-tenant" },
       );
     });
 
@@ -260,7 +274,9 @@ describe("EventSourcingService - Hook Error Recovery", () => {
         serviceOptions: { hooks: { afterPersist } },
       });
 
-      await expect(service.rebuildProjection("test-1")).rejects.toThrow(
+      await expect(service.rebuildProjection("test-1", {
+        eventStoreContext: { tenantId: "test-tenant" },
+      })).rejects.toThrow(
         "afterPersist failed",
       );
     });
@@ -293,7 +309,9 @@ describe("EventSourcingService - Hook Error Recovery", () => {
         serviceOptions: { hooks: { afterPersist } },
       });
 
-      await expect(service.rebuildProjection("test-1")).rejects.toThrow(
+      await expect(service.rebuildProjection("test-1", {
+        eventStoreContext: { tenantId: "test-tenant" },
+      })).rejects.toThrow(
         "Store failed",
       );
       expect(afterPersist).not.toHaveBeenCalled();
@@ -322,7 +340,9 @@ describe("EventSourcingService - Hook Error Recovery", () => {
         serviceOptions: { hooks: { beforeHandle, afterHandle } },
       });
 
-      await expect(service.rebuildProjection("test-1")).rejects.toThrow(
+      await expect(service.rebuildProjection("test-1", {
+        eventStoreContext: { tenantId: "test-tenant" },
+      })).rejects.toThrow(
         "beforeHandle failed",
       );
       // afterHandle shouldn't even be reached
