@@ -1,3 +1,4 @@
+import { context, trace } from "@opentelemetry/api";
 import { EventStream } from "../core/eventStream";
 import type {
   Event,
@@ -5,13 +6,18 @@ import type {
   EventOrderingStrategy,
   ProjectionMetadata,
 } from "../core/types";
+import type { EventMetadataBase } from "../core/types";
 
-function createEvent<AggregateId = string>(
+function createEvent<
+  AggregateId = string,
+  Payload = unknown,
+  Metadata extends EventMetadataBase = EventMetadataBase,
+>(
   aggregateId: AggregateId,
   type: string,
-  data: unknown,
-  metadata?: Record<string, unknown>,
-): Event<AggregateId> {
+  data: Payload,
+  metadata?: Metadata,
+): Event<AggregateId, Payload, Metadata> {
   return {
     aggregateId,
     timestamp: Date.now(),
@@ -19,6 +25,64 @@ function createEvent<AggregateId = string>(
     data,
     metadata,
   };
+}
+
+function getCurrentTraceparentFromActiveSpan(): string | undefined {
+  const span = trace.getSpan(context.active());
+  if (!span) {
+    return void 0;
+  }
+
+  const spanContext = span.spanContext();
+  if (!spanContext.traceId || !spanContext.spanId) {
+    return void 0;
+  }
+
+  const flagsHex = spanContext.traceFlags.toString(16).padStart(2, "0");
+  return `00-${spanContext.traceId}-${spanContext.spanId}-${flagsHex}`;
+}
+
+function buildEventMetadataWithCurrentTraceparent<
+  Metadata extends EventMetadataBase = EventMetadataBase,
+>(metadata?: Metadata): Metadata {
+  if (metadata && typeof metadata.traceparent === "string") {
+    return metadata;
+  }
+
+  const traceparent = getCurrentTraceparentFromActiveSpan();
+  if (!traceparent) {
+    return (metadata ?? ({} as Metadata));
+  }
+
+  return {
+    ...(metadata ?? ({} as Metadata)),
+    traceparent,
+  } as Metadata;
+}
+
+function createEventWithTraceContext<
+  AggregateId = string,
+  Payload = unknown,
+  Metadata extends EventMetadataBase = EventMetadataBase,
+>(
+  aggregateId: AggregateId,
+  type: string,
+  data: Payload,
+  metadata?: Metadata,
+): Event<AggregateId, Payload, Metadata> {
+  const enrichedMetadata =
+    buildEventMetadataWithCurrentTraceparent<Metadata>(metadata);
+
+  const hasMetadata =
+    enrichedMetadata &&
+    Object.keys(enrichedMetadata as Record<string, unknown>).length > 0;
+
+  return createEvent<AggregateId, Payload, Metadata>(
+    aggregateId,
+    type,
+    data,
+    hasMetadata ? enrichedMetadata : void 0,
+  );
 }
 
 function createProjection<AggregateId = string, Data = unknown>(
@@ -129,6 +193,7 @@ export {
 
 export const EventUtils = {
   createEvent,
+  createEventWithTraceContext,
   createEventStream,
   createProjection,
   eventBelongsToAggregate,
@@ -138,6 +203,7 @@ export const EventUtils = {
   isValidEvent,
   isValidProjection,
   buildProjectionMetadata,
+  buildEventMetadataWithCurrentTraceparent,
 } as const;
 
 

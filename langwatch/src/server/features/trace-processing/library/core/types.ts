@@ -2,10 +2,19 @@
  * Core types for the event sourcing library.
  */
 
+export interface EventMetadataBase {
+  /**
+   * W3C traceparent header value capturing the originating OTel trace context.
+   * Example: "00-<trace-id>-<span-id>-01"
+   */
+  traceparent?: string;
+  [key: string]: unknown;
+}
+
 export interface Event<
   AggregateId = string,
   Payload = unknown,
-  Metadata = Record<string, unknown>,
+  Metadata = EventMetadataBase,
 > {
   /** Unique identifier for the aggregate this event belongs to */
   aggregateId: AggregateId;

@@ -50,6 +50,7 @@ export {
 // Utility functions
 export {
   createEvent,
+  createEventWithTraceContext,
   createEventStream,
   createProjection,
   eventBelongsToAggregate,
@@ -59,5 +60,6 @@ export {
   isValidEvent,
   isValidProjection,
   buildProjectionMetadata,
+  buildEventMetadataWithCurrentTraceparent,
   EventUtils,
 } from "./utils/event.utils";

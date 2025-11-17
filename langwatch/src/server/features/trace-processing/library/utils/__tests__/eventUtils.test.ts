@@ -1,4 +1,5 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
+import { context, trace } from "@opentelemetry/api";
 import { EventUtils } from "../event.utils";
 import type { Event, Projection } from "../../core/types";
 
@@ -8,6 +9,38 @@ describe("createEvent", () => {
       const event = EventUtils.createEvent("agg-1", "TEST", { foo: "bar" });
 
       expect(event.aggregateId).toBe("agg-1");
+    });
+  });
+});
+
+describe("createEventWithTraceContext", () => {
+  describe("when metadata already has traceparent", () => {
+    it("preserves existing traceparent", () => {
+      const event = EventUtils.createEventWithTraceContext("agg-1", "TEST", {
+        foo: "bar",
+      }, {
+        traceparent: "00-test-trace-span-01",
+        custom: "value",
+      });
+
+      expect(event.metadata?.traceparent).toBe("00-test-trace-span-01");
+      expect(event.metadata?.custom).toBe("value");
+    });
+  });
+
+  describe("when there is no active span and no metadata", () => {
+    it("does not set metadata", () => {
+      const getSpanSpy = vi
+        .spyOn(trace, "getSpan")
+        .mockReturnValue(void 0 as any);
+
+      const event = EventUtils.createEventWithTraceContext("agg-1", "TEST", {
+        foo: "bar",
+      });
+
+      expect(event.metadata).toBeUndefined();
+
+      getSpanSpy.mockRestore();
     });
   });
 });
