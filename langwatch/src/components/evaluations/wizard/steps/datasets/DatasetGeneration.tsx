@@ -28,7 +28,7 @@ export function DatasetGeneration() {
     useShallow((state) => ({
       datasetId: state.getDatasetId(),
       datasetGridRef: state.datasetGridRef,
-    }))
+    })),
   );
 
   // Check if the default model is enabled
@@ -36,7 +36,7 @@ export function DatasetGeneration() {
   const { modelOption } = useModelSelectionOptions(
     allModelOptions,
     defaultModel,
-    "chat"
+    "chat",
   );
   const isDefaultModelDisabled = modelOption?.isDisabled ?? false;
 
@@ -45,7 +45,7 @@ export function DatasetGeneration() {
     {
       enabled: !!project && !!datasetId,
       refetchOnWindowFocus: false,
-    }
+    },
   );
 
   const columnTypes = useMemo(() => {
@@ -166,7 +166,7 @@ export function DatasetGeneration() {
           }
 
           const rowData = Object.fromEntries(
-            columnNames.map((col) => [col, row[col] ?? ""])
+            columnNames.map((col) => [col, row[col] ?? ""]),
           );
           if (!rowData.id) {
             rowData.id = nanoid();
@@ -224,7 +224,7 @@ export function DatasetGeneration() {
           }
 
           const rowData = Object.fromEntries(
-            columnNames.map((col) => [col, row[col] ?? ""])
+            columnNames.map((col) => [col, row[col] ?? ""]),
           );
           rowData.id = id;
 
@@ -357,7 +357,7 @@ export function DatasetGeneration() {
                 void databaseDataset.refetch();
                 reject(error);
               },
-            }
+            },
           );
         });
 
@@ -391,7 +391,7 @@ export function DatasetGeneration() {
         });
       }
     },
-    [datasetId, processQueue]
+    [datasetId, processQueue],
   );
 
   const deleteRecord = useCallback(
@@ -418,10 +418,10 @@ export function DatasetGeneration() {
             });
             void databaseDataset.refetch();
           },
-        }
+        },
       );
     },
-    [databaseDataset, datasetId, project?.id, deleteDatasetRecord]
+    [databaseDataset, datasetId, project?.id, deleteDatasetRecord],
   );
 
   // Cleanup effect to process remaining queue items
@@ -433,9 +433,11 @@ export function DatasetGeneration() {
       if (queue?.length > 0 && !processing) {
         processQueue().catch((error) => {
           captureException(error, {
-            tags: {
-              datasetId: datasetId,
-            },
+            ...(datasetId && {
+              tags: {
+                datasetId: datasetId,
+              },
+            }),
           });
           console.error("Error processing queue during cleanup:", error);
         });
@@ -449,9 +451,11 @@ export function DatasetGeneration() {
       processQueue().catch((error) => {
         console.error("Error processing queue during dataset change:", error);
         captureException(error, {
-          tags: {
-            datasetId: datasetId,
-          },
+          ...(datasetId && {
+            tags: {
+              datasetId: datasetId,
+            },
+          }),
         });
         console.error("Error processing queue during cleanup:", error);
       });
@@ -483,7 +487,7 @@ export function DatasetGeneration() {
             dataset: datasetCsv,
             projectId: project?.id,
           },
-        }
+        },
       );
       setInput("");
     }
