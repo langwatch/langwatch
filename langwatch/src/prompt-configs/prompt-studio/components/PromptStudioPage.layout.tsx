@@ -9,7 +9,7 @@ import { PromptStudioChatProvider } from "./chat/PromptStudioChatContext";
  * PromptStudioLayout
  * Single Responsibility: Renders the main layout structure for the Prompt Studio feature with sidebar and main content.
  */
-export function PromptStudioLayout() {
+export function PromptStudioPageLayout() {
   return (
     <DashboardLayout position="relative">
       <HStack width="full" height="full" gap={0} position="relative">
