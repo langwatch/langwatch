@@ -1,4 +1,5 @@
 import type { ConnectionOptions } from "bullmq";
+import { BullMQOtel } from "bullmq-otel";
 
 import { connection } from "../../redis";
 import { QueueWithFallback } from "./queueWithFallback";
@@ -14,6 +15,7 @@ export const spanIngestionWriteQueue = new QueueWithFallback<
   string
 >(SPAN_INGESTION_WRITE_QUEUE, handleSpanIngestionWriteJob, {
   connection: connection as ConnectionOptions,
+  telemetry: new BullMQOtel(SPAN_INGESTION_WRITE_QUEUE),
   defaultJobOptions: {
     attempts: 5,
     backoff: {

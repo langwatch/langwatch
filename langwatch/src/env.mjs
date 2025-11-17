@@ -13,6 +13,7 @@ export const env = createEnv({
    */
   server: {
     DATABASE_URL: optionalIfBuildTime(z.string().url()),
+    CLICKHOUSE_URL: z.string().url().optional(),
     NODE_ENV: z.enum(["development", "test", "production"]),
     BASE_HOST: optionalIfBuildTime(z.string().min(1)),
     NEXTAUTH_PROVIDER: z.string().optional(),
@@ -110,6 +111,7 @@ export const env = createEnv({
    */
   runtimeEnv: {
     DATABASE_URL: process.env.DATABASE_URL,
+    CLICKHOUSE_URL: process.env.CLICKHOUSE_URL,
     NODE_ENV: process.env.NODE_ENV,
     BASE_HOST: process.env.BASE_HOST,
     NEXTAUTH_PROVIDER: process.env.NEXTAUTH_PROVIDER ?? "email",
