@@ -20,7 +20,7 @@ import type { InstrumentationScope } from "@opentelemetry/core";
 import type { TraceForCollection } from "../../../../tracer/otel.traces";
 import type { Span, RAGSpan } from "../../../../tracer/types";
 import type { DeepPartial } from "../../../../../utils/types";
-import type { SpanProcessingWriteRecord } from "../types/";
+import type { SpanIngestionWriteRecord } from "../types/spanIngestionWriteRecord";
 import {
   unixNanoToMs,
   msToUnixNano,
@@ -58,7 +58,7 @@ export class SpanProcessingMapperService {
     trace: TraceForCollection,
     traceRequest: DeepPartial<IExportTraceServiceRequest>,
     tenantId: string,
-  ): SpanProcessingWriteRecord[] {
+  ): SpanIngestionWriteRecord[] {
     return tracer.withActiveSpan(
       "mapLangWatchSpansToOtelReadableSpans",
       {
@@ -69,7 +69,7 @@ export class SpanProcessingMapperService {
         },
       },
       (span) => {
-        const records: SpanProcessingWriteRecord[] = [];
+        const records: SpanIngestionWriteRecord[] = [];
 
         for (const langWatchSpan of trace.spans) {
           span.addEvent("processing span", {

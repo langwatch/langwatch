@@ -1,10 +1,11 @@
+/* eslint-disable @typescript-eslint/unbound-method */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import {
   createMockTraceForCollection,
   createMockExportTraceServiceRequest,
   createMockReadableSpan,
 } from "./testDoubles/testDataFactories";
-import type { SpanProcessingWriteRecord } from "../../types/";
+import type { SpanIngestionWriteRecord } from "../../types/spanIngestionWriteRecord";
 
 // Mock the command dispatcher
 vi.mock("../../pipeline", () => ({
@@ -48,25 +49,29 @@ vi.mock("../spanProcessingMapperService", () => ({
 
 // Import after mocking
 import { SpanProcessingMapperService } from "../spanProcessingMapperService";
-import { SpanProcessingService } from "../spanProcessingService";
+import { SpanIngestionService } from "../spanIngestionService";
 import { spanProcessingCommandDispatcher } from "../../pipeline";
 
-describe("SpanProcessingService", () => {
-  let service: SpanProcessingService;
+describe("SpanIngestionService", () => {
+  let service: SpanIngestionService;
   let mockMapperService: {
     mapLangWatchSpansToOtelReadableSpans: ReturnType<typeof vi.fn>;
     mapReadableSpanToSpanData: ReturnType<typeof vi.fn>;
   };
 
   beforeEach(() => {
-    service = new SpanProcessingService();
+    service = new SpanIngestionService();
     const MockedMapperService = vi.mocked(SpanProcessingMapperService);
     const instance = new MockedMapperService();
+    // The methods are already vi.fn() instances from the mock implementation
     mockMapperService = {
-      mapLangWatchSpansToOtelReadableSpans: vi.mocked(
-        instance.mapLangWatchSpansToOtelReadableSpans,
-      ),
-      mapReadableSpanToSpanData: vi.mocked(instance.mapReadableSpanToSpanData),
+      mapLangWatchSpansToOtelReadableSpans:
+        instance.mapLangWatchSpansToOtelReadableSpans as ReturnType<
+          typeof vi.fn
+        >,
+      mapReadableSpanToSpanData: instance.mapReadableSpanToSpanData as ReturnType<
+        typeof vi.fn
+      >,
     };
     // Replace the service's mapper with our mock
     (service as any).mapperService = mockMapperService;
@@ -85,7 +90,7 @@ describe("SpanProcessingService", () => {
         const mockReadableSpan1 = createMockReadableSpan({ name: "span-1" });
         const mockReadableSpan2 = createMockReadableSpan({ name: "span-2" });
 
-        const mappedRecords: SpanProcessingWriteRecord[] = [
+        const mappedRecords: SpanIngestionWriteRecord[] = [
           { readableSpan: mockReadableSpan1, tenantId },
           { readableSpan: mockReadableSpan2, tenantId },
         ];
@@ -94,7 +99,7 @@ describe("SpanProcessingService", () => {
           mappedRecords,
         );
 
-        await service.processSpans(tenantId, traceForCollection, traceRequest);
+        await service.ingestSpanCollection(tenantId, traceForCollection, traceRequest);
 
         // We only assert that mapping was called; command side effects are covered elsewhere.
         expect(
@@ -113,7 +118,7 @@ describe("SpanProcessingService", () => {
           [],
         );
 
-        await service.processSpans(tenantId, traceForCollection, traceRequest);
+        await service.ingestSpanCollection(tenantId, traceForCollection, traceRequest);
       });
     });
 
@@ -125,7 +130,7 @@ describe("SpanProcessingService", () => {
         const mockReadableSpan = createMockReadableSpan();
         const producerError = new Error("Queue is full");
 
-        const mappedRecords: SpanProcessingWriteRecord[] = [
+        const mappedRecords: SpanIngestionWriteRecord[] = [
           { readableSpan: mockReadableSpan, tenantId },
         ];
 
@@ -139,7 +144,7 @@ describe("SpanProcessingService", () => {
         );
 
         await expect(
-          service.processSpans(tenantId, traceForCollection, traceRequest),
+          service.ingestSpanCollection(tenantId, traceForCollection, traceRequest),
         ).rejects.toThrow("Queue is full");
       });
     });

@@ -4,30 +4,30 @@ import { getLangWatchTracer } from "langwatch";
 import type { TraceForCollection } from "../../../../tracer/otel.traces";
 import type { DeepPartial } from "../../../../../utils/types";
 import type { IExportTraceServiceRequest } from "@opentelemetry/otlp-transformer";
-import type { RecordSpanProcessingCommandData } from "../types";
 import { createLogger } from "../../../../../utils/logger";
 import { SpanProcessingMapperService } from "./spanProcessingMapperService";
 import { spanProcessingCommandDispatcher } from "../pipeline";
 
-export class SpanProcessingService {
-  tracer = getLangWatchTracer("langwatch.span-processing.service");
-  logger = createLogger("langwatch:span-processing:service");
+export class SpanIngestionService {
+  tracer = getLangWatchTracer("langwatch.span-ingestion.service");
+  logger = createLogger("langwatch:span-ingestion:service");
   private readonly mapperService = new SpanProcessingMapperService();
 
   /**
-   * Processes spans into the LangWatch platform.
+   * Ingests a span collection into the LangWatch platform by mapping its spans to
+   * commands and sending them through the event sourcing pipeline.
    * @param tenantId - The tenant ID.
    * @param traceForCollection - The trace for collection.
    * @param traceRequest - The trace request.
-   * @returns A promise that resolves when the spans have been processed.
+   * @returns A promise that resolves when the trace has been ingested.
    */
-  async processSpans(
+  async ingestSpanCollection(
     tenantId: string,
     traceForCollection: TraceForCollection,
     traceRequest: DeepPartial<IExportTraceServiceRequest>,
   ): Promise<void> {
     return await this.tracer.withActiveSpan(
-      "SpanProcessingService.processSpans",
+      "SpanIngestionService.ingestSpanCollection",
       {
         kind: ApiSpanKind.PRODUCER,
         attributes: {
@@ -77,4 +77,4 @@ export class SpanProcessingService {
   }
 }
 
-export const spanProcessingService = new SpanProcessingService();
+export const spanIngestionService = new SpanIngestionService();
