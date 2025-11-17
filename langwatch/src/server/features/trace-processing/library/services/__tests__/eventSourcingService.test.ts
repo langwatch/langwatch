@@ -256,9 +256,11 @@ describe("EventSourcingService", () => {
           eventHandler: mockEventHandler,
         });
 
-        await expect(service.rebuildProjection("test-1")).rejects.toThrow(
-          "Handler failed",
-        );
+        await expect(
+          service.rebuildProjection("test-1", {
+            eventStoreContext: { tenantId: "test-tenant" },
+          }),
+        ).rejects.toThrow("Handler failed");
       });
     });
   });
