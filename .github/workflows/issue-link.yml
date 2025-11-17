@@ -14,8 +14,8 @@ jobs:
         with:
           repo-token: '${{ secrets.GITHUB_TOKEN }}'
           branch-prefix: 'issue'
-          link-style: 'comment'
+          link-style: 'body'
           position: 'body'
           header: '# Related Issue'
           resolve: true
-          assign-pr-creator-to-issue: 'true' 
+          assign-pr-creator-to-issue: 'true'
