@@ -16,7 +16,7 @@ export function withAppRouterTracer(name?: string) {
       return otContext.with(parentCtx, async () => {
         return tracer.startActiveSpan(
           spanName,
-          { kind: SpanKind.SERVER, attributes: name ? { "service.name": name } : void 0 },
+          { kind: SpanKind.SERVER, attributes: name ? { "langwatch.embedded-service.name": name } : void 0 },
           async (span) => {
             let response: NextResponse | null = null;
             try {

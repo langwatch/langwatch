@@ -53,7 +53,7 @@ export const useSetRunHistorySidebarController = () => {
       // Only fetch when we have both required IDs to avoid unnecessary API calls
       enabled: !!project?.id && !!scenarioSetId,
       refetchInterval: 1000,
-    }
+    },
   );
 
   // Fetch total count for pagination info
@@ -65,11 +65,10 @@ export const useSetRunHistorySidebarController = () => {
       },
       {
         enabled: !!project?.id && !!scenarioSetId,
-      }
+      },
     );
 
   const totalCount = countData?.count ?? 0;
-  const hasMore = runData?.hasMore ?? false;
   const currentPage = cursorHistory.length + 1;
   const totalPages = Math.ceil(totalCount / limit);
 
@@ -140,7 +139,7 @@ export const useSetRunHistorySidebarController = () => {
       setCursorHistory([]);
     } else if (newPage > currentPage) {
       // Navigate forward from current position
-      const stepsForward = newPage - currentPage;
+      // const stepsForward = newPage - currentPage;
       // This is simplified - in practice you'd need to fetch each page
       // For now, just allow forward navigation
     }

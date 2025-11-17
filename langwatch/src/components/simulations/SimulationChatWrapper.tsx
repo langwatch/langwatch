@@ -44,7 +44,7 @@ export const SimulationChatWrapper: React.FC<
     {
       enabled: !!project && !!scenarioRunId,
       refetchInterval: 1000,
-    }
+    },
   );
 
   return <>{children(query)}</>;

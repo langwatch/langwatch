@@ -7,11 +7,12 @@ import "../../simulations.css";
 import { useSimulationRouter } from "~/hooks/simulations/useSimulationRouter";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
+import { withSpan } from "~/observability/react-otel/withSpan";
 
 import { useEffect, useMemo } from "react";
 
 // Main layout for a single Simulation Set page
-export default function SimulationSetPage() {
+function SimulationSetPage() {
   const { scenarioSetId } = useSimulationRouter();
   const { project } = useOrganizationTeamProject();
   const { batchRunId, goToSimulationBatchRuns } = useSimulationRouter();
@@ -72,3 +73,5 @@ export default function SimulationSetPage() {
     </SimulationLayout>
   );
 }
+
+export default withSpan("View Simulation Batch")(SimulationSetPage);

@@ -18,6 +18,7 @@ import { type LlmConfigRepository } from "~/server/prompt-config/repositories/ll
 import {
   authMiddleware,
   handleError,
+  tracerMiddleware,
   loggerMiddleware,
 } from "../../middleware";
 
@@ -38,6 +39,7 @@ export const app = new Hono<{
 }>().basePath("/api/copilotkit");
 
 // Middleware
+app.use(tracerMiddleware({ name: "copilotkit" }));
 app.use(loggerMiddleware());
 app.use("/*", authMiddleware);
 app.onError(handleError);

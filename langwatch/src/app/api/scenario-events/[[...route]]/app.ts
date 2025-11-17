@@ -6,6 +6,7 @@ import { validator as zValidator, resolver } from "hono-openapi/zod";
 import {
   authMiddleware,
   handleError,
+  tracerMiddleware,
   loggerMiddleware,
 } from "../../middleware";
 import { baseResponses } from "../../shared/base-responses";
@@ -29,6 +30,7 @@ export const app = new Hono<{
 }>().basePath("/api/scenario-events");
 
 // Middleware
+app.use(tracerMiddleware({ name: "scenario-events" }));
 app.use(loggerMiddleware());
 app.use("/*", authMiddleware);
 app.onError(handleError);
@@ -59,6 +61,19 @@ app.post(
     const { project } = c.var;
     const event = c.req.valid("json");
 
+    logger.info(
+      {
+        projectId: project.id,
+        type: (event as any)?.type,
+        scenarioId: (event as any)?.scenarioId,
+        scenarioRunId: (event as any)?.scenarioRunId,
+        scenarioSetId: (event as any)?.scenarioSetId,
+        batchRunId: (event as any)?.batchRunId,
+        timestamp: (event as any)?.timestamp ?? Date.now(),
+      },
+      "scenario-event:create"
+    );
+
     const scenarioRunnerService = new ScenarioEventService();
     await scenarioRunnerService.saveScenarioEvent({
       projectId: project.id,
@@ -73,6 +88,11 @@ app.post(
 
     if (!base) {
       logger.error(
+        {
+          projectId: project.id,
+          path,
+          scenarioSetId: (event as any)?.scenarioSetId,
+        },
         "BASE_HOST is not set, but required for scenario event url payload"
       );
 

@@ -25,7 +25,7 @@ export const tracerMiddleware = (options?: TracerOptions) => {
         spanName,
         {
           kind: SpanKind.SERVER,
-          attributes: options?.name ? { "service.name": options.name } : void 0,
+          attributes: options?.name ? { "langwatch.embedded-service.name": options.name } : void 0,
         },
         async (span) => {
           try {

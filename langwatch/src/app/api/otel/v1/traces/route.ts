@@ -285,4 +285,4 @@ async function handleTracesRequest(req: NextRequest) {
 }
 
 // Export the handler wrapped with logging middleware
-export const POST = withAppRouterTracer("langwatch.otel.v1.traces")(withAppRouterLogger(handleTracesRequest));
+export const POST = withAppRouterTracer("otel.v1.traces")(withAppRouterLogger(handleTracesRequest));

@@ -15,9 +15,10 @@ import "../../../simulations.css";
 import { useSimulationRouter } from "~/hooks/simulations";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
+import { withSpan } from "~/observability/react-otel/withSpan";
 
 // Main component
-export default function IndividualScenarioRunPage() {
+function IndividualScenarioRunPage() {
   const [showPreviousRuns, setShowPreviousRuns] = useState(false);
   const { goToSimulationBatchRuns, scenarioRunId } = useSimulationRouter();
   const { project } = useOrganizationTeamProject();
@@ -216,3 +217,5 @@ export default function IndividualScenarioRunPage() {
     </SimulationLayout>
   );
 }
+
+export default withSpan("View Simulation Run")(IndividualScenarioRunPage);

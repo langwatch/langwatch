@@ -8,6 +8,7 @@ import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import ScenarioInfoCard from "~/components/simulations/ScenarioInfoCard";
 import React, { useEffect, useMemo, useState } from "react";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
+import { withSpan } from "~/observability/react-otel";
 
 function SimulationsPageContent() {
   const router = useRouter();
@@ -117,4 +118,4 @@ function SimulationsPageContent() {
 
 export default withPermissionGuard("scenarios:view", {
   layoutComponent: DashboardLayout,
-})(SimulationsPageContent);
+})(withSpan("SimulationsPageContent")(SimulationsPageContent));

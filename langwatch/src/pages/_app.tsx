@@ -4,6 +4,14 @@ import { type AppType } from "next/app";
 
 import { api } from "~/utils/api";
 
+// Get OTEL status from server environment
+const getOtelStatus = () => {
+  if (typeof window === 'undefined') {
+    return Boolean(process.env.OTEL_EXPORTER_OTLP_ENDPOINT);
+  }
+  return false;
+};
+
 import {
   ChakraProvider,
   createSystem,
@@ -11,6 +19,7 @@ import {
   defineRecipe,
   defineSlotRecipe,
 } from "@chakra-ui/react";
+import "~/observability/instrumentation.web";
 import "~/styles/globals.scss";
 import "~/styles/markdown.scss";
 
@@ -18,6 +27,7 @@ import { Inter } from "next/font/google";
 import Head from "next/head";
 import { useRouter } from "next/router";
 import NProgress from "nprogress";
+import Script from "next/script";
 import { useEffect, useState } from "react";
 import { colorSystem } from "../components/ui/color-mode";
 import { Toaster } from "../components/ui/toaster";
@@ -28,6 +38,7 @@ import { usePostHog } from "../hooks/usePostHog";
 import { AnalyticsProvider } from "react-contextual-analytics";
 import { createAppAnalyticsClient } from "~/utils/analyticsClient";
 import { usePublicEnv } from "~/hooks/usePublicEnv";
+import OtelProvider from "~/observability/react-otel/OtelContextProvider";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -594,15 +605,23 @@ const LangWatch: AppType<{
   }, [router]);
 
   return (
-    <SessionProvider
-      session={session}
-      refetchInterval={0}
-      refetchOnWindowFocus={false}
-    >
-      <ChakraProvider value={system}>
+      <SessionProvider
+        session={session}
+        refetchInterval={0}
+        refetchOnWindowFocus={false}
+      >
+        <OtelProvider>
+          <ChakraProvider value={system}>
         <Head>
           <title>LangWatch</title>
         </Head>
+        <Script
+          id="otel-status"
+          strategy="beforeInteractive"
+          dangerouslySetInnerHTML={{
+            __html: `window.__OTEL_ENABLED__ = ${getOtelStatus()};`,
+          }}
+        />
         <AnalyticsProvider
           client={createAppAnalyticsClient({
             isSaaS: Boolean(publicEnv.data?.IS_SAAS),
@@ -622,7 +641,8 @@ const LangWatch: AppType<{
         {dependencies.ExtraFooterComponents && (
           <dependencies.ExtraFooterComponents />
         )}
-      </ChakraProvider>
+        </ChakraProvider>
+      </OtelProvider>
     </SessionProvider>
   );
 };

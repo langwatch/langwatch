@@ -1,5 +1,6 @@
 import { Box, HStack, Text, VStack } from "@chakra-ui/react";
 import { type ScenarioResults } from "~/app/api/scenario-events/[[...route]]/schemas";
+import { AnalyticsBoundary } from "react-contextual-analytics";
 
 // Component for displaying the verdict with proper styling
 function VerdictSection({ verdict }: { verdict: string }) {
@@ -84,27 +85,37 @@ function CriteriaSection({
 // Main results component that orchestrates the smaller components
 export function SimulationResults({ results }: { results: ScenarioResults }) {
   return (
-    <Box p={6} width="100%" height="100%">
-      <Text fontSize="xl" fontWeight="bold" mb={6} color="gray.900">
-        Results
-      </Text>
-      <VStack alignItems="flex-start" gap={6} height="100%">
-        <VerdictSection verdict={results.verdict} />
+    <AnalyticsBoundary
+      name="results"
+      attributes={{
+        verdict: results.verdict,
+        metCriteriaCount: results.metCriteria.length,
+        unmetCriteriaCount: results.unmetCriteria.length
+      }}
+      sendViewedEvent
+    >
+      <Box p={6} width="100%" height="100%">
+        <Text fontSize="xl" fontWeight="bold" mb={6} color="gray.900">
+          Results
+        </Text>
+        <VStack alignItems="flex-start" gap={6} height="100%">
+          <VerdictSection verdict={results.verdict} />
 
-        <ReasoningSection reasoning={results.reasoning} />
+          <ReasoningSection reasoning={results.reasoning} />
 
-        <CriteriaSection
-          title="Met Criteria"
-          criteria={results.metCriteria}
-          color="green"
-        />
+          <CriteriaSection
+            title="Met Criteria"
+            criteria={results.metCriteria}
+            color="green"
+          />
 
-        <CriteriaSection
-          title="Unmet Criteria"
-          criteria={results.unmetCriteria}
-          color="red"
-        />
-      </VStack>
-    </Box>
+          <CriteriaSection
+            title="Unmet Criteria"
+            criteria={results.unmetCriteria}
+            color="red"
+          />
+        </VStack>
+      </Box>
+    </AnalyticsBoundary>
   );
 }

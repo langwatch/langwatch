@@ -3,16 +3,19 @@ import { DashboardLayout } from "../DashboardLayout";
 import { SetRunHistorySidebar } from "./set-run-history-sidebar";
 import { useSimulationRouter } from "~/hooks/simulations";
 import { LuPanelLeftClose, LuPanelLeftOpen } from "react-icons/lu";
+import { useOtel } from "~/observability/react-otel/useOtel";
+import { AnalyticsBoundary, useAnalytics } from "react-contextual-analytics";
 
 // TODO: This file could be better organized.
-export const SimulationLayout = ({
+export function SimulationLayout({
   children,
 }: {
   children: React.ReactNode;
-}) => {
+}) {
   const { open: isHistorySidebarOpen, onToggle } = useDisclosure({
     defaultOpen: true,
   });
+  const { scenarioSetId } = useSimulationRouter();
 
   return (
     <DashboardLayout>
@@ -20,30 +23,36 @@ export const SimulationLayout = ({
         isHistorySidebarOpen={isHistorySidebarOpen}
         onHistorySidebarOpenChange={onToggle}
       />
-      <HStack w="full" h="full" alignItems="stretch" gap={0} bg="white">
-        <Box
-          w={isHistorySidebarOpen ? "500px" : "0px"}
-          position="relative"
-          h="full"
-          transition="width 0.2s"
-        >
-          <SetRunHistorySidebar />
-        </Box>
-        <Box
-          w="full"
-          position="relative"
-          h="full"
-          borderTopLeftRadius={isHistorySidebarOpen ? "lg" : "0px"}
-          transition="border-top-left-radius 0.2s"
-          overflow="hidden"
-          bg="gray.100"
-        >
-          {children}
-        </Box>
-      </HStack>
+      <AnalyticsBoundary
+        name="simulations.layout"
+        attributes={{ scenarioSetId: scenarioSetId ?? "unknown" }}
+        sendViewedEvent
+      >
+        <HStack w="full" h="full" alignItems="stretch" gap={0} bg="white">
+          <Box
+            w={isHistorySidebarOpen ? "500px" : "0px"}
+            position="relative"
+            h="full"
+            transition="width 0.2s"
+          >
+            <SetRunHistorySidebar />
+          </Box>
+          <Box
+            w="full"
+            position="relative"
+            h="full"
+            borderTopLeftRadius={isHistorySidebarOpen ? "lg" : "0px"}
+            transition="border-top-left-radius 0.2s"
+            overflow="hidden"
+            bg="gray.100"
+          >
+            {children}
+          </Box>
+        </HStack>
+      </AnalyticsBoundary>
     </DashboardLayout>
   );
-};
+}
 
 const Header = ({
   isHistorySidebarOpen,
@@ -53,13 +62,23 @@ const Header = ({
   onHistorySidebarOpenChange: (open: boolean) => void;
 }) => {
   const { scenarioSetId } = useSimulationRouter();
+  const { addEvent } = useOtel();
+  const { emit } = useAnalytics();
+
+  const handleToggleSidebar = () => {
+    const newState = !isHistorySidebarOpen;
+    addEvent("History Sidebar Toggled", { open: newState });
+    emit("clicked", "toggle-history", { open: newState });
+    onHistorySidebarOpenChange(newState);
+  };
+
   return (
     <Box w="full" p={4} borderBottom="1px" bg="white" borderColor="gray.200">
       <HStack>
         <Button
           size="sm"
           bg={isHistorySidebarOpen ? "gray.200" : "gray.100"}
-          onClick={() => onHistorySidebarOpenChange(!isHistorySidebarOpen)}
+          onClick={handleToggleSidebar}
           title={isHistorySidebarOpen ? "Close History" : "Open History"}
         >
           {isHistorySidebarOpen ? (

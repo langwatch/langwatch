@@ -4,6 +4,7 @@ import {
   SimpleSpanProcessor,
 } from "@opentelemetry/sdk-trace-node";
 import { getNodeAutoInstrumentations } from "@opentelemetry/auto-instrumentations-node";
+import { PrismaInstrumentation } from "@prisma/instrumentation";
 import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-proto";
 import { detectResources } from "@opentelemetry/resources";
 import { awsEksDetector } from "@opentelemetry/resource-detector-aws";
@@ -64,6 +65,7 @@ if (spanProcessors.length > 0) {
           enabled: false,
         },
       }),
+      new PrismaInstrumentation({ middleware: true }),
     ],
   });
 }
