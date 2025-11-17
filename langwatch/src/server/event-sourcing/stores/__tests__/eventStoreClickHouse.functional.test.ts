@@ -108,7 +108,7 @@ describe("EventStoreClickHouse - Functional Behavior", () => {
         {
           EventTimestamp: "2024-01-01T10:00:00.000Z",
           EventType: "TEST",
-          EventPayload: "",
+          EventPayload: null,
           ProcessingTraceparent: "",
         },
       ];
@@ -119,7 +119,7 @@ describe("EventStoreClickHouse - Functional Behavior", () => {
 
       const events = await store.getEvents("agg-1", context, aggregateType);
 
-      expect(events[0]?.data).toEqual({});
+      expect(events[0]?.data).toEqual(null);
     });
 
     it("handles null EventPayload", async () => {
@@ -138,7 +138,7 @@ describe("EventStoreClickHouse - Functional Behavior", () => {
 
       const events = await store.getEvents("agg-1", context, aggregateType);
 
-      expect(events[0]?.data).toEqual({});
+      expect(events[0]?.data).toEqual(null);
     });
 
     it("handles invalid timestamp (NaN fallback)", async () => {
@@ -319,7 +319,7 @@ describe("EventStoreClickHouse - Functional Behavior", () => {
       expect(values[0].EventId).not.toBe(values[1].EventId);
     });
 
-    it("generates valid UUID v4 format EventIds", async () => {
+    it("generates valid KSUID format EventIds", async () => {
       const events: Event<string>[] = [
         {
           aggregateId: "agg-1",
@@ -335,9 +335,8 @@ describe("EventStoreClickHouse - Functional Behavior", () => {
 
       const insertCall = mockClickHouseClient.insert.mock.calls[0];
       const eventId = insertCall[0].values[0].EventId;
-      const uuidRegex =
-        /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-      expect(eventId).toMatch(uuidRegex);
+
+      expect(parse(eventId).resource).toBe("event");
     });
 
     it("stores correct tenant, aggregateType, aggregateId", async () => {
