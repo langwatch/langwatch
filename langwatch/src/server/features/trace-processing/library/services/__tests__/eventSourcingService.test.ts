@@ -43,11 +43,11 @@ describe("EventSourcingService", () => {
         vi.mocked(mockEventStore.getEvents).mockResolvedValue(events);
         vi.mocked(mockEventHandler.handle).mockResolvedValue(projection);
 
-        const service = new EventSourcingService(
-          mockEventStore,
-          mockProjectionStore,
-          mockEventHandler,
-        );
+        const service = new EventSourcingService({
+          eventStore: mockEventStore,
+          projectionStore: mockProjectionStore,
+          eventHandler: mockEventHandler,
+        });
 
         const result = await service.rebuildProjection("test-1");
 
@@ -72,12 +72,12 @@ describe("EventSourcingService", () => {
         vi.mocked(mockEventStore.getEvents).mockResolvedValue(events);
         vi.mocked(mockEventHandler.handle).mockResolvedValue(projection);
 
-        const service = new EventSourcingService(
-          mockEventStore,
-          mockProjectionStore,
-          mockEventHandler,
-          { hooks: { beforeHandle } },
-        );
+        const service = new EventSourcingService({
+          eventStore: mockEventStore,
+          projectionStore: mockProjectionStore,
+          eventHandler: mockEventHandler,
+          serviceOptions: { hooks: { beforeHandle } },
+        });
 
         await service.rebuildProjection("test-1");
 
@@ -100,12 +100,12 @@ describe("EventSourcingService", () => {
         vi.mocked(mockEventStore.getEvents).mockResolvedValue(events);
         vi.mocked(mockEventHandler.handle).mockResolvedValue(projection);
 
-        const service = new EventSourcingService(
-          mockEventStore,
-          mockProjectionStore,
-          mockEventHandler,
-          { hooks: { afterHandle } },
-        );
+        const service = new EventSourcingService({
+          eventStore: mockEventStore,
+          projectionStore: mockProjectionStore,
+          eventHandler: mockEventHandler,
+          serviceOptions: { hooks: { afterHandle } },
+        });
 
         await service.rebuildProjection("test-1");
 
@@ -128,12 +128,12 @@ describe("EventSourcingService", () => {
         vi.mocked(mockEventStore.getEvents).mockResolvedValue(events);
         vi.mocked(mockEventHandler.handle).mockResolvedValue(projection);
 
-        const service = new EventSourcingService(
-          mockEventStore,
-          mockProjectionStore,
-          mockEventHandler,
-          { hooks: { beforePersist } },
-        );
+        const service = new EventSourcingService({
+          eventStore: mockEventStore,
+          projectionStore: mockProjectionStore,
+          eventHandler: mockEventHandler,
+          serviceOptions: { hooks: { beforePersist } },
+        });
 
         await service.rebuildProjection("test-1");
 
@@ -156,12 +156,12 @@ describe("EventSourcingService", () => {
         vi.mocked(mockEventStore.getEvents).mockResolvedValue(events);
         vi.mocked(mockEventHandler.handle).mockResolvedValue(projection);
 
-        const service = new EventSourcingService(
-          mockEventStore,
-          mockProjectionStore,
-          mockEventHandler,
-          { hooks: { afterPersist } },
-        );
+        const service = new EventSourcingService({
+          eventStore: mockEventStore,
+          projectionStore: mockProjectionStore,
+          eventHandler: mockEventHandler,
+          serviceOptions: { hooks: { afterPersist } },
+        });
 
         await service.rebuildProjection("test-1");
 
@@ -203,12 +203,14 @@ describe("EventSourcingService", () => {
           return Promise.resolve();
         });
 
-        const service = new EventSourcingService(
-          mockEventStore,
-          mockProjectionStore,
-          mockEventHandler,
-          { hooks: { beforeHandle, afterHandle, beforePersist, afterPersist } },
-        );
+        const service = new EventSourcingService({
+          eventStore: mockEventStore,
+          projectionStore: mockProjectionStore,
+          eventHandler: mockEventHandler,
+          serviceOptions: {
+            hooks: { beforeHandle, afterHandle, beforePersist, afterPersist },
+          },
+        });
 
         await service.rebuildProjection("test-1");
 
@@ -234,11 +236,11 @@ describe("EventSourcingService", () => {
           new Error("Handler failed"),
         );
 
-        const service = new EventSourcingService(
-          mockEventStore,
-          mockProjectionStore,
-          mockEventHandler,
-        );
+        const service = new EventSourcingService({
+          eventStore: mockEventStore,
+          projectionStore: mockProjectionStore,
+          eventHandler: mockEventHandler,
+        });
 
         await expect(service.rebuildProjection("test-1")).rejects.toThrow(
           "Handler failed",
@@ -261,11 +263,11 @@ describe("EventSourcingService", () => {
           projection,
         );
 
-        const service = new EventSourcingService(
-          mockEventStore,
-          mockProjectionStore,
-          mockEventHandler,
-        );
+        const service = new EventSourcingService({
+          eventStore: mockEventStore,
+          projectionStore: mockProjectionStore,
+          eventHandler: mockEventHandler,
+        });
 
         const result = await service.getProjection("test-1");
 
@@ -289,11 +291,11 @@ describe("EventSourcingService", () => {
         vi.mocked(mockEventStore.getEvents).mockResolvedValue(events);
         vi.mocked(mockEventHandler.handle).mockResolvedValue(projection);
 
-        const service = new EventSourcingService(
-          mockEventStore,
-          mockProjectionStore,
-          mockEventHandler,
-        );
+        const service = new EventSourcingService({
+          eventStore: mockEventStore,
+          projectionStore: mockProjectionStore,
+          eventHandler: mockEventHandler,
+        });
 
         const result = await service.getProjection("test-1");
 
@@ -316,11 +318,11 @@ describe("EventSourcingService", () => {
           projection,
         );
 
-        const service = new EventSourcingService(
-          mockEventStore,
-          mockProjectionStore,
-          mockEventHandler,
-        );
+        const service = new EventSourcingService({
+          eventStore: mockEventStore,
+          projectionStore: mockProjectionStore,
+          eventHandler: mockEventHandler,
+        });
 
         const result = await service.hasProjection("test-1");
 
@@ -332,11 +334,11 @@ describe("EventSourcingService", () => {
       it("returns false", async () => {
         vi.mocked(mockProjectionStore.getProjection).mockResolvedValue(null);
 
-        const service = new EventSourcingService(
-          mockEventStore,
-          mockProjectionStore,
-          mockEventHandler,
-        );
+        const service = new EventSourcingService({
+          eventStore: mockEventStore,
+          projectionStore: mockProjectionStore,
+          eventHandler: mockEventHandler,
+        });
 
         const result = await service.hasProjection("test-1");
 
@@ -361,11 +363,11 @@ describe("EventSourcingService", () => {
         vi.mocked(mockEventStore.getEvents).mockResolvedValue(events);
         vi.mocked(mockEventHandler.handle).mockResolvedValue(projection);
 
-        const service = new EventSourcingService(
-          mockEventStore,
-          mockProjectionStore,
-          mockEventHandler,
-        );
+        const service = new EventSourcingService({
+          eventStore: mockEventStore,
+          projectionStore: mockProjectionStore,
+          eventHandler: mockEventHandler,
+        });
 
         const result = await service.forceRebuildProjection("test-1");
 
