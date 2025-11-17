@@ -26,7 +26,7 @@ import {
   type messageSchema,
   type outputsSchema,
   type promptingTechniqueSchema,
-} from "~/prompt-configs/schemas/field-schemas";
+} from "~/prompts/schemas/field-schemas";
 
 // Extract the configData type from the schema
 type ConfigData = z.infer<

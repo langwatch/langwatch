@@ -16,7 +16,7 @@ import {
   promptingTechniqueSchema,
   responseFormatSchema,
   versionSchema,
-} from "~/prompt-configs/schemas/field-schemas";
+} from "~/prompts/schemas/field-schemas";
 
 const logger = createLogger(
   "langwatch:prompt-config:llm-config-version-schema",

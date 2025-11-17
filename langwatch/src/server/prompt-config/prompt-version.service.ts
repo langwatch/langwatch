@@ -13,7 +13,7 @@ import {
   LATEST_SCHEMA_VERSION,
 } from "./repositories/llm-config-version-schema";
 
-import { type messageSchema } from "~/prompt-configs/schemas/field-schemas";
+import { type messageSchema } from "~/prompts/schemas/field-schemas";
 
 /**
  * Service for managing prompt version operations.
