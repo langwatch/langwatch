@@ -15,11 +15,17 @@ export interface EventStreamOptions<EventType> {
  * Represents a stream of events for a specific aggregate.
  * Events are ordered according to the specified strategy.
  *
- * Note: AggregateId values are converted to strings for metadata storage.
- * String and numeric IDs work well, but complex objects will be converted using String(),
- * be careful as this MIGHT NOT create meaningful results
- * (e.g., objects become the JS meme result of "[object Object]").
- * For complex aggregate IDs, make sure that they have a not-shit toString() impl.
+ * **Aggregate ID Handling:**
+ * AggregateId values are converted to strings for metadata storage using String().
+ * - String and numeric IDs work well
+ * - Complex objects will be converted using String(), which typically produces "[object Object]"
+ * 
+ * **SECURITY WARNING:** Using complex objects as aggregate IDs without a proper toString()
+ * implementation can cause ID collisions (multiple different objects map to "[object Object]").
+ * This could allow cross-aggregate data leakage.
+ * 
+ * **Best Practice:** Use string or number aggregate IDs. If you must use objects,
+ * ensure they implement toString() to return a unique, stable identifier.
  */
 export class EventStream<
   AggregateId = string,
