@@ -1,4 +1,4 @@
-import { PromptPlaygroundPageLayout } from "~/prompt-configs/prompt-playground/components/PromptPlaygroundPage.layout";
+import { PromptPlaygroundPageLayout } from "~/prompts/prompt-playground/components/PromptPlaygroundPage.layout";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
 import { DashboardLayout } from "~/components/DashboardLayout";
 

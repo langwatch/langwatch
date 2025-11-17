@@ -8,7 +8,7 @@ import {
   outputsSchema,
   promptingTechniqueSchema,
   responseFormatSchema,
-} from "~/prompt-configs/schemas";
+} from "~/prompts/schemas";
 
 /**
  * Base schema for API Response (only llm config)

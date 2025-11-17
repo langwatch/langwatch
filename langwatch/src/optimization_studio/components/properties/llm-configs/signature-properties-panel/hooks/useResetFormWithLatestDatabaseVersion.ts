@@ -3,8 +3,8 @@ import { useFormContext } from "react-hook-form";
 
 import { toaster } from "~/components/ui/toaster";
 import type { PromptConfigFormValues } from "~/prompt-configs";
-import { usePrompts } from "~/prompt-configs/hooks/usePrompts";
-import { versionedPromptToPromptConfigFormValues } from "~/prompt-configs/utils/llmPromptConfigUtils";
+import { usePrompts } from "~/prompts/hooks/usePrompts";
+import { versionedPromptToPromptConfigFormValues } from "~/prompts/utils/llmPromptConfigUtils";
 import { createLogger } from "~/utils/logger";
 
 const logger = createLogger(

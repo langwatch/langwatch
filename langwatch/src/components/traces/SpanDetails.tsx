@@ -28,7 +28,7 @@ import { Tooltip } from "../ui/tooltip";
 import { RenderInputOutput } from "./RenderInputOutput";
 import { OverflownTextWithTooltip } from "../OverflownText";
 import { RedactedField } from "../ui/RedactedField";
-import { useGoToSpanInPlaygroundTabUrlBuilder } from "~/prompt-configs/prompt-studio/hooks/useLoadSpanIntoPromptStudio";
+import { useGoToSpanInPlaygroundTabUrlBuilder } from "~/prompts/prompt-studio/hooks/useLoadSpanIntoPromptStudio";
 
 /**
  * Displays detailed information about a trace span, including metadata, timing, tokens, cost, and input/output.

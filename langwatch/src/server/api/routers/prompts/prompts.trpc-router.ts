@@ -12,7 +12,7 @@ import {
   outputsSchema,
   promptingTechniqueSchema,
   responseFormatSchema,
-} from "~/prompt-configs/schemas";
+} from "~/prompts/schemas";
 import { nodeDatasetSchema } from "~/optimization_studio/types/dsl";
 
 /**

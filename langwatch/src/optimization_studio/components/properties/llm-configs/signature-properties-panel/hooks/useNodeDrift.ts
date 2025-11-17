@@ -6,7 +6,7 @@ import type { LlmPromptConfigComponent } from "~/optimization_studio/types/dsl";
 import {
   isNodeDataEqual,
   versionedPromptToOptimizationStudioNodeData,
-} from "~/prompt-configs/utils/llmPromptConfigUtils";
+} from "~/prompts/utils/llmPromptConfigUtils";
 import { api } from "~/utils/api";
 
 /**
