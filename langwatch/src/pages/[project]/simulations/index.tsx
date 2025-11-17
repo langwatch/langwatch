@@ -8,7 +8,6 @@ import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import ScenarioInfoCard from "~/components/simulations/ScenarioInfoCard";
 import React, { useEffect, useMemo, useState } from "react";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
-import { useTracedQuery } from "~/observability/react-otel/useTracedQuery";
 import { withSpan } from "~/observability/react-otel";
 
 function SimulationsPageContent() {
@@ -34,8 +33,7 @@ function SimulationsPageContent() {
     data: scenarioSetsData,
     isLoading,
     error,
-  } = useTracedQuery(
-    api.scenarios.getScenarioSetsData,
+  } = api.scenarios.getScenarioSetsData.useQuery(
     { projectId: project?.id ?? "" },
     {
       refetchInterval,

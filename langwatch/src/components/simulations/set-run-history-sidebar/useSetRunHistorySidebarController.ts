@@ -5,7 +5,6 @@ import { useSimulationRouter } from "~/hooks/simulations/useSimulationRouter";
 import type { Run, RunItem } from "./types";
 import type { ScenarioRunData } from "~/app/api/scenario-events/[[...route]]/types";
 import { createLogger } from "~/utils/logger";
-import { useTracedQuery } from "~/observability/react-otel/useTracedQuery";
 
 const logger = createLogger("useSetRunHistorySidebarController");
 
@@ -43,7 +42,7 @@ export const useSetRunHistorySidebarController = () => {
     data: runData,
     error,
     isLoading,
-  } = useTracedQuery(api.scenarios.getScenarioSetRunData,
+  } = api.scenarios.getScenarioSetRunData.useQuery(
     {
       projectId: project?.id ?? "",
       scenarioSetId: scenarioSetId ?? "",
@@ -54,19 +53,19 @@ export const useSetRunHistorySidebarController = () => {
       // Only fetch when we have both required IDs to avoid unnecessary API calls
       enabled: !!project?.id && !!scenarioSetId,
       refetchInterval: 1000,
-    }
+    },
   );
 
   // Fetch total count for pagination info
   const { data: countData } =
-    useTracedQuery(api.scenarios.getScenarioSetBatchRunCount,
+    api.scenarios.getScenarioSetBatchRunCount.useQuery(
       {
         projectId: project?.id ?? "",
         scenarioSetId: scenarioSetId ?? "",
       },
       {
         enabled: !!project?.id && !!scenarioSetId,
-      }
+      },
     );
 
   const totalCount = countData?.count ?? 0;

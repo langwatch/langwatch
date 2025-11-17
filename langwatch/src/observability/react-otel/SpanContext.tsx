@@ -1,5 +1,5 @@
 import { createContext, useContext, type ReactNode } from "react";
-import { context, trace, type Span } from "@opentelemetry/api";
+import { context, trace, type Span, type Context } from "@opentelemetry/api";
 
 /**
  * React context that provides the active OpenTelemetry span.
@@ -16,13 +16,19 @@ export function useParentSpan(): Span | null {
  * Child operations (fetch, XHR) will automatically use this span as parent
  * thanks to the ZoneContextManager and auto-instrumentation.
  */
-export function SpanProvider({ span, children }: { span: Span; children: ReactNode }) {
-  // Set this span as the active span in the OpenTelemetry context
-  // This is picked up by the ZoneContextManager
-  const ctx = trace.setSpan(context.active(), span);
+export function SpanProvider({
+  span,
+  parentContext,
+  children,
+}: {
+  span: Span;
+  parentContext?: Context;
+  children: ReactNode;
+}) {
+  // Use provided parent context when available to preserve proper span hierarchy.
+  const ctx = trace.setSpan(parentContext ?? context.active(), span);
 
-  // Render children within this context
-  // All async operations started from children will inherit this span
+  // Render children within this context to propagate the active span.
   let rendered: ReactNode = null;
   context.with(ctx, () => {
     rendered = (

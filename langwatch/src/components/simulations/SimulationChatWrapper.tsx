@@ -1,7 +1,6 @@
 import { api } from "~/utils/api";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import type { ScenarioRunData } from "~/app/api/scenario-events/[[...route]]/types";
-import { useTracedQuery } from "~/observability/react-otel/useTracedQuery";
 
 type ChildProps = Omit<
   ReturnType<typeof api.scenarios.getRunState.useQuery>,
@@ -37,7 +36,7 @@ export const SimulationChatWrapper: React.FC<
   SimulationChatViewerWrapperProps
 > = ({ scenarioRunId, children }) => {
   const { project } = useOrganizationTeamProject();
-  const query = useTracedQuery(api.scenarios.getRunState,
+  const query = api.scenarios.getRunState.useQuery(
     {
       scenarioRunId,
       projectId: project?.id ?? "",

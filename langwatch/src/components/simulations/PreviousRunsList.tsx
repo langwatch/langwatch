@@ -19,7 +19,6 @@ import { api } from "~/utils/api";
 import { ScenarioRunStatus } from "~/app/api/scenario-events/[[...route]]/enums";
 import { useOtel } from "~/observability/react-otel/useOtel";
 import { AnalyticsBoundary } from "react-contextual-analytics";
-import { useTracedQuery } from "~/observability/react-otel/useTracedQuery";
 
 // Previous Runs List Component
 export function PreviousRunsList({ scenarioId }: { scenarioId?: string }) {
@@ -28,16 +27,16 @@ export function PreviousRunsList({ scenarioId }: { scenarioId?: string }) {
     useSimulationRouter();
   const { addEvent } = useOtel();
 
-  const { data: scenarioRunData, isLoading } = useTracedQuery(
-    api.scenarios.getRunDataByScenarioId,
-    {
-      projectId: project?.id ?? "",
-      scenarioId: scenarioId ?? "",
-    },
-    {
-      enabled: !!project?.id && !!scenarioId,
-    },
-  );
+  const { data: scenarioRunData, isLoading } =
+    api.scenarios.getRunDataByScenarioId.useQuery(
+      {
+        projectId: project?.id ?? "",
+        scenarioId: scenarioId ?? "",
+      },
+      {
+        enabled: !!project?.id && !!scenarioId,
+      },
+    );
 
   return (
     <AnalyticsBoundary

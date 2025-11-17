@@ -1,5 +1,12 @@
 import { type ComponentType, useEffect, useMemo, useRef, useState } from "react";
-import { trace, type SpanOptions, type Attributes, type Span } from "@opentelemetry/api";
+import {
+  context as otelContext,
+  trace,
+  type SpanOptions,
+  type Attributes,
+  type Span,
+  type Context,
+} from "@opentelemetry/api";
 import { useOtelContext } from "./OtelContext";
 import { SpanProvider } from "./SpanContext";
 
@@ -54,11 +61,12 @@ export function withSpan<P extends Record<string, unknown>>(
 
       // Store span ref to keep it active throughout component lifecycle
       const spanRef = useRef<Span | null>(null);
+      const parentContextRef = useRef<Context>(otelContext.active());
       const [isSpanReady, setIsSpanReady] = useState(false);
 
       // Create span on mount, end on unmount
       useEffect(() => {
-        const span = tracer.startSpan(spanName, config?.options);
+        const span = tracer.startSpan(spanName, config?.options, parentContextRef.current);
         spanRef.current = span;
         setCurrentSpan(span);
 
@@ -115,7 +123,7 @@ export function withSpan<P extends Record<string, unknown>>(
       // Wrap component in SpanProvider to set active context
       // This ensures all async operations inherit this span as parent
       return (
-        <SpanProvider span={spanRef.current}>
+        <SpanProvider span={spanRef.current} parentContext={parentContextRef.current}>
           <Component {...props} />
         </SpanProvider>
       );
