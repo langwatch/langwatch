@@ -35,6 +35,7 @@ export type ProjectionStoreWriteContext = ProjectionStoreReadContext;
  * 
  * **Implementation Requirements:**
  * - MUST validate projections using isValidProjection before storage
+ * - MUST validate tenantId using validateTenantId() before any operations
  * - MUST enforce tenant isolation
  * - SHOULD implement optimistic locking to detect concurrent updates
  * - SHOULD support upsert semantics (create or update)
@@ -56,27 +57,42 @@ export interface ProjectionStore<
    * Retrieves a projection for a given aggregate.
    * 
    * @param aggregateId - The aggregate to fetch projection for
-   * @param context - Optional filtering/security context
+   * @param context - Security context with required tenantId
    * @returns The projection if it exists, null otherwise
+   * @throws {Error} If tenantId is missing or invalid
    * 
-   * **Security:** MUST enforce tenant isolation when context.tenantId is provided.
+   * **Security:** Implementations MUST call validateTenantId(context, 'getProjection')
+   * before executing the query to ensure tenant isolation.
    */
   getProjection(
     aggregateId: AggregateId,
     context?: ProjectionStoreReadContext
   ): Promise<ProjectionType | null>;
-  
+
   /**
    * Stores or updates a projection.
    * 
    * @param projection - The projection to store. MUST be validated before storage.
-   * @param context - Optional security/metadata context
-   * @throws {Error} If projection is malformed or validation fails
+   * @param context - Security context with required tenantId
+   * @throws {Error} If projection is malformed, tenantId is missing, or validation fails
    * 
-   * **Security:** Implementations MUST extract and enforce tenant boundaries from projection.
+   * **Security:** Implementations MUST:
+   * 1. Call validateTenantId(context, 'storeProjection') to ensure tenantId is present
+   * 2. Verify projection belongs to the same tenant as context
+   * 3. Filter all queries by tenantId to prevent cross-tenant access
+   * 
    * **Concurrency:** Current design is "last write wins". Consider adding optimistic locking.
    * **Race Condition Warning:** Multiple concurrent rebuilds of the same aggregate can
    * result in lost updates. Implementers should consider adding version checks.
+   * 
+   * @example
+   * ```typescript
+   * async storeProjection(projection: Projection, context: { tenantId: string }): Promise<void> {
+   *   EventUtils.validateTenantId(context, 'ProjectionStore.storeProjection');
+   *   EventUtils.isValidProjection(projection); // also validate the projection itself
+   *   // ... proceed with storage, ensuring tenant isolation
+   * }
+   * ```
    */
   storeProjection(
     projection: ProjectionType,

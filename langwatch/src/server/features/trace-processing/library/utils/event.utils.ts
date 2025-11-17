@@ -182,6 +182,44 @@ function isValidProjection(projection: any): projection is Projection {
   );
 }
 
+/**
+ * Validates that a context has a valid tenantId.
+ * Throws an error if tenantId is missing or invalid.
+ * 
+ * **Security:** This is a critical security check to prevent cross-tenant data leakage.
+ * Store implementations MUST call this before any read or write operations.
+ * 
+ * @param context - The context to validate
+ * @param operation - Description of the operation (for error messages)
+ * @throws {Error} If tenantId is missing, empty, or invalid
+ * 
+ * @example
+ * ```typescript
+ * async storeEvents(events: Event[]): Promise<void> {
+ *   // Extract tenantId from first event's metadata or from a context parameter
+ *   const context = { tenantId: events[0].metadata?.tenantId };
+ *   EventUtils.validateTenantId(context, 'storeEvents');
+ *   // ... proceed with storage
+ * }
+ * ```
+ */
+function validateTenantId(
+  context: { tenantId?: string } | undefined,
+  operation: string,
+): void {
+  if (!context) {
+    throw new Error(
+      `[SECURITY] ${operation} requires a context with tenantId for tenant isolation`,
+    );
+  }
+
+  if (!context.tenantId || context.tenantId.trim() === "") {
+    throw new Error(
+      `[SECURITY] ${operation} requires a non-empty tenantId for tenant isolation`,
+    );
+  }
+}
+
 export {
   createEvent,
   createEventWithProcessingTraceContext,
@@ -193,6 +231,7 @@ export {
   getLatestProjection,
   isValidEvent,
   isValidProjection,
+  validateTenantId,
   buildProjectionMetadata,
   buildEventMetadataWithCurrentProcessingTraceparent,
 };
@@ -208,6 +247,7 @@ export const EventUtils = {
   getLatestProjection,
   isValidEvent,
   isValidProjection,
+  validateTenantId,
   buildProjectionMetadata,
   buildEventMetadataWithCurrentProcessingTraceparent,
 } as const;
