@@ -5,7 +5,7 @@ description: "Overview of the generic event sourcing library used in trace proce
 
 ### Overview
 
-The trace-processing subsystem uses a small, generic event sourcing library under `src/server/features/trace-processing/library`.  
+The trace-processing subsystem uses a small, generic event sourcing library under `src/server/features/trace-processing/library`.
 This library is designed to be **domain-agnostic** (usable for traces, users, etc.) and now includes:
 
 - **Events and projections**: Core types and helpers for event streams and projections.
@@ -178,7 +178,7 @@ class SecureEventStore implements EventStore<string, Event> {
   async storeEvents(events: readonly Event[], context: EventStoreWriteContext) {
     // CRITICAL: Validate tenantId before ANY write
     EventUtils.validateTenantId(context, 'EventStore.storeEvents');
-    
+
     // Validate all events
     for (const event of events) {
       if (!EventUtils.isValidEvent(event)) {
@@ -391,7 +391,7 @@ async rebuildProjectionsInBatches() {
 Option 3: Partition by Tenant
 ```typescript
 // Worker 1: tenants A-M, Worker 2: tenants N-Z
-await service.rebuildProjectionsInBatches({ 
+await service.rebuildProjectionsInBatches({
   eventStoreContext: { tenantId: myAssignedTenants }
 });
 ```
