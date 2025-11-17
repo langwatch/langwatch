@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { context, trace } from "@opentelemetry/api";
+import { trace } from "@opentelemetry/api";
 import { EventUtils } from "../event.utils";
 import type { Event, Projection } from "../../core/types";
 
@@ -13,17 +13,17 @@ describe("createEvent", () => {
   });
 });
 
-describe("createEventWithTraceContext", () => {
-  describe("when metadata already has traceparent", () => {
-    it("preserves existing traceparent", () => {
-      const event = EventUtils.createEventWithTraceContext("agg-1", "TEST", {
+describe("createEventWithProcessingTraceContext", () => {
+  describe("when metadata already has processingTraceparent", () => {
+    it("preserves existing processingTraceparent", () => {
+      const event = EventUtils.createEventWithProcessingTraceContext("agg-1", "TEST", {
         foo: "bar",
       }, {
-        traceparent: "00-test-trace-span-01",
+        processingTraceparent: "00-test-trace-span-01",
         custom: "value",
       });
 
-      expect(event.metadata?.traceparent).toBe("00-test-trace-span-01");
+      expect(event.metadata?.processingTraceparent).toBe("00-test-trace-span-01");
       expect(event.metadata?.custom).toBe("value");
     });
   });
@@ -34,7 +34,7 @@ describe("createEventWithTraceContext", () => {
         .spyOn(trace, "getSpan")
         .mockReturnValue(void 0 as any);
 
-      const event = EventUtils.createEventWithTraceContext("agg-1", "TEST", {
+      const event = EventUtils.createEventWithProcessingTraceContext("agg-1", "TEST", {
         foo: "bar",
       });
 

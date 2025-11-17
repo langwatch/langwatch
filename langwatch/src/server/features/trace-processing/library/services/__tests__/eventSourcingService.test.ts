@@ -7,14 +7,16 @@ import type { EventHandler } from "../../processing/eventHandler";
 import type { Event, Projection } from "../../core/types";
 
 describe("EventSourcingService", () => {
-  let mockEventStore: EventStore<string, Event<string>>;
+  let mockEventStore: any;
   let mockProjectionStore: ProjectionStore<string, Projection<string>>;
   let mockEventHandler: EventHandler<string, Event<string>, Projection<string>>;
 
   beforeEach(() => {
+    // @ts-ignore we intentionally use a relaxed mock shape for the event store in tests
     mockEventStore = {
       getEvents: vi.fn(),
       storeEvents: vi.fn(),
+      listAggregateIds: vi.fn(),
     };
 
     mockProjectionStore = {
@@ -372,6 +374,135 @@ describe("EventSourcingService", () => {
         const result = await service.forceRebuildProjection("test-1");
 
         expect(result).toBe(projection);
+      });
+    });
+  });
+
+  describe("rebuildProjectionsInBatches", () => {
+    describe("when no aggregates are returned", () => {
+      it("returns checkpoint with zero processed", async () => {
+        vi.mocked(mockEventStore.listAggregateIds).mockResolvedValue({
+          aggregateIds: [],
+        });
+
+        const service = new EventSourcingService({
+          eventStore: mockEventStore,
+          projectionStore: mockProjectionStore,
+          eventHandler: mockEventHandler,
+        });
+
+        const checkpoint = await service.rebuildProjectionsInBatches();
+
+        expect(checkpoint.processedCount).toBe(0);
+      });
+    });
+
+    describe("when aggregates are returned", () => {
+      it("rebuilds projections for each aggregate", async () => {
+        vi.mocked(mockEventStore.listAggregateIds).mockResolvedValue({
+          aggregateIds: ["agg-1", "agg-2"],
+        });
+
+        const service = new EventSourcingService({
+          eventStore: mockEventStore,
+          projectionStore: mockProjectionStore,
+          eventHandler: mockEventHandler,
+        });
+
+        const rebuildSpy = vi
+          .spyOn(service, "rebuildProjection")
+          .mockResolvedValue({
+            id: "proj",
+            aggregateId: "agg-1",
+            version: 1,
+            data: {},
+          });
+
+        const checkpoint = await service.rebuildProjectionsInBatches({
+          batchSize: 10,
+        });
+
+        expect(rebuildSpy).toHaveBeenCalledTimes(2);
+        expect(checkpoint.processedCount).toBe(2);
+      });
+    });
+
+    describe("when onProgress is provided", () => {
+      it("calls onProgress with updated checkpoint", async () => {
+        vi.mocked(mockEventStore.listAggregateIds).mockResolvedValue({
+          aggregateIds: ["agg-1"],
+        });
+
+        const service = new EventSourcingService({
+          eventStore: mockEventStore,
+          projectionStore: mockProjectionStore,
+          eventHandler: mockEventHandler,
+        });
+
+        vi.spyOn(service, "rebuildProjection").mockResolvedValue({
+          id: "proj",
+          aggregateId: "agg-1",
+          version: 1,
+          data: {},
+        });
+
+        const onProgress = vi.fn();
+
+        const checkpoint = await service.rebuildProjectionsInBatches({
+          onProgress,
+        });
+
+        expect(onProgress).toHaveBeenCalledTimes(1);
+        expect(onProgress).toHaveBeenCalledWith({
+          checkpoint: {
+            cursor: undefined,
+            lastAggregateId: "agg-1",
+            processedCount: 1,
+          },
+        });
+        expect(checkpoint.processedCount).toBe(1);
+      });
+    });
+
+    describe("when resumeFrom checkpoint is provided", () => {
+      it("continues from previous processedCount and cursor", async () => {
+        vi.mocked(mockEventStore.listAggregateIds).mockResolvedValue({
+          aggregateIds: ["agg-2", "agg-3"],
+          nextCursor: undefined,
+        });
+
+        const service = new EventSourcingService({
+          eventStore: mockEventStore,
+          projectionStore: mockProjectionStore,
+          eventHandler: mockEventHandler,
+        });
+
+        const rebuildSpy = vi
+          .spyOn(service, "rebuildProjection")
+          .mockResolvedValue({
+            id: "proj",
+            aggregateId: "agg-2",
+            version: 1,
+            data: {},
+          });
+
+        const checkpoint = await service.rebuildProjectionsInBatches({
+          resumeFrom: {
+            cursor: "cursor-1",
+            lastAggregateId: "agg-1",
+            processedCount: 5,
+          },
+        });
+
+        expect(mockEventStore.listAggregateIds).toHaveBeenCalledWith(
+          undefined,
+          "cursor-1",
+          100,
+        );
+        expect(rebuildSpy).toHaveBeenCalledTimes(2);
+        expect(checkpoint.processedCount).toBe(7);
+        expect(checkpoint.lastAggregateId).toBe("agg-3");
+        expect(checkpoint.cursor).toBeUndefined();
       });
     });
   });
