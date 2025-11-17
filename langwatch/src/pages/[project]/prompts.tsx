@@ -1,4 +1,4 @@
-import { PromptStudioPageLayout } from "~/prompt-configs/prompt-studio/components/PromptStudioPage.layout";
+import { PromptPlaygroundPageLayout } from "~/prompt-configs/prompt-playground/components/PromptPlaygroundPage.layout";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
 import { DashboardLayout } from "~/components/DashboardLayout";
 
@@ -7,7 +7,7 @@ import { DashboardLayout } from "~/components/DashboardLayout";
  * Single Responsibility: Route and permission handling for prompts
  */
 function Page() {
-  return <PromptStudioPageLayout />;
+  return <PromptPlaygroundPageLayout />;
 }
 
 export default withPermissionGuard("prompts:view", {

@@ -9,28 +9,28 @@ import { SyncedChatInput } from "./SyncedChatInput";
 import { TraceMessage } from "~/components/copilot-kit/TraceMessage";
 import { Box, type BoxProps } from "@chakra-ui/react";
 import clsx from "clsx";
-import { useDraggableTabsBrowserStore } from "../../prompt-studio-store/DraggableTabsBrowserStore";
+import { useDraggableTabsBrowserStore } from "../../prompt-playground-store/DraggableTabsBrowserStore";
 import { useTabId } from "../prompt-browser/ui/TabContext";
 import { convertScenarioMessagesToCopilotKit } from "~/components/simulations/utils/convert-scenario-messages";
 import type { ChatMessage } from "~/server/tracer/types";
 
-interface PromptStudioChatProps extends BoxProps {
+interface PromptPlaygroundChatProps extends BoxProps {
   formValues: PromptConfigFormValues;
   variables?: z.infer<typeof runtimeInputsSchema>;
 }
 
 /**
- * PromptStudioChatRef
+ * PromptPlaygroundChatRef
  * Single Responsibility: Exposes imperative methods to control the chat instance (e.g., reset).
  */
-export interface PromptStudioChatRef {
+export interface PromptPlaygroundChatRef {
   resetChat: () => void;
 }
 
-export const PromptStudioChat = forwardRef<
-  PromptStudioChatRef,
-  PromptStudioChatProps
->(function PromptStudioChat(props, ref) {
+export const PromptPlaygroundChat = forwardRef<
+  PromptPlaygroundChatRef,
+  PromptPlaygroundChatProps
+>(function PromptPlaygroundChat(props, ref) {
   const { formValues, variables, ...boxProps } = props;
   const { project } = useOrganizationTeamProject();
   const additionalParams = useMemo(() => {

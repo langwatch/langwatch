@@ -1,6 +1,6 @@
 import { describe, it } from "vitest";
 
-describe("useLoadSpanIntoPromptStudio", () => {
+describe("useLoadSpanIntoPromptPlayground", () => {
   describe("createDefaultPromptFormValues", () => {
     describe("when model is missing", () => {
       it.todo("uses DEFAULT_MODEL when spanData.llmConfig.model is undefined");

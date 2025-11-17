@@ -6,7 +6,7 @@ import { useEffect, useRef } from "react";
 import {
   TabDataSchema,
   useDraggableTabsBrowserStore,
-} from "../prompt-studio-store/DraggableTabsBrowserStore";
+} from "../prompt-playground-store/DraggableTabsBrowserStore";
 import type { PromptConfigFormValues } from "~/prompt-configs/types";
 import { createLogger } from "~/utils/logger";
 import { toaster } from "~/components/ui/toaster";
@@ -15,21 +15,21 @@ import { DEFAULT_MODEL } from "~/utils/constants";
 import { getRoutePath } from "~/utils/routes";
 import { formSchema } from "~/prompt-configs/schemas";
 
-const logger = createLogger("useLoadSpanIntoPromptStudio");
+const logger = createLogger("useLoadSpanIntoPromptPlayground");
 
 const QUERY_PARAM_PROMPT_PLAYGROUND_SPAN_ID = "promptPlaygroundSpanId";
 
 /**
- * Hook for navigation to prompt studio with a span ID.
- * Single Responsibility: Navigate to prompt studio page with span query param.
+ * Hook for navigation to prompt playground with a span ID.
+ * Single Responsibility: Navigate to prompt playground page with span query param.
  */
 export function useGoToSpanInPlaygroundTabUrlBuilder() {
   const { project } = useOrganizationTeamProject();
 
   /**
    * buildUrl
-   * Single Responsibility: Constructs URL to prompt studio page with span ID query parameter.
-   * @param spanId - The ID of the span to load into the prompt studio
+   * Single Responsibility: Constructs URL to prompt playground page with span ID query parameter.
+   * @param spanId - The ID of the span to load into the prompt playground
    * @returns A URL object if the project slug is available, otherwise null
    */
   const buildUrl = (spanId: string) => {
@@ -48,8 +48,8 @@ export function useGoToSpanInPlaygroundTabUrlBuilder() {
 
   return {
     /**
-     * Build a URL to the prompt studio page with the given span ID.
-     * @param spanId - The ID of the span to load into the prompt studio.
+     * Build a URL to the prompt playground page with the given span ID.
+     * @param spanId - The ID of the span to load into the prompt playground.
      * @returns A URL object if the project slug is available, otherwise null.
      */
     buildUrl,

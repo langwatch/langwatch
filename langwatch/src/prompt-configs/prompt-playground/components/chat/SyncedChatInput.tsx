@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { Box, HStack } from "@chakra-ui/react";
 import type { InputProps } from "@copilotkit/react-ui";
-import { usePromptStudioChatSync } from "./PromptStudioChatContext";
+import { usePromptPlaygroundChatSync } from "./PromptPlaygroundChatContext";
 import { ChatSendButton } from "./ui/ChatSendButton";
 import { ChatSyncCheckbox } from "./ui/ChatSyncCheckbox";
 import { ChatTextArea } from "./ui/ChatTextArea";
@@ -30,7 +30,7 @@ export function SyncedChatInput({
     setIsSynced,
     submitTrigger,
     triggerSubmit,
-  } = usePromptStudioChatSync();
+  } = usePromptPlaygroundChatSync();
   const [localInput, setLocalInput] = useState("");
   const [isHovered, setIsHovered] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);

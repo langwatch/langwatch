@@ -1,20 +1,20 @@
 import { DashboardLayout } from "~/components/DashboardLayout";
-import { PromptStudioSidebar } from "~/prompt-configs/prompt-studio/components/sidebar/PromptStudioSidebar";
-import { PromptStudioMainContent } from "~/prompt-configs/prompt-studio/components/PromptStudioMainContent";
+import { PromptPlaygroundSidebar } from "~/prompt-configs/prompt-playground/components/sidebar/PromptPlaygroundSidebar";
+import { PromptPlaygroundMainContent } from "~/prompt-configs/prompt-playground/components/PromptPlaygroundMainContent";
 import { Box, HStack } from "@chakra-ui/react";
 import { PromptConfigProvider } from "~/prompt-configs/providers/PromptConfigProvider";
-import { PromptStudioChatProvider } from "./chat/PromptStudioChatContext";
+import { PromptPlaygroundChatProvider } from "./chat/PromptPlaygroundChatContext";
 
 /**
- * PromptStudioLayout
- * Single Responsibility: Renders the main layout structure for the Prompt Studio feature with sidebar and main content.
+ * PromptPlaygroundLayout
+ * Single Responsibility: Renders the main layout structure for the Prompt Playground feature with sidebar and main content.
  */
-export function PromptStudioPageLayout() {
+export function PromptPlaygroundPageLayout() {
   return (
     <DashboardLayout position="relative">
       <HStack width="full" height="full" gap={0} position="relative">
         <PromptConfigProvider>
-          <PromptStudioChatProvider>
+          <PromptPlaygroundChatProvider>
             <HStack
               position="relative"
               top={0}
@@ -30,11 +30,11 @@ export function PromptStudioPageLayout() {
                 height="full"
                 bg="white"
               >
-                <PromptStudioSidebar />
+                <PromptPlaygroundSidebar />
               </Box>
             </HStack>
-            <PromptStudioMainContent />
-          </PromptStudioChatProvider>
+            <PromptPlaygroundMainContent />
+          </PromptPlaygroundChatProvider>
         </PromptConfigProvider>
       </HStack>
     </DashboardLayout>

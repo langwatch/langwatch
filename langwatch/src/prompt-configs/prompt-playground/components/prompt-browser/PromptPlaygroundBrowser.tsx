@@ -1,16 +1,16 @@
 import { HStack, IconButton, Spacer } from "@chakra-ui/react";
 import { PromptBrowserWindowContent } from "./prompt-browser-window/PromptBrowserWindowContent";
 import { PromptBrowserTab } from "./tab/PromptBrowserTab";
-import { useDraggableTabsBrowserStore } from "../../prompt-studio-store/DraggableTabsBrowserStore";
+import { useDraggableTabsBrowserStore } from "../../prompt-playground-store/DraggableTabsBrowserStore";
 import { DraggableTabsBrowser } from "./ui/DraggableTabsBrowser";
 import { LuColumns2 } from "react-icons/lu";
 import { TabIdProvider } from "./ui/TabContext";
 
 /**
- * Tabbed browser for the prompt studio with draggable tabs and split-pane support.
+ * Tabbed browser for the prompt playground with draggable tabs and split-pane support.
  * Single Responsibility: Manages the browser-like tab interface for editing multiple prompts simultaneously.
  */
-export function PromptStudioBrowser() {
+export function PromptPlaygroundBrowser() {
   const {
     windows,
     splitTab,

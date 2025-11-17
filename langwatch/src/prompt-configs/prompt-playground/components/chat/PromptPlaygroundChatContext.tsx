@@ -26,7 +26,7 @@ interface SubmitTrigger {
  * - Submit actions broadcast to all synced chats via timestamp-based trigger
  * - Each chat tracks last processed timestamp to prevent duplicate sends
  */
-interface PromptStudioChatContextType {
+interface PromptPlaygroundChatContextType {
   /** Current synced input value (shared across all tabs when sync enabled) */
   syncedInput: string;
   /** Update the synced input value */
@@ -41,21 +41,21 @@ interface PromptStudioChatContextType {
   triggerSubmit: (message: string) => void;
 }
 
-const PromptStudioChatContext = createContext<
-  PromptStudioChatContextType | undefined
+const PromptPlaygroundChatContext = createContext<
+  PromptPlaygroundChatContextType | undefined
 >(undefined);
 
-export function usePromptStudioChatSync() {
-  const context = useContext(PromptStudioChatContext);
+export function usePromptPlaygroundChatSync() {
+  const context = useContext(PromptPlaygroundChatContext);
   if (!context) {
     throw new Error(
-      "usePromptStudioChatSync must be used within PromptStudioChatProvider",
+      "usePromptPlaygroundChatSync must be used within PromptPlaygroundChatProvider",
     );
   }
   return context;
 }
 
-interface PromptStudioChatProviderProps {
+interface PromptPlaygroundChatProviderProps {
   children: ReactNode;
 }
 
@@ -65,7 +65,7 @@ interface PromptStudioChatProviderProps {
  *
  * Usage:
  * 1. Wrap your component tree with this provider
- * 2. Use `usePromptStudioChatSync()` in child components to access sync state
+ * 2. Use `usePromptPlaygroundChatSync()` in child components to access sync state
  * 3. When sync is enabled, input and submit actions are shared across all chat instances
  *
  * How Submit Broadcasting Works:
@@ -76,9 +76,9 @@ interface PromptStudioChatProviderProps {
  * 5. Unprocessed chats submit the message and mark timestamp as processed
  * 6. This ensures each chat submits exactly once per broadcast
  */
-export function PromptStudioChatProvider({
+export function PromptPlaygroundChatProvider({
   children,
-}: PromptStudioChatProviderProps) {
+}: PromptPlaygroundChatProviderProps) {
   const [syncedInput, setSyncedInput] = useState("");
   const [isSynced, setIsSynced] = useState(true);
   const [submitTrigger, setSubmitTrigger] = useState<SubmitTrigger | null>(
@@ -100,7 +100,7 @@ export function PromptStudioChatProvider({
   );
 
   return (
-    <PromptStudioChatContext.Provider
+    <PromptPlaygroundChatContext.Provider
       value={{
         syncedInput,
         setSyncedInput,
@@ -111,6 +111,6 @@ export function PromptStudioChatProvider({
       }}
     >
       {children}
-    </PromptStudioChatContext.Provider>
+    </PromptPlaygroundChatContext.Provider>
   );
 }

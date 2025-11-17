@@ -14,7 +14,7 @@ import { createTabId, createWindowId } from "./utils/id-generators";
 const logger = createLogger("DraggableTabsBrowserStore");
 
 /**
- * Zod schema for the data associated with a tab in the prompt studio browser.
+ * Zod schema for the data associated with a tab in the prompt playground browser.
  * Single Responsibility: Represents the state and metadata for a prompt tab.
  */
 export const TabDataSchema = z.object({

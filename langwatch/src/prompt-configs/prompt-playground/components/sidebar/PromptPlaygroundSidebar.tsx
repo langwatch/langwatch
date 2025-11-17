@@ -4,10 +4,10 @@ import { Text } from "@chakra-ui/react";
 import { AddPromptButton } from "./AddPromptButton";
 
 /**
- * The Prompt Studio sidebar component.
+ * The Prompt Playground sidebar component.
  * Note: drafts and sessions are not yet supported
  */
-export function PromptStudioSidebar() {
+export function PromptPlaygroundSidebar() {
   return (
     <Sidebar.Root>
       <Sidebar.Section>

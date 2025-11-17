@@ -1,8 +1,8 @@
 import { Box, HStack, Tabs, IconButton } from "@chakra-ui/react";
 import {
-  PromptStudioChat,
-  type PromptStudioChatRef,
-} from "../../chat/PromptStudioChat";
+  PromptPlaygroundChat,
+  type PromptPlaygroundChatRef,
+} from "../../chat/PromptPlaygroundChat";
 import { useFormContext } from "react-hook-form";
 import type { PromptConfigFormValues } from "~/prompt-configs/types";
 import { SettingsTabContent } from "./SettingsTabContent";
@@ -29,7 +29,7 @@ export function PromptTabbedSection() {
   >([]);
   const formValues = form.watch();
   const hasInputs = inputs.length > 0;
-  const chatRef = useRef<PromptStudioChatRef>(null);
+  const chatRef = useRef<PromptPlaygroundChatRef>(null);
 
   return (
     <Tabs.Root
@@ -85,7 +85,7 @@ export function PromptTabbedSection() {
             height="full"
             maxHeight="full"
           >
-            <PromptStudioChat
+            <PromptPlaygroundChat
               ref={chatRef}
               formValues={formValues}
               variables={variables}
