@@ -18,25 +18,72 @@ import type {
 } from "../stores/projectionStore.types";
 import type { EventHandler } from "../processing/eventHandler";
 import { EventUtils } from "../utils/event.utils";
+import type { Logger } from "pino";
 
+const DEFAULT_REBUILD_BATCH_SIZE = 100;
+
+/**
+ * Hooks for extending the event sourcing pipeline.
+ * 
+ * **Execution Order:** beforeHandle → handle → afterHandle → beforePersist → persist → afterPersist
+ * 
+ * **Error Handling:**
+ * - If beforeHandle throws: handler is not called, no persistence occurs
+ * - If handler throws: afterHandle/beforePersist/persist/afterPersist are not called
+ * - If afterHandle throws: projection is not persisted
+ * - If beforePersist throws: projection is not persisted
+ * - If persist fails: afterPersist is not called
+ * - If afterPersist throws: projection WAS persisted (partial success state)
+ * 
+ * **Concurrency Note:** Hooks are called sequentially, not concurrently.
+ * Each hook completes before the next begins.
+ * 
+ * **Best Practices:**
+ * - Keep hooks fast and focused
+ * - Avoid side effects in beforePersist/afterPersist that can't be rolled back
+ * - Consider implementing compensating transactions if afterPersist can fail
+ * - Don't throw in afterPersist unless you need to signal an error
+ */
 export interface EventSourcingHooks<
   AggregateId = string,
   EventType extends Event<AggregateId> = Event<AggregateId>,
   ProjectionType extends Projection<AggregateId> = Projection<AggregateId>,
 > {
+  /**
+   * Called before the event handler processes the stream.
+   * Use for validation, logging, or preparation.
+   * Throwing here prevents handler execution.
+   */
   beforeHandle?(
     stream: EventStream<AggregateId, EventType>,
     metadata: ProjectionMetadata,
   ): Promise<void> | void;
+  /**
+   * Called after the event handler produces a projection, before persistence.
+   * Use for validation, enrichment, or logging.
+   * Throwing here prevents persistence.
+   */
   afterHandle?(
     stream: EventStream<AggregateId, EventType>,
     projection: ProjectionType,
     metadata: ProjectionMetadata,
   ): Promise<void> | void;
+  /**
+   * Called immediately before persisting the projection.
+   * Use for final validation or logging.
+   * Throwing here prevents persistence.
+   */
   beforePersist?(
     projection: ProjectionType,
     metadata: ProjectionMetadata,
   ): Promise<void> | void;
+  /**
+   * Called after the projection has been successfully persisted.
+   * 
+   * **WARNING:** The projection IS already persisted when this runs.
+   * Throwing here leaves the system in a partial success state.
+   * Consider carefully whether errors here should fail the operation.
+   */
   afterPersist?(
     projection: ProjectionType,
     metadata: ProjectionMetadata,
@@ -112,6 +159,7 @@ export interface EventSourcingServiceOptions<
   projectionStore: ProjectionStore<AggregateId, ProjectionType>;
   eventHandler: EventHandler<AggregateId, EventType, ProjectionType>;
   serviceOptions?: EventSourcingOptions<AggregateId, EventType>;
+  logger?: Logger;
 }
 
 /**
@@ -123,7 +171,8 @@ export class EventSourcingService<
   EventType extends Event<AggregateId> = Event<AggregateId>,
   ProjectionType extends Projection<AggregateId> = Projection<AggregateId>,
 > {
-  private readonly tracer = getLangWatchTracer("EventSourcingService");
+  private readonly tracer = getLangWatchTracer("langwatch.trace-processing.event-sourcing-service");
+  private readonly logger?: Logger;
 
   private readonly eventStore: EventStore<AggregateId, EventType>;
   private readonly projectionStore: ProjectionStore<AggregateId, ProjectionType>;
@@ -139,6 +188,7 @@ export class EventSourcingService<
     projectionStore,
     eventHandler,
     serviceOptions,
+    logger,
   }: EventSourcingServiceOptions<
     AggregateId,
     EventType,
@@ -148,6 +198,7 @@ export class EventSourcingService<
     this.projectionStore = projectionStore;
     this.eventHandler = eventHandler;
     this.options = serviceOptions ?? {};
+    this.logger = logger;
   }
 
   /**
@@ -165,13 +216,27 @@ export class EventSourcingService<
         kind: SpanKind.INTERNAL,
         attributes: {
           "aggregate.id": String(aggregateId),
+          "tenant.id": options?.eventStoreContext?.tenantId ?? "unknown",
         },
       },
       async (span) => {
+        const startTime = Date.now();
+        
+        this.logger?.info(
+          { 
+            aggregateId: String(aggregateId),
+            tenantId: options?.eventStoreContext?.tenantId,
+          },
+          "Starting projection rebuild"
+        );
+
+        span.addEvent("event_store.fetch.start");
         const events = await this.eventStore.getEvents(
           aggregateId,
           options?.eventStoreContext,
         );
+        span.addEvent("event_store.fetch.complete");
+
         const stream = this.createEventStream(aggregateId, events);
         const metadata = EventUtils.buildProjectionMetadata(stream);
 
@@ -181,16 +246,66 @@ export class EventSourcingService<
           "event.last_timestamp": metadata.lastEventTimestamp ?? void 0,
         });
 
-        await this.options.hooks?.beforeHandle?.(stream, metadata);
-        const projection = await this.eventHandler.handle(stream);
-        await this.options.hooks?.afterHandle?.(stream, projection, metadata);
+        this.logger?.debug(
+          {
+            aggregateId: String(aggregateId),
+            eventCount: metadata.eventCount,
+          },
+          "Loaded events for projection rebuild"
+        );
 
-        await this.options.hooks?.beforePersist?.(projection, metadata);
+        if (this.options.hooks?.beforeHandle) {
+          span.addEvent("hook.before_handle.start");
+          await this.options.hooks.beforeHandle(stream, metadata);
+          span.addEvent("hook.before_handle.complete");
+        }
+
+        span.addEvent("event_handler.handle.start");
+        const projection = await this.eventHandler.handle(stream);
+        span.addEvent("event_handler.handle.complete");
+
+        span.setAttributes({
+          "projection.id": projection.id,
+          "projection.version": projection.version,
+        });
+
+        if (this.options.hooks?.afterHandle) {
+          span.addEvent("hook.after_handle.start");
+          await this.options.hooks.afterHandle(stream, projection, metadata);
+          span.addEvent("hook.after_handle.complete");
+        }
+
+        if (this.options.hooks?.beforePersist) {
+          span.addEvent("hook.before_persist.start");
+          await this.options.hooks.beforePersist(projection, metadata);
+          span.addEvent("hook.before_persist.complete");
+        }
+
+        span.addEvent("projection_store.store.start");
         await this.projectionStore.storeProjection(
           projection,
           options?.projectionStoreContext,
         );
-        await this.options.hooks?.afterPersist?.(projection, metadata);
+        span.addEvent("projection_store.store.complete");
+
+        if (this.options.hooks?.afterPersist) {
+          span.addEvent("hook.after_persist.start");
+          await this.options.hooks.afterPersist(projection, metadata);
+          span.addEvent("hook.after_persist.complete");
+        }
+
+        const durationMs = Date.now() - startTime;
+        
+        this.logger?.info(
+          {
+            aggregateId: String(aggregateId),
+            projectionId: projection.id,
+            projectionVersion: projection.version,
+            eventCount: metadata.eventCount,
+            durationMs,
+          },
+          "Projection rebuild completed"
+        );
 
         return projection;
       },
@@ -275,7 +390,7 @@ export class EventSourcingService<
     const safeOptions = options ?? {};
     const batchSize = safeOptions.batchSize && safeOptions.batchSize > 0
       ? safeOptions.batchSize
-      : 100;
+      : DEFAULT_REBUILD_BATCH_SIZE;
 
     return await this.tracer.withActiveSpan(
       "EventSourcingService.rebuildProjectionsInBatches",
@@ -283,6 +398,7 @@ export class EventSourcingService<
         kind: SpanKind.INTERNAL,
         attributes: {
           "batch.size": batchSize,
+          "tenant.id": safeOptions.eventStoreContext?.tenantId ?? "unknown",
         },
       },
       async (span) => {
@@ -292,13 +408,28 @@ export class EventSourcingService<
         let lastAggregateId: AggregateId | undefined =
           safeOptions.resumeFrom?.lastAggregateId;
 
+        this.logger?.info(
+          {
+            batchSize,
+            resumedFromCount: safeOptions.resumeFrom?.processedCount,
+            cursor: safeOptions.resumeFrom?.cursor,
+            tenantId: safeOptions.eventStoreContext?.tenantId,
+          },
+          "Starting batch rebuild"
+        );
+
         // Loop until the event store indicates there are no more aggregate IDs.
         // This method is deliberately conservative: callers can chunk work further
         // at a higher level if they want finer-grained jobs.
         if (!this.eventStore.listAggregateIds) {
-          throw new Error(
+          const error = new Error(
             "EventStore.listAggregateIds is not implemented for this store",
           );
+          this.logger?.error(
+            { error: error.message },
+            "Cannot perform batch rebuild: listAggregateIds not implemented"
+          );
+          throw error;
         }
 
         for (;;) {
@@ -311,27 +442,64 @@ export class EventSourcingService<
 
           if (!aggregateIds.length) {
             cursor = void 0;
+            this.logger?.debug(
+              { processedCount },
+              "No more aggregates to process"
+            );
             break;
           }
 
-          for (const aggregateId of aggregateIds) {
-            // Rebuild projection for each aggregate using existing pipeline.
-            await this.rebuildProjection(aggregateId, {
-              eventStoreContext: safeOptions.eventStoreContext,
-              projectionStoreContext: safeOptions.projectionStoreContext,
-            });
-
-            processedCount += 1;
-            lastAggregateId = aggregateId;
-
-            const checkpoint: BulkRebuildCheckpoint<AggregateId> = {
-              cursor: nextCursor,
-              lastAggregateId,
+          this.logger?.debug(
+            {
+              batchAggregateCount: aggregateIds.length,
               processedCount,
-            };
+              cursor,
+            },
+            "Processing batch of aggregates"
+          );
 
-            if (safeOptions.onProgress) {
-              await safeOptions.onProgress({ checkpoint });
+          for (const aggregateId of aggregateIds) {
+            try {
+              // Rebuild projection for each aggregate using existing pipeline.
+              await this.rebuildProjection(aggregateId, {
+                eventStoreContext: safeOptions.eventStoreContext,
+                projectionStoreContext: safeOptions.projectionStoreContext,
+              });
+
+              processedCount += 1;
+              lastAggregateId = aggregateId;
+
+              // Log progress every 100 aggregates
+              if (processedCount % 100 === 0) {
+                this.logger?.info(
+                  {
+                    processedCount,
+                    lastAggregateId: String(aggregateId),
+                    cursor: nextCursor,
+                  },
+                  "Batch rebuild progress"
+                );
+              }
+
+              const checkpoint: BulkRebuildCheckpoint<AggregateId> = {
+                cursor: nextCursor,
+                lastAggregateId,
+                processedCount,
+              };
+
+              if (safeOptions.onProgress) {
+                await safeOptions.onProgress({ checkpoint });
+              }
+            } catch (error) {
+              this.logger?.error(
+                {
+                  aggregateId: String(aggregateId),
+                  error: error instanceof Error ? error.message : String(error),
+                  processedCount,
+                },
+                "Failed to rebuild projection for aggregate"
+              );
+              throw error;
             }
           }
 
@@ -357,6 +525,14 @@ export class EventSourcingService<
                 ? String(lastAggregateId)
                 : void 0,
         });
+
+        this.logger?.info(
+          {
+            processedCount,
+            lastAggregateId: lastAggregateId ? String(lastAggregateId) : void 0,
+          },
+          "Batch rebuild completed"
+        );
 
         return finalCheckpoint;
       },
