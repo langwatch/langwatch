@@ -27,7 +27,13 @@ export type {
 export type { EventHandler } from "./processing/eventHandler";
 
 // Store interfaces
-export type { EventStore, ReadOnlyEventStore, EventStoreReadContext } from "./stores/eventStore";
+export type {
+  EventStore,
+  ReadOnlyEventStore,
+  EventStoreReadContext,
+  EventStoreListCursor,
+  ListAggregateIdsResult,
+} from "./stores/eventStore";
 export type {
   ProjectionStore,
   ProjectionStoreReadContext,
@@ -50,7 +56,7 @@ export {
 // Utility functions
 export {
   createEvent,
-  createEventWithTraceContext,
+  createEventWithProcessingTraceContext,
   createEventStream,
   createProjection,
   eventBelongsToAggregate,
@@ -60,6 +66,6 @@ export {
   isValidEvent,
   isValidProjection,
   buildProjectionMetadata,
-  buildEventMetadataWithCurrentTraceparent,
+  buildEventMetadataWithCurrentProcessingTraceparent,
   EventUtils,
 } from "./utils/event.utils";

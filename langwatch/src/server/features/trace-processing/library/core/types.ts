@@ -4,10 +4,11 @@
 
 export interface EventMetadataBase {
   /**
-   * W3C traceparent header value capturing the originating OTel trace context.
+   * W3C traceparent header value capturing the originating OTel trace context
+   * of the processing pipeline (ingestion, reprocessing jobs, etc.).
    * Example: "00-<trace-id>-<span-id>-01"
    */
-  traceparent?: string;
+  processingTraceparent?: string;
   [key: string]: unknown;
 }
 

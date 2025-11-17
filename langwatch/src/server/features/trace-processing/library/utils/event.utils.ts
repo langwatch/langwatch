@@ -2,11 +2,11 @@ import { context, trace } from "@opentelemetry/api";
 import { EventStream } from "../core/eventStream";
 import type {
   Event,
+  EventMetadataBase,
   Projection,
   EventOrderingStrategy,
   ProjectionMetadata,
 } from "../core/types";
-import type { EventMetadataBase } from "../core/types";
 
 function createEvent<
   AggregateId = string,
@@ -42,10 +42,10 @@ function getCurrentTraceparentFromActiveSpan(): string | undefined {
   return `00-${spanContext.traceId}-${spanContext.spanId}-${flagsHex}`;
 }
 
-function buildEventMetadataWithCurrentTraceparent<
+function buildEventMetadataWithCurrentProcessingTraceparent<
   Metadata extends EventMetadataBase = EventMetadataBase,
 >(metadata?: Metadata): Metadata {
-  if (metadata && typeof metadata.traceparent === "string") {
+  if (metadata && typeof metadata.processingTraceparent === "string") {
     return metadata;
   }
 
@@ -56,11 +56,11 @@ function buildEventMetadataWithCurrentTraceparent<
 
   return {
     ...(metadata ?? ({} as Metadata)),
-    traceparent,
+    processingTraceparent: traceparent,
   } as Metadata;
 }
 
-function createEventWithTraceContext<
+function createEventWithProcessingTraceContext<
   AggregateId = string,
   Payload = unknown,
   Metadata extends EventMetadataBase = EventMetadataBase,
@@ -71,7 +71,7 @@ function createEventWithTraceContext<
   metadata?: Metadata,
 ): Event<AggregateId, Payload, Metadata> {
   const enrichedMetadata =
-    buildEventMetadataWithCurrentTraceparent<Metadata>(metadata);
+    buildEventMetadataWithCurrentProcessingTraceparent<Metadata>(metadata);
 
   const hasMetadata =
     enrichedMetadata &&
@@ -180,6 +180,7 @@ function isValidProjection(projection: any): projection is Projection {
 
 export {
   createEvent,
+  createEventWithProcessingTraceContext,
   createEventStream,
   createProjection,
   eventBelongsToAggregate,
@@ -189,11 +190,12 @@ export {
   isValidEvent,
   isValidProjection,
   buildProjectionMetadata,
+  buildEventMetadataWithCurrentProcessingTraceparent,
 };
 
 export const EventUtils = {
   createEvent,
-  createEventWithTraceContext,
+  createEventWithProcessingTraceContext,
   createEventStream,
   createProjection,
   eventBelongsToAggregate,
@@ -203,7 +205,7 @@ export const EventUtils = {
   isValidEvent,
   isValidProjection,
   buildProjectionMetadata,
-  buildEventMetadataWithCurrentTraceparent,
+  buildEventMetadataWithCurrentProcessingTraceparent,
 } as const;
 
 
