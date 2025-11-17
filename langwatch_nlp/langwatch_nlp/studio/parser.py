@@ -472,6 +472,10 @@ def normalized_workflow(workflow: Workflow) -> Workflow:
     for node in workflow.nodes:
         normalized_node(node, mutate=True)
 
+    has_llm_node = any(node.type == "llm" for node in workflow.nodes)
+    if not has_llm_node:
+        workflow.default_llm = None
+
     for edge in workflow.edges:
         edge.source = normalize_to_variable_name(edge.source)
         [handle, field] = edge.sourceHandle.split(".")
