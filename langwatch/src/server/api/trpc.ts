@@ -14,7 +14,7 @@ import {
   type ProcedureParams,
   type Simplify,
 } from "@trpc/server";
-import * as Sentry from "@sentry/node";
+import { captureException } from "~/utils/posthogErrorCapture";
 import { type CreateNextContextOptions } from "@trpc/server/adapters/next";
 import type { inferParser } from "@trpc/server";
 import type { NextApiRequest, NextApiResponse } from "next";
@@ -226,7 +226,7 @@ export const loggerMiddleware = t.middleware(
       if (error) {
         logData.error = error instanceof Error ? error : JSON.stringify(error);
 
-        Sentry.captureException(error);
+        captureException(error);
 
         logger.error(logData, "trpc error");
       } else {

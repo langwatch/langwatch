@@ -1,4 +1,4 @@
-import * as Sentry from "@sentry/nextjs";
+import { captureException, withScope } from "~/utils/posthogErrorCapture";
 import { type Job, Worker } from "bullmq";
 import type { TopicClusteringJob } from "~/server/background/types";
 import { createLogger } from "../../../utils/logger";
@@ -47,10 +47,10 @@ export const startTopicClusteringWorker = () => {
   topicClusteringWorker.on("failed", (job, err) => {
     getJobProcessingCounter("topic_clustering", "failed").inc();
     logger.error({ jobId: job?.id, error: err.message }, "job failed");
-    Sentry.withScope((scope) => {
-      scope.setTag("worker", "topicClustering");
-      scope.setExtra("job", job?.data);
-      Sentry.captureException(err);
+    withScope((scope) => {
+      scope.setTag?.("worker", "topicClustering");
+      scope.setExtra?.("job", job?.data);
+      captureException(err);
     });
   });
 

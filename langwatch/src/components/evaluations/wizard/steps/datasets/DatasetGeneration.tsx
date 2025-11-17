@@ -14,7 +14,7 @@ import { AISparklesLoader } from "../../../../icons/AISparklesLoader";
 import { Markdown } from "../../../../Markdown";
 import { nanoid } from "nanoid";
 import { DefaultChatTransport } from "ai";
-import * as Sentry from "@sentry/nextjs";
+import { captureException } from "~/utils/posthogErrorCapture";
 import {
   allModelOptions,
   useModelSelectionOptions,
@@ -382,7 +382,7 @@ export function DatasetGeneration() {
       // Start processing if not already processing
       if (!isProcessing.current) {
         processQueue().catch((error) => {
-          Sentry.captureException(error, {
+          captureException(error, {
             tags: {
               datasetId: datasetId,
             },
@@ -432,7 +432,7 @@ export function DatasetGeneration() {
     return () => {
       if (queue?.length > 0 && !processing) {
         processQueue().catch((error) => {
-          Sentry.captureException(error, {
+          captureException(error, {
             tags: {
               datasetId: datasetId,
             },
@@ -448,7 +448,7 @@ export function DatasetGeneration() {
     if (updateQueue.current?.length > 0 && !isProcessing.current) {
       processQueue().catch((error) => {
         console.error("Error processing queue during dataset change:", error);
-        Sentry.captureException(error, {
+        captureException(error, {
           tags: {
             datasetId: datasetId,
           },

@@ -1,11 +1,8 @@
-import { withSentryConfig } from "@sentry/nextjs";
 import path from "path";
 import fs from "fs";
 import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import bundleAnalyser from "@next/bundle-analyzer";
-
-process.env.SENTRY_IGNORE_API_RESOLUTION_ERROR = "1";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -195,21 +192,5 @@ const config = {
 };
 
 export default bundleAnalyser({ enabled: process.env.ANALYZE === "true" })(
-    withSentryConfig(config, {
-        // For all available options, see:
-        // https://github.com/getsentry/sentry-webpack-plugin#options
-
-        // Suppresses source map uploading logs during build
-        silent: true,
-        org: "langwatch",
-        project: "langwatch",
-
-        widenClientFileUpload: true,
-        tunnelRoute: "/monitoring",
-        sourcemaps: {
-            disable: false,
-            deleteSourcemapsAfterUpload: true,
-        },
-        disableLogger: true,
-    }),
+    config,
 );

@@ -12,7 +12,7 @@ import {
 } from "@aws-sdk/client-cloudwatch-logs";
 import type { FunctionConfiguration } from "@aws-sdk/client-lambda";
 import type { StudioClientEvent } from "../types/events";
-import * as Sentry from "@sentry/node";
+import { captureException } from "~/utils/posthogErrorCapture";
 import { env } from "../../env.mjs";
 import { createLogger } from "../../utils/logger";
 
@@ -391,7 +391,7 @@ export const invokeLambda = async (
               const error = new Error(
                 `Failed run workflow: ${chunk.InvokeComplete.ErrorCode}`,
               );
-              Sentry.captureException(error, {
+              captureException(error, {
                 extra: { event, details: chunk.InvokeComplete.ErrorDetails },
               });
               throw error;
@@ -413,7 +413,7 @@ export const invokeLambda = async (
               const error = new Error(
                 `Optimization Studio validation failed, please contact support`,
               );
-              Sentry.captureException(error, { extra: { event } });
+              captureException(error, { extra: { event } });
               throw error;
             }
             throw new Error(
@@ -454,7 +454,7 @@ export const invokeLambda = async (
         const error = new Error(
           `Optimization Studio validation failed, please contact support`,
         );
-        Sentry.captureException(error, { extra: { event } });
+        captureException(error, { extra: { event } });
         throw error;
       }
       throw new Error(`Failed run workflow: ${response.statusText}\n\n${body}`);

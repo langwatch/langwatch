@@ -1,5 +1,10 @@
 import type { Project } from "@prisma/client";
-import * as Sentry from "@sentry/nextjs";
+import {
+  captureException,
+  getCurrentScope,
+  startSpan,
+  withScope,
+} from "~/utils/posthogErrorCapture";
 import { Worker } from "bullmq";
 import type {
   CollectorCheckAndAdjustJob,
@@ -208,13 +213,13 @@ export async function processCollectorJob(
   }
   getJobProcessingCounter("collector", "processing").inc();
 
-  Sentry.getCurrentScope().setPropagationContext({
+  getCurrentScope().setPropagationContext?.({
     traceId: data.traceId,
     sampleRand: 1,
     parentSpanId: data.traceId,
   });
 
-  const result = await Sentry.startSpan(
+  const result = await startSpan(
     {
       name: "Process Collector Job",
       op: "rootSpan",
@@ -278,7 +283,7 @@ const processCollectorJob_ = async (
       { error, projectId: project.id, traceId },
       "failed to add LLM tokens count",
     );
-    Sentry.captureException(new Error("Failed to add LLM tokens count"), {
+    captureException(new Error("Failed to add LLM tokens count"), {
       extra: { projectId: project.id, traceId, error: error },
     });
   }
@@ -434,7 +439,7 @@ const processCollectorJob_ = async (
     });
   }
 
-  await Sentry.startSpan({ name: "updateTrace" }, async () => {
+  await startSpan({ name: "updateTrace" }, async () => {
     await updateTrace(trace, esSpans, evaluations);
   });
 
@@ -912,10 +917,10 @@ export const startCollectorWorker = () => {
       getJobProcessingCounter("collector", "failed").inc();
     }
     logger.debug({ jobId: job?.id, error: err.message }, "job failed");
-    Sentry.withScope((scope) => {
-      scope.setTag("worker", "collector");
-      scope.setExtra("job", job?.data);
-      Sentry.captureException(err);
+    withScope((scope) => {
+      scope.setTag?.("worker", "collector");
+      scope.setExtra?.("job", job?.data);
+      captureException(err);
     });
   });
 

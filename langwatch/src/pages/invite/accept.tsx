@@ -7,7 +7,7 @@ import { SetupLayout } from "../../components/SetupLayout";
 import { toaster } from "../../components/ui/toaster";
 import { useRequiredSession } from "../../hooks/useRequiredSession";
 import { api } from "../../utils/api";
-import * as Sentry from "@sentry/nextjs";
+import { captureException } from "~/utils/posthogErrorCapture";
 
 export default function Accept() {
   const router = useRouter();
@@ -27,7 +27,7 @@ export default function Accept() {
         onSuccess: (data) => {
           // Invalidate queries to refresh user's organization data
           void queryClient.organization.getAll.invalidate().catch((error) => {
-            Sentry.captureException(error, {
+            captureException(error, {
               tags: {
                 inviteCode,
               },
@@ -45,7 +45,7 @@ export default function Accept() {
           });
 
           void router.push(`/${data.project?.slug ?? ""}`).catch((error) => {
-            Sentry.captureException(error, {
+            captureException(error, {
               tags: {
                 inviteCode,
               },

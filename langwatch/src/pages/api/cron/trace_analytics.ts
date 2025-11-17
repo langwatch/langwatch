@@ -9,7 +9,7 @@ import {
   getProjectIdsForOrganization,
 } from "~/server/api/routers/limits";
 import { dependencies } from "~/injection/dependencies.server";
-import * as Sentry from "@sentry/nextjs";
+import { captureException } from "~/utils/posthogErrorCapture";
 import { env } from "~/env.mjs";
 
 export default async function handler(
@@ -235,14 +235,14 @@ export default async function handler(
             `[Trace Analytics] Error checking usage limits for organization ${org.id}:`,
             error,
           );
-          Sentry.captureException(error, {
+          captureException(error, {
             extra: { organizationId: org.id },
           });
         }
       }
     } catch (error) {
       console.error("[Trace Analytics] Error checking usage limits:", error);
-      Sentry.captureException(error);
+      captureException(error);
     }
   } else {
     console.log(

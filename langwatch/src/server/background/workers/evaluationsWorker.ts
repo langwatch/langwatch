@@ -1,5 +1,5 @@
 import { CostReferenceType, CostType } from "@prisma/client";
-import * as Sentry from "@sentry/nextjs";
+import { captureException, withScope } from "~/utils/posthogErrorCapture";
 import { Worker, type Job } from "bullmq";
 import { nanoid } from "nanoid";
 import type { EvaluationJob } from "~/server/background/types";
@@ -684,10 +684,10 @@ export const startEvaluationsWorker = (
   traceChecksWorker.on("failed", (job, err) => {
     getJobProcessingCounter("evaluation", "failed").inc();
     logger.error({ jobId: job?.id, error: err }, "job failed");
-    Sentry.withScope((scope) => {
-      scope.setTag("worker", "traceChecks");
-      scope.setExtra("job", job?.data);
-      Sentry.captureException(err);
+    withScope((scope) => {
+      scope.setTag?.("worker", "traceChecks");
+      scope.setExtra?.("job", job?.data);
+      captureException(err);
     });
   });
 

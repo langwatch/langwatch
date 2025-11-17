@@ -1,4 +1,4 @@
-import * as Sentry from "@sentry/nextjs";
+import { captureException } from "~/utils/posthogErrorCapture";
 
 const truncateString = (str: string, maxLength: number): string => {
   if (str.length <= maxLength) return str;
@@ -92,7 +92,7 @@ export const safeTruncate = <T>(
   try {
     return truncateWithSizeLimit(data, maxTotalLength, stringLengths) as T;
   } catch (error) {
-    Sentry.captureException(error, {
+    captureException(error, {
       extra: { data },
     });
     return data;

@@ -13,7 +13,7 @@ import {
   getEvaluationStatusCounter,
   getPiiChecksCounter,
 } from "../../../metrics";
-import * as Sentry from "@sentry/nextjs";
+import { startSpan } from "~/utils/posthogErrorCapture";
 import { createLogger } from "../../../../utils/logger";
 
 const logger = createLogger("langwatch:workers:collector:piiCheck");
@@ -308,7 +308,7 @@ export const cleanupPIIs = async (
   spans: ElasticSearchSpan[],
   options: PIICheckOptions
 ): Promise<void> => {
-  return await Sentry.startSpan({ name: "cleanupPIIs" }, async () => {
+  return await startSpan({ name: "cleanupPIIs" }, async () => {
     const { enforced, mainMethod } = options;
 
     if (!credentials && mainMethod === "google_dlp") {

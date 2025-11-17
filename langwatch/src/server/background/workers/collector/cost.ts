@@ -7,7 +7,7 @@ import {
   getLLMModelCosts,
   type MaybeStoredLLMModelCost,
 } from "../../../modelProviders/llmModelCost";
-import * as Sentry from "@sentry/nextjs";
+import { startSpan } from "~/utils/posthogErrorCapture";
 import NodeFetchCache, { FileSystemCache } from "node-fetch-cache";
 import { createLogger } from "../../../../utils/logger";
 import { isBuildOrNoRedis } from "../../../redis";
@@ -144,7 +144,7 @@ export async function tokenizeAndEstimateCost({
   outputTokens: number;
   cost: number | undefined;
 }> {
-  return await Sentry.startSpan(
+  return await startSpan(
     { name: "tokenizeAndEstimateCost" },
     async () => {
       const inputTokens = (await countTokens(llmModelCost, input)) ?? 0;

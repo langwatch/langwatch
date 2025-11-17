@@ -1,6 +1,6 @@
 import { type NextApiRequest, type NextApiResponse } from "next";
 import { getPostHogInstance } from "../../server/posthog";
-import * as Sentry from "@sentry/node";
+import { captureException } from "~/utils/posthogErrorCapture";
 
 export default async function handler(
   req: NextApiRequest,
@@ -19,7 +19,7 @@ export default async function handler(
         properties,
       });
     } catch (error) {
-      Sentry.captureException(error);
+      captureException(error);
     }
   }
 

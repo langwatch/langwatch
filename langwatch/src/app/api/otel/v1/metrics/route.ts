@@ -1,6 +1,6 @@
 import { type IExportMetricsServiceRequest } from "@opentelemetry/otlp-transformer";
 import * as root from "@opentelemetry/otlp-transformer/build/src/generated/root";
-import * as Sentry from "@sentry/nextjs";
+import { captureException } from "~/utils/posthogErrorCapture";
 import crypto from "node:crypto";
 import { NextResponse, type NextRequest } from "next/server";
 import { prisma } from "../../../../../server/db";
@@ -113,7 +113,7 @@ async function handleMetricsRequest(req: NextRequest) {
             "error parsing metrics"
           );
 
-          Sentry.captureException(error, {
+          captureException(error, {
             extra: {
               projectId: project.id,
               metricsRequest: Buffer.from(body).toString("base64"),
