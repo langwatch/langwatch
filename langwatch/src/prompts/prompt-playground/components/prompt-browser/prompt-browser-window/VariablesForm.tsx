@@ -1,5 +1,5 @@
 import { zodResolver } from "@hookform/resolvers/zod";
-import { VStack, Textarea } from "@chakra-ui/react";
+import { VStack, Textarea, HStack, Text, Badge } from "@chakra-ui/react";
 import { useForm } from "react-hook-form";
 import { useMemo, useEffect } from "react";
 import type { z } from "zod";
@@ -51,16 +51,19 @@ export function VariablesForm({ inputs, onChange }: VariablesFormProps) {
         if (!input.identifier) return null;
         return (
           <div key={input.identifier} style={{ width: "100%" }}>
-            <label
-              style={{
-                display: "block",
-                fontWeight: 500,
-                marginBottom: "2px",
-              }}
-              htmlFor={input.identifier}
-            >
-              {input.identifier}
-            </label>
+            <HStack justify="space-between" align="center" mb={1}>
+              <Text
+                as="label"
+                fontWeight="bold"
+                fontFamily="mono"
+                color="gray.600"
+              >
+                {input.identifier}
+              </Text>
+              <Badge variant="subtle" colorPalette="gray">
+                {input.type}
+              </Badge>
+            </HStack>
             <Textarea
               id={input.identifier}
               {...form.register(`${i}.value` as any)}
