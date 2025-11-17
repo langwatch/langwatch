@@ -12,7 +12,7 @@ import {
   fetchExistingMD5s,
   scheduleTraceCollectionWithFallback,
 } from "../../../../../server/background/workers/collectorWorker";
-import { spanIngestionService } from "../../../../../server/features/span-ingestion/services/spanIngestionService";
+import { spanProcessingService } from "../../../../../server/event-sourcing/pipelines/span-processing/services/spanProcessingService";
 import { createLogger } from "../../../../../utils/logger";
 import { withAppRouterLogger } from "../../../../../middleware/app-router-logger";
 import { withAppRouterTracer } from "../../../../../middleware/app-router-tracer";
@@ -231,7 +231,7 @@ async function handleTracesRequest(req: NextRequest) {
 
             if (project.featureClickHouse) {
               clickHouseTasks.push(
-                spanIngestionService.consumeSpans(
+                spanProcessingService.processSpans(
                   project.id,
                   traceForCollection,
                   traceRequest,
