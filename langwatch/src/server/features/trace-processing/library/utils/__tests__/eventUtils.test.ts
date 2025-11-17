@@ -1,17 +1,30 @@
 import { describe, it, expect } from "vitest";
-import {
-  eventBelongsToAggregate,
-  sortEventsByTimestamp,
-  filterEventsByType,
-  getLatestProjection,
-  isValidEvent,
-  isValidProjection,
-  createEvent,
-  createProjection,
-  buildProjectionMetadata,
-  createEventStream,
-} from "../eventUtils";
+import { EventUtils } from "../event.utils";
 import type { Event, Projection } from "../../core/types";
+
+describe("createEvent", () => {
+  describe("when called with basic data", () => {
+    it("returns an event with the provided fields", () => {
+      const event = EventUtils.createEvent("agg-1", "TEST", { foo: "bar" });
+
+      expect(event.aggregateId).toBe("agg-1");
+    });
+  });
+});
+
+describe("createProjection", () => {
+  describe("when called with basic data", () => {
+    it("returns a projection with the provided fields", () => {
+      const projection = EventUtils.createProjection(
+        "proj-1",
+        "agg-1",
+        { foo: "bar" },
+      );
+
+      expect(projection.id).toBe("proj-1");
+    });
+  });
+});
 
 describe("eventBelongsToAggregate", () => {
   describe("when event belongs to aggregate", () => {
@@ -23,7 +36,7 @@ describe("eventBelongsToAggregate", () => {
         data: {},
       };
 
-      expect(eventBelongsToAggregate(event, "test-123")).toBe(true);
+      expect(EventUtils.eventBelongsToAggregate(event, "test-123")).toBe(true);
     });
   });
 
@@ -36,7 +49,9 @@ describe("eventBelongsToAggregate", () => {
         data: {},
       };
 
-      expect(eventBelongsToAggregate(event, "different-123")).toBe(false);
+      expect(EventUtils.eventBelongsToAggregate(event, "different-123")).toBe(
+        false,
+      );
     });
   });
 });
@@ -50,7 +65,7 @@ describe("sortEventsByTimestamp", () => {
         { aggregateId: "1", timestamp: 2000, type: "B", data: {} },
       ];
 
-      const sorted = sortEventsByTimestamp(events);
+      const sorted = EventUtils.sortEventsByTimestamp(events);
 
       expect(sorted[0]!.timestamp).toBe(1000);
     });
@@ -64,7 +79,7 @@ describe("sortEventsByTimestamp", () => {
         { aggregateId: "1", timestamp: 3000, type: "C", data: {} },
       ];
 
-      const sorted = sortEventsByTimestamp(events);
+      const sorted = EventUtils.sortEventsByTimestamp(events);
 
       expect(sorted[0]!.timestamp).toBe(1000);
     });
@@ -80,7 +95,7 @@ describe("filterEventsByType", () => {
         { aggregateId: "1", timestamp: 3000, type: "CREATE", data: {} },
       ];
 
-      const filtered = filterEventsByType(events, "CREATE");
+      const filtered = EventUtils.filterEventsByType(events, "CREATE");
 
       expect(filtered).toHaveLength(2);
     });
@@ -93,7 +108,7 @@ describe("filterEventsByType", () => {
         { aggregateId: "1", timestamp: 2000, type: "UPDATE", data: {} },
       ];
 
-      const filtered = filterEventsByType(events, "DELETE");
+      const filtered = EventUtils.filterEventsByType(events, "DELETE");
 
       expect(filtered).toHaveLength(0);
     });
@@ -105,7 +120,7 @@ describe("getLatestProjection", () => {
     it("returns null", () => {
       const projections: Projection[] = [];
 
-      const latest = getLatestProjection(projections);
+      const latest = EventUtils.getLatestProjection(projections);
 
       expect(latest).toBeNull();
     });
@@ -119,7 +134,7 @@ describe("getLatestProjection", () => {
         { id: "3", aggregateId: "a", version: 200, data: {} },
       ];
 
-      const latest = getLatestProjection(projections);
+      const latest = EventUtils.getLatestProjection(projections);
 
       expect(latest?.version).toBe(300);
     });
@@ -132,7 +147,7 @@ describe("getLatestProjection", () => {
         { id: "2", aggregateId: "a", version: 100, data: {} },
       ];
 
-      const latest = getLatestProjection(projections);
+      const latest = EventUtils.getLatestProjection(projections);
 
       expect(latest?.version).toBe(100);
     });
@@ -149,7 +164,7 @@ describe("isValidEvent", () => {
         data: { value: 42 },
       };
 
-      expect(isValidEvent(event)).toBe(true);
+      expect(EventUtils.isValidEvent(event)).toBe(true);
     });
   });
 
@@ -161,7 +176,7 @@ describe("isValidEvent", () => {
         data: { value: 42 },
       };
 
-      expect(isValidEvent(event)).toBe(false);
+      expect(EventUtils.isValidEvent(event)).toBe(false);
     });
   });
 
@@ -174,7 +189,7 @@ describe("isValidEvent", () => {
         data: { value: 42 },
       };
 
-      expect(isValidEvent(event)).toBe(false);
+      expect(EventUtils.isValidEvent(event)).toBe(false);
     });
   });
 
@@ -187,7 +202,7 @@ describe("isValidEvent", () => {
         data: { value: 42 },
       };
 
-      expect(isValidEvent(event)).toBe(false);
+      expect(EventUtils.isValidEvent(event)).toBe(false);
     });
   });
 
@@ -199,19 +214,19 @@ describe("isValidEvent", () => {
         type: "TEST",
       };
 
-      expect(isValidEvent(event)).toBe(false);
+      expect(EventUtils.isValidEvent(event)).toBe(false);
     });
   });
 
   describe("when event is null", () => {
     it("returns false", () => {
-      expect(isValidEvent(null)).toBeFalsy();
+      expect(EventUtils.isValidEvent(null)).toBeFalsy();
     });
   });
 
   describe("when event is undefined", () => {
     it("returns false", () => {
-      expect(isValidEvent(void 0)).toBeFalsy();
+      expect(EventUtils.isValidEvent(void 0)).toBeFalsy();
     });
   });
 });
@@ -226,7 +241,7 @@ describe("isValidProjection", () => {
         data: { value: 42 },
       };
 
-      expect(isValidProjection(projection)).toBe(true);
+      expect(EventUtils.isValidProjection(projection)).toBe(true);
     });
   });
 
@@ -239,7 +254,7 @@ describe("isValidProjection", () => {
         data: { value: 42 },
       };
 
-      expect(isValidProjection(projection)).toBe(false);
+      expect(EventUtils.isValidProjection(projection)).toBe(false);
     });
   });
 
@@ -251,7 +266,7 @@ describe("isValidProjection", () => {
         data: { value: 42 },
       };
 
-      expect(isValidProjection(projection)).toBe(false);
+      expect(EventUtils.isValidProjection(projection)).toBe(false);
     });
   });
 
@@ -264,7 +279,7 @@ describe("isValidProjection", () => {
         data: { value: 42 },
       };
 
-      expect(isValidProjection(projection)).toBe(false);
+      expect(EventUtils.isValidProjection(projection)).toBe(false);
     });
   });
 
@@ -276,19 +291,19 @@ describe("isValidProjection", () => {
         version: 1234567890,
       };
 
-      expect(isValidProjection(projection)).toBe(false);
+      expect(EventUtils.isValidProjection(projection)).toBe(false);
     });
   });
 
   describe("when projection is null", () => {
     it("returns false", () => {
-      expect(isValidProjection(null)).toBe(false);
+      expect(EventUtils.isValidProjection(null)).toBe(false);
     });
   });
 
   describe("when projection is undefined", () => {
     it("returns false", () => {
-      expect(isValidProjection(void 0)).toBe(false);
+      expect(EventUtils.isValidProjection(void 0)).toBe(false);
     });
   });
 });

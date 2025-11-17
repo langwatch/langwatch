@@ -172,18 +172,6 @@ describe("EventStream", () => {
         expect(stream.getMetadata().aggregateId).toBe("123");
       });
     });
-
-    describe("when aggregateId is string", () => {
-      it("preserves string in metadata", () => {
-        const events: Event[] = [
-          { aggregateId: "test-123", timestamp: 1000, type: "A", data: {} },
-        ];
-
-        const stream = new EventStream("test-123", events);
-
-        expect(stream.getMetadata().aggregateId).toBe("test-123");
-      });
-    });
   });
 
   describe("getAggregateId", () => {

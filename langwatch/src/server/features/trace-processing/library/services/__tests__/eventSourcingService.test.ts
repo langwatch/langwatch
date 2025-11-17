@@ -2,7 +2,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { EventSourcingService } from "../eventSourcingService";
 import type { EventStore } from "../../stores/eventStore";
-import type { ProjectionStore } from "../../stores/projectionStore";
+import type { ProjectionStore } from "../../stores/projectionStore.types";
 import type { EventHandler } from "../../processing/eventHandler";
 import type { Event, Projection } from "../../core/types";
 

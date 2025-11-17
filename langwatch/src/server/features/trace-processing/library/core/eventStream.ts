@@ -36,6 +36,8 @@ export class EventStream<
     // Only clone and sort if ordering is needed!
     let orderedEvents: readonly EventType[];
     if (ordering === "as-is") {
+      // Use "as-is" when upstream (e.g. ClickHouse) has already provided a correctly
+      // ordered stream so we can avoid an extra copy + sort.
       orderedEvents = events;
     } else {
       const clonedEvents = [...events];

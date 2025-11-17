@@ -22,3 +22,4 @@ export interface ProjectionStore<
   ): Promise<void>;
 }
 
+

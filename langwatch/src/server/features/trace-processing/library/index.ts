@@ -27,7 +27,7 @@ export type {
   ProjectionStore,
   ProjectionStoreReadContext,
   ProjectionStoreWriteContext,
-} from "./stores/projectionStore";
+} from "./stores/projectionStore.types";
 
 // Services & pipeline
 export {
@@ -54,4 +54,5 @@ export {
   isValidEvent,
   isValidProjection,
   buildProjectionMetadata,
-} from "./utils/eventUtils";
+  EventUtils,
+} from "./utils/event.utils";

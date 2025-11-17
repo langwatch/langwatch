@@ -11,12 +11,9 @@ import type { EventStore, EventStoreReadContext } from "../stores/eventStore";
 import type {
   ProjectionStore,
   ProjectionStoreReadContext,
-} from "../stores/projectionStore";
+} from "../stores/projectionStore.types";
 import type { EventHandler } from "../processing/eventHandler";
-import {
-  buildProjectionMetadata,
-  createEventStream,
-} from "../utils/eventUtils";
+import { EventUtils } from "../utils/event.utils";
 
 export interface EventSourcingHooks<
   AggregateId = string,
@@ -58,6 +55,17 @@ export interface RebuildProjectionOptions<
   projectionStoreContext?: ProjectionStoreReadContext;
 }
 
+export interface EventSourcingServiceOptions<
+  AggregateId = string,
+  EventType extends Event<AggregateId> = Event<AggregateId>,
+  ProjectionType extends Projection<AggregateId> = Projection<AggregateId>,
+> {
+  eventStore: EventStore<AggregateId, EventType>;
+  projectionStore: ProjectionStore<AggregateId, ProjectionType>;
+  eventHandler: EventHandler<AggregateId, EventType, ProjectionType>;
+  serviceOptions?: EventSourcingOptions<AggregateId, EventType>;
+}
+
 /**
  * Main service that orchestrates event sourcing.
  * Coordinates between event stores, projection stores, and event handlers.
@@ -69,19 +77,30 @@ export class EventSourcingService<
 > {
   private readonly tracer = getLangWatchTracer("EventSourcingService");
 
-  constructor(
-    private readonly eventStore: EventStore<AggregateId, EventType>,
-    private readonly projectionStore: ProjectionStore<
-      AggregateId,
-      ProjectionType
-    >,
-    private readonly eventHandler: EventHandler<
-      AggregateId,
-      EventType,
-      ProjectionType
-    >,
-    private readonly options: EventSourcingOptions<AggregateId, EventType> = {},
-  ) {}
+  private readonly eventStore: EventStore<AggregateId, EventType>;
+  private readonly projectionStore: ProjectionStore<AggregateId, ProjectionType>;
+  private readonly eventHandler: EventHandler<
+    AggregateId,
+    EventType,
+    ProjectionType
+  >;
+  private readonly options: EventSourcingOptions<AggregateId, EventType>;
+
+  constructor({
+    eventStore,
+    projectionStore,
+    eventHandler,
+    serviceOptions,
+  }: EventSourcingServiceOptions<
+    AggregateId,
+    EventType,
+    ProjectionType
+  >) {
+    this.eventStore = eventStore;
+    this.projectionStore = projectionStore;
+    this.eventHandler = eventHandler;
+    this.options = serviceOptions ?? {};
+  }
 
   /**
    * Rebuilds the projection for a specific aggregate by reprocessing all its events.
@@ -106,7 +125,7 @@ export class EventSourcingService<
           options?.eventStoreContext,
         );
         const stream = this.createEventStream(aggregateId, events);
-        const metadata = buildProjectionMetadata(stream);
+        const metadata = EventUtils.buildProjectionMetadata(stream);
 
         span.setAttributes({
           "event.count": metadata.eventCount,
@@ -202,7 +221,7 @@ export class EventSourcingService<
     aggregateId: AggregateId,
     events: readonly EventType[],
   ): EventStream<AggregateId, EventType> {
-    return createEventStream(
+    return EventUtils.createEventStream(
       aggregateId,
       events,
       this.options.ordering ?? "timestamp",
