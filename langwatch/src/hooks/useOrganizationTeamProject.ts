@@ -123,10 +123,16 @@ export const useOrganizationTeamProject = (
       ),
   );
 
-  // For demo mode, backend already filters to only return demo org/team/project
-  // So we just take the first ones (which should be the demo ones)
+  // For demo mode, find the organization that contains the demo project
+  // (backend returns all user orgs + demo org, so we need to find the one with demo project)
   const organization = isDemo
-    ? organizations.data?.[0] // Backend filters to only return demo org when isDemo=true
+    ? organizations.data?.find((org) =>
+        org.teams.some((team) =>
+          team.projects.some(
+            (project) => project.slug === publicEnv.data?.DEMO_PROJECT_SLUG,
+          ),
+        ),
+      ) ?? organizations.data?.[0] // Fallback to first if not found
     : teamsMatchingSlug?.[0]
     ? teamsMatchingSlug?.[0].organization
     : projectsTeamsOrganizationsMatchingSlug?.[0]
@@ -137,8 +143,13 @@ export const useOrganizationTeamProject = (
     : undefined;
 
   const team = isDemo
-    ? organization?.teams.find((t) => t.projects.length > 0) ??
-      organization?.teams[0] // Find team with projects (backend should filter to demo project)
+    ? organization?.teams.find((t) =>
+        t.projects.some(
+          (project) => project.slug === publicEnv.data?.DEMO_PROJECT_SLUG,
+        ),
+      ) ??
+      organization?.teams.find((t) => t.projects.length > 0) ??
+      organization?.teams[0] // Find team with demo project, or any team with projects
     : projectsTeamsOrganizationsMatchingSlug?.[0]
     ? projectsTeamsOrganizationsMatchingSlug?.[0].team
     : organization
@@ -147,10 +158,11 @@ export const useOrganizationTeamProject = (
       organization.teams[0]
     : undefined;
 
-  // For demo mode, backend already filters to only return the demo project
-  // So we just need to take the first (and only) project from the team
+  // For demo mode, find the project with the demo slug
   const project = isDemo
-    ? team?.projects[0] // Backend filters to only return demo project when isDemo=true
+    ? team?.projects.find(
+        (p) => p.slug === publicEnv.data?.DEMO_PROJECT_SLUG,
+      ) ?? team?.projects[0] // Find demo project by slug, or fallback to first
     : team
     ? projectsTeamsOrganizationsMatchingSlug?.[0]?.project ?? team.projects[0]
     : undefined;
