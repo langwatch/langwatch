@@ -13,6 +13,28 @@ export interface EventStoreReadContext<
 }
 
 /**
+ * Cursor type used to resume listing aggregate IDs.
+ * Implementations are free to encode any state they need, but in practice this
+ * should be a small, serializable token.
+ */
+export type EventStoreListCursor =
+  | string
+  | number
+  | null
+  | Record<string, unknown>;
+
+export interface ListAggregateIdsResult<AggregateId = string> {
+  /**
+   * Aggregate identifiers that have at least one event matching the provided context.
+   */
+  aggregateIds: readonly AggregateId[];
+  /**
+   * Cursor to resume listing from. Omitted when there are no more results.
+   */
+  nextCursor?: EventStoreListCursor;
+}
+
+/**
  * Read-only event store for querying events.
  * Use this interface when you only need to read events without storing new ones.
  */
@@ -24,6 +46,16 @@ export interface ReadOnlyEventStore<
     aggregateId: AggregateId,
     context?: EventStoreReadContext<AggregateId, EventType>,
   ): Promise<readonly EventType[]>;
+
+  /**
+   * Lists aggregate IDs that have events, optionally filtered by context.
+   * Implementations should return stable, deterministic ordering when used with cursors.
+   */
+  listAggregateIds?(
+    context?: EventStoreReadContext<AggregateId, EventType>,
+    cursor?: EventStoreListCursor,
+    limit?: number,
+  ): Promise<ListAggregateIdsResult<AggregateId>>;
 }
 
 /**

@@ -7,7 +7,11 @@ import type {
   Projection,
   ProjectionMetadata,
 } from "../core/types";
-import type { EventStore, EventStoreReadContext } from "../stores/eventStore";
+import type {
+  EventStore,
+  EventStoreListCursor,
+  EventStoreReadContext,
+} from "../stores/eventStore";
 import type {
   ProjectionStore,
   ProjectionStoreReadContext,
@@ -53,6 +57,50 @@ export interface RebuildProjectionOptions<
 > {
   eventStoreContext?: EventStoreReadContext<AggregateId, EventType>;
   projectionStoreContext?: ProjectionStoreReadContext;
+}
+
+export interface BulkRebuildCheckpoint<AggregateId = string> {
+  /**
+   * Cursor pointing to the next position in the aggregate listing.
+   * When undefined, there are no more aggregates to process.
+   */
+  cursor?: EventStoreListCursor;
+  /**
+   * Aggregate ID of the last successfully processed projection.
+   * Useful for debugging and external progress tracking.
+   */
+  lastAggregateId?: AggregateId;
+  /**
+   * Total number of aggregates processed so far across all batches.
+   */
+  processedCount: number;
+}
+
+export interface BulkRebuildProgress<AggregateId = string> {
+  checkpoint: BulkRebuildCheckpoint<AggregateId>;
+}
+
+export interface BulkRebuildOptions<
+  AggregateId = string,
+  EventType extends Event<AggregateId> = Event<AggregateId>,
+> {
+  /**
+   * Maximum number of aggregate IDs to process per batch.
+   * Implementations may use a smaller internal limit if needed.
+   */
+  batchSize?: number;
+  eventStoreContext?: EventStoreReadContext<AggregateId, EventType>;
+  projectionStoreContext?: ProjectionStoreReadContext;
+  /**
+   * Optional checkpoint to resume from.
+   */
+  resumeFrom?: BulkRebuildCheckpoint<AggregateId>;
+  /**
+   * Optional callback invoked after each aggregate is processed.
+   */
+  onProgress?: (
+    progress: BulkRebuildProgress<AggregateId>,
+  ) => Promise<void> | void;
 }
 
 export interface EventSourcingServiceOptions<
@@ -213,6 +261,104 @@ export class EventSourcingService<
       },
       async () => {
         return await this.rebuildProjection(aggregateId, options);
+      },
+    );
+  }
+
+  /**
+   * Rebuilds projections for many aggregates in batches.
+   * Intended for reprocessing scenarios (all, by tenant, by trace, since timestamp).
+   */
+  async rebuildProjectionsInBatches(
+    options?: BulkRebuildOptions<AggregateId, EventType>,
+  ): Promise<BulkRebuildCheckpoint<AggregateId>> {
+    const safeOptions = options ?? {};
+    const batchSize = safeOptions.batchSize && safeOptions.batchSize > 0
+      ? safeOptions.batchSize
+      : 100;
+
+    return await this.tracer.withActiveSpan(
+      "EventSourcingService.rebuildProjectionsInBatches",
+      {
+        kind: SpanKind.INTERNAL,
+        attributes: {
+          "batch.size": batchSize,
+        },
+      },
+      async (span) => {
+        let processedCount = safeOptions.resumeFrom?.processedCount ?? 0;
+        let cursor: EventStoreListCursor | undefined =
+          safeOptions.resumeFrom?.cursor;
+        let lastAggregateId: AggregateId | undefined =
+          safeOptions.resumeFrom?.lastAggregateId;
+
+        // Loop until the event store indicates there are no more aggregate IDs.
+        // This method is deliberately conservative: callers can chunk work further
+        // at a higher level if they want finer-grained jobs.
+        if (!this.eventStore.listAggregateIds) {
+          throw new Error(
+            "EventStore.listAggregateIds is not implemented for this store",
+          );
+        }
+
+        for (;;) {
+          const { aggregateIds, nextCursor } =
+            await this.eventStore.listAggregateIds(
+              safeOptions.eventStoreContext,
+              cursor,
+              batchSize,
+            );
+
+          if (!aggregateIds.length) {
+            cursor = void 0;
+            break;
+          }
+
+          for (const aggregateId of aggregateIds) {
+            // Rebuild projection for each aggregate using existing pipeline.
+            await this.rebuildProjection(aggregateId, {
+              eventStoreContext: safeOptions.eventStoreContext,
+              projectionStoreContext: safeOptions.projectionStoreContext,
+            });
+
+            processedCount += 1;
+            lastAggregateId = aggregateId;
+
+            const checkpoint: BulkRebuildCheckpoint<AggregateId> = {
+              cursor: nextCursor,
+              lastAggregateId,
+              processedCount,
+            };
+
+            if (safeOptions.onProgress) {
+              await safeOptions.onProgress({ checkpoint });
+            }
+          }
+
+          cursor = nextCursor;
+
+          if (!cursor) {
+            break;
+          }
+        }
+
+        const finalCheckpoint: BulkRebuildCheckpoint<AggregateId> = {
+          cursor,
+          lastAggregateId,
+          processedCount,
+        };
+
+        span.setAttributes({
+          "rebuild.processed_count": processedCount,
+          "rebuild.last_aggregate_id":
+            typeof lastAggregateId === "string"
+              ? lastAggregateId
+              : lastAggregateId !== void 0
+                ? String(lastAggregateId)
+                : void 0,
+        });
+
+        return finalCheckpoint;
       },
     );
   }
