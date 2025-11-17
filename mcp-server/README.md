@@ -1,32 +1,24 @@
 # LangWatch 🏰 MCP Server
 
-The LangWatch MCP Server is a tool designed to automatically instrument your AI code with LangWatch monitoring via the [Model Context Protocol](https://modelcontextprotocol.io/introduction).
+The LangWatch MCP Server makes your AI coding assistant an expert in both [LangWatch](https://docs.langwatch.ai/), for automatically instrumenting your code, managing versioned prompts and creating evaluations; and [Scenario](https://scenario.langwatch.ai/), for automatically testing your agents via simulations.
 
-This server facilitates LLM development by helping AI coding assistants automatically add LangWatch instrumentation to your codebase, then use those traces to analyze and debug the very AI agents they're building.
+## Setup in your Coding Assistant 👩‍💻
 
-## Setup in your Codebase
-
-Check out [LangWatch integration guide](https://docs.langwatch.ai/integration/overview) to start tracking your agents so both you and Cursor/Windsurf/Claude Code or your favorite coding assistant can debug it.
-
-## Setup in Cursor 👩‍💻
-
-1. Navigate to the Cursor Settings
-2. Navigate to the MCP item in the sidebar
+1. Open Cursor/Claude Code/your editor Settings
+2. Navigate to the MCP settings
 3. Set the "name" as "LangWatch"
-4. Set the "type" to `command`
-5. Set the "command" to `npx -y @langwatch/mcp-server --apiKey=sk-lw-...`
+4. Add the LangWatch MCP:
 
-- `--apiKey`: Your LangWatch API key. This is mandatory and must be provided.
-- `--endpoint`: _Optional_ The endpoint for the LangWatch API. Defaults to `https://app.langwatch.ai` if not specified.
-
-> [!TIP]
-> To aid in securing your keys, the MCP will first look at the global system environment variables `LANGWATCH_API_KEY` and `LANGWATCH_ENDPOINT` to check if they have values as well as looking at arguments passed into the server on start.
-
-<picture>
-<source media="(prefers-color-scheme: dark)" srcset="../assets/mcp-server/cursor-setup.dark.webp">
-<source media="(prefers-color-scheme: light)" srcset="../assets/mcp-server/cursor-setup.light.webp">
-<img alt="LangWatch Logo" src="../assets/mcp-server/cursor-setup.light.webp" width="900">
-</picture>
+```json
+{
+  "mcpServers": {
+    "langwatch": {
+      "command": "npx",
+      "args": ["-y", "@langwatch/mcp-server"]
+    }
+  }
+}
+```
 
 ## Tools
 
@@ -38,43 +30,28 @@ The MCP Server provides the following tools:
 - **Parameters:**
   - `url`: (Optional) The full url of the specific doc page. If not provided, the docs index will be fetched.
 
-### `get_latest_traces`
+### `fetch_scenario_docs`
 
-- **Description:** Retrieves the latest LLM traces.
+- **Description:** Fetches Scenario docs for understanding how to write agent simulations to test the agents on your codebase.
 - **Parameters:**
-  - `pageOffset` (optional): The page offset for pagination.
-  - `daysBackToSearch` (optional): The number of days back to search for traces. Defaults to 1.
+  - `url`: (Optional) The full url of the specific doc page. If not provided, the docs index will be fetched.
 
-### `get_trace_by_id`
+## Example Usage
 
-- **Description:** Retrieves a specific LLM trace by its ID.
-- **Parameters:**
-  - `id`: The ID of the trace to retrieve.
+Ask your coding assistant to instrument your code:
 
-## Usage in Cursor
+> "Can you instrument my LLM code with LangWatch"
 
-To use these tools within Cursor, follow these steps:
+Or ask it to write a scenario test:
 
-1. **Open the Cursor Chat view:**
+> "Can you implement a scenario test for my agent?"
 
-   - `Cmd + I`
-
-2. **Ensure the MCP server is running:**
-
-3. **Interact with your Agent:**
-   - Ask a question like the following to test the tools are accessible: \*Note: When the tool is detected, you'll need to run `Run tool` in the chat view for it to be called.
-
-> "I just ran into an issue while debugging, can you check the latest traces and fix it?"
-
-<picture>
-<source media="(prefers-color-scheme: dark)" srcset="../assets/mcp-server/cursor-example.dark.webp">
-<source media="(prefers-color-scheme: light)" srcset="../assets/mcp-server/cursor-example.light.webp">
-<img alt="LangWatch Logo" src="../assets/mcp-server/cursor-example.light.webp" width="900">
-</picture>
+<img alt="LangWatch MCP Cursor Example" src="../assets/mcp-server/cursor-example.png" width="900">
 
 ## 🛟 Support
 
 If you have questions or need help, join our community:
 
 - [Discord Community](https://discord.gg/kT4PhDS2gH)
+- [LangWatch Docs](https://docs.langwatch.ai/)
 - [Email Support](mailto:support@langwatch.ai)

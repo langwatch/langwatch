@@ -5,6 +5,7 @@ import { connection } from "../../redis";
 import { createLogger } from "../../../utils/logger";
 import { SPAN_INGESTION_WRITE_QUEUE } from "../queues/spanIngestionWriteQueue";
 import { Worker } from "bullmq";
+import { BullMQOtel } from "bullmq-otel";
 import os from "node:os";
 
 
@@ -22,6 +23,7 @@ export const startSpanIngestionWriteWorker = () => {
     {
       connection,
       concurrency: Math.min(15, Math.max(2, Math.floor(os.cpus().length * 0.75))),
+      telemetry: new BullMQOtel(SPAN_INGESTION_WRITE_QUEUE),
     },
   );
 
