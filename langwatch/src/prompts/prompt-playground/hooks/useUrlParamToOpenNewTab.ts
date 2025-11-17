@@ -1,5 +1,5 @@
 import { useEffect } from "react";
-import { useDraggableTabsBrowserStore } from "../prompt-studio-store/DraggableTabsBrowserStore";
+import { useDraggableTabsBrowserStore } from "../prompt-playground-store/DraggableTabsBrowserStore";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { computeInitialFormValuesForPrompt } from "~/prompts/utils/computeInitialFormValuesForPrompt";
 import { usePromptIdQueryParam } from "~/hooks/usePromptIdQueryParam";

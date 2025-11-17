@@ -4,7 +4,7 @@ import type { PrismLanguage } from "@react-email/components";
 import { ChevronDownIcon, CheckIcon } from "lucide-react";
 import React, { useEffect, useState, createContext, useContext } from "react";
 
-import type { Snippet, Target } from "../prompt-configs/types";
+import type { Snippet, Target } from "~/prompts/types";
 
 import { RenderCode } from "./code/RenderCode";
 import { Dialog } from "./ui/dialog";

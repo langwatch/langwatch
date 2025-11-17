@@ -27,7 +27,7 @@ export interface PromptPlaygroundChatRef {
   resetChat: () => void;
 }
 
-export const PromptPlaygroundChat = forwardRef<
+const PromptPlaygroundChat = forwardRef<
   PromptPlaygroundChatRef,
   PromptPlaygroundChatProps
 >(function PromptPlaygroundChat(props, ref) {
@@ -61,14 +61,14 @@ export const PromptPlaygroundChat = forwardRef<
         }}
         disableSystemMessage
       >
-        <PromptStudioChatInner ref={ref} />
+        <PromptPlaygroundChatInner ref={ref} />
       </CopilotKit>
     </Box>
   );
 });
 
-const PromptStudioChatInner = forwardRef<PromptStudioChatRef, object>(
-  function PromptStudioChatInner(_props, ref) {
+const PromptPlaygroundChatInner = forwardRef<PromptPlaygroundChatRef, object>(
+  function PromptPlaygroundChatInner(_props, ref) {
     const tabId = useTabId();
     const { getTabById } = useDraggableTabsBrowserStore((state) => ({
       getTabById: state.getByTabId,
@@ -137,3 +137,5 @@ const PromptStudioChatInner = forwardRef<PromptStudioChatRef, object>(
     );
   },
 );
+
+export { PromptPlaygroundChat };

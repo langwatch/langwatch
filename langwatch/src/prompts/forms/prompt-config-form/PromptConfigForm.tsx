@@ -7,7 +7,7 @@ import {
   type UseFormReturn,
 } from "react-hook-form";
 
-import type { PromptConfigFormValues } from "~/prompt-configs";
+import type { PromptConfigFormValues } from "~/prompts";
 import type { VersionedPrompt } from "~/server/prompt-config";
 import { PromptConfigProvider } from "../../providers/PromptConfigProvider";
 import { DemonstrationsField } from "../fields/DemonstrationsField";

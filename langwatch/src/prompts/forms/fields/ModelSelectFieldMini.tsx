@@ -1,6 +1,6 @@
 import React from "react";
 import { useFormContext, Controller } from "react-hook-form";
-import type { PromptConfigFormValues } from "~/prompt-configs";
+import type { PromptConfigFormValues } from "~/prompts";
 import { LLMConfigModal } from "~/components/llmPromptConfigs/LLMConfigModal";
 import { HStack, useDisclosure } from "@chakra-ui/react";
 import { LLMModelDisplay } from "~/components/llmPromptConfigs/LLMModelDisplay";

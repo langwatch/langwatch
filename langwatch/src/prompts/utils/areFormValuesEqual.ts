@@ -1,5 +1,5 @@
 import { isEqual } from "lodash";
-import type { PromptConfigFormValues } from "~/prompt-configs";
+import type { PromptConfigFormValues } from "~/prompts";
 import type { DeepPartial } from "react-hook-form";
 
 /**

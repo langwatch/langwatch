@@ -1,7 +1,7 @@
 import { Sidebar } from "./ui/Sidebar";
 import { useMemo } from "react";
 import { modelProviderIcons } from "~/server/modelProviders/iconsMap";
-import { useDraggableTabsBrowserStore } from "../../prompt-studio-store/DraggableTabsBrowserStore";
+import { useDraggableTabsBrowserStore } from "../../prompt-playground-store/DraggableTabsBrowserStore";
 import { groupBy } from "lodash-es";
 import { useAllPromptsForProject } from "~/prompts/hooks/useAllPromptsForProject";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";

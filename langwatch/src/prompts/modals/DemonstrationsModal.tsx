@@ -1,7 +1,7 @@
 import { Dialog } from "~/components/ui/dialog";
 import { Box, Button, Heading } from "@chakra-ui/react";
 import { DatasetTable } from "~/components/datasets/DatasetTable";
-import type { PromptConfigFormValues } from "~/prompt-configs";
+import type { PromptConfigFormValues } from "~/prompts";
 import { transposeColumnsFirstToRowsFirstWithId, transpostRowsFirstToColumnsFirstWithoutId } from "../../optimization_studio/utils/datasetUtils";
 
 type Demonstrations =

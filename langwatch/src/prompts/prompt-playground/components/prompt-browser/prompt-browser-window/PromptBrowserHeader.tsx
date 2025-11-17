@@ -4,7 +4,7 @@ import { GeneratePromptApiSnippetDialog } from "~/prompts/components/GeneratePro
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { GenerateApiSnippetButton } from "~/components/GenerateApiSnippetButton";
 import { useFormContext } from "react-hook-form";
-import type { PromptConfigFormValues } from "~/prompt-configs";
+import type { PromptConfigFormValues } from "~/prompts";
 import { ModelSelectFieldMini } from "~/prompts/forms/fields/ModelSelectFieldMini";
 import { SavePromptButton } from "./SavePromptButton";
 import { VersionHistoryButton } from "~/prompts/forms/prompt-config-form/components/VersionHistoryButton";

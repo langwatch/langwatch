@@ -1,5 +1,5 @@
 import { useTabId } from "../components/prompt-browser/prompt-browser-window/PromptBrowserWindowContent";
-import { useDraggableTabsBrowserStore } from "../prompt-studio-store/DraggableTabsBrowserStore";
+import { useDraggableTabsBrowserStore } from "../prompt-playground-store/DraggableTabsBrowserStore";
 
 /**
  * useIsTabActive

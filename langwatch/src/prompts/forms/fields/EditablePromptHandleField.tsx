@@ -5,7 +5,7 @@ import { Edit3 } from "react-feather";
 
 import { toaster } from "~/components/ui/toaster";
 import { Tooltip } from "~/components/ui/tooltip";
-import type { PromptConfigFormValues } from "~/prompt-configs";
+import type { PromptConfigFormValues } from "~/prompts";
 import { versionedPromptToPromptConfigFormValuesWithSystemMessage } from "~/prompts/utils/llmPromptConfigUtils";
 import { usePromptConfigContext } from "~/prompts/providers/PromptConfigProvider";
 import type { VersionedPrompt } from "~/server/prompt-config";

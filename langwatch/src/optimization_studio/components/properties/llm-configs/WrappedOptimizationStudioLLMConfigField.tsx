@@ -5,7 +5,7 @@ import { OptimizationStudioLLMConfigField } from "./OptimizationStudioLLMConfigF
 import { VStack } from "@chakra-ui/react";
 import { VerticalFormControl } from "~/components/VerticalFormControl";
 import type { LLMConfig } from "~/optimization_studio/types/dsl";
-import type { PromptConfigFormValues } from "~/prompt-configs";
+import type { PromptConfigFormValues } from "~/prompts";
 
 /**
  * Wrapped OptimizationStudioLLMConfigField that works with

@@ -2,7 +2,7 @@ import { useCallback } from "react";
 import { useFormContext } from "react-hook-form";
 
 import { toaster } from "~/components/ui/toaster";
-import type { PromptConfigFormValues } from "~/prompt-configs";
+import type { PromptConfigFormValues } from "~/prompts";
 import { usePrompts } from "~/prompts/hooks/usePrompts";
 import { versionedPromptToPromptConfigFormValues } from "~/prompts/utils/llmPromptConfigUtils";
 import { createLogger } from "~/utils/logger";

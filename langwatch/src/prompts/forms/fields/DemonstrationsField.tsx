@@ -2,7 +2,7 @@ import { Button, HStack, Spacer, Text, useDisclosure } from "@chakra-ui/react";
 import { Edit2, Info } from "react-feather";
 import { useFormContext, Controller } from "react-hook-form";
 
-import type { PromptConfigFormValues } from "~/prompt-configs";
+import type { PromptConfigFormValues } from "~/prompts";
 import { DemonstrationsModal } from "../../modals/DemonstrationsModal";
 
 import { DatasetPreview } from "~/components/datasets/DatasetPreview";

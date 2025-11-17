@@ -6,11 +6,11 @@ import { toaster } from "~/components/ui/toaster";
 import { type VersionedPrompt } from "~/server/prompt-config";
 import { versionedPromptToPromptConfigFormValuesWithSystemMessage } from "~/prompts/utils/llmPromptConfigUtils";
 import { useFormContext } from "react-hook-form";
-import type { PromptConfigFormValues } from "~/prompt-configs";
+import type { PromptConfigFormValues } from "~/prompts";
 import {
   useDraggableTabsBrowserStore,
   type TabData,
-} from "../prompt-studio-store/DraggableTabsBrowserStore";
+} from "../prompt-playground-store/DraggableTabsBrowserStore";
 import { useTabId } from "../components/prompt-browser/prompt-browser-window/PromptBrowserWindowContent";
 
 /**

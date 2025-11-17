@@ -12,7 +12,7 @@ import { Trash2 } from "react-feather";
 import { useFieldArray, useFormContext } from "react-hook-form";
 
 import { PropertySectionTitle } from "~/optimization_studio/components/properties/BasePropertiesPanel";
-import type { PromptConfigFormValues } from "~/prompt-configs";
+import type { PromptConfigFormValues } from "~/prompts";
 import { TypeSelector } from "~/prompts/components/ui/TypeSelector";
 import { generateUniqueIdentifier } from "~/prompts/utils/identifierUtils";
 import { Tooltip } from "~/components/ui/tooltip";

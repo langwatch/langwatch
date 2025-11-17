@@ -8,7 +8,7 @@ import { FormProvider, type DeepPartial } from "react-hook-form";
 import {
   useDraggableTabsBrowserStore,
   type TabData,
-} from "~/prompts/prompt-studio/prompt-studio-store/DraggableTabsBrowserStore";
+} from "~/prompts/prompt-playground/prompt-playground-store/DraggableTabsBrowserStore";
 import type { PromptConfigFormValues } from "~/prompts/types";
 import debounce from "lodash/debounce";
 import { cloneDeep } from "lodash";

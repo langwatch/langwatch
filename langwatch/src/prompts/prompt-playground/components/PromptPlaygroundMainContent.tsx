@@ -25,7 +25,7 @@ export function PromptPlaygroundMainContent() {
 
   return (
     <HStack width="full" height="full" gap={0} overflowX="scroll" bg="white">
-      <PromptStudioBrowser />
+            <PromptPlaygroundBrowser />
     </HStack>
   );
 }

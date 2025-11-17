@@ -9,7 +9,7 @@ import type {
   NodeDataset,
   Signature,
 } from "~/optimization_studio/types/dsl";
-import { formSchema, type PromptConfigFormValues } from "~/prompt-configs";
+import { formSchema, type PromptConfigFormValues } from "~/prompts";
 import { type SaveVersionParams } from "~/prompts/providers/types";
 import {
   versionMetadataToFormFormat,

@@ -2,7 +2,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 import { salvageValidData } from "~/utils/zodSalvage";
-import { formSchema } from "~/prompt-configs";
+import { formSchema } from "~/prompts";
 import { buildDefaultFormValues } from "~/prompts/utils/buildDefaultFormValues";
 
 /**

@@ -149,7 +149,7 @@ function addIdToMessages(
  * Hook to load span data from a trace into the prompt studio.
  * Single Responsibility: Orchestrate fetching span data and creating a new tab.
  */
-export function useLoadSpanIntoPromptStudio() {
+export function useLoadSpanIntoPromptPlayground() {
   const loadedRef = useRef(false);
   const { project } = useOrganizationTeamProject();
   const { spanId, clearSpanIdFromUrl } = useSpanIdFromUrl();

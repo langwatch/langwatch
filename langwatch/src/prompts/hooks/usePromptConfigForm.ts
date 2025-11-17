@@ -3,7 +3,7 @@ import isEqual from "lodash-es/isEqual";
 import { useEffect, useMemo } from "react";
 import { useForm, type DeepPartial } from "react-hook-form";
 
-import { formSchema, type PromptConfigFormValues } from "~/prompt-configs";
+import { formSchema, type PromptConfigFormValues } from "~/prompts";
 import { salvageValidData } from "~/utils/zodSalvage";
 
 import { inputsAndOutputsToDemostrationColumns } from "../utils/llmPromptConfigUtils";
