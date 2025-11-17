@@ -1,0 +1,1 @@
+export { TraceProcessingCommandHandler } from "./traceProcessingCommandHandler";
