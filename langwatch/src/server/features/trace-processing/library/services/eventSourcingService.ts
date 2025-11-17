@@ -1,0 +1,601 @@
+import { SpanKind } from "@opentelemetry/api";
+import { getLangWatchTracer } from "langwatch";
+import type { EventStream } from "../core/eventStream";
+import type {
+  Event,
+  EventOrderingStrategy,
+  Projection,
+  ProjectionMetadata,
+} from "../core/types";
+import type {
+  EventStore,
+  EventStoreListCursor,
+  EventStoreReadContext,
+} from "../stores/eventStore";
+import type {
+  ProjectionStore,
+  ProjectionStoreReadContext,
+} from "../stores/projectionStore.types";
+import type { EventHandler } from "../processing/eventHandler";
+import { EventUtils } from "../utils/event.utils";
+import type { Logger } from "pino";
+
+const DEFAULT_REBUILD_BATCH_SIZE = 100;
+
+/**
+ * Hooks for extending the event sourcing pipeline.
+ *
+ * **Execution Order:** beforeHandle → handle → afterHandle → beforePersist → persist → afterPersist
+ *
+ * **Error Handling:**
+ * - If beforeHandle throws: handler is not called, no persistence occurs
+ * - If handler throws: afterHandle/beforePersist/persist/afterPersist are not called
+ * - If afterHandle throws: projection is not persisted
+ * - If beforePersist throws: projection is not persisted
+ * - If persist fails: afterPersist is not called
+ * - If afterPersist throws: projection WAS persisted (partial success state)
+ *
+ * **Concurrency Note:** Hooks are called sequentially, not concurrently.
+ * Each hook completes before the next begins.
+ *
+ * **Best Practices:**
+ * - Keep hooks fast and focused
+ * - Avoid side effects in beforePersist/afterPersist that can't be rolled back
+ * - Consider implementing compensating transactions if afterPersist can fail
+ * - Don't throw in afterPersist unless you need to signal an error
+ */
+export interface EventSourcingHooks<
+  AggregateId = string,
+  EventType extends Event<AggregateId> = Event<AggregateId>,
+  ProjectionType extends Projection<AggregateId> = Projection<AggregateId>,
+> {
+  /**
+   * Called before the event handler processes the stream.
+   * Use for validation, logging, or preparation.
+   * Throwing here prevents handler execution.
+   */
+  beforeHandle?(
+    stream: EventStream<AggregateId, EventType>,
+    metadata: ProjectionMetadata,
+  ): Promise<void> | void;
+  /**
+   * Called after the event handler produces a projection, before persistence.
+   * Use for validation, enrichment, or logging.
+   * Throwing here prevents persistence.
+   */
+  afterHandle?(
+    stream: EventStream<AggregateId, EventType>,
+    projection: ProjectionType,
+    metadata: ProjectionMetadata,
+  ): Promise<void> | void;
+  /**
+   * Called immediately before persisting the projection.
+   * Use for final validation or logging.
+   * Throwing here prevents persistence.
+   */
+  beforePersist?(
+    projection: ProjectionType,
+    metadata: ProjectionMetadata,
+  ): Promise<void> | void;
+  /**
+   * Called after the projection has been successfully persisted.
+   *
+   * **WARNING:** The projection IS already persisted when this runs.
+   * Throwing here leaves the system in a partial success state.
+   * Consider carefully whether errors here should fail the operation.
+   */
+  afterPersist?(
+    projection: ProjectionType,
+    metadata: ProjectionMetadata,
+  ): Promise<void> | void;
+}
+
+export interface EventSourcingOptions<
+  AggregateId = string,
+  EventType extends Event<AggregateId> = Event<AggregateId>,
+> {
+  ordering?: EventOrderingStrategy<EventType>;
+  hooks?: EventSourcingHooks<AggregateId, EventType>;
+}
+
+export interface RebuildProjectionOptions<
+  AggregateId = string,
+  EventType extends Event<AggregateId> = Event<AggregateId>,
+> {
+  eventStoreContext?: EventStoreReadContext<AggregateId, EventType>;
+  projectionStoreContext?: ProjectionStoreReadContext;
+}
+
+export interface BulkRebuildCheckpoint<AggregateId = string> {
+  /**
+   * Cursor pointing to the next position in the aggregate listing.
+   * When undefined, there are no more aggregates to process.
+   */
+  cursor?: EventStoreListCursor;
+  /**
+   * Aggregate ID of the last successfully processed projection.
+   * Useful for debugging and external progress tracking.
+   */
+  lastAggregateId?: AggregateId;
+  /**
+   * Total number of aggregates processed so far across all batches.
+   */
+  processedCount: number;
+}
+
+export interface BulkRebuildProgress<AggregateId = string> {
+  checkpoint: BulkRebuildCheckpoint<AggregateId>;
+}
+
+export interface BulkRebuildOptions<
+  AggregateId = string,
+  EventType extends Event<AggregateId> = Event<AggregateId>,
+> {
+  /**
+   * Maximum number of aggregate IDs to process per batch.
+   * Implementations may use a smaller internal limit if needed.
+   */
+  batchSize?: number;
+  eventStoreContext?: EventStoreReadContext<AggregateId, EventType>;
+  projectionStoreContext?: ProjectionStoreReadContext;
+  /**
+   * Optional checkpoint to resume from.
+   */
+  resumeFrom?: BulkRebuildCheckpoint<AggregateId>;
+  /**
+   * Optional callback invoked after each aggregate is processed.
+   */
+  onProgress?: (
+    progress: BulkRebuildProgress<AggregateId>,
+  ) => Promise<void> | void;
+}
+
+export interface EventSourcingServiceOptions<
+  AggregateId = string,
+  EventType extends Event<AggregateId> = Event<AggregateId>,
+  ProjectionType extends Projection<AggregateId> = Projection<AggregateId>,
+> {
+  eventStore: EventStore<AggregateId, EventType>;
+  projectionStore: ProjectionStore<AggregateId, ProjectionType>;
+  eventHandler: EventHandler<AggregateId, EventType, ProjectionType>;
+  serviceOptions?: EventSourcingOptions<AggregateId, EventType>;
+  logger?: Logger;
+}
+
+/**
+ * Main service that orchestrates event sourcing.
+ * Coordinates between event stores, projection stores, and event handlers.
+ */
+export class EventSourcingService<
+  AggregateId = string,
+  EventType extends Event<AggregateId> = Event<AggregateId>,
+  ProjectionType extends Projection<AggregateId> = Projection<AggregateId>,
+> {
+  private readonly tracer = getLangWatchTracer("langwatch.trace-processing.event-sourcing-service");
+  private readonly logger?: Logger;
+
+  private readonly eventStore: EventStore<AggregateId, EventType>;
+  private readonly projectionStore: ProjectionStore<AggregateId, ProjectionType>;
+  private readonly eventHandler: EventHandler<
+    AggregateId,
+    EventType,
+    ProjectionType
+  >;
+  private readonly options: EventSourcingOptions<AggregateId, EventType>;
+
+  constructor({
+    eventStore,
+    projectionStore,
+    eventHandler,
+    serviceOptions,
+    logger,
+  }: EventSourcingServiceOptions<
+    AggregateId,
+    EventType,
+    ProjectionType
+  >) {
+    this.eventStore = eventStore;
+    this.projectionStore = projectionStore;
+    this.eventHandler = eventHandler;
+    this.options = serviceOptions ?? {};
+    this.logger = logger;
+  }
+
+  /**
+   * Rebuilds the projection for a specific aggregate by reprocessing all its events.
+   * @param aggregateId - The aggregate to rebuild projection for
+   * @returns The rebuilt projection
+   */
+  async rebuildProjection(
+    aggregateId: AggregateId,
+    options?: RebuildProjectionOptions<AggregateId, EventType>,
+  ): Promise<ProjectionType> {
+    return await this.tracer.withActiveSpan(
+      "EventSourcingService.rebuildProjection",
+      {
+        kind: SpanKind.INTERNAL,
+        attributes: {
+          "aggregate.id": String(aggregateId),
+          "tenant.id": options?.eventStoreContext?.tenantId ?? "missing",
+        },
+      },
+      async (span) => {
+        if (!options?.eventStoreContext) {
+          throw new Error(
+            "[SECURITY] rebuildProjection requires eventStoreContext with tenantId for tenant isolation",
+          );
+        }
+
+        const startTime = Date.now();
+
+        this.logger?.info(
+          {
+            aggregateId: String(aggregateId),
+            tenantId: options.eventStoreContext.tenantId,
+          },
+          "Starting projection rebuild"
+        );
+
+        span.addEvent("event_store.fetch.start");
+        const events = await this.eventStore.getEvents(
+          aggregateId,
+          options.eventStoreContext,
+        );
+        span.addEvent("event_store.fetch.complete");
+
+        const stream = this.createEventStream(aggregateId, events);
+        const metadata = EventUtils.buildProjectionMetadata(stream);
+
+        span.setAttributes({
+          "event.count": metadata.eventCount,
+          "event.first_timestamp": metadata.firstEventTimestamp ?? void 0,
+          "event.last_timestamp": metadata.lastEventTimestamp ?? void 0,
+        });
+
+        this.logger?.debug(
+          {
+            aggregateId: String(aggregateId),
+            eventCount: metadata.eventCount,
+          },
+          "Loaded events for projection rebuild"
+        );
+
+        if (this.options.hooks?.beforeHandle) {
+          span.addEvent("hook.before_handle.start");
+          await this.options.hooks.beforeHandle(stream, metadata);
+          span.addEvent("hook.before_handle.complete");
+        }
+
+        span.addEvent("event_handler.handle.start");
+        const projection = await this.eventHandler.handle(stream);
+        span.addEvent("event_handler.handle.complete");
+
+        span.setAttributes({
+          "projection.id": projection.id,
+          "projection.version": projection.version,
+        });
+
+        if (this.options.hooks?.afterHandle) {
+          span.addEvent("hook.after_handle.start");
+          await this.options.hooks.afterHandle(stream, projection, metadata);
+          span.addEvent("hook.after_handle.complete");
+        }
+
+        if (this.options.hooks?.beforePersist) {
+          span.addEvent("hook.before_persist.start");
+          await this.options.hooks.beforePersist(projection, metadata);
+          span.addEvent("hook.before_persist.complete");
+        }
+
+        const projectionContext = options?.projectionStoreContext ?? options?.eventStoreContext;
+        if (!projectionContext) {
+          throw new Error(
+            "[SECURITY] rebuildProjection requires context with tenantId for tenant isolation",
+          );
+        }
+
+        span.addEvent("projection_store.store.start");
+        await this.projectionStore.storeProjection(
+          projection,
+          projectionContext,
+        );
+        span.addEvent("projection_store.store.complete");
+
+        if (this.options.hooks?.afterPersist) {
+          span.addEvent("hook.after_persist.start");
+          await this.options.hooks.afterPersist(projection, metadata);
+          span.addEvent("hook.after_persist.complete");
+        }
+
+        const durationMs = Date.now() - startTime;
+
+        this.logger?.info(
+          {
+            aggregateId: String(aggregateId),
+            projectionId: projection.id,
+            projectionVersion: projection.version,
+            eventCount: metadata.eventCount,
+            durationMs,
+          },
+          "Projection rebuild completed"
+        );
+
+        return projection;
+      },
+    );
+  }
+
+  /**
+   * Gets the current projection for an aggregate, rebuilding if necessary.
+   * @param aggregateId - The aggregate to get projection for
+   * @param options - Options including context with tenantId
+   * @returns The current projection
+   */
+  async getProjection(
+    aggregateId: AggregateId,
+    options?: RebuildProjectionOptions<AggregateId, EventType>,
+  ): Promise<ProjectionType> {
+    return await this.tracer.withActiveSpan(
+      "EventSourcingService.getProjection",
+      {
+        kind: SpanKind.INTERNAL,
+        attributes: {
+          "aggregate.id": String(aggregateId),
+        },
+      },
+      async (span) => {
+        const projectionContext = options?.projectionStoreContext ?? options?.eventStoreContext;
+        if (!projectionContext) {
+          throw new Error(
+            "[SECURITY] getProjection requires context with tenantId for tenant isolation",
+          );
+        }
+
+        let projection = await this.projectionStore.getProjection(
+          aggregateId,
+          projectionContext,
+        );
+
+        if (!projection) {
+          span.addEvent("projection.not_found");
+          projection = await this.rebuildProjection(aggregateId, options);
+        } else {
+          span.addEvent("projection.found");
+        }
+
+        return projection;
+      },
+    );
+  }
+
+  /**
+   * Checks if a projection exists for an aggregate without rebuilding.
+   * @param aggregateId - The aggregate to check
+   * @param options - Options including projection store context with tenantId
+   * @returns True if projection exists
+   */
+  async hasProjection(
+    aggregateId: AggregateId,
+    options?: RebuildProjectionOptions<AggregateId, EventType>,
+  ): Promise<boolean> {
+    const context = options?.projectionStoreContext ?? options?.eventStoreContext;
+    if (!context) {
+      throw new Error(
+        "[SECURITY] hasProjection requires context with tenantId for tenant isolation",
+      );
+    }
+    const projection = await this.projectionStore.getProjection(aggregateId, context);
+    return projection !== null;
+  }
+
+  /**
+   * Forces a rebuild of the projection even if it already exists.
+   * @param aggregateId - The aggregate to rebuild projection for
+   * @returns The rebuilt projection
+   */
+  async forceRebuildProjection(
+    aggregateId: AggregateId,
+    options?: RebuildProjectionOptions<AggregateId, EventType>,
+  ): Promise<ProjectionType> {
+    return await this.tracer.withActiveSpan(
+      "EventSourcingService.forceRebuildProjection",
+      {
+        kind: SpanKind.INTERNAL,
+        attributes: {
+          "aggregate.id": String(aggregateId),
+        },
+      },
+      async () => {
+        return await this.rebuildProjection(aggregateId, options);
+      },
+    );
+  }
+
+  /**
+   * Rebuilds projections for many aggregates in batches.
+   * Intended for reprocessing scenarios (all, by tenant, by trace, since timestamp).
+   */
+  async rebuildProjectionsInBatches(
+    options?: BulkRebuildOptions<AggregateId, EventType>,
+  ): Promise<BulkRebuildCheckpoint<AggregateId>> {
+    const safeOptions = options ?? {};
+    const batchSize = safeOptions.batchSize && safeOptions.batchSize > 0
+      ? safeOptions.batchSize
+      : DEFAULT_REBUILD_BATCH_SIZE;
+
+    return await this.tracer.withActiveSpan(
+      "EventSourcingService.rebuildProjectionsInBatches",
+      {
+        kind: SpanKind.INTERNAL,
+        attributes: {
+          "batch.size": batchSize,
+          "tenant.id": safeOptions.eventStoreContext?.tenantId ?? "missing",
+        },
+      },
+      async (span) => {
+        let processedCount = safeOptions.resumeFrom?.processedCount ?? 0;
+        let cursor: EventStoreListCursor | undefined =
+          safeOptions.resumeFrom?.cursor;
+        let lastAggregateId: AggregateId | undefined =
+          safeOptions.resumeFrom?.lastAggregateId;
+
+        this.logger?.info(
+          {
+            batchSize,
+            resumedFromCount: safeOptions.resumeFrom?.processedCount,
+            cursor: safeOptions.resumeFrom?.cursor,
+            tenantId: safeOptions.eventStoreContext?.tenantId ?? "missing",
+          },
+          "Starting batch rebuild"
+        );
+
+        // Loop until the event store indicates there are no more aggregate IDs.
+        // This method is deliberately conservative: callers can chunk work further
+        // at a higher level if they want finer-grained jobs.
+        if (!this.eventStore.listAggregateIds) {
+          const error = new Error(
+            "EventStore.listAggregateIds is not implemented for this store",
+          );
+          this.logger?.error(
+            { error: error.message },
+            "Cannot perform batch rebuild: listAggregateIds not implemented"
+          );
+          throw error;
+        }
+
+        if (!safeOptions.eventStoreContext) {
+          throw new Error(
+            "[SECURITY] rebuildProjectionsInBatches requires eventStoreContext with tenantId for tenant isolation",
+          );
+        }
+
+        for (;;) {
+          const { aggregateIds, nextCursor } =
+            await this.eventStore.listAggregateIds(
+              safeOptions.eventStoreContext,
+              cursor,
+              batchSize,
+            );
+
+          if (!aggregateIds.length) {
+            cursor = void 0;
+            this.logger?.debug(
+              { processedCount },
+              "No more aggregates to process"
+            );
+            break;
+          }
+
+          this.logger?.debug(
+            {
+              batchAggregateCount: aggregateIds.length,
+              processedCount,
+              cursor,
+            },
+            "Processing batch of aggregates"
+          );
+
+          for (const aggregateId of aggregateIds) {
+            try {
+              // Rebuild projection for each aggregate using existing pipeline.
+              await this.rebuildProjection(aggregateId, {
+                eventStoreContext: safeOptions.eventStoreContext,
+                projectionStoreContext: safeOptions.projectionStoreContext,
+              });
+
+              processedCount += 1;
+              lastAggregateId = aggregateId;
+
+              // Log progress every 100 aggregates
+              if (processedCount % 100 === 0) {
+                this.logger?.info(
+                  {
+                    processedCount,
+                    lastAggregateId: String(aggregateId),
+                    cursor: nextCursor,
+                  },
+                  "Batch rebuild progress"
+                );
+              }
+
+              const checkpoint: BulkRebuildCheckpoint<AggregateId> = {
+                cursor: nextCursor,
+                lastAggregateId,
+                processedCount,
+              };
+
+              if (safeOptions.onProgress) {
+                await safeOptions.onProgress({ checkpoint });
+              }
+            } catch (error) {
+              // CURRENT: Fail-fast error handling
+              // When a single aggregate fails, we halt the entire batch operation.
+              // This ensures strict correctness and prevents partial state.
+              //
+              // FUTURE IMPROVEMENT: Consider implementing graceful degradation:
+              // - Collect per-aggregate errors instead of throwing immediately
+              // - Continue processing remaining aggregates in the batch
+              // - Return both the checkpoint and collected errors
+              // - Benefits: Better throughput, one bad aggregate doesn't block all others
+              // - Trade-offs: More complex error reporting, partial success states
+              //
+              // For now, callers can use resumeFrom to retry failed batches.
+              this.logger?.error(
+                {
+                  aggregateId: String(aggregateId),
+                  error: error instanceof Error ? error.message : String(error),
+                  processedCount,
+                },
+                "Failed to rebuild projection for aggregate"
+              );
+              throw error;
+            }
+          }
+
+          cursor = nextCursor;
+
+          if (!cursor) {
+            break;
+          }
+        }
+
+        const finalCheckpoint: BulkRebuildCheckpoint<AggregateId> = {
+          cursor,
+          lastAggregateId,
+          processedCount,
+        };
+
+        span.setAttributes({
+          "rebuild.processed_count": processedCount,
+          "rebuild.last_aggregate_id":
+            typeof lastAggregateId === "string"
+              ? lastAggregateId
+              : lastAggregateId !== void 0
+                ? String(lastAggregateId)
+                : void 0,
+        });
+
+        this.logger?.info(
+          {
+            processedCount,
+            lastAggregateId: lastAggregateId ? String(lastAggregateId) : void 0,
+          },
+          "Batch rebuild completed"
+        );
+
+        return finalCheckpoint;
+      },
+    );
+  }
+
+  private createEventStream(
+    aggregateId: AggregateId,
+    events: readonly EventType[],
+  ): EventStream<AggregateId, EventType> {
+    return EventUtils.createEventStream(
+      aggregateId,
+      events,
+      this.options.ordering ?? "timestamp",
+    );
+  }
+}
