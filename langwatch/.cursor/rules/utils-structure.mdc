@@ -49,4 +49,4 @@ export const UtilsName = {
 } as const;
 ```
 
-Reference implementation: `src/server/event-sourcing/library/utils/event.utils.ts`
+Reference implementation: `../../src/server/event-sourcing/library/utils/event.utils.ts`
