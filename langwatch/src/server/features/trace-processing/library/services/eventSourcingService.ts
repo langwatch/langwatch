@@ -220,12 +220,18 @@ export class EventSourcingService<
         },
       },
       async (span) => {
+        if (!options?.eventStoreContext) {
+          throw new Error(
+            "[SECURITY] rebuildProjection requires eventStoreContext with tenantId for tenant isolation",
+          );
+        }
+
         const startTime = Date.now();
 
         this.logger?.info(
           {
             aggregateId: String(aggregateId),
-            tenantId: options?.eventStoreContext?.tenantId ?? "missing",
+            tenantId: options.eventStoreContext.tenantId,
           },
           "Starting projection rebuild"
         );
@@ -233,7 +239,7 @@ export class EventSourcingService<
         span.addEvent("event_store.fetch.start");
         const events = await this.eventStore.getEvents(
           aggregateId,
-          options?.eventStoreContext,
+          options.eventStoreContext,
         );
         span.addEvent("event_store.fetch.complete");
 
@@ -455,6 +461,12 @@ export class EventSourcingService<
             "Cannot perform batch rebuild: listAggregateIds not implemented"
           );
           throw error;
+        }
+
+        if (!safeOptions.eventStoreContext) {
+          throw new Error(
+            "[SECURITY] rebuildProjectionsInBatches requires eventStoreContext with tenantId for tenant isolation",
+          );
         }
 
         for (;;) {
