@@ -17,6 +17,11 @@ export type {
   ProjectionEnvelope,
   ProjectionMetadata,
 } from "./core/types";
+export type {
+  Command,
+  CommandHandler,
+  CommandHandlerResult,
+} from "./core/command";
 
 // Processing interfaces
 export type { EventHandler } from "./processing/eventHandler";
