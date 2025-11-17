@@ -347,6 +347,52 @@ describe("EventUtils - Validation Edge Cases", () => {
     });
   });
 
+  describe("validateTenantId", () => {
+    describe("when context is undefined", () => {
+      it("throws security error", () => {
+        expect(() => EventUtils.validateTenantId(void 0, "testOperation")).toThrow(
+          "[SECURITY] testOperation requires a context with tenantId for tenant isolation",
+        );
+      });
+    });
+
+    describe("when context has no tenantId", () => {
+      it("throws security error", () => {
+        expect(() => EventUtils.validateTenantId({}, "testOperation")).toThrow(
+          "[SECURITY] testOperation requires a non-empty tenantId for tenant isolation",
+        );
+      });
+    });
+
+    describe("when tenantId is empty string", () => {
+      it("throws security error", () => {
+        expect(() => EventUtils.validateTenantId({ tenantId: "" }, "testOperation")).toThrow(
+          "[SECURITY] testOperation requires a non-empty tenantId for tenant isolation",
+        );
+      });
+    });
+
+    describe("when tenantId is only whitespace", () => {
+      it("throws security error", () => {
+        expect(() => EventUtils.validateTenantId({ tenantId: "   " }, "testOperation")).toThrow(
+          "[SECURITY] testOperation requires a non-empty tenantId for tenant isolation",
+        );
+      });
+    });
+
+    describe("when tenantId is valid", () => {
+      it("does not throw", () => {
+        expect(() => EventUtils.validateTenantId({ tenantId: "tenant123" }, "testOperation")).not.toThrow();
+      });
+    });
+
+    describe("when tenantId has whitespace but is non-empty after trim", () => {
+      it("does not throw", () => {
+        expect(() => EventUtils.validateTenantId({ tenantId: "  tenant123  " }, "testOperation")).not.toThrow();
+      });
+    });
+  });
+
   describe("sortEventsByTimestamp", () => {
     describe("when array contains NaN timestamps", () => {
       it("handles NaN timestamps without crashing", () => {
