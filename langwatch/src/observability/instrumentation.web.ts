@@ -10,8 +10,8 @@ import { OTLPMetricExporter } from "@opentelemetry/exporter-metrics-otlp-http";
 import { PeriodicExportingMetricReader, MeterProvider } from "@opentelemetry/sdk-metrics";
 import { ZoneContextManager } from "@opentelemetry/context-zone";
 
-// Guard against SSR
-if (typeof window !== "undefined") {
+// Guard against SSR and OTEL configuration
+if (typeof window !== "undefined" && (window as Window & { __OTEL_ENABLED__?: boolean }).__OTEL_ENABLED__) {
   const isProd = process.env.NODE_ENV === "production";
 
   // Traces
@@ -32,38 +32,28 @@ if (typeof window !== "undefined") {
 
   tracerProvider.register({ contextManager: new ZoneContextManager() });
 
+  const httpIgnoreUrls: RegExp[] = [
+    /\/api/,
+    /\/api\/otel-proxy\//,
+    /\/_next\//,
+    /\/__nextjs_/,
+    /posthog\.com/,
+    /pendo\.io/,
+    /crisp.chat/,
+    /reo.dev/,
+  ];
+
   registerInstrumentations({
     instrumentations: [
       new FetchInstrumentation({
-        propagateTraceHeaderCorsUrls: [],
-        // enabled: false,
+        // propagateTraceHeaderCorsUrls: [], // Set to blank, as we want to do this ourselves!
         measureRequestSize: true,
-        ignoreUrls: [
-          /\/api/,
-          /\/api\/otel-proxy\//,
-          /\/_next\//,
-          /\/__nextjs_/,
-          /posthog\.com/,
-          /pendo\.io/,
-          /crisp.chat/,
-          /reo.dev/,
-        ],
+        ignoreUrls: httpIgnoreUrls,
       }),
       new XMLHttpRequestInstrumentation({
-        // propagateTraceHeaderCorsUrls: /.*/,
-        propagateTraceHeaderCorsUrls: [],
+        // propagateTraceHeaderCorsUrls: [], // Set to blank, as we want to do this ourselves!
         measureRequestSize: true,
-        // enabled: false,
-        ignoreUrls: [
-          /\/api/,
-          /^\/api\/otel-proxy\//,
-          /^\/_next\//,
-          /\/__nextjs_/,
-          /posthog\.com/,
-          /pendo\.io/,
-          /crisp.chat/,
-          /reo.dev/,
-        ],
+        ignoreUrls: httpIgnoreUrls,
       }),
     ],
   });

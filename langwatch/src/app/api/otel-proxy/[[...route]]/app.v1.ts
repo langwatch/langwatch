@@ -1,6 +1,4 @@
 import { Hono } from "hono";
-import { SignatureV4 } from "@aws-sdk/signature-v4";
-import { Sha256 } from "@aws-crypto/sha256-js";
 
 export const app = new Hono().basePath("/");
 
@@ -26,14 +24,13 @@ app.post("/v1/metrics", async (c) => {
   }
 });
 
-// OTLP Traces proxy (with optional AWS SigV4 signing)
+// OTLP Traces proxy
 app.post("/v1/traces", async (c) => {
   const endpoint = process.env.OTEL_EXPORTER_OTLP_ENDPOINT;
   if (!endpoint) {
     return c.body(null, 204);
   }
 
-  const target = new URL(endpoint);
   const body = await c.req.raw.arrayBuffer();
 
   try {
@@ -41,39 +38,12 @@ app.post("/v1/traces", async (c) => {
       "content-type": "application/json",
     };
 
-    let response: Response;
 
-    if (target.hostname.endsWith(".amazonaws.com")) {
-      const signer = new SignatureV4({
-        service: "xray",
-        region: process.env.AWS_REGION ?? process.env.AWS_DEFAULT_REGION ?? "us-east-1",
-        // Credentials are resolved by the AWS SDK provider chain in runtime environments
-        // @ts-ignore
-        credentials: undefined,
-        sha256: Sha256,
-      });
-
-      const signed = await signer.sign({
-        method: "POST",
-        protocol: target.protocol.replace(":", ""),
-        hostname: target.hostname,
-        path: target.pathname || "/v1/traces",
-        headers: defaultHeaders,
-        body,
-      });
-
-      response = await fetch(endpoint, {
-        method: "POST",
-        headers: signed.headers as Record<string, string>,
-        body,
-      });
-    } else {
-      response = await fetch(`${endpoint}/v1/traces`, {
-        method: "POST",
-        headers: defaultHeaders,
-        body,
-      });
-    }
+    const response = await fetch(`${endpoint}/v1/traces`, {
+      method: "POST",
+      headers: defaultHeaders,
+      body,
+    });
 
     const buf = await response.arrayBuffer();
     return new Response(buf, { status: response.status });

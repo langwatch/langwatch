@@ -26,7 +26,7 @@ export function withPagesRouterTracer(
       return otContext.with(parentCtx, async () => {
         return tracer.startActiveSpan(
           spanName,
-          { kind: SpanKind.SERVER, attributes: name ? { "service.name": name } : void 0 },
+          { kind: SpanKind.SERVER, attributes: name ? { "langwatch.embedded-service.name": name } : void 0 },
           async (span) => {
             const carrier: Record<string, string> = {};
             propagation.inject(otContext.active(), carrier);

@@ -4,6 +4,14 @@ import { type AppType } from "next/app";
 
 import { api } from "~/utils/api";
 
+// Get OTEL status from server environment
+const getOtelStatus = () => {
+  if (typeof window === 'undefined') {
+    return Boolean(process.env.OTEL_EXPORTER_OTLP_ENDPOINT);
+  }
+  return false;
+};
+
 import {
   ChakraProvider,
   createSystem,
@@ -19,6 +27,7 @@ import { Inter } from "next/font/google";
 import Head from "next/head";
 import { useRouter } from "next/router";
 import NProgress from "nprogress";
+import Script from "next/script";
 import { useEffect, useState } from "react";
 import { colorSystem } from "../components/ui/color-mode";
 import { Toaster } from "../components/ui/toaster";
@@ -606,6 +615,13 @@ const LangWatch: AppType<{
         <Head>
           <title>LangWatch</title>
         </Head>
+        <Script
+          id="otel-status"
+          strategy="beforeInteractive"
+          dangerouslySetInnerHTML={{
+            __html: `window.__OTEL_ENABLED__ = ${getOtelStatus()};`,
+          }}
+        />
         <AnalyticsProvider
           client={createAppAnalyticsClient({
             isSaaS: Boolean(publicEnv.data?.IS_SAAS),
