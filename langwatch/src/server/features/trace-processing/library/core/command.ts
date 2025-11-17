@@ -33,8 +33,16 @@ export interface CommandHandler<
   /**
    * Processes a command, typically by validating state and emitting one or more events.
    * This interface is intentionally generic and agnostic of storage or transport.
+   *
+   * @param command - The command to handle
+   * @returns Promise that resolves to the handler result (void or events)
+   *
+   * **Note:** Handlers are typically async because they need to:
+   * - Fetch current state from stores
+   * - Validate business rules
+   * - Emit events to event stores
    */
-  handle(command: CommandType): CommandHandlerResult;
+  handle(command: CommandType): Promise<CommandHandlerResult>;
 }
 
 export function createCommand<

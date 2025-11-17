@@ -1,8 +1,5 @@
 import { describe, it, expect } from "vitest";
-import {
-  createCommand,
-  type CommandHandler,
-} from "../command";
+import { createCommand, type CommandHandler } from "../command";
 
 describe("Command", () => {
   describe("createCommand", () => {
@@ -39,7 +36,7 @@ describe("Command", () => {
         const received: unknown[] = [];
 
         class TestHandler implements CommandHandler<string> {
-          handle(command: unknown) {
+          async handle(command: unknown): Promise<void> {
             received.push(command);
           }
         }
@@ -53,7 +50,4 @@ describe("Command", () => {
       });
     });
   });
-}
-);
-
-
+});
