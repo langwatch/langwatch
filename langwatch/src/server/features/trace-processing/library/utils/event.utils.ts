@@ -160,9 +160,11 @@ function buildProjectionMetadata<
 
 function isValidEvent(event: any): event is Event {
   return (
-    event &&
+    Boolean(event) &&
     typeof event.aggregateId !== "undefined" &&
+    event.aggregateId !== null &&
     typeof event.timestamp === "number" &&
+    !Number.isNaN(event.timestamp) &&
     typeof event.type === "string" &&
     event.data !== void 0
   );
@@ -173,7 +175,9 @@ function isValidProjection(projection: any): projection is Projection {
     Boolean(projection) &&
     typeof projection.id === "string" &&
     typeof projection.aggregateId !== "undefined" &&
+    projection.aggregateId !== null &&
     typeof projection.version === "number" &&
+    !Number.isNaN(projection.version) &&
     projection.data !== void 0
   );
 }
