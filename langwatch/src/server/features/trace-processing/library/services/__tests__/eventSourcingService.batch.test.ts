@@ -49,9 +49,11 @@ describe("EventSourcingService - Batch Processing Failures", () => {
           data: {},
         });
 
-      await expect(service.rebuildProjectionsInBatches()).rejects.toThrow(
-        "Database connection lost",
-      );
+      await expect(
+        service.rebuildProjectionsInBatches({
+          eventStoreContext: { tenantId: "test-tenant" },
+        }),
+      ).rejects.toThrow("Database connection lost");
       // First aggregate was processed
       expect(rebuildSpy).toHaveBeenCalledWith("agg-1", expect.anything());
     });
@@ -159,7 +161,10 @@ describe("EventSourcingService - Batch Processing Failures", () => {
       });
 
       await expect(
-        service.rebuildProjectionsInBatches({ onProgress }),
+        service.rebuildProjectionsInBatches({
+          onProgress,
+          eventStoreContext: { tenantId: "test-tenant" },
+        }),
       ).rejects.toThrow("Progress tracking failed");
 
       // Only first aggregate was processed before error
@@ -185,10 +190,11 @@ describe("EventSourcingService - Batch Processing Failures", () => {
           cursor: invalidCursor,
           processedCount: 5,
         },
+        eventStoreContext: { tenantId: "test-tenant" },
       });
 
       expect(mockEventStore.listAggregateIds).toHaveBeenCalledWith(
-        void 0,
+        { tenantId: "test-tenant" },
         invalidCursor,
         100,
       );
@@ -209,7 +215,11 @@ describe("EventSourcingService - Batch Processing Failures", () => {
         eventHandler: mockEventHandler,
       });
 
-      await expect(service.rebuildProjectionsInBatches()).rejects.toThrow(
+      await expect(
+        service.rebuildProjectionsInBatches({
+          eventStoreContext: { tenantId: "test-tenant" },
+        }),
+      ).rejects.toThrow(
         "EventStore.listAggregateIds is not implemented for this store",
       );
     });
@@ -228,7 +238,11 @@ describe("EventSourcingService - Batch Processing Failures", () => {
 
       const rebuildSpy = vi.spyOn(service, "rebuildProjection");
 
-      await expect(service.rebuildProjectionsInBatches()).rejects.toThrow();
+      await expect(
+        service.rebuildProjectionsInBatches({
+          eventStoreContext: { tenantId: "test-tenant" },
+        }),
+      ).rejects.toThrow();
       expect(rebuildSpy).not.toHaveBeenCalled();
     });
   });
@@ -255,9 +269,11 @@ describe("EventSourcingService - Batch Processing Failures", () => {
         })
         .mockRejectedValueOnce(new Error("Rebuild failed for agg-2"));
 
-      await expect(service.rebuildProjectionsInBatches()).rejects.toThrow(
-        "Rebuild failed for agg-2",
-      );
+      await expect(
+        service.rebuildProjectionsInBatches({
+          eventStoreContext: { tenantId: "test-tenant" },
+        }),
+      ).rejects.toThrow("Rebuild failed for agg-2");
 
       // Only first and second aggregates were attempted
       expect(rebuildSpy).toHaveBeenCalledTimes(2);
@@ -276,7 +292,9 @@ describe("EventSourcingService - Batch Processing Failures", () => {
         eventHandler: mockEventHandler,
       });
 
-      const checkpoint = await service.rebuildProjectionsInBatches();
+      const checkpoint = await service.rebuildProjectionsInBatches({
+        eventStoreContext: { tenantId: "test-tenant" },
+      });
 
       expect(checkpoint.processedCount).toBe(0);
       expect(checkpoint.cursor).toBeUndefined();
@@ -295,7 +313,10 @@ describe("EventSourcingService - Batch Processing Failures", () => {
 
       const onProgress = vi.fn();
 
-      await service.rebuildProjectionsInBatches({ onProgress });
+      await service.rebuildProjectionsInBatches({
+        onProgress,
+        eventStoreContext: { tenantId: "test-tenant" },
+      });
 
       expect(onProgress).not.toHaveBeenCalled();
     });

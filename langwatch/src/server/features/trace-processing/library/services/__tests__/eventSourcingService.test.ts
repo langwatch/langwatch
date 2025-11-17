@@ -415,7 +415,9 @@ describe("EventSourcingService", () => {
           eventHandler: mockEventHandler,
         });
 
-        const checkpoint = await service.rebuildProjectionsInBatches();
+        const checkpoint = await service.rebuildProjectionsInBatches({
+          eventStoreContext: { tenantId: "test-tenant" },
+        });
 
         expect(checkpoint.processedCount).toBe(0);
       });
@@ -444,6 +446,7 @@ describe("EventSourcingService", () => {
 
         const checkpoint = await service.rebuildProjectionsInBatches({
           batchSize: 10,
+          eventStoreContext: { tenantId: "test-tenant" },
         });
 
         expect(rebuildSpy).toHaveBeenCalledTimes(2);
@@ -474,6 +477,7 @@ describe("EventSourcingService", () => {
 
         const checkpoint = await service.rebuildProjectionsInBatches({
           onProgress,
+          eventStoreContext: { tenantId: "test-tenant" },
         });
 
         expect(onProgress).toHaveBeenCalledTimes(1);
@@ -516,10 +520,11 @@ describe("EventSourcingService", () => {
             lastAggregateId: "agg-1",
             processedCount: 5,
           },
+          eventStoreContext: { tenantId: "test-tenant" },
         });
 
         expect(mockEventStore.listAggregateIds).toHaveBeenCalledWith(
-          undefined,
+          { tenantId: "test-tenant" },
           "cursor-1",
           100,
         );
