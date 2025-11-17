@@ -1,4 +1,5 @@
 import {
+  Box,
   Button,
   Field,
   HStack,
@@ -9,7 +10,7 @@ import {
   Text,
   VStack,
 } from "@chakra-ui/react";
-import { Mail, Plus, Trash } from "react-feather";
+import { Mail, Plus, Trash2 } from "lucide-react";
 import {
   Controller,
   useFieldArray,
@@ -103,34 +104,20 @@ export function AddMembersForm({
   return (
     <form onSubmit={handleFormSubmit}>
       <VStack align="start" gap={4} width="100%">
-        <Table.Root variant="line" width="100%">
-          <Table.Header>
-            <Table.Row>
-              <Table.ColumnHeader paddingLeft={0} paddingTop={0}>
-                Email
-              </Table.ColumnHeader>
-              <Table.ColumnHeader paddingLeft={0} paddingTop={0}>
-                Org Role
-              </Table.ColumnHeader>
-            </Table.Row>
-          </Table.Header>
-          <Table.Body>
-            {fields.map((field, index) => (
-              <MemberRow
-                key={field.id}
-                index={index}
-                control={control}
-                register={register}
-                errors={errors}
-                teamOptions={teamOptions}
-                orgRoleOptions={orgRoleOptions}
-                organizationId={organizationId}
-                setValue={setValue}
-                onRemove={() => remove(index)}
-              />
-            ))}
-          </Table.Body>
-        </Table.Root>
+        {fields.map((field, index) => (
+          <MemberRow
+            key={field.id}
+            index={index}
+            control={control}
+            register={register}
+            errors={errors}
+            teamOptions={teamOptions}
+            orgRoleOptions={orgRoleOptions}
+            organizationId={organizationId}
+            setValue={setValue}
+            onRemove={() => remove(index)}
+          />
+        ))}
         <Button type="button" onClick={onAddField} marginTop={2}>
           <Plus size={16} /> Add another
         </Button>
@@ -236,10 +223,17 @@ function MemberRow({
   };
 
   return (
-    <>
-      <Table.Row>
-        <Table.Cell paddingLeft={0} paddingY={2} verticalAlign="top">
-          <Field.Root>
+    <Box
+      borderWidth="1px"
+      borderRadius="md"
+      padding={4}
+      borderColor="gray.200"
+      width="100%"
+    >
+      <VStack align="stretch" gap={4}>
+        <HStack gap={4} align="start">
+          <Field.Root flex="1">
+            <Field.Label>Email</Field.Label>
             <Input
               placeholder="Enter email address"
               {...register(`invites.${index}.email`, {
@@ -250,9 +244,8 @@ function MemberRow({
               {errors.invites?.[index]?.email?.message}
             </Field.ErrorText>
           </Field.Root>
-        </Table.Cell>
-        <Table.Cell paddingLeft={0} paddingY={2} verticalAlign="top">
-          <Field.Root>
+          <Field.Root flex="1">
+            <Field.Label>Org Role</Field.Label>
             <Controller
               control={control}
               name={`invites.${index}.orgRole`}
@@ -265,19 +258,52 @@ function MemberRow({
                       </option>
                     ))}
                   </NativeSelect.Field>
+                  <NativeSelect.Indicator />
                 </NativeSelect.Root>
               )}
             />
           </Field.Root>
-        </Table.Cell>
-      </Table.Row>
-      {teamFields.length > 0 && (
-        <Table.Row>
-          <Table.Cell colSpan={2} paddingLeft={0} paddingY={2}>
+          <Box alignSelf="start" paddingTop={7}>
+            <Button
+              type="button"
+              size="sm"
+              colorPalette="red"
+              variant="ghost"
+              onClick={onRemove}
+            >
+              <Trash2 size={16} />
+            </Button>
+          </Box>
+        </HStack>
+        {teamFields.length > 0 && (
+          <Box
+            paddingLeft={4}
+            paddingY={3}
+            paddingRight={3}
+            marginLeft={4}
+            backgroundColor="gray.100"
+            borderRadius="md"
+            borderWidth="1px"
+            borderColor="gray.300"
+          >
             <VStack align="start" gap={2} width="100%">
+              <HStack justify="space-between" width="100%">
+                <Text fontSize="sm" fontWeight="medium" color="gray.700">
+                  Team Assignments
+                </Text>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  onClick={handleAddTeam}
+                  disabled={getAvailableTeamOptions().length === 0}
+                >
+                  <Plus size={14} /> Add team
+                </Button>
+              </HStack>
               <Table.Root variant="line" size="sm" width="100%">
                 <Table.Header>
-                  <Table.Row>
+                  <Table.Row backgroundColor="gray.100">
                     <Table.ColumnHeader paddingLeft={0} paddingTop={0}>
                       Team
                     </Table.ColumnHeader>
@@ -288,23 +314,14 @@ function MemberRow({
                       paddingLeft={0}
                       paddingRight={0}
                       paddingTop={0}
-                    >
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="ghost"
-                        onClick={handleAddTeam}
-                        disabled={getAvailableTeamOptions().length === 0}
-                      >
-                        <Plus size={14} /> Add team
-                      </Button>
-                    </Table.ColumnHeader>
+                      width="60px"
+                    ></Table.ColumnHeader>
                   </Table.Row>
                 </Table.Header>
                 <Table.Body>
                   {teamFields.map((teamField, teamIndex) => (
-                    <Table.Row key={teamField.id}>
-                      <Table.Cell paddingLeft={0} paddingY={2}>
+                    <Table.Row key={teamField.id} backgroundColor="gray.100">
+                      <Table.Cell paddingLeft={0}>
                         <Controller
                           control={control}
                           name={`invites.${index}.teams.${teamIndex}.teamId`}
@@ -314,7 +331,10 @@ function MemberRow({
                               getAvailableTeamOptions(teamIndex);
                             return (
                               <NativeSelect.Root>
-                                <NativeSelect.Field {...field}>
+                                <NativeSelect.Field
+                                  {...field}
+                                  backgroundColor="white"
+                                >
                                   {availableOptions.length === 0 ? (
                                     <option value="">No teams available</option>
                                   ) : (
@@ -328,12 +348,13 @@ function MemberRow({
                                     ))
                                   )}
                                 </NativeSelect.Field>
+                                <NativeSelect.Indicator />
                               </NativeSelect.Root>
                             );
                           }}
                         />
                       </Table.Cell>
-                      <Table.Cell paddingLeft={0} paddingY={2}>
+                      <Table.Cell paddingLeft={0}>
                         <TeamRoleSelect
                           index={index}
                           teamIndex={teamIndex}
@@ -350,7 +371,7 @@ function MemberRow({
                           variant="ghost"
                           onClick={() => removeTeam(teamIndex)}
                         >
-                          <Text fontSize="sm">remove</Text>
+                          <Trash2 size={16} />
                         </Button>
                       </Table.Cell>
                     </Table.Row>
@@ -358,36 +379,23 @@ function MemberRow({
                 </Table.Body>
               </Table.Root>
             </VStack>
-          </Table.Cell>
-        </Table.Row>
-      )}
-      {teamFields.length === 0 && (
-        <Table.Row>
-          <Table.Cell colSpan={2} paddingLeft={0} paddingY={2}>
-            <HStack gap={2}>
-              <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                onClick={handleAddTeam}
-                disabled={getAvailableTeamOptions().length === 0}
-              >
-                <Plus size={14} /> Add team
-              </Button>
-              <Button
-                type="button"
-                size="sm"
-                colorPalette="red"
-                variant="ghost"
-                onClick={onRemove}
-              >
-                <Trash size={14} />
-              </Button>
-            </HStack>
-          </Table.Cell>
-        </Table.Row>
-      )}
-    </>
+          </Box>
+        )}
+        {teamFields.length === 0 && (
+          <HStack gap={2} paddingLeft={4} marginLeft={4}>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              onClick={handleAddTeam}
+              disabled={getAvailableTeamOptions().length === 0}
+            >
+              <Plus size={14} /> Add team
+            </Button>
+          </HStack>
+        )}
+      </VStack>
+    </Box>
   );
 }
 
@@ -448,7 +456,7 @@ function TeamRoleSelect({
         };
 
         return (
-          <NativeSelect.Root>
+          <NativeSelect.Root backgroundColor="white">
             <NativeSelect.Field {...field} onChange={handleChange}>
               {roleOptions.map((option) => (
                 <option key={option.value} value={option.value}>
@@ -456,6 +464,7 @@ function TeamRoleSelect({
                 </option>
               ))}
             </NativeSelect.Field>
+            <NativeSelect.Indicator />
           </NativeSelect.Root>
         );
       }}
