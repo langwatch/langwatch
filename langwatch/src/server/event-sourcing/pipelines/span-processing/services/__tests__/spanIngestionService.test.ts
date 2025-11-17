@@ -69,9 +69,8 @@ describe("SpanIngestionService", () => {
         instance.mapLangWatchSpansToOtelReadableSpans as ReturnType<
           typeof vi.fn
         >,
-      mapReadableSpanToSpanData: instance.mapReadableSpanToSpanData as ReturnType<
-        typeof vi.fn
-      >,
+      mapReadableSpanToSpanData:
+        instance.mapReadableSpanToSpanData as ReturnType<typeof vi.fn>,
     };
     // Replace the service's mapper with our mock
     (service as any).mapperService = mockMapperService;
@@ -99,7 +98,11 @@ describe("SpanIngestionService", () => {
           mappedRecords,
         );
 
-        await service.ingestSpanCollection(tenantId, traceForCollection, traceRequest);
+        await service.ingestSpanCollection(
+          tenantId,
+          traceForCollection,
+          traceRequest,
+        );
 
         // We only assert that mapping was called; command side effects are covered elsewhere.
         expect(
@@ -118,7 +121,11 @@ describe("SpanIngestionService", () => {
           [],
         );
 
-        await service.ingestSpanCollection(tenantId, traceForCollection, traceRequest);
+        await service.ingestSpanCollection(
+          tenantId,
+          traceForCollection,
+          traceRequest,
+        );
       });
     });
 
@@ -144,7 +151,11 @@ describe("SpanIngestionService", () => {
         );
 
         await expect(
-          service.ingestSpanCollection(tenantId, traceForCollection, traceRequest),
+          service.ingestSpanCollection(
+            tenantId,
+            traceForCollection,
+            traceRequest,
+          ),
         ).rejects.toThrow("Queue is full");
       });
     });

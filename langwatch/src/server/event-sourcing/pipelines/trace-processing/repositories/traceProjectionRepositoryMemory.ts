@@ -22,7 +22,10 @@ export class TraceProjectionRepositoryMemory
     context: ProjectionStoreReadContext,
   ): Promise<TraceProjection | null> {
     // Validate tenant context
-    EventUtils.validateTenantId(context, "TraceProjectionRepositoryMemory.getProjection");
+    EventUtils.validateTenantId(
+      context,
+      "TraceProjectionRepositoryMemory.getProjection",
+    );
 
     const tenantProjections = this.projectionsByTenant.get(
       String(context.tenantId),
@@ -69,4 +72,3 @@ export class TraceProjectionRepositoryMemory
     tenantProjections.set(projection.aggregateId, projection);
   }
 }
-

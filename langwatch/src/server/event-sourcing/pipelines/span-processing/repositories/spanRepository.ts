@@ -10,4 +10,3 @@ export interface SpanRepository {
    */
   insertSpan(command: StoreSpanIngestionCommandData): Promise<void>;
 }
-

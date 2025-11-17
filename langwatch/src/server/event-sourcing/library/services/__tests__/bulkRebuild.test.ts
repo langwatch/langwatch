@@ -123,9 +123,7 @@ describe("runBulkRebuildWithCheckpoint", () => {
         processedCount: 100,
       };
 
-      vi.mocked(mockCheckpointStore.loadCheckpoint).mockResolvedValue(
-        null,
-      );
+      vi.mocked(mockCheckpointStore.loadCheckpoint).mockResolvedValue(null);
       vi.mocked(
         mockEventSourcingService.rebuildProjectionsInBatches,
       ).mockResolvedValue(finalCheckpoint);
@@ -487,9 +485,7 @@ describe("runBulkRebuildWithCheckpoint", () => {
   describe("error handling", () => {
     it("propagates errors from checkpointStore.loadCheckpoint", async () => {
       const error = new Error("Failed to load checkpoint");
-      vi.mocked(mockCheckpointStore.loadCheckpoint).mockRejectedValue(
-        error,
-      );
+      vi.mocked(mockCheckpointStore.loadCheckpoint).mockRejectedValue(error);
 
       await expect(
         runBulkRebuildWithCheckpoint(

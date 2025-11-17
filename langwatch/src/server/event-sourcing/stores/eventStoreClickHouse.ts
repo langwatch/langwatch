@@ -1,6 +1,7 @@
 import { type ClickHouseClient } from "@clickhouse/client";
 import { SpanKind } from "@opentelemetry/api";
 import { getLangWatchTracer } from "langwatch";
+import { generate } from "@langwatch/ksuid";
 
 import type {
   EventStore as BaseEventStore,
@@ -79,15 +80,6 @@ export class EventStoreClickHouse<
 
           const rows = await result.json<EventRecord>();
 
-<<<<<<< Updated upstream
-          return rows.map((row): EventType => {
-            const timestampMs = Date.parse(row.EventTimestamp);
-            const payload = row.EventPayload
-              ? typeof row.EventPayload === "string"
-                ? JSON.parse(row.EventPayload)
-                : row.EventPayload
-              : {};
-=======
           return rows.map((row) => {
             // EventTimestamp is already a number (Unix timestamp in milliseconds)
             // Handle invalid timestamps by falling back to current time
@@ -104,7 +96,6 @@ export class EventStoreClickHouse<
               timestampMs = Date.now();
             }
             const payload = this.parseEventPayload(row.EventPayload);
->>>>>>> Stashed changes
 
             // Construct event object matching Event interface structure
             // We first check the type is valid using satisfies, then cast to EventType
@@ -233,20 +224,6 @@ export class EventStoreClickHouse<
 
         try {
           // Transform events to ClickHouse format
-<<<<<<< Updated upstream
-          const eventRecords = events.map((event) => ({
-            TenantId: context.tenantId,
-            AggregateType: aggregateType,
-            AggregateId: event.aggregateId,
-            EventId: this.generateEventId(),
-            EventTimestamp: event.timestamp,
-            EventType: event.type,
-            EventPayload: JSON.stringify(event.data),
-            ProcessingTraceparent:
-              (event.metadata as { processingTraceparent?: string })
-                ?.processingTraceparent ?? "",
-          }));
-=======
           // For Object type columns with JSONEachRow, pass as JavaScript objects
           // The ClickHouse client will handle serialization automatically
           const eventRecords = events.map(
@@ -263,7 +240,6 @@ export class EventStoreClickHouse<
                   event.metadata?.processingTraceparent ?? "",
               }) satisfies EventRecord,
           );
->>>>>>> Stashed changes
 
           await this.clickHouseClient.insert({
             table: "event_log",
@@ -300,27 +276,42 @@ export class EventStoreClickHouse<
     );
   }
 
+  /**
+   * Parses the EventPayload from ClickHouse query results.
+   *
+   * ClickHouse can return Object-type columns in different formats depending on
+   * the query format and data storage:
+   * - As a JSON string (when stored as string or returned via certain formats)
+   * - As a parsed object (when ClickHouse automatically parses it)
+   * - As an empty string (which should be treated as null)
+   *
+   * This helper normalizes all these cases into a consistent parsed payload.
+   *
+   * @param rawPayload - The raw EventPayload value from ClickHouse (string, object, or other)
+   * @returns The parsed payload (object, null, or primitive value)
+   * @throws Error if the payload is in an unexpected format (corrupted data)
+   */
+  private parseEventPayload(rawPayload: unknown): unknown {
+    if (typeof rawPayload === "string") {
+      if (rawPayload.length === 0) {
+        return null;
+      } else {
+        return JSON.parse(rawPayload);
+      }
+    } else if (typeof rawPayload === "object") {
+      return rawPayload;
+    } else {
+      throw new Error(
+        `[CORRUPTED_DATA] EventPayload is not a string or object, it is of type ${typeof rawPayload}`,
+      );
+    }
+  }
+
   private generateEventId(): string {
-<<<<<<< Updated upstream
-    // Generate a UUID v4 for the event
-    // Format: xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx
-    // where y is one of 8, 9, a, or b
-    const randomHex = (length: number): string => {
-      return Array.from({ length }, () =>
-        Math.floor(Math.random() * 16).toString(16),
-      ).join("");
-    };
-
-    // Fourth segment must start with 8, 9, a, or b (variant bits)
-    const variantChar = ["8", "9", "a", "b"][Math.floor(Math.random() * 4)];
-
-    return `${randomHex(8)}-${randomHex(4)}-4${randomHex(3)}-${variantChar}${randomHex(3)}-${randomHex(12)}`;
-=======
     // Generate a KSUID for the event!!
     // KSUIDs are k-sortable, providing better ordering guarantees than UUIDs
     // when used as a secondary sort key (EventTimestamp ASC, EventId ASC)
     return generate("event").toString();
->>>>>>> Stashed changes
   }
 
   async listAggregateIds(

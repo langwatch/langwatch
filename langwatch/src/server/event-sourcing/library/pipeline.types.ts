@@ -32,4 +32,3 @@ export interface RegisteredPipeline<
   aggregateType: AggregateType;
   service: EventSourcingService<AggregateId, EventType, ProjectionType>;
 }
-

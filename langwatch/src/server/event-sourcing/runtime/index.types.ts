@@ -45,4 +45,3 @@ export interface EventSourcedQueueProcessor<Payload> {
    */
   close(): Promise<void>;
 }
-

@@ -214,7 +214,10 @@ export class TraceProjectionService {
   private deriveModelInfo(
     spans: readonly SpanData[],
   ): ProjectionHeuristicResult {
-    const models = this.collectUniqueAttributeValues(spans, MODEL_ATTRIBUTE_KEYS);
+    const models = this.collectUniqueAttributeValues(
+      spans,
+      MODEL_ATTRIBUTE_KEYS,
+    );
     return {
       models: models.length ? models.join(",") : null,
     };
@@ -342,4 +345,3 @@ export function buildTraceProjection(
 ): TraceProjectionData {
   return traceProjectionService.buildTraceProjection(tenantId, traceId, spans);
 }
-

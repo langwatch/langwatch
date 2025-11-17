@@ -204,9 +204,7 @@ import {
   type ProjectionStoreWriteContext,
 } from "./library";
 
-class MyProjectionStore
-  implements ProjectionStore<string, MyProjection>
-{
+class MyProjectionStore implements ProjectionStore<string, MyProjection> {
   async getProjection(
     aggregateId: string,
     context: ProjectionStoreReadContext,

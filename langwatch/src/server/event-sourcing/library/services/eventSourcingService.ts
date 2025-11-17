@@ -23,7 +23,6 @@ import type { EventHandler } from "../processing/eventHandler";
 import type { DistributedLock } from "../utils/distributedLock";
 import type { EventStoreReadContext } from "../";
 
-
 /**
  * Main service that orchestrates event sourcing.
  * Coordinates between event stores, projection stores, and event handlers.

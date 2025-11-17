@@ -25,4 +25,3 @@ export class SpanProjectionStoreMemory
     // No-op: spans don't have projections
   }
 }
-

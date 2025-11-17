@@ -67,4 +67,3 @@ export class CheckpointStoreMemory implements CheckpointStore<string> {
     this.checkpoints.delete(key);
   }
 }
-

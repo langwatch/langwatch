@@ -1,12 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { EventStoreClickHouse } from "../eventStoreClickHouse";
 import type { Event } from "../../library";
-<<<<<<< Updated upstream
-import type { ClickHouseClient } from "@clickhouse/client";
-=======
 import { createTenantId } from "../../library";
 import { parse } from "@langwatch/ksuid";
->>>>>>> Stashed changes
 
 describe("EventStoreClickHouse - Functional Behavior", () => {
   let mockClickHouseClient: any;

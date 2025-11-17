@@ -277,4 +277,3 @@ type TraceProjectionInsert = {
   CreatedAt: number;
   LastUpdatedAt: number;
 };
-

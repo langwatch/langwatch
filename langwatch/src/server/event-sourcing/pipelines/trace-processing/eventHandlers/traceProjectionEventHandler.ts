@@ -10,7 +10,9 @@ import type { SpanReadRepository } from "../repositories/spanReadRepositoryClick
 export class TraceProjectionEventHandler implements EventHandler {
   constructor(private readonly spanReadRepository: SpanReadRepository) {}
 
-  async handle(stream: EventStream<string, Event<string, unknown>>): Promise<TraceProjection> {
+  async handle(
+    stream: EventStream<string, Event<string, unknown>>,
+  ): Promise<TraceProjection> {
     const aggregateId = stream.getAggregateId();
 
     const firstEvent = stream.getEvents()[0] as

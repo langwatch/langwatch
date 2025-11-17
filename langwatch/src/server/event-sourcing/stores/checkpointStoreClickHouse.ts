@@ -244,4 +244,3 @@ export class CheckpointStoreClickHouse implements CheckpointStore<string> {
     );
   }
 }
-

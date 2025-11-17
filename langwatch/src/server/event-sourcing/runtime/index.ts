@@ -1,11 +1,5 @@
-import type {
-  Event,
-  Projection,
-  AggregateType,
-} from "../library";
-import {
-  EventSourcingService,
-} from "../library";
+import type { Event, Projection, AggregateType } from "../library";
+import { EventSourcingService } from "../library";
 import type {
   EventSourcingPipelineDefinition,
   RegisteredPipeline,

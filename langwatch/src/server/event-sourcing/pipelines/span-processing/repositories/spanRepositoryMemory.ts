@@ -40,4 +40,3 @@ export class SpanRepositoryMemory implements SpanRepository {
     );
   }
 }
-

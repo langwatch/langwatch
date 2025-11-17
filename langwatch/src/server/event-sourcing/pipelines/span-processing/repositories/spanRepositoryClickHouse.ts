@@ -164,4 +164,3 @@ interface ClickHouseSpan {
   LangWatchTenantId: string;
   CollectedAt: number;
 }
-

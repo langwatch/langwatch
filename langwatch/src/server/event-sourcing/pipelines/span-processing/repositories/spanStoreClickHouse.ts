@@ -51,9 +51,7 @@ export class SpanStoreClickHouse implements SpanStore {
     );
   }
 
-  private transformSpanData(
-    command: SpanStoreCommand,
-  ): ClickHouseSpan {
+  private transformSpanData(command: SpanStoreCommand): ClickHouseSpan {
     const { tenantId, spanData } = command;
 
     // Extract service name from resource attributes
