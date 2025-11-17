@@ -1,5 +1,9 @@
 // Global type augmentations to improve typings of Object.keys/entries/values
 declare global {
+  interface Window {
+    __OTEL_ENABLED__?: boolean;
+  }
+
   interface ObjectConstructor {
     /**
      * Strongly-typed keys that preserve keyof T as string keys
