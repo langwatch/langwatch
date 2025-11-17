@@ -1,0 +1,52 @@
+---
+description: Utils file structure pattern
+alwaysApply: true
+---
+
+When creating utils files, follow this pattern:
+
+1. Export individual functions, classes, and interfaces as named exports
+2. At the end of the file, export a utils object (named after the module) that contains all functions/classes as a const object
+3. Types and interfaces remain as separate exports (not included in the utils object)
+
+This pattern allows both individual imports and namespace imports:
+
+```typescript
+// Individual imports
+import { functionName } from "./utils";
+
+// Namespace imports
+import { UtilsName } from "./utils";
+UtilsName.functionName();
+```
+
+Example:
+
+```typescript
+export function helperFunction() {
+  // ...
+}
+
+export function anotherHelper() {
+  // ...
+}
+
+export const UtilsName = {
+  helperFunction,
+  anotherHelper,
+} as const;
+```
+
+For files with classes instead of functions, include the classes in the utils object:
+
+```typescript
+export class MyClass {
+  // ...
+}
+
+export const UtilsName = {
+  MyClass,
+} as const;
+```
+
+Reference implementation: `src/server/event-sourcing/library/utils/event.utils.ts`
