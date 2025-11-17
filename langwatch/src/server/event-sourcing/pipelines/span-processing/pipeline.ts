@@ -2,7 +2,7 @@ import type { RecordSpanProcessingCommandData } from "./types";
 import { EventSourcedQueueProcessorImpl } from "../../runtime";
 import { createCommand, createTenantId } from "../../library";
 import { traceProcessingCommandHandler } from "../trace-processing/pipeline";
-import type { RecordSpanIngestionCommand } from "../trace-processing/commands/traceProcessingCommand";
+import type { RecordSpanProcessingCommand } from "../trace-processing/commands/traceProcessingCommand";
 
 export const SPAN_PROCESSING_COMMAND_QUEUE = "{span_processing_command}";
 export const SPAN_PROCESSING_COMMAND_NAME = "span_processing_command";
@@ -31,7 +31,7 @@ export const spanProcessingCommandDispatcher =
         command.spanData.traceId,
         "trace.record_span_ingestion",
         commandData,
-      ) as RecordSpanIngestionCommand;
+      ) as RecordSpanProcessingCommand;
       await traceProcessingCommandHandler.handle(recordCommand);
     },
   });
