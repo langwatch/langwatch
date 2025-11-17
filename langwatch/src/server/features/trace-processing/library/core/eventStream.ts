@@ -19,11 +19,11 @@ export interface EventStreamOptions<EventType> {
  * AggregateId values are converted to strings for metadata storage using String().
  * - String and numeric IDs work well
  * - Complex objects will be converted using String(), which typically produces "[object Object]"
- * 
+ *
  * **SECURITY WARNING:** Using complex objects as aggregate IDs without a proper toString()
  * implementation can cause ID collisions (multiple different objects map to "[object Object]").
  * This could allow cross-aggregate data leakage.
- * 
+ *
  * **Best Practice:** Use string or number aggregate IDs. If you must use objects,
  * ensure they implement toString() to return a unique, stable identifier.
  */

@@ -185,14 +185,14 @@ function isValidProjection(projection: any): projection is Projection {
 /**
  * Validates that a context has a valid tenantId.
  * Throws an error if tenantId is missing or invalid.
- * 
+ *
  * **Security:** This is a critical security check to prevent cross-tenant data leakage.
  * Store implementations MUST call this before any read or write operations.
- * 
+ *
  * @param context - The context to validate
  * @param operation - Description of the operation (for error messages)
  * @throws {Error} If tenantId is missing, empty, or invalid
- * 
+ *
  * @example
  * ```typescript
  * async storeEvents(events: Event[]): Promise<void> {
