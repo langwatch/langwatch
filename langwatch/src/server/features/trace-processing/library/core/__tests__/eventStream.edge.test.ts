@@ -123,7 +123,9 @@ describe("EventStream - Edge Cases", () => {
 
       // Sort by priority instead of timestamp
       const stream = new EventStream("1", events, {
-        ordering: (a, b) => a.data.priority - b.data.priority,
+        ordering: (a, b) =>
+          (a.data as { priority: number }).priority -
+          (b.data as { priority: number }).priority,
       });
 
       const ordered = stream.getEvents();
@@ -259,4 +261,3 @@ describe("EventStream - Edge Cases", () => {
     });
   });
 });
-
