@@ -3,8 +3,8 @@ import type { Event } from "../core/types";
 /**
  * Context for reading events from the event store.
  * 
- * **Security Note:** Implementations MUST enforce tenant isolation when tenantId is provided.
- * In multi-tenant systems, tenantId should be treated as required and validated.
+ * **Security Note:** tenantId is REQUIRED for tenant isolation.
+ * All queries MUST filter by tenant to prevent cross-tenant data access.
  * 
  * **Concurrency Note:** Implementations should return a consistent snapshot of events
  * for a given aggregateId, even under concurrent writes.
@@ -18,10 +18,9 @@ export interface EventStoreReadContext<
 > {
   /**
    * Tenant identifier for multi-tenant systems.
-   * Implementations MUST use this for tenant isolation when provided.
-   * Consider making this required in your concrete implementation for security.
+   * REQUIRED - all operations must be scoped to a specific tenant for security.
    */
-  tenantId?: string;
+  tenantId: string;
   /**
    * Additional metadata for the read operation.
    * Should not be used to bypass security checks.

@@ -216,7 +216,7 @@ export class EventSourcingService<
         kind: SpanKind.INTERNAL,
         attributes: {
           "aggregate.id": String(aggregateId),
-          "tenant.id": options?.eventStoreContext?.tenantId ?? "unknown",
+          "tenant.id": options?.eventStoreContext?.tenantId ?? "missing",
         },
       },
       async (span) => {
@@ -225,7 +225,7 @@ export class EventSourcingService<
         this.logger?.info(
           { 
             aggregateId: String(aggregateId),
-            tenantId: options?.eventStoreContext?.tenantId,
+            tenantId: options?.eventStoreContext?.tenantId ?? "missing",
           },
           "Starting projection rebuild"
         );
@@ -398,7 +398,7 @@ export class EventSourcingService<
         kind: SpanKind.INTERNAL,
         attributes: {
           "batch.size": batchSize,
-          "tenant.id": safeOptions.eventStoreContext?.tenantId ?? "unknown",
+          "tenant.id": safeOptions.eventStoreContext?.tenantId ?? "missing",
         },
       },
       async (span) => {
@@ -413,7 +413,7 @@ export class EventSourcingService<
             batchSize,
             resumedFromCount: safeOptions.resumeFrom?.processedCount,
             cursor: safeOptions.resumeFrom?.cursor,
-            tenantId: safeOptions.eventStoreContext?.tenantId,
+            tenantId: safeOptions.eventStoreContext?.tenantId ?? "missing",
           },
           "Starting batch rebuild"
         );
