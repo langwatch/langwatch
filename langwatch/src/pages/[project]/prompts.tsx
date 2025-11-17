@@ -1,6 +1,7 @@
 import { PromptPlaygroundPageLayout } from "~/prompts/prompt-playground/components/PromptPlaygroundPage.layout";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
 import { DashboardLayout } from "~/components/DashboardLayout";
+import "@copilotkit/react-ui/styles.css";
 
 /**
  * Prompts page
