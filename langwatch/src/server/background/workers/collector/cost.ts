@@ -7,7 +7,7 @@ import {
   getLLMModelCosts,
   type MaybeStoredLLMModelCost,
 } from "../../../modelProviders/llmModelCost";
-import { startSpan } from "~/utils/posthogErrorCapture";
+import { startSpan } from "../../../../utils/posthogErrorCapture";
 import NodeFetchCache, { FileSystemCache } from "node-fetch-cache";
 import { createLogger } from "../../../../utils/logger";
 import { isBuildOrNoRedis } from "../../../redis";

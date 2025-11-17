@@ -3,8 +3,24 @@
  * for capturing exceptions and errors.
  */
 
-import { getPostHogInstance } from "../server/posthog";
 import posthog from "posthog-js";
+
+// Lazy import for server-side PostHog to avoid bundling posthog-node in client code
+// This function is only called on the server side (when window is undefined)
+function getServerPostHogInstance() {
+  if (typeof window !== "undefined") {
+    return null;
+  }
+  // Dynamic require that only executes on server side
+  // Using a string-based require to prevent webpack from analyzing it for client bundles
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/no-var-requires
+    const posthogServer = new Function('return require("../server/posthog")')();
+    return posthogServer.getPostHogInstance();
+  } catch {
+    return null;
+  }
+}
 
 interface CaptureExceptionOptions {
   extra?: Record<string, unknown>;
@@ -51,7 +67,7 @@ export function captureMessage(
 
   // Try server-side PostHog first
   if (typeof window === "undefined") {
-    const serverPostHog = getPostHogInstance();
+    const serverPostHog = getServerPostHogInstance();
     if (serverPostHog) {
       try {
         serverPostHog.capture({
@@ -113,7 +129,7 @@ export function captureException(
 
   // Try server-side PostHog first (for API routes, server components, etc.)
   if (typeof window === "undefined") {
-    const serverPostHog = getPostHogInstance();
+    const serverPostHog = getServerPostHogInstance();
     if (serverPostHog) {
       try {
         serverPostHog.capture({

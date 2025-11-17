@@ -25,7 +25,7 @@ import GitlabProvider from "next-auth/providers/gitlab";
 import GoogleProvider from "next-auth/providers/google";
 import OktaProvider from "next-auth/providers/okta";
 import type { Account, Organization } from "@prisma/client";
-import { captureException } from "~/utils/posthogErrorCapture";
+import { captureException } from "../utils/posthogErrorCapture";
 import { createLogger } from "../utils/logger";
 
 const logger = createLogger("langwatch:auth");

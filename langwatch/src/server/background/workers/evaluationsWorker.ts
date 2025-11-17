@@ -1,5 +1,5 @@
 import { CostReferenceType, CostType } from "@prisma/client";
-import { captureException, withScope } from "~/utils/posthogErrorCapture";
+import { captureException, withScope } from "../../../utils/posthogErrorCapture";
 import { Worker, type Job } from "bullmq";
 import { nanoid } from "nanoid";
 import type { EvaluationJob } from "~/server/background/types";

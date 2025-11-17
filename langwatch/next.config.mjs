@@ -3,6 +3,7 @@ import fs from "fs";
 import { dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import bundleAnalyser from "@next/bundle-analyzer";
+import webpack from "webpack";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -150,6 +151,16 @@ const config = {
                 worker_threads: false,
                 "node:worker_threads": false,
             };
+            // Ignore server-only PostHog modules in client builds
+            config.plugins = config.plugins || [];
+            config.plugins.push(
+                new webpack.IgnorePlugin({
+                    resourceRegExp: /^(\.\.\/)*server\/posthog$/,
+                }),
+                new webpack.IgnorePlugin({
+                    resourceRegExp: /^posthog-node$/,
+                }),
+            );
         }
 
         config.module.rules.push({

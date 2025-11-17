@@ -4,7 +4,7 @@ import {
   getCurrentScope,
   startSpan,
   withScope,
-} from "~/utils/posthogErrorCapture";
+} from "../../../utils/posthogErrorCapture";
 import { Worker } from "bullmq";
 import type {
   CollectorCheckAndAdjustJob,

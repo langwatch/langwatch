@@ -14,7 +14,7 @@ import {
   type ProcedureParams,
   type Simplify,
 } from "@trpc/server";
-import { captureException } from "~/utils/posthogErrorCapture";
+import { captureException } from "../../utils/posthogErrorCapture";
 import { type CreateNextContextOptions } from "@trpc/server/adapters/next";
 import type { inferParser } from "@trpc/server";
 import type { NextApiRequest, NextApiResponse } from "next";
@@ -171,7 +171,7 @@ const auditLogTRPCErrors = t.middleware(
     }
 
     return result;
-  }
+  },
 );
 
 const auditLogMutations = t.middleware(
@@ -197,7 +197,7 @@ const auditLogMutations = t.middleware(
     });
 
     return result;
-  }
+  },
 );
 
 export const loggerMiddleware = t.middleware(
@@ -233,7 +233,7 @@ export const loggerMiddleware = t.middleware(
         logger.info(logData, "trpc call");
       }
     }
-  }
+  },
 );
 
 /**
@@ -260,7 +260,7 @@ type OverwriteIfDefined<TType, TWith> = UnsetMarker extends TType
 interface PendingPermissionProcedureBuilder<TParams extends ProcedureParams> {
   // Copy-paste from @trpc core internals procedureBuilder
   input: <$Parser extends Parser>(
-    schema: $Parser
+    schema: $Parser,
   ) => PendingPermissionProcedureBuilder<{
     _config: TParams["_config"];
     _meta: TParams["_meta"];
@@ -278,12 +278,12 @@ interface PendingPermissionProcedureBuilder<TParams extends ProcedureParams> {
     _output_out: TParams["_output_out"];
   }>;
   use: (
-    middleware: PermissionMiddleware<TParams["_input_out"]>
+    middleware: PermissionMiddleware<TParams["_input_out"]>,
   ) => ReturnType<ProcedureBuilder<TParams>["use"]>;
 }
 
 const permissionProcedureBuilder = <TParams extends ProcedureParams>(
-  procedure: ProcedureBuilder<TParams>
+  procedure: ProcedureBuilder<TParams>,
 ): PendingPermissionProcedureBuilder<TParams> => {
   return {
     input: (input) => {
@@ -300,7 +300,7 @@ const permissionProcedureBuilder = <TParams extends ProcedureParams>(
 };
 
 export const protectedProcedure = permissionProcedureBuilder(
-  authProtectedProcedure
+  authProtectedProcedure,
 );
 
 /**

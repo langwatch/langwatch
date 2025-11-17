@@ -1,4 +1,4 @@
-import { captureException } from "~/utils/posthogErrorCapture";
+import { captureException } from "./posthogErrorCapture";
 
 const truncateString = (str: string, maxLength: number): string => {
   if (str.length <= maxLength) return str;

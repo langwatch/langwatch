@@ -1,4 +1,4 @@
-import { captureException, withScope } from "~/utils/posthogErrorCapture";
+import { captureException, withScope } from "../../../utils/posthogErrorCapture";
 import { type Job, Worker } from "bullmq";
 import type { UsageStatsJob } from "~/server/background/types";
 import { createLogger } from "../../../utils/logger";

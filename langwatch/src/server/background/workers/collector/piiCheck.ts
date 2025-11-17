@@ -13,7 +13,7 @@ import {
   getEvaluationStatusCounter,
   getPiiChecksCounter,
 } from "../../../metrics";
-import { startSpan } from "~/utils/posthogErrorCapture";
+import { startSpan } from "../../../../utils/posthogErrorCapture";
 import { createLogger } from "../../../../utils/logger";
 
 const logger = createLogger("langwatch:workers:collector:piiCheck");
