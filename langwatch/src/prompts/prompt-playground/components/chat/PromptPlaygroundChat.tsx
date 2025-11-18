@@ -1,12 +1,17 @@
 import { useEffect, useMemo, forwardRef, useImperativeHandle } from "react";
 import { CopilotKit, useCopilotChat } from "@copilotkit/react-core";
-import { AssistantMessage, CopilotChat } from "@copilotkit/react-ui";
+import {
+  AssistantMessage,
+  CopilotChat,
+  UserMessage,
+} from "@copilotkit/react-ui";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import type { PromptConfigFormValues } from "~/prompts/types";
 import type { z } from "zod";
 import { type runtimeInputsSchema } from "~/prompts/schemas/field-schemas";
 import { SyncedChatInput } from "./SyncedChatInput";
 import { TraceMessage } from "~/components/copilot-kit/TraceMessage";
+import { DeletableMessage } from "./DeletableMessage";
 import { Box, type BoxProps } from "@chakra-ui/react";
 import clsx from "clsx";
 import { useDraggableTabsBrowserStore } from "../../prompt-playground-store/DraggableTabsBrowserStore";
@@ -84,6 +89,18 @@ const PromptPlaygroundChatInner = forwardRef<PromptPlaygroundChatRef, object>(
       },
     }));
 
+    /**
+     * deleteMessage
+     * Single Responsibility: Removes a message from the chat and updates tab data.
+     */
+    const deleteMessage = (messageId: string) => {
+      // Remove message from CopilotKit state
+      const updatedMessages = visibleMessages.filter(
+        (message) => message.id !== messageId,
+      );
+      void setMessages(updatedMessages);
+    };
+
     useEffect(() => {
       const tab = getTabById(tabId);
       const initialMessagesFromSpanData =
@@ -125,12 +142,25 @@ const PromptPlaygroundChatInner = forwardRef<PromptPlaygroundChatRef, object>(
         Input={SyncedChatInput}
         AssistantMessage={(props) => {
           return (
-            <>
+            <DeletableMessage
+              messageId={props.rawData.id}
+              onDelete={deleteMessage}
+            >
               <AssistantMessage {...props} />
               {!props.isLoading && !props.isGenerating && (
                 <TraceMessage traceId={props.rawData.id} marginTop={2} />
               )}
-            </>
+            </DeletableMessage>
+          );
+        }}
+        UserMessage={(props) => {
+          return (
+            <DeletableMessage
+              messageId={props.rawData.id}
+              onDelete={deleteMessage}
+            >
+              <UserMessage {...props} />
+            </DeletableMessage>
           );
         }}
       />
