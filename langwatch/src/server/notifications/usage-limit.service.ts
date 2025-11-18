@@ -251,7 +251,9 @@ export class UsageLimitService {
     const logoUrl =
       "https://ci3.googleusercontent.com/meips/ADKq_NaCbt6cv8rmCuTdJyU7KZ6qJLgPHvuxWR2ud8CtuuF97I33b_-E_lMAtaI1Qgi9VlWtWcG1rCjarfQyMZGNr_6Vevm70VjyT-G05bbo7dtXHr8At8jIeAKNhebm0bFH43okoSx3UyqcKkJcahSiOMPDB8YFhbk0Vr-12M2hpmUFcSC6_NgZ9KQQFYXxJaM=s0-d-e1-ft#https://hs-143534269.f.hubspotstarter-eu1.net/hub/143534269/hubfs/header-3.png?width=1116&upscale=true&name=header-3.png";
 
-    const usagePercentageFormatted = usagePercentage.toFixed(1);
+    // Cap at 100% maximum, then round down to whole number (no decimal)
+    const cappedPercentage = Math.min(usagePercentage, 100);
+    const usagePercentageFormatted = Math.floor(cappedPercentage).toString();
 
     // Determine severity based on threshold
     let severity: string;
