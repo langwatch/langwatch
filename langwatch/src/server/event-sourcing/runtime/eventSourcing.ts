@@ -2,8 +2,8 @@ import { type ClickHouseClient } from "@clickhouse/client";
 import { getClickHouseClient } from "../../../utils/clickhouse";
 import { EventStoreClickHouse } from "../stores/eventStoreClickHouse";
 import { EventStoreMemory } from "../stores/eventStoreMemory";
-import { CheckpointRepositoryClickHouse } from "../stores/checkpointRepositoryClickHouse";
-import { CheckpointRepositoryMemory } from "../stores/checkpointRepositoryMemory";
+import { CheckpointStoreClickHouse } from "../stores/checkpointStoreClickHouse";
+import { CheckpointStoreMemory } from "../stores/checkpointStoreMemory";
 import type {
   Event,
   Projection,
@@ -11,9 +11,10 @@ import type {
   ProjectionStore,
   EventHandler,
   AggregateType,
-  CheckpointRepository,
+  CheckpointStore,
 } from "../library";
-import { EventSourcingPipeline, type RegisteredPipeline } from "./index";
+import { EventSourcingPipeline } from "./index";
+import type { RegisteredPipeline } from "../library/pipeline.types";
 
 /**
  * Builder for creating event sourcing pipelines with type-safe required fields.
@@ -269,7 +270,7 @@ class PipelineBuilderComplete<
  * class EventSourcing {
  *   constructor(
  *     private readonly eventStore: EventStore,
- *     private readonly checkpointRepository: CheckpointRepository
+ *     private readonly checkpointStore: CheckpointStore
  *   ) {}
  * }
  * ```
@@ -287,16 +288,16 @@ export class EventSourcing {
   private static instance: EventSourcing | null = null;
   private readonly clickHouseClient: ClickHouseClient | null;
   private readonly eventStore: EventStore<string, any>;
-  private readonly checkpointRepository: CheckpointRepository<string>;
+  private readonly checkpointStore: CheckpointStore<string>;
 
   private constructor() {
     this.clickHouseClient = getClickHouseClient();
     this.eventStore = this.clickHouseClient
       ? new EventStoreClickHouse<string, any>(this.clickHouseClient)
       : new EventStoreMemory<string, any>();
-    this.checkpointRepository = this.clickHouseClient
-      ? new CheckpointRepositoryClickHouse(this.clickHouseClient)
-      : new CheckpointRepositoryMemory();
+    this.checkpointStore = this.clickHouseClient
+      ? new CheckpointStoreClickHouse(this.clickHouseClient)
+      : new CheckpointStoreMemory();
   }
 
   static getInstance(): EventSourcing {
@@ -319,11 +320,11 @@ export class EventSourcing {
   }
 
   /**
-   * Returns the shared checkpoint repository instance.
+   * Returns the shared checkpoint store instance.
    * This single instance handles all aggregate types.
    */
-  getCheckpointRepository(): CheckpointRepository<string> {
-    return this.checkpointRepository;
+  getCheckpointStore(): CheckpointStore<string> {
+    return this.checkpointStore;
   }
 
   /**

@@ -1,11 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { CheckpointRepositoryClickHouse } from "../checkpointRepositoryClickHouse";
+import { CheckpointStoreClickHouse } from "../checkpointStoreClickHouse";
 import type { BulkRebuildCheckpoint } from "../../library";
 import type { ClickHouseClient } from "@clickhouse/client";
 
-describe("CheckpointRepositoryClickHouse", () => {
+describe("CheckpointStoreClickHouse", () => {
   let mockClickHouseClient: any;
-  let repo: CheckpointRepositoryClickHouse;
+  let repo: CheckpointStoreClickHouse;
   const tenantId = "test-tenant";
   const aggregateType = "trace";
 
@@ -14,7 +14,7 @@ describe("CheckpointRepositoryClickHouse", () => {
       insert: vi.fn().mockResolvedValue(void 0),
       query: vi.fn(),
     };
-    repo = new CheckpointRepositoryClickHouse(mockClickHouseClient);
+    repo = new CheckpointStoreClickHouse(mockClickHouseClient);
   });
 
   describe("saveCheckpoint()", () => {

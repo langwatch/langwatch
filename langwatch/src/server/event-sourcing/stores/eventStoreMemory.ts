@@ -75,9 +75,12 @@ export class EventStoreMemory<
         );
       }
 
-      // Validate that event tenantId (if present) matches context tenantId
-      const eventTenantId = (event.metadata as { tenantId?: string })?.tenantId;
-      if (eventTenantId && eventTenantId !== context.tenantId) {
+      // Validate that event tenantId matches context tenantId
+      const eventTenantId = event.tenantId;
+      if (!eventTenantId) {
+        throw new Error(`[SECURITY] Event at index ${i} has no tenantId`);
+      }
+      if (eventTenantId !== context.tenantId) {
         throw new Error(
           `[SECURITY] Event at index ${i} has tenantId '${eventTenantId}' that does not match context tenantId '${context.tenantId}'`,
         );

@@ -320,7 +320,10 @@ describe("EventSourcedQueueProcessorImpl", () => {
       if (!workerCall) {
         throw new Error("Worker was not called");
       }
-      const workerProcessor = workerCall[1] as (job: { id: string; data: unknown }) => Promise<void>;
+      const workerProcessor = workerCall[1] as (job: {
+        id: string;
+        data: unknown;
+      }) => Promise<void>;
       if (!workerProcessor || typeof workerProcessor !== "function") {
         throw new Error("Worker processor is not a function");
       }
@@ -350,7 +353,10 @@ describe("EventSourcedQueueProcessorImpl", () => {
       if (!workerCall) {
         throw new Error("Worker was not called");
       }
-      const workerProcessor = workerCall[1] as (job: { id: string; data: unknown }) => Promise<void>;
+      const workerProcessor = workerCall[1] as (job: {
+        id: string;
+        data: unknown;
+      }) => Promise<void>;
       if (!workerProcessor || typeof workerProcessor !== "function") {
         throw new Error("Worker processor is not a function");
       }

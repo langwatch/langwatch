@@ -1,4 +1,5 @@
 import type { Projection } from "../core/types";
+import type { TenantId } from "../core/tenantId";
 
 /**
  * Context for reading projections from the projection store.
@@ -11,7 +12,7 @@ export interface ProjectionStoreReadContext {
    * Tenant identifier for multi-tenant systems.
    * REQUIRED - all operations must be scoped to a specific tenant for security.
    */
-  tenantId: string;
+  tenantId: TenantId;
   /**
    * Additional metadata for the read operation.
    * Should not be used to bypass security checks.

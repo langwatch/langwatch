@@ -1,15 +1,15 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { EventStoreMemory } from "../eventStoreMemory";
 import type { Event } from "../../library";
+import { createTenantId } from "../../library/core/tenantId";
 
-// Helper to create test events with arbitrary types
 const createTestEvent = <T extends string>(
   event: Omit<Event<string>, "type"> & { type: T },
 ): Event<string> => event as Event<string>;
 
 describe("EventStoreMemory - Functional Behavior", () => {
   let store: EventStoreMemory<string, Event<string>>;
-  const tenantId = "test-tenant";
+  const tenantId = createTenantId("test-tenant");
   const aggregateType = "trace" as const;
   const context = { tenantId };
 
@@ -22,12 +22,14 @@ describe("EventStoreMemory - Functional Behavior", () => {
       const events: Event<string>[] = [
         createTestEvent({
           aggregateId: "agg-1",
+          tenantId: createTenantId("test-tenant"),
           timestamp: 1000,
           type: "EVENT_1" as any,
           data: { value: 1 },
         }),
         createTestEvent({
           aggregateId: "agg-1",
+          tenantId: createTenantId("test-tenant"),
           timestamp: 1001,
           type: "EVENT_2" as any,
           data: { value: 2 },
@@ -57,6 +59,7 @@ describe("EventStoreMemory - Functional Behavior", () => {
       const events: Event<string>[] = [
         {
           aggregateId: "agg-1",
+          tenantId: createTenantId("test-tenant"),
           timestamp: 1000,
           type: "TEST" as any,
           data: {},
@@ -76,6 +79,7 @@ describe("EventStoreMemory - Functional Behavior", () => {
       const events: Event<string>[] = [
         {
           aggregateId: "agg-1",
+          tenantId: createTenantId("test-tenant"),
           timestamp: 1000,
           type: "TEST" as any,
           data: { value: 1 },
@@ -98,8 +102,12 @@ describe("EventStoreMemory - Functional Behavior", () => {
     });
 
     it("isolates events by tenant", async () => {
+      const tenant1 = createTenantId("tenant-1");
+      const tenant2 = createTenantId("tenant-2");
+
       const event1: Event<string> = {
         aggregateId: "agg-1",
+        tenantId: tenant1,
         timestamp: 1000,
         type: "TEST" as any,
         data: { tenant: "tenant-1" },
@@ -107,30 +115,23 @@ describe("EventStoreMemory - Functional Behavior", () => {
 
       const event2: Event<string> = {
         aggregateId: "agg-1",
+        tenantId: tenant2,
         timestamp: 1000,
         type: "TEST" as any,
         data: { tenant: "tenant-2" },
       };
 
-      await store.storeEvents(
-        [event1],
-        { tenantId: "tenant-1" },
-        aggregateType,
-      );
-      await store.storeEvents(
-        [event2],
-        { tenantId: "tenant-2" },
-        aggregateType,
-      );
+      await store.storeEvents([event1], { tenantId: tenant1 }, aggregateType);
+      await store.storeEvents([event2], { tenantId: tenant2 }, aggregateType);
 
       const tenant1Events = await store.getEvents(
         "agg-1",
-        { tenantId: "tenant-1" },
+        { tenantId: tenant1 },
         aggregateType,
       );
       const tenant2Events = await store.getEvents(
         "agg-1",
-        { tenantId: "tenant-2" },
+        { tenantId: tenant2 },
         aggregateType,
       );
 
@@ -145,6 +146,7 @@ describe("EventStoreMemory - Functional Behavior", () => {
     it("stores single event", async () => {
       const event: Event<string> = {
         aggregateId: "agg-1",
+        tenantId: createTenantId("test-tenant"),
         timestamp: 1000,
         type: "TEST" as any,
         data: { value: 1 },
@@ -162,18 +164,21 @@ describe("EventStoreMemory - Functional Behavior", () => {
       const events: Event<string>[] = [
         {
           aggregateId: "agg-1",
+          tenantId: createTenantId("test-tenant"),
           timestamp: 1000,
           type: "EVENT_1" as any,
           data: {},
         },
         {
           aggregateId: "agg-1",
+          tenantId: createTenantId("test-tenant"),
           timestamp: 1001,
           type: "EVENT_2" as any,
           data: {},
         },
         {
           aggregateId: "agg-1",
+          tenantId: createTenantId("test-tenant"),
           timestamp: 1002,
           type: "EVENT_3" as any,
           data: {},
@@ -193,6 +198,7 @@ describe("EventStoreMemory - Functional Behavior", () => {
       const events1: Event<string>[] = [
         {
           aggregateId: "agg-1",
+          tenantId: createTenantId("test-tenant"),
           timestamp: 1000,
           type: "EVENT_1" as any,
           data: {},
@@ -202,6 +208,7 @@ describe("EventStoreMemory - Functional Behavior", () => {
       const events2: Event<string>[] = [
         {
           aggregateId: "agg-1",
+          tenantId: createTenantId("test-tenant"),
           timestamp: 1001,
           type: "EVENT_2" as any,
           data: {},
@@ -221,12 +228,14 @@ describe("EventStoreMemory - Functional Behavior", () => {
       const events: Event<string>[] = [
         {
           aggregateId: "agg-1",
+          tenantId: createTenantId("test-tenant"),
           timestamp: 1000,
           type: "TEST" as any,
           data: {},
         },
         {
           aggregateId: "agg-2",
+          tenantId: createTenantId("test-tenant"),
           timestamp: 1001,
           type: "TEST" as any,
           data: {},
@@ -246,18 +255,21 @@ describe("EventStoreMemory - Functional Behavior", () => {
       const events: Event<string>[] = [
         {
           aggregateId: "agg-1",
+          tenantId: createTenantId("test-tenant"),
           timestamp: 1000,
           type: "EVENT_1" as any,
           data: {},
         },
         {
           aggregateId: "agg-1",
+          tenantId: createTenantId("test-tenant"),
           timestamp: 1001,
           type: "EVENT_2" as any,
           data: {},
         },
         {
           aggregateId: "agg-1",
+          tenantId: createTenantId("test-tenant"),
           timestamp: 1002,
           type: "EVENT_3" as any,
           data: {},
@@ -275,6 +287,7 @@ describe("EventStoreMemory - Functional Behavior", () => {
     it("prevents mutation of stored events from input", async () => {
       const event: Event<string> = {
         aggregateId: "agg-1",
+        tenantId: createTenantId("test-tenant"),
         timestamp: 1000,
         type: "TEST" as any,
         data: { value: 1 },
@@ -298,18 +311,21 @@ describe("EventStoreMemory - Functional Behavior", () => {
       const events: Event<string>[] = [
         {
           aggregateId: "agg-1",
+          tenantId: createTenantId("test-tenant"),
           timestamp: 1000,
           type: "TEST" as any,
           data: {},
         },
         {
           aggregateId: "agg-2",
+          tenantId: createTenantId("test-tenant"),
           timestamp: 1001,
           type: "TEST" as any,
           data: {},
         },
         {
           aggregateId: "agg-3",
+          tenantId: createTenantId("test-tenant"),
           timestamp: 1002,
           type: "TEST" as any,
           data: {},
@@ -329,18 +345,21 @@ describe("EventStoreMemory - Functional Behavior", () => {
       const events: Event<string>[] = [
         {
           aggregateId: "agg-1",
+          tenantId: createTenantId("test-tenant"),
           timestamp: 1000,
           type: "TEST" as any,
           data: {},
         },
         {
           aggregateId: "agg-2",
+          tenantId: createTenantId("test-tenant"),
           timestamp: 1001,
           type: "TEST" as any,
           data: {},
         },
         {
           aggregateId: "agg-3",
+          tenantId: createTenantId("test-tenant"),
           timestamp: 1002,
           type: "TEST" as any,
           data: {},
@@ -351,7 +370,7 @@ describe("EventStoreMemory - Functional Behavior", () => {
       const result = await store.listAggregateIds(
         context,
         aggregateType,
-        undefined,
+        void 0,
         2,
       );
 
@@ -362,18 +381,21 @@ describe("EventStoreMemory - Functional Behavior", () => {
       const events: Event<string>[] = [
         {
           aggregateId: "agg-1",
+          tenantId: createTenantId("test-tenant"),
           timestamp: 1000,
           type: "TEST" as any,
           data: {},
         },
         {
           aggregateId: "agg-2",
+          tenantId: createTenantId("test-tenant"),
           timestamp: 1001,
           type: "TEST" as any,
           data: {},
         },
         {
           aggregateId: "agg-3",
+          tenantId: createTenantId("test-tenant"),
           timestamp: 1002,
           type: "TEST" as any,
           data: {},
@@ -406,6 +428,7 @@ describe("EventStoreMemory - Functional Behavior", () => {
       const events: Event<string>[] = [
         {
           aggregateId: "agg-1",
+          tenantId: createTenantId("test-tenant"),
           timestamp: 1000,
           type: "TEST" as any,
           data: {},
@@ -428,18 +451,21 @@ describe("EventStoreMemory - Functional Behavior", () => {
       const events: Event<string>[] = [
         {
           aggregateId: "agg-normal",
+          tenantId: createTenantId("test-tenant"),
           timestamp: 1000,
           type: "TEST" as any,
           data: {},
         },
         {
           aggregateId: specialId,
+          tenantId: createTenantId("test-tenant"),
           timestamp: 1001,
           type: "TEST" as any,
           data: {},
         },
         {
           aggregateId: "agg-z",
+          tenantId: createTenantId("test-tenant"),
           timestamp: 1002,
           type: "TEST" as any,
           data: {},
@@ -452,7 +478,7 @@ describe("EventStoreMemory - Functional Behavior", () => {
       const allIds = await store.listAggregateIds(
         context,
         aggregateType,
-        undefined,
+        void 0,
         100,
       );
       const sorted = [...allIds.aggregateIds].sort();
@@ -484,18 +510,21 @@ describe("EventStoreMemory - Functional Behavior", () => {
       const events: Event<string>[] = [
         {
           aggregateId: "agg-1",
+          tenantId: createTenantId("test-tenant"),
           timestamp: 1000,
           type: "TEST" as any,
           data: {},
         },
         {
           aggregateId: "agg-2",
+          tenantId: createTenantId("test-tenant"),
           timestamp: 1001,
           type: "TEST" as any,
           data: {},
         },
         {
           aggregateId: "agg-3",
+          tenantId: createTenantId("test-tenant"),
           timestamp: 1002,
           type: "TEST" as any,
           data: {},
@@ -506,7 +535,7 @@ describe("EventStoreMemory - Functional Behavior", () => {
       const result = await store.listAggregateIds(
         context,
         aggregateType,
-        undefined,
+        void 0,
         3,
       );
 
@@ -518,12 +547,14 @@ describe("EventStoreMemory - Functional Behavior", () => {
       const events: Event<string>[] = [
         {
           aggregateId: "agg-1",
+          tenantId: createTenantId("test-tenant"),
           timestamp: 1000,
           type: "TEST" as any,
           data: {},
         },
         {
           aggregateId: "agg-2",
+          tenantId: createTenantId("test-tenant"),
           timestamp: 1001,
           type: "TEST" as any,
           data: {},
@@ -534,7 +565,7 @@ describe("EventStoreMemory - Functional Behavior", () => {
       const result = await store.listAggregateIds(
         context,
         aggregateType,
-        undefined,
+        void 0,
         3,
       );
 
@@ -553,18 +584,21 @@ describe("EventStoreMemory - Functional Behavior", () => {
       const events: Event<string>[] = [
         {
           aggregateId: "agg-3",
+          tenantId: createTenantId("test-tenant"),
           timestamp: 1000,
           type: "TEST" as any,
           data: {},
         },
         {
           aggregateId: "agg-1",
+          tenantId: createTenantId("test-tenant"),
           timestamp: 1001,
           type: "TEST" as any,
           data: {},
         },
         {
           aggregateId: "agg-2",
+          tenantId: createTenantId("test-tenant"),
           timestamp: 1002,
           type: "TEST" as any,
           data: {},
@@ -584,6 +618,7 @@ describe("EventStoreMemory - Functional Behavior", () => {
       const events: Event<string>[] = [
         {
           aggregateId: "agg-1",
+          tenantId: createTenantId("test-tenant"),
           timestamp: 1000,
           type: "TEST" as any,
           data: {},
@@ -604,16 +639,18 @@ describe("EventStoreMemory - Functional Behavior", () => {
   });
 
   describe("seed()", () => {
-    it("seeds events correctly", () => {
+    it("seeds events correctly", async () => {
       const events: Event<string>[] = [
         {
           aggregateId: "agg-1",
+          tenantId: createTenantId("test-tenant"),
           timestamp: 1000,
           type: "TEST" as any,
           data: { value: 1 },
         },
         {
           aggregateId: "agg-1",
+          tenantId: createTenantId("test-tenant"),
           timestamp: 1001,
           type: "TEST" as any,
           data: { value: 2 },
@@ -621,19 +658,18 @@ describe("EventStoreMemory - Functional Behavior", () => {
       ];
 
       store.seed("agg-1", events, tenantId, aggregateType);
-      const retrieved = store.getEvents("agg-1", context, aggregateType);
+      const retrieved = await store.getEvents("agg-1", context, aggregateType);
 
-      return retrieved.then((result) => {
-        expect(result).toHaveLength(2);
-        expect(result[0]?.data).toEqual({ value: 1 });
-        expect(result[1]?.data).toEqual({ value: 2 });
-      });
+      expect(retrieved).toHaveLength(2);
+      expect(retrieved[0]?.data).toEqual({ value: 1 });
+      expect(retrieved[1]?.data).toEqual({ value: 2 });
     });
 
     it("overwrites existing events (not appends)", async () => {
       const initialEvents: Event<string>[] = [
         {
           aggregateId: "agg-1",
+          tenantId: createTenantId("test-tenant"),
           timestamp: 1000,
           type: "OLD" as any,
           data: {},
@@ -645,6 +681,7 @@ describe("EventStoreMemory - Functional Behavior", () => {
       const newEvents: Event<string>[] = [
         {
           aggregateId: "agg-1",
+          tenantId: createTenantId("test-tenant"),
           timestamp: 2000,
           type: "NEW" as any,
           data: {},
@@ -662,6 +699,7 @@ describe("EventStoreMemory - Functional Behavior", () => {
       const events: Event<string>[] = [
         {
           aggregateId: "agg-1",
+          tenantId: createTenantId("test-tenant"),
           timestamp: 1000,
           type: "TEST" as any,
           data: {},
@@ -678,6 +716,7 @@ describe("EventStoreMemory - Functional Behavior", () => {
       const events: Event<string>[] = [
         {
           aggregateId: "agg-1",
+          tenantId: createTenantId("test-tenant"),
           timestamp: 1000,
           type: "TEST" as any,
           data: {},
@@ -688,7 +727,6 @@ describe("EventStoreMemory - Functional Behavior", () => {
       store.seed("agg-1", [], tenantId, aggregateType);
 
       const retrieved = await store.getEvents("agg-1", context, aggregateType);
-      const result = await store.listAggregateIds(context, aggregateType);
 
       expect(retrieved).toEqual([]);
       // Aggregate might still be in list or removed, depending on implementation
@@ -699,6 +737,7 @@ describe("EventStoreMemory - Functional Behavior", () => {
       const events: Event<string>[] = [
         {
           aggregateId: "agg-1",
+          tenantId: createTenantId("test-tenant"),
           timestamp: 1000,
           type: "TEST" as any,
           data: { tenant: "tenant-1" },
@@ -709,12 +748,12 @@ describe("EventStoreMemory - Functional Behavior", () => {
 
       const tenant1Events = await store.getEvents(
         "agg-1",
-        { tenantId: "tenant-1" },
+        { tenantId: createTenantId("tenant-1") },
         aggregateType,
       );
       const tenant2Events = await store.getEvents(
         "agg-1",
-        { tenantId: "tenant-2" },
+        { tenantId: createTenantId("tenant-2") },
         aggregateType,
       );
 

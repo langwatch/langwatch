@@ -8,6 +8,7 @@ import type {
   ProjectionMetadata,
 } from "../core/types";
 import type { EventType } from "../core/eventType";
+import type { TenantId } from "../core/tenantId";
 
 function createEvent<
   AggregateId = string,
@@ -16,16 +17,18 @@ function createEvent<
   TEventType extends EventType = EventType,
 >(
   aggregateId: AggregateId,
+  tenantId: TenantId,
   type: TEventType,
   data: Payload,
   metadata?: Metadata,
 ): Event<AggregateId, Payload, Metadata> {
   return {
     aggregateId,
+    tenantId,
     timestamp: Date.now(),
     type,
     data,
-    metadata,
+    ...(metadata !== void 0 && { metadata }),
   };
 }
 
@@ -46,14 +49,14 @@ function getCurrentTraceparentFromActiveSpan(): string | undefined {
 
 function buildEventMetadataWithCurrentProcessingTraceparent<
   Metadata extends EventMetadataBase = EventMetadataBase,
->(metadata?: Metadata): Metadata {
+>(metadata?: Metadata): Metadata | undefined {
   if (metadata && typeof metadata.processingTraceparent === "string") {
     return metadata;
   }
 
   const traceparent = getCurrentTraceparentFromActiveSpan();
   if (!traceparent) {
-    return metadata ?? ({} as Metadata);
+    return metadata;
   }
 
   return {
@@ -69,6 +72,7 @@ function createEventWithProcessingTraceContext<
   TEventType extends EventType = EventType,
 >(
   aggregateId: AggregateId,
+  tenantId: TenantId,
   type: TEventType,
   data: Payload,
   metadata?: Metadata,
@@ -82,6 +86,7 @@ function createEventWithProcessingTraceContext<
 
   return createEvent<AggregateId, Payload, Metadata, TEventType>(
     aggregateId,
+    tenantId,
     type,
     data,
     hasMetadata ? enrichedMetadata : void 0,
@@ -91,12 +96,14 @@ function createEventWithProcessingTraceContext<
 function createProjection<AggregateId = string, Data = unknown>(
   id: string,
   aggregateId: AggregateId,
+  tenantId: TenantId,
   data: Data,
   version: number = Date.now(),
 ): Projection<AggregateId, Data> {
   return {
     id,
     aggregateId,
+    tenantId,
     version,
     data,
   };
@@ -161,27 +168,37 @@ function buildProjectionMetadata<
   };
 }
 
-function isValidEvent(event: any): event is Event {
+function isValidEvent(event: unknown): event is Event {
   return (
     Boolean(event) &&
-    typeof event.aggregateId !== "undefined" &&
-    event.aggregateId !== null &&
-    typeof event.timestamp === "number" &&
-    !Number.isNaN(event.timestamp) &&
-    typeof event.type === "string" &&
-    event.data !== void 0
+    typeof event === "object" &&
+    event !== null &&
+    typeof (event as Record<string, unknown>).aggregateId !== "undefined" &&
+    (event as Record<string, unknown>).aggregateId !== null &&
+    typeof (event as Record<string, unknown>).tenantId === "string" &&
+    ((event as Record<string, unknown>).tenantId as string).trim() !== "" &&
+    typeof (event as Record<string, unknown>).timestamp === "number" &&
+    !Number.isNaN((event as Record<string, unknown>).timestamp as number) &&
+    typeof (event as Record<string, unknown>).type === "string" &&
+    (event as Record<string, unknown>).data !== void 0
   );
 }
 
-function isValidProjection(projection: any): projection is Projection {
+function isValidProjection(projection: unknown): projection is Projection {
   return (
     Boolean(projection) &&
-    typeof projection.id === "string" &&
-    typeof projection.aggregateId !== "undefined" &&
-    projection.aggregateId !== null &&
-    typeof projection.version === "number" &&
-    !Number.isNaN(projection.version) &&
-    projection.data !== void 0
+    typeof projection === "object" &&
+    projection !== null &&
+    typeof (projection as Record<string, unknown>).id === "string" &&
+    typeof (projection as Record<string, unknown>).aggregateId !==
+      "undefined" &&
+    (projection as Record<string, unknown>).aggregateId !== null &&
+    typeof (projection as Record<string, unknown>).tenantId === "string" &&
+    ((projection as Record<string, unknown>).tenantId as string).trim() !==
+      "" &&
+    typeof (projection as Record<string, unknown>).version === "number" &&
+    !Number.isNaN((projection as Record<string, unknown>).version as number) &&
+    (projection as Record<string, unknown>).data !== void 0
   );
 }
 
@@ -199,8 +216,8 @@ function isValidProjection(projection: any): projection is Projection {
  * @example
  * ```typescript
  * async storeEvents(events: Event[]): Promise<void> {
- *   // Extract tenantId from first event's metadata or from a context parameter
- *   const context = { tenantId: events[0].metadata?.tenantId };
+ *   // Extract tenantId from first event's root level
+ *   const context = { tenantId: events[0].tenantId };
  *   EventUtils.validateTenantId(context, 'storeEvents');
  *   // ... proceed with storage
  * }

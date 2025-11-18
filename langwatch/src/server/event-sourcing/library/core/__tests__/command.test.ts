@@ -10,7 +10,7 @@ describe("Command", () => {
         const command = createCommand(
           tenantId,
           "agg-1",
-          "trace.rebuild_projection",
+          "lw.obs.trace.projection.rebuild",
           { foo: "bar" },
           { meta: 1 },
         );
@@ -18,7 +18,7 @@ describe("Command", () => {
         expect(command).toEqual({
           tenantId,
           aggregateId: "agg-1",
-          type: "trace.rebuild_projection",
+          type: "lw.obs.trace.projection.rebuild",
           data: { foo: "bar" },
           metadata: { meta: 1 },
         });
@@ -28,9 +28,14 @@ describe("Command", () => {
     describe("when metadata is omitted", () => {
       it("creates a command without metadata", () => {
         const tenantId = createTenantId("test-tenant");
-        const command = createCommand(tenantId, "agg-1", "trace.rebuild_projection", {
-          foo: "bar",
-        });
+        const command = createCommand(
+          tenantId,
+          "agg-1",
+          "lw.obs.trace.projection.rebuild",
+          {
+            foo: "bar",
+          },
+        );
 
         expect(command.metadata).toBeUndefined();
         expect(command.tenantId).toBe(tenantId);
@@ -51,9 +56,14 @@ describe("Command", () => {
 
         const handler = new TestHandler();
         const tenantId = createTenantId("test-tenant");
-        const command = createCommand(tenantId, "agg-1", "trace.rebuild_projection", {
-          foo: "bar",
-        });
+        const command = createCommand(
+          tenantId,
+          "agg-1",
+          "lw.obs.trace.projection.rebuild",
+          {
+            foo: "bar",
+          },
+        );
 
         await handler.handle(command);
 

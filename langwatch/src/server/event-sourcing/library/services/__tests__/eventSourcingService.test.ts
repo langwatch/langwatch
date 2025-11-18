@@ -1,18 +1,24 @@
 /* eslint-disable @typescript-eslint/unbound-method */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { EventSourcingService } from "../eventSourcingService";
-import type { EventStore } from "../../stores/eventStore";
 import type { ProjectionStore } from "../../stores/projectionStore.types";
 import type { EventHandler } from "../../processing/eventHandler";
 import type { Event, Projection } from "../../core/types";
+import type { EventStore } from "../../stores/eventStore.types";
+import { createTenantId } from "../../core/tenantId";
+
+const tenantId = createTenantId("test-tenant");
 
 describe("EventSourcingService", () => {
-  let mockEventStore: any;
+  let mockEventStore: {
+    getEvents: ReturnType<typeof vi.fn>;
+    storeEvents: ReturnType<typeof vi.fn>;
+    listAggregateIds: ReturnType<typeof vi.fn>;
+  } & Partial<EventStore<string, Event<string>>>;
   let mockProjectionStore: ProjectionStore<string, Projection<string>>;
   let mockEventHandler: EventHandler<string, Event<string>, Projection<string>>;
 
   beforeEach(() => {
-    // @ts-ignore we intentionally use a relaxed mock shape for the event store in tests
     mockEventStore = {
       getEvents: vi.fn(),
       storeEvents: vi.fn(),
@@ -35,14 +41,16 @@ describe("EventSourcingService", () => {
         const events: Event<string>[] = [
           {
             aggregateId: "test-1",
+            tenantId,
             timestamp: 1000,
-            type: "span.ingestion.ingested",
+            type: "lw.obs.span.ingestion.recorded",
             data: {},
           },
         ];
         const projection: Projection<string> = {
           id: "proj-1",
           aggregateId: "test-1",
+          tenantId,
           version: 1000,
           data: {},
         };
@@ -58,7 +66,7 @@ describe("EventSourcingService", () => {
         });
 
         const result = await service.rebuildProjection("test-1", {
-          eventStoreContext: { tenantId: "test-tenant" },
+          eventStoreContext: { tenantId: createTenantId("test-tenant") },
         });
 
         expect(result).toBe(projection);
@@ -70,14 +78,16 @@ describe("EventSourcingService", () => {
         const events: Event<string>[] = [
           {
             aggregateId: "test-1",
+            tenantId,
             timestamp: 1000,
-            type: "span.ingestion.ingested",
+            type: "lw.obs.span.ingestion.recorded",
             data: {},
           },
         ];
         const projection: Projection<string> = {
           id: "proj-1",
           aggregateId: "test-1",
+          tenantId,
           version: 1000,
           data: {},
         };
@@ -96,7 +106,7 @@ describe("EventSourcingService", () => {
         });
 
         await service.rebuildProjection("test-1", {
-          eventStoreContext: { tenantId: "test-tenant" },
+          eventStoreContext: { tenantId: createTenantId("test-tenant") },
         });
 
         expect(beforeHandle).toHaveBeenCalled();
@@ -106,14 +116,16 @@ describe("EventSourcingService", () => {
         const events: Event<string>[] = [
           {
             aggregateId: "test-1",
+            tenantId,
             timestamp: 1000,
-            type: "span.ingestion.ingested",
+            type: "lw.obs.span.ingestion.recorded",
             data: {},
           },
         ];
         const projection: Projection<string> = {
           id: "proj-1",
           aggregateId: "test-1",
+          tenantId,
           version: 1000,
           data: {},
         };
@@ -132,7 +144,7 @@ describe("EventSourcingService", () => {
         });
 
         await service.rebuildProjection("test-1", {
-          eventStoreContext: { tenantId: "test-tenant" },
+          eventStoreContext: { tenantId: createTenantId("test-tenant") },
         });
 
         expect(afterHandle).toHaveBeenCalled();
@@ -142,17 +154,19 @@ describe("EventSourcingService", () => {
         const events: Event<string>[] = [
           {
             aggregateId: "test-1",
+            tenantId: createTenantId("test-tenant"),
             timestamp: 1000,
-            type: "span.ingestion.ingested",
+            type: "lw.obs.span.ingestion.recorded",
             data: {},
           },
         ];
         const projection: Projection<string> = {
           id: "proj-1",
           aggregateId: "test-1",
+          tenantId: createTenantId("test-tenant"),
           version: 1000,
           data: {},
-        };
+        } satisfies Projection<string>;
 
         const beforePersist = vi.fn();
 
@@ -168,7 +182,7 @@ describe("EventSourcingService", () => {
         });
 
         await service.rebuildProjection("test-1", {
-          eventStoreContext: { tenantId: "test-tenant" },
+          eventStoreContext: { tenantId: createTenantId("test-tenant") },
         });
 
         expect(beforePersist).toHaveBeenCalled();
@@ -178,17 +192,19 @@ describe("EventSourcingService", () => {
         const events: Event<string>[] = [
           {
             aggregateId: "test-1",
+            tenantId: createTenantId("test-tenant"),
             timestamp: 1000,
-            type: "span.ingestion.ingested",
+            type: "lw.obs.span.ingestion.recorded",
             data: {},
           },
         ];
         const projection: Projection<string> = {
           id: "proj-1",
           aggregateId: "test-1",
+          tenantId: createTenantId("test-tenant"),
           version: 1000,
           data: {},
-        };
+        } satisfies Projection<string>;
 
         const afterPersist = vi.fn();
 
@@ -204,7 +220,7 @@ describe("EventSourcingService", () => {
         });
 
         await service.rebuildProjection("test-1", {
-          eventStoreContext: { tenantId: "test-tenant" },
+          eventStoreContext: { tenantId: createTenantId("test-tenant") },
         });
 
         expect(afterPersist).toHaveBeenCalled();
@@ -214,14 +230,16 @@ describe("EventSourcingService", () => {
         const events: Event<string>[] = [
           {
             aggregateId: "test-1",
+            tenantId,
             timestamp: 1000,
-            type: "span.ingestion.ingested",
+            type: "lw.obs.span.ingestion.recorded",
             data: {},
           },
         ];
         const projection: Projection<string> = {
           id: "proj-1",
           aggregateId: "test-1",
+          tenantId,
           version: 1000,
           data: {},
         };
@@ -263,7 +281,7 @@ describe("EventSourcingService", () => {
         });
 
         await service.rebuildProjection("test-1", {
-          eventStoreContext: { tenantId: "test-tenant" },
+          eventStoreContext: { tenantId: createTenantId("test-tenant") },
         });
 
         expect(callOrder).toEqual([
@@ -282,8 +300,9 @@ describe("EventSourcingService", () => {
         const events: Event<string>[] = [
           {
             aggregateId: "test-1",
+            tenantId,
             timestamp: 1000,
-            type: "span.ingestion.ingested",
+            type: "lw.obs.span.ingestion.recorded",
             data: {},
           },
         ];
@@ -302,9 +321,43 @@ describe("EventSourcingService", () => {
 
         await expect(
           service.rebuildProjection("test-1", {
-            eventStoreContext: { tenantId: "test-tenant" },
+            eventStoreContext: { tenantId: createTenantId("test-tenant") },
           }),
         ).rejects.toThrow("Handler failed");
+      });
+    });
+
+    describe("tenantId validation", () => {
+      it("rejects operations without eventStoreContext", async () => {
+        const service = new EventSourcingService({
+          aggregateType: "trace",
+          eventStore: mockEventStore,
+          projectionStore: mockProjectionStore,
+          eventHandler: mockEventHandler,
+        });
+
+        await expect(
+          service.rebuildProjection("test-1", {} as any),
+        ).rejects.toThrow(
+          "[SECURITY] rebuildProjection requires eventStoreContext with tenantId",
+        );
+      });
+
+      it("rejects operations with empty tenantId in eventStoreContext", async () => {
+        const service = new EventSourcingService({
+          aggregateType: "trace",
+          eventStore: mockEventStore,
+          projectionStore: mockProjectionStore,
+          eventHandler: mockEventHandler,
+        });
+
+        await expect(
+          service.rebuildProjection("test-1", {
+            eventStoreContext: { tenantId: "" } as any,
+          }),
+        ).rejects.toThrow(
+          "[SECURITY] rebuildProjection requires a non-empty tenantId for tenant isolation",
+        );
       });
     });
   });
@@ -315,6 +368,7 @@ describe("EventSourcingService", () => {
         const projection: Projection<string> = {
           id: "proj-1",
           aggregateId: "test-1",
+          tenantId,
           version: 1000,
           data: {},
         };
@@ -331,7 +385,7 @@ describe("EventSourcingService", () => {
         });
 
         const result = await service.getProjection("test-1", {
-          eventStoreContext: { tenantId: "test-tenant" },
+          eventStoreContext: { tenantId: createTenantId("test-tenant") },
         });
 
         expect(result).toBe(projection);
@@ -343,14 +397,16 @@ describe("EventSourcingService", () => {
         const events: Event<string>[] = [
           {
             aggregateId: "test-1",
+            tenantId,
             timestamp: 1000,
-            type: "span.ingestion.ingested",
+            type: "lw.obs.span.ingestion.recorded",
             data: {},
           },
         ];
         const projection: Projection<string> = {
           id: "proj-1",
           aggregateId: "test-1",
+          tenantId,
           version: 1000,
           data: {},
         };
@@ -367,10 +423,44 @@ describe("EventSourcingService", () => {
         });
 
         const result = await service.getProjection("test-1", {
-          eventStoreContext: { tenantId: "test-tenant" },
+          eventStoreContext: { tenantId: createTenantId("test-tenant") },
         });
 
         expect(result).toBe(projection);
+      });
+    });
+
+    describe("tenantId validation", () => {
+      it("rejects operations without context", async () => {
+        const service = new EventSourcingService({
+          aggregateType: "trace",
+          eventStore: mockEventStore,
+          projectionStore: mockProjectionStore,
+          eventHandler: mockEventHandler,
+        });
+
+        await expect(
+          service.getProjection("test-1", {} as any),
+        ).rejects.toThrow(
+          "[SECURITY] getProjection requires context with tenantId",
+        );
+      });
+
+      it("rejects operations with empty tenantId in context", async () => {
+        const service = new EventSourcingService({
+          aggregateType: "trace",
+          eventStore: mockEventStore,
+          projectionStore: mockProjectionStore,
+          eventHandler: mockEventHandler,
+        });
+
+        await expect(
+          service.getProjection("test-1", {
+            eventStoreContext: { tenantId: "" } as any,
+          }),
+        ).rejects.toThrow(
+          "[SECURITY] getProjection requires a non-empty tenantId for tenant isolation",
+        );
       });
     });
   });
@@ -381,6 +471,7 @@ describe("EventSourcingService", () => {
         const projection: Projection<string> = {
           id: "proj-1",
           aggregateId: "test-1",
+          tenantId,
           version: 1000,
           data: {},
         };
@@ -397,7 +488,7 @@ describe("EventSourcingService", () => {
         });
 
         const result = await service.hasProjection("test-1", {
-          eventStoreContext: { tenantId: "test-tenant" },
+          eventStoreContext: { tenantId: createTenantId("test-tenant") },
         });
 
         expect(result).toBe(true);
@@ -416,10 +507,44 @@ describe("EventSourcingService", () => {
         });
 
         const result = await service.hasProjection("test-1", {
-          eventStoreContext: { tenantId: "test-tenant" },
+          eventStoreContext: { tenantId: createTenantId("test-tenant") },
         });
 
         expect(result).toBe(false);
+      });
+    });
+
+    describe("tenantId validation", () => {
+      it("rejects operations without context", async () => {
+        const service = new EventSourcingService({
+          aggregateType: "trace",
+          eventStore: mockEventStore,
+          projectionStore: mockProjectionStore,
+          eventHandler: mockEventHandler,
+        });
+
+        await expect(
+          service.getProjection("test-1", {} as any),
+        ).rejects.toThrow(
+          "[SECURITY] getProjection requires context with tenantId",
+        );
+      });
+
+      it("rejects operations with empty tenantId in context", async () => {
+        const service = new EventSourcingService({
+          aggregateType: "trace",
+          eventStore: mockEventStore,
+          projectionStore: mockProjectionStore,
+          eventHandler: mockEventHandler,
+        });
+
+        await expect(
+          service.hasProjection("test-1", {
+            eventStoreContext: { tenantId: "" } as any,
+          }),
+        ).rejects.toThrow(
+          "[SECURITY] hasProjection requires a non-empty tenantId for tenant isolation",
+        );
       });
     });
   });
@@ -430,14 +555,16 @@ describe("EventSourcingService", () => {
         const events: Event<string>[] = [
           {
             aggregateId: "test-1",
+            tenantId,
             timestamp: 1000,
-            type: "span.ingestion.ingested",
+            type: "lw.obs.span.ingestion.recorded",
             data: {},
           },
         ];
         const projection: Projection<string> = {
           id: "proj-1",
           aggregateId: "test-1",
+          tenantId,
           version: 1000,
           data: {},
         };
@@ -453,10 +580,44 @@ describe("EventSourcingService", () => {
         });
 
         const result = await service.forceRebuildProjection("test-1", {
-          eventStoreContext: { tenantId: "test-tenant" },
+          eventStoreContext: { tenantId: createTenantId("test-tenant") },
         });
 
         expect(result).toBe(projection);
+      });
+    });
+
+    describe("tenantId validation", () => {
+      it("rejects operations without eventStoreContext", async () => {
+        const service = new EventSourcingService({
+          aggregateType: "trace",
+          eventStore: mockEventStore,
+          projectionStore: mockProjectionStore,
+          eventHandler: mockEventHandler,
+        });
+
+        await expect(
+          service.forceRebuildProjection("test-1", {} as any),
+        ).rejects.toThrow(
+          "[SECURITY] rebuildProjection requires eventStoreContext with tenantId",
+        );
+      });
+
+      it("rejects operations with empty tenantId in eventStoreContext", async () => {
+        const service = new EventSourcingService({
+          aggregateType: "trace",
+          eventStore: mockEventStore,
+          projectionStore: mockProjectionStore,
+          eventHandler: mockEventHandler,
+        });
+
+        await expect(
+          service.forceRebuildProjection("test-1", {
+            eventStoreContext: { tenantId: "" } as any,
+          }),
+        ).rejects.toThrow(
+          "[SECURITY] rebuildProjection requires a non-empty tenantId for tenant isolation",
+        );
       });
     });
   });
@@ -476,7 +637,7 @@ describe("EventSourcingService", () => {
         });
 
         const checkpoint = await service.rebuildProjectionsInBatches({
-          eventStoreContext: { tenantId: "test-tenant" },
+          eventStoreContext: { tenantId: createTenantId("test-tenant") },
         });
 
         expect(checkpoint.processedCount).toBe(0);
@@ -501,13 +662,14 @@ describe("EventSourcingService", () => {
           .mockResolvedValue({
             id: "proj",
             aggregateId: "agg-1",
+            tenantId,
             version: 1,
             data: {},
           });
 
         const checkpoint = await service.rebuildProjectionsInBatches({
           batchSize: 10,
-          eventStoreContext: { tenantId: "test-tenant" },
+          eventStoreContext: { tenantId: createTenantId("test-tenant") },
         });
 
         expect(rebuildSpy).toHaveBeenCalledTimes(2);
@@ -531,6 +693,7 @@ describe("EventSourcingService", () => {
         vi.spyOn(service, "rebuildProjection").mockResolvedValue({
           id: "proj",
           aggregateId: "agg-1",
+          tenantId,
           version: 1,
           data: {},
         });
@@ -539,7 +702,7 @@ describe("EventSourcingService", () => {
 
         const checkpoint = await service.rebuildProjectionsInBatches({
           onProgress,
-          eventStoreContext: { tenantId: "test-tenant" },
+          eventStoreContext: { tenantId: createTenantId("test-tenant") },
         });
 
         expect(onProgress).toHaveBeenCalledTimes(1);
@@ -573,6 +736,7 @@ describe("EventSourcingService", () => {
           .mockResolvedValue({
             id: "proj",
             aggregateId: "agg-2",
+            tenantId,
             version: 1,
             data: {},
           });
@@ -583,11 +747,11 @@ describe("EventSourcingService", () => {
             lastAggregateId: "agg-1",
             processedCount: 5,
           },
-          eventStoreContext: { tenantId: "test-tenant" },
+          eventStoreContext: { tenantId: createTenantId("test-tenant") },
         });
 
         expect(mockEventStore.listAggregateIds).toHaveBeenCalledWith(
-          { tenantId: "test-tenant" },
+          { tenantId: createTenantId("test-tenant") },
           "trace",
           "cursor-1",
           100,
@@ -596,6 +760,40 @@ describe("EventSourcingService", () => {
         expect(checkpoint.processedCount).toBe(7);
         expect(checkpoint.lastAggregateId).toBe("agg-3");
         expect(checkpoint.cursor).toBeUndefined();
+      });
+    });
+
+    describe("tenantId validation", () => {
+      it("rejects operations without eventStoreContext", async () => {
+        const service = new EventSourcingService({
+          aggregateType: "trace",
+          eventStore: mockEventStore,
+          projectionStore: mockProjectionStore,
+          eventHandler: mockEventHandler,
+        });
+
+        await expect(
+          service.rebuildProjectionsInBatches({} as any),
+        ).rejects.toThrow(
+          "[SECURITY] rebuildProjectionsInBatches requires eventStoreContext with tenantId",
+        );
+      });
+
+      it("rejects operations with empty tenantId in eventStoreContext", async () => {
+        const service = new EventSourcingService({
+          aggregateType: "trace",
+          eventStore: mockEventStore,
+          projectionStore: mockProjectionStore,
+          eventHandler: mockEventHandler,
+        });
+
+        await expect(
+          service.rebuildProjectionsInBatches({
+            eventStoreContext: { tenantId: "" } as any,
+          }),
+        ).rejects.toThrow(
+          "[SECURITY] rebuildProjectionsInBatches requires a non-empty tenantId for tenant isolation",
+        );
       });
     });
   });

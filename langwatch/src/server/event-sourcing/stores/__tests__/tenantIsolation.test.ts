@@ -1,8 +1,9 @@
 import { describe, it, expect } from "vitest";
 import { EventStoreMemory } from "../eventStoreMemory";
-import { CheckpointRepositoryMemory } from "../checkpointRepositoryMemory";
+import { CheckpointStoreMemory } from "../checkpointStoreMemory";
 import type { Event } from "../../library";
 import type { BulkRebuildCheckpoint } from "../../library";
+import { createTenantId } from "../../library/core/tenantId";
 
 describe("Tenant Isolation", () => {
   describe("EventStoreMemory", () => {
@@ -10,12 +11,13 @@ describe("Tenant Isolation", () => {
     const aggregateType = "trace" as const;
 
     it("isolates events by tenant", async () => {
-      const tenant1 = "tenant-1";
-      const tenant2 = "tenant-2";
+      const tenant1 = createTenantId("tenant-1");
+      const tenant2 = createTenantId("tenant-2");
       const aggregateId = "agg-1";
 
       const event1: Event<string> = {
         aggregateId,
+        tenantId: tenant1,
         timestamp: 1000,
         type: "TEST" as any,
         data: { value: "tenant1" },
@@ -23,6 +25,7 @@ describe("Tenant Isolation", () => {
 
       const event2: Event<string> = {
         aggregateId,
+        tenantId: tenant2,
         timestamp: 1000,
         type: "TEST" as any,
         data: { value: "tenant2" },
@@ -54,6 +57,7 @@ describe("Tenant Isolation", () => {
     it("rejects operations without tenantId", async () => {
       const event: Event<string> = {
         aggregateId: "agg-1",
+        tenantId: createTenantId("test-tenant"),
         timestamp: 1000,
         type: "TEST" as any,
         data: {},
@@ -71,28 +75,30 @@ describe("Tenant Isolation", () => {
     it("rejects operations with empty tenantId", async () => {
       const event: Event<string> = {
         aggregateId: "agg-1",
+        tenantId: createTenantId("test-tenant"),
         timestamp: 1000,
         type: "TEST" as any,
         data: {},
       };
 
       await expect(
-        store.storeEvents([event], { tenantId: "" }, aggregateType),
+        store.storeEvents([event], { tenantId: "" as any }, aggregateType),
       ).rejects.toThrow("[SECURITY]");
 
       await expect(
-        store.getEvents("agg-1", { tenantId: "" }, aggregateType),
+        store.getEvents("agg-1", { tenantId: "" as any }, aggregateType),
       ).rejects.toThrow("[SECURITY]");
     });
 
     it("isolates aggregate lists by tenant", async () => {
       // Use a fresh store instance to avoid state from previous tests
       const freshStore = new EventStoreMemory<string, Event<string>>();
-      const tenant1 = "tenant-1";
-      const tenant2 = "tenant-2";
+      const tenant1 = createTenantId("tenant-1");
+      const tenant2 = createTenantId("tenant-2");
 
       const event1: Event<string> = {
         aggregateId: "agg-1",
+        tenantId: tenant1,
         timestamp: 1000,
         type: "TEST" as any,
         data: {},
@@ -100,6 +106,7 @@ describe("Tenant Isolation", () => {
 
       const event2: Event<string> = {
         aggregateId: "agg-2",
+        tenantId: tenant2,
         timestamp: 1000,
         type: "TEST" as any,
         data: {},
@@ -130,8 +137,8 @@ describe("Tenant Isolation", () => {
     });
   });
 
-  describe("CheckpointRepositoryMemory", () => {
-    const repo = new CheckpointRepositoryMemory();
+  describe("CheckpointStoreMemory", () => {
+    const repo = new CheckpointStoreMemory();
     const aggregateType = "trace";
 
     it("isolates checkpoints by tenant", async () => {

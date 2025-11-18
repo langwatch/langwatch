@@ -1,12 +1,17 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { EventStoreClickHouse } from "../eventStoreClickHouse";
 import type { Event } from "../../library";
+<<<<<<< Updated upstream
 import type { ClickHouseClient } from "@clickhouse/client";
+=======
+import { createTenantId } from "../../library";
+import { parse } from "@langwatch/ksuid";
+>>>>>>> Stashed changes
 
 describe("EventStoreClickHouse - Functional Behavior", () => {
   let mockClickHouseClient: any;
   let store: EventStoreClickHouse<string, Event<string>>;
-  const tenantId = "test-tenant";
+  const tenantId = createTenantId("test-tenant");
   const aggregateType = "trace" as const;
   const context = { tenantId };
 
@@ -276,6 +281,8 @@ describe("EventStoreClickHouse - Functional Behavior", () => {
           timestamp: 1000,
           type: "TEST" as any,
           data: { value: 1 },
+          tenantId,
+          metadata: {},
         },
       ];
 
@@ -294,12 +301,16 @@ describe("EventStoreClickHouse - Functional Behavior", () => {
           timestamp: 1000,
           type: "TEST" as any,
           data: {},
+          tenantId,
+          metadata: {},
         },
         {
           aggregateId: "agg-1",
           timestamp: 1001,
           type: "TEST" as any,
           data: {},
+          tenantId,
+          metadata: {},
         },
       ];
 
@@ -319,6 +330,8 @@ describe("EventStoreClickHouse - Functional Behavior", () => {
           timestamp: 1000,
           type: "TEST" as any,
           data: {},
+          tenantId,
+          metadata: {},
         },
       ];
 
@@ -338,6 +351,8 @@ describe("EventStoreClickHouse - Functional Behavior", () => {
           timestamp: 1000,
           type: "TEST" as any,
           data: {},
+          tenantId,
+          metadata: {},
         },
       ];
 
@@ -357,8 +372,8 @@ describe("EventStoreClickHouse - Functional Behavior", () => {
           timestamp: 1000,
           type: "TEST" as any,
           data: {},
+          tenantId,
           metadata: {
-            tenantId,
             processingTraceparent: "00-abc123-def456-01",
           },
         },
@@ -378,6 +393,8 @@ describe("EventStoreClickHouse - Functional Behavior", () => {
           timestamp: 1000,
           type: "TEST" as any,
           data: {},
+          tenantId,
+          metadata: {},
         },
       ];
 
@@ -395,12 +412,16 @@ describe("EventStoreClickHouse - Functional Behavior", () => {
           timestamp: 1000,
           type: "TEST" as any,
           data: {},
+          tenantId,
+          metadata: {},
         },
         {
           aggregateId: "agg-2",
           timestamp: 1001,
           type: "TEST" as any,
           data: {},
+          tenantId,
+          metadata: {},
         },
       ];
 
@@ -419,6 +440,8 @@ describe("EventStoreClickHouse - Functional Behavior", () => {
           timestamp: 1000,
           type: "TEST" as any,
           data: { key: "value", number: 42, nested: { foo: "bar" } },
+          tenantId,
+          metadata: {},
         },
       ];
 
@@ -426,8 +449,8 @@ describe("EventStoreClickHouse - Functional Behavior", () => {
 
       const insertCall = mockClickHouseClient.insert.mock.calls[0];
       const payload = insertCall[0].values[0].EventPayload;
-      expect(typeof payload).toBe("string");
-      expect(JSON.parse(payload)).toEqual({
+      expect(typeof payload).toBe("object");
+      expect(payload).toEqual({
         key: "value",
         number: 42,
         nested: { foo: "bar" },
@@ -444,12 +467,49 @@ describe("EventStoreClickHouse - Functional Behavior", () => {
           timestamp: 1000,
           type: "TEST" as any,
           data: {},
+          tenantId,
+          metadata: {},
         },
       ];
 
       await expect(
         store.storeEvents(events, context, aggregateType),
       ).rejects.toThrow("Insert failed");
+    });
+
+    it("errors when no tenant id is present on the event", async () => {
+      const events: Event<string>[] = [
+        {
+          aggregateId: "agg-1",
+          timestamp: 1000,
+          type: "TEST" as any,
+          data: {},
+          // tenantId is missing
+        } as any,
+      ];
+
+      await expect(
+        store.storeEvents(events, context, aggregateType),
+      ).rejects.toThrow("[SECURITY] Event at index 0 has no tenantId");
+    });
+
+    it("errors when the context tenant id does not match the event tenant id", async () => {
+      const events: Event<string>[] = [
+        {
+          aggregateId: "agg-1",
+          timestamp: 1000,
+          type: "TEST" as any,
+          data: {},
+          tenantId: createTenantId("other-tenant"),
+          metadata: {},
+        },
+      ];
+
+      await expect(
+        store.storeEvents(events, context, aggregateType),
+      ).rejects.toThrow(
+        "[SECURITY] Event at index 0 has tenantId 'other-tenant' that does not match context tenantId 'test-tenant'",
+      );
     });
   });
 
@@ -501,12 +561,7 @@ describe("EventStoreClickHouse - Functional Behavior", () => {
         json: vi.fn().mockResolvedValue(mockRows),
       });
 
-      const result = await store.listAggregateIds(
-        context,
-        aggregateType,
-        "agg-1",
-        100,
-      );
+      await store.listAggregateIds(context, aggregateType, "agg-1", 100);
 
       const queryCall = mockClickHouseClient.query.mock.calls[0];
       expect(queryCall[0].query).toContain("AND AggregateId > {cursor:String}");
@@ -596,7 +651,7 @@ describe("EventStoreClickHouse - Functional Behavior", () => {
         json: vi.fn().mockResolvedValue(mockRows),
       });
 
-      const result = await store.listAggregateIds(context, aggregateType);
+      await store.listAggregateIds(context, aggregateType);
 
       // ClickHouse should return sorted, but we verify the query
       const queryCall = mockClickHouseClient.query.mock.calls[0];

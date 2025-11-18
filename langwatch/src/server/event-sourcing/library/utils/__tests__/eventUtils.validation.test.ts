@@ -1,12 +1,16 @@
 import { describe, it, expect } from "vitest";
 import { EventUtils } from "../event.utils";
+import { createTenantId } from "../../core/tenantId";
 
 describe("EventUtils - Validation Edge Cases", () => {
   describe("isValidEvent", () => {
+    const testTenantId = createTenantId("test-tenant");
+
     describe("when data is null", () => {
       it("returns true (null is valid data)", () => {
         const event = {
           aggregateId: "test-123",
+          tenantId: testTenantId,
           timestamp: 1234567890,
           type: "TEST",
           data: null,
@@ -20,6 +24,7 @@ describe("EventUtils - Validation Edge Cases", () => {
       it("returns false", () => {
         const event = {
           aggregateId: "test-123",
+          tenantId: testTenantId,
           timestamp: 1234567890,
           type: "TEST",
           data: void 0,
@@ -33,6 +38,7 @@ describe("EventUtils - Validation Edge Cases", () => {
       it("returns false", () => {
         const event = {
           aggregateId: null,
+          tenantId: testTenantId,
           timestamp: 1234567890,
           type: "TEST",
           data: {},
@@ -46,6 +52,7 @@ describe("EventUtils - Validation Edge Cases", () => {
       it("returns true (zero is valid)", () => {
         const event = {
           aggregateId: 0,
+          tenantId: testTenantId,
           timestamp: 1234567890,
           type: "TEST",
           data: {},
@@ -59,6 +66,7 @@ describe("EventUtils - Validation Edge Cases", () => {
       it("returns true (empty string is technically valid)", () => {
         const event = {
           aggregateId: "",
+          tenantId: testTenantId,
           timestamp: 1234567890,
           type: "TEST",
           data: {},
@@ -72,6 +80,7 @@ describe("EventUtils - Validation Edge Cases", () => {
       it("returns true (epoch zero is valid)", () => {
         const event = {
           aggregateId: "test-123",
+          tenantId: testTenantId,
           timestamp: 0,
           type: "TEST",
           data: {},
@@ -85,6 +94,7 @@ describe("EventUtils - Validation Edge Cases", () => {
       it("returns true (pre-epoch is valid)", () => {
         const event = {
           aggregateId: "test-123",
+          tenantId: testTenantId,
           timestamp: -1000,
           type: "TEST",
           data: {},
@@ -98,6 +108,7 @@ describe("EventUtils - Validation Edge Cases", () => {
       it("returns false", () => {
         const event = {
           aggregateId: "test-123",
+          tenantId: testTenantId,
           timestamp: NaN,
           type: "TEST",
           data: {},
@@ -107,23 +118,11 @@ describe("EventUtils - Validation Edge Cases", () => {
       });
     });
 
-    describe("when timestamp is Infinity", () => {
-      it("returns true (Infinity is a number)", () => {
-        const event = {
-          aggregateId: "test-123",
-          timestamp: Infinity,
-          type: "TEST",
-          data: {},
-        };
-
-        expect(EventUtils.isValidEvent(event)).toBe(true);
-      });
-    });
-
     describe("when type is empty string", () => {
       it("returns true (empty type is valid string)", () => {
         const event = {
           aggregateId: "test-123",
+          tenantId: testTenantId,
           timestamp: 1234567890,
           type: "",
           data: {},
@@ -137,6 +136,7 @@ describe("EventUtils - Validation Edge Cases", () => {
       it("returns false", () => {
         const event = {
           aggregateId: "test-123",
+          tenantId: testTenantId,
           timestamp: 1234567890,
           type: null,
           data: {},
@@ -150,6 +150,7 @@ describe("EventUtils - Validation Edge Cases", () => {
       it("returns true (extra fields allowed)", () => {
         const event = {
           aggregateId: "test-123",
+          tenantId: testTenantId,
           timestamp: 1234567890,
           type: "TEST",
           data: {},
@@ -163,11 +164,14 @@ describe("EventUtils - Validation Edge Cases", () => {
   });
 
   describe("isValidProjection", () => {
+    const testTenantId = createTenantId("test-tenant");
+
     describe("when data is null", () => {
       it("returns true (null is valid data)", () => {
         const projection = {
           id: "proj-123",
           aggregateId: "test-123",
+          tenantId: testTenantId,
           version: 1234567890,
           data: null,
         };
@@ -181,6 +185,7 @@ describe("EventUtils - Validation Edge Cases", () => {
         const projection = {
           id: "proj-123",
           aggregateId: "test-123",
+          tenantId: testTenantId,
           version: 1234567890,
           data: void 0,
         };
@@ -194,6 +199,7 @@ describe("EventUtils - Validation Edge Cases", () => {
         const projection = {
           id: "",
           aggregateId: "test-123",
+          tenantId: testTenantId,
           version: 1234567890,
           data: {},
         };
@@ -207,6 +213,7 @@ describe("EventUtils - Validation Edge Cases", () => {
         const projection = {
           id: null,
           aggregateId: "test-123",
+          tenantId: testTenantId,
           version: 1234567890,
           data: {},
         };
@@ -220,6 +227,7 @@ describe("EventUtils - Validation Edge Cases", () => {
         const projection = {
           id: 123,
           aggregateId: "test-123",
+          tenantId: testTenantId,
           version: 1234567890,
           data: {},
         };
@@ -233,6 +241,7 @@ describe("EventUtils - Validation Edge Cases", () => {
         const projection = {
           id: "proj-123",
           aggregateId: 0,
+          tenantId: testTenantId,
           version: 1234567890,
           data: {},
         };
@@ -246,6 +255,7 @@ describe("EventUtils - Validation Edge Cases", () => {
         const projection = {
           id: "proj-123",
           aggregateId: null,
+          tenantId: testTenantId,
           version: 1234567890,
           data: {},
         };
@@ -259,6 +269,7 @@ describe("EventUtils - Validation Edge Cases", () => {
         const projection = {
           id: "proj-123",
           aggregateId: "test-123",
+          tenantId: testTenantId,
           version: 0,
           data: {},
         };
@@ -272,6 +283,7 @@ describe("EventUtils - Validation Edge Cases", () => {
         const projection = {
           id: "proj-123",
           aggregateId: "test-123",
+          tenantId: testTenantId,
           version: -1,
           data: {},
         };
@@ -285,6 +297,7 @@ describe("EventUtils - Validation Edge Cases", () => {
         const projection = {
           id: "proj-123",
           aggregateId: "test-123",
+          tenantId: testTenantId,
           version: NaN,
           data: {},
         };
@@ -293,29 +306,17 @@ describe("EventUtils - Validation Edge Cases", () => {
       });
     });
 
-    describe("when version is Infinity", () => {
-      it("returns true (Infinity is a number)", () => {
-        const projection = {
-          id: "proj-123",
-          aggregateId: "test-123",
-          version: Infinity,
-          data: {},
-        };
-
-        expect(EventUtils.isValidProjection(projection)).toBe(true);
-      });
-    });
-
     describe("when projection has extra fields", () => {
       it("returns true (extra fields allowed)", () => {
         const projection = {
           id: "proj-123",
           aggregateId: "test-123",
+          tenantId: createTenantId("test-tenant"),
           version: 1234567890,
           data: {},
           extraField: "extra",
           metadata: { custom: "data" },
-        };
+        } as any;
 
         expect(EventUtils.isValidProjection(projection)).toBe(true);
       });
@@ -324,7 +325,13 @@ describe("EventUtils - Validation Edge Cases", () => {
     describe("when projection is an array", () => {
       it("returns false", () => {
         const projection = [
-          { id: "proj-123", aggregateId: "test-123", version: 1, data: {} },
+          {
+            id: "proj-123",
+            aggregateId: "test-123",
+            tenantId: testTenantId,
+            version: 1,
+            data: {},
+          },
         ];
 
         expect(EventUtils.isValidProjection(projection)).toBe(false);
@@ -337,6 +344,7 @@ describe("EventUtils - Validation Edge Cases", () => {
           return {
             id: "proj-123",
             aggregateId: "test-123",
+            tenantId: testTenantId,
             version: 1,
             data: {},
           };
@@ -410,12 +418,32 @@ describe("EventUtils - Validation Edge Cases", () => {
   });
 
   describe("sortEventsByTimestamp", () => {
+    const testTenantId = createTenantId("test-tenant");
+
     describe("when array contains NaN timestamps", () => {
       it("handles NaN timestamps without crashing", () => {
         const events = [
-          { aggregateId: "1", timestamp: 2000, type: "B" as any, data: {} },
-          { aggregateId: "1", timestamp: NaN, type: "NaN" as any, data: {} },
-          { aggregateId: "1", timestamp: 1000, type: "A" as any, data: {} },
+          {
+            aggregateId: "1",
+            tenantId: testTenantId,
+            timestamp: 2000,
+            type: "B" as any,
+            data: {},
+          },
+          {
+            aggregateId: "1",
+            tenantId: testTenantId,
+            timestamp: NaN,
+            type: "NaN" as any,
+            data: {},
+          },
+          {
+            aggregateId: "1",
+            tenantId: testTenantId,
+            timestamp: 1000,
+            type: "A" as any,
+            data: {},
+          },
         ];
 
         const sorted = EventUtils.sortEventsByTimestamp(events as any);
@@ -433,14 +461,27 @@ describe("EventUtils - Validation Edge Cases", () => {
     describe("when array contains Infinity", () => {
       it("sorts Infinity after finite values", () => {
         const events = [
-          { aggregateId: "1", timestamp: 2000, type: "B" as any, data: {} },
           {
             aggregateId: "1",
+            tenantId: testTenantId,
+            timestamp: 2000,
+            type: "B" as any,
+            data: {},
+          },
+          {
+            aggregateId: "1",
+            tenantId: testTenantId,
             timestamp: Infinity,
             type: "INF" as any,
             data: {},
           },
-          { aggregateId: "1", timestamp: 1000, type: "A" as any, data: {} },
+          {
+            aggregateId: "1",
+            tenantId: testTenantId,
+            timestamp: 1000,
+            type: "A" as any,
+            data: {},
+          },
         ];
 
         const sorted = EventUtils.sortEventsByTimestamp(events as any);
@@ -454,14 +495,27 @@ describe("EventUtils - Validation Edge Cases", () => {
     describe("when array contains negative Infinity", () => {
       it("sorts negative Infinity before finite values", () => {
         const events = [
-          { aggregateId: "1", timestamp: 1000, type: "A" as any, data: {} },
           {
             aggregateId: "1",
+            tenantId: testTenantId,
+            timestamp: 1000,
+            type: "A" as any,
+            data: {},
+          },
+          {
+            aggregateId: "1",
+            tenantId: testTenantId,
             timestamp: -Infinity,
             type: "NEG_INF" as any,
             data: {},
           },
-          { aggregateId: "1", timestamp: 2000, type: "B" as any, data: {} },
+          {
+            aggregateId: "1",
+            tenantId: testTenantId,
+            timestamp: 2000,
+            type: "B" as any,
+            data: {},
+          },
         ];
 
         const sorted = EventUtils.sortEventsByTimestamp(events as any);

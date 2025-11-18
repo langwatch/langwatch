@@ -8,11 +8,21 @@ import type {
   EventStoreListCursor,
   ListAggregateIdsResult,
   Event,
-  EventMetadataBase,
   AggregateType,
 } from "../library";
-import { EventUtils } from "../library";
+import { EventUtils, createTenantId } from "../library";
 import { createLogger } from "../../../utils/logger";
+
+interface EventRecord {
+  TenantId: string;
+  AggregateType: string;
+  AggregateId: string;
+  EventId: string;
+  EventTimestamp: number;
+  EventType: string;
+  EventPayload: unknown;
+  ProcessingTraceparent: string;
+}
 
 export class EventStoreClickHouse<
   AggregateId = string,
@@ -67,13 +77,9 @@ export class EventStoreClickHouse<
             format: "JSONEachRow",
           });
 
-          const rows: Array<{
-            EventTimestamp: string;
-            EventType: string;
-            EventPayload: unknown;
-            ProcessingTraceparent: string;
-          }> = await result.json();
+          const rows = await result.json<EventRecord>();
 
+<<<<<<< Updated upstream
           return rows.map((row): EventType => {
             const timestampMs = Date.parse(row.EventTimestamp);
             const payload = row.EventPayload
@@ -81,22 +87,41 @@ export class EventStoreClickHouse<
                 ? JSON.parse(row.EventPayload)
                 : row.EventPayload
               : {};
+=======
+          return rows.map((row) => {
+            // EventTimestamp is already a number (Unix timestamp in milliseconds)
+            // Handle invalid timestamps by falling back to current time
+            let timestampMs: number;
+            if (
+              typeof row.EventTimestamp === "number" &&
+              !Number.isNaN(row.EventTimestamp)
+            ) {
+              timestampMs = row.EventTimestamp;
+            } else if (typeof row.EventTimestamp === "string") {
+              const parsed = Date.parse(row.EventTimestamp);
+              timestampMs = Number.isNaN(parsed) ? Date.now() : parsed;
+            } else {
+              timestampMs = Date.now();
+            }
+            const payload = this.parseEventPayload(row.EventPayload);
+>>>>>>> Stashed changes
 
             // Construct event object matching Event interface structure
-            // Type assertion is necessary here because EventType is a generic type parameter
-            // and we're constructing from database data, but we ensure the structure matches
-            const event: Event<AggregateId, unknown, EventMetadataBase> = {
+            // We first check the type is valid using satisfies, then cast to EventType
+            // since EventType is a generic that could be a more specific subtype, but
+            // we have already checked the type is valid using satisfies, so we can cast
+            // to EventType. TypeScript just isn't as clever as we are. hehe.
+            const event = {
               aggregateId: aggregateId,
-              timestamp: Number.isNaN(timestampMs) ? Date.now() : timestampMs,
+              tenantId: createTenantId(context.tenantId),
+              timestamp: timestampMs,
               type: row.EventType as EventType["type"],
               data: payload,
               metadata: {
-                tenantId: context.tenantId,
                 processingTraceparent: row.ProcessingTraceparent || void 0,
               },
-            };
+            } satisfies Event<AggregateId>;
 
-            // Single type assertion instead of double cast - we know the structure matches EventType
             return event as EventType;
           });
         } catch (error) {
@@ -144,8 +169,49 @@ export class EventStoreClickHouse<
         }
 
         // Validate all events before storage
+        // Security checks (tenantId) should happen before validation checks
         for (let i = 0; i < events.length; i++) {
           const event = events[i];
+
+          // First, check tenantId for security (before validation)
+          const eventTenantId = event?.tenantId;
+          if (!eventTenantId) {
+            const error = new Error(
+              `[SECURITY] Event at index ${i} has no tenantId`,
+            );
+            this.logger.error(
+              {
+                tenantId: context.tenantId,
+                eventIndex: i,
+                aggregateId: event?.aggregateId
+                  ? String(event.aggregateId)
+                  : "missing",
+                eventType: event?.type ?? "missing",
+              },
+              "Event has no tenantId",
+            );
+            throw error;
+          }
+
+          if (eventTenantId !== context.tenantId) {
+            const error = new Error(
+              `[SECURITY] Event at index ${i} has tenantId '${String(eventTenantId)}' that does not match context tenantId '${context.tenantId}'`,
+            );
+            this.logger.error(
+              {
+                tenantId: context.tenantId,
+                eventIndex: i,
+                eventTenantId,
+                aggregateId: event?.aggregateId
+                  ? String(event.aggregateId)
+                  : "missing",
+              },
+              "Tenant mismatch in event batch",
+            );
+            throw error;
+          }
+
+          // Then validate event structure
           if (!EventUtils.isValidEvent(event)) {
             const error = new Error(
               `[VALIDATION] Invalid event at index ${i}: event must have aggregateId, timestamp, type, and data`,
@@ -163,29 +229,11 @@ export class EventStoreClickHouse<
             );
             throw error;
           }
-
-          // Validate that event tenantId (if present) matches context tenantId
-          const eventTenantId = (event.metadata as { tenantId?: string })
-            ?.tenantId;
-          if (eventTenantId && eventTenantId !== context.tenantId) {
-            const error = new Error(
-              `[SECURITY] Event at index ${i} has tenantId '${eventTenantId}' that does not match context tenantId '${context.tenantId}'`,
-            );
-            this.logger.error(
-              {
-                tenantId: context.tenantId,
-                eventIndex: i,
-                eventTenantId,
-                aggregateId: String(event.aggregateId),
-              },
-              "Tenant mismatch in event batch",
-            );
-            throw error;
-          }
         }
 
         try {
           // Transform events to ClickHouse format
+<<<<<<< Updated upstream
           const eventRecords = events.map((event) => ({
             TenantId: context.tenantId,
             AggregateType: aggregateType,
@@ -198,6 +246,24 @@ export class EventStoreClickHouse<
               (event.metadata as { processingTraceparent?: string })
                 ?.processingTraceparent ?? "",
           }));
+=======
+          // For Object type columns with JSONEachRow, pass as JavaScript objects
+          // The ClickHouse client will handle serialization automatically
+          const eventRecords = events.map(
+            (event) =>
+              ({
+                TenantId: String(event.tenantId),
+                AggregateType: aggregateType,
+                AggregateId: String(event.aggregateId),
+                EventId: this.generateEventId(),
+                EventTimestamp: event.timestamp,
+                EventType: event.type,
+                EventPayload: event.data ?? {},
+                ProcessingTraceparent:
+                  event.metadata?.processingTraceparent ?? "",
+              }) satisfies EventRecord,
+          );
+>>>>>>> Stashed changes
 
           await this.clickHouseClient.insert({
             table: "event_log",
@@ -235,6 +301,7 @@ export class EventStoreClickHouse<
   }
 
   private generateEventId(): string {
+<<<<<<< Updated upstream
     // Generate a UUID v4 for the event
     // Format: xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx
     // where y is one of 8, 9, a, or b
@@ -248,6 +315,12 @@ export class EventStoreClickHouse<
     const variantChar = ["8", "9", "a", "b"][Math.floor(Math.random() * 4)];
 
     return `${randomHex(8)}-${randomHex(4)}-4${randomHex(3)}-${variantChar}${randomHex(3)}-${randomHex(12)}`;
+=======
+    // Generate a KSUID for the event!!
+    // KSUIDs are k-sortable, providing better ordering guarantees than UUIDs
+    // when used as a secondary sort key (EventTimestamp ASC, EventId ASC)
+    return generate("event").toString();
+>>>>>>> Stashed changes
   }
 
   async listAggregateIds(

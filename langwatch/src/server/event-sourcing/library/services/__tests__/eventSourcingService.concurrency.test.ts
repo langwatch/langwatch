@@ -1,13 +1,21 @@
+/* eslint-disable @typescript-eslint/unbound-method */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { EventSourcingService } from "../eventSourcingService";
-import type { EventStore } from "../../stores/eventStore";
 import type { ProjectionStore } from "../../stores/projectionStore.types";
 import type { EventHandler } from "../../processing/eventHandler";
 import type { Event, Projection } from "../../core/types";
+import type { EventStore } from "../../stores/eventStore.types";
+import { createTenantId } from "../../core/tenantId";
 import { InMemoryDistributedLock } from "../../utils/distributedLock";
 
+const tenantId = createTenantId("test-tenant");
+
 describe("EventSourcingService - Concurrency", () => {
-  let mockEventStore: any;
+  let mockEventStore: {
+    getEvents: ReturnType<typeof vi.fn>;
+    storeEvents: ReturnType<typeof vi.fn>;
+    listAggregateIds: ReturnType<typeof vi.fn>;
+  } & Partial<EventStore<string, Event<string>>>;
   let mockProjectionStore: ProjectionStore<string, Projection<string>>;
   let mockEventHandler: EventHandler<string, Event<string>, Projection<string>>;
 
@@ -34,14 +42,16 @@ describe("EventSourcingService - Concurrency", () => {
       const events: Event<string>[] = [
         {
           aggregateId: "test-1",
+          tenantId,
           timestamp: 1000,
-          type: "span.ingestion.ingested",
+          type: "lw.obs.span.ingestion.recorded",
           data: {},
         },
       ];
       const projection: Projection<string> = {
         id: "proj-1",
         aggregateId: "test-1",
+        tenantId,
         version: 1000,
         data: {},
       };
@@ -58,7 +68,7 @@ describe("EventSourcingService - Concurrency", () => {
         rebuildLockTtlMs: 5000,
       });
 
-      const context = { tenantId: "test-tenant" };
+      const context = { tenantId: createTenantId("test-tenant") };
 
       // Start first rebuild
       const promise1 = service.rebuildProjection("test-1", {
@@ -84,14 +94,16 @@ describe("EventSourcingService - Concurrency", () => {
       const events: Event<string>[] = [
         {
           aggregateId: "test-1",
+          tenantId,
           timestamp: 1000,
-          type: "span.ingestion.ingested",
+          type: "lw.obs.span.ingestion.recorded",
           data: {},
         },
       ];
       const projection: Projection<string> = {
         id: "proj-1",
         aggregateId: "test-1",
+        tenantId,
         version: 1000,
         data: {},
       };
@@ -108,7 +120,7 @@ describe("EventSourcingService - Concurrency", () => {
         rebuildLockTtlMs: 5000,
       });
 
-      const context = { tenantId: "test-tenant" };
+      const context = { tenantId: createTenantId("test-tenant") };
 
       // Start rebuilds for different aggregates - both should succeed
       const promise1 = service.rebuildProjection("test-1", {
@@ -128,14 +140,16 @@ describe("EventSourcingService - Concurrency", () => {
       const events: Event<string>[] = [
         {
           aggregateId: "test-1",
+          tenantId,
           timestamp: 1000,
-          type: "span.ingestion.ingested",
+          type: "lw.obs.span.ingestion.recorded",
           data: {},
         },
       ];
       const projection: Projection<string> = {
         id: "proj-1",
         aggregateId: "test-1",
+        tenantId,
         version: 1000,
         data: {},
       };
@@ -152,7 +166,7 @@ describe("EventSourcingService - Concurrency", () => {
         rebuildLockTtlMs: 5000,
       });
 
-      const context = { tenantId: "test-tenant" };
+      const context = { tenantId: createTenantId("test-tenant") };
 
       // First rebuild
       await service.rebuildProjection("test-1", {
@@ -174,8 +188,9 @@ describe("EventSourcingService - Concurrency", () => {
       const events: Event<string>[] = [
         {
           aggregateId: "test-1",
+          tenantId,
           timestamp: 1000,
-          type: "span.ingestion.ingested",
+          type: "lw.obs.span.ingestion.recorded",
           data: {},
         },
       ];
@@ -194,7 +209,7 @@ describe("EventSourcingService - Concurrency", () => {
         rebuildLockTtlMs: 5000,
       });
 
-      const context = { tenantId: "test-tenant" };
+      const context = { tenantId: createTenantId("test-tenant") };
 
       // First rebuild should fail
       await expect(
@@ -207,6 +222,7 @@ describe("EventSourcingService - Concurrency", () => {
       vi.mocked(mockEventHandler.handle).mockResolvedValue({
         id: "proj-1",
         aggregateId: "test-1",
+        tenantId,
         version: 1000,
         data: {},
       });
@@ -226,20 +242,23 @@ describe("EventSourcingService - Concurrency", () => {
       const events: Event<string>[] = [
         {
           aggregateId: "test-1",
+          tenantId,
           timestamp: 1000,
-          type: "span.ingestion.ingested",
+          type: "lw.obs.span.ingestion.recorded",
           data: {},
         },
       ];
       const projection1: Projection<string> = {
         id: "proj-1",
         aggregateId: "test-1",
+        tenantId,
         version: 1000,
         data: { value: "first" },
       };
       const projection2: Projection<string> = {
         id: "proj-1",
         aggregateId: "test-1",
+        tenantId,
         version: 2000,
         data: { value: "second" },
       };
@@ -257,7 +276,7 @@ describe("EventSourcingService - Concurrency", () => {
         // No distributed lock
       });
 
-      const context = { tenantId: "test-tenant" };
+      const context = { tenantId: createTenantId("test-tenant") };
 
       // Both rebuilds should succeed (no lock to prevent them)
       const promise1 = service.rebuildProjection("test-1", {

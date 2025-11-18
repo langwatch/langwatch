@@ -11,12 +11,14 @@ export interface BulkRebuildCheckpoint<AggregateId = string> {
 }
 
 /**
- * Repository interface for managing bulk rebuild checkpoints.
+ * Store interface for managing bulk rebuild checkpoints.
  *
+ * In event sourcing, "store" is the common term for persistence abstractions
+ * (as opposed to "repository" which is more common in DDD/CRUD contexts).
  * Implementations are responsible for persisting checkpoints for a given
  * tenant and aggregate type so bulk rebuilds can be resumed safely.
  */
-export interface CheckpointRepository<AggregateId = string> {
+export interface CheckpointStore<AggregateId = string> {
   /**
    * Saves a checkpoint for bulk rebuild progress.
    */

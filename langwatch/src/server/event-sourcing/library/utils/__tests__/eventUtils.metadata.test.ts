@@ -2,6 +2,9 @@ import { describe, it, expect, vi } from "vitest";
 import { EventUtils } from "../event.utils";
 import { EventStream } from "../../core/eventStream";
 import type { Event } from "../../core/types";
+import { createTenantId } from "../../core/tenantId";
+
+const tenantId = createTenantId("test-tenant");
 
 describe("buildProjectionMetadata", () => {
   describe("when EventStream has events", () => {
@@ -9,18 +12,21 @@ describe("buildProjectionMetadata", () => {
       const events: Event<string>[] = [
         {
           aggregateId: "agg-1",
+          tenantId,
           timestamp: 1000,
           type: "CREATE" as any,
           data: {},
         },
         {
           aggregateId: "agg-1",
+          tenantId,
           timestamp: 2000,
           type: "UPDATE" as any,
           data: {},
         },
         {
           aggregateId: "agg-1",
+          tenantId,
           timestamp: 3000,
           type: "DELETE" as any,
           data: {},
@@ -40,10 +46,34 @@ describe("buildProjectionMetadata", () => {
 
     it("correctly extracts eventCount, firstEventTimestamp, lastEventTimestamp", () => {
       const events: Event<string>[] = [
-        { aggregateId: "agg-1", timestamp: 500, type: "A" as any, data: {} },
-        { aggregateId: "agg-1", timestamp: 1500, type: "B" as any, data: {} },
-        { aggregateId: "agg-1", timestamp: 2500, type: "C" as any, data: {} },
-        { aggregateId: "agg-1", timestamp: 3500, type: "D" as any, data: {} },
+        {
+          aggregateId: "agg-1",
+          tenantId,
+          timestamp: 500,
+          type: "A" as any,
+          data: {},
+        },
+        {
+          aggregateId: "agg-1",
+          tenantId,
+          timestamp: 1500,
+          type: "B" as any,
+          data: {},
+        },
+        {
+          aggregateId: "agg-1",
+          tenantId,
+          timestamp: 2500,
+          type: "C" as any,
+          data: {},
+        },
+        {
+          aggregateId: "agg-1",
+          tenantId,
+          timestamp: 3500,
+          type: "D" as any,
+          data: {},
+        },
       ];
 
       const stream = new EventStream("agg-1", events);
@@ -58,6 +88,7 @@ describe("buildProjectionMetadata", () => {
       const events: Event<string>[] = [
         {
           aggregateId: "agg-1",
+          tenantId,
           timestamp: 1234,
           type: "SINGLE" as any,
           data: {},
@@ -75,11 +106,41 @@ describe("buildProjectionMetadata", () => {
 
     it("handles stream with multiple events", () => {
       const events: Event<string>[] = [
-        { aggregateId: "agg-1", timestamp: 100, type: "E1" as any, data: {} },
-        { aggregateId: "agg-1", timestamp: 200, type: "E2" as any, data: {} },
-        { aggregateId: "agg-1", timestamp: 300, type: "E3" as any, data: {} },
-        { aggregateId: "agg-1", timestamp: 400, type: "E4" as any, data: {} },
-        { aggregateId: "agg-1", timestamp: 500, type: "E5" as any, data: {} },
+        {
+          aggregateId: "agg-1",
+          tenantId,
+          timestamp: 100,
+          type: "E1" as any,
+          data: {},
+        },
+        {
+          aggregateId: "agg-1",
+          tenantId,
+          timestamp: 200,
+          type: "E2" as any,
+          data: {},
+        },
+        {
+          aggregateId: "agg-1",
+          tenantId,
+          timestamp: 300,
+          type: "E3" as any,
+          data: {},
+        },
+        {
+          aggregateId: "agg-1",
+          tenantId,
+          timestamp: 400,
+          type: "E4" as any,
+          data: {},
+        },
+        {
+          aggregateId: "agg-1",
+          tenantId,
+          timestamp: 500,
+          type: "E5" as any,
+          data: {},
+        },
       ];
 
       const stream = new EventStream("agg-1", events);
@@ -111,6 +172,7 @@ describe("buildProjectionMetadata", () => {
       const events: Event<string>[] = [
         {
           aggregateId: "agg-1",
+          tenantId,
           timestamp: 1000,
           type: "TEST" as any,
           data: {},
@@ -134,6 +196,7 @@ describe("buildProjectionMetadata", () => {
       const events: Event<string>[] = [
         {
           aggregateId: "agg-1",
+          tenantId,
           timestamp: 1000,
           type: "TEST" as any,
           data: {},
@@ -155,9 +218,27 @@ describe("buildProjectionMetadata", () => {
   describe("when events are unsorted", () => {
     it("uses sorted order from EventStream (timestamp ordering)", () => {
       const events: Event<string>[] = [
-        { aggregateId: "agg-1", timestamp: 3000, type: "C" as any, data: {} },
-        { aggregateId: "agg-1", timestamp: 1000, type: "A" as any, data: {} },
-        { aggregateId: "agg-1", timestamp: 2000, type: "B" as any, data: {} },
+        {
+          aggregateId: "agg-1",
+          tenantId,
+          timestamp: 3000,
+          type: "C" as any,
+          data: {},
+        },
+        {
+          aggregateId: "agg-1",
+          tenantId,
+          timestamp: 1000,
+          type: "A" as any,
+          data: {},
+        },
+        {
+          aggregateId: "agg-1",
+          tenantId,
+          timestamp: 2000,
+          type: "B" as any,
+          data: {},
+        },
       ];
 
       // EventStream with default timestamp ordering will sort them
@@ -174,9 +255,27 @@ describe("buildProjectionMetadata", () => {
 
     it("uses as-is order from EventStream when specified", () => {
       const events: Event<string>[] = [
-        { aggregateId: "agg-1", timestamp: 3000, type: "C" as any, data: {} },
-        { aggregateId: "agg-1", timestamp: 1000, type: "A" as any, data: {} },
-        { aggregateId: "agg-1", timestamp: 2000, type: "B" as any, data: {} },
+        {
+          aggregateId: "agg-1",
+          tenantId,
+          timestamp: 3000,
+          type: "C" as any,
+          data: {},
+        },
+        {
+          aggregateId: "agg-1",
+          tenantId,
+          timestamp: 1000,
+          type: "A" as any,
+          data: {},
+        },
+        {
+          aggregateId: "agg-1",
+          tenantId,
+          timestamp: 2000,
+          type: "B" as any,
+          data: {},
+        },
       ];
 
       // EventStream with as-is ordering preserves original order
@@ -193,9 +292,27 @@ describe("buildProjectionMetadata", () => {
   describe("edge cases", () => {
     it("handles events with same timestamp", () => {
       const events: Event<string>[] = [
-        { aggregateId: "agg-1", timestamp: 1000, type: "A" as any, data: {} },
-        { aggregateId: "agg-1", timestamp: 1000, type: "B" as any, data: {} },
-        { aggregateId: "agg-1", timestamp: 1000, type: "C" as any, data: {} },
+        {
+          aggregateId: "agg-1",
+          tenantId,
+          timestamp: 1000,
+          type: "A" as any,
+          data: {},
+        },
+        {
+          aggregateId: "agg-1",
+          tenantId,
+          timestamp: 1000,
+          type: "B" as any,
+          data: {},
+        },
+        {
+          aggregateId: "agg-1",
+          tenantId,
+          timestamp: 1000,
+          type: "C" as any,
+          data: {},
+        },
       ];
 
       const stream = new EventStream("agg-1", events);
@@ -208,7 +325,13 @@ describe("buildProjectionMetadata", () => {
 
     it("handles events with zero timestamp", () => {
       const events: Event<string>[] = [
-        { aggregateId: "agg-1", timestamp: 0, type: "ZERO" as any, data: {} },
+        {
+          aggregateId: "agg-1",
+          tenantId,
+          timestamp: 0,
+          type: "ZERO" as any,
+          data: {},
+        },
       ];
 
       const stream = new EventStream("agg-1", events);
@@ -222,13 +345,21 @@ describe("buildProjectionMetadata", () => {
       const events: Event<string>[] = [
         {
           aggregateId: "agg-1",
+          tenantId,
           timestamp: -1000,
           type: "NEGATIVE" as any,
           data: {},
         },
-        { aggregateId: "agg-1", timestamp: 0, type: "ZERO" as any, data: {} },
         {
           aggregateId: "agg-1",
+          tenantId,
+          timestamp: 0,
+          type: "ZERO" as any,
+          data: {},
+        },
+        {
+          aggregateId: "agg-1",
+          tenantId,
           timestamp: 1000,
           type: "POSITIVE" as any,
           data: {},

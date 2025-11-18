@@ -2,8 +2,8 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { EventSourcing } from "../eventSourcing";
 import { EventStoreClickHouse } from "../../stores/eventStoreClickHouse";
 import { EventStoreMemory } from "../../stores/eventStoreMemory";
-import { CheckpointRepositoryClickHouse } from "../../stores/checkpointRepositoryClickHouse";
-import { CheckpointRepositoryMemory } from "../../stores/checkpointRepositoryMemory";
+import { CheckpointStoreClickHouse } from "../../stores/checkpointStoreClickHouse";
+import { CheckpointStoreMemory } from "../../stores/checkpointStoreMemory";
 import type {
   Event,
   Projection,
@@ -95,52 +95,53 @@ describe("EventSourcing", () => {
     });
   });
 
-  describe("getCheckpointRepository()", () => {
-    it("returns ClickHouse repository when client is available", () => {
+  describe("getCheckpointStore()", () => {
+    it("returns ClickHouse store when client is available", () => {
       const mockClient = {} as any;
       vi.mocked(clickhouseUtils.getClickHouseClient).mockReturnValue(
         mockClient,
       );
 
       const instance = EventSourcing.getInstance();
-      const repo = instance.getCheckpointRepository();
+      const store = instance.getCheckpointStore();
 
-      expect(repo).toBeInstanceOf(CheckpointRepositoryClickHouse);
+      expect(store).toBeInstanceOf(CheckpointStoreClickHouse);
     });
 
-    it("returns Memory repository when client is not available", () => {
+    it("returns Memory store when client is not available", () => {
       vi.mocked(clickhouseUtils.getClickHouseClient).mockReturnValue(null);
 
       const instance = EventSourcing.getInstance();
-      const repo = instance.getCheckpointRepository();
+      const store = instance.getCheckpointStore();
 
-      expect(repo).toBeInstanceOf(CheckpointRepositoryMemory);
+      expect(store).toBeInstanceOf(CheckpointStoreMemory);
     });
 
-    it("returns same repository instance across multiple calls", () => {
+    it("returns same store instance across multiple calls", () => {
       vi.mocked(clickhouseUtils.getClickHouseClient).mockReturnValue(null);
 
       const instance = EventSourcing.getInstance();
-      const repo1 = instance.getCheckpointRepository();
-      const repo2 = instance.getCheckpointRepository();
+      const store1 = instance.getCheckpointStore();
+      const store2 = instance.getCheckpointStore();
 
-      expect(repo1).toBe(repo2);
+      expect(store1).toBe(store2);
     });
 
-    it("repository type matches event store type", () => {
+    it("store type matches event store type", () => {
       const mockClient = {} as any;
       vi.mocked(clickhouseUtils.getClickHouseClient).mockReturnValue(
         mockClient,
       );
 
       const instance = EventSourcing.getInstance();
-      const store = instance.getEventStore();
-      const repo = instance.getCheckpointRepository();
+      const eventStore = instance.getEventStore();
+      const checkpointStore = instance.getCheckpointStore();
 
-      const isClickHouseStore = store instanceof EventStoreClickHouse;
-      const isClickHouseRepo = repo instanceof CheckpointRepositoryClickHouse;
+      const isClickHouseEventStore = eventStore instanceof EventStoreClickHouse;
+      const isClickHouseCheckpointStore =
+        checkpointStore instanceof CheckpointStoreClickHouse;
 
-      expect(isClickHouseStore).toBe(isClickHouseRepo);
+      expect(isClickHouseEventStore).toBe(isClickHouseCheckpointStore);
     });
   });
 

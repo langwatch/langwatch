@@ -1,15 +1,19 @@
 import type {
   Event,
   Projection,
-  EventStore,
-  ProjectionStore,
-  EventHandler,
   AggregateType,
 } from "../library";
 import {
-  createEventSourcingPipeline,
-  type EventSourcingService,
+  EventSourcingService,
 } from "../library";
+import type {
+  EventSourcingPipelineDefinition,
+  RegisteredPipeline,
+} from "../library/pipeline.types";
+import type {
+  EventSourcedQueueDefinition,
+  EventSourcedQueueProcessor,
+} from "./index.types";
 import {
   Queue,
   Worker,
@@ -23,38 +27,6 @@ import { createLogger } from "../../../utils/logger";
 import { getLangWatchTracer } from "langwatch";
 import { SpanKind } from "@opentelemetry/api";
 import type { SemConvAttributes } from "langwatch/observability";
-
-export interface EventSourcedQueueProcessorOptions {
-  concurrency?: number;
-}
-
-export interface EventSourcingPipelineDefinition<
-  AggregateId = string,
-  EventType extends Event<AggregateId> = Event<AggregateId>,
-  ProjectionType extends Projection<AggregateId> = Projection<AggregateId>,
-> {
-  /**
-   * Logical name for this pipeline, used for logging/metrics.
-   */
-  name: string;
-  /**
-   * Aggregate type for this pipeline (e.g., "trace", "user").
-   */
-  aggregateType: AggregateType;
-  eventStore: EventStore<AggregateId, EventType>;
-  projectionStore: ProjectionStore<AggregateId, ProjectionType>;
-  eventHandler: EventHandler<AggregateId, EventType, ProjectionType>;
-}
-
-export interface RegisteredPipeline<
-  AggregateId = string,
-  EventType extends Event<AggregateId> = Event<AggregateId>,
-  ProjectionType extends Projection<AggregateId> = Projection<AggregateId>,
-> {
-  name: string;
-  aggregateType: AggregateType;
-  service: EventSourcingService<AggregateId, EventType, ProjectionType>;
-}
 
 export class EventSourcingPipeline<
   AggregateId = string,
@@ -91,11 +63,7 @@ export class EventSourcingPipeline<
       configurable: false,
     });
     Object.defineProperty(this, "service", {
-      value: createEventSourcingPipeline<
-        AggregateId,
-        EventType,
-        ProjectionType
-      >({
+      value: new EventSourcingService<AggregateId, EventType, ProjectionType>({
         aggregateType: definition.aggregateType,
         eventStore: definition.eventStore,
         projectionStore: definition.projectionStore,
@@ -108,39 +76,6 @@ export class EventSourcingPipeline<
   }
 }
 
-export interface EventSourcedQueueDefinition<Payload> {
-  queueName: string;
-  jobName: string;
-  /**
-   * Optional job ID factory for idempotency.
-   */
-  makeJobId?: (payload: Payload) => string;
-  /**
-   * Domain-specific processor that runs inside the worker.
-   */
-  process: (payload: Payload) => Promise<void>;
-
-  /**
-   * Optional options for the queue processor.
-   */
-  options?: EventSourcedQueueProcessorOptions;
-
-  /**
-   * Optional function to extract span attributes from the payload.
-   * These attributes will be merged with common attributes like queue.name, queue.job_name, etc.
-   */
-  spanAttributes?: (payload: Payload) => SemConvAttributes;
-}
-
-export interface EventSourcedQueueProcessor<Payload> {
-  send(payload: Payload): Promise<void>;
-  /**
-   * Gracefully closes the queue processor, waiting for in-flight jobs to complete.
-   * Should be called during application shutdown.
-   */
-  close(): Promise<void>;
-}
-
 export class EventSourcedQueueProcessorImpl<Payload>
   implements EventSourcedQueueProcessor<Payload>
 {
@@ -150,19 +85,27 @@ export class EventSourcedQueueProcessorImpl<Payload>
   private readonly jobName: string;
   private readonly makeJobId?: (payload: Payload) => string;
   private readonly process: (payload: Payload) => Promise<void>;
-  private readonly spanAttributes?: (
-    payload: Payload,
-  ) => SemConvAttributes;
+  private readonly spanAttributes?: (payload: Payload) => SemConvAttributes;
   private readonly queue?: Queue<Payload, void, string>;
   private readonly worker?: Worker<Payload, void, string>;
   private readonly isInline: boolean;
 
+  private readonly delay?: number;
+
   constructor(definition: EventSourcedQueueDefinition<Payload>) {
-    const { queueName, jobName, makeJobId, process, options, spanAttributes } =
-      definition;
+    const {
+      queueName,
+      jobName,
+      makeJobId,
+      process,
+      options,
+      delay,
+      spanAttributes,
+    } = definition;
 
     this.tracer = getLangWatchTracer("langwatch.event-sourcing.queue");
     this.spanAttributes = spanAttributes;
+    this.delay = delay;
 
     this.queueName = queueName;
     this.jobName = jobName;
@@ -189,6 +132,7 @@ export class EventSourcedQueueProcessorImpl<Payload>
           type: "exponential",
           delay: 2000,
         },
+        delay: this.delay ?? 0,
         removeOnComplete: {
           age: 3600,
           count: 1000,
@@ -275,7 +219,12 @@ export class EventSourcedQueueProcessorImpl<Payload>
     }
 
     const jobId = this.makeJobId ? this.makeJobId(payload) : void 0;
-    const opts: JobsOptions = jobId ? { jobId } : {};
+    const opts: JobsOptions = {
+      ...(jobId ? { jobId } : {}),
+      ...(this.delay !== void 0 ? { delay: this.delay } : {}),
+      // When jobId is provided and a job with the same ID exists, BullMQ will
+      // automatically replace it if it's still waiting. This enables batching/debouncing.
+    };
 
     await this.tracer.withActiveSpan(
       `EventSourcedQueue.send.${this.queueName}`,

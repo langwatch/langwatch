@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { EventStream } from "../eventStream";
 import type { Event } from "../types";
+import { createTenantId } from "../../core/tenantId";
 
 describe("EventStream - Edge Cases", () => {
   describe("when events have identical timestamps", () => {
@@ -8,20 +9,23 @@ describe("EventStream - Edge Cases", () => {
       const events: Event[] = [
         {
           aggregateId: "1",
+          tenantId: createTenantId("test-tenant"),
           timestamp: 1000,
-          type: "span.ingestion.ingested",
+          type: "lw.obs.span.ingestion.recorded",
           data: { order: 1 },
         },
         {
           aggregateId: "1",
+          tenantId: createTenantId("test-tenant"),
           timestamp: 1000,
-          type: "trace.projection.reset",
+          type: "lw.obs.trace.projection.reset",
           data: { order: 2 },
         },
         {
           aggregateId: "1",
+          tenantId: createTenantId("test-tenant"),
           timestamp: 1000,
-          type: "trace.projection.recomputed",
+          type: "lw.obs.trace.projection.recomputed",
           data: { order: 3 },
         },
       ];
@@ -30,29 +34,32 @@ describe("EventStream - Edge Cases", () => {
       const orderedEvents = stream.getEvents();
 
       // Sort is stable in V8, so original order should be preserved
-      expect(orderedEvents[0]!.type).toBe("span.ingestion.ingested");
-      expect(orderedEvents[1]!.type).toBe("trace.projection.reset");
-      expect(orderedEvents[2]!.type).toBe("trace.projection.recomputed");
+      expect(orderedEvents[0]!.type).toBe("lw.obs.span.ingestion.recorded");
+      expect(orderedEvents[1]!.type).toBe("lw.obs.trace.projection.reset");
+      expect(orderedEvents[2]!.type).toBe("lw.obs.trace.projection.recomputed");
     });
 
     it("does not lose events with identical timestamps", () => {
       const events: Event[] = [
         {
           aggregateId: "1",
+          tenantId: createTenantId("test-tenant"),
           timestamp: 1000,
-          type: "span.ingestion.ingested",
+          type: "lw.obs.span.ingestion.recorded",
           data: {},
         },
         {
           aggregateId: "1",
+          tenantId: createTenantId("test-tenant"),
           timestamp: 1000,
-          type: "trace.projection.reset",
+          type: "lw.obs.trace.projection.reset",
           data: {},
         },
         {
           aggregateId: "1",
+          tenantId: createTenantId("test-tenant"),
           timestamp: 1000,
-          type: "trace.projection.recomputed",
+          type: "lw.obs.trace.projection.recomputed",
           data: {},
         },
       ];
@@ -69,8 +76,9 @@ describe("EventStream - Edge Cases", () => {
       const events: Event<number>[] = [
         {
           aggregateId: maxInt,
+          tenantId: createTenantId("test-tenant"),
           timestamp: 1000,
-          type: "span.ingestion.ingested",
+          type: "lw.obs.span.ingestion.recorded",
           data: {},
         },
       ];
@@ -85,8 +93,9 @@ describe("EventStream - Edge Cases", () => {
       const events: Event<number>[] = [
         {
           aggregateId: -42,
+          tenantId: createTenantId("test-tenant"),
           timestamp: 1000,
-          type: "span.ingestion.ingested",
+          type: "lw.obs.span.ingestion.recorded",
           data: {},
         },
       ];
@@ -101,8 +110,9 @@ describe("EventStream - Edge Cases", () => {
       const events: Event<number>[] = [
         {
           aggregateId: 0,
+          tenantId: createTenantId("test-tenant"),
           timestamp: 1000,
-          type: "span.ingestion.ingested",
+          type: "lw.obs.span.ingestion.recorded",
           data: {},
         },
       ];
@@ -120,8 +130,9 @@ describe("EventStream - Edge Cases", () => {
       const events: Event<typeof objId>[] = [
         {
           aggregateId: objId,
+          tenantId: createTenantId("test-tenant"),
           timestamp: 1000,
-          type: "span.ingestion.ingested",
+          type: "lw.obs.span.ingestion.recorded",
           data: {},
         },
       ];
@@ -143,8 +154,9 @@ describe("EventStream - Edge Cases", () => {
       const events: Event<typeof objId>[] = [
         {
           aggregateId: objId,
+          tenantId: createTenantId("test-tenant"),
           timestamp: 1000,
-          type: "span.ingestion.ingested",
+          type: "lw.obs.span.ingestion.recorded",
           data: {},
         },
       ];
@@ -173,20 +185,23 @@ describe("EventStream - Edge Cases", () => {
       const events: Event[] = [
         {
           aggregateId: "1",
+          tenantId: createTenantId("test-tenant"),
           timestamp: 1000,
-          type: "span.ingestion.ingested",
+          type: "lw.obs.span.ingestion.recorded",
           data: { priority: 3 },
         },
         {
           aggregateId: "1",
+          tenantId: createTenantId("test-tenant"),
           timestamp: 2000,
-          type: "trace.projection.reset",
+          type: "lw.obs.trace.projection.reset",
           data: { priority: 1 },
         },
         {
           aggregateId: "1",
+          tenantId: createTenantId("test-tenant"),
           timestamp: 3000,
-          type: "trace.projection.recomputed",
+          type: "lw.obs.trace.projection.recomputed",
           data: { priority: 2 },
         },
       ];
@@ -199,29 +214,32 @@ describe("EventStream - Edge Cases", () => {
       });
 
       const ordered = stream.getEvents();
-      expect(ordered[0]!.type).toBe("trace.projection.reset"); // priority 1
-      expect(ordered[1]!.type).toBe("trace.projection.recomputed"); // priority 2
-      expect(ordered[2]!.type).toBe("span.ingestion.ingested"); // priority 3
+      expect(ordered[0]!.type).toBe("lw.obs.trace.projection.reset"); // priority 1
+      expect(ordered[1]!.type).toBe("lw.obs.trace.projection.recomputed"); // priority 2
+      expect(ordered[2]!.type).toBe("lw.obs.span.ingestion.recorded"); // priority 3
     });
 
     it("metadata reflects original event order not sorted order", () => {
       const events: Event[] = [
         {
           aggregateId: "1",
+          tenantId: createTenantId("test-tenant"),
           timestamp: 3000,
-          type: "trace.projection.recomputed",
+          type: "lw.obs.trace.projection.recomputed",
           data: {},
         },
         {
           aggregateId: "1",
+          tenantId: createTenantId("test-tenant"),
           timestamp: 1000,
-          type: "span.ingestion.ingested",
+          type: "lw.obs.span.ingestion.recorded",
           data: {},
         },
         {
           aggregateId: "1",
+          tenantId: createTenantId("test-tenant"),
           timestamp: 2000,
-          type: "trace.projection.reset",
+          type: "lw.obs.trace.projection.reset",
           data: {},
         },
       ];
@@ -242,9 +260,10 @@ describe("EventStream - Edge Cases", () => {
   describe("when events array is large", () => {
     it("handles 10000 events without error", () => {
       const events: Event[] = Array.from({ length: 10000 }, (_, i) => ({
+        tenantId: createTenantId("test-tenant"),
         aggregateId: "1",
         timestamp: i * 1000,
-        type: "span.ingestion.ingested",
+        type: "lw.obs.span.ingestion.recorded",
         data: { index: i },
       }));
 
@@ -257,9 +276,10 @@ describe("EventStream - Edge Cases", () => {
     it("sorts large event stream efficiently", () => {
       // Reverse order to force sorting
       const events: Event[] = Array.from({ length: 10000 }, (_, i) => ({
+        tenantId: createTenantId("test-tenant"),
         aggregateId: "1",
         timestamp: (10000 - i) * 1000,
-        type: "span.ingestion.ingested",
+        type: "lw.obs.span.ingestion.recorded",
         data: {},
       }));
 
@@ -290,8 +310,9 @@ describe("EventStream - Edge Cases", () => {
       const events: Event[] = [
         {
           aggregateId: "1",
+          tenantId: createTenantId("test-tenant"),
           timestamp: 1000,
-          type: "span.ingestion.ingested",
+          type: "lw.obs.span.ingestion.recorded",
           data: {},
         },
       ];
@@ -310,20 +331,23 @@ describe("EventStream - Edge Cases", () => {
       const events: Event[] = [
         {
           aggregateId: "1",
+          tenantId: createTenantId("test-tenant"),
           timestamp: 3000,
-          type: "trace.projection.recomputed",
+          type: "lw.obs.trace.projection.recomputed",
           data: {},
         },
         {
           aggregateId: "1",
+          tenantId: createTenantId("test-tenant"),
           timestamp: 1000,
-          type: "span.ingestion.ingested",
+          type: "lw.obs.span.ingestion.recorded",
           data: {},
         },
         {
           aggregateId: "1",
+          tenantId: createTenantId("test-tenant"),
           timestamp: 2000,
-          type: "trace.projection.reset",
+          type: "lw.obs.trace.projection.reset",
           data: {},
         },
       ];
@@ -340,8 +364,9 @@ describe("EventStream - Edge Cases", () => {
       const events: Event[] = [
         {
           aggregateId: "1",
+          tenantId: createTenantId("test-tenant"),
           timestamp: 1000,
-          type: "span.ingestion.ingested",
+          type: "lw.obs.span.ingestion.recorded",
           data: {},
         },
       ];
@@ -359,14 +384,16 @@ describe("EventStream - Edge Cases", () => {
       const events: Event[] = [
         {
           aggregateId: "1",
+          tenantId: createTenantId("test-tenant"),
           timestamp: 3000,
-          type: "trace.projection.recomputed",
+          type: "lw.obs.trace.projection.recomputed",
           data: {},
         },
         {
           aggregateId: "1",
+          tenantId: createTenantId("test-tenant"),
           timestamp: 1000,
-          type: "span.ingestion.ingested",
+          type: "lw.obs.span.ingestion.recorded",
           data: {},
         },
       ];

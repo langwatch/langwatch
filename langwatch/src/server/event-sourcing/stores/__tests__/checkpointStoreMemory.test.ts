@@ -1,14 +1,14 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { CheckpointRepositoryMemory } from "../checkpointRepositoryMemory";
+import { CheckpointStoreMemory } from "../checkpointStoreMemory";
 import type { BulkRebuildCheckpoint } from "../../library";
 
-describe("CheckpointRepositoryMemory", () => {
-  let repo: CheckpointRepositoryMemory;
+describe("CheckpointStoreMemory", () => {
+  let repo: CheckpointStoreMemory;
   const tenantId = "test-tenant";
   const aggregateType = "trace";
 
   beforeEach(() => {
-    repo = new CheckpointRepositoryMemory();
+    repo = new CheckpointStoreMemory();
   });
 
   describe("saveCheckpoint()", () => {

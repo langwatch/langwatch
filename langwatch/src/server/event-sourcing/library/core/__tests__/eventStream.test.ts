@@ -1,6 +1,9 @@
 import { describe, it, expect } from "vitest";
 import { EventStream } from "../eventStream";
 import type { Event } from "../types";
+import { createTenantId } from "../../core/tenantId";
+
+const tenantId = createTenantId("test-tenant");
 
 describe("EventStream", () => {
   describe('constructor with "as-is" ordering', () => {
@@ -9,20 +12,23 @@ describe("EventStream", () => {
         const events: Event[] = [
           {
             aggregateId: "1",
+            tenantId,
             timestamp: 3000,
-            type: "trace.projection.recomputed",
+            type: "lw.obs.trace.projection.recomputed",
             data: {},
           },
           {
             aggregateId: "1",
+            tenantId,
             timestamp: 1000,
-            type: "span.ingestion.ingested",
+            type: "lw.obs.span.ingestion.recorded",
             data: {},
           },
           {
             aggregateId: "1",
+            tenantId,
             timestamp: 2000,
-            type: "trace.projection.reset",
+            type: "lw.obs.trace.projection.reset",
             data: {},
           },
         ];
@@ -50,20 +56,23 @@ describe("EventStream", () => {
         const events: Event[] = [
           {
             aggregateId: "1",
+            tenantId,
             timestamp: 3000,
-            type: "trace.projection.recomputed",
+            type: "lw.obs.trace.projection.recomputed",
             data: {},
           },
           {
             aggregateId: "1",
+            tenantId,
             timestamp: 1000,
-            type: "span.ingestion.ingested",
+            type: "lw.obs.span.ingestion.recorded",
             data: {},
           },
           {
             aggregateId: "1",
+            tenantId,
             timestamp: 2000,
-            type: "trace.projection.reset",
+            type: "lw.obs.trace.projection.reset",
             data: {},
           },
         ];
@@ -79,20 +88,23 @@ describe("EventStream", () => {
         const events: Event[] = [
           {
             aggregateId: "1",
+            tenantId,
             timestamp: 1000,
-            type: "span.ingestion.ingested",
+            type: "lw.obs.span.ingestion.recorded",
             data: {},
           },
           {
             aggregateId: "1",
+            tenantId,
             timestamp: 2000,
-            type: "trace.projection.reset",
+            type: "lw.obs.trace.projection.reset",
             data: {},
           },
           {
             aggregateId: "1",
+            tenantId,
             timestamp: 3000,
-            type: "trace.projection.recomputed",
+            type: "lw.obs.trace.projection.recomputed",
             data: {},
           },
         ];
@@ -120,20 +132,23 @@ describe("EventStream", () => {
         const events: Event[] = [
           {
             aggregateId: "1",
+            tenantId,
             timestamp: 1000,
-            type: "span.ingestion.ingested",
+            type: "lw.obs.span.ingestion.recorded",
             data: {},
           },
           {
             aggregateId: "1",
+            tenantId,
             timestamp: 2000,
-            type: "trace.projection.reset",
+            type: "lw.obs.trace.projection.reset",
             data: {},
           },
           {
             aggregateId: "1",
+            tenantId,
             timestamp: 3000,
-            type: "trace.projection.recomputed",
+            type: "lw.obs.trace.projection.recomputed",
             data: {},
           },
         ];
@@ -174,8 +189,9 @@ describe("EventStream", () => {
         const events: Event[] = [
           {
             aggregateId: "1",
+            tenantId,
             timestamp: 1000,
-            type: "span.ingestion.ingested",
+            type: "lw.obs.span.ingestion.recorded",
             data: {},
           },
         ];
@@ -207,14 +223,16 @@ describe("EventStream", () => {
         const events: Event[] = [
           {
             aggregateId: "1",
+            tenantId,
             timestamp: 1000,
-            type: "span.ingestion.ingested",
+            type: "lw.obs.span.ingestion.recorded",
             data: {},
           },
           {
             aggregateId: "1",
+            tenantId,
             timestamp: 2000,
-            type: "trace.projection.reset",
+            type: "lw.obs.trace.projection.reset",
             data: {},
           },
         ];
@@ -228,14 +246,16 @@ describe("EventStream", () => {
         const events: Event[] = [
           {
             aggregateId: "1",
+            tenantId,
             timestamp: 1000,
-            type: "span.ingestion.ingested",
+            type: "lw.obs.span.ingestion.recorded",
             data: {},
           },
           {
             aggregateId: "1",
+            tenantId,
             timestamp: 2000,
-            type: "trace.projection.reset",
+            type: "lw.obs.trace.projection.reset",
             data: {},
           },
         ];
@@ -251,8 +271,9 @@ describe("EventStream", () => {
         const events: Event<number>[] = [
           {
             aggregateId: 123,
+            tenantId,
             timestamp: 1000,
-            type: "span.ingestion.ingested",
+            type: "lw.obs.span.ingestion.recorded",
             data: {},
           },
         ];
@@ -277,8 +298,9 @@ describe("EventStream", () => {
       const events: Event[] = [
         {
           aggregateId: "1",
+          tenantId,
           timestamp: 1000,
-          type: "span.ingestion.ingested",
+          type: "lw.obs.span.ingestion.recorded",
           data: {},
         },
       ];

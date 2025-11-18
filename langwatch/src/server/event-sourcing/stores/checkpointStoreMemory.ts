@@ -1,12 +1,13 @@
-import type { CheckpointRepository, BulkRebuildCheckpoint } from "../library";
+import type { CheckpointStore, BulkRebuildCheckpoint } from "../library";
 import { EventUtils } from "../library";
 
 /**
- * In-memory implementation of checkpoint repository for testing.
+ * In-memory implementation of checkpoint store for testing.
+ *
+ * In event sourcing, "store" is the common term for persistence abstractions
+ * (as opposed to "repository" which is more common in DDD/CRUD contexts).
  */
-export class CheckpointRepositoryMemory
-  implements CheckpointRepository<string>
-{
+export class CheckpointStoreMemory implements CheckpointStore<string> {
   private checkpoints = new Map<string, BulkRebuildCheckpoint<string>>();
 
   async saveCheckpoint(
@@ -17,7 +18,7 @@ export class CheckpointRepositoryMemory
     // Validate tenant context
     EventUtils.validateTenantId(
       { tenantId },
-      "CheckpointRepositoryMemory.saveCheckpoint",
+      "CheckpointStoreMemory.saveCheckpoint",
     );
 
     const key = `${tenantId}:${aggregateType}`;
@@ -36,7 +37,7 @@ export class CheckpointRepositoryMemory
     // Validate tenant context
     EventUtils.validateTenantId(
       { tenantId },
-      "CheckpointRepositoryMemory.loadCheckpoint",
+      "CheckpointStoreMemory.loadCheckpoint",
     );
 
     const key = `${tenantId}:${aggregateType}`;
@@ -59,10 +60,11 @@ export class CheckpointRepositoryMemory
     // Validate tenant context
     EventUtils.validateTenantId(
       { tenantId },
-      "CheckpointRepositoryMemory.clearCheckpoint",
+      "CheckpointStoreMemory.clearCheckpoint",
     );
 
     const key = `${tenantId}:${aggregateType}`;
     this.checkpoints.delete(key);
   }
 }
+

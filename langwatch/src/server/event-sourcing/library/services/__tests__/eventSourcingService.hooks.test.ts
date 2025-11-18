@@ -4,14 +4,21 @@ import { EventSourcingService } from "../eventSourcingService";
 import type { ProjectionStore } from "../../stores/projectionStore.types";
 import type { EventHandler } from "../../processing/eventHandler";
 import type { Event, Projection } from "../../core/types";
+import type { EventStore } from "../../stores/eventStore.types";
+import { createTenantId } from "../../core/tenantId";
+
+const tenantId = createTenantId("test-tenant");
 
 describe("EventSourcingService - Hook Error Recovery", () => {
-  let mockEventStore: any;
+  let mockEventStore: {
+    getEvents: ReturnType<typeof vi.fn>;
+    storeEvents: ReturnType<typeof vi.fn>;
+    listAggregateIds?: ReturnType<typeof vi.fn>;
+  } & Partial<EventStore<string, Event<string>>>;
   let mockProjectionStore: ProjectionStore<string, Projection<string>>;
   let mockEventHandler: EventHandler<string, Event<string>, Projection<string>>;
 
   beforeEach(() => {
-    // @ts-ignore we intentionally use a relaxed mock shape for the event store in tests
     mockEventStore = {
       getEvents: vi.fn(),
       storeEvents: vi.fn(),
@@ -32,8 +39,9 @@ describe("EventSourcingService - Hook Error Recovery", () => {
       const events: Event<string>[] = [
         {
           aggregateId: "test-1",
+          tenantId,
           timestamp: 1000,
-          type: "span.ingestion.ingested",
+          type: "lw.obs.span.ingestion.recorded",
           data: {},
         },
       ];
@@ -54,7 +62,7 @@ describe("EventSourcingService - Hook Error Recovery", () => {
 
       await expect(
         service.rebuildProjection("test-1", {
-          eventStoreContext: { tenantId: "test-tenant" },
+          eventStoreContext: { tenantId: createTenantId("test-tenant") },
         }),
       ).rejects.toThrow("beforeHandle failed");
       expect(mockEventHandler.handle).not.toHaveBeenCalled();
@@ -64,8 +72,9 @@ describe("EventSourcingService - Hook Error Recovery", () => {
       const events: Event<string>[] = [
         {
           aggregateId: "test-1",
+          tenantId,
           timestamp: 1000,
-          type: "span.ingestion.ingested",
+          type: "lw.obs.span.ingestion.recorded",
           data: {},
         },
       ];
@@ -86,7 +95,7 @@ describe("EventSourcingService - Hook Error Recovery", () => {
 
       await expect(
         service.rebuildProjection("test-1", {
-          eventStoreContext: { tenantId: "test-tenant" },
+          eventStoreContext: { tenantId: createTenantId("test-tenant") },
         }),
       ).rejects.toThrow();
       expect(mockProjectionStore.storeProjection).not.toHaveBeenCalled();
@@ -98,14 +107,16 @@ describe("EventSourcingService - Hook Error Recovery", () => {
       const events: Event<string>[] = [
         {
           aggregateId: "test-1",
+          tenantId,
           timestamp: 1000,
-          type: "span.ingestion.ingested",
+          type: "lw.obs.span.ingestion.recorded",
           data: {},
         },
       ];
       const projection: Projection<string> = {
         id: "proj-1",
         aggregateId: "test-1",
+        tenantId,
         version: 1000,
         data: {},
       };
@@ -127,7 +138,7 @@ describe("EventSourcingService - Hook Error Recovery", () => {
 
       await expect(
         service.rebuildProjection("test-1", {
-          eventStoreContext: { tenantId: "test-tenant" },
+          eventStoreContext: { tenantId: createTenantId("test-tenant") },
         }),
       ).rejects.toThrow("afterHandle failed");
       expect(mockProjectionStore.storeProjection).not.toHaveBeenCalled();
@@ -137,14 +148,16 @@ describe("EventSourcingService - Hook Error Recovery", () => {
       const events: Event<string>[] = [
         {
           aggregateId: "test-1",
+          tenantId,
           timestamp: 1000,
-          type: "span.ingestion.ingested",
+          type: "lw.obs.span.ingestion.recorded",
           data: {},
         },
       ];
       const projection: Projection<string> = {
         id: "proj-1",
         aggregateId: "test-1",
+        tenantId,
         version: 1000,
         data: {},
       };
@@ -166,7 +179,7 @@ describe("EventSourcingService - Hook Error Recovery", () => {
 
       await expect(
         service.rebuildProjection("test-1", {
-          eventStoreContext: { tenantId: "test-tenant" },
+          eventStoreContext: { tenantId: createTenantId("test-tenant") },
         }),
       ).rejects.toThrow();
       expect(mockEventHandler.handle).toHaveBeenCalled();
@@ -178,14 +191,16 @@ describe("EventSourcingService - Hook Error Recovery", () => {
       const events: Event<string>[] = [
         {
           aggregateId: "test-1",
+          tenantId,
           timestamp: 1000,
-          type: "span.ingestion.ingested",
+          type: "lw.obs.span.ingestion.recorded",
           data: {},
         },
       ];
       const projection: Projection<string> = {
         id: "proj-1",
         aggregateId: "test-1",
+        tenantId,
         version: 1000,
         data: {},
       };
@@ -207,7 +222,7 @@ describe("EventSourcingService - Hook Error Recovery", () => {
 
       await expect(
         service.rebuildProjection("test-1", {
-          eventStoreContext: { tenantId: "test-tenant" },
+          eventStoreContext: { tenantId: createTenantId("test-tenant") },
         }),
       ).rejects.toThrow("beforePersist failed");
       expect(mockProjectionStore.storeProjection).not.toHaveBeenCalled();
@@ -217,14 +232,16 @@ describe("EventSourcingService - Hook Error Recovery", () => {
       const events: Event<string>[] = [
         {
           aggregateId: "test-1",
+          tenantId,
           timestamp: 1000,
-          type: "span.ingestion.ingested",
+          type: "lw.obs.span.ingestion.recorded",
           data: {},
         },
       ];
       const projection: Projection<string> = {
         id: "proj-1",
         aggregateId: "test-1",
+        tenantId,
         version: 1000,
         data: {},
       };
@@ -246,7 +263,7 @@ describe("EventSourcingService - Hook Error Recovery", () => {
 
       await expect(
         service.rebuildProjection("test-1", {
-          eventStoreContext: { tenantId: "test-tenant" },
+          eventStoreContext: { tenantId: createTenantId("test-tenant") },
         }),
       ).rejects.toThrow();
       expect(mockEventHandler.handle).toHaveBeenCalled();
@@ -258,14 +275,16 @@ describe("EventSourcingService - Hook Error Recovery", () => {
       const events: Event<string>[] = [
         {
           aggregateId: "test-1",
+          tenantId,
           timestamp: 1000,
-          type: "span.ingestion.ingested",
+          type: "lw.obs.span.ingestion.recorded",
           data: {},
         },
       ];
       const projection: Projection<string> = {
         id: "proj-1",
         aggregateId: "test-1",
+        tenantId,
         version: 1000,
         data: {},
       };
@@ -287,13 +306,13 @@ describe("EventSourcingService - Hook Error Recovery", () => {
 
       await expect(
         service.rebuildProjection("test-1", {
-          eventStoreContext: { tenantId: "test-tenant" },
+          eventStoreContext: { tenantId: createTenantId("test-tenant") },
         }),
       ).rejects.toThrow("afterPersist failed");
       // Projection WAS stored despite the error
       expect(mockProjectionStore.storeProjection).toHaveBeenCalledWith(
         projection,
-        { tenantId: "test-tenant" },
+        { tenantId: createTenantId("test-tenant") },
       );
     });
 
@@ -301,14 +320,16 @@ describe("EventSourcingService - Hook Error Recovery", () => {
       const events: Event<string>[] = [
         {
           aggregateId: "test-1",
+          tenantId,
           timestamp: 1000,
-          type: "span.ingestion.ingested",
+          type: "lw.obs.span.ingestion.recorded",
           data: {},
         },
       ];
       const projection: Projection<string> = {
         id: "proj-1",
         aggregateId: "test-1",
+        tenantId,
         version: 1000,
         data: {},
       };
@@ -330,7 +351,7 @@ describe("EventSourcingService - Hook Error Recovery", () => {
 
       await expect(
         service.rebuildProjection("test-1", {
-          eventStoreContext: { tenantId: "test-tenant" },
+          eventStoreContext: { tenantId: createTenantId("test-tenant") },
         }),
       ).rejects.toThrow("afterPersist failed");
     });
@@ -341,14 +362,16 @@ describe("EventSourcingService - Hook Error Recovery", () => {
       const events: Event<string>[] = [
         {
           aggregateId: "test-1",
+          tenantId,
           timestamp: 1000,
-          type: "span.ingestion.ingested",
+          type: "lw.obs.span.ingestion.recorded",
           data: {},
         },
       ];
       const projection: Projection<string> = {
         id: "proj-1",
         aggregateId: "test-1",
+        tenantId,
         version: 1000,
         data: {},
       };
@@ -371,7 +394,7 @@ describe("EventSourcingService - Hook Error Recovery", () => {
 
       await expect(
         service.rebuildProjection("test-1", {
-          eventStoreContext: { tenantId: "test-tenant" },
+          eventStoreContext: { tenantId: createTenantId("test-tenant") },
         }),
       ).rejects.toThrow("Store failed");
       expect(afterPersist).not.toHaveBeenCalled();
@@ -383,8 +406,9 @@ describe("EventSourcingService - Hook Error Recovery", () => {
       const events: Event<string>[] = [
         {
           aggregateId: "test-1",
+          tenantId,
           timestamp: 1000,
-          type: "span.ingestion.ingested",
+          type: "lw.obs.span.ingestion.recorded",
           data: {},
         },
       ];
@@ -408,7 +432,7 @@ describe("EventSourcingService - Hook Error Recovery", () => {
 
       await expect(
         service.rebuildProjection("test-1", {
-          eventStoreContext: { tenantId: "test-tenant" },
+          eventStoreContext: { tenantId: createTenantId("test-tenant") },
         }),
       ).rejects.toThrow("beforeHandle failed");
       // afterHandle shouldn't even be reached

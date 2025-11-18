@@ -3,6 +3,7 @@
  */
 
 import type { EventType } from "./eventType";
+import type { TenantId } from "./tenantId";
 
 export interface EventMetadataBase {
   /**
@@ -21,13 +22,15 @@ export interface Event<
 > {
   /** Unique identifier for the aggregate this event belongs to */
   aggregateId: AggregateId;
+  /** The tenant ID associated with the event */
+  tenantId: TenantId;
   /** When this event occurred (Unix timestamp in milliseconds) */
   timestamp: number;
   /** Event type for routing and processing */
   type: EventType;
   /** Event-specific data */
   data: Payload;
-  /** Optional metadata about the event */
+  /** Metadata about the event, optional */
   metadata?: Metadata;
 }
 
@@ -40,6 +43,8 @@ export interface Projection<AggregateId = string, Data = unknown> {
   id: string;
   /** The aggregate this projection represents */
   aggregateId: AggregateId;
+  /** The tenant ID associated with the projection */
+  tenantId: TenantId;
   /** Version/timestamp when this projection was last updated */
   version: number;
   /** The projection data */

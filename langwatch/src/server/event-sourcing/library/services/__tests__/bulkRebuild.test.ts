@@ -3,10 +3,13 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { runBulkRebuildWithCheckpoint } from "../bulkRebuild";
 import type { EventSourcingService } from "../eventSourcingService";
 import type {
-  CheckpointRepository,
+  CheckpointStore,
   BulkRebuildCheckpoint,
 } from "../../stores/bulkRebuildCheckpoint";
 import type { Event, Projection } from "../../core/types";
+import { createTenantId } from "../../core/tenantId";
+
+const tenantId = createTenantId("test-tenant");
 
 describe("runBulkRebuildWithCheckpoint", () => {
   let mockEventSourcingService: EventSourcingService<
@@ -14,7 +17,7 @@ describe("runBulkRebuildWithCheckpoint", () => {
     Event<string>,
     Projection<string>
   >;
-  let mockCheckpointRepository: CheckpointRepository<string>;
+  let mockCheckpointStore: CheckpointStore<string>;
   let mockOnProgress: (progress: {
     checkpoint: BulkRebuildCheckpoint<string>;
   }) => Promise<void> | void;
@@ -24,7 +27,7 @@ describe("runBulkRebuildWithCheckpoint", () => {
       rebuildProjectionsInBatches: vi.fn(),
     } as any;
 
-    mockCheckpointRepository = {
+    mockCheckpointStore = {
       loadCheckpoint: vi.fn(),
       saveCheckpoint: vi.fn(),
       clearCheckpoint: vi.fn(),
@@ -46,7 +49,7 @@ describe("runBulkRebuildWithCheckpoint", () => {
         processedCount: 100,
       };
 
-      vi.mocked(mockCheckpointRepository.loadCheckpoint).mockResolvedValue(
+      vi.mocked(mockCheckpointStore.loadCheckpoint).mockResolvedValue(
         checkpoint,
       );
       vi.mocked(
@@ -56,19 +59,19 @@ describe("runBulkRebuildWithCheckpoint", () => {
       await runBulkRebuildWithCheckpoint(
         {
           eventSourcingService: mockEventSourcingService,
-          checkpointRepository: mockCheckpointRepository,
+          checkpointStore: mockCheckpointStore,
         },
         {
-          tenantId: "test-tenant",
+          tenantId,
           aggregateType: "trace",
           resumeFromCheckpoint: true,
-          eventStoreContext: { tenantId: "test-tenant" },
-          projectionStoreContext: { tenantId: "test-tenant" },
+          eventStoreContext: { tenantId },
+          projectionStoreContext: { tenantId },
         },
       );
 
-      expect(mockCheckpointRepository.loadCheckpoint).toHaveBeenCalledWith(
-        "test-tenant",
+      expect(mockCheckpointStore.loadCheckpoint).toHaveBeenCalledWith(
+        tenantId,
         "trace",
       );
       expect(
@@ -93,18 +96,18 @@ describe("runBulkRebuildWithCheckpoint", () => {
       await runBulkRebuildWithCheckpoint(
         {
           eventSourcingService: mockEventSourcingService,
-          checkpointRepository: mockCheckpointRepository,
+          checkpointStore: mockCheckpointStore,
         },
         {
-          tenantId: "test-tenant",
+          tenantId,
           aggregateType: "trace",
           resumeFromCheckpoint: false,
-          eventStoreContext: { tenantId: "test-tenant" },
-          projectionStoreContext: { tenantId: "test-tenant" },
+          eventStoreContext: { tenantId },
+          projectionStoreContext: { tenantId },
         },
       );
 
-      expect(mockCheckpointRepository.loadCheckpoint).not.toHaveBeenCalled();
+      expect(mockCheckpointStore.loadCheckpoint).not.toHaveBeenCalled();
       expect(
         mockEventSourcingService.rebuildProjectionsInBatches,
       ).toHaveBeenCalledWith(
@@ -120,7 +123,7 @@ describe("runBulkRebuildWithCheckpoint", () => {
         processedCount: 100,
       };
 
-      vi.mocked(mockCheckpointRepository.loadCheckpoint).mockResolvedValue(
+      vi.mocked(mockCheckpointStore.loadCheckpoint).mockResolvedValue(
         null,
       );
       vi.mocked(
@@ -130,19 +133,19 @@ describe("runBulkRebuildWithCheckpoint", () => {
       await runBulkRebuildWithCheckpoint(
         {
           eventSourcingService: mockEventSourcingService,
-          checkpointRepository: mockCheckpointRepository,
+          checkpointStore: mockCheckpointStore,
         },
         {
-          tenantId: "test-tenant",
+          tenantId,
           aggregateType: "trace",
           resumeFromCheckpoint: true,
-          eventStoreContext: { tenantId: "test-tenant" },
-          projectionStoreContext: { tenantId: "test-tenant" },
+          eventStoreContext: { tenantId },
+          projectionStoreContext: { tenantId },
         },
       );
 
-      expect(mockCheckpointRepository.loadCheckpoint).toHaveBeenCalledWith(
-        "test-tenant",
+      expect(mockCheckpointStore.loadCheckpoint).toHaveBeenCalledWith(
+        tenantId,
         "trace",
       );
       expect(
@@ -166,7 +169,7 @@ describe("runBulkRebuildWithCheckpoint", () => {
         processedCount: 150,
       };
 
-      vi.mocked(mockCheckpointRepository.loadCheckpoint).mockResolvedValue(
+      vi.mocked(mockCheckpointStore.loadCheckpoint).mockResolvedValue(
         checkpoint,
       );
       vi.mocked(
@@ -176,14 +179,14 @@ describe("runBulkRebuildWithCheckpoint", () => {
       await runBulkRebuildWithCheckpoint(
         {
           eventSourcingService: mockEventSourcingService,
-          checkpointRepository: mockCheckpointRepository,
+          checkpointStore: mockCheckpointStore,
         },
         {
-          tenantId: "test-tenant",
+          tenantId,
           aggregateType: "trace",
           resumeFromCheckpoint: true,
-          eventStoreContext: { tenantId: "test-tenant" },
-          projectionStoreContext: { tenantId: "test-tenant" },
+          eventStoreContext: { tenantId },
+          projectionStoreContext: { tenantId },
         },
       );
 
@@ -195,7 +198,7 @@ describe("runBulkRebuildWithCheckpoint", () => {
   });
 
   describe("checkpoint saving", () => {
-    it("saves checkpoint via checkpointRepository.saveCheckpoint on progress", async () => {
+    it("saves checkpoint via checkpointStore.saveCheckpoint on progress", async () => {
       const progressCheckpoint: BulkRebuildCheckpoint<string> = {
         cursor: "cursor-progress",
         lastAggregateId: "agg-50",
@@ -220,18 +223,18 @@ describe("runBulkRebuildWithCheckpoint", () => {
       await runBulkRebuildWithCheckpoint(
         {
           eventSourcingService: mockEventSourcingService,
-          checkpointRepository: mockCheckpointRepository,
+          checkpointStore: mockCheckpointStore,
         },
         {
-          tenantId: "test-tenant",
+          tenantId,
           aggregateType: "trace",
-          eventStoreContext: { tenantId: "test-tenant" },
-          projectionStoreContext: { tenantId: "test-tenant" },
+          eventStoreContext: { tenantId },
+          projectionStoreContext: { tenantId },
         },
       );
 
-      expect(mockCheckpointRepository.saveCheckpoint).toHaveBeenCalledWith(
-        "test-tenant",
+      expect(mockCheckpointStore.saveCheckpoint).toHaveBeenCalledWith(
+        tenantId,
         "trace",
         progressCheckpoint,
       );
@@ -261,14 +264,14 @@ describe("runBulkRebuildWithCheckpoint", () => {
       await runBulkRebuildWithCheckpoint(
         {
           eventSourcingService: mockEventSourcingService,
-          checkpointRepository: mockCheckpointRepository,
+          checkpointStore: mockCheckpointStore,
           onProgress: mockOnProgress,
         },
         {
-          tenantId: "test-tenant",
+          tenantId,
           aggregateType: "trace",
-          eventStoreContext: { tenantId: "test-tenant" },
-          projectionStoreContext: { tenantId: "test-tenant" },
+          eventStoreContext: { tenantId },
+          projectionStoreContext: { tenantId },
         },
       );
 
@@ -300,18 +303,18 @@ describe("runBulkRebuildWithCheckpoint", () => {
       await runBulkRebuildWithCheckpoint(
         {
           eventSourcingService: mockEventSourcingService,
-          checkpointRepository: mockCheckpointRepository,
+          checkpointStore: mockCheckpointStore,
         },
         {
-          tenantId: "custom-tenant",
+          tenantId,
           aggregateType: "evaluation",
-          eventStoreContext: { tenantId: "custom-tenant" },
-          projectionStoreContext: { tenantId: "custom-tenant" },
+          eventStoreContext: { tenantId },
+          projectionStoreContext: { tenantId },
         },
       );
 
-      expect(mockCheckpointRepository.saveCheckpoint).toHaveBeenCalledWith(
-        "custom-tenant",
+      expect(mockCheckpointStore.saveCheckpoint).toHaveBeenCalledWith(
+        tenantId,
         "evaluation",
         progressCheckpoint,
       );
@@ -332,18 +335,18 @@ describe("runBulkRebuildWithCheckpoint", () => {
       await runBulkRebuildWithCheckpoint(
         {
           eventSourcingService: mockEventSourcingService,
-          checkpointRepository: mockCheckpointRepository,
+          checkpointStore: mockCheckpointStore,
         },
         {
-          tenantId: "test-tenant",
+          tenantId,
           aggregateType: "trace",
-          eventStoreContext: { tenantId: "test-tenant" },
-          projectionStoreContext: { tenantId: "test-tenant" },
+          eventStoreContext: { tenantId },
+          projectionStoreContext: { tenantId },
         },
       );
 
-      expect(mockCheckpointRepository.clearCheckpoint).toHaveBeenCalledWith(
-        "test-tenant",
+      expect(mockCheckpointStore.clearCheckpoint).toHaveBeenCalledWith(
+        tenantId,
         "trace",
       );
     });
@@ -358,18 +361,18 @@ describe("runBulkRebuildWithCheckpoint", () => {
         runBulkRebuildWithCheckpoint(
           {
             eventSourcingService: mockEventSourcingService,
-            checkpointRepository: mockCheckpointRepository,
+            checkpointStore: mockCheckpointStore,
           },
           {
-            tenantId: "test-tenant",
+            tenantId,
             aggregateType: "trace",
-            eventStoreContext: { tenantId: "test-tenant" },
-            projectionStoreContext: { tenantId: "test-tenant" },
+            eventStoreContext: { tenantId },
+            projectionStoreContext: { tenantId },
           },
         ),
       ).rejects.toThrow("Rebuild failed");
 
-      expect(mockCheckpointRepository.clearCheckpoint).toHaveBeenCalledWith(
+      expect(mockCheckpointStore.clearCheckpoint).toHaveBeenCalledWith(
         "test-tenant",
         "trace",
       );
@@ -390,14 +393,14 @@ describe("runBulkRebuildWithCheckpoint", () => {
       await runBulkRebuildWithCheckpoint(
         {
           eventSourcingService: mockEventSourcingService,
-          checkpointRepository: mockCheckpointRepository,
+          checkpointStore: mockCheckpointStore,
         },
         {
-          tenantId: "test-tenant",
+          tenantId: createTenantId("test-tenant"),
           aggregateType: "trace",
           batchSize: 50,
-          eventStoreContext: { tenantId: "test-tenant" },
-          projectionStoreContext: { tenantId: "test-tenant" },
+          eventStoreContext: { tenantId: createTenantId("test-tenant") },
+          projectionStoreContext: { tenantId: createTenantId("test-tenant") },
         },
       );
 
@@ -406,7 +409,7 @@ describe("runBulkRebuildWithCheckpoint", () => {
       ).toHaveBeenCalledWith(
         expect.objectContaining({
           batchSize: 50,
-          eventStoreContext: { tenantId: "test-tenant" },
+          eventStoreContext: { tenantId: createTenantId("test-tenant") },
           projectionStoreContext: { tenantId: "test-tenant" },
         }),
       );
@@ -423,21 +426,21 @@ describe("runBulkRebuildWithCheckpoint", () => {
       ).mockResolvedValue(finalCheckpoint);
 
       const eventStoreContext = {
-        tenantId: "test-tenant",
+        tenantId,
         metadata: { custom: "value" },
       };
       const projectionStoreContext = {
-        tenantId: "test-tenant",
+        tenantId,
         raw: { db: "connection" },
       };
 
       await runBulkRebuildWithCheckpoint(
         {
           eventSourcingService: mockEventSourcingService,
-          checkpointRepository: mockCheckpointRepository,
+          checkpointStore: mockCheckpointStore,
         },
         {
-          tenantId: "test-tenant",
+          tenantId,
           aggregateType: "trace",
           batchSize: 200,
           eventStoreContext,
@@ -467,13 +470,13 @@ describe("runBulkRebuildWithCheckpoint", () => {
       const result = await runBulkRebuildWithCheckpoint(
         {
           eventSourcingService: mockEventSourcingService,
-          checkpointRepository: mockCheckpointRepository,
+          checkpointStore: mockCheckpointStore,
         },
         {
-          tenantId: "test-tenant",
+          tenantId,
           aggregateType: "trace",
-          eventStoreContext: { tenantId: "test-tenant" },
-          projectionStoreContext: { tenantId: "test-tenant" },
+          eventStoreContext: { tenantId },
+          projectionStoreContext: { tenantId },
         },
       );
 
@@ -482,9 +485,9 @@ describe("runBulkRebuildWithCheckpoint", () => {
   });
 
   describe("error handling", () => {
-    it("propagates errors from checkpointRepository.loadCheckpoint", async () => {
+    it("propagates errors from checkpointStore.loadCheckpoint", async () => {
       const error = new Error("Failed to load checkpoint");
-      vi.mocked(mockCheckpointRepository.loadCheckpoint).mockRejectedValue(
+      vi.mocked(mockCheckpointStore.loadCheckpoint).mockRejectedValue(
         error,
       );
 
@@ -492,14 +495,14 @@ describe("runBulkRebuildWithCheckpoint", () => {
         runBulkRebuildWithCheckpoint(
           {
             eventSourcingService: mockEventSourcingService,
-            checkpointRepository: mockCheckpointRepository,
+            checkpointStore: mockCheckpointStore,
           },
           {
-            tenantId: "test-tenant",
+            tenantId,
             aggregateType: "trace",
             resumeFromCheckpoint: true,
-            eventStoreContext: { tenantId: "test-tenant" },
-            projectionStoreContext: { tenantId: "test-tenant" },
+            eventStoreContext: { tenantId },
+            projectionStoreContext: { tenantId },
           },
         ),
       ).rejects.toThrow("Failed to load checkpoint");
@@ -519,13 +522,13 @@ describe("runBulkRebuildWithCheckpoint", () => {
         runBulkRebuildWithCheckpoint(
           {
             eventSourcingService: mockEventSourcingService,
-            checkpointRepository: mockCheckpointRepository,
+            checkpointStore: mockCheckpointStore,
           },
           {
-            tenantId: "test-tenant",
+            tenantId,
             aggregateType: "trace",
-            eventStoreContext: { tenantId: "test-tenant" },
-            projectionStoreContext: { tenantId: "test-tenant" },
+            eventStoreContext: { tenantId },
+            projectionStoreContext: { tenantId },
           },
         ),
       ).rejects.toThrow("Rebuild service failed");
@@ -541,19 +544,19 @@ describe("runBulkRebuildWithCheckpoint", () => {
         runBulkRebuildWithCheckpoint(
           {
             eventSourcingService: mockEventSourcingService,
-            checkpointRepository: mockCheckpointRepository,
+            checkpointStore: mockCheckpointStore,
           },
           {
-            tenantId: "test-tenant",
+            tenantId,
             aggregateType: "trace",
-            eventStoreContext: { tenantId: "test-tenant" },
-            projectionStoreContext: { tenantId: "test-tenant" },
+            eventStoreContext: { tenantId },
+            projectionStoreContext: { tenantId },
           },
         ),
       ).rejects.toThrow("Rebuild failed");
 
       // Should still attempt cleanup
-      expect(mockCheckpointRepository.clearCheckpoint).toHaveBeenCalledWith(
+      expect(mockCheckpointStore.clearCheckpoint).toHaveBeenCalledWith(
         "test-tenant",
         "trace",
       );

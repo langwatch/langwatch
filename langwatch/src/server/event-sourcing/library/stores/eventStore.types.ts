@@ -1,5 +1,6 @@
 import type { Event } from "../core/types";
 import type { AggregateType } from "../core/aggregateType";
+import type { TenantId } from "../core/tenantId";
 
 /**
  * Context for reading events from the event store.
@@ -20,7 +21,7 @@ export interface EventStoreReadContext<
    * Tenant identifier for multi-tenant systems.
    * REQUIRED - all operations must be scoped to a specific tenant for security.
    */
-  tenantId: string;
+  tenantId: TenantId;
   /**
    * Additional metadata for the read operation.
    * Should not be used to bypass security checks.

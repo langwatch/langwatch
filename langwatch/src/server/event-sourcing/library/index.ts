@@ -38,10 +38,10 @@ export type {
   EventStoreReadContext,
   EventStoreListCursor,
   ListAggregateIdsResult,
-} from "./stores/eventStore";
+} from "./stores/eventStore.types";
 export type {
   BulkRebuildCheckpoint,
-  CheckpointRepository,
+  CheckpointStore,
 } from "./stores/bulkRebuildCheckpoint";
 export type {
   ProjectionStore,
@@ -55,9 +55,12 @@ export type {
   EventSourcingHooks,
   EventSourcingOptions,
   RebuildProjectionOptions,
-} from "./services/eventSourcingService";
+} from "./services/eventSourcingService.types";
 export { runBulkRebuildWithCheckpoint } from "./services/bulkRebuild";
-export { createEventSourcingPipeline } from "./services/createEventSourcingPipeline";
+export type {
+  EventSourcingPipelineDefinition,
+  RegisteredPipeline,
+} from "./pipeline.types";
 
 // Utility functions
 export {

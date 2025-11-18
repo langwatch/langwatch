@@ -2,13 +2,22 @@ import { describe, it, expect, vi } from "vitest";
 import { trace } from "@opentelemetry/api";
 import { EventUtils } from "../event.utils";
 import type { Event, Projection } from "../../core/types";
+import { createTenantId } from "../../core/tenantId";
+
+const testTenantId = createTenantId("test-tenant");
 
 describe("createEvent", () => {
   describe("when called with basic data", () => {
     it("returns an event with the provided fields", () => {
-      const event = EventUtils.createEvent("agg-1", "span.ingestion.ingested", { foo: "bar" });
+      const event = EventUtils.createEvent(
+        "agg-1",
+        testTenantId,
+        "lw.obs.span.ingestion.recorded",
+        { foo: "bar" },
+      );
 
       expect(event.aggregateId).toBe("agg-1");
+      expect(event.tenantId).toBe(testTenantId);
     });
   });
 });
@@ -18,7 +27,8 @@ describe("createEventWithProcessingTraceContext", () => {
     it("preserves existing processingTraceparent", () => {
       const event = EventUtils.createEventWithProcessingTraceContext(
         "agg-1",
-        "span.ingestion.ingested",
+        testTenantId,
+        "lw.obs.span.ingestion.recorded",
         {
           foo: "bar",
         },
@@ -43,7 +53,8 @@ describe("createEventWithProcessingTraceContext", () => {
 
       const event = EventUtils.createEventWithProcessingTraceContext(
         "agg-1",
-        "span.ingestion.ingested",
+        testTenantId,
+        "lw.obs.span.ingestion.recorded",
         {
           foo: "bar",
         },
@@ -71,7 +82,8 @@ describe("createEventWithProcessingTraceContext", () => {
 
       const event = EventUtils.createEventWithProcessingTraceContext(
         "agg-1",
-        "span.ingestion.ingested",
+        testTenantId,
+        "lw.obs.span.ingestion.recorded",
         {
           foo: "bar",
         },
@@ -99,7 +111,8 @@ describe("createEventWithProcessingTraceContext", () => {
 
       const event = EventUtils.createEventWithProcessingTraceContext(
         "agg-1",
-        "span.ingestion.ingested",
+        testTenantId,
+        "lw.obs.span.ingestion.recorded",
         {
           foo: "bar",
         },
@@ -127,7 +140,8 @@ describe("createEventWithProcessingTraceContext", () => {
 
       const event = EventUtils.createEventWithProcessingTraceContext(
         "agg-1",
-        "span.ingestion.ingested",
+        testTenantId,
+        "lw.obs.span.ingestion.recorded",
         {
           foo: "bar",
         },
@@ -155,7 +169,8 @@ describe("createEventWithProcessingTraceContext", () => {
 
       const event = EventUtils.createEventWithProcessingTraceContext(
         "agg-1",
-        "span.ingestion.ingested",
+        testTenantId,
+        "lw.obs.span.ingestion.recorded",
         {
           foo: "bar",
         },
@@ -183,7 +198,8 @@ describe("createEventWithProcessingTraceContext", () => {
 
       const event = EventUtils.createEventWithProcessingTraceContext(
         "agg-1",
-        "span.ingestion.ingested",
+        testTenantId,
+        "lw.obs.span.ingestion.recorded",
         {
           foo: "bar",
         },
@@ -211,7 +227,8 @@ describe("createEventWithProcessingTraceContext", () => {
 
       const event = EventUtils.createEventWithProcessingTraceContext(
         "agg-1",
-        "span.ingestion.ingested",
+        testTenantId,
+        "lw.obs.span.ingestion.recorded",
         {
           foo: "bar",
         },
@@ -227,11 +244,17 @@ describe("createEventWithProcessingTraceContext", () => {
 describe("createProjection", () => {
   describe("when called with basic data", () => {
     it("returns a projection with the provided fields", () => {
-      const projection = EventUtils.createProjection("proj-1", "agg-1", {
-        foo: "bar",
-      });
+      const projection = EventUtils.createProjection(
+        "proj-1",
+        "agg-1",
+        testTenantId,
+        {
+          foo: "bar",
+        },
+      );
 
       expect(projection.id).toBe("proj-1");
+      expect(projection.tenantId).toBe(testTenantId);
     });
   });
 });
@@ -241,8 +264,9 @@ describe("eventBelongsToAggregate", () => {
     it("returns true", () => {
       const event: Event = {
         aggregateId: "test-123",
+        tenantId: testTenantId,
         timestamp: Date.now(),
-        type: "span.ingestion.ingested",
+        type: "lw.obs.span.ingestion.recorded",
         data: {},
       };
 
@@ -254,8 +278,9 @@ describe("eventBelongsToAggregate", () => {
     it("returns false", () => {
       const event: Event = {
         aggregateId: "test-123",
+        tenantId: testTenantId,
         timestamp: Date.now(),
-        type: "span.ingestion.ingested",
+        type: "lw.obs.span.ingestion.recorded",
         data: {},
       };
 
@@ -270,9 +295,27 @@ describe("sortEventsByTimestamp", () => {
   describe("when events are unsorted", () => {
     it("returns chronologically sorted events", () => {
       const events: Event[] = [
-        { aggregateId: "1", timestamp: 3000, type: "C" as any, data: {} },
-        { aggregateId: "1", timestamp: 1000, type: "A" as any, data: {} },
-        { aggregateId: "1", timestamp: 2000, type: "B" as any, data: {} },
+        {
+          aggregateId: "1",
+          tenantId: testTenantId,
+          timestamp: 3000,
+          type: "C" as any,
+          data: {},
+        },
+        {
+          aggregateId: "1",
+          tenantId: testTenantId,
+          timestamp: 1000,
+          type: "A" as any,
+          data: {},
+        },
+        {
+          aggregateId: "1",
+          tenantId: testTenantId,
+          timestamp: 2000,
+          type: "B" as any,
+          data: {},
+        },
       ];
 
       const sorted = EventUtils.sortEventsByTimestamp(events);
@@ -286,20 +329,23 @@ describe("sortEventsByTimestamp", () => {
       const events: Event[] = [
         {
           aggregateId: "1",
+          tenantId: testTenantId,
           timestamp: 1000,
-          type: "span.ingestion.ingested",
+          type: "lw.obs.span.ingestion.recorded",
           data: {},
         },
         {
           aggregateId: "1",
+          tenantId: testTenantId,
           timestamp: 2000,
-          type: "trace.projection.reset",
+          type: "lw.obs.trace.projection.reset",
           data: {},
         },
         {
           aggregateId: "1",
+          tenantId: testTenantId,
           timestamp: 3000,
-          type: "trace.projection.recomputed",
+          type: "lw.obs.trace.projection.recomputed",
           data: {},
         },
       ];
@@ -315,9 +361,27 @@ describe("filterEventsByType", () => {
   describe("when events match type", () => {
     it("returns matching events", () => {
       const events: Event[] = [
-        { aggregateId: "1", timestamp: 1000, type: "CREATE" as any, data: {} },
-        { aggregateId: "1", timestamp: 2000, type: "UPDATE" as any, data: {} },
-        { aggregateId: "1", timestamp: 3000, type: "CREATE", data: {} },
+        {
+          aggregateId: "1",
+          tenantId: testTenantId,
+          timestamp: 1000,
+          type: "CREATE" as any,
+          data: {},
+        },
+        {
+          aggregateId: "1",
+          tenantId: testTenantId,
+          timestamp: 2000,
+          type: "UPDATE" as any,
+          data: {},
+        },
+        {
+          aggregateId: "1",
+          tenantId: testTenantId,
+          timestamp: 3000,
+          type: "CREATE",
+          data: {},
+        },
       ];
 
       const filtered = EventUtils.filterEventsByType(events, "CREATE");
@@ -329,8 +393,20 @@ describe("filterEventsByType", () => {
   describe("when no events match type", () => {
     it("returns empty array", () => {
       const events: Event[] = [
-        { aggregateId: "1", timestamp: 1000, type: "CREATE" as any, data: {} },
-        { aggregateId: "1", timestamp: 2000, type: "UPDATE" as any, data: {} },
+        {
+          aggregateId: "1",
+          tenantId: testTenantId,
+          timestamp: 1000,
+          type: "CREATE" as any,
+          data: {},
+        },
+        {
+          aggregateId: "1",
+          tenantId: testTenantId,
+          timestamp: 2000,
+          type: "UPDATE" as any,
+          data: {},
+        },
       ];
 
       const filtered = EventUtils.filterEventsByType(events, "DELETE");
@@ -354,9 +430,27 @@ describe("getLatestProjection", () => {
   describe("when projections have different versions", () => {
     it("returns highest version", () => {
       const projections: Projection[] = [
-        { id: "1", aggregateId: "a", version: 100, data: {} },
-        { id: "2", aggregateId: "a", version: 300, data: {} },
-        { id: "3", aggregateId: "a", version: 200, data: {} },
+        {
+          id: "1",
+          aggregateId: "a",
+          tenantId: testTenantId,
+          version: 100,
+          data: {},
+        },
+        {
+          id: "2",
+          aggregateId: "a",
+          tenantId: testTenantId,
+          version: 300,
+          data: {},
+        },
+        {
+          id: "3",
+          aggregateId: "a",
+          tenantId: testTenantId,
+          version: 200,
+          data: {},
+        },
       ];
 
       const latest = EventUtils.getLatestProjection(projections);
@@ -368,8 +462,20 @@ describe("getLatestProjection", () => {
   describe("when projections have same version", () => {
     it("returns one of them", () => {
       const projections: Projection[] = [
-        { id: "1", aggregateId: "a", version: 100, data: {} },
-        { id: "2", aggregateId: "a", version: 100, data: {} },
+        {
+          id: "1",
+          aggregateId: "a",
+          tenantId: testTenantId,
+          version: 100,
+          data: {},
+        },
+        {
+          id: "2",
+          aggregateId: "a",
+          tenantId: testTenantId,
+          version: 100,
+          data: {},
+        },
       ];
 
       const latest = EventUtils.getLatestProjection(projections);
@@ -384,8 +490,9 @@ describe("isValidEvent", () => {
     it("returns true", () => {
       const event = {
         aggregateId: "test-123",
+        tenantId: testTenantId,
         timestamp: 1234567890,
-        type: "span.ingestion.ingested",
+        type: "lw.obs.span.ingestion.recorded",
         data: { value: 42 },
       };
 
@@ -397,7 +504,34 @@ describe("isValidEvent", () => {
     it("returns false", () => {
       const event = {
         timestamp: 1234567890,
-        type: "span.ingestion.ingested",
+        type: "lw.obs.span.ingestion.recorded",
+        data: { value: 42 },
+      };
+
+      expect(EventUtils.isValidEvent(event)).toBe(false);
+    });
+  });
+
+  describe("when tenantId is missing", () => {
+    it("returns false", () => {
+      const event = {
+        aggregateId: "test-123",
+        timestamp: 1234567890,
+        type: "lw.obs.span.ingestion.recorded",
+        data: { value: 42 },
+      };
+
+      expect(EventUtils.isValidEvent(event)).toBe(false);
+    });
+  });
+
+  describe("when tenantId is empty", () => {
+    it("returns false", () => {
+      const event = {
+        aggregateId: "test-123",
+        tenantId: "",
+        timestamp: 1234567890,
+        type: "lw.obs.span.ingestion.recorded",
         data: { value: 42 },
       };
 
@@ -409,8 +543,9 @@ describe("isValidEvent", () => {
     it("returns false", () => {
       const event = {
         aggregateId: "test-123",
+        tenantId: testTenantId,
         timestamp: "not-a-number",
-        type: "span.ingestion.ingested",
+        type: "lw.obs.span.ingestion.recorded",
         data: { value: 42 },
       };
 
@@ -422,6 +557,7 @@ describe("isValidEvent", () => {
     it("returns false", () => {
       const event = {
         aggregateId: "test-123",
+        tenantId: testTenantId,
         timestamp: 1234567890,
         type: 123,
         data: { value: 42 },
@@ -435,8 +571,9 @@ describe("isValidEvent", () => {
     it("returns false", () => {
       const event = {
         aggregateId: "test-123",
+        tenantId: testTenantId,
         timestamp: 1234567890,
-        type: "span.ingestion.ingested",
+        type: "lw.obs.span.ingestion.recorded",
       };
 
       expect(EventUtils.isValidEvent(event)).toBe(false);
@@ -462,6 +599,7 @@ describe("isValidProjection", () => {
       const projection = {
         id: "proj-123",
         aggregateId: "test-123",
+        tenantId: testTenantId,
         version: 1234567890,
         data: { value: 42 },
       };
@@ -473,8 +611,36 @@ describe("isValidProjection", () => {
   describe("when id is not a string", () => {
     it("returns false", () => {
       const projection = {
-        id: 123,
+        id: 123 as any,
         aggregateId: "test-123",
+        tenantId: testTenantId,
+        version: 1234567890,
+        data: { value: 42 },
+      } satisfies Projection;
+
+      expect(EventUtils.isValidProjection(projection)).toBe(false);
+    });
+  });
+
+  describe("when tenantId is missing", () => {
+    it("returns false", () => {
+      const projection = {
+        id: "proj-123",
+        aggregateId: "test-123",
+        version: 1234567890,
+        data: { value: 42 },
+      };
+
+      expect(EventUtils.isValidProjection(projection)).toBe(false);
+    });
+  });
+
+  describe("when tenantId is empty", () => {
+    it("returns false", () => {
+      const projection = {
+        id: "proj-123",
+        aggregateId: "test-123",
+        tenantId: "",
         version: 1234567890,
         data: { value: 42 },
       };
@@ -487,6 +653,7 @@ describe("isValidProjection", () => {
     it("returns false", () => {
       const projection = {
         id: "proj-123",
+        tenantId: testTenantId,
         version: 1234567890,
         data: { value: 42 },
       };
@@ -500,6 +667,7 @@ describe("isValidProjection", () => {
       const projection = {
         id: "proj-123",
         aggregateId: "test-123",
+        tenantId: testTenantId,
         version: "not-a-number",
         data: { value: 42 },
       };
@@ -513,6 +681,7 @@ describe("isValidProjection", () => {
       const projection = {
         id: "proj-123",
         aggregateId: "test-123",
+        tenantId: testTenantId,
         version: 1234567890,
       };
 

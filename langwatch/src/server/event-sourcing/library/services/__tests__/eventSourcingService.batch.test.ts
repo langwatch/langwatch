@@ -4,14 +4,21 @@ import { EventSourcingService } from "../eventSourcingService";
 import type { ProjectionStore } from "../../stores/projectionStore.types";
 import type { EventHandler } from "../../processing/eventHandler";
 import type { Event, Projection } from "../../core/types";
+import type { EventStore } from "../../stores/eventStore.types";
+import { createTenantId } from "../../core/tenantId";
+
+const tenantId = createTenantId("test-tenant");
 
 describe("EventSourcingService - Batch Processing Failures", () => {
-  let mockEventStore: any;
+  let mockEventStore: {
+    getEvents: ReturnType<typeof vi.fn>;
+    storeEvents: ReturnType<typeof vi.fn>;
+    listAggregateIds: ReturnType<typeof vi.fn>;
+  } & Partial<EventStore<string, Event<string>>>;
   let mockProjectionStore: ProjectionStore<string, Projection<string>>;
   let mockEventHandler: EventHandler<string, Event<string>, Projection<string>>;
 
   beforeEach(() => {
-    // @ts-ignore we intentionally use a relaxed mock shape for the event store in tests
     mockEventStore = {
       getEvents: vi.fn(),
       storeEvents: vi.fn(),
@@ -49,13 +56,14 @@ describe("EventSourcingService - Batch Processing Failures", () => {
         .mockResolvedValue({
           id: "proj-1",
           aggregateId: "agg-1",
+          tenantId,
           version: 1,
           data: {},
         });
 
       await expect(
         service.rebuildProjectionsInBatches({
-          eventStoreContext: { tenantId: "test-tenant" },
+          eventStoreContext: { tenantId: createTenantId("test-tenant") },
         }),
       ).rejects.toThrow("Database connection lost");
       // First aggregate was processed
@@ -72,8 +80,9 @@ describe("EventSourcingService - Batch Processing Failures", () => {
       vi.mocked(mockEventStore.getEvents).mockResolvedValue([
         {
           aggregateId: "agg-1",
+          tenantId,
           timestamp: 1000,
-          type: "span.ingestion.ingested",
+          type: "lw.obs.span.ingestion.recorded",
           data: {},
         },
       ]);
@@ -81,6 +90,7 @@ describe("EventSourcingService - Batch Processing Failures", () => {
       vi.mocked(mockEventHandler.handle).mockResolvedValue({
         id: "proj-1",
         aggregateId: "agg-1",
+        tenantId,
         version: 1,
         data: {},
       });
@@ -99,7 +109,7 @@ describe("EventSourcingService - Batch Processing Failures", () => {
 
       await expect(
         service.rebuildProjectionsInBatches({
-          eventStoreContext: { tenantId: "test-tenant" },
+          eventStoreContext: { tenantId: createTenantId("test-tenant") },
         }),
       ).rejects.toThrow("Projection store write failed");
     });
@@ -112,8 +122,9 @@ describe("EventSourcingService - Batch Processing Failures", () => {
       vi.mocked(mockEventStore.getEvents).mockResolvedValue([
         {
           aggregateId: "agg-1",
+          tenantId,
           timestamp: 1000,
-          type: "span.ingestion.ingested",
+          type: "lw.obs.span.ingestion.recorded",
           data: {},
         },
       ]);
@@ -121,6 +132,7 @@ describe("EventSourcingService - Batch Processing Failures", () => {
       vi.mocked(mockEventHandler.handle).mockResolvedValue({
         id: "proj-1",
         aggregateId: "agg-1",
+        tenantId,
         version: 1,
         data: {},
       });
@@ -139,7 +151,7 @@ describe("EventSourcingService - Batch Processing Failures", () => {
 
       await expect(
         service.rebuildProjectionsInBatches({
-          eventStoreContext: { tenantId: "test-tenant" },
+          eventStoreContext: { tenantId: createTenantId("test-tenant") },
         }),
       ).rejects.toThrow();
       // Store was called twice (once successfully, once failed)
@@ -165,6 +177,7 @@ describe("EventSourcingService - Batch Processing Failures", () => {
         .mockResolvedValue({
           id: "proj-1",
           aggregateId: "agg-1",
+          tenantId,
           version: 1,
           data: {},
         });
@@ -180,7 +193,7 @@ describe("EventSourcingService - Batch Processing Failures", () => {
       await expect(
         service.rebuildProjectionsInBatches({
           onProgress,
-          eventStoreContext: { tenantId: "test-tenant" },
+          eventStoreContext: { tenantId: createTenantId("test-tenant") },
         }),
       ).rejects.toThrow("Progress tracking failed");
 
@@ -208,7 +221,7 @@ describe("EventSourcingService - Batch Processing Failures", () => {
           cursor: invalidCursor,
           processedCount: 5,
         },
-        eventStoreContext: { tenantId: "test-tenant" },
+        eventStoreContext: { tenantId: createTenantId("test-tenant") },
       });
 
       expect(mockEventStore.listAggregateIds).toHaveBeenCalledWith(
@@ -237,7 +250,7 @@ describe("EventSourcingService - Batch Processing Failures", () => {
 
       await expect(
         service.rebuildProjectionsInBatches({
-          eventStoreContext: { tenantId: "test-tenant" },
+          eventStoreContext: { tenantId: createTenantId("test-tenant") },
         }),
       ).rejects.toThrow(
         "EventStore.listAggregateIds is not implemented for this store",
@@ -261,7 +274,7 @@ describe("EventSourcingService - Batch Processing Failures", () => {
 
       await expect(
         service.rebuildProjectionsInBatches({
-          eventStoreContext: { tenantId: "test-tenant" },
+          eventStoreContext: { tenantId: createTenantId("test-tenant") },
         }),
       ).rejects.toThrow();
       expect(rebuildSpy).not.toHaveBeenCalled();
@@ -285,6 +298,7 @@ describe("EventSourcingService - Batch Processing Failures", () => {
         .spyOn(service, "rebuildProjection")
         .mockResolvedValueOnce({
           id: "proj-1",
+          tenantId,
           aggregateId: "agg-1",
           version: 1,
           data: {},
@@ -293,7 +307,7 @@ describe("EventSourcingService - Batch Processing Failures", () => {
 
       await expect(
         service.rebuildProjectionsInBatches({
-          eventStoreContext: { tenantId: "test-tenant" },
+          eventStoreContext: { tenantId: createTenantId("test-tenant") },
         }),
       ).rejects.toThrow("Rebuild failed for agg-2");
 
@@ -316,7 +330,7 @@ describe("EventSourcingService - Batch Processing Failures", () => {
       });
 
       const checkpoint = await service.rebuildProjectionsInBatches({
-        eventStoreContext: { tenantId: "test-tenant" },
+        eventStoreContext: { tenantId: createTenantId("test-tenant") },
       });
 
       expect(checkpoint.processedCount).toBe(0);
@@ -339,7 +353,7 @@ describe("EventSourcingService - Batch Processing Failures", () => {
 
       await service.rebuildProjectionsInBatches({
         onProgress,
-        eventStoreContext: { tenantId: "test-tenant" },
+        eventStoreContext: { tenantId: createTenantId("test-tenant") },
       });
 
       expect(onProgress).not.toHaveBeenCalled();
