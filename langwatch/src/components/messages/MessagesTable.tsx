@@ -88,7 +88,7 @@ export function MessagesTable({
   const { openDrawer } = useDrawer();
   const queryClient = api.useContext();
 
-  const { filterParams, queryOpts } = useFilterParams();
+  const { filterParams, queryOpts, setFilters } = useFilterParams();
   const [selectedTraceIds, setSelectedTraceIds] = useState<string[]>([]);
 
   const { showFilters } = useFilterToggle();
@@ -110,7 +110,7 @@ export function MessagesTable({
       sortBy: getSingleQueryParam(router.query.sortBy),
       sortDirection: getSingleQueryParam(router.query.orderBy),
     },
-    queryOpts
+    queryOpts,
   );
 
   navigationFooter.useUpdateTotalHits(traceGroups);
@@ -121,7 +121,7 @@ export function MessagesTable({
       enabled: project?.id !== undefined,
       refetchOnWindowFocus: false,
       refetchOnMount: false,
-    }
+    },
   );
 
   const downloadTraces = api.traces.getAllForDownload.useMutation();
@@ -137,13 +137,13 @@ export function MessagesTable({
 
   const traceCheckColumnsAvailable = Object.fromEntries(
     Object.values(
-      traceGroups.data?.traceChecks ?? previousTraceChecks ?? {}
+      traceGroups.data?.traceChecks ?? previousTraceChecks ?? {},
     ).flatMap((checks) =>
       checks.map((check: any) => [
         `evaluations.${check.evaluator_id}`,
         check.name,
-      ])
-    )
+      ]),
+    ),
   );
 
   const [scrollXPosition, setScrollXPosition] = useState(0);
@@ -208,7 +208,7 @@ export function MessagesTable({
     render: (trace: TraceWithGuardrail, index: number) => React.ReactNode;
     value: (
       trace: TraceWithGuardrail,
-      evaluations: ElasticSearchEvaluation[]
+      evaluations: ElasticSearchEvaluation[],
     ) => string | number | Date;
   };
 
@@ -228,7 +228,7 @@ export function MessagesTable({
           trace.trace_id
         ]?.find(
           (traceCheck_: ElasticSearchEvaluation) =>
-            traceCheck_.evaluator_id === checkId
+            traceCheck_.evaluator_id === checkId,
         );
         const evaluator = getEvaluatorDefinitions(traceCheck?.type ?? "");
 
@@ -264,7 +264,7 @@ export function MessagesTable({
       value: (_trace: Trace, evaluations: ElasticSearchEvaluation[]) => {
         const checkId = columnKey.split(".")[1];
         const traceCheck = evaluations.find(
-          (evaluation) => evaluation.evaluator_id === checkId
+          (evaluation) => evaluation.evaluator_id === checkId,
         );
         const evaluator = getEvaluatorDefinitions(traceCheck?.type ?? "");
 
@@ -469,6 +469,82 @@ export function MessagesTable({
       ),
       value: (trace: Trace) => trace.metadata?.labels?.join(", ") ?? "",
     },
+    "metadata.prompts": {
+      name: "Prompts",
+      sortable: true,
+      render: (trace, index) => (
+        <Table.Cell key={index}>
+          <HStack gap={1}>
+            {trace.metadata.prompt_ids?.map((promptId) => (
+              <Badge
+                key={`prompt-${promptId}`}
+                size="sm"
+                paddingX={2}
+                background={
+                  getColorForString("colors", `prompt-${promptId}`).background
+                }
+                color={getColorForString("colors", `prompt-${promptId}`).color}
+                fontSize="12px"
+                cursor="pointer"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  const currentPromptIds =
+                    (filterParams.filters["metadata.prompt_ids"] as string[]) ??
+                    [];
+                  const newPromptIds = currentPromptIds.includes(promptId)
+                    ? currentPromptIds.filter((id) => id !== promptId)
+                    : [...currentPromptIds, promptId];
+                  setFilters({
+                    ...filterParams.filters,
+                    "metadata.prompt_ids":
+                      newPromptIds.length > 0 ? newPromptIds : [],
+                  });
+                }}
+              >
+                {promptId}
+              </Badge>
+            ))}
+            {trace.metadata.prompt_version_ids?.map((versionId) => (
+              <Badge
+                key={`version-${versionId}`}
+                size="sm"
+                paddingX={2}
+                background={
+                  getColorForString("colors", `version-${versionId}`).background
+                }
+                color={
+                  getColorForString("colors", `version-${versionId}`).color
+                }
+                fontSize="12px"
+                cursor="pointer"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  const currentVersionIds =
+                    (filterParams.filters[
+                      "metadata.prompt_version_ids"
+                    ] as string[]) ?? [];
+                  const newVersionIds = currentVersionIds.includes(versionId)
+                    ? currentVersionIds.filter((id) => id !== versionId)
+                    : [...currentVersionIds, versionId];
+                  setFilters({
+                    ...filterParams.filters,
+                    "metadata.prompt_version_ids":
+                      newVersionIds.length > 0 ? newVersionIds : [],
+                  });
+                }}
+              >
+                v:{versionId.slice(0, 8)}
+              </Badge>
+            ))}
+          </HStack>
+        </Table.Cell>
+      ),
+      value: (trace: Trace) =>
+        [
+          ...(trace.metadata?.prompt_ids ?? []),
+          ...(trace.metadata?.prompt_version_ids ?? []),
+        ].join(", "),
+    },
     "metrics.first_token_ms": {
       name: "First Token",
       sortable: true,
@@ -637,7 +713,7 @@ export function MessagesTable({
           <Text>
             {
               topics.data?.find(
-                (topic) => topic.id === trace.metadata.subtopic_id
+                (topic) => topic.id === trace.metadata.subtopic_id,
               )?.name
             }
           </Text>
@@ -661,8 +737,8 @@ export function MessagesTable({
         ([columnKey, checkName]) => [
           columnKey,
           headerColumnForEvaluation({ columnKey, checkName }),
-        ]
-      )
+        ],
+      ),
     ),
   };
 
@@ -684,8 +760,8 @@ export function MessagesTable({
               enabled: key !== "trace.trace_id",
               name: column.name,
             },
-          ])
-        )
+          ]),
+        ),
   );
 
   const isFirstRender = useRef(true);
@@ -758,9 +834,10 @@ export function MessagesTable({
           ...Object.fromEntries(
             Object.entries(traceCheckColumnsAvailable)
               .filter(
-                ([key]) => !Object.keys(prevSelectedHeaderColumns).includes(key)
+                ([key]) =>
+                  !Object.keys(prevSelectedHeaderColumns).includes(key),
               )
-              .map(([key, name]) => [key, { enabled: true, name }])
+              .map(([key, name]) => [key, { enabled: true, name }]),
           ),
         }));
       }
@@ -769,7 +846,7 @@ export function MessagesTable({
 
   const { open, onOpen, onClose } = useDisclosure();
   const checkedHeaderColumnsEntries = Object.entries(
-    selectedHeaderColumns
+    selectedHeaderColumns,
   ).filter(([_, { enabled }]) => enabled);
 
   const [downloadProgress, setDownloadProgress] = useState(0);
@@ -851,7 +928,7 @@ export function MessagesTable({
   };
   const queueItem = api.annotation.createQueueItem.useMutation();
   const [annotators, setAnnotators] = useState<{ id: string; name: string }[]>(
-    []
+    [],
   );
 
   const dialog = useDisclosure();
@@ -887,7 +964,7 @@ export function MessagesTable({
             },
           });
         },
-      }
+      },
     );
   };
 
@@ -900,7 +977,7 @@ export function MessagesTable({
       : await fetchAllTraces();
 
     const checkedHeaderColumnsEntries_ = checkedHeaderColumnsEntries.filter(
-      ([column, _]) => column !== "checked"
+      ([column, _]) => column !== "checked",
     );
 
     const evaluations: Record<string, ElasticSearchEvaluation[]> =
@@ -909,12 +986,12 @@ export function MessagesTable({
     const getValueForColumn = (
       trace: TraceWithGuardrail,
       column: string,
-      name: string
+      name: string,
     ) => {
       return (
         headerColumns[column]?.value?.(
           trace,
-          evaluations[trace.trace_id] ?? []
+          evaluations[trace.trace_id] ?? [],
         ) ??
         headerColumnForEvaluation({
           columnKey: column,
@@ -931,9 +1008,9 @@ export function MessagesTable({
             .filter((trace) => selectedTraceIds.includes(trace.trace_id))
             .map((trace) =>
               checkedHeaderColumnsEntries_.map(([column, { name }]) =>
-                getValueForColumn(trace, column, name)
-              )
-            )
+                getValueForColumn(trace, column, name),
+              ),
+            ),
         )
         .filter((row) => row.some((cell) => cell !== ""));
     } else {
@@ -941,8 +1018,10 @@ export function MessagesTable({
         traceGroup.map((trace) =>
           checkedHeaderColumnsEntries_
             .filter(([column, _]) => column !== "checked")
-            .map(([column, { name }]) => getValueForColumn(trace, column, name))
-        )
+            .map(([column, { name }]) =>
+              getValueForColumn(trace, column, name),
+            ),
+        ),
       );
     }
 
@@ -976,8 +1055,8 @@ export function MessagesTable({
     } else {
       setSelectedTraceIds(
         traceGroups.data?.groups.flatMap((traceGroup) =>
-          traceGroup.map((trace) => trace.trace_id)
-        ) ?? []
+          traceGroup.map((trace) => trace.trace_id),
+        ) ?? [],
       );
     }
   };
@@ -1206,10 +1285,10 @@ export function MessagesTable({
                                   headerColumnForEvaluation({
                                     columnKey: column,
                                     checkName: name,
-                                  })?.render(trace, index)
+                                  })?.render(trace, index),
                               )}
                             </Table.Row>
-                          ))
+                          )),
                         )}
                         {traceGroups.isLoading &&
                           Array.from({ length: 3 }).map((_, i) => (

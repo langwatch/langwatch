@@ -11,6 +11,7 @@ export const studioClientEventSchema = z.discriminatedUnion("type", [
       workflow: workflowJsonSchema,
       node_id: z.string(),
       inputs: z.record(z.string(), z.any()),
+      metadata: z.record(z.string(), z.any()).optional(),
     }),
   }),
   z.object({

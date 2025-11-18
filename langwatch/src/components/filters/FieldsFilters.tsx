@@ -83,6 +83,7 @@ export function FieldsFilters({
 }) {
   const filterKeys: FilterField[] = [
     "metadata.prompt_ids",
+    "metadata.prompt_version_ids",
     "spans.model",
     "metadata.labels",
     "evaluations.passed",

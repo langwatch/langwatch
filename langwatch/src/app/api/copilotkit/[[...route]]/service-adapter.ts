@@ -100,11 +100,10 @@ export class PromptStudioAdapter implements CopilotServiceAdapter {
         messagesHistory,
       });
 
-      // Build execute_flow event (inputs must be an array)
+      // Build execute_component event
       const rawEvent: StudioClientEvent = {
         type: "execute_component",
         payload: {
-          enable_tracing: true,
           trace_id: traceId,
           workflow,
           node_id: nodeId,
@@ -112,8 +111,13 @@ export class PromptStudioAdapter implements CopilotServiceAdapter {
             ...variables,
             messages: messagesHistory,
           },
+          metadata: {
+            prompt_id: formValues.configId,
+            prompt_version_id: formValues.versionMetadata?.versionId,
+            prompt_handle: formValues.handle,
+          },
         },
-      } as StudioClientEvent;
+      };
 
       // Enrich with envs and datasets to match server route behavior
       preparedEvent = await loadDatasets(
