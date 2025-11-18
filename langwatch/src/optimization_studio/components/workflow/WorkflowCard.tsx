@@ -12,13 +12,14 @@ import { Tooltip } from "../../../components/ui/tooltip";
 import { WorkflowIcon } from "../ColorfulBlockIcons";
 import { MoreVertical } from "react-feather";
 import { api } from "../../../utils/api";
-import { useCallback } from "react";
+import { useCallback, useState } from "react";
 import { useOrganizationTeamProject } from "../../../hooks/useOrganizationTeamProject";
 import type { TRPCClientErrorLike } from "@trpc/client";
 import type { UseTRPCQueryResult } from "@trpc/react-query/shared";
 import type { inferRouterOutputs } from "@trpc/server";
 import type { AppRouter } from "../../../server/api/root";
 import { toaster } from "../../../components/ui/toaster";
+import { DeleteConfirmationDialog } from "../../../components/annotations/DeleteConfirmationDialog";
 
 export function WorkflowCardBase(props: React.ComponentProps<typeof VStack>) {
   return (
@@ -66,6 +67,7 @@ export function WorkflowCard({
   const { project, hasPermission } = useOrganizationTeamProject();
   const archiveWorkflow = api.workflow.archive.useMutation();
   const hasWorkflowsDeletePermission = hasPermission("workflows:delete");
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
 
   const onArchiveWorkflow = useCallback(() => {
     if (!workflowId || !project) return;
@@ -134,51 +136,63 @@ export function WorkflowCard({
   }, [archiveWorkflow, name, project, query, workflowId]);
 
   return (
-    <WorkflowCardBase paddingX={0} {...props}>
-      <HStack gap={4} paddingX={4} width="full">
-        <WorkflowIcon icon={icon} size={"lg"} />
-        <Heading as={"h2"} size="sm" fontWeight={600}>
-          {name}
-        </Heading>
-        <Spacer />
-        {workflowId && (
-          <Menu.Root>
-            <Menu.Trigger className="js-inner-menu">
-              <MoreVertical size={24} />
-            </Menu.Trigger>
-            <Menu.Content className="js-inner-menu">
-              <Tooltip
-                content={
-                  !hasWorkflowsDeletePermission
-                    ? "You need workflows:delete permission to delete workflows"
-                    : undefined
-                }
-                disabled={hasWorkflowsDeletePermission}
-                positioning={{ placement: "right" }}
-                showArrow
-              >
-                <Menu.Item
-                  value="delete"
-                  color="red.500"
-                  onClick={
-                    hasWorkflowsDeletePermission ? onArchiveWorkflow : undefined
+    <>
+      <WorkflowCardBase paddingX={0} {...props}>
+        <HStack gap={4} paddingX={4} width="full">
+          <WorkflowIcon icon={icon} size={"lg"} />
+          <Heading as={"h2"} size="sm" fontWeight={600}>
+            {name}
+          </Heading>
+          <Spacer />
+          {workflowId && (
+            <Menu.Root>
+              <Menu.Trigger className="js-inner-menu">
+                <MoreVertical size={24} />
+              </Menu.Trigger>
+              <Menu.Content className="js-inner-menu">
+                <Tooltip
+                  content={
+                    !hasWorkflowsDeletePermission
+                      ? "You need workflows:delete permission to delete workflows"
+                      : undefined
                   }
-                  disabled={!hasWorkflowsDeletePermission}
+                  disabled={hasWorkflowsDeletePermission}
+                  positioning={{ placement: "right" }}
+                  showArrow
                 >
-                  Delete
-                </Menu.Item>
-              </Tooltip>
-            </Menu.Content>
-          </Menu.Root>
+                  <Menu.Item
+                    value="delete"
+                    color="red.500"
+                    onClick={
+                      hasWorkflowsDeletePermission
+                        ? () => setIsDeleteDialogOpen(true)
+                        : undefined
+                    }
+                    disabled={!hasWorkflowsDeletePermission}
+                  >
+                    Delete
+                  </Menu.Item>
+                </Tooltip>
+              </Menu.Content>
+            </Menu.Root>
+          )}
+        </HStack>
+        <Separator />
+        {description && (
+          <Text paddingX={4} color="gray.600" fontSize="14px">
+            {description}
+          </Text>
         )}
-      </HStack>
-      <Separator />
-      {description && (
-        <Text paddingX={4} color="gray.600" fontSize="14px">
-          {description}
-        </Text>
-      )}
-      {children}
-    </WorkflowCardBase>
+        {children}
+      </WorkflowCardBase>
+
+      <DeleteConfirmationDialog
+        title="Are you really sure?"
+        description={`Deleting "${name}" cannot be undone. If you're sure you want to delete this workflow, type 'delete' below:`}
+        open={isDeleteDialogOpen}
+        onClose={() => setIsDeleteDialogOpen(false)}
+        onConfirm={onArchiveWorkflow}
+      />
+    </>
   );
 }
