@@ -91,12 +91,33 @@ const PromptPlaygroundChatInner = forwardRef<PromptPlaygroundChatRef, object>(
 
     /**
      * deleteMessage
-     * Single Responsibility: Removes a message from the chat and updates tab data.
+     * Single Responsibility: Removes an assistant message and its corresponding user message from the chat.
      */
     const deleteMessage = (messageId: string) => {
-      // Remove message from CopilotKit state
+      // Find the assistant message to delete
+      const assistantMessageIndex = visibleMessages.findIndex(
+        (message) => message.id === messageId,
+      );
+
+      if (assistantMessageIndex === -1) return;
+
+      // Find the corresponding user message (immediately before the assistant message)
+      let userMessageIndex = -1;
+      for (let i = assistantMessageIndex - 1; i >= 0; i--) {
+        if (visibleMessages[i].role === "user") {
+          userMessageIndex = i;
+          break;
+        }
+      }
+
+      // Remove both messages from CopilotKit state
+      const messagesToDelete = new Set([messageId]);
+      if (userMessageIndex !== -1) {
+        messagesToDelete.add(visibleMessages[userMessageIndex].id);
+      }
+
       const updatedMessages = visibleMessages.filter(
-        (message) => message.id !== messageId,
+        (message) => !messagesToDelete.has(message.id),
       );
       void setMessages(updatedMessages);
     };
@@ -142,25 +163,17 @@ const PromptPlaygroundChatInner = forwardRef<PromptPlaygroundChatRef, object>(
         Input={SyncedChatInput}
         AssistantMessage={(props) => {
           return (
-            <DeletableMessage
-              messageId={props.rawData.id}
-              onDelete={deleteMessage}
-            >
-              <AssistantMessage {...props} />
+            <>
+              <DeletableMessage
+                messageId={props.rawData.id}
+                onDelete={deleteMessage}
+              >
+                <AssistantMessage {...props} />
+              </DeletableMessage>
               {!props.isLoading && !props.isGenerating && (
                 <TraceMessage traceId={props.rawData.id} marginTop={2} />
               )}
-            </DeletableMessage>
-          );
-        }}
-        UserMessage={(props) => {
-          return (
-            <DeletableMessage
-              messageId={props.rawData.id}
-              onDelete={deleteMessage}
-            >
-              <UserMessage {...props} />
-            </DeletableMessage>
+            </>
           );
         }}
       />
