@@ -11,11 +11,13 @@ This library is designed to be **domain-agnostic** (usable for traces, users, or
 - **Events and projections**: Core types and helpers for event streams and projections.
 - **Event streams**: Normalized ordering, metadata, and late-arriving event handling.
 - **Commands**: A generic way to represent intent that produces events.
-- **Pipeline factory**: `createEventSourcingPipeline` wires stores and handlers into a fully typed `EventSourcingService`.
+- **EventSourcingService**: Main service class that orchestrates event sourcing pipelines.
+- **Runtime builder**: The runtime provides a builder pattern for registering pipelines with shared infrastructure (see [runtime docs](./05-event-sourcing-runtime.md)).
 - **Context-aware stores**: Both `EventStore` and `ProjectionStore` accept read/write context (tenant IDs, metadata) for multi-tenant isolation.
 - **Hooks & lifecycle**: Before/after handle and persist hooks for telemetry and validation.
 - **Processing-trace context**: Optional metadata to link events to the pipeline's own OpenTelemetry trace.
 - **Bulk reprocessing**: APIs to scan aggregates and rebuild projections in batches with checkpoints.
+- **Distributed locking**: Optional support for preventing concurrent rebuilds of the same aggregate.
 
 This document explains the architecture, patterns, and how they relate to trace/span reprocessing workflows.
 
@@ -54,19 +56,23 @@ Both `EventStore` and `ProjectionStore` accept read/write context for multi-tena
 
 ```typescript
 interface EventStoreReadContext<AggregateId = string, EventType = Event> {
-  tenantId: string;  // Required for tenant isolation
+  tenantId: TenantId;  // Required for tenant isolation (use createTenantId())
   metadata?: Record<string, unknown>;  // Optional domain-specific filters
-  raw?: any;  // Optional optimization hints
+  raw?: Record<string, unknown>;  // Optional optimization hints
 }
 ```
+
+**Important:** `tenantId` is now a branded `TenantId` type (not a plain string) to ensure type safety. Always use `createTenantId()` to create tenant IDs.
 
 Trace consumers pass `{ eventStoreContext, projectionStoreContext }`, enabling multi-tenant ClickHouse queries without baking tenancy into aggregate IDs.
 
 **Example:**
 ```typescript
+import { createTenantId } from "../../../event-sourcing/library";
+
 await service.rebuildProjection(traceId, {
-  eventStoreContext: { tenantId: "tenant_abc123" },
-  projectionStoreContext: { tenantId: "tenant_abc123" },
+  eventStoreContext: { tenantId: createTenantId("tenant_abc123") },
+  projectionStoreContext: { tenantId: createTenantId("tenant_abc123") },
 });
 ```
 
@@ -87,14 +93,17 @@ interface EventSourcingHooks<AggregateId, EventType, ProjectionType> {
 
 Hooks can emit telemetry, validate projections, or mutate metadata without forking the service.
 
-### Pipeline Factory
+### Service Instantiation
 
-`createEventSourcingPipeline` centralizes instantiation:
+The `EventSourcingService` can be instantiated directly or via the runtime builder pattern. For new pipelines, prefer the [runtime builder](./05-event-sourcing-runtime.md) which provides shared infrastructure.
+
+#### Direct Instantiation
 
 ```typescript
-import { createEventSourcingPipeline } from "../../../event-sourcing/library";
+import { EventSourcingService } from "../../../event-sourcing/library";
 
-const { service } = createEventSourcingPipeline({
+const service = new EventSourcingService({
+  aggregateType: "trace",
   eventStore: new EventStoreClickHouse(client),
   projectionStore: new ProjectionStoreClickHouse(client),
   eventHandler,
@@ -103,7 +112,26 @@ const { service } = createEventSourcingPipeline({
     hooks: myHooks,
   },
   logger: myLogger,  // Optional Pino logger
+  distributedLock: myDistributedLock,  // Optional: for concurrent rebuild protection
+  rebuildLockTtlMs: 5 * 60 * 1000,  // Optional: default 5 minutes
 });
+```
+
+#### Using Runtime Builder (Recommended)
+
+```typescript
+import { eventSourcing } from "../../../event-sourcing/runtime";
+
+const pipeline = eventSourcing
+  .registerPipeline<SpanEvent, TraceProjection>()
+  .withName("trace-processing")
+  .withAggregateType("trace")
+  .withProjectionStore(projectionStore)
+  .withEventHandler(eventHandler)
+  .build();
+
+// Access service via pipeline.service
+const service = pipeline.service;
 ```
 
 You can swap ClickHouse with in-memory stores for tests without touching consumers.
@@ -128,9 +156,10 @@ Use commands in feature modules (e.g. trace processing) to formalize the contrac
 
 **Example:**
 ```typescript
-import { createCommand } from "../../../event-sourcing/library";
+import { createCommand, createTenantId } from "../../../event-sourcing/library";
 
 const command = createCommand(
+  createTenantId("tenant_abc123"),
   aggregateId,
   "UpdateTrace",
   { status: "completed" },
@@ -147,12 +176,15 @@ const result = await commandHandler.handle(command);
 
 ### Basic Usage
 
+**Note:** For new pipelines, use the [runtime builder pattern](./05-event-sourcing-runtime.md) which provides shared infrastructure.
+
 ```typescript
 import {
-  createEventSourcingPipeline,
   type EventHandler,
   type EventStream,
+  createTenantId,
 } from "../../../event-sourcing/library";
+import { eventSourcing } from "../../../event-sourcing/runtime";
 
 const eventHandler: EventHandler<string, SpanEvent, TraceProjection> = {
   handle(stream: EventStream<string, SpanEvent>) {
@@ -160,19 +192,44 @@ const eventHandler: EventHandler<string, SpanEvent, TraceProjection> = {
   },
 };
 
-const service = createEventSourcingPipeline({
-  aggregateType: "trace",
-  eventStore: new EventStoreClickHouse(client),
-  projectionStore: new ProjectionStoreClickHouse(client),
-  eventHandler,
-  serviceOptions: {
-    ordering: "timestamp",
-  },
+// Using runtime builder (recommended)
+const pipeline = eventSourcing
+  .registerPipeline<SpanEvent, TraceProjection>()
+  .withName("trace-processing")
+  .withAggregateType("trace")
+  .withProjectionStore(new TraceProjectionStoreClickHouse(client))
+  .withEventHandler(eventHandler)
+  .build();
+
+await pipeline.service.rebuildProjection(traceId, {
+  eventStoreContext: { tenantId: createTenantId(tenantId) },
+  projectionStoreContext: { tenantId: createTenantId(tenantId) },
 });
+```
+
+### EventSourcingService Constructor Options
+
+When instantiating `EventSourcingService` directly, you can configure:
+
+- **`aggregateType`** (required): The aggregate type identifier (e.g., "trace", "user")
+- **`eventStore`** (required): Implementation of `EventStore` interface
+- **`projectionStore`** (required): Implementation of `ProjectionStore` interface
+- **`eventHandler`** (required): Implementation of `EventHandler` interface
+- **`serviceOptions`** (optional): Configuration object with:
+  - `ordering`: Event ordering strategy ("timestamp", "as-is", or custom comparator)
+  - `hooks`: Lifecycle hooks for extending the pipeline
+- **`logger`** (optional): Pino logger instance for structured logging
+- **`distributedLock`** (optional): `DistributedLock` implementation for preventing concurrent rebuilds
+- **`rebuildLockTtlMs`** (optional): Time-to-live for rebuild locks in milliseconds (default: 5 minutes)
+
+**Important:** The `eventStoreContext.tenantId` is now required at the type level. Always use `createTenantId()` to create tenant IDs:
+
+```typescript
+import { createTenantId } from "../../../event-sourcing/library";
 
 await service.rebuildProjection(traceId, {
-  eventStoreContext: { tenantId },
-  projectionStoreContext: { tenantId },
+  eventStoreContext: { tenantId: createTenantId("tenant_abc123") },
+  projectionStoreContext: { tenantId: createTenantId("tenant_abc123") },
 });
 ```
 
@@ -296,10 +353,12 @@ This API is the building block for:
 
 **Example:**
 ```typescript
+import { createTenantId } from "../../../event-sourcing/library";
+
 const checkpoint = await service.rebuildProjectionsInBatches({
   batchSize: 100,
-  eventStoreContext: { tenantId: "tenant_abc123" },
-  projectionStoreContext: { tenantId: "tenant_abc123" },
+  eventStoreContext: { tenantId: createTenantId("tenant_abc123") },
+  projectionStoreContext: { tenantId: createTenantId("tenant_abc123") },
   onProgress: async ({ checkpoint }) => {
     console.log(`Processed ${checkpoint.processedCount} aggregates`);
   },
@@ -551,21 +610,35 @@ Check the observability platform for:
 #### Secure Implementation Example
 
 ```typescript
-import { EventStore, EventUtils } from "./library";
+import {
+  EventStore,
+  EventUtils,
+  type EventStoreReadContext,
+  type EventStoreWriteContext,
+  type AggregateType,
+} from "./library";
 
 class SecureEventStore implements EventStore<string, Event> {
-  async getEvents(aggregateId: string, context: EventStoreReadContext) {
+  async getEvents(
+    aggregateId: string,
+    context: EventStoreReadContext<string, Event>,
+    aggregateType: AggregateType,
+  ): Promise<readonly Event[]> {
     // CRITICAL: Validate tenantId before ANY query
     EventUtils.validateTenantId(context, 'EventStore.getEvents');
 
     // Query with tenant isolation
     return await this.db.query(
-      "SELECT * FROM events WHERE aggregate_id = ? AND tenant_id = ?",
-      [aggregateId, context.tenantId]
+      "SELECT * FROM events WHERE aggregate_id = ? AND tenant_id = ? AND aggregate_type = ?",
+      [aggregateId, context.tenantId, aggregateType]
     );
   }
 
-  async storeEvents(events: readonly Event[], context: EventStoreWriteContext) {
+  async storeEvents(
+    events: readonly Event[],
+    context: EventStoreWriteContext<string, Event>,
+    aggregateType: AggregateType,
+  ): Promise<void> {
     // CRITICAL: Validate tenantId before ANY write
     EventUtils.validateTenantId(context, 'EventStore.storeEvents');
 
@@ -577,7 +650,7 @@ class SecureEventStore implements EventStore<string, Event> {
     }
 
     // Ensure all events belong to same tenant
-    const tenantIds = new Set(events.map(e => e.metadata?.tenantId));
+    const tenantIds = new Set(events.map(e => e.tenantId));
     if (tenantIds.size !== 1 || !tenantIds.has(context.tenantId)) {
       throw new Error("All events must belong to context tenant");
     }
@@ -716,20 +789,31 @@ async getProjection(aggregateId: string) {
 - Duplicate work is wasteful but usually safe
 - Ensure projection store handles concurrent writes gracefully
 
-**Option 2: Distributed Locking**
+**Option 2: Distributed Locking (Implemented in rebuildProjection)**
+The `EventSourcingService.rebuildProjection` method now supports distributed locking when a `DistributedLock` is provided to the service constructor:
+
 ```typescript
-async getProjection(aggregateId: string) {
-  return await this.lock.withLock(`projection:${aggregateId}`, async () => {
-    let projection = await this.projectionStore.getProjection(aggregateId);
-    if (!projection) {
-      projection = await this.rebuildProjection(aggregateId);
-    }
-    return projection;
-  });
-}
+import { EventSourcingService, RedisDistributedLock } from "./library";
+
+const service = new EventSourcingService({
+  // ... other options
+  distributedLock: new RedisDistributedLock(redisClient),
+  rebuildLockTtlMs: 5 * 60 * 1000, // 5 minutes
+});
+
+// rebuildProjection will automatically acquire a lock before rebuilding
+await service.rebuildProjection(aggregateId, {
+  eventStoreContext: { tenantId: createTenantId("tenant") },
+  projectionStoreContext: { tenantId: createTenantId("tenant") },
+});
 ```
 
-**Option 3: Optimistic Locking (Recommended)**
+When a distributed lock is provided, `rebuildProjection` will:
+- Acquire a lock with key: `rebuild:{tenantId}:{aggregateType}:{aggregateId}`
+- Throw an error if the lock cannot be acquired (another rebuild is in progress)
+- Automatically release the lock when the rebuild completes
+
+**Option 3: Optimistic Locking (Recommended for ProjectionStore)**
 ```typescript
 interface ProjectionStore {
   storeProjection(projection, context): Promise<{ success: boolean; conflict?: Projection }>;
@@ -762,27 +846,31 @@ Both rebuild agg-1, agg-2, agg-3 simultaneously
 - Only run batch rebuilds from one worker
 - Use cron job or scheduled task
 
-**Option 2: Work Stealing with Locking**
+**Option 2: Distributed Locking (Automatic if configured)**
+If the service is configured with a `distributedLock`, each call to `rebuildProjection` (which is called internally by `rebuildProjectionsInBatches`) will automatically acquire a lock. This prevents concurrent rebuilds of the same aggregate:
+
 ```typescript
-async rebuildProjectionsInBatches() {
-  for (const aggregateId of aggregateIds) {
-    const lockAcquired = await this.tryLock(`rebuild:${aggregateId}`);
-    if (lockAcquired) {
-      try {
-        await this.rebuildProjection(aggregateId);
-      } finally {
-        await this.releaseLock(`rebuild:${aggregateId}`);
-      }
-    }
-  }
-}
+const service = new EventSourcingService({
+  // ... other options
+  distributedLock: new RedisDistributedLock(redisClient),
+});
+
+// Each rebuildProjection call will acquire/release locks automatically
+await service.rebuildProjectionsInBatches({
+  batchSize: 100,
+  eventStoreContext: { tenantId: createTenantId("tenant") },
+  projectionStoreContext: { tenantId: createTenantId("tenant") },
+});
 ```
 
 **Option 3: Partition by Tenant**
 ```typescript
+import { createTenantId } from "./library";
+
 // Worker 1: tenants A-M, Worker 2: tenants N-Z
 await service.rebuildProjectionsInBatches({
-  eventStoreContext: { tenantId: myAssignedTenants }
+  eventStoreContext: { tenantId: createTenantId(myAssignedTenants) },
+  projectionStoreContext: { tenantId: createTenantId(myAssignedTenants) },
 });
 ```
 
@@ -858,7 +946,8 @@ class VersionedProjectionStore implements ProjectionStore {
 
 - [ ] Understand `getProjection` check-then-act race condition
 - [ ] Projection store handles concurrent writes gracefully
-- [ ] Batch rebuilds coordinated (single worker or distributed locking)
+- [ ] Configure `distributedLock` in production to prevent concurrent rebuilds
+- [ ] Batch rebuilds coordinated (single worker or distributed locking via service configuration)
 - [ ] Hooks are idempotent and document error handling
 - [ ] Consider optimistic locking for projection stores
 - [ ] Test concurrent access patterns

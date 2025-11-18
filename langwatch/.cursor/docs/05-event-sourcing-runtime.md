@@ -76,6 +76,11 @@ const processor = new EventSourcedQueueProcessorImpl<MyJobPayload>({
   queueName: "{my_queue}",
   jobName: "my_job",
   makeJobId: (payload) => `${payload.tenantId}:${payload.aggregateId}`,  // Optional: for idempotency
+  delay: 100,  // Optional: delay in milliseconds before processing (useful for batching/debouncing)
+  spanAttributes: (payload) => ({  // Optional: extract custom span attributes from payload
+    "payload.trace.id": payload.traceId,
+    "payload.span.id": payload.spanId,
+  }),
   async process(payload) {
     // domain logic goes here
   },
@@ -85,10 +90,21 @@ const processor = new EventSourcedQueueProcessorImpl<MyJobPayload>({
 });
 ```
 
+**Queue Processor Options:**
+
+- **`queueName`** (required): The BullMQ queue name
+- **`jobName`** (required): The job type name
+- **`process`** (required): Async function that processes the job payload
+- **`makeJobId`** (optional): Function to generate job IDs for idempotency. When the same jobId is used, BullMQ will automatically replace the existing job if it hasn't been processed yet. This is useful for batching/debouncing.
+- **`delay`** (optional): Delay in milliseconds before processing the job. Useful for batching/debouncing where later jobs can override earlier ones (when combined with `makeJobId`). BullMQ will replace waiting jobs with the same jobId.
+- **`spanAttributes`** (optional): Function to extract custom span attributes from the payload. These attributes will be merged with common attributes like `queue.name`, `queue.job_name`, etc. for OpenTelemetry tracing.
+- **`options`** (optional): Configuration object with:
+  - `concurrency`: Worker concurrency (default: 5)
+
 Under the hood, this:
 
 - Creates a BullMQ `Queue` and `Worker` using the shared `redis` connection.
-- Wraps enqueue and job processing in LangWatch tracer spans.
+- Wraps enqueue and job processing in LangWatch tracer spans with custom attributes.
 - Applies sensible defaults (retries, backoff, removal policies).
 - Executes jobs **inline** if Redis is not available, so local dev and tests keep working.
 
@@ -126,16 +142,20 @@ This module is now the **single place** where trace event-sourcing wiring lives.
 
 Span ingestion now uses an **async, command-driven** flow managed by the event-sourcing runtime; feature code is queue-agnostic.
 
-- `SpanIngestionService` maps incoming spans to `RecordSpanProcessingCommandData` DTOs.
-- For each job it sends a **span processing command** via the runtime-managed queue processor
-  `spanProcessingCommandDispatcher` (defined in
+- `SpanIngestionService` maps incoming spans to `StoreSpanIngestionCommandData` DTOs.
+- For each job it sends a **span ingestion record command** via the runtime-managed queue processor
+  `spanIngestionRecordCommandDispatcher` (defined in
   `server/event-sourcing/pipelines/span-processing/pipeline.ts`).
-- The queue processor:
-  - Issues a `trace.record_span_ingestion` command via the shared
-    `traceProcessingCommandHandler`.
-  - The command handler persists the span via `SpanStoreClickHouse`.
-  - Appends a `span.ingestion.ingested` event to the trace event store.
-  - Calls `traceProcessingPipeline.service` to rebuild the trace projection for that trace.
+- The queue processor uses:
+  - `makeJobId`: `${command.tenantId}:${command.spanData.traceId}` for deduplication
+  - `delay: 100` milliseconds for batching/debouncing
+  - `spanAttributes` to extract trace and span IDs for observability
+- The queue processor's `process` function:
+  - Creates a command using `createCommand` with tenant ID and aggregate ID
+  - Calls `SpanIngestionRecordCommandHandler.handle()` which:
+    - Persists the span via `SpanRepository`
+    - Stores a `span.ingestion.recorded` event via `spanProcessingPipeline.service.storeEvents()`
+    - Dispatches a trace processing command to rebuild the trace projection
 
 This makes span ingestion + trace projection an event-sourced, async flow owned by the runtime wiring, with feature code only responsible for mapping and sending commands.
 
