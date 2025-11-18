@@ -9,7 +9,7 @@ import type { SpanIngestionWriteRecord } from "../../types/spanIngestionWriteRec
 
 // Mock the command dispatcher
 vi.mock("../../pipeline", () => ({
-  spanProcessingCommandDispatcher: {
+  spanIngestionRecordCommandDispatcher: {
     send: vi.fn().mockResolvedValue(void 0),
   },
 }));
@@ -50,7 +50,7 @@ vi.mock("../spanProcessingMapperService", () => ({
 // Import after mocking
 import { SpanProcessingMapperService } from "../spanProcessingMapperService";
 import { SpanIngestionService } from "../spanIngestionService";
-import { spanProcessingCommandDispatcher } from "../../pipeline";
+import { spanIngestionRecordCommandDispatcher } from "../../pipeline";
 
 describe("SpanIngestionService", () => {
   let service: SpanIngestionService;
@@ -146,9 +146,9 @@ describe("SpanIngestionService", () => {
         );
 
         // Mock the command dispatcher to throw
-        vi.mocked(spanProcessingCommandDispatcher.send).mockRejectedValueOnce(
-          producerError,
-        );
+        vi.mocked(
+          spanIngestionRecordCommandDispatcher.send,
+        ).mockRejectedValueOnce(producerError);
 
         await expect(
           service.ingestSpanCollection(

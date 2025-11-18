@@ -1,17 +1,10 @@
+import type { Projection } from "../../../library/core/types";
+
 /**
  * Projection containing computed metrics for a trace.
  * This is built from all spans in a trace and contains aggregated data.
  */
-export interface TraceProjection {
-  /** Unique ID for this projection */
-  id: string;
-  /** The trace ID this projection represents */
-  aggregateId: string;
-  /** When this projection was last computed */
-  version: number;
-  /** Projection data */
-  data: TraceProjectionData;
-}
+export type TraceProjection = Projection<string, TraceProjectionData>;
 
 export interface TraceProjectionData {
   tenantId: string;

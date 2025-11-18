@@ -7,11 +7,8 @@ import type {
   RebuildTraceProjectionCommand,
   ForceRebuildTraceProjectionCommand,
   BulkRebuildTraceProjectionsCommand,
-  RecordSpanProcessingCommand,
 } from "../commands/traceProcessingCommand";
 import { traceProcessingPipeline } from "../pipeline";
-import type { SpanEvent } from "../types";
-import type { SpanStore } from "../../span-processing/repositories/spanStore";
 import { createLogger } from "../../../../../utils/logger";
 
 /**
@@ -23,8 +20,6 @@ export class TraceProcessingCommandHandler
 {
   tracer = getLangWatchTracer("langwatch.trace-processing.command-handler");
   logger = createLogger("langwatch:trace-processing:command-handler");
-
-  constructor(private readonly spanStore: SpanStore) {}
 
   async handle(command: TraceProcessingCommand): Promise<void> {
     return await this.tracer.withActiveSpan(
@@ -42,14 +37,12 @@ export class TraceProcessingCommandHandler
         const cmd = command as Command<string, unknown>;
 
         switch (command.type) {
-          case "trace.rebuild_projection":
+          case "lw.obs.trace.projection.rebuild":
             return await this.handleRebuildProjection(command);
-          case "trace.force_rebuild":
+          case "lw.obs.trace.projection.rebuild_force":
             return await this.handleForceRebuild(command);
-          case "trace.bulk_rebuild":
+          case "lw.obs.trace.projection.rebuild_bulk":
             return await this.handleBulkRebuild(command);
-          case "trace.record_span_ingestion":
-            return await this.handleRecordSpanIngestion(command);
           default:
             throw new Error(`Unknown command type: ${cmd.type}`);
         }
@@ -131,56 +124,6 @@ export class TraceProcessingCommandHandler
             processedCount: resumeFromCount ?? 0,
           }
         : void 0,
-    });
-  }
-
-  private async handleRecordSpanIngestion(
-    command: RecordSpanProcessingCommand,
-  ): Promise<void> {
-    const commandData = command.data;
-    const { spanData, collectedAtUnixMs } = commandData;
-    const tenantId = command.tenantId;
-    const traceId = spanData.traceId;
-    const spanId = spanData.spanId;
-
-    this.logger.info(
-      {
-        tenantId,
-        traceId,
-        spanId,
-        collectedAtUnixMs,
-      },
-      "Handling record span ingestion command",
-    );
-
-    await this.spanStore.insertSpan({
-      ...commandData,
-      tenantId,
-    });
-
-    const ingestionEvent: SpanEvent = {
-      aggregateId: traceId,
-      timestamp: collectedAtUnixMs,
-      type: "span.ingestion.ingested",
-      data: {
-        traceId,
-        spanId,
-        collectedAtUnixMs,
-      },
-      metadata: {
-        tenantId,
-        spanId,
-        collectedAtUnixMs,
-      },
-    };
-
-    await traceProcessingPipeline.service.storeEvents([ingestionEvent], {
-      tenantId,
-    });
-
-    await traceProcessingPipeline.service.rebuildProjection(traceId, {
-      eventStoreContext: { tenantId },
-      projectionStoreContext: { tenantId },
     });
   }
 }

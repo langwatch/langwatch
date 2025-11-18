@@ -4,5 +4,4 @@ export type {
   RebuildTraceProjectionCommand,
   ForceRebuildTraceProjectionCommand,
   BulkRebuildTraceProjectionsCommand,
-  RecordSpanProcessingCommand,
 } from "./traceProcessingCommand";

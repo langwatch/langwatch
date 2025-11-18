@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { SpanKind } from "@opentelemetry/api";
-import { SpanStoreClickHouse } from "../spanStoreClickHouse";
-import type { SpanStoreCommand } from "../spanStore";
+import { SpanRepositoryClickHouse } from "../spanRepositoryClickHouse";
+import type { StoreSpanIngestionCommandData } from "../../types/storeSpanIngestionCommand";
 import type { ClickHouseClient } from "@clickhouse/client";
 
 // Mock dependencies
@@ -28,12 +28,12 @@ vi.mocked(getLangWatchTracer).mockReturnValue({
 
 import { getLangWatchTracer } from "langwatch";
 
-describe("SpanStoreClickHouse", () => {
-  let repository: SpanStoreClickHouse;
+describe("SpanRepositoryClickHouse", () => {
+  let repository: SpanRepositoryClickHouse;
   let mockClickHouseClient: ClickHouseClient;
   let mockInsert: ReturnType<typeof vi.fn>;
 
-  const mockCommand: SpanStoreCommand = {
+  const mockCommand: StoreSpanIngestionCommandData = {
     tenantId: "test-tenant",
     collectedAtUnixMs: Date.now(),
     spanData: {
@@ -62,12 +62,12 @@ describe("SpanStoreClickHouse", () => {
   };
 
   beforeEach(() => {
-    mockInsert = vi.fn().mockResolvedValue(undefined);
+    mockInsert = vi.fn().mockResolvedValue(void 0);
     mockClickHouseClient = {
       insert: mockInsert,
     } as unknown as ClickHouseClient;
 
-    repository = new SpanStoreClickHouse(mockClickHouseClient);
+    repository = new SpanRepositoryClickHouse(mockClickHouseClient);
 
     // Setup tracer to call the callback with a mock span
     mockWithActiveSpan.mockImplementation(async (name, options, callback) => {

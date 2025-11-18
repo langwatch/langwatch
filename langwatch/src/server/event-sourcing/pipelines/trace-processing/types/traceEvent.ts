@@ -1,11 +1,11 @@
 import type { Event, EventMetadataBase } from "../../../library";
+import type { SpanIngestionEventData } from "../../span-processing/types";
 
 /**
  * Base metadata for all trace events.
  * Extends EventMetadataBase to include processingTraceparent.
  */
 export interface TraceEventMetadata extends EventMetadataBase {
-  tenantId: string;
   collectedAtUnixMs?: number;
   spanId?: string;
   commandId?: string;
@@ -20,22 +20,12 @@ export type TraceEvent =
   | TraceRecomputedEvent;
 
 /**
- * Slim payload for a span ingestion event.
- * Full span content lives in observability_spans; this payload is a signal.
- */
-export interface SpanIngestionEventData {
-  traceId: string;
-  spanId: string;
-  collectedAtUnixMs: number;
-}
-
-/**
  * Event representing a span that was ingested.
  */
 export interface TraceSpanIngestedEvent
   extends Event<string, SpanIngestionEventData, TraceEventMetadata> {
   aggregateId: string;
-  type: "span.ingestion.ingested";
+  type: "lw.obs.span.ingestion.recorded";
   metadata: TraceSpanIngestedEventMetadata;
 }
 
@@ -57,7 +47,7 @@ export interface TraceProjectionResetEvent
     },
     TraceEventMetadata
   > {
-  type: "trace.projection.reset";
+  type: "lw.obs.trace.projection.reset";
 }
 
 /**
@@ -72,7 +62,7 @@ export interface TraceRecomputedEvent
     },
     TraceEventMetadata
   > {
-  type: "trace.projection.recomputed";
+  type: "lw.obs.trace.projection.recomputed";
 }
 
 /**
@@ -87,7 +77,7 @@ export type SpanEvent = TraceSpanIngestedEvent;
 export function isTraceSpanIngestedEvent(
   event: TraceEvent,
 ): event is TraceSpanIngestedEvent {
-  return event.type === "span.ingestion.ingested";
+  return event.type === "lw.obs.span.ingestion.recorded";
 }
 
 /**
@@ -96,7 +86,7 @@ export function isTraceSpanIngestedEvent(
 export function isTraceProjectionResetEvent(
   event: TraceEvent,
 ): event is TraceProjectionResetEvent {
-  return event.type === "trace.projection.reset";
+  return event.type === "lw.obs.trace.projection.reset";
 }
 
 /**
@@ -105,5 +95,5 @@ export function isTraceProjectionResetEvent(
 export function isTraceRecomputedEvent(
   event: TraceEvent,
 ): event is TraceRecomputedEvent {
-  return event.type === "trace.projection.recomputed";
+  return event.type === "lw.obs.trace.projection.recomputed";
 }

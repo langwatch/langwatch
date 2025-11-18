@@ -1,21 +1,19 @@
 import { getClickHouseClient } from "../../../../utils/clickhouse";
-import { TraceProjectionStoreClickHouse } from "./repositories/traceProjectionStoreClickHouse";
-import { TraceProjectionStoreMemory } from "./repositories/traceProjectionStoreMemory";
+import { TraceProjectionRepositoryClickHouse } from "./repositories/traceProjectionRepositoryClickHouse";
+import { TraceProjectionRepositoryMemory } from "./repositories/traceProjectionRepositoryMemory";
 import { SpanReadRepositoryClickHouse } from "./repositories/spanReadRepositoryClickHouse";
 import { TraceProjectionEventHandler } from "./eventHandlers/traceProjectionEventHandler";
 import type { SpanEvent, TraceProjection } from "./types";
 import { eventSourcing } from "../../runtime";
 import { TraceProcessingCommandHandler } from "./commandHandlers/traceProcessingCommandHandler";
-import { SpanStoreClickHouse } from "../span-processing/repositories/spanStoreClickHouse";
-import { SpanStoreMemory } from "../span-processing/repositories/spanStoreMemory";
 
 const clickHouseClient = getClickHouseClient();
 
 const projectionStore = clickHouseClient
-  ? new TraceProjectionStoreClickHouse(clickHouseClient)
-  : new TraceProjectionStoreMemory();
+  ? new TraceProjectionRepositoryClickHouse(clickHouseClient)
+  : new TraceProjectionRepositoryMemory();
 
-export const checkpointRepository = eventSourcing.getCheckpointRepository();
+export const checkpointStore = eventSourcing.getCheckpointStore();
 
 const spanReadRepository = clickHouseClient
   ? new SpanReadRepositoryClickHouse(clickHouseClient)
@@ -37,10 +35,5 @@ export const traceProcessingPipeline = eventSourcing
   .withEventHandler(eventHandler)
   .build();
 
-const spanStore = clickHouseClient
-  ? new SpanStoreClickHouse(clickHouseClient)
-  : new SpanStoreMemory();
-
-export const traceProcessingCommandHandler = new TraceProcessingCommandHandler(
-  spanStore,
-);
+export const traceProcessingCommandHandler =
+  new TraceProcessingCommandHandler();

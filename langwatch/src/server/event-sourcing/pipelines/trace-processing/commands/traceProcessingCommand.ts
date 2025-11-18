@@ -1,14 +1,12 @@
 import type { Command } from "../../../library";
-import type { RecordSpanProcessingCommandData } from "../../span-processing/types";
 
 /**
  * Base trace processing command types.
  */
 export type TraceProcessingCommandType =
-  | "trace.rebuild_projection"
-  | "trace.force_rebuild"
-  | "trace.bulk_rebuild"
-  | "trace.record_span_ingestion";
+  | "lw.obs.trace.projection.rebuild"
+  | "lw.obs.trace.projection.rebuild_force"
+  | "lw.obs.trace.projection.rebuild_bulk";
 
 /**
  * Command to rebuild a trace projection from stored events.
@@ -22,7 +20,7 @@ export interface RebuildTraceProjectionCommand
       force?: boolean;
     }
   > {
-  type: "trace.rebuild_projection";
+  type: "lw.obs.trace.projection.rebuild";
 }
 
 /**
@@ -35,7 +33,7 @@ export interface ForceRebuildTraceProjectionCommand
       traceId: string;
     }
   > {
-  type: "trace.force_rebuild";
+  type: "lw.obs.trace.projection.rebuild_force";
 }
 
 /**
@@ -50,19 +48,10 @@ export interface BulkRebuildTraceProjectionsCommand
       resumeFromCount?: number;
     }
   > {
-  type: "trace.bulk_rebuild";
-}
-
-/**
- * Command to record a span processing event and trigger projection rebuild.
- */
-export interface RecordSpanProcessingCommand
-  extends Command<string, RecordSpanProcessingCommandData> {
-  type: "trace.record_span_ingestion";
+  type: "lw.obs.trace.projection.rebuild_bulk";
 }
 
 export type TraceProcessingCommand =
   | RebuildTraceProjectionCommand
   | ForceRebuildTraceProjectionCommand
-  | BulkRebuildTraceProjectionsCommand
-  | RecordSpanProcessingCommand;
+  | BulkRebuildTraceProjectionsCommand;

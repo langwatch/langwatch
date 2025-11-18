@@ -1,2 +1,2 @@
-export type { SpanStore } from "./spanStore";
-export { SpanStoreClickHouse } from "./spanStoreClickHouse";
+export type { SpanRepository } from "./spanRepository";
+export { SpanRepositoryClickHouse } from "./spanRepositoryClickHouse";

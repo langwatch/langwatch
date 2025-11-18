@@ -6,7 +6,7 @@ import type { DeepPartial } from "../../../../../utils/types";
 import type { IExportTraceServiceRequest } from "@opentelemetry/otlp-transformer";
 import { createLogger } from "../../../../../utils/logger";
 import { SpanProcessingMapperService } from "./spanProcessingMapperService";
-import { spanProcessingCommandDispatcher } from "../pipeline";
+import { spanIngestionRecordCommandDispatcher } from "../pipeline";
 
 export class SpanIngestionService {
   tracer = getLangWatchTracer("langwatch.span-ingestion.service");
@@ -63,7 +63,7 @@ export class SpanIngestionService {
             collectedAtUnixMs: Date.now(),
           };
 
-          await spanProcessingCommandDispatcher.send(command);
+          await spanIngestionRecordCommandDispatcher.send(command);
         }
 
         span.setAttributes({
