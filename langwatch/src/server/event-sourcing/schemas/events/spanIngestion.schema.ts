@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { EventSchema } from "../../library/schemas";
+import { EventSchema } from "../../library/domain/types";
 import type { TenantId } from "../../library";
 
 /**
@@ -43,6 +43,11 @@ export const spanIngestionEventDataSchema = z.object({
 }>;
 
 /**
+ * Event type identifier for span ingestion recorded event.
+ */
+export const SPAN_INGESTION_RECORDED_EVENT_TYPE = "lw.obs.span_ingestion.recorded" as const;
+
+/**
  * Zod schema for SpanIngestionRecordedEventMetadata.
  * Required metadata fields for recorded events.
  */
@@ -63,7 +68,7 @@ export const spanIngestionRecordedEventMetadataSchema =
  * Full event schema combining EventSchema with span-specific data and metadata.
  */
 export const spanIngestionRecordedEventSchema = EventSchema.extend({
-  type: z.literal("lw.obs.span_ingestion.recorded"),
+  type: z.literal(SPAN_INGESTION_RECORDED_EVENT_TYPE),
   data: spanIngestionEventDataSchema,
   metadata: spanIngestionRecordedEventMetadataSchema,
 }) satisfies z.ZodType<{
@@ -71,7 +76,7 @@ export const spanIngestionRecordedEventSchema = EventSchema.extend({
   aggregateId: string;
   tenantId: string;
   timestamp: number;
-  type: "lw.obs.span_ingestion.recorded";
+  type: typeof SPAN_INGESTION_RECORDED_EVENT_TYPE;
   data: z.infer<typeof spanIngestionEventDataSchema>;
   metadata: z.infer<typeof spanIngestionRecordedEventMetadataSchema>;
 }>;
@@ -100,3 +105,15 @@ export type SpanIngestionRecordedEvent = Omit<
  * Union of all span event types.
  */
 export type SpanIngestionEvent = SpanIngestionRecordedEvent;
+
+/**
+ * All event type identifiers for span ingestion events.
+ */
+export const SPAN_INGESTION_EVENT_TYPES = [
+  SPAN_INGESTION_RECORDED_EVENT_TYPE,
+] as const;
+
+/**
+ * Type for span ingestion event type identifiers.
+ */
+export type SpanIngestionEventType = (typeof SPAN_INGESTION_EVENT_TYPES)[number];
