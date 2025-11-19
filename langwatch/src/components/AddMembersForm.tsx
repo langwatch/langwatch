@@ -77,7 +77,15 @@ export function AddMembersForm({
         {
           email: "",
           orgRole: OrganizationUserRole.MEMBER,
-          teams: [],
+          teams:
+            teamOptions.length > 0
+              ? [
+                  {
+                    teamId: teamOptions[0]?.value ?? "",
+                    role: TeamUserRole.MEMBER,
+                  },
+                ]
+              : [],
         },
       ],
     },
@@ -92,7 +100,15 @@ export function AddMembersForm({
     append({
       email: "",
       orgRole: OrganizationUserRole.MEMBER,
-      teams: [],
+      teams:
+        teamOptions.length > 0
+          ? [
+              {
+                teamId: teamOptions[0]?.value ?? "",
+                role: TeamUserRole.MEMBER,
+              },
+            ]
+          : [],
     });
   };
 
