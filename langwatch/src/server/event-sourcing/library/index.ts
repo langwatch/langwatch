@@ -1,0 +1,147 @@
+/**
+ * Generic Event Sourcing Library
+ *
+ * This library provides the core interfaces and patterns for event-sourced systems.
+ * It can be reused across different domains (traces, users, etc.) by implementing
+ * the specific event and projection types.
+ */
+
+// Domain types
+export type {
+  Event,
+  EventMetadataBase,
+  EventOrderingStrategy,
+  Projection,
+  ProjectionEnvelope,
+  ProjectionMetadata,
+  EventHandlerCheckpoint,
+} from "./domain/types";
+export {
+  EventSchema,
+  ProjectionSchema,
+  EventMetadataBaseSchema,
+  ProjectionMetadataSchema,
+  ProjectionEnvelopeSchema,
+  createProjectionEnvelopeSchema,
+  EventHandlerCheckpointSchema,
+} from "./domain/types";
+export type { ProjectionType } from "./domain/types";
+export type { AggregateType } from "./domain/aggregateType";
+export { AggregateTypeSchema } from "./domain/aggregateType";
+export type { CommandType } from "./domain/commandType";
+export { CommandTypeSchema } from "./domain/commandType";
+export type { EventType } from "./domain/eventType";
+export { EventTypeSchema } from "./domain/eventType";
+export type { TenantId } from "./domain/tenantId";
+export { TenantIdSchema, createTenantId } from "./domain/tenantId";
+
+// Streams
+export { EventStream } from "./streams/eventStream";
+export type { EventStreamMetadata } from "./streams/eventStream";
+export { EventStreamMetadataSchema } from "./streams/eventStream";
+
+// Commands
+export type {
+  Command,
+  CommandHandler,
+  CommandHandlerResult,
+} from "./commands/command";
+export { CommandSchema, createCommand, validateCommand } from "./commands/command";
+export type {
+  CommandSchema as CommandSchemaType,
+  CommandPayloadValidator,
+} from "./commands/commandSchema";
+export { defineCommandSchema } from "./commands/commandSchema";
+export type {
+  CommandHandlerClass,
+  CommandHandlerClassStatic,
+  ExtractCommandHandlerPayload,
+  ExtractCommandHandlerType,
+  ExtractCommandHandlerEvent,
+  ExtractCommandHandlerDispatcherName,
+} from "./commands/commandHandlerClass";
+
+// Domain handlers
+export type { EventHandler } from "./domain/handlers/eventHandler";
+export type { EventReactionHandler } from "./domain/handlers/eventReactionHandler";
+
+// Domain helpers
+export type {
+  ExtractAggregateId,
+  ExtractEventPayload,
+  ExtractProjectionData,
+  InferEventHandlerEvent,
+  InferEventHandlerProjection,
+  InferEventStoreEvent,
+  InferProjectionStoreProjection,
+} from "./domain/helpers";
+export { isEvent, isProjection } from "./domain/helpers";
+
+// Store interfaces
+export type {
+  EventStore,
+  ReadOnlyEventStore,
+  EventStoreReadContext,
+} from "./stores/eventStore.types";
+export { EventStoreReadContextSchema } from "./stores/eventStore.types";
+export type {
+  ProjectionStore,
+  ProjectionStoreReadContext,
+  ProjectionStoreWriteContext,
+} from "./stores/projectionStore.types";
+export { ProjectionStoreReadContextSchema } from "./stores/projectionStore.types";
+export type { EventHandlerCheckpointStore } from "./stores/eventHandlerCheckpointStore.types";
+
+// Queue interfaces
+export type {
+  EventSourcedQueueProcessor,
+  EventSourcedQueueDefinition,
+  EventSourcedQueueProcessorOptions,
+} from "./queues";
+
+// Services & pipeline
+export { EventSourcingService } from "./services/eventSourcingService";
+export type {
+  EventSourcingOptions,
+  UpdateProjectionOptions,
+  ReplayEventsOptions,
+} from "./services/eventSourcingService.types";
+export type {
+  ProjectionDefinition,
+  ProjectionDefinitions,
+} from "./projection.types";
+export type { EventPublisher } from "./publishing/eventPublisher.types";
+export type {
+  EventSourcingPipelineDefinition,
+  RegisteredPipeline,
+} from "../runtime/pipeline";
+
+// Utility functions
+export {
+  createEvent,
+  createEventWithProcessingTraceContext,
+  createEventStream,
+  createProjection,
+  eventBelongsToAggregate,
+  sortEventsByTimestamp,
+  filterEventsByType,
+  getLatestProjection,
+  isValidEvent,
+  isValidProjection,
+  buildProjectionMetadata,
+  buildEventMetadataWithCurrentProcessingTraceparent,
+  EventUtils,
+} from "./utils/event.utils";
+
+// Distributed locking
+export type {
+  DistributedLock,
+  LockHandle,
+  RedisClient,
+} from "./utils/distributedLock";
+export {
+  LockHandleSchema,
+  InMemoryDistributedLock,
+  RedisDistributedLock,
+  DistributedLockUtils,
+} from "./utils/distributedLock";
