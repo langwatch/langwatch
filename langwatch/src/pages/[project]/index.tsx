@@ -29,7 +29,7 @@ import { api } from "../../utils/api";
 import GraphsLayout from "../../components/GraphsLayout";
 import { AnalyticsHeader } from "../../components/analytics/AnalyticsHeader";
 import { LLMMetrics } from "../../components/LLMMetrics";
-import * as Sentry from "@sentry/nextjs";
+import { captureException } from "~/utils/posthogErrorCapture";
 
 function ProjectRouter() {
   const router = useRouter();
@@ -82,7 +82,7 @@ function IndexContent() {
       const target = new URL(url, window.location.origin);
       return target.origin === window.location.origin;
     } catch (error) {
-      Sentry.captureException(error, {
+      captureException(error, {
         tags: {
           url,
         },

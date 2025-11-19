@@ -1,4 +1,4 @@
-import * as Sentry from "@sentry/nextjs";
+import { captureException } from "~/utils/posthogErrorCapture";
 import { nanoid } from "nanoid";
 import { type NextApiRequest, type NextApiResponse } from "next";
 import { type ZodError, z } from "zod";
@@ -86,7 +86,7 @@ export default async function handler(
       { error, body: req.body, projectId: project.id },
       "invalid event received"
     );
-    Sentry.captureException(error);
+    captureException(error);
     const validationError = fromZodError(error as ZodError);
     return res.status(400).json({ error: validationError.message });
   }
@@ -99,7 +99,7 @@ export default async function handler(
         { error, body: req.body, projectId: project.id },
         "invalid event received"
       );
-      Sentry.captureException(error);
+      captureException(error);
       const validationError = fromZodError(error as ZodError);
       return res.status(400).json({ error: validationError.message });
     }

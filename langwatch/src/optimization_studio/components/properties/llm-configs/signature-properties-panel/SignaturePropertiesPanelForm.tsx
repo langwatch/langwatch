@@ -11,23 +11,23 @@ import { useSmartSetNode } from "~/optimization_studio/hooks/useSmartSetNode";
 import {
   usePromptConfigForm,
   type PromptConfigFormValues,
-} from "~/prompt-configs";
-import type { PromptTextAreaOnAddMention } from "~/prompt-configs/components/ui/PromptTextArea";
-import { DemonstrationsField } from "~/prompt-configs/forms/fields/DemonstrationsField";
+} from "~/prompts";
+import type { PromptTextAreaOnAddMention } from "~/prompts/components/ui/PromptTextArea";
+import { DemonstrationsField } from "~/prompts/forms/fields/DemonstrationsField";
 import {
   InputsFieldGroup,
   OutputsFieldGroup,
-} from "~/prompt-configs/forms/fields/PromptConfigVersionFieldGroup";
-import { PromptField } from "~/prompt-configs/forms/fields/PromptField";
+} from "~/prompts/forms/fields/PromptConfigVersionFieldGroup";
+import { PromptField } from "~/prompts/forms/fields/PromptField";
 import {
   promptConfigFormValuesToOptimizationStudioNodeData,
   versionedPromptToPromptConfigFormValues,
   safeOptimizationStudioNodeDataToPromptConfigFormInitialValues,
-} from "~/prompt-configs/utils/llmPromptConfigUtils";
+} from "~/prompts/utils/llmPromptConfigUtils";
 import { api } from "~/utils/api";
 
 import { useWizardContext } from "../../../../../components/evaluations/wizard/hooks/useWizardContext";
-import { PromptMessagesField } from "../../../../../prompt-configs/forms/fields/message-history-fields/PromptMessagesField";
+import { PromptMessagesField } from "~/prompts/forms/fields/message-history-fields/PromptMessagesField";
 import { useWorkflowStore } from "../../../../hooks/useWorkflowStore";
 import type { LlmPromptConfigComponent } from "../../../../types/dsl";
 import { PromptSourceHeader } from "../promptSourceSelect/PromptSourceHeader";

@@ -1,5 +1,5 @@
 import { IncomingWebhook } from "@slack/webhook";
-import * as Sentry from "../../../node_modules/@sentry/nextjs";
+import { captureException } from "../../utils/posthogErrorCapture";
 import { env } from "../../env.mjs";
 import { type AlertType, AlertType as AlertTypeEnum } from "@prisma/client";
 import { type Trace } from "~/server/tracer/types";
@@ -86,6 +86,6 @@ export const sendSlackWebhook = async ({
       icon_emoji: ":robot_face:",
     });
   } catch (err) {
-    Sentry.captureException(err);
+    captureException(err);
   }
 };

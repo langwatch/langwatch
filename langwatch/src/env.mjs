@@ -24,8 +24,8 @@ export const env = createEnv({
         // Since NextAuth.js automatically uses the VERCEL_URL if present.
         (str) => process.env.VERCEL_URL ?? str,
         // VERCEL_URL doesn't include `https` so it cant be validated as a URL
-        process.env.VERCEL ? z.string().min(1) : z.string().url()
-      )
+        process.env.VERCEL ? z.string().min(1) : z.string().url(),
+      ),
     ),
     AUTH0_CLIENT_ID: z.string().optional(),
     AUTH0_CLIENT_SECRET: z.string().optional(),
@@ -50,7 +50,6 @@ export const env = createEnv({
     IS_QUICKWIT: z.boolean().optional(),
     USE_AWS_SES: z.string().optional(),
     AWS_REGION: z.string().optional(),
-    SENTRY_DSN: z.string().optional(),
     EMAIL_DEFAULT_FROM: z.string().optional(),
     S3_KEY_SALT: z.string().optional(),
     IS_SAAS: z.boolean().optional(),
@@ -148,7 +147,6 @@ export const env = createEnv({
       process.env.ELASTICSEARCH_NODE_URL?.startsWith("quickwit://"),
     USE_AWS_SES: process.env.USE_AWS_SES,
     AWS_REGION: process.env.AWS_REGION,
-    SENTRY_DSN: process.env.SENTRY_DSN,
     EMAIL_DEFAULT_FROM: process.env.EMAIL_DEFAULT_FROM,
     S3_KEY_SALT: process.env.S3_KEY_SALT,
     IS_SAAS:

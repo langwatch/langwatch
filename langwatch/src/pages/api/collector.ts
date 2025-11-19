@@ -1,4 +1,4 @@
-import * as Sentry from "@sentry/nextjs";
+import { captureException, getCurrentScope } from "~/utils/posthogErrorCapture";
 import crypto from "crypto";
 import { type NextApiRequest, type NextApiResponse } from "next";
 import type { ZodError } from "zod";
@@ -132,7 +132,7 @@ async function handleCollectorRequest(
       { error, projectId: project.id },
       "Error getting current month messages count"
     );
-    Sentry.captureException(
+    captureException(
       new Error("Error getting current month messages count"),
       {
         extra: { projectId: project.id, zodError: error },
@@ -214,7 +214,7 @@ async function handleCollectorRequest(
   try {
     params = collectorRESTParamsValidatorSchema.parse(req.body);
   } catch (error) {
-    Sentry.captureException(new Error("ZodError on parsing body"), {
+    captureException(new Error("ZodError on parsing body"), {
       extra: { projectId: project.id, body: req.body, zodError: error },
     });
 
@@ -277,7 +277,7 @@ async function handleCollectorRequest(
     }
   } catch (error) {
     const validationError = fromZodError(error as ZodError);
-    Sentry.captureException(new Error("ZodError on parsing metadata"), {
+    captureException(new Error("ZodError on parsing metadata"), {
       extra: {
         projectId: project.id,
         metadata: params.metadata,
@@ -371,7 +371,7 @@ async function handleCollectorRequest(
     return res.status(400).json({ message: "Trace ID not defined" });
   }
 
-  Sentry.getCurrentScope()?.setPropagationContext({
+  getCurrentScope()?.setPropagationContext?.({
     traceId,
     sampleRand: 1,
     propagationSpanId: traceId,
@@ -411,7 +411,7 @@ async function handleCollectorRequest(
     try {
       spans[index] = spanValidatorSchema.parse(span);
     } catch (error) {
-      Sentry.captureException(new Error("ZodError on parsing spans"), {
+      captureException(new Error("ZodError on parsing spans"), {
         extra: { projectId: project.id, span, zodError: error },
       });
 

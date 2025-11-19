@@ -17,7 +17,7 @@ import {
 } from "../../../../optimization_studio/types/events";
 import { createLogger } from "../../../../utils/logger";
 import type { NextRequest } from "next/server";
-import * as Sentry from "@sentry/nextjs";
+import { captureException } from "~/utils/posthogErrorCapture";
 import { loggerMiddleware } from "../../middleware/logger";
 
 const logger = createLogger("langwatch:post_message");
@@ -68,7 +68,7 @@ app.post(
       );
     } catch (error) {
       logger.error({ error, projectId }, "error");
-      Sentry.captureException(error, {
+      captureException(error, {
         extra: {
           projectId,
         },

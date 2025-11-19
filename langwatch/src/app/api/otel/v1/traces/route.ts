@@ -6,7 +6,7 @@ import {
 import * as root from "@opentelemetry/otlp-transformer/build/src/generated/root";
 import { prisma } from "../../../../../server/db";
 import { openTelemetryTraceRequestToTracesForCollection } from "../../../../../server/tracer/otel.traces";
-import * as Sentry from "@sentry/nextjs";
+import { captureException } from "~/utils/posthogErrorCapture";
 import * as crypto from "crypto";
 import {
   fetchExistingMD5s,
@@ -135,7 +135,7 @@ async function handleTracesRequest(req: NextRequest) {
           { error, projectId: project.id },
           "Error getting current month messages count",
         );
-        Sentry.captureException(
+        captureException(
           new Error("Error getting current month messages count"),
           {
             extra: { projectId: project.id, zodError: error },
@@ -173,7 +173,7 @@ async function handleTracesRequest(req: NextRequest) {
             },
             "error parsing traces",
           );
-          Sentry.captureException(error, {
+          captureException(error, {
             extra: {
               projectId: project.id,
               traceRequest: Buffer.from(body).toString("base64"),

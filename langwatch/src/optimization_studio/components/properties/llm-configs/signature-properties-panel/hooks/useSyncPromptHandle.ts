@@ -2,7 +2,7 @@ import { useEffect, useCallback } from "react";
 import { useFormContext } from "react-hook-form";
 
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import type { PromptConfigFormValues } from "~/prompt-configs";
+import type { PromptConfigFormValues } from "~/prompts";
 import { api } from "~/utils/api";
 
 /**

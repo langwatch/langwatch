@@ -35,7 +35,7 @@ import type {
 } from "../../server/api/routers/organization";
 import { type PlanInfo } from "../../server/subscriptionHandler";
 import { api } from "../../utils/api";
-import * as Sentry from "@sentry/nextjs";
+import { captureException } from "~/utils/posthogErrorCapture";
 import { usePublicEnv } from "../../hooks/usePublicEnv";
 import { withPermissionGuard } from "../../components/WithPermissionGuard";
 
@@ -238,7 +238,7 @@ function MembersList({
           void queryClient.organization.getOrganizationWithMembersAndTheirTeams
             .invalidate()
             .catch((error) => {
-              Sentry.captureException(error, {
+              captureException(error, {
                 tags: {
                   userId,
                   organizationId: organization.id,

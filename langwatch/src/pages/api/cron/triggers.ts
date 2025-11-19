@@ -1,5 +1,5 @@
 import { TriggerAction, type Project, type Trigger } from "@prisma/client";
-import * as Sentry from "@sentry/nextjs";
+import { captureException } from "~/utils/posthogErrorCapture";
 import { type NextApiRequest, type NextApiResponse } from "next";
 import { getAllTracesForProject } from "~/server/api/routers/traces";
 import { sendTriggerEmail } from "~/server/mailer/triggerEmail";
@@ -164,7 +164,7 @@ const getTracesForAlert = async (trigger: Trigger, projects: Project[]) => {
 
         await sendTriggerEmail(triggerInfo);
       } catch (error) {
-        Sentry.captureException(error, {
+        captureException(error, {
           extra: {
             triggerId,
             projectId: input.projectId,
@@ -186,7 +186,7 @@ const getTracesForAlert = async (trigger: Trigger, projects: Project[]) => {
 
         await sendSlackWebhook(triggerInfo);
       } catch (error) {
-        Sentry.captureException(error, {
+        captureException(error, {
           extra: {
             triggerId,
             projectId: input.projectId,
@@ -206,7 +206,7 @@ const getTracesForAlert = async (trigger: Trigger, projects: Project[]) => {
 
         await createQueueItems(triggerData, annotators ?? [], createdByUserId);
       } catch (error) {
-        Sentry.captureException(error, {
+        captureException(error, {
           extra: {
             triggerId,
             projectId: input.projectId,
@@ -272,7 +272,7 @@ const getTracesForAlert = async (trigger: Trigger, projects: Project[]) => {
           projectSlug: project!.slug,
         };
       } catch (error) {
-        Sentry.captureException(error, {
+        captureException(error, {
           extra: {
             triggerId,
             projectId: input.projectId,

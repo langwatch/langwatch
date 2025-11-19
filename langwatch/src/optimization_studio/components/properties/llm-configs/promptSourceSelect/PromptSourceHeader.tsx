@@ -8,16 +8,16 @@ import { toaster } from "~/components/ui/toaster";
 import { VerticalFormControl } from "~/components/VerticalFormControl";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import type { LlmPromptConfigComponent } from "~/optimization_studio/types/dsl";
-import { type PromptConfigFormValues } from "~/prompt-configs";
-import { GeneratePromptApiSnippetDialog } from "~/prompt-configs/components/GeneratePromptApiSnippetDialog";
-import { EditablePromptHandleField } from "~/prompt-configs/forms/fields/EditablePromptHandleField";
-import { VersionHistoryButton } from "~/prompt-configs/forms/prompt-config-form/components/VersionHistoryButton";
-import { VersionSaveButton } from "~/prompt-configs/forms/prompt-config-form/components/VersionSaveButton";
-import { usePromptConfigContext } from "~/prompt-configs/providers/PromptConfigProvider";
+import { type PromptConfigFormValues } from "~/prompts";
+import { GeneratePromptApiSnippetDialog } from "~/prompts/components/GeneratePromptApiSnippetDialog";
+import { EditablePromptHandleField } from "~/prompts/forms/fields/EditablePromptHandleField";
+import { VersionHistoryButton } from "~/prompts/forms/prompt-config-form/components/VersionHistoryButton";
+import { VersionSaveButton } from "~/prompts/forms/prompt-config-form/components/VersionSaveButton";
+import { usePromptConfigContext } from "~/prompts/providers/PromptConfigProvider";
 import {
   formValuesToTriggerSaveVersionParams,
   versionedPromptToPromptConfigFormValues,
-} from "~/prompt-configs/utils/llmPromptConfigUtils";
+} from "~/prompts/utils/llmPromptConfigUtils";
 import type { VersionedPrompt } from "~/server/prompt-config";
 
 import { useNodeDrift } from "../signature-properties-panel/hooks/useNodeDrift";

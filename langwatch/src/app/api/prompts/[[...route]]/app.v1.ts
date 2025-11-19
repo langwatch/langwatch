@@ -31,7 +31,7 @@ import { badRequestSchema, successSchema } from "~/app/api/shared/schemas";
 import {
   commitMessageSchema,
   versionSchema,
-} from "~/prompt-configs/schemas/field-schemas";
+} from "~/prompts/schemas/field-schemas";
 import { patchZodOpenapi } from "~/utils/extend-zod-openapi";
 import { createLogger } from "~/utils/logger";
 
