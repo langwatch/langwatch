@@ -12,4 +12,6 @@ export const DEFAULT_MAX_TOKENS = 128_000;
 
 export const MIN_MAX_TOKENS = 256;
 
+export const FALLBACK_MAX_TOKENS = 64_000;
+
 export const DEFAULT_TEMPERATURE = 0.7;

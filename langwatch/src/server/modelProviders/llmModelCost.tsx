@@ -1,5 +1,4 @@
 import escapeStringRegexp from "escape-string-regexp";
-// @ts-ignore
 import * as llmModelCosts from "./llmModelCosts.json";
 import { prisma } from "../db";
 
@@ -27,7 +26,7 @@ const getImportedModelCosts = () => {
           "input_cost_per_token" in model &&
           "output_cost_per_token" in model &&
           typeof model.input_cost_per_token === "number" &&
-          typeof model.output_cost_per_token === "number"
+          typeof model.output_cost_per_token === "number",
       )
       .map(([model_name, model]) => {
         const model_ = model as {
@@ -53,7 +52,7 @@ const getImportedModelCosts = () => {
             outputCostPerToken: model_.output_cost_per_token,
           },
         ];
-      })
+      }),
   );
 
   // Exclude models with : after it if there is already the same model there without the :
@@ -78,16 +77,16 @@ const getImportedModelCosts = () => {
 
   // Exclude models with no costs
   const paidModels = mergedModels.filter(
-    (model) => !!model.inputCostPerToken || !!model.outputCostPerToken
+    (model) => !!model.inputCostPerToken || !!model.outputCostPerToken,
   );
 
   // Exclude some vendors
   const relevantModels = paidModels.filter(
-    (model) => !model.model.includes("openrouter/")
+    (model) => !model.model.includes("openrouter/"),
   );
 
   return Object.fromEntries(
-    relevantModels.map((model) => [model.model, model])
+    relevantModels.map((model) => [model.model, model]),
   );
 };
 
@@ -124,7 +123,7 @@ export const getLLMModelCosts = async ({
           outputCostPerToken: record.outputCostPerToken ?? undefined,
           updatedAt: record.updatedAt,
           createdAt: record.createdAt,
-        }) as MaybeStoredLLMModelCost
+        }) as MaybeStoredLLMModelCost,
     )
     .sort((a, b) => b.createdAt!.getTime() - a.createdAt!.getTime())
     .concat(
@@ -134,7 +133,7 @@ export const getLLMModelCosts = async ({
         regex: value.regex,
         inputCostPerToken: value.inputCostPerToken,
         outputCostPerToken: value.outputCostPerToken,
-      }))
+      })),
     );
 
   return data;
