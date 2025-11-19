@@ -16,7 +16,7 @@ export interface EventHandlerOptions<
    * Optional: Event types this handler is interested in.
    * If not provided, handler will receive all events for the aggregate type.
    */
-  eventTypes?: string[];
+  eventTypes?: EventType["type"][];
   /**
    * Optional: Names of other handlers this handler depends on.
    * Handlers will be executed in dependency order (dependencies first).
