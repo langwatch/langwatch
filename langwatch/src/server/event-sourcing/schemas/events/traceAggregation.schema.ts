@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { EventSchema } from "../../library/schemas";
+import { EventSchema } from "../../library/domain/types";
 import type { TenantId } from "../../library";
 
 /**
@@ -69,10 +69,17 @@ export const traceAggregationCancelledEventDataSchema = z.object({
 }>;
 
 /**
+ * Event type identifiers for trace aggregation events.
+ */
+export const TRACE_AGGREGATION_STARTED_EVENT_TYPE = "lw.obs.trace_aggregation.started" as const;
+export const TRACE_AGGREGATION_COMPLETED_EVENT_TYPE = "lw.obs.trace_aggregation.completed" as const;
+export const TRACE_AGGREGATION_CANCELLED_EVENT_TYPE = "lw.obs.trace_aggregation.cancelled" as const;
+
+/**
  * Zod schema for TraceAggregationStartedEvent.
  */
 export const traceAggregationStartedEventSchema = EventSchema.extend({
-  type: z.literal("lw.obs.trace_aggregation.started"),
+  type: z.literal(TRACE_AGGREGATION_STARTED_EVENT_TYPE),
   data: traceAggregationStartedEventDataSchema,
   metadata: traceAggregationEventMetadataSchema,
 }) satisfies z.ZodType<{
@@ -80,7 +87,7 @@ export const traceAggregationStartedEventSchema = EventSchema.extend({
   aggregateId: string;
   tenantId: string;
   timestamp: number;
-  type: "lw.obs.trace_aggregation.started";
+  type: typeof TRACE_AGGREGATION_STARTED_EVENT_TYPE;
   data: z.infer<typeof traceAggregationStartedEventDataSchema>;
   metadata: z.infer<typeof traceAggregationEventMetadataSchema>;
 }>;
@@ -89,7 +96,7 @@ export const traceAggregationStartedEventSchema = EventSchema.extend({
  * Zod schema for TraceAggregationCompletedEvent.
  */
 export const traceAggregationCompletedEventSchema = EventSchema.extend({
-  type: z.literal("lw.obs.trace_aggregation.completed"),
+  type: z.literal(TRACE_AGGREGATION_COMPLETED_EVENT_TYPE),
   data: traceAggregationCompletedEventDataSchema,
   metadata: traceAggregationEventMetadataSchema,
 }) satisfies z.ZodType<{
@@ -97,7 +104,7 @@ export const traceAggregationCompletedEventSchema = EventSchema.extend({
   aggregateId: string;
   tenantId: string;
   timestamp: number;
-  type: "lw.obs.trace_aggregation.completed";
+  type: typeof TRACE_AGGREGATION_COMPLETED_EVENT_TYPE;
   data: z.infer<typeof traceAggregationCompletedEventDataSchema>;
   metadata: z.infer<typeof traceAggregationEventMetadataSchema>;
 }>;
@@ -106,7 +113,7 @@ export const traceAggregationCompletedEventSchema = EventSchema.extend({
  * Zod schema for TraceAggregationCancelledEvent.
  */
 export const traceAggregationCancelledEventSchema = EventSchema.extend({
-  type: z.literal("lw.obs.trace_aggregation.cancelled"),
+  type: z.literal(TRACE_AGGREGATION_CANCELLED_EVENT_TYPE),
   data: traceAggregationCancelledEventDataSchema,
   metadata: traceAggregationEventMetadataSchema,
 }) satisfies z.ZodType<{
@@ -114,7 +121,7 @@ export const traceAggregationCancelledEventSchema = EventSchema.extend({
   aggregateId: string;
   tenantId: string;
   timestamp: number;
-  type: "lw.obs.trace_aggregation.cancelled";
+  type: typeof TRACE_AGGREGATION_CANCELLED_EVENT_TYPE;
   data: z.infer<typeof traceAggregationCancelledEventDataSchema>;
   metadata: z.infer<typeof traceAggregationEventMetadataSchema>;
 }>;
@@ -161,3 +168,38 @@ export type TraceAggregationEvent =
   | TraceAggregationStartedEvent
   | TraceAggregationCompletedEvent
   | TraceAggregationCancelledEvent;
+
+/**
+ * Type guard functions for trace aggregation events.
+ */
+export function isTraceAggregationStartedEvent(
+  event: TraceAggregationEvent,
+): event is TraceAggregationStartedEvent {
+  return event.type === TRACE_AGGREGATION_STARTED_EVENT_TYPE;
+}
+
+export function isTraceAggregationCompletedEvent(
+  event: TraceAggregationEvent,
+): event is TraceAggregationCompletedEvent {
+  return event.type === TRACE_AGGREGATION_COMPLETED_EVENT_TYPE;
+}
+
+export function isTraceAggregationCancelledEvent(
+  event: TraceAggregationEvent,
+): event is TraceAggregationCancelledEvent {
+  return event.type === TRACE_AGGREGATION_CANCELLED_EVENT_TYPE;
+}
+
+/**
+ * All event type identifiers for trace aggregation events.
+ */
+export const TRACE_AGGREGATION_EVENT_TYPES = [
+  TRACE_AGGREGATION_STARTED_EVENT_TYPE,
+  TRACE_AGGREGATION_COMPLETED_EVENT_TYPE,
+  TRACE_AGGREGATION_CANCELLED_EVENT_TYPE,
+] as const;
+
+/**
+ * Type for trace aggregation event type identifiers.
+ */
+export type TraceAggregationEventType = (typeof TRACE_AGGREGATION_EVENT_TYPES)[number];
