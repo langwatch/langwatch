@@ -369,7 +369,7 @@ export class PipelineBuilderWithNameAndType<
    * ```typescript
    * pipeline
    *   .withEventHandler("span-storage", clickHouseHandler, {
-   *     eventTypes: ["lw.obs.span.ingestion.recorded"],
+   *     eventTypes: ["lw.obs.span_ingestion.recorded"],
    *   })
    *   .withEventHandler("trace-aggregator", traceHandler, {
    *     dependsOn: ["span-storage"], // Type-safe! Only accepts "span-storage"

@@ -36,12 +36,12 @@ describe("PipelineBuilder Integration Tests", () => {
       const eventStore = createMockEventStore<TestEvent>();
       const builder = new PipelineBuilder<TestEvent, Projection>(eventStore)
         .withName("test-pipeline")
-        .withAggregateType("span");
+        .withAggregateType("span_ingestion");
 
       const pipeline = builder.build();
 
       expect(pipeline.name).toBe("test-pipeline");
-      expect(pipeline.aggregateType).toBe("span");
+      expect(pipeline.aggregateType).toBe("span_ingestion");
       expect(pipeline.service).toBeDefined();
       expect(pipeline.commands).toBeDefined();
     });
@@ -62,7 +62,7 @@ describe("PipelineBuilder Integration Tests", () => {
 
       const builder = new PipelineBuilder<TestEvent, Projection>(eventStore)
         .withName("test-pipeline")
-        .withAggregateType("span")
+        .withAggregateType("span_ingestion")
         .withProjection("test-projection", store, handler);
 
       const pipeline = builder.build();
@@ -72,7 +72,7 @@ describe("PipelineBuilder Integration Tests", () => {
       expect(getEventsSpy).toHaveBeenCalledWith(
         "aggregate-1",
         { tenantId },
-        "span",
+        "span_ingestion",
       );
       expect(handleSpy).toHaveBeenCalled();
       const callArgs = handleSpy.mock.calls[0];
@@ -99,7 +99,7 @@ describe("PipelineBuilder Integration Tests", () => {
 
       const builder = new PipelineBuilder<TestEvent, Projection>(eventStore)
         .withName("test-pipeline")
-        .withAggregateType("span")
+        .withAggregateType("span_ingestion")
         .withEventPublisher(publisher);
 
       const pipeline = builder.build();
@@ -119,7 +119,7 @@ describe("PipelineBuilder Integration Tests", () => {
 
       const builder = new PipelineBuilder<TestEvent, Projection>(eventStore)
         .withName("test-pipeline")
-        .withAggregateType("span")
+        .withAggregateType("span_ingestion")
         .withEventHandler("test-handler", handler);
 
       const pipeline = builder.build();
@@ -145,7 +145,7 @@ describe("PipelineBuilder Integration Tests", () => {
         factory,
       )
         .withName("test-pipeline")
-        .withAggregateType("span")
+        .withAggregateType("span_ingestion")
         .withCommandHandler(HandlerClass);
 
       const pipeline = builder.build();
@@ -187,7 +187,7 @@ describe("PipelineBuilder Integration Tests", () => {
         factory,
       )
         .withName("test-pipeline")
-        .withAggregateType("span")
+        .withAggregateType("span_ingestion")
         .withProjection("test-projection", store, projectionHandler)
         .withEventPublisher(publisher)
         .withEventHandler("test-handler", eventHandler)
@@ -196,7 +196,7 @@ describe("PipelineBuilder Integration Tests", () => {
       const pipeline = builder.build();
 
       expect(pipeline.name).toBe("test-pipeline");
-      expect(pipeline.aggregateType).toBe("span");
+      expect(pipeline.aggregateType).toBe("span_ingestion");
       expect(pipeline.service).toBeDefined();
       expect(pipeline.commands).toHaveProperty("testDispatcher");
 
@@ -218,13 +218,13 @@ describe("PipelineBuilder Integration Tests", () => {
 
       const builder = new PipelineBuilder<TestEvent, Projection>(eventStore)
         .withName("test-pipeline")
-        .withAggregateType("span");
+        .withAggregateType("span_ingestion");
 
       const pipeline = builder.build();
 
       await pipeline.service.storeEvents([event], context);
 
-      expect(storeEventsSpy).toHaveBeenCalledWith([event], context, "span");
+      expect(storeEventsSpy).toHaveBeenCalledWith([event], context, "span_ingestion");
     });
   });
 
@@ -251,7 +251,7 @@ describe("PipelineBuilder Integration Tests", () => {
         factory,
       )
         .withName("test-pipeline")
-        .withAggregateType("span")
+        .withAggregateType("span_ingestion")
         .withCommandHandler(HandlerClass)
         .build();
 
@@ -294,7 +294,7 @@ describe("PipelineBuilder Integration Tests", () => {
         factory,
       )
         .withName("test-pipeline")
-        .withAggregateType("span")
+        .withAggregateType("span_ingestion")
         .withEventHandler("test-handler", eventHandler)
         .withCommandHandler(HandlerClass)
         .build();
@@ -341,7 +341,7 @@ describe("PipelineBuilder Integration Tests", () => {
         factory,
       )
         .withName("test-pipeline")
-        .withAggregateType("span")
+        .withAggregateType("span_ingestion")
         .withProjection("test-projection", store, projectionHandler)
         .withCommandHandler(HandlerClass)
         .build();
@@ -383,7 +383,7 @@ describe("PipelineBuilder Integration Tests", () => {
         factory,
       )
         .withName("test-pipeline")
-        .withAggregateType("span")
+        .withAggregateType("span_ingestion")
         .withEventPublisher(publisher)
         .withCommandHandler(HandlerClass)
         .build();
@@ -420,7 +420,7 @@ describe("PipelineBuilder Integration Tests", () => {
         factory,
       )
         .withName("test-pipeline")
-        .withAggregateType("span")
+        .withAggregateType("span_ingestion")
         .withCommandHandler(HandlerClass)
         .build();
 
@@ -453,7 +453,7 @@ describe("PipelineBuilder Integration Tests", () => {
         factory,
       )
         .withName("test-pipeline")
-        .withAggregateType("span")
+        .withAggregateType("span_ingestion")
         .withCommandHandler(HandlerClass)
         .build();
 
@@ -494,7 +494,7 @@ describe("PipelineBuilder Integration Tests", () => {
         factory,
       )
         .withName("span-ingestion")
-        .withAggregateType("span")
+        .withAggregateType("span_ingestion")
         .withCommandHandler(HandlerClass)
         .withEventHandler("trace-aggregation-trigger", eventHandler, {
           eventTypes: [EVENT_TYPES[0]],
@@ -502,7 +502,7 @@ describe("PipelineBuilder Integration Tests", () => {
         .build();
 
       expect(pipeline.name).toBe("span-ingestion");
-      expect(pipeline.aggregateType).toBe("span");
+      expect(pipeline.aggregateType).toBe("span_ingestion");
       expect(pipeline.commands).toHaveProperty("recordSpan");
       expect(pipeline.service).toBeDefined();
     });
@@ -563,7 +563,7 @@ describe("PipelineBuilder Integration Tests", () => {
         factory,
       )
         .withName("test-pipeline")
-        .withAggregateType("span")
+        .withAggregateType("span_ingestion")
         .withCommandHandler(HandlerClass1)
         .withCommandHandler(HandlerClass2)
         .build();
@@ -588,7 +588,7 @@ describe("PipelineBuilder Integration Tests", () => {
         factory,
       )
         .withName("test-pipeline")
-        .withAggregateType("span")
+        .withAggregateType("span_ingestion")
         .withCommandHandler(HandlerClass)
         .build();
 
@@ -629,7 +629,7 @@ describe("PipelineBuilder Integration Tests", () => {
         factory,
       )
         .withName("test-pipeline")
-        .withAggregateType("span")
+        .withAggregateType("span_ingestion")
         .withCommandHandler(RecordSpanCommandHandler)
         .build();
 
@@ -652,7 +652,7 @@ describe("PipelineBuilder Integration Tests", () => {
         factory,
       )
         .withName("test-pipeline")
-        .withAggregateType("span")
+        .withAggregateType("span_ingestion")
         .withCommandHandler(HandlerClass, { dispatcherName: "customName" })
         .build();
 

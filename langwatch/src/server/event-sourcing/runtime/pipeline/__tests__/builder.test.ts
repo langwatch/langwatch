@@ -80,7 +80,7 @@ describe("PipelineBuilder", () => {
       );
 
       const withName = builder.withName("test-pipeline");
-      const withType = withName.withAggregateType("span");
+      const withType = withName.withAggregateType("span_ingestion");
       const pipeline = withType.build();
 
       expect(pipeline.service).toBeDefined();
@@ -100,7 +100,7 @@ describe("PipelineBuilder", () => {
 
       new PipelineBuilder<TestEvent, Projection>(eventStore, factory)
         .withName("test-pipeline")
-        .withAggregateType("span")
+        .withAggregateType("span_ingestion")
         .withCommandHandler(HandlerClass)
         .build();
 
@@ -126,7 +126,7 @@ describe("PipelineBuilder", () => {
         eventStore,
       ).withName("test-pipeline");
 
-      const result = builder.withAggregateType("span");
+      const result = builder.withAggregateType("span_ingestion");
 
       expect(result).toBeDefined();
       // Verify it has the expected methods for the final builder state
@@ -143,12 +143,12 @@ describe("PipelineBuilder", () => {
       const eventStore = createMockEventStore<TestEvent>();
       const builder = new PipelineBuilder<TestEvent, Projection>(eventStore)
         .withName("test-pipeline")
-        .withAggregateType("span");
+        .withAggregateType("span_ingestion");
 
       const pipeline = builder.build();
 
       expect(pipeline.name).toBe("test-pipeline");
-      expect(pipeline.aggregateType).toBe("span");
+      expect(pipeline.aggregateType).toBe("span_ingestion");
     });
   });
 
@@ -157,7 +157,7 @@ describe("PipelineBuilder", () => {
       const eventStore = createMockEventStore<TestEvent>();
       const builder = new PipelineBuilder<TestEvent, Projection>(eventStore)
         .withName("my-pipeline")
-        .withAggregateType("span");
+        .withAggregateType("span_ingestion");
 
       const pipeline = builder.build();
 
@@ -179,7 +179,7 @@ describe("PipelineBuilder", () => {
       const eventStore = createMockEventStore<TestEvent>();
       const builder = new PipelineBuilder<TestEvent, Projection>(eventStore)
         .withName("test-pipeline")
-        .withAggregateType("span");
+        .withAggregateType("span_ingestion");
 
       const pipeline = builder.build();
 
@@ -194,7 +194,7 @@ describe("PipelineBuilder", () => {
 
       const builder = new PipelineBuilder<TestEvent, Projection>(eventStore)
         .withName("test-pipeline")
-        .withAggregateType("span");
+        .withAggregateType("span_ingestion");
 
       const pipeline = builder.build();
       const event = createTestEventForBuilder("aggregate-1");
@@ -210,7 +210,7 @@ describe("PipelineBuilder", () => {
       const eventStore = createMockEventStore<TestEvent>();
       const builder = new PipelineBuilder<TestEvent, Projection>(eventStore)
         .withName("test-pipeline")
-        .withAggregateType("span");
+        .withAggregateType("span_ingestion");
 
       const pipeline = builder.build();
 
@@ -221,7 +221,7 @@ describe("PipelineBuilder", () => {
       const eventStore = createMockEventStore<TestEvent>();
       const builder = new PipelineBuilder<TestEvent, Projection>(eventStore)
         .withName("test-pipeline")
-        .withAggregateType("span");
+        .withAggregateType("span_ingestion");
 
       const pipeline = builder.build();
 
@@ -232,7 +232,7 @@ describe("PipelineBuilder", () => {
       const eventStore = createMockEventStore<TestEvent>();
       const builder = new PipelineBuilder<TestEvent, Projection>(eventStore)
         .withName("test-pipeline")
-        .withAggregateType("span");
+        .withAggregateType("span_ingestion");
 
       const pipeline = builder.build();
 
@@ -248,7 +248,7 @@ describe("PipelineBuilder", () => {
 
       const builder = new PipelineBuilder<TestEvent, Projection>(eventStore)
         .withName("test-pipeline")
-        .withAggregateType("span")
+        .withAggregateType("span_ingestion")
         .withProjection("my-projection", store, handler);
 
       const pipeline = builder.build();
@@ -272,7 +272,7 @@ describe("PipelineBuilder", () => {
 
       const builder = new PipelineBuilder<TestEvent, Projection>(eventStore)
         .withName("test-pipeline")
-        .withAggregateType("span")
+        .withAggregateType("span_ingestion")
         .withProjection("test-projection", store, handler);
 
       const pipeline = builder.build();
@@ -290,7 +290,7 @@ describe("PipelineBuilder", () => {
 
       const builder = new PipelineBuilder<TestEvent, Projection>(eventStore)
         .withName("test-pipeline")
-        .withAggregateType("span");
+        .withAggregateType("span_ingestion");
 
       const result = builder.withProjection("test-projection", store, handler);
 
@@ -304,7 +304,7 @@ describe("PipelineBuilder", () => {
 
       const builder = new PipelineBuilder<TestEvent, Projection>(eventStore)
         .withName("test-pipeline")
-        .withAggregateType("span")
+        .withAggregateType("span_ingestion")
         .withProjection("duplicate-name", store, handler);
 
       expect(() => {
@@ -323,7 +323,7 @@ describe("PipelineBuilder", () => {
 
       const builder = new PipelineBuilder<TestEvent, Projection>(eventStore)
         .withName("test-pipeline")
-        .withAggregateType("span")
+        .withAggregateType("span_ingestion")
         .withProjection("projection-1", store1, handler1)
         .withProjection("projection-2", store2, handler2);
 
@@ -362,7 +362,7 @@ describe("PipelineBuilder", () => {
 
       const builder = new PipelineBuilder<TestEvent, Projection>(eventStore)
         .withName("test-pipeline")
-        .withAggregateType("span")
+        .withAggregateType("span_ingestion")
         .withProjection("projection-1", store1, handler1)
         .withProjection("projection-2", store2, handler2);
 
@@ -386,7 +386,7 @@ describe("PipelineBuilder", () => {
 
       const builder = new PipelineBuilder<TestEvent, Projection>(eventStore)
         .withName("test-pipeline")
-        .withAggregateType("span")
+        .withAggregateType("span_ingestion")
         .withEventPublisher(publisher);
 
       const pipeline = builder.build();
@@ -408,7 +408,7 @@ describe("PipelineBuilder", () => {
 
       const builder = new PipelineBuilder<TestEvent, Projection>(eventStore)
         .withName("test-pipeline")
-        .withAggregateType("span")
+        .withAggregateType("span_ingestion")
         .withEventPublisher(publisher1)
         .withEventPublisher(publisher2);
 
@@ -427,7 +427,7 @@ describe("PipelineBuilder", () => {
 
       const builder = new PipelineBuilder<TestEvent, Projection>(eventStore)
         .withName("test-pipeline")
-        .withAggregateType("span");
+        .withAggregateType("span_ingestion");
 
       const result = builder.withEventPublisher(publisher);
 
@@ -443,7 +443,7 @@ describe("PipelineBuilder", () => {
 
       const builder = new PipelineBuilder<TestEvent, Projection>(eventStore)
         .withName("test-pipeline")
-        .withAggregateType("span")
+        .withAggregateType("span_ingestion")
         .withEventPublisher(publisher);
 
       const pipeline = builder.build();
@@ -460,7 +460,7 @@ describe("PipelineBuilder", () => {
 
       const builder = new PipelineBuilder<TestEvent, Projection>(eventStore)
         .withName("test-pipeline")
-        .withAggregateType("span");
+        .withAggregateType("span_ingestion");
 
       const pipeline = builder.build();
 
@@ -477,7 +477,7 @@ describe("PipelineBuilder", () => {
 
         const builder = new PipelineBuilder<TestEvent, Projection>(eventStore)
           .withName("test-pipeline")
-          .withAggregateType("span")
+          .withAggregateType("span_ingestion")
           .withEventHandler("my-handler", handler);
 
         expect(() => {
@@ -501,7 +501,7 @@ describe("PipelineBuilder", () => {
             factory,
           )
             .withName("test-pipeline")
-            .withAggregateType("span")
+            .withAggregateType("span_ingestion")
             .withEventHandler("test-handler", handler);
 
           const pipeline = builder.build();
@@ -528,7 +528,7 @@ describe("PipelineBuilder", () => {
 
         const builder = new PipelineBuilder<TestEvent, Projection>(eventStore)
           .withName("test-pipeline")
-          .withAggregateType("span")
+          .withAggregateType("span_ingestion")
           .withEventHandler("test-handler", handler, {
             eventTypes: [EVENT_TYPES[0]],
           });
@@ -544,7 +544,7 @@ describe("PipelineBuilder", () => {
 
         const builder = new PipelineBuilder<TestEvent, Projection>(eventStore)
           .withName("test-pipeline")
-          .withAggregateType("span")
+          .withAggregateType("span_ingestion")
           .withEventHandler("test-handler", handler);
 
         expect(() => {
@@ -558,7 +558,7 @@ describe("PipelineBuilder", () => {
 
         const builder = new PipelineBuilder<TestEvent, Projection>(eventStore)
           .withName("test-pipeline")
-          .withAggregateType("span")
+          .withAggregateType("span_ingestion")
           .withEventHandler("duplicate-name", handler);
 
         expect(() => {
@@ -575,7 +575,7 @@ describe("PipelineBuilder", () => {
 
         const builder = new PipelineBuilder<TestEvent, Projection>(eventStore)
           .withName("test-pipeline")
-          .withAggregateType("span")
+          .withAggregateType("span_ingestion")
           .withEventHandler("handler-1", handler1)
           .withEventHandler("handler-2", handler2);
 
@@ -600,7 +600,7 @@ describe("PipelineBuilder", () => {
           factory,
         )
           .withName("test-pipeline")
-          .withAggregateType("span")
+          .withAggregateType("span_ingestion")
           .withEventHandler("handler-1", handler1)
           .withEventHandler("handler-2", handler2);
 
@@ -631,7 +631,7 @@ describe("PipelineBuilder", () => {
 
       new PipelineBuilder<TestEvent, Projection>(eventStore, factory)
         .withName("test-pipeline")
-        .withAggregateType("span")
+        .withAggregateType("span_ingestion")
         .withCommandHandler(HandlerClass)
         .build();
 
@@ -654,7 +654,7 @@ describe("PipelineBuilder", () => {
         factory,
       )
         .withName("test-pipeline")
-        .withAggregateType("span")
+        .withAggregateType("span_ingestion")
         .withCommandHandler(HandlerClass)
         .build();
 
@@ -677,7 +677,7 @@ describe("PipelineBuilder", () => {
         factory,
       )
         .withName("test-pipeline")
-        .withAggregateType("span")
+        .withAggregateType("span_ingestion")
         .withCommandHandler(HandlerClass)
         .build();
 
@@ -700,7 +700,7 @@ describe("PipelineBuilder", () => {
         factory,
       )
         .withName("test-pipeline")
-        .withAggregateType("span")
+        .withAggregateType("span_ingestion")
         .withCommandHandler(HandlerClass, { dispatcherName: "customName" })
         .build();
 
@@ -731,7 +731,7 @@ describe("PipelineBuilder", () => {
         factory,
       )
         .withName("test-pipeline")
-        .withAggregateType("span")
+        .withAggregateType("span_ingestion")
         .withCommandHandler(HandlerClass1)
         .withCommandHandler(HandlerClass2)
         .build();
@@ -763,7 +763,7 @@ describe("PipelineBuilder", () => {
 
       new PipelineBuilder<TestEvent, Projection>(eventStore, factory)
         .withName("test-pipeline")
-        .withAggregateType("span")
+        .withAggregateType("span_ingestion")
         .withCommandHandler(HandlerClass1)
         .withCommandHandler(HandlerClass2)
         .build();
@@ -785,7 +785,7 @@ describe("PipelineBuilder", () => {
 
       new PipelineBuilder<TestEvent, Projection>(eventStore, factory)
         .withName("my-pipeline")
-        .withAggregateType("span")
+        .withAggregateType("span_ingestion")
         .withCommandHandler(HandlerClass)
         .build();
 
@@ -822,7 +822,7 @@ describe("PipelineBuilder", () => {
         factory,
       )
         .withName("test-pipeline")
-        .withAggregateType("span")
+        .withAggregateType("span_ingestion")
         .withCommandHandler(HandlerClass)
         .build();
 
@@ -846,7 +846,7 @@ describe("PipelineBuilder", () => {
         factory,
       )
         .withName("test-pipeline")
-        .withAggregateType("span")
+        .withAggregateType("span_ingestion")
         .withCommandHandler(HandlerClass)
         .build();
 
@@ -872,7 +872,7 @@ describe("PipelineBuilder", () => {
         factory,
       )
         .withName("test-pipeline")
-        .withAggregateType("span")
+        .withAggregateType("span_ingestion")
         .withCommandHandler(HandlerClass)
         .build();
 
@@ -895,7 +895,7 @@ describe("PipelineBuilder", () => {
         factory,
       )
         .withName("test-pipeline")
-        .withAggregateType("span")
+        .withAggregateType("span_ingestion")
         .withCommandHandler(HandlerClass, { dispatcherName: "overrideName" })
         .build();
 
@@ -937,7 +937,7 @@ describe("PipelineBuilder", () => {
         factory,
       )
         .withName("test-pipeline")
-        .withAggregateType("span")
+        .withAggregateType("span_ingestion")
         .withCommandHandler(RecordSpanCommandHandler)
         .build();
 
@@ -965,7 +965,7 @@ describe("PipelineBuilder", () => {
       expect(() => {
         new PipelineBuilder<TestEvent, Projection>(eventStore, factory)
           .withName("test-pipeline")
-          .withAggregateType("span")
+          .withAggregateType("span_ingestion")
           .withCommandHandler(HandlerClass1)
           .withCommandHandler(HandlerClass2)
           .build();
@@ -1001,7 +1001,7 @@ describe("PipelineBuilder", () => {
         factory,
       )
         .withName("test-pipeline")
-        .withAggregateType("span")
+        .withAggregateType("span_ingestion")
         .withCommandHandler(HandlerClass)
         .build();
 
@@ -1032,7 +1032,7 @@ describe("PipelineBuilder", () => {
         factory,
       )
         .withName("test-pipeline")
-        .withAggregateType("span")
+        .withAggregateType("span_ingestion")
         .withCommandHandler(HandlerClass)
         .build();
 
@@ -1067,7 +1067,7 @@ describe("PipelineBuilder", () => {
         factory,
       )
         .withName("test-pipeline")
-        .withAggregateType("span")
+        .withAggregateType("span_ingestion")
         .withCommandHandler(HandlerClass)
         .build();
 
@@ -1108,7 +1108,7 @@ describe("PipelineBuilder", () => {
         factory,
       )
         .withName("test-pipeline")
-        .withAggregateType("span")
+        .withAggregateType("span_ingestion")
         .withCommandHandler(HandlerClass)
         .build();
 
@@ -1148,7 +1148,7 @@ describe("PipelineBuilder", () => {
         factory,
       )
         .withName("test-pipeline")
-        .withAggregateType("span")
+        .withAggregateType("span_ingestion")
         .withCommandHandler(HandlerClass)
         .build();
 
@@ -1190,7 +1190,7 @@ describe("PipelineBuilder", () => {
         factory,
       )
         .withName("test-pipeline")
-        .withAggregateType("span")
+        .withAggregateType("span_ingestion")
         .withCommandHandler(HandlerClass)
         .build();
 
@@ -1228,7 +1228,7 @@ describe("PipelineBuilder", () => {
         factory,
       )
         .withName("test-pipeline")
-        .withAggregateType("span")
+        .withAggregateType("span_ingestion")
         .withCommandHandler(HandlerClass)
         .build();
 
@@ -1266,7 +1266,7 @@ describe("PipelineBuilder", () => {
         factory,
       )
         .withName("test-pipeline")
-        .withAggregateType("span")
+        .withAggregateType("span_ingestion")
         .withCommandHandler(HandlerClass)
         .build();
 
@@ -1290,7 +1290,7 @@ describe("PipelineBuilder", () => {
 
       const builder = new PipelineBuilder<TestEvent, Projection>(eventStore)
         .withName("test-pipeline")
-        .withAggregateType("span")
+        .withAggregateType("span_ingestion")
         .withProjection("duplicate", store, handler);
 
       expect(() => {
@@ -1305,7 +1305,7 @@ describe("PipelineBuilder", () => {
       const builder = new PipelineBuilder<TestEvent, Projection>(eventStore);
 
       const withName = builder.withName("");
-      const pipeline = withName.withAggregateType("span").build();
+      const pipeline = withName.withAggregateType("span_ingestion").build();
 
       // Verify that empty name is accepted and stored
       expect(pipeline.name).toBe("");
@@ -1316,7 +1316,7 @@ describe("PipelineBuilder", () => {
       const longName = "a".repeat(1000);
       const builder = new PipelineBuilder<TestEvent, Projection>(eventStore)
         .withName(longName)
-        .withAggregateType("span");
+        .withAggregateType("span_ingestion");
 
       expect(() => {
         builder.build();
@@ -1331,7 +1331,7 @@ describe("PipelineBuilder", () => {
       const specialName = "test-pipeline_with.special@chars#123";
       const builder = new PipelineBuilder<TestEvent, Projection>(eventStore)
         .withName(specialName)
-        .withAggregateType("span");
+        .withAggregateType("span_ingestion");
 
       expect(() => {
         builder.build();
@@ -1347,7 +1347,7 @@ describe("PipelineBuilder", () => {
 
       const builder = new PipelineBuilder<TestEvent, Projection>(eventStore)
         .withName("test-pipeline")
-        .withAggregateType("span")
+        .withAggregateType("span_ingestion")
         .withEventHandler("duplicate", handler);
 
       expect(() => {
@@ -1378,7 +1378,7 @@ describe("PipelineBuilder", () => {
       expect(() => {
         new PipelineBuilder<TestEvent, Projection>(eventStore, factory)
           .withName("test-pipeline")
-          .withAggregateType("span")
+          .withAggregateType("span_ingestion")
           .withCommandHandler(HandlerClass1)
           .withCommandHandler(HandlerClass2)
           .build();
@@ -1394,7 +1394,7 @@ describe("PipelineBuilder", () => {
 
       const builder = new PipelineBuilder<TestEvent, Projection>(eventStore)
         .withName("test-pipeline")
-        .withAggregateType("span");
+        .withAggregateType("span_ingestion");
 
       const pipeline = builder.build();
       const event = createTestEventForBuilder("aggregate-1");

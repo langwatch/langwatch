@@ -132,7 +132,7 @@ describe("Pipeline Builder Helper Functions", () => {
         factory,
       )
         .withName("test-pipeline")
-        .withAggregateType("span")
+        .withAggregateType("span_ingestion")
         .withCommandHandler(TestHandler)
         .build();
 
@@ -170,7 +170,7 @@ describe("Pipeline Builder Helper Functions", () => {
 
       new PipelineBuilder<TestEvent, Projection>(eventStore, factory)
         .withName("test-pipeline")
-        .withAggregateType("span")
+        .withAggregateType("span_ingestion")
         .withCommandHandler(TestHandler)
         .build();
 
@@ -206,7 +206,7 @@ describe("Pipeline Builder Helper Functions", () => {
 
       new PipelineBuilder<TestEvent, Projection>(eventStore, factory)
         .withName("test-pipeline")
-        .withAggregateType("span")
+        .withAggregateType("span_ingestion")
         .withCommandHandler(HandlerClass)
         .build();
 
@@ -231,7 +231,7 @@ describe("Pipeline Builder Helper Functions", () => {
 
       new PipelineBuilder<TestEvent, Projection>(eventStore, factory)
         .withName("test-pipeline")
-        .withAggregateType("span")
+        .withAggregateType("span_ingestion")
         .withCommandHandler(HandlerClass)
         .build();
 
@@ -255,7 +255,7 @@ describe("Pipeline Builder Helper Functions", () => {
 
       new PipelineBuilder<TestEvent, Projection>(eventStore, factory)
         .withName("test-pipeline")
-        .withAggregateType("span")
+        .withAggregateType("span_ingestion")
         .withCommandHandler(HandlerClass)
         .build();
 
@@ -291,7 +291,7 @@ describe("Pipeline Builder Helper Functions", () => {
 
       new PipelineBuilder<TestEvent, Projection>(eventStore, factory)
         .withName("test-pipeline")
-        .withAggregateType("span")
+        .withAggregateType("span_ingestion")
         .withCommandHandler(TestHandler)
         .build();
 
@@ -330,7 +330,7 @@ describe("Pipeline Builder Helper Functions", () => {
 
       new PipelineBuilder<TestEvent, Projection>(eventStore, factory)
         .withName("test-pipeline")
-        .withAggregateType("span")
+        .withAggregateType("span_ingestion")
         .withCommandHandler(HandlerClass)
         .build();
 
@@ -355,7 +355,7 @@ describe("Pipeline Builder Helper Functions", () => {
 
       new PipelineBuilder<TestEvent, Projection>(eventStore, factory)
         .withName("test-pipeline")
-        .withAggregateType("span")
+        .withAggregateType("span_ingestion")
         .withCommandHandler(HandlerClass)
         .build();
 
@@ -379,7 +379,7 @@ describe("Pipeline Builder Helper Functions", () => {
 
       new PipelineBuilder<TestEvent, Projection>(eventStore, factory)
         .withName("test-pipeline")
-        .withAggregateType("span")
+        .withAggregateType("span_ingestion")
         .withCommandHandler(HandlerClass)
         .build();
 
