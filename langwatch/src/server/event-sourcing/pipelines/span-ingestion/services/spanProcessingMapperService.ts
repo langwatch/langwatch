@@ -20,7 +20,6 @@ import type { InstrumentationScope } from "@opentelemetry/core";
 import type { TraceForCollection } from "../../../../tracer/otel.traces";
 import type { Span, RAGSpan } from "../../../../tracer/types";
 import type { DeepPartial } from "../../../../../utils/types";
-import type { SpanIngestionWriteRecord } from "../types/spanIngestionWriteRecord";
 import {
   unixNanoToMs,
   msToUnixNano,
@@ -33,10 +32,15 @@ import {
 } from "../utils/otelConversions";
 import { createLogger } from "../../../../../utils/logger";
 import { getLangWatchTracer } from "langwatch";
-import type { SpanData } from "../types/";
+import type { SpanData } from "../../../schemas/commands/spanIngestion.schema";
 
 const logger = createLogger("langwatch:span-ingestion:mapper");
 const tracer = getLangWatchTracer("langwatch.span-ingestion.mapper");
+
+export type SpanIngestionWriteRecord = {
+  readableSpan: ReadableSpan;
+  tenantId: string;
+};
 
 /**
  * Type definition from @opentelemetry/resources for RawResourceAttribute

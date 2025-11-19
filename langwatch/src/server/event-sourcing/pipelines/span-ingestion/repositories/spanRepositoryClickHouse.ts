@@ -4,8 +4,7 @@ import { getLangWatchTracer } from "langwatch";
 import { generate } from "@langwatch/ksuid";
 
 import type { SpanRepository } from "./spanRepository";
-import type { StoreSpanIngestionCommandData } from "../types/storeSpanIngestionCommand";
-import type { SpanData } from "../types/spanData";
+import type { StoreSpanIngestionCommandData, SpanData } from "../../../schemas/commands/spanIngestion.schema";
 import { createLogger } from "../../../../../utils/logger";
 
 export class SpanRepositoryClickHouse implements SpanRepository {
@@ -253,15 +252,15 @@ export class SpanRepositoryClickHouse implements SpanRepository {
       Duration: spanData.durationMs,
       StatusCode: this.mapStatusCode(spanData.status.code),
       StatusMessage: spanData.status.message,
-      "Events.Timestamp": spanData.events.map((event) => event.timeUnixMs),
-      "Events.Name": spanData.events.map((event) => event.name),
+      "Events.Timestamp": spanData.events.map((event: SpanData["events"][number]) => event.timeUnixMs),
+      "Events.Name": spanData.events.map((event: SpanData["events"][number]) => event.name),
       "Events.Attributes": spanData.events.map(
-        (event) => event.attributes || {},
+        (event: SpanData["events"][number]) => event.attributes || {},
       ),
-      "Links.TraceId": spanData.links.map((link) => link.traceId),
-      "Links.SpanId": spanData.links.map((link) => link.spanId),
-      "Links.TraceState": spanData.links.map((link) => link.traceState ?? ""),
-      "Links.Attributes": spanData.links.map((link) => link.attributes ?? {}),
+      "Links.TraceId": spanData.links.map((link: SpanData["links"][number]) => link.traceId),
+      "Links.SpanId": spanData.links.map((link: SpanData["links"][number]) => link.spanId),
+      "Links.TraceState": spanData.links.map((link: SpanData["links"][number]) => link.traceState ?? ""),
+      "Links.Attributes": spanData.links.map((link: SpanData["links"][number]) => link.attributes ?? {}),
       CollectedAt: collectedAtUnixMs,
     } satisfies ClickHouseSpan;
   }

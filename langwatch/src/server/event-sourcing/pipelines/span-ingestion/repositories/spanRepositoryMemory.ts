@@ -2,8 +2,8 @@ import { SpanKind } from "@opentelemetry/api";
 import { getLangWatchTracer } from "langwatch";
 
 import type { SpanRepository } from "./spanRepository";
-import type { StoreSpanIngestionCommandData } from "../types/storeSpanIngestionCommand";
-import type { SpanData } from "../types/spanData";
+import type { StoreSpanIngestionCommandData } from "../../../schemas/commands/spanIngestion.schema";
+import type { SpanData } from "../../../schemas/commands/spanIngestion.schema";
 import { createLogger } from "../../../../../utils/logger";
 
 export class SpanRepositoryMemory implements SpanRepository {

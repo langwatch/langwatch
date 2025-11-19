@@ -4,9 +4,10 @@ import { getLangWatchTracer } from "langwatch";
 import type { Command, CommandHandler } from "../../../library";
 import { EventUtils, createTenantId } from "../../../library";
 import { defineCommandSchema } from "../../../library";
-import type { StoreSpanIngestionCommandData } from "../types";
-import type { SpanIngestionRecordedEvent } from "../../../types/events/spanIngestion";
-import { storeSpanIngestionCommandDataSchema } from "../../../schemas/commands/spanIngestion.schema";
+import type { StoreSpanIngestionCommandData } from "../../../schemas/commands/spanIngestion.schema";
+import { SPAN_INGESTION_RECORD_COMMAND_TYPE, storeSpanIngestionCommandDataSchema } from "../../../schemas/commands/spanIngestion.schema";
+import type { SpanIngestionRecordedEvent } from "../../../schemas/events/spanIngestion.schema";
+import { SPAN_INGESTION_RECORDED_EVENT_TYPE } from "../../../schemas/events/spanIngestion.schema";
 import { createLogger } from "../../../../../utils/logger";
 import { getClickHouseClient } from "../../../../../utils/clickhouse";
 import { SpanRepositoryClickHouse } from "../repositories/spanRepositoryClickHouse";
@@ -28,7 +29,7 @@ export class RecordSpanCommand
 {
   static readonly dispatcherName = "recordSpan" as const;
   static readonly schema = defineCommandSchema(
-    "lw.obs.span_ingestion.record",
+    SPAN_INGESTION_RECORD_COMMAND_TYPE,
     storeSpanIngestionCommandDataSchema,
     "Command to record a span ingestion event",
   );
@@ -98,7 +99,7 @@ export class RecordSpanCommand
         >(
           traceId,
           tenantId,
-          "lw.obs.span_ingestion.recorded",
+          SPAN_INGESTION_RECORDED_EVENT_TYPE,
           {
             traceId,
             spanId,
