@@ -14,6 +14,11 @@ import {
 } from "./testHelpers";
 import { EVENT_TYPES } from "../../domain/eventType";
 
+// Helper to escape special regex characters
+function escapeRegex(str: string): string {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
 describe("EventSourcingService - Event Handlers", () => {
   const aggregateType = createTestAggregateType();
   const tenantId = createTestTenantId();
@@ -402,7 +407,11 @@ describe("EventSourcingService - Event Handlers", () => {
           aggregateType: aggregateType,
           lastProcessedAggregateId: TEST_CONSTANTS.AGGREGATE_ID,
           lastProcessedTimestamp: TEST_CONSTANTS.BASE_TIMESTAMP,
-          lastProcessedEventId: `${TEST_CONSTANTS.AGGREGATE_ID}:${TEST_CONSTANTS.BASE_TIMESTAMP}:${EVENT_TYPES[0]}`,
+          lastProcessedEventId: expect.stringMatching(
+            new RegExp(
+              `^event_[A-Za-z0-9]+:${escapeRegex(TEST_CONSTANTS.AGGREGATE_ID)}:${TEST_CONSTANTS.BASE_TIMESTAMP}:${escapeRegex(EVENT_TYPES[0])}$`,
+            ),
+          ),
         }),
       );
     });
@@ -443,7 +452,11 @@ describe("EventSourcingService - Event Handlers", () => {
           aggregateType: aggregateType,
           lastProcessedAggregateId: aggregateId,
           lastProcessedTimestamp: timestamp,
-          lastProcessedEventId: `${aggregateId}:${timestamp}:${eventType}`,
+          lastProcessedEventId: expect.stringMatching(
+            new RegExp(
+              `^event_[A-Za-z0-9]+:${escapeRegex(aggregateId)}:${timestamp}:${escapeRegex(eventType)}$`,
+            ),
+          ),
         }),
       );
     });
@@ -524,8 +537,10 @@ describe("EventSourcingService - Event Handlers", () => {
       const checkpointCall = mockCalls[0]!;
       const checkpoint = checkpointCall[4]; // aggregateId is now 4th param, checkpoint is 5th
 
-      expect(checkpoint.lastProcessedEventId).toBe(
-        `${TEST_CONSTANTS.AGGREGATE_ID}:${TEST_CONSTANTS.BASE_TIMESTAMP}:${EVENT_TYPES[0]}`,
+      expect(checkpoint.lastProcessedEventId).toMatch(
+        new RegExp(
+          `^event_[A-Za-z0-9]+:${escapeRegex(TEST_CONSTANTS.AGGREGATE_ID)}:${TEST_CONSTANTS.BASE_TIMESTAMP}:${escapeRegex(EVENT_TYPES[0])}$`,
+        ),
       );
     });
   });
