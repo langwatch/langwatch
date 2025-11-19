@@ -2,7 +2,7 @@ import { SpanKind } from "@opentelemetry/api";
 import { getLangWatchTracer } from "langwatch";
 
 import type { EventReactionHandler } from "../../../library";
-import type { SpanIngestionRecordedEvent } from "../../../types/events/spanIngestion";
+import type { SpanIngestionRecordedEvent } from "../../../schemas/events/spanIngestion.schema";
 import { createLogger } from "../../../../../utils/logger";
 import { traceAggregationPipeline } from "../../trace-aggregation/pipeline";
 
@@ -59,7 +59,7 @@ export class TraceAggregationTriggerHandler
     );
   }
 
-  getEventTypes(): string[] {
-    return ["lw.obs.span.ingestion.recorded"];
+  getEventTypes() {
+    return ["lw.obs.span_ingestion.recorded"] as const;
   }
 }
