@@ -326,7 +326,7 @@ export function createMinimalPipelineBuilder() {
   ) => {
     return new PipelineBuilder<TestEvent, Projection>(eventStore, factory)
       .withName("test-pipeline")
-      .withAggregateType("span")
+      .withAggregateType("span_ingestion")
       .withCommandHandler(HandlerClass)
       .build();
   };
