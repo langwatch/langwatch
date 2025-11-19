@@ -15,10 +15,7 @@ import { ChevronDown } from "react-feather";
  * Can be used within a FormProvider context (uses react-hook-form Controller)
  */
 export const ModelSelectFieldMini = React.memo(function ModelSelectFieldMini() {
-  const {
-    control,
-    formState: { errors },
-  } = useFormContext<PromptConfigFormValues>();
+  const { control, formState } = useFormContext<PromptConfigFormValues>();
   const { open, onClose, onToggle } = useDisclosure();
 
   return (
@@ -28,7 +25,7 @@ export const ModelSelectFieldMini = React.memo(function ModelSelectFieldMini() {
         name="version.configData.llm"
         control={control}
         render={({ field }) => {
-          const llmErrors = errors.version?.configData?.llm;
+          const llmErrors = formState.errors.version?.configData?.llm;
           return (
             <>
               <HStack

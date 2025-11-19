@@ -1,4 +1,4 @@
-import { Button, HStack, Input, Text, VStack, Field } from "@chakra-ui/react";
+import { Button, HStack, Input, Text, VStack } from "@chakra-ui/react";
 import { Settings } from "react-feather";
 
 import { ConfigModal } from "../../optimization_studio/components/properties/modals/ConfigModal";
@@ -110,63 +110,54 @@ export function LLMConfigModal({
           </Tooltip>
         </HStack>
       </HorizontalFormControl>
-      <Field
+      <HorizontalFormControl
+        helper="Controls randomness in the output"
         invalid={!!errors?.temperature}
         label="Temperature"
-        errorText={errors?.temperature?.message}
+        inputWidth="55%"
       >
-        <HorizontalFormControl
-          helper="Controls randomness in the output"
-          inputWidth="55%"
-        >
-          <Input
-            required
-            value={values?.temperature}
-            type="number"
-            step={0.1}
-            min={isGpt5 ? 1 : 0}
-            max={isGpt5 ? 1 : 2}
-            placeholder="1"
-            onChange={(e) =>
-              onChange({ ...values, temperature: Number(e.target.value) })
-            }
-          />
-          {isGpt5 && (
-            <WarningText>
-              Temperature is fixed to 1 for GPT-5 models
-            </WarningText>
-          )}
-        </HorizontalFormControl>
-      </Field>
-      <Field
+        <Input
+          required
+          value={values?.temperature}
+          type="number"
+          step={0.1}
+          min={isGpt5 ? 1 : 0}
+          max={isGpt5 ? 1 : 2}
+          placeholder="1"
+          onChange={(e) =>
+            onChange({ ...values, temperature: Number(e.target.value) })
+          }
+        />
+        {isGpt5 && (
+          <WarningText>Temperature is fixed to 1 for GPT-5 models</WarningText>
+        )}
+      </HorizontalFormControl>
+      <HorizontalFormControl
         invalid={!!errors?.maxTokens}
         label="Max Tokens"
-        errorText={errors?.maxTokens?.message}
+        error={errors?.maxTokens?.message}
+        helper={"Limit to avoid expensive outputs"}
+        inputWidth="55%"
       >
-        <HorizontalFormControl
-          helper={"Limit to avoid expensive outputs"}
-          inputWidth="55%"
-        >
-          <VStack align="stretch" gap={0}>
-            <Input
-              required
-              value={maxTokens}
-              type="number"
-              step={64}
-              min={MIN_MAX_TOKENS}
-              placeholder={MIN_MAX_TOKENS.toString()}
-              max={maxTokenLimit}
-              onChange={(e) =>
-                onChange(normalizeMaxTokens(values, Number(e.target.value)))
-              }
-            />
-            <Text fontSize="xs" color="gray.500" marginTop={1}>
-              Min: {MIN_MAX_TOKENS.toLocaleString()} | Max:{" "}
-              {maxTokenLimit.toLocaleString()}
-            </Text>
-          </VStack>
-        </HorizontalFormControl>
-      </Field>
+        <VStack align="stretch" gap={0}>
+          <Input
+            required
+            value={maxTokens}
+            type="number"
+            step={64}
+            min={MIN_MAX_TOKENS}
+            placeholder={MIN_MAX_TOKENS.toString()}
+            max={maxTokenLimit}
+            onChange={(e) =>
+              onChange(normalizeMaxTokens(values, Number(e.target.value)))
+            }
+          />
+          <Text fontSize="xs" color="gray.500" marginTop={1}>
+            Min: {MIN_MAX_TOKENS.toLocaleString()} | Max:{" "}
+            {maxTokenLimit.toLocaleString()}
+          </Text>
+        </VStack>
+      </HorizontalFormControl>
     </ConfigModal>
   );
 }

@@ -14,6 +14,16 @@ import {
 
 const latestConfigVersionSchema = getLatestConfigVersionSchema();
 
+const llmSchemaWithPreprocessing = z.object({
+  model:
+    latestConfigVersionSchema.shape.configData.shape.model.default(
+      DEFAULT_MODEL,
+    ),
+  temperature: z.preprocess((v) => v ?? DEFAULT_TEMPERATURE, z.number()),
+  maxTokens: z.preprocess((v) => v ?? DEFAULT_MAX_TOKENS, z.number()),
+  litellmParams: z.record(z.string()).optional(),
+});
+
 // Base schema with static validation using fallback limits
 const baseFormSchema = z.object({
   // Config ID (separate from version metadata)
@@ -31,46 +41,7 @@ const baseFormSchema = z.object({
       messages: latestConfigVersionSchema.shape.configData.shape.messages,
       inputs: latestConfigVersionSchema.shape.configData.shape.inputs,
       outputs: latestConfigVersionSchema.shape.configData.shape.outputs,
-      llm: z
-        .object({
-          model:
-            latestConfigVersionSchema.shape.configData.shape.model.default(
-              DEFAULT_MODEL,
-            ),
-          temperature: z.preprocess(
-            (v) => v ?? DEFAULT_TEMPERATURE,
-            z.number(),
-          ),
-          maxTokens: z
-            .preprocess((v) => v ?? DEFAULT_MAX_TOKENS, z.number())
-            .refine((val) => val >= MIN_MAX_TOKENS, {
-              message: `Max tokens must be at least ${MIN_MAX_TOKENS}`,
-            })
-            .refine((val) => val <= FALLBACK_MAX_TOKENS, {
-              message: `Max tokens cannot exceed ${FALLBACK_MAX_TOKENS.toLocaleString()}`,
-            }),
-          // Additional params attached to the LLM config
-          litellmParams: z.record(z.string()).optional(),
-        })
-        .refine(
-          (data) => {
-            const isGpt5 = data.model.includes("gpt-5");
-            if (isGpt5) {
-              return data.temperature === 1;
-            }
-            return true;
-          },
-          (data) => {
-            const isGpt5 = data.model.includes("gpt-5");
-            if (isGpt5 && data.temperature !== 1) {
-              return {
-                message: "Temperature must be 1 for GPT-5 models",
-                path: ["temperature"],
-              };
-            }
-            return { message: "Invalid LLM configuration", path: [] };
-          },
-        ),
+      llm: llmSchemaWithPreprocessing,
       demonstrations:
         latestConfigVersionSchema.shape.configData.shape.demonstrations,
       promptingTechnique:
@@ -106,23 +77,34 @@ export function refinedFormSchemaWithModelLimits(
     return baseFormSchema;
   }
 
-  // Create refined maxTokens validation
-  const refinedMaxTokens = z
-    .preprocess((v) => v ?? DEFAULT_MAX_TOKENS, z.number())
-    .refine((val) => val >= MIN_MAX_TOKENS, {
-      message: `Max tokens must be at least ${MIN_MAX_TOKENS}`,
-    })
-    .refine((val) => val <= maxTokenLimit, {
-      message: `Max tokens cannot exceed ${maxTokenLimit.toLocaleString()}`,
-    });
-
   // Return the base schema with refined maxTokens validation
   return baseFormSchema.extend({
     version: baseFormSchema.shape.version.extend({
       configData: baseFormSchema.shape.version.shape.configData.extend({
-        llm: baseFormSchema.shape.version.shape.configData.shape.llm.extend({
-          maxTokens: refinedMaxTokens,
-        }),
+        llm: z
+          .object({
+            model: llmSchemaWithPreprocessing.shape.model,
+            temperature: llmSchemaWithPreprocessing.shape.temperature,
+            maxTokens: llmSchemaWithPreprocessing.shape.maxTokens
+              .refine((val) => val <= maxTokenLimit, {
+                message: `Max tokens cannot exceed ${maxTokenLimit.toLocaleString()}`,
+              })
+              .refine((val) => val >= MIN_MAX_TOKENS, {
+                message: `Max tokens must be at least ${MIN_MAX_TOKENS}`,
+              }),
+            // Additional params attached to the LLM config
+            litellmParams: llmSchemaWithPreprocessing.shape.litellmParams,
+          })
+          .refine((data) => {
+            const isGpt5 = data.model.includes("gpt-5");
+            if (isGpt5 && data.temperature !== 1) {
+              return {
+                message: "Temperature must be 1 for GPT-5 models",
+                path: ["temperature"],
+              };
+            }
+            return { message: "Invalid LLM configuration", path: [] };
+          }),
       }),
     }),
   });

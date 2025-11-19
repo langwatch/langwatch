@@ -29,6 +29,8 @@ export const usePromptConfigForm = ({
   onChange,
   initialConfigValues = {},
 }: UsePromptConfigFormProps) => {
+  // Store schema in ref so resolver can access it
+  const schemaRef = useRef(formSchema);
   /**
    * Parse initial values once with schema defaults applied.
    * Memoized to avoid re-parsing on every render.
@@ -60,12 +62,9 @@ export const usePromptConfigForm = ({
     [modelLimits],
   );
 
-  // Store schema in ref so resolver can access it
-  const schemaRef = useRef(formSchema);
-
   // Update schema ref when limits change
   useEffect(() => {
-    schemaRef.current = dynamicSchema;
+    schemaRef.current = dynamicSchema as typeof formSchema;
     // Re-validate when schema changes
     if (methods.formState.isDirty) {
       void methods.trigger("version.configData.llm");
