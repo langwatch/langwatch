@@ -338,7 +338,11 @@ describe("EventSourcingService - Unit Tests", () => {
         aggregateType,
         TEST_CONSTANTS.AGGREGATE_ID,
         expect.objectContaining({
-          lastProcessedEventId: `${TEST_CONSTANTS.AGGREGATE_ID}:${TEST_CONSTANTS.BASE_TIMESTAMP}:${EVENT_TYPES[0]}`,
+          lastProcessedEventId: expect.stringMatching(
+            new RegExp(
+              `^event_[A-Za-z0-9]+:${TEST_CONSTANTS.AGGREGATE_ID}:${TEST_CONSTANTS.BASE_TIMESTAMP}:${EVENT_TYPES[0]}$`,
+            ),
+          ),
         }),
       );
     });
@@ -377,7 +381,11 @@ describe("EventSourcingService - Unit Tests", () => {
         aggregateType,
         numericAggregateId,
         expect.objectContaining({
-          lastProcessedEventId: `${numericAggregateId}:${TEST_CONSTANTS.BASE_TIMESTAMP}:${EVENT_TYPES[0]}`,
+          lastProcessedEventId: expect.stringMatching(
+            new RegExp(
+              `^event_[A-Za-z0-9]+:${numericAggregateId}:${TEST_CONSTANTS.BASE_TIMESTAMP}:${EVENT_TYPES[0]}$`,
+            ),
+          ),
         }),
       );
     });
