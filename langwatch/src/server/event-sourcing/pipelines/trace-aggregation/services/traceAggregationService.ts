@@ -1,5 +1,5 @@
-import type { SpanData } from "../../span-ingestion/types/spanData";
-import type { TraceAggregationCompletedEventData } from "../../../types/events/traceAggregation";
+import type { SpanData } from "../../../schemas/commands/spanIngestion.schema";
+import type { TraceAggregationCompletedEventData } from "../../../schemas/events/traceAggregation.schema";
 import { createLogger } from "../../../../../utils/logger";
 
 /**

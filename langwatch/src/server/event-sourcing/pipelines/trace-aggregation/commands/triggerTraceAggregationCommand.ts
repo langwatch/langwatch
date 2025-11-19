@@ -4,14 +4,14 @@ import { getLangWatchTracer } from "langwatch";
 import type { Command, CommandHandler } from "../../../library";
 import { EventUtils, createTenantId } from "../../../library";
 import { defineCommandSchema } from "../../../library";
-import type { TriggerTraceAggregationCommandData } from "../types/triggerTraceAggregationCommand";
+import type { TriggerTraceAggregationCommandData } from "../../../schemas/commands/traceAggregation.schema";
 import { triggerTraceAggregationCommandDataSchema } from "../../../schemas/commands/traceAggregation.schema";
 import type {
   TraceAggregationEvent,
   TraceAggregationStartedEvent,
   TraceAggregationCompletedEvent,
   TraceAggregationCancelledEvent,
-} from "../../../types/events/traceAggregation";
+} from "../../../schemas/events/traceAggregation.schema";
 import { createLogger } from "../../../../../utils/logger";
 import { getClickHouseClient } from "../../../../../utils/clickhouse";
 import { SpanRepositoryClickHouse } from "../../span-ingestion/repositories/spanRepositoryClickHouse";
