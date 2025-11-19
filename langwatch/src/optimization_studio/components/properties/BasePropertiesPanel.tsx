@@ -13,7 +13,8 @@ import {
 } from "@chakra-ui/react";
 import { Field } from "@chakra-ui/react";
 import { useUpdateNodeInternals, type Node } from "@xyflow/react";
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
+import { useDebouncedCallback } from "use-debounce";
 import {
   ChevronDown,
   Columns,
@@ -305,6 +306,8 @@ export function FieldsForm({
     control,
     handleSubmit,
     formState: { errors },
+    setValue,
+    watch,
   } = useForm<FieldArrayForm>({
     defaultValues: {
       fields: node.data[field] ?? [],
@@ -317,25 +320,38 @@ export function FieldsForm({
   });
 
   const updateNodeInternals = useUpdateNodeInternals();
-  const onSubmit = (data: FieldArrayForm) => {
-    setNode({
-      id: node.id,
-      data: { [field]: data.fields },
+  const onSubmit = useCallback(
+    (data: FieldArrayForm) => {
+      setNode({
+        id: node.id,
+        data: { [field]: data.fields },
+      });
+      updateNodeInternals(node.id);
+    },
+    [node.id, field, setNode, updateNodeInternals],
+  );
+
+  const handleSubmit_ = useCallback(() => {
+    void handleSubmit(onSubmit)();
+  }, [handleSubmit, onSubmit]);
+
+  const handleSubmitDebounced = useDebouncedCallback(handleSubmit_, 100, {
+    leading: true,
+    trailing: false,
+  });
+
+  useEffect(() => {
+    const subscription = watch(() => {
+      handleSubmitDebounced();
     });
-    updateNodeInternals(node.id);
-  };
+
+    return () => subscription.unsubscribe();
+  }, [watch, handleSubmitDebounced]);
 
   const codeEditorModal = useDisclosure();
 
   return (
-    <VStack
-      as="form"
-      align="start"
-      gap={3}
-      width="full"
-      // eslint-disable-next-line @typescript-eslint/no-misused-promises
-      onChange={handleSubmit(onSubmit)}
-    >
+    <VStack as="form" align="start" gap={3} width="full">
       {fields.map((field, index) => {
         if (field.type === "llm") {
           return (
@@ -345,17 +361,9 @@ export function FieldsForm({
               defaultLLMConfig={default_llm}
               llmConfig={node.data.parameters?.[index]?.value as LLMConfig}
               onChange={(llmConfig) => {
-                setNode({
-                  id: node.id,
-                  data: {
-                    parameters: node.data.parameters?.map((p) =>
-                      p.identifier === field.identifier
-                        ? { ...p, value: llmConfig }
-                        : p,
-                    ),
-                  },
+                setValue(`fields.${index}.value`, llmConfig, {
+                  shouldValidate: true,
                 });
-                updateNodeInternals(node.id);
               }}
             />
           );
