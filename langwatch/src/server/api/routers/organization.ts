@@ -9,6 +9,7 @@ import {
   type CustomRole,
   TeamUserRole,
 } from "@prisma/client";
+import { PrismaClientKnownRequestError } from "@prisma/client/runtime/library";
 import { TRPCError } from "@trpc/server";
 import { nanoid } from "nanoid";
 import { z } from "zod";
@@ -20,7 +21,7 @@ import { scheduleUsageStatsForOrganization } from "~/server/background/queues/us
 import { dependencies } from "../../../injection/dependencies.server";
 import { elasticsearchMigrate } from "../../../tasks/elasticMigrate";
 import { sendInviteEmail } from "../../mailer/inviteEmail";
-import { OrganizationRoleGroup, skipPermissionCheck } from "../permission";
+import { skipPermissionCheck } from "../permission";
 import { checkTeamPermission, checkOrganizationPermission } from "../rbac";
 
 import { signUpDataSchema } from "./onboarding";
@@ -554,7 +555,24 @@ export const organizationRouter = createTRPCRouter({
         invites: z.array(
           z.object({
             email: z.string().email(),
-            teamIds: z.string(),
+            teamIds: z.string().optional(), // Keep for backward compatibility
+            teams: z
+              .array(
+                z.object({
+                  teamId: z.string(),
+                  role: z.union([
+                    z.nativeEnum(TeamUserRole),
+                    z
+                      .string()
+                      .regex(
+                        /^custom:[a-zA-Z0-9_-]+$/,
+                        "Custom role must be in format 'custom:{roleId}'",
+                      ),
+                  ]),
+                  customRoleId: z.string().optional(),
+                }),
+              )
+              .optional(),
             role: z.nativeEnum(OrganizationUserRole),
           }),
         ),
@@ -598,23 +616,102 @@ export const organizationRouter = createTRPCRouter({
 
       const invites = await Promise.all(
         input.invites.map(async (invite) => {
-          if (!invite.email.trim() || !invite.teamIds.trim()) {
-            return null;
-          }
+          // Support both new teams array and legacy teamIds string
+          let teamAssignments: Array<{
+            teamId: string;
+            role: TeamUserRole;
+            customRoleId?: string;
+          }> = [];
+          let teamIdsString = "";
 
-          // Filter out team IDs that do not belong to the organization
-          const validTeamIds = (
-            await prisma.team.findMany({
+          if (invite.teams && invite.teams.length > 0) {
+            // New format: teams array with roles
+            const teamIds = invite.teams.map((t) => t.teamId);
+
+            // Filter out team IDs that do not belong to the organization
+            const validTeams = await prisma.team.findMany({
               where: {
-                id: { in: invite.teamIds.split(",") },
+                id: { in: teamIds },
                 organizationId: input.organizationId,
               },
               select: { id: true },
-            })
-          ).map((team) => team.id);
+            });
 
-          // If no valid team IDs are found, skip this invite
-          if (validTeamIds.length === 0) {
+            const validTeamIds = validTeams.map((team) => team.id);
+
+            // If no valid team IDs are found, skip this invite
+            if (validTeamIds.length === 0) {
+              return null;
+            }
+
+            // Build teamAssignments with only valid teams
+            teamAssignments = invite.teams
+              .filter((t) => validTeamIds.includes(t.teamId))
+              .map((t) => {
+                const isCustomRole =
+                  typeof t.role === "string" && t.role.startsWith("custom:");
+                return {
+                  teamId: t.teamId,
+                  role: isCustomRole
+                    ? TeamUserRole.CUSTOM
+                    : (t.role as TeamUserRole),
+                  customRoleId:
+                    isCustomRole && t.customRoleId ? t.customRoleId : undefined,
+                };
+              })
+              .filter((t) => {
+                // Validate custom roles have customRoleId
+                if (t.role === TeamUserRole.CUSTOM && !t.customRoleId) {
+                  return false;
+                }
+                return true;
+              });
+
+            teamIdsString = validTeamIds.join(",");
+          } else if (invite.teamIds?.trim()) {
+            // Legacy format: comma-separated teamIds string
+            const teamIdArray = invite.teamIds
+              .split(",")
+              .map((s) => s.trim())
+              .filter(Boolean);
+
+            // Filter out team IDs that do not belong to the organization
+            const validTeams = await prisma.team.findMany({
+              where: {
+                id: { in: teamIdArray },
+                organizationId: input.organizationId,
+              },
+              select: { id: true },
+            });
+
+            const validTeamIds = validTeams.map((team) => team.id);
+
+            // If no valid team IDs are found, skip this invite
+            if (validTeamIds.length === 0) {
+              return null;
+            }
+
+            // For legacy format, use organization role mapping (backward compatibility)
+            const organizationToTeamRoleMap: {
+              [K in OrganizationUserRole]: TeamUserRole;
+            } = {
+              [OrganizationUserRole.ADMIN]: TeamUserRole.ADMIN,
+              [OrganizationUserRole.MEMBER]: TeamUserRole.MEMBER,
+              [OrganizationUserRole.EXTERNAL]: TeamUserRole.VIEWER,
+            };
+
+            teamAssignments = validTeamIds.map((teamId) => ({
+              teamId,
+              role: organizationToTeamRoleMap[invite.role],
+            }));
+
+            teamIdsString = validTeamIds.join(",");
+          } else {
+            // No teams provided
+            return null;
+          }
+
+          if (!invite.email.trim()) {
             return null;
           }
 
@@ -639,7 +736,9 @@ export const organizationRouter = createTRPCRouter({
               inviteCode: inviteCode,
               expiration: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000), // 2 days from now
               organizationId: input.organizationId,
-              teamIds: validTeamIds.join(","),
+              teamIds: teamIdsString,
+              teamAssignments:
+                teamAssignments.length > 0 ? teamAssignments : undefined,
               role: invite.role,
             },
           });
@@ -747,34 +846,96 @@ export const organizationRouter = createTRPCRouter({
           skipDuplicates: true,
         });
 
-        const organizationToTeamRoleMap: {
-          [K in OrganizationUserRole]: TeamUserRole;
-        } = {
-          [OrganizationUserRole.ADMIN]: TeamUserRole.ADMIN,
-          [OrganizationUserRole.MEMBER]: TeamUserRole.MEMBER,
-          [OrganizationUserRole.EXTERNAL]: TeamUserRole.VIEWER,
-        };
+        // Use teamAssignments if available (new format), otherwise fall back to legacy teamIds
+        let teamMembershipData: Array<{
+          userId: string;
+          teamId: string;
+          role: TeamUserRole;
+          customRoleId?: string;
+        }> = [];
 
-        const dedupedTeamIds = Array.from(
-          new Set(
-            invite.teamIds
-              .split(",")
-              .map((s) => s.trim())
-              .filter(Boolean),
-          ),
-        );
+        if (invite.teamAssignments && Array.isArray(invite.teamAssignments)) {
+          // New format: use per-team roles from teamAssignments
+          const assignments = invite.teamAssignments as Array<{
+            teamId: string;
+            role: TeamUserRole;
+            customRoleId?: string;
+          }>;
+          teamMembershipData = assignments.map((assignment) => ({
+            userId: session.user.id,
+            teamId: assignment.teamId,
+            role: assignment.role,
+            customRoleId: assignment.customRoleId,
+          }));
+        } else {
+          // Legacy format: use organization role mapping
+          const organizationToTeamRoleMap: {
+            [K in OrganizationUserRole]: TeamUserRole;
+          } = {
+            [OrganizationUserRole.ADMIN]: TeamUserRole.ADMIN,
+            [OrganizationUserRole.MEMBER]: TeamUserRole.MEMBER,
+            [OrganizationUserRole.EXTERNAL]: TeamUserRole.VIEWER,
+          };
 
-        if (dedupedTeamIds.length > 0) {
-          const teamMembershipData = dedupedTeamIds.map((teamId) => ({
+          const dedupedTeamIds = Array.from(
+            new Set(
+              invite.teamIds
+                .split(",")
+                .map((s) => s.trim())
+                .filter(Boolean),
+            ),
+          );
+
+          teamMembershipData = dedupedTeamIds.map((teamId) => ({
             userId: session.user.id,
             teamId,
             role: organizationToTeamRoleMap[invite.role],
           }));
+        }
 
-          await prisma.teamUser.createMany({
-            data: teamMembershipData,
-            skipDuplicates: true, // safe under concurrency and preserves existing roles
-          });
+        if (teamMembershipData.length > 0) {
+          // Handle custom roles separately since createMany doesn't support assignedRoleId
+          const builtInRoles = teamMembershipData.filter(
+            (data) => data.role !== TeamUserRole.CUSTOM,
+          );
+          const customRoles = teamMembershipData.filter(
+            (data) => data.role === TeamUserRole.CUSTOM && data.customRoleId,
+          );
+
+          // Create team memberships with built-in roles
+          if (builtInRoles.length > 0) {
+            await prisma.teamUser.createMany({
+              data: builtInRoles.map(
+                ({ customRoleId: _customRoleId, ...data }) => data,
+              ),
+              skipDuplicates: true,
+            });
+          }
+
+          // Create team memberships with custom roles (requires individual creates for assignedRoleId)
+          for (const customRole of customRoles) {
+            try {
+              await prisma.teamUser.create({
+                data: {
+                  userId: customRole.userId,
+                  teamId: customRole.teamId,
+                  role: TeamUserRole.CUSTOM,
+                  assignedRoleId: customRole.customRoleId!,
+                },
+              });
+            } catch (error: unknown) {
+              // Ignore unique constraint violations (concurrent inserts)
+              if (
+                error instanceof PrismaClientKnownRequestError &&
+                error.code === "P2002"
+              ) {
+                // Swallow the error - record already exists
+                continue;
+              }
+              // Rethrow other errors
+              throw error;
+            }
+          }
         }
 
         await prisma.organizationInvite.update({
