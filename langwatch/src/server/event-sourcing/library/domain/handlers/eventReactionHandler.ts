@@ -14,8 +14,8 @@ import type { Event } from "../types";
  *     await this.clickHouse.insert(event.data.spanData);
  *   }
  *
- *   getEventTypes(): string[] {
- *     return ["lw.obs.span.ingestion.recorded"];
+ *   getEventTypes() {
+ *     return ["lw.obs.span_ingestion.recorded"];
  *   }
  * }
  * ```
@@ -37,5 +37,5 @@ export interface EventReactionHandler<EventType extends Event = Event> {
    *
    * @returns Array of event type strings, or undefined to handle all events
    */
-  getEventTypes?(): string[] | undefined;
+  getEventTypes?(): readonly EventType["type"][] | undefined;
 }

@@ -1179,7 +1179,7 @@ export class EventSourcingService<
    *
    * // Replay from a specific event ID
    * await service.replayEventsForHandler("clickhouse-writer", "trace-123", context, {
-   *   fromEventId: "trace-123:1234567890:lw.obs.span.ingestion.recorded"
+   *   fromEventId: "trace_123:1234567890:lw.obs.span_ingestion.recorded"
    * });
    * ```
    */

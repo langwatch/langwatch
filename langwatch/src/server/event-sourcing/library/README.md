@@ -211,7 +211,7 @@ class RecordSpanCommand
 {
   static readonly dispatcherName = "recordSpan" as const;
   static readonly schema = defineCommandSchema<SpanPayload>(
-    "lw.obs.span.ingestion.record",
+    "lw.obs.span_ingestion.record",
     (payload): payload is SpanPayload => {
       return payload.traceId !== undefined && payload.spanId !== undefined;
     },
@@ -225,7 +225,7 @@ class RecordSpanCommand
     const event = EventUtils.createEventWithProcessingTraceContext(
       command.aggregateId,
       command.tenantId,
-      "lw.obs.span.ingestion.recorded",
+      "lw.obs.span_ingestion.recorded",
       { traceId: command.data.traceId, spanId: command.data.spanId },
     );
     return [event];
@@ -254,8 +254,8 @@ import type { EventReactionHandler } from "./library";
 class SpanClickHouseWriterHandler implements EventReactionHandler<SpanEvent> {
   constructor(private spanRepository: SpanRepository) {}
 
-  getEventTypes(): string[] {
-    return ["lw.obs.span.ingestion.recorded"];
+  getEventTypes() {
+    return ["lw.obs.span_ingestion.recorded"];
   }
 
   async handle(event: SpanEvent): Promise<void> {
@@ -266,12 +266,12 @@ class SpanClickHouseWriterHandler implements EventReactionHandler<SpanEvent> {
 const pipeline = eventSourcing
   .registerPipeline<SpanEvent>()
   .withName("span-ingestion")
-  .withAggregateType("span")
+  .withAggregateType("span_ingestion")
   .withEventHandler(
     "span-storage",
     new SpanClickHouseWriterHandler(repository),
     {
-      eventTypes: ["lw.obs.span.ingestion.recorded"],
+      eventTypes: ["lw.obs.span_ingestion.recorded"],
     },
   )
   .build();
@@ -282,8 +282,8 @@ const pipeline = eventSourcing
 ```typescript
 const pipeline = eventSourcing
   .registerPipeline<SpanEvent>()
-  .withName("trace-processing")
-  .withAggregateType("trace")
+  .withName("trace-aggregation")
+  .withAggregateType("trace_aggregation")
   .withProjection("summary", summaryStore, summaryHandler)
   .withProjection("analytics", analyticsStore, analyticsHandler)
   .build();

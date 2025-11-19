@@ -16,6 +16,11 @@ import {
 } from "./testHelpers";
 import { EVENT_TYPES } from "../../domain/eventType";
 
+// Helper to escape special regex characters
+function escapeRegex(str: string): string {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
 describe("EventSourcingService - Unit Tests", () => {
   const aggregateType = createTestAggregateType();
   const tenantId = createTestTenantId();
@@ -340,7 +345,7 @@ describe("EventSourcingService - Unit Tests", () => {
         expect.objectContaining({
           lastProcessedEventId: expect.stringMatching(
             new RegExp(
-              `^event_[A-Za-z0-9]+:${TEST_CONSTANTS.AGGREGATE_ID}:${TEST_CONSTANTS.BASE_TIMESTAMP}:${EVENT_TYPES[0]}$`,
+              `^event_[A-Za-z0-9]+:${escapeRegex(TEST_CONSTANTS.AGGREGATE_ID)}:${TEST_CONSTANTS.BASE_TIMESTAMP}:${escapeRegex(EVENT_TYPES[0])}$`,
             ),
           ),
         }),
@@ -383,7 +388,7 @@ describe("EventSourcingService - Unit Tests", () => {
         expect.objectContaining({
           lastProcessedEventId: expect.stringMatching(
             new RegExp(
-              `^event_[A-Za-z0-9]+:${numericAggregateId}:${TEST_CONSTANTS.BASE_TIMESTAMP}:${EVENT_TYPES[0]}$`,
+              `^event_[A-Za-z0-9]+:${escapeRegex(numericAggregateId)}:${TEST_CONSTANTS.BASE_TIMESTAMP}:${escapeRegex(EVENT_TYPES[0])}$`,
             ),
           ),
         }),

@@ -14,6 +14,7 @@ import {
   createTestAggregateType,
   TEST_CONSTANTS,
 } from "./testHelpers";
+import type { AggregateType } from "../../domain/aggregateType";
 
 describe("EventSourcingService - Security", () => {
   const aggregateType = createTestAggregateType();
@@ -250,8 +251,8 @@ describe("EventSourcingService - Security", () => {
 
     it("aggregateType prevents cross-type contamination", async () => {
       const eventStore = createMockEventStore<Event>();
-      const aggregateType1 = "span" as const;
-      const aggregateType2 = "trace_aggregation" as const;
+      const aggregateType1 = "span_ingestion" as const satisfies AggregateType;
+      const aggregateType2 = "trace_aggregation" as const as AggregateType;
 
       const service1 = new EventSourcingService({
         aggregateType: aggregateType1,
