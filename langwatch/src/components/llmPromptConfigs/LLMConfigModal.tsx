@@ -1,5 +1,4 @@
-import { Button, HStack, Input, Text, VStack } from "@chakra-ui/react";
-import { useEffect } from "react";
+import { Button, HStack, Input, Text, VStack, Field } from "@chakra-ui/react";
 import { Settings } from "react-feather";
 
 import { ConfigModal } from "../../optimization_studio/components/properties/modals/ConfigModal";
@@ -24,18 +23,19 @@ export type LlmConfigModalValues = {
  *
  * Responsibilities:
  * - Display and edit LLM configuration (model, temperature, max tokens)
- * - Enforce GPT-5 constraints when switching TO GPT-5 (temperature=1)
  * - Support both snake_case and camelCase for backwards compatibility
- * - Normalize values to ensure consistency (defaults undefined maxTokens to MIN_MAX_TOKENS)
  * - Dynamically determine min/max token limits based on selected model
+ * - Display validation errors from form schema
  *
- * Note: Form schema enforces minimum constraints as data integrity layer:
+ * Note: Form schema enforces constraints as data integrity layer:
  * - All models: min 256 tokens, max based on model's capabilities
+ * - GPT-5: temperature must be 1
  *
  * @param open - Whether the modal is open
  * @param onClose - Callback when modal closes
  * @param values - Current LLM configuration values
  * @param onChange - Callback when values change
+ * @param errors - Validation errors from form schema
  */
 /**
  * Ensures only one of maxTokens or max_tokens is set
@@ -61,49 +61,26 @@ export function LLMConfigModal({
   onClose,
   values,
   onChange,
+  errors,
 }: {
   open: boolean;
   onClose: () => void;
   values: LlmConfigModalValues;
   onChange: (params: LlmConfigModalValues) => void;
+  errors?: {
+    temperature?: { message?: string };
+    maxTokens?: { message?: string };
+  };
 }) {
   const maxTokens = values.maxTokens ?? values.max_tokens;
   const isGpt5 = values?.model?.includes("gpt-5");
 
-  // Get model limits dynamically
+  // Get model limits dynamically for UI display
   const { limits: modelLimits } = useModelLimits({ model: values.model });
   const maxTokenLimit =
     modelLimits?.maxOutputTokens ??
     modelLimits?.maxTokens ??
     FALLBACK_MAX_TOKENS;
-
-  // Enforce constraints when model limits change (async)
-  useEffect(() => {
-    if (!modelLimits) return; // Wait for limits to load
-
-    // Constrain max tokens to the range
-    let constrainedMaxTokens = Math.max(maxTokens ?? 0, MIN_MAX_TOKENS);
-    constrainedMaxTokens = Math.min(constrainedMaxTokens, maxTokenLimit);
-
-    // Check if we need to enforce constraints
-    const needsMaxTokenUpdate = constrainedMaxTokens !== maxTokens;
-    const isGpt5 = values.model?.includes("gpt-5");
-    const needsTempUpdate = isGpt5 && values.temperature !== 1;
-
-    if (needsMaxTokenUpdate || needsTempUpdate) {
-      const updates: Partial<LlmConfigModalValues> = {};
-      if (needsMaxTokenUpdate) {
-        updates.maxTokens = constrainedMaxTokens;
-      }
-      if (needsTempUpdate) {
-        updates.temperature = 1;
-      }
-
-      onChange(
-        normalizeMaxTokens({ ...values, ...updates }, constrainedMaxTokens),
-      );
-    }
-  }, [modelLimits, values, onChange, maxTokens, maxTokenLimit]);
 
   return (
     <ConfigModal open={open} onClose={onClose} title="LLM Config">
@@ -133,51 +110,63 @@ export function LLMConfigModal({
           </Tooltip>
         </HStack>
       </HorizontalFormControl>
-      <HorizontalFormControl
+      <Field
+        invalid={!!errors?.temperature}
         label="Temperature"
-        helper="Controls randomness in the output"
-        inputWidth="55%"
+        errorText={errors?.temperature?.message}
       >
-        <Input
-          required
-          value={values?.temperature}
-          type="number"
-          step={0.1}
-          min={isGpt5 ? 1 : 0}
-          max={isGpt5 ? 1 : 2}
-          placeholder="1"
-          onChange={(e) =>
-            onChange({ ...values, temperature: Number(e.target.value) })
-          }
-        />
-        {isGpt5 && (
-          <WarningText>Temperature is fixed to 1 for GPT-5 models</WarningText>
-        )}
-      </HorizontalFormControl>
-      <HorizontalFormControl
-        label="Max Tokens"
-        helper={"Limit to avoid expensive outputs"}
-        inputWidth="55%"
-      >
-        <VStack align="stretch" gap={0}>
+        <HorizontalFormControl
+          helper="Controls randomness in the output"
+          inputWidth="55%"
+        >
           <Input
             required
-            value={maxTokens}
+            value={values?.temperature}
             type="number"
-            step={64}
-            min={MIN_MAX_TOKENS}
-            placeholder={MIN_MAX_TOKENS.toString()}
-            max={maxTokenLimit}
+            step={0.1}
+            min={isGpt5 ? 1 : 0}
+            max={isGpt5 ? 1 : 2}
+            placeholder="1"
             onChange={(e) =>
-              onChange(normalizeMaxTokens(values, Number(e.target.value)))
+              onChange({ ...values, temperature: Number(e.target.value) })
             }
           />
-          <Text fontSize="xs" color="gray.500" marginTop={1}>
-            Min: {MIN_MAX_TOKENS.toLocaleString()} | Max:{" "}
-            {maxTokenLimit.toLocaleString()}
-          </Text>
-        </VStack>
-      </HorizontalFormControl>
+          {isGpt5 && (
+            <WarningText>
+              Temperature is fixed to 1 for GPT-5 models
+            </WarningText>
+          )}
+        </HorizontalFormControl>
+      </Field>
+      <Field
+        invalid={!!errors?.maxTokens}
+        label="Max Tokens"
+        errorText={errors?.maxTokens?.message}
+      >
+        <HorizontalFormControl
+          helper={"Limit to avoid expensive outputs"}
+          inputWidth="55%"
+        >
+          <VStack align="stretch" gap={0}>
+            <Input
+              required
+              value={maxTokens}
+              type="number"
+              step={64}
+              min={MIN_MAX_TOKENS}
+              placeholder={MIN_MAX_TOKENS.toString()}
+              max={maxTokenLimit}
+              onChange={(e) =>
+                onChange(normalizeMaxTokens(values, Number(e.target.value)))
+              }
+            />
+            <Text fontSize="xs" color="gray.500" marginTop={1}>
+              Min: {MIN_MAX_TOKENS.toLocaleString()} | Max:{" "}
+              {maxTokenLimit.toLocaleString()}
+            </Text>
+          </VStack>
+        </HorizontalFormControl>
+      </Field>
     </ConfigModal>
   );
 }

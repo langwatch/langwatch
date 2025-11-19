@@ -8,7 +8,7 @@ export const DEFAULT_TOPIC_CLUSTERING_MODEL = "openai/gpt-5";
 
 export const KEY_CHECK = ["KEY", "GOOGLE_APPLICATION_CREDENTIALS"];
 
-export const DEFAULT_MAX_TOKENS = 128_000;
+export const DEFAULT_MAX_TOKENS = 64_000;
 
 export const MIN_MAX_TOKENS = 256;
 
