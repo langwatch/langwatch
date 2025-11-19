@@ -1,5 +1,5 @@
 import { Button, HStack, Input, Text, VStack } from "@chakra-ui/react";
-import { useCallback } from "react";
+import { useEffect } from "react";
 import { Settings } from "react-feather";
 
 import { ConfigModal } from "../../optimization_studio/components/properties/modals/ConfigModal";
@@ -7,7 +7,8 @@ import { HorizontalFormControl } from "../HorizontalFormControl";
 import { allModelOptions, ModelSelector } from "../ModelSelector";
 import { Link } from "../ui/link";
 import { Tooltip } from "../ui/tooltip";
-import { DEFAULT_MAX_TOKENS, MIN_MAX_TOKENS } from "~/utils/constants";
+import { MIN_MAX_TOKENS, FALLBACK_MAX_TOKENS } from "~/utils/constants";
+import { useModelLimits } from "~/hooks/useModelLimits";
 
 export type LlmConfigModalValues = {
   model: string;
@@ -23,13 +24,13 @@ export type LlmConfigModalValues = {
  *
  * Responsibilities:
  * - Display and edit LLM configuration (model, temperature, max tokens)
- * - Enforce GPT-5 constraints when switching TO GPT-5 (temperature=1, min maxTokens=128k)
+ * - Enforce GPT-5 constraints when switching TO GPT-5 (temperature=1)
  * - Support both snake_case and camelCase for backwards compatibility
  * - Normalize values to ensure consistency (defaults undefined maxTokens to MIN_MAX_TOKENS)
+ * - Dynamically determine min/max token limits based on selected model
  *
- * Note: Form schema also enforces minimum constraints as data integrity layer:
- * - GPT-5: temperature=1, min 128k tokens
- * - Other models: min 256 tokens
+ * Note: Form schema enforces minimum constraints as data integrity layer:
+ * - All models: min 256 tokens, max based on model's capabilities
  *
  * @param open - Whether the modal is open
  * @param onClose - Callback when modal closes
@@ -45,13 +46,12 @@ function normalizeMaxTokens(
 ): LlmConfigModalValues {
   const usesCamelCase = values.maxTokens !== undefined;
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const { maxTokens, max_tokens, ...rest } = values;
+
   if (usesCamelCase) {
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { max_tokens, ...rest } = values;
     return { ...rest, maxTokens: tokenValue } as LlmConfigModalValues;
   } else {
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { maxTokens, ...rest } = values;
     return { ...rest, max_tokens: tokenValue } as LlmConfigModalValues;
   }
 }
@@ -70,41 +70,40 @@ export function LLMConfigModal({
   const maxTokens = values.maxTokens ?? values.max_tokens;
   const isGpt5 = values?.model?.includes("gpt-5");
 
-  /**
-   * Intelligent value change handler
-   *
-   * Responsibilities:
-   * - When switching TO GPT-5: Enforce temp=1 & min 128k tokens
-   * - All changes: Normalize maxTokens format (snake_case vs camelCase) and default to MIN_MAX_TOKENS
-   */
-  const handleValueChange = useCallback(
-    (updates: Partial<LlmConfigModalValues>) => {
-      const newValues = { ...values, ...updates };
-      const newMaxTokens = newValues.maxTokens ?? newValues.max_tokens;
-      const newIsGpt5 = newValues.model?.includes("gpt-5");
-      const wasGpt5 = values.model?.includes("gpt-5");
-      const modelChanged =
-        updates.model !== undefined && newValues.model !== values.model;
+  // Get model limits dynamically
+  const { limits: modelLimits } = useModelLimits({ model: values.model });
+  const maxTokenLimit =
+    modelLimits?.maxOutputTokens ??
+    modelLimits?.maxTokens ??
+    FALLBACK_MAX_TOKENS;
 
-      // Switching TO GPT-5 - enforce constraints
-      if (modelChanged && newIsGpt5 && !wasGpt5) {
-        const enforcedMaxTokens = Math.max(
-          newMaxTokens ?? MIN_MAX_TOKENS,
-          DEFAULT_MAX_TOKENS,
-        );
-        onChange(
-          normalizeMaxTokens(
-            { ...newValues, temperature: 1 },
-            enforcedMaxTokens,
-          ),
-        );
-        return;
+  // Enforce constraints when model limits change (async)
+  useEffect(() => {
+    if (!modelLimits) return; // Wait for limits to load
+
+    // Constrain max tokens to the range
+    let constrainedMaxTokens = Math.max(maxTokens ?? 0, MIN_MAX_TOKENS);
+    constrainedMaxTokens = Math.min(constrainedMaxTokens, maxTokenLimit);
+
+    // Check if we need to enforce constraints
+    const needsMaxTokenUpdate = constrainedMaxTokens !== maxTokens;
+    const isGpt5 = values.model?.includes("gpt-5");
+    const needsTempUpdate = isGpt5 && values.temperature !== 1;
+
+    if (needsMaxTokenUpdate || needsTempUpdate) {
+      const updates: Partial<LlmConfigModalValues> = {};
+      if (needsMaxTokenUpdate) {
+        updates.maxTokens = constrainedMaxTokens;
+      }
+      if (needsTempUpdate) {
+        updates.temperature = 1;
       }
 
-      onChange(normalizeMaxTokens(newValues, newMaxTokens ?? MIN_MAX_TOKENS));
-    },
-    [values, onChange],
-  );
+      onChange(
+        normalizeMaxTokens({ ...values, ...updates }, constrainedMaxTokens),
+      );
+    }
+  }, [modelLimits, values, onChange, maxTokens, maxTokenLimit]);
 
   return (
     <ConfigModal open={open} onClose={onClose} title="LLM Config">
@@ -117,7 +116,7 @@ export function LLMConfigModal({
           <ModelSelector
             model={values?.model ?? ""}
             options={allModelOptions}
-            onChange={(model) => handleValueChange({ model })}
+            onChange={(model) => onChange({ ...values, model })}
             mode="chat"
             size="full"
           />
@@ -148,7 +147,7 @@ export function LLMConfigModal({
           max={isGpt5 ? 1 : 2}
           placeholder="1"
           onChange={(e) =>
-            handleValueChange({ temperature: Number(e.target.value) })
+            onChange({ ...values, temperature: Number(e.target.value) })
           }
         />
         {isGpt5 && (
@@ -166,25 +165,17 @@ export function LLMConfigModal({
             value={maxTokens}
             type="number"
             step={64}
-            min={isGpt5 ? DEFAULT_MAX_TOKENS : MIN_MAX_TOKENS}
-            placeholder={
-              isGpt5 ? DEFAULT_MAX_TOKENS.toString() : MIN_MAX_TOKENS.toString()
+            min={MIN_MAX_TOKENS}
+            placeholder={MIN_MAX_TOKENS.toString()}
+            max={maxTokenLimit}
+            onChange={(e) =>
+              onChange(normalizeMaxTokens(values, Number(e.target.value)))
             }
-            max={1048576}
-            onChange={(e) => {
-              const newValue = Number(e.target.value);
-              handleValueChange(
-                values.maxTokens !== undefined
-                  ? { maxTokens: newValue }
-                  : { max_tokens: newValue },
-              );
-            }}
           />
-          {isGpt5 && (
-            <WarningText>
-              Max tokens must be at least {DEFAULT_MAX_TOKENS} for GPT-5 models
-            </WarningText>
-          )}
+          <Text fontSize="xs" color="gray.500" marginTop={1}>
+            Min: {MIN_MAX_TOKENS.toLocaleString()} | Max:{" "}
+            {maxTokenLimit.toLocaleString()}
+          </Text>
         </VStack>
       </HorizontalFormControl>
     </ConfigModal>
