@@ -38,6 +38,27 @@ export type LlmConfigModalValues = {
  * @param errors - Validation errors from form schema
  */
 /**
+ * WarningText
+ * Responsibilities:
+ * Display warning text with yellow styling
+ *
+ * TODO: Move to a separate file
+ */
+function WarningText({ children }: { children: React.ReactNode }) {
+  return (
+    <Text
+      fontSize="xs"
+      color="yellow.500"
+      fontStyle="italic"
+      marginTop={1}
+      marginLeft={2}
+    >
+      {children}
+    </Text>
+  );
+}
+
+/**
  * Ensures only one of maxTokens or max_tokens is set
  */
 function normalizeMaxTokens(
@@ -169,26 +190,5 @@ export function LLMConfigModal({
         </VStack>
       </HorizontalFormControl>
     </ConfigModal>
-  );
-}
-
-/**
- * WarningText
- * Responsibilities:
- * Display warning text with yellow styling
- *
- * TODO: Move to a separate file
- */
-function WarningText({ children }: { children: React.ReactNode }) {
-  return (
-    <Text
-      fontSize="xs"
-      color="yellow.500"
-      fontStyle="italic"
-      marginTop={1}
-      marginLeft={2}
-    >
-      {children}
-    </Text>
   );
 }
