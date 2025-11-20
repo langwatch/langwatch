@@ -1,4 +1,4 @@
-import { Button, HStack, Input, Text, VStack } from "@chakra-ui/react";
+import { Button, HStack, Input, Text, VStack, Field } from "@chakra-ui/react";
 import { Settings } from "react-feather";
 
 import { ConfigModal } from "../../optimization_studio/components/properties/modals/ConfigModal";
@@ -83,6 +83,7 @@ export function LLMConfigModal({
     FALLBACK_MAX_TOKENS;
 
   return (
+    // TODO: Issue #863 - Issues are hidden when the modal is closed
     <ConfigModal open={open} onClose={onClose} title="LLM Config">
       <HorizontalFormControl
         label="Model"
@@ -131,11 +132,15 @@ export function LLMConfigModal({
         {isGpt5 && (
           <WarningText>Temperature is fixed to 1 for GPT-5 models</WarningText>
         )}
+        {errors?.temperature?.message && (
+          <Field.ErrorText margin={0} fontSize="13px">
+            {errors?.temperature?.message?.toString()}
+          </Field.ErrorText>
+        )}
       </HorizontalFormControl>
       <HorizontalFormControl
         invalid={!!errors?.maxTokens}
         label="Max Tokens"
-        error={errors?.maxTokens?.message}
         helper={"Limit to avoid expensive outputs"}
         inputWidth="55%"
       >
@@ -156,6 +161,11 @@ export function LLMConfigModal({
             Min: {MIN_MAX_TOKENS.toLocaleString()} | Max:{" "}
             {maxTokenLimit.toLocaleString()}
           </Text>
+          {errors?.maxTokens?.message && (
+            <Field.ErrorText margin={0} fontSize="13px">
+              {errors?.maxTokens?.message?.toString()}
+            </Field.ErrorText>
+          )}
         </VStack>
       </HorizontalFormControl>
     </ConfigModal>

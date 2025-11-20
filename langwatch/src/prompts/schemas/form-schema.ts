@@ -95,16 +95,17 @@ export function refinedFormSchemaWithModelLimits(
             // Additional params attached to the LLM config
             litellmParams: llmSchemaWithPreprocessing.shape.litellmParams,
           })
-          .refine((data) => {
-            const isGpt5 = data.model.includes("gpt-5");
-            if (isGpt5 && data.temperature !== 1) {
-              return {
-                message: "Temperature must be 1 for GPT-5 models",
-                path: ["temperature"],
-              };
-            }
-            return { message: "Invalid LLM configuration", path: [] };
-          }),
+          .refine(
+            (data) => {
+              const isGpt5 = data.model.includes("gpt-5");
+              if (!isGpt5) return true;
+              return isGpt5 && data.temperature !== 1 ? false : true;
+            },
+            {
+              message: "Temperature must be 1 for GPT-5 models",
+              path: ["temperature"],
+            },
+          ),
       }),
     }),
   });

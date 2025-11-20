@@ -12,7 +12,7 @@ import { AddModelProviderKey } from "~/optimization_studio/components/AddModelPr
 import { VStack } from "@chakra-ui/react";
 
 export function ModelSelectField() {
-  const { control, formState, watch } =
+  const { control, formState, watch, trigger } =
     useFormContext<PromptConfigFormValues>();
   const { errors } = formState;
 
@@ -44,7 +44,10 @@ export function ModelSelectField() {
             return (
               <LLMConfigField
                 llmConfig={field.value}
-                onChange={field.onChange}
+                onChange={(values) => {
+                  field.onChange(values);
+                  void trigger?.("version.configData.llm");
+                }}
                 requiresCustomKey={false}
               />
             );
