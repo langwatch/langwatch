@@ -165,7 +165,12 @@ export function WorkflowCard({
                 >
                   <Menu.Item
                     value="copy"
-                    onClick={() => setIsCopyDialogOpen(true)}
+                    onClick={
+                      hasWorkflowsCreatePermission
+                        ? () => setIsCopyDialogOpen(true)
+                        : undefined
+                    }
+                    disabled={!hasWorkflowsCreatePermission}
                   >
                     <Copy size={16} /> Copy to another project
                   </Menu.Item>
