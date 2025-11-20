@@ -20,6 +20,7 @@ import type { inferRouterOutputs } from "@trpc/server";
 import type { AppRouter } from "../../../server/api/root";
 import { toaster } from "../../../components/ui/toaster";
 import { DeleteConfirmationDialog } from "../../../components/annotations/DeleteConfirmationDialog";
+import { CopyWorkflowDialog } from "./CopyWorkflowDialog";
 
 export function WorkflowCardBase(props: React.ComponentProps<typeof VStack>) {
   return (
@@ -67,7 +68,9 @@ export function WorkflowCard({
   const { project, hasPermission } = useOrganizationTeamProject();
   const archiveWorkflow = api.workflow.archive.useMutation();
   const hasWorkflowsDeletePermission = hasPermission("workflows:delete");
+  const hasWorkflowsCreatePermission = hasPermission("workflows:create");
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [isCopyDialogOpen, setIsCopyDialogOpen] = useState(false);
 
   const onArchiveWorkflow = useCallback(() => {
     if (!workflowId || !project) return;
@@ -152,6 +155,23 @@ export function WorkflowCard({
               <Menu.Content className="js-inner-menu">
                 <Tooltip
                   content={
+                    !hasWorkflowsCreatePermission
+                      ? "You need workflows:create permission to copy workflows"
+                      : undefined
+                  }
+                  disabled={hasWorkflowsCreatePermission}
+                  positioning={{ placement: "right" }}
+                  showArrow
+                >
+                  <Menu.Item
+                    value="copy"
+                    onClick={() => setIsCopyDialogOpen(true)}
+                  >
+                    Copy to new project
+                  </Menu.Item>
+                </Tooltip>
+                <Tooltip
+                  content={
                     !hasWorkflowsDeletePermission
                       ? "You need workflows:delete permission to delete workflows"
                       : undefined
@@ -193,6 +213,15 @@ export function WorkflowCard({
         onClose={() => setIsDeleteDialogOpen(false)}
         onConfirm={onArchiveWorkflow}
       />
+
+      {workflowId && (
+        <CopyWorkflowDialog
+          open={isCopyDialogOpen}
+          onClose={() => setIsCopyDialogOpen(false)}
+          workflowId={workflowId}
+          workflowName={name}
+        />
+      )}
     </>
   );
 }

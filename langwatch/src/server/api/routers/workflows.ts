@@ -17,6 +17,7 @@ import {
   clearDsl,
   recursiveAlphabeticallySortedKeys,
 } from "../../../optimization_studio/utils/dslUtils";
+import { DatasetService } from "../../datasets/dataset.service";
 import { checkProjectPermission } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 import type { OpenAIResponsesProviderOptions } from "@ai-sdk/openai";
@@ -57,6 +58,124 @@ export const workflowRouter = createTRPCRouter({
       });
 
       return { workflow, version };
+    }),
+
+  copy: protectedProcedure
+    .input(
+      z.object({
+        workflowId: z.string(),
+        projectId: z.string(),
+        sourceProjectId: z.string(),
+        copyDatasets: z.boolean().optional(),
+      }),
+    )
+    .use(checkProjectPermission("workflows:create"))
+    .mutation(async ({ ctx, input }) => {
+      const workflow = await ctx.prisma.workflow.findUnique({
+        where: {
+          id: input.workflowId,
+          projectId: input.sourceProjectId,
+        },
+        include: {
+          latestVersion: true,
+        },
+      });
+
+      if (!workflow || !workflow.latestVersion?.dsl) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Workflow not found",
+        });
+      }
+
+      // Deep clone DSL to ensure mutability
+      const dsl = JSON.parse(
+        JSON.stringify(workflow.latestVersion.dsl),
+      ) as Workflow;
+      const datasetIdMap = new Map<string, { id: string; name: string }>();
+
+      if (input.copyDatasets) {
+        const datasetService = DatasetService.create(ctx.prisma);
+
+        // Helper to process dataset reference
+        const processDatasetRef = async (datasetRef: {
+          id?: string;
+          name?: string;
+        }) => {
+          if (!datasetRef.id) return;
+
+          if (datasetIdMap.has(datasetRef.id)) {
+            const newDataset = datasetIdMap.get(datasetRef.id)!;
+            datasetRef.id = newDataset.id;
+            datasetRef.name = newDataset.name;
+            return;
+          }
+
+          // Create new dataset in target project using service
+          const newDataset = await datasetService.copyDataset({
+            sourceDatasetId: datasetRef.id,
+            sourceProjectId: input.sourceProjectId,
+            targetProjectId: input.projectId,
+          });
+
+          datasetIdMap.set(datasetRef.id, {
+            id: newDataset.id,
+            name: newDataset.name,
+          });
+
+          datasetRef.id = newDataset.id;
+          datasetRef.name = newDataset.name;
+        };
+
+        // Traverse nodes to find datasets
+        for (const node of dsl.nodes) {
+          // Check Entry node dataset
+          if (node.data && "dataset" in node.data && node.data.dataset) {
+            await processDatasetRef(node.data.dataset);
+          }
+
+          // Check parameters for Demonstrations
+          if (node.data && "parameters" in node.data && node.data.parameters) {
+            for (const param of node.data.parameters) {
+              if (
+                param.type === "dataset" &&
+                param.value &&
+                typeof param.value === "object" &&
+                "id" in param.value
+              ) {
+                await processDatasetRef(param.value as any);
+              }
+            }
+          }
+        }
+      }
+
+      const newWorkflow = await ctx.prisma.workflow.create({
+        data: {
+          id: `workflow_${nanoid()}`,
+          projectId: input.projectId,
+          name: workflow.name,
+          icon: workflow.icon,
+          description: workflow.description,
+        },
+      });
+
+      const version = await saveOrCommitWorkflowVersion({
+        ctx,
+        input: {
+          projectId: input.projectId,
+          workflowId: newWorkflow.id,
+          dsl: {
+            ...dsl,
+            workflow_id: newWorkflow.id,
+            version: "1",
+          },
+        },
+        autoSaved: false,
+        commitMessage: "Copied from " + workflow.name,
+      });
+
+      return { workflow: newWorkflow, version };
     }),
   getAll: protectedProcedure
     .input(z.object({ projectId: z.string() }))
