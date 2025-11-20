@@ -1,6 +1,10 @@
 import { useEffect, useMemo, forwardRef, useImperativeHandle } from "react";
 import { CopilotKit, useCopilotChat } from "@copilotkit/react-core";
-import { AssistantMessage, CopilotChat } from "@copilotkit/react-ui";
+import {
+  AssistantMessage,
+  UserMessage,
+  CopilotChat,
+} from "@copilotkit/react-ui";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import type { PromptConfigFormValues } from "~/prompts/types";
 import type { z } from "zod";
@@ -145,6 +149,16 @@ const PromptPlaygroundChatInner = forwardRef<PromptPlaygroundChatRef, object>(
                 <TraceMessage traceId={props.rawData.id} marginTop={2} />
               )}
             </>
+          );
+        }}
+        UserMessage={(props) => {
+          return (
+            <DeletableMessage
+              messageId={props.rawData.id}
+              onDelete={deleteMessage}
+            >
+              <UserMessage {...props} />
+            </DeletableMessage>
           );
         }}
       />
