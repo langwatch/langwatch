@@ -6,6 +6,7 @@ import { generate } from "@langwatch/ksuid";
 import type { SpanIngestionWriteRepository } from "./spanIngestionWriteRepository";
 import type { SpanIngestionWriteJob } from "../types/";
 import { createLogger } from "../../../../utils/logger";
+import { traceProjectionQueue, TRACE_PROJECTION_JOB_NAME } from "../../../background/queues/traceProjectionQueue";
 
 export class SpanIngestionWriteRepositoryClickHouse
   implements SpanIngestionWriteRepository
@@ -38,6 +39,28 @@ export class SpanIngestionWriteRepositoryClickHouse
             table: "observability_spans",
             values: [spanRecord],
             format: "JSONEachRow",
+          });
+
+          // TODO(afr): Move this out! should be handled in service layer, as repo/queue agnostic.
+          await traceProjectionQueue.add(
+            TRACE_PROJECTION_JOB_NAME,
+            {
+              tenantId: jobData.tenantId,
+              traceId: jobData.spanData.traceId,
+              jobData: {
+                tenantId: jobData.tenantId,
+                traceId: jobData.spanData.traceId,
+                spanId: jobData.spanData.spanId,
+              },
+            },
+            {
+              jobId: `${jobData.tenantId}:${jobData.spanData.traceId}`,
+            }
+          );
+
+          span.addEvent("trace-projection.job.enqueued", {
+            "tenant.id": jobData.tenantId,
+            "trace.id": jobData.spanData.traceId,
           });
         } catch (error) {
           this.logger.error(

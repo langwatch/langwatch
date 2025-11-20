@@ -28,7 +28,9 @@ import { workerRestartsCounter } from "../metrics";
 import { startUsageStatsWorker } from "./workers/usageStatsWorker";
 import { WorkersRestart } from "./errors";
 import type { SpanIngestionWriteJob } from "../features/span-ingestion/types/";
+import type { TraceProjectionJob } from "../features/trace-processing/types/";
 import { startSpanIngestionWriteWorker } from "./workers/spanIngestionWriteWorker";
+import { startTraceProjectionWorker } from "./workers/traceProjectionWorker";
 
 const logger = createLogger("langwatch:workers");
 
@@ -38,8 +40,12 @@ type Workers = {
   topicClusteringWorker: Worker<TopicClusteringJob, void, string> | undefined;
   trackEventsWorker: Worker<TrackEventJob, void, string> | undefined;
   usageStatsWorker: Worker<UsageStatsJob, void, string> | undefined;
+
   spanIngestionWriteWorker:
     | Worker<SpanIngestionWriteJob, void, string>
+    | undefined;
+  traceProjectionWorker:
+    | Worker<TraceProjectionJob, void, string>
     | undefined;
 };
 
@@ -59,7 +65,9 @@ export const start = (
     const topicClusteringWorker = startTopicClusteringWorker();
     const trackEventsWorker = startTrackEventsWorker();
     const usageStatsWorker = startUsageStatsWorker();
+
     const spanIngestionWriteWorker = startSpanIngestionWriteWorker();
+    const traceProjectionWorker = startTraceProjectionWorker();
 
     startMetricsServer();
     incrementWorkerRestartCount();
@@ -75,6 +83,7 @@ export const start = (
     trackEventsWorker?.on("closing", closingListener);
     usageStatsWorker?.on("closing", closingListener);
     spanIngestionWriteWorker?.on("closing", closingListener);
+    traceProjectionWorker?.on("closing", closingListener);
 
     if (maxRuntimeMs) {
       setTimeout(() => {
@@ -87,6 +96,7 @@ export const start = (
           trackEventsWorker?.off("closing", closingListener);
           usageStatsWorker?.off("closing", closingListener);
           spanIngestionWriteWorker?.off("closing", closingListener);
+          traceProjectionWorker?.off("closing", closingListener);
           await Promise.all([
             collectorWorker?.close(),
             evaluationsWorker?.close(),
@@ -94,6 +104,7 @@ export const start = (
             trackEventsWorker?.close(),
             usageStatsWorker?.close(),
             spanIngestionWriteWorker?.close(),
+            traceProjectionWorker?.close(),
           ]);
 
           setTimeout(() => {
@@ -111,6 +122,7 @@ export const start = (
         trackEventsWorker,
         usageStatsWorker,
         spanIngestionWriteWorker,
+        traceProjectionWorker,
       });
     }
   });
