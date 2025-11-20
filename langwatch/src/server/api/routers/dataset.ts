@@ -214,4 +214,27 @@ export const datasetRouter = createTRPCRouter({
         input.proposedName,
       );
     }),
+  /**
+   * Copy a dataset to a target project.
+   * Handles name conflicts by appending a suffix.
+   * Copies all records with correct structure.
+   */
+  copy: protectedProcedure
+    .input(
+      z.object({
+        datasetId: z.string(),
+        sourceProjectId: z.string(),
+        projectId: z.string(),
+      }),
+    )
+    .use(checkProjectPermission("datasets:create"))
+    .use(datasetErrorHandler)
+    .mutation(async ({ ctx, input }) => {
+      const datasetService = DatasetService.create(ctx.prisma);
+      return await datasetService.copyDataset({
+        sourceDatasetId: input.datasetId,
+        sourceProjectId: input.sourceProjectId,
+        targetProjectId: input.projectId,
+      });
+    }),
 });
