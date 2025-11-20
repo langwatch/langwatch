@@ -1,10 +1,6 @@
 import { useEffect, useMemo, forwardRef, useImperativeHandle } from "react";
 import { CopilotKit, useCopilotChat } from "@copilotkit/react-core";
-import {
-  AssistantMessage,
-  CopilotChat,
-  UserMessage,
-} from "@copilotkit/react-ui";
+import { AssistantMessage, CopilotChat } from "@copilotkit/react-ui";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import type { PromptConfigFormValues } from "~/prompts/types";
 import type { z } from "zod";
@@ -89,37 +85,12 @@ const PromptPlaygroundChatInner = forwardRef<PromptPlaygroundChatRef, object>(
       },
     }));
 
-    /**
-     * deleteMessage
-     * Single Responsibility: Removes an assistant message and its corresponding user message from the chat.
-     */
     const deleteMessage = (messageId: string) => {
-      // Find the assistant message to delete
-      const assistantMessageIndex = visibleMessages.findIndex(
-        (message) => message.id === messageId,
-      );
-
-      if (assistantMessageIndex === -1) return;
-
-      // Find the corresponding user message (immediately before the assistant message)
-      let userMessageIndex = -1;
-      for (let i = assistantMessageIndex - 1; i >= 0; i--) {
-        if (visibleMessages[i].role === "user") {
-          userMessageIndex = i;
-          break;
-        }
-      }
-
-      // Remove both messages from CopilotKit state
-      const messagesToDelete = new Set([messageId]);
-      if (userMessageIndex !== -1) {
-        messagesToDelete.add(visibleMessages[userMessageIndex].id);
-      }
-
       const updatedMessages = visibleMessages.filter(
-        (message) => !messagesToDelete.has(message.id),
+        (message) => message.id !== messageId,
       );
-      void setMessages(updatedMessages);
+
+      setMessages(updatedMessages);
     };
 
     useEffect(() => {
