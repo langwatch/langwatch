@@ -10,7 +10,7 @@ import {
 import { Menu } from "../../../components/ui/menu";
 import { Tooltip } from "../../../components/ui/tooltip";
 import { WorkflowIcon } from "../ColorfulBlockIcons";
-import { MoreVertical } from "react-feather";
+import { MoreVertical, Copy, Trash2 } from "react-feather";
 import { api } from "../../../utils/api";
 import { useCallback, useState } from "react";
 import { useOrganizationTeamProject } from "../../../hooks/useOrganizationTeamProject";
@@ -167,7 +167,7 @@ export function WorkflowCard({
                     value="copy"
                     onClick={() => setIsCopyDialogOpen(true)}
                   >
-                    Copy to new project
+                    <Copy size={16} /> Copy to new project
                   </Menu.Item>
                 </Tooltip>
                 <Tooltip
@@ -190,7 +190,7 @@ export function WorkflowCard({
                     }
                     disabled={!hasWorkflowsDeletePermission}
                   >
-                    Delete
+                    <Trash2 size={16} /> Delete
                   </Menu.Item>
                 </Tooltip>
               </Menu.Content>
