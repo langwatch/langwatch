@@ -167,7 +167,7 @@ export function WorkflowCard({
                     value="copy"
                     onClick={() => setIsCopyDialogOpen(true)}
                   >
-                    <Copy size={16} /> Copy to new project
+                    <Copy size={16} /> Copy to another project
                   </Menu.Item>
                 </Tooltip>
                 <Tooltip

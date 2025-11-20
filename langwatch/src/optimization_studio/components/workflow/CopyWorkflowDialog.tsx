@@ -1,14 +1,10 @@
-import {
-  Button,
-  createListCollection,
-  Field,
-  VStack,
-} from "@chakra-ui/react";
+import { Button, createListCollection, Field, VStack } from "@chakra-ui/react";
 import { useState } from "react";
 import { Dialog } from "../../../components/ui/dialog";
 import { Select } from "../../../components/ui/select";
 import { toaster } from "../../../components/ui/toaster";
 import { useOrganizationTeamProject } from "../../../hooks/useOrganizationTeamProject";
+import { useRequiredSession } from "../../../hooks/useRequiredSession";
 import { api } from "../../../utils/api";
 
 import {
@@ -30,14 +26,20 @@ export const CopyWorkflowDialog = ({
   workflowName: string;
 }) => {
   const { organizations, project } = useOrganizationTeamProject();
+  const session = useRequiredSession();
   const copyWorkflow = api.workflow.copy.useMutation();
   const [selectedProjectId, setSelectedProjectId] = useState<string[]>([]);
   const [copyDatasets, setCopyDatasets] = useState(false);
 
+  const currentUserId = session.data?.user?.id;
+
   const projects =
     organizations?.flatMap((org) =>
       org.teams.flatMap((team) => {
-        const teamMember = team.members[0];
+        // Find the current user's membership in this team
+        const teamMember = team.members.find(
+          (member) => member.userId === currentUserId,
+        );
         if (!teamMember) return [];
 
         let hasCreatePermission = false;
@@ -47,18 +49,18 @@ export const CopyWorkflowDialog = ({
           if (permissions.length > 0) {
             hasCreatePermission = hasPermissionWithHierarchy(
               permissions,
-              "workflows:create"
+              "workflows:create",
             );
           } else {
             hasCreatePermission = teamRoleHasPermission(
               teamMember.role,
-              "workflows:create"
+              "workflows:create",
             );
           }
         } else {
           hasCreatePermission = teamRoleHasPermission(
             teamMember.role,
-            "workflows:create"
+            "workflows:create",
           );
         }
 
@@ -68,7 +70,7 @@ export const CopyWorkflowDialog = ({
           label: `${org.name} / ${team.name} / ${project.name}`,
           value: project.id,
         }));
-      })
+      }),
     ) ?? [];
 
   const projectCollection = createListCollection({
@@ -145,7 +147,9 @@ export const CopyWorkflowDialog = ({
           </Button>
           <Button
             colorPalette="blue"
-            onClick={handleCopy}
+            onClick={() => {
+              void handleCopy();
+            }}
             loading={copyWorkflow.isLoading}
             disabled={!selectedProjectId.length}
           >

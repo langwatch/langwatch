@@ -6,7 +6,8 @@ import {
   datasetRecordEntrySchema,
   datasetRecordFormSchema,
 } from "../../datasets/types.generated";
-import { checkProjectPermission } from "../rbac";
+import { checkProjectPermission, hasProjectPermission } from "../rbac";
+import { TRPCError } from "@trpc/server";
 import { DatasetService } from "../../datasets/dataset.service";
 import { datasetErrorHandler } from "../../datasets/middleware";
 import { slugify } from "~/utils/slugify";
@@ -230,6 +231,20 @@ export const datasetRouter = createTRPCRouter({
     .use(checkProjectPermission("datasets:create"))
     .use(datasetErrorHandler)
     .mutation(async ({ ctx, input }) => {
+      // Check that the user has at least datasets:view permission on the source project
+      const hasSourcePermission = await hasProjectPermission(
+        ctx,
+        input.sourceProjectId,
+        "datasets:view",
+      );
+
+      if (!hasSourcePermission) {
+        throw new TRPCError({
+          code: "UNAUTHORIZED",
+          message: "You do not have permission to view datasets in the source project",
+        });
+      }
+
       const datasetService = DatasetService.create(ctx.prisma);
       return await datasetService.copyDataset({
         sourceDatasetId: input.datasetId,

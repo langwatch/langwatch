@@ -9,6 +9,7 @@ import { Dialog } from "../ui/dialog";
 import { Select } from "../ui/select";
 import { toaster } from "../ui/toaster";
 import { useOrganizationTeamProject } from "../../hooks/useOrganizationTeamProject";
+import { useRequiredSession } from "../../hooks/useRequiredSession";
 import { api } from "../../utils/api";
 
 import {
@@ -28,13 +29,19 @@ export const CopyDatasetDialog = ({
   datasetName: string;
 }) => {
   const { organizations, project } = useOrganizationTeamProject();
+  const session = useRequiredSession();
   const copyDataset = api.dataset.copy.useMutation();
   const [selectedProjectId, setSelectedProjectId] = useState<string[]>([]);
+
+  const currentUserId = session.data?.user?.id;
 
   const projects =
     organizations?.flatMap((org) =>
       org.teams.flatMap((team) => {
-        const teamMember = team.members[0];
+        // Find the current user's membership in this team
+        const teamMember = team.members.find(
+          (member) => member.userId === currentUserId
+        );
         if (!teamMember) return [];
 
         let hasCreatePermission = false;
@@ -135,7 +142,9 @@ export const CopyDatasetDialog = ({
           </Button>
           <Button
             colorPalette="blue"
-            onClick={handleCopy}
+            onClick={() => {
+              void handleCopy();
+            }}
             loading={copyDataset.isLoading}
             disabled={!selectedProjectId.length}
           >

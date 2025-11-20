@@ -18,7 +18,7 @@ import {
   recursiveAlphabeticallySortedKeys,
 } from "../../../optimization_studio/utils/dslUtils";
 import { DatasetService } from "../../datasets/dataset.service";
-import { checkProjectPermission } from "../rbac";
+import { checkProjectPermission, hasProjectPermission } from "../rbac";
 import { createTRPCRouter, protectedProcedure } from "../trpc";
 import type { OpenAIResponsesProviderOptions } from "@ai-sdk/openai";
 
@@ -71,6 +71,20 @@ export const workflowRouter = createTRPCRouter({
     )
     .use(checkProjectPermission("workflows:create"))
     .mutation(async ({ ctx, input }) => {
+      // Check that the user has at least workflows:view permission on the source project
+      const hasSourcePermission = await hasProjectPermission(
+        ctx,
+        input.sourceProjectId,
+        "workflows:view",
+      );
+
+      if (!hasSourcePermission) {
+        throw new TRPCError({
+          code: "UNAUTHORIZED",
+          message: "You do not have permission to view workflows in the source project",
+        });
+      }
+
       const workflow = await ctx.prisma.workflow.findUnique({
         where: {
           id: input.workflowId,
