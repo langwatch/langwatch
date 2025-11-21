@@ -4,10 +4,10 @@ import { getLangWatchTracer } from "langwatch";
 import type { Command, CommandHandler } from "../../../library";
 import { EventUtils, createTenantId } from "../../../library";
 import { defineCommandSchema } from "../../../library";
-import type { StoreSpanIngestionCommandData } from "../../../schemas/commands/spanIngestion.schema";
-import { SPAN_INGESTION_RECORD_COMMAND_TYPE, storeSpanIngestionCommandDataSchema } from "../../../schemas/commands/spanIngestion.schema";
-import type { SpanIngestionRecordedEvent } from "../../../schemas/events/spanIngestion.schema";
-import { SPAN_INGESTION_RECORDED_EVENT_TYPE } from "../../../schemas/events/spanIngestion.schema";
+import type { StoreSpanIngestionCommandData } from "../schemas/commands";
+import { SPAN_INGESTION_RECORD_COMMAND_TYPE, storeSpanIngestionCommandDataSchema } from "../schemas/commands";
+import type { SpanIngestionRecordedEvent } from "../schemas/events";
+import { SPAN_INGESTION_RECORDED_EVENT_TYPE } from "../schemas/events";
 import { createLogger } from "../../../../../utils/logger";
 import { getClickHouseClient } from "../../../../../utils/clickhouse";
 import { SpanRepositoryClickHouse } from "../repositories/spanRepositoryClickHouse";
@@ -105,14 +105,13 @@ export class RecordSpanCommand
             spanId,
             collectedAtUnixMs,
           },
+          "span_ingestion",
           {
             spanId,
             collectedAtUnixMs,
           },
+          collectedAtUnixMs, // timestamp
         ) as SpanIngestionRecordedEvent;
-
-        // Override timestamp with the collected timestamp
-        ingestionEvent.timestamp = collectedAtUnixMs;
 
         return [ingestionEvent];
       },

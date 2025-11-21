@@ -1,6 +1,21 @@
 import { z } from "zod";
-import { EventSchema } from "../../library/domain/types";
-import type { TenantId } from "../../library";
+import { EventSchema } from "../../../library/domain/types";
+import type { TenantId } from "../../../library";
+import {
+  TRACE_AGGREGATION_STARTED_EVENT_TYPE,
+  TRACE_AGGREGATION_COMPLETED_EVENT_TYPE,
+  TRACE_AGGREGATION_CANCELLED_EVENT_TYPE,
+  TRACE_AGGREGATION_EVENT_TYPES,
+} from "./typeIdentifiers";
+
+export type { TraceAggregationEventType } from "./typeIdentifiers";
+export {
+  TRACE_AGGREGATION_STARTED_EVENT_TYPE,
+  TRACE_AGGREGATION_COMPLETED_EVENT_TYPE,
+  TRACE_AGGREGATION_CANCELLED_EVENT_TYPE,
+  TRACE_AGGREGATION_EVENT_TYPES,
+} from "./typeIdentifiers";
+
 
 /**
  * Zod schema for EventMetadataBase.
@@ -24,6 +39,7 @@ export const traceAggregationEventMetadataSchema =
     traceId?: string;
     [key: string]: unknown;
   }>;
+
 
 /**
  * Zod schema for TraceAggregationStartedEventData.
@@ -68,12 +84,6 @@ export const traceAggregationCancelledEventDataSchema = z.object({
   reason?: string;
 }>;
 
-/**
- * Event type identifiers for trace aggregation events.
- */
-export const TRACE_AGGREGATION_STARTED_EVENT_TYPE = "lw.obs.trace_aggregation.started" as const;
-export const TRACE_AGGREGATION_COMPLETED_EVENT_TYPE = "lw.obs.trace_aggregation.completed" as const;
-export const TRACE_AGGREGATION_CANCELLED_EVENT_TYPE = "lw.obs.trace_aggregation.cancelled" as const;
 
 /**
  * Zod schema for TraceAggregationStartedEvent.
@@ -126,6 +136,7 @@ export const traceAggregationCancelledEventSchema = EventSchema.extend({
   metadata: z.infer<typeof traceAggregationEventMetadataSchema>;
 }>;
 
+
 /**
  * Types inferred from Zod schemas.
  * Note: tenantId is converted from string to TenantId for compatibility with Event interface.
@@ -169,6 +180,7 @@ export type TraceAggregationEvent =
   | TraceAggregationCompletedEvent
   | TraceAggregationCancelledEvent;
 
+
 /**
  * Type guard functions for trace aggregation events.
  */
@@ -190,16 +202,3 @@ export function isTraceAggregationCancelledEvent(
   return event.type === TRACE_AGGREGATION_CANCELLED_EVENT_TYPE;
 }
 
-/**
- * All event type identifiers for trace aggregation events.
- */
-export const TRACE_AGGREGATION_EVENT_TYPES = [
-  TRACE_AGGREGATION_STARTED_EVENT_TYPE,
-  TRACE_AGGREGATION_COMPLETED_EVENT_TYPE,
-  TRACE_AGGREGATION_CANCELLED_EVENT_TYPE,
-] as const;
-
-/**
- * Type for trace aggregation event type identifiers.
- */
-export type TraceAggregationEventType = (typeof TRACE_AGGREGATION_EVENT_TYPES)[number];

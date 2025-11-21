@@ -1,9 +1,9 @@
 import { z } from "zod";
+import { SPAN_INGESTION_RECORD_COMMAND_TYPE, SPAN_INGESTION_COMMAND_TYPES } from "./typeIdentifiers";
 
-/**
- * Command type identifier for span ingestion record command.
- */
-export const SPAN_INGESTION_RECORD_COMMAND_TYPE = "lw.obs.span_ingestion.record" as const;
+export type { SpanIngestionCommandType } from "./typeIdentifiers";
+export { SPAN_INGESTION_RECORD_COMMAND_TYPE, SPAN_INGESTION_COMMAND_TYPES } from "./typeIdentifiers";
+
 
 /**
  * Zod schema for OpenTelemetry AttributeValue.
@@ -136,6 +136,7 @@ export const storeSpanIngestionCommandDataSchema = z.object({
   collectedAtUnixMs: number;
 }>;
 
+
 /**
  * Type inferred from the spanDataSchema Zod schema.
  */
@@ -148,14 +149,3 @@ export type StoreSpanIngestionCommandData = z.infer<
   typeof storeSpanIngestionCommandDataSchema
 >;
 
-/**
- * All command type identifiers for span ingestion commands.
- */
-export const SPAN_INGESTION_COMMAND_TYPES = [
-  SPAN_INGESTION_RECORD_COMMAND_TYPE,
-] as const;
-
-/**
- * Type for span ingestion command type identifiers.
- */
-export type SpanIngestionCommandType = (typeof SPAN_INGESTION_COMMAND_TYPES)[number];

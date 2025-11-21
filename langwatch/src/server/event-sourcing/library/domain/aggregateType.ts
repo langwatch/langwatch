@@ -1,7 +1,12 @@
 import { z } from "zod";
-// Import type arrays from schemas for zod schema construction
-// Schemas are the single source of truth for type identifiers
-import { AGGREGATE_TYPE_IDENTIFIERS } from "../../schemas";
+import { AGGREGATE_TYPE_IDENTIFIERS } from "../../schemas/typeIdentifiers";
+
+/**
+ * Aggregate type identifiers follow the taxonomy system defined in ./taxonomy.ts.
+ * They are the third segment in the taxonomy hierarchy: `<provenance>.<domain>.<aggregate-type>.<identifier>`
+ *
+ * Example: In "lw.obs.span_ingestion.recorded", the aggregate type is "span_ingestion".
+ */
 
 export const AggregateTypeSpanIngestionSchema = z.literal("span_ingestion");
 export type AggregateTypeSpanIngestion = z.infer<typeof AggregateTypeSpanIngestionSchema>;
@@ -20,6 +25,9 @@ export const AggregateTypeSchema = z.enum(AGGREGATE_TYPE_IDENTIFIERS);
  *
  * Aggregate types represent the type of aggregate root (e.g., "span_ingestion", "trace_aggregation"),
  * NOT the event type (e.g., "lw.obs.span_ingestion.recorded").
+ *
+ * Aggregate types are part of the taxonomy system (see ./taxonomy.ts) and are the third segment
+ * in the taxonomy hierarchy: `<provenance>.<domain>.<aggregate-type>.<identifier>`
  *
  * Events are partitioned in the database by tenantId + aggregateType.
  *
