@@ -20,6 +20,7 @@ import { defineCommandSchema } from "../../../library/commands/commandSchema";
 import { createTenantId } from "../../../library/domain/tenantId";
 import { createTestEvent } from "../../../library/services/__tests__/testHelpers";
 import { PipelineBuilder } from "../builder";
+import type { AggregateType } from "~/server/event-sourcing/library";
 
 /**
  * Creates a mock EventStore with spyable methods.
@@ -257,7 +258,7 @@ export const TEST_CONSTANTS = {
   PROJECTION_NAME: "test-projection",
   HANDLER_NAME: "test-handler",
   PIPELINE_NAME: "test-pipeline",
-  AGGREGATE_TYPE: "span" as const,
+  AGGREGATE_TYPE: "test-aggregate" as AggregateType,
   EVENT_TYPE_1: EVENT_TYPES[0],
   COMMAND_TYPE_1: COMMAND_TYPES[0],
 } as const;
@@ -269,7 +270,7 @@ export function createTestEventForBuilder(
   aggregateId: string,
   tenantId = createTenantId(TEST_CONSTANTS.TENANT_ID_VALUE),
 ): TestEvent {
-  return createTestEvent(aggregateId, tenantId) as TestEvent;
+  return createTestEvent(aggregateId, TEST_CONSTANTS.AGGREGATE_TYPE, tenantId) as TestEvent;
 }
 
 /**

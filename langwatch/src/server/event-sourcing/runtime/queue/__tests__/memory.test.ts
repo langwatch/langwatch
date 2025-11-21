@@ -3,7 +3,6 @@ import { SpanKind } from "@opentelemetry/api";
 import type { EventSourcedQueueDefinition } from "../../../library/queues";
 import type { SemConvAttributes } from "langwatch/observability";
 
-// Mock modules at the top level - this is the most reliable approach
 const mockLogger = {
   info: vi.fn(),
   error: vi.fn(),
@@ -22,7 +21,6 @@ vi.mock("langwatch", () => ({
   getLangWatchTracer: vi.fn(() => mockTracer),
 }));
 
-// Import after mocks are set up
 import { EventSourcedQueueProcessorMemory } from "../memory";
 
 describe("EventSourcedQueueProcessorMemory", () => {
