@@ -370,5 +370,51 @@ export class DatasetService {
       index++;
     }
   }
+  /**
+   * Copies a dataset to a target project.
+   * Handles name conflicts by appending a suffix.
+   * Copies all records with correct structure.
+   */
+  async copyDataset(params: {
+    sourceDatasetId: string;
+    sourceProjectId: string;
+    targetProjectId: string;
+  }) {
+    const { sourceDatasetId, sourceProjectId, targetProjectId } = params;
+
+    const sourceDataset = await this.repository.findOne({
+      id: sourceDatasetId,
+      projectId: sourceProjectId,
+    });
+
+    if (!sourceDataset) {
+      throw new DatasetNotFoundError();
+    }
+
+    // Fetch source records
+    const sourceRecords = await this.recordRepository.findDatasetRecords({
+      datasetId: sourceDatasetId,
+      projectId: sourceProjectId,
+    });
+
+    // Determine new name
+    const newName = await this.findNextAvailableName(
+      targetProjectId,
+      sourceDataset.name,
+    );
+
+    // Create new dataset
+    const newDataset = await this.createNewDataset({
+      projectId: targetProjectId,
+      name: newName,
+      columnTypes: sourceDataset.columnTypes as DatasetColumns,
+      datasetRecords: sourceRecords.map((record) => ({
+        ...(record.entry as Record<string, any>),
+        id: nanoid(),
+      })),
+    });
+
+    return newDataset;
+  }
 }
 
