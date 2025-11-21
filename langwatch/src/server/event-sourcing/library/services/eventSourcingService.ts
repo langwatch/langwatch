@@ -667,7 +667,7 @@ export class EventSourcingService<
         await handlerDef.handler.handle(event);
 
         if (this.eventHandlerCheckpointStore) {
-          const eventId = this.createEventId(event);
+          const eventId = event.id;
           const aggregateId = String(event.aggregateId);
           const checkpoint: EventHandlerCheckpoint = {
             handlerName,
@@ -709,18 +709,10 @@ export class EventSourcingService<
    */
   private getHandlerEventTypes(
     handlerDef: EventHandlerDefinition<EventType>,
-  ): string[] | undefined {
+  ): readonly EventType["type"][] | undefined {
     const { handler, options } = handlerDef;
 
     return options.eventTypes ?? handler.getEventTypes?.();
-  }
-
-  /**
-   * Creates a unique identifier for an event.
-   * Format: `${ksuid}:${aggregateId}:${timestamp}:${eventType}`
-   */
-  private createEventId(event: EventType): string {
-    return `${EventUtils.generateEventId()}:${String(event.aggregateId)}:${event.timestamp}:${event.type}`;
   }
 
   /**

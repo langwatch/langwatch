@@ -76,7 +76,21 @@ export class EventStoreClickHouse<EventType extends Event = Event>
 
           const rows = await result.json<EventRecord>();
 
-          return rows.map((row) => {
+          // Deduplicate by Event ID (keep first occurrence when sorted by timestamp)
+          const seenEventIds = new Set<string>();
+          const deduplicatedRows = rows.filter((row) => {
+            if (!row.EventId) {
+              // If no Event ID, keep the row (shouldn't happen but handle gracefully)
+              return true;
+            }
+            if (seenEventIds.has(row.EventId)) {
+              return false; // Skip duplicate
+            }
+            seenEventIds.add(row.EventId);
+            return true;
+          });
+
+          return deduplicatedRows.map((row) => {
             // EventTimestamp is already a number (Unix timestamp in milliseconds)
             // Handle invalid timestamps by falling back to current time
             let timestampMs: number;
@@ -101,6 +115,7 @@ export class EventStoreClickHouse<EventType extends Event = Event>
             const event = {
               id: row.EventId,
               aggregateId: aggregateId,
+              aggregateType: row.AggregateType as AggregateType,
               tenantId: createTenantId(context.tenantId),
               timestamp: timestampMs,
               type: row.EventType as EventType["type"],
@@ -156,10 +171,10 @@ export class EventStoreClickHouse<EventType extends Event = Event>
         }
 
         // Validate all events before storage
-        this.validateEvents(events, context);
+        this.validateEvents(events, context, aggregateType);
 
         // Transform and store events
-        await this.insertEvents(events, context, aggregateType);
+        await this.insertEvents(events, context);
       },
     );
   }
@@ -171,6 +186,7 @@ export class EventStoreClickHouse<EventType extends Event = Event>
   private validateEvents(
     events: readonly EventType[],
     context: EventStoreReadContext<EventType>,
+    aggregateType: AggregateType,
   ): void {
     for (let i = 0; i < events.length; i++) {
       const event = events[i];
@@ -179,7 +195,30 @@ export class EventStoreClickHouse<EventType extends Event = Event>
       }
 
       this.validateEventTenant(event, context, i);
+      this.validateEventAggregateType(event, aggregateType, i);
       this.validateEventStructure(event, context, i);
+    }
+  }
+
+  /**
+   * Validates event aggregate type matches context aggregate type.
+   */
+  private validateEventAggregateType(
+    event: EventType,
+    aggregateType: AggregateType,
+    index: number,
+  ): void {
+    if (event.aggregateType !== aggregateType) {
+      const error = new Error(`[VALIDATION] Event at index ${index} has aggregate type '${event.aggregateType}' that does not match pipeline aggregate type '${aggregateType}'`);
+      this.logger.error(
+        {
+          tenantId: event.tenantId,
+          eventIndex: index,
+          aggregateType,
+        },
+        "Aggregate type mismatch in event batch",
+      );
+      throw error;
     }
   }
 
@@ -257,14 +296,13 @@ export class EventStoreClickHouse<EventType extends Event = Event>
   private async insertEvents(
     events: readonly EventType[],
     context: EventStoreReadContext<EventType>,
-    aggregateType: AggregateType,
   ): Promise<void> {
     try {
       const eventRecords = events.map(
         (event) =>
           ({
             TenantId: String(event.tenantId),
-            AggregateType: aggregateType,
+            AggregateType: event.aggregateType,
             AggregateId: String(event.aggregateId),
             EventId: event.id,
             EventTimestamp: event.timestamp,
@@ -292,7 +330,6 @@ export class EventStoreClickHouse<EventType extends Event = Event>
       this.logger.error(
         {
           tenantId: context.tenantId,
-          aggregateType,
           eventCount: events.length,
           aggregateIds: [...new Set(events.map((e) => String(e.aggregateId)))],
           error: error instanceof Error ? error.message : String(error),
