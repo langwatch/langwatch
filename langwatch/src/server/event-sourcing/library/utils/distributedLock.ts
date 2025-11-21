@@ -1,4 +1,6 @@
 import { z } from "zod";
+import { SpanKind } from "@opentelemetry/api";
+import { getLangWatchTracer } from "langwatch";
 
 /**
  * Distributed lock interface for preventing concurrent operations on the same resource.
@@ -51,6 +53,9 @@ export class InMemoryDistributedLock implements DistributedLock {
     { value: string; expiresAt: number }
   >();
   private cleanupInterval?: NodeJS.Timeout;
+  private readonly tracer = getLangWatchTracer(
+    "langwatch.event-sourcing.distributed-lock",
+  );
 
   constructor() {
     // Periodic cleanup prevents memory leaks from expired locks that were never explicitly released
@@ -65,28 +70,66 @@ export class InMemoryDistributedLock implements DistributedLock {
   }
 
   async acquire(key: string, ttlMs: number): Promise<LockHandle | null> {
-    const now = Date.now();
-    const existing = this.locks.get(key);
+    return await this.tracer.withActiveSpan(
+      "DistributedLock.acquire",
+      {
+        kind: SpanKind.INTERNAL,
+        attributes: {
+          "lock.key": key,
+          "lock.ttl_ms": ttlMs,
+          "lock.type": "in-memory",
+        },
+      },
+      async (span) => {
+        const now = Date.now();
+        const existing = this.locks.get(key);
 
-    if (existing && existing.expiresAt > now) {
-      return null;
-    }
+        if (existing && existing.expiresAt > now) {
+          span.setAttributes({
+            "lock.acquired": false,
+          });
+          return null;
+        }
 
-    // Unique value ensures only the acquiring process can release the lock
-    const value = `${Date.now()}-${Math.random()}`;
-    this.locks.set(key, {
-      value,
-      expiresAt: now + ttlMs,
-    });
+        // Unique value ensures only the acquiring process can release the lock
+        const value = `${Date.now()}-${Math.random()}`;
+        this.locks.set(key, {
+          value,
+          expiresAt: now + ttlMs,
+        });
 
-    return { key, value };
+        span.setAttributes({
+          "lock.acquired": true,
+          "lock.value": value,
+        });
+
+        return { key, value };
+      },
+    );
   }
 
   async release(handle: LockHandle): Promise<void> {
-    const existing = this.locks.get(handle.key);
-    if (existing && existing.value === handle.value) {
-      this.locks.delete(handle.key);
-    }
+    return await this.tracer.withActiveSpan(
+      "DistributedLock.release",
+      {
+        kind: SpanKind.INTERNAL,
+        attributes: {
+          "lock.key": handle.key,
+          "lock.type": "in-memory",
+        },
+      },
+      async (span) => {
+        const existing = this.locks.get(handle.key);
+        const released =
+          existing !== undefined && existing.value === handle.value;
+        if (released) {
+          this.locks.delete(handle.key);
+        }
+        span.setAttributes({
+          "lock.released": released,
+        });
+      },
+    );
   }
 
   /**
@@ -154,46 +197,92 @@ export interface RedisClient {
  * ```
  */
 export class RedisDistributedLock implements DistributedLock {
+  private readonly tracer = getLangWatchTracer(
+    "langwatch.event-sourcing.distributed-lock",
+  );
+
   constructor(private readonly redis: RedisClient) {}
 
   async acquire(key: string, ttlMs: number): Promise<LockHandle | null> {
-    // Unique value ensures only the acquiring process can release the lock
-    const value = `${Date.now()}-${Math.random()}`;
-    const ttlSeconds = Math.ceil(ttlMs / 1000);
+    return await this.tracer.withActiveSpan(
+      "DistributedLock.acquire",
+      {
+        kind: SpanKind.INTERNAL,
+        attributes: {
+          "lock.key": key,
+          "lock.ttl_ms": ttlMs,
+          "lock.type": "redis",
+        },
+      },
+      async (span) => {
+        // Unique value ensures only the acquiring process can release the lock
+        const value = `${Date.now()}-${Math.random()}`;
+        const ttlSeconds = Math.ceil(ttlMs / 1000);
 
-    // SET NX EX: atomic operation that only succeeds if key doesn't exist, with expiration
-    const result = await this.redis.set(key, value, {
-      NX: true,
-      EX: ttlSeconds,
-    });
+        // SET NX EX: atomic operation that only succeeds if key doesn't exist, with expiration
+        const result = await this.redis.set(key, value, {
+          NX: true,
+          EX: ttlSeconds,
+        });
 
-    if (result === "OK") {
-      return { key, value };
-    }
+        const acquired = result === "OK";
+        span.setAttributes({
+          "lock.acquired": acquired,
+          ...(acquired ? { "lock.value": value } : {}),
+        });
 
-    return null;
+        if (acquired) {
+          return { key, value };
+        }
+
+        return null;
+      },
+    );
   }
 
   async release(handle: LockHandle): Promise<void> {
-    // Use Lua script for atomic check-and-delete to prevent race conditions:
-    // - Process A acquires lock, expires, Process B acquires same lock
-    // - Process A tries to release: value check prevents deleting B's lock
-    if (this.redis.eval) {
-      const script = `
-        if redis.call("get", KEYS[1]) == ARGV[1] then
-          return redis.call("del", KEYS[1])
-        else
-          return 0
-        end
-      `;
-      await this.redis.eval(script, 1, handle.key, handle.value);
-    } else {
-      // Fallback: non-atomic but still safe (check-then-delete)
-      const currentValue = await this.redis.get(handle.key);
-      if (currentValue === handle.value) {
-        await this.redis.del(handle.key);
-      }
-    }
+    return await this.tracer.withActiveSpan(
+      "DistributedLock.release",
+      {
+        kind: SpanKind.INTERNAL,
+        attributes: {
+          "lock.key": handle.key,
+          "lock.type": "redis",
+        },
+      },
+      async (span) => {
+        // Use Lua script for atomic check-and-delete to prevent race conditions:
+        // - Process A acquires lock, expires, Process B acquires same lock
+        // - Process A tries to release: value check prevents deleting B's lock
+        let released = false;
+        if (this.redis.eval) {
+          const script = `
+            if redis.call("get", KEYS[1]) == ARGV[1] then
+              return redis.call("del", KEYS[1])
+            else
+              return 0
+            end
+          `;
+          const result = await this.redis.eval(
+            script,
+            1,
+            handle.key,
+            handle.value,
+          );
+          released = result === 1;
+        } else {
+          // Fallback: non-atomic but still safe (check-then-delete)
+          const currentValue = await this.redis.get(handle.key);
+          if (currentValue === handle.value) {
+            await this.redis.del(handle.key);
+            released = true;
+          }
+        }
+        span.setAttributes({
+          "lock.released": released,
+        });
+      },
+    );
   }
 }
 
