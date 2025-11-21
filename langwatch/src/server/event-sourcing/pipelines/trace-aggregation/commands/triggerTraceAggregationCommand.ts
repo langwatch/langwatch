@@ -88,7 +88,6 @@ export class TriggerTraceAggregationCommand
         const events: TraceAggregationEvent[] = [];
 
         const tenantIdObj = createTenantId(tenantId);
-        const timestamp = Date.now();
 
         // If aggregation is already in progress, emit cancellation event first
         if (currentProjection?.data.aggregationStatus === "in_progress") {
@@ -117,7 +116,7 @@ export class TriggerTraceAggregationCommand
               {
                 traceId,
               },
-              timestamp,
+              Date.now(),
             ) as TraceAggregationCancelledEvent;
 
           events.push(cancelledEvent);
@@ -138,7 +137,7 @@ export class TriggerTraceAggregationCommand
           {
             traceId,
           },
-          timestamp,
+          Date.now(),
         ) as TraceAggregationStartedEvent;
 
         // Fetch all spans for the trace
@@ -186,7 +185,7 @@ export class TriggerTraceAggregationCommand
           {
             traceId,
           },
-          timestamp,
+          Date.now(),
         ) as TraceAggregationCompletedEvent;
 
         events.push(completedEvent);
