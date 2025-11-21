@@ -35,7 +35,7 @@ describe("EventSourcingService - Projections", () => {
       const eventStore = createMockEventStore<Event>();
       const projectionHandler = createMockEventHandler<Event, any>();
       const projectionStore = createMockProjectionStore<any>();
-      const events = [createTestEvent(TEST_CONSTANTS.AGGREGATE_ID, tenantId)];
+      const events = [createTestEvent(TEST_CONSTANTS.AGGREGATE_ID, TEST_CONSTANTS.AGGREGATE_TYPE, tenantId)];
 
       eventStore.getEvents = vi.fn().mockResolvedValue(events);
       const expectedProjection = createTestProjection(
@@ -81,9 +81,10 @@ describe("EventSourcingService - Projections", () => {
       const projectionHandler = createMockEventHandler<Event, any>();
       const projectionStore = createMockProjectionStore<any>();
       const events = [
-        createTestEvent(TEST_CONSTANTS.AGGREGATE_ID, tenantId),
+        createTestEvent(TEST_CONSTANTS.AGGREGATE_ID, TEST_CONSTANTS.AGGREGATE_TYPE, tenantId),
         createTestEvent(
           TEST_CONSTANTS.AGGREGATE_ID,
+          TEST_CONSTANTS.AGGREGATE_TYPE,
           tenantId,
           EVENT_TYPES[0],
           1000001,
@@ -129,18 +130,21 @@ describe("EventSourcingService - Projections", () => {
       const events = [
         createTestEvent(
           TEST_CONSTANTS.AGGREGATE_ID,
+          TEST_CONSTANTS.AGGREGATE_TYPE,
           tenantId,
           EVENT_TYPES[0],
           1000002,
         ),
         createTestEvent(
           TEST_CONSTANTS.AGGREGATE_ID,
+          TEST_CONSTANTS.AGGREGATE_TYPE,
           tenantId,
           EVENT_TYPES[0],
           1000000,
         ),
         createTestEvent(
           TEST_CONSTANTS.AGGREGATE_ID,
+          TEST_CONSTANTS.AGGREGATE_TYPE,
           tenantId,
           EVENT_TYPES[0],
           1000001,
@@ -190,7 +194,7 @@ describe("EventSourcingService - Projections", () => {
       const eventStore = createMockEventStore<Event>();
       const projectionHandler = createMockEventHandler<Event, any>();
       const projectionStore = createMockProjectionStore<any>();
-      const events = [createTestEvent(TEST_CONSTANTS.AGGREGATE_ID, tenantId)];
+      const events = [createTestEvent(TEST_CONSTANTS.AGGREGATE_ID, TEST_CONSTANTS.AGGREGATE_TYPE, tenantId)];
 
       eventStore.getEvents = vi.fn().mockResolvedValue(events);
       projectionHandler.handle = vi
@@ -230,7 +234,7 @@ describe("EventSourcingService - Projections", () => {
       const eventStore = createMockEventStore<Event>();
       const projectionHandler = createMockEventHandler<Event, any>();
       const projectionStore = createMockProjectionStore<any>();
-      const events = [createTestEvent(TEST_CONSTANTS.AGGREGATE_ID, tenantId)];
+      const events = [createTestEvent(TEST_CONSTANTS.AGGREGATE_ID, TEST_CONSTANTS.AGGREGATE_TYPE, tenantId)];
       const expectedProjection = createTestProjection(
         TEST_CONSTANTS.AGGREGATE_ID,
         tenantId,
@@ -268,7 +272,7 @@ describe("EventSourcingService - Projections", () => {
       const eventStore = createMockEventStore<Event>();
       const projectionHandler = createMockEventHandler<Event, any>();
       const projectionStore = createMockProjectionStore<any>();
-      const events = [createTestEvent(TEST_CONSTANTS.AGGREGATE_ID, tenantId)];
+      const events = [createTestEvent(TEST_CONSTANTS.AGGREGATE_ID, TEST_CONSTANTS.AGGREGATE_TYPE, tenantId)];
       const expectedProjection = createTestProjection(
         TEST_CONSTANTS.AGGREGATE_ID,
         tenantId,
@@ -344,7 +348,7 @@ describe("EventSourcingService - Projections", () => {
       const eventStore = createMockEventStore<Event>();
       const projectionHandler = createMockEventHandler<Event, any>();
       const projectionStore = createMockProjectionStore<any>();
-      const events = [createTestEvent(TEST_CONSTANTS.AGGREGATE_ID, tenantId)];
+      const events = [createTestEvent(TEST_CONSTANTS.AGGREGATE_ID, TEST_CONSTANTS.AGGREGATE_TYPE, tenantId)];
 
       eventStore.getEvents = vi.fn().mockResolvedValue(events);
       const handlerError = new Error("Handler failed");
@@ -377,7 +381,7 @@ describe("EventSourcingService - Projections", () => {
       const eventStore = createMockEventStore<Event>();
       const projectionHandler = createMockEventHandler<Event, any>();
       const projectionStore = createMockProjectionStore<any>();
-      const events = [createTestEvent(TEST_CONSTANTS.AGGREGATE_ID, tenantId)];
+      const events = [createTestEvent(TEST_CONSTANTS.AGGREGATE_ID, TEST_CONSTANTS.AGGREGATE_TYPE, tenantId)];
       const projection = createTestProjection(
         TEST_CONSTANTS.AGGREGATE_ID,
         tenantId,
@@ -707,9 +711,9 @@ describe("EventSourcingService - Projections", () => {
       const aggregate1 = "aggregate-1";
       const aggregate2 = "aggregate-2";
       const events = [
-        createTestEvent(aggregate1, tenantId),
-        createTestEvent(aggregate2, tenantId),
-        createTestEvent(aggregate1, tenantId),
+        createTestEvent(aggregate1, TEST_CONSTANTS.AGGREGATE_TYPE, tenantId),
+        createTestEvent(aggregate2, TEST_CONSTANTS.AGGREGATE_TYPE, tenantId),
+        createTestEvent(aggregate1, TEST_CONSTANTS.AGGREGATE_TYPE, tenantId),
       ];
 
       eventStore.getEvents = vi.fn().mockImplementation((aggId) => {
@@ -752,7 +756,7 @@ describe("EventSourcingService - Projections", () => {
       const projectionHandler2 = createMockEventHandler<Event, any>();
       const projectionStore1 = createMockProjectionStore<any>();
       const projectionStore2 = createMockProjectionStore<any>();
-      const events = [createTestEvent(TEST_CONSTANTS.AGGREGATE_ID, tenantId)];
+      const events = [createTestEvent(TEST_CONSTANTS.AGGREGATE_ID, TEST_CONSTANTS.AGGREGATE_TYPE, tenantId)];
 
       eventStore.getEvents = vi.fn().mockResolvedValue(events);
       projectionHandler1.handle = vi
@@ -799,8 +803,8 @@ describe("EventSourcingService - Projections", () => {
       const aggregate1 = "aggregate-1";
       const aggregate2 = "aggregate-2";
       const events = [
-        createTestEvent(aggregate1, tenantId),
-        createTestEvent(aggregate2, tenantId),
+        createTestEvent(aggregate1, TEST_CONSTANTS.AGGREGATE_TYPE, tenantId),
+        createTestEvent(aggregate2, TEST_CONSTANTS.AGGREGATE_TYPE, tenantId),
       ];
 
       eventStore.getEvents = vi.fn().mockImplementation((aggId) => {

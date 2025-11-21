@@ -7,6 +7,7 @@ import { createTenantId } from "../../domain/tenantId";
 import type { Event, EventMetadataBase } from "../../domain/types";
 import type { Command } from "../command";
 import { defineCommandSchema } from "../commandSchema";
+import type { AggregateType } from "../../domain/aggregateType";
 
 interface TestPayload {
   id: string;
@@ -73,6 +74,7 @@ describe("CommandHandlerClass", () => {
             {
               id: "event-1",
               aggregateId: command.aggregateId,
+              aggregateType: "test_aggregate" as AggregateType,
               tenantId: command.tenantId,
               timestamp: 1234567890,
               type: EVENT_TYPES[0],
@@ -233,6 +235,7 @@ describe("CommandHandlerClass", () => {
           return Promise.resolve([
             {
               id: "event-1",
+              aggregateType: "test_aggregate" as AggregateType,
               aggregateId: command.aggregateId,
               tenantId: command.tenantId,
               timestamp: 1234567890,
@@ -275,6 +278,7 @@ describe("CommandHandlerClass", () => {
           return [
             {
               id: "event-1",
+              aggregateType: "test_aggregate" as AggregateType,
               aggregateId: command.aggregateId,
               tenantId: command.tenantId,
               timestamp: 1234567890,

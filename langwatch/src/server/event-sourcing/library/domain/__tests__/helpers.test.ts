@@ -4,18 +4,21 @@ import { EVENT_TYPES } from "../eventType";
 import { createTenantId, type TenantId } from "../tenantId";
 import type { Event, Projection } from "../types";
 import { isEvent, isProjection } from "../helpers";
+import type { AggregateType } from "../aggregateType";
 
 function createValidEvent(
-  id: string = "event-1",
-  aggregateId: string = "agg-1",
+  id = "event-1",
+  aggregateId = "agg-1",
+  aggregateType: AggregateType = "span_ingestion",
   tenantId: TenantId = createTenantId("tenant-1"),
-  timestamp: number = 1000000,
+  timestamp = 1000000,
   type: (typeof EVENT_TYPES)[number] = EVENT_TYPES[0]!,
   data: unknown = { value: "test" },
 ): Event {
   return {
     id,
     aggregateId,
+    aggregateType,
     tenantId,
     timestamp,
     type,
@@ -24,10 +27,10 @@ function createValidEvent(
 }
 
 function createValidProjection(
-  id: string = "proj-1",
-  aggregateId: string = "agg-1",
+  id = "proj-1",
+  aggregateId = "agg-1",
   tenantId: TenantId = createTenantId("tenant-1"),
-  version: number = 1,
+  version = 1,
   data: unknown = { value: "test" },
 ): Projection {
   return {
@@ -58,6 +61,7 @@ describe("isEvent", () => {
       const event = createValidEvent(
         "event-1",
         "agg-1",
+        "span_ingestion",
         createTenantId("tenant-1"),
         1000000,
         EVENT_TYPES[0]!,
@@ -70,6 +74,7 @@ describe("isEvent", () => {
       const event = createValidEvent(
         "event-1",
         "agg-1",
+        "span_ingestion",
         createTenantId("tenant-1"),
         1000000,
         EVENT_TYPES[0]!,
@@ -82,6 +87,7 @@ describe("isEvent", () => {
       const event = createValidEvent(
         "event-1",
         "agg-1",
+        "span_ingestion",
         createTenantId("tenant-1"),
         1000000,
         EVENT_TYPES[0]!,
@@ -94,6 +100,7 @@ describe("isEvent", () => {
       const event = createValidEvent(
         "event-1",
         "agg-1",
+        "span_ingestion",
         createTenantId("tenant-1"),
         1000000,
         EVENT_TYPES[0]!,
@@ -106,6 +113,7 @@ describe("isEvent", () => {
       const event = createValidEvent(
         "event-1",
         "agg-1",
+        "span_ingestion",
         createTenantId("tenant-1"),
         1000000,
         EVENT_TYPES[0]!,
@@ -143,27 +151,27 @@ describe("isEvent", () => {
 
   describe("when value is missing required fields", () => {
     it("returns false when aggregateId is missing", () => {
-      const { aggregateId, ...eventWithoutAggregateId } = createValidEvent();
+      const { aggregateId: _aggregateId, ...eventWithoutAggregateId } = createValidEvent();
       expect(isEvent(eventWithoutAggregateId)).toBe(false);
     });
 
     it("returns false when tenantId is missing", () => {
-      const { tenantId, ...eventWithoutTenantId } = createValidEvent();
+      const { tenantId: _tenantId, ...eventWithoutTenantId } = createValidEvent();
       expect(isEvent(eventWithoutTenantId)).toBe(false);
     });
 
     it("returns false when timestamp is missing", () => {
-      const { timestamp, ...eventWithoutTimestamp } = createValidEvent();
+      const { timestamp: _timestamp, ...eventWithoutTimestamp } = createValidEvent();
       expect(isEvent(eventWithoutTimestamp)).toBe(false);
     });
 
     it("returns false when type is missing", () => {
-      const { type, ...eventWithoutType } = createValidEvent();
+      const { type: _type, ...eventWithoutType } = createValidEvent();
       expect(isEvent(eventWithoutType)).toBe(false);
     });
 
     it("returns false when data is missing", () => {
-      const { data, ...eventWithoutData } = createValidEvent();
+      const { data: _data, ...eventWithoutData } = createValidEvent();
       expect(isEvent(eventWithoutData)).toBe(false);
     });
   });
@@ -325,29 +333,29 @@ describe("isProjection", () => {
 
   describe("when value is missing required fields", () => {
     it("returns false when id is missing", () => {
-      const { id, ...projectionWithoutId } = createValidProjection();
+      const { id: _id, ...projectionWithoutId } = createValidProjection();
       expect(isProjection(projectionWithoutId)).toBe(false);
     });
 
     it("returns false when aggregateId is missing", () => {
-      const { aggregateId, ...projectionWithoutAggregateId } =
+      const { aggregateId: _aggregateId, ...projectionWithoutAggregateId } =
         createValidProjection();
       expect(isProjection(projectionWithoutAggregateId)).toBe(false);
     });
 
     it("returns false when tenantId is missing", () => {
-      const { tenantId, ...projectionWithoutTenantId } =
+      const { tenantId: _tenantId, ...projectionWithoutTenantId } =
         createValidProjection();
       expect(isProjection(projectionWithoutTenantId)).toBe(false);
     });
 
     it("returns false when version is missing", () => {
-      const { version, ...projectionWithoutVersion } = createValidProjection();
+      const { version: _version, ...projectionWithoutVersion } = createValidProjection();
       expect(isProjection(projectionWithoutVersion)).toBe(false);
     });
 
     it("returns false when data is missing", () => {
-      const { data, ...projectionWithoutData } = createValidProjection();
+      const { data: _data, ...projectionWithoutData } = createValidProjection();
       expect(isProjection(projectionWithoutData)).toBe(false);
     });
   });

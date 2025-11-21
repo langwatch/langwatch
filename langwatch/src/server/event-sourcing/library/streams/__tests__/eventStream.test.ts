@@ -4,6 +4,7 @@ import type { Event, EventOrderingStrategy } from "../../domain/types";
 import { EVENT_TYPES } from "../../domain/eventType";
 import { createTenantId, type TenantId } from "../../domain/tenantId";
 import { EventStream } from "../eventStream";
+import type { AggregateType } from "../../domain/aggregateType";
 
 type TestEvent = Event<{ value: string }>;
 
@@ -17,6 +18,7 @@ function createTestEvent(
   return {
     id,
     aggregateId,
+    aggregateType: "test-aggregate" as AggregateType,
     tenantId,
     timestamp,
     type,

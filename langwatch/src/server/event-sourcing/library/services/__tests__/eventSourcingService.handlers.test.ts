@@ -14,7 +14,6 @@ import {
 } from "./testHelpers";
 import { EVENT_TYPES } from "../../domain/eventType";
 
-// Helper to escape special regex characters
 function escapeRegex(str: string): string {
   return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
@@ -47,9 +46,9 @@ describe("EventSourcingService - Event Handlers", () => {
       });
 
       const events = [
-        createTestEvent(TEST_CONSTANTS.AGGREGATE_ID, tenantId),
-        createTestEvent("aggregate-456", tenantId),
-        createTestEvent("aggregate-789", tenantId),
+        createTestEvent(TEST_CONSTANTS.AGGREGATE_ID, TEST_CONSTANTS.AGGREGATE_TYPE, tenantId),
+        createTestEvent("aggregate-456", TEST_CONSTANTS.AGGREGATE_TYPE, tenantId),
+        createTestEvent("aggregate-789", TEST_CONSTANTS.AGGREGATE_TYPE, tenantId),
       ];
 
       await service.storeEvents(events, context);
@@ -73,6 +72,7 @@ describe("EventSourcingService - Event Handlers", () => {
 
       const event = createTestEvent(
         TEST_CONSTANTS.AGGREGATE_ID,
+        TEST_CONSTANTS.AGGREGATE_TYPE,
         tenantId,
         EVENT_TYPES[0],
         TEST_CONSTANTS.BASE_TIMESTAMP,
@@ -117,7 +117,7 @@ describe("EventSourcingService - Event Handlers", () => {
         },
       });
 
-      const event = createTestEvent(TEST_CONSTANTS.AGGREGATE_ID, tenantId);
+      const event = createTestEvent(TEST_CONSTANTS.AGGREGATE_ID, TEST_CONSTANTS.AGGREGATE_TYPE, tenantId);
       await service.storeEvents([event], context);
 
       expect(callOrder).toEqual(["A", "B", "C"]);
@@ -153,7 +153,7 @@ describe("EventSourcingService - Event Handlers", () => {
         },
       });
 
-      const event = createTestEvent(TEST_CONSTANTS.AGGREGATE_ID, tenantId);
+      const event = createTestEvent(TEST_CONSTANTS.AGGREGATE_ID, TEST_CONSTANTS.AGGREGATE_TYPE, tenantId);
       await service.storeEvents([event], context);
 
       // A and B should be before C (order between A and B not specified)
@@ -179,11 +179,13 @@ describe("EventSourcingService - Event Handlers", () => {
 
       const event1 = createTestEvent(
         TEST_CONSTANTS.AGGREGATE_ID,
+        TEST_CONSTANTS.AGGREGATE_TYPE,
         tenantId,
         EVENT_TYPES[0],
       );
       const event2 = createTestEvent(
         TEST_CONSTANTS.AGGREGATE_ID,
+        TEST_CONSTANTS.AGGREGATE_TYPE,
         tenantId,
         EVENT_TYPES[1] ?? EVENT_TYPES[0],
       );
@@ -207,11 +209,13 @@ describe("EventSourcingService - Event Handlers", () => {
 
       const event1 = createTestEvent(
         TEST_CONSTANTS.AGGREGATE_ID,
+        TEST_CONSTANTS.AGGREGATE_TYPE,
         tenantId,
         EVENT_TYPES[0],
       );
       const event2 = createTestEvent(
         TEST_CONSTANTS.AGGREGATE_ID,
+        TEST_CONSTANTS.AGGREGATE_TYPE,
         tenantId,
         EVENT_TYPES[1] ?? EVENT_TYPES[0],
       );
@@ -236,7 +240,7 @@ describe("EventSourcingService - Event Handlers", () => {
         },
       });
 
-      const event = createTestEvent(TEST_CONSTANTS.AGGREGATE_ID, tenantId);
+      const event = createTestEvent(TEST_CONSTANTS.AGGREGATE_ID, TEST_CONSTANTS.AGGREGATE_TYPE, tenantId);
 
       await service.storeEvents([event], context);
 
@@ -271,7 +275,7 @@ describe("EventSourcingService - Event Handlers", () => {
         },
       });
 
-      const event = createTestEvent(TEST_CONSTANTS.AGGREGATE_ID, tenantId);
+      const event = createTestEvent(TEST_CONSTANTS.AGGREGATE_ID, TEST_CONSTANTS.AGGREGATE_TYPE, tenantId);
       await service.storeEvents([event], context);
 
       expect(callOrder[0]).toBe("A");
@@ -317,7 +321,7 @@ describe("EventSourcingService - Event Handlers", () => {
         },
       });
 
-      const event = createTestEvent(TEST_CONSTANTS.AGGREGATE_ID, tenantId);
+      const event = createTestEvent(TEST_CONSTANTS.AGGREGATE_ID, TEST_CONSTANTS.AGGREGATE_TYPE, tenantId);
       await service.storeEvents([event], context);
 
       // A must be first
@@ -361,7 +365,7 @@ describe("EventSourcingService - Event Handlers", () => {
         },
       });
 
-      const event = createTestEvent(TEST_CONSTANTS.AGGREGATE_ID, tenantId);
+      const event = createTestEvent(TEST_CONSTANTS.AGGREGATE_ID, TEST_CONSTANTS.AGGREGATE_TYPE, tenantId);
       await service.storeEvents([event], context);
 
       // A must be first
@@ -388,6 +392,7 @@ describe("EventSourcingService - Event Handlers", () => {
 
       const event = createTestEvent(
         TEST_CONSTANTS.AGGREGATE_ID,
+        TEST_CONSTANTS.AGGREGATE_TYPE,
         tenantId,
         EVENT_TYPES[0],
         TEST_CONSTANTS.BASE_TIMESTAMP,
@@ -409,7 +414,7 @@ describe("EventSourcingService - Event Handlers", () => {
           lastProcessedTimestamp: TEST_CONSTANTS.BASE_TIMESTAMP,
           lastProcessedEventId: expect.stringMatching(
             new RegExp(
-              `^event_[A-Za-z0-9]+:${escapeRegex(TEST_CONSTANTS.AGGREGATE_ID)}:${TEST_CONSTANTS.BASE_TIMESTAMP}:${escapeRegex(EVENT_TYPES[0])}$`,
+              `^${TEST_CONSTANTS.BASE_TIMESTAMP}:${escapeRegex(String(tenantId))}:${escapeRegex(TEST_CONSTANTS.AGGREGATE_ID)}:${escapeRegex(aggregateType)}$`,
             ),
           ),
         }),
@@ -434,6 +439,7 @@ describe("EventSourcingService - Event Handlers", () => {
       const eventType = EVENT_TYPES[0];
       const event = createTestEvent(
         aggregateId,
+        TEST_CONSTANTS.AGGREGATE_TYPE,
         tenantId,
         eventType,
         timestamp,
@@ -454,7 +460,7 @@ describe("EventSourcingService - Event Handlers", () => {
           lastProcessedTimestamp: timestamp,
           lastProcessedEventId: expect.stringMatching(
             new RegExp(
-              `^event_[A-Za-z0-9]+:${escapeRegex(aggregateId)}:${timestamp}:${escapeRegex(eventType)}$`,
+              `^${timestamp}:${escapeRegex(String(tenantId))}:${escapeRegex(aggregateId)}:${escapeRegex(aggregateType)}$`,
             ),
           ),
         }),
@@ -492,7 +498,7 @@ describe("EventSourcingService - Event Handlers", () => {
         logger: logger as any,
       });
 
-      const event = createTestEvent(TEST_CONSTANTS.AGGREGATE_ID, tenantId);
+      const event = createTestEvent(TEST_CONSTANTS.AGGREGATE_ID, TEST_CONSTANTS.AGGREGATE_TYPE, tenantId);
 
       await expect(
         service.storeEvents([event], context),
@@ -523,6 +529,7 @@ describe("EventSourcingService - Event Handlers", () => {
 
       const event = createTestEvent(
         TEST_CONSTANTS.AGGREGATE_ID,
+        TEST_CONSTANTS.AGGREGATE_TYPE,
         tenantId,
         EVENT_TYPES[0],
         TEST_CONSTANTS.BASE_TIMESTAMP,
@@ -539,7 +546,7 @@ describe("EventSourcingService - Event Handlers", () => {
 
       expect(checkpoint.lastProcessedEventId).toMatch(
         new RegExp(
-          `^event_[A-Za-z0-9]+:${escapeRegex(TEST_CONSTANTS.AGGREGATE_ID)}:${TEST_CONSTANTS.BASE_TIMESTAMP}:${escapeRegex(EVENT_TYPES[0])}$`,
+          `^${TEST_CONSTANTS.BASE_TIMESTAMP}:${escapeRegex(String(tenantId))}:${escapeRegex(TEST_CONSTANTS.AGGREGATE_ID)}:${escapeRegex(aggregateType)}$`,
         ),
       );
     });
@@ -573,7 +580,7 @@ describe("EventSourcingService - Event Handlers", () => {
         logger: logger as any,
       });
 
-      const event = createTestEvent(TEST_CONSTANTS.AGGREGATE_ID, tenantId);
+      const event = createTestEvent(TEST_CONSTANTS.AGGREGATE_ID, TEST_CONSTANTS.AGGREGATE_TYPE, tenantId);
 
       await expect(
         service.storeEvents([event], context),
@@ -608,7 +615,7 @@ describe("EventSourcingService - Event Handlers", () => {
         },
       });
 
-      const event = createTestEvent(TEST_CONSTANTS.AGGREGATE_ID, tenantId);
+      const event = createTestEvent(TEST_CONSTANTS.AGGREGATE_ID, TEST_CONSTANTS.AGGREGATE_TYPE, tenantId);
 
       await expect(
         service.storeEvents([event], context),
@@ -637,7 +644,7 @@ describe("EventSourcingService - Event Handlers", () => {
         },
       });
 
-      const event = createTestEvent(TEST_CONSTANTS.AGGREGATE_ID, tenantId);
+      const event = createTestEvent(TEST_CONSTANTS.AGGREGATE_ID, TEST_CONSTANTS.AGGREGATE_TYPE, tenantId);
 
       await expect(
         service.storeEvents([event], context),
@@ -656,7 +663,7 @@ describe("EventSourcingService - Event Handlers", () => {
         eventStore,
       });
 
-      const event = createTestEvent(TEST_CONSTANTS.AGGREGATE_ID, tenantId);
+      const event = createTestEvent(TEST_CONSTANTS.AGGREGATE_ID, TEST_CONSTANTS.AGGREGATE_TYPE, tenantId);
 
       await expect(
         service.storeEvents([event], context),

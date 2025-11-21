@@ -1,5 +1,4 @@
 import { context, trace } from "@opentelemetry/api";
-import { generate } from "@langwatch/ksuid";
 import { EventStream } from "../streams/eventStream";
 import {
   EventSchema,
@@ -15,13 +14,26 @@ import type {
 } from "../domain/types";
 import type { TenantId } from "../domain/tenantId";
 import type { EventType } from "../domain/eventType";
+import type { AggregateType } from "../domain/aggregateType";
 
 /**
- * Generates a unique event ID using KSUID.
- * KSUIDs are k-sortable, providing better ordering guarantees than UUIDs.
+ * Generates a unique event ID.
+ * Format: {timestamp}:{tenantId}:{aggregateId}:{aggregateType}
+ * Timestamps within the same aggregate are guaranteed unique, ensuring Event ID uniqueness.
+ *
+ * @param timestamp - Event timestamp in milliseconds
+ * @param tenantId - The tenant ID
+ * @param aggregateId - The aggregate ID
+ * @param aggregateType - The aggregate type
+ * @returns Event ID in format {timestamp}:{tenantId}:{aggregateId}:{aggregateType}
  */
-function generateEventId(): string {
-  return generate("event").toString();
+function generateEventId(
+  timestamp: number,
+  tenantId: string,
+  aggregateId: string,
+  aggregateType: string,
+): string {
+  return `${timestamp}:${tenantId}:${aggregateId}:${aggregateType}`;
 }
 
 /**
@@ -31,9 +43,10 @@ function generateEventId(): string {
  * @param tenantId - Tenant identifier for multi-tenant isolation
  * @param type - Event type identifier
  * @param data - Event-specific payload data
+ * @param aggregateType - The aggregate type (used for event ID generation)
  * @param metadata - Optional metadata (e.g., trace context)
- * @param id - Optional event ID (generated if not provided)
- * @returns A new event with timestamp set to current time
+ * @param timestamp - Optional timestamp (defaults to current time)
+ * @returns A new event with timestamp set to current time (or provided timestamp)
  */
 function createEvent<
   Payload = unknown,
@@ -44,14 +57,17 @@ function createEvent<
   tenantId: TenantId,
   type: TEventType,
   data: Payload,
+  aggregateType: AggregateType,
   metadata?: Metadata,
-  id?: string,
+  timestamp?: number,
 ): Event<Payload, Metadata> {
+  const eventTimestamp = timestamp ?? Date.now();
   return {
-    id: id ?? generateEventId(),
+    id: generateEventId(eventTimestamp, String(tenantId), aggregateId, aggregateType),
     aggregateId,
+    aggregateType,
     tenantId,
-    timestamp: Date.now(),
+    timestamp: eventTimestamp,
     type,
     data,
     ...(metadata !== void 0 && { metadata }),
@@ -115,8 +131,9 @@ function buildEventMetadataWithCurrentProcessingTraceparent<
  * @param tenantId - Tenant identifier for multi-tenant isolation
  * @param type - Event type identifier
  * @param data - Event-specific payload data
+ * @param aggregateType - The aggregate type (used for event ID generation)
  * @param metadata - Optional metadata (will be enriched with trace context)
- * @param id - Optional event ID (generated if not provided)
+ * @param timestamp - Optional timestamp (defaults to current time)
  * @returns A new event with trace context in metadata
  */
 function createEventWithProcessingTraceContext<
@@ -128,8 +145,9 @@ function createEventWithProcessingTraceContext<
   tenantId: TenantId,
   type: TEventType,
   data: Payload,
+  aggregateType: AggregateType,
   metadata?: Metadata,
-  id?: string,
+  timestamp?: number,
 ): Event<Payload, Metadata> {
   const enrichedMetadata =
     buildEventMetadataWithCurrentProcessingTraceparent<Metadata>(metadata);
@@ -143,8 +161,9 @@ function createEventWithProcessingTraceContext<
     tenantId,
     type,
     data,
+    aggregateType,
     hasMetadata ? enrichedMetadata : void 0,
-    id,
+    timestamp,
   );
 }
 
@@ -278,8 +297,11 @@ function buildProjectionMetadata<EventType extends Event = Event>(
  * @returns True if the value is a valid Event, false otherwise
  */
 function isValidEvent(event: unknown): event is Event {
+  if (typeof event !== "object" || event === null) return false;
   const result = EventSchema.safeParse(event);
-  return result.success;
+  if (!result.success) return false;
+  // Explicitly check that data is not undefined
+  return "data" in event && (event as any).data !== undefined;
 }
 
 /**
@@ -290,8 +312,11 @@ function isValidEvent(event: unknown): event is Event {
  * @returns True if the value is a valid Projection, false otherwise
  */
 function isValidProjection(projection: unknown): projection is Projection {
+  if (typeof projection !== "object" || projection === null) return false;
   const result = ProjectionSchema.safeParse(projection);
-  return result.success;
+  if (!result.success) return false;
+  // Explicitly check that data is not undefined
+  return "data" in projection && (projection as any).data !== undefined;
 }
 
 /**
