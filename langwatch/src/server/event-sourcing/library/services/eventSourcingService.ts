@@ -3,7 +3,6 @@ import { getLangWatchTracer } from "langwatch";
 import type { EventStream } from "../streams/eventStream";
 import type {
   Event,
-  EventHandlerCheckpoint,
   Projection,
 } from "../domain/types";
 import { EventUtils } from "../utils/event.utils";
@@ -25,7 +24,7 @@ import type { EventStore } from "../stores/eventStore.types";
 import type { EventStoreReadContext } from "../stores/eventStore.types";
 import type { DistributedLock } from "../utils/distributedLock";
 import type { EventPublisher } from "../publishing/eventPublisher.types";
-import type { EventHandlerCheckpointStore } from "../stores/eventHandlerCheckpointStore.types";
+import type { ProcessorCheckpointStore } from "../stores/eventHandlerCheckpointStore.types";
 import type { EventSourcedQueueProcessor } from "../queues";
 import { createLogger } from "~/utils/logger";
 
@@ -53,7 +52,7 @@ export class EventSourcingService<
     string,
     EventHandlerDefinition<EventType>
   >;
-  private readonly eventHandlerCheckpointStore?: EventHandlerCheckpointStore;
+  private readonly processorCheckpointStore?: ProcessorCheckpointStore;
   private readonly options: EventSourcingOptions<EventType>;
   private readonly distributedLock?: DistributedLock;
   private readonly updateLockTtlMs: number;
@@ -66,6 +65,11 @@ export class EventSourcingService<
     string,
     EventSourcedQueueProcessor<EventType>
   >();
+  // Queue processors for projections (one per projection)
+  private readonly projectionQueueProcessors = new Map<
+    string,
+    EventSourcedQueueProcessor<EventType>
+  >();
 
   constructor({
     aggregateType,
@@ -73,14 +77,14 @@ export class EventSourcingService<
     projections,
     eventPublisher,
     eventHandlers,
-    eventHandlerCheckpointStore,
+    processorCheckpointStore,
     serviceOptions,
     logger,
     distributedLock,
     updateLockTtlMs = DEFAULT_UPDATE_LOCK_TTL_MS,
     queueProcessorFactory,
   }: EventSourcingServiceOptions<EventType, ProjectionType> & {
-    eventHandlerCheckpointStore?: EventHandlerCheckpointStore;
+    processorCheckpointStore?: ProcessorCheckpointStore;
   }) {
     this.aggregateType = aggregateType;
     this.eventStore = eventStore;
@@ -91,7 +95,7 @@ export class EventSourcingService<
     this.eventHandlers = eventHandlers
       ? new Map(Object.entries(eventHandlers))
       : void 0;
-    this.eventHandlerCheckpointStore = eventHandlerCheckpointStore;
+    this.processorCheckpointStore = processorCheckpointStore;
     this.options = serviceOptions ?? {};
     this.logger =
       logger ??
@@ -126,9 +130,30 @@ export class EventSourcingService<
       );
     }
 
+    // Warn in production if queue factory is not provided (projections will be synchronous)
+    if (
+      process.env.NODE_ENV === "production" &&
+      !queueProcessorFactory &&
+      projections &&
+      Object.keys(projections).length > 0 &&
+      logger
+    ) {
+      logger.warn(
+        {
+          aggregateType,
+        },
+        "[PERFORMANCE] EventSourcingService initialized without queue processor factory in production. Projections will be executed synchronously, blocking event storage. Consider providing a QueueProcessorFactory for async processing.",
+      );
+    }
+
     // Initialize queue processors for event handlers if factory is provided
     if (queueProcessorFactory && eventHandlers) {
       this.initializeHandlerQueues(eventHandlers);
+    }
+
+    // Initialize queue processors for projections if factory is provided
+    if (queueProcessorFactory && projections) {
+      this.initializeProjectionQueues(projections);
     }
   }
 
@@ -285,6 +310,60 @@ export class EventSourcingService<
   }
 
   /**
+   * Initializes queue processors for all registered projections.
+   * Each projection gets its own queue processor for async processing.
+   *
+   * **Serial Processing**: Uses event ID as job ID to prevent deduplication (all events are queued).
+   * The distributed lock in `updateProjectionByName` ensures serial processing per aggregate.
+   * When lock acquisition fails, BullMQ will retry the job with backoff.
+   */
+  private initializeProjectionQueues(
+    projections: Record<string, ProjectionDefinition<EventType, any>>,
+  ): void {
+    if (!this.queueProcessorFactory) {
+      return;
+    }
+
+    for (const [projectionName, projectionDef] of Object.entries(projections)) {
+      const queueName = `${this.aggregateType}_projection_${projectionName}`;
+
+      // Use event ID directly as job ID - event IDs are unique, preventing deduplication
+      // Distributed lock ensures serial processing per aggregate
+      const makeProjectionJobId = (event: EventType): string => {
+        this.logger?.debug(
+          {
+            projectionName,
+            eventId: event.id,
+            tenantId: event.tenantId,
+            aggregateId: String(event.aggregateId),
+            eventType: event.type,
+          },
+          "Created projection job ID from event ID",
+        );
+        return event.id;
+      };
+
+      const queueProcessor = this.queueProcessorFactory.create<EventType>({
+        name: queueName,
+        makeJobId: makeProjectionJobId,
+        spanAttributes: (event) => ({
+          "projection.name": projectionName,
+          "event.type": event.type,
+          "event.id": event.id,
+          "event.aggregate_id": String(event.aggregateId),
+        }),
+        process: async (event: EventType) => {
+          await this.processProjectionEvent(projectionName, projectionDef, event, {
+            tenantId: event.tenantId,
+          });
+        },
+      });
+
+      this.projectionQueueProcessors.set(projectionName, queueProcessor);
+    }
+  }
+
+  /**
    * Creates a default job ID for event handler processing.
    * Format: `${tenantId}:${aggregateId}:${timestamp}:${eventType}:${handlerName}`
    */
@@ -364,6 +443,30 @@ export class EventSourcingService<
         // Dispatch events to queues in dependency order (actual processing order maintained by queue workers)
         for (const event of events) {
           for (const handlerName of sortedHandlers) {
+            // Check if processing should continue (no failed events for this aggregate)
+            if (this.processorCheckpointStore) {
+              const hasFailures =
+                await this.processorCheckpointStore.hasFailedEvents(
+                  handlerName,
+                  "handler",
+                  event.tenantId,
+                  this.aggregateType,
+                  String(event.aggregateId),
+                );
+
+              if (hasFailures) {
+                this.logger?.warn(
+                  {
+                    handlerName,
+                    eventId: event.id,
+                    aggregateId: String(event.aggregateId),
+                    tenantId: event.tenantId,
+                  },
+                  "Skipping event dispatch due to previous failures for this aggregate",
+                );
+                continue;
+              }
+            }
             const handlerDef = this.eventHandlers?.get(handlerName);
             if (!handlerDef) {
               continue;
@@ -418,6 +521,104 @@ export class EventSourcingService<
                       error instanceof Error ? error.message : String(error),
                   },
                   "Failed to dispatch event to handler queue",
+                );
+              }
+            }
+          }
+        }
+      },
+    );
+  }
+
+  /**
+   * Dispatches events to projection queues asynchronously.
+   * Events are queued immediately and processed asynchronously by workers.
+   */
+  private async dispatchEventsToProjectionQueues(
+    events: readonly EventType[],
+  ): Promise<void> {
+    return await this.tracer.withActiveSpan(
+      "EventSourcingService.dispatchEventsToProjectionQueues",
+      {
+        kind: SpanKind.INTERNAL,
+        attributes: {
+          "aggregate.type": this.aggregateType,
+          "event.count": events.length,
+          "projection.count": this.projectionQueueProcessors.size,
+        },
+      },
+      async (span) => {
+        if (!this.projections) {
+          return;
+        }
+
+        // Dispatch events to queues
+        for (const event of events) {
+          for (const projectionName of this.projections.keys()) {
+            // Check if processing should continue (no failed events for this aggregate)
+            if (this.processorCheckpointStore) {
+              const hasFailures =
+                await this.processorCheckpointStore.hasFailedEvents(
+                  projectionName,
+                  "projection",
+                  event.tenantId,
+                  this.aggregateType,
+                  String(event.aggregateId),
+                );
+
+              if (hasFailures) {
+                this.logger?.warn(
+                  {
+                    projectionName,
+                    eventId: event.id,
+                    aggregateId: String(event.aggregateId),
+                    tenantId: event.tenantId,
+                  },
+                  "Skipping event dispatch to projection queue due to previous failures for this aggregate",
+                );
+                continue;
+              }
+            }
+            const queueProcessor =
+              this.projectionQueueProcessors.get(projectionName);
+            if (!queueProcessor) {
+              this.logger?.warn(
+                {
+                  projectionName,
+                  eventType: event.type,
+                },
+                "Queue processor not found for projection, skipping",
+              );
+              continue;
+            }
+
+            try {
+              span.addEvent("projection.queue.send", {
+                "projection.name": projectionName,
+                "event.type": event.type,
+                "event.id": event.id,
+                "event.aggregate_id": String(event.aggregateId),
+              });
+              await queueProcessor.send(event);
+            } catch (error) {
+              span.addEvent("projection.queue.send.error", {
+                "projection.name": projectionName,
+                "event.type": event.type,
+                "error.message":
+                  error instanceof Error ? error.message : String(error),
+              });
+              // Queue processor handles retries internally
+              if (this.logger) {
+                this.logger.error(
+                  {
+                    projectionName,
+                    eventType: event.type,
+                    aggregateId: String(event.aggregateId),
+                    tenantId: event.tenantId,
+                    error:
+                      error instanceof Error ? error.message : String(error),
+                  },
+                  "Failed to dispatch event to projection queue",
                 );
               }
             }
@@ -643,6 +844,7 @@ export class EventSourcingService<
 
   /**
    * Handles a single event with a handler and updates checkpoint on success.
+   * Implements per-event checkpointing with failure detection.
    */
   private async handleEvent(
     handlerName: string,
@@ -664,39 +866,339 @@ export class EventSourcingService<
         },
       },
       async () => {
-        await handlerDef.handler.handle(event);
-
-        if (this.eventHandlerCheckpointStore) {
-          const eventId = event.id;
-          const aggregateId = String(event.aggregateId);
-          const checkpoint: EventHandlerCheckpoint = {
-            handlerName,
-            tenantId: event.tenantId,
-            aggregateType: this.aggregateType,
-            lastProcessedAggregateId: aggregateId,
-            lastProcessedTimestamp: event.timestamp,
-            lastProcessedEventId: eventId,
-          };
-
-          try {
-            await this.eventHandlerCheckpointStore.saveCheckpoint(
+        // Check if event already processed (idempotency)
+        if (this.processorCheckpointStore) {
+          const existingCheckpoint =
+            await this.processorCheckpointStore.loadCheckpoint(
               handlerName,
-              event.tenantId,
-              this.aggregateType,
-              aggregateId,
-              checkpoint,
+              "handler",
+              event.id,
             );
-          } catch (error) {
-            this.logger?.error(
+
+          if (existingCheckpoint?.status === "processed") {
+            this.logger?.debug(
               {
                 handlerName,
-                aggregateId,
-                eventId,
-                error: error instanceof Error ? error.message : String(error),
+                eventId: event.id,
+                aggregateId: String(event.aggregateId),
               },
-              "Failed to save checkpoint for event handler",
+              "Event already processed, skipping",
             );
+            return;
           }
+
+          // Check if any previous events failed (stop processing if so)
+          const hasFailures =
+            await this.processorCheckpointStore.hasFailedEvents(
+              handlerName,
+              "handler",
+              event.tenantId,
+              this.aggregateType,
+              String(event.aggregateId),
+            );
+
+          if (hasFailures) {
+            const errorMessage =
+              "Previous events have failed processing for this aggregate. Processing stopped to prevent cascading failures.";
+            this.logger?.warn(
+              {
+                handlerName,
+                eventId: event.id,
+                aggregateId: String(event.aggregateId),
+                tenantId: event.tenantId,
+              },
+              errorMessage,
+            );
+            throw new Error(errorMessage);
+          }
+        }
+
+        try {
+          // Save checkpoint as "pending" before processing
+          if (this.processorCheckpointStore) {
+            try {
+              await this.processorCheckpointStore.saveCheckpoint(
+                handlerName,
+                "handler",
+                event,
+                "pending",
+              );
+            } catch (checkpointError) {
+              // Log checkpoint error but continue processing
+              this.logger?.error(
+                {
+                  handlerName,
+                  eventId: event.id,
+                  aggregateId: String(event.aggregateId),
+                  error:
+                    checkpointError instanceof Error
+                      ? checkpointError.message
+                      : String(checkpointError),
+                },
+                "Failed to save pending checkpoint for event handler",
+              );
+            }
+          }
+
+          // Process the event
+          await handlerDef.handler.handle(event);
+
+          // Save checkpoint as "processed" on success
+          if (this.processorCheckpointStore) {
+            try {
+              await this.processorCheckpointStore.saveCheckpoint(
+                handlerName,
+                "handler",
+                event,
+                "processed",
+              );
+            } catch (checkpointError) {
+              // Log checkpoint error but don't fail handler execution
+              this.logger?.error(
+                {
+                  handlerName,
+                  eventId: event.id,
+                  aggregateId: String(event.aggregateId),
+                  error:
+                    checkpointError instanceof Error
+                      ? checkpointError.message
+                      : String(checkpointError),
+                },
+                "Failed to save checkpoint for event handler",
+              );
+            }
+          }
+        } catch (error) {
+          // Save checkpoint as "failed" on failure
+          const errorMessage =
+            error instanceof Error ? error.message : String(error);
+          if (this.processorCheckpointStore) {
+            try {
+              await this.processorCheckpointStore.saveCheckpoint(
+                handlerName,
+                "handler",
+                event,
+                "failed",
+                errorMessage,
+              );
+            } catch (checkpointError) {
+              this.logger?.error(
+                {
+                  handlerName,
+                  eventId: event.id,
+                  aggregateId: String(event.aggregateId),
+                  error:
+                    checkpointError instanceof Error
+                      ? checkpointError.message
+                      : String(checkpointError),
+                },
+                "Failed to save failed checkpoint for event handler",
+              );
+            }
+          }
+
+          this.logger?.error(
+            {
+              handlerName,
+              eventId: event.id,
+              aggregateId: String(event.aggregateId),
+              tenantId: event.tenantId,
+              error: errorMessage,
+            },
+            "Failed to handle event",
+          );
+
+          // Throw to stop queue processing
+          throw error;
+        }
+      },
+    );
+  }
+
+  /**
+   * Processes a single event for a projection and updates checkpoint on success.
+   * Implements per-event checkpointing with failure detection.
+   * Note: Projections rebuild from all events for the aggregate, but we checkpoint per-event
+   * to track which events have been processed and detect failures.
+   */
+  private async processProjectionEvent(
+    projectionName: string,
+    projectionDef: ProjectionDefinition<EventType, any>,
+    event: EventType,
+    context: EventStoreReadContext<EventType>,
+  ): Promise<void> {
+    await this.tracer.withActiveSpan(
+      "EventSourcingService.processProjectionEvent",
+      {
+        kind: SpanKind.INTERNAL,
+        attributes: {
+          "projection.name": projectionName,
+          "event.id": event.id,
+          "event.aggregate_id": String(event.aggregateId),
+          "event.timestamp": event.timestamp,
+          "event.type": event.type,
+          "event.tenant_id": event.tenantId,
+        },
+      },
+      async () => {
+        // Check if event already processed (idempotency)
+        if (this.processorCheckpointStore) {
+          const existingCheckpoint =
+            await this.processorCheckpointStore.loadCheckpoint(
+              projectionName,
+              "projection",
+              event.id,
+            );
+
+          if (existingCheckpoint?.status === "processed") {
+            this.logger?.debug(
+              {
+                projectionName,
+                eventId: event.id,
+                aggregateId: String(event.aggregateId),
+              },
+              "Event already processed for projection, skipping",
+            );
+            return;
+          }
+
+          // Check if any previous events failed (stop processing if so)
+          const hasFailures =
+            await this.processorCheckpointStore.hasFailedEvents(
+              projectionName,
+              "projection",
+              event.tenantId,
+              this.aggregateType,
+              String(event.aggregateId),
+            );
+
+          if (hasFailures) {
+            const errorMessage =
+              "Previous events have failed processing for this aggregate. Processing stopped to prevent cascading failures.";
+            this.logger?.warn(
+              {
+                projectionName,
+                eventId: event.id,
+                aggregateId: String(event.aggregateId),
+                tenantId: event.tenantId,
+              },
+              errorMessage,
+            );
+            throw new Error(errorMessage);
+          }
+        }
+
+        try {
+          // Save checkpoint as "pending" before processing
+          if (this.processorCheckpointStore) {
+            try {
+              await this.processorCheckpointStore.saveCheckpoint(
+                projectionName,
+                "projection",
+                event,
+                "pending",
+              );
+            } catch (checkpointError) {
+              // Log checkpoint error but continue processing
+              this.logger?.error(
+                {
+                  projectionName,
+                  eventId: event.id,
+                  aggregateId: String(event.aggregateId),
+                  error:
+                    checkpointError instanceof Error
+                      ? checkpointError.message
+                      : String(checkpointError),
+                },
+                "Failed to save pending checkpoint for projection",
+              );
+            }
+          }
+
+          // Rebuild projection from all events for the aggregate
+          await this.updateProjectionByName(
+            projectionName,
+            String(event.aggregateId),
+            context,
+          );
+
+          // Save checkpoint as "processed" on success
+          if (this.processorCheckpointStore) {
+            try {
+              await this.processorCheckpointStore.saveCheckpoint(
+                projectionName,
+                "projection",
+                event,
+                "processed",
+              );
+              this.logger?.debug(
+                {
+                  projectionName,
+                  eventId: event.id,
+                  aggregateId: String(event.aggregateId),
+                  tenantId: event.tenantId,
+                  eventType: event.type,
+                },
+                "Saved processed checkpoint for projection",
+              );
+            } catch (checkpointError) {
+              // Log checkpoint error but don't fail projection update
+              this.logger?.error(
+                {
+                  projectionName,
+                  eventId: event.id,
+                  aggregateId: String(event.aggregateId),
+                  error:
+                    checkpointError instanceof Error
+                      ? checkpointError.message
+                      : String(checkpointError),
+                },
+                "Failed to save checkpoint for projection",
+              );
+            }
+          }
+        } catch (error) {
+          // Save checkpoint as "failed" on failure
+          const errorMessage =
+            error instanceof Error ? error.message : String(error);
+          if (this.processorCheckpointStore) {
+            try {
+              await this.processorCheckpointStore.saveCheckpoint(
+                projectionName,
+                "projection",
+                event,
+                "failed",
+                errorMessage,
+              );
+            } catch (checkpointError) {
+              this.logger?.error(
+                {
+                  projectionName,
+                  eventId: event.id,
+                  aggregateId: String(event.aggregateId),
+                  error:
+                    checkpointError instanceof Error
+                      ? checkpointError.message
+                      : String(checkpointError),
+                },
+                "Failed to save failed checkpoint for projection",
+              );
+            }
+          }
+
+          this.logger?.error(
+            {
+              projectionName,
+              eventId: event.id,
+              aggregateId: String(event.aggregateId),
+              tenantId: event.tenantId,
+              error: errorMessage,
+            },
+            "Failed to process event for projection",
+          );
+
+          // Throw to stop queue processing
+          throw error;
         }
       },
     );
@@ -723,7 +1225,10 @@ export class EventSourcingService<
    * but this method can be used for manual updates (e.g., recovery or reprocessing).
    *
    * **Concurrency:** Uses distributed lock (if configured) to prevent concurrent updates of the same
-   * aggregate projection. If lock acquisition fails, throws an error (caller should retry via queue).
+   * aggregate projection. The lock key includes the projection name to ensure different projections
+   * for the same aggregate can be updated concurrently, while the same projection is updated serially.
+   * Lock key format: `update:${aggregateType}:${aggregateId}:${projectionName}`
+   * If lock acquisition fails, throws an error (caller should retry via queue).
    * Without a distributed lock, concurrent updates may result in lost updates (last write wins).
    *
    * **Performance:** O(n) where n is the number of events for the aggregate. Lock acquisition adds
@@ -863,17 +1368,41 @@ export class EventSourcingService<
 
           const durationMs = Date.now() - startTime;
 
+          // Extract projection state for logging (if available)
+          const projectionState =
+            projection.data &&
+            typeof projection.data === "object" &&
+            "aggregationStatus" in projection.data
+              ? (projection.data as { aggregationStatus?: string })
+                  .aggregationStatus
+              : void 0;
+
           this.logger?.debug(
             {
               projectionName,
               aggregateId: String(aggregateId),
               projectionId: projection.id,
               projectionVersion: projection.version,
+              projectionState,
               eventCount: metadata.eventCount,
               durationMs,
             },
             "Projection update completed",
           );
+
+          // Log state transition if state is available
+          if (projectionState) {
+            this.logger?.debug(
+              {
+                projectionName,
+                aggregateId: String(aggregateId),
+                projectionState,
+                eventType: events[events.length - 1]?.type,
+                eventCount: metadata.eventCount,
+              },
+              "Projection state transition",
+            );
+          }
 
           return projection;
         } finally {
@@ -901,8 +1430,8 @@ export class EventSourcingService<
   /**
    * Updates all registered projections for aggregates affected by the given events.
    *
-   * Groups events by aggregateId and updates each projection for each affected aggregate.
-   * Each projection update uses distributed locking (if configured) to prevent concurrent updates.
+   * If queue processors are available, events are dispatched to queues asynchronously.
+   * Otherwise, projections are updated inline (fallback for backwards compatibility).
    *
    * **Concurrency:** Projection updates for different aggregates run concurrently.
    * Updates for the same aggregate are serialized via distributed lock (if configured).
@@ -928,9 +1457,18 @@ export class EventSourcingService<
           "event.count": events.length,
           "tenant.id": context.tenantId,
           "projection.count": this.projections.size,
+          "dispatch.mode":
+            this.projectionQueueProcessors.size > 0 ? "async" : "sync",
         },
       },
       async (span) => {
+        // If queue processors are available, use async queue-based dispatch
+        if (this.projectionQueueProcessors.size > 0) {
+          await this.dispatchEventsToProjectionQueues(events);
+          return;
+        }
+
+        // Fallback: inline processing (for backwards compatibility or when no queue factory provided)
         const eventsByAggregate = new Map<string, EventType[]>();
         for (const event of events) {
           const aggregateId = String(event.aggregateId);
@@ -945,39 +1483,48 @@ export class EventSourcingService<
         });
 
         for (const aggregateId of eventsByAggregate.keys()) {
-          for (const projectionName of this.projections!.keys()) {
-            try {
-              span.addEvent("projection.update.aggregate.start", {
-                "projection.name": projectionName,
-                "aggregate.id": aggregateId,
-              });
-              await this.updateProjectionByName(
-                projectionName,
-                aggregateId,
-                context,
-              );
-              span.addEvent("projection.update.aggregate.complete", {
-                "projection.name": projectionName,
-                "aggregate.id": aggregateId,
-              });
-            } catch (error) {
-              span.addEvent("projection.update.aggregate.error", {
-                "projection.name": projectionName,
-                "aggregate.id": aggregateId,
-                "error.message":
-                  error instanceof Error ? error.message : String(error),
-              });
-              if (this.logger) {
-                this.logger.error(
-                  {
+          const eventsForAggregate = eventsByAggregate.get(aggregateId)!;
+          // For inline processing, checkpoint per event (similar to queue processing)
+          for (const event of eventsForAggregate) {
+            for (const projectionName of this.projections!.keys()) {
+              try {
+                span.addEvent("projection.update.aggregate.start", {
+                  "projection.name": projectionName,
+                  "aggregate.id": aggregateId,
+                });
+                // Use processProjectionEvent for inline processing to get checkpointing
+                const projectionDef = this.projections!.get(projectionName);
+                if (projectionDef) {
+                  await this.processProjectionEvent(
                     projectionName,
-                    aggregateId,
-                    tenantId: context.tenantId,
-                    error:
-                      error instanceof Error ? error.message : String(error),
-                  },
-                  "Failed to update projection after storing events",
-                );
+                    projectionDef,
+                    event,
+                    context,
+                  );
+                }
+                span.addEvent("projection.update.aggregate.complete", {
+                  "projection.name": projectionName,
+                  "aggregate.id": aggregateId,
+                });
+              } catch (error) {
+                span.addEvent("projection.update.aggregate.error", {
+                  "projection.name": projectionName,
+                  "aggregate.id": aggregateId,
+                  "error.message":
+                    error instanceof Error ? error.message : String(error),
+                });
+                if (this.logger) {
+                  this.logger.error(
+                    {
+                      projectionName,
+                      aggregateId,
+                      tenantId: context.tenantId,
+                      error:
+                        error instanceof Error ? error.message : String(error),
+                    },
+                    "Failed to update projection after storing events",
+                  );
+                }
               }
             }
           }
@@ -1200,7 +1747,7 @@ export class EventSourcingService<
   }
 
   /**
-   * Gracefully closes all queue processors for event handlers.
+   * Gracefully closes all queue processors for event handlers and projections.
    * Should be called during application shutdown to ensure all queued jobs complete.
    */
   async close(): Promise<void> {
@@ -1217,11 +1764,25 @@ export class EventSourcingService<
       closePromises.push(queueProcessor.close());
     }
 
+    for (const [
+      projectionName,
+      queueProcessor,
+    ] of this.projectionQueueProcessors.entries()) {
+      this.logger?.debug(
+        { projectionName },
+        "Closing queue processor for projection",
+      );
+      closePromises.push(queueProcessor.close());
+    }
+
     await Promise.allSettled(closePromises);
 
     this.logger?.debug(
-      { handlerCount: this.handlerQueueProcessors.size },
-      "All event handler queue processors closed",
+      {
+        handlerCount: this.handlerQueueProcessors.size,
+        projectionCount: this.projectionQueueProcessors.size,
+      },
+      "All queue processors closed",
     );
   }
 }
