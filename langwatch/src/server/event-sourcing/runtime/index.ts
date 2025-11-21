@@ -4,8 +4,8 @@ import type {
   EventSourcingPipelineDefinition,
   RegisteredPipeline,
 } from "./pipeline";
-import { EventHandlerCheckpointStoreMemory } from "./stores/eventHandlerCheckpointStoreMemory";
-import { EventHandlerCheckpointStoreClickHouse } from "./stores/eventHandlerCheckpointStoreClickHouse";
+import { ProcessorCheckpointStoreMemory } from "./stores/processorCheckpointStoreMemory";
+import { ProcessorCheckpointStoreClickHouse } from "./stores/processorCheckpointStoreClickHouse";
 import { getClickHouseClient } from "../../../utils/clickhouse";
 
 export class EventSourcingPipeline<
@@ -33,16 +33,21 @@ export class EventSourcingPipeline<
       enumerable: true,
       configurable: false,
     });
-    // Create checkpoint store for event handlers
-    // Use ClickHouse if available (for production), otherwise use memory (for dev/test)
-    const checkpointStore = definition.eventHandlers
-      ? (() => {
-          const clickHouseClient = getClickHouseClient();
-          return clickHouseClient
-            ? new EventHandlerCheckpointStoreClickHouse(clickHouseClient)
-            : new EventHandlerCheckpointStoreMemory();
-        })()
-      : void 0;
+    // Create checkpoint store for event handlers and projections
+    // Always use Memory store in test environment, otherwise use ClickHouse if available
+    const checkpointStore =
+      definition.eventHandlers ?? definition.projections
+        ? (() => {
+            // Always use Memory store in test environment
+            if (process.env.NODE_ENV === "test" || process.env.VITEST) {
+              return new ProcessorCheckpointStoreMemory();
+            }
+            const clickHouseClient = getClickHouseClient();
+            return clickHouseClient
+              ? new ProcessorCheckpointStoreClickHouse(clickHouseClient)
+              : new ProcessorCheckpointStoreMemory();
+          })()
+        : void 0;
 
     Object.defineProperty(this, "service", {
       value: new EventSourcingService<EventType, ProjectionType>({
@@ -51,7 +56,7 @@ export class EventSourcingPipeline<
         projections: definition.projections,
         eventPublisher: definition.eventPublisher,
         eventHandlers: definition.eventHandlers,
-        eventHandlerCheckpointStore: checkpointStore,
+        processorCheckpointStore: checkpointStore,
         queueProcessorFactory: definition.queueProcessorFactory,
       }),
       writable: false,
