@@ -91,7 +91,7 @@ export class EventSourcedQueueProcessorBullmq<Payload>
         const attributes = { ...baseAttributes, ...customAttributes };
 
         await this.tracer.withActiveSpan(
-          "pipeline.process",
+          "queue.process",
           {
             kind: SpanKind.CONSUMER,
             attributes,
@@ -133,7 +133,7 @@ export class EventSourcedQueueProcessorBullmq<Payload>
     };
 
     await this.tracer.withActiveSpan(
-      `EventSourcedQueue.send.${this.queueName}`,
+      "queue.send",
       {
         kind: SpanKind.PRODUCER,
         attributes: {
@@ -142,13 +142,26 @@ export class EventSourcedQueueProcessorBullmq<Payload>
           "queue.job_id": jobId ?? "auto",
         },
       },
-      async () => {
-        const addJob = this.queue.add.bind(this.queue) as (
-          name: string,
-          data: Payload,
-          opts?: JobsOptions,
-        ) => Promise<unknown>;
-        await addJob(this.jobName, payload, opts);
+      async (span) => {
+        await this.tracer.withActiveSpan(
+          "queue.add",
+          {
+            kind: SpanKind.PRODUCER,
+            attributes: {
+              "queue.name": this.queueName,
+              "queue.job_name": this.jobName,
+              "queue.job_id": jobId ?? "auto",
+            },
+          },
+          async () => {
+            const addJob = this.queue.add.bind(this.queue) as (
+              name: string,
+              data: Payload,
+              opts?: JobsOptions,
+            ) => Promise<unknown>;
+            await addJob(this.jobName, payload, opts);
+          },
+        );
       },
     );
   }
