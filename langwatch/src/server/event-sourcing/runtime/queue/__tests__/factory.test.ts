@@ -1,7 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { EventSourcedQueueDefinition } from "../../../library/queues";
 
-// Mock only external dependencies needed for the processors
 const mockLogger = {
   info: vi.fn(),
   error: vi.fn(),
@@ -20,7 +19,6 @@ vi.mock("langwatch", () => ({
   getLangWatchTracer: vi.fn(() => mockTracer),
 }));
 
-// Mock Redis connection - this is the only thing we need to control for factory behavior
 vi.mock("../../../../redis", async () => {
   const actual =
     await vi.importActual<typeof import("../../../../redis")>(
@@ -32,7 +30,6 @@ vi.mock("../../../../redis", async () => {
   };
 });
 
-// Import after mocks are set up
 import {
   DefaultQueueProcessorFactory,
   BullmqQueueProcessorFactory,

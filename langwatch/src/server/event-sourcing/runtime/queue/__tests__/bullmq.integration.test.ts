@@ -6,7 +6,6 @@ import type { SemConvAttributes } from "langwatch/observability";
 import { EventSourcedQueueProcessorBullmq } from "../bullmq";
 import { connection } from "../../../../redis";
 
-// Mock external dependencies
 const mockLogger = {
   info: vi.fn(),
   error: vi.fn(),
@@ -41,17 +40,14 @@ vi.mock("langwatch", () => ({
  * 2. Run: npm test -- bullmq.integration.test.ts
  */
 
-// Helper to check if Redis is available
 function isRedisAvailable(): boolean {
   return connection !== undefined && connection !== null;
 }
 
-// Helper to generate unique queue names
 function generateQueueName(testName: string): string {
   return `test-${testName}-${Date.now()}-${Math.random().toString(36).substring(7)}`;
 }
 
-// Helper to clean up a queue
 async function cleanupQueue(queueName: string): Promise<void> {
   if (!connection) return;
 

@@ -2,7 +2,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Projection } from "../../../library/domain/types";
 import { PipelineBuilder } from "../builder";
 
-// Mock tracer to prevent hanging in tests
 vi.mock("langwatch", () => ({
   getLangWatchTracer: vi.fn(() => ({
     withActiveSpan: vi.fn((name, options, fn) => {
