@@ -1,69 +1,130 @@
-import type { EventHandlerCheckpoint } from "../domain/types";
+import type { Event, ProcessorCheckpoint } from "../domain/types";
 import type { TenantId } from "../domain/tenantId";
 import type { AggregateType } from "../domain/aggregateType";
 
 /**
- * Store interface for managing event handler checkpoints.
+ * Store interface for managing processor checkpoints (event handlers and projections).
  *
- * Checkpoints track the last processed event for each handler per aggregate, enabling:
+ * Checkpoints track per-event processing status, enabling:
  * - Resuming processing after queue failures per aggregate
+ * - Preventing duplicate processing (idempotency)
+ * - Stopping processing when failures occur for a specific aggregate
  * - Replay from specific points per aggregate
- * - Idempotent processing per aggregate
+ *
+ * Checkpoints use `processorName:eventId` as the unique key, where processorName is either
+ * a handler name or projection name.
  *
  * **Implementation Requirements:**
  * - MUST enforce tenant isolation
  * - MUST validate tenantId using validateTenantId() before operations
  * - SHOULD prevent mutation of stored checkpoints
  */
-export interface EventHandlerCheckpointStore {
+export interface ProcessorCheckpointStore {
   /**
-   * Saves a checkpoint for a handler and aggregate.
+   * Saves a checkpoint for a processor and event.
+   * Uses `processorName:eventId` as the unique key.
    *
-   * @param handlerName - The name of the handler
-   * @param tenantId - The tenant ID
-   * @param aggregateType - The aggregate type
-   * @param aggregateId - The aggregate ID
-   * @param checkpoint - The checkpoint to save
+   * @param processorName - The name of the processor (handler or projection)
+   * @param processorType - The type of processor ('handler' or 'projection')
+   * @param event - The event being checkpointed
+   * @param status - The processing status ('processed', 'failed', or 'pending')
+   * @param errorMessage - Optional error message if status is 'failed'
    * @throws {Error} If tenantId is missing or invalid
    */
-  saveCheckpoint(
-    handlerName: string,
-    tenantId: TenantId,
-    aggregateType: AggregateType,
-    aggregateId: string,
-    checkpoint: EventHandlerCheckpoint,
+  saveCheckpoint<EventType extends Event>(
+    processorName: string,
+    processorType: "handler" | "projection",
+    event: EventType,
+    status: "processed" | "failed" | "pending",
+    errorMessage?: string,
   ): Promise<void>;
 
   /**
-   * Loads the checkpoint for a handler and aggregate.
+   * Loads the checkpoint for a specific processor and event.
+   * Uses `processorName:eventId` as the lookup key.
    *
-   * @param handlerName - The name of the handler
-   * @param tenantId - The tenant ID
-   * @param aggregateType - The aggregate type
-   * @param aggregateId - The aggregate ID
+   * @param processorName - The name of the processor (handler or projection)
+   * @param processorType - The type of processor ('handler' or 'projection')
+   * @param eventId - The unique event identifier
    * @returns The checkpoint if it exists, null otherwise
-   * @throws {Error} If tenantId is missing or invalid
    */
   loadCheckpoint(
-    handlerName: string,
-    tenantId: TenantId,
-    aggregateType: AggregateType,
-    aggregateId: string,
-  ): Promise<EventHandlerCheckpoint | null>;
+    processorName: string,
+    processorType: "handler" | "projection",
+    eventId: string,
+  ): Promise<ProcessorCheckpoint | null>;
 
   /**
-   * Clears the checkpoint for a handler and aggregate.
+   * Gets the last successfully processed event for a processor and aggregate.
+   * Used to determine where to resume processing after failures.
    *
-   * @param handlerName - The name of the handler
+   * @param processorName - The name of the processor (handler or projection)
+   * @param processorType - The type of processor ('handler' or 'projection')
    * @param tenantId - The tenant ID
    * @param aggregateType - The aggregate type
    * @param aggregateId - The aggregate ID
+   * @returns The checkpoint for the last processed event, or null if none exists
    * @throws {Error} If tenantId is missing or invalid
    */
-  clearCheckpoint(
-    handlerName: string,
+  getLastProcessedEvent(
+    processorName: string,
+    processorType: "handler" | "projection",
     tenantId: TenantId,
     aggregateType: AggregateType,
     aggregateId: string,
+  ): Promise<ProcessorCheckpoint | null>;
+
+  /**
+   * Checks if any events have failed processing for a processor and aggregate.
+   * Used to stop processing subsequent events when failures occur.
+   *
+   * @param processorName - The name of the processor (handler or projection)
+   * @param processorType - The type of processor ('handler' or 'projection')
+   * @param tenantId - The tenant ID
+   * @param aggregateType - The aggregate type
+   * @param aggregateId - The aggregate ID
+   * @returns True if any events have failed, false otherwise
+   * @throws {Error} If tenantId is missing or invalid
+   */
+  hasFailedEvents(
+    processorName: string,
+    processorType: "handler" | "projection",
+    tenantId: TenantId,
+    aggregateType: AggregateType,
+    aggregateId: string,
+  ): Promise<boolean>;
+
+  /**
+   * Gets all failed events for a processor and aggregate.
+   * Used for debugging and recovery scenarios.
+   *
+   * @param processorName - The name of the processor (handler or projection)
+   * @param processorType - The type of processor ('handler' or 'projection')
+   * @param tenantId - The tenant ID
+   * @param aggregateType - The aggregate type
+   * @param aggregateId - The aggregate ID
+   * @returns Array of checkpoints for failed events, empty array if none
+   * @throws {Error} If tenantId is missing or invalid
+   */
+  getFailedEvents(
+    processorName: string,
+    processorType: "handler" | "projection",
+    tenantId: TenantId,
+    aggregateType: AggregateType,
+    aggregateId: string,
+  ): Promise<ProcessorCheckpoint[]>;
+
+  /**
+   * Clears the checkpoint for a specific processor and event.
+   * Used for recovery scenarios when reprocessing events.
+   *
+   * @param processorName - The name of the processor (handler or projection)
+   * @param processorType - The type of processor ('handler' or 'projection')
+   * @param eventId - The unique event identifier
+   */
+  clearCheckpoint(
+    processorName: string,
+    processorType: "handler" | "projection",
+    eventId: string,
   ): Promise<void>;
 }
