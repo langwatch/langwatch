@@ -12,7 +12,7 @@ import type { PromptConfigFormValues } from "~/prompts";
  * the Form field
  */
 export function WrappedOptimizationStudioLLMConfigField() {
-  const { control, formState } = useFormContext<PromptConfigFormValues>();
+  const { control, formState, trigger } = useFormContext<PromptConfigFormValues>();
   const { errors } = formState;
 
   return (
@@ -31,7 +31,10 @@ export function WrappedOptimizationStudioLLMConfigField() {
             return (
               <OptimizationStudioLLMConfigField
                 llmConfig={field.value as LLMConfig}
-                onChange={field.onChange}
+                onChange={(values) => {
+                  field.onChange(values);
+                  void trigger?.("version.configData.llm");
+                }}
               />
             );
           }}

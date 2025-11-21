@@ -1,10 +1,15 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import isEqual from "lodash-es/isEqual";
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { useForm, type DeepPartial } from "react-hook-form";
 
-import { formSchema, type PromptConfigFormValues } from "~/prompts";
+import {
+  formSchema,
+  refinedFormSchemaWithModelLimits,
+  type PromptConfigFormValues,
+} from "~/prompts";
 import { salvageValidData } from "~/utils/zodSalvage";
+import { useModelLimits } from "~/hooks/useModelLimits";
 
 import { inputsAndOutputsToDemostrationColumns } from "../utils/llmPromptConfigUtils";
 import { buildDefaultFormValues } from "../utils/buildDefaultFormValues";
@@ -24,6 +29,8 @@ export const usePromptConfigForm = ({
   onChange,
   initialConfigValues = {},
 }: UsePromptConfigFormProps) => {
+  // Store schema in ref so resolver can access it
+  const schemaRef = useRef(formSchema);
   /**
    * Parse initial values once with schema defaults applied.
    * Memoized to avoid re-parsing on every render.
@@ -41,11 +48,28 @@ export const usePromptConfigForm = ({
      */
     defaultValues: parsedInitialValues,
     resolver: (data, ...args) => {
-      return zodResolver(formSchema)(data, ...args);
+      // Use ref to get current schema (updated by useEffect)
+      return zodResolver(schemaRef.current)(data, ...args);
     },
   });
 
   const formData = methods.watch();
+  const model = formData.version?.configData?.llm?.model;
+  const { limits: modelLimits } = useModelLimits({ model });
+
+  const dynamicSchema = useMemo(
+    () => refinedFormSchemaWithModelLimits(modelLimits),
+    [modelLimits],
+  );
+
+  // Update schema ref when limits change
+  useEffect(() => {
+    schemaRef.current = dynamicSchema as typeof formSchema;
+    // Re-validate when schema changes
+    if (methods.formState.isDirty) {
+      void methods.trigger("version.configData.llm");
+    }
+  }, [dynamicSchema, methods]);
   const messages = methods.watch("version.configData.messages");
   // Messages should always be defined, but we're being defensive here.
   const systemMessage = messages?.find(({ role }) => role === "system")

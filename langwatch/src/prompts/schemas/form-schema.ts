@@ -9,11 +9,23 @@ import {
   DEFAULT_MODEL,
   MIN_MAX_TOKENS,
   DEFAULT_TEMPERATURE,
+  FALLBACK_MAX_TOKENS,
 } from "~/utils/constants";
 
 const latestConfigVersionSchema = getLatestConfigVersionSchema();
 
-export const formSchema = z.object({
+const llmSchemaWithPreprocessing = z.object({
+  model:
+    latestConfigVersionSchema.shape.configData.shape.model.default(
+      DEFAULT_MODEL,
+    ),
+  temperature: z.preprocess((v) => v ?? DEFAULT_TEMPERATURE, z.number()),
+  maxTokens: z.preprocess((v) => v ?? DEFAULT_MAX_TOKENS, z.number()),
+  litellmParams: z.record(z.string()).optional(),
+});
+
+// Base schema with static validation using fallback limits
+const baseFormSchema = z.object({
   // Config ID (separate from version metadata)
   configId: z.string().optional(),
 
@@ -29,37 +41,7 @@ export const formSchema = z.object({
       messages: latestConfigVersionSchema.shape.configData.shape.messages,
       inputs: latestConfigVersionSchema.shape.configData.shape.inputs,
       outputs: latestConfigVersionSchema.shape.configData.shape.outputs,
-      llm: z
-        .object({
-          model:
-            latestConfigVersionSchema.shape.configData.shape.model.default(
-              DEFAULT_MODEL,
-            ),
-          temperature: z.preprocess(
-            (v) => v ?? DEFAULT_TEMPERATURE,
-            z.number(),
-          ),
-          maxTokens: z.preprocess((v) => v ?? DEFAULT_MAX_TOKENS, z.number()),
-          // Additional params attached to the LLM config
-          litellmParams: z.record(z.string()).optional(),
-        })
-        .transform((data) => {
-          // Data integrity layer: Enforce minimum constraints
-          // GPT-5: temperature=1, min 128k tokens
-          // Other models: min 256 tokens
-          // Note: UI (LLMConfigModal) provides smart UX on top of this
-          const isGpt5 = data.model.includes("gpt-5");
-          const temperature = isGpt5 ? 1 : data.temperature;
-          const maxTokens = isGpt5
-            ? Math.max(data.maxTokens, DEFAULT_MAX_TOKENS)
-            : Math.max(data.maxTokens, MIN_MAX_TOKENS);
-
-          return {
-            ...data,
-            temperature,
-            maxTokens,
-          };
-        }),
+      llm: llmSchemaWithPreprocessing,
       demonstrations:
         latestConfigVersionSchema.shape.configData.shape.demonstrations,
       promptingTechnique:
@@ -69,3 +51,65 @@ export const formSchema = z.object({
     }),
   }),
 });
+
+/**
+ * Returns a refined form schema with dynamic model limits validation
+ * @param modelLimits - Optional model limits from server
+ * @returns Zod schema with refined maxTokens validation based on model limits
+ */
+export function refinedFormSchemaWithModelLimits(
+  modelLimits?: {
+    maxOutputTokens?: number;
+    maxTokens?: number;
+  } | null,
+) {
+  if (!modelLimits) {
+    return baseFormSchema;
+  }
+
+  const maxTokenLimit =
+    modelLimits?.maxOutputTokens ??
+    modelLimits?.maxTokens ??
+    FALLBACK_MAX_TOKENS;
+
+  // Only refine if the limit is different from fallback
+  if (maxTokenLimit === FALLBACK_MAX_TOKENS) {
+    return baseFormSchema;
+  }
+
+  // Return the base schema with refined maxTokens validation
+  return baseFormSchema.extend({
+    version: baseFormSchema.shape.version.extend({
+      configData: baseFormSchema.shape.version.shape.configData.extend({
+        llm: z
+          .object({
+            model: llmSchemaWithPreprocessing.shape.model,
+            temperature: llmSchemaWithPreprocessing.shape.temperature,
+            maxTokens: llmSchemaWithPreprocessing.shape.maxTokens
+              .refine((val) => val <= maxTokenLimit, {
+                message: `Max tokens cannot exceed ${maxTokenLimit.toLocaleString()}`,
+              })
+              .refine((val) => val >= MIN_MAX_TOKENS, {
+                message: `Max tokens must be at least ${MIN_MAX_TOKENS}`,
+              }),
+            // Additional params attached to the LLM config
+            litellmParams: llmSchemaWithPreprocessing.shape.litellmParams,
+          })
+          .refine(
+            (data) => {
+              const isGpt5 = data.model.includes("gpt-5");
+              if (!isGpt5) return true;
+              return isGpt5 && data.temperature !== 1 ? false : true;
+            },
+            {
+              message: "Temperature must be 1 for GPT-5 models",
+              path: ["temperature"],
+            },
+          ),
+      }),
+    }),
+  });
+}
+
+// Base schema for type inference and static parsing
+export const formSchema = baseFormSchema;

@@ -104,16 +104,19 @@ const PromptPlaygroundChatInner = forwardRef<PromptPlaygroundChatRef, object>(
         updateTabData({
           tabId,
           updater: (data) => ({
-            ...data,
+            ...(data || {}),
             chat: {
-              ...data.chat,
+              ...(data?.chat || {}),
               initialMessagesFromSpanData: visibleMessages
                 .filter((message) => message.isTextMessage())
-                .map((message) => ({
-                  id: message.id,
-                  role: message.role as ChatMessage["role"],
-                  content: message.content.toString(),
-                })),
+                .map((message) => {
+                  const textMessage = message as any; // Type assertion after isTextMessage() filter
+                  return {
+                    id: message.id,
+                    role: textMessage.role as ChatMessage["role"],
+                    content: textMessage.content?.toString() || "",
+                  };
+                }),
             },
           }),
         });
