@@ -2582,12 +2582,12 @@ describe("opentelemetry traces receiver", () => {
     }
 
     expect(trace).toEqual({
-      traceId: "ef9e5bd5d6f6db6ef6f79f1bf7671bd34ddfdf4d39f1eef8",
+      traceId: "755b1db22272958b92cb003f30058e74",
       spans: [
         {
-          span_id: "d1d79d7faf36e9d7f4f7b6bd",
-          trace_id: "ef9e5bd5d6f6db6ef6f79f1bf7671bd34ddfdf4d39f1eef8",
-          parent_id: "f35dbbf7ad1f6f77fb734e1d",
+          span_id: "0dedf6826df097a9",
+          trace_id: "755b1db22272958b92cb003f30058e74",
+          parent_id: "8127960fb3f7c04d",
           name: "chat gpt-5",
           type: "llm",
           model: "gpt-5",

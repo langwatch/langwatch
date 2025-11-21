@@ -41,6 +41,7 @@ import {
 import { getLangWatchTracer } from "langwatch";
 import { SpanKind, SpanStatusCode } from "@opentelemetry/api";
 import Long from "long";
+import { decodeBase64OpenTelemetryId, decodeOpenTelemetryId } from "./utils";
 
 const logger = createLogger("langwatch.tracer.otel.traces");
 const tracer = getLangWatchTracer("langwatch.tracer.otel.traces");
@@ -124,28 +125,28 @@ const decodeOpenTelemetryIds = (
       for (const scopeSpan of resourceSpan?.scopeSpans ?? []) {
         for (const span of scopeSpan?.spans ?? []) {
           if (span?.traceId) {
-            const values =
-              typeof span.traceId === "object" && !Array.isArray(span.traceId)
-                ? Object.values(span.traceId)
-                : span.traceId;
-            span.traceId = Buffer.from(values as any, "base64").toString("hex");
+            const decoded = typeof span.traceId === "string"
+              ? decodeBase64OpenTelemetryId(span.traceId)
+              : decodeOpenTelemetryId(span.traceId);
+            if (decoded) {
+              span.traceId = decoded;
+            }
           }
           if (span?.spanId) {
-            const values =
-              typeof span.spanId === "object" && !Array.isArray(span.spanId)
-                ? Object.values(span.spanId)
-                : span.spanId;
-            span.spanId = Buffer.from(values as any, "base64").toString("hex");
+            const decoded = typeof span.spanId === "string"
+              ? decodeBase64OpenTelemetryId(span.spanId)
+              : decodeOpenTelemetryId(span.spanId);
+            if (decoded) {
+              span.spanId = decoded;
+            }
           }
           if (span?.parentSpanId) {
-            const values =
-              typeof span.parentSpanId === "object" &&
-              !Array.isArray(span.parentSpanId)
-                ? Object.values(span.parentSpanId)
-                : span.parentSpanId;
-            span.parentSpanId = Buffer.from(values as any, "base64").toString(
-              "hex",
-            );
+            const decoded = typeof span.parentSpanId === "string"
+              ? decodeBase64OpenTelemetryId(span.parentSpanId)
+              : decodeOpenTelemetryId(span.parentSpanId);
+            if (decoded) {
+              span.parentSpanId = decoded;
+            }
           }
         }
       }
