@@ -12,6 +12,7 @@ import {
   createTestEventForBuilder,
   createTestProjection,
   TEST_CONSTANTS,
+  testCommandPayloadSchema,
   type TestCommandPayload,
   type TestEvent,
 } from "./testHelpers";
@@ -600,17 +601,9 @@ describe("PipelineBuilder Integration Tests", () => {
       const factory = createMockQueueProcessorFactory();
 
       class RecordSpanCommandHandler {
-        static readonly schema = defineCommandSchema<TestCommandPayload>(
+        static readonly schema = defineCommandSchema(
           COMMAND_TYPES[0],
-          (payload): payload is TestCommandPayload => {
-            return (
-              typeof payload === "object" &&
-              payload !== null &&
-              "tenantId" in payload &&
-              "id" in payload &&
-              "value" in payload
-            );
-          },
+          testCommandPayloadSchema,
         );
 
         static readonly dispatcherName = "recordSpan";

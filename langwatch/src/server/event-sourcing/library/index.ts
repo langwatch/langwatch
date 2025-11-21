@@ -13,7 +13,7 @@ export type {
   Projection,
   ProjectionEnvelope,
   ProjectionMetadata,
-  EventHandlerCheckpoint,
+  ProcessorCheckpoint,
 } from "./domain/types";
 export {
   EventSchema,
@@ -22,7 +22,7 @@ export {
   ProjectionMetadataSchema,
   ProjectionEnvelopeSchema,
   createProjectionEnvelopeSchema,
-  EventHandlerCheckpointSchema,
+  ProcessorCheckpointSchema,
 } from "./domain/types";
 export type { ProjectionType } from "./domain/types";
 export type { AggregateType } from "./domain/aggregateType";
@@ -46,7 +46,6 @@ export type {
 export { CommandSchema, createCommand, validateCommand } from "./commands/command";
 export type {
   CommandSchema as CommandSchemaType,
-  CommandPayloadValidator,
 } from "./commands/commandSchema";
 export { defineCommandSchema } from "./commands/commandSchema";
 export type {
@@ -84,7 +83,9 @@ export type {
   ProjectionStoreWriteContext,
 } from "./stores/projectionStore.types";
 export { ProjectionStoreReadContextSchema } from "./stores/projectionStore.types";
-export type { EventHandlerCheckpointStore } from "./stores/eventHandlerCheckpointStore.types";
+export type {
+  ProcessorCheckpointStore,
+} from "./stores/eventHandlerCheckpointStore.types";
 
 export type {
   EventSourcedQueueProcessor,

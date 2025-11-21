@@ -204,24 +204,28 @@ npm test src/server/event-sourcing/library
 #### Command → Event → Handler
 
 ```typescript
+import { z } from "zod";
 import { defineCommandSchema, EventUtils } from "./library";
 
+const spanPayloadSchema = z.object({
+  traceId: z.string(),
+  spanId: z.string(),
+});
+
 class RecordSpanCommand
-  implements CommandHandler<Command<SpanPayload>, SpanEvent>
+  implements CommandHandler<Command<z.infer<typeof spanPayloadSchema>>, SpanEvent>
 {
   static readonly dispatcherName = "recordSpan" as const;
-  static readonly schema = defineCommandSchema<SpanPayload>(
+  static readonly schema = defineCommandSchema(
     "lw.obs.span_ingestion.record",
-    (payload): payload is SpanPayload => {
-      return payload.traceId !== undefined && payload.spanId !== undefined;
-    },
+    spanPayloadSchema,
   );
 
-  static getAggregateId(payload: SpanPayload): string {
+  static getAggregateId(payload: z.infer<typeof spanPayloadSchema>): string {
     return payload.traceId;
   }
 
-  async handle(command: Command<SpanPayload>): Promise<SpanEvent[]> {
+  async handle(command: Command<z.infer<typeof spanPayloadSchema>>): Promise<SpanEvent[]> {
     const event = EventUtils.createEventWithProcessingTraceContext(
       command.aggregateId,
       command.tenantId,
