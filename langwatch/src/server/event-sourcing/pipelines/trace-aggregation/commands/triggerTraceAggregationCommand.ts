@@ -4,14 +4,14 @@ import { getLangWatchTracer } from "langwatch";
 import type { Command, CommandHandler } from "../../../library";
 import { EventUtils, createTenantId } from "../../../library";
 import { defineCommandSchema } from "../../../library";
-import type { TriggerTraceAggregationCommandData } from "../../../schemas/commands/traceAggregation.schema";
-import { triggerTraceAggregationCommandDataSchema } from "../../../schemas/commands/traceAggregation.schema";
+import type { TriggerTraceAggregationCommandData } from "../schemas/commands";
+import { triggerTraceAggregationCommandDataSchema } from "../schemas/commands";
 import type {
   TraceAggregationEvent,
   TraceAggregationStartedEvent,
   TraceAggregationCompletedEvent,
   TraceAggregationCancelledEvent,
-} from "../../../schemas/events/traceAggregation.schema";
+} from "../schemas/events";
 import { createLogger } from "../../../../../utils/logger";
 import { getClickHouseClient } from "../../../../../utils/clickhouse";
 import { SpanRepositoryClickHouse } from "../../span-ingestion/repositories/spanRepositoryClickHouse";
@@ -87,6 +87,9 @@ export class TriggerTraceAggregationCommand
 
         const events: TraceAggregationEvent[] = [];
 
+        const tenantIdObj = createTenantId(tenantId);
+        const timestamp = Date.now();
+
         // If aggregation is already in progress, emit cancellation event first
         if (currentProjection?.data.aggregationStatus === "in_progress") {
           this.logger.debug(
@@ -104,15 +107,17 @@ export class TriggerTraceAggregationCommand
               TraceAggregationCancelledEvent["metadata"]
             >(
               traceId,
-              createTenantId(tenantId),
+              tenantIdObj,
               "lw.obs.trace_aggregation.cancelled",
               {
                 traceId,
                 reason: "New aggregation triggered",
               },
+              "trace_aggregation",
               {
                 traceId,
               },
+              timestamp,
             ) as TraceAggregationCancelledEvent;
 
           events.push(cancelledEvent);
@@ -124,14 +129,16 @@ export class TriggerTraceAggregationCommand
           TraceAggregationStartedEvent["metadata"]
         >(
           traceId,
-          createTenantId(tenantId),
+          tenantIdObj,
           "lw.obs.trace_aggregation.started",
           {
             traceId,
           },
+          "trace_aggregation",
           {
             traceId,
           },
+          timestamp,
         ) as TraceAggregationStartedEvent;
 
         // Fetch all spans for the trace
@@ -172,12 +179,14 @@ export class TriggerTraceAggregationCommand
           TraceAggregationCompletedEvent["metadata"]
         >(
           traceId,
-          createTenantId(tenantId),
+          tenantIdObj,
           "lw.obs.trace_aggregation.completed",
           aggregatedData,
+          "trace_aggregation",
           {
             traceId,
           },
+          timestamp,
         ) as TraceAggregationCompletedEvent;
 
         events.push(completedEvent);

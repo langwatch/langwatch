@@ -1,7 +1,16 @@
 import { z } from "zod";
-// Import type arrays from schemas for zod schema construction
-// Schemas are the single source of truth for type identifiers
-import { EVENT_TYPE_IDENTIFIERS } from "../../schemas";
+import { EVENT_TYPE_IDENTIFIERS } from "../../schemas/typeIdentifiers";
+
+/**
+ * Event type identifiers follow the taxonomy system defined in ./taxonomy.ts.
+ * Format: `<provenance>.<domain>.<aggregate-type>.<event-name>`
+ *
+ * Example: "lw.obs.span_ingestion.recorded"
+ * - `lw`: Provenance (LangWatch)
+ * - `obs`: Domain (Observability)
+ * - `span_ingestion`: Aggregate type
+ * - `recorded`: Event name
+ */
 
 /**
  * Array of all event types (for backwards compatibility).
@@ -17,6 +26,9 @@ export const EventTypeSchema = z.enum(EVENT_TYPES);
 
 /**
  * Strongly-typed event type identifiers.
+ *
+ * Event types follow the taxonomy system (see ./taxonomy.ts):
+ * `<provenance>.<domain>.<aggregate-type>.<event-name>`
  *
  * This type is inferred from the zod schema, which is built from type arrays
  * defined in schemas. Schemas are the single source of truth for type identifiers.
