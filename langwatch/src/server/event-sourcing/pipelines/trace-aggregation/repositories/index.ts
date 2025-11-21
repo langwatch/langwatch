@@ -6,8 +6,6 @@ import { TraceAggregationStateProjectionRepositoryClickHouse } from "./traceAggr
 import { TraceAggregationStateProjectionRepositoryMemory } from "./traceAggregationStateProjectionRepositoryMemory";
 import type { TraceAggregationStateProjectionRepository } from "./traceAggregationStateProjectionRepository";
 
-// Shared instance for use by command handler and pipeline
-// Selects ClickHouse if available, otherwise falls back to Memory
 const clickHouseClient = getClickHouseClient();
 export const traceAggregationStateProjectionRepository: TraceAggregationStateProjectionRepository =
   clickHouseClient

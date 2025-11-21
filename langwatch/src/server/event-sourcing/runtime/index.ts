@@ -61,7 +61,6 @@ export class EventSourcingPipeline<
   }
 }
 
-// Export queue processor implementations and factory
 export {
   EventSourcedQueueProcessorBullmq,
   EventSourcedQueueProcessorMemory,
@@ -72,7 +71,6 @@ export {
   defaultQueueProcessorFactory,
 } from "./queue";
 
-// Export pipeline builder
 export { PipelineBuilder } from "./pipeline";
 export type {
   EventSourcingPipelineDefinition,
@@ -80,6 +78,5 @@ export type {
   PipelineWithCommandHandlers,
 } from "./pipeline";
 
-// Export singleton instance
 export { eventSourcing } from "./eventSourcing";
 export type { EventSourcing } from "./eventSourcing";

@@ -3,7 +3,7 @@ import { TriggerTraceAggregationCommand } from "./commands/triggerTraceAggregati
 import { traceAggregationStateProjectionRepository } from "./repositories";
 import { TraceAggregationStateProjectionHandler } from "./projections";
 import type { TraceAggregationStateProjection } from "./projections/traceAggregationStateProjection";
-import type { TraceAggregationEvent } from "../../schemas";
+import type { TraceAggregationEvent } from "./schemas/events";
 
 export const traceAggregationPipeline = eventSourcing
   .registerPipeline<TraceAggregationEvent, TraceAggregationStateProjection>()

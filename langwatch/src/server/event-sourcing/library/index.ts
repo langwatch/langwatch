@@ -6,7 +6,6 @@
  * the specific event and projection types.
  */
 
-// Domain types
 export type {
   Event,
   EventMetadataBase,
@@ -35,12 +34,10 @@ export { EventTypeSchema } from "./domain/eventType";
 export type { TenantId } from "./domain/tenantId";
 export { TenantIdSchema, createTenantId } from "./domain/tenantId";
 
-// Streams
 export { EventStream } from "./streams/eventStream";
 export type { EventStreamMetadata } from "./streams/eventStream";
 export { EventStreamMetadataSchema } from "./streams/eventStream";
 
-// Commands
 export type {
   Command,
   CommandHandler,
@@ -61,11 +58,9 @@ export type {
   ExtractCommandHandlerDispatcherName,
 } from "./commands/commandHandlerClass";
 
-// Domain handlers
 export type { EventHandler } from "./domain/handlers/eventHandler";
 export type { EventReactionHandler } from "./domain/handlers/eventReactionHandler";
 
-// Domain helpers
 export type {
   ExtractAggregateId,
   ExtractEventPayload,
@@ -77,7 +72,6 @@ export type {
 } from "./domain/helpers";
 export { isEvent, isProjection } from "./domain/helpers";
 
-// Store interfaces
 export type {
   EventStore,
   ReadOnlyEventStore,
@@ -92,14 +86,12 @@ export type {
 export { ProjectionStoreReadContextSchema } from "./stores/projectionStore.types";
 export type { EventHandlerCheckpointStore } from "./stores/eventHandlerCheckpointStore.types";
 
-// Queue interfaces
 export type {
   EventSourcedQueueProcessor,
   EventSourcedQueueDefinition,
   EventSourcedQueueProcessorOptions,
 } from "./queues";
 
-// Services & pipeline
 export { EventSourcingService } from "./services/eventSourcingService";
 export type {
   EventSourcingOptions,
@@ -116,7 +108,6 @@ export type {
   RegisteredPipeline,
 } from "../runtime/pipeline";
 
-// Utility functions
 export {
   createEvent,
   createEventWithProcessingTraceContext,
@@ -133,7 +124,6 @@ export {
   EventUtils,
 } from "./utils/event.utils";
 
-// Distributed locking
 export type {
   DistributedLock,
   LockHandle,

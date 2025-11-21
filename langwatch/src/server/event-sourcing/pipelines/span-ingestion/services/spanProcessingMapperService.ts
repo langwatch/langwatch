@@ -32,7 +32,7 @@ import {
 } from "../utils/otelConversions";
 import { createLogger } from "../../../../../utils/logger";
 import { getLangWatchTracer } from "langwatch";
-import type { SpanData } from "../../../schemas/commands/spanIngestion.schema";
+import type { SpanData } from "../schemas/commands";
 
 const logger = createLogger("langwatch:span-ingestion:mapper");
 const tracer = getLangWatchTracer("langwatch.span-ingestion.mapper");
