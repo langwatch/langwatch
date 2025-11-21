@@ -52,6 +52,10 @@ class PromptsFacade:
 
         Tries local files first, then falls back to API.
         You can optionally specify a version number to get a specific version of the prompt.
+
+        Raises:
+            ValueError: If the prompt is not found (404 error).
+            RuntimeError: If the API call fails for other reasons (auth, server errors, etc.).
         """
         # Try to load from local files first
         local_data = self._local_loader.load_prompt(prompt_id)
