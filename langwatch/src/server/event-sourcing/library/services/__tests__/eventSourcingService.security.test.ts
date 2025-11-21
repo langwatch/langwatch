@@ -7,7 +7,7 @@ import {
   createMockEventReactionHandler,
   createMockProjectionDefinition,
   createMockEventHandler,
-  createMockEventHandlerCheckpointStore,
+  createMockProcessorCheckpointStore,
   createTestEvent,
   createTestTenantId,
   createTestEventStoreReadContext,
@@ -130,7 +130,7 @@ describe("EventSourcingService - Security", () => {
     it("checkpoints are scoped to tenantId", async () => {
       const eventStore = createMockEventStore<Event>();
       const handler = createMockEventReactionHandler<Event>();
-      const checkpointStore = createMockEventHandlerCheckpointStore();
+      const checkpointStore = createMockProcessorCheckpointStore();
       const context1 = createTestEventStoreReadContext(tenantId1);
 
       const service = new EventSourcingService({
@@ -139,18 +139,22 @@ describe("EventSourcingService - Security", () => {
         eventHandlers: {
           handler: createMockEventHandlerDefinition("handler", handler),
         },
-        eventHandlerCheckpointStore: checkpointStore,
+        processorCheckpointStore: checkpointStore,
       });
 
       const events = [createTestEvent(TEST_CONSTANTS.AGGREGATE_ID, TEST_CONSTANTS.AGGREGATE_TYPE, tenantId1)];
       await service.storeEvents(events, context1);
 
+      // Checkpoint is saved with new signature: processorName, processorType, event, status
       expect(checkpointStore.saveCheckpoint).toHaveBeenCalledWith(
         "handler",
-        tenantId1,
-        aggregateType,
-        TEST_CONSTANTS.AGGREGATE_ID,
-        expect.any(Object),
+        "handler",
+        expect.objectContaining({
+          tenantId: tenantId1,
+          aggregateType: aggregateType,
+          aggregateId: TEST_CONSTANTS.AGGREGATE_ID,
+        }),
+        expect.any(String), // status: "pending" or "processed"
       );
     });
   });

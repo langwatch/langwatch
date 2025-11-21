@@ -321,6 +321,9 @@ describe("EventSourcingService - Unit Tests", () => {
       const checkpointStore = {
         saveCheckpoint: vi.fn().mockResolvedValue(void 0),
         loadCheckpoint: vi.fn().mockResolvedValue(null),
+        getLastProcessedEvent: vi.fn().mockResolvedValue(null),
+        hasFailedEvents: vi.fn().mockResolvedValue(false),
+        getFailedEvents: vi.fn().mockResolvedValue([]),
         clearCheckpoint: vi.fn().mockResolvedValue(void 0),
       };
 
@@ -330,7 +333,7 @@ describe("EventSourcingService - Unit Tests", () => {
         eventHandlers: {
           handler: createMockEventHandlerDefinition("handler", handler),
         },
-        eventHandlerCheckpointStore: checkpointStore,
+        processorCheckpointStore: checkpointStore,
       });
 
       const event = createTestEvent(
@@ -343,18 +346,21 @@ describe("EventSourcingService - Unit Tests", () => {
 
       await service.storeEvents([event], context);
 
+      // Checkpoint is saved with new signature: processorName, processorType, event, status
       expect(checkpointStore.saveCheckpoint).toHaveBeenCalledWith(
         "handler",
-        tenantId,
-        aggregateType,
-        TEST_CONSTANTS.AGGREGATE_ID,
+        "handler",
         expect.objectContaining({
-          lastProcessedEventId: expect.stringMatching(
+          id: expect.stringMatching(
             new RegExp(
               `^${TEST_CONSTANTS.BASE_TIMESTAMP}:${escapeRegex(String(tenantId))}:${escapeRegex(TEST_CONSTANTS.AGGREGATE_ID)}:${escapeRegex(aggregateType)}$`,
             ),
           ),
+          tenantId: tenantId,
+          aggregateType: aggregateType,
+          aggregateId: TEST_CONSTANTS.AGGREGATE_ID,
         }),
+        expect.any(String), // status: "pending" or "processed"
       );
     });
 
@@ -364,6 +370,9 @@ describe("EventSourcingService - Unit Tests", () => {
       const checkpointStore = {
         saveCheckpoint: vi.fn().mockResolvedValue(void 0),
         loadCheckpoint: vi.fn().mockResolvedValue(null),
+        getLastProcessedEvent: vi.fn().mockResolvedValue(null),
+        hasFailedEvents: vi.fn().mockResolvedValue(false),
+        getFailedEvents: vi.fn().mockResolvedValue([]),
         clearCheckpoint: vi.fn().mockResolvedValue(void 0),
       };
 
@@ -373,7 +382,7 @@ describe("EventSourcingService - Unit Tests", () => {
         eventHandlers: {
           handler: createMockEventHandlerDefinition("handler", handler),
         },
-        eventHandlerCheckpointStore: checkpointStore,
+        processorCheckpointStore: checkpointStore,
       });
 
       const numericAggregateId = "12345";
@@ -387,18 +396,21 @@ describe("EventSourcingService - Unit Tests", () => {
 
       await service.storeEvents([event], context);
 
+      // Checkpoint is saved with new signature: processorName, processorType, event, status
       expect(checkpointStore.saveCheckpoint).toHaveBeenCalledWith(
         "handler",
-        tenantId,
-        aggregateType,
-        numericAggregateId,
+        "handler",
         expect.objectContaining({
-          lastProcessedEventId: expect.stringMatching(
+          id: expect.stringMatching(
             new RegExp(
               `^${TEST_CONSTANTS.BASE_TIMESTAMP}:${escapeRegex(String(tenantId))}:${escapeRegex(numericAggregateId)}:${escapeRegex(aggregateType)}$`,
             ),
           ),
+          tenantId: tenantId,
+          aggregateType: aggregateType,
+          aggregateId: numericAggregateId,
         }),
+        expect.any(String), // status: "pending" or "processed"
       );
     });
   });

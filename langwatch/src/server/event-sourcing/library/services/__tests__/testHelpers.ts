@@ -17,7 +17,7 @@ import type { EventReactionHandler } from "../../domain/handlers/eventReactionHa
 import type { EventHandlerDefinition } from "../../eventHandler.types";
 import type { ProjectionDefinition } from "../../projection.types";
 import type { DistributedLock, LockHandle } from "../../utils/distributedLock";
-import type { EventHandlerCheckpointStore } from "../../stores/eventHandlerCheckpointStore.types";
+import type { ProcessorCheckpointStore } from "../../stores/eventHandlerCheckpointStore.types";
 import type { Logger } from "pino";
 import { createTenantId } from "../../domain/tenantId";
 import { EVENT_TYPES } from "../../domain/eventType";
@@ -134,12 +134,15 @@ export function createMockDistributedLock(): DistributedLock {
 }
 
 /**
- * Creates a mock EventHandlerCheckpointStore with default implementations.
+ * Creates a mock ProcessorCheckpointStore with default implementations.
  */
-export function createMockEventHandlerCheckpointStore(): EventHandlerCheckpointStore {
+export function createMockProcessorCheckpointStore(): ProcessorCheckpointStore {
   return {
     saveCheckpoint: vi.fn().mockResolvedValue(void 0),
     loadCheckpoint: vi.fn().mockResolvedValue(null),
+    getLastProcessedEvent: vi.fn().mockResolvedValue(null),
+    hasFailedEvents: vi.fn().mockResolvedValue(false),
+    getFailedEvents: vi.fn().mockResolvedValue([]),
     clearCheckpoint: vi.fn().mockResolvedValue(void 0),
   };
 }

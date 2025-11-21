@@ -10,7 +10,7 @@ import {
   createMockEventHandler,
   createMockProjectionStore,
   createMockDistributedLock,
-  createMockEventHandlerCheckpointStore,
+  createMockProcessorCheckpointStore,
   createTestEvent,
   createTestTenantId,
   createTestEventStoreReadContext,
@@ -491,7 +491,7 @@ describe("EventSourcingService - Error Handling", () => {
     it("checkpoint save errors are caught and logged", async () => {
       const eventStore = createMockEventStore<Event>();
       const handler = createMockEventReactionHandler<Event>();
-      const checkpointStore = createMockEventHandlerCheckpointStore();
+      const checkpointStore = createMockProcessorCheckpointStore();
       const logger = {
         debug: vi.fn(),
         info: vi.fn(),
@@ -515,7 +515,7 @@ describe("EventSourcingService - Error Handling", () => {
         eventHandlers: {
           handler: createMockEventHandlerDefinition("handler", handler),
         },
-        eventHandlerCheckpointStore: checkpointStore,
+        processorCheckpointStore: checkpointStore,
         logger: logger as any,
       });
 
@@ -525,19 +525,20 @@ describe("EventSourcingService - Error Handling", () => {
         service.storeEvents([event], context),
       ).resolves.not.toThrow();
 
+      // Checkpoint errors are logged but don't prevent handler execution
       expect(logger.error).toHaveBeenCalledWith(
         expect.objectContaining({
           handlerName: "handler",
           error: "Checkpoint save failed",
         }),
-        "Failed to save checkpoint for event handler",
+        expect.stringMatching(/Failed to save.*checkpoint for event handler/),
       );
     });
 
     it("handler execution succeeds despite checkpoint failure", async () => {
       const eventStore = createMockEventStore<Event>();
       const handler = createMockEventReactionHandler<Event>();
-      const checkpointStore = createMockEventHandlerCheckpointStore();
+      const checkpointStore = createMockProcessorCheckpointStore();
 
       checkpointStore.saveCheckpoint = vi
         .fn()
@@ -549,7 +550,7 @@ describe("EventSourcingService - Error Handling", () => {
         eventHandlers: {
           handler: createMockEventHandlerDefinition("handler", handler),
         },
-        eventHandlerCheckpointStore: checkpointStore,
+        processorCheckpointStore: checkpointStore,
       });
 
       const event = createTestEvent(TEST_CONSTANTS.AGGREGATE_ID, TEST_CONSTANTS.AGGREGATE_TYPE, tenantId);
