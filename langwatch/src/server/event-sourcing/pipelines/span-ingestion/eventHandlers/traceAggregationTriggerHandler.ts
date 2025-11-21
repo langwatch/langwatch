@@ -2,7 +2,7 @@ import { SpanKind } from "@opentelemetry/api";
 import { getLangWatchTracer } from "langwatch";
 
 import type { EventReactionHandler } from "../../../library";
-import type { SpanIngestionRecordedEvent } from "../../../schemas/events/spanIngestion.schema";
+import type { SpanIngestionRecordedEvent } from "../schemas/events";
 import { createLogger } from "../../../../../utils/logger";
 import { traceAggregationPipeline } from "../../trace-aggregation/pipeline";
 

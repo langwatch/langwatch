@@ -166,6 +166,7 @@ export function createMockLogger(): Logger {
  */
 export function createTestEvent(
   aggregateId: string,
+  aggregateType: AggregateType,
   tenantId: TenantId,
   type: EventType = EVENT_TYPES[0],
   timestamp = 1000000,
@@ -173,8 +174,9 @@ export function createTestEvent(
   id?: string,
 ): Event {
   return {
-    id: id ?? `event-${aggregateId}-${timestamp}`,
+    id: id ?? `${timestamp}:${tenantId}:${aggregateId}:${aggregateType}`,
     aggregateId,
+    aggregateType,
     tenantId,
     timestamp,
     type,

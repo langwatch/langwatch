@@ -1,5 +1,14 @@
 /**
  * Core types for the event sourcing library.
+ *
+ * Event and command types follow the taxonomy system defined in ./taxonomy.ts:
+ * `<provenance>.<domain>.<aggregate-type>.<specific-identifier>`
+ *
+ * Example: `lw.obs.span_ingestion.recorded`
+ * - `lw`: Provenance (LangWatch)
+ * - `obs`: Domain (Observability)
+ * - `span_ingestion`: Aggregate type
+ * - `recorded`: Specific identifier (event name)
  */
 
 import { z } from "zod";
@@ -28,12 +37,17 @@ export type EventMetadataBase = z.infer<typeof EventMetadataBaseSchema>;
 /**
  * Zod schema for Event objects.
  * Enhanced with proper validation for timestamp and tenantId.
+ *
+ * Event types follow the taxonomy system: `<provenance>.<domain>.<aggregate-type>.<identifier>`
+ * For LangWatch Observability events, this would be: `lw.obs.<aggregate-type>.<event-name>`
  */
 export const EventSchema = z.object({
   /** Unique identifier for the event */
   id: z.string(),
   /** Unique identifier for the aggregate this event belongs to */
   aggregateId: z.string(),
+  /** The aggregate type associated with the event */
+  aggregateType: AggregateTypeSchema,
   /** The tenant ID associated with the event */
   tenantId: TenantIdSchema,
   /** When this event occurred (Unix timestamp in milliseconds) */
@@ -56,6 +70,9 @@ type EventBase = z.infer<typeof EventSchema>;
  *
  * Events represent facts that have occurred in the system. They are immutable and
  * stored in the event store. Events are processed by handlers to build projections.
+ *
+ * Event types follow the taxonomy system defined in ./taxonomy.ts.
+ * For LangWatch Observability, event types are of the form: `lw.obs.<aggregate-type>.<event-name>`
  */
 export type Event<
   Payload = unknown,
@@ -185,6 +202,7 @@ export const EventHandlerCheckpointSchema = z.object({
   tenantId: TenantIdSchema,
   /**
    * The aggregate type this checkpoint is for.
+   * Aggregate types follow the taxonomy system (e.g., "span_ingestion", "trace_aggregation").
    */
   aggregateType: AggregateTypeSchema,
   /**

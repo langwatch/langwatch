@@ -39,7 +39,7 @@ describe("EventSourcingService - Security", () => {
         eventStore,
       });
 
-      const events = [createTestEvent(TEST_CONSTANTS.AGGREGATE_ID, tenantId1)];
+      const events = [createTestEvent(TEST_CONSTANTS.AGGREGATE_ID, TEST_CONSTANTS.AGGREGATE_TYPE, tenantId1)];
 
       // Context without tenantId should fail
       const invalidContext = {} as any;
@@ -56,7 +56,7 @@ describe("EventSourcingService - Security", () => {
         eventStore,
       });
 
-      const events = [createTestEvent(TEST_CONSTANTS.AGGREGATE_ID, tenantId1)];
+      const events = [createTestEvent(TEST_CONSTANTS.AGGREGATE_ID, TEST_CONSTANTS.AGGREGATE_TYPE, tenantId1)];
 
       // Empty tenantId should fail
       const invalidContext = { tenantId: "" } as any;
@@ -74,7 +74,7 @@ describe("EventSourcingService - Security", () => {
       });
 
       const context1 = createTestEventStoreReadContext(tenantId1);
-      const events = [createTestEvent(TEST_CONSTANTS.AGGREGATE_ID, tenantId1)];
+      const events = [createTestEvent(TEST_CONSTANTS.AGGREGATE_ID, TEST_CONSTANTS.AGGREGATE_TYPE, tenantId1)];
 
       await service.storeEvents(events, context1);
 
@@ -142,7 +142,7 @@ describe("EventSourcingService - Security", () => {
         eventHandlerCheckpointStore: checkpointStore,
       });
 
-      const events = [createTestEvent(TEST_CONSTANTS.AGGREGATE_ID, tenantId1)];
+      const events = [createTestEvent(TEST_CONSTANTS.AGGREGATE_ID, TEST_CONSTANTS.AGGREGATE_TYPE, tenantId1)];
       await service.storeEvents(events, context1);
 
       expect(checkpointStore.saveCheckpoint).toHaveBeenCalledWith(
@@ -163,7 +163,7 @@ describe("EventSourcingService - Security", () => {
         eventStore,
       });
 
-      const events = [createTestEvent(TEST_CONSTANTS.AGGREGATE_ID, tenantId1)];
+      const events = [createTestEvent(TEST_CONSTANTS.AGGREGATE_ID, TEST_CONSTANTS.AGGREGATE_TYPE, tenantId1)];
 
       await expect(
         service.storeEvents(events, undefined as any),
@@ -177,7 +177,7 @@ describe("EventSourcingService - Security", () => {
         eventStore,
       });
 
-      const events = [createTestEvent(TEST_CONSTANTS.AGGREGATE_ID, tenantId1)];
+      const events = [createTestEvent(TEST_CONSTANTS.AGGREGATE_ID, TEST_CONSTANTS.AGGREGATE_TYPE, tenantId1)];
 
       const invalidContexts = [
         { tenantId: "" },
@@ -237,7 +237,7 @@ describe("EventSourcingService - Security", () => {
         eventStore,
       });
 
-      const events = [createTestEvent(TEST_CONSTANTS.AGGREGATE_ID, tenantId1)];
+      const events = [createTestEvent(TEST_CONSTANTS.AGGREGATE_ID, TEST_CONSTANTS.AGGREGATE_TYPE, tenantId1)];
       const context = createTestEventStoreReadContext(tenantId1);
 
       await service.storeEvents(events, context);
@@ -264,7 +264,7 @@ describe("EventSourcingService - Security", () => {
         eventStore,
       });
 
-      const events = [createTestEvent(TEST_CONSTANTS.AGGREGATE_ID, tenantId1)];
+      const events = [createTestEvent(TEST_CONSTANTS.AGGREGATE_ID, TEST_CONSTANTS.AGGREGATE_TYPE, tenantId1)];
       const context = createTestEventStoreReadContext(tenantId1);
 
       await service1.storeEvents(events, context);
@@ -293,8 +293,8 @@ describe("EventSourcingService - Security", () => {
 
       const context1 = createTestEventStoreReadContext(tenantId1);
       const context2 = createTestEventStoreReadContext(tenantId2);
-      const events1 = [createTestEvent(TEST_CONSTANTS.AGGREGATE_ID, tenantId1)];
-      const events2 = [createTestEvent(TEST_CONSTANTS.AGGREGATE_ID, tenantId2)];
+      const events1 = [createTestEvent(TEST_CONSTANTS.AGGREGATE_ID, TEST_CONSTANTS.AGGREGATE_TYPE, tenantId1)];
+      const events2 = [createTestEvent(TEST_CONSTANTS.AGGREGATE_ID, TEST_CONSTANTS.AGGREGATE_TYPE, tenantId2)];
 
       await service.storeEvents(events1, context1);
       await service.storeEvents(events2, context2);
@@ -325,7 +325,7 @@ describe("EventSourcingService - Security", () => {
         },
       });
 
-      const events = [createTestEvent(TEST_CONSTANTS.AGGREGATE_ID, tenantId1)];
+      const events = [createTestEvent(TEST_CONSTANTS.AGGREGATE_ID, TEST_CONSTANTS.AGGREGATE_TYPE, tenantId1)];
       await service.storeEvents(events, context1);
 
       // Handler should receive event with correct tenantId
@@ -391,8 +391,8 @@ describe("EventSourcingService - Security", () => {
         },
       });
 
-      const events1 = [createTestEvent(TEST_CONSTANTS.AGGREGATE_ID, tenantId1)];
-      const events2 = [createTestEvent(TEST_CONSTANTS.AGGREGATE_ID, tenantId2)];
+      const events1 = [createTestEvent(TEST_CONSTANTS.AGGREGATE_ID, TEST_CONSTANTS.AGGREGATE_TYPE, tenantId1)];
+      const events2 = [createTestEvent(TEST_CONSTANTS.AGGREGATE_ID, TEST_CONSTANTS.AGGREGATE_TYPE, tenantId2)];
 
       await service.storeEvents(events1, context1);
       await service.storeEvents(events2, context2);
