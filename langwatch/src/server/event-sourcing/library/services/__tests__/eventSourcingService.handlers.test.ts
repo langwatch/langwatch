@@ -5,7 +5,7 @@ import {
   createMockEventStore,
   createMockEventHandlerDefinition,
   createMockEventReactionHandler,
-  createMockEventHandlerCheckpointStore,
+  createMockProcessorCheckpointStore,
   createTestEvent,
   createTestTenantId,
   createTestEventStoreReadContext,
@@ -380,14 +380,14 @@ describe("EventSourcingService - Event Handlers", () => {
     it("saves checkpoints after successful handler execution", async () => {
       const eventStore = createMockEventStore<Event>();
       const handler = createMockEventReactionHandler<Event>();
-      const checkpointStore = createMockEventHandlerCheckpointStore();
+      const checkpointStore = createMockProcessorCheckpointStore();
       const service = new EventSourcingService({
         aggregateType,
         eventStore,
         eventHandlers: {
           handler: createMockEventHandlerDefinition("handler", handler),
         },
-        eventHandlerCheckpointStore: checkpointStore,
+        processorCheckpointStore: checkpointStore,
       });
 
       const event = createTestEvent(
@@ -400,38 +400,37 @@ describe("EventSourcingService - Event Handlers", () => {
 
       await service.storeEvents([event], context);
 
-      expect(checkpointStore.saveCheckpoint).toHaveBeenCalledTimes(1);
-      expect(checkpointStore.saveCheckpoint).toHaveBeenCalledWith(
+      // Checkpoint is saved multiple times: pending, then processed
+      expect(checkpointStore.saveCheckpoint).toHaveBeenCalledTimes(2);
+      // First call: pending status
+      expect(checkpointStore.saveCheckpoint).toHaveBeenNthCalledWith(
+        1,
         "handler",
-        tenantId,
-        aggregateType,
-        TEST_CONSTANTS.AGGREGATE_ID,
-        expect.objectContaining({
-          handlerName: "handler",
-          tenantId: tenantId,
-          aggregateType: aggregateType,
-          lastProcessedAggregateId: TEST_CONSTANTS.AGGREGATE_ID,
-          lastProcessedTimestamp: TEST_CONSTANTS.BASE_TIMESTAMP,
-          lastProcessedEventId: expect.stringMatching(
-            new RegExp(
-              `^${TEST_CONSTANTS.BASE_TIMESTAMP}:${escapeRegex(String(tenantId))}:${escapeRegex(TEST_CONSTANTS.AGGREGATE_ID)}:${escapeRegex(aggregateType)}$`,
-            ),
-          ),
-        }),
+        "handler",
+        event,
+        "pending",
+      );
+      // Second call: processed status
+      expect(checkpointStore.saveCheckpoint).toHaveBeenNthCalledWith(
+        2,
+        "handler",
+        "handler",
+        event,
+        "processed",
       );
     });
 
     it("checkpoint contains correct information", async () => {
       const eventStore = createMockEventStore<Event>();
       const handler = createMockEventReactionHandler<Event>();
-      const checkpointStore = createMockEventHandlerCheckpointStore();
+      const checkpointStore = createMockProcessorCheckpointStore();
       const service = new EventSourcingService({
         aggregateType,
         eventStore,
         eventHandlers: {
           handler: createMockEventHandlerDefinition("handler", handler),
         },
-        eventHandlerCheckpointStore: checkpointStore,
+        processorCheckpointStore: checkpointStore,
       });
 
       const aggregateId = "custom-aggregate-123";
@@ -447,30 +446,30 @@ describe("EventSourcingService - Event Handlers", () => {
 
       await service.storeEvents([event], context);
 
-      expect(checkpointStore.saveCheckpoint).toHaveBeenCalledWith(
+      // Checkpoint is saved multiple times: pending, then processed
+      expect(checkpointStore.saveCheckpoint).toHaveBeenCalledTimes(2);
+      // First call: pending status
+      expect(checkpointStore.saveCheckpoint).toHaveBeenNthCalledWith(
+        1,
         "handler",
-        tenantId,
-        aggregateType,
-        aggregateId,
-        expect.objectContaining({
-          handlerName: "handler",
-          tenantId: tenantId,
-          aggregateType: aggregateType,
-          lastProcessedAggregateId: aggregateId,
-          lastProcessedTimestamp: timestamp,
-          lastProcessedEventId: expect.stringMatching(
-            new RegExp(
-              `^${timestamp}:${escapeRegex(String(tenantId))}:${escapeRegex(aggregateId)}:${escapeRegex(aggregateType)}$`,
-            ),
-          ),
-        }),
+        "handler",
+        event,
+        "pending",
+      );
+      // Second call: processed status
+      expect(checkpointStore.saveCheckpoint).toHaveBeenNthCalledWith(
+        2,
+        "handler",
+        "handler",
+        event,
+        "processed",
       );
     });
 
     it("checkpoint errors don't fail handler execution", async () => {
       const eventStore = createMockEventStore<Event>();
       const handler = createMockEventReactionHandler<Event>();
-      const checkpointStore = createMockEventHandlerCheckpointStore();
+      const checkpointStore = createMockProcessorCheckpointStore();
       const logger = {
         debug: vi.fn(),
         info: vi.fn(),
@@ -494,7 +493,7 @@ describe("EventSourcingService - Event Handlers", () => {
         eventHandlers: {
           handler: createMockEventHandlerDefinition("handler", handler),
         },
-        eventHandlerCheckpointStore: checkpointStore,
+        processorCheckpointStore: checkpointStore,
         logger: logger as any,
       });
 
@@ -505,26 +504,27 @@ describe("EventSourcingService - Event Handlers", () => {
       ).resolves.not.toThrow();
 
       expect(handler.handle).toHaveBeenCalledTimes(1);
+      // Checkpoint errors are logged but don't prevent handler execution
       expect(logger.error).toHaveBeenCalledWith(
         expect.objectContaining({
           handlerName: "handler",
           error: "Checkpoint save failed",
         }),
-        "Failed to save checkpoint for event handler",
+        expect.stringMatching(/Failed to save.*checkpoint for event handler/),
       );
     });
 
     it("checkpoint format is correct", async () => {
       const eventStore = createMockEventStore<Event>();
       const handler = createMockEventReactionHandler<Event>();
-      const checkpointStore = createMockEventHandlerCheckpointStore();
+      const checkpointStore = createMockProcessorCheckpointStore();
       const service = new EventSourcingService({
         aggregateType,
         eventStore,
         eventHandlers: {
           handler: createMockEventHandlerDefinition("handler", handler),
         },
-        eventHandlerCheckpointStore: checkpointStore,
+        processorCheckpointStore: checkpointStore,
       });
 
       const event = createTestEvent(
@@ -542,9 +542,10 @@ describe("EventSourcingService - Event Handlers", () => {
       ).mock.calls;
       expect(mockCalls[0]).toBeDefined();
       const checkpointCall = mockCalls[0]!;
-      const checkpoint = checkpointCall[4]; // aggregateId is now 4th param, checkpoint is 5th
+      // New signature: processorName, processorType, event, status, errorMessage?
+      const eventParam = checkpointCall[2] as Event;
 
-      expect(checkpoint.lastProcessedEventId).toMatch(
+      expect(eventParam.id).toMatch(
         new RegExp(
           `^${TEST_CONSTANTS.BASE_TIMESTAMP}:${escapeRegex(String(tenantId))}:${escapeRegex(TEST_CONSTANTS.AGGREGATE_ID)}:${escapeRegex(aggregateType)}$`,
         ),
@@ -686,6 +687,255 @@ describe("EventSourcingService - Event Handlers", () => {
       await expect(service.storeEvents([], context)).resolves.not.toThrow();
 
       expect(eventStore.storeEvents).toHaveBeenCalledTimes(1);
+      expect(handler.handle).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("failure handling and checkpointing", () => {
+    it("stops processing when a previous event failed for the same aggregate", async () => {
+      const eventStore = createMockEventStore<Event>();
+      const handler = createMockEventReactionHandler<Event>();
+      const checkpointStore = createMockProcessorCheckpointStore();
+      const service = new EventSourcingService({
+        aggregateType,
+        eventStore,
+        eventHandlers: {
+          handler: createMockEventHandlerDefinition("handler", handler),
+        },
+        processorCheckpointStore: checkpointStore,
+      });
+
+      const event1 = createTestEvent(
+        TEST_CONSTANTS.AGGREGATE_ID,
+        TEST_CONSTANTS.AGGREGATE_TYPE,
+        tenantId,
+        EVENT_TYPES[0],
+        TEST_CONSTANTS.BASE_TIMESTAMP,
+      );
+      const event2 = createTestEvent(
+        TEST_CONSTANTS.AGGREGATE_ID,
+        TEST_CONSTANTS.AGGREGATE_TYPE,
+        tenantId,
+        EVENT_TYPES[0],
+        TEST_CONSTANTS.BASE_TIMESTAMP + 1000,
+      );
+
+      // Simulate that event1 failed
+      checkpointStore.hasFailedEvents = vi
+        .fn()
+        .mockResolvedValueOnce(false) // First check for event1 (no failures yet)
+        .mockResolvedValueOnce(true); // Second check for event2 (event1 failed)
+
+      // Make handler fail for event1
+      handler.handle = vi
+        .fn()
+        .mockRejectedValueOnce(new Error("Handler failed"))
+        .mockResolvedValueOnce(void 0);
+
+      // Process event1 - should fail
+      await expect(
+        service.storeEvents([event1], context),
+      ).resolves.not.toThrow();
+
+      // Verify event1 was marked as failed
+      expect(checkpointStore.saveCheckpoint).toHaveBeenCalledWith(
+        "handler",
+        "handler",
+        event1,
+        "failed",
+        "Handler failed",
+      );
+
+      // Process event2 - should be skipped due to previous failure
+      await expect(
+        service.storeEvents([event2], context),
+      ).resolves.not.toThrow();
+
+      // Verify event2 handler was not called
+      expect(handler.handle).toHaveBeenCalledTimes(1); // Only event1
+      expect(checkpointStore.hasFailedEvents).toHaveBeenCalledWith(
+        "handler",
+        "handler",
+        tenantId,
+        aggregateType,
+        TEST_CONSTANTS.AGGREGATE_ID,
+      );
+    });
+
+    it("does not stop processing for different aggregates when one fails", async () => {
+      const eventStore = createMockEventStore<Event>();
+      const handler = createMockEventReactionHandler<Event>();
+      const checkpointStore = createMockProcessorCheckpointStore();
+      const service = new EventSourcingService({
+        aggregateType,
+        eventStore,
+        eventHandlers: {
+          handler: createMockEventHandlerDefinition("handler", handler),
+        },
+        processorCheckpointStore: checkpointStore,
+      });
+
+      const event1 = createTestEvent(
+        "aggregate-1",
+        TEST_CONSTANTS.AGGREGATE_TYPE,
+        tenantId,
+        EVENT_TYPES[0],
+        TEST_CONSTANTS.BASE_TIMESTAMP,
+      );
+      const event2 = createTestEvent(
+        "aggregate-2",
+        TEST_CONSTANTS.AGGREGATE_TYPE,
+        tenantId,
+        EVENT_TYPES[0],
+        TEST_CONSTANTS.BASE_TIMESTAMP + 1000,
+      );
+
+      // Make handler fail for aggregate-1
+      handler.handle = vi
+        .fn()
+        .mockRejectedValueOnce(new Error("Handler failed"))
+        .mockResolvedValueOnce(void 0);
+
+      checkpointStore.hasFailedEvents = vi
+        .fn()
+        .mockResolvedValue(false); // No failures for aggregate-2
+
+      // Process both events
+      await expect(
+        service.storeEvents([event1, event2], context),
+      ).resolves.not.toThrow();
+
+      // Both handlers should be called (even though aggregate-1 failed)
+      expect(handler.handle).toHaveBeenCalledTimes(2);
+    });
+
+    it("skips processing if event is already processed (idempotency)", async () => {
+      const eventStore = createMockEventStore<Event>();
+      const handler = createMockEventReactionHandler<Event>();
+      const checkpointStore = createMockProcessorCheckpointStore();
+      const service = new EventSourcingService({
+        aggregateType,
+        eventStore,
+        eventHandlers: {
+          handler: createMockEventHandlerDefinition("handler", handler),
+        },
+        processorCheckpointStore: checkpointStore,
+      });
+
+      const event = createTestEvent(
+        TEST_CONSTANTS.AGGREGATE_ID,
+        TEST_CONSTANTS.AGGREGATE_TYPE,
+        tenantId,
+        EVENT_TYPES[0],
+        TEST_CONSTANTS.BASE_TIMESTAMP,
+      );
+
+      // Simulate event already processed
+      checkpointStore.loadCheckpoint = vi.fn().mockResolvedValue({
+        processorName: "handler",
+        processorType: "handler",
+        eventId: event.id,
+        status: "processed",
+        eventTimestamp: event.timestamp,
+        tenantId: event.tenantId,
+        aggregateType: event.aggregateType,
+        aggregateId: String(event.aggregateId),
+      });
+
+      await service.storeEvents([event], context);
+
+      // Handler should not be called
+      expect(handler.handle).not.toHaveBeenCalled();
+      // Checkpoint should not be saved again
+      expect(checkpointStore.saveCheckpoint).not.toHaveBeenCalled();
+    });
+
+    it("saves checkpoint with failed status when handler throws", async () => {
+      const eventStore = createMockEventStore<Event>();
+      const handler = createMockEventReactionHandler<Event>();
+      const checkpointStore = createMockProcessorCheckpointStore();
+      const service = new EventSourcingService({
+        aggregateType,
+        eventStore,
+        eventHandlers: {
+          handler: createMockEventHandlerDefinition("handler", handler),
+        },
+        processorCheckpointStore: checkpointStore,
+      });
+
+      const event = createTestEvent(
+        TEST_CONSTANTS.AGGREGATE_ID,
+        TEST_CONSTANTS.AGGREGATE_TYPE,
+        tenantId,
+        EVENT_TYPES[0],
+        TEST_CONSTANTS.BASE_TIMESTAMP,
+      );
+
+      const error = new Error("Handler processing failed");
+      handler.handle = vi.fn().mockRejectedValue(error);
+      checkpointStore.hasFailedEvents = vi.fn().mockResolvedValue(false);
+
+      await expect(
+        service.storeEvents([event], context),
+      ).resolves.not.toThrow();
+
+      // Should save pending checkpoint first
+      expect(checkpointStore.saveCheckpoint).toHaveBeenCalledWith(
+        "handler",
+        "handler",
+        event,
+        "pending",
+      );
+
+      // Then save failed checkpoint
+      expect(checkpointStore.saveCheckpoint).toHaveBeenCalledWith(
+        "handler",
+        "handler",
+        event,
+        "failed",
+        "Handler processing failed",
+      );
+    });
+
+    it("checks for failed events before processing", async () => {
+      const eventStore = createMockEventStore<Event>();
+      const handler = createMockEventReactionHandler<Event>();
+      const checkpointStore = createMockProcessorCheckpointStore();
+      const service = new EventSourcingService({
+        aggregateType,
+        eventStore,
+        eventHandlers: {
+          handler: createMockEventHandlerDefinition("handler", handler),
+        },
+        processorCheckpointStore: checkpointStore,
+      });
+
+      const event = createTestEvent(
+        TEST_CONSTANTS.AGGREGATE_ID,
+        TEST_CONSTANTS.AGGREGATE_TYPE,
+        tenantId,
+        EVENT_TYPES[0],
+        TEST_CONSTANTS.BASE_TIMESTAMP,
+      );
+
+      // Simulate previous failure
+      checkpointStore.hasFailedEvents = vi.fn().mockResolvedValue(true);
+      checkpointStore.loadCheckpoint = vi.fn().mockResolvedValue(null);
+
+      await expect(
+        service.storeEvents([event], context),
+      ).resolves.not.toThrow();
+
+      // Should check for failures
+      expect(checkpointStore.hasFailedEvents).toHaveBeenCalledWith(
+        "handler",
+        "handler",
+        tenantId,
+        aggregateType,
+        TEST_CONSTANTS.AGGREGATE_ID,
+      );
+
+      // Handler should not be called
       expect(handler.handle).not.toHaveBeenCalled();
     });
   });

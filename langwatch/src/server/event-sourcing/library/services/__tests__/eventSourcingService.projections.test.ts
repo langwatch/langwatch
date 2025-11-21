@@ -6,6 +6,7 @@ import {
   createMockProjectionStore,
   createMockProjectionDefinition,
   createMockEventHandler,
+  createMockProcessorCheckpointStore,
   createTestEvent,
   createTestTenantId,
   createTestEventStoreReadContext,
@@ -852,6 +853,281 @@ describe("EventSourcingService - Projections", () => {
       await service.storeEvents([], context);
 
       expect(eventStore.getEvents).not.toHaveBeenCalled();
+      expect(projectionHandler.handle).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("projection checkpointing", () => {
+    it("saves checkpoints after successful projection update", async () => {
+      const eventStore = createMockEventStore<Event>();
+      const projectionHandler = createMockEventHandler<Event, any>();
+      const projectionStore = createMockProjectionStore<any>();
+      const checkpointStore = createMockProcessorCheckpointStore();
+      const events = [
+        createTestEvent(
+          TEST_CONSTANTS.AGGREGATE_ID,
+          TEST_CONSTANTS.AGGREGATE_TYPE,
+          tenantId,
+        ),
+      ];
+
+      eventStore.getEvents = vi.fn().mockResolvedValue(events);
+      projectionHandler.handle = vi
+        .fn()
+        .mockResolvedValue(
+          createTestProjection(TEST_CONSTANTS.AGGREGATE_ID, tenantId),
+        );
+
+      const service = new EventSourcingService({
+        aggregateType,
+        eventStore,
+        projections: {
+          projection: createMockProjectionDefinition(
+            "projection",
+            projectionHandler,
+            projectionStore,
+          ),
+        },
+        processorCheckpointStore: checkpointStore,
+      });
+
+      await service.storeEvents(events, context);
+
+      // Checkpoint should be saved: pending, then processed
+      expect(checkpointStore.saveCheckpoint).toHaveBeenCalledTimes(2);
+      expect(checkpointStore.saveCheckpoint).toHaveBeenNthCalledWith(
+        1,
+        "projection",
+        "projection",
+        events[0],
+        "pending",
+      );
+      expect(checkpointStore.saveCheckpoint).toHaveBeenNthCalledWith(
+        2,
+        "projection",
+        "projection",
+        events[0],
+        "processed",
+      );
+    });
+
+    it("saves checkpoint with failed status when projection update fails", async () => {
+      const eventStore = createMockEventStore<Event>();
+      const projectionHandler = createMockEventHandler<Event, any>();
+      const projectionStore = createMockProjectionStore<any>();
+      const checkpointStore = createMockProcessorCheckpointStore();
+      const events = [
+        createTestEvent(
+          TEST_CONSTANTS.AGGREGATE_ID,
+          TEST_CONSTANTS.AGGREGATE_TYPE,
+          tenantId,
+        ),
+      ];
+
+      eventStore.getEvents = vi.fn().mockResolvedValue(events);
+      const error = new Error("Projection update failed");
+      projectionHandler.handle = vi.fn().mockRejectedValue(error);
+      checkpointStore.hasFailedEvents = vi.fn().mockResolvedValue(false);
+
+      const service = new EventSourcingService({
+        aggregateType,
+        eventStore,
+        projections: {
+          projection: createMockProjectionDefinition(
+            "projection",
+            projectionHandler,
+            projectionStore,
+          ),
+        },
+        processorCheckpointStore: checkpointStore,
+      });
+
+      await expect(
+        service.storeEvents(events, context),
+      ).resolves.not.toThrow();
+
+      // Should save pending checkpoint first, then failed checkpoint
+      expect(checkpointStore.saveCheckpoint).toHaveBeenCalledWith(
+        "projection",
+        "projection",
+        events[0],
+        "pending",
+      );
+      expect(checkpointStore.saveCheckpoint).toHaveBeenCalledWith(
+        "projection",
+        "projection",
+        events[0],
+        "failed",
+        "Projection update failed",
+      );
+    });
+
+    it("stops processing when a previous event failed for the same aggregate", async () => {
+      const eventStore = createMockEventStore<Event>();
+      const projectionHandler = createMockEventHandler<Event, any>();
+      const projectionStore = createMockProjectionStore<any>();
+      const checkpointStore = createMockProcessorCheckpointStore();
+      const event1 = createTestEvent(
+        TEST_CONSTANTS.AGGREGATE_ID,
+        TEST_CONSTANTS.AGGREGATE_TYPE,
+        tenantId,
+        EVENT_TYPES[0],
+        TEST_CONSTANTS.BASE_TIMESTAMP,
+      );
+      const event2 = createTestEvent(
+        TEST_CONSTANTS.AGGREGATE_ID,
+        TEST_CONSTANTS.AGGREGATE_TYPE,
+        tenantId,
+        EVENT_TYPES[0],
+        TEST_CONSTANTS.BASE_TIMESTAMP + 1000,
+      );
+
+      eventStore.getEvents = vi
+        .fn()
+        .mockResolvedValueOnce([event1])
+        .mockResolvedValueOnce([event1, event2]);
+
+      // Make projection fail for event1
+      const error = new Error("Projection failed");
+      projectionHandler.handle = vi
+        .fn()
+        .mockRejectedValueOnce(error);
+
+      checkpointStore.hasFailedEvents = vi
+        .fn()
+        .mockResolvedValueOnce(false) // First check for event1 (no failures yet)
+        .mockResolvedValueOnce(true); // Second check for event2 (event1 failed)
+
+      checkpointStore.loadCheckpoint = vi
+        .fn()
+        .mockResolvedValue(null); // No existing checkpoints
+
+      const service = new EventSourcingService({
+        aggregateType,
+        eventStore,
+        projections: {
+          projection: createMockProjectionDefinition(
+            "projection",
+            projectionHandler,
+            projectionStore,
+          ),
+        },
+        processorCheckpointStore: checkpointStore,
+      });
+
+      // Process event1 - should fail
+      await expect(
+        service.storeEvents([event1], context),
+      ).resolves.not.toThrow();
+
+      // Process event2 - should be skipped due to previous failure
+      await expect(
+        service.storeEvents([event2], context),
+      ).resolves.not.toThrow();
+
+      // Verify projection handler was only called once (for event1)
+      // Note: handler is called once for event1, and event2 is skipped due to failure check
+      expect(projectionHandler.handle).toHaveBeenCalledTimes(1);
+      expect(checkpointStore.hasFailedEvents).toHaveBeenCalledWith(
+        "projection",
+        "projection",
+        tenantId,
+        aggregateType,
+        TEST_CONSTANTS.AGGREGATE_ID,
+      );
+    });
+
+    it("skips processing if event is already processed (idempotency)", async () => {
+      const eventStore = createMockEventStore<Event>();
+      const projectionHandler = createMockEventHandler<Event, any>();
+      const projectionStore = createMockProjectionStore<any>();
+      const checkpointStore = createMockProcessorCheckpointStore();
+      const events = [
+        createTestEvent(
+          TEST_CONSTANTS.AGGREGATE_ID,
+          TEST_CONSTANTS.AGGREGATE_TYPE,
+          tenantId,
+        ),
+      ];
+
+      // Simulate event already processed
+      const event = events[0]!;
+      checkpointStore.loadCheckpoint = vi.fn().mockResolvedValue({
+        processorName: "projection",
+        processorType: "projection",
+        eventId: event.id,
+        status: "processed",
+        eventTimestamp: event.timestamp,
+        tenantId: event.tenantId,
+        aggregateType: event.aggregateType,
+        aggregateId: String(event.aggregateId),
+      });
+
+      const service = new EventSourcingService({
+        aggregateType,
+        eventStore,
+        projections: {
+          projection: createMockProjectionDefinition(
+            "projection",
+            projectionHandler,
+            projectionStore,
+          ),
+        },
+        processorCheckpointStore: checkpointStore,
+      });
+
+      await service.storeEvents(events, context);
+
+      // Projection handler should not be called
+      expect(projectionHandler.handle).not.toHaveBeenCalled();
+      // Checkpoint should not be saved again
+      expect(checkpointStore.saveCheckpoint).not.toHaveBeenCalled();
+    });
+
+    it("checks for failed events before processing projection", async () => {
+      const eventStore = createMockEventStore<Event>();
+      const projectionHandler = createMockEventHandler<Event, any>();
+      const projectionStore = createMockProjectionStore<any>();
+      const checkpointStore = createMockProcessorCheckpointStore();
+      const events = [
+        createTestEvent(
+          TEST_CONSTANTS.AGGREGATE_ID,
+          TEST_CONSTANTS.AGGREGATE_TYPE,
+          tenantId,
+        ),
+      ];
+
+      // Simulate previous failure
+      checkpointStore.hasFailedEvents = vi.fn().mockResolvedValue(true);
+      checkpointStore.loadCheckpoint = vi.fn().mockResolvedValue(null);
+
+      const service = new EventSourcingService({
+        aggregateType,
+        eventStore,
+        projections: {
+          projection: createMockProjectionDefinition(
+            "projection",
+            projectionHandler,
+            projectionStore,
+          ),
+        },
+        processorCheckpointStore: checkpointStore,
+      });
+
+      await expect(
+        service.storeEvents(events, context),
+      ).resolves.not.toThrow();
+
+      // Should check for failures
+      expect(checkpointStore.hasFailedEvents).toHaveBeenCalledWith(
+        "projection",
+        "projection",
+        tenantId,
+        aggregateType,
+        TEST_CONSTANTS.AGGREGATE_ID,
+      );
+
+      // Projection handler should not be called
       expect(projectionHandler.handle).not.toHaveBeenCalled();
     });
   });
