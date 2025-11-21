@@ -58,7 +58,7 @@ export type InferEventHandlerEvent<THandler extends EventHandler<any, any>> =
 
 export type InferEventHandlerProjection<
   THandler extends EventHandler<any, any>,
-> = THandler extends EventHandler<any, infer P> ? P : never;
+> =   THandler extends EventHandler<any, infer P> ? P : never;
 
 /**
  * Helper type to infer the Event type from an EventStore.
@@ -83,7 +83,7 @@ export type InferEventStoreEvent<TStore extends EventStore<any>> =
  */
 export type InferProjectionStoreProjection<
   TStore extends ProjectionStore<any>,
-> = TStore extends ProjectionStore<infer P> ? P : never;
+> =   TStore extends ProjectionStore<infer P> ? P : never;
 
 /**
  * Type guard to check if a value is a valid Event.

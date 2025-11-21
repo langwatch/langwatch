@@ -1,7 +1,7 @@
 import { RecordSpanCommand } from "./commands/recordSpanCommand";
 import { eventSourcing } from "../../runtime";
 import { TraceAggregationTriggerHandler } from "./eventHandlers/traceAggregationTriggerHandler";
-import type { SpanIngestionEvent } from "../../schemas";
+import type { SpanIngestionEvent } from "./schemas/events";
 
 export const spanIngestionPipeline = eventSourcing
   .registerPipeline<SpanIngestionEvent>()

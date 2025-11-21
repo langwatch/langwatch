@@ -4,7 +4,7 @@ import { getLangWatchTracer } from "langwatch";
 import { generate } from "@langwatch/ksuid";
 
 import type { SpanRepository } from "./spanRepository";
-import type { StoreSpanIngestionCommandData, SpanData } from "../../../schemas/commands/spanIngestion.schema";
+import type { StoreSpanIngestionCommandData, SpanData } from "../schemas/commands";
 import { createLogger } from "../../../../../utils/logger";
 
 export class SpanRepositoryClickHouse implements SpanRepository {

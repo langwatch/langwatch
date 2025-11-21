@@ -1,11 +1,11 @@
 import type { EventHandler, EventStream } from "../../../library";
 import type { Projection } from "../../../library";
-import type { TraceAggregationEvent } from "../../../schemas/events/traceAggregation.schema";
+import type { TraceAggregationEvent } from "../schemas/events";
 import {
   isTraceAggregationStartedEvent,
   isTraceAggregationCompletedEvent,
   isTraceAggregationCancelledEvent,
-} from "../../../schemas/events/traceAggregation.schema";
+} from "../schemas/events";
 
 /**
  * Projection data for trace aggregation state.

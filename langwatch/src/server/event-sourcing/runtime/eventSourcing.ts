@@ -99,5 +99,4 @@ export class EventSourcing {
   }
 }
 
-// Export singleton instance
 export const eventSourcing = EventSourcing.getInstance();
