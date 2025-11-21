@@ -60,10 +60,17 @@ export interface CommandHandlerClassStatic<Payload, Type extends CommandType> {
  *
  * @example
  * ```typescript
- * class MyCommandHandler implements CommandHandler<string, Command<string, MyPayload>, MyEvent> {
- *   static readonly schema = defineCommandSchema<MyPayload>(
+ * import { z } from "zod";
+ *
+ * const myPayloadSchema = z.object({
+ *   id: z.string(),
+ *   data: z.string(),
+ * });
+ *
+ * class MyCommandHandler implements CommandHandler<string, Command<string, z.infer<typeof myPayloadSchema>>, MyEvent> {
+ *   static readonly schema = defineCommandSchema(
  *     "my.command.type",
- *     (payload): payload is MyPayload => { ... }
+ *     myPayloadSchema
  *   );
  *
  *   static getAggregateId(payload: MyPayload): string {

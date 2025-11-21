@@ -26,6 +26,7 @@ import {
   createTestEventForBuilder,
   createTestProjection,
   TEST_CONSTANTS,
+  testCommandPayloadSchema,
   type TestCommandPayload,
   type TestEvent,
 } from "./testHelpers";
@@ -907,17 +908,9 @@ describe("PipelineBuilder", () => {
       const factory = createMockQueueProcessorFactory();
 
       class RecordSpanCommandHandler {
-        static readonly schema = defineCommandSchema<TestCommandPayload>(
+        static readonly schema = defineCommandSchema(
           COMMAND_TYPES[0],
-          (payload): payload is TestCommandPayload => {
-            return (
-              typeof payload === "object" &&
-              payload !== null &&
-              "tenantId" in payload &&
-              "id" in payload &&
-              "value" in payload
-            );
-          },
+          testCommandPayloadSchema,
         );
 
         static readonly dispatcherName = "recordSpan";
@@ -978,13 +971,12 @@ describe("PipelineBuilder", () => {
     it("dispatcher.send() validates payload using handler's static schema.validate() method", async () => {
       const eventStore = createMockEventStore<TestEvent>();
       const factory = createMockQueueProcessorFactory();
-      const validateSpy = vi.fn().mockReturnValue(false) as unknown as (
-        payload: unknown,
-      ) => payload is TestCommandPayload;
-
-      const schema = defineCommandSchema<TestCommandPayload>(
+      
+      // Create a schema that will reject invalid payloads
+      const strictSchema = testCommandPayloadSchema.strict();
+      const schema = defineCommandSchema(
         COMMAND_TYPES[0],
-        validateSpy,
+        strictSchema,
       );
 
       const HandlerClass = createTestCommandHandlerClass<
@@ -1011,8 +1003,6 @@ describe("PipelineBuilder", () => {
           invalidPayload as unknown as TestCommandPayload,
         ),
       ).rejects.toThrow();
-
-      expect(validateSpy).toHaveBeenCalledWith(invalidPayload);
     });
 
     it("dispatcher.send() throws Error with message containing command type when schema validation returns false", async () => {

@@ -1,4 +1,5 @@
 import { vi } from "vitest";
+import { z } from "zod";
 import type { Event, Projection } from "../../../library/domain/types";
 import type { CommandType } from "../../../library/domain/commandType";
 import type { EventStore } from "../../../library/stores/eventStore.types";
@@ -95,6 +96,15 @@ export interface TestCommandPayload {
 }
 
 /**
+ * Zod schema for test command payload.
+ */
+export const testCommandPayloadSchema = z.object({
+  tenantId: z.string(),
+  id: z.string(),
+  value: z.number(),
+});
+
+/**
  * Test event interface.
  */
 export interface TestEvent extends Event<{ result: string }> {
@@ -132,18 +142,10 @@ export function createTestCommandHandlerClass<
     static readonly dispatcherName = dispatcherName;
     static readonly schema: CommandSchema<Payload, CommandType> =
       config?.schema ??
-      defineCommandSchema<Payload>(
+      (defineCommandSchema(
         COMMAND_TYPES[0],
-        (payload): payload is Payload => {
-          return (
-            typeof payload === "object" &&
-            payload !== null &&
-            "tenantId" in payload &&
-            "id" in payload &&
-            "value" in payload
-          );
-        },
-      );
+        testCommandPayloadSchema,
+      ) as CommandSchema<Payload, CommandType>);
 
     static getAggregateId(payload: Payload): string {
       return getAggregateId(payload);
@@ -297,17 +299,9 @@ export function createTestProjection<TData = unknown>(
  * This reduces duplication in tests that create classes with specific names.
  */
 export const BASE_COMMAND_HANDLER_SCHEMA =
-  defineCommandSchema<TestCommandPayload>(
+  defineCommandSchema(
     COMMAND_TYPES[0],
-    (payload): payload is TestCommandPayload => {
-      return (
-        typeof payload === "object" &&
-        payload !== null &&
-        "tenantId" in payload &&
-        "id" in payload &&
-        "value" in payload
-      );
-    },
+    testCommandPayloadSchema,
   );
 
 /**
