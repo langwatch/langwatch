@@ -1,12 +1,17 @@
 import { useEffect, useMemo, forwardRef, useImperativeHandle } from "react";
 import { CopilotKit, useCopilotChat } from "@copilotkit/react-core";
-import { AssistantMessage, CopilotChat } from "@copilotkit/react-ui";
+import {
+  AssistantMessage,
+  UserMessage,
+  CopilotChat,
+} from "@copilotkit/react-ui";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import type { PromptConfigFormValues } from "~/prompts/types";
 import type { z } from "zod";
 import { type runtimeInputsSchema } from "~/prompts/schemas/field-schemas";
 import { SyncedChatInput } from "./SyncedChatInput";
 import { TraceMessage } from "~/components/copilot-kit/TraceMessage";
+import { DeletableMessage } from "./DeletableMessage";
 import { Box, type BoxProps } from "@chakra-ui/react";
 import clsx from "clsx";
 import { useDraggableTabsBrowserStore } from "../../prompt-playground-store/DraggableTabsBrowserStore";
@@ -84,6 +89,14 @@ const PromptPlaygroundChatInner = forwardRef<PromptPlaygroundChatRef, object>(
       },
     }));
 
+    const deleteMessage = (messageId: string) => {
+      const updatedMessages = visibleMessages.filter(
+        (message) => message.id !== messageId,
+      );
+
+      setMessages(updatedMessages);
+    };
+
     useEffect(() => {
       const tab = getTabById(tabId);
       const initialMessagesFromSpanData =
@@ -129,11 +142,26 @@ const PromptPlaygroundChatInner = forwardRef<PromptPlaygroundChatRef, object>(
         AssistantMessage={(props) => {
           return (
             <>
-              <AssistantMessage {...props} />
+              <DeletableMessage
+                messageId={props.rawData.id}
+                onDelete={deleteMessage}
+              >
+                <AssistantMessage {...props} />
+              </DeletableMessage>
               {!props.isLoading && !props.isGenerating && (
                 <TraceMessage traceId={props.rawData.id} marginTop={2} />
               )}
             </>
+          );
+        }}
+        UserMessage={(props) => {
+          return (
+            <DeletableMessage
+              messageId={props.rawData.id}
+              onDelete={deleteMessage}
+            >
+              <UserMessage {...props} />
+            </DeletableMessage>
           );
         }}
       />
