@@ -187,45 +187,79 @@ export type EventOrderingStrategy<TEvent> =
   | ((a: TEvent, b: TEvent) => number);
 
 /**
- * Zod schema for event handler checkpoint.
- * Checkpoint tracking the last processed event for an event handler.
- * Used for resuming processing after failures and for replay scenarios.
+ * Zod schema for processor checkpoint.
+ * Checkpoint tracking per-event processing status for event handlers and projections.
+ * Used for resuming processing after failures, preventing duplicate processing, and stopping
+ * processing when failures occur for a specific aggregate.
+ *
+ * Checkpoints use `processorName:eventId` as the unique key, where processorName is either
+ * a handler name or projection name.
  */
-export const EventHandlerCheckpointSchema = z.object({
+export const ProcessorCheckpointSchema = z.object({
   /**
-   * The handler name this checkpoint belongs to.
+   * The processor name (handler name or projection name) this checkpoint belongs to.
    */
-  handlerName: z.string(),
+  processorName: z.string(),
   /**
-   * The tenant ID this checkpoint is scoped to.
+   * The type of processor (handler or projection).
+   */
+  processorType: z.enum(["handler", "projection"]),
+  /**
+   * Unique event identifier. The checkpoint key is `processorName:eventId`.
+   * Format: `${aggregateId}:${timestamp}:${eventType}`
+   */
+  eventId: z.string(),
+  /**
+   * Processing status of this event.
+   */
+  status: z.enum(["processed", "failed", "pending"]),
+  /**
+   * Timestamp when the event was successfully processed (Unix milliseconds).
+   * Only set when status is "processed".
+   */
+  processedAt: z.number().int().nonnegative().optional(),
+  /**
+   * Timestamp when the event processing failed (Unix milliseconds).
+   * Only set when status is "failed".
+   */
+  failedAt: z.number().int().nonnegative().optional(),
+  /**
+   * Error message if processing failed.
+   * Only set when status is "failed".
+   */
+  errorMessage: z.string().optional(),
+  /**
+   * Original event timestamp (Unix milliseconds).
+   * Used for ordering events and determining processing order.
+   */
+  eventTimestamp: z.number().int().nonnegative(),
+  /**
+   * Denormalized tenant ID (extracted from event).
+   * Stored for efficient querying by tenant.
    */
   tenantId: TenantIdSchema,
   /**
-   * The aggregate type this checkpoint is for.
-   * Aggregate types follow the taxonomy system (e.g., "span_ingestion", "trace_aggregation").
+   * Denormalized aggregate type (extracted from event).
+   * Stored for efficient querying by aggregate type.
    */
   aggregateType: AggregateTypeSchema,
   /**
-   * The last processed aggregate ID.
+   * Denormalized aggregate ID (extracted from event).
+   * Stored for efficient querying by aggregate.
    */
-  lastProcessedAggregateId: z.string(),
-  /**
-   * The timestamp of the last processed event (Unix milliseconds).
-   */
-  lastProcessedTimestamp: z.number().int().nonnegative(),
-  /**
-   * A unique identifier for the last processed event.
-   * Format: `${aggregateId}:${timestamp}:${eventType}`
-   */
-  lastProcessedEventId: z.string(),
+  aggregateId: z.string(),
 });
 
 /**
- * Checkpoint tracking the last processed event for an event handler.
+ * Checkpoint tracking per-event processing status for event handlers and projections.
  *
- * Used for resuming processing after failures and for replay scenarios.
- * Checkpoints are stored per handler, tenant, and aggregate type.
+ * Used for:
+ * - Resuming processing after failures
+ * - Preventing duplicate processing (idempotency)
+ * - Stopping processing when failures occur for a specific aggregate
+ * - Replay scenarios
+ *
+ * Checkpoints are stored per processor (handler or projection), per event.
+ * The unique key is `processorName:eventId`.
  */
-export type EventHandlerCheckpoint = z.infer<
-  typeof EventHandlerCheckpointSchema
->;
+export type ProcessorCheckpoint = z.infer<typeof ProcessorCheckpointSchema>;
