@@ -9,7 +9,7 @@ export const traceAggregationPipeline = eventSourcing
   .registerPipeline<TraceAggregationEvent, TraceAggregationStateProjection>()
   .withName("trace-aggregation")
   .withAggregateType("trace_aggregation")
-  .withProjection(
+  .withEventProjection(
     "state",
     traceAggregationStateProjectionRepository,
     new TraceAggregationStateProjectionHandler(),

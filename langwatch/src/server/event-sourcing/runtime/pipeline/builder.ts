@@ -171,7 +171,7 @@ function createCommandDispatcher<Payload, EventType extends Event>(
  * 1. Start with `registerPipeline()` which returns `PipelineBuilder`
  * 2. Call `withName(name)` → returns `PipelineBuilderWithName`
  * 3. Call `withAggregateType(type)` → returns `PipelineBuilderWithNameAndType`
- * 4. Optionally call `withProjection(name, store, handler)` multiple times to register projections
+ * 4. Optionally call `withEventProjection(name, store, handler)` multiple times to register projections
  * 5. Optionally call `withEventPublisher(publisher)` to register an event publisher
  * 6. Optionally call `withCommandHandler(...)` to register command handlers
  * 7. Call `build()` to create the `RegisteredPipeline`
@@ -182,8 +182,8 @@ function createCommandDispatcher<Payload, EventType extends Event>(
  *   .registerPipeline<MyEvent>()
  *   .withName("my-pipeline")
  *   .withAggregateType("trace")
- *   .withProjection("summary", summaryStore, summaryHandler)
- *   .withProjection("analytics", analyticsStore, analyticsHandler)
+ *   .withEventProjection("summary", summaryStore, summaryHandler)
+ *   .withEventProjection("analytics", analyticsStore, analyticsHandler)
  *   .withEventPublisher(publisher)
  *   .withCommandHandler(...)
  *   .build();
@@ -296,11 +296,11 @@ export class PipelineBuilderWithNameAndType<
    * @example
    * ```typescript
    * pipeline
-   *   .withProjection("summary", summaryStore, summaryHandler)
-   *   .withProjection("analytics", analyticsStore, analyticsHandler)
+   *   .withEventProjection("summary", summaryStore, summaryHandler)
+   *   .withEventProjection("analytics", analyticsStore, analyticsHandler)
    * ```
    */
-  withProjection<
+  withEventProjection<
     ProjectionName extends string,
     ProjType extends Projection = Projection,
   >(
