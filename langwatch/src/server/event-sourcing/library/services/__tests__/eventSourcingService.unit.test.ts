@@ -322,6 +322,7 @@ describe("EventSourcingService - Unit Tests", () => {
         saveCheckpoint: vi.fn().mockResolvedValue(void 0),
         loadCheckpoint: vi.fn().mockResolvedValue(null),
         getLastProcessedEvent: vi.fn().mockResolvedValue(null),
+        getCheckpointBySequenceNumber: vi.fn().mockResolvedValue(null),
         hasFailedEvents: vi.fn().mockResolvedValue(false),
         getFailedEvents: vi.fn().mockResolvedValue([]),
         clearCheckpoint: vi.fn().mockResolvedValue(void 0),
@@ -346,7 +347,7 @@ describe("EventSourcingService - Unit Tests", () => {
 
       await service.storeEvents([event], context);
 
-      // Checkpoint is saved with new signature: processorName, processorType, event, status
+      // Checkpoint is saved with new signature: processorName, processorType, event, status, sequenceNumber
       expect(checkpointStore.saveCheckpoint).toHaveBeenCalledWith(
         "handler",
         "handler",
@@ -361,6 +362,7 @@ describe("EventSourcingService - Unit Tests", () => {
           aggregateId: TEST_CONSTANTS.AGGREGATE_ID,
         }),
         expect.any(String), // status: "pending" or "processed"
+        expect.any(Number), // sequenceNumber
       );
     });
 
@@ -371,6 +373,7 @@ describe("EventSourcingService - Unit Tests", () => {
         saveCheckpoint: vi.fn().mockResolvedValue(void 0),
         loadCheckpoint: vi.fn().mockResolvedValue(null),
         getLastProcessedEvent: vi.fn().mockResolvedValue(null),
+        getCheckpointBySequenceNumber: vi.fn().mockResolvedValue(null),
         hasFailedEvents: vi.fn().mockResolvedValue(false),
         getFailedEvents: vi.fn().mockResolvedValue([]),
         clearCheckpoint: vi.fn().mockResolvedValue(void 0),
@@ -396,7 +399,7 @@ describe("EventSourcingService - Unit Tests", () => {
 
       await service.storeEvents([event], context);
 
-      // Checkpoint is saved with new signature: processorName, processorType, event, status
+      // Checkpoint is saved with new signature: processorName, processorType, event, status, sequenceNumber
       expect(checkpointStore.saveCheckpoint).toHaveBeenCalledWith(
         "handler",
         "handler",
@@ -411,6 +414,7 @@ describe("EventSourcingService - Unit Tests", () => {
           aggregateId: numericAggregateId,
         }),
         expect.any(String), // status: "pending" or "processed"
+        expect.any(Number), // sequenceNumber
       );
     });
   });

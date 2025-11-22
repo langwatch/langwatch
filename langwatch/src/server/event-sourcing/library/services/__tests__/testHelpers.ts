@@ -29,6 +29,7 @@ export function createMockEventStore<T extends Event>(): EventStore<T> {
   return {
     storeEvents: vi.fn().mockResolvedValue(void 0),
     getEvents: vi.fn().mockResolvedValue([]),
+    countEventsBefore: vi.fn().mockResolvedValue(0),
   };
 }
 
@@ -141,6 +142,7 @@ export function createMockProcessorCheckpointStore(): ProcessorCheckpointStore {
     saveCheckpoint: vi.fn().mockResolvedValue(void 0),
     loadCheckpoint: vi.fn().mockResolvedValue(null),
     getLastProcessedEvent: vi.fn().mockResolvedValue(null),
+    getCheckpointBySequenceNumber: vi.fn().mockResolvedValue(null),
     hasFailedEvents: vi.fn().mockResolvedValue(false),
     getFailedEvents: vi.fn().mockResolvedValue([]),
     clearCheckpoint: vi.fn().mockResolvedValue(void 0),

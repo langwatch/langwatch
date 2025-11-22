@@ -30,6 +30,7 @@ export function createMockEventStore<T extends Event>(): EventStore<T> {
   return {
     storeEvents: vi.fn().mockResolvedValue(void 0),
     getEvents: vi.fn().mockResolvedValue([]),
+    countEventsBefore: vi.fn().mockResolvedValue(0),
   };
 }
 

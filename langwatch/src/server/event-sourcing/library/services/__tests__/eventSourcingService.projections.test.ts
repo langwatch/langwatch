@@ -901,6 +901,7 @@ describe("EventSourcingService - Projections", () => {
         "projection",
         events[0],
         "pending",
+        1,
       );
       expect(checkpointStore.saveCheckpoint).toHaveBeenNthCalledWith(
         2,
@@ -908,6 +909,7 @@ describe("EventSourcingService - Projections", () => {
         "projection",
         events[0],
         "processed",
+        1,
       );
     });
 
@@ -952,12 +954,14 @@ describe("EventSourcingService - Projections", () => {
         "projection",
         events[0],
         "pending",
+        1,
       );
       expect(checkpointStore.saveCheckpoint).toHaveBeenCalledWith(
         "projection",
         "projection",
         events[0],
         "failed",
+        1,
         "Projection update failed",
       );
     });

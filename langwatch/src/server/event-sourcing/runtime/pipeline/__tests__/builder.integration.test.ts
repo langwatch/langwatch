@@ -47,7 +47,7 @@ describe("PipelineBuilder Integration Tests", () => {
       expect(pipeline.commands).toBeDefined();
     });
 
-    it("builds pipeline with projections when withProjection() called before build()", async () => {
+    it("builds pipeline with projections when withEventProjection() called before build()", async () => {
       const eventStore = createMockEventStore<TestEvent>();
       const store = createMockProjectionStore<Projection>();
       const handler = createMockEventHandler<TestEvent, Projection>();
@@ -64,7 +64,7 @@ describe("PipelineBuilder Integration Tests", () => {
       const builder = new PipelineBuilder<TestEvent, Projection>(eventStore)
         .withName("test-pipeline")
         .withAggregateType("span_ingestion")
-        .withProjection("test-projection", store, handler);
+        .withEventProjection("test-projection", store, handler);
 
       const pipeline = builder.build();
 
@@ -189,7 +189,7 @@ describe("PipelineBuilder Integration Tests", () => {
       )
         .withName("test-pipeline")
         .withAggregateType("span_ingestion")
-        .withProjection("test-projection", store, projectionHandler)
+        .withEventProjection("test-projection", store, projectionHandler)
         .withEventPublisher(publisher)
         .withEventHandler("test-handler", eventHandler)
         .withCommandHandler(commandHandler);
@@ -343,7 +343,7 @@ describe("PipelineBuilder Integration Tests", () => {
       )
         .withName("test-pipeline")
         .withAggregateType("span_ingestion")
-        .withProjection("test-projection", store, projectionHandler)
+        .withEventProjection("test-projection", store, projectionHandler)
         .withCommandHandler(HandlerClass)
         .build();
 
@@ -527,7 +527,7 @@ describe("PipelineBuilder Integration Tests", () => {
       )
         .withName("trace-aggregation")
         .withAggregateType("trace_aggregation")
-        .withProjection("traceAggregationState", store, projectionHandler)
+        .withEventProjection("traceAggregationState", store, projectionHandler)
         .withCommandHandler(HandlerClass)
         .build();
 

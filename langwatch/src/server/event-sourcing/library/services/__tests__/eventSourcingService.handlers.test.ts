@@ -409,6 +409,7 @@ describe("EventSourcingService - Event Handlers", () => {
         "handler",
         event,
         "pending",
+        1,
       );
       // Second call: processed status
       expect(checkpointStore.saveCheckpoint).toHaveBeenNthCalledWith(
@@ -417,6 +418,7 @@ describe("EventSourcingService - Event Handlers", () => {
         "handler",
         event,
         "processed",
+        1,
       );
     });
 
@@ -455,6 +457,7 @@ describe("EventSourcingService - Event Handlers", () => {
         "handler",
         event,
         "pending",
+        1,
       );
       // Second call: processed status
       expect(checkpointStore.saveCheckpoint).toHaveBeenNthCalledWith(
@@ -463,6 +466,7 @@ describe("EventSourcingService - Event Handlers", () => {
         "handler",
         event,
         "processed",
+        1,
       );
     });
 
@@ -743,6 +747,7 @@ describe("EventSourcingService - Event Handlers", () => {
         "handler",
         event1,
         "failed",
+        1,
         "Handler failed",
       );
 
@@ -885,6 +890,7 @@ describe("EventSourcingService - Event Handlers", () => {
         "handler",
         event,
         "pending",
+        1,
       );
 
       // Then save failed checkpoint
@@ -893,6 +899,7 @@ describe("EventSourcingService - Event Handlers", () => {
         "handler",
         event,
         "failed",
+        1,
         "Handler processing failed",
       );
     });

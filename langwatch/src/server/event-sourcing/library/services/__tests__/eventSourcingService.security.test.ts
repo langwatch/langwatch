@@ -145,7 +145,7 @@ describe("EventSourcingService - Security", () => {
       const events = [createTestEvent(TEST_CONSTANTS.AGGREGATE_ID, TEST_CONSTANTS.AGGREGATE_TYPE, tenantId1)];
       await service.storeEvents(events, context1);
 
-      // Checkpoint is saved with new signature: processorName, processorType, event, status
+      // Checkpoint is saved with new signature: processorName, processorType, event, status, sequenceNumber
       expect(checkpointStore.saveCheckpoint).toHaveBeenCalledWith(
         "handler",
         "handler",
@@ -155,6 +155,7 @@ describe("EventSourcingService - Security", () => {
           aggregateId: TEST_CONSTANTS.AGGREGATE_ID,
         }),
         expect.any(String), // status: "pending" or "processed"
+        expect.any(Number), // sequenceNumber
       );
     });
   });

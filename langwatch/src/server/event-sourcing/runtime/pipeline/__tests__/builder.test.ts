@@ -130,7 +130,7 @@ describe("PipelineBuilder", () => {
 
       expect(result).toBeDefined();
       // Verify it has the expected methods for the final builder state
-      expect(result).toHaveProperty("withProjection");
+      expect(result).toHaveProperty("withEventProjection");
       expect(result).toHaveProperty("withEventPublisher");
       expect(result).toHaveProperty("withEventHandler");
       expect(result).toHaveProperty("withCommandHandler");
@@ -240,7 +240,7 @@ describe("PipelineBuilder", () => {
     });
   });
 
-  describe("withProjection() Registration Contract", () => {
+  describe("withEventProjection() Registration Contract", () => {
     it("stores projection definition in internal Map with exact name key when called with unique name", () => {
       const eventStore = createMockEventStore<TestEvent>();
       const store = createMockProjectionStore<Projection>();
@@ -249,7 +249,7 @@ describe("PipelineBuilder", () => {
       const builder = new PipelineBuilder<TestEvent, Projection>(eventStore)
         .withName("test-pipeline")
         .withAggregateType("span_ingestion")
-        .withProjection("my-projection", store, handler);
+        .withEventProjection("my-projection", store, handler);
 
       const pipeline = builder.build();
 
@@ -273,7 +273,7 @@ describe("PipelineBuilder", () => {
       const builder = new PipelineBuilder<TestEvent, Projection>(eventStore)
         .withName("test-pipeline")
         .withAggregateType("span_ingestion")
-        .withProjection("test-projection", store, handler);
+        .withEventProjection("test-projection", store, handler);
 
       const pipeline = builder.build();
 
@@ -292,7 +292,7 @@ describe("PipelineBuilder", () => {
         .withName("test-pipeline")
         .withAggregateType("span_ingestion");
 
-      const result = builder.withProjection("test-projection", store, handler);
+      const result = builder.withEventProjection("test-projection", store, handler);
 
       expect(result).toBe(builder);
     });
@@ -305,10 +305,10 @@ describe("PipelineBuilder", () => {
       const builder = new PipelineBuilder<TestEvent, Projection>(eventStore)
         .withName("test-pipeline")
         .withAggregateType("span_ingestion")
-        .withProjection("duplicate-name", store, handler);
+        .withEventProjection("duplicate-name", store, handler);
 
       expect(() => {
-        builder.withProjection("duplicate-name", store, handler);
+        builder.withEventProjection("duplicate-name", store, handler);
       }).toThrow(
         'Projection with name "duplicate-name" already exists. Projection names must be unique within a pipeline.',
       );
@@ -324,8 +324,8 @@ describe("PipelineBuilder", () => {
       const builder = new PipelineBuilder<TestEvent, Projection>(eventStore)
         .withName("test-pipeline")
         .withAggregateType("span_ingestion")
-        .withProjection("projection-1", store1, handler1)
-        .withProjection("projection-2", store2, handler2);
+        .withEventProjection("projection-1", store1, handler1)
+        .withEventProjection("projection-2", store2, handler2);
 
       expect(() => {
         builder.build();
@@ -363,8 +363,8 @@ describe("PipelineBuilder", () => {
       const builder = new PipelineBuilder<TestEvent, Projection>(eventStore)
         .withName("test-pipeline")
         .withAggregateType("span_ingestion")
-        .withProjection("projection-1", store1, handler1)
-        .withProjection("projection-2", store2, handler2);
+        .withEventProjection("projection-1", store1, handler1)
+        .withEventProjection("projection-2", store2, handler2);
 
       const pipeline = builder.build();
 
@@ -971,7 +971,7 @@ describe("PipelineBuilder", () => {
     it("dispatcher.send() validates payload using handler's static schema.validate() method", async () => {
       const eventStore = createMockEventStore<TestEvent>();
       const factory = createMockQueueProcessorFactory();
-      
+
       // Create a schema that will reject invalid payloads
       const strictSchema = testCommandPayloadSchema.strict();
       const schema = defineCommandSchema(
@@ -1272,7 +1272,7 @@ describe("PipelineBuilder", () => {
   });
 
   describe("Error Handling & Edge Cases", () => {
-    it("throws Error when withProjection() called twice with same name", () => {
+    it("throws Error when withEventProjection() called twice with same name", () => {
       const eventStore = createMockEventStore<TestEvent>();
       const store = createMockProjectionStore<Projection>();
       const handler = createMockEventHandler<TestEvent, Projection>();
@@ -1280,10 +1280,10 @@ describe("PipelineBuilder", () => {
       const builder = new PipelineBuilder<TestEvent, Projection>(eventStore)
         .withName("test-pipeline")
         .withAggregateType("span_ingestion")
-        .withProjection("duplicate", store, handler);
+        .withEventProjection("duplicate", store, handler);
 
       expect(() => {
-        builder.withProjection("duplicate", store, handler);
+        builder.withEventProjection("duplicate", store, handler);
       }).toThrow(
         'Projection with name "duplicate" already exists. Projection names must be unique within a pipeline.',
       );
