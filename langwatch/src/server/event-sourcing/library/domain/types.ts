@@ -234,6 +234,12 @@ export const ProcessorCheckpointSchema = z.object({
    */
   eventTimestamp: z.number().int().nonnegative(),
   /**
+   * Sequence number of the event within the aggregate (1-indexed).
+   * Computed by counting events that come before this event in chronological order.
+   * Used to enforce strict ordering: event N can only be processed after event N-1 is processed.
+   */
+  sequenceNumber: z.number().int().nonnegative(),
+  /**
    * Denormalized tenant ID (extracted from event).
    * Stored for efficient querying by tenant.
    */
