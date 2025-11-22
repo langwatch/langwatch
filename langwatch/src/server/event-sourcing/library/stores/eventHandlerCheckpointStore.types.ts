@@ -28,6 +28,7 @@ export interface ProcessorCheckpointStore {
    * @param processorType - The type of processor ('handler' or 'projection')
    * @param event - The event being checkpointed
    * @param status - The processing status ('processed', 'failed', or 'pending')
+   * @param sequenceNumber - The sequence number of the event within the aggregate (1-indexed)
    * @param errorMessage - Optional error message if status is 'failed'
    * @throws {Error} If tenantId is missing or invalid
    */
@@ -36,6 +37,7 @@ export interface ProcessorCheckpointStore {
     processorType: "handler" | "projection",
     event: EventType,
     status: "processed" | "failed" | "pending",
+    sequenceNumber: number,
     errorMessage?: string,
   ): Promise<void>;
 
@@ -72,6 +74,29 @@ export interface ProcessorCheckpointStore {
     tenantId: TenantId,
     aggregateType: AggregateType,
     aggregateId: string,
+  ): Promise<ProcessorCheckpoint | null>;
+
+  /**
+   * Gets the checkpoint for a specific sequence number for a processor and aggregate.
+   * Used to verify that a previous event (by sequence number) has been processed
+   * before processing the current event, ensuring strict ordering.
+   *
+   * @param processorName - The name of the processor (handler or projection)
+   * @param processorType - The type of processor ('handler' or 'projection')
+   * @param tenantId - The tenant ID
+   * @param aggregateType - The aggregate type
+   * @param aggregateId - The aggregate ID
+   * @param sequenceNumber - The sequence number to look up (1-indexed)
+   * @returns The checkpoint if it exists and has status 'processed', null otherwise
+   * @throws {Error} If tenantId is missing or invalid
+   */
+  getCheckpointBySequenceNumber(
+    processorName: string,
+    processorType: "handler" | "projection",
+    tenantId: TenantId,
+    aggregateType: AggregateType,
+    aggregateId: string,
+    sequenceNumber: number,
   ): Promise<ProcessorCheckpoint | null>;
 
   /**
