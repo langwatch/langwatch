@@ -843,6 +843,30 @@ export class EventSourcingService<
   }
 
   /**
+   * Computes the sequence number for an event within its aggregate.
+   * Sequence numbers are 1-indexed and represent the position of the event
+   * in chronological order within the aggregate.
+   *
+   * @param event - The event to compute the sequence number for
+   * @param context - Security context with required tenantId
+   * @returns The sequence number (1-indexed)
+   */
+  private async computeEventSequenceNumber(
+    event: EventType,
+    context: EventStoreReadContext<EventType>,
+  ): Promise<number> {
+    const count = await this.eventStore.countEventsBefore(
+      String(event.aggregateId),
+      context,
+      this.aggregateType,
+      event.timestamp,
+      event.id,
+    );
+    // Return count + 1 for 1-indexed sequence number
+    return count + 1;
+  }
+
+  /**
    * Handles a single event with a handler and updates checkpoint on success.
    * Implements per-event checkpointing with failure detection.
    */
@@ -850,7 +874,7 @@ export class EventSourcingService<
     handlerName: string,
     handlerDef: EventHandlerDefinition<EventType>,
     event: EventType,
-    _context: EventStoreReadContext<EventType>,
+    context: EventStoreReadContext<EventType>,
   ): Promise<void> {
     await this.tracer.withActiveSpan(
       "EventSourcingService.handleEvent",
@@ -866,6 +890,24 @@ export class EventSourcingService<
         },
       },
       async () => {
+        // Compute sequence number for this event
+        let sequenceNumber: number;
+        try {
+          sequenceNumber = await this.computeEventSequenceNumber(event, context);
+        } catch (error) {
+          this.logger?.error(
+            {
+              handlerName,
+              eventId: event.id,
+              aggregateId: String(event.aggregateId),
+              error:
+                error instanceof Error ? error.message : String(error),
+            },
+            "Failed to compute sequence number for event",
+          );
+          throw error;
+        }
+
         // Check if event already processed (idempotency)
         if (this.processorCheckpointStore) {
           const existingCheckpoint =
@@ -885,6 +927,36 @@ export class EventSourcingService<
               "Event already processed, skipping",
             );
             return;
+          }
+
+          // Enforce ordering: check if previous sequence number was processed
+          if (sequenceNumber > 1) {
+            const previousCheckpoint =
+              await this.processorCheckpointStore.getCheckpointBySequenceNumber(
+                handlerName,
+                "handler",
+                event.tenantId,
+                this.aggregateType,
+                String(event.aggregateId),
+                sequenceNumber - 1,
+              );
+
+            if (!previousCheckpoint || previousCheckpoint.status !== "processed") {
+              const errorMessage =
+                `Previous event (sequence ${sequenceNumber - 1}) has not been processed yet. Processing stopped to maintain event ordering.`;
+              this.logger?.warn(
+                {
+                  handlerName,
+                  eventId: event.id,
+                  aggregateId: String(event.aggregateId),
+                  sequenceNumber,
+                  previousSequenceNumber: sequenceNumber - 1,
+                  tenantId: event.tenantId,
+                },
+                errorMessage,
+              );
+              throw new Error(errorMessage);
+            }
           }
 
           // Check if any previous events failed (stop processing if so)
@@ -922,6 +994,7 @@ export class EventSourcingService<
                 "handler",
                 event,
                 "pending",
+                sequenceNumber,
               );
             } catch (checkpointError) {
               // Log checkpoint error but continue processing
@@ -951,6 +1024,7 @@ export class EventSourcingService<
                 "handler",
                 event,
                 "processed",
+                sequenceNumber,
               );
             } catch (checkpointError) {
               // Log checkpoint error but don't fail handler execution
@@ -979,6 +1053,7 @@ export class EventSourcingService<
                 "handler",
                 event,
                 "failed",
+                sequenceNumber,
                 errorMessage,
               );
             } catch (checkpointError) {
@@ -1041,6 +1116,24 @@ export class EventSourcingService<
         },
       },
       async () => {
+        // Compute sequence number for this event
+        let sequenceNumber: number;
+        try {
+          sequenceNumber = await this.computeEventSequenceNumber(event, context);
+        } catch (error) {
+          this.logger?.error(
+            {
+              projectionName,
+              eventId: event.id,
+              aggregateId: String(event.aggregateId),
+              error:
+                error instanceof Error ? error.message : String(error),
+            },
+            "Failed to compute sequence number for event",
+          );
+          throw error;
+        }
+
         // Check if event already processed (idempotency)
         if (this.processorCheckpointStore) {
           const existingCheckpoint =
@@ -1060,6 +1153,36 @@ export class EventSourcingService<
               "Event already processed for projection, skipping",
             );
             return;
+          }
+
+          // Enforce ordering: check if previous sequence number was processed
+          if (sequenceNumber > 1) {
+            const previousCheckpoint =
+              await this.processorCheckpointStore.getCheckpointBySequenceNumber(
+                projectionName,
+                "projection",
+                event.tenantId,
+                this.aggregateType,
+                String(event.aggregateId),
+                sequenceNumber - 1,
+              );
+
+            if (!previousCheckpoint || previousCheckpoint.status !== "processed") {
+              const errorMessage =
+                `Previous event (sequence ${sequenceNumber - 1}) has not been processed yet. Processing stopped to maintain event ordering.`;
+              this.logger?.warn(
+                {
+                  projectionName,
+                  eventId: event.id,
+                  aggregateId: String(event.aggregateId),
+                  sequenceNumber,
+                  previousSequenceNumber: sequenceNumber - 1,
+                  tenantId: event.tenantId,
+                },
+                errorMessage,
+              );
+              throw new Error(errorMessage);
+            }
           }
 
           // Check if any previous events failed (stop processing if so)
@@ -1097,6 +1220,7 @@ export class EventSourcingService<
                 "projection",
                 event,
                 "pending",
+                sequenceNumber,
               );
             } catch (checkpointError) {
               // Log checkpoint error but continue processing
@@ -1130,6 +1254,7 @@ export class EventSourcingService<
                 "projection",
                 event,
                 "processed",
+                sequenceNumber,
               );
               this.logger?.debug(
                 {
@@ -1168,6 +1293,7 @@ export class EventSourcingService<
                 "projection",
                 event,
                 "failed",
+                sequenceNumber,
                 errorMessage,
               );
             } catch (checkpointError) {
