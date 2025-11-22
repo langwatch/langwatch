@@ -103,23 +103,42 @@ See: [`services/eventSourcingService.ts`](./services/eventSourcingService.ts#L14
 
 ### Event Ordering Within Aggregates
 
-Events for the same aggregate are **guaranteed to be processed in order**. This is critical for maintaining consistency when building projections.
+Events for the same aggregate are **guaranteed to be processed in order**. This is critical for maintaining consistency when building projections and processing side effects.
 
 **How it works:**
 
 1. **Event Storage**: Events are stored scoped to `tenantId + aggregateId + aggregateType`
 2. **Event Retrieval**: The event store returns events for a specific aggregate, typically ordered by timestamp
-3. **EventStream Ordering**: The `EventStream` class ensures events are always in chronological order before being passed to projection handlers
+3. **Sequence Numbers**: Each event is assigned a sequence number (1-indexed) based on its position in chronological order within the aggregate
+4. **EventStream Ordering**: The `EventStream` class ensures events are always in chronological order before being passed to projection handlers
+5. **Sequential Processing**: Handlers and projections enforce strict sequential processing - event N+1 cannot be processed until event N is processed
 
 ```mermaid
 graph LR
     ES[(Event Store)] --> |"Get Events<br/>tenantId + aggregateId"| ER[Event Retrieval]
     ER --> |"Raw Events"| ESort[EventStream<br/>Sorting]
-    ESort --> |"Ordered Events<br/>by timestamp"| PH[Projection Handler]
+    ESort --> |"Ordered Events<br/>by timestamp"| SN[Sequence Numbers<br/>1, 2, 3, ...]
+    SN --> |"Sequential Processing"| PH[Projection Handler]
 
     style ESort fill:#ffe1f5
+    style SN fill:#fff4e1
     style PH fill:#e1ffe1
 ```
+
+**Sequence Number Computation:**
+
+Sequence numbers are computed using `countEventsBefore()` - the number of events that occurred before this event (by timestamp and ID), plus 1. This ensures:
+- Events are numbered 1, 2, 3, ... in chronological order
+- Sequence numbers are stable and deterministic
+- Out-of-order processing is prevented
+
+**Sequential Processing Enforcement:**
+
+Before processing an event, the system:
+1. Checks if the event was already processed (idempotency)
+2. Verifies that the previous sequence number (N-1) was processed
+3. Checks if any previous events failed (stops processing if so)
+4. Only processes if all conditions are met
 
 **Ordering strategies:**
 
@@ -133,7 +152,7 @@ graph LR
 - Events from different tenants are never mixed, even if they share the same aggregateId
 - The event store validates tenantId before any operations
 
-See: [`streams/eventStream.ts`](./streams/eventStream.ts#L38-L68) for ordering implementation and [`stores/eventStore.types.ts`](./stores/eventStore.types.ts#L11-L12) for concurrency guarantees.
+See: [`streams/eventStream.ts`](./streams/eventStream.ts#L38-L68) for ordering implementation, [`services/eventSourcingService.ts`](./services/eventSourcingService.ts#L854-L867) for sequence number computation, and [`stores/eventStore.types.ts`](./stores/eventStore.types.ts#L11-L12) for concurrency guarantees.
 
 ### Concurrent Projection Updates
 
@@ -183,34 +202,76 @@ Event handlers process individual events asynchronously via queues. They can:
 
 - Filter by event type
 - Have dependencies on other handlers (executed in order)
-- Be idempotent (via job IDs)
+- Be idempotent (via per-event checkpoints)
 - Have concurrency limits
+- Enforce sequential ordering per aggregate
 
 ```mermaid
 sequenceDiagram
     participant ES as Event Store
     participant Q as Queue System
+    participant CP as Checkpoint Store
     participant EH1 as Handler 1
     participant EH2 as Handler 2
 
-    ES->>Q: Dispatch Event
+    ES->>Q: Dispatch Event (seq: 2)
+    Q->>CP: Check seq 1 processed?
+    CP-->>Q: Yes, proceed
+    Q->>CP: Save checkpoint (pending)
     Q->>EH1: Process (async)
     EH1->>EH1: Side Effect
+    EH1->>CP: Save checkpoint (processed)
     EH1->>Q: Complete
     Q->>EH2: Process (depends on EH1)
     EH2->>EH2: Side Effect
     EH2->>Q: Complete
 ```
 
-**Handler dependencies:** Handlers are topologically sorted to respect dependencies. See: [`services/eventSourcingService.ts`](./services/eventSourcingService.ts#L474-L555)
+**Per-Event Checkpointing:**
 
-**Queue processing:** Handlers are dispatched to queues for async processing. See: [`services/eventSourcingService.ts`](./services/eventSourcingService.ts#L317-L414)
+Each event is checkpointed individually with status tracking:
+- **`pending`**: Event is queued but not yet processed
+- **`processed`**: Event was successfully processed
+- **`failed`**: Event processing failed
+
+Checkpoints enable:
+- **Idempotency**: Already processed events are automatically skipped
+- **Sequential ordering**: Events are processed in sequence number order
+- **Failure detection**: Failed events stop processing of subsequent events for that aggregate
+- **Recovery**: Failed events can be identified and reprocessed
+
+**Handler dependencies:** Handlers are topologically sorted to respect dependencies. See: [`services/eventSourcingService.ts`](./services/eventSourcingService.ts#L728-L843)
+
+**Queue processing:** Handlers are dispatched to queues for async processing. See: [`services/eventSourcingService.ts`](./services/eventSourcingService.ts#L273-L310)
+
+**Sequential ordering:** Events are processed in sequence number order per aggregate. See: [`services/eventSourcingService.ts`](./services/eventSourcingService.ts#L873-L1091) for `handleEvent` implementation.
 
 ### Event Publishing
 
 Events can be published to external systems (message queues, event buses) after successful storage. Publishing failures are logged but don't fail event storage.
 
-See: [`publishing/eventPublisher.types.ts`](./publishing/eventPublisher.types.ts) and [`services/eventSourcingService.ts`](./services/eventSourcingService.ts#L152-L175)
+See: [`publishing/eventPublisher.types.ts`](./publishing/eventPublisher.types.ts) and [`services/eventSourcingService.ts`](./services/eventSourcingService.ts#L228-L251)
+
+### Failure Handling
+
+When an event fails processing (handler or projection), the system:
+
+1. **Saves checkpoint as `failed`**: Records the failure with error message
+2. **Stops processing subsequent events**: Events with higher sequence numbers for that aggregate will not be processed until the failure is resolved
+3. **Enables recovery**: Failed events can be identified via `getFailedEvents()` and reprocessed after fixing the issue
+
+**Failure Detection:**
+
+Before processing an event, the system checks `hasFailedEvents()` for the aggregate. If any previous events failed, processing stops immediately to prevent cascading failures.
+
+**Recovery Workflow:**
+
+1. Identify failed events using `getFailedEvents()`
+2. Fix the underlying issue (code bug, data issue, external dependency, etc.)
+3. Clear checkpoints for failed events using `clearCheckpoint()`
+4. Events will be reprocessed automatically via queue retries or manual replay
+
+See: [`services/eventSourcingService.ts`](./services/eventSourcingService.ts#L962-L986) for failure detection and [`stores/eventHandlerCheckpointStore.types.ts`](./stores/eventHandlerCheckpointStore.types.ts) for checkpoint store interface.
 
 ## Time Travel & Debugging
 
@@ -253,17 +314,21 @@ See: [`streams/eventStream.ts`](./streams/eventStream.ts)
 
 ## Multiple Projections for Different Views
 
-A single aggregate can have multiple projections, each providing a different view of the same events.
+A single aggregate can have multiple projections, each providing a different view of the same events. Projections are processed asynchronously via queues, similar to event handlers.
 
 ```mermaid
 graph TB
-    ES[(Event Store)] --> |"Same Events"| PH1[Projection Handler 1]
-    ES --> |"Same Events"| PH2[Projection Handler 2]
-    ES --> |"Same Events"| PH3[Projection Handler 3]
+    ES[(Event Store)] --> |"Event (seq: N)"| Q1[Projection Queue 1]
+    ES --> |"Event (seq: N)"| Q2[Projection Queue 2]
+    ES --> |"Event (seq: N)"| Q3[Projection Queue 3]
 
-    PH1 --> P1[Summary Projection]
-    PH2 --> P2[Analytics Projection]
-    PH3 --> P3[Search Index]
+    Q1 --> |"Sequential Processing"| PH1[Projection Handler 1]
+    Q2 --> |"Sequential Processing"| PH2[Projection Handler 2]
+    Q3 --> |"Sequential Processing"| PH3[Projection Handler 3]
+
+    PH1 --> |"Rebuild from<br/>All Events"| P1[Summary Projection]
+    PH2 --> |"Rebuild from<br/>All Events"| P2[Analytics Projection]
+    PH3 --> |"Rebuild from<br/>All Events"| P3[Search Index]
 
     P1 --> PS1[(Projection Store 1)]
     P2 --> PS2[(Projection Store 2)]
@@ -275,6 +340,24 @@ graph TB
     style P3 fill:#e1ffe1
 ```
 
+**Key characteristics:**
+
+- **Per-event triggering**: Each event triggers a projection rebuild for all projections
+- **Full rebuild**: Projections rebuild from **all events** for the aggregate (not incremental)
+- **Queue-based**: Each projection has its own queue processor for async processing
+- **Sequential ordering**: Events are processed in sequence number order per aggregate
+- **Per-event checkpoints**: Each event is checkpointed for each projection
+- **Distributed locking**: Concurrent updates to the same aggregate projection are serialized
+
+**Processing Flow:**
+
+1. Event is stored in event store
+2. Event is dispatched to each projection's queue
+3. Queue processor processes event in sequence number order
+4. Before processing, checks previous sequence number was processed
+5. Rebuilds projection from all events for the aggregate
+6. Saves checkpoint as `processed` on success, `failed` on failure
+
 **Use cases:**
 
 - **Summary view:** Fast, denormalized view for UI
@@ -282,9 +365,11 @@ graph TB
 - **Search index:** Full-text searchable representation
 - **Reporting view:** Pre-computed reports
 
-**Registration:** Multiple projections are registered via the pipeline builder. See: [`runtime/pipeline/builder.ts`](./runtime/pipeline/builder.ts#L306-L332)
+**Registration:** Multiple projections are registered via the pipeline builder. See: [`runtime/pipeline/builder.ts`](./runtime/pipeline/builder.ts#L303-L329)
 
-**Access:** Each projection is accessed by name. See: [`services/eventSourcingService.ts`](./services/eventSourcingService.ts#L912-L940)
+**Access:** Each projection is accessed by name. See: [`services/eventSourcingService.ts`](./services/eventSourcingService.ts#L1671-L1713)
+
+**Implementation:** See [`services/eventSourcingService.ts`](./services/eventSourcingService.ts#L1099-L1331) for `processProjectionEvent` and [`services/eventSourcingService.ts`](./services/eventSourcingService.ts#L320-L364) for projection queue initialization.
 
 ## Understanding State Over Time
 
@@ -334,7 +419,7 @@ graph LR
     Start[registerPipeline] --> Name[withName]
     Name --> Type[withAggregateType]
     Type --> Config{Configure}
-    Config --> |"Projections"| Proj[withProjection]
+    Config --> |"Projections"| Proj[withEventProjection]
     Config --> |"Handlers"| Hand[withEventHandler]
     Config --> |"Commands"| Cmd[withCommandHandler]
     Config --> |"Publishing"| Pub[withEventPublisher]
@@ -357,6 +442,7 @@ graph LR
 - **Event handlers:** [`domain/handlers/eventReactionHandler.ts`](./domain/handlers/eventReactionHandler.ts)
 - **Projection handlers:** [`domain/handlers/eventHandler.ts`](./domain/handlers/eventHandler.ts)
 - **Distributed locking:** [`utils/distributedLock.ts`](./utils/distributedLock.ts)
+- **Processor checkpoints:** [`stores/eventHandlerCheckpointStore.types.ts`](./stores/eventHandlerCheckpointStore.types.ts)
 
 ## Next Steps
 

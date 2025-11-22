@@ -55,7 +55,7 @@ const pipeline = eventSourcing
   .registerPipeline<MyEvent, MyProjection>()
   .withName("my-pipeline")
   .withAggregateType("my-aggregate")
-  .withProjection("summary", projectionStore, new MyProjectionHandler())
+  .withEventProjection("summary", projectionStore, new MyProjectionHandler())
   .build();
 
 // Use pipeline
@@ -74,9 +74,10 @@ const projection = await pipeline.service.getProjectionByName(
 **Basic usage:**
 
 - **Commands**: Register with `.withCommandHandler()` → access via `pipeline.commands.commandName.send()`
-- **Event Handlers**: Register with `.withEventHandler()` → process events asynchronously
-- **Projections**: Register with `.withProjection()` → access via `pipeline.service.getProjectionByName()`
+- **Event Handlers**: Register with `.withEventHandler()` → process events asynchronously via queues with sequential ordering
+- **Projections**: Register with `.withEventProjection()` → process events asynchronously via queues, access via `pipeline.service.getProjectionByName()`
 - **Events**: Store via `pipeline.service.storeEvents()` → triggers handlers and updates projections automatically
+- **Checkpoints**: Automatically tracked per-event for both handlers and projections, enabling idempotency and sequential ordering
 
 ## Navigating the Codebase
 
@@ -88,7 +89,7 @@ The library contains no feature/product specifcs, so this is not the section you
 - **`commands/`** - Command handling (Command, CommandHandler, CommandSchema)
 - **`streams/`** - EventStream for ordered event processing
 - **`services/`** - EventSourcingService (main orchestration)
-- **`stores/`** - Store interfaces (EventStore, ProjectionStore, EventHandlerCheckpointStore)
+- **`stores/`** - Store interfaces (EventStore, ProjectionStore, ProcessorCheckpointStore)
 - **`domain/handlers/`** - Handler interfaces (EventHandler, EventReactionHandler)
 - **`publishing/`** - Event publishing interface
 - **`queues/`** - Queue processor interfaces
@@ -110,7 +111,7 @@ Runtime infrastructure and pipeline builder:
 Concrete store implementations:
 
 - **`eventStoreClickHouse.ts`** / **`eventStoreMemory.ts`** - Event store implementations
-- **`eventHandlerCheckpointStoreClickHouse.ts`** / **`eventHandlerCheckpointStoreMemory.ts`** - Checkpoint stores
+- **`processorCheckpointStoreClickHouse.ts`** / **`processorCheckpointStoreMemory.ts`** - Processor checkpoint stores (for handlers and projections)
 
 ## Cautions, Security & Best Practices
 
@@ -158,7 +159,7 @@ const pipeline = eventSourcing
   .registerPipeline<MyEvent, MyProjection>()
   .withName("my-pipeline")
   .withAggregateType("my-aggregate")
-  .withProjection("summary", store, handler)
+  .withEventProjection("summary", store, handler)
   .build();
 
 // Lock is automatically used when updating projections
@@ -180,7 +181,7 @@ const pipeline = eventSourcing
   .registerPipeline<MyEvent, MyProjection>()
   .withName("test-pipeline")
   .withAggregateType("test")
-  .withProjection("test", projectionStore, handler)
+  .withEventProjection("test", projectionStore, handler)
   .build();
 ```
 
@@ -195,7 +196,9 @@ npm test src/server/event-sourcing/library
 1. **Missing tenant validation**: Always validate `tenantId` in store implementations
 2. **Concurrent updates**: Use distributed locking in production
 3. **Event ordering**: Events are automatically ordered by timestamp (see Event Ordering section)
-4. **Projection updates**: Projections are automatically updated after `storeEvents()` - manual updates only needed for recovery
+4. **Sequential processing**: Events must be processed in sequence number order - if a previous event fails, subsequent events stop processing
+5. **Projection updates**: Projections are automatically updated after `storeEvents()` via queues - manual updates only needed for recovery
+6. **Checkpoint stores**: Processor checkpoint stores are automatically created for handlers and projections when using the runtime
 
 ## Reference
 
@@ -252,6 +255,8 @@ await pipeline.commands.recordSpan.send({
 
 #### Event Handlers for Side Effects
 
+Event handlers process individual events asynchronously via queues. The system enforces sequential ordering per aggregate - events are processed in sequence number order, and if any event fails, subsequent events for that aggregate stop processing.
+
 ```typescript
 import type { EventReactionHandler } from "./library";
 
@@ -263,6 +268,8 @@ class SpanClickHouseWriterHandler implements EventReactionHandler<SpanEvent> {
   }
 
   async handle(event: SpanEvent): Promise<void> {
+    // This handler is idempotent - the system tracks checkpoints per event
+    // If this event was already processed, it will be skipped automatically
     await this.spanRepository.insertSpan(event.data.spanData);
   }
 }
@@ -276,22 +283,38 @@ const pipeline = eventSourcing
     new SpanClickHouseWriterHandler(repository),
     {
       eventTypes: ["lw.obs.span_ingestion.recorded"],
+      // Optional: configure concurrency, delay, job ID factory, etc.
     },
   )
   .build();
 ```
 
+**Key features:**
+- **Sequential ordering**: Events are processed in sequence number order per aggregate
+- **Per-event checkpoints**: Each event is checkpointed individually (pending → processed/failed)
+- **Idempotency**: Already processed events are automatically skipped
+- **Failure handling**: If an event fails, subsequent events for that aggregate stop processing
+- **Queue-based**: Events are processed asynchronously via queues (BullMQ or Memory)
+
 #### Multiple Projections
+
+Projections are processed asynchronously via queues, similar to event handlers. Each event triggers a projection rebuild, but the rebuild uses all events for the aggregate to ensure consistency.
 
 ```typescript
 const pipeline = eventSourcing
   .registerPipeline<SpanEvent>()
   .withName("trace-aggregation")
   .withAggregateType("trace_aggregation")
-  .withProjection("summary", summaryStore, summaryHandler)
-  .withProjection("analytics", analyticsStore, analyticsHandler)
+  .withEventProjection("summary", summaryStore, summaryHandler)
+  .withEventProjection("analytics", analyticsStore, analyticsHandler)
   .build();
 
+// Projections are automatically updated after events are stored
+await pipeline.service.storeEvents(events, {
+  tenantId: createTenantId("acme"),
+});
+
+// Access projections
 const summary = await pipeline.service.getProjectionByName(
   "summary",
   "trace-123",
@@ -300,6 +323,13 @@ const summary = await pipeline.service.getProjectionByName(
   },
 );
 ```
+
+**Key features:**
+- **Queue-based processing**: Each projection has its own queue processor
+- **Per-event triggering**: Each event triggers a projection rebuild
+- **Full rebuild**: Projections rebuild from all events for the aggregate (not incremental)
+- **Sequential ordering**: Events are processed in sequence number order
+- **Per-event checkpoints**: Each event is checkpointed for the projection
 
 ### API Reference
 
@@ -310,7 +340,7 @@ const pipeline = eventSourcing
   .registerPipeline<EventType, ProjectionType>()
   .withName("pipeline-name")
   .withAggregateType("aggregate-type")
-  .withProjection("projection-name", store, handler)
+  .withEventProjection("projection-name", store, handler)
   .withEventHandler("handler-name", handler, { eventTypes: ["event.type"] })
   .withCommandHandler(CommandHandlerClass)
   .withEventPublisher(publisher)
@@ -363,7 +393,9 @@ await pipeline.commands.commandName.send({
 
 ### Event Ordering
 
-Events are automatically ordered when building projections:
+Events are automatically ordered when building projections. Additionally, the system enforces sequential processing per aggregate using sequence numbers.
+
+**Event Stream Ordering:**
 
 ```typescript
 // Timestamp ordering (default)
@@ -380,6 +412,18 @@ const stream = new EventStream(aggregateId, tenantId, events, {
 });
 ```
 
+**Sequential Processing:**
+
+The system computes sequence numbers (1-indexed) for each event within its aggregate and enforces strict sequential processing:
+
+- Events are assigned sequence numbers based on their position in chronological order
+- Handlers and projections process events in sequence number order
+- If event N hasn't been processed, event N+1 will not be processed (throws error)
+- If any event fails, subsequent events for that aggregate stop processing
+- This ensures consistency and prevents out-of-order processing
+
+Sequence numbers are computed using `countEventsBefore()` - the number of events that occurred before this event (by timestamp and ID), plus 1.
+
 ### Additional Resources
 
 - **Architecture Overview**: See [OVERVIEW.md](./OVERVIEW.md) for core concepts and architecture
@@ -389,5 +433,6 @@ const stream = new EventStream(aggregateId, tenantId, events, {
   - `domain/types.ts` - Core types (Event, Projection)
   - `stores/eventStore.types.ts` - Event store interface
   - `stores/projectionStore.types.ts` - Projection store interface
+  - `stores/eventHandlerCheckpointStore.types.ts` - Processor checkpoint store interface
   - `services/eventSourcingService.ts` - Main service
   - `utils/event.utils.ts` - Utilities
