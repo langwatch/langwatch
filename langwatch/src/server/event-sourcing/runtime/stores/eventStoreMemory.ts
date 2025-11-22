@@ -74,6 +74,34 @@ export class EventStoreMemory<EventType extends Event = Event>
     }));
   }
 
+  async countEventsBefore(
+    aggregateId: string,
+    context: EventStoreReadContext<EventType>,
+    aggregateType: AggregateType,
+    beforeTimestamp: number,
+    beforeEventId: string,
+  ): Promise<number> {
+    // Validate tenant context
+    EventUtils.validateTenantId(context, "EventStoreMemory.countEventsBefore");
+
+    // Get all events for the aggregate
+    const events = await this.getEvents(aggregateId, context, aggregateType);
+
+    // Count events that come before the specified event
+    // Events where: (timestamp < beforeTimestamp) OR (timestamp === beforeTimestamp AND id < beforeEventId)
+    const count = events.filter((event) => {
+      if (event.timestamp < beforeTimestamp) {
+        return true;
+      }
+      if (event.timestamp === beforeTimestamp && event.id < beforeEventId) {
+        return true;
+      }
+      return false;
+    }).length;
+
+    return count;
+  }
+
   async storeEvents(
     events: readonly EventType[],
     context: EventStoreReadContext<EventType>,

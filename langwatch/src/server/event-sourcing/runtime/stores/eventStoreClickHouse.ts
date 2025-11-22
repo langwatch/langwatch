@@ -145,6 +145,79 @@ export class EventStoreClickHouse<EventType extends Event = Event>
     );
   }
 
+  async countEventsBefore(
+    aggregateId: string,
+    context: EventStoreReadContext<EventType>,
+    aggregateType: AggregateType,
+    beforeTimestamp: number,
+    beforeEventId: string,
+  ): Promise<number> {
+    // Validate tenant context
+    EventUtils.validateTenantId(
+      context,
+      "EventStoreClickHouse.countEventsBefore",
+    );
+
+    return await this.tracer.withActiveSpan(
+      "EventStoreClickHouse.countEventsBefore",
+      {
+        kind: SpanKind.INTERNAL,
+        attributes: {
+          "aggregate.id": String(aggregateId),
+          "tenant.id": context.tenantId,
+          "aggregate.type": aggregateType,
+          "before.timestamp": beforeTimestamp,
+          "before.event_id": beforeEventId,
+        },
+      },
+      async () => {
+        try {
+          const result = await this.clickHouseClient.query({
+            query: `
+              SELECT COUNT(*) as count
+              FROM event_log
+              WHERE TenantId = {tenantId:String}
+                AND AggregateType = {aggregateType:String}
+                AND AggregateId = {aggregateId:String}
+                AND (
+                  EventTimestamp < {beforeTimestamp:UInt64}
+                  OR (EventTimestamp = {beforeTimestamp:UInt64} AND EventId < {beforeEventId:String})
+                )
+            `,
+            query_params: {
+              tenantId: context.tenantId,
+              aggregateType,
+              aggregateId: String(aggregateId),
+              beforeTimestamp,
+              beforeEventId,
+            },
+            format: "JSONEachRow",
+          });
+
+          const rows = await result.json<{ count: number }>();
+          const count = rows[0]?.count ?? 0;
+
+          return count;
+        } catch (error) {
+          this.logger.error(
+            {
+              aggregateId: String(aggregateId),
+              tenantId: context.tenantId,
+              aggregateType,
+              beforeTimestamp,
+              beforeEventId,
+              error: error instanceof Error ? error.message : String(error),
+              errorStack: error instanceof Error ? error.stack : void 0,
+              errorName: error instanceof Error ? error.name : void 0,
+            },
+            "Failed to count events before from ClickHouse",
+          );
+          throw error;
+        }
+      },
+    );
+  }
+
   async storeEvents(
     events: readonly EventType[],
     context: EventStoreReadContext<EventType>,

@@ -78,6 +78,37 @@ export interface ReadOnlyEventStore<EventType extends Event = Event> {
     context: EventStoreReadContext<EventType>,
     aggregateType: AggregateType,
   ): Promise<readonly EventType[]>;
+
+  /**
+   * Counts events that come before a given event in chronological order.
+   * Used to compute sequence numbers for event ordering.
+   *
+   * Counts events where:
+   * - `timestamp < beforeTimestamp`, OR
+   * - `timestamp === beforeTimestamp AND id < beforeEventId`
+   *
+   * **Performance:** Implementations SHOULD use efficient COUNT queries rather than
+   * fetching all events. For example, ClickHouse implementations should use COUNT(*)
+   * with WHERE clause filtering, leveraging indexes.
+   *
+   * @param aggregateId - The aggregate to count events for
+   * @param context - Security context with required tenantId
+   * @param aggregateType - The type of aggregate root (e.g., "trace", "user")
+   * @param beforeTimestamp - The timestamp to compare against
+   * @param beforeEventId - The event ID to compare against (for tie-breaking when timestamps are equal)
+   * @returns The count of events that come before the specified event
+   * @throws {Error} If tenantId is missing or invalid
+   *
+   * **Security:** Implementations MUST call validateTenantId(context, 'countEventsBefore')
+   * before executing the query to ensure tenant isolation.
+   */
+  countEventsBefore(
+    aggregateId: string,
+    context: EventStoreReadContext<EventType>,
+    aggregateType: AggregateType,
+    beforeTimestamp: number,
+    beforeEventId: string,
+  ): Promise<number>;
 }
 
 /**
