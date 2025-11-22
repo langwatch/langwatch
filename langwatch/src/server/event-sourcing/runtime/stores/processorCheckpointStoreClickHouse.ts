@@ -16,6 +16,7 @@ interface CheckpointRecord {
   EventId: string;
   Status: "processed" | "failed" | "pending";
   EventTimestamp: number;
+  SequenceNumber: number;
   ProcessedAt: number | null;
   FailedAt: number | null;
   ErrorMessage: string | null;
@@ -33,10 +34,11 @@ interface CheckpointRecord {
  * CREATE TABLE IF NOT EXISTS processor_checkpoints (
  *   CheckpointKey String, -- Primary key: processorName:eventId
  *   ProcessorName String,
- *   ProcessorType Enum8('handler' = 1, 'projection' = 2),
+ *   ProcessorType String,
  *   EventId String,
- *   Status Enum8('processed' = 1, 'failed' = 2, 'pending' = 3),
+ *   Status String,
  *   EventTimestamp UInt64,
+ *   SequenceNumber UInt64, -- Sequence number of event within aggregate (1-indexed)
  *   ProcessedAt Nullable(UInt64),
  *   FailedAt Nullable(UInt64),
  *   ErrorMessage Nullable(String),
@@ -66,6 +68,7 @@ export class ProcessorCheckpointStoreClickHouse
     processorType: "handler" | "projection",
     event: EventType,
     status: "processed" | "failed" | "pending",
+    sequenceNumber: number,
     errorMessage?: string,
   ): Promise<void> {
     EventUtils.validateTenantId(
@@ -99,6 +102,7 @@ export class ProcessorCheckpointStoreClickHouse
             EventId: event.id,
             Status: status,
             EventTimestamp: event.timestamp,
+            SequenceNumber: sequenceNumber,
             ProcessedAt: status === "processed" ? now : null,
             FailedAt: status === "failed" ? now : null,
             ErrorMessage: status === "failed" ? errorMessage ?? null : null,
@@ -174,6 +178,7 @@ export class ProcessorCheckpointStoreClickHouse
                 EventId,
                 Status,
                 EventTimestamp,
+                SequenceNumber,
                 ProcessedAt,
                 FailedAt,
                 ErrorMessage,
@@ -203,6 +208,7 @@ export class ProcessorCheckpointStoreClickHouse
             eventId: row.EventId,
             status: row.Status,
             eventTimestamp: row.EventTimestamp,
+            sequenceNumber: row.SequenceNumber,
             processedAt: row.ProcessedAt ?? void 0,
             failedAt: row.FailedAt ?? void 0,
             errorMessage: row.ErrorMessage ?? void 0,
@@ -263,6 +269,7 @@ export class ProcessorCheckpointStoreClickHouse
                 EventId,
                 Status,
                 EventTimestamp,
+                SequenceNumber,
                 ProcessedAt,
                 FailedAt,
                 ErrorMessage,
@@ -302,6 +309,7 @@ export class ProcessorCheckpointStoreClickHouse
             eventId: row.EventId,
             status: row.Status,
             eventTimestamp: row.EventTimestamp,
+            sequenceNumber: row.SequenceNumber,
             processedAt: row.ProcessedAt ?? void 0,
             failedAt: row.FailedAt ?? void 0,
             errorMessage: row.ErrorMessage ?? void 0,
@@ -323,6 +331,113 @@ export class ProcessorCheckpointStoreClickHouse
               errorStack: error instanceof Error ? error.stack : void 0,
             },
             "Failed to get last processed event from ClickHouse",
+          );
+          throw error;
+        }
+      },
+    );
+  }
+
+  async getCheckpointBySequenceNumber(
+    processorName: string,
+    processorType: "handler" | "projection",
+    tenantId: TenantId,
+    aggregateType: AggregateType,
+    aggregateId: string,
+    sequenceNumber: number,
+  ): Promise<ProcessorCheckpoint | null> {
+    EventUtils.validateTenantId(
+      { tenantId },
+      "ProcessorCheckpointStoreClickHouse.getCheckpointBySequenceNumber",
+    );
+
+    return await this.tracer.withActiveSpan(
+      "ProcessorCheckpointStoreClickHouse.getCheckpointBySequenceNumber",
+      {
+        kind: SpanKind.INTERNAL,
+        attributes: {
+          "processor.name": processorName,
+          "processor.type": processorType,
+          "tenant.id": tenantId,
+          "aggregate.type": aggregateType,
+          "aggregate.id": aggregateId,
+          "sequence.number": sequenceNumber,
+        },
+      },
+      async () => {
+        try {
+          const result = await this.clickHouseClient.query({
+            query: `
+              SELECT
+                ProcessorName,
+                ProcessorType,
+                EventId,
+                Status,
+                EventTimestamp,
+                SequenceNumber,
+                ProcessedAt,
+                FailedAt,
+                ErrorMessage,
+                TenantId,
+                AggregateType,
+                AggregateId
+              FROM processor_checkpoints FINAL
+              WHERE TenantId = {tenantId:String}
+                AND ProcessorName = {processorName:String}
+                AND ProcessorType = {processorType:String}
+                AND AggregateType = {aggregateType:String}
+                AND AggregateId = {aggregateId:String}
+                AND SequenceNumber = {sequenceNumber:UInt64}
+                AND Status = 'processed'
+              LIMIT 1
+            `,
+            query_params: {
+              tenantId,
+              processorName,
+              processorType,
+              aggregateType,
+              aggregateId,
+              sequenceNumber,
+            },
+            format: "JSONEachRow",
+          });
+
+          const rows = await result.json<CheckpointRecord>();
+          const row = rows[0];
+
+          if (!row) {
+            return null;
+          }
+
+          const checkpoint: ProcessorCheckpoint = {
+            processorName: row.ProcessorName,
+            processorType: row.ProcessorType,
+            eventId: row.EventId,
+            status: row.Status,
+            eventTimestamp: row.EventTimestamp,
+            sequenceNumber: row.SequenceNumber,
+            processedAt: row.ProcessedAt ?? void 0,
+            failedAt: row.FailedAt ?? void 0,
+            errorMessage: row.ErrorMessage ?? void 0,
+            tenantId: row.TenantId as TenantId,
+            aggregateType: row.AggregateType as AggregateType,
+            aggregateId: row.AggregateId,
+          };
+
+          return checkpoint;
+        } catch (error) {
+          this.logger.error(
+            {
+              processorName,
+              processorType,
+              tenantId,
+              aggregateType,
+              aggregateId,
+              sequenceNumber,
+              error: error instanceof Error ? error.message : String(error),
+              errorStack: error instanceof Error ? error.stack : void 0,
+            },
+            "Failed to get checkpoint by sequence number from ClickHouse",
           );
           throw error;
         }
@@ -435,6 +550,7 @@ export class ProcessorCheckpointStoreClickHouse
                 EventId,
                 Status,
                 EventTimestamp,
+                SequenceNumber,
                 ProcessedAt,
                 FailedAt,
                 ErrorMessage,
@@ -468,6 +584,7 @@ export class ProcessorCheckpointStoreClickHouse
             eventId: row.EventId,
             status: row.Status,
             eventTimestamp: row.EventTimestamp,
+            sequenceNumber: row.SequenceNumber,
             processedAt: row.ProcessedAt ?? void 0,
             failedAt: row.FailedAt ?? void 0,
             errorMessage: row.ErrorMessage ?? void 0,

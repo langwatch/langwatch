@@ -37,6 +37,7 @@ export class ProcessorCheckpointStoreMemory
     processorType: "handler" | "projection",
     event: EventType,
     status: "processed" | "failed" | "pending",
+    sequenceNumber: number,
     errorMessage?: string,
   ): Promise<void> {
     EventUtils.validateTenantId(
@@ -53,6 +54,7 @@ export class ProcessorCheckpointStoreMemory
       eventId: event.id,
       status,
       eventTimestamp: event.timestamp,
+      sequenceNumber,
       processedAt: status === "processed" ? now : void 0,
       failedAt: status === "failed" ? now : void 0,
       errorMessage: status === "failed" ? errorMessage : void 0,
@@ -116,6 +118,37 @@ export class ProcessorCheckpointStoreMemory
 
     // Deep clone to prevent mutation
     return JSON.parse(JSON.stringify(lastCheckpoint));
+  }
+
+  async getCheckpointBySequenceNumber(
+    processorName: string,
+    processorType: "handler" | "projection",
+    tenantId: TenantId,
+    aggregateType: AggregateType,
+    aggregateId: string,
+    sequenceNumber: number,
+  ): Promise<ProcessorCheckpoint | null> {
+    EventUtils.validateTenantId(
+      { tenantId },
+      "ProcessorCheckpointStoreMemory.getCheckpointBySequenceNumber",
+    );
+
+    for (const checkpoint of this.checkpoints.values()) {
+      if (
+        checkpoint.processorName === processorName &&
+        checkpoint.processorType === processorType &&
+        checkpoint.tenantId === tenantId &&
+        checkpoint.aggregateType === aggregateType &&
+        checkpoint.aggregateId === aggregateId &&
+        checkpoint.sequenceNumber === sequenceNumber &&
+        checkpoint.status === "processed"
+      ) {
+        // Deep clone to prevent mutation
+        return JSON.parse(JSON.stringify(checkpoint));
+      }
+    }
+
+    return null;
   }
 
   async hasFailedEvents(
