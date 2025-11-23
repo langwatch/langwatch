@@ -13,7 +13,7 @@ import type {
 } from "../../stores/projectionStore.types";
 import type { EventPublisher } from "../../publishing/eventPublisher.types";
 import type { EventHandler } from "../../domain/handlers/eventHandler";
-import type { EventReactionHandler } from "../../domain/handlers/eventReactionHandler";
+import type { ProjectionHandler } from "../../domain/handlers/projectionHandler";
 import type { EventHandlerDefinition } from "../../eventHandler.types";
 import type { ProjectionDefinition } from "../../projection.types";
 import type { DistributedLock, LockHandle } from "../../utils/distributedLock";
@@ -55,12 +55,12 @@ export function createMockEventPublisher<T extends Event>(): EventPublisher<T> {
 }
 
 /**
- * Creates a mock EventHandler (for projections) with default implementations.
+ * Creates a mock ProjectionHandler (for projections) with default implementations.
  */
 export function createMockEventHandler<
   TEvent extends Event,
   TProjection extends Projection,
->(): EventHandler<TEvent, TProjection> {
+>(): ProjectionHandler<TEvent, TProjection> {
   return {
     handle: vi.fn().mockResolvedValue({
       id: "test-projection-id",
@@ -73,11 +73,11 @@ export function createMockEventHandler<
 }
 
 /**
- * Creates a mock EventReactionHandler (for event handlers) with default implementations.
+ * Creates a mock EventHandler (for event handlers) with default implementations.
  */
 export function createMockEventReactionHandler<
   T extends Event,
->(): EventReactionHandler<T> {
+>(): EventHandler<T> {
   return {
     handle: vi.fn().mockResolvedValue(void 0),
     getEventTypes: vi.fn().mockReturnValue(void 0),
@@ -89,7 +89,7 @@ export function createMockEventReactionHandler<
  */
 export function createMockEventHandlerDefinition<T extends Event>(
   name: string,
-  handler?: EventReactionHandler<T>,
+  handler?: EventHandler<T>,
   options?: Partial<EventHandlerDefinition<T>["options"]>,
 ): EventHandlerDefinition<T> {
   return {
@@ -97,7 +97,6 @@ export function createMockEventHandlerDefinition<T extends Event>(
     handler: handler ?? createMockEventReactionHandler<T>(),
     options: {
       eventTypes: void 0,
-      dependsOn: void 0,
       ...options,
     },
   };
@@ -111,7 +110,7 @@ export function createMockProjectionDefinition<
   TProjection extends Projection,
 >(
   name: string,
-  handler?: EventHandler<TEvent, TProjection>,
+  handler?: ProjectionHandler<TEvent, TProjection>,
   store?: ProjectionStore<TProjection>,
 ): ProjectionDefinition<TEvent, TProjection> {
   return {
@@ -256,8 +255,38 @@ export const TEST_CONSTANTS = {
   AGGREGATE_ID: "test-aggregate-123",
   TENANT_ID_VALUE: "test-tenant",
   PROJECTION_NAME: "test-projection",
+  PIPELINE_NAME: "test-pipeline",
   HANDLER_NAME: "test-handler",
   AGGREGATE_TYPE: "span_ingestion" as const satisfies AggregateType,
   EVENT_TYPE_1: EVENT_TYPES[0],
   EVENT_TYPE_2: EVENT_TYPES[1] ?? EVENT_TYPES[0],
 } as const;
+
+/**
+ * Sets up common test environment (fake timers, base timestamp).
+ * Call this in beforeEach() hooks.
+ */
+export function setupTestEnvironment(): void {
+  vi.useFakeTimers();
+  vi.setSystemTime(TEST_CONSTANTS.BASE_TIMESTAMP);
+}
+
+/**
+ * Cleans up test environment (restore real timers, clear mocks).
+ * Call this in afterEach() hooks.
+ */
+export function cleanupTestEnvironment(): void {
+  vi.useRealTimers();
+  vi.restoreAllMocks();
+}
+
+/**
+ * Creates a standard test context with common test values.
+ * Returns an object with aggregateType, tenantId, and context.
+ */
+export function createTestContext() {
+  const aggregateType = createTestAggregateType();
+  const tenantId = createTestTenantId();
+  const context = createTestEventStoreReadContext(tenantId);
+  return { aggregateType, tenantId, context };
+}
