@@ -819,7 +819,7 @@ describe("EventSourcingService - Sequential Ordering Flows", () => {
       const seq2 = checkpoint2?.sequenceNumber;
 
       // Clear checkpoint and rebuild
-      await checkpointStore.clearCheckpoint(checkpointKey);
+      await checkpointStore.clearCheckpoint(tenantId, checkpointKey);
 
       // Rebuild projections (process events again) and check sequence numbers after each
       await service.storeEvents([event1], context);

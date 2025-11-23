@@ -23,7 +23,8 @@ export type TenantId = z.infer<typeof TenantIdSchema>;
  *
  * @param value - The string value to convert to a TenantId
  * @returns A TenantId branded type
- * @throws {z.ZodError} If the value is empty or not a string
+ * @throws {SecurityError} If the value is empty, ir not a string
+ * @throws {Error}
  */
 export function createTenantId(value: string): TenantId {
   try {

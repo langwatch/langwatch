@@ -56,6 +56,7 @@ export class ProcessorCheckpointStoreClickHouse
   constructor(private readonly repository: CheckpointRepository) {}
 
   async saveCheckpoint<EventType extends Event>(
+    tenantId: TenantId,
     checkpointKey: string,
     processorType: "handler" | "projection",
     event: EventType,
@@ -63,15 +64,33 @@ export class ProcessorCheckpointStoreClickHouse
     sequenceNumber: number,
     errorMessage?: string,
   ): Promise<void> {
+    // Validate tenantId
     EventUtils.validateTenantId(
-      { tenantId: event.tenantId },
+      { tenantId },
       "ProcessorCheckpointStoreClickHouse.saveCheckpoint",
     );
+
+    // Parse checkpointKey to extract tenantId for verification
+    const parsedKey = parseCheckpointKey(checkpointKey);
+
+    // Verify tenantId matches event.tenantId
+    if (tenantId.toString() !== event.tenantId.toString()) {
+      throw new Error(
+        `TenantId mismatch: provided tenantId (${tenantId.toString()}) does not match event.tenantId (${event.tenantId.toString()})`,
+      );
+    }
+
+    // Verify tenantId matches the tenantId in checkpointKey
+    if (tenantId.toString() !== parsedKey.tenantId.toString()) {
+      throw new Error(
+        `TenantId mismatch: provided tenantId (${tenantId.toString()}) does not match checkpointKey tenantId (${parsedKey.tenantId.toString()})`,
+      );
+    }
 
     const now = Date.now();
 
     // Extract processorName from checkpointKey (format: tenantId:pipelineName:processorName:aggregateType:aggregateId)
-    const { processorName } = parseCheckpointKey(checkpointKey);
+    const { processorName } = parsedKey;
 
     return await this.tracer.withActiveSpan(
       "ProcessorCheckpointStoreClickHouse.saveCheckpoint",
@@ -442,13 +461,30 @@ export class ProcessorCheckpointStoreClickHouse
     );
   }
 
-  async clearCheckpoint(checkpointKey: string): Promise<void> {
+  async clearCheckpoint(tenantId: TenantId, checkpointKey: string): Promise<void> {
+    // Validate tenantId
+    EventUtils.validateTenantId(
+      { tenantId },
+      "ProcessorCheckpointStoreClickHouse.clearCheckpoint",
+    );
+
+    // Parse checkpointKey to extract tenantId for verification
+    const parsedKey = parseCheckpointKey(checkpointKey);
+
+    // Verify tenantId matches the tenantId in checkpointKey
+    if (tenantId.toString() !== parsedKey.tenantId.toString()) {
+      throw new Error(
+        `TenantId mismatch: provided tenantId (${tenantId.toString()}) does not match checkpointKey tenantId (${parsedKey.tenantId.toString()})`,
+      );
+    }
+
     return await this.tracer.withActiveSpan(
       "ProcessorCheckpointStoreClickHouse.clearCheckpoint",
       {
         kind: SpanKind.INTERNAL,
         attributes: {
           "checkpoint.key": checkpointKey,
+          "tenant.id": tenantId.toString(),
         },
       },
       async () => {

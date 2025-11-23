@@ -350,20 +350,10 @@ describe("EventProcessorValidator", () => {
         checkpointStore.loadCheckpoint = vi
           .fn()
           .mockImplementation((checkpointKey: string) => {
-            // laterEvent not processed
-            if (
-              checkpointKey ===
-              buildCheckpointKey(
-                tenantId,
-                TEST_CONSTANTS.PIPELINE_NAME,
-                "processor",
-                TEST_CONSTANTS.AGGREGATE_TYPE,
-                TEST_CONSTANTS.AGGREGATE_ID,
-              )
-            ) {
-              return Promise.resolve(null);
-            }
-            // earlierEvent already processed
+            // Both earlierEvent and laterEvent share the same checkpoint key (per-aggregate checkpoints).
+            // The checkpoint represents the last processed event for the aggregate.
+            // Since earlierEvent (sequence 1) was processed, return a checkpoint showing sequence 1.
+            // Note: getCheckpointBySequenceNumber handles predecessor checks for ordering validation.
             if (
               checkpointKey ===
               buildCheckpointKey(

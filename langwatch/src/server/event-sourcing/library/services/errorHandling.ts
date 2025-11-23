@@ -524,7 +524,8 @@ export function categorizeError(error: unknown): ErrorCategory {
     return ErrorCategory.CRITICAL;
   }
 
-  // Default to non-critical for unknown errors
+  // Default to recoverable for unknown errors, so they can be retried by default and
+  // logged as warnings. If we're lucky, this will be all gucci.
   // Callers can override based on context
-  return ErrorCategory.NON_CRITICAL;
+  return ErrorCategory.RECOVERABLE;
 }

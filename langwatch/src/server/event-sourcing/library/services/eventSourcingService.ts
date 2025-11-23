@@ -127,14 +127,14 @@ export class EventSourcingService<
     }
 
     // Initialize components
-    const validator = new EventProcessorValidator<EventType>({
+    const validator = new EventProcessorValidator({
       eventStore,
       aggregateType,
       processorCheckpointStore,
       pipelineName: this.pipelineName,
     });
 
-    const checkpointManager = new CheckpointManager<EventType>(
+    const checkpointManager = new CheckpointManager(
       this.pipelineName,
       processorCheckpointStore,
     );

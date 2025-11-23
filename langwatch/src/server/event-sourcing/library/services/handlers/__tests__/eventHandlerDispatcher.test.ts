@@ -268,6 +268,7 @@ describe("EventHandlerDispatcher", () => {
       // 1st call: pending checkpoint from idempotency checker (optimistic locking) - 5 args, no errorMessage
       expect(checkpointStore.saveCheckpoint).toHaveBeenNthCalledWith(
         1,
+        tenantId,
         buildCheckpointKey(
           tenantId,
           TEST_CONSTANTS.PIPELINE_NAME,
@@ -283,6 +284,7 @@ describe("EventHandlerDispatcher", () => {
       // 2nd call: pending checkpoint before processing (from handleEvent)
       expect(checkpointStore.saveCheckpoint).toHaveBeenNthCalledWith(
         2,
+        tenantId,
         buildCheckpointKey(
           tenantId,
           TEST_CONSTANTS.PIPELINE_NAME,
@@ -299,6 +301,7 @@ describe("EventHandlerDispatcher", () => {
       // 3rd call: processed checkpoint after successful processing
       expect(checkpointStore.saveCheckpoint).toHaveBeenNthCalledWith(
         3,
+        tenantId,
         buildCheckpointKey(
           tenantId,
           TEST_CONSTANTS.PIPELINE_NAME,
@@ -345,6 +348,7 @@ describe("EventHandlerDispatcher", () => {
       // The failed checkpoint is the 3rd call (after 2 pending checkpoints)
       expect(checkpointStore.saveCheckpoint).toHaveBeenNthCalledWith(
         3,
+        tenantId,
         buildCheckpointKey(
           tenantId,
           TEST_CONSTANTS.PIPELINE_NAME,

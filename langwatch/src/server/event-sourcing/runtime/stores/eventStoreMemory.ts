@@ -15,6 +15,7 @@ import {
   ValidationError,
   SecurityError,
   StoreError,
+  ErrorCategory,
 } from "../../library/services/errorHandling";
 
 /**

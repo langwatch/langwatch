@@ -179,13 +179,14 @@ describe("EventSourcingService - Security Flows", () => {
       ];
       await service.storeEvents(events, context1);
 
-      // Checkpoint is saved with new signature: checkpointKey, processorType, event, status, sequenceNumber, errorMessage
+      // Checkpoint is saved with new signature: tenantId, checkpointKey, processorType, event, status, sequenceNumber, errorMessage
       // Note: saveCheckpoint is called twice (pending, then processed), so we just verify it was called
       expect(checkpointStore.saveCheckpoint).toHaveBeenCalled();
       const saveCheckpointMock = checkpointStore.saveCheckpoint as ReturnType<
         typeof vi.fn
       >;
-      expect(saveCheckpointMock.mock.calls[0]?.[0]).toBe(
+      expect(saveCheckpointMock.mock.calls[0]?.[0]).toBe(tenantId1);
+      expect(saveCheckpointMock.mock.calls[0]?.[1]).toBe(
         buildCheckpointKey(
           tenantId1,
           TEST_CONSTANTS.PIPELINE_NAME,
@@ -194,8 +195,8 @@ describe("EventSourcingService - Security Flows", () => {
           TEST_CONSTANTS.AGGREGATE_ID,
         ),
       );
-      expect(saveCheckpointMock.mock.calls[0]?.[1]).toBe("handler");
-      expect(saveCheckpointMock.mock.calls[0]?.[2]).toMatchObject({
+      expect(saveCheckpointMock.mock.calls[0]?.[2]).toBe("handler");
+      expect(saveCheckpointMock.mock.calls[0]?.[3]).toMatchObject({
         tenantId: tenantId1,
         aggregateType: aggregateType,
         aggregateId: TEST_CONSTANTS.AGGREGATE_ID,
@@ -643,7 +644,7 @@ describe("EventSourcingService - Security Flows", () => {
         TEST_CONSTANTS.AGGREGATE_TYPE,
         TEST_CONSTANTS.AGGREGATE_ID,
       );
-      await checkpointStore.clearCheckpoint(checkpointKey1ToClear);
+      await checkpointStore.clearCheckpoint(tenantId1, checkpointKey1ToClear);
 
       // Verify tenant1's checkpoint is cleared
       const checkpointKey1 = buildCheckpointKey(

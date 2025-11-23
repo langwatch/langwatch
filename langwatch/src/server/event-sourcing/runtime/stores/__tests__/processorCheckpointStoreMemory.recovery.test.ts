@@ -56,6 +56,7 @@ describe("ProcessorCheckpointStoreMemory - Recovery Methods", () => {
         aggregateId,
       );
       await store.saveCheckpoint(
+        tenantId,
         checkpointKey,
         processorType,
         event1,
@@ -66,6 +67,7 @@ describe("ProcessorCheckpointStoreMemory - Recovery Methods", () => {
       // Note: With per-aggregate checkpoints, saving event2 as processed will overwrite the failed checkpoint
       // This test may need adjustment based on desired behavior
       await store.saveCheckpoint(
+        tenantId,
         checkpointKey,
         processorType,
         event2,
@@ -126,6 +128,7 @@ describe("ProcessorCheckpointStoreMemory - Recovery Methods", () => {
         aggregateId,
       );
       await store.saveCheckpoint(
+        tenantId,
         checkpointKey1,
         processorType,
         event1,
@@ -134,6 +137,7 @@ describe("ProcessorCheckpointStoreMemory - Recovery Methods", () => {
         "Handler1 failed",
       );
       await store.saveCheckpoint(
+        tenantId,
         checkpointKey2,
         processorType,
         event1,
@@ -197,6 +201,7 @@ describe("ProcessorCheckpointStoreMemory - Recovery Methods", () => {
         aggregateId,
       );
       await store.saveCheckpoint(
+        tenantId,
         checkpointKeyHandler,
         "handler",
         event1,
@@ -205,6 +210,7 @@ describe("ProcessorCheckpointStoreMemory - Recovery Methods", () => {
         "Handler failed",
       );
       await store.saveCheckpoint(
+        tenantId,
         checkpointKeyProjection,
         "projection",
         event1,
@@ -262,6 +268,7 @@ describe("ProcessorCheckpointStoreMemory - Recovery Methods", () => {
         aggregateId,
       );
       await store.saveCheckpoint(
+        tenantId,
         checkpointKey,
         processorType,
         event1,
@@ -322,6 +329,7 @@ describe("ProcessorCheckpointStoreMemory - Recovery Methods", () => {
         aggregateId,
       );
       await store.saveCheckpoint(
+        tenantId1,
         checkpointKey1,
         processorType,
         event1,
@@ -330,6 +338,7 @@ describe("ProcessorCheckpointStoreMemory - Recovery Methods", () => {
         "Tenant1 failed",
       );
       await store.saveCheckpoint(
+        tenantId2,
         checkpointKey2,
         processorType,
         event2,
@@ -409,6 +418,7 @@ describe("ProcessorCheckpointStoreMemory - Recovery Methods", () => {
         aggregateId,
       );
       await store.saveCheckpoint(
+        tenantId,
         checkpointKey,
         processorType,
         event1,
@@ -417,6 +427,7 @@ describe("ProcessorCheckpointStoreMemory - Recovery Methods", () => {
         "Event1 failed",
       );
       await store.saveCheckpoint(
+        tenantId,
         checkpointKey,
         processorType,
         event2,
@@ -425,6 +436,7 @@ describe("ProcessorCheckpointStoreMemory - Recovery Methods", () => {
         "Event2 failed",
       );
       await store.saveCheckpoint(
+        tenantId,
         checkpointKey,
         processorType,
         event3,
@@ -475,6 +487,7 @@ describe("ProcessorCheckpointStoreMemory - Recovery Methods", () => {
         aggregateId,
       );
       await store.saveCheckpoint(
+        tenantId,
         checkpointKey,
         processorType,
         event1,
@@ -488,7 +501,7 @@ describe("ProcessorCheckpointStoreMemory - Recovery Methods", () => {
       expect(checkpointBefore).not.toBeNull();
 
       // Clear checkpoint
-      await store.clearCheckpoint(checkpointKey);
+      await store.clearCheckpoint(tenantId, checkpointKey);
 
       // Verify checkpoint is removed
       const checkpointAfter = await store.loadCheckpoint(checkpointKey);
@@ -509,7 +522,7 @@ describe("ProcessorCheckpointStoreMemory - Recovery Methods", () => {
         nonExistentAggregateId,
       );
       await expect(
-        store.clearCheckpoint(nonExistentCheckpointKey),
+        store.clearCheckpoint(tenantId, nonExistentCheckpointKey),
       ).resolves.not.toThrow();
     });
 
@@ -544,6 +557,7 @@ describe("ProcessorCheckpointStoreMemory - Recovery Methods", () => {
         aggregateId,
       );
       await store.saveCheckpoint(
+        tenantId,
         checkpointKey1,
         processorType,
         event1,
@@ -552,6 +566,7 @@ describe("ProcessorCheckpointStoreMemory - Recovery Methods", () => {
         "Handler1 failed",
       );
       await store.saveCheckpoint(
+        tenantId,
         checkpointKey2,
         processorType,
         event1,
@@ -561,7 +576,7 @@ describe("ProcessorCheckpointStoreMemory - Recovery Methods", () => {
       );
 
       // Clear checkpoint for processor1 only
-      await store.clearCheckpoint(checkpointKey1);
+      await store.clearCheckpoint(tenantId, checkpointKey1);
 
       // Verify processor1 checkpoint is removed
       const checkpoint1 = await store.loadCheckpoint(checkpointKey1);
@@ -604,6 +619,7 @@ describe("ProcessorCheckpointStoreMemory - Recovery Methods", () => {
         aggregateId,
       );
       await store.saveCheckpoint(
+        tenantId,
         checkpointKeyHandler,
         "handler",
         event1,
@@ -612,6 +628,7 @@ describe("ProcessorCheckpointStoreMemory - Recovery Methods", () => {
         "Handler failed",
       );
       await store.saveCheckpoint(
+        tenantId,
         checkpointKeyProjection,
         "projection",
         event1,
@@ -621,7 +638,7 @@ describe("ProcessorCheckpointStoreMemory - Recovery Methods", () => {
       );
 
       // Clear checkpoint for handler only
-      await store.clearCheckpoint(checkpointKeyHandler);
+      await store.clearCheckpoint(tenantId, checkpointKeyHandler);
 
       // Verify handler checkpoint is removed
       const handlerCheckpoint =

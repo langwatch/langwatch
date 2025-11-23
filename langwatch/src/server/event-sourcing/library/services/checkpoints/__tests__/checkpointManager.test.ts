@@ -73,6 +73,7 @@ describe("CheckpointManager", () => {
         );
 
         expect(checkpointStore.saveCheckpoint).toHaveBeenCalledWith(
+          tenantId,
           buildCheckpointKey(
             tenantId,
             TEST_CONSTANTS.PIPELINE_NAME,
@@ -111,6 +112,7 @@ describe("CheckpointManager", () => {
         );
 
         expect(checkpointStore.saveCheckpoint).toHaveBeenCalledWith(
+          tenantId,
           buildCheckpointKey(
             tenantId,
             TEST_CONSTANTS.PIPELINE_NAME,

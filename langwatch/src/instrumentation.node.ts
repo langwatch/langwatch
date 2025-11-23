@@ -31,11 +31,6 @@ if (explicitEndpoint) {
         new OTLPTraceExporter({ url: `${explicitEndpoint}/v1/traces` }),
       ),
     );
-    spanProcessors.push(
-      new SimpleSpanProcessor(
-        new OTLPTraceExporter({ url: `http://localhost:4320/v1/traces` }),
-      ),
-    );
   }
 }
 

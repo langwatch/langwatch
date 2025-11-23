@@ -475,7 +475,7 @@ describe("ProcessorCheckpointStoreClickHouse - Recovery Methods", () => {
         mockClickHouseClient.command as ReturnType<typeof vi.fn>
       ).mockResolvedValue(void 0);
 
-      await store.clearCheckpoint(checkpointKey);
+      await store.clearCheckpoint(tenantId, checkpointKey);
 
       // Verify ALTER DELETE command was executed
       expect(mockClickHouseClient.command).toHaveBeenCalledWith(
@@ -509,7 +509,7 @@ describe("ProcessorCheckpointStoreClickHouse - Recovery Methods", () => {
         nonExistentAggregateId,
       );
       await expect(
-        store.clearCheckpoint(nonExistentCheckpointKey),
+        store.clearCheckpoint(tenantId, nonExistentCheckpointKey),
       ).resolves.not.toThrow();
     });
 
@@ -530,7 +530,7 @@ describe("ProcessorCheckpointStoreClickHouse - Recovery Methods", () => {
       ).mockResolvedValue(void 0);
 
       // Clear checkpoint for processor1
-      await store.clearCheckpoint(checkpointKey);
+      await store.clearCheckpoint(tenantId, checkpointKey);
 
       // Verify command includes checkpointKey (which includes processorName)
       expect(mockClickHouseClient.command).toHaveBeenCalledWith(
@@ -558,7 +558,7 @@ describe("ProcessorCheckpointStoreClickHouse - Recovery Methods", () => {
       ).mockResolvedValue(void 0);
 
       // Clear checkpoint for handler
-      await store.clearCheckpoint(checkpointKey);
+      await store.clearCheckpoint(tenantId, checkpointKey);
 
       // Verify command was executed with checkpointKey
       expect(mockClickHouseClient.command).toHaveBeenCalledWith(
@@ -586,7 +586,7 @@ describe("ProcessorCheckpointStoreClickHouse - Recovery Methods", () => {
         aggregateType,
         aggregateId,
       );
-      await expect(store.clearCheckpoint(checkpointKey)).rejects.toThrow(
+      await expect(store.clearCheckpoint(tenantId, checkpointKey)).rejects.toThrow(
         "ClickHouse connection failed",
       );
     });

@@ -121,6 +121,8 @@ export class ProjectionUpdater<EventType extends Event = Event> {
         },
       },
       async (span) => {
+        EventUtils.validateTenantId(context, "updateProjectionsForAggregates");
+
         // If queue processors are available, use async queue-based dispatch
         if (this.queueManager.getProjectionQueueProcessors().size > 0) {
           await this.dispatchEventsToProjectionQueues(events);
@@ -322,6 +324,8 @@ export class ProjectionUpdater<EventType extends Event = Event> {
         },
       },
       async () => {
+        EventUtils.validateTenantId(context, "processProjectionEvent");
+
         // Validate event processing prerequisites (sequence number, idempotency, ordering)
         const sequenceNumber = await this.validator.validateEventProcessing(
           projectionName,
@@ -455,10 +459,12 @@ export class ProjectionUpdater<EventType extends Event = Event> {
     context: EventStoreReadContext<EventType>,
     options?: UpdateProjectionOptions<EventType>,
   ): Promise<any> {
+    EventUtils.validateTenantId(options?.projectionStoreContext ?? context, "updateProjectionByName");
+
     if (!this.projections) {
       throw new ConfigurationError(
-        "ProjectionUpdater",
-        "updateProjectionByName requires multiple projections to be configured",
+        "EventSourcingService",
+        "EventSourcingService.updateProjectionByName requires multiple projections to be configured",
       );
     }
 
@@ -659,10 +665,12 @@ export class ProjectionUpdater<EventType extends Event = Event> {
     aggregateId: string,
     context: EventStoreReadContext<EventType>,
   ): Promise<unknown> {
+    EventUtils.validateTenantId(context, "getProjectionByName");
+
     if (!this.projections) {
       throw new ConfigurationError(
-        "ProjectionUpdater",
-        "getProjectionByName requires multiple projections to be configured. Use getProjection for single projection pipelines.",
+        "EventSourcingService",
+        "EventSourcingService.getProjectionByName requires multiple projections to be configured",
       );
     }
 
@@ -715,10 +723,12 @@ export class ProjectionUpdater<EventType extends Event = Event> {
     aggregateId: string,
     context: EventStoreReadContext<EventType>,
   ): Promise<boolean> {
+    EventUtils.validateTenantId(context, "hasProjectionByName");
+
     if (!this.projections) {
       throw new ConfigurationError(
-        "ProjectionUpdater",
-        "hasProjectionByName requires multiple projections to be configured. Use hasProjection for single projection pipelines.",
+        "EventSourcingService",
+        "EventSourcingService.hasProjectionByName requires multiple projections to be configured",
       );
     }
 
@@ -746,12 +756,9 @@ export class ProjectionUpdater<EventType extends Event = Event> {
         },
       },
       async (span) => {
-        const projectionContext = context;
-        EventUtils.validateTenantId(projectionContext, "hasProjectionByName");
-
         const projection = await projectionDef.store.getProjection(
           aggregateId,
-          projectionContext,
+          context,
         );
         const exists = projection !== null;
         span.setAttributes({

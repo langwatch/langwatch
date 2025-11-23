@@ -17,7 +17,10 @@ import type { AggregateType } from "../domain/aggregateType";
  *
  * **Implementation Requirements:**
  * - MUST enforce tenant isolation
- * - MUST validate tenantId using validateTenantId() before operations
+ * - MUST validate tenantId using validateTenantId() before all operations
+ * - For write/clear operations, MUST verify that the provided tenantId matches:
+ *   - The tenantId embedded in the checkpointKey (for all operations)
+ *   - The event.tenantId (for saveCheckpoint operations)
  * - SHOULD prevent mutation of stored checkpoints
  */
 export interface ProcessorCheckpointStore {
@@ -26,15 +29,17 @@ export interface ProcessorCheckpointStore {
    * Uses the provided checkpointKey (format: `tenantId:pipelineName:processorName:aggregateType:aggregateId`).
    * Key construction is handled by CheckpointManager.
    *
+   * @param tenantId - The tenant ID (must match event.tenantId and the tenantId in checkpointKey)
    * @param checkpointKey - The full checkpoint key (tenantId:pipelineName:processorName:aggregateType:aggregateId)
    * @param processorType - The type of processor ('handler' or 'projection')
    * @param event - The event being checkpointed
    * @param status - The processing status ('processed', 'failed', or 'pending')
    * @param sequenceNumber - The sequence number of the event within the aggregate (1-indexed)
    * @param errorMessage - Optional error message if status is 'failed'
-   * @throws {Error} If tenantId is missing or invalid
+   * @throws {Error} If tenantId is missing, invalid, or doesn't match event.tenantId or the tenantId in checkpointKey
    */
   saveCheckpoint<EventType extends Event>(
+    tenantId: TenantId,
     checkpointKey: string,
     processorType: "handler" | "projection",
     event: EventType,
@@ -152,7 +157,9 @@ export interface ProcessorCheckpointStore {
    * Uses the provided checkpointKey (format: `tenantId:pipelineName:processorName:aggregateType:aggregateId`).
    * Key construction is handled by CheckpointManager.
    *
+   * @param tenantId - The tenant ID (must match the tenantId in checkpointKey)
    * @param checkpointKey - The full checkpoint key (tenantId:pipelineName:processorName:aggregateType:aggregateId)
+   * @throws {Error} If tenantId is missing, invalid, or doesn't match the tenantId in checkpointKey
    */
-  clearCheckpoint(checkpointKey: string): Promise<void>;
+  clearCheckpoint(tenantId: TenantId, checkpointKey: string): Promise<void>;
 }

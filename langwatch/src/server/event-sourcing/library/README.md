@@ -53,8 +53,8 @@ class MyProjectionHandler implements ProjectionHandler<MyEvent, MyProjection> {
 // Create pipeline
 const pipeline = eventSourcing
   .registerPipeline<MyEvent, MyProjection>()
-  .withName("my-pipeline")
-  .withAggregateType("my-aggregate")
+  .withName("m_pipeline")
+  .withAggregateType("my_aggregate")
   .withProjection("summary", MyProjectionHandler)
   .build();
 
@@ -165,8 +165,8 @@ import { RedisDistributedLock } from "./library";
 
 const pipeline = eventSourcing
   .registerPipeline<MyEvent, MyProjection>()
-  .withName("my-pipeline")
-  .withAggregateType("my-aggregate")
+  .withName("my_pipeline")
+  .withAggregateType("my_aggregate")
   .withEventProjection("summary", store, handler)
   .build();
 
@@ -187,7 +187,7 @@ const projectionStore = new ProjectionStoreMemory();
 
 const pipeline = eventSourcing
   .registerPipeline<MyEvent, MyProjection>()
-  .withName("test-pipeline")
+  .withName("test_pipeline")
   .withAggregateType("test")
   .withEventProjection("test", projectionStore, handler)
   .build();
@@ -294,9 +294,9 @@ class SpanClickHouseWriterHandler implements EventHandler<SpanEvent> {
 
 const pipeline = eventSourcing
   .registerPipeline<SpanEvent>()
-  .withName("span-ingestion")
+  .withName("span_ingestion")
   .withAggregateType("span_ingestion")
-  .withEventHandler("span-storage", SpanClickHouseWriterHandler, {
+  .withEventHandler("spanStorage", SpanClickHouseWriterHandler, {
     // Optional: override eventTypes, configure concurrency, delay, job ID factory, etc.
   })
   .build();
@@ -318,7 +318,7 @@ Projections are processed asynchronously via queues, similar to event handlers. 
 ```typescript
 const pipeline = eventSourcing
   .registerPipeline<SpanEvent>()
-  .withName("trace-aggregation")
+  .withName("trace_aggregation")
   .withAggregateType("trace_aggregation")
   .withProjection("summary", SummaryProjectionHandler)
   .withProjection("analytics", AnalyticsProjectionHandler)
@@ -354,13 +354,13 @@ const summary = await pipeline.service.getProjectionByName(
 ```typescript
 const pipeline = eventSourcing
   .registerPipeline<EventType, ProjectionType>()
-  .withName("pipeline-name")
-  .withAggregateType("aggregate-type")
-  .withProjection("projection-name", ProjectionHandlerClass)
-  .withEventHandler("handler-name", EventHandlerClass, {
+  .withName("pipeline_name")
+  .withAggregateType("aggregate_type")
+  .withProjection("projectionName", ProjectionHandlerClass)
+  .withEventHandler("handlerName", EventHandlerClass, {
     eventTypes: ["event.type"],
   })
-  .withCommand("command-name", CommandHandlerClass)
+  .withCommand("commandName", CommandHandlerClass)
   .withEventPublisher(publisher)
   .build();
 ```

@@ -9,8 +9,11 @@ import type { EventStoreReadContext } from "../stores/eventStore.types";
  *
  * @example
  * ```typescript
- * class KafkaEventPublisher implements EventPublisher<string, MyEvent> {
- *   async publish(events: readonly MyEvent[], context: EventStoreReadContext<string, MyEvent>): Promise<void> {
+ * class KafkaEventPublisher implements EventPublisher<MyEvent> {
+ *   async publish(
+ *     events: readonly MyEvent[],
+ *     context: EventStoreReadContext<MyEvent>,
+ *   ): Promise<void> {
  *     await this.kafkaProducer.send({
  *       topic: 'events',
  *       messages: events.map(event => ({ value: JSON.stringify(event) }))

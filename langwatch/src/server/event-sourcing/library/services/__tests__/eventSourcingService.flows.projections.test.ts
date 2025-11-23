@@ -732,6 +732,7 @@ describe("EventSourcingService - Projection Flows", () => {
       // 1st call: pending checkpoint from idempotency checker (optimistic locking) - 5 args, no errorMessage
       expect(checkpointStore.saveCheckpoint).toHaveBeenNthCalledWith(
         1,
+        tenantId,
         buildCheckpointKey(
           tenantId,
           TEST_CONSTANTS.PIPELINE_NAME,
@@ -747,6 +748,7 @@ describe("EventSourcingService - Projection Flows", () => {
       // 2nd call: pending checkpoint before processing (from processProjectionEvent)
       expect(checkpointStore.saveCheckpoint).toHaveBeenNthCalledWith(
         2,
+        tenantId,
         buildCheckpointKey(
           tenantId,
           TEST_CONSTANTS.PIPELINE_NAME,
@@ -763,6 +765,7 @@ describe("EventSourcingService - Projection Flows", () => {
       // 3rd call: processed checkpoint after successful processing
       expect(checkpointStore.saveCheckpoint).toHaveBeenNthCalledWith(
         3,
+        tenantId,
         buildCheckpointKey(
           tenantId,
           TEST_CONSTANTS.PIPELINE_NAME,
@@ -814,6 +817,7 @@ describe("EventSourcingService - Projection Flows", () => {
 
       // Should save pending checkpoint first, then failed checkpoint
       expect(checkpointStore.saveCheckpoint).toHaveBeenCalledWith(
+        tenantId,
         buildCheckpointKey(
           tenantId,
           TEST_CONSTANTS.PIPELINE_NAME,
@@ -828,6 +832,7 @@ describe("EventSourcingService - Projection Flows", () => {
         undefined,
       );
       expect(checkpointStore.saveCheckpoint).toHaveBeenCalledWith(
+        tenantId,
         buildCheckpointKey(
           tenantId,
           TEST_CONSTANTS.PIPELINE_NAME,

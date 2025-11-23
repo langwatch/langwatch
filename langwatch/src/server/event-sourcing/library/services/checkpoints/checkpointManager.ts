@@ -112,6 +112,7 @@ export class CheckpointManager<EventType extends Event = Event> {
       );
 
       await this.processorCheckpointStore.saveCheckpoint(
+        event.tenantId,
         checkpointKey,
         processorType,
         event,

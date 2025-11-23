@@ -18,7 +18,7 @@ This separation keeps event-sourcing concerns centralized while feature code onl
 
 ### Three-Layer Architecture
 
-```
+```ascii
 ┌─────────────────────────────────────────────────────────┐
 │  Pipelines (Domain Logic)                               │
 │  - Commands (RecordSpanCommand)                         │

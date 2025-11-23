@@ -163,6 +163,7 @@ describe("ProjectionUpdater", () => {
       // The processed checkpoint is the 3rd call
       expect(checkpointStore.saveCheckpoint).toHaveBeenNthCalledWith(
         3,
+        tenantId,
         buildCheckpointKey(
           tenantId,
           TEST_CONSTANTS.PIPELINE_NAME,
@@ -240,6 +241,7 @@ describe("ProjectionUpdater", () => {
       // The failed checkpoint is the 3rd call (after 2 pending checkpoints)
       expect(checkpointStore.saveCheckpoint).toHaveBeenNthCalledWith(
         3,
+        tenantId,
         buildCheckpointKey(
           tenantId,
           TEST_CONSTANTS.PIPELINE_NAME,

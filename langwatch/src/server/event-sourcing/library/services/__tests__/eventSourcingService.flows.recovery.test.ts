@@ -266,7 +266,7 @@ describe("EventSourcingService - Recovery Flows", () => {
       expect(checkpointBefore?.status).toBe("failed");
 
       // Clear checkpoint
-      await checkpointStore.clearCheckpoint(checkpointKey1);
+      await checkpointStore.clearCheckpoint(tenantId, checkpointKey1);
 
       // Verify checkpoint is removed
       const checkpointAfter =
@@ -280,10 +280,16 @@ describe("EventSourcingService - Recovery Flows", () => {
       );
 
       // Try to clear non-existent checkpoint - should not throw
+      // Build a proper checkpoint key for a non-existent aggregate
+      const nonExistentCheckpointKey = buildCheckpointKey(
+        tenantId,
+        TEST_CONSTANTS.PIPELINE_NAME,
+        "handler",
+        TEST_CONSTANTS.AGGREGATE_TYPE,
+        "non-existent-id",
+      );
       await expect(
-        checkpointStore.clearCheckpoint(
-          `${TEST_CONSTANTS.PIPELINE_NAME}:handler:non-existent-id`,
-        ),
+        checkpointStore.clearCheckpoint(tenantId, nonExistentCheckpointKey),
       ).resolves.not.toThrow();
     });
   });
@@ -362,7 +368,7 @@ describe("EventSourcingService - Recovery Flows", () => {
         TEST_CONSTANTS.AGGREGATE_TYPE,
         TEST_CONSTANTS.AGGREGATE_ID,
       );
-      await checkpointStore.clearCheckpoint(checkpointKey1);
+      await checkpointStore.clearCheckpoint(tenantId, checkpointKey1);
 
       // Verify checkpoint is cleared
       const checkpointAfter =
@@ -509,7 +515,7 @@ describe("EventSourcingService - Recovery Flows", () => {
         TEST_CONSTANTS.AGGREGATE_TYPE,
         TEST_CONSTANTS.AGGREGATE_ID,
       );
-      await checkpointStore.clearCheckpoint(checkpointKey1);
+      await checkpointStore.clearCheckpoint(tenantId, checkpointKey1);
 
       // Step 3: Fix projection handler (now succeeds) - change behavior without resetting
       vi.mocked(projectionHandler.handle).mockImplementation(async () =>
@@ -607,7 +613,7 @@ describe("EventSourcingService - Recovery Flows", () => {
         TEST_CONSTANTS.AGGREGATE_TYPE,
         TEST_CONSTANTS.AGGREGATE_ID,
       );
-      await checkpointStore.clearCheckpoint(checkpointKey1);
+      await checkpointStore.clearCheckpoint(tenantId, checkpointKey1);
 
       // Fix handler - change behavior without resetting to preserve call history
       vi.mocked(handler.handle).mockImplementation(async () => void 0);
@@ -707,7 +713,7 @@ describe("EventSourcingService - Recovery Flows", () => {
         TEST_CONSTANTS.AGGREGATE_TYPE,
         TEST_CONSTANTS.AGGREGATE_ID,
       );
-      await checkpointStore.clearCheckpoint(checkpointKey1);
+      await checkpointStore.clearCheckpoint(tenantId, checkpointKey1);
 
       // Fix handler
       vi.mocked(handler.handle).mockImplementation(async () => void 0);
@@ -816,7 +822,7 @@ describe("EventSourcingService - Recovery Flows", () => {
         TEST_CONSTANTS.AGGREGATE_TYPE,
         TEST_CONSTANTS.AGGREGATE_ID,
       );
-      await checkpointStore.clearCheckpoint(checkpointKey1);
+      await checkpointStore.clearCheckpoint(tenantId, checkpointKey1);
 
       // Fix handler (bug fixed) - change behavior without resetting to preserve call history
       vi.mocked(handler.handle).mockImplementation(async () => void 0);
@@ -892,7 +898,7 @@ describe("EventSourcingService - Recovery Flows", () => {
         TEST_CONSTANTS.AGGREGATE_TYPE,
         TEST_CONSTANTS.AGGREGATE_ID,
       );
-      await checkpointStore.clearCheckpoint(checkpointKey1);
+      await checkpointStore.clearCheckpoint(tenantId, checkpointKey1);
 
       // Fix projection handler (bug fixed) - change behavior without resetting
       vi.mocked(projectionHandler.handle).mockImplementation(async () =>

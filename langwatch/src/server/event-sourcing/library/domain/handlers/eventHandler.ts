@@ -22,13 +22,14 @@ import type { Event } from "../types";
  */
 export interface EventHandler<EventType extends Event = Event> {
   /**
-   * Handles a single event.
-   * This method should be idempotent - the framework ensures idempotency via event ID
-   * in job IDs, but handlers can also implement their own checks.
-   *
-   * @param event - The event to handle
-   * @returns Promise that resolves when handling is complete
-   */
+  * Handles a single event.
+  * This method should be idempotent - the framework ensures idempotency via
+  * per-aggregate checkpoints with sequence number tracking, but handlers can
+  * also implement their own additional checks if needed.
+  *
+  * @param event - The event to handle
+  * @returns Promise that resolves when handling is complete
+  */
   handle(event: EventType): Promise<void>;
 
   /**

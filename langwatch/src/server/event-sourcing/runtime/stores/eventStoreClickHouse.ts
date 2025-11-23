@@ -275,6 +275,12 @@ export class EventStoreClickHouse<EventType extends Event = Event>
   ): void {
     const eventTenantId = event.tenantId;
     if (!eventTenantId) {
+      const error = new SecurityError(
+        "validateEventTenant",
+        `Event at index ${index} has no tenantId`,
+        void 0,
+        { index },
+      );
       this.logger.error(
         {
           tenantId: context.tenantId,
@@ -284,15 +290,16 @@ export class EventStoreClickHouse<EventType extends Event = Event>
         },
         "Event has no tenantId",
       );
-      throw new SecurityError(
-        "validateEventTenant",
-        `Event at index ${index} has no tenantId`,
-        void 0,
-        { index },
-      );
+      throw error;
     }
 
     if (eventTenantId !== context.tenantId) {
+      const error = new SecurityError(
+        "validateEventTenant",
+        `Event at index ${index} has tenantId '${eventTenantId}' that does not match context tenantId '${context.tenantId}'`,
+        void 0,
+        { index },
+      );
       this.logger.error(
         {
           tenantId: context.tenantId,

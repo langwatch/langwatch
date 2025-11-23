@@ -202,6 +202,7 @@ describe("EventSourcingService - Handler Flows", () => {
 
       // Verify event1 was marked as failed
       expect(checkpointStore.saveCheckpoint).toHaveBeenCalledWith(
+        tenantId,
         buildCheckpointKey(
           tenantId,
           TEST_CONSTANTS.PIPELINE_NAME,
@@ -311,6 +312,7 @@ describe("EventSourcingService - Handler Flows", () => {
 
       // Should save pending checkpoint first
       expect(checkpointStore.saveCheckpoint).toHaveBeenCalledWith(
+        tenantId,
         buildCheckpointKey(
           tenantId,
           TEST_CONSTANTS.PIPELINE_NAME,
@@ -327,6 +329,7 @@ describe("EventSourcingService - Handler Flows", () => {
 
       // Then save failed checkpoint
       expect(checkpointStore.saveCheckpoint).toHaveBeenCalledWith(
+        tenantId,
         buildCheckpointKey(
           tenantId,
           TEST_CONSTANTS.PIPELINE_NAME,
