@@ -4,7 +4,9 @@ import type {
   Event,
   AggregateType,
 } from "../../library";
-import { EventUtils } from "../../library";
+import { EventUtils, createTenantId } from "../../library";
+import type { EventRepository, EventRecord } from "./repositories/eventRepository.types";
+import { EventRepositoryMemory } from "./repositories/eventRepositoryMemory";
 
 /**
  * Simple in-memory EventStore used for tests and local development.
@@ -27,10 +29,14 @@ import { EventUtils } from "../../library";
 export class EventStoreMemory<EventType extends Event = Event>
   implements BaseEventStore<EventType>
 {
-  // Partition by tenant + aggregateType + aggregateId
-  private readonly eventsByKey = new Map<string, EventType[]>();
-  // Track tenant + aggregateType -> aggregateIds mapping for listAggregateIds
-  private readonly aggregatesByTenantAndType = new Map<string, Set<string>>();
+  constructor(private readonly repository: EventRepository = new EventRepositoryMemory()) {
+    // Prevent accidental use in production - memory stores are not thread-safe
+    if (process.env.NODE_ENV === "production") {
+      throw new Error(
+        "EventStoreMemory is not thread-safe and cannot be used in production. Use EventStoreClickHouse or another thread-safe implementation instead.",
+      );
+    }
+  }
 
   async getEvents(
     aggregateId: string,
@@ -40,8 +46,15 @@ export class EventStoreMemory<EventType extends Event = Event>
     // Validate tenant context
     EventUtils.validateTenantId(context, "EventStoreMemory.getEvents");
 
-    const key = `${context.tenantId}:${aggregateType}:${String(aggregateId)}`;
-    const events = this.eventsByKey.get(key) ?? [];
+    // Get raw records from repository
+    const records = await this.repository.getEventRecords(
+      context.tenantId,
+      aggregateType,
+      aggregateId,
+    );
+
+    // Transform records to events
+    const events = records.map((record) => this.recordToEvent(record, aggregateId));
 
     // Sort by timestamp first to ensure consistent ordering
     const sortedEvents = [...events].sort((a, b) => {
@@ -84,22 +97,14 @@ export class EventStoreMemory<EventType extends Event = Event>
     // Validate tenant context
     EventUtils.validateTenantId(context, "EventStoreMemory.countEventsBefore");
 
-    // Get all events for the aggregate
-    const events = await this.getEvents(aggregateId, context, aggregateType);
-
-    // Count events that come before the specified event
-    // Events where: (timestamp < beforeTimestamp) OR (timestamp === beforeTimestamp AND id < beforeEventId)
-    const count = events.filter((event) => {
-      if (event.timestamp < beforeTimestamp) {
-        return true;
-      }
-      if (event.timestamp === beforeTimestamp && event.id < beforeEventId) {
-        return true;
-      }
-      return false;
-    }).length;
-
-    return count;
+    // Delegate to repository for counting
+    return await this.repository.countEventRecords(
+      context.tenantId,
+      aggregateType,
+      aggregateId,
+      beforeTimestamp,
+      beforeEventId,
+    );
   }
 
   async storeEvents(
@@ -115,11 +120,57 @@ export class EventStoreMemory<EventType extends Event = Event>
     }
 
     // Validate all events before storage
+    this.validateEvents(events, context, aggregateType);
+
+    // Transform events to records
+    const records = events.map((event) => this.eventToRecord(event));
+
+    // Delegate to repository
+    await this.repository.insertEventRecords(records);
+  }
+
+  /**
+   * Seeds the event store with events for a given aggregate.
+   * Useful in tests.
+   *
+   * @param _aggregateId - The aggregate ID
+   * @param events - Events to seed
+   * @param _tenantId - Tenant ID (required for proper partitioning)
+   * @param _aggregateType - Aggregate type (required for proper partitioning)
+   */
+  async seed(
+    _aggregateId: string,
+    events: EventType[],
+    _tenantId: string,
+    _aggregateType: AggregateType,
+  ): Promise<void> {
+    // Transform events to records
+    const records = events.map((event) => this.eventToRecord(event));
+
+    // Store via repository
+    await this.repository.insertEventRecords(records);
+  }
+
+  /**
+   * Validates all events before storage.
+   */
+  private validateEvents(
+    events: readonly EventType[],
+    context: EventStoreReadContext<EventType>,
+    aggregateType: AggregateType,
+  ): void {
     for (let i = 0; i < events.length; i++) {
       const event = events[i];
       if (!EventUtils.isValidEvent(event)) {
         throw new Error(
           `[VALIDATION] Invalid event at index ${i}: event must have aggregateId, timestamp, type, and data`,
+        );
+      }
+
+      // Validate that event aggregateType matches context aggregateType
+      if (event.aggregateType !== aggregateType) {
+        throw new Error(
+          `[VALIDATION] Event at index ${i} has aggregate type '${event.aggregateType}' that does not match pipeline aggregate type '${aggregateType}'`,
         );
       }
 
@@ -134,54 +185,76 @@ export class EventStoreMemory<EventType extends Event = Event>
         );
       }
     }
-
-    // Store all events - deduplication happens in getEvents() after sorting by timestamp
-    // This matches the behavior of EventStoreClickHouse which inserts all events
-    // and deduplicates during retrieval.
-    for (const event of events) {
-      const key = `${context.tenantId}:${event.aggregateType}:${String(event.aggregateId)}`;
-      const aggregateEvents = this.eventsByKey.get(key) ?? [];
-
-      // Deep clone to prevent mutation
-      aggregateEvents.push({
-        ...event,
-        data: JSON.parse(JSON.stringify(event.data)),
-        metadata: { ...event.metadata },
-      });
-      this.eventsByKey.set(key, aggregateEvents);
-
-      // Track tenant + aggregateType -> aggregateId mapping
-      const tenantTypeKey = `${context.tenantId}:${event.aggregateType}`;
-      const aggregates =
-        this.aggregatesByTenantAndType.get(tenantTypeKey) ?? new Set();
-      aggregates.add(String(event.aggregateId));
-      this.aggregatesByTenantAndType.set(tenantTypeKey, aggregates);
-    }
   }
 
   /**
-   * Seeds the event store with events for a given aggregate.
-   * Useful in tests.
-   *
-   * @param aggregateId - The aggregate ID
-   * @param events - Events to seed
-   * @param tenantId - Tenant ID (required for proper partitioning)
-   * @param aggregateType - Aggregate type (required for proper partitioning)
+   * Transforms an EventRecord to an Event.
    */
-  seed(
-    aggregateId: string,
-    events: EventType[],
-    tenantId: string,
-    aggregateType: AggregateType,
-  ): void {
-    const key = `${tenantId}:${aggregateType}:${String(aggregateId)}`;
-    this.eventsByKey.set(key, [...events]);
+  private recordToEvent(record: EventRecord, aggregateId: string): EventType {
+    // Handle invalid timestamps by falling back to current time
+    let timestampMs: number;
+    if (
+      typeof record.EventTimestamp === "number" &&
+      !Number.isNaN(record.EventTimestamp)
+    ) {
+      timestampMs = record.EventTimestamp;
+    } else if (typeof record.EventTimestamp === "string") {
+      const parsed = Date.parse(record.EventTimestamp);
+      timestampMs = Number.isNaN(parsed) ? Date.now() : parsed;
+    } else {
+      timestampMs = Date.now();
+    }
 
-    // Update tenant + aggregateType tracking
-    const tenantTypeKey = `${tenantId}:${aggregateType}`;
-    const aggregates =
-      this.aggregatesByTenantAndType.get(tenantTypeKey) ?? new Set();
-    aggregates.add(String(aggregateId));
-    this.aggregatesByTenantAndType.set(tenantTypeKey, aggregates);
+    const payload = this.parseEventPayload(record.EventPayload);
+
+    const event = {
+      id: record.EventId,
+      aggregateId: aggregateId,
+      aggregateType: record.AggregateType as AggregateType,
+      tenantId: createTenantId(record.TenantId),
+      timestamp: timestampMs,
+      type: record.EventType as EventType["type"],
+      data: payload,
+      metadata: {
+        processingTraceparent: record.ProcessingTraceparent || void 0,
+      },
+    } satisfies Event;
+
+    return event as EventType;
+  }
+
+  /**
+   * Transforms an Event to an EventRecord.
+   */
+  private eventToRecord(event: EventType): EventRecord {
+    return {
+      TenantId: String(event.tenantId),
+      AggregateType: event.aggregateType,
+      AggregateId: String(event.aggregateId),
+      EventId: event.id,
+      EventTimestamp: event.timestamp,
+      EventType: event.type,
+      EventPayload: event.data ?? {},
+      ProcessingTraceparent: event.metadata?.processingTraceparent ?? "",
+    };
+  }
+
+  /**
+   * Parses the EventPayload from storage.
+   */
+  private parseEventPayload(rawPayload: unknown): unknown {
+    if (typeof rawPayload === "string") {
+      if (rawPayload.length === 0) {
+        return null;
+      } else {
+        return JSON.parse(rawPayload);
+      }
+    } else if (typeof rawPayload === "object") {
+      return rawPayload;
+    } else {
+      throw new Error(
+        `[CORRUPTED_DATA] EventPayload is not a string or object, it is of type ${typeof rawPayload}`,
+      );
+    }
   }
 }

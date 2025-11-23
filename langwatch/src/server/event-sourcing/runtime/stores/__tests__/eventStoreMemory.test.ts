@@ -1,5 +1,6 @@
 import { describe, expect, it, beforeEach } from "vitest";
 import { EventStoreMemory } from "../eventStoreMemory";
+import { EventRepositoryMemory } from "../repositories/eventRepositoryMemory";
 import { EventUtils, type AggregateType } from "../../../library";
 import { createTenantId } from "../../../library/domain/tenantId";
 import { EVENT_TYPES } from "../../../library/domain/eventType";
@@ -13,7 +14,7 @@ describe("EventStoreMemory - Event ID Deduplication", () => {
   let store: EventStoreMemory;
 
   beforeEach(() => {
-    store = new EventStoreMemory();
+    store = new EventStoreMemory(new EventRepositoryMemory());
   });
 
   describe("getEvents - deduplication", () => {
@@ -23,11 +24,12 @@ describe("EventStoreMemory - Event ID Deduplication", () => {
 
       // Create two events with same Event ID (same timestamp/tenant/aggregate/type)
       const event1 = EventUtils.createEvent(
+
+        aggregateType,
         aggregateId,
         tenantId,
         eventType,
         { value: 1 },
-        aggregateType,
         void 0,
         timestamp,
       );
@@ -35,11 +37,12 @@ describe("EventStoreMemory - Event ID Deduplication", () => {
       // Manually create event2 with same Event ID
       const event2 = {
         ...EventUtils.createEvent(
+
+          aggregateType,
           aggregateId,
           tenantId,
           eventType,
           { value: 2 },
-          aggregateType,
           void 0,
           timestamp,
         ),
@@ -64,11 +67,12 @@ describe("EventStoreMemory - Event ID Deduplication", () => {
       const timestamp = 1000;
 
       const event1 = EventUtils.createEvent(
+
+        aggregateType,
         aggregateId,
         tenantId,
         eventType,
         { value: "first" },
-        aggregateType,
         void 0,
         timestamp,
       );
@@ -76,11 +80,12 @@ describe("EventStoreMemory - Event ID Deduplication", () => {
       // Create events with same Event ID
       const event2 = {
         ...EventUtils.createEvent(
+
+          aggregateType,
           aggregateId,
           tenantId,
           eventType,
           { value: "second" },
-          aggregateType,
           void 0,
           timestamp,
         ),
@@ -89,11 +94,12 @@ describe("EventStoreMemory - Event ID Deduplication", () => {
 
       const event3 = {
         ...EventUtils.createEvent(
+
+          aggregateType,
           aggregateId,
           tenantId,
           eventType,
           { value: "third" },
-          aggregateType,
           void 0,
           timestamp,
         ),
@@ -116,22 +122,24 @@ describe("EventStoreMemory - Event ID Deduplication", () => {
 
       // Create events with same timestamp (same Event ID)
       const event1 = EventUtils.createEvent(
+
+        aggregateType,
         aggregateId,
         tenantId,
         eventType,
         { value: 1 },
-        aggregateType,
         void 0,
         timestamp,
       );
 
       const event2 = {
         ...EventUtils.createEvent(
+
+          aggregateType,
           aggregateId,
           tenantId,
           eventType,
           { value: 2 },
-          aggregateType,
           void 0,
           timestamp,
         ),
@@ -140,11 +148,12 @@ describe("EventStoreMemory - Event ID Deduplication", () => {
 
       const event3 = {
         ...EventUtils.createEvent(
+
+          aggregateType,
           aggregateId,
           tenantId,
           eventType,
           { value: 3 },
-          aggregateType,
           void 0,
           timestamp,
         ),
@@ -166,21 +175,23 @@ describe("EventStoreMemory - Event ID Deduplication", () => {
       const context = { tenantId };
 
       const event1 = EventUtils.createEvent(
+
+        aggregateType,
         aggregateId,
         tenantId,
         eventType,
         { value: 1 },
-        aggregateType,
         void 0,
         1000,
       );
 
       const event2 = EventUtils.createEvent(
+
+        aggregateType,
         aggregateId,
         tenantId,
         eventType,
         { value: 2 },
-        aggregateType,
         void 0,
         2000, // Different timestamp = different Event ID
       );
@@ -200,11 +211,12 @@ describe("EventStoreMemory - Event ID Deduplication", () => {
       const timestamp = 1000;
 
       const event1 = EventUtils.createEvent(
+
+        aggregateType,
         aggregateId,
         tenantId,
         eventType,
         { value: 1 },
-        aggregateType,
         void 0,
         timestamp,
       );
@@ -212,11 +224,12 @@ describe("EventStoreMemory - Event ID Deduplication", () => {
       // Create event2 with same Event ID
       const event2 = {
         ...EventUtils.createEvent(
+
+          aggregateType,
           aggregateId,
           tenantId,
           eventType,
           { value: 2 },
-          aggregateType,
           void 0,
           timestamp,
         ),
@@ -239,21 +252,23 @@ describe("EventStoreMemory - Event ID Deduplication", () => {
       const context = { tenantId };
 
       const event1 = EventUtils.createEvent(
+
+        aggregateType,
         aggregateId,
         tenantId,
         eventType,
         { value: 1 },
-        aggregateType,
         void 0,
         1000,
       );
 
       const event2 = EventUtils.createEvent(
+
+        aggregateType,
         aggregateId,
         tenantId,
         eventType,
         { value: 2 },
-        aggregateType,
         void 0,
         2000, // Different timestamp = different Event ID
       );

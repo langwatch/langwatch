@@ -1,4 +1,3 @@
-import { type ClickHouseClient } from "@clickhouse/client";
 import { SpanKind } from "@opentelemetry/api";
 import { getLangWatchTracer } from "langwatch";
 
@@ -7,23 +6,12 @@ import type { Event, ProcessorCheckpoint } from "../../library/domain/types";
 import type { TenantId } from "../../library/domain/tenantId";
 import type { AggregateType } from "../../library/domain/aggregateType";
 import { EventUtils } from "../../library";
+import { parseCheckpointKey, buildCheckpointKey } from "../../library/utils/checkpointKey";
 import { createLogger } from "../../../../utils/logger";
-
-interface CheckpointRecord {
-  CheckpointKey: string; // processorName:eventId
-  ProcessorName: string;
-  ProcessorType: "handler" | "projection";
-  EventId: string;
-  Status: "processed" | "failed" | "pending";
-  EventTimestamp: number;
-  SequenceNumber: number;
-  ProcessedAt: number | null;
-  FailedAt: number | null;
-  ErrorMessage: string | null;
-  TenantId: string;
-  AggregateType: string;
-  AggregateId: string;
-}
+import type {
+  CheckpointRepository,
+  CheckpointRecord,
+} from "./repositories/checkpointRepository.types";
 
 /**
  * ClickHouse implementation of ProcessorCheckpointStore.
@@ -32,13 +20,13 @@ interface CheckpointRecord {
  * **Table Schema:**
  * ```sql
  * CREATE TABLE IF NOT EXISTS processor_checkpoints (
- *   CheckpointKey String, -- Primary key: processorName:eventId
+ *   CheckpointKey String, -- Primary key: tenantId:pipelineName:processorName:aggregateType:aggregateId
  *   ProcessorName String,
  *   ProcessorType String,
  *   EventId String,
  *   Status String,
  *   EventTimestamp UInt64,
- *   SequenceNumber UInt64, -- Sequence number of event within aggregate (1-indexed)
+ *   SequenceNumber UInt64, -- Sequence number of last processed event within aggregate (1-indexed)
  *   ProcessedAt Nullable(UInt64),
  *   FailedAt Nullable(UInt64),
  *   ErrorMessage Nullable(String),
@@ -48,7 +36,8 @@ interface CheckpointRecord {
  *   UpdatedAt DateTime DEFAULT now()
  * ) ENGINE = ReplacingMergeTree(UpdatedAt)
  * PARTITION BY (TenantId, AggregateType)
- * ORDER BY (CheckpointKey, TenantId, ProcessorName, ProcessorType, AggregateType, AggregateId, EventTimestamp);
+ * ORDER BY (CheckpointKey);
+ * Note: ReplacingMergeTree will keep the row with the highest UpdatedAt value for each CheckpointKey.
  * ```
  */
 export class ProcessorCheckpointStoreClickHouse
@@ -61,10 +50,10 @@ export class ProcessorCheckpointStoreClickHouse
     "langwatch:event-sourcing:checkpoint-store:clickhouse",
   );
 
-  constructor(private readonly clickHouseClient: ClickHouseClient) {}
+  constructor(private readonly repository: CheckpointRepository) {}
 
   async saveCheckpoint<EventType extends Event>(
-    processorName: string,
+    checkpointKey: string,
     processorType: "handler" | "projection",
     event: EventType,
     status: "processed" | "failed" | "pending",
@@ -76,8 +65,10 @@ export class ProcessorCheckpointStoreClickHouse
       "ProcessorCheckpointStoreClickHouse.saveCheckpoint",
     );
 
-    const checkpointKey = `${processorName}:${event.id}`;
     const now = Date.now();
+
+    // Extract processorName from checkpointKey (format: tenantId:pipelineName:processorName:aggregateType:aggregateId)
+    const { processorName } = parseCheckpointKey(checkpointKey);
 
     return await this.tracer.withActiveSpan(
       "ProcessorCheckpointStoreClickHouse.saveCheckpoint",
@@ -95,6 +86,7 @@ export class ProcessorCheckpointStoreClickHouse
       },
       async () => {
         try {
+          // Transform to record
           const record: CheckpointRecord = {
             CheckpointKey: checkpointKey,
             ProcessorName: processorName,
@@ -111,11 +103,8 @@ export class ProcessorCheckpointStoreClickHouse
             AggregateId: String(event.aggregateId),
           };
 
-          await this.clickHouseClient.insert({
-            table: "processor_checkpoints",
-            values: [record],
-            format: "JSONEachRow",
-          });
+          // Delegate to repository
+          await this.repository.insertCheckpointRecord(record);
 
           this.logger.debug(
             {
@@ -151,79 +140,33 @@ export class ProcessorCheckpointStoreClickHouse
   }
 
   async loadCheckpoint(
-    processorName: string,
-    processorType: "handler" | "projection",
-    eventId: string,
+    checkpointKey: string,
   ): Promise<ProcessorCheckpoint | null> {
-    const checkpointKey = `${processorName}:${eventId}`;
-
     return await this.tracer.withActiveSpan(
       "ProcessorCheckpointStoreClickHouse.loadCheckpoint",
       {
         kind: SpanKind.INTERNAL,
         attributes: {
-          "processor.name": processorName,
-          "processor.type": processorType,
-          "event.id": eventId,
+          "checkpoint.key": checkpointKey,
         },
       },
       async () => {
         try {
-          // Use FINAL to get the latest version from ReplacingMergeTree
-          const result = await this.clickHouseClient.query({
-            query: `
-              SELECT
-                ProcessorName,
-                ProcessorType,
-                EventId,
-                Status,
-                EventTimestamp,
-                SequenceNumber,
-                ProcessedAt,
-                FailedAt,
-                ErrorMessage,
-                TenantId,
-                AggregateType,
-                AggregateId
-              FROM processor_checkpoints FINAL
-              WHERE CheckpointKey = {checkpointKey:String}
-              LIMIT 1
-            `,
-            query_params: {
-              checkpointKey,
-            },
-            format: "JSONEachRow",
-          });
+          // Get record from repository
+          const record = await this.repository.getCheckpointRecord(
+            checkpointKey,
+          );
 
-          const rows = await result.json<CheckpointRecord>();
-          const row = rows[0];
-
-          if (!row) {
+          if (!record) {
             return null;
           }
 
-          const checkpoint: ProcessorCheckpoint = {
-            processorName: row.ProcessorName,
-            processorType: row.ProcessorType,
-            eventId: row.EventId,
-            status: row.Status,
-            eventTimestamp: row.EventTimestamp,
-            sequenceNumber: row.SequenceNumber,
-            processedAt: row.ProcessedAt ?? void 0,
-            failedAt: row.FailedAt ?? void 0,
-            errorMessage: row.ErrorMessage ?? void 0,
-            tenantId: row.TenantId as TenantId,
-            aggregateType: row.AggregateType as AggregateType,
-            aggregateId: row.AggregateId,
-          };
-
-          return checkpoint;
+          // Transform to checkpoint
+          return this.recordToCheckpoint(record);
         } catch (error) {
           this.logger.error(
             {
-              processorName,
-              processorType,
-              eventId,
+              checkpointKey,
               error: error instanceof Error ? error.message : String(error),
               errorStack: error instanceof Error ? error.stack : void 0,
             },
@@ -236,6 +179,7 @@ export class ProcessorCheckpointStoreClickHouse
   }
 
   async getLastProcessedEvent(
+    pipelineName: string,
     processorName: string,
     processorType: "handler" | "projection",
     tenantId: TenantId,
@@ -252,6 +196,7 @@ export class ProcessorCheckpointStoreClickHouse
       {
         kind: SpanKind.INTERNAL,
         attributes: {
+          "pipeline.name": pipelineName,
           "processor.name": processorName,
           "processor.type": processorType,
           "tenant.id": tenantId,
@@ -261,64 +206,26 @@ export class ProcessorCheckpointStoreClickHouse
       },
       async () => {
         try {
-          const result = await this.clickHouseClient.query({
-            query: `
-              SELECT
-                ProcessorName,
-                ProcessorType,
-                EventId,
-                Status,
-                EventTimestamp,
-                SequenceNumber,
-                ProcessedAt,
-                FailedAt,
-                ErrorMessage,
-                TenantId,
-                AggregateType,
-                AggregateId
-              FROM processor_checkpoints FINAL
-              WHERE TenantId = {tenantId:String}
-                AND ProcessorName = {processorName:String}
-                AND ProcessorType = {processorType:String}
-                AND AggregateType = {aggregateType:String}
-                AND AggregateId = {aggregateId:String}
-                AND Status = 'processed'
-              ORDER BY EventTimestamp DESC
-              LIMIT 1
-            `,
-            query_params: {
-              tenantId,
-              processorName,
-              processorType,
-              aggregateType,
-              aggregateId,
-            },
-            format: "JSONEachRow",
-          });
+          // Build checkpoint key (business logic in store layer)
+          const checkpointKey = buildCheckpointKey(
+            tenantId,
+            pipelineName,
+            processorName,
+            aggregateType,
+            aggregateId,
+          );
 
-          const rows = await result.json<CheckpointRecord>();
-          const row = rows[0];
+          // Get record from repository
+          const record = await this.repository.getLastProcessedCheckpointRecord(
+            checkpointKey,
+          );
 
-          if (!row) {
+          if (!record) {
             return null;
           }
 
-          const checkpoint: ProcessorCheckpoint = {
-            processorName: row.ProcessorName,
-            processorType: row.ProcessorType,
-            eventId: row.EventId,
-            status: row.Status,
-            eventTimestamp: row.EventTimestamp,
-            sequenceNumber: row.SequenceNumber,
-            processedAt: row.ProcessedAt ?? void 0,
-            failedAt: row.FailedAt ?? void 0,
-            errorMessage: row.ErrorMessage ?? void 0,
-            tenantId: row.TenantId as TenantId,
-            aggregateType: row.AggregateType as AggregateType,
-            aggregateId: row.AggregateId,
-          };
-
-          return checkpoint;
+          // Transform to checkpoint
+          return this.recordToCheckpoint(record);
         } catch (error) {
           this.logger.error(
             {
@@ -339,6 +246,7 @@ export class ProcessorCheckpointStoreClickHouse
   }
 
   async getCheckpointBySequenceNumber(
+    pipelineName: string,
     processorName: string,
     processorType: "handler" | "projection",
     tenantId: TenantId,
@@ -356,6 +264,7 @@ export class ProcessorCheckpointStoreClickHouse
       {
         kind: SpanKind.INTERNAL,
         attributes: {
+          "pipeline.name": pipelineName,
           "processor.name": processorName,
           "processor.type": processorType,
           "tenant.id": tenantId,
@@ -366,65 +275,27 @@ export class ProcessorCheckpointStoreClickHouse
       },
       async () => {
         try {
-          const result = await this.clickHouseClient.query({
-            query: `
-              SELECT
-                ProcessorName,
-                ProcessorType,
-                EventId,
-                Status,
-                EventTimestamp,
-                SequenceNumber,
-                ProcessedAt,
-                FailedAt,
-                ErrorMessage,
-                TenantId,
-                AggregateType,
-                AggregateId
-              FROM processor_checkpoints FINAL
-              WHERE TenantId = {tenantId:String}
-                AND ProcessorName = {processorName:String}
-                AND ProcessorType = {processorType:String}
-                AND AggregateType = {aggregateType:String}
-                AND AggregateId = {aggregateId:String}
-                AND SequenceNumber = {sequenceNumber:UInt64}
-                AND Status = 'processed'
-              LIMIT 1
-            `,
-            query_params: {
-              tenantId,
-              processorName,
-              processorType,
-              aggregateType,
-              aggregateId,
-              sequenceNumber,
-            },
-            format: "JSONEachRow",
-          });
+          // Build checkpoint key (business logic in store layer)
+          const checkpointKey = buildCheckpointKey(
+            tenantId,
+            pipelineName,
+            processorName,
+            aggregateType,
+            aggregateId,
+          );
 
-          const rows = await result.json<CheckpointRecord>();
-          const row = rows[0];
+          // Get record from repository
+          const record = await this.repository.getCheckpointRecordBySequenceNumber(
+            checkpointKey,
+            sequenceNumber,
+          );
 
-          if (!row) {
+          if (!record) {
             return null;
           }
 
-          const checkpoint: ProcessorCheckpoint = {
-            processorName: row.ProcessorName,
-            processorType: row.ProcessorType,
-            eventId: row.EventId,
-            status: row.Status,
-            eventTimestamp: row.EventTimestamp,
-            sequenceNumber: row.SequenceNumber,
-            processedAt: row.ProcessedAt ?? void 0,
-            failedAt: row.FailedAt ?? void 0,
-            errorMessage: row.ErrorMessage ?? void 0,
-            tenantId: row.TenantId as TenantId,
-            aggregateType: row.AggregateType as AggregateType,
-            aggregateId: row.AggregateId,
-          };
-
-          return checkpoint;
+          // Transform to checkpoint
+          return this.recordToCheckpoint(record);
         } catch (error) {
           this.logger.error(
             {
@@ -446,6 +317,7 @@ export class ProcessorCheckpointStoreClickHouse
   }
 
   async hasFailedEvents(
+    pipelineName: string,
     processorName: string,
     processorType: "handler" | "projection",
     tenantId: TenantId,
@@ -462,6 +334,7 @@ export class ProcessorCheckpointStoreClickHouse
       {
         kind: SpanKind.INTERNAL,
         attributes: {
+          "pipeline.name": pipelineName,
           "processor.name": processorName,
           "processor.type": processorType,
           "tenant.id": tenantId,
@@ -471,32 +344,17 @@ export class ProcessorCheckpointStoreClickHouse
       },
       async () => {
         try {
-          const result = await this.clickHouseClient.query({
-            query: `
-              SELECT COUNT(*) as count
-              FROM processor_checkpoints FINAL
-              WHERE TenantId = {tenantId:String}
-                AND ProcessorName = {processorName:String}
-                AND ProcessorType = {processorType:String}
-                AND AggregateType = {aggregateType:String}
-                AND AggregateId = {aggregateId:String}
-                AND Status = 'failed'
-              LIMIT 1
-            `,
-            query_params: {
-              tenantId,
-              processorName,
-              processorType,
-              aggregateType,
-              aggregateId,
-            },
-            format: "JSONEachRow",
-          });
+          // Build checkpoint key (business logic in store layer)
+          const checkpointKey = buildCheckpointKey(
+            tenantId,
+            pipelineName,
+            processorName,
+            aggregateType,
+            aggregateId,
+          );
 
-          const rows = await result.json<{ count: number }>();
-          const count = rows[0]?.count ?? 0;
-
-          return count > 0;
+          // Delegate to repository
+          return await this.repository.hasFailedCheckpointRecords(checkpointKey);
         } catch (error) {
           this.logger.error(
             {
@@ -517,6 +375,7 @@ export class ProcessorCheckpointStoreClickHouse
   }
 
   async getFailedEvents(
+    pipelineName: string,
     processorName: string,
     processorType: "handler" | "projection",
     tenantId: TenantId,
@@ -533,6 +392,7 @@ export class ProcessorCheckpointStoreClickHouse
       {
         kind: SpanKind.INTERNAL,
         attributes: {
+          "pipeline.name": pipelineName,
           "processor.name": processorName,
           "processor.type": processorType,
           "tenant.id": tenantId,
@@ -542,56 +402,22 @@ export class ProcessorCheckpointStoreClickHouse
       },
       async () => {
         try {
-          const result = await this.clickHouseClient.query({
-            query: `
-              SELECT
-                ProcessorName,
-                ProcessorType,
-                EventId,
-                Status,
-                EventTimestamp,
-                SequenceNumber,
-                ProcessedAt,
-                FailedAt,
-                ErrorMessage,
-                TenantId,
-                AggregateType,
-                AggregateId
-              FROM processor_checkpoints FINAL
-              WHERE TenantId = {tenantId:String}
-                AND ProcessorName = {processorName:String}
-                AND ProcessorType = {processorType:String}
-                AND AggregateType = {aggregateType:String}
-                AND AggregateId = {aggregateId:String}
-                AND Status = 'failed'
-              ORDER BY EventTimestamp ASC
-            `,
-            query_params: {
-              tenantId,
-              processorName,
-              processorType,
-              aggregateType,
-              aggregateId,
-            },
-            format: "JSONEachRow",
-          });
+          // Build checkpoint key (business logic in store layer)
+          const checkpointKey = buildCheckpointKey(
+            tenantId,
+            pipelineName,
+            processorName,
+            aggregateType,
+            aggregateId,
+          );
 
-          const rows = await result.json<CheckpointRecord>();
+          // Get records from repository
+          const records = await this.repository.getFailedCheckpointRecords(
+            checkpointKey,
+          );
 
-          return rows.map((row) => ({
-            processorName: row.ProcessorName,
-            processorType: row.ProcessorType,
-            eventId: row.EventId,
-            status: row.Status,
-            eventTimestamp: row.EventTimestamp,
-            sequenceNumber: row.SequenceNumber,
-            processedAt: row.ProcessedAt ?? void 0,
-            failedAt: row.FailedAt ?? void 0,
-            errorMessage: row.ErrorMessage ?? void 0,
-            tenantId: row.TenantId as TenantId,
-            aggregateType: row.AggregateType as AggregateType,
-            aggregateId: row.AggregateId,
-          }));
+          // Transform to checkpoints
+          return records.map((record) => this.recordToCheckpoint(record));
         } catch (error) {
           this.logger.error(
             {
@@ -612,49 +438,33 @@ export class ProcessorCheckpointStoreClickHouse
   }
 
   async clearCheckpoint(
-    processorName: string,
-    processorType: "handler" | "projection",
-    eventId: string,
+    checkpointKey: string,
   ): Promise<void> {
-    const checkpointKey = `${processorName}:${eventId}`;
-
     return await this.tracer.withActiveSpan(
       "ProcessorCheckpointStoreClickHouse.clearCheckpoint",
       {
         kind: SpanKind.INTERNAL,
         attributes: {
-          "processor.name": processorName,
-          "processor.type": processorType,
-          "event.id": eventId,
+          "checkpoint.key": checkpointKey,
         },
       },
       async () => {
         try {
-          // Delete checkpoint using ALTER DELETE
-          await this.clickHouseClient.command({
-            query: `
-              ALTER TABLE processor_checkpoints
-              DELETE WHERE CheckpointKey = {checkpointKey:String}
-            `,
-            query_params: {
-              checkpointKey,
-            },
-          });
+          // Delegate to repository
+          await this.repository.deleteCheckpointRecord(
+            checkpointKey,
+          );
 
           this.logger.debug(
             {
-              processorName,
-              processorType,
-              eventId,
+              checkpointKey,
             },
             "Cleared checkpoint from ClickHouse",
           );
         } catch (error) {
           this.logger.error(
             {
-              processorName,
-              processorType,
-              eventId,
+              checkpointKey,
               error: error instanceof Error ? error.message : String(error),
               errorStack: error instanceof Error ? error.stack : void 0,
             },
@@ -664,5 +474,25 @@ export class ProcessorCheckpointStoreClickHouse
         }
       },
     );
+  }
+
+  /**
+   * Transforms a CheckpointRecord to a ProcessorCheckpoint.
+   */
+  private recordToCheckpoint(record: CheckpointRecord): ProcessorCheckpoint {
+    return {
+      processorName: record.ProcessorName,
+      processorType: record.ProcessorType,
+      eventId: record.EventId,
+      status: record.Status,
+      eventTimestamp: record.EventTimestamp,
+      sequenceNumber: record.SequenceNumber,
+      processedAt: record.ProcessedAt ?? void 0,
+      failedAt: record.FailedAt ?? void 0,
+      errorMessage: record.ErrorMessage ?? void 0,
+      tenantId: record.TenantId as TenantId,
+      aggregateType: record.AggregateType as AggregateType,
+      aggregateId: record.AggregateId,
+    };
   }
 }

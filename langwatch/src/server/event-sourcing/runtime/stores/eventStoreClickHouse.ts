@@ -1,4 +1,3 @@
-import { type ClickHouseClient } from "@clickhouse/client";
 import { SpanKind } from "@opentelemetry/api";
 import { getLangWatchTracer } from "langwatch";
 
@@ -10,17 +9,7 @@ import type {
 } from "../../library";
 import { EventUtils, createTenantId } from "../../library";
 import { createLogger } from "../../../../utils/logger";
-
-interface EventRecord {
-  TenantId: string;
-  AggregateType: string;
-  AggregateId: string;
-  EventId: string;
-  EventTimestamp: number;
-  EventType: string;
-  EventPayload: unknown;
-  ProcessingTraceparent: string;
-}
+import type { EventRepository, EventRecord } from "./repositories/eventRepository.types";
 
 export class EventStoreClickHouse<EventType extends Event = Event>
   implements BaseEventStore<EventType>
@@ -30,7 +19,7 @@ export class EventStoreClickHouse<EventType extends Event = Event>
   );
   logger = createLogger("langwatch:trace-processing:event-store:clickhouse");
 
-  constructor(private readonly clickHouseClient: ClickHouseClient) {}
+  constructor(private readonly repository: EventRepository) {}
 
   async getEvents(
     aggregateId: string,
@@ -52,81 +41,33 @@ export class EventStoreClickHouse<EventType extends Event = Event>
       },
       async () => {
         try {
-          const result = await this.clickHouseClient.query({
-            query: `
-              SELECT
-                EventId,
-                EventTimestamp,
-                EventType,
-                EventPayload,
-                ProcessingTraceparent
-              FROM event_log
-              WHERE TenantId = {tenantId:String}
-                AND AggregateType = {aggregateType:String}
-                AND AggregateId = {aggregateId:String}
-              ORDER BY EventTimestamp ASC, EventId ASC
-            `,
-            query_params: {
-              tenantId: context.tenantId,
-              aggregateType,
-              aggregateId: String(aggregateId),
-            },
-            format: "JSONEachRow",
-          });
+          // Get raw records from repository
+          const records = await this.repository.getEventRecords(
+            context.tenantId,
+            aggregateType,
+            aggregateId,
+          );
 
-          const rows = await result.json<EventRecord>();
+          // Transform records to events
+          const events = records.map((record) =>
+            this.recordToEvent(record, aggregateId),
+          );
 
           // Deduplicate by Event ID (keep first occurrence when sorted by timestamp)
           const seenEventIds = new Set<string>();
-          const deduplicatedRows = rows.filter((row) => {
-            if (!row.EventId) {
-              // If no Event ID, keep the row (shouldn't happen but handle gracefully)
+          const deduplicatedEvents = events.filter((event) => {
+            if (!event.id) {
+              // If no Event ID, keep the event (shouldn't happen but handle gracefully)
               return true;
             }
-            if (seenEventIds.has(row.EventId)) {
+            if (seenEventIds.has(event.id)) {
               return false; // Skip duplicate
             }
-            seenEventIds.add(row.EventId);
+            seenEventIds.add(event.id);
             return true;
           });
 
-          return deduplicatedRows.map((row) => {
-            // EventTimestamp is already a number (Unix timestamp in milliseconds)
-            // Handle invalid timestamps by falling back to current time
-            let timestampMs: number;
-            if (
-              typeof row.EventTimestamp === "number" &&
-              !Number.isNaN(row.EventTimestamp)
-            ) {
-              timestampMs = row.EventTimestamp;
-            } else if (typeof row.EventTimestamp === "string") {
-              const parsed = Date.parse(row.EventTimestamp);
-              timestampMs = Number.isNaN(parsed) ? Date.now() : parsed;
-            } else {
-              timestampMs = Date.now();
-            }
-            const payload = this.parseEventPayload(row.EventPayload);
-
-            // Construct event object matching Event interface structure
-            // We first check the type is valid using satisfies, then cast to EventType
-            // since EventType is a generic that could be a more specific subtype, but
-            // we have already checked the type is valid using satisfies, so we can cast
-            // to EventType. TypeScript just isn't as clever as we are. hehe.
-            const event = {
-              id: row.EventId,
-              aggregateId: aggregateId,
-              aggregateType: row.AggregateType as AggregateType,
-              tenantId: createTenantId(context.tenantId),
-              timestamp: timestampMs,
-              type: row.EventType as EventType["type"],
-              data: payload,
-              metadata: {
-                processingTraceparent: row.ProcessingTraceparent || void 0,
-              },
-            } satisfies Event;
-
-            return event as EventType;
-          });
+          return deduplicatedEvents;
         } catch (error) {
           this.logger.error(
             {
@@ -172,32 +113,14 @@ export class EventStoreClickHouse<EventType extends Event = Event>
       },
       async () => {
         try {
-          const result = await this.clickHouseClient.query({
-            query: `
-              SELECT COUNT(*) as count
-              FROM event_log
-              WHERE TenantId = {tenantId:String}
-                AND AggregateType = {aggregateType:String}
-                AND AggregateId = {aggregateId:String}
-                AND (
-                  EventTimestamp < {beforeTimestamp:UInt64}
-                  OR (EventTimestamp = {beforeTimestamp:UInt64} AND EventId < {beforeEventId:String})
-                )
-            `,
-            query_params: {
-              tenantId: context.tenantId,
-              aggregateType,
-              aggregateId: String(aggregateId),
-              beforeTimestamp,
-              beforeEventId,
-            },
-            format: "JSONEachRow",
-          });
-
-          const rows = await result.json<{ count: number }>();
-          const count = rows[0]?.count ?? 0;
-
-          return count;
+          // Delegate to repository
+          return await this.repository.countEventRecords(
+            context.tenantId,
+            aggregateType,
+            aggregateId,
+            beforeTimestamp,
+            beforeEventId,
+          );
         } catch (error) {
           this.logger.error(
             {
@@ -234,20 +157,49 @@ export class EventStoreClickHouse<EventType extends Event = Event>
         },
       },
       async () => {
-        EventUtils.validateTenantId(
-          context,
-          "EventStoreClickHouse.storeEvents",
-        );
+        try {
+          EventUtils.validateTenantId(
+            context,
+            "EventStoreClickHouse.storeEvents",
+          );
 
-        if (events.length === 0) {
-          return;
+          if (events.length === 0) {
+            return;
+          }
+
+          // Validate all events before storage
+          this.validateEvents(events, context, aggregateType);
+
+          // Transform events to records
+          const records = events.map((event) => this.eventToRecord(event));
+
+          // Delegate to repository
+          await this.repository.insertEventRecords(records);
+
+          this.logger.info(
+            {
+              tenantId: context.tenantId,
+              eventCount: events.length,
+              aggregateIds: [...new Set(events.map((e) => e.aggregateId))],
+            },
+            "Stored events to ClickHouse",
+          );
+        } catch (error) {
+          this.logger.error(
+            {
+              tenantId: context.tenantId,
+              eventCount: events.length,
+              aggregateIds: [
+                ...new Set(events.map((e) => String(e.aggregateId))),
+              ],
+              error: error instanceof Error ? error.message : String(error),
+              errorStack: error instanceof Error ? error.stack : void 0,
+              errorName: error instanceof Error ? error.name : void 0,
+            },
+            "Failed to store events in ClickHouse",
+          );
+          throw error;
         }
-
-        // Validate all events before storage
-        this.validateEvents(events, context, aggregateType);
-
-        // Transform and store events
-        await this.insertEvents(events, context);
       },
     );
   }
@@ -364,55 +316,59 @@ export class EventStoreClickHouse<EventType extends Event = Event>
   }
 
   /**
-   * Transforms events to ClickHouse format and inserts them.
+   * Transforms an EventRecord to an Event.
    */
-  private async insertEvents(
-    events: readonly EventType[],
-    context: EventStoreReadContext<EventType>,
-  ): Promise<void> {
-    try {
-      const eventRecords = events.map(
-        (event) =>
-          ({
-            TenantId: String(event.tenantId),
-            AggregateType: event.aggregateType,
-            AggregateId: String(event.aggregateId),
-            EventId: event.id,
-            EventTimestamp: event.timestamp,
-            EventType: event.type,
-            EventPayload: event.data ?? {},
-            ProcessingTraceparent: event.metadata?.processingTraceparent ?? "",
-          }) satisfies EventRecord,
-      );
-
-      await this.clickHouseClient.insert({
-        table: "event_log",
-        values: eventRecords,
-        format: "JSONEachRow",
-      });
-
-      this.logger.info(
-        {
-          tenantId: context.tenantId,
-          eventCount: events.length,
-          aggregateIds: [...new Set(events.map((e) => e.aggregateId))],
-        },
-        "Stored events to ClickHouse",
-      );
-    } catch (error) {
-      this.logger.error(
-        {
-          tenantId: context.tenantId,
-          eventCount: events.length,
-          aggregateIds: [...new Set(events.map((e) => String(e.aggregateId)))],
-          error: error instanceof Error ? error.message : String(error),
-          errorStack: error instanceof Error ? error.stack : void 0,
-          errorName: error instanceof Error ? error.name : void 0,
-        },
-        "Failed to store events in ClickHouse",
-      );
-      throw error;
+  private recordToEvent(record: EventRecord, aggregateId: string): EventType {
+    // Handle invalid timestamps by falling back to current time
+    let timestampMs: number;
+    if (
+      typeof record.EventTimestamp === "number" &&
+      !Number.isNaN(record.EventTimestamp)
+    ) {
+      timestampMs = record.EventTimestamp;
+    } else if (typeof record.EventTimestamp === "string") {
+      const parsed = Date.parse(record.EventTimestamp);
+      timestampMs = Number.isNaN(parsed) ? Date.now() : parsed;
+    } else {
+      timestampMs = Date.now();
     }
+    const payload = this.parseEventPayload(record.EventPayload);
+
+    // Construct event object matching Event interface structure
+    // We first check the type is valid using satisfies, then cast to EventType
+    // since EventType is a generic that could be a more specific subtype, but
+    // we have already checked the type is valid using satisfies, so we can cast
+    // to EventType. TypeScript just isn't as clever as we are. hehe.
+    const event = {
+      id: record.EventId,
+      aggregateId: aggregateId,
+      aggregateType: record.AggregateType as AggregateType,
+      tenantId: createTenantId(record.TenantId),
+      timestamp: timestampMs,
+      type: record.EventType as EventType["type"],
+      data: payload,
+      metadata: {
+        processingTraceparent: record.ProcessingTraceparent || void 0,
+      },
+    } satisfies Event;
+
+    return event as EventType;
+  }
+
+  /**
+   * Transforms an Event to an EventRecord.
+   */
+  private eventToRecord(event: EventType): EventRecord {
+    return {
+      TenantId: String(event.tenantId),
+      AggregateType: event.aggregateType,
+      AggregateId: String(event.aggregateId),
+      EventId: event.id,
+      EventTimestamp: event.timestamp,
+      EventType: event.type,
+      EventPayload: event.data ?? {},
+      ProcessingTraceparent: event.metadata?.processingTraceparent ?? "",
+    };
   }
 
   /**

@@ -3,6 +3,13 @@ import type { Event, ProcessorCheckpoint } from "../../library/domain/types";
 import type { TenantId } from "../../library/domain/tenantId";
 import type { AggregateType } from "../../library/domain/aggregateType";
 import { EventUtils } from "../../library";
+import { parseCheckpointKey, buildCheckpointKey } from "../../library/utils/checkpointKey";
+import type {
+  CheckpointRepository,
+  CheckpointRecord,
+} from "./repositories/checkpointRepository.types";
+import { CheckpointRepositoryMemory } from "./repositories/checkpointRepositoryMemory";
+import { createLogger } from "~/utils/logger";
 
 /**
  * In-memory implementation of ProcessorCheckpointStore.
@@ -24,16 +31,23 @@ import { EventUtils } from "../../library";
 export class ProcessorCheckpointStoreMemory
   implements ProcessorCheckpointStore
 {
-  // Key: `${processorName}:${eventId}`
-  private readonly checkpoints = new Map<string, ProcessorCheckpoint>();
+  private readonly repository: CheckpointRepository;
+  private readonly logger = createLogger("langwatch:event-sourcing:processor-checkpoint-store:memory");
 
-  constructor() {
-    // Note: This implementation is safe for single-instance deployments.
-    // The pipeline automatically uses ClickHouse checkpoint store when available.
+  constructor(
+    repository?: CheckpointRepository,
+  ) {
+    // Prevent accidental use in production - memory stores are not thread-safe
+    if (process.env.NODE_ENV === "production") {
+      throw new Error(
+        "ProcessorCheckpointStoreMemory is not thread-safe and cannot be used in production. Use ProcessorCheckpointStoreClickHouse or another thread-safe implementation instead.",
+      );
+    }
+    this.repository = repository ?? new CheckpointRepositoryMemory();
   }
 
   async saveCheckpoint<EventType extends Event>(
-    processorName: string,
+    checkpointKey: string,
     processorType: "handler" | "projection",
     event: EventType,
     status: "processed" | "failed" | "pending",
@@ -45,44 +59,50 @@ export class ProcessorCheckpointStoreMemory
       "ProcessorCheckpointStoreMemory.saveCheckpoint",
     );
 
-    const checkpointKey = `${processorName}:${event.id}`;
     const now = Date.now();
 
-    const checkpoint: ProcessorCheckpoint = {
-      processorName,
-      processorType,
-      eventId: event.id,
-      status,
-      eventTimestamp: event.timestamp,
-      sequenceNumber,
-      processedAt: status === "processed" ? now : void 0,
-      failedAt: status === "failed" ? now : void 0,
-      errorMessage: status === "failed" ? errorMessage : void 0,
-      tenantId: event.tenantId,
-      aggregateType: event.aggregateType,
-      aggregateId: String(event.aggregateId),
+    // Extract processorName from checkpointKey (format: tenantId:pipelineName:processorName:aggregateType:aggregateId)
+    const { processorName } = parseCheckpointKey(checkpointKey);
+
+    // Transform to record
+    const record: CheckpointRecord = {
+      CheckpointKey: checkpointKey,
+      ProcessorName: processorName,
+      ProcessorType: processorType,
+      EventId: event.id,
+      Status: status,
+      EventTimestamp: event.timestamp,
+      SequenceNumber: sequenceNumber,
+      ProcessedAt: status === "processed" ? now : null,
+      FailedAt: status === "failed" ? now : null,
+      ErrorMessage: status === "failed" ? errorMessage ?? null : null,
+      TenantId: event.tenantId,
+      AggregateType: event.aggregateType,
+      AggregateId: String(event.aggregateId),
     };
 
-    // Deep clone to prevent mutation
-    this.checkpoints.set(checkpointKey, JSON.parse(JSON.stringify(checkpoint)));
+    // Delegate to repository
+    await this.repository.insertCheckpointRecord(record);
   }
 
   async loadCheckpoint(
-    processorName: string,
-    processorType: "handler" | "projection",
-    eventId: string,
+    checkpointKey: string,
   ): Promise<ProcessorCheckpoint | null> {
-    const checkpointKey = `${processorName}:${eventId}`;
-    const checkpoint = this.checkpoints.get(checkpointKey);
-    if (!checkpoint) {
+    // Get record from repository
+    const record = await this.repository.getCheckpointRecord(
+      checkpointKey,
+    );
+
+    if (!record) {
       return null;
     }
 
-    // Deep clone to prevent mutation
-    return JSON.parse(JSON.stringify(checkpoint));
+    // Transform to checkpoint
+    return this.recordToCheckpoint(record);
   }
 
   async getLastProcessedEvent(
+    pipelineName: string,
     processorName: string,
     processorType: "handler" | "projection",
     tenantId: TenantId,
@@ -94,33 +114,30 @@ export class ProcessorCheckpointStoreMemory
       "ProcessorCheckpointStoreMemory.getLastProcessedEvent",
     );
 
-    let lastCheckpoint: ProcessorCheckpoint | null = null;
-    let lastTimestamp = -1;
+    // Build checkpoint key (business logic in store layer)
+    const checkpointKey = buildCheckpointKey(
+      tenantId,
+      pipelineName,
+      processorName,
+      aggregateType,
+      aggregateId,
+    );
 
-    for (const checkpoint of this.checkpoints.values()) {
-      if (
-        checkpoint.processorName === processorName &&
-        checkpoint.processorType === processorType &&
-        checkpoint.tenantId === tenantId &&
-        checkpoint.aggregateType === aggregateType &&
-        checkpoint.aggregateId === aggregateId &&
-        checkpoint.status === "processed" &&
-        checkpoint.eventTimestamp > lastTimestamp
-      ) {
-        lastCheckpoint = checkpoint;
-        lastTimestamp = checkpoint.eventTimestamp;
-      }
-    }
+    // Get record from repository
+    const record = await this.repository.getLastProcessedCheckpointRecord(
+      checkpointKey,
+    );
 
-    if (!lastCheckpoint) {
+    if (!record) {
       return null;
     }
 
-    // Deep clone to prevent mutation
-    return JSON.parse(JSON.stringify(lastCheckpoint));
+    // Transform to checkpoint
+    return this.recordToCheckpoint(record);
   }
 
   async getCheckpointBySequenceNumber(
+    pipelineName: string,
     processorName: string,
     processorType: "handler" | "projection",
     tenantId: TenantId,
@@ -133,25 +150,45 @@ export class ProcessorCheckpointStoreMemory
       "ProcessorCheckpointStoreMemory.getCheckpointBySequenceNumber",
     );
 
-    for (const checkpoint of this.checkpoints.values()) {
-      if (
-        checkpoint.processorName === processorName &&
-        checkpoint.processorType === processorType &&
-        checkpoint.tenantId === tenantId &&
-        checkpoint.aggregateType === aggregateType &&
-        checkpoint.aggregateId === aggregateId &&
-        checkpoint.sequenceNumber === sequenceNumber &&
-        checkpoint.status === "processed"
-      ) {
-        // Deep clone to prevent mutation
-        return JSON.parse(JSON.stringify(checkpoint));
-      }
+    // Build aggregate checkpoint key (business logic in store layer)
+    const checkpointKey = buildCheckpointKey(
+      tenantId,
+      pipelineName,
+      processorName,
+      aggregateType,
+      aggregateId,
+    );
+
+    this.logger.debug(
+      {
+        pipelineName,
+        processorName,
+        processorType,
+        tenantId,
+        aggregateType,
+        aggregateId,
+        sequenceNumber,
+        checkpointKey,
+      },
+      "getCheckpointBySequenceNumber",
+    );
+
+    // Get record from repository
+    const record = await this.repository.getCheckpointRecordBySequenceNumber(
+      checkpointKey,
+      sequenceNumber,
+    );
+
+    if (!record) {
+      return null;
     }
 
-    return null;
+    // Transform to checkpoint
+    return this.recordToCheckpoint(record);
   }
 
   async hasFailedEvents(
+    pipelineName: string,
     processorName: string,
     processorType: "handler" | "projection",
     tenantId: TenantId,
@@ -163,23 +200,21 @@ export class ProcessorCheckpointStoreMemory
       "ProcessorCheckpointStoreMemory.hasFailedEvents",
     );
 
-    for (const checkpoint of this.checkpoints.values()) {
-      if (
-        checkpoint.processorName === processorName &&
-        checkpoint.processorType === processorType &&
-        checkpoint.tenantId === tenantId &&
-        checkpoint.aggregateType === aggregateType &&
-        checkpoint.aggregateId === aggregateId &&
-        checkpoint.status === "failed"
-      ) {
-        return true;
-      }
-    }
+    // Build checkpoint key (business logic in store layer)
+    const checkpointKey = buildCheckpointKey(
+      tenantId,
+      pipelineName,
+      processorName,
+      aggregateType,
+      aggregateId,
+    );
 
-    return false;
+    // Delegate to repository
+    return await this.repository.hasFailedCheckpointRecords(checkpointKey);
   }
 
   async getFailedEvents(
+    pipelineName: string,
     processorName: string,
     processorType: "handler" | "projection",
     tenantId: TenantId,
@@ -191,34 +226,50 @@ export class ProcessorCheckpointStoreMemory
       "ProcessorCheckpointStoreMemory.getFailedEvents",
     );
 
-    const failedCheckpoints: ProcessorCheckpoint[] = [];
+    // Build checkpoint key (business logic in store layer)
+    const checkpointKey = buildCheckpointKey(
+      tenantId,
+      pipelineName,
+      processorName,
+      aggregateType,
+      aggregateId,
+    );
 
-    for (const checkpoint of this.checkpoints.values()) {
-      if (
-        checkpoint.processorName === processorName &&
-        checkpoint.processorType === processorType &&
-        checkpoint.tenantId === tenantId &&
-        checkpoint.aggregateType === aggregateType &&
-        checkpoint.aggregateId === aggregateId &&
-        checkpoint.status === "failed"
-      ) {
-        failedCheckpoints.push(checkpoint);
-      }
-    }
+    // Get records from repository
+    const records = await this.repository.getFailedCheckpointRecords(
+      checkpointKey,
+    );
 
-    // Sort by event timestamp ascending
-    failedCheckpoints.sort((a, b) => a.eventTimestamp - b.eventTimestamp);
-
-    // Deep clone to prevent mutation
-    return failedCheckpoints.map((cp) => JSON.parse(JSON.stringify(cp)));
+    // Transform to checkpoints
+    return records.map((record) => this.recordToCheckpoint(record));
   }
 
   async clearCheckpoint(
-    processorName: string,
-    processorType: "handler" | "projection",
-    eventId: string,
+    checkpointKey: string,
   ): Promise<void> {
-    const checkpointKey = `${processorName}:${eventId}`;
-    this.checkpoints.delete(checkpointKey);
+    // Delegate to repository
+    await this.repository.deleteCheckpointRecord(
+      checkpointKey,
+    );
+  }
+
+  /**
+   * Transforms a CheckpointRecord to a ProcessorCheckpoint.
+   */
+  private recordToCheckpoint(record: CheckpointRecord): ProcessorCheckpoint {
+    return {
+      processorName: record.ProcessorName,
+      processorType: record.ProcessorType,
+      eventId: record.EventId,
+      status: record.Status,
+      eventTimestamp: record.EventTimestamp,
+      sequenceNumber: record.SequenceNumber,
+      processedAt: record.ProcessedAt ?? void 0,
+      failedAt: record.FailedAt ?? void 0,
+      errorMessage: record.ErrorMessage ?? void 0,
+      tenantId: record.TenantId as TenantId,
+      aggregateType: record.AggregateType as AggregateType,
+      aggregateId: record.AggregateId,
+    };
   }
 }
