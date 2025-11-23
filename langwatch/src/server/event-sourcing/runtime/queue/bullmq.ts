@@ -88,7 +88,6 @@ export class EventSourcedQueueProcessorBullMq<Payload>
         span?.setAttributes({
           ...customAttributes,
         });
-        span?.updateName("EventQueue.Process");
 
         this.logger.debug(
           {
@@ -174,7 +173,6 @@ export class EventSourcedQueueProcessorBullMq<Payload>
 
     const span = trace.getActiveSpan();
     span?.setAttributes({ ...customAttributes });
-    span?.updateName("EventQueue.Send");
 
     await this.queue.add(
       // @ts-expect-error - jobName is a string, this is stupid typing from BullMQ

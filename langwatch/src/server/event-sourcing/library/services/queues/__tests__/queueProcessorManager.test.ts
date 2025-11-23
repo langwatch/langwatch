@@ -14,7 +14,6 @@ import {
   createTestEvent,
   createTestTenantId,
   createTestAggregateType,
-  createMockLogger,
   TEST_CONSTANTS,
 } from "../../__tests__/testHelpers";
 import { EVENT_TYPES } from "../../../domain/eventType";
@@ -259,11 +258,9 @@ describe("QueueProcessorManager", () => {
         create: vi.fn().mockReturnValue(mockQueueProcessor),
       };
 
-      const logger = createMockLogger();
       const manager = new QueueProcessorManager({
         aggregateType,
         queueProcessorFactory: queueFactory as any,
-        logger: logger as any,
       });
 
       const projections = {
@@ -297,11 +294,9 @@ describe("QueueProcessorManager", () => {
         create: vi.fn().mockReturnValue(mockQueueProcessor),
       };
 
-      const logger = createMockLogger();
       const manager = new QueueProcessorManager({
         aggregateType,
         queueProcessorFactory: queueFactory as any,
-        logger: logger as any,
       });
 
       const projections = {
@@ -458,11 +453,9 @@ describe("QueueProcessorManager", () => {
           .mockReturnValueOnce(commandQueueProcessor),
       };
 
-      const logger = createMockLogger();
       const manager = new QueueProcessorManager({
         aggregateType,
         queueProcessorFactory: queueFactory as any,
-        logger: logger as any,
       });
 
       const handlers = {
@@ -510,11 +503,9 @@ describe("QueueProcessorManager", () => {
         create: vi.fn().mockReturnValue(handlerQueueProcessor),
       };
 
-      const logger = createMockLogger();
       const manager = new QueueProcessorManager({
         aggregateType,
         queueProcessorFactory: queueFactory as any,
-        logger: logger as any,
       });
 
       const handlers = {

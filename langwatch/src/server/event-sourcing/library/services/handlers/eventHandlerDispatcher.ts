@@ -145,7 +145,7 @@ export class EventHandlerDispatcher<EventType extends Event = Event> {
                   "handler",
                   event.tenantId,
                   this.aggregateType,
-                  String(event.aggregateId),
+                  event.aggregateId,
                 );
 
               if (hasFailures) {

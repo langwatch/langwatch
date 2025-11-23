@@ -131,24 +131,21 @@ export class EventSourcingService<
     }
 
     // Initialize components
-    const validator = new EventProcessorValidator({
+    const validator = new EventProcessorValidator<EventType>({
       eventStore,
       aggregateType,
       processorCheckpointStore,
       pipelineName: this.pipelineName,
-      logger: this.logger,
     });
 
-    const checkpointManager = new CheckpointManager({
+    const checkpointManager = new CheckpointManager<EventType>(
+      this.pipelineName,
       processorCheckpointStore,
-      pipelineName: this.pipelineName,
-      logger: this.logger,
-    });
+    );
 
     this.queueManager = new QueueProcessorManager<EventType>({
       aggregateType,
       queueProcessorFactory,
-      logger: this.logger,
     });
 
     this.handlerDispatcher = new EventHandlerDispatcher<EventType>({
@@ -160,10 +157,9 @@ export class EventSourcingService<
       queueManager: this.queueManager,
       distributedLock,
       handlerLockTtlMs,
-      logger: this.logger,
     });
 
-    this.projectionUpdater = new ProjectionUpdater({
+    this.projectionUpdater = new ProjectionUpdater<EventType>({
       aggregateType,
       eventStore,
       projections: this.projections,
@@ -174,7 +170,6 @@ export class EventSourcingService<
       validator,
       checkpointManager,
       queueManager: this.queueManager,
-      logger: this.logger,
     });
 
     // Initialize queue processors for event handlers if factory is provided

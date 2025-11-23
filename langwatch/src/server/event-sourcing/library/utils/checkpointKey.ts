@@ -10,6 +10,9 @@
  */
 
 import { createTenantId, type TenantId } from "../domain/tenantId";
+import { createLogger } from "~/utils/logger";
+
+const logger = createLogger("langwatch:event-sourcing:checkpointKey");
 
 /**
  * Builds a checkpoint key from its components.
@@ -34,8 +37,19 @@ export function buildCheckpointKey(
   aggregateId: string,
 ): string {
   // Validate no colons in components
-  const components = { tenantId, pipelineName, processorName, aggregateType, aggregateId };
+  const components = { tenantId: tenantId.toString(), pipelineName, processorName, aggregateType, aggregateId };
   for (const [name, value] of Object.entries(components)) {
+    if (!value) {
+      const error = new Error(`${name} cannot be empty`);
+      logger.error({ name, value }, "Checkpoint key component cannot be empty");
+      throw error;
+    }
+    if (typeof value !== "string") {
+      const error = new Error(`${name} must be a string`);
+      logger.error({ name, value }, "Checkpoint key component must be a string");
+      throw error;
+    }
+
     if (value.includes(":")) {
       throw new Error(`${name} cannot contain ':' delimiter: ${value}`);
     }

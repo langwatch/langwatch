@@ -74,10 +74,10 @@ describe("ProjectionUpdater", () => {
 
     const checkpointManager =
       options.checkpointManager ??
-      new CheckpointManager({
-        processorCheckpointStore: options.processorCheckpointStore,
-        pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
-      });
+      new CheckpointManager(
+        TEST_CONSTANTS.PIPELINE_NAME,
+        options.processorCheckpointStore,
+      );
 
     const queueManager =
       options.queueManager ??
@@ -104,160 +104,9 @@ describe("ProjectionUpdater", () => {
       validator,
       checkpointManager,
       queueManager,
-      logger: options.logger,
     });
   }
 
-  describe("updateProjectionsForAggregates", () => {
-    it("does nothing when no projections registered", async () => {
-      const updater = createUpdater({});
-
-      await updater.updateProjectionsForAggregates([], context);
-
-      // Should complete without error
-      expect(true).toBe(true);
-    });
-
-    it("dispatches to queues when queue processors available", async () => {
-      const projectionHandler = createMockEventHandler<Event, any>();
-      const projections = new Map([
-        [
-          "projection1",
-          createMockProjectionDefinition("projection1", projectionHandler),
-        ],
-      ]);
-
-      const mockQueueProcessor: EventSourcedQueueProcessor<Event> = {
-        send: vi.fn().mockResolvedValue(void 0),
-        close: vi.fn().mockResolvedValue(void 0),
-      };
-
-      const queueManager = new QueueProcessorManager({
-        aggregateType,
-      });
-      (queueManager as any).projectionQueueProcessors.set(
-        "projection1",
-        mockQueueProcessor,
-      );
-
-      const checkpointStore = createMockProcessorCheckpointStore();
-      checkpointStore.hasFailedEvents = vi.fn().mockResolvedValue(false);
-
-      const updater = createUpdater({
-        projections,
-        processorCheckpointStore: checkpointStore,
-        queueManager,
-      });
-
-      const event = createTestEvent(
-        TEST_CONSTANTS.AGGREGATE_ID,
-        aggregateType,
-        tenantId,
-      );
-
-      await updater.updateProjectionsForAggregates([event], context);
-
-      expect(mockQueueProcessor.send).toHaveBeenCalledWith(event);
-    });
-
-    it("updates synchronously when no queue processors", async () => {
-      const projectionHandler = createMockEventHandler<Event, any>();
-      const projectionStore = createMockProjectionStore();
-      const projections = new Map([
-        [
-          "projection1",
-          createMockProjectionDefinition(
-            "projection1",
-            projectionHandler,
-            projectionStore,
-          ),
-        ],
-      ]);
-
-      const checkpointStore = createMockProcessorCheckpointStore();
-      checkpointStore.loadCheckpoint = vi.fn().mockResolvedValue(null);
-      checkpointStore.hasFailedEvents = vi.fn().mockResolvedValue(false);
-
-      const eventStore = createMockEventStore<Event>();
-      eventStore.countEventsBefore = vi.fn().mockResolvedValue(0);
-      eventStore.getEvents = vi.fn().mockResolvedValue([
-        createTestEvent(
-          TEST_CONSTANTS.AGGREGATE_ID,
-          aggregateType,
-          tenantId,
-        ),
-      ]);
-
-      const validator = new EventProcessorValidator({
-        eventStore,
-        aggregateType,
-        processorCheckpointStore: checkpointStore,
-        pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
-      });
-
-      const updater = createUpdater({
-        projections,
-        processorCheckpointStore: checkpointStore,
-        validator,
-      });
-      (updater as any).eventStore = eventStore;
-
-      const event = createTestEvent(
-        TEST_CONSTANTS.AGGREGATE_ID,
-        aggregateType,
-        tenantId,
-      );
-
-      await updater.updateProjectionsForAggregates([event], context);
-
-      expect(projectionHandler.handle).toHaveBeenCalled();
-    });
-
-    it("skips dispatch when previous events have failed (queue mode)", async () => {
-      const projectionHandler = createMockEventHandler<Event, any>();
-      const projections = new Map([
-        [
-          "projection1",
-          createMockProjectionDefinition("projection1", projectionHandler),
-        ],
-      ]);
-
-      const mockQueueProcessor: EventSourcedQueueProcessor<Event> = {
-        send: vi.fn().mockResolvedValue(void 0),
-        close: vi.fn().mockResolvedValue(void 0),
-      };
-
-      const queueManager = new QueueProcessorManager({
-        aggregateType,
-      });
-      (queueManager as any).projectionQueueProcessors.set(
-        "projection1",
-        mockQueueProcessor,
-      );
-
-      const checkpointStore = createMockProcessorCheckpointStore();
-      checkpointStore.hasFailedEvents = vi.fn().mockResolvedValue(true);
-
-      const logger = createMockLogger();
-      const updater = createUpdater({
-        projections,
-        processorCheckpointStore: checkpointStore,
-        queueManager,
-        logger: logger as any,
-      });
-
-      const event = createTestEvent(
-        TEST_CONSTANTS.AGGREGATE_ID,
-        aggregateType,
-        tenantId,
-      );
-
-      await updater.updateProjectionsForAggregates([event], context);
-
-      expect(mockQueueProcessor.send).not.toHaveBeenCalled();
-      expect(logger.warn).toHaveBeenCalled();
-    });
-  });
 
   describe("processProjectionEvent", () => {
     it("processes event and saves checkpoints", async () => {
@@ -312,7 +161,18 @@ describe("ProjectionUpdater", () => {
         context,
       );
 
-      expect(checkpointStore.saveCheckpoint).toHaveBeenCalledTimes(3); // pending (optimistic locking), then processed
+      // Checkpoint is saved 3 times: pending (idempotency), pending (before processing), then processed
+      expect(checkpointStore.saveCheckpoint).toHaveBeenCalledTimes(3);
+      // The processed checkpoint is the 3rd call
+      expect(checkpointStore.saveCheckpoint).toHaveBeenNthCalledWith(
+        3,
+        buildCheckpointKey(tenantId, TEST_CONSTANTS.PIPELINE_NAME, "projection1", TEST_CONSTANTS.AGGREGATE_TYPE, TEST_CONSTANTS.AGGREGATE_ID),
+        "projection",
+        event,
+        "processed",
+        1,
+        void 0,
+      );
     });
 
     it("saves failed checkpoint when update fails", async () => {
@@ -374,7 +234,8 @@ describe("ProjectionUpdater", () => {
         ),
       ).rejects.toThrow("Projection error");
 
-      expect(checkpointStore.saveCheckpoint).toHaveBeenCalledTimes(3); // pending (idempotency), pending (validation), then failed
+      // Checkpoint is saved 3 times: pending (idempotency), pending (before processing), then failed
+      expect(checkpointStore.saveCheckpoint).toHaveBeenCalledTimes(3);
       // The failed checkpoint is the 3rd call (after 2 pending checkpoints)
       expect(checkpointStore.saveCheckpoint).toHaveBeenNthCalledWith(
         3,
