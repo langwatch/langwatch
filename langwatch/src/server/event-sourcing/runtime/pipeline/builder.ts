@@ -2,21 +2,16 @@ import type {
   Event,
   Projection,
   EventStore,
-  ProjectionStore,
-  EventHandler,
-  EventReactionHandler,
+  EventHandlerClass,
+  ProjectionHandlerClass,
   AggregateType,
-  CommandHandler,
-  Command,
-  CommandType,
   EventPublisher,
-  CommandSchemaType,
   EventStoreReadContext,
   CommandHandlerClass,
   ExtractCommandHandlerPayload,
-  ExtractCommandHandlerDispatcherName,
   EventSourcedQueueProcessor,
 } from "../../library";
+import type { DistributedLock } from "../../library/utils/distributedLock";
 import type { ProjectionDefinition } from "../../library/projection.types";
 import type {
   EventHandlerDefinition,
@@ -26,141 +21,45 @@ import { EventSourcingPipeline } from "../index";
 import { defaultQueueProcessorFactory } from "../queue";
 import type { RegisteredPipeline, PipelineWithCommandHandlers } from "./types";
 import type { QueueProcessorFactory } from "../queue";
-import { createCommand, createTenantId } from "../../library";
 
 /**
- * Infers a dispatcher name from a command handler class.
- * First tries to use the static dispatcherName property, then falls back to
- * inferring from the class name.
- *
- * Examples:
- * - Class with `static readonly dispatcherName = "recordSpan"` → `recordSpan`
- * - `RecordSpanCommand` → `recordSpan`
- *
- * Strategy:
- * 1. Check for static dispatcherName property
- * 2. If not found, extract class name
- * 3. Remove "CommandHandler" or "Command" suffix
- * 4. Convert PascalCase to camelCase
+ * Options for configuring a command handler.
+ * All options are optional and will fall back to static methods on the handler class if not provided.
  */
-function inferDispatcherName(handler: CommandHandler<any, any>): string {
-  const HandlerClass = handler.constructor as { dispatcherName?: string };
+export interface CommandHandlerOptions<Payload> {
+  /**
+   * Optional: Function to extract aggregate ID from payload.
+   * Default: Uses static getAggregateId from handler class
+   */
+  getAggregateId?: (payload: Payload) => string;
 
-  // Use static dispatcherName if available
-  if (HandlerClass.dispatcherName) {
-    return HandlerClass.dispatcherName;
-  }
-
-  // Fall back to inferring from class name
-  const className = handler.constructor.name;
-
-  // Remove "CommandHandler" or "Command" suffix
-  const withoutSuffix = className.replace(/Command(Handler)?$/, "");
-
-  // Convert PascalCase to camelCase
-  const camelCase =
-    withoutSuffix.charAt(0).toLowerCase() + withoutSuffix.slice(1);
-
-  return camelCase;
-}
-
-/**
- * Configuration extracted from a command handler class.
- */
-interface HandlerConfig<Payload> {
-  getAggregateId: (payload: Payload) => string;
+  /**
+   * Optional: Custom job ID factory for idempotency.
+   * Default: Uses static makeJobId from handler class, or auto-generated
+   */
   makeJobId?: (payload: Payload) => string;
+
+  /**
+   * Optional: Delay in milliseconds before processing the job.
+   * Default: Uses static delay from handler class, or 0
+   */
   delay?: number;
+
+  /**
+   * Optional: Concurrency limit for processing jobs.
+   * Default: Uses static concurrency from handler class, or 5
+   */
+  concurrency?: number;
+
+  /**
+   * Optional: Function to extract span attributes from the payload.
+   * Default: Uses static getSpanAttributes from handler class
+   */
   spanAttributes?: (
     payload: Payload,
   ) => Record<string, string | number | boolean>;
-  concurrency?: number;
 }
 
-/**
- * Extracts configuration from a command handler class.
- */
-function extractHandlerConfig<Payload>(HandlerClass: {
-  getAggregateId: (payload: Payload) => string;
-  getSpanAttributes?: (
-    payload: Payload,
-  ) => Record<string, string | number | boolean>;
-  makeJobId?: (payload: Payload) => string;
-  delay?: number;
-  concurrency?: number;
-}): HandlerConfig<Payload> {
-  return {
-    getAggregateId: HandlerClass.getAggregateId.bind(HandlerClass),
-    makeJobId: HandlerClass.makeJobId?.bind(HandlerClass),
-    delay: HandlerClass.delay,
-    spanAttributes: HandlerClass.getSpanAttributes?.bind(HandlerClass),
-    concurrency: HandlerClass.concurrency,
-  };
-}
-
-/**
- * Validates that a dispatcher name is unique.
- */
-function validateDispatcherName(
-  dispatcherName: string,
-  existingDispatchers: Record<string, EventSourcedQueueProcessor<unknown>>,
-): void {
-  if (existingDispatchers[dispatcherName]) {
-    throw new Error(
-      `Dispatcher with name "${dispatcherName}" already exists. Dispatcher names must be unique.`,
-    );
-  }
-}
-
-/**
- * Creates a command dispatcher that processes commands and stores resulting events.
- */
-function createCommandDispatcher<Payload, EventType extends Event>(
-  commandType: CommandType,
-  commandSchema: CommandSchemaType<Payload, CommandType>,
-  handler: CommandHandler<Command<Payload>, EventType>,
-  config: HandlerConfig<Payload>,
-  queueName: string,
-  storeEventsFn: (
-    events: EventType[],
-    context: EventStoreReadContext<EventType>,
-  ) => Promise<void>,
-  factory: QueueProcessorFactory,
-): EventSourcedQueueProcessor<Payload> {
-  return factory.create<Payload>({
-    name: queueName,
-    makeJobId: config.makeJobId,
-    delay: config.delay,
-    spanAttributes: config.spanAttributes,
-    options: config.concurrency ? { concurrency: config.concurrency } : void 0,
-    async process(payload: Payload) {
-      // Validate payload
-      if (!commandSchema.validate(payload)) {
-        throw new Error(
-          `Invalid payload for command type "${commandType}". Validation failed.`,
-        );
-      }
-
-      const tenantId = createTenantId((payload as any).tenantId);
-      const aggregateId = config.getAggregateId(payload);
-
-      const command = createCommand(
-        tenantId,
-        aggregateId,
-        commandType,
-        payload,
-      );
-
-      // Handler returns events
-      const events = await handler.handle(command);
-
-      // Store events automatically
-      if (events && events.length > 0) {
-        await storeEventsFn(events, { tenantId });
-      }
-    },
-  });
-}
 
 /**
  * Builder for creating event sourcing pipelines with type-safe required fields.
@@ -171,10 +70,11 @@ function createCommandDispatcher<Payload, EventType extends Event>(
  * 1. Start with `registerPipeline()` which returns `PipelineBuilder`
  * 2. Call `withName(name)` → returns `PipelineBuilderWithName`
  * 3. Call `withAggregateType(type)` → returns `PipelineBuilderWithNameAndType`
- * 4. Optionally call `withEventProjection(name, store, handler)` multiple times to register projections
+ * 4. Optionally call `withProjection(name, HandlerClass)` multiple times to register projections
  * 5. Optionally call `withEventPublisher(publisher)` to register an event publisher
- * 6. Optionally call `withCommandHandler(...)` to register command handlers
- * 7. Call `build()` to create the `RegisteredPipeline`
+ * 6. Optionally call `withEventHandler(name, HandlerClass, options?)` to register event handlers
+ * 7. Optionally call `withCommand(name, HandlerClass, options?)` to register command handlers
+ * 8. Call `build()` to create the `RegisteredPipeline`
  *
  * **Example:**
  * ```typescript
@@ -182,10 +82,11 @@ function createCommandDispatcher<Payload, EventType extends Event>(
  *   .registerPipeline<MyEvent>()
  *   .withName("my-pipeline")
  *   .withAggregateType("trace")
- *   .withEventProjection("summary", summaryStore, summaryHandler)
- *   .withEventProjection("analytics", analyticsStore, analyticsHandler)
+ *   .withProjection("summary", SummaryProjectionHandler)
+ *   .withProjection("analytics", AnalyticsProjectionHandler)
  *   .withEventPublisher(publisher)
- *   .withCommandHandler(...)
+ *   .withEventHandler("span-storage", SpanClickHouseHandler, { eventTypes: [...] })
+ *   .withCommand("recordSpan", RecordSpanCommand, { delay: 5000 })
  *   .build();
  * ```
  */
@@ -196,6 +97,9 @@ export class PipelineBuilder<
   constructor(
     private readonly eventStore: EventStore<any>,
     private readonly queueProcessorFactory: QueueProcessorFactory = defaultQueueProcessorFactory,
+    private readonly distributedLock?: DistributedLock,
+    private readonly handlerLockTtlMs?: number,
+    private readonly updateLockTtlMs?: number,
   ) {}
 
   withName(name: string): PipelineBuilderWithName<EventType, ProjectionType> {
@@ -203,6 +107,9 @@ export class PipelineBuilder<
       this.eventStore,
       name,
       this.queueProcessorFactory,
+      this.distributedLock,
+      this.handlerLockTtlMs,
+      this.updateLockTtlMs,
     );
   }
 
@@ -219,6 +126,9 @@ export class PipelineBuilderWithName<
     private readonly eventStore: EventStore<any>,
     private readonly name: string,
     private readonly queueProcessorFactory: QueueProcessorFactory = defaultQueueProcessorFactory,
+    private readonly distributedLock?: DistributedLock,
+    private readonly handlerLockTtlMs?: number,
+    private readonly updateLockTtlMs?: number,
   ) {}
 
   withAggregateType(
@@ -229,6 +139,9 @@ export class PipelineBuilderWithName<
       this.name,
       aggregateType,
       this.queueProcessorFactory,
+      this.distributedLock,
+      this.handlerLockTtlMs,
+      this.updateLockTtlMs,
     );
   }
 
@@ -239,7 +152,8 @@ export class PipelineBuilderWithName<
 
 interface CommandHandlerRegistration<EventType extends Event = Event> {
   HandlerClass: CommandHandlerClass<any, any, EventType>;
-  dispatcherName?: string;
+  name: string;
+  options?: CommandHandlerOptions<any>;
 }
 
 /**
@@ -274,39 +188,40 @@ export class PipelineBuilderWithNameAndType<
     EventHandlerDefinition<EventType, RegisteredHandlerNames>
   >();
   private commandHandlers: Array<CommandHandlerRegistration<EventType>> = [];
-  private dispatchers: Record<string, EventSourcedQueueProcessor<unknown>> = {};
 
   constructor(
     private readonly eventStore: EventStore<any>,
     private readonly name: string,
     private readonly aggregateType: AggregateType,
     private readonly queueProcessorFactory: QueueProcessorFactory = defaultQueueProcessorFactory,
+    private readonly distributedLock?: DistributedLock,
+    private readonly handlerLockTtlMs?: number,
+    private readonly updateLockTtlMs?: number,
   ) {}
 
   /**
-   * Register a projection with a unique name, store, and handler.
+   * Register a projection handler class with a unique name.
+   * The handler class must have a static `store` property.
    * This method can be called multiple times to register multiple projections.
    *
    * @param name - Unique name for this projection within the pipeline
-   * @param store - Store for persisting this projection
-   * @param handler - Handler that processes events to build this projection
+   * @param HandlerClass - Projection handler class to register (must have static `store` property)
    * @returns The same builder instance for method chaining
-   * @throws Error if projection name already exists
+   * @throws Error if projection name already exists or if handler class doesn't have static store property
    *
    * @example
    * ```typescript
    * pipeline
-   *   .withEventProjection("summary", summaryStore, summaryHandler)
-   *   .withEventProjection("analytics", analyticsStore, analyticsHandler)
+   *   .withProjection("summary", SummaryProjectionHandler)
+   *   .withProjection("analytics", AnalyticsProjectionHandler)
    * ```
    */
-  withEventProjection<
+  withProjection<
+    HandlerClass extends ProjectionHandlerClass<EventType, any>,
     ProjectionName extends string,
-    ProjType extends Projection = Projection,
   >(
     name: ProjectionName,
-    store: ProjectionStore<ProjType>,
-    handler: EventHandler<EventType, ProjType>,
+    HandlerClass: HandlerClass,
   ): PipelineBuilderWithNameAndType<
     EventType,
     ProjectionType,
@@ -319,11 +234,21 @@ export class PipelineBuilderWithNameAndType<
       );
     }
 
+    // Extract store from static property
+    if (!HandlerClass.store) {
+      throw new Error(
+        `Projection handler class must have a static "store" property.`,
+      );
+    }
+
+    // Instantiate handler
+    const handler = new HandlerClass();
+
     this.projections.set(name, {
       name,
-      store,
+      store: HandlerClass.store,
       handler,
-    } as ProjectionDefinition<EventType, ProjType>);
+    } as ProjectionDefinition<EventType, any>);
 
     return this;
   }
@@ -353,14 +278,11 @@ export class PipelineBuilderWithNameAndType<
   }
 
   /**
-   * Register an event handler that reacts to individual events.
+   * Register an event handler class that reacts to individual events.
    * Handlers are dispatched asynchronously via queues after events are stored.
    *
-   * The `dependsOn` option is type-safe and only accepts handler names that have been
-   * registered before this handler, providing compile-time safety for handler dependencies.
-   *
    * @param name - Unique name for this handler within the pipeline
-   * @param handler - Handler that processes individual events
+   * @param HandlerClass - Event handler class to register
    * @param options - Options for configuring the handler (event types, idempotency, etc.)
    * @returns A new builder instance with the handler name added to the registered names type
    * @throws Error if handler name already exists
@@ -368,17 +290,18 @@ export class PipelineBuilderWithNameAndType<
    * @example
    * ```typescript
    * pipeline
-   *   .withEventHandler("span-storage", clickHouseHandler, {
+   *   .withEventHandler("span-storage", SpanClickHouseHandler, {
    *     eventTypes: ["lw.obs.span_ingestion.recorded"],
    *   })
-   *   .withEventHandler("trace-aggregator", traceHandler, {
-   *     dependsOn: ["span-storage"], // Type-safe! Only accepts "span-storage"
-   *   })
+   *   .withEventHandler("trace-aggregator", TraceHandler)
    * ```
    */
-  withEventHandler<HandlerName extends string>(
+  withEventHandler<
+    HandlerClass extends EventHandlerClass<EventType>,
+    HandlerName extends string,
+  >(
     name: HandlerName,
-    handler: EventReactionHandler<EventType>,
+    HandlerClass: HandlerClass,
     options?: EventHandlerOptions<EventType, RegisteredHandlerNames>,
   ): PipelineBuilderWithNameAndType<
     EventType,
@@ -392,10 +315,23 @@ export class PipelineBuilderWithNameAndType<
       );
     }
 
+    // Instantiate handler
+    const handler = new HandlerClass();
+
+    // Merge event types from static method and options (options take precedence)
+    const mergedOptions: EventHandlerOptions<EventType, RegisteredHandlerNames> =
+      {
+        ...options,
+        eventTypes:
+          options?.eventTypes ??
+          HandlerClass.getEventTypes?.() ??
+          void 0,
+      };
+
     this.eventHandlers.set(name, {
       name,
       handler,
-      options: options ?? {},
+      options: mergedOptions,
     } as EventHandlerDefinition<EventType, RegisteredHandlerNames>);
 
     return this as PipelineBuilderWithNameAndType<
@@ -410,38 +346,45 @@ export class PipelineBuilderWithNameAndType<
    * Register a self-contained command handler class.
    * The class bundles schema, handler implementation, and all configuration methods.
    *
-   * @param HandlerClass - The command handler class to register (must have a static dispatcherName property)
-   * @param options - Optional configuration, including custom dispatcher name (overrides static property)
+   * @param name - Unique name for this command handler within the pipeline
+   * @param HandlerClass - The command handler class to register
+   * @param options - Optional configuration that can override static methods (delay, concurrency, etc.)
    * @returns A new builder instance with the command handler tracked in the type system
    *
    * @example
    * ```typescript
-   * pipeline.withCommandHandler(RecordSpanCommand);
-   * pipeline.withCommandHandler(RecordSpanCommand, { dispatcherName: "custom-name" });
+   * pipeline.withCommand("recordSpan", RecordSpanCommand);
+   * pipeline.withCommand("recordSpan", RecordSpanCommand, { delay: 5000, concurrency: 10 });
    * ```
    */
-  withCommandHandler<
+  withCommand<
     HandlerClass extends CommandHandlerClass<any, any, EventType>,
-    DispatcherName extends
-      string = ExtractCommandHandlerDispatcherName<HandlerClass>,
+    Name extends string,
   >(
+    name: Name,
     HandlerClass: HandlerClass,
-    options?: {
-      dispatcherName?: DispatcherName;
-    },
+    options?: CommandHandlerOptions<ExtractCommandHandlerPayload<HandlerClass>>,
   ): PipelineBuilderWithNameAndType<
     EventType,
     ProjectionType,
     RegisteredHandlerNames,
     | RegisteredCommandHandlers
     | {
-        name: DispatcherName;
+        name: Name;
         payload: ExtractCommandHandlerPayload<HandlerClass>;
       }
   > {
+    // Validate uniqueness
+    if (this.commandHandlers.some((reg) => reg.name === name)) {
+      throw new Error(
+        `Command handler with name "${name}" already exists. Command handler names must be unique within a pipeline.`,
+      );
+    }
+
     this.commandHandlers.push({
       HandlerClass,
-      dispatcherName: options?.dispatcherName,
+      name,
+      options,
     });
 
     return this as PipelineBuilderWithNameAndType<
@@ -450,7 +393,7 @@ export class PipelineBuilderWithNameAndType<
       RegisteredHandlerNames,
       | RegisteredCommandHandlers
       | {
-          name: DispatcherName;
+          name: Name;
           payload: ExtractCommandHandlerPayload<HandlerClass>;
         }
     >;
@@ -480,6 +423,9 @@ export class PipelineBuilderWithNameAndType<
       eventPublisher: this.eventPublisher,
       eventHandlers: eventHandlersObject,
       queueProcessorFactory: this.queueProcessorFactory,
+      distributedLock: this.distributedLock,
+      handlerLockTtlMs: this.handlerLockTtlMs,
+      updateLockTtlMs: this.updateLockTtlMs,
     });
 
     // Create dispatchers now that we have the service
@@ -491,43 +437,32 @@ export class PipelineBuilderWithNameAndType<
       await pipeline.service.storeEvents(events, context);
     };
 
-    // Create dispatchers from registered handler classes
-    for (const registration of this.commandHandlers) {
-      const HandlerClass = registration.HandlerClass;
-      const schema = HandlerClass.schema;
-      const commandType = schema.type;
-      const handlerInstance = new HandlerClass();
-      const config = extractHandlerConfig(HandlerClass);
-
-      // Use provided dispatcher name, or static property, or infer from class name
-      const dispatcherName =
-        registration.dispatcherName ?? inferDispatcherName(handlerInstance);
-
-      // Validate uniqueness
-      validateDispatcherName(dispatcherName, this.dispatchers);
-
-      // Create queue name
-      const queueName = `${this.name}_${dispatcherName}`;
-
-      // Create and register dispatcher
-      const dispatcher = createCommandDispatcher(
-        commandType,
-        schema,
-        handlerInstance,
-        config,
-        queueName,
+    // Initialize command queues using the service's queue manager
+    if (this.commandHandlers.length > 0) {
+      const queueManager = pipeline.service.getQueueManager();
+      queueManager.initializeCommandQueues(
+        this.commandHandlers.map((reg) => ({
+          name: reg.name,
+          HandlerClass: reg.HandlerClass,
+          options: reg.options,
+        })),
         storeEventsFn,
-        this.queueProcessorFactory,
+        this.name,
       );
+    }
 
-      this.dispatchers[dispatcherName] = dispatcher;
+    // Get command dispatchers from the queue manager and attach to pipeline
+    const commandProcessors = pipeline.service.getQueueManager().getCommandQueueProcessors();
+    const dispatchers: Record<string, EventSourcedQueueProcessor<any>> = {};
+    for (const [commandName, processor] of commandProcessors.entries()) {
+      dispatchers[commandName] = processor;
     }
 
     // Attach dispatchers under a `commands` property
     // Type assertion is safe because we track the command handlers in the type system
     // and create dispatchers that match those types at runtime
     return Object.assign(pipeline, {
-      commands: this.dispatchers,
+      commands: dispatchers,
     }) as unknown as PipelineWithCommandHandlers<
       RegisteredPipeline<EventType, ProjectionType>,
       RegisteredCommandHandlers extends never

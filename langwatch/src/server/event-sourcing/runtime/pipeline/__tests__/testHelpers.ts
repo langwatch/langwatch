@@ -6,7 +6,9 @@ import type { EventStore } from "../../../library/stores/eventStore.types";
 import type { ProjectionStore } from "../../../library/stores/projectionStore.types";
 import type { EventPublisher } from "../../../library/publishing/eventPublisher.types";
 import type { EventHandler } from "../../../library/domain/handlers/eventHandler";
-import type { EventReactionHandler } from "../../../library/domain/handlers/eventReactionHandler";
+import type { EventHandlerClass } from "../../../library/domain/handlers/eventHandlerClass";
+import type { ProjectionHandler } from "../../../library/domain/handlers/projectionHandler";
+import type { ProjectionHandlerClass } from "../../../library/domain/handlers/projectionHandlerClass";
 import type { CommandHandlerClass } from "../../../library/commands/commandHandlerClass";
 import type { CommandSchema } from "../../../library/commands/commandSchema";
 import type { Command } from "../../../library/commands/command";
@@ -119,7 +121,6 @@ export function createTestCommandHandlerClass<
   Payload extends TestCommandPayload = TestCommandPayload,
   EventType extends Event = TestEvent,
 >(config?: {
-  dispatcherName?: string;
   getAggregateId?: (payload: Payload) => string;
   makeJobId?: (payload: Payload) => string;
   delay?: number;
@@ -130,7 +131,6 @@ export function createTestCommandHandlerClass<
   handleImpl?: (command: Command<Payload>) => Promise<EventType[]>;
   schema?: CommandSchema<Payload, CommandType>;
 }): CommandHandlerClass<Payload, CommandType, EventType> {
-  const dispatcherName = config?.dispatcherName ?? "testDispatcher";
   const getAggregateId =
     config?.getAggregateId ?? ((payload: Payload) => payload.id);
   const handleImpl =
@@ -140,7 +140,6 @@ export function createTestCommandHandlerClass<
     });
 
   class TestCommandHandler {
-    static readonly dispatcherName = dispatcherName;
     static readonly schema: CommandSchema<Payload, CommandType> =
       config?.schema ??
       (defineCommandSchema(
@@ -213,12 +212,12 @@ export function createMockProjectionStore<
 }
 
 /**
- * Creates a mock EventHandler for projections.
+ * Creates a mock ProjectionHandler for projections.
  */
 export function createMockEventHandler<
   TEvent extends Event,
   TProjection extends Projection,
->(): EventHandler<TEvent, TProjection> {
+>(): ProjectionHandler<TEvent, TProjection> {
   return {
     handle: vi.fn().mockResolvedValue({
       id: "test-projection-id",
@@ -231,15 +230,71 @@ export function createMockEventHandler<
 }
 
 /**
- * Creates a mock EventReactionHandler.
+ * Creates a mock EventHandler.
  */
 export function createMockEventReactionHandler<
   T extends Event,
->(): EventReactionHandler<T> {
+>(): EventHandler<T> {
   return {
     handle: vi.fn().mockResolvedValue(void 0),
     getEventTypes: vi.fn().mockReturnValue(void 0),
   };
+}
+
+/**
+ * Creates a test event handler class with configurable properties.
+ */
+export function createTestEventHandlerClass<
+  T extends Event = TestEvent,
+>(config?: {
+  getEventTypes?: () => readonly T["type"][] | undefined;
+  handleImpl?: (event: T) => Promise<void>;
+}): EventHandlerClass<T> {
+  class TestEventHandler {
+    static getEventTypes() {
+      return config?.getEventTypes?.();
+    }
+
+    async handle(event: T): Promise<void> {
+      if (config?.handleImpl) {
+        return config.handleImpl(event);
+      }
+    }
+  }
+
+  return TestEventHandler as EventHandlerClass<T>;
+}
+
+/**
+ * Creates a test projection handler class with configurable properties.
+ */
+export function createTestProjectionHandlerClass<
+  TEvent extends Event = TestEvent,
+  TProjection extends Projection = Projection,
+>(config?: {
+  store?: ProjectionStore<TProjection>;
+  handleImpl?: (stream: any) => Promise<TProjection> | TProjection;
+}): ProjectionHandlerClass<TEvent, TProjection> {
+  const store = config?.store ?? createMockProjectionStore<TProjection>();
+
+  class TestProjectionHandler {
+    static readonly store = store;
+
+    handle(stream: any): Promise<TProjection> | TProjection {
+      if (config?.handleImpl) {
+        return config.handleImpl(stream);
+      }
+      return {
+        id: "test-projection-id",
+        aggregateId: "test-aggregate",
+        tenantId: createTenantId("test-tenant"),
+        version: 1000000,
+        data: {},
+      } as TProjection;
+    }
+  }
+
+  return TestProjectionHandler as ProjectionHandlerClass<TEvent, TProjection>;
 }
 
 /**
@@ -323,7 +378,7 @@ export function createMinimalPipelineBuilder() {
     return new PipelineBuilder<TestEvent, Projection>(eventStore, factory)
       .withName("test-pipeline")
       .withAggregateType("span_ingestion")
-      .withCommandHandler(HandlerClass)
+      .withCommand("testCommand", HandlerClass)
       .build();
   };
 

@@ -5,6 +5,7 @@ import type { EventSourcingService } from "../../library/services/eventSourcingS
 import type { ProjectionDefinitions } from "../../library/projection.types";
 import type { EventHandlerDefinitions } from "../../library/eventHandler.types";
 import type { EventPublisher } from "../../library/publishing/eventPublisher.types";
+import type { DistributedLock } from "../../library/utils/distributedLock";
 import type {
   EventSourcedQueueProcessor,
   EventSourcedQueueDefinition,
@@ -46,6 +47,24 @@ export interface EventSourcingPipelineDefinition<
       definition: EventSourcedQueueDefinition<Payload>,
     ): EventSourcedQueueProcessor<Payload>;
   };
+  /**
+   * Optional distributed lock for preventing concurrent updates.
+   * Used for both projections and event handlers to serialize processing per aggregate.
+   * If not provided, concurrent processing may result in ordering validation failures.
+   */
+  distributedLock?: DistributedLock;
+  /**
+   * Time-to-live for handler locks in milliseconds.
+   * Prevents locks from being held indefinitely if a process crashes.
+   * Default: 30 seconds
+   */
+  handlerLockTtlMs?: number;
+  /**
+   * Time-to-live for projection update locks in milliseconds.
+   * Prevents locks from being held indefinitely if a process crashes.
+   * Default: 5 minutes
+   */
+  updateLockTtlMs?: number;
 }
 
 export interface RegisteredPipeline<

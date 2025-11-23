@@ -19,10 +19,10 @@ import {
   createMockEventStore,
   createMockQueueProcessorFactory,
   createMockProjectionStore,
-  createMockEventHandler,
-  createMockEventReactionHandler,
   createMockEventPublisher,
   createTestCommandHandlerClass,
+  createTestEventHandlerClass,
+  createTestProjectionHandlerClass,
   createTestEventForBuilder,
   createTestProjection,
   TEST_CONSTANTS,
@@ -94,14 +94,12 @@ describe("PipelineBuilder", () => {
       const HandlerClass = createTestCommandHandlerClass<
         TestCommandPayload,
         TestEvent
-      >({
-        dispatcherName: "testDispatcher",
-      });
+      >();
 
       new PipelineBuilder<TestEvent, Projection>(eventStore, factory)
         .withName("test-pipeline")
         .withAggregateType("span_ingestion")
-        .withCommandHandler(HandlerClass)
+        .withCommand("testDispatcher", HandlerClass)
         .build();
 
       expect(createSpy).toHaveBeenCalled();
@@ -130,10 +128,10 @@ describe("PipelineBuilder", () => {
 
       expect(result).toBeDefined();
       // Verify it has the expected methods for the final builder state
-      expect(result).toHaveProperty("withEventProjection");
+      expect(result).toHaveProperty("withProjection");
       expect(result).toHaveProperty("withEventPublisher");
       expect(result).toHaveProperty("withEventHandler");
-      expect(result).toHaveProperty("withCommandHandler");
+      expect(result).toHaveProperty("withCommand");
       expect(result).toHaveProperty("build");
       // Verify build() succeeds (doesn't throw)
       expect(() => result.build()).not.toThrow();
@@ -240,16 +238,15 @@ describe("PipelineBuilder", () => {
     });
   });
 
-  describe("withEventProjection() Registration Contract", () => {
+  describe("withProjection() Registration Contract", () => {
     it("stores projection definition in internal Map with exact name key when called with unique name", () => {
       const eventStore = createMockEventStore<TestEvent>();
       const store = createMockProjectionStore<Projection>();
-      const handler = createMockEventHandler<TestEvent, Projection>();
 
       const builder = new PipelineBuilder<TestEvent, Projection>(eventStore)
         .withName("test-pipeline")
         .withAggregateType("span_ingestion")
-        .withEventProjection("my-projection", store, handler);
+        .withProjection("my-projection", createTestProjectionHandlerClass<TestEvent, Projection>({ store }));
 
       const pipeline = builder.build();
 
@@ -259,8 +256,11 @@ describe("PipelineBuilder", () => {
     it("stores projection definition with handler reference matching provided handler", async () => {
       const eventStore = createMockEventStore<TestEvent>();
       const store = createMockProjectionStore<Projection>();
-      const handler = createMockEventHandler<TestEvent, Projection>();
-      const handleSpy = vi.spyOn(handler, "handle");
+      const ProjectionHandlerClass = createTestProjectionHandlerClass<TestEvent, Projection>({
+        store,
+        handleImpl: async () => createTestProjection("proj-id", "aggregate-1", createTenantId(TEST_CONSTANTS.TENANT_ID_VALUE)),
+      });
+      const handleSpy = vi.spyOn(ProjectionHandlerClass.prototype, "handle");
 
       const tenantId = createTenantId(TEST_CONSTANTS.TENANT_ID_VALUE);
       const event = createTestEventForBuilder("aggregate-1", tenantId);
@@ -273,7 +273,7 @@ describe("PipelineBuilder", () => {
       const builder = new PipelineBuilder<TestEvent, Projection>(eventStore)
         .withName("test-pipeline")
         .withAggregateType("span_ingestion")
-        .withEventProjection("test-projection", store, handler);
+        .withProjection("test-projection", ProjectionHandlerClass);
 
       const pipeline = builder.build();
 
@@ -286,13 +286,12 @@ describe("PipelineBuilder", () => {
     it("returns builder instance that allows method chaining", () => {
       const eventStore = createMockEventStore<TestEvent>();
       const store = createMockProjectionStore<Projection>();
-      const handler = createMockEventHandler<TestEvent, Projection>();
 
       const builder = new PipelineBuilder<TestEvent, Projection>(eventStore)
         .withName("test-pipeline")
         .withAggregateType("span_ingestion");
 
-      const result = builder.withEventProjection("test-projection", store, handler);
+      const result = builder.withProjection("test-projection", createTestProjectionHandlerClass<TestEvent, Projection>({ store }));
 
       expect(result).toBe(builder);
     });
@@ -300,15 +299,14 @@ describe("PipelineBuilder", () => {
     it("throws Error with message containing projection name when duplicate projection name registered", () => {
       const eventStore = createMockEventStore<TestEvent>();
       const store = createMockProjectionStore<Projection>();
-      const handler = createMockEventHandler<TestEvent, Projection>();
 
       const builder = new PipelineBuilder<TestEvent, Projection>(eventStore)
         .withName("test-pipeline")
         .withAggregateType("span_ingestion")
-        .withEventProjection("duplicate-name", store, handler);
+        .withProjection("duplicate-name", createTestProjectionHandlerClass<TestEvent, Projection>({ store }));
 
       expect(() => {
-        builder.withEventProjection("duplicate-name", store, handler);
+        builder.withProjection("duplicate-name", createTestProjectionHandlerClass<TestEvent, Projection>({ store }));
       }).toThrow(
         'Projection with name "duplicate-name" already exists. Projection names must be unique within a pipeline.',
       );
@@ -318,14 +316,12 @@ describe("PipelineBuilder", () => {
       const eventStore = createMockEventStore<TestEvent>();
       const store1 = createMockProjectionStore<Projection>();
       const store2 = createMockProjectionStore<Projection>();
-      const handler1 = createMockEventHandler<TestEvent, Projection>();
-      const handler2 = createMockEventHandler<TestEvent, Projection>();
 
       const builder = new PipelineBuilder<TestEvent, Projection>(eventStore)
         .withName("test-pipeline")
         .withAggregateType("span_ingestion")
-        .withEventProjection("projection-1", store1, handler1)
-        .withEventProjection("projection-2", store2, handler2);
+        .withProjection("projection-1", createTestProjectionHandlerClass<TestEvent, Projection>({ store: store1 }))
+        .withProjection("projection-2", createTestProjectionHandlerClass<TestEvent, Projection>({ store: store2 }));
 
       expect(() => {
         builder.build();
@@ -336,10 +332,16 @@ describe("PipelineBuilder", () => {
       const eventStore = createMockEventStore<TestEvent>();
       const store1 = createMockProjectionStore<Projection>();
       const store2 = createMockProjectionStore<Projection>();
-      const handler1 = createMockEventHandler<TestEvent, Projection>();
-      const handler2 = createMockEventHandler<TestEvent, Projection>();
-      const handleSpy1 = vi.spyOn(handler1, "handle");
-      const handleSpy2 = vi.spyOn(handler2, "handle");
+      const ProjectionHandlerClass1 = createTestProjectionHandlerClass<TestEvent, Projection>({
+        store: store1,
+        handleImpl: async () => createTestProjection("proj1-id", "aggregate-1", createTenantId(TEST_CONSTANTS.TENANT_ID_VALUE)),
+      });
+      const ProjectionHandlerClass2 = createTestProjectionHandlerClass<TestEvent, Projection>({
+        store: store2,
+        handleImpl: async () => createTestProjection("proj2-id", "aggregate-1", createTenantId(TEST_CONSTANTS.TENANT_ID_VALUE)),
+      });
+      const handleSpy1 = vi.spyOn(ProjectionHandlerClass1.prototype, "handle");
+      const handleSpy2 = vi.spyOn(ProjectionHandlerClass2.prototype, "handle");
 
       const tenantId = createTenantId(TEST_CONSTANTS.TENANT_ID_VALUE);
       const event = createTestEventForBuilder("aggregate-1", tenantId);
@@ -363,8 +365,8 @@ describe("PipelineBuilder", () => {
       const builder = new PipelineBuilder<TestEvent, Projection>(eventStore)
         .withName("test-pipeline")
         .withAggregateType("span_ingestion")
-        .withEventProjection("projection-1", store1, handler1)
-        .withEventProjection("projection-2", store2, handler2);
+        .withProjection("projection-1", ProjectionHandlerClass1)
+        .withProjection("projection-2", ProjectionHandlerClass2);
 
       const pipeline = builder.build();
 
@@ -473,12 +475,11 @@ describe("PipelineBuilder", () => {
     () => {
       it("stores event handler definition in internal Map with exact name key when called with unique name", () => {
         const eventStore = createMockEventStore<TestEvent>();
-        const handler = createMockEventReactionHandler<TestEvent>();
 
         const builder = new PipelineBuilder<TestEvent, Projection>(eventStore)
           .withName("test-pipeline")
           .withAggregateType("span_ingestion")
-          .withEventHandler("my-handler", handler);
+          .withEventHandler("my-handler", createTestEventHandlerClass<TestEvent>());
 
         expect(() => {
           builder.build();
@@ -491,8 +492,10 @@ describe("PipelineBuilder", () => {
           vi.useRealTimers(); // Use real timers for async operations
           const eventStore = createMockEventStore<TestEvent>();
           const factory = createMockQueueProcessorFactory();
-          const handler = createMockEventReactionHandler<TestEvent>();
-          const handleSpy = vi.spyOn(handler, "handle");
+          const handleSpy = vi.fn().mockResolvedValue(void 0);
+          const HandlerClass = createTestEventHandlerClass<TestEvent>({
+            handleImpl: handleSpy,
+          });
 
           const tenantId = createTenantId(TEST_CONSTANTS.TENANT_ID_VALUE);
 
@@ -502,7 +505,7 @@ describe("PipelineBuilder", () => {
           )
             .withName("test-pipeline")
             .withAggregateType("span_ingestion")
-            .withEventHandler("test-handler", handler);
+            .withEventHandler("test-handler", HandlerClass);
 
           const pipeline = builder.build();
           const event = createTestEventForBuilder("aggregate-1", tenantId);
@@ -524,12 +527,10 @@ describe("PipelineBuilder", () => {
 
       it("stores handler definition with options object matching provided options", () => {
         const eventStore = createMockEventStore<TestEvent>();
-        const handler = createMockEventReactionHandler<TestEvent>();
-
         const builder = new PipelineBuilder<TestEvent, Projection>(eventStore)
           .withName("test-pipeline")
           .withAggregateType("span_ingestion")
-          .withEventHandler("test-handler", handler, {
+          .withEventHandler("test-handler", createTestEventHandlerClass<TestEvent>(), {
             eventTypes: [EVENT_TYPES[0]],
           });
 
@@ -540,12 +541,10 @@ describe("PipelineBuilder", () => {
 
       it("stores handler definition with empty options object when options not provided", () => {
         const eventStore = createMockEventStore<TestEvent>();
-        const handler = createMockEventReactionHandler<TestEvent>();
-
         const builder = new PipelineBuilder<TestEvent, Projection>(eventStore)
           .withName("test-pipeline")
           .withAggregateType("span_ingestion")
-          .withEventHandler("test-handler", handler);
+          .withEventHandler("test-handler", createTestEventHandlerClass<TestEvent>());
 
         expect(() => {
           builder.build();
@@ -554,15 +553,15 @@ describe("PipelineBuilder", () => {
 
       it("throws Error with message containing handler name when duplicate handler name registered", () => {
         const eventStore = createMockEventStore<TestEvent>();
-        const handler = createMockEventReactionHandler<TestEvent>();
+        const HandlerClass = createTestEventHandlerClass<TestEvent>();
 
         const builder = new PipelineBuilder<TestEvent, Projection>(eventStore)
           .withName("test-pipeline")
           .withAggregateType("span_ingestion")
-          .withEventHandler("duplicate-name", handler);
+          .withEventHandler("duplicate-name", HandlerClass);
 
         expect(() => {
-          builder.withEventHandler("duplicate-name", handler);
+          builder.withEventHandler("duplicate-name", HandlerClass);
         }).toThrow(
           'Event handler with name "duplicate-name" already exists. Handler names must be unique within a pipeline.',
         );
@@ -570,14 +569,14 @@ describe("PipelineBuilder", () => {
 
       it("allows registering multiple handlers with different names in sequence", () => {
         const eventStore = createMockEventStore<TestEvent>();
-        const handler1 = createMockEventReactionHandler<TestEvent>();
-        const handler2 = createMockEventReactionHandler<TestEvent>();
+        const HandlerClass1 = createTestEventHandlerClass<TestEvent>();
+        const HandlerClass2 = createTestEventHandlerClass<TestEvent>();
 
         const builder = new PipelineBuilder<TestEvent, Projection>(eventStore)
           .withName("test-pipeline")
           .withAggregateType("span_ingestion")
-          .withEventHandler("handler-1", handler1)
-          .withEventHandler("handler-2", handler2);
+          .withEventHandler("handler-1", HandlerClass1)
+          .withEventHandler("handler-2", HandlerClass2);
 
         expect(() => {
           builder.build();
@@ -588,10 +587,14 @@ describe("PipelineBuilder", () => {
         vi.useRealTimers(); // Use real timers for async operations
         const eventStore = createMockEventStore<TestEvent>();
         const factory = createMockQueueProcessorFactory();
-        const handler1 = createMockEventReactionHandler<TestEvent>();
-        const handler2 = createMockEventReactionHandler<TestEvent>();
-        const handleSpy1 = vi.spyOn(handler1, "handle");
-        const handleSpy2 = vi.spyOn(handler2, "handle");
+        const handleSpy1 = vi.fn().mockResolvedValue(void 0);
+        const handleSpy2 = vi.fn().mockResolvedValue(void 0);
+        const HandlerClass1 = createTestEventHandlerClass<TestEvent>({
+          handleImpl: handleSpy1,
+        });
+        const HandlerClass2 = createTestEventHandlerClass<TestEvent>({
+          handleImpl: handleSpy2,
+        });
 
         const tenantId = createTenantId(TEST_CONSTANTS.TENANT_ID_VALUE);
 
@@ -601,8 +604,8 @@ describe("PipelineBuilder", () => {
         )
           .withName("test-pipeline")
           .withAggregateType("span_ingestion")
-          .withEventHandler("handler-1", handler1)
-          .withEventHandler("handler-2", handler2);
+          .withEventHandler("handler-1", HandlerClass1)
+          .withEventHandler("handler-2", HandlerClass2);
 
         const pipeline = builder.build();
         const event = createTestEventForBuilder("aggregate-1", tenantId);
@@ -616,7 +619,7 @@ describe("PipelineBuilder", () => {
     { timeout: 10000 },
   );
 
-  describe("withCommandHandler() Registration Contract", () => {
+  describe("withCommand() Registration Contract", () => {
     it("stores handler registration in internal array when called with CommandHandlerClass", () => {
       const eventStore = createMockEventStore<TestEvent>();
       const factory = createMockQueueProcessorFactory();
@@ -625,14 +628,12 @@ describe("PipelineBuilder", () => {
       const HandlerClass = createTestCommandHandlerClass<
         TestCommandPayload,
         TestEvent
-      >({
-        dispatcherName: "testDispatcher",
-      });
+      >();
 
       new PipelineBuilder<TestEvent, Projection>(eventStore, factory)
         .withName("test-pipeline")
         .withAggregateType("span_ingestion")
-        .withCommandHandler(HandlerClass)
+        .withCommand("testDispatcher", HandlerClass)
         .build();
 
       expect(createSpy).toHaveBeenCalled();
@@ -645,9 +646,7 @@ describe("PipelineBuilder", () => {
       const HandlerClass = createTestCommandHandlerClass<
         TestCommandPayload,
         TestEvent
-      >({
-        dispatcherName: "testDispatcher",
-      });
+      >();
 
       const pipeline = new PipelineBuilder<TestEvent, Projection>(
         eventStore,
@@ -655,22 +654,20 @@ describe("PipelineBuilder", () => {
       )
         .withName("test-pipeline")
         .withAggregateType("span_ingestion")
-        .withCommandHandler(HandlerClass)
+        .withCommand("testDispatcher", HandlerClass)
         .build();
 
       expect(pipeline.commands).toHaveProperty("testDispatcher");
     });
 
-    it("stores handler registration with undefined dispatcherName when options not provided", () => {
+    it("stores handler registration using provided name argument", () => {
       const eventStore = createMockEventStore<TestEvent>();
       const factory = createMockQueueProcessorFactory();
 
       const HandlerClass = createTestCommandHandlerClass<
         TestCommandPayload,
         TestEvent
-      >({
-        dispatcherName: "staticName",
-      });
+      >();
 
       const pipeline = new PipelineBuilder<TestEvent, Projection>(
         eventStore,
@@ -678,22 +675,20 @@ describe("PipelineBuilder", () => {
       )
         .withName("test-pipeline")
         .withAggregateType("span_ingestion")
-        .withCommandHandler(HandlerClass)
+        .withCommand("testDispatcher", HandlerClass)
         .build();
 
-      expect(pipeline.commands).toHaveProperty("staticName");
+      expect(pipeline.commands).toHaveProperty("testDispatcher");
     });
 
-    it("stores handler registration with custom dispatcherName when provided in options", () => {
+    it("uses provided name argument for command registration", () => {
       const eventStore = createMockEventStore<TestEvent>();
       const factory = createMockQueueProcessorFactory();
 
       const HandlerClass = createTestCommandHandlerClass<
         TestCommandPayload,
         TestEvent
-      >({
-        dispatcherName: "staticName",
-      });
+      >();
 
       const pipeline = new PipelineBuilder<TestEvent, Projection>(
         eventStore,
@@ -701,11 +696,10 @@ describe("PipelineBuilder", () => {
       )
         .withName("test-pipeline")
         .withAggregateType("span_ingestion")
-        .withCommandHandler(HandlerClass, { dispatcherName: "customName" })
+        .withCommand("customName", HandlerClass)
         .build();
 
       expect(pipeline.commands).toHaveProperty("customName");
-      expect(pipeline.commands).not.toHaveProperty("staticName");
     });
 
     it("allows registering multiple command handlers in sequence", () => {
@@ -715,16 +709,12 @@ describe("PipelineBuilder", () => {
       const HandlerClass1 = createTestCommandHandlerClass<
         TestCommandPayload,
         TestEvent
-      >({
-        dispatcherName: "handler1",
-      });
+      >();
 
       const HandlerClass2 = createTestCommandHandlerClass<
         TestCommandPayload,
         TestEvent
-      >({
-        dispatcherName: "handler2",
-      });
+      >();
 
       const pipeline = new PipelineBuilder<TestEvent, Projection>(
         eventStore,
@@ -732,8 +722,8 @@ describe("PipelineBuilder", () => {
       )
         .withName("test-pipeline")
         .withAggregateType("span_ingestion")
-        .withCommandHandler(HandlerClass1)
-        .withCommandHandler(HandlerClass2)
+        .withCommand("handler1", HandlerClass1)
+        .withCommand("handler2", HandlerClass2)
         .build();
 
       expect(pipeline.commands).toHaveProperty("handler1");
@@ -750,22 +740,18 @@ describe("PipelineBuilder", () => {
       const HandlerClass1 = createTestCommandHandlerClass<
         TestCommandPayload,
         TestEvent
-      >({
-        dispatcherName: "handler1",
-      });
+      >();
 
       const HandlerClass2 = createTestCommandHandlerClass<
         TestCommandPayload,
         TestEvent
-      >({
-        dispatcherName: "handler2",
-      });
+      >();
 
       new PipelineBuilder<TestEvent, Projection>(eventStore, factory)
         .withName("test-pipeline")
         .withAggregateType("span_ingestion")
-        .withCommandHandler(HandlerClass1)
-        .withCommandHandler(HandlerClass2)
+        .withCommand("handler1", HandlerClass1)
+        .withCommand("handler2", HandlerClass2)
         .build();
 
       expect(createSpy).toHaveBeenCalledTimes(2);
@@ -779,14 +765,12 @@ describe("PipelineBuilder", () => {
       const HandlerClass = createTestCommandHandlerClass<
         TestCommandPayload,
         TestEvent
-      >({
-        dispatcherName: "testDispatcher",
-      });
+      >();
 
       new PipelineBuilder<TestEvent, Projection>(eventStore, factory)
         .withName("my-pipeline")
         .withAggregateType("span_ingestion")
-        .withCommandHandler(HandlerClass)
+        .withCommand("testDispatcher", HandlerClass)
         .build();
 
       expect(createSpy).toHaveBeenCalledWith(
@@ -813,9 +797,7 @@ describe("PipelineBuilder", () => {
       const HandlerClass = createTestCommandHandlerClass<
         TestCommandPayload,
         TestEvent
-      >({
-        dispatcherName: "testDispatcher",
-      });
+      >();
 
       const pipeline = new PipelineBuilder<TestEvent, Projection>(
         eventStore,
@@ -823,7 +805,7 @@ describe("PipelineBuilder", () => {
       )
         .withName("test-pipeline")
         .withAggregateType("span_ingestion")
-        .withCommandHandler(HandlerClass)
+        .withCommand("testDispatcher", HandlerClass)
         .build();
 
       expect(pipeline.commands).toHaveProperty("testDispatcher");
@@ -837,9 +819,7 @@ describe("PipelineBuilder", () => {
       const HandlerClass = createTestCommandHandlerClass<
         TestCommandPayload,
         TestEvent
-      >({
-        dispatcherName: "testDispatcher",
-      });
+      >();
 
       const pipeline = new PipelineBuilder<TestEvent, Projection>(
         eventStore,
@@ -847,7 +827,7 @@ describe("PipelineBuilder", () => {
       )
         .withName("test-pipeline")
         .withAggregateType("span_ingestion")
-        .withCommandHandler(HandlerClass)
+        .withCommand("testDispatcher", HandlerClass)
         .build();
 
       expect(pipeline).toHaveProperty("commands");
@@ -855,17 +835,15 @@ describe("PipelineBuilder", () => {
     });
   });
 
-  describe("Dispatcher Name Resolution", () => {
-    it("uses static dispatcherName property when handler class has it", () => {
+  describe("Command Name Resolution", () => {
+    it("uses provided name argument for command registration", () => {
       const eventStore = createMockEventStore<TestEvent>();
       const factory = createMockQueueProcessorFactory();
 
       const HandlerClass = createTestCommandHandlerClass<
         TestCommandPayload,
         TestEvent
-      >({
-        dispatcherName: "staticName",
-      });
+      >();
 
       const pipeline = new PipelineBuilder<TestEvent, Projection>(
         eventStore,
@@ -873,37 +851,13 @@ describe("PipelineBuilder", () => {
       )
         .withName("test-pipeline")
         .withAggregateType("span_ingestion")
-        .withCommandHandler(HandlerClass)
+        .withCommand("customName", HandlerClass)
         .build();
 
-      expect(pipeline.commands).toHaveProperty("staticName");
+      expect(pipeline.commands).toHaveProperty("customName");
     });
 
-    it("uses options.dispatcherName when provided, overriding static property", () => {
-      const eventStore = createMockEventStore<TestEvent>();
-      const factory = createMockQueueProcessorFactory();
-
-      const HandlerClass = createTestCommandHandlerClass<
-        TestCommandPayload,
-        TestEvent
-      >({
-        dispatcherName: "staticName",
-      });
-
-      const pipeline = new PipelineBuilder<TestEvent, Projection>(
-        eventStore,
-        factory,
-      )
-        .withName("test-pipeline")
-        .withAggregateType("span_ingestion")
-        .withCommandHandler(HandlerClass, { dispatcherName: "overrideName" })
-        .build();
-
-      expect(pipeline.commands).toHaveProperty("overrideName");
-      expect(pipeline.commands).not.toHaveProperty("staticName");
-    });
-
-    it("infers dispatcher name from class name when neither static property nor options provided", () => {
+    it("uses provided name argument for command registration", () => {
       const eventStore = createMockEventStore<TestEvent>();
       const factory = createMockQueueProcessorFactory();
 
@@ -912,8 +866,6 @@ describe("PipelineBuilder", () => {
           COMMAND_TYPES[0],
           testCommandPayloadSchema,
         );
-
-        static readonly dispatcherName = "recordSpan";
 
         static getAggregateId(payload: TestCommandPayload): string {
           return payload.id;
@@ -930,39 +882,35 @@ describe("PipelineBuilder", () => {
       )
         .withName("test-pipeline")
         .withAggregateType("span_ingestion")
-        .withCommandHandler(RecordSpanCommandHandler)
+        .withCommand("recordSpan", RecordSpanCommandHandler)
         .build();
 
       expect(pipeline.commands).toHaveProperty("recordSpan");
     });
 
-    it("throws Error with message containing dispatcher name when duplicate dispatcher name detected", () => {
+    it("throws Error with message containing command name when duplicate command name detected", () => {
       const eventStore = createMockEventStore<TestEvent>();
       const factory = createMockQueueProcessorFactory();
 
       const HandlerClass1 = createTestCommandHandlerClass<
         TestCommandPayload,
         TestEvent
-      >({
-        dispatcherName: "duplicateName",
-      });
+      >();
 
       const HandlerClass2 = createTestCommandHandlerClass<
         TestCommandPayload,
         TestEvent
-      >({
-        dispatcherName: "duplicateName",
-      });
+      >();
 
       expect(() => {
         new PipelineBuilder<TestEvent, Projection>(eventStore, factory)
           .withName("test-pipeline")
           .withAggregateType("span_ingestion")
-          .withCommandHandler(HandlerClass1)
-          .withCommandHandler(HandlerClass2)
+          .withCommand("duplicateName", HandlerClass1)
+          .withCommand("duplicateName", HandlerClass2)
           .build();
       }).toThrow(
-        'Dispatcher with name "duplicateName" already exists. Dispatcher names must be unique.',
+        'Command handler with name "duplicateName" already exists. Command handler names must be unique within a pipeline.',
       );
     });
   });
@@ -983,7 +931,6 @@ describe("PipelineBuilder", () => {
         TestCommandPayload,
         TestEvent
       >({
-        dispatcherName: "testDispatcher",
         schema,
       });
 
@@ -993,7 +940,7 @@ describe("PipelineBuilder", () => {
       )
         .withName("test-pipeline")
         .withAggregateType("span_ingestion")
-        .withCommandHandler(HandlerClass)
+        .withCommand("testDispatcher", HandlerClass)
         .build();
 
       const invalidPayload = { invalid: "data" };
@@ -1012,9 +959,7 @@ describe("PipelineBuilder", () => {
       const HandlerClass = createTestCommandHandlerClass<
         TestCommandPayload,
         TestEvent
-      >({
-        dispatcherName: "testDispatcher",
-      });
+      >();
 
       const pipeline = new PipelineBuilder<TestEvent, Projection>(
         eventStore,
@@ -1022,7 +967,7 @@ describe("PipelineBuilder", () => {
       )
         .withName("test-pipeline")
         .withAggregateType("span_ingestion")
-        .withCommandHandler(HandlerClass)
+        .withCommand("testDispatcher", HandlerClass)
         .build();
 
       const invalidPayload = { invalid: "data" };
@@ -1047,7 +992,6 @@ describe("PipelineBuilder", () => {
         TestCommandPayload,
         TestEvent
       >({
-        dispatcherName: "testDispatcher",
         handleImpl: handleSpy,
       });
 
@@ -1057,7 +1001,7 @@ describe("PipelineBuilder", () => {
       )
         .withName("test-pipeline")
         .withAggregateType("span_ingestion")
-        .withCommandHandler(HandlerClass)
+        .withCommand("testDispatcher", HandlerClass)
         .build();
 
       const payload: TestCommandPayload = {
@@ -1087,7 +1031,6 @@ describe("PipelineBuilder", () => {
         TestCommandPayload,
         TestEvent
       >({
-        dispatcherName: "testDispatcher",
         getAggregateId: (payload) => payload.id,
         handleImpl: handleSpy,
       });
@@ -1098,7 +1041,7 @@ describe("PipelineBuilder", () => {
       )
         .withName("test-pipeline")
         .withAggregateType("span_ingestion")
-        .withCommandHandler(HandlerClass)
+        .withCommand("testDispatcher", HandlerClass)
         .build();
 
       const payload: TestCommandPayload = {
@@ -1128,7 +1071,6 @@ describe("PipelineBuilder", () => {
         TestCommandPayload,
         TestEvent
       >({
-        dispatcherName: "testDispatcher",
         handleImpl: handleSpy,
       });
 
@@ -1138,7 +1080,7 @@ describe("PipelineBuilder", () => {
       )
         .withName("test-pipeline")
         .withAggregateType("span_ingestion")
-        .withCommandHandler(HandlerClass)
+        .withCommand("testDispatcher", HandlerClass)
         .build();
 
       const payload: TestCommandPayload = {
@@ -1170,7 +1112,6 @@ describe("PipelineBuilder", () => {
         TestCommandPayload,
         TestEvent
       >({
-        dispatcherName: "testDispatcher",
         handleImpl: async () => events,
       });
 
@@ -1180,7 +1121,7 @@ describe("PipelineBuilder", () => {
       )
         .withName("test-pipeline")
         .withAggregateType("span_ingestion")
-        .withCommandHandler(HandlerClass)
+        .withCommand("testDispatcher", HandlerClass)
         .build();
 
       const serviceStoreEventsSpy = vi.spyOn(pipeline.service, "storeEvents");
@@ -1208,7 +1149,6 @@ describe("PipelineBuilder", () => {
         TestCommandPayload,
         TestEvent
       >({
-        dispatcherName: "testDispatcher",
         handleImpl: async () => [],
       });
 
@@ -1218,7 +1158,7 @@ describe("PipelineBuilder", () => {
       )
         .withName("test-pipeline")
         .withAggregateType("span_ingestion")
-        .withCommandHandler(HandlerClass)
+        .withCommand("testDispatcher", HandlerClass)
         .build();
 
       const serviceStoreEventsSpy = vi.spyOn(pipeline.service, "storeEvents");
@@ -1244,7 +1184,6 @@ describe("PipelineBuilder", () => {
         TestCommandPayload,
         TestEvent
       >({
-        dispatcherName: "testDispatcher",
         handleImpl: async () => {
           throw handlerError;
         },
@@ -1256,7 +1195,7 @@ describe("PipelineBuilder", () => {
       )
         .withName("test-pipeline")
         .withAggregateType("span_ingestion")
-        .withCommandHandler(HandlerClass)
+        .withCommand("testDispatcher", HandlerClass)
         .build();
 
       const payload: TestCommandPayload = {
@@ -1272,18 +1211,17 @@ describe("PipelineBuilder", () => {
   });
 
   describe("Error Handling & Edge Cases", () => {
-    it("throws Error when withEventProjection() called twice with same name", () => {
+    it("throws Error when withProjection() called twice with same name", () => {
       const eventStore = createMockEventStore<TestEvent>();
       const store = createMockProjectionStore<Projection>();
-      const handler = createMockEventHandler<TestEvent, Projection>();
 
       const builder = new PipelineBuilder<TestEvent, Projection>(eventStore)
         .withName("test-pipeline")
         .withAggregateType("span_ingestion")
-        .withEventProjection("duplicate", store, handler);
+        .withProjection("duplicate", createTestProjectionHandlerClass<TestEvent, Projection>({ store }));
 
       expect(() => {
-        builder.withEventProjection("duplicate", store, handler);
+        builder.withProjection("duplicate", createTestProjectionHandlerClass<TestEvent, Projection>({ store }));
       }).toThrow(
         'Projection with name "duplicate" already exists. Projection names must be unique within a pipeline.',
       );
@@ -1332,47 +1270,43 @@ describe("PipelineBuilder", () => {
 
     it("throws Error when withEventHandler() called twice with same name", () => {
       const eventStore = createMockEventStore<TestEvent>();
-      const handler = createMockEventReactionHandler<TestEvent>();
+      const HandlerClass = createTestEventHandlerClass<TestEvent>();
 
       const builder = new PipelineBuilder<TestEvent, Projection>(eventStore)
         .withName("test-pipeline")
         .withAggregateType("span_ingestion")
-        .withEventHandler("duplicate", handler);
+        .withEventHandler("duplicate", HandlerClass);
 
       expect(() => {
-        builder.withEventHandler("duplicate", handler);
+        builder.withEventHandler("duplicate", HandlerClass);
       }).toThrow(
         'Event handler with name "duplicate" already exists. Handler names must be unique within a pipeline.',
       );
     });
 
-    it("throws Error when withCommandHandler() creates dispatcher with duplicate name (static property conflict)", () => {
+    it("throws Error when withCommand() creates command with duplicate name", () => {
       const eventStore = createMockEventStore<TestEvent>();
       const factory = createMockQueueProcessorFactory();
 
       const HandlerClass1 = createTestCommandHandlerClass<
         TestCommandPayload,
         TestEvent
-      >({
-        dispatcherName: "duplicate",
-      });
+      >();
 
       const HandlerClass2 = createTestCommandHandlerClass<
         TestCommandPayload,
         TestEvent
-      >({
-        dispatcherName: "duplicate",
-      });
+      >();
 
       expect(() => {
         new PipelineBuilder<TestEvent, Projection>(eventStore, factory)
           .withName("test-pipeline")
           .withAggregateType("span_ingestion")
-          .withCommandHandler(HandlerClass1)
-          .withCommandHandler(HandlerClass2)
+          .withCommand("duplicate", HandlerClass1)
+          .withCommand("duplicate", HandlerClass2)
           .build();
       }).toThrow(
-        'Dispatcher with name "duplicate" already exists. Dispatcher names must be unique.',
+        'Command handler with name "duplicate" already exists. Command handler names must be unique within a pipeline.',
       );
     });
 

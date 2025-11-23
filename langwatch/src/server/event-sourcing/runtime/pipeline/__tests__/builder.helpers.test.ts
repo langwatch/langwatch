@@ -23,88 +23,25 @@ describe("Pipeline Builder Helper Functions", () => {
     vi.restoreAllMocks();
   });
 
-  describe("inferDispatcherName() behavior (tested via builder)", () => {
-    it("prefers static dispatcherName property over class name inference", () => {
-      const { buildPipelineWithHandler } = createMinimalPipelineBuilder();
+  describe("withCommand() name parameter", () => {
+    it("uses provided name parameter for command registration", () => {
+      const { eventStore, factory } = createMinimalPipelineBuilder();
       const HandlerClass = createTestCommandHandlerClass<
         TestCommandPayload,
         TestEvent
-      >({
-        dispatcherName: "customDispatcher",
-      });
+      >();
 
-      const pipeline = buildPipelineWithHandler(HandlerClass);
+      const pipeline = new PipelineBuilder<TestEvent, Projection>(
+        eventStore,
+        factory,
+      )
+        .withName("test-pipeline")
+        .withAggregateType("span_ingestion")
+        .withCommand("customDispatcher", HandlerClass)
+        .build();
 
       expect(pipeline.commands).toHaveProperty("customDispatcher");
       expect(pipeline.commands.customDispatcher).toBeDefined();
-    });
-
-    it("infers dispatcher name from class name by removing Command/CommandHandler suffix and converting to camelCase", () => {
-      const { buildPipelineWithHandler } = createMinimalPipelineBuilder();
-
-      // Test multiple name patterns: CommandHandler suffix, Command suffix, and edge cases
-      class RecordSpanCommandHandler {
-        static readonly schema = BASE_COMMAND_HANDLER_SCHEMA;
-
-        static getAggregateId(payload: TestCommandPayload): string {
-          return payload.id;
-        }
-
-        async handle(): Promise<TestEvent[]> {
-          return [];
-        }
-      }
-
-      class CreateUserCommandHandler {
-        static readonly schema = BASE_COMMAND_HANDLER_SCHEMA;
-
-        static getAggregateId(payload: TestCommandPayload): string {
-          return payload.id;
-        }
-
-        async handle(): Promise<TestEvent[]> {
-          return [];
-        }
-      }
-
-      class ACommandHandler {
-        static readonly schema = BASE_COMMAND_HANDLER_SCHEMA;
-
-        static getAggregateId(payload: TestCommandPayload): string {
-          return payload.id;
-        }
-
-        async handle(): Promise<TestEvent[]> {
-          return [];
-        }
-      }
-
-      const pipeline1 = buildPipelineWithHandler(
-        RecordSpanCommandHandler as unknown as CommandHandlerClass<
-          TestCommandPayload,
-          CommandType,
-          TestEvent
-        >,
-      );
-      expect(pipeline1.commands).toHaveProperty("recordSpan");
-
-      const pipeline2 = buildPipelineWithHandler(
-        CreateUserCommandHandler as unknown as CommandHandlerClass<
-          TestCommandPayload,
-          CommandType,
-          TestEvent
-        >,
-      );
-      expect(pipeline2.commands).toHaveProperty("createUser");
-
-      const pipeline3 = buildPipelineWithHandler(
-        ACommandHandler as unknown as CommandHandlerClass<
-          TestCommandPayload,
-          CommandType,
-          TestEvent
-        >,
-      );
-      expect(pipeline3.commands).toHaveProperty("a");
     });
   });
 
@@ -114,7 +51,6 @@ describe("Pipeline Builder Helper Functions", () => {
       let calledWithContext: unknown = null;
 
       class TestHandler {
-        static readonly dispatcherName = "testDispatcher" as const;
         static readonly schema = BASE_COMMAND_HANDLER_SCHEMA;
 
         static getAggregateId(payload: TestCommandPayload): string {
@@ -133,7 +69,7 @@ describe("Pipeline Builder Helper Functions", () => {
       )
         .withName("test-pipeline")
         .withAggregateType("span_ingestion")
-        .withCommandHandler(TestHandler)
+        .withCommand("testDispatcher", TestHandler)
         .build();
 
       const payload: TestCommandPayload = {
@@ -152,7 +88,6 @@ describe("Pipeline Builder Helper Functions", () => {
       const createSpy = vi.spyOn(factory, "create");
 
       class TestHandler {
-        static readonly dispatcherName = "testDispatcher" as const;
         static readonly schema = BASE_COMMAND_HANDLER_SCHEMA;
 
         static getAggregateId(payload: TestCommandPayload): string {
@@ -171,7 +106,7 @@ describe("Pipeline Builder Helper Functions", () => {
       new PipelineBuilder<TestEvent, Projection>(eventStore, factory)
         .withName("test-pipeline")
         .withAggregateType("span_ingestion")
-        .withCommandHandler(TestHandler)
+        .withCommand("testDispatcher", TestHandler)
         .build();
 
       expect(createSpy).toHaveBeenCalledWith(
@@ -201,13 +136,12 @@ describe("Pipeline Builder Helper Functions", () => {
         TestCommandPayload,
         TestEvent
       >({
-        dispatcherName: "testDispatcher",
       });
 
       new PipelineBuilder<TestEvent, Projection>(eventStore, factory)
         .withName("test-pipeline")
         .withAggregateType("span_ingestion")
-        .withCommandHandler(HandlerClass)
+        .withCommand("testDispatcher", HandlerClass)
         .build();
 
       expect(createSpy).toHaveBeenCalledWith(
@@ -225,14 +159,13 @@ describe("Pipeline Builder Helper Functions", () => {
         TestCommandPayload,
         TestEvent
       >({
-        dispatcherName: "testDispatcher",
         delay: 5000,
       });
 
       new PipelineBuilder<TestEvent, Projection>(eventStore, factory)
         .withName("test-pipeline")
         .withAggregateType("span_ingestion")
-        .withCommandHandler(HandlerClass)
+        .withCommand("testDispatcher", HandlerClass)
         .build();
 
       expect(createSpy).toHaveBeenCalledWith(
@@ -250,13 +183,12 @@ describe("Pipeline Builder Helper Functions", () => {
         TestCommandPayload,
         TestEvent
       >({
-        dispatcherName: "testDispatcher",
       });
 
       new PipelineBuilder<TestEvent, Projection>(eventStore, factory)
         .withName("test-pipeline")
         .withAggregateType("span_ingestion")
-        .withCommandHandler(HandlerClass)
+        .withCommand("testDispatcher", HandlerClass)
         .build();
 
       expect(createSpy).toHaveBeenCalledWith(
@@ -271,7 +203,6 @@ describe("Pipeline Builder Helper Functions", () => {
       const createSpy = vi.spyOn(factory, "create");
 
       class TestHandler {
-        static readonly dispatcherName = "testDispatcher" as const;
         static readonly schema = BASE_COMMAND_HANDLER_SCHEMA;
 
         static getAggregateId(payload: TestCommandPayload): string {
@@ -292,7 +223,7 @@ describe("Pipeline Builder Helper Functions", () => {
       new PipelineBuilder<TestEvent, Projection>(eventStore, factory)
         .withName("test-pipeline")
         .withAggregateType("span_ingestion")
-        .withCommandHandler(TestHandler)
+        .withCommand("testDispatcher", TestHandler)
         .build();
 
       expect(createSpy).toHaveBeenCalledWith(
@@ -325,13 +256,12 @@ describe("Pipeline Builder Helper Functions", () => {
         TestCommandPayload,
         TestEvent
       >({
-        dispatcherName: "testDispatcher",
       });
 
       new PipelineBuilder<TestEvent, Projection>(eventStore, factory)
         .withName("test-pipeline")
         .withAggregateType("span_ingestion")
-        .withCommandHandler(HandlerClass)
+        .withCommand("testDispatcher", HandlerClass)
         .build();
 
       expect(createSpy).toHaveBeenCalledWith(
@@ -349,14 +279,13 @@ describe("Pipeline Builder Helper Functions", () => {
         TestCommandPayload,
         TestEvent
       >({
-        dispatcherName: "testDispatcher",
         concurrency: 10,
       });
 
       new PipelineBuilder<TestEvent, Projection>(eventStore, factory)
         .withName("test-pipeline")
         .withAggregateType("span_ingestion")
-        .withCommandHandler(HandlerClass)
+        .withCommand("testDispatcher", HandlerClass)
         .build();
 
       expect(createSpy).toHaveBeenCalledWith(
@@ -374,13 +303,12 @@ describe("Pipeline Builder Helper Functions", () => {
         TestCommandPayload,
         TestEvent
       >({
-        dispatcherName: "testDispatcher",
       });
 
       new PipelineBuilder<TestEvent, Projection>(eventStore, factory)
         .withName("test-pipeline")
         .withAggregateType("span_ingestion")
-        .withCommandHandler(HandlerClass)
+        .withCommand("testDispatcher", HandlerClass)
         .build();
 
       expect(createSpy).toHaveBeenCalledWith(
