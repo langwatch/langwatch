@@ -40,3 +40,5 @@ export const createLogger = (name: string) => {
   const destination = getDestinationStream();
   return (pino as any).default(options, destination) as ReturnType<typeof pino>;
 };
+
+export type Logger = ReturnType<typeof createLogger>;
