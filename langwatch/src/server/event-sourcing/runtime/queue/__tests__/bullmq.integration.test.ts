@@ -3,7 +3,7 @@ import { Queue } from "bullmq";
 import { SpanKind } from "@opentelemetry/api";
 import type { EventSourcedQueueDefinition } from "../../../library/queues";
 import type { SemConvAttributes } from "langwatch/observability";
-import { EventSourcedQueueProcessorBullmq } from "../bullmq";
+import { EventSourcedQueueProcessorBullMq } from "../bullmq";
 import { connection } from "../../../../redis";
 
 const mockLogger = {
@@ -61,7 +61,7 @@ async function cleanupQueue(queueName: string): Promise<void> {
 }
 
 describe("EventSourcedQueueProcessorBullmq - Integration Tests", () => {
-  const processors: EventSourcedQueueProcessorBullmq<any>[] = [];
+  const processors: EventSourcedQueueProcessorBullMq<any>[] = [];
   const queueNames: string[] = [];
 
   beforeEach(() => {
@@ -104,7 +104,7 @@ describe("EventSourcedQueueProcessorBullmq - Integration Tests", () => {
         process: processFn,
       };
 
-      const processor = new EventSourcedQueueProcessorBullmq(definition);
+      const processor = new EventSourcedQueueProcessorBullMq(definition);
       processors.push(processor);
 
       // Wait a bit for worker to be ready
@@ -136,7 +136,7 @@ describe("EventSourcedQueueProcessorBullmq - Integration Tests", () => {
         options: { concurrency: 1 }, // Sequential processing
       };
 
-      const processor = new EventSourcedQueueProcessorBullmq(definition);
+      const processor = new EventSourcedQueueProcessorBullMq(definition);
       processors.push(processor);
 
       await new Promise((resolve) => setTimeout(resolve, 100));
@@ -172,7 +172,7 @@ describe("EventSourcedQueueProcessorBullmq - Integration Tests", () => {
         options: { concurrency: concurrencyLimit },
       };
 
-      const processor = new EventSourcedQueueProcessorBullmq(definition);
+      const processor = new EventSourcedQueueProcessorBullMq(definition);
       processors.push(processor);
 
       await new Promise((resolve) => setTimeout(resolve, 100));
@@ -206,7 +206,7 @@ describe("EventSourcedQueueProcessorBullmq - Integration Tests", () => {
         delay,
       };
 
-      const processor = new EventSourcedQueueProcessorBullmq(definition);
+      const processor = new EventSourcedQueueProcessorBullMq(definition);
       processors.push(processor);
 
       await new Promise((resolve) => setTimeout(resolve, 100));
@@ -243,7 +243,7 @@ describe("EventSourcedQueueProcessorBullmq - Integration Tests", () => {
         makeJobId,
       };
 
-      const processor = new EventSourcedQueueProcessorBullmq(definition);
+      const processor = new EventSourcedQueueProcessorBullMq(definition);
       processors.push(processor);
 
       await new Promise((resolve) => setTimeout(resolve, 100));
@@ -279,7 +279,7 @@ describe("EventSourcedQueueProcessorBullmq - Integration Tests", () => {
         process: processFn,
       };
 
-      const processor = new EventSourcedQueueProcessorBullmq(definition);
+      const processor = new EventSourcedQueueProcessorBullMq(definition);
       processors.push(processor);
 
       await new Promise((resolve) => setTimeout(resolve, 100));
@@ -305,7 +305,7 @@ describe("EventSourcedQueueProcessorBullmq - Integration Tests", () => {
         process: processFn,
       };
 
-      const processor = new EventSourcedQueueProcessorBullmq(definition);
+      const processor = new EventSourcedQueueProcessorBullMq(definition);
       processors.push(processor);
 
       await new Promise((resolve) => setTimeout(resolve, 100));
@@ -337,7 +337,7 @@ describe("EventSourcedQueueProcessorBullmq - Integration Tests", () => {
         process: processFn,
       };
 
-      const processor = new EventSourcedQueueProcessorBullmq(definition);
+      const processor = new EventSourcedQueueProcessorBullMq(definition);
       processors.push(processor);
 
       await new Promise((resolve) => setTimeout(resolve, 100));
@@ -366,7 +366,7 @@ describe("EventSourcedQueueProcessorBullmq - Integration Tests", () => {
         process: processFn,
       };
 
-      const processor = new EventSourcedQueueProcessorBullmq(definition);
+      const processor = new EventSourcedQueueProcessorBullMq(definition);
       processors.push(processor);
 
       // Wait for worker to be ready (worker ready event may fire quickly)
@@ -396,7 +396,7 @@ describe("EventSourcedQueueProcessorBullmq - Integration Tests", () => {
         process: processFn,
       };
 
-      const processor = new EventSourcedQueueProcessorBullmq(definition);
+      const processor = new EventSourcedQueueProcessorBullMq(definition);
       processors.push(processor);
 
       // Wait for worker to be ready
@@ -428,7 +428,7 @@ describe("EventSourcedQueueProcessorBullmq - Integration Tests", () => {
         process: processFn,
       };
 
-      const processor = new EventSourcedQueueProcessorBullmq(definition);
+      const processor = new EventSourcedQueueProcessorBullMq(definition);
       processors.push(processor);
 
       await new Promise((resolve) => setTimeout(resolve, 100));
@@ -459,7 +459,7 @@ describe("EventSourcedQueueProcessorBullmq - Integration Tests", () => {
         process: processFn,
       };
 
-      const processor = new EventSourcedQueueProcessorBullmq(definition);
+      const processor = new EventSourcedQueueProcessorBullMq(definition);
       processors.push(processor);
 
       await new Promise((resolve) => setTimeout(resolve, 100));
@@ -491,7 +491,7 @@ describe("EventSourcedQueueProcessorBullmq - Integration Tests", () => {
         spanAttributes,
       };
 
-      const processor = new EventSourcedQueueProcessorBullmq(definition);
+      const processor = new EventSourcedQueueProcessorBullMq(definition);
       processors.push(processor);
 
       await new Promise((resolve) => setTimeout(resolve, 100));
@@ -516,7 +516,7 @@ describe("EventSourcedQueueProcessorBullmq - Integration Tests", () => {
         process: processFn,
       };
 
-      const processor = new EventSourcedQueueProcessorBullmq(definition);
+      const processor = new EventSourcedQueueProcessorBullMq(definition);
       processors.push(processor);
 
       await new Promise((resolve) => setTimeout(resolve, 100));
@@ -539,7 +539,7 @@ describe("EventSourcedQueueProcessorBullmq - Integration Tests", () => {
         process: processFn,
       };
 
-      const processor = new EventSourcedQueueProcessorBullmq(definition);
+      const processor = new EventSourcedQueueProcessorBullMq(definition);
       processors.push(processor);
 
       await new Promise((resolve) => setTimeout(resolve, 100));
@@ -570,7 +570,7 @@ describe("EventSourcedQueueProcessorBullmq - Integration Tests", () => {
         makeJobId,
       };
 
-      const processor = new EventSourcedQueueProcessorBullmq(definition);
+      const processor = new EventSourcedQueueProcessorBullMq(definition);
       processors.push(processor);
 
       await new Promise((resolve) => setTimeout(resolve, 100));

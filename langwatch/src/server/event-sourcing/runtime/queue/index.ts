@@ -1,4 +1,4 @@
-export { EventSourcedQueueProcessorBullmq } from "./bullmq";
+export { EventSourcedQueueProcessorBullMq as EventSourcedQueueProcessorBullmq } from "./bullmq";
 export { EventSourcedQueueProcessorMemory } from "./memory";
 export {
   type QueueProcessorFactory,

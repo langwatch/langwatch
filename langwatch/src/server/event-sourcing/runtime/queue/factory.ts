@@ -3,7 +3,7 @@ import type {
   EventSourcedQueueDefinition,
   EventSourcedQueueProcessor,
 } from "../../library/queues";
-import { EventSourcedQueueProcessorBullmq } from "./bullmq";
+import { EventSourcedQueueProcessorBullMq } from "./bullmq";
 import { EventSourcedQueueProcessorMemory } from "./memory";
 
 /**
@@ -32,7 +32,7 @@ export class DefaultQueueProcessorFactory implements QueueProcessorFactory {
     definition: EventSourcedQueueDefinition<Payload>,
   ): EventSourcedQueueProcessor<Payload> {
     if (connection) {
-      return new EventSourcedQueueProcessorBullmq<Payload>(definition);
+      return new EventSourcedQueueProcessorBullMq<Payload>(definition);
     }
     return new EventSourcedQueueProcessorMemory<Payload>(definition);
   }
@@ -46,7 +46,7 @@ export class BullmqQueueProcessorFactory implements QueueProcessorFactory {
   create<Payload>(
     definition: EventSourcedQueueDefinition<Payload>,
   ): EventSourcedQueueProcessor<Payload> {
-    return new EventSourcedQueueProcessorBullmq<Payload>(definition);
+    return new EventSourcedQueueProcessorBullMq<Payload>(definition);
   }
 }
 

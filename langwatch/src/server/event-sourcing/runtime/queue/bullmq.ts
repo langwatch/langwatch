@@ -8,26 +8,28 @@ import {
 import { BullMQOtel } from "bullmq-otel";
 import { connection } from "../../../redis";
 import { createLogger } from "../../../../utils/logger";
-import { getLangWatchTracer } from "langwatch";
-import { SpanKind } from "@opentelemetry/api";
+import { trace } from "@opentelemetry/api";
 import type { SemConvAttributes } from "langwatch/observability";
 import type {
   EventSourcedQueueDefinition,
   EventSourcedQueueProcessor,
 } from "../../library/queues";
+import {
+  isSequentialOrderingError,
+  extractPreviousSequenceNumber,
+} from "../../library/services/errorHandling";
 
-export class EventSourcedQueueProcessorBullmq<Payload>
+export class EventSourcedQueueProcessorBullMq<Payload>
   implements EventSourcedQueueProcessor<Payload>
 {
   private readonly logger = createLogger("langwatch:event-sourcing:queue");
-  private readonly tracer: ReturnType<typeof getLangWatchTracer>;
   private readonly queueName: string;
   private readonly jobName: string;
   private readonly makeJobId?: (payload: Payload) => string;
   private readonly process: (payload: Payload) => Promise<void>;
   private readonly spanAttributes?: (payload: Payload) => SemConvAttributes;
-  private readonly queue: Queue<Payload, void, string>;
-  private readonly worker: Worker<Payload, void, string>;
+  private readonly queue: Queue<Payload, unknown, string>;
+  private readonly worker: Worker<Payload>;
   private readonly delay?: number;
 
   constructor(definition: EventSourcedQueueDefinition<Payload>) {
@@ -40,12 +42,11 @@ export class EventSourcedQueueProcessorBullmq<Payload>
       );
     }
 
-    this.tracer = getLangWatchTracer("langwatch.event-sourcing.queue");
     this.spanAttributes = spanAttributes;
     this.delay = delay;
 
     // Derive queue name with braces and job name without braces
-    this.queueName = `{${name}}`;
+    this.queueName = name;
     this.jobName = name;
     this.makeJobId = makeJobId;
     this.process = process;
@@ -54,52 +55,87 @@ export class EventSourcedQueueProcessorBullmq<Payload>
       connection,
       telemetry: new BullMQOtel(this.queueName),
       defaultJobOptions: {
-        attempts: 3,
+        attempts: 15,
         backoff: {
           type: "exponential",
           delay: 2000,
         },
         delay: this.delay ?? 0,
         removeOnComplete: {
-          age: 3600,
+          age: 3600, // 1 hour
           count: 1000,
         },
         removeOnFail: {
-          age: 60 * 60 * 24 * 7,
+          age: 60 * 60 * 24 * 7, // 7 days
         },
       },
     };
-    this.queue = new Queue<Payload, void, string>(this.queueName, queueOptions);
+    this.queue = new Queue<Payload, unknown, string>(this.queueName, queueOptions);
 
     const workerOptions: WorkerOptions = {
       connection,
       concurrency: options?.concurrency ?? 5,
       telemetry: new BullMQOtel(this.queueName),
     };
-    this.worker = new Worker<Payload, void, string>(
+    this.worker = new Worker<Payload>(
       this.queueName,
       async (job) => {
-        const baseAttributes: Record<string, string | number | boolean> = {
-          "queue.name": this.queueName,
-          "queue.job_name": this.jobName,
-          "queue.job_id": job.id ?? "unknown",
-        };
-
         const customAttributes = this.spanAttributes
           ? this.spanAttributes(job.data)
           : {};
-        const attributes = { ...baseAttributes, ...customAttributes };
 
-        await this.tracer.withActiveSpan(
-          "queue.process",
+        const span = trace.getActiveSpan();
+        span?.setAttributes({
+          ...customAttributes,
+        });
+        span?.updateName("EventQueue.Process");
+
+        this.logger.debug(
           {
-            kind: SpanKind.CONSUMER,
-            attributes,
+            queueName: this.queueName,
+            jobId: job.id,
           },
-          async () => {
-            await this.process(job.data);
-          },
+          "Processing queue job",
         );
+
+        try {
+          await this.process(job.data);
+          this.logger.debug(
+            {
+              queueName: this.queueName,
+              jobId: job.id,
+            },
+            "Queue job processed successfully",
+          );
+        } catch (error) {
+          // Detect ordering errors for better logging and potential future smart retry logic
+          const isOrderingError = isSequentialOrderingError(error);
+          const previousSequence = isOrderingError
+            ? extractPreviousSequenceNumber(error)
+            : null;
+
+          this.logger.error(
+            {
+              queueName: this.queueName,
+              jobId: job.id,
+              error: error instanceof Error ? error.message : String(error),
+              errorStack: error instanceof Error ? error.stack : void 0,
+              isOrderingError,
+              ...(previousSequence !== null
+                ? { previousSequenceNumber: previousSequence }
+                : {}),
+            },
+            isOrderingError
+              ? "Queue job failed due to ordering violation - previous event not yet processed"
+              : "Queue job processing failed",
+          );
+
+          // For ordering errors, the error will be retried by BullMQ with backoff
+          // The early ordering check in handleEvent should prevent most of these,
+          // but if they occur, they indicate the previous event completed between
+          // the early check and lock acquisition (race condition)
+          throw error;
+        }
       },
       workerOptions,
     );
@@ -132,37 +168,19 @@ export class EventSourcedQueueProcessorBullmq<Payload>
       // automatically replace it if it's still waiting. This enables batching/debouncing.
     };
 
-    await this.tracer.withActiveSpan(
-      "queue.send",
-      {
-        kind: SpanKind.PRODUCER,
-        attributes: {
-          "queue.name": this.queueName,
-          "queue.job_name": this.jobName,
-          "queue.job_id": jobId ?? "auto",
-        },
-      },
-      async (span) => {
-        await this.tracer.withActiveSpan(
-          "queue.add",
-          {
-            kind: SpanKind.PRODUCER,
-            attributes: {
-              "queue.name": this.queueName,
-              "queue.job_name": this.jobName,
-              "queue.job_id": jobId ?? "auto",
-            },
-          },
-          async () => {
-            const addJob = this.queue.add.bind(this.queue) as (
-              name: string,
-              data: Payload,
-              opts?: JobsOptions,
-            ) => Promise<unknown>;
-            await addJob(this.jobName, payload, opts);
-          },
-        );
-      },
+    const customAttributes = this.spanAttributes
+        ? this.spanAttributes(payload)
+    : {};
+
+    const span = trace.getActiveSpan();
+    span?.setAttributes({ ...customAttributes });
+    span?.updateName("EventQueue.Send");
+
+    await this.queue.add(
+      // @ts-expect-error - jobName is a string, this is stupid typing from BullMQ
+      this.jobName,
+      payload,
+      opts,
     );
   }
 
