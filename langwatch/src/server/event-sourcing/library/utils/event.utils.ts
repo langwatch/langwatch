@@ -1,3 +1,4 @@
+import { randomUUID } from "crypto";
 import { context, trace } from "@opentelemetry/api";
 import { EventStream } from "../streams/eventStream";
 import {
@@ -13,19 +14,21 @@ import type {
   ProjectionMetadata,
 } from "../domain/types";
 import type { TenantId } from "../domain/tenantId";
+import { TenantIdSchema } from "../domain/tenantId";
 import type { EventType } from "../domain/eventType";
 import type { AggregateType } from "../domain/aggregateType";
+import { generate } from "@langwatch/ksuid";
 
 /**
- * Generates a unique event ID.
- * Format: {timestamp}:{tenantId}:{aggregateId}:{aggregateType}
- * Timestamps within the same aggregate are guaranteed unique, ensuring Event ID uniqueness.
+ * Generates a unique event ID with entropy to prevent predictability and replay attacks.
+ * Format: {timestamp}:{tenantId}:{aggregateId}:{aggregateType}:{ksuid}
+ * The KSUID component ensures uniqueness even when timestamps collide and prevents.
  *
  * @param timestamp - Event timestamp in milliseconds
  * @param tenantId - The tenant ID
  * @param aggregateId - The aggregate ID
  * @param aggregateType - The aggregate type
- * @returns Event ID in format {timestamp}:{tenantId}:{aggregateId}:{aggregateType}
+ * @returns Event ID in format {timestamp}:{tenantId}:{aggregateId}:{aggregateType}:{ksuid}
  */
 function generateEventId(
   timestamp: number,
@@ -33,35 +36,87 @@ function generateEventId(
   aggregateId: string,
   aggregateType: string,
 ): string {
-  return `${timestamp}:${tenantId}:${aggregateId}:${aggregateType}`;
+  return `${timestamp}:${tenantId}:${aggregateId}:${aggregateType}:${generate("event").toString()}`;
+}
+
+/**
+ * Options for event creation.
+ */
+export interface CreateEventOptions {
+  /**
+   * Whether to automatically enrich metadata with current OpenTelemetry trace context.
+   * Defaults to false (trace context is not included by default).
+   */
+  includeTraceContext?: boolean;
 }
 
 /**
  * Creates an event with the given payload and metadata.
  *
+ * @param aggregateType - The aggregate type (used for event ID generation)
  * @param aggregateId - The aggregate this event belongs to
  * @param tenantId - Tenant identifier for multi-tenant isolation
  * @param type - Event type identifier
  * @param data - Event-specific payload data
- * @param aggregateType - The aggregate type (used for event ID generation)
  * @param metadata - Optional metadata (e.g., trace context)
  * @param timestamp - Optional timestamp (defaults to current time)
+ * @param options - Optional configuration (e.g., includeTraceContext)
  * @returns A new event with timestamp set to current time (or provided timestamp)
  */
+// Overload for full Event type
+function createEvent<TEvent extends Event>(
+  aggregateType: AggregateType,
+  aggregateId: string,
+  tenantId: TenantId,
+  type: TEvent["type"],
+  data: TEvent["data"],
+  metadata?: TEvent["metadata"],
+  timestamp?: number,
+  options?: CreateEventOptions,
+): TEvent;
+
+// Generic overload for backward compatibility
 function createEvent<
   Payload = unknown,
   Metadata extends EventMetadataBase = EventMetadataBase,
   TEventType extends EventType = EventType,
 >(
+  aggregateType: AggregateType,
   aggregateId: string,
   tenantId: TenantId,
   type: TEventType,
   data: Payload,
-  aggregateType: AggregateType,
   metadata?: Metadata,
   timestamp?: number,
+  options?: CreateEventOptions,
+): Event<Payload, Metadata>;
+
+// Implementation
+function createEvent<
+  Payload = unknown,
+  Metadata extends EventMetadataBase = EventMetadataBase,
+  TEventType extends EventType = EventType,
+>(
+  aggregateType: AggregateType,
+  aggregateId: string,
+  tenantId: TenantId,
+  type: TEventType,
+  data: Payload,
+  metadata?: Metadata,
+  timestamp?: number,
+  options?: CreateEventOptions,
 ): Event<Payload, Metadata> {
   const eventTimestamp = timestamp ?? Date.now();
+
+  let finalMetadata = metadata;
+  if (options?.includeTraceContext === true) {
+    finalMetadata = buildEventMetadataWithCurrentProcessingTraceparent<Metadata>(metadata);
+  }
+
+  const hasMetadata =
+    finalMetadata &&
+    Object.keys(finalMetadata as Record<string, unknown>).length > 0;
+
   return {
     id: generateEventId(eventTimestamp, String(tenantId), aggregateId, aggregateType),
     aggregateId,
@@ -70,7 +125,7 @@ function createEvent<
     timestamp: eventTimestamp,
     type,
     data,
-    ...(metadata !== void 0 && { metadata }),
+    ...(hasMetadata && { metadata: finalMetadata }),
   };
 }
 
@@ -123,49 +178,6 @@ function buildEventMetadataWithCurrentProcessingTraceparent<
   return result.data as Metadata;
 }
 
-/**
- * Creates an event and automatically enriches metadata with current OpenTelemetry trace context.
- * Convenience wrapper around createEvent that adds processingTraceparent for observability.
- *
- * @param aggregateId - The aggregate this event belongs to
- * @param tenantId - Tenant identifier for multi-tenant isolation
- * @param type - Event type identifier
- * @param data - Event-specific payload data
- * @param aggregateType - The aggregate type (used for event ID generation)
- * @param metadata - Optional metadata (will be enriched with trace context)
- * @param timestamp - Optional timestamp (defaults to current time)
- * @returns A new event with trace context in metadata
- */
-function createEventWithProcessingTraceContext<
-  Payload = unknown,
-  Metadata extends EventMetadataBase = EventMetadataBase,
-  TEventType extends EventType = EventType,
->(
-  aggregateId: string,
-  tenantId: TenantId,
-  type: TEventType,
-  data: Payload,
-  aggregateType: AggregateType,
-  metadata?: Metadata,
-  timestamp?: number,
-): Event<Payload, Metadata> {
-  const enrichedMetadata =
-    buildEventMetadataWithCurrentProcessingTraceparent<Metadata>(metadata);
-
-  const hasMetadata =
-    enrichedMetadata &&
-    Object.keys(enrichedMetadata as Record<string, unknown>).length > 0;
-
-  return createEvent<Payload, Metadata, TEventType>(
-    aggregateId,
-    tenantId,
-    type,
-    data,
-    aggregateType,
-    hasMetadata ? enrichedMetadata : void 0,
-    timestamp,
-  );
-}
 
 /**
  * Creates a projection representing the current state of an aggregate.
@@ -325,6 +337,7 @@ function isValidProjection(projection: unknown): projection is Projection {
  *
  * **Security:** This is a critical security check to prevent cross-tenant data leakage.
  * Store implementations MUST call this before any read or write operations.
+ * Uses TenantIdSchema for consistent validation across the codebase.
  *
  * @param context - The context to validate
  * @param operation - Description of the operation (for error messages)
@@ -350,17 +363,25 @@ function validateTenantId(
     );
   }
 
-  if (!context.tenantId || context.tenantId.trim() === "") {
+  if (!context.tenantId) {
     throw new Error(
-      `[SECURITY] ${operation} requires a non-empty tenantId for tenant isolation`,
+      `[SECURITY] ${operation} requires a tenantId for tenant isolation`,
     );
+  }
+
+  // Use TenantIdSchema for consistent validation (handles empty strings, whitespace, etc.)
+  const result = TenantIdSchema.safeParse(context.tenantId);
+  if (!result.success) {
+    const errorMessage =
+      result.error.issues[0]?.message ??
+      "[SECURITY] TenantId must be a non-empty string for tenant isolation";
+    throw new Error(`[SECURITY] ${operation}: ${errorMessage}`);
   }
 }
 
 export {
   generateEventId,
   createEvent,
-  createEventWithProcessingTraceContext,
   createEventStream,
   createProjection,
   eventBelongsToAggregate,
@@ -377,7 +398,6 @@ export {
 export const EventUtils = {
   generateEventId,
   createEvent,
-  createEventWithProcessingTraceContext,
   createEventStream,
   createProjection,
   eventBelongsToAggregate,

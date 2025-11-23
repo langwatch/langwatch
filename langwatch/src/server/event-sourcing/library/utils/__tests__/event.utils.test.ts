@@ -14,19 +14,20 @@ describe("EventUtils - Event ID", () => {
     it("generates event ID in correct format: {timestamp}:{tenantId}:{aggregateId}:{aggregateType}", () => {
       const timestamp = 1000000;
       const event = EventUtils.createEvent(
+        aggregateType,
         aggregateId,
         tenantId,
         eventType,
         { test: "data" },
-        aggregateType,
         void 0,
         timestamp,
       );
 
-      // Event ID should be timestamp:tenantId:aggregateId:aggregateType
-      expect(event.id).toMatch(/^\d+:[^:]+:[^:]+:[^:]+$/);
+      // Event ID should be timestamp:tenantId:aggregateId:aggregateType:ksuid
+      // KSUID is added for entropy and uniqueness
+      expect(event.id).toMatch(/^\d+:[^:]+:[^:]+:[^:]+:.+$/);
       const parts = event.id.split(":");
-      expect(parts.length).toBe(4);
+      expect(parts.length).toBeGreaterThanOrEqual(5); // At least 5 parts (timestamp, tenantId, aggregateId, aggregateType, ksuid)
       expect(parts[0]).toBe(String(timestamp));
       expect(parts[1]).toBe(String(tenantId));
       expect(parts[2]).toBe(aggregateId);
@@ -38,21 +39,21 @@ describe("EventUtils - Event ID", () => {
       const timestamp2 = 1000001;
       
       const event1 = EventUtils.createEvent(
+        aggregateType,
         aggregateId,
         tenantId,
         eventType,
         { test: "data" },
-        aggregateType,
         void 0,
         timestamp1,
       );
 
       const event2 = EventUtils.createEvent(
+        aggregateType,
         aggregateId,
         tenantId,
         eventType,
         { test: "data" },
-        aggregateType,
         void 0,
         timestamp2, // Different timestamp = different Event ID
       );
@@ -67,11 +68,11 @@ describe("EventUtils - Event ID", () => {
       const customAggregateType = "custom_type" as AggregateType;
 
       const event = EventUtils.createEvent(
+        customAggregateType,
         customAggregateId,
         tenantId,
         eventType,
         { test: "data" },
-        customAggregateType,
         void 0,
         timestamp,
       );
@@ -84,21 +85,22 @@ describe("EventUtils - Event ID", () => {
     });
   });
 
-  describe("createEventWithProcessingTraceContext - event ID format", () => {
+  describe("createEvent with trace context - event ID format", () => {
     it("generates event ID in correct format", () => {
       const timestamp = 2000000;
-      const event = EventUtils.createEventWithProcessingTraceContext(
+      const event = EventUtils.createEvent(
+        aggregateType,
         aggregateId,
         tenantId,
         eventType,
         { test: "data" },
-        aggregateType,
         void 0,
         timestamp,
+        { includeTraceContext: true },
       );
 
       const parts = event.id.split(":");
-      expect(parts.length).toBe(4);
+      expect(parts.length).toBeGreaterThanOrEqual(5); // At least 5 parts (timestamp, tenantId, aggregateId, aggregateType, ksuid)
       expect(parts[0]).toBe(String(timestamp));
       expect(parts[1]).toBe(String(tenantId));
       expect(parts[2]).toBe(aggregateId);

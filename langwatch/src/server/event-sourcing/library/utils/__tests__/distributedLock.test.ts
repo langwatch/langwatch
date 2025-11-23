@@ -391,13 +391,23 @@ describe("InMemoryDistributedLock", () => {
   });
 });
 
+type MockRedisClient = {
+  set: ReturnType<
+    typeof vi.fn<
+      (key: string, value: string, ...args: (string | number)[]) => Promise<string | null>
+    >
+  >;
+  del: ReturnType<typeof vi.fn<(key: string) => Promise<number>>>;
+  get: ReturnType<typeof vi.fn<(key: string) => Promise<string | null>>>;
+  eval?: ReturnType<
+    typeof vi.fn<
+      (script: string, numKeys: number, ...args: (string | number)[]) => Promise<unknown>
+    >
+  >;
+};
+
 describe("RedisDistributedLock", () => {
-  let mockRedis: {
-    set: ReturnType<typeof vi.fn>;
-    del: ReturnType<typeof vi.fn>;
-    get: ReturnType<typeof vi.fn>;
-    eval?: ReturnType<typeof vi.fn>;
-  } & RedisClient;
+  let mockRedis: MockRedisClient;
   let lock: RedisDistributedLock;
   let originalRandom: typeof Math.random;
   let randomValues: number[];
@@ -411,19 +421,24 @@ describe("RedisDistributedLock", () => {
       return value;
     });
 
-    const setMock = vi.fn<RedisClient["set"]>();
-    const delMock = vi.fn<RedisClient["del"]>();
-    const getMock = vi.fn<RedisClient["get"]>();
-    const evalMock = vi.fn<NonNullable<RedisClient["eval"]>>();
+    // IORedis set signature: set(key, value, ...args: (string | number)[])
+    const setMock = vi.fn<
+      (key: string, value: string, ...args: (string | number)[]) => Promise<string | null>
+    >();
+    const delMock = vi.fn<(key: string) => Promise<number>>();
+    const getMock = vi.fn<(key: string) => Promise<string | null>>();
+    const evalMock = vi.fn<
+      (script: string, numKeys: number, ...args: (string | number)[]) => Promise<unknown>
+    >();
 
     mockRedis = {
       set: setMock,
       del: delMock,
       get: getMock,
       eval: evalMock,
-    } as typeof mockRedis;
+    };
 
-    lock = new RedisDistributedLock(mockRedis);
+    lock = new RedisDistributedLock(mockRedis as unknown as RedisClient);
   });
 
   afterEach(() => {
@@ -449,10 +464,9 @@ describe("RedisDistributedLock", () => {
         expect(mockRedis.set).toHaveBeenCalledWith(
           "test-key",
           `${baseTime}-0.12345`,
-          {
-            NX: true,
-            EX: 5,
-          },
+          "EX",
+          5,
+          "NX",
         );
       });
 
@@ -486,7 +500,9 @@ describe("RedisDistributedLock", () => {
         expect(mockRedis.set).toHaveBeenCalledWith(
           "test-key",
           expect.stringContaining(`${baseTime}-`),
-          { NX: true, EX: expect.any(Number) },
+          "EX",
+          expect.any(Number),
+          "NX",
         );
       });
     });
@@ -504,7 +520,9 @@ describe("RedisDistributedLock", () => {
         expect(mockRedis.set).toHaveBeenCalledWith(
           "test-key",
           expect.any(String),
-          { NX: true, EX: 1 },
+          "EX",
+          1,
+          "NX",
         );
       });
 
@@ -520,7 +538,9 @@ describe("RedisDistributedLock", () => {
         expect(mockRedis.set).toHaveBeenCalledWith(
           "test-key",
           expect.any(String),
-          { NX: true, EX: 2 },
+          "EX",
+          2,
+          "NX",
         );
       });
 
@@ -536,7 +556,9 @@ describe("RedisDistributedLock", () => {
         expect(mockRedis.set).toHaveBeenCalledWith(
           "test-key",
           expect.any(String),
-          { NX: true, EX: 0 },
+          "EX",
+          0,
+          "NX",
         );
       });
 
@@ -552,7 +574,9 @@ describe("RedisDistributedLock", () => {
         expect(mockRedis.set).toHaveBeenCalledWith(
           "test-key",
           expect.any(String),
-          { NX: true, EX: 86400 },
+          "EX",
+          86400,
+          "NX",
         );
       });
     });
@@ -573,7 +597,9 @@ describe("RedisDistributedLock", () => {
         expect(mockRedis.set).toHaveBeenCalledWith(
           specialKey,
           expect.any(String),
-          { NX: true, EX: 5 },
+          "EX",
+          5,
+          "NX",
         );
       });
     });
@@ -689,87 +715,31 @@ describe("RedisDistributedLock", () => {
       });
     });
 
-    describe("when eval is not available (fallback)", () => {
+    describe("when eval is not available", () => {
       beforeEach(() => {
-        const setMock = vi.fn<RedisClient["set"]>();
-        const delMock = vi.fn<RedisClient["del"]>();
-        const getMock = vi.fn<RedisClient["get"]>();
+        const setMock = vi.fn<
+          (key: string, value: string, ...args: (string | number)[]) => Promise<string | null>
+        >();
+        const delMock = vi.fn<(key: string) => Promise<number>>();
+        const getMock = vi.fn<(key: string) => Promise<string | null>>();
 
         mockRedis = {
           set: setMock,
           del: delMock,
           get: getMock,
-        } as typeof mockRedis;
-        lock = new RedisDistributedLock(mockRedis);
+        };
+        lock = new RedisDistributedLock(mockRedis as unknown as RedisClient);
       });
 
-      it("successfully releases lock when value matches using get + del", async () => {
+      it("throws error when eval is not available (atomic release required)", async () => {
         const handle: LockHandle = {
           key: "test-key",
           value: "test-value",
         };
 
-        mockRedis.get.mockResolvedValue("test-value");
-        mockRedis.del.mockResolvedValue(1);
-
-        await lock.release(handle);
-
-        expect(mockRedis.get).toHaveBeenCalledWith("test-key");
-        expect(mockRedis.del).toHaveBeenCalledWith("test-key");
-      });
-
-      it("does not release lock when value doesn't match", async () => {
-        const handle: LockHandle = {
-          key: "test-key",
-          value: "test-value",
-        };
-
-        mockRedis.get.mockResolvedValue("different-value");
-        mockRedis.del.mockResolvedValue(1);
-
-        await lock.release(handle);
-
-        expect(mockRedis.get).toHaveBeenCalledWith("test-key");
-        expect(mockRedis.del).not.toHaveBeenCalled();
-      });
-
-      it("does not release lock when key doesn't exist", async () => {
-        const handle: LockHandle = {
-          key: "test-key",
-          value: "test-value",
-        };
-
-        mockRedis.get.mockResolvedValue(null);
-
-        await lock.release(handle);
-
-        expect(mockRedis.get).toHaveBeenCalledWith("test-key");
-        expect(mockRedis.del).not.toHaveBeenCalled();
-      });
-
-      it("handles get errors gracefully", async () => {
-        const handle: LockHandle = {
-          key: "test-key",
-          value: "test-value",
-        };
-
-        const error = new Error("Redis get failed");
-        mockRedis.get.mockRejectedValue(error);
-
-        await expect(lock.release(handle)).rejects.toThrow("Redis get failed");
-      });
-
-      it("handles del errors gracefully", async () => {
-        const handle: LockHandle = {
-          key: "test-key",
-          value: "test-value",
-        };
-
-        mockRedis.get.mockResolvedValue("test-value");
-        const error = new Error("Redis del failed");
-        mockRedis.del.mockRejectedValue(error);
-
-        await expect(lock.release(handle)).rejects.toThrow("Redis del failed");
+        await expect(lock.release(handle)).rejects.toThrow(
+          "RedisDistributedLock requires eval() support for atomic lock release",
+        );
       });
     });
   });

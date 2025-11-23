@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { SpanKind } from "@opentelemetry/api";
 import { getLangWatchTracer } from "langwatch";
+import type { Redis, Cluster } from "ioredis";
 
 /**
  * Distributed lock interface for preventing concurrent operations on the same resource.
@@ -12,7 +13,7 @@ export interface DistributedLock {
   /**
    * Acquires a lock for the given key.
    *
-   * @param key - The lock key (e.g., "update:aggregateType:aggregateId:projectionName")
+   * @param key - The lock key (e.g., "tenantId:update:aggregateType:aggregateId:projectionName")
    * @param ttlMs - Time-to-live in milliseconds. Lock will be released after this time even if not explicitly released.
    *   Prevents locks from being held indefinitely if a process crashes.
    * @returns A lock handle that must be used to release the lock, or null if lock could not be acquired.
@@ -145,36 +146,10 @@ export class InMemoryDistributedLock implements DistributedLock {
 }
 
 /**
- * Redis client interface for distributed locking.
- * Compatible with ioredis, node-redis, and other Redis clients that support these methods.
+ * Redis client type for distributed locking.
+ * Supports IORedis Redis and Cluster instances.
  */
-export interface RedisClient {
-  /**
-   * Sets a key with options. Should support NX (only if not exists) and EX (expiration in seconds).
-   * Returns "OK" if successful, null if key already exists (with NX).
-   */
-  set(
-    key: string,
-    value: string,
-    options: { NX: boolean; EX: number },
-  ): Promise<string | null>;
-  /**
-   * Deletes a key. Returns number of keys deleted.
-   */
-  del(key: string): Promise<number>;
-  /**
-   * Gets a key value. Used for Lua script-based release.
-   */
-  get(key: string): Promise<string | null>;
-  /**
-   * Evaluates a Lua script. Used for atomic lock release.
-   */
-  eval?(
-    script: string,
-    numKeys: number,
-    ...args: (string | number)[]
-  ): Promise<unknown>;
-}
+export type RedisClient = Redis | Cluster;
 
 /**
  * Redis-based distributed lock implementation.
@@ -220,10 +195,8 @@ export class RedisDistributedLock implements DistributedLock {
         const ttlSeconds = Math.ceil(ttlMs / 1000);
 
         // SET NX EX: atomic operation that only succeeds if key doesn't exist, with expiration
-        const result = await this.redis.set(key, value, {
-          NX: true,
-          EX: ttlSeconds,
-        });
+        // IORedis uses positional arguments: set(key, value, 'EX', seconds, 'NX')
+        const result = await this.redis.set(key, value, "EX", ttlSeconds, "NX");
 
         const acquired = result === "OK";
         span.setAttributes({
@@ -254,30 +227,27 @@ export class RedisDistributedLock implements DistributedLock {
         // Use Lua script for atomic check-and-delete to prevent race conditions:
         // - Process A acquires lock, expires, Process B acquires same lock
         // - Process A tries to release: value check prevents deleting B's lock
-        let released = false;
-        if (this.redis.eval) {
-          const script = `
-            if redis.call("get", KEYS[1]) == ARGV[1] then
-              return redis.call("del", KEYS[1])
-            else
-              return 0
-            end
-          `;
-          const result = await this.redis.eval(
-            script,
-            1,
-            handle.key,
-            handle.value,
+        if (!this.redis.eval) {
+          throw new Error(
+            "RedisDistributedLock requires eval() support for atomic lock release. The Redis client must support Lua script evaluation.",
           );
-          released = result === 1;
-        } else {
-          // Fallback: non-atomic but still safe (check-then-delete)
-          const currentValue = await this.redis.get(handle.key);
-          if (currentValue === handle.value) {
-            await this.redis.del(handle.key);
-            released = true;
-          }
         }
+
+        const script = `
+          if redis.call("get", KEYS[1]) == ARGV[1] then
+            return redis.call("del", KEYS[1])
+          else
+            return 0
+          end
+        `;
+        const result = await this.redis.eval(
+          script,
+          1,
+          handle.key,
+          handle.value,
+        );
+        const released = result === 1;
+
         span.setAttributes({
           "lock.released": released,
         });
