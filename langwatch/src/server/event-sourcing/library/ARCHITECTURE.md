@@ -53,7 +53,7 @@ See: [`domain/types.ts`](./domain/types.ts#L39-L50)
 
 Event handlers react to individual events and perform side effects (e.g., writing to ClickHouse, triggering external processes). They process events asynchronously via queues.
 
-See: [`domain/handlers/eventReactionHandler.ts`](./domain/handlers/eventReactionHandler.ts)
+See: [`domain/handlers/eventHandler.ts`](./domain/handlers/eventHandler.ts)
 
 ## Architecture Overview
 
@@ -101,6 +101,8 @@ See: [`services/eventSourcingService.ts`](./services/eventSourcingService.ts#L14
 
 ## Guaranteed Ordering & Consistency
 
+### Sequential Ordering & Per-Aggregate Checkpointing
+
 ### Event Ordering Within Aggregates
 
 Events for the same aggregate are **guaranteed to be processed in order**. This is critical for maintaining consistency when building projections and processing side effects.
@@ -134,11 +136,18 @@ Sequence numbers are computed using `countEventsBefore()` - the number of events
 
 **Sequential Processing Enforcement:**
 
+The `EventProcessorValidator` orchestrates validation by coordinating:
+- **SequenceNumberCalculator**: Computes sequence numbers for events
+- **IdempotencyChecker**: Checks if events were already processed and atomically claims them
+- **OrderingValidator**: Verifies that the previous sequence number (N-1) was processed
+- **FailureDetector**: Checks if any previous events failed (stops processing if so)
+
 Before processing an event, the system:
-1. Checks if the event was already processed (idempotency)
-2. Verifies that the previous sequence number (N-1) was processed
-3. Checks if any previous events failed (stops processing if so)
-4. Only processes if all conditions are met
+1. Computes the event's sequence number
+2. Checks if the event was already processed (idempotency) and atomically claims it
+3. Checks if any previous events failed (stops processing gracefully if so)
+4. Verifies that the previous sequence number (N-1) was processed (throws error if not)
+5. Only processes if all conditions are met
 
 **Ordering strategies:**
 
@@ -152,7 +161,20 @@ Before processing an event, the system:
 - Events from different tenants are never mixed, even if they share the same aggregateId
 - The event store validates tenantId before any operations
 
-See: [`streams/eventStream.ts`](./streams/eventStream.ts#L38-L68) for ordering implementation, [`services/eventSourcingService.ts`](./services/eventSourcingService.ts#L854-L867) for sequence number computation, and [`stores/eventStore.types.ts`](./stores/eventStore.types.ts#L11-L12) for concurrency guarantees.
+**Per-Aggregate Checkpointing:**
+
+Checkpoints track processing status per aggregate (not per event). One checkpoint per aggregate stores the last processed event's details:
+- **Checkpoint key format**: `tenantId:pipelineName:processorName:aggregateType:aggregateId`
+- **Checkpoint data**: Last processed event ID, sequence number, status (pending/processed/failed), timestamps
+- **Key construction**: Centralized in `buildCheckpointKey()` utility (see [`utils/checkpointKey.ts`](./utils/checkpointKey.ts))
+
+This design enables:
+- Efficient checkpoint storage (one record per aggregate instead of one per event)
+- Fast idempotency checks (check if last processed sequence >= current sequence)
+- Sequential ordering validation (check if previous sequence number was processed)
+- Failure detection (check if any events failed for the aggregate)
+
+See: [`streams/eventStream.ts`](./streams/eventStream.ts#L38-L68) for ordering implementation, [`services/validation/sequenceNumberCalculator.ts`](./services/validation/sequenceNumberCalculator.ts) for sequence number computation, [`services/validation/eventProcessorValidator.ts`](./services/validation/eventProcessorValidator.ts) for validation orchestration, and [`stores/eventStore.types.ts`](./stores/eventStore.types.ts#L11-L12) for concurrency guarantees.
 
 ### Concurrent Projection Updates
 
@@ -192,17 +214,29 @@ sequenceDiagram
 
 **Note:** Without distributed locking in production, concurrent updates to the same aggregate projection may result in lost updates. See: [`services/eventSourcingService.ts`](./services/eventSourcingService.ts#L598-L608) for lock implementation.
 
+## Modular Service Architecture
+
+The event sourcing library uses a modular service architecture for maintainability and testability:
+
+- **EventProcessorValidator**: Orchestrates validation by coordinating sequence number calculation, idempotency checking, ordering validation, and failure detection
+- **CheckpointManager**: Manages checkpoint operations with error handling (wraps checkpoint store calls)
+- **QueueProcessorManager**: Manages queue processors for handlers, projections, and commands
+- **EventHandlerDispatcher**: Dispatches events to handlers (supports both sync and async dispatch via queues)
+- **ProjectionUpdater**: Handles projection updates (supports both sync and async dispatch via queues)
+
+These services are composed by `EventSourcingService` to provide the complete event sourcing functionality. See: [`services/eventSourcingService.ts`](./services/eventSourcingService.ts) for the main orchestration.
+
 ## Side Effects: Event Handlers & Publishing
 
 After events are stored, they trigger side effects through two mechanisms:
 
 ### Event Handlers
 
-Event handlers process individual events asynchronously via queues. They can:
+The `EventHandlerDispatcher` manages event handler processing. Event handlers process individual events asynchronously via queues. They can:
 
 - Filter by event type
 - Have dependencies on other handlers (executed in order)
-- Be idempotent (via per-event checkpoints)
+- Be idempotent (via per-aggregate checkpoints)
 - Have concurrency limits
 - Enforce sequential ordering per aggregate
 
@@ -227,42 +261,44 @@ sequenceDiagram
     EH2->>Q: Complete
 ```
 
-**Per-Event Checkpointing:**
+**Per-Aggregate Checkpointing:**
 
-Each event is checkpointed individually with status tracking:
+One checkpoint per aggregate tracks the last processed event with status tracking:
 - **`pending`**: Event is queued but not yet processed
 - **`processed`**: Event was successfully processed
 - **`failed`**: Event processing failed
 
+Checkpoint key format: `tenantId:pipelineName:processorName:aggregateType:aggregateId`
+
 Checkpoints enable:
-- **Idempotency**: Already processed events are automatically skipped
-- **Sequential ordering**: Events are processed in sequence number order
+- **Idempotency**: Already processed events are automatically skipped (check if last processed sequence >= current sequence)
+- **Sequential ordering**: Events are processed in sequence number order (check if previous sequence was processed)
 - **Failure detection**: Failed events stop processing of subsequent events for that aggregate
 - **Recovery**: Failed events can be identified and reprocessed
 
-**Handler dependencies:** Handlers are topologically sorted to respect dependencies. See: [`services/eventSourcingService.ts`](./services/eventSourcingService.ts#L728-L843)
+**Handler dependencies:** Handlers are topologically sorted to respect dependencies. See: [`services/handlers/eventHandlerDispatcher.ts`](./services/handlers/eventHandlerDispatcher.ts) for handler dispatch logic.
 
-**Queue processing:** Handlers are dispatched to queues for async processing. See: [`services/eventSourcingService.ts`](./services/eventSourcingService.ts#L273-L310)
+**Queue processing:** The `QueueProcessorManager` manages queue processors for handlers. Handlers are dispatched to queues for async processing. See: [`services/queues/queueProcessorManager.ts`](./services/queues/queueProcessorManager.ts) for queue initialization.
 
-**Sequential ordering:** Events are processed in sequence number order per aggregate. See: [`services/eventSourcingService.ts`](./services/eventSourcingService.ts#L873-L1091) for `handleEvent` implementation.
+**Sequential ordering:** Events are processed in sequence number order per aggregate. The `EventProcessorValidator` enforces ordering before processing. See: [`services/handlers/eventHandlerDispatcher.ts`](./services/handlers/eventHandlerDispatcher.ts) for handler processing implementation.
 
 ### Event Publishing
 
 Events can be published to external systems (message queues, event buses) after successful storage. Publishing failures are logged but don't fail event storage.
 
-See: [`publishing/eventPublisher.types.ts`](./publishing/eventPublisher.types.ts) and [`services/eventSourcingService.ts`](./services/eventSourcingService.ts#L228-L251)
+See: [`publishing/eventPublisher.types.ts`](./publishing/eventPublisher.types.ts) and [`services/eventSourcingService.ts`](./services/eventSourcingService.ts) for publishing integration.
 
 ### Failure Handling
 
-When an event fails processing (handler or projection), the system:
+Handlers and projections share the same validation and checkpointing logic. When an event fails processing (handler or projection), the system:
 
 1. **Saves checkpoint as `failed`**: Records the failure with error message
-2. **Stops processing subsequent events**: Events with higher sequence numbers for that aggregate will not be processed until the failure is resolved
+2. **Skips processing subsequent events gracefully**: Events with higher sequence numbers for that aggregate skip processing (storeEvents succeeds, but processing is skipped) until the failure is resolved
 3. **Enables recovery**: Failed events can be identified via `getFailedEvents()` and reprocessed after fixing the issue
 
 **Failure Detection:**
 
-Before processing an event, the system checks `hasFailedEvents()` for the aggregate. If any previous events failed, processing stops immediately to prevent cascading failures.
+Before processing an event, the system checks `hasFailedEvents()` for the aggregate. If any previous events failed, processing stops immediately (gracefully skips) to prevent cascading failures. Sequential ordering violations (e.g., event N+1 arrives before event N is processed) cause storeEvents to reject (hard constraint).
 
 **Recovery Workflow:**
 
@@ -271,7 +307,7 @@ Before processing an event, the system checks `hasFailedEvents()` for the aggreg
 3. Clear checkpoints for failed events using `clearCheckpoint()`
 4. Events will be reprocessed automatically via queue retries or manual replay
 
-See: [`services/eventSourcingService.ts`](./services/eventSourcingService.ts#L962-L986) for failure detection and [`stores/eventHandlerCheckpointStore.types.ts`](./stores/eventHandlerCheckpointStore.types.ts) for checkpoint store interface.
+The `FailureDetector` component checks for failed events before processing. See: [`services/validation/failureDetector.ts`](./services/validation/failureDetector.ts) for failure detection and [`stores/eventHandlerCheckpointStore.types.ts`](./stores/eventHandlerCheckpointStore.types.ts) for checkpoint store interface.
 
 ## Time Travel & Debugging
 
@@ -344,19 +380,19 @@ graph TB
 
 - **Per-event triggering**: Each event triggers a projection rebuild for all projections
 - **Full rebuild**: Projections rebuild from **all events** for the aggregate (not incremental)
-- **Queue-based**: Each projection has its own queue processor for async processing
+- **Queue-based**: Each projection has its own queue processor for async processing (managed by `QueueProcessorManager`)
 - **Sequential ordering**: Events are processed in sequence number order per aggregate
-- **Per-event checkpoints**: Each event is checkpointed for each projection
+- **Per-aggregate checkpoints**: One checkpoint per aggregate tracks the last processed event for each projection
 - **Distributed locking**: Concurrent updates to the same aggregate projection are serialized
 
 **Processing Flow:**
 
 1. Event is stored in event store
-2. Event is dispatched to each projection's queue
+2. `ProjectionUpdater` dispatches event to each projection's queue (via `QueueProcessorManager`)
 3. Queue processor processes event in sequence number order
-4. Before processing, checks previous sequence number was processed
-5. Rebuilds projection from all events for the aggregate
-6. Saves checkpoint as `processed` on success, `failed` on failure
+4. `EventProcessorValidator` validates: computes sequence number, checks idempotency, validates ordering, detects failures
+5. If validation passes, rebuilds projection from all events for the aggregate
+6. `CheckpointManager` saves checkpoint as `processed` on success, `failed` on failure
 
 **Use cases:**
 
@@ -367,9 +403,9 @@ graph TB
 
 **Registration:** Multiple projections are registered via the pipeline builder. See: [`runtime/pipeline/builder.ts`](./runtime/pipeline/builder.ts#L303-L329)
 
-**Access:** Each projection is accessed by name. See: [`services/eventSourcingService.ts`](./services/eventSourcingService.ts#L1671-L1713)
+**Access:** Each projection is accessed by name. See: [`services/eventSourcingService.ts`](./services/eventSourcingService.ts) for projection access methods.
 
-**Implementation:** See [`services/eventSourcingService.ts`](./services/eventSourcingService.ts#L1099-L1331) for `processProjectionEvent` and [`services/eventSourcingService.ts`](./services/eventSourcingService.ts#L320-L364) for projection queue initialization.
+**Implementation:** The `ProjectionUpdater` handles projection updates. See: [`services/projections/projectionUpdater.ts`](./services/projections/projectionUpdater.ts) for projection processing and [`services/queues/queueProcessorManager.ts`](./services/queues/queueProcessorManager.ts) for projection queue initialization.
 
 ## Understanding State Over Time
 
@@ -419,9 +455,9 @@ graph LR
     Start[registerPipeline] --> Name[withName]
     Name --> Type[withAggregateType]
     Type --> Config{Configure}
-    Config --> |"Projections"| Proj[withEventProjection]
+    Config --> |"Projections"| Proj[withProjection]
     Config --> |"Handlers"| Hand[withEventHandler]
-    Config --> |"Commands"| Cmd[withCommandHandler]
+    Config --> |"Commands"| Cmd[withCommand]
     Config --> |"Publishing"| Pub[withEventPublisher]
     Proj --> Build[build]
     Hand --> Build
@@ -437,11 +473,21 @@ graph LR
 - **Core types:** [`domain/types.ts`](./domain/types.ts)
 - **Event streams:** [`streams/eventStream.ts`](./streams/eventStream.ts)
 - **Main service:** [`services/eventSourcingService.ts`](./services/eventSourcingService.ts)
+- **Modular services:**
+  - **Validation:** [`services/validation/eventProcessorValidator.ts`](./services/validation/eventProcessorValidator.ts) - Orchestrates validation
+  - **Validation components:** [`services/validation/sequenceNumberCalculator.ts`](./services/validation/sequenceNumberCalculator.ts), [`services/validation/idempotencyChecker.ts`](./services/validation/idempotencyChecker.ts), [`services/validation/orderingValidator.ts`](./services/validation/orderingValidator.ts), [`services/validation/failureDetector.ts`](./services/validation/failureDetector.ts)
+  - **Checkpoints:** [`services/checkpoints/checkpointManager.ts`](./services/checkpoints/checkpointManager.ts) - Manages checkpoint operations
+  - **Queues:** [`services/queues/queueProcessorManager.ts`](./services/queues/queueProcessorManager.ts) - Manages queue processors
+  - **Handlers:** [`services/handlers/eventHandlerDispatcher.ts`](./services/handlers/eventHandlerDispatcher.ts) - Dispatches events to handlers
+  - **Projections:** [`services/projections/projectionUpdater.ts`](./services/projections/projectionUpdater.ts) - Handles projection updates
+  - **Error handling:** [`services/errorHandling.ts`](./services/errorHandling.ts) - Standardized error categorization
+  - **Dispatch strategy:** [`services/dispatchStrategy.ts`](./services/dispatchStrategy.ts) - Sync vs async dispatch
 - **Pipeline builder:** [`runtime/pipeline/builder.ts`](./runtime/pipeline/builder.ts)
 - **Command handling:** [`commands/commandHandlerClass.ts`](./commands/commandHandlerClass.ts)
-- **Event handlers:** [`domain/handlers/eventReactionHandler.ts`](./domain/handlers/eventReactionHandler.ts)
-- **Projection handlers:** [`domain/handlers/eventHandler.ts`](./domain/handlers/eventHandler.ts)
+- **Event handlers:** [`domain/handlers/eventHandler.ts`](./domain/handlers/eventHandler.ts)
+- **Projection handlers:** [`domain/handlers/projectionHandler.ts`](./domain/handlers/projectionHandler.ts)
 - **Distributed locking:** [`utils/distributedLock.ts`](./utils/distributedLock.ts)
+- **Checkpoint keys:** [`utils/checkpointKey.ts`](./utils/checkpointKey.ts) - Checkpoint key construction
 - **Processor checkpoints:** [`stores/eventHandlerCheckpointStore.types.ts`](./stores/eventHandlerCheckpointStore.types.ts)
 
 ## Next Steps
