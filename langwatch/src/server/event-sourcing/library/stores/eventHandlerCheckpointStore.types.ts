@@ -11,8 +11,9 @@ import type { AggregateType } from "../domain/aggregateType";
  * - Stopping processing when failures occur for a specific aggregate
  * - Replay from specific points per aggregate
  *
- * Checkpoints use `processorName:eventId` as the unique key, where processorName is either
- * a handler name or projection name.
+ * Checkpoints use `tenantId:pipelineName:processorName:aggregateType:aggregateId` as the unique key.
+ * One checkpoint per aggregate tracks the last processed event's details.
+ * Key construction is centralized in CheckpointManager - stores only receive/use keys, not construct them.
  *
  * **Implementation Requirements:**
  * - MUST enforce tenant isolation
@@ -22,9 +23,10 @@ import type { AggregateType } from "../domain/aggregateType";
 export interface ProcessorCheckpointStore {
   /**
    * Saves a checkpoint for a processor and event.
-   * Uses `processorName:eventId` as the unique key.
+   * Uses the provided checkpointKey (format: `tenantId:pipelineName:processorName:aggregateType:aggregateId`).
+   * Key construction is handled by CheckpointManager.
    *
-   * @param processorName - The name of the processor (handler or projection)
+   * @param checkpointKey - The full checkpoint key (tenantId:pipelineName:processorName:aggregateType:aggregateId)
    * @param processorType - The type of processor ('handler' or 'projection')
    * @param event - The event being checkpointed
    * @param status - The processing status ('processed', 'failed', or 'pending')
@@ -33,7 +35,7 @@ export interface ProcessorCheckpointStore {
    * @throws {Error} If tenantId is missing or invalid
    */
   saveCheckpoint<EventType extends Event>(
-    processorName: string,
+    checkpointKey: string,
     processorType: "handler" | "projection",
     event: EventType,
     status: "processed" | "failed" | "pending",
@@ -43,23 +45,21 @@ export interface ProcessorCheckpointStore {
 
   /**
    * Loads the checkpoint for a specific processor and event.
-   * Uses `processorName:eventId` as the lookup key.
+   * Uses the provided checkpointKey (format: `tenantId:pipelineName:processorName:aggregateType:aggregateId`).
+   * Key construction is handled by CheckpointManager.
    *
-   * @param processorName - The name of the processor (handler or projection)
-   * @param processorType - The type of processor ('handler' or 'projection')
-   * @param eventId - The unique event identifier
+   * @param checkpointKey - The full checkpoint key (tenantId:pipelineName:processorName:aggregateType:aggregateId)
    * @returns The checkpoint if it exists, null otherwise
    */
   loadCheckpoint(
-    processorName: string,
-    processorType: "handler" | "projection",
-    eventId: string,
+    checkpointKey: string,
   ): Promise<ProcessorCheckpoint | null>;
 
   /**
    * Gets the last successfully processed event for a processor and aggregate.
    * Used to determine where to resume processing after failures.
    *
+   * @param pipelineName - The pipeline name for checkpoint isolation
    * @param processorName - The name of the processor (handler or projection)
    * @param processorType - The type of processor ('handler' or 'projection')
    * @param tenantId - The tenant ID
@@ -69,6 +69,7 @@ export interface ProcessorCheckpointStore {
    * @throws {Error} If tenantId is missing or invalid
    */
   getLastProcessedEvent(
+    pipelineName: string,
     processorName: string,
     processorType: "handler" | "projection",
     tenantId: TenantId,
@@ -78,19 +79,23 @@ export interface ProcessorCheckpointStore {
 
   /**
    * Gets the checkpoint for a specific sequence number for a processor and aggregate.
+   * With per-aggregate checkpoints, this loads the aggregate checkpoint and checks if
+   * the last processed sequence number is >= the requested sequence number.
    * Used to verify that a previous event (by sequence number) has been processed
    * before processing the current event, ensuring strict ordering.
    *
+   * @param pipelineName - The pipeline name for checkpoint isolation
    * @param processorName - The name of the processor (handler or projection)
    * @param processorType - The type of processor ('handler' or 'projection')
    * @param tenantId - The tenant ID
    * @param aggregateType - The aggregate type
    * @param aggregateId - The aggregate ID
-   * @param sequenceNumber - The sequence number to look up (1-indexed)
-   * @returns The checkpoint if it exists and has status 'processed', null otherwise
+   * @param sequenceNumber - The sequence number to verify (1-indexed)
+   * @returns The checkpoint if it exists, has status 'processed', and sequenceNumber >= requested sequenceNumber, null otherwise
    * @throws {Error} If tenantId is missing or invalid
    */
   getCheckpointBySequenceNumber(
+    pipelineName: string,
     processorName: string,
     processorType: "handler" | "projection",
     tenantId: TenantId,
@@ -103,6 +108,7 @@ export interface ProcessorCheckpointStore {
    * Checks if any events have failed processing for a processor and aggregate.
    * Used to stop processing subsequent events when failures occur.
    *
+   * @param pipelineName - The pipeline name for checkpoint isolation
    * @param processorName - The name of the processor (handler or projection)
    * @param processorType - The type of processor ('handler' or 'projection')
    * @param tenantId - The tenant ID
@@ -112,6 +118,7 @@ export interface ProcessorCheckpointStore {
    * @throws {Error} If tenantId is missing or invalid
    */
   hasFailedEvents(
+    pipelineName: string,
     processorName: string,
     processorType: "handler" | "projection",
     tenantId: TenantId,
@@ -123,6 +130,7 @@ export interface ProcessorCheckpointStore {
    * Gets all failed events for a processor and aggregate.
    * Used for debugging and recovery scenarios.
    *
+   * @param pipelineName - The pipeline name for checkpoint isolation
    * @param processorName - The name of the processor (handler or projection)
    * @param processorType - The type of processor ('handler' or 'projection')
    * @param tenantId - The tenant ID
@@ -132,6 +140,7 @@ export interface ProcessorCheckpointStore {
    * @throws {Error} If tenantId is missing or invalid
    */
   getFailedEvents(
+    pipelineName: string,
     processorName: string,
     processorType: "handler" | "projection",
     tenantId: TenantId,
@@ -142,14 +151,12 @@ export interface ProcessorCheckpointStore {
   /**
    * Clears the checkpoint for a specific processor and event.
    * Used for recovery scenarios when reprocessing events.
+   * Uses the provided checkpointKey (format: `tenantId:pipelineName:processorName:aggregateType:aggregateId`).
+   * Key construction is handled by CheckpointManager.
    *
-   * @param processorName - The name of the processor (handler or projection)
-   * @param processorType - The type of processor ('handler' or 'projection')
-   * @param eventId - The unique event identifier
+   * @param checkpointKey - The full checkpoint key (tenantId:pipelineName:processorName:aggregateType:aggregateId)
    */
   clearCheckpoint(
-    processorName: string,
-    processorType: "handler" | "projection",
-    eventId: string,
+    checkpointKey: string,
   ): Promise<void>;
 }
