@@ -1,9 +1,6 @@
 import { SpanKind } from "@opentelemetry/api";
 import { getLangWatchTracer } from "langwatch";
-import type {
-  Event,
-  Projection,
-} from "../domain/types";
+import type { Event, Projection } from "../domain/types";
 import { EventUtils } from "../utils/event.utils";
 import { DEFAULT_UPDATE_LOCK_TTL_MS } from "./eventSourcingService.types";
 import type {
@@ -25,6 +22,7 @@ import { CheckpointManager } from "./checkpoints/checkpointManager";
 import { QueueProcessorManager } from "./queues/queueProcessorManager";
 import { EventHandlerDispatcher } from "./handlers/eventHandlerDispatcher";
 import { ProjectionUpdater } from "./projections/projectionUpdater";
+import { ConfigurationError } from "./errorHandling";
 
 /**
  * Main service that orchestrates event sourcing.
@@ -89,8 +87,8 @@ export class EventSourcingService<
       createLogger("langwatch.trace-processing.event-sourcing-service");
 
     // Warn in production if distributed lock is not provided
-    if (process.env.NODE_ENV === "production" && !distributedLock && logger) {
-      logger.warn(
+    if (process.env.NODE_ENV === "production" && !distributedLock) {
+      this.logger.warn(
         {
           aggregateType,
         },
@@ -103,10 +101,9 @@ export class EventSourcingService<
       process.env.NODE_ENV === "production" &&
       !queueProcessorFactory &&
       eventHandlers &&
-      Object.keys(eventHandlers).length > 0 &&
-      logger
+      Object.keys(eventHandlers).length > 0
     ) {
-      logger.warn(
+      this.logger.warn(
         {
           aggregateType,
         },
@@ -119,10 +116,9 @@ export class EventSourcingService<
       process.env.NODE_ENV === "production" &&
       !queueProcessorFactory &&
       projections &&
-      Object.keys(projections).length > 0 &&
-      logger
+      Object.keys(projections).length > 0
     ) {
-      logger.warn(
+      this.logger.warn(
         {
           aggregateType,
         },
@@ -179,7 +175,11 @@ export class EventSourcingService<
         async (handlerName, event, context) => {
           const handlerDef = this.eventHandlers?.get(handlerName);
           if (!handlerDef) {
-            throw new Error(`Handler "${handlerName}" not found`);
+            throw new ConfigurationError(
+              "EventSourcingService",
+              `Handler "${handlerName}" not found`,
+              { handlerName },
+            );
           }
           await this.handlerDispatcher.handleEvent(
             handlerName,
@@ -198,7 +198,11 @@ export class EventSourcingService<
         async (projectionName, event, context) => {
           const projectionDef = this.projections?.get(projectionName);
           if (!projectionDef) {
-            throw new Error(`Projection "${projectionName}" not found`);
+            throw new ConfigurationError(
+              "EventSourcingService",
+              `Projection "${projectionName}" not found`,
+              { projectionName },
+            );
           }
           await this.projectionUpdater.processProjectionEvent(
             projectionName,
@@ -455,7 +459,10 @@ export class EventSourcingService<
     _context: EventStoreReadContext<EventType>,
     _options?: ReplayEventsOptions<EventType>,
   ): Promise<any> {
-    throw new Error("Not implemented");
+    throw new ConfigurationError(
+      "EventSourcingService",
+      "Method not implemented",
+    );
   }
 
   /**
@@ -496,7 +503,10 @@ export class EventSourcingService<
       fromEventId?: string;
     },
   ): Promise<void> {
-    throw new Error("Not implemented");
+    throw new ConfigurationError(
+      "EventSourcingService",
+      "Method not implemented",
+    );
   }
 
   /**
