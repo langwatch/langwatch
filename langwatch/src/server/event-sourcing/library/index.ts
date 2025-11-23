@@ -54,18 +54,29 @@ export type {
   ExtractCommandHandlerPayload,
   ExtractCommandHandlerType,
   ExtractCommandHandlerEvent,
-  ExtractCommandHandlerDispatcherName,
 } from "./commands/commandHandlerClass";
 
 export type { EventHandler } from "./domain/handlers/eventHandler";
-export type { EventReactionHandler } from "./domain/handlers/eventReactionHandler";
+export type {
+  EventHandlerClass,
+  EventHandlerClassStatic,
+  ExtractEventHandlerEvent,
+} from "./domain/handlers/eventHandlerClass";
+
+export type { ProjectionHandler } from "./domain/handlers/projectionHandler";
+export type {
+  ProjectionHandlerClass,
+  ProjectionHandlerClassStatic,
+  ExtractProjectionHandlerEvent,
+  ExtractProjectionHandlerProjection,
+} from "./domain/handlers/projectionHandlerClass";
 
 export type {
   ExtractAggregateId,
   ExtractEventPayload,
   ExtractProjectionData,
-  InferEventHandlerEvent,
-  InferEventHandlerProjection,
+  InferProjectionHandlerEvent,
+  InferProjectionHandlerProjection,
   InferEventStoreEvent,
   InferProjectionStoreProjection,
 } from "./domain/helpers";
@@ -111,7 +122,6 @@ export type {
 
 export {
   createEvent,
-  createEventWithProcessingTraceContext,
   createEventStream,
   createProjection,
   eventBelongsToAggregate,
@@ -124,6 +134,7 @@ export {
   buildEventMetadataWithCurrentProcessingTraceparent,
   EventUtils,
 } from "./utils/event.utils";
+export type { CreateEventOptions } from "./utils/event.utils";
 
 export type {
   DistributedLock,

@@ -3,7 +3,7 @@
  */
 
 import type { Event, Projection } from "./domain/types";
-import type { EventHandler } from "./domain/handlers/eventHandler";
+import type { ProjectionHandler } from "./domain/handlers/projectionHandler";
 import type { ProjectionStore } from "./stores/projectionStore.types";
 
 /**
@@ -26,7 +26,7 @@ export interface ProjectionDefinition<
   /**
    * Handler that processes events to build this projection.
    */
-  handler: EventHandler<EventType, ProjectionType>;
+  handler: ProjectionHandler<EventType, ProjectionType>;
 }
 
 /**

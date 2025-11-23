@@ -3,7 +3,7 @@
  */
 
 import type { Event } from "./domain/types";
-import type { EventReactionHandler } from "./domain/handlers/eventReactionHandler";
+import type { EventHandler } from "./domain/handlers/eventHandler";
 
 /**
  * Options for configuring an event handler.
@@ -16,16 +16,7 @@ export interface EventHandlerOptions<
    * Optional: Event types this handler is interested in.
    * If not provided, handler will receive all events for the aggregate type.
    */
-  eventTypes?: EventType["type"][];
-  /**
-   * Optional: Names of other handlers this handler depends on.
-   * Handlers will be executed in dependency order (dependencies first).
-   * Use semantic names (e.g., "span-storage") not implementation names (e.g., "clickhouse-writer").
-   * Type-safe: Only accepts handler names that have been registered before this handler.
-   */
-  dependsOn?: RegisteredHandlerNames extends never
-    ? never
-    : RegisteredHandlerNames[];
+  eventTypes?: readonly EventType["type"][];
   /**
    * Optional: Custom job ID factory for idempotency.
    * Default: `${event.tenantId}:${event.aggregateId}:${event.timestamp}:${event.type}`
@@ -45,6 +36,11 @@ export interface EventHandlerOptions<
   spanAttributes?: (
     event: EventType,
   ) => Record<string, string | number | boolean>;
+  /**
+   * Optional: List of handler names this handler depends on.
+   * Handlers will be executed in dependency order (dependencies first).
+   */
+  dependsOn?: RegisteredHandlerNames[];
 }
 
 /**
@@ -63,7 +59,7 @@ export interface EventHandlerDefinition<
   /**
    * Handler that processes individual events.
    */
-  handler: EventReactionHandler<EventType>;
+  handler: EventHandler<EventType>;
   /**
    * Options for configuring the handler.
    */
