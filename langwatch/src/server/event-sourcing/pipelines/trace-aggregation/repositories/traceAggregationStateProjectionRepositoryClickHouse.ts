@@ -10,47 +10,62 @@ import type { Projection } from "../../../library";
 import { EventUtils, createTenantId } from "../../../library";
 import { createLogger } from "../../../../../utils/logger";
 import type { TraceAggregationStateProjectionRepository } from "./traceAggregationStateProjectionRepository";
-import type { TraceAggregationStateProjectionData } from "../projections/traceAggregationStateProjection";
-import type { TraceAggregationStateProjection } from "../projections/traceAggregationStateProjection";
+import type { TraceProjectionData } from "../projections/traceAggregationStateProjection";
+import type { TraceProjection } from "../projections/traceAggregationStateProjection";
 
-const TABLE_NAME = "trace_aggregation_projections" as const;
+const TABLE_NAME = "trace_projections" as const;
 
-const VALID_AGGREGATION_STATUSES = [
-  "idle",
-  "in_progress",
-  "completed",
-] as const satisfies readonly TraceAggregationStateProjectionData["aggregationStatus"][];
-
+/**
+ * ClickHouse record matching the trace_projections table schema.
+ * Version is stored as DateTime64(9) in ClickHouse (nanoseconds since epoch).
+ */
 interface ClickHouseProjectionRecord {
+  Id: string;
   TenantId: string;
-  AggregateId: string;
-  ProjectionId: string;
-  ProjectionVersion: number;
-  // Projection status fields
-  AggregationStatus: TraceAggregationStateProjectionData["aggregationStatus"];
-  StartedAt: number | null;
-  CompletedAt: number | null;
-  // Aggregated trace data fields (from TraceAggregationCompletedEventData)
-  TraceId: string | null;
-  SpanIds: string[] | null;
-  TotalSpans: number;
-  StartTimeUnixMs: number | null;
-  EndTimeUnixMs: number | null;
-  DurationMs: number | null;
-  ServiceNames: string[] | null;
-  RootSpanId: string | null;
-  // Metadata fields
-  UpdatedAt: number;
+  TraceId: string;
+  Version: string; // DateTime64(9) as string in ClickHouse format
+  IOSchemaVersion: string;
+  ComputedInput: string | null;
+  ComputedOutput: string | null;
+  ComputedMetadata: Record<string, string>;
+  TimeToFirstTokenMs: number | null;
+  TimeToLastTokenMs: number | null;
+  TotalDurationMs: number;
+  TokensPerSecond: number | null;
+  SpanCount: number;
+  ContainsErrorStatus: boolean;
+  ContainsOKStatus: boolean;
+  Models: string[];
+  TopicId: string | null;
+  SubTopicId: string | null;
+  TotalPromptTokenCount: number | null;
+  TotalCompletionTokenCount: number | null;
+  HasAnnotation: boolean | null;
+  CreatedAt: string; // DateTime64(9) as string
+  LastUpdatedAt: string; // DateTime64(9) as string
 }
 
 /**
- * ClickHouse projection repository for trace aggregation state.
- * Stores projections in ClickHouse for persistence and scalability.
- *
- * The `getProjection` method uses `ORDER BY TotalSpans DESC` to select the row
- * with the highest span count, ensuring we get the most complete aggregation even
- * before background merges complete. The ReplacingMergeTree will eventually merge
- * duplicate rows, keeping only the one with the highest TotalSpans value.
+ * Converts a Unix timestamp in milliseconds to ClickHouse DateTime64(9) string format.
+ * DateTime64(9) stores nanoseconds since epoch, so we multiply by 1,000,000.
+ */
+function timestampToDateTime64(timestampMs: number): string {
+  const timestampNs = BigInt(timestampMs) * BigInt(1_000_000);
+  return timestampNs.toString();
+}
+
+/**
+ * Converts a ClickHouse DateTime64(9) string to Unix timestamp in milliseconds.
+ */
+function dateTime64ToTimestamp(dateTime64: string): number {
+  const timestampNs = BigInt(dateTime64);
+  return Number(timestampNs / BigInt(1_000_000));
+}
+
+/**
+ * ClickHouse projection repository for trace projections.
+ * Stores trace metrics in ClickHouse matching the trace_projections table schema.
+ * Uses ReplacingMergeTree with Version to keep the latest projection per trace.
  */
 export class TraceAggregationStateProjectionRepositoryClickHouse<
   ProjectionType extends Projection = Projection,
@@ -66,47 +81,32 @@ export class TraceAggregationStateProjectionRepositoryClickHouse<
   constructor(private readonly clickHouseClient: ClickHouseClient) {}
 
   /**
-   * Validates that a value is a valid aggregation status.
-   */
-  private isValidAggregationStatus(
-    value: unknown,
-  ): value is TraceAggregationStateProjectionData["aggregationStatus"] {
-    return (
-      typeof value === "string" &&
-      VALID_AGGREGATION_STATUSES.includes(
-        value as TraceAggregationStateProjectionData["aggregationStatus"],
-      )
-    );
-  }
-
-  /**
    * Maps a ClickHouse record to projection data.
    */
   private mapClickHouseRecordToProjectionData(
     record: ClickHouseProjectionRecord,
-  ): TraceAggregationStateProjectionData {
-    if (!this.isValidAggregationStatus(record.AggregationStatus)) {
-      throw new Error(
-        `[CORRUPTED_DATA] Invalid aggregationStatus value: ${String(
-          record.AggregationStatus,
-        )}`,
-      );
-    }
-
+  ): TraceProjectionData {
     return {
-      aggregationStatus: record.AggregationStatus,
-      startedAt: record.StartedAt ?? undefined,
-      completedAt: record.CompletedAt ?? undefined,
-      traceId: record.TraceId ?? undefined,
-      spanIds: record.SpanIds?.length ? record.SpanIds : undefined,
-      totalSpans: record.TotalSpans > 0 ? record.TotalSpans : undefined,
-      startTimeUnixMs: record.StartTimeUnixMs ?? undefined,
-      endTimeUnixMs: record.EndTimeUnixMs ?? undefined,
-      durationMs: record.DurationMs ?? undefined,
-      serviceNames: record.ServiceNames?.length
-        ? record.ServiceNames
-        : undefined,
-      rootSpanId: record.RootSpanId ?? undefined,
+      TraceId: record.TraceId,
+      SpanCount: record.SpanCount,
+      TotalDurationMs: record.TotalDurationMs,
+      IOSchemaVersion: record.IOSchemaVersion,
+      ComputedInput: record.ComputedInput,
+      ComputedOutput: record.ComputedOutput,
+      ComputedMetadata: record.ComputedMetadata,
+      TimeToFirstTokenMs: record.TimeToFirstTokenMs,
+      TimeToLastTokenMs: record.TimeToLastTokenMs,
+      TokensPerSecond: record.TokensPerSecond,
+      ContainsErrorStatus: record.ContainsErrorStatus,
+      ContainsOKStatus: record.ContainsOKStatus,
+      Models: record.Models,
+      TopicId: record.TopicId,
+      SubTopicId: record.SubTopicId,
+      TotalPromptTokenCount: record.TotalPromptTokenCount,
+      TotalCompletionTokenCount: record.TotalCompletionTokenCount,
+      HasAnnotation: record.HasAnnotation,
+      CreatedAt: dateTime64ToTimestamp(record.CreatedAt),
+      LastUpdatedAt: dateTime64ToTimestamp(record.LastUpdatedAt),
     };
   }
 
@@ -114,29 +114,36 @@ export class TraceAggregationStateProjectionRepositoryClickHouse<
    * Maps projection data to a ClickHouse record.
    */
   private mapProjectionDataToClickHouseRecord(
-    data: TraceAggregationStateProjectionData,
+    data: TraceProjectionData,
     tenantId: string,
-    aggregateId: string,
+    traceId: string,
     projectionId: string,
     projectionVersion: number,
   ): ClickHouseProjectionRecord {
     return {
+      Id: projectionId,
       TenantId: tenantId,
-      AggregateId: aggregateId,
-      ProjectionId: projectionId,
-      ProjectionVersion: projectionVersion,
-      AggregationStatus: data.aggregationStatus,
-      StartedAt: data.startedAt ?? null,
-      CompletedAt: data.completedAt ?? null,
-      TraceId: data.traceId ?? null,
-      SpanIds: data.spanIds ?? null,
-      TotalSpans: data.totalSpans ?? 0,
-      StartTimeUnixMs: data.startTimeUnixMs ?? null,
-      EndTimeUnixMs: data.endTimeUnixMs ?? null,
-      DurationMs: data.durationMs ?? null,
-      ServiceNames: data.serviceNames ?? null,
-      RootSpanId: data.rootSpanId ?? null,
-      UpdatedAt: Date.now(),
+      TraceId: traceId,
+      Version: timestampToDateTime64(projectionVersion),
+      IOSchemaVersion: data.IOSchemaVersion,
+      ComputedInput: data.ComputedInput,
+      ComputedOutput: data.ComputedOutput,
+      ComputedMetadata: data.ComputedMetadata,
+      TimeToFirstTokenMs: data.TimeToFirstTokenMs,
+      TimeToLastTokenMs: data.TimeToLastTokenMs,
+      TotalDurationMs: data.TotalDurationMs,
+      TokensPerSecond: data.TokensPerSecond,
+      SpanCount: data.SpanCount,
+      ContainsErrorStatus: data.ContainsErrorStatus,
+      ContainsOKStatus: data.ContainsOKStatus,
+      Models: data.Models,
+      TopicId: data.TopicId,
+      SubTopicId: data.SubTopicId,
+      TotalPromptTokenCount: data.TotalPromptTokenCount,
+      TotalCompletionTokenCount: data.TotalCompletionTokenCount,
+      HasAnnotation: data.HasAnnotation,
+      CreatedAt: timestampToDateTime64(data.CreatedAt),
+      LastUpdatedAt: timestampToDateTime64(data.LastUpdatedAt),
     };
   }
 
@@ -160,33 +167,45 @@ export class TraceAggregationStateProjectionRepositoryClickHouse<
           "TraceAggregationStateProjectionRepositoryClickHouse.getProjection",
         );
 
+        // aggregateId is the traceId in this pipeline
+        const traceId = String(aggregateId);
+
         try {
           const result = await this.clickHouseClient.query({
             query: `
               SELECT
-                ProjectionId,
-                ProjectionVersion,
-                AggregationStatus,
-                StartedAt,
-                CompletedAt,
+                Id,
+                TenantId,
                 TraceId,
-                SpanIds,
-                TotalSpans,
-                StartTimeUnixMs,
-                EndTimeUnixMs,
-                DurationMs,
-                ServiceNames,
-                RootSpanId,
-                UpdatedAt
+                Version,
+                IOSchemaVersion,
+                ComputedInput,
+                ComputedOutput,
+                ComputedMetadata,
+                TimeToFirstTokenMs,
+                TimeToLastTokenMs,
+                TotalDurationMs,
+                TokensPerSecond,
+                SpanCount,
+                ContainsErrorStatus,
+                ContainsOKStatus,
+                Models,
+                TopicId,
+                SubTopicId,
+                TotalPromptTokenCount,
+                TotalCompletionTokenCount,
+                HasAnnotation,
+                CreatedAt,
+                LastUpdatedAt
               FROM ${TABLE_NAME}
               WHERE TenantId = {tenantId:String}
-                AND AggregateId = {aggregateId:String}
-              ORDER BY TotalSpans DESC
+                AND TraceId = {traceId:String}
+              ORDER BY Version DESC
               LIMIT 1
             `,
             query_params: {
               tenantId: context.tenantId,
-              aggregateId: String(aggregateId),
+              traceId: traceId,
             },
             format: "JSONEachRow",
           });
@@ -199,11 +218,11 @@ export class TraceAggregationStateProjectionRepositoryClickHouse<
 
           const projectionData = this.mapClickHouseRecordToProjectionData(row);
 
-          const projection: TraceAggregationStateProjection = {
-            id: row.ProjectionId,
-            aggregateId: String(aggregateId),
+          const projection: TraceProjection = {
+            id: row.Id,
+            aggregateId: traceId,
             tenantId: createTenantId(context.tenantId),
-            version: row.ProjectionVersion,
+            version: dateTime64ToTimestamp(row.Version),
             data: projectionData,
           };
 
@@ -213,16 +232,14 @@ export class TraceAggregationStateProjectionRepositoryClickHouse<
             error instanceof Error ? error.message : String(error);
           this.logger.error(
             {
-              aggregateId: String(aggregateId),
+              traceId: traceId,
               tenantId: context.tenantId,
               error: errorMessage,
             },
             "Failed to get projection from ClickHouse",
           );
           throw new Error(
-            `Failed to get projection for aggregate ${String(
-              aggregateId,
-            )}: ${errorMessage}`,
+            `Failed to get projection for trace ${traceId}: ${errorMessage}`,
             { cause: error },
           );
         }
@@ -265,16 +282,17 @@ export class TraceAggregationStateProjectionRepositoryClickHouse<
         }
 
         try {
+          const traceId = String(projection.aggregateId);
           const projectionRecord = this.mapProjectionDataToClickHouseRecord(
-            projection.data as TraceAggregationStateProjectionData,
+            projection.data as TraceProjectionData,
             String(context.tenantId),
-            String(projection.aggregateId),
+            traceId,
             projection.id,
             projection.version,
           );
 
-          // Use INSERT - ReplacingMergeTree will automatically keep the row with highest TotalSpans
-          // when merging occurs. The ORDER BY key is (TenantId, AggregateId) to ensure idempotency.
+          // Use INSERT - ReplacingMergeTree will automatically keep the row with highest Version
+          // when merging occurs. The ORDER BY key is (TenantId, TraceId, Version) to ensure idempotency.
           await this.clickHouseClient.insert({
             table: TABLE_NAME,
             values: [projectionRecord],
@@ -284,7 +302,7 @@ export class TraceAggregationStateProjectionRepositoryClickHouse<
           this.logger.debug(
             {
               tenantId: context.tenantId,
-              aggregateId: projection.aggregateId,
+              traceId: traceId,
               projectionId: projection.id,
             },
             "Stored projection to ClickHouse",
@@ -295,14 +313,14 @@ export class TraceAggregationStateProjectionRepositoryClickHouse<
           this.logger.error(
             {
               tenantId: context.tenantId,
-              aggregateId: projection.aggregateId,
+              traceId: String(projection.aggregateId),
               projectionId: projection.id,
               error: errorMessage,
             },
             "Failed to store projection in ClickHouse",
           );
           throw new Error(
-            `Failed to store projection ${projection.id} for aggregate ${projection.aggregateId}: ${errorMessage}`,
+            `Failed to store projection ${projection.id} for trace ${projection.aggregateId}: ${errorMessage}`,
             { cause: error },
           );
         }

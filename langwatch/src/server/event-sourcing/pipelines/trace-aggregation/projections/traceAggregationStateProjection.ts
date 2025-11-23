@@ -1,129 +1,149 @@
-import type { EventHandler, EventStream } from "../../../library";
+import type { ProjectionHandler, EventStream } from "../../../library";
 import type { Projection } from "../../../library";
 import type { TraceAggregationEvent } from "../schemas/events";
-import {
-  isTraceAggregationStartedEvent,
-  isTraceAggregationCompletedEvent,
-  isTraceAggregationCancelledEvent,
-} from "../schemas/events";
+import { isTraceAggregationCompletedEvent } from "../schemas/events";
+import { traceAggregationStateProjectionRepository } from "../repositories";
 
 /**
- * Projection data for trace aggregation state.
- * Tracks the status of aggregation operations, not the trace itself.
- * When completed, includes all aggregated trace data.
+ * Projection data for trace metrics.
+ * Matches the trace_projections ClickHouse table schema.
  */
-export interface TraceAggregationStateProjectionData {
-  aggregationStatus: "idle" | "in_progress" | "completed";
-  startedAt?: number;
-  completedAt?: number;
-  // Fields from TraceAggregationCompletedEventData (populated when completed)
-  traceId?: string;
-  spanIds?: string[];
-  totalSpans?: number;
-  startTimeUnixMs?: number;
-  endTimeUnixMs?: number;
-  durationMs?: number;
-  serviceNames?: string[];
-  rootSpanId?: string | null;
+export interface TraceProjectionData {
+  // Basic trace info
+  TraceId: string;
+  SpanCount: number;
+  TotalDurationMs: number;
+  
+  // Computed metrics
+  IOSchemaVersion: string;
+  ComputedInput: string | null;
+  ComputedOutput: string | null;
+  ComputedMetadata: Record<string, string>;
+  TimeToFirstTokenMs: number | null;
+  TimeToLastTokenMs: number | null;
+  TokensPerSecond: number | null;
+  ContainsErrorStatus: boolean;
+  ContainsOKStatus: boolean;
+  Models: string[];
+  TopicId: string | null;
+  SubTopicId: string | null;
+  TotalPromptTokenCount: number | null;
+  TotalCompletionTokenCount: number | null;
+  HasAnnotation: boolean | null;
+  
+  // Metadata timestamps
+  CreatedAt: number;
+  LastUpdatedAt: number;
 }
 
 /**
- * Projection for tracking trace aggregation state.
+ * Projection for trace metrics matching the ClickHouse schema.
  */
-export interface TraceAggregationStateProjection
-  extends Projection<TraceAggregationStateProjectionData> {
-  data: TraceAggregationStateProjectionData;
+export interface TraceProjection
+  extends Projection<TraceProjectionData> {
+  data: TraceProjectionData;
 }
 
 /**
- * Event handler that builds the trace aggregation state projection.
- * Tracks the current state of trace aggregation based on events.
+ * Projection handler that builds the trace projection from completed events.
+ * Populates all computed trace metrics from TraceAggregationCompletedEvent data.
  */
 export class TraceAggregationStateProjectionHandler
   implements
-    EventHandler<TraceAggregationEvent, TraceAggregationStateProjection>
+    ProjectionHandler<TraceAggregationEvent, TraceProjection>
 {
-  /**
-   * Validates that a timestamp is valid (not 0, null, undefined, or negative).
-   */
-  private isValidTimestamp(timestamp: number | undefined | null): boolean {
-    return (
-      typeof timestamp === "number" &&
-      timestamp > 0 &&
-      isFinite(timestamp) &&
-      !isNaN(timestamp)
-    );
-  }
+  static readonly store = traceAggregationStateProjectionRepository;
 
   handle(
     stream: EventStream<
       TraceAggregationEvent["tenantId"],
       TraceAggregationEvent
     >,
-  ): TraceAggregationStateProjection {
+  ): TraceProjection {
     const events = stream.getEvents();
     const aggregateId = stream.getAggregateId();
     const tenantId = stream.getTenantId();
 
-    // Initialize with idle state
-    let state: TraceAggregationStateProjectionData = {
-      aggregationStatus: "idle",
-    };
+    // Find the latest completed event
+    let latestCompletedEvent: TraceAggregationEvent | null = null;
+    let createdAt: number | null = null;
 
-    // Process events in order
     for (const event of events) {
-      if (isTraceAggregationStartedEvent(event)) {
-        state = {
-          aggregationStatus: "in_progress",
-          startedAt: event.timestamp,
-        };
-      } else if (isTraceAggregationCompletedEvent(event)) {
-        // Validate timestamps before storing - only include if valid
-        const startTimeUnixMs = this.isValidTimestamp(
-          event.data.startTimeUnixMs,
-        )
-          ? event.data.startTimeUnixMs
-          : undefined;
-        const endTimeUnixMs = this.isValidTimestamp(event.data.endTimeUnixMs)
-          ? event.data.endTimeUnixMs
-          : undefined;
-        const durationMs =
-          startTimeUnixMs !== undefined && endTimeUnixMs !== undefined
-            ? endTimeUnixMs - startTimeUnixMs
-            : undefined;
-
-        // Store full aggregated data when completed
-        state = {
-          aggregationStatus: "completed",
-          startedAt: state.startedAt ?? event.timestamp,
-          completedAt: event.timestamp,
-          traceId: event.data.traceId,
-          spanIds: event.data.spanIds,
-          totalSpans: event.data.totalSpans,
-          startTimeUnixMs,
-          endTimeUnixMs,
-          durationMs,
-          serviceNames: event.data.serviceNames,
-          rootSpanId: event.data.rootSpanId,
-        };
-      } else if (isTraceAggregationCancelledEvent(event)) {
-        // Reset to idle when cancelled
-        state = {
-          aggregationStatus: "idle",
-        };
+      if (isTraceAggregationCompletedEvent(event)) {
+        if (!latestCompletedEvent || event.timestamp > latestCompletedEvent.timestamp) {
+          latestCompletedEvent = event;
+        }
+        if (createdAt === null) {
+          createdAt = event.timestamp;
+        }
       }
     }
 
-    // Get the latest event timestamp for version
-    const lastEvent = events[events.length - 1];
-    const version = lastEvent ? lastEvent.timestamp : Date.now();
+    // If no completed event, return empty projection (shouldn't happen in practice)
+    if (!latestCompletedEvent || !isTraceAggregationCompletedEvent(latestCompletedEvent)) {
+      const now = Date.now();
+      return {
+        id: `trace:${aggregateId}`,
+        aggregateId,
+        tenantId,
+        version: now,
+        data: {
+          TraceId: aggregateId,
+          SpanCount: 0,
+          TotalDurationMs: 0,
+          IOSchemaVersion: "1.0",
+          ComputedInput: null,
+          ComputedOutput: null,
+          ComputedMetadata: {},
+          TimeToFirstTokenMs: null,
+          TimeToLastTokenMs: null,
+          TokensPerSecond: null,
+          ContainsErrorStatus: false,
+          ContainsOKStatus: false,
+          Models: [],
+          TopicId: null,
+          SubTopicId: null,
+          TotalPromptTokenCount: null,
+          TotalCompletionTokenCount: null,
+          HasAnnotation: null,
+          CreatedAt: now,
+          LastUpdatedAt: now,
+        },
+      };
+    }
 
+    const event = latestCompletedEvent;
+    const version = event.timestamp;
+    const lastUpdatedAt = event.timestamp;
+
+    // Populate projection from event data
     return {
-      id: `trace-aggregation-state:${aggregateId}`,
+      id: `trace:${event.data.traceId}`,
       aggregateId,
       tenantId,
       version,
-      data: state,
+      data: {
+        TraceId: event.data.traceId,
+        SpanCount: event.data.totalSpans,
+        TotalDurationMs: event.data.durationMs,
+        IOSchemaVersion: event.data.IOSchemaVersion,
+        ComputedInput: event.data.ComputedInput,
+        ComputedOutput: event.data.ComputedOutput,
+        ComputedMetadata: event.data.ComputedMetadata,
+        TimeToFirstTokenMs: event.data.TimeToFirstTokenMs,
+        TimeToLastTokenMs: event.data.TimeToLastTokenMs,
+        TokensPerSecond: event.data.TokensPerSecond,
+        ContainsErrorStatus: event.data.ContainsErrorStatus,
+        ContainsOKStatus: event.data.ContainsOKStatus,
+        Models: event.data.Models,
+        TopicId: event.data.TopicId,
+        SubTopicId: event.data.SubTopicId,
+        TotalPromptTokenCount: event.data.TotalPromptTokenCount,
+        TotalCompletionTokenCount: event.data.TotalCompletionTokenCount,
+        HasAnnotation: event.data.HasAnnotation,
+        CreatedAt: createdAt ?? version,
+        LastUpdatedAt: lastUpdatedAt,
+      },
     };
   }
 }

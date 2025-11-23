@@ -11,9 +11,8 @@ import { createLogger } from "../../../../../utils/logger";
 import type { TraceAggregationStateProjectionRepository } from "./traceAggregationStateProjectionRepository";
 
 /**
- * In-memory projection repository for trace aggregation state.
- * Stores the full projection data including aggregation status and all aggregated trace data
- * (spanIds, totalSpans, serviceNames, etc.) when aggregation is completed.
+ * In-memory projection repository for trace projections.
+ * Stores trace metrics matching the trace_projections ClickHouse schema.
  *
  * **WARNING: NOT THREAD-SAFE**
  * This implementation is NOT safe for concurrent access.
@@ -29,7 +28,7 @@ export class TraceAggregationStateProjectionRepositoryMemory<
   logger = createLogger(
     "langwatch:trace-aggregation-state-projection-repository:memory",
   );
-  // Partition by tenant + aggregateId
+  // Partition by tenant + traceId
   private readonly projectionsByKey = new Map<string, ProjectionType>();
 
   async getProjection(

@@ -2,17 +2,13 @@ import { z } from "zod";
 import { EventSchema } from "../../../library/domain/types";
 import type { TenantId } from "../../../library";
 import {
-  TRACE_AGGREGATION_STARTED_EVENT_TYPE,
   TRACE_AGGREGATION_COMPLETED_EVENT_TYPE,
-  TRACE_AGGREGATION_CANCELLED_EVENT_TYPE,
   TRACE_AGGREGATION_EVENT_TYPES,
 } from "./typeIdentifiers";
 
 export type { TraceAggregationEventType } from "./typeIdentifiers";
 export {
-  TRACE_AGGREGATION_STARTED_EVENT_TYPE,
   TRACE_AGGREGATION_COMPLETED_EVENT_TYPE,
-  TRACE_AGGREGATION_CANCELLED_EVENT_TYPE,
   TRACE_AGGREGATION_EVENT_TYPES,
 } from "./typeIdentifiers";
 
@@ -42,16 +38,8 @@ export const traceAggregationEventMetadataSchema =
 
 
 /**
- * Zod schema for TraceAggregationStartedEventData.
- */
-export const traceAggregationStartedEventDataSchema = z.object({
-  traceId: z.string(),
-}) satisfies z.ZodType<{
-  traceId: string;
-}>;
-
-/**
  * Zod schema for TraceAggregationCompletedEventData.
+ * Contains all computed trace metrics matching the trace_projections ClickHouse schema.
  */
 export const traceAggregationCompletedEventDataSchema = z.object({
   traceId: z.string(),
@@ -62,6 +50,22 @@ export const traceAggregationCompletedEventDataSchema = z.object({
   durationMs: z.number(),
   serviceNames: z.array(z.string()),
   rootSpanId: z.string().nullable(),
+  // Computed metrics
+  IOSchemaVersion: z.string(),
+  ComputedInput: z.string().nullable(),
+  ComputedOutput: z.string().nullable(),
+  ComputedMetadata: z.record(z.string(), z.string()),
+  TimeToFirstTokenMs: z.number().nullable(),
+  TimeToLastTokenMs: z.number().nullable(),
+  TokensPerSecond: z.number().nullable(),
+  ContainsErrorStatus: z.boolean(),
+  ContainsOKStatus: z.boolean(),
+  Models: z.array(z.string()),
+  TopicId: z.string().nullable(),
+  SubTopicId: z.string().nullable(),
+  TotalPromptTokenCount: z.number().nullable(),
+  TotalCompletionTokenCount: z.number().nullable(),
+  HasAnnotation: z.boolean().nullable(),
 }) satisfies z.ZodType<{
   traceId: string;
   spanIds: string[];
@@ -71,36 +75,23 @@ export const traceAggregationCompletedEventDataSchema = z.object({
   durationMs: number;
   serviceNames: string[];
   rootSpanId: string | null;
+  IOSchemaVersion: string;
+  ComputedInput: string | null;
+  ComputedOutput: string | null;
+  ComputedMetadata: Record<string, string>;
+  TimeToFirstTokenMs: number | null;
+  TimeToLastTokenMs: number | null;
+  TokensPerSecond: number | null;
+  ContainsErrorStatus: boolean;
+  ContainsOKStatus: boolean;
+  Models: string[];
+  TopicId: string | null;
+  SubTopicId: string | null;
+  TotalPromptTokenCount: number | null;
+  TotalCompletionTokenCount: number | null;
+  HasAnnotation: boolean | null;
 }>;
 
-/**
- * Zod schema for TraceAggregationCancelledEventData.
- */
-export const traceAggregationCancelledEventDataSchema = z.object({
-  traceId: z.string(),
-  reason: z.string().optional(),
-}) satisfies z.ZodType<{
-  traceId: string;
-  reason?: string;
-}>;
-
-
-/**
- * Zod schema for TraceAggregationStartedEvent.
- */
-export const traceAggregationStartedEventSchema = EventSchema.extend({
-  type: z.literal(TRACE_AGGREGATION_STARTED_EVENT_TYPE),
-  data: traceAggregationStartedEventDataSchema,
-  metadata: traceAggregationEventMetadataSchema,
-}) satisfies z.ZodType<{
-  id: string;
-  aggregateId: string;
-  tenantId: string;
-  timestamp: number;
-  type: typeof TRACE_AGGREGATION_STARTED_EVENT_TYPE;
-  data: z.infer<typeof traceAggregationStartedEventDataSchema>;
-  metadata: z.infer<typeof traceAggregationEventMetadataSchema>;
-}>;
 
 /**
  * Zod schema for TraceAggregationCompletedEvent.
@@ -119,23 +110,6 @@ export const traceAggregationCompletedEventSchema = EventSchema.extend({
   metadata: z.infer<typeof traceAggregationEventMetadataSchema>;
 }>;
 
-/**
- * Zod schema for TraceAggregationCancelledEvent.
- */
-export const traceAggregationCancelledEventSchema = EventSchema.extend({
-  type: z.literal(TRACE_AGGREGATION_CANCELLED_EVENT_TYPE),
-  data: traceAggregationCancelledEventDataSchema,
-  metadata: traceAggregationEventMetadataSchema,
-}) satisfies z.ZodType<{
-  id: string;
-  aggregateId: string;
-  tenantId: string;
-  timestamp: number;
-  type: typeof TRACE_AGGREGATION_CANCELLED_EVENT_TYPE;
-  data: z.infer<typeof traceAggregationCancelledEventDataSchema>;
-  metadata: z.infer<typeof traceAggregationEventMetadataSchema>;
-}>;
-
 
 /**
  * Types inferred from Zod schemas.
@@ -144,29 +118,11 @@ export const traceAggregationCancelledEventSchema = EventSchema.extend({
 export type TraceAggregationEventMetadata = z.infer<
   typeof traceAggregationEventMetadataSchema
 >;
-export type TraceAggregationStartedEventData = z.infer<
-  typeof traceAggregationStartedEventDataSchema
->;
 export type TraceAggregationCompletedEventData = z.infer<
   typeof traceAggregationCompletedEventDataSchema
 >;
-export type TraceAggregationCancelledEventData = z.infer<
-  typeof traceAggregationCancelledEventDataSchema
->;
-export type TraceAggregationStartedEvent = Omit<
-  z.infer<typeof traceAggregationStartedEventSchema>,
-  "tenantId"
-> & {
-  tenantId: TenantId;
-};
 export type TraceAggregationCompletedEvent = Omit<
   z.infer<typeof traceAggregationCompletedEventSchema>,
-  "tenantId"
-> & {
-  tenantId: TenantId;
-};
-export type TraceAggregationCancelledEvent = Omit<
-  z.infer<typeof traceAggregationCancelledEventSchema>,
   "tenantId"
 > & {
   tenantId: TenantId;
@@ -175,30 +131,14 @@ export type TraceAggregationCancelledEvent = Omit<
 /**
  * Union of all trace aggregation event types.
  */
-export type TraceAggregationEvent =
-  | TraceAggregationStartedEvent
-  | TraceAggregationCompletedEvent
-  | TraceAggregationCancelledEvent;
-
+export type TraceAggregationEvent = TraceAggregationCompletedEvent;
 
 /**
- * Type guard functions for trace aggregation events.
+ * Type guard function for trace aggregation completed event.
  */
-export function isTraceAggregationStartedEvent(
-  event: TraceAggregationEvent,
-): event is TraceAggregationStartedEvent {
-  return event.type === TRACE_AGGREGATION_STARTED_EVENT_TYPE;
-}
-
 export function isTraceAggregationCompletedEvent(
   event: TraceAggregationEvent,
 ): event is TraceAggregationCompletedEvent {
   return event.type === TRACE_AGGREGATION_COMPLETED_EVENT_TYPE;
-}
-
-export function isTraceAggregationCancelledEvent(
-  event: TraceAggregationEvent,
-): event is TraceAggregationCancelledEvent {
-  return event.type === TRACE_AGGREGATION_CANCELLED_EVENT_TYPE;
 }
 

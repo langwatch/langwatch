@@ -8,9 +8,7 @@ import type { TriggerTraceAggregationCommandData } from "../schemas/commands";
 import { triggerTraceAggregationCommandDataSchema } from "../schemas/commands";
 import type {
   TraceAggregationEvent,
-  TraceAggregationStartedEvent,
   TraceAggregationCompletedEvent,
-  TraceAggregationCancelledEvent,
 } from "../schemas/events";
 import { createLogger } from "../../../../../utils/logger";
 import { getClickHouseClient } from "../../../../../utils/clickhouse";
@@ -18,13 +16,10 @@ import { SpanRepositoryClickHouse } from "../../span-ingestion/repositories/span
 import { SpanRepositoryMemory } from "../../span-ingestion/repositories/spanRepositoryMemory";
 import type { SpanRepository } from "../../span-ingestion/repositories/spanRepository";
 import { traceAggregationService } from "../services/traceAggregationService";
-import type { TraceAggregationStateProjection } from "../projections/traceAggregationStateProjection";
-import { traceAggregationPipeline } from "../pipeline";
 
 /**
- * Self-contained command handler for triggering trace aggregation.
- * Checks if aggregation is already in progress using projection state,
- * and if not, fetches all spans for the trace and aggregates them.
+ * Command handler for triggering trace aggregation.
+ * Fetches all spans for the trace, aggregates them, and emits a completed event.
  */
 export class TriggerTraceAggregationCommand
   implements
@@ -33,7 +28,6 @@ export class TriggerTraceAggregationCommand
       TraceAggregationEvent
     >
 {
-  static readonly dispatcherName = "triggerTraceAggregation" as const;
   static readonly schema = defineCommandSchema(
     "lw.obs.trace_aggregation.trigger",
     triggerTraceAggregationCommandDataSchema,
@@ -47,7 +41,7 @@ export class TriggerTraceAggregationCommand
   private readonly spanRepository: SpanRepository;
 
   constructor() {
-    // Initialize repository (same pattern as RecordSpanCommand)
+    // Initialize repository
     const clickHouseClient = getClickHouseClient();
     this.spanRepository = clickHouseClient
       ? new SpanRepositoryClickHouse(clickHouseClient)
@@ -68,85 +62,25 @@ export class TriggerTraceAggregationCommand
         },
       },
       async () => {
-        const { traceId } = command.data;
+        const { traceId, spanId } = command.data;
         const { tenantId } = command;
 
         this.logger.debug(
           {
             tenantId,
             traceId,
+            spanId,
           },
           "Handling trace aggregation trigger command",
         );
 
-        // Check current projection state to see if aggregation is already in progress
-        const currentProjection = await this.getCurrentProjectionState(
-          traceId,
-          tenantId,
-        );
-
-        const events: TraceAggregationEvent[] = [];
-
         const tenantIdObj = createTenantId(tenantId);
-
-        // If aggregation is already in progress, emit cancellation event first
-        if (currentProjection?.data.aggregationStatus === "in_progress") {
-          this.logger.debug(
-            {
-              tenantId,
-              traceId,
-            },
-            "Trace aggregation already in progress, cancelling previous aggregation",
-          );
-
-          // Emit cancellation event
-          const cancelledEvent =
-            EventUtils.createEventWithProcessingTraceContext<
-              TraceAggregationCancelledEvent["data"],
-              TraceAggregationCancelledEvent["metadata"]
-            >(
-              traceId,
-              tenantIdObj,
-              "lw.obs.trace_aggregation.cancelled",
-              {
-                traceId,
-                reason: "New aggregation triggered",
-              },
-              "trace_aggregation",
-              {
-                traceId,
-              },
-              Date.now(),
-            ) as TraceAggregationCancelledEvent;
-
-          events.push(cancelledEvent);
-        }
-
-        // Emit started event
-        const startedEvent = EventUtils.createEventWithProcessingTraceContext<
-          TraceAggregationStartedEvent["data"],
-          TraceAggregationStartedEvent["metadata"]
-        >(
-          traceId,
-          tenantIdObj,
-          "lw.obs.trace_aggregation.started",
-          {
-            traceId,
-          },
-          "trace_aggregation",
-          {
-            traceId,
-          },
-          Date.now(),
-        ) as TraceAggregationStartedEvent;
 
         // Fetch all spans for the trace
         const spans = await this.spanRepository.getSpansByTraceId(
           tenantId,
           traceId,
         );
-
-        events.push(startedEvent);
 
         if (spans.length === 0) {
           this.logger.warn(
@@ -156,8 +90,8 @@ export class TriggerTraceAggregationCommand
             },
             "No spans found for trace, cannot aggregate",
           );
-          // Still emit started event, but no completed event
-          return events;
+          // Return empty array - no event to emit
+          return [];
         }
 
         // Aggregate trace metadata
@@ -167,63 +101,27 @@ export class TriggerTraceAggregationCommand
           {
             tenantId,
             traceId,
+            spanId,
             totalSpans: aggregatedData.totalSpans,
           },
           "Trace aggregated successfully",
         );
 
-        // Emit completed event
-        const completedEvent = EventUtils.createEventWithProcessingTraceContext<
-          TraceAggregationCompletedEvent["data"],
-          TraceAggregationCompletedEvent["metadata"]
-        >(
+        // Emit completed event with all computed metrics
+        const completedEvent = EventUtils.createEvent<TraceAggregationCompletedEvent>(
+          "trace_aggregation",
           traceId,
           tenantIdObj,
           "lw.obs.trace_aggregation.completed",
           aggregatedData,
-          "trace_aggregation",
           {
             traceId,
           },
-          Date.now(),
-        ) as TraceAggregationCompletedEvent;
+        );
 
-        events.push(completedEvent);
-        return events;
+        return [completedEvent];
       },
     );
-  }
-
-  /**
-   * Gets the current projection state from the pipeline service.
-   * The library handles keeping projections up-to-date automatically.
-   */
-  private async getCurrentProjectionState(
-    traceId: string,
-    tenantId: string,
-  ): Promise<TraceAggregationStateProjection | null> {
-    try {
-      const projection =
-        await traceAggregationPipeline.service.getProjectionByName(
-          "state",
-          traceId,
-          {
-            tenantId: createTenantId(tenantId),
-          },
-        );
-      return projection as TraceAggregationStateProjection | null;
-    } catch (error) {
-      // If projection doesn't exist or can't be retrieved, that's okay - it means no aggregation has started
-      this.logger.debug(
-        {
-          tenantId,
-          traceId,
-          error: error instanceof Error ? error.message : String(error),
-        },
-        "Could not get current projection state, assuming idle",
-      );
-      return null;
-    }
   }
 
   static getAggregateId(payload: TriggerTraceAggregationCommandData): string {
@@ -239,6 +137,6 @@ export class TriggerTraceAggregationCommand
   }
 
   static makeJobId(payload: TriggerTraceAggregationCommandData): string {
-    return `${payload.tenantId}:${payload.traceId}`;
+    return `${payload.tenantId}:${payload.traceId}:${payload.spanId}`;
   }
 }
