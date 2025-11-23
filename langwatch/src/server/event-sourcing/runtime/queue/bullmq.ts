@@ -45,9 +45,8 @@ export class EventSourcedQueueProcessorBullMq<Payload>
     this.spanAttributes = spanAttributes;
     this.delay = delay;
 
-    // Derive queue name with braces and job name without braces
     this.queueName = name;
-    this.jobName = name;
+    this.jobName = 'queue';
     this.makeJobId = makeJobId;
     this.process = process;
 
@@ -57,7 +56,11 @@ export class EventSourcedQueueProcessorBullMq<Payload>
       defaultJobOptions: {
         attempts: 15,
         backoff: {
-          type: "exponential",
+          // Due to the sequential nature of event processing, we don't really want to use exponential backoff, as that
+          // could cause a chain reaction of events that are laggier and laggier in processing, causing the system to
+          // grind to a halt. Quick retires, coupled with our custom delay logic for event ordering errors, will
+          // produce a much more resilient system.
+          type: "fixed",
           delay: 2000,
         },
         delay: this.delay ?? 0,
@@ -129,10 +132,60 @@ export class EventSourcedQueueProcessorBullMq<Payload>
               : "Queue job processing failed",
           );
 
-          // For ordering errors, the error will be retried by BullMQ with backoff
-          // The early ordering check in handleEvent should prevent most of these,
-          // but if they occur, they indicate the previous event completed between
-          // the early check and lock acquisition (race condition)
+          // For ordering errors, we should NOT retry immediately because:
+          // 1. The event is already stored in the database
+          // 2. The sequence number calculation will include it, causing sequence numbers to grow
+          // 3. The previous event needs to be processed first, which will happen naturally
+          // Instead, we move the job to delayed state to retry later when the previous event is processed
+          // IMPORTANT: We use progressive delays to prevent jobs from hitting retry limits when many
+          // events arrive simultaneously. Ordering errors should wait indefinitely until their turn.
+          if (isOrderingError) {
+            // Use progressive delay based on attempts made:
+            // - Base delay: 2 seconds
+            // - Progressive: +1 second per attempt (capped at 20 seconds max)
+            // This gives earlier events time to complete while preventing later events from
+            // hitting retry limits when processing 30+ events sequentially
+            const baseDelayMs = 2000;
+            const progressiveDelayMs = Math.min(
+              baseDelayMs + (job.attemptsMade * 1000),
+              20000, // Cap at 30 seconds
+            );
+            const delayedTimestamp = Date.now() + progressiveDelayMs;
+
+            try {
+              await job.moveToDelayed(delayedTimestamp);
+
+              this.logger.debug(
+                {
+                  queueName: this.queueName,
+                  jobId: job.id,
+                  delayMs: progressiveDelayMs,
+                  attemptsMade: job.attemptsMade,
+                  previousSequenceNumber: previousSequence,
+                },
+                "Ordering error: moved job to delayed state with progressive delay",
+              );
+
+              // Don't throw - job is moved to delayed state
+              // Note: moveToDelayed doesn't increment attemptsMade, so ordering errors
+              // won't consume retry attempts. The job will retry indefinitely until
+              // the previous event is processed.
+              return;
+            } catch (moveError) {
+              // If moveToDelayed fails (e.g., job already processed), log and throw original error
+              this.logger.warn(
+                {
+                  queueName: this.queueName,
+                  jobId: job.id,
+                  moveError: moveError instanceof Error ? moveError.message : String(moveError),
+                },
+                "Failed to move ordering error job to delayed state, will retry normally",
+              );
+              // Fall through to throw original error
+            }
+          }
+
+          // For non-ordering errors, throw to trigger normal retry logic
           throw error;
         }
       },
