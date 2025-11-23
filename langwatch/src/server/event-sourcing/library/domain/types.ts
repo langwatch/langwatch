@@ -188,12 +188,13 @@ export type EventOrderingStrategy<TEvent> =
 
 /**
  * Zod schema for processor checkpoint.
- * Checkpoint tracking per-event processing status for event handlers and projections.
+ * Checkpoint tracking per-aggregate processing status for event handlers and projections.
  * Used for resuming processing after failures, preventing duplicate processing, and stopping
  * processing when failures occur for a specific aggregate.
  *
- * Checkpoints use `processorName:eventId` as the unique key, where processorName is either
- * a handler name or projection name.
+ * Checkpoints use `tenantId:pipelineName:processorName:aggregateType:aggregateId` as the unique key.
+ * One checkpoint per aggregate tracks the last processed event's details (EventId, SequenceNumber, etc.).
+ * Key construction is centralized in CheckpointManager - stores only receive/use keys, not construct them.
  */
 export const ProcessorCheckpointSchema = z.object({
   /**
@@ -205,8 +206,9 @@ export const ProcessorCheckpointSchema = z.object({
    */
   processorType: z.enum(["handler", "projection"]),
   /**
-   * Unique event identifier. The checkpoint key is `processorName:eventId`.
-   * Format: `${aggregateId}:${timestamp}:${eventType}`
+   * Unique event identifier for the last processed event in this aggregate.
+   * The checkpoint key is `tenantId:pipelineName:processorName:aggregateType:aggregateId`.
+   * This field stores the EventId of the last processed event for reference.
    */
   eventId: z.string(),
   /**
@@ -234,9 +236,10 @@ export const ProcessorCheckpointSchema = z.object({
    */
   eventTimestamp: z.number().int().nonnegative(),
   /**
-   * Sequence number of the event within the aggregate (1-indexed).
-   * Computed by counting events that come before this event in chronological order.
+   * Sequence number of the last processed event within the aggregate (1-indexed).
+   * Computed by counting events that come before the event in chronological order.
    * Used to enforce strict ordering: event N can only be processed after event N-1 is processed.
+   * The checkpoint tracks the highest sequence number processed for the aggregate.
    */
   sequenceNumber: z.number().int().nonnegative(),
   /**
@@ -257,7 +260,7 @@ export const ProcessorCheckpointSchema = z.object({
 });
 
 /**
- * Checkpoint tracking per-event processing status for event handlers and projections.
+ * Checkpoint tracking per-aggregate processing status for event handlers and projections.
  *
  * Used for:
  * - Resuming processing after failures
@@ -265,7 +268,8 @@ export const ProcessorCheckpointSchema = z.object({
  * - Stopping processing when failures occur for a specific aggregate
  * - Replay scenarios
  *
- * Checkpoints are stored per processor (handler or projection), per event.
- * The unique key is `processorName:eventId`.
+ * Checkpoints are stored per processor (handler or projection), per aggregate.
+ * One checkpoint per aggregate tracks the last processed event's details.
+ * The unique key is `tenantId:pipelineName:processorName:aggregateType:aggregateId`.
  */
 export type ProcessorCheckpoint = z.infer<typeof ProcessorCheckpointSchema>;

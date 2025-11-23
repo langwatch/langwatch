@@ -4,7 +4,7 @@
 
 import type { Event, Projection } from "./types";
 import { EventSchema, ProjectionSchema } from "./types";
-import type { EventHandler } from "./handlers/eventHandler";
+import type { ProjectionHandler } from "./handlers/projectionHandler";
 import type { EventStore } from "../stores/eventStore.types";
 import type { ProjectionStore } from "../stores/projectionStore.types";
 
@@ -44,21 +44,21 @@ export type ExtractProjectionData<TProjection extends Projection> =
   TProjection extends Projection<infer D> ? D : never;
 
 /**
- * Helper type to infer Event and Projection types from an EventHandler.
+ * Helper type to infer Event and Projection types from a ProjectionHandler.
  *
  * @example
  * ```typescript
- * type Handler = EventHandler<MyEvent, MyProjection>;
- * type InferredEvent = InferEventHandlerEvent<Handler>; // MyEvent
- * type InferredProjection = InferEventHandlerProjection<Handler>; // MyProjection
+ * type Handler = ProjectionHandler<MyEvent, MyProjection>;
+ * type InferredEvent = InferProjectionHandlerEvent<Handler>; // MyEvent
+ * type InferredProjection = InferProjectionHandlerProjection<Handler>; // MyProjection
  * ```
  */
-export type InferEventHandlerEvent<THandler extends EventHandler<any, any>> =
-  THandler extends EventHandler<infer E, any> ? E : never;
+export type InferProjectionHandlerEvent<THandler extends ProjectionHandler<any, any>> =
+  THandler extends ProjectionHandler<infer E, any> ? E : never;
 
-export type InferEventHandlerProjection<
-  THandler extends EventHandler<any, any>,
-> =   THandler extends EventHandler<any, infer P> ? P : never;
+export type InferProjectionHandlerProjection<
+  THandler extends ProjectionHandler<any, any>,
+> =   THandler extends ProjectionHandler<any, infer P> ? P : never;
 
 /**
  * Helper type to infer the Event type from an EventStore.
