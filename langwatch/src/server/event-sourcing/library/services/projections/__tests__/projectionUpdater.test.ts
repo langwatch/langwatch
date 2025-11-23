@@ -1,0 +1,513 @@
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { ProjectionUpdater } from "../projectionUpdater";
+import type { Event } from "../../../domain/types";
+import type { EventSourcedQueueProcessor } from "../../../queues";
+import {
+  createMockEventStore,
+  createMockProjectionDefinition,
+  createMockEventHandler,
+  createMockProjectionStore,
+  createMockDistributedLock,
+  createMockProcessorCheckpointStore,
+  createTestEvent,
+  createTestTenantId,
+  createTestEventStoreReadContext,
+  createTestAggregateType,
+  createTestProjection,
+  createMockLogger,
+  TEST_CONSTANTS,
+} from "../../__tests__/testHelpers";
+import { buildCheckpointKey } from "../../../utils/checkpointKey";
+import { EventProcessorValidator } from "../../validation/eventProcessorValidator";
+import { CheckpointManager } from "../../checkpoints/checkpointManager";
+import { QueueProcessorManager } from "../../queues/queueProcessorManager";
+import { EventUtils } from "../../../utils/event.utils";
+import { EVENT_TYPES } from "../../../domain/eventType";
+
+// Mock EventUtils
+vi.mock("../../../utils/event.utils", () => ({
+  EventUtils: {
+    createEventStream: vi.fn(),
+    buildProjectionMetadata: vi.fn(),
+    validateTenantId: vi.fn(),
+  },
+}));
+
+describe("ProjectionUpdater", () => {
+  const aggregateType = createTestAggregateType();
+  const tenantId = createTestTenantId();
+  const context = createTestEventStoreReadContext(tenantId);
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(TEST_CONSTANTS.BASE_TIMESTAMP);
+    vi.clearAllMocks();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+  });
+
+  function createUpdater(options: {
+    projections?: Map<string, any>;
+    processorCheckpointStore?: any;
+    distributedLock?: any;
+    queueManager?: QueueProcessorManager<Event>;
+    validator?: EventProcessorValidator<Event>;
+    checkpointManager?: CheckpointManager<Event>;
+    logger?: any;
+    ordering?: "timestamp" | "as-is";
+  }): ProjectionUpdater<Event> {
+    const eventStore = createMockEventStore<Event>();
+    eventStore.countEventsBefore = vi.fn().mockResolvedValue(0);
+    eventStore.getEvents = vi.fn().mockResolvedValue([]);
+
+    const validator =
+      options.validator ??
+      new EventProcessorValidator({
+        eventStore,
+        aggregateType,
+        processorCheckpointStore: options.processorCheckpointStore,
+        pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
+      });
+
+    const checkpointManager =
+      options.checkpointManager ??
+      new CheckpointManager({
+        processorCheckpointStore: options.processorCheckpointStore,
+        pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
+      });
+
+    const queueManager =
+      options.queueManager ??
+      new QueueProcessorManager({
+        aggregateType,
+      });
+
+    const mockStream = {
+      getEvents: vi.fn().mockReturnValue([]),
+    };
+    (EventUtils.createEventStream as any).mockReturnValue(mockStream);
+    (EventUtils.buildProjectionMetadata as any).mockReturnValue({
+      eventCount: 0,
+    });
+
+    return new ProjectionUpdater({
+      aggregateType,
+      eventStore,
+      projections: options.projections,
+      processorCheckpointStore: options.processorCheckpointStore,
+      distributedLock: options.distributedLock,
+      updateLockTtlMs: 5000,
+      ordering: options.ordering ?? "timestamp",
+      validator,
+      checkpointManager,
+      queueManager,
+      logger: options.logger,
+    });
+  }
+
+  describe("updateProjectionsForAggregates", () => {
+    it("does nothing when no projections registered", async () => {
+      const updater = createUpdater({});
+
+      await updater.updateProjectionsForAggregates([], context);
+
+      // Should complete without error
+      expect(true).toBe(true);
+    });
+
+    it("dispatches to queues when queue processors available", async () => {
+      const projectionHandler = createMockEventHandler<Event, any>();
+      const projections = new Map([
+        [
+          "projection1",
+          createMockProjectionDefinition("projection1", projectionHandler),
+        ],
+      ]);
+
+      const mockQueueProcessor: EventSourcedQueueProcessor<Event> = {
+        send: vi.fn().mockResolvedValue(void 0),
+        close: vi.fn().mockResolvedValue(void 0),
+      };
+
+      const queueManager = new QueueProcessorManager({
+        aggregateType,
+      });
+      (queueManager as any).projectionQueueProcessors.set(
+        "projection1",
+        mockQueueProcessor,
+      );
+
+      const checkpointStore = createMockProcessorCheckpointStore();
+      checkpointStore.hasFailedEvents = vi.fn().mockResolvedValue(false);
+
+      const updater = createUpdater({
+        projections,
+        processorCheckpointStore: checkpointStore,
+        queueManager,
+      });
+
+      const event = createTestEvent(
+        TEST_CONSTANTS.AGGREGATE_ID,
+        aggregateType,
+        tenantId,
+      );
+
+      await updater.updateProjectionsForAggregates([event], context);
+
+      expect(mockQueueProcessor.send).toHaveBeenCalledWith(event);
+    });
+
+    it("updates synchronously when no queue processors", async () => {
+      const projectionHandler = createMockEventHandler<Event, any>();
+      const projectionStore = createMockProjectionStore();
+      const projections = new Map([
+        [
+          "projection1",
+          createMockProjectionDefinition(
+            "projection1",
+            projectionHandler,
+            projectionStore,
+          ),
+        ],
+      ]);
+
+      const checkpointStore = createMockProcessorCheckpointStore();
+      checkpointStore.loadCheckpoint = vi.fn().mockResolvedValue(null);
+      checkpointStore.hasFailedEvents = vi.fn().mockResolvedValue(false);
+
+      const eventStore = createMockEventStore<Event>();
+      eventStore.countEventsBefore = vi.fn().mockResolvedValue(0);
+      eventStore.getEvents = vi.fn().mockResolvedValue([
+        createTestEvent(
+          TEST_CONSTANTS.AGGREGATE_ID,
+          aggregateType,
+          tenantId,
+        ),
+      ]);
+
+      const validator = new EventProcessorValidator({
+        eventStore,
+        aggregateType,
+        processorCheckpointStore: checkpointStore,
+        pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
+      });
+
+      const updater = createUpdater({
+        projections,
+        processorCheckpointStore: checkpointStore,
+        validator,
+      });
+      (updater as any).eventStore = eventStore;
+
+      const event = createTestEvent(
+        TEST_CONSTANTS.AGGREGATE_ID,
+        aggregateType,
+        tenantId,
+      );
+
+      await updater.updateProjectionsForAggregates([event], context);
+
+      expect(projectionHandler.handle).toHaveBeenCalled();
+    });
+
+    it("skips dispatch when previous events have failed (queue mode)", async () => {
+      const projectionHandler = createMockEventHandler<Event, any>();
+      const projections = new Map([
+        [
+          "projection1",
+          createMockProjectionDefinition("projection1", projectionHandler),
+        ],
+      ]);
+
+      const mockQueueProcessor: EventSourcedQueueProcessor<Event> = {
+        send: vi.fn().mockResolvedValue(void 0),
+        close: vi.fn().mockResolvedValue(void 0),
+      };
+
+      const queueManager = new QueueProcessorManager({
+        aggregateType,
+      });
+      (queueManager as any).projectionQueueProcessors.set(
+        "projection1",
+        mockQueueProcessor,
+      );
+
+      const checkpointStore = createMockProcessorCheckpointStore();
+      checkpointStore.hasFailedEvents = vi.fn().mockResolvedValue(true);
+
+      const logger = createMockLogger();
+      const updater = createUpdater({
+        projections,
+        processorCheckpointStore: checkpointStore,
+        queueManager,
+        logger: logger as any,
+      });
+
+      const event = createTestEvent(
+        TEST_CONSTANTS.AGGREGATE_ID,
+        aggregateType,
+        tenantId,
+      );
+
+      await updater.updateProjectionsForAggregates([event], context);
+
+      expect(mockQueueProcessor.send).not.toHaveBeenCalled();
+      expect(logger.warn).toHaveBeenCalled();
+    });
+  });
+
+  describe("processProjectionEvent", () => {
+    it("processes event and saves checkpoints", async () => {
+      const projectionHandler = createMockEventHandler<Event, any>();
+      const projectionStore = createMockProjectionStore();
+      const projectionDef = createMockProjectionDefinition(
+        "projection1",
+        projectionHandler,
+        projectionStore,
+      );
+
+      const projections = new Map([["projection1", projectionDef]]);
+
+      const checkpointStore = createMockProcessorCheckpointStore();
+      checkpointStore.loadCheckpoint = vi.fn().mockResolvedValue(null);
+      checkpointStore.hasFailedEvents = vi.fn().mockResolvedValue(false);
+
+      const eventStore = createMockEventStore<Event>();
+      eventStore.countEventsBefore = vi.fn().mockResolvedValue(0);
+      eventStore.getEvents = vi.fn().mockResolvedValue([
+        createTestEvent(
+          TEST_CONSTANTS.AGGREGATE_ID,
+          aggregateType,
+          tenantId,
+        ),
+      ]);
+
+      const validator = new EventProcessorValidator({
+        eventStore,
+        aggregateType,
+        processorCheckpointStore: checkpointStore,
+        pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
+      });
+
+      const updater = createUpdater({
+        projections,
+        processorCheckpointStore: checkpointStore,
+        validator,
+      });
+      (updater as any).eventStore = eventStore;
+
+      const event = createTestEvent(
+        TEST_CONSTANTS.AGGREGATE_ID,
+        aggregateType,
+        tenantId,
+      );
+
+      await updater.processProjectionEvent(
+        "projection1",
+        projectionDef,
+        event,
+        context,
+      );
+
+      expect(checkpointStore.saveCheckpoint).toHaveBeenCalledTimes(3); // pending (optimistic locking), then processed
+    });
+
+    it("saves failed checkpoint when update fails", async () => {
+      const projectionHandler = createMockEventHandler<Event, any>();
+      projectionHandler.handle = vi
+        .fn()
+        .mockRejectedValue(new Error("Projection error"));
+      const projectionStore = createMockProjectionStore();
+      const projectionDef = createMockProjectionDefinition(
+        "projection1",
+        projectionHandler,
+        projectionStore,
+      );
+
+      const projections = new Map([["projection1", projectionDef]]);
+
+      const checkpointStore = createMockProcessorCheckpointStore();
+      checkpointStore.loadCheckpoint = vi.fn().mockResolvedValue(null);
+      checkpointStore.hasFailedEvents = vi.fn().mockResolvedValue(false);
+
+      const eventStore = createMockEventStore<Event>();
+      eventStore.countEventsBefore = vi.fn().mockResolvedValue(0);
+      eventStore.getEvents = vi.fn().mockResolvedValue([
+        createTestEvent(
+          TEST_CONSTANTS.AGGREGATE_ID,
+          aggregateType,
+          tenantId,
+        ),
+      ]);
+
+      const validator = new EventProcessorValidator({
+        eventStore,
+        aggregateType,
+        processorCheckpointStore: checkpointStore,
+        pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
+      });
+
+      const logger = createMockLogger();
+      const updater = createUpdater({
+        projections,
+        processorCheckpointStore: checkpointStore,
+        validator,
+        logger: logger as any,
+      });
+      (updater as any).eventStore = eventStore;
+
+      const event = createTestEvent(
+        TEST_CONSTANTS.AGGREGATE_ID,
+        aggregateType,
+        tenantId,
+      );
+
+      await expect(
+        updater.processProjectionEvent(
+          "projection1",
+          projectionDef,
+          event,
+          context,
+        ),
+      ).rejects.toThrow("Projection error");
+
+      expect(checkpointStore.saveCheckpoint).toHaveBeenCalledTimes(3); // pending (idempotency), pending (validation), then failed
+      // The failed checkpoint is the 3rd call (after 2 pending checkpoints)
+      expect(checkpointStore.saveCheckpoint).toHaveBeenNthCalledWith(
+        3,
+        buildCheckpointKey(tenantId, TEST_CONSTANTS.PIPELINE_NAME, "projection1", TEST_CONSTANTS.AGGREGATE_TYPE, TEST_CONSTANTS.AGGREGATE_ID),
+        "projection",
+        event,
+        "failed",
+        1,
+        "Projection error",
+      );
+    });
+  });
+
+  describe("updateProjectionByName", () => {
+    it("updates projection successfully with distributed lock", async () => {
+      const projectionHandler = createMockEventHandler<Event, any>();
+      const projectionStore = createMockProjectionStore();
+      const projections = new Map([
+        [
+          "projection1",
+          createMockProjectionDefinition(
+            "projection1",
+            projectionHandler,
+            projectionStore,
+          ),
+        ],
+      ]);
+
+      const distributedLock = createMockDistributedLock();
+      const lockHandle = { key: "test-key", value: "test-value" };
+      distributedLock.acquire = vi.fn().mockResolvedValue(lockHandle);
+
+      const eventStore = createMockEventStore<Event>();
+      const events = [
+        createTestEvent(
+          TEST_CONSTANTS.AGGREGATE_ID,
+          aggregateType,
+          tenantId,
+        ),
+      ];
+      eventStore.getEvents = vi.fn().mockResolvedValue(events);
+
+      const mockStream = {
+        getEvents: vi.fn().mockReturnValue(events),
+      };
+      (EventUtils.createEventStream as any).mockReturnValue(mockStream);
+      (EventUtils.buildProjectionMetadata as any).mockReturnValue({
+        eventCount: 1,
+      });
+
+      const updater = createUpdater({
+        projections,
+        distributedLock,
+      });
+      (updater as any).eventStore = eventStore;
+
+      const result = await updater.updateProjectionByName(
+        "projection1",
+        TEST_CONSTANTS.AGGREGATE_ID,
+        context,
+      );
+
+      expect(distributedLock.acquire).toHaveBeenCalled();
+      expect(projectionHandler.handle).toHaveBeenCalled();
+      expect(projectionStore.storeProjection).toHaveBeenCalled();
+      expect(distributedLock.release).toHaveBeenCalledWith(lockHandle);
+      expect(result).toBeDefined();
+    });
+
+    it("throws when projection name not found", async () => {
+      const projections = new Map();
+      const updater = createUpdater({ projections });
+
+      await expect(
+        updater.updateProjectionByName(
+          "nonexistent",
+          TEST_CONSTANTS.AGGREGATE_ID,
+          context,
+        ),
+      ).rejects.toThrow('Projection "nonexistent" not found');
+    });
+
+    it("throws when no events found", async () => {
+      const projectionHandler = createMockEventHandler<Event, any>();
+      const projections = new Map([
+        [
+          "projection1",
+          createMockProjectionDefinition("projection1", projectionHandler),
+        ],
+      ]);
+
+      const eventStore = createMockEventStore<Event>();
+      eventStore.getEvents = vi.fn().mockResolvedValue([]);
+
+      const updater = createUpdater({ projections });
+      (updater as any).eventStore = eventStore;
+
+      await expect(
+        updater.updateProjectionByName(
+          "projection1",
+          TEST_CONSTANTS.AGGREGATE_ID,
+          context,
+        ),
+      ).rejects.toThrow(
+        `No events found for aggregate ${TEST_CONSTANTS.AGGREGATE_ID}`,
+      );
+    });
+
+    it("throws when distributed lock cannot be acquired", async () => {
+      const projectionHandler = createMockEventHandler<Event, any>();
+      const projections = new Map([
+        [
+          "projection1",
+          createMockProjectionDefinition("projection1", projectionHandler),
+        ],
+      ]);
+
+      const distributedLock = createMockDistributedLock();
+      distributedLock.acquire = vi.fn().mockResolvedValue(null);
+
+      const updater = createUpdater({
+        projections,
+        distributedLock,
+      });
+
+      await expect(
+        updater.updateProjectionByName(
+          "projection1",
+          TEST_CONSTANTS.AGGREGATE_ID,
+          context,
+        ),
+      ).rejects.toThrow("Cannot acquire lock for projection update");
+    });
+  });
+});
+
