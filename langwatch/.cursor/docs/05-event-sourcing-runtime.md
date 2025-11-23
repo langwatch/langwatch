@@ -169,6 +169,7 @@ When you call `.build()`, here's what happens:
    - Projection definitions (if any)
    - Event handler definitions (if any)
    - Event publisher (if any)
+   - Processor checkpoint store (automatically created for handlers and projections)
 
 2. **Create Command Dispatchers**: For each registered command handler:
    - Extract schema, handler instance, and configuration from handler class
@@ -204,10 +205,19 @@ await pipeline.commands.recordSpan.send({ /* ... */ });
 - Provides automatic retries, backoff, and error handling
 - Enables batching and debouncing via job ID deduplication
 - Handles Redis connection management and graceful shutdown
+- Enables sequential processing per aggregate via checkpoints
+- Supports both event handlers and projections
+
+**Queue Types:**
+
+The runtime creates three types of queues:
+1. **Command queues**: One per command handler (e.g., `span-ingestion_recordSpan`)
+2. **Handler queues**: One per event handler (e.g., `span_handler_span-storage`)
+3. **Projection queues**: One per projection (e.g., `trace_aggregation_projection_summary`)
 
 **How it works:**
 
-`EventSourcedQueueProcessorImpl` wraps BullMQ with LangWatch-specific features:
+The `QueueProcessorManager` manages queue processors for handlers, projections, and commands. `EventSourcedQueueProcessorImpl` wraps BullMQ with LangWatch-specific features:
 
 ```typescript
 class EventSourcedQueueProcessorImpl<Payload> {
@@ -353,11 +363,33 @@ The runtime topologically sorts handlers based on dependencies:
 When `pipeline.service.storeEvents()` is called:
 1. Events are stored in event store
 2. Events are published to event publisher (if configured)
-3. Events are dispatched to handlers in dependency order:
+3. Events are dispatched to handler queues in dependency order:
    - Filters handlers by event type (if specified)
-   - Calls handler.handle(event) for each matching handler
-   - Updates checkpoints on success (if checkpoint store configured)
-   - Logs errors but doesn't fail dispatch
+   - Checks for previous failures (stops dispatch if any)
+   - Enqueues events to handler queues (async processing)
+   - Each handler processes events sequentially per aggregate
+4. Events are dispatched to projection queues:
+   - Each projection gets its own queue
+   - Events are enqueued for async processing
+   - Projections rebuild from all events for the aggregate
+   - Sequential ordering enforced per aggregate
+
+**Sequential Processing:**
+
+Both handlers and projections enforce sequential processing:
+- Events are assigned sequence numbers (1-indexed) within each aggregate
+- Before processing event N, the system verifies event N-1 was processed
+- If any event fails, subsequent events for that aggregate stop processing
+- Per-aggregate checkpoints track the last processed event (checkpoint key: `tenantId:pipelineName:processorName:aggregateType:aggregateId`)
+
+**Processor Checkpoint Store:**
+
+The runtime automatically creates a `ProcessorCheckpointStore` when handlers or projections are registered:
+- **Memory store**: Used in test environment
+- **ClickHouse store**: Used in production (if ClickHouse available)
+- Tracks per-aggregate processing status (one checkpoint per aggregate tracks last processed event)
+- Checkpoint key format: `tenantId:pipelineName:processorName:aggregateType:aggregateId`
+- Enables idempotency, sequential ordering, and failure detection
 
 ## Span Ingestion Pipeline Example
 
@@ -386,9 +418,29 @@ export const spanIngestionPipeline = eventSourcing
 3. Job processes: validates payload, creates command, calls `RecordSpanCommand.handle()`
 4. Handler returns `SpanIngestionEvent`
 5. Event is stored via `pipeline.service.storeEvents()`
-6. Event triggers handlers:
-   - `span-storage` writes span to ClickHouse
-   - `trace-aggregation-trigger` (after span-storage completes) triggers trace projection rebuild
+6. Event is dispatched to handler queues (via `QueueProcessorManager`):
+   - `span-storage` queue: Event enqueued, processed sequentially per aggregate
+   - Checkpoint (per aggregate) saved as `pending` → handler processes → checkpoint saved as `processed`
+   - `trace-aggregation-trigger` queue: Event enqueued (after span-storage completes)
+7. Event is dispatched to projection queues (if any, via `QueueProcessorManager`):
+   - Each projection queue processes event sequentially per aggregate
+   - Projection rebuilds from all events for the aggregate
+   - Checkpoint (per aggregate) saved as `processed` on success
+
+**Sequential Ordering Example:**
+
+If events arrive out of order:
+- Event 1 (seq: 1) → processed immediately
+- Event 3 (seq: 3) → waits for event 2 (seq: 2) to be processed
+- Event 2 (seq: 2) → processed after event 1 completes
+- Event 3 → processed after event 2 completes
+
+**Failure Handling:**
+
+If event 2 fails:
+- Checkpoint (per aggregate) saved as `failed`
+- Event 3 (and subsequent events) stop processing for that aggregate
+- Failed events can be identified via `getFailedEvents()` and reprocessed after fixing the issue
 
 ## Design Decisions
 
@@ -455,9 +507,12 @@ See the [README](../langwatch/src/server/event-sourcing/library/README.md) for c
 ## Summary
 
 The runtime provides:
-- **Shared infrastructure**: Singleton event store, queue processors
+- **Shared infrastructure**: Singleton event store, queue processors (via `QueueProcessorManager`), processor checkpoint store
 - **Type-safe registration**: Builder pattern with compile-time validation
 - **Queue integration**: BullMQ with automatic retries, tracing, and inline fallback
 - **Command/event dispatch**: Automatic validation, storage, and handler execution
+- **Sequential processing**: Per-aggregate ordering enforcement via sequence numbers and checkpoints
+- **Per-aggregate checkpointing**: One checkpoint per aggregate tracks last processed event (key: `tenantId:pipelineName:processorName:aggregateType:aggregateId`)
+- **Projection queues**: Async processing for projections, similar to event handlers
 
 This keeps event-sourcing infrastructure centralized while feature code focuses on domain logic.

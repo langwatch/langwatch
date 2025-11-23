@@ -61,16 +61,53 @@ interface Projection<Data = unknown> {
 - Manages event ordering and stream creation
 - Supports hooks for extensibility
 - Optional distributed locking for concurrency control
+- Enforces sequential processing per aggregate via sequence numbers
+- Manages per-aggregate checkpoints for handlers and projections
+- Composes modular services for maintainability
+
+**ProcessorCheckpointStore**: Tracks processing status per aggregate
+- Used for both event handlers and projections
+- Tracks per-aggregate status (one checkpoint per aggregate tracks last processed event)
+- Checkpoint key format: `tenantId:pipelineName:processorName:aggregateType:aggregateId`
+- Enables sequential ordering enforcement
+- Enables idempotency and failure detection
+
+### Modular Service Architecture
+
+The event sourcing library uses a modular service architecture for maintainability and testability:
+
+- **EventProcessorValidator**: Orchestrates validation by coordinating sequence number calculation, idempotency checking, ordering validation, and failure detection
+- **CheckpointManager**: Manages checkpoint operations with error handling (wraps checkpoint store calls)
+- **QueueProcessorManager**: Manages queue processors for handlers, projections, and commands
+- **EventHandlerDispatcher**: Dispatches events to handlers (supports both sync and async dispatch via queues)
+- **ProjectionUpdater**: Handles projection updates (supports both sync and async dispatch via queues)
+- **SequenceNumberCalculator**: Computes sequence numbers for events
+- **IdempotencyChecker**: Checks if events were already processed and atomically claims them
+- **OrderingValidator**: Verifies that the previous sequence number was processed
+- **FailureDetector**: Checks if any previous events failed
+
+These services are composed by `EventSourcingService` to provide the complete event sourcing functionality.
 
 ### Component Relationships
 
 ```
 EventSourcingService
-  ├── EventStore (getEvents, storeEvents)
+  ├── EventStore (getEvents, storeEvents, countEventsBefore)
   ├── ProjectionStore (getProjection, storeProjection)
+  ├── ProcessorCheckpointStore (saveCheckpoint, loadCheckpoint, getCheckpointBySequenceNumber, hasFailedEvents)
+  ├── EventProcessorValidator (orchestrates validation)
+  │   ├── SequenceNumberCalculator (computes sequence numbers)
+  │   ├── IdempotencyChecker (checks idempotency, atomically claims events)
+  │   ├── OrderingValidator (validates sequential ordering)
+  │   └── FailureDetector (detects failed events)
+  ├── CheckpointManager (manages checkpoint operations)
+  ├── QueueProcessorManager (manages queue processors)
+  ├── EventHandlerDispatcher (dispatches events to handlers)
+  ├── ProjectionUpdater (handles projection updates)
   ├── EventHandler (builds projections from EventStream)
   ├── EventReactionHandler (reacts to individual events)
-  └── EventPublisher (publishes events to external systems)
+  ├── EventPublisher (publishes events to external systems)
+  └── DistributedLock (optional, for concurrent projection updates)
 ```
 
 ## Security Considerations
@@ -273,6 +310,150 @@ import { EventUtils } from "./library";
 - [ ] Test cross-tenant access attempts (should throw)
 - [ ] Events validated to belong to context tenant before storage
 
+## Sequential Ordering & Per-Aggregate Checkpointing
+
+### Sequence Numbers
+
+Events are assigned **sequence numbers** (1-indexed) based on their position in chronological order within each aggregate. The `SequenceNumberCalculator` computes sequence numbers using `countEventsBefore()` - the number of events that occurred before this event (by timestamp and ID), plus 1.
+
+**Computation:**
+```typescript
+// In SequenceNumberCalculator
+async computeEventSequenceNumber(
+  event: EventType,
+  context: EventStoreReadContext<EventType>,
+): Promise<number> {
+  const count = await this.eventStore.countEventsBefore(
+    String(event.aggregateId),
+    context,
+    this.aggregateType,
+    event.timestamp,
+    event.id,
+  );
+  return count + 1; // 1-indexed
+}
+```
+
+**Properties:**
+- **Deterministic**: Same event always gets same sequence number
+- **Stable**: Sequence numbers don't change once assigned
+- **Per-aggregate**: Sequence numbers are scoped to `tenantId + aggregateId + aggregateType`
+
+### Sequential Processing Enforcement
+
+The `EventProcessorValidator` orchestrates validation by coordinating:
+- **SequenceNumberCalculator**: Computes sequence numbers for events
+- **IdempotencyChecker**: Checks if events were already processed and atomically claims them
+- **OrderingValidator**: Verifies that the previous sequence number (N-1) was processed
+- **FailureDetector**: Checks if any previous events failed (stops processing if so)
+
+The system enforces strict sequential processing per aggregate:
+
+1. **Before processing event N:**
+   - Compute sequence number using `SequenceNumberCalculator`
+   - Check if event N was already processed (idempotency via `IdempotencyChecker`)
+   - Check if any previous events failed (stop processing gracefully via `FailureDetector`)
+   - Verify event N-1 was processed (sequential ordering via `OrderingValidator`)
+
+2. **During processing:**
+   - `CheckpointManager` saves checkpoint as `pending` before processing
+   - Execute handler/projection logic
+   - `CheckpointManager` saves checkpoint as `processed` on success, `failed` on failure
+
+3. **After failure:**
+   - `CheckpointManager` saves checkpoint as `failed` with error message
+   - Subsequent events for that aggregate stop processing (detected by `FailureDetector`)
+   - Failed events can be identified and reprocessed
+
+**Implementation:**
+```typescript
+// EventProcessorValidator orchestrates validation
+const sequenceNumber = await validator.computeEventSequenceNumber(event, context);
+const shouldSkip = await validator.validateEventProcessing(
+  processorName,
+  processorType,
+  event,
+  context,
+);
+if (shouldSkip === null) {
+  // Processing should be skipped (already processed or has failures)
+  return;
+}
+
+// CheckpointManager handles checkpoint operations
+await checkpointManager.saveCheckpointSafely(
+  processorName,
+  processorType,
+  event,
+  "pending",
+  sequenceNumber,
+);
+// ... process event ...
+await checkpointManager.saveCheckpointSafely(
+  processorName,
+  processorType,
+  event,
+  "processed",
+  sequenceNumber,
+);
+```
+
+### Per-Aggregate Checkpointing
+
+One checkpoint per aggregate tracks the last processed event with status tracking:
+
+**Checkpoint Status:**
+- **`pending`**: Event is queued but not yet processed
+- **`processed`**: Event was successfully processed
+- **`failed`**: Event processing failed
+
+**Checkpoint Key:**
+- Format: `tenantId:pipelineName:processorName:aggregateType:aggregateId`
+- Key construction: Centralized in `buildCheckpointKey()` utility (see [`utils/checkpointKey.ts`](../langwatch/src/server/event-sourcing/library/utils/checkpointKey.ts))
+- One checkpoint per aggregate (not per event)
+
+**Checkpoint Data:**
+- Processor name and type (handler/projection)
+- Last processed event ID and timestamp
+- Last processed sequence number (1-indexed)
+- Status (pending/processed/failed)
+- Processed/failed timestamps
+- Error message (if failed)
+
+**Benefits:**
+- **Efficient storage**: One record per aggregate instead of one per event
+- **Idempotency**: Already processed events are automatically skipped (check if last processed sequence >= current sequence)
+- **Sequential ordering**: Events processed in sequence number order (check if previous sequence was processed)
+- **Failure detection**: Failed events stop subsequent processing
+- **Recovery**: Failed events can be identified and reprocessed
+
+### Failure Handling
+
+When an event fails processing:
+
+1. **Checkpoint saved as `failed`**: Records failure with error message
+2. **Subsequent events stop**: Events with higher sequence numbers for that aggregate will not be processed
+3. **Recovery workflow**:
+   - Identify failed events via `getFailedEvents()`
+   - Fix underlying issue (code bug, data issue, external dependency)
+   - Clear checkpoints for failed events via `clearCheckpoint()`
+   - Events will be reprocessed automatically via queue retries
+
+**Failure Detection:**
+```typescript
+// FailureDetector checks for failures before processing
+const hasFailures = await failureDetector.hasFailedEvents(
+  processorName,
+  processorType,
+  event,
+);
+
+if (hasFailures) {
+  // Processing stops gracefully (storeEvents succeeds, but processing is skipped)
+  return null; // Skip processing
+}
+```
+
 ## Concurrency Considerations
 
 ### Race Condition 1: Check-Then-Act in getProjection
@@ -437,6 +618,34 @@ Process 2: storeProjection(v2)  // Overwrites v1 - LOST!
 
 **Mitigation:** Implement optimistic locking in your projection store (see Option 3 above).
 
+### Race Condition 5: Out-of-Order Event Processing
+
+**Severity: High (Mitigated by Sequential Ordering)**
+
+**The Problem (Before Sequential Ordering):**
+```typescript
+// Events arrive out of order
+Event 3 (seq: 3) arrives first → processed
+Event 1 (seq: 1) arrives second → processed
+Event 2 (seq: 2) arrives third → processed
+
+// Result: Projection built from events in wrong order!
+```
+
+**Mitigation: Sequential Ordering Enforcement**
+
+The system now enforces sequential processing:
+- Event N cannot be processed until event N-1 is processed
+- Sequence numbers are computed deterministically
+- Checkpoints track processing status per event
+- Out-of-order processing is prevented at the checkpoint level
+
+**How it works:**
+1. Event arrives and sequence number is computed
+2. System checks if previous sequence number was processed
+3. If not, processing stops with error (queue will retry)
+4. Once previous event is processed, current event can proceed
+
 ### Concurrency Checklist
 
 - [ ] Understand `getProjection` check-then-act race condition
@@ -446,6 +655,9 @@ Process 2: storeProjection(v2)  // Overwrites v1 - LOST!
 - [ ] Hooks are idempotent and document error handling
 - [ ] Consider optimistic locking for projection stores
 - [ ] Test concurrent access patterns
+- [ ] Sequential ordering enforced via checkpoints (automatic)
+- [ ] Per-aggregate checkpoints enable idempotency (automatic)
+- [ ] Failure detection stops cascading failures (automatic)
 
 ## Implementation Patterns
 
@@ -664,6 +876,227 @@ class MyEventReactionHandler implements EventReactionHandler<MyEvent> {
 - Use `getEventTypes()` to filter events (optional)
 - Handle errors gracefully (framework logs but doesn't fail dispatch)
 - Don't throw unless truly exceptional (affects other handlers)
+- Sequential ordering is enforced automatically by the framework (via `EventProcessorValidator`)
+- Per-aggregate checkpoints enable idempotency automatically (via `CheckpointManager`)
+
+### Implementing ProcessorCheckpointStore
+
+**Purpose:** Tracks per-aggregate processing status for both handlers and projections (one checkpoint per aggregate tracks last processed event)
+
+**Interface:**
+```typescript
+interface ProcessorCheckpointStore {
+  saveCheckpoint(
+    checkpointKey: string, // Format: tenantId:pipelineName:processorName:aggregateType:aggregateId
+    processorType: "handler" | "projection",
+    event: EventType,
+    status: "processed" | "failed" | "pending",
+    sequenceNumber: number,
+    errorMessage?: string,
+  ): Promise<void>;
+
+  loadCheckpoint(
+    checkpointKey: string, // Format: tenantId:pipelineName:processorName:aggregateType:aggregateId
+  ): Promise<ProcessorCheckpoint | null>;
+
+  getCheckpointBySequenceNumber(
+    pipelineName: string,
+    processorName: string,
+    processorType: "handler" | "projection",
+    tenantId: TenantId,
+    aggregateType: AggregateType,
+    aggregateId: string,
+    sequenceNumber: number,
+  ): Promise<ProcessorCheckpoint | null>;
+
+  hasFailedEvents(
+    pipelineName: string,
+    processorName: string,
+    processorType: "handler" | "projection",
+    tenantId: TenantId,
+    aggregateType: AggregateType,
+    aggregateId: string,
+  ): Promise<boolean>;
+
+  getFailedEvents(
+    pipelineName: string,
+    processorName: string,
+    processorType: "handler" | "projection",
+    tenantId: TenantId,
+    aggregateType: AggregateType,
+    aggregateId: string,
+  ): Promise<ProcessorCheckpoint[]>;
+}
+```
+
+**Template:**
+```typescript
+import {
+  ProcessorCheckpointStore,
+  EventUtils,
+  buildCheckpointKey,
+  type Event,
+  type ProcessorCheckpoint,
+  type TenantId,
+  type AggregateType,
+} from "./library";
+
+class MyProcessorCheckpointStore implements ProcessorCheckpointStore {
+  async saveCheckpoint<EventType extends Event>(
+    checkpointKey: string, // Format: tenantId:pipelineName:processorName:aggregateType:aggregateId
+    processorType: "handler" | "projection",
+    event: EventType,
+    status: "processed" | "failed" | "pending",
+    sequenceNumber: number,
+    errorMessage?: string,
+  ): Promise<void> {
+    // CRITICAL: Validate tenant
+    EventUtils.validateTenantId(
+      { tenantId: event.tenantId },
+      "ProcessorCheckpointStore.saveCheckpoint",
+    );
+
+    // checkpointKey is provided (constructed by CheckpointManager using buildCheckpointKey)
+    const now = Date.now();
+
+    await this.db.upsert({
+      checkpoint_key: checkpointKey,
+      processor_type: processorType,
+      event_id: event.id,
+      status,
+      event_timestamp: event.timestamp,
+      sequence_number: sequenceNumber,
+      processed_at: status === "processed" ? now : null,
+      failed_at: status === "failed" ? now : null,
+      error_message: status === "failed" ? errorMessage : null,
+      tenant_id: event.tenantId,
+      aggregate_type: event.aggregateType,
+      aggregate_id: String(event.aggregateId),
+    });
+  }
+
+  async loadCheckpoint(
+    checkpointKey: string, // Format: tenantId:pipelineName:processorName:aggregateType:aggregateId
+  ): Promise<ProcessorCheckpoint | null> {
+    const record = await this.db.findOne({ checkpoint_key: checkpointKey });
+    if (!record) return null;
+
+    return {
+      processorName: record.processor_name,
+      processorType: record.processor_type,
+      eventId: record.event_id,
+      status: record.status,
+      eventTimestamp: record.event_timestamp,
+      sequenceNumber: record.sequence_number,
+      processedAt: record.processed_at ?? void 0,
+      failedAt: record.failed_at ?? void 0,
+      errorMessage: record.error_message ?? void 0,
+      tenantId: record.tenant_id as TenantId,
+      aggregateType: record.aggregate_type as AggregateType,
+      aggregateId: record.aggregate_id,
+    };
+  }
+
+  async getCheckpointBySequenceNumber(
+    pipelineName: string,
+    processorName: string,
+    processorType: "handler" | "projection",
+    tenantId: TenantId,
+    aggregateType: AggregateType,
+    aggregateId: string,
+    sequenceNumber: number,
+  ): Promise<ProcessorCheckpoint | null> {
+    EventUtils.validateTenantId(
+      { tenantId },
+      "ProcessorCheckpointStore.getCheckpointBySequenceNumber",
+    );
+
+    // Load aggregate checkpoint and check if last processed sequence >= requested sequence
+    const checkpointKey = buildCheckpointKey(
+      tenantId,
+      pipelineName,
+      processorName,
+      aggregateType,
+      aggregateId,
+    );
+    const checkpoint = await this.loadCheckpoint(checkpointKey);
+
+    if (!checkpoint || checkpoint.status !== "processed") {
+      return null;
+    }
+
+    // Check if last processed sequence number is >= requested sequence number
+    if (checkpoint.sequenceNumber >= sequenceNumber) {
+      return checkpoint;
+    }
+
+    return null;
+  }
+
+  async hasFailedEvents(
+    pipelineName: string,
+    processorName: string,
+    processorType: "handler" | "projection",
+    tenantId: TenantId,
+    aggregateType: AggregateType,
+    aggregateId: string,
+  ): Promise<boolean> {
+    EventUtils.validateTenantId(
+      { tenantId },
+      "ProcessorCheckpointStore.hasFailedEvents",
+    );
+
+    const checkpointKey = buildCheckpointKey(
+      tenantId,
+      pipelineName,
+      processorName,
+      aggregateType,
+      aggregateId,
+    );
+    const checkpoint = await this.loadCheckpoint(checkpointKey);
+
+    return checkpoint?.status === "failed";
+  }
+
+  async getFailedEvents(
+    pipelineName: string,
+    processorName: string,
+    processorType: "handler" | "projection",
+    tenantId: TenantId,
+    aggregateType: AggregateType,
+    aggregateId: string,
+  ): Promise<ProcessorCheckpoint[]> {
+    EventUtils.validateTenantId(
+      { tenantId },
+      "ProcessorCheckpointStore.getFailedEvents",
+    );
+
+    const checkpointKey = buildCheckpointKey(
+      tenantId,
+      pipelineName,
+      processorName,
+      aggregateType,
+      aggregateId,
+    );
+    const checkpoint = await this.loadCheckpoint(checkpointKey);
+
+    if (checkpoint?.status === "failed") {
+      return [checkpoint];
+    }
+
+    return [];
+  }
+}
+```
+
+**Key Points:**
+- Always validate tenant ID before any operation
+- Checkpoint key format: `tenantId:pipelineName:processorName:aggregateType:aggregateId` (use `buildCheckpointKey()` utility)
+- One checkpoint per aggregate (not per event)
+- Track last processed sequence number for sequential ordering enforcement
+- Support status transitions: pending → processed/failed
+- Filter queries by tenant ID, aggregate type, and aggregate ID
+- Use sequence numbers to verify previous events were processed
 
 ### Implementing CommandHandler
 
@@ -849,8 +1282,12 @@ The event sourcing library provides:
 - **Type-safe abstractions**: Event, Projection, EventStream, Stores
 - **Multi-tenant isolation**: Branded TenantId type and validation utilities
 - **Concurrency control**: Distributed locking and optimistic locking patterns
+- **Sequential ordering**: Per-aggregate ordering enforcement via sequence numbers and checkpoints
+- **Per-aggregate checkpointing**: One checkpoint per aggregate tracks last processed event (key: `tenantId:pipelineName:processorName:aggregateType:aggregateId`)
+- **Modular service architecture**: EventProcessorValidator, CheckpointManager, QueueProcessorManager, EventHandlerDispatcher, ProjectionUpdater
 - **Observability**: OpenTelemetry tracing and structured logging
 - **Extensibility**: Hooks, custom ordering, pluggable stores
+- **Error handling**: Standardized error categorization (ErrorCategory enum)
 
 **Critical Requirements:**
 1. Always validate tenant ID before any store operation
@@ -858,5 +1295,15 @@ The event sourcing library provides:
 3. Validate inputs before storing
 4. Handle concurrency (distributed locking or optimistic locking)
 5. Make handlers idempotent
+6. Sequential ordering is enforced automatically via checkpoints (EventProcessorValidator)
+7. Processor checkpoint stores track per-aggregate status (one checkpoint per aggregate)
+
+**Key Features:**
+- **Sequence numbers**: Events are numbered 1, 2, 3, ... in chronological order per aggregate (SequenceNumberCalculator)
+- **Sequential processing**: Events must be processed in sequence number order (OrderingValidator)
+- **Per-aggregate checkpoints**: One checkpoint per aggregate tracks last processed event (CheckpointManager)
+- **Failure detection**: Failed events stop processing of subsequent events for that aggregate (FailureDetector)
+- **Idempotency**: Already processed events are automatically skipped (IdempotencyChecker)
+- **Validation orchestration**: EventProcessorValidator coordinates all validation components
 
 For quick start examples, see the [README](../langwatch/src/server/event-sourcing/library/README.md). For runtime architecture, see [Runtime Documentation](./05-event-sourcing-runtime.md).
