@@ -61,6 +61,11 @@ export interface EventSourcingServiceOptions<
   _ProjectionType extends Projection = Projection,
 > {
   /**
+   * The pipeline name for this service.
+   * Used for checkpoint key isolation between different pipelines.
+   */
+  pipelineName: string;
+  /**
    * The aggregate type this service manages (e.g., "trace", "user").
    * Used for routing and event storage.
    */
@@ -117,6 +122,12 @@ export interface EventSourcingServiceOptions<
    * Default: 5 minutes
    */
   updateLockTtlMs?: number;
+  /**
+   * Time-to-live for handler locks in milliseconds.
+   * Prevents locks from being held indefinitely if a process crashes.
+   * Default: 30 seconds
+   */
+  handlerLockTtlMs?: number;
   /**
    * Optional queue processor factory for creating queues for event handlers.
    *
