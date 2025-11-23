@@ -1,9 +1,14 @@
 import { SpanKind } from "@opentelemetry/api";
 import { getLangWatchTracer } from "langwatch";
 import { getClickHouseClient } from "../../../utils/clickhouse";
+import { connection } from "../../redis";
 import { EventStoreClickHouse } from "./stores/eventStoreClickHouse";
 import { EventStoreMemory } from "./stores/eventStoreMemory";
+import { EventRepositoryClickHouse } from "./stores/repositories/eventRepositoryClickHouse";
+import { EventRepositoryMemory } from "./stores/repositories/eventRepositoryMemory";
 import type { Event, Projection, EventStore } from "../library";
+import { RedisDistributedLock } from "../library/utils/distributedLock";
+import type { DistributedLock } from "../library/utils/distributedLock";
 import { PipelineBuilder } from "./pipeline";
 import type { QueueProcessorFactory } from "./queue";
 import { defaultQueueProcessorFactory } from "./queue";
@@ -25,19 +30,26 @@ import { defaultQueueProcessorFactory } from "./queue";
  */
 export class EventSourcing {
   private static instance: EventSourcing | null = null;
-  private readonly eventStore: EventStore<any>;
+  private readonly eventStore: EventStore;
   private readonly queueProcessorFactory: QueueProcessorFactory;
+  private readonly distributedLock?: DistributedLock;
   private readonly tracer = getLangWatchTracer(
     "langwatch.event-sourcing.runtime",
   );
 
   constructor(
-    eventStore?: EventStore<any>,
+    eventStore?: EventStore,
     queueProcessorFactory?: QueueProcessorFactory,
+    distributedLock?: DistributedLock,
   ) {
     this.eventStore = eventStore ?? this.createDefaultEventStore();
     this.queueProcessorFactory =
       queueProcessorFactory ?? defaultQueueProcessorFactory;
+
+    // Create distributed lock from Redis if available and not explicitly provided
+    this.distributedLock =
+      distributedLock ??
+      (connection ? new RedisDistributedLock(connection) : void 0);
   }
 
   /**
@@ -47,11 +59,13 @@ export class EventSourcing {
    * - ClickHouse (production): If available, provides persistent storage
    * - Memory (development/testing): If unavailable, provides in-memory storage for local development
    */
-  private createDefaultEventStore(): EventStore<any> {
+  private createDefaultEventStore(): EventStore {
     const clickHouseClient = getClickHouseClient();
     return clickHouseClient
-      ? new EventStoreClickHouse<any>(clickHouseClient)
-      : new EventStoreMemory<any>();
+      ? new EventStoreClickHouse(
+          new EventRepositoryClickHouse(clickHouseClient),
+        )
+      : new EventStoreMemory(new EventRepositoryMemory());
   }
 
   /**
@@ -93,6 +107,7 @@ export class EventSourcing {
         return new PipelineBuilder<EventType, ProjectionType>(
           this.eventStore,
           this.queueProcessorFactory,
+          this.distributedLock,
         );
       },
     );

@@ -6,6 +6,8 @@ import type {
 } from "./pipeline";
 import { ProcessorCheckpointStoreMemory } from "./stores/processorCheckpointStoreMemory";
 import { ProcessorCheckpointStoreClickHouse } from "./stores/processorCheckpointStoreClickHouse";
+import { CheckpointRepositoryClickHouse } from "./stores/repositories/checkpointRepositoryClickHouse";
+import { CheckpointRepositoryMemory } from "./stores/repositories/checkpointRepositoryMemory";
 import { getClickHouseClient } from "../../../utils/clickhouse";
 
 export class EventSourcingPipeline<
@@ -40,17 +42,24 @@ export class EventSourcingPipeline<
         ? (() => {
             // Always use Memory store in test environment
             if (process.env.NODE_ENV === "test" || process.env.VITEST) {
-              return new ProcessorCheckpointStoreMemory();
+              return new ProcessorCheckpointStoreMemory(
+                new CheckpointRepositoryMemory(),
+              );
             }
             const clickHouseClient = getClickHouseClient();
             return clickHouseClient
-              ? new ProcessorCheckpointStoreClickHouse(clickHouseClient)
-              : new ProcessorCheckpointStoreMemory();
+              ? new ProcessorCheckpointStoreClickHouse(
+                  new CheckpointRepositoryClickHouse(clickHouseClient),
+                )
+              : new ProcessorCheckpointStoreMemory(
+                  new CheckpointRepositoryMemory(),
+                );
           })()
         : void 0;
 
     Object.defineProperty(this, "service", {
       value: new EventSourcingService<EventType, ProjectionType>({
+        pipelineName: definition.name,
         aggregateType: definition.aggregateType,
         eventStore: definition.eventStore,
         projections: definition.projections,
@@ -58,6 +67,9 @@ export class EventSourcingPipeline<
         eventHandlers: definition.eventHandlers,
         processorCheckpointStore: checkpointStore,
         queueProcessorFactory: definition.queueProcessorFactory,
+        distributedLock: definition.distributedLock,
+        handlerLockTtlMs: definition.handlerLockTtlMs,
+        updateLockTtlMs: definition.updateLockTtlMs,
       }),
       writable: false,
       enumerable: true,
