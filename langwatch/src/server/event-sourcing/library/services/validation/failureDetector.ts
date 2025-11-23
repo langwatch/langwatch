@@ -40,4 +40,3 @@ export class FailureDetector<EventType extends Event = Event> {
     );
   }
 }
-

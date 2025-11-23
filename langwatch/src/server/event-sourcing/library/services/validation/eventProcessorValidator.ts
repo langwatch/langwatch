@@ -23,7 +23,9 @@ export class EventProcessorValidator<EventType extends Event = Event> {
   private readonly idempotencyChecker: IdempotencyChecker<EventType>;
   private readonly orderingValidator: OrderingValidator<EventType>;
   private readonly failureDetector: FailureDetector<EventType>;
-  private readonly logger = createLogger("langwatch:event-sourcing:event-processor-validator");
+  private readonly logger = createLogger(
+    "langwatch:event-sourcing:event-processor-validator",
+  );
 
   constructor({
     eventStore,
@@ -109,8 +111,7 @@ export class EventProcessorValidator<EventType extends Event = Event> {
           processorType,
           eventId: event.id,
           aggregateId: String(event.aggregateId),
-          error:
-            error instanceof Error ? error.message : String(error),
+          error: error instanceof Error ? error.message : String(error),
         },
         "Failed to compute sequence number for event",
       );
@@ -172,4 +173,3 @@ export class EventProcessorValidator<EventType extends Event = Event> {
     return sequenceNumber;
   }
 }
-

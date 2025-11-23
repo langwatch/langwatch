@@ -21,6 +21,7 @@ import { EventSourcingPipeline } from "../index";
 import { defaultQueueProcessorFactory } from "../queue";
 import type { RegisteredPipeline, PipelineWithCommandHandlers } from "./types";
 import type { QueueProcessorFactory } from "../queue";
+import { ConfigurationError } from "../../library/services/errorHandling";
 
 /**
  * Options for configuring a command handler.
@@ -59,7 +60,6 @@ export interface CommandHandlerOptions<Payload> {
     payload: Payload,
   ) => Record<string, string | number | boolean>;
 }
-
 
 /**
  * Builder for creating event sourcing pipelines with type-safe required fields.
@@ -114,7 +114,10 @@ export class PipelineBuilder<
   }
 
   build(): never {
-    throw new Error("Pipeline name is required");
+    throw new ConfigurationError(
+      "PipelineBuilder",
+      "Pipeline name is required",
+    );
   }
 }
 
@@ -146,7 +149,10 @@ export class PipelineBuilderWithName<
   }
 
   build(): never {
-    throw new Error("Aggregate type is required");
+    throw new ConfigurationError(
+      "PipelineBuilder",
+      "Aggregate type is required",
+    );
   }
 }
 
@@ -229,15 +235,19 @@ export class PipelineBuilderWithNameAndType<
     RegisteredCommandHandlers
   > {
     if (this.projections.has(name)) {
-      throw new Error(
+      throw new ConfigurationError(
+        "PipelineBuilder",
         `Projection with name "${name}" already exists. Projection names must be unique within a pipeline.`,
+        { projectionName: name },
       );
     }
 
     // Extract store from static property
     if (!HandlerClass.store) {
-      throw new Error(
+      throw new ConfigurationError(
+        "PipelineBuilder",
         `Projection handler class must have a static "store" property.`,
+        { projectionName: name },
       );
     }
 
@@ -310,8 +320,10 @@ export class PipelineBuilderWithNameAndType<
     RegisteredCommandHandlers
   > {
     if (this.eventHandlers.has(name)) {
-      throw new Error(
+      throw new ConfigurationError(
+        "PipelineBuilder",
         `Event handler with name "${name}" already exists. Handler names must be unique within a pipeline.`,
+        { handlerName: name },
       );
     }
 
@@ -319,14 +331,14 @@ export class PipelineBuilderWithNameAndType<
     const handler = new HandlerClass();
 
     // Merge event types from static method and options (options take precedence)
-    const mergedOptions: EventHandlerOptions<EventType, RegisteredHandlerNames> =
-      {
-        ...options,
-        eventTypes:
-          options?.eventTypes ??
-          HandlerClass.getEventTypes?.() ??
-          void 0,
-      };
+    const mergedOptions: EventHandlerOptions<
+      EventType,
+      RegisteredHandlerNames
+    > = {
+      ...options,
+      eventTypes:
+        options?.eventTypes ?? HandlerClass.getEventTypes?.() ?? void 0,
+    };
 
     this.eventHandlers.set(name, {
       name,
@@ -376,8 +388,10 @@ export class PipelineBuilderWithNameAndType<
   > {
     // Validate uniqueness
     if (this.commandHandlers.some((reg) => reg.name === name)) {
-      throw new Error(
+      throw new ConfigurationError(
+        "PipelineBuilder",
         `Command handler with name "${name}" already exists. Command handler names must be unique within a pipeline.`,
+        { commandHandlerName: name },
       );
     }
 
@@ -452,7 +466,9 @@ export class PipelineBuilderWithNameAndType<
     }
 
     // Get command dispatchers from the queue manager and attach to pipeline
-    const commandProcessors = pipeline.service.getQueueManager().getCommandQueueProcessors();
+    const commandProcessors = pipeline.service
+      .getQueueManager()
+      .getCommandQueueProcessors();
     const dispatchers: Record<string, EventSourcedQueueProcessor<any>> = {};
     for (const [commandName, processor] of commandProcessors.entries()) {
       dispatchers[commandName] = processor;

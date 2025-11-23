@@ -11,7 +11,9 @@ import { buildCheckpointKey } from "../../utils/checkpointKey";
 export class CheckpointManager<EventType extends Event = Event> {
   private readonly processorCheckpointStore?: ProcessorCheckpointStore;
   private readonly pipelineName: string;
-  private readonly logger = createLogger("langwatch:event-sourcing:checkpoint-manager");
+  private readonly logger = createLogger(
+    "langwatch:event-sourcing:checkpoint-manager",
+  );
 
   constructor(
     pipelineName: string,
@@ -76,7 +78,8 @@ export class CheckpointManager<EventType extends Event = Event> {
       // Safety check: Don't overwrite failed checkpoints unless we're explicitly saving a failed status
       // This prevents overwriting failed checkpoints with pending/processed statuses
       if (status !== "failed" && this.processorCheckpointStore) {
-        const existingCheckpoint = await this.processorCheckpointStore.loadCheckpoint(checkpointKey);
+        const existingCheckpoint =
+          await this.processorCheckpointStore.loadCheckpoint(checkpointKey);
         if (existingCheckpoint?.status === "failed") {
           this.logger.warn(
             {
@@ -149,13 +152,10 @@ export class CheckpointManager<EventType extends Event = Event> {
               ? checkpointError.message
               : String(checkpointError),
           errorStack:
-            checkpointError instanceof Error
-              ? checkpointError.stack
-              : void 0,
+            checkpointError instanceof Error ? checkpointError.stack : void 0,
         },
         logMessage,
       );
     }
   }
 }
-

@@ -394,14 +394,22 @@ describe("InMemoryDistributedLock", () => {
 type MockRedisClient = {
   set: ReturnType<
     typeof vi.fn<
-      (key: string, value: string, ...args: (string | number)[]) => Promise<string | null>
+      (
+        key: string,
+        value: string,
+        ...args: (string | number)[]
+      ) => Promise<string | null>
     >
   >;
   del: ReturnType<typeof vi.fn<(key: string) => Promise<number>>>;
   get: ReturnType<typeof vi.fn<(key: string) => Promise<string | null>>>;
   eval?: ReturnType<
     typeof vi.fn<
-      (script: string, numKeys: number, ...args: (string | number)[]) => Promise<unknown>
+      (
+        script: string,
+        numKeys: number,
+        ...args: (string | number)[]
+      ) => Promise<unknown>
     >
   >;
 };
@@ -422,14 +430,24 @@ describe("RedisDistributedLock", () => {
     });
 
     // IORedis set signature: set(key, value, ...args: (string | number)[])
-    const setMock = vi.fn<
-      (key: string, value: string, ...args: (string | number)[]) => Promise<string | null>
-    >();
+    const setMock =
+      vi.fn<
+        (
+          key: string,
+          value: string,
+          ...args: (string | number)[]
+        ) => Promise<string | null>
+      >();
     const delMock = vi.fn<(key: string) => Promise<number>>();
     const getMock = vi.fn<(key: string) => Promise<string | null>>();
-    const evalMock = vi.fn<
-      (script: string, numKeys: number, ...args: (string | number)[]) => Promise<unknown>
-    >();
+    const evalMock =
+      vi.fn<
+        (
+          script: string,
+          numKeys: number,
+          ...args: (string | number)[]
+        ) => Promise<unknown>
+      >();
 
     mockRedis = {
       set: setMock,
@@ -717,9 +735,14 @@ describe("RedisDistributedLock", () => {
 
     describe("when eval is not available", () => {
       beforeEach(() => {
-        const setMock = vi.fn<
-          (key: string, value: string, ...args: (string | number)[]) => Promise<string | null>
-        >();
+        const setMock =
+          vi.fn<
+            (
+              key: string,
+              value: string,
+              ...args: (string | number)[]
+            ) => Promise<string | null>
+          >();
         const delMock = vi.fn<(key: string) => Promise<number>>();
         const getMock = vi.fn<(key: string) => Promise<string | null>>();
 

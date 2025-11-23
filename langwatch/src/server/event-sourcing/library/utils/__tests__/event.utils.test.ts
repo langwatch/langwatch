@@ -37,7 +37,7 @@ describe("EventUtils - Event ID", () => {
     it("auto-generates event ID with current timestamp when not provided", () => {
       const timestamp1 = 1000000;
       const timestamp2 = 1000001;
-      
+
       const event1 = EventUtils.createEvent(
         aggregateType,
         aggregateId,
@@ -108,4 +108,3 @@ describe("EventUtils - Event ID", () => {
     });
   });
 });
-

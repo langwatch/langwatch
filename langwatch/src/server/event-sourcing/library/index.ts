@@ -43,10 +43,12 @@ export type {
   CommandHandler,
   CommandHandlerResult,
 } from "./commands/command";
-export { CommandSchema, createCommand, validateCommand } from "./commands/command";
-export type {
-  CommandSchema as CommandSchemaType,
-} from "./commands/commandSchema";
+export {
+  CommandSchema,
+  createCommand,
+  validateCommand,
+} from "./commands/command";
+export type { CommandSchema as CommandSchemaType } from "./commands/commandSchema";
 export { defineCommandSchema } from "./commands/commandSchema";
 export type {
   CommandHandlerClass,
@@ -94,9 +96,7 @@ export type {
   ProjectionStoreWriteContext,
 } from "./stores/projectionStore.types";
 export { ProjectionStoreReadContextSchema } from "./stores/projectionStore.types";
-export type {
-  ProcessorCheckpointStore,
-} from "./stores/eventHandlerCheckpointStore.types";
+export type { ProcessorCheckpointStore } from "./stores/eventHandlerCheckpointStore.types";
 
 export type {
   EventSourcedQueueProcessor,

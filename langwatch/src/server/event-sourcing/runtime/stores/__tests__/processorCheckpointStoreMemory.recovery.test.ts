@@ -16,7 +16,9 @@ describe("ProcessorCheckpointStoreMemory - Recovery Methods", () => {
   let store: ProcessorCheckpointStoreMemory;
 
   beforeEach(() => {
-    store = new ProcessorCheckpointStoreMemory(new CheckpointRepositoryMemory());
+    store = new ProcessorCheckpointStoreMemory(
+      new CheckpointRepositoryMemory(),
+    );
   });
 
   describe("getFailedEvents", () => {
@@ -482,18 +484,14 @@ describe("ProcessorCheckpointStoreMemory - Recovery Methods", () => {
       );
 
       // Verify checkpoint exists
-      const checkpointBefore = await store.loadCheckpoint(
-        checkpointKey,
-      );
+      const checkpointBefore = await store.loadCheckpoint(checkpointKey);
       expect(checkpointBefore).not.toBeNull();
 
       // Clear checkpoint
       await store.clearCheckpoint(checkpointKey);
 
       // Verify checkpoint is removed
-      const checkpointAfter = await store.loadCheckpoint(
-        checkpointKey,
-      );
+      const checkpointAfter = await store.loadCheckpoint(checkpointKey);
       expect(checkpointAfter).toBeNull();
     });
 
@@ -566,15 +564,11 @@ describe("ProcessorCheckpointStoreMemory - Recovery Methods", () => {
       await store.clearCheckpoint(checkpointKey1);
 
       // Verify processor1 checkpoint is removed
-      const checkpoint1 = await store.loadCheckpoint(
-        checkpointKey1,
-      );
+      const checkpoint1 = await store.loadCheckpoint(checkpointKey1);
       expect(checkpoint1).toBeNull();
 
       // Verify processor2 checkpoint still exists
-      const checkpoint2 = await store.loadCheckpoint(
-        checkpointKey2,
-      );
+      const checkpoint2 = await store.loadCheckpoint(checkpointKey2);
       expect(checkpoint2).not.toBeNull();
       expect(checkpoint2?.processorName).toBe(processorName2);
     });
@@ -630,9 +624,8 @@ describe("ProcessorCheckpointStoreMemory - Recovery Methods", () => {
       await store.clearCheckpoint(checkpointKeyHandler);
 
       // Verify handler checkpoint is removed
-      const handlerCheckpoint = await store.loadCheckpoint(
-        checkpointKeyHandler,
-      );
+      const handlerCheckpoint =
+        await store.loadCheckpoint(checkpointKeyHandler);
       expect(handlerCheckpoint).toBeNull();
 
       // Verify projection checkpoint still exists
@@ -644,4 +637,3 @@ describe("ProcessorCheckpointStoreMemory - Recovery Methods", () => {
     });
   });
 });
-

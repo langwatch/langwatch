@@ -37,12 +37,10 @@ export interface EventHandlerClassStatic<EventType extends Event> {
  * ```
  */
 export type EventHandlerClass<EventType extends Event> =
-  EventHandlerClassStatic<EventType> &
-  (new () => EventHandler<EventType>);
+  EventHandlerClassStatic<EventType> & (new () => EventHandler<EventType>);
 
 /**
  * Type helper to extract the event type from an EventHandlerClass.
  */
 export type ExtractEventHandlerEvent<T> =
   T extends EventHandlerClass<infer EventType> ? EventType : never;
-

@@ -12,6 +12,12 @@ import { createLogger } from "../../../../../utils/logger";
 import type { TraceAggregationStateProjectionRepository } from "./traceAggregationStateProjectionRepository";
 import type { TraceProjectionData } from "../projections/traceAggregationStateProjection";
 import type { TraceProjection } from "../projections/traceAggregationStateProjection";
+import {
+  ErrorCategory,
+  SecurityError,
+  StoreError,
+  ValidationError,
+} from "~/server/event-sourcing/library/services/errorHandling";
 
 const TABLE_NAME = "trace_projections" as const;
 
@@ -238,9 +244,13 @@ export class TraceAggregationStateProjectionRepositoryClickHouse<
             },
             "Failed to get projection from ClickHouse",
           );
-          throw new Error(
+          throw new StoreError(
+            "getProjection",
+            "TraceAggregationStateProjectionRepositoryClickHouse",
             `Failed to get projection for trace ${traceId}: ${errorMessage}`,
-            { cause: error },
+            ErrorCategory.CRITICAL,
+            { traceId },
+            error,
           );
         }
       },
@@ -269,15 +279,20 @@ export class TraceAggregationStateProjectionRepositoryClickHouse<
 
         // Validate projection
         if (!EventUtils.isValidProjection(projection)) {
-          throw new Error(
-            "[VALIDATION] Invalid projection: projection must have id, aggregateId, tenantId, version, and data",
+          throw new ValidationError(
+            "Invalid projection: projection must have id, aggregateId, tenantId, version, and data",
+            "projection",
+            projection,
           );
         }
 
         // Validate that projection tenantId matches context tenantId
         if (projection.tenantId !== context.tenantId) {
-          throw new Error(
-            `[SECURITY] Projection has tenantId '${projection.tenantId}' that does not match context tenantId '${context.tenantId}'`,
+          throw new SecurityError(
+            "storeProjection",
+            `Projection has tenantId '${projection.tenantId}' that does not match context tenantId '${context.tenantId}'`,
+            projection.tenantId,
+            { contextTenantId: context.tenantId },
           );
         }
 
@@ -319,9 +334,16 @@ export class TraceAggregationStateProjectionRepositoryClickHouse<
             },
             "Failed to store projection in ClickHouse",
           );
-          throw new Error(
+          throw new StoreError(
+            "storeProjection",
+            "TraceAggregationStateProjectionRepositoryClickHouse",
             `Failed to store projection ${projection.id} for trace ${projection.aggregateId}: ${errorMessage}`,
-            { cause: error },
+            ErrorCategory.CRITICAL,
+            {
+              projectionId: projection.id,
+              traceId: String(projection.aggregateId),
+            },
+            error,
           );
         }
       },

@@ -46,7 +46,13 @@ describe("EventSourcingService - Error Handling Flows", () => {
         eventStore,
       });
 
-      const events = [createTestEvent(TEST_CONSTANTS.AGGREGATE_ID, TEST_CONSTANTS.AGGREGATE_TYPE, tenantId)];
+      const events = [
+        createTestEvent(
+          TEST_CONSTANTS.AGGREGATE_ID,
+          TEST_CONSTANTS.AGGREGATE_TYPE,
+          tenantId,
+        ),
+      ];
 
       await expect(service.storeEvents(events, context)).rejects.toThrow(
         "Storage failed",
@@ -80,7 +86,13 @@ describe("EventSourcingService - Error Handling Flows", () => {
         },
       });
 
-      const events = [createTestEvent(TEST_CONSTANTS.AGGREGATE_ID, TEST_CONSTANTS.AGGREGATE_TYPE, tenantId)];
+      const events = [
+        createTestEvent(
+          TEST_CONSTANTS.AGGREGATE_ID,
+          TEST_CONSTANTS.AGGREGATE_TYPE,
+          tenantId,
+        ),
+      ];
 
       await expect(service.storeEvents(events, context)).rejects.toThrow(
         "Storage failed",
@@ -119,7 +131,13 @@ describe("EventSourcingService - Error Handling Flows", () => {
         logger: logger as any,
       });
 
-      const events = [createTestEvent(TEST_CONSTANTS.AGGREGATE_ID, TEST_CONSTANTS.AGGREGATE_TYPE, tenantId)];
+      const events = [
+        createTestEvent(
+          TEST_CONSTANTS.AGGREGATE_ID,
+          TEST_CONSTANTS.AGGREGATE_TYPE,
+          tenantId,
+        ),
+      ];
 
       await expect(service.storeEvents(events, context)).resolves.not.toThrow();
 
@@ -147,7 +165,13 @@ describe("EventSourcingService - Error Handling Flows", () => {
         eventPublisher,
       });
 
-      const events = [createTestEvent(TEST_CONSTANTS.AGGREGATE_ID, TEST_CONSTANTS.AGGREGATE_TYPE, tenantId)];
+      const events = [
+        createTestEvent(
+          TEST_CONSTANTS.AGGREGATE_ID,
+          TEST_CONSTANTS.AGGREGATE_TYPE,
+          tenantId,
+        ),
+      ];
 
       await expect(service.storeEvents(events, context)).resolves.not.toThrow();
 
@@ -181,8 +205,16 @@ describe("EventSourcingService - Error Handling Flows", () => {
       });
 
       const events = [
-        createTestEvent(TEST_CONSTANTS.AGGREGATE_ID, TEST_CONSTANTS.AGGREGATE_TYPE, tenantId),
-        createTestEvent("aggregate-456", TEST_CONSTANTS.AGGREGATE_TYPE, tenantId),
+        createTestEvent(
+          TEST_CONSTANTS.AGGREGATE_ID,
+          TEST_CONSTANTS.AGGREGATE_TYPE,
+          tenantId,
+        ),
+        createTestEvent(
+          "aggregate-456",
+          TEST_CONSTANTS.AGGREGATE_TYPE,
+          tenantId,
+        ),
       ];
 
       await service.storeEvents(events, context);
@@ -227,7 +259,11 @@ describe("EventSourcingService - Error Handling Flows", () => {
         logger: logger as any,
       });
 
-      const event = createTestEvent(TEST_CONSTANTS.AGGREGATE_ID, TEST_CONSTANTS.AGGREGATE_TYPE, tenantId);
+      const event = createTestEvent(
+        TEST_CONSTANTS.AGGREGATE_ID,
+        TEST_CONSTANTS.AGGREGATE_TYPE,
+        tenantId,
+      );
 
       await expect(
         service.storeEvents([event], context),
@@ -257,7 +293,11 @@ describe("EventSourcingService - Error Handling Flows", () => {
         },
       });
 
-      const event = createTestEvent(TEST_CONSTANTS.AGGREGATE_ID, TEST_CONSTANTS.AGGREGATE_TYPE, tenantId);
+      const event = createTestEvent(
+        TEST_CONSTANTS.AGGREGATE_ID,
+        TEST_CONSTANTS.AGGREGATE_TYPE,
+        tenantId,
+      );
 
       await expect(
         service.storeEvents([event], context),
@@ -282,7 +322,11 @@ describe("EventSourcingService - Error Handling Flows", () => {
         },
       });
 
-      const event = createTestEvent(TEST_CONSTANTS.AGGREGATE_ID, TEST_CONSTANTS.AGGREGATE_TYPE, tenantId);
+      const event = createTestEvent(
+        TEST_CONSTANTS.AGGREGATE_ID,
+        TEST_CONSTANTS.AGGREGATE_TYPE,
+        tenantId,
+      );
 
       await expect(
         service.storeEvents([event], context),
@@ -290,7 +334,6 @@ describe("EventSourcingService - Error Handling Flows", () => {
 
       expect(eventStore.storeEvents).toHaveBeenCalledTimes(1);
     });
-
   });
 
   describe("projection update errors", () => {
@@ -327,7 +370,13 @@ describe("EventSourcingService - Error Handling Flows", () => {
         logger: logger as any,
       });
 
-      const events = [createTestEvent(TEST_CONSTANTS.AGGREGATE_ID, TEST_CONSTANTS.AGGREGATE_TYPE, tenantId)];
+      const events = [
+        createTestEvent(
+          TEST_CONSTANTS.AGGREGATE_ID,
+          TEST_CONSTANTS.AGGREGATE_TYPE,
+          tenantId,
+        ),
+      ];
 
       await expect(service.storeEvents(events, context)).resolves.not.toThrow();
 
@@ -344,7 +393,13 @@ describe("EventSourcingService - Error Handling Flows", () => {
       const projectionHandler2 = createMockEventHandler<Event, any>();
       const projectionStore1 = createMockProjectionStore<any>();
       const projectionStore2 = createMockProjectionStore<any>();
-      const events = [createTestEvent(TEST_CONSTANTS.AGGREGATE_ID, TEST_CONSTANTS.AGGREGATE_TYPE, tenantId)];
+      const events = [
+        createTestEvent(
+          TEST_CONSTANTS.AGGREGATE_ID,
+          TEST_CONSTANTS.AGGREGATE_TYPE,
+          tenantId,
+        ),
+      ];
 
       eventStore.getEvents = vi.fn().mockResolvedValue(events);
       projectionHandler1.handle = vi
@@ -385,7 +440,13 @@ describe("EventSourcingService - Error Handling Flows", () => {
       const eventStore = createMockEventStore<Event>();
       const projectionHandler = createMockEventHandler<Event, any>();
       const projectionStore = createMockProjectionStore<any>();
-      const events = [createTestEvent(TEST_CONSTANTS.AGGREGATE_ID, TEST_CONSTANTS.AGGREGATE_TYPE, tenantId)];
+      const events = [
+        createTestEvent(
+          TEST_CONSTANTS.AGGREGATE_ID,
+          TEST_CONSTANTS.AGGREGATE_TYPE,
+          tenantId,
+        ),
+      ];
 
       eventStore.getEvents = vi
         .fn()
@@ -494,7 +555,11 @@ describe("EventSourcingService - Error Handling Flows", () => {
         logger: logger as any,
       });
 
-      const event = createTestEvent(TEST_CONSTANTS.AGGREGATE_ID, TEST_CONSTANTS.AGGREGATE_TYPE, tenantId);
+      const event = createTestEvent(
+        TEST_CONSTANTS.AGGREGATE_ID,
+        TEST_CONSTANTS.AGGREGATE_TYPE,
+        tenantId,
+      );
 
       await expect(
         service.storeEvents([event], context),
@@ -524,7 +589,11 @@ describe("EventSourcingService - Error Handling Flows", () => {
         processorCheckpointStore: checkpointStore,
       });
 
-      const event = createTestEvent(TEST_CONSTANTS.AGGREGATE_ID, TEST_CONSTANTS.AGGREGATE_TYPE, tenantId);
+      const event = createTestEvent(
+        TEST_CONSTANTS.AGGREGATE_ID,
+        TEST_CONSTANTS.AGGREGATE_TYPE,
+        tenantId,
+      );
 
       await expect(
         service.storeEvents([event], context),
@@ -573,7 +642,13 @@ describe("EventSourcingService - Error Handling Flows", () => {
       const projectionStore = createMockProjectionStore<any>();
       const distributedLock = createMockDistributedLock();
       const lockHandle = { key: "test-key", value: "test-value" };
-      const events = [createTestEvent(TEST_CONSTANTS.AGGREGATE_ID, TEST_CONSTANTS.AGGREGATE_TYPE, tenantId)];
+      const events = [
+        createTestEvent(
+          TEST_CONSTANTS.AGGREGATE_ID,
+          TEST_CONSTANTS.AGGREGATE_TYPE,
+          tenantId,
+        ),
+      ];
 
       eventStore.getEvents = vi.fn().mockResolvedValue(events);
       projectionHandler.handle = vi
@@ -620,7 +695,13 @@ describe("EventSourcingService - Error Handling Flows", () => {
         eventStore,
       });
 
-      const events = [createTestEvent(TEST_CONSTANTS.AGGREGATE_ID, TEST_CONSTANTS.AGGREGATE_TYPE, tenantId)];
+      const events = [
+        createTestEvent(
+          TEST_CONSTANTS.AGGREGATE_ID,
+          TEST_CONSTANTS.AGGREGATE_TYPE,
+          tenantId,
+        ),
+      ];
 
       await expect(service.storeEvents(events, context)).resolves.not.toThrow();
     });
@@ -634,7 +715,13 @@ describe("EventSourcingService - Error Handling Flows", () => {
         // No eventPublisher, eventHandlers, projections, etc.
       });
 
-      const events = [createTestEvent(TEST_CONSTANTS.AGGREGATE_ID, TEST_CONSTANTS.AGGREGATE_TYPE, tenantId)];
+      const events = [
+        createTestEvent(
+          TEST_CONSTANTS.AGGREGATE_ID,
+          TEST_CONSTANTS.AGGREGATE_TYPE,
+          tenantId,
+        ),
+      ];
 
       await expect(service.storeEvents(events, context)).resolves.not.toThrow();
       expect(eventStore.storeEvents).toHaveBeenCalledTimes(1);

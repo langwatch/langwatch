@@ -31,9 +31,7 @@ function createMockCommandHandlerClass(
     data: z.string().optional(),
   });
 
-  class MockCommandHandler
-    implements CommandHandler<Command<any, any>, Event>
-  {
+  class MockCommandHandler implements CommandHandler<Command<any, any>, Event> {
     static readonly schema = defineCommandSchema(
       `test.command.${name}` as CommandType,
       payloadSchema,
@@ -521,4 +519,3 @@ describe("QueueProcessorManager", () => {
     });
   });
 });
-

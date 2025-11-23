@@ -130,6 +130,7 @@ graph LR
 **Sequence Number Computation:**
 
 Sequence numbers are computed using `countEventsBefore()` - the number of events that occurred before this event (by timestamp and ID), plus 1. This ensures:
+
 - Events are numbered 1, 2, 3, ... in chronological order
 - Sequence numbers are stable and deterministic
 - Out-of-order processing is prevented
@@ -137,12 +138,14 @@ Sequence numbers are computed using `countEventsBefore()` - the number of events
 **Sequential Processing Enforcement:**
 
 The `EventProcessorValidator` orchestrates validation by coordinating:
+
 - **SequenceNumberCalculator**: Computes sequence numbers for events
 - **IdempotencyChecker**: Checks if events were already processed and atomically claims them
 - **OrderingValidator**: Verifies that the previous sequence number (N-1) was processed
 - **FailureDetector**: Checks if any previous events failed (stops processing if so)
 
 Before processing an event, the system:
+
 1. Computes the event's sequence number
 2. Checks if the event was already processed (idempotency) and atomically claims it
 3. Checks if any previous events failed (stops processing gracefully if so)
@@ -164,11 +167,13 @@ Before processing an event, the system:
 **Per-Aggregate Checkpointing:**
 
 Checkpoints track processing status per aggregate (not per event). One checkpoint per aggregate stores the last processed event's details:
+
 - **Checkpoint key format**: `tenantId:pipelineName:processorName:aggregateType:aggregateId`
 - **Checkpoint data**: Last processed event ID, sequence number, status (pending/processed/failed), timestamps
 - **Key construction**: Centralized in `buildCheckpointKey()` utility (see [`utils/checkpointKey.ts`](./utils/checkpointKey.ts))
 
 This design enables:
+
 - Efficient checkpoint storage (one record per aggregate instead of one per event)
 - Fast idempotency checks (check if last processed sequence >= current sequence)
 - Sequential ordering validation (check if previous sequence number was processed)
@@ -264,6 +269,7 @@ sequenceDiagram
 **Per-Aggregate Checkpointing:**
 
 One checkpoint per aggregate tracks the last processed event with status tracking:
+
 - **`pending`**: Event is queued but not yet processed
 - **`processed`**: Event was successfully processed
 - **`failed`**: Event processing failed
@@ -271,6 +277,7 @@ One checkpoint per aggregate tracks the last processed event with status trackin
 Checkpoint key format: `tenantId:pipelineName:processorName:aggregateType:aggregateId`
 
 Checkpoints enable:
+
 - **Idempotency**: Already processed events are automatically skipped (check if last processed sequence >= current sequence)
 - **Sequential ordering**: Events are processed in sequence number order (check if previous sequence was processed)
 - **Failure detection**: Failed events stop processing of subsequent events for that aggregate

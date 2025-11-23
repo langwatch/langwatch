@@ -23,7 +23,6 @@ describe("EventStoreMemory - countEventsBefore", () => {
       const timestamp = 1000;
 
       const event1 = EventUtils.createEvent(
-
         aggregateType,
         aggregateId,
         tenantId,
@@ -50,7 +49,6 @@ describe("EventStoreMemory - countEventsBefore", () => {
       const context = { tenantId };
 
       const event1 = EventUtils.createEvent(
-
         aggregateType,
         aggregateId,
         tenantId,
@@ -60,7 +58,6 @@ describe("EventStoreMemory - countEventsBefore", () => {
         1000,
       );
       const event2 = EventUtils.createEvent(
-
         aggregateType,
         aggregateId,
         tenantId,
@@ -70,7 +67,6 @@ describe("EventStoreMemory - countEventsBefore", () => {
         2000,
       );
       const event3 = EventUtils.createEvent(
-
         aggregateType,
         aggregateId,
         tenantId,
@@ -177,7 +173,6 @@ describe("EventStoreMemory - countEventsBefore", () => {
       const context2 = { tenantId: tenantId2 };
 
       const event1 = EventUtils.createEvent(
-
         aggregateType,
         aggregateId,
         tenantId1,
@@ -187,7 +182,6 @@ describe("EventStoreMemory - countEventsBefore", () => {
         1000,
       );
       const event2 = EventUtils.createEvent(
-
         aggregateType,
         aggregateId,
         tenantId2,
@@ -290,7 +284,6 @@ describe("EventStoreMemory - countEventsBefore", () => {
       const context = { tenantId };
 
       const event1 = EventUtils.createEvent(
-
         aggregateType,
         aggregateId,
         tenantId,
@@ -300,7 +293,6 @@ describe("EventStoreMemory - countEventsBefore", () => {
         1000,
       );
       const event2 = EventUtils.createEvent(
-
         aggregateType,
         aggregateId,
         tenantId,
@@ -310,7 +302,6 @@ describe("EventStoreMemory - countEventsBefore", () => {
         2000,
       );
       const event3 = EventUtils.createEvent(
-
         aggregateType,
         aggregateId,
         tenantId,
@@ -323,7 +314,6 @@ describe("EventStoreMemory - countEventsBefore", () => {
       event2.id = `${event2.id}-event2`;
       event3.id = `${event3.id}-event3`;
       const event4 = EventUtils.createEvent(
-
         aggregateType,
         aggregateId,
         tenantId,
@@ -333,7 +323,11 @@ describe("EventStoreMemory - countEventsBefore", () => {
         3000,
       );
 
-      await store.storeEvents([event1, event2, event3, event4], context, aggregateType);
+      await store.storeEvents(
+        [event1, event2, event3, event4],
+        context,
+        aggregateType,
+      );
 
       // Count events before event4 (timestamp 3000)
       const count = await store.countEventsBefore(
@@ -349,4 +343,3 @@ describe("EventStoreMemory - countEventsBefore", () => {
     });
   });
 });
-

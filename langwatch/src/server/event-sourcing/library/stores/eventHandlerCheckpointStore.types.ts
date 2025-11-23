@@ -51,9 +51,7 @@ export interface ProcessorCheckpointStore {
    * @param checkpointKey - The full checkpoint key (tenantId:pipelineName:processorName:aggregateType:aggregateId)
    * @returns The checkpoint if it exists, null otherwise
    */
-  loadCheckpoint(
-    checkpointKey: string,
-  ): Promise<ProcessorCheckpoint | null>;
+  loadCheckpoint(checkpointKey: string): Promise<ProcessorCheckpoint | null>;
 
   /**
    * Gets the last successfully processed event for a processor and aggregate.
@@ -156,7 +154,5 @@ export interface ProcessorCheckpointStore {
    *
    * @param checkpointKey - The full checkpoint key (tenantId:pipelineName:processorName:aggregateType:aggregateId)
    */
-  clearCheckpoint(
-    checkpointKey: string,
-  ): Promise<void>;
+  clearCheckpoint(checkpointKey: string): Promise<void>;
 }

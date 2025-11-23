@@ -1,8 +1,10 @@
 import { z } from "zod";
 
 export type { TraceAggregationCommandType } from "./typeIdentifiers";
-export { TRACE_AGGREGATION_TRIGGER_COMMAND_TYPE, TRACE_AGGREGATION_COMMAND_TYPES } from "./typeIdentifiers";
-
+export {
+  TRACE_AGGREGATION_TRIGGER_COMMAND_TYPE,
+  TRACE_AGGREGATION_COMMAND_TYPES,
+} from "./typeIdentifiers";
 
 /**
  * Zod schema for TriggerTraceAggregationCommandData.

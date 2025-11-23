@@ -29,9 +29,7 @@ describe("CheckpointManager", () => {
   describe("saveCheckpointSafely", () => {
     describe("when checkpoint store is not provided", () => {
       it("returns without saving", async () => {
-        const manager = new CheckpointManager(
-          TEST_CONSTANTS.PIPELINE_NAME,
-        );
+        const manager = new CheckpointManager(TEST_CONSTANTS.PIPELINE_NAME);
 
         const event = createTestEvent(
           TEST_CONSTANTS.AGGREGATE_ID,
@@ -248,4 +246,3 @@ describe("CheckpointManager", () => {
     });
   });
 });
-

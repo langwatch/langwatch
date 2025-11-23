@@ -24,7 +24,6 @@ describe("EventStoreMemory - Event ID Deduplication", () => {
 
       // Create two events with same Event ID (same timestamp/tenant/aggregate/type)
       const event1 = EventUtils.createEvent(
-
         aggregateType,
         aggregateId,
         tenantId,
@@ -37,7 +36,6 @@ describe("EventStoreMemory - Event ID Deduplication", () => {
       // Manually create event2 with same Event ID
       const event2 = {
         ...EventUtils.createEvent(
-
           aggregateType,
           aggregateId,
           tenantId,
@@ -54,7 +52,11 @@ describe("EventStoreMemory - Event ID Deduplication", () => {
       await store.storeEvents([event2], context, aggregateType);
 
       // Get events - should return only one (first occurrence)
-      const retrieved = await store.getEvents(aggregateId, context, aggregateType);
+      const retrieved = await store.getEvents(
+        aggregateId,
+        context,
+        aggregateType,
+      );
 
       expect(retrieved.length).toBe(1);
       expect(retrieved[0]?.id).toBe(event1.id);
@@ -67,7 +69,6 @@ describe("EventStoreMemory - Event ID Deduplication", () => {
       const timestamp = 1000;
 
       const event1 = EventUtils.createEvent(
-
         aggregateType,
         aggregateId,
         tenantId,
@@ -80,7 +81,6 @@ describe("EventStoreMemory - Event ID Deduplication", () => {
       // Create events with same Event ID
       const event2 = {
         ...EventUtils.createEvent(
-
           aggregateType,
           aggregateId,
           tenantId,
@@ -94,7 +94,6 @@ describe("EventStoreMemory - Event ID Deduplication", () => {
 
       const event3 = {
         ...EventUtils.createEvent(
-
           aggregateType,
           aggregateId,
           tenantId,
@@ -109,7 +108,11 @@ describe("EventStoreMemory - Event ID Deduplication", () => {
       // Store all events
       await store.storeEvents([event1, event2, event3], context, aggregateType);
 
-      const retrieved = await store.getEvents(aggregateId, context, aggregateType);
+      const retrieved = await store.getEvents(
+        aggregateId,
+        context,
+        aggregateType,
+      );
 
       expect(retrieved.length).toBe(1);
       expect(retrieved[0]?.data).toEqual({ value: "first" });
@@ -122,7 +125,6 @@ describe("EventStoreMemory - Event ID Deduplication", () => {
 
       // Create events with same timestamp (same Event ID)
       const event1 = EventUtils.createEvent(
-
         aggregateType,
         aggregateId,
         tenantId,
@@ -134,7 +136,6 @@ describe("EventStoreMemory - Event ID Deduplication", () => {
 
       const event2 = {
         ...EventUtils.createEvent(
-
           aggregateType,
           aggregateId,
           tenantId,
@@ -148,7 +149,6 @@ describe("EventStoreMemory - Event ID Deduplication", () => {
 
       const event3 = {
         ...EventUtils.createEvent(
-
           aggregateType,
           aggregateId,
           tenantId,
@@ -163,7 +163,11 @@ describe("EventStoreMemory - Event ID Deduplication", () => {
       // Store in order - first one should be kept
       await store.storeEvents([event1, event2, event3], context, aggregateType);
 
-      const retrieved = await store.getEvents(aggregateId, context, aggregateType);
+      const retrieved = await store.getEvents(
+        aggregateId,
+        context,
+        aggregateType,
+      );
 
       // Should keep the first one when sorted (earliest timestamp, first in array)
       expect(retrieved.length).toBe(1);
@@ -175,7 +179,6 @@ describe("EventStoreMemory - Event ID Deduplication", () => {
       const context = { tenantId };
 
       const event1 = EventUtils.createEvent(
-
         aggregateType,
         aggregateId,
         tenantId,
@@ -186,7 +189,6 @@ describe("EventStoreMemory - Event ID Deduplication", () => {
       );
 
       const event2 = EventUtils.createEvent(
-
         aggregateType,
         aggregateId,
         tenantId,
@@ -198,10 +200,16 @@ describe("EventStoreMemory - Event ID Deduplication", () => {
 
       await store.storeEvents([event1, event2], context, aggregateType);
 
-      const retrieved = await store.getEvents(aggregateId, context, aggregateType);
+      const retrieved = await store.getEvents(
+        aggregateId,
+        context,
+        aggregateType,
+      );
 
       expect(retrieved.length).toBe(2);
-      expect(retrieved.map((e) => e.id).sort()).toEqual([event1.id, event2.id].sort());
+      expect(retrieved.map((e) => e.id).sort()).toEqual(
+        [event1.id, event2.id].sort(),
+      );
     });
   });
 
@@ -211,7 +219,6 @@ describe("EventStoreMemory - Event ID Deduplication", () => {
       const timestamp = 1000;
 
       const event1 = EventUtils.createEvent(
-
         aggregateType,
         aggregateId,
         tenantId,
@@ -224,7 +231,6 @@ describe("EventStoreMemory - Event ID Deduplication", () => {
       // Create event2 with same Event ID
       const event2 = {
         ...EventUtils.createEvent(
-
           aggregateType,
           aggregateId,
           tenantId,
@@ -243,7 +249,11 @@ describe("EventStoreMemory - Event ID Deduplication", () => {
       await store.storeEvents([event2], context, aggregateType);
 
       // Should only have one event
-      const retrieved = await store.getEvents(aggregateId, context, aggregateType);
+      const retrieved = await store.getEvents(
+        aggregateId,
+        context,
+        aggregateType,
+      );
       expect(retrieved.length).toBe(1);
       expect(retrieved[0]?.data).toEqual({ value: 1 });
     });
@@ -252,7 +262,6 @@ describe("EventStoreMemory - Event ID Deduplication", () => {
       const context = { tenantId };
 
       const event1 = EventUtils.createEvent(
-
         aggregateType,
         aggregateId,
         tenantId,
@@ -263,7 +272,6 @@ describe("EventStoreMemory - Event ID Deduplication", () => {
       );
 
       const event2 = EventUtils.createEvent(
-
         aggregateType,
         aggregateId,
         tenantId,
@@ -276,9 +284,12 @@ describe("EventStoreMemory - Event ID Deduplication", () => {
       await store.storeEvents([event1], context, aggregateType);
       await store.storeEvents([event2], context, aggregateType);
 
-      const retrieved = await store.getEvents(aggregateId, context, aggregateType);
+      const retrieved = await store.getEvents(
+        aggregateId,
+        context,
+        aggregateType,
+      );
       expect(retrieved.length).toBe(2);
     });
   });
 });
-

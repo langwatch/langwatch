@@ -5,8 +5,9 @@ import type { EventStream } from "../../streams/eventStream";
  * Result type for projection handler execution.
  * Handlers can return a projection directly or as a promise.
  */
-export type ProjectionHandlerResult<ProjectionType extends Projection = Projection> =
-  Promise<ProjectionType> | ProjectionType;
+export type ProjectionHandlerResult<
+  ProjectionType extends Projection = Projection,
+> = Promise<ProjectionType> | ProjectionType;
 
 /**
  * Handler that processes a stream of events to build or update a projection.
@@ -32,4 +33,3 @@ export interface ProjectionHandler<
     stream: EventStream<EventType["tenantId"], EventType>,
   ): ProjectionHandlerResult<ProjectionType>;
 }
-

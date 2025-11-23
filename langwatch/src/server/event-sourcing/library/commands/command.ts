@@ -93,7 +93,9 @@ export interface CommandHandler<
  * @returns The validated command
  * @throws {z.ZodError} If the command is invalid
  */
-export function validateCommand(command: unknown): z.infer<typeof CommandSchema> {
+export function validateCommand(
+  command: unknown,
+): z.infer<typeof CommandSchema> {
   return CommandSchema.parse(command);
 }
 

@@ -7,6 +7,10 @@ import type {
 } from "../../../library";
 import type { Projection } from "../../../library";
 import { EventUtils } from "../../../library";
+import {
+  ValidationError,
+  SecurityError,
+} from "../../../library/services/errorHandling";
 import { createLogger } from "../../../../../utils/logger";
 import type { TraceAggregationStateProjectionRepository } from "./traceAggregationStateProjectionRepository";
 
@@ -85,15 +89,20 @@ export class TraceAggregationStateProjectionRepositoryMemory<
 
         // Validate projection
         if (!EventUtils.isValidProjection(projection)) {
-          throw new Error(
-            "[VALIDATION] Invalid projection: projection must have id, aggregateId, tenantId, version, and data",
+          throw new ValidationError(
+            "Invalid projection: projection must have id, aggregateId, tenantId, version, and data",
+            "projection",
+            projection,
           );
         }
 
         // Validate that projection tenantId matches context tenantId
         if (projection.tenantId !== context.tenantId) {
-          throw new Error(
-            `[SECURITY] Projection has tenantId '${projection.tenantId}' that does not match context tenantId '${context.tenantId}'`,
+          throw new SecurityError(
+            "storeProjection",
+            `Projection has tenantId '${projection.tenantId}' that does not match context tenantId '${context.tenantId}'`,
+            projection.tenantId,
+            { contextTenantId: context.tenantId },
           );
         }
 

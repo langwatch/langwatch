@@ -133,7 +133,9 @@ describe("EventHandlerDispatcher", () => {
       const checkpointStore = createMockProcessorCheckpointStore();
       checkpointStore.loadCheckpoint = vi.fn().mockResolvedValue(null);
       checkpointStore.hasFailedEvents = vi.fn().mockResolvedValue(false);
-      checkpointStore.getCheckpointBySequenceNumber = vi.fn().mockResolvedValue(null);
+      checkpointStore.getCheckpointBySequenceNumber = vi
+        .fn()
+        .mockResolvedValue(null);
 
       const dispatcher = createDispatcher({
         eventHandlers,
@@ -165,7 +167,9 @@ describe("EventHandlerDispatcher", () => {
       const checkpointStore = createMockProcessorCheckpointStore();
       checkpointStore.loadCheckpoint = vi.fn().mockResolvedValue(null);
       checkpointStore.hasFailedEvents = vi.fn().mockResolvedValue(false);
-      checkpointStore.getCheckpointBySequenceNumber = vi.fn().mockResolvedValue(null);
+      checkpointStore.getCheckpointBySequenceNumber = vi
+        .fn()
+        .mockResolvedValue(null);
 
       const dispatcher = createDispatcher({
         eventHandlers,
@@ -243,7 +247,9 @@ describe("EventHandlerDispatcher", () => {
       const checkpointStore = createMockProcessorCheckpointStore();
       checkpointStore.loadCheckpoint = vi.fn().mockResolvedValue(null);
       checkpointStore.hasFailedEvents = vi.fn().mockResolvedValue(false);
-      checkpointStore.getCheckpointBySequenceNumber = vi.fn().mockResolvedValue(null);
+      checkpointStore.getCheckpointBySequenceNumber = vi
+        .fn()
+        .mockResolvedValue(null);
 
       const dispatcher = createDispatcher({
         processorCheckpointStore: checkpointStore,
@@ -262,7 +268,13 @@ describe("EventHandlerDispatcher", () => {
       // 1st call: pending checkpoint from idempotency checker (optimistic locking) - 5 args, no errorMessage
       expect(checkpointStore.saveCheckpoint).toHaveBeenNthCalledWith(
         1,
-        buildCheckpointKey(tenantId, TEST_CONSTANTS.PIPELINE_NAME, "handler1", TEST_CONSTANTS.AGGREGATE_TYPE, TEST_CONSTANTS.AGGREGATE_ID),
+        buildCheckpointKey(
+          tenantId,
+          TEST_CONSTANTS.PIPELINE_NAME,
+          "handler1",
+          TEST_CONSTANTS.AGGREGATE_TYPE,
+          TEST_CONSTANTS.AGGREGATE_ID,
+        ),
         "handler",
         event,
         "pending",
@@ -271,7 +283,13 @@ describe("EventHandlerDispatcher", () => {
       // 2nd call: pending checkpoint before processing (from handleEvent)
       expect(checkpointStore.saveCheckpoint).toHaveBeenNthCalledWith(
         2,
-        buildCheckpointKey(tenantId, TEST_CONSTANTS.PIPELINE_NAME, "handler1", TEST_CONSTANTS.AGGREGATE_TYPE, TEST_CONSTANTS.AGGREGATE_ID),
+        buildCheckpointKey(
+          tenantId,
+          TEST_CONSTANTS.PIPELINE_NAME,
+          "handler1",
+          TEST_CONSTANTS.AGGREGATE_TYPE,
+          TEST_CONSTANTS.AGGREGATE_ID,
+        ),
         "handler",
         event,
         "pending",
@@ -281,7 +299,13 @@ describe("EventHandlerDispatcher", () => {
       // 3rd call: processed checkpoint after successful processing
       expect(checkpointStore.saveCheckpoint).toHaveBeenNthCalledWith(
         3,
-        buildCheckpointKey(tenantId, TEST_CONSTANTS.PIPELINE_NAME, "handler1", TEST_CONSTANTS.AGGREGATE_TYPE, TEST_CONSTANTS.AGGREGATE_ID),
+        buildCheckpointKey(
+          tenantId,
+          TEST_CONSTANTS.PIPELINE_NAME,
+          "handler1",
+          TEST_CONSTANTS.AGGREGATE_TYPE,
+          TEST_CONSTANTS.AGGREGATE_ID,
+        ),
         "handler",
         event,
         "processed",
@@ -298,7 +322,9 @@ describe("EventHandlerDispatcher", () => {
       const checkpointStore = createMockProcessorCheckpointStore();
       checkpointStore.loadCheckpoint = vi.fn().mockResolvedValue(null);
       checkpointStore.hasFailedEvents = vi.fn().mockResolvedValue(false);
-      checkpointStore.getCheckpointBySequenceNumber = vi.fn().mockResolvedValue(null);
+      checkpointStore.getCheckpointBySequenceNumber = vi
+        .fn()
+        .mockResolvedValue(null);
 
       const logger = createMockLogger();
       const dispatcher = createDispatcher({
@@ -319,7 +345,13 @@ describe("EventHandlerDispatcher", () => {
       // The failed checkpoint is the 3rd call (after 2 pending checkpoints)
       expect(checkpointStore.saveCheckpoint).toHaveBeenNthCalledWith(
         3,
-        buildCheckpointKey(tenantId, TEST_CONSTANTS.PIPELINE_NAME, "handler1", TEST_CONSTANTS.AGGREGATE_TYPE, TEST_CONSTANTS.AGGREGATE_ID),
+        buildCheckpointKey(
+          tenantId,
+          TEST_CONSTANTS.PIPELINE_NAME,
+          "handler1",
+          TEST_CONSTANTS.AGGREGATE_TYPE,
+          TEST_CONSTANTS.AGGREGATE_ID,
+        ),
         "handler",
         event,
         "failed",
@@ -383,4 +415,3 @@ describe("EventHandlerDispatcher", () => {
     });
   });
 });
-

@@ -38,7 +38,7 @@ export class EventSourcingPipeline<
     // Create checkpoint store for event handlers and projections
     // Always use Memory store in test environment, otherwise use ClickHouse if available
     const checkpointStore =
-      definition.eventHandlers ?? definition.projections
+      (definition.eventHandlers ?? definition.projections)
         ? (() => {
             // Always use Memory store in test environment
             if (process.env.NODE_ENV === "test" || process.env.VITEST) {

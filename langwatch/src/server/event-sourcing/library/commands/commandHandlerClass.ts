@@ -108,4 +108,3 @@ export type ExtractCommandHandlerType<T> =
  */
 export type ExtractCommandHandlerEvent<T> =
   T extends CommandHandlerClass<any, any, infer EventType> ? EventType : never;
-

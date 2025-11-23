@@ -36,7 +36,13 @@ describe("EventSourcingService - Concurrency Flows", () => {
       const projectionHandler = createMockEventHandler<Event, any>();
       const projectionStore = createMockProjectionStore<any>();
       const distributedLock = createMockDistributedLock();
-      const events = [createTestEvent(TEST_CONSTANTS.AGGREGATE_ID, TEST_CONSTANTS.AGGREGATE_TYPE, tenantId)];
+      const events = [
+        createTestEvent(
+          TEST_CONSTANTS.AGGREGATE_ID,
+          TEST_CONSTANTS.AGGREGATE_TYPE,
+          tenantId,
+        ),
+      ];
 
       eventStore.getEvents = vi.fn().mockResolvedValue(events);
       projectionHandler.handle = vi
@@ -76,7 +82,13 @@ describe("EventSourcingService - Concurrency Flows", () => {
       const projectionHandler = createMockEventHandler<Event, any>();
       const projectionStore = createMockProjectionStore<any>();
       const distributedLock = createMockDistributedLock();
-      const events = [createTestEvent(TEST_CONSTANTS.AGGREGATE_ID, TEST_CONSTANTS.AGGREGATE_TYPE, tenantId)];
+      const events = [
+        createTestEvent(
+          TEST_CONSTANTS.AGGREGATE_ID,
+          TEST_CONSTANTS.AGGREGATE_TYPE,
+          tenantId,
+        ),
+      ];
 
       eventStore.getEvents = vi.fn().mockResolvedValue(events);
       projectionHandler.handle = vi
@@ -118,7 +130,13 @@ describe("EventSourcingService - Concurrency Flows", () => {
       const projectionStore = createMockProjectionStore<any>();
       const distributedLock = createMockDistributedLock();
       const customTtl = 10 * 60 * 1000; // 10 minutes
-      const events = [createTestEvent(TEST_CONSTANTS.AGGREGATE_ID, TEST_CONSTANTS.AGGREGATE_TYPE, tenantId)];
+      const events = [
+        createTestEvent(
+          TEST_CONSTANTS.AGGREGATE_ID,
+          TEST_CONSTANTS.AGGREGATE_TYPE,
+          tenantId,
+        ),
+      ];
 
       eventStore.getEvents = vi.fn().mockResolvedValue(events);
       projectionHandler.handle = vi
@@ -160,7 +178,13 @@ describe("EventSourcingService - Concurrency Flows", () => {
       const projectionStore = createMockProjectionStore<any>();
       const distributedLock = createMockDistributedLock();
       const lockHandle = { key: "test-key", value: "test-value" };
-      const events = [createTestEvent(TEST_CONSTANTS.AGGREGATE_ID, TEST_CONSTANTS.AGGREGATE_TYPE, tenantId)];
+      const events = [
+        createTestEvent(
+          TEST_CONSTANTS.AGGREGATE_ID,
+          TEST_CONSTANTS.AGGREGATE_TYPE,
+          tenantId,
+        ),
+      ];
 
       eventStore.getEvents = vi.fn().mockResolvedValue(events);
       projectionHandler.handle = vi
@@ -200,7 +224,13 @@ describe("EventSourcingService - Concurrency Flows", () => {
       const projectionStore = createMockProjectionStore<any>();
       const distributedLock = createMockDistributedLock();
       const lockHandle = { key: "test-key", value: "test-value" };
-      const events = [createTestEvent(TEST_CONSTANTS.AGGREGATE_ID, TEST_CONSTANTS.AGGREGATE_TYPE, tenantId)];
+      const events = [
+        createTestEvent(
+          TEST_CONSTANTS.AGGREGATE_ID,
+          TEST_CONSTANTS.AGGREGATE_TYPE,
+          tenantId,
+        ),
+      ];
 
       eventStore.getEvents = vi.fn().mockResolvedValue(events);
       const handlerError = new Error("Handler failed");
@@ -323,7 +353,13 @@ describe("EventSourcingService - Concurrency Flows", () => {
       const projectionHandler = createMockEventHandler<Event, any>();
       const projectionStore = createMockProjectionStore<any>();
       const distributedLock = createMockDistributedLock();
-      const events = [createTestEvent(TEST_CONSTANTS.AGGREGATE_ID, TEST_CONSTANTS.AGGREGATE_TYPE, tenantId)];
+      const events = [
+        createTestEvent(
+          TEST_CONSTANTS.AGGREGATE_ID,
+          TEST_CONSTANTS.AGGREGATE_TYPE,
+          tenantId,
+        ),
+      ];
 
       let lockAcquired = false;
       const lockHandle = { key: "test-key", value: "test-value" };
@@ -403,7 +439,9 @@ describe("EventSourcingService - Concurrency Flows", () => {
 
       eventStore.getEvents = vi
         .fn()
-        .mockResolvedValue([createTestEvent(aggregate1, TEST_CONSTANTS.AGGREGATE_TYPE, tenantId)]);
+        .mockResolvedValue([
+          createTestEvent(aggregate1, TEST_CONSTANTS.AGGREGATE_TYPE, tenantId),
+        ]);
       projectionHandler.handle = vi
         .fn()
         .mockResolvedValue(createTestProjection(aggregate1, tenantId));
@@ -492,7 +530,13 @@ describe("EventSourcingService - Concurrency Flows", () => {
       const eventStore = createMockEventStore<Event>();
       const projectionHandler = createMockEventHandler<Event, any>();
       const projectionStore = createMockProjectionStore<any>();
-      const events = [createTestEvent(TEST_CONSTANTS.AGGREGATE_ID, TEST_CONSTANTS.AGGREGATE_TYPE, tenantId)];
+      const events = [
+        createTestEvent(
+          TEST_CONSTANTS.AGGREGATE_ID,
+          TEST_CONSTANTS.AGGREGATE_TYPE,
+          tenantId,
+        ),
+      ];
 
       eventStore.getEvents = vi.fn().mockResolvedValue(events);
       projectionHandler.handle = vi
@@ -604,7 +648,13 @@ describe("EventSourcingService - Concurrency Flows", () => {
       const projectionStore = createMockProjectionStore<any>();
       const distributedLock = createMockDistributedLock();
       const customTtl = 15 * 60 * 1000; // 15 minutes
-      const events = [createTestEvent(TEST_CONSTANTS.AGGREGATE_ID, TEST_CONSTANTS.AGGREGATE_TYPE, tenantId)];
+      const events = [
+        createTestEvent(
+          TEST_CONSTANTS.AGGREGATE_ID,
+          TEST_CONSTANTS.AGGREGATE_TYPE,
+          tenantId,
+        ),
+      ];
 
       eventStore.getEvents = vi.fn().mockResolvedValue(events);
       projectionHandler.handle = vi
@@ -645,7 +695,13 @@ describe("EventSourcingService - Concurrency Flows", () => {
       const projectionHandler = createMockEventHandler<Event, any>();
       const projectionStore = createMockProjectionStore<any>();
       const distributedLock = createMockDistributedLock();
-      const events = [createTestEvent(TEST_CONSTANTS.AGGREGATE_ID, TEST_CONSTANTS.AGGREGATE_TYPE, tenantId)];
+      const events = [
+        createTestEvent(
+          TEST_CONSTANTS.AGGREGATE_ID,
+          TEST_CONSTANTS.AGGREGATE_TYPE,
+          tenantId,
+        ),
+      ];
       const DEFAULT_UPDATE_LOCK_TTL_MS = 5 * 60 * 1000; // 5 minutes
 
       eventStore.getEvents = vi.fn().mockResolvedValue(events);

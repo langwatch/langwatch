@@ -6,7 +6,10 @@ import type { Event, ProcessorCheckpoint } from "../../library/domain/types";
 import type { TenantId } from "../../library/domain/tenantId";
 import type { AggregateType } from "../../library/domain/aggregateType";
 import { EventUtils } from "../../library";
-import { parseCheckpointKey, buildCheckpointKey } from "../../library/utils/checkpointKey";
+import {
+  parseCheckpointKey,
+  buildCheckpointKey,
+} from "../../library/utils/checkpointKey";
 import { createLogger } from "../../../../utils/logger";
 import type {
   CheckpointRepository,
@@ -78,7 +81,7 @@ export class ProcessorCheckpointStoreClickHouse
           "processor.name": processorName,
           "processor.type": processorType,
           "event.id": event.id,
-          "status": status,
+          status: status,
           "tenant.id": event.tenantId,
           "aggregate.type": event.aggregateType,
           "aggregate.id": String(event.aggregateId),
@@ -97,7 +100,7 @@ export class ProcessorCheckpointStoreClickHouse
             SequenceNumber: sequenceNumber,
             ProcessedAt: status === "processed" ? now : null,
             FailedAt: status === "failed" ? now : null,
-            ErrorMessage: status === "failed" ? errorMessage ?? null : null,
+            ErrorMessage: status === "failed" ? (errorMessage ?? null) : null,
             TenantId: event.tenantId,
             AggregateType: event.aggregateType,
             AggregateId: String(event.aggregateId),
@@ -153,9 +156,8 @@ export class ProcessorCheckpointStoreClickHouse
       async () => {
         try {
           // Get record from repository
-          const record = await this.repository.getCheckpointRecord(
-            checkpointKey,
-          );
+          const record =
+            await this.repository.getCheckpointRecord(checkpointKey);
 
           if (!record) {
             return null;
@@ -216,9 +218,10 @@ export class ProcessorCheckpointStoreClickHouse
           );
 
           // Get record from repository
-          const record = await this.repository.getLastProcessedCheckpointRecord(
-            checkpointKey,
-          );
+          const record =
+            await this.repository.getLastProcessedCheckpointRecord(
+              checkpointKey,
+            );
 
           if (!record) {
             return null;
@@ -285,10 +288,11 @@ export class ProcessorCheckpointStoreClickHouse
           );
 
           // Get record from repository
-          const record = await this.repository.getCheckpointRecordBySequenceNumber(
-            checkpointKey,
-            sequenceNumber,
-          );
+          const record =
+            await this.repository.getCheckpointRecordBySequenceNumber(
+              checkpointKey,
+              sequenceNumber,
+            );
 
           if (!record) {
             return null;
@@ -354,7 +358,9 @@ export class ProcessorCheckpointStoreClickHouse
           );
 
           // Delegate to repository
-          return await this.repository.hasFailedCheckpointRecords(checkpointKey);
+          return await this.repository.hasFailedCheckpointRecords(
+            checkpointKey,
+          );
         } catch (error) {
           this.logger.error(
             {
@@ -412,9 +418,8 @@ export class ProcessorCheckpointStoreClickHouse
           );
 
           // Get records from repository
-          const records = await this.repository.getFailedCheckpointRecords(
-            checkpointKey,
-          );
+          const records =
+            await this.repository.getFailedCheckpointRecords(checkpointKey);
 
           // Transform to checkpoints
           return records.map((record) => this.recordToCheckpoint(record));
@@ -437,9 +442,7 @@ export class ProcessorCheckpointStoreClickHouse
     );
   }
 
-  async clearCheckpoint(
-    checkpointKey: string,
-  ): Promise<void> {
+  async clearCheckpoint(checkpointKey: string): Promise<void> {
     return await this.tracer.withActiveSpan(
       "ProcessorCheckpointStoreClickHouse.clearCheckpoint",
       {
@@ -451,9 +454,7 @@ export class ProcessorCheckpointStoreClickHouse
       async () => {
         try {
           // Delegate to repository
-          await this.repository.deleteCheckpointRecord(
-            checkpointKey,
-          );
+          await this.repository.deleteCheckpointRecord(checkpointKey);
 
           this.logger.debug(
             {

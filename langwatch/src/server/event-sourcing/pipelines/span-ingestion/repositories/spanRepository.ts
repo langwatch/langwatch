@@ -1,4 +1,7 @@
-import type { StoreSpanIngestionCommandData, SpanData } from "../schemas/commands";
+import type {
+  StoreSpanIngestionCommandData,
+  SpanData,
+} from "../schemas/commands";
 
 /**
  * Repository interface for span storage operations

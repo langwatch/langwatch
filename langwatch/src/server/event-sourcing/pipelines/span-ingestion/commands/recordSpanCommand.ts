@@ -5,7 +5,10 @@ import type { Command, CommandHandler } from "../../../library";
 import { EventUtils, createTenantId } from "../../../library";
 import { defineCommandSchema } from "../../../library";
 import type { StoreSpanIngestionCommandData } from "../schemas/commands";
-import { SPAN_INGESTION_RECORD_COMMAND_TYPE, storeSpanIngestionCommandDataSchema } from "../schemas/commands";
+import {
+  SPAN_INGESTION_RECORD_COMMAND_TYPE,
+  storeSpanIngestionCommandDataSchema,
+} from "../schemas/commands";
 import type { SpanIngestionRecordedEvent } from "../schemas/events";
 import { SPAN_INGESTION_RECORDED_EVENT_TYPE } from "../schemas/events";
 import { createLogger } from "../../../../../utils/logger";
@@ -92,21 +95,22 @@ export class RecordSpanCommand
 
         // Create lightweight event with only identifiers
         // Full span data is stored separately in ClickHouse
-        const ingestionEvent = EventUtils.createEvent<SpanIngestionRecordedEvent>(
-          "span_ingestion",
-          traceId,
-          tenantId,
-          SPAN_INGESTION_RECORDED_EVENT_TYPE,
-          {
+        const ingestionEvent =
+          EventUtils.createEvent<SpanIngestionRecordedEvent>(
+            "span_ingestion",
             traceId,
-            spanId,
-            collectedAtUnixMs,
-          },
-          {
-            spanId,
-            collectedAtUnixMs,
-          },
-        );
+            tenantId,
+            SPAN_INGESTION_RECORDED_EVENT_TYPE,
+            {
+              traceId,
+              spanId,
+              collectedAtUnixMs,
+            },
+            {
+              spanId,
+              collectedAtUnixMs,
+            },
+          );
 
         return [ingestionEvent];
       },

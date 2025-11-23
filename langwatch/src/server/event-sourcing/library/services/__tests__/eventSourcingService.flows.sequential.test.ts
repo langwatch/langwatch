@@ -72,9 +72,7 @@ describe("EventSourcingService - Sequential Ordering Flows", () => {
 
       // Try to process event2 (sequence 2) before event1 (sequence 1) is processed
       // This should fail because event1 hasn't been processed yet
-      await expect(
-        service.storeEvents([event2], context),
-      ).rejects.toThrow(
+      await expect(service.storeEvents([event2], context)).rejects.toThrow(
         "Previous event (sequence 1) has not been processed yet",
       );
 
@@ -164,18 +162,22 @@ describe("EventSourcingService - Sequential Ordering Flows", () => {
       );
 
       // Store all events
-      await eventStore.storeEvents([event1, event2, event3], context, aggregateType);
+      await eventStore.storeEvents(
+        [event1, event2, event3],
+        context,
+        aggregateType,
+      );
 
       // Process events out of order: event3, then event1, then event2
       // event3 should fail (waiting for event2, which is the immediate predecessor)
-      await expect(
-        service.storeEvents([event3], context),
-      ).rejects.toThrow(/Previous event \(sequence \d+\) has not been processed yet/);
+      await expect(service.storeEvents([event3], context)).rejects.toThrow(
+        /Previous event \(sequence \d+\) has not been processed yet/,
+      );
 
       // event2 should fail (waiting for event1)
-      await expect(
-        service.storeEvents([event2], context),
-      ).rejects.toThrow("Previous event (sequence 1) has not been processed yet");
+      await expect(service.storeEvents([event2], context)).rejects.toThrow(
+        "Previous event (sequence 1) has not been processed yet",
+      );
 
       // event1 should succeed (first event, no previous)
       await service.storeEvents([event1], context);
@@ -285,7 +287,11 @@ describe("EventSourcingService - Sequential Ordering Flows", () => {
       );
 
       // Store all events
-      await eventStore.storeEvents([event1, event2, event3], context, aggregateType);
+      await eventStore.storeEvents(
+        [event1, event2, event3],
+        context,
+        aggregateType,
+      );
 
       // Process events in order and verify sequence numbers after each
       const checkpointKey = buildCheckpointKey(
@@ -367,7 +373,11 @@ describe("EventSourcingService - Sequential Ordering Flows", () => {
       );
 
       // Store all events
-      await eventStore.storeEvents([event1, event2, event3], context, aggregateType);
+      await eventStore.storeEvents(
+        [event1, event2, event3],
+        context,
+        aggregateType,
+      );
 
       // Process events in order and verify sequence numbers after each
       const checkpointKey = buildCheckpointKey(
@@ -444,14 +454,14 @@ describe("EventSourcingService - Sequential Ordering Flows", () => {
       await eventStore.storeEvents([event1, event2], context, aggregateType);
 
       // Mock projection handler to return a projection
-      projectionHandler.handle = vi.fn().mockResolvedValue(
-        createTestProjection(TEST_CONSTANTS.AGGREGATE_ID, tenantId),
-      );
+      projectionHandler.handle = vi
+        .fn()
+        .mockResolvedValue(
+          createTestProjection(TEST_CONSTANTS.AGGREGATE_ID, tenantId),
+        );
 
       // Try to process event2 before event1 - should fail
-      await expect(
-        service.storeEvents([event2], context),
-      ).rejects.toThrow(
+      await expect(service.storeEvents([event2], context)).rejects.toThrow(
         "Previous event (sequence 1) has not been processed yet",
       );
 
@@ -528,9 +538,11 @@ describe("EventSourcingService - Sequential Ordering Flows", () => {
       await eventStore.storeEvents([event1], context, aggregateType);
 
       // Mock projection handler
-      projectionHandler.handle = vi.fn().mockResolvedValue(
-        createTestProjection(TEST_CONSTANTS.AGGREGATE_ID, tenantId),
-      );
+      projectionHandler.handle = vi
+        .fn()
+        .mockResolvedValue(
+          createTestProjection(TEST_CONSTANTS.AGGREGATE_ID, tenantId),
+        );
 
       // Process first event - should succeed without checking for previous
       await service.storeEvents([event1], context);
@@ -603,7 +615,11 @@ describe("EventSourcingService - Sequential Ordering Flows", () => {
       );
 
       // Store all events
-      await eventStore.storeEvents([eventA, eventB, eventC], context, aggregateType);
+      await eventStore.storeEvents(
+        [eventA, eventB, eventC],
+        context,
+        aggregateType,
+      );
 
       // Process events and verify sequence numbers after each
       const checkpointKey = buildCheckpointKey(
@@ -720,12 +736,14 @@ describe("EventSourcingService - Sequential Ordering Flows", () => {
 
       // Process event1 and check sequence number
       await service2.storeEvents([event1], context);
-      const checkpoint1_2 = await checkpointStore2.loadCheckpoint(checkpointKey2);
+      const checkpoint1_2 =
+        await checkpointStore2.loadCheckpoint(checkpointKey2);
       const seq1_2 = checkpoint1_2?.sequenceNumber;
 
       // Process event2 and check sequence number
       await service2.storeEvents([event2], context);
-      const checkpoint2_2 = await checkpointStore2.loadCheckpoint(checkpointKey2);
+      const checkpoint2_2 =
+        await checkpointStore2.loadCheckpoint(checkpointKey2);
       const seq2_2 = checkpoint2_2?.sequenceNumber;
 
       // Verify sequence numbers are the same
@@ -775,9 +793,11 @@ describe("EventSourcingService - Sequential Ordering Flows", () => {
       await eventStore.storeEvents([event1, event2], context, aggregateType);
 
       // Mock projection handler
-      projectionHandler.handle = vi.fn().mockResolvedValue(
-        createTestProjection(TEST_CONSTANTS.AGGREGATE_ID, tenantId),
-      );
+      projectionHandler.handle = vi
+        .fn()
+        .mockResolvedValue(
+          createTestProjection(TEST_CONSTANTS.AGGREGATE_ID, tenantId),
+        );
 
       // Process events and get sequence numbers after each
       const checkpointKey = buildCheckpointKey(
@@ -863,7 +883,11 @@ describe("EventSourcingService - Sequential Ordering Flows", () => {
       );
 
       // Store all events
-      await eventStore.storeEvents([event1, event2, event3], context, aggregateType);
+      await eventStore.storeEvents(
+        [event1, event2, event3],
+        context,
+        aggregateType,
+      );
 
       // Process events in order and verify sequence numbers after each
       const checkpointKey = buildCheckpointKey(
@@ -1117,10 +1141,22 @@ describe("EventSourcingService - Sequential Ordering Flows", () => {
 
       // Verify checkpoints exist for both handlers
       const checkpoint1_handler1 = await checkpointStore.loadCheckpoint(
-        buildCheckpointKey(tenantId, TEST_CONSTANTS.PIPELINE_NAME, "handler1", TEST_CONSTANTS.AGGREGATE_TYPE, TEST_CONSTANTS.AGGREGATE_ID),
+        buildCheckpointKey(
+          tenantId,
+          TEST_CONSTANTS.PIPELINE_NAME,
+          "handler1",
+          TEST_CONSTANTS.AGGREGATE_TYPE,
+          TEST_CONSTANTS.AGGREGATE_ID,
+        ),
       );
       const checkpoint1_handler2 = await checkpointStore.loadCheckpoint(
-        buildCheckpointKey(tenantId, TEST_CONSTANTS.PIPELINE_NAME, "handler2", TEST_CONSTANTS.AGGREGATE_TYPE, TEST_CONSTANTS.AGGREGATE_ID),
+        buildCheckpointKey(
+          tenantId,
+          TEST_CONSTANTS.PIPELINE_NAME,
+          "handler2",
+          TEST_CONSTANTS.AGGREGATE_TYPE,
+          TEST_CONSTANTS.AGGREGATE_ID,
+        ),
       );
       expect(checkpoint1_handler1).not.toBeNull();
       expect(checkpoint1_handler2).not.toBeNull();
@@ -1198,10 +1234,22 @@ describe("EventSourcingService - Sequential Ordering Flows", () => {
 
       // Verify checkpoints exist for both events (different event IDs)
       const checkpoint1 = await checkpointStore.loadCheckpoint(
-        buildCheckpointKey(tenantId, TEST_CONSTANTS.PIPELINE_NAME, "handler", TEST_CONSTANTS.AGGREGATE_TYPE, aggregateId1),
+        buildCheckpointKey(
+          tenantId,
+          TEST_CONSTANTS.PIPELINE_NAME,
+          "handler",
+          TEST_CONSTANTS.AGGREGATE_TYPE,
+          aggregateId1,
+        ),
       );
       const checkpoint2 = await checkpointStore.loadCheckpoint(
-        buildCheckpointKey(tenantId, TEST_CONSTANTS.PIPELINE_NAME, "handler", TEST_CONSTANTS.AGGREGATE_TYPE, aggregateId2),
+        buildCheckpointKey(
+          tenantId,
+          TEST_CONSTANTS.PIPELINE_NAME,
+          "handler",
+          TEST_CONSTANTS.AGGREGATE_TYPE,
+          aggregateId2,
+        ),
       );
       expect(checkpoint1).not.toBeNull();
       expect(checkpoint2).not.toBeNull();
@@ -1287,4 +1335,3 @@ describe("EventSourcingService - Sequential Ordering Flows", () => {
     });
   });
 });
-

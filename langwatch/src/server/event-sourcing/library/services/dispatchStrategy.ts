@@ -16,7 +16,10 @@ export interface DispatchStrategy<EventType extends Event = Event> {
   dispatch(
     events: readonly EventType[],
     context: EventStoreReadContext<EventType>,
-    dispatchCallback: (event: EventType, context: EventStoreReadContext<EventType>) => Promise<void>,
+    dispatchCallback: (
+      event: EventType,
+      context: EventStoreReadContext<EventType>,
+    ) => Promise<void>,
   ): Promise<void>;
 }
 
@@ -49,9 +52,7 @@ export class QueueDispatchStrategy<EventType extends Event = Event>
   implements DispatchStrategy<EventType>
 {
   constructor(
-    private readonly sendToQueue: (
-      event: EventType,
-    ) => Promise<void>,
+    private readonly sendToQueue: (event: EventType) => Promise<void>,
   ) {}
 
   async dispatch(
@@ -67,4 +68,3 @@ export class QueueDispatchStrategy<EventType extends Event = Event>
     }
   }
 }
-

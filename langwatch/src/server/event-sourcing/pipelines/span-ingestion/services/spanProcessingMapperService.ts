@@ -172,7 +172,9 @@ export class SpanProcessingMapperService {
    * This mapping is critical for command serialization.
    * They will be properly set when the command is processed (aggregateId is traceId).
    */
-  mapReadableSpanToSpanData(span: ReadableSpan): Omit<SpanData, "id" | "tenantId"> {
+  mapReadableSpanToSpanData(
+    span: ReadableSpan,
+  ): Omit<SpanData, "id" | "tenantId"> {
     const spanContext = span.spanContext();
     const parentSpanContext = span.parentSpanContext;
 

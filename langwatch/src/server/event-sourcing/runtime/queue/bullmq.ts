@@ -17,6 +17,7 @@ import type {
 import {
   isSequentialOrderingError,
   extractPreviousSequenceNumber,
+  ConfigurationError,
 } from "../../library/services/errorHandling";
 
 export class EventSourcedQueueProcessorBullMq<Payload>
@@ -37,7 +38,8 @@ export class EventSourcedQueueProcessorBullMq<Payload>
       definition;
 
     if (!connection) {
-      throw new Error(
+      throw new ConfigurationError(
+        "BullMQQueueProcessor",
         "BullMQ queue processor requires Redis connection. Use memory implementation instead.",
       );
     }
@@ -46,7 +48,7 @@ export class EventSourcedQueueProcessorBullMq<Payload>
     this.delay = delay;
 
     this.queueName = name;
-    this.jobName = 'queue';
+    this.jobName = "queue";
     this.makeJobId = makeJobId;
     this.process = process;
 
@@ -73,7 +75,10 @@ export class EventSourcedQueueProcessorBullMq<Payload>
         },
       },
     };
-    this.queue = new Queue<Payload, unknown, string>(this.queueName, queueOptions);
+    this.queue = new Queue<Payload, unknown, string>(
+      this.queueName,
+      queueOptions,
+    );
 
     const workerOptions: WorkerOptions = {
       connection,
@@ -147,7 +152,7 @@ export class EventSourcedQueueProcessorBullMq<Payload>
             // hitting retry limits when processing 30+ events sequentially
             const baseDelayMs = 2000;
             const progressiveDelayMs = Math.min(
-              baseDelayMs + (job.attemptsMade * 1000),
+              baseDelayMs + job.attemptsMade * 1000,
               20000, // Cap at 30 seconds
             );
             const delayedTimestamp = Date.now() + progressiveDelayMs;
@@ -177,7 +182,10 @@ export class EventSourcedQueueProcessorBullMq<Payload>
                 {
                   queueName: this.queueName,
                   jobId: job.id,
-                  moveError: moveError instanceof Error ? moveError.message : String(moveError),
+                  moveError:
+                    moveError instanceof Error
+                      ? moveError.message
+                      : String(moveError),
                 },
                 "Failed to move ordering error job to delayed state, will retry normally",
               );
@@ -221,8 +229,8 @@ export class EventSourcedQueueProcessorBullMq<Payload>
     };
 
     const customAttributes = this.spanAttributes
-        ? this.spanAttributes(payload)
-    : {};
+      ? this.spanAttributes(payload)
+      : {};
 
     const span = trace.getActiveSpan();
     span?.setAttributes({ ...customAttributes });

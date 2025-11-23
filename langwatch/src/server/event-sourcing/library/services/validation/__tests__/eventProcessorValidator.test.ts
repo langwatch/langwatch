@@ -146,7 +146,13 @@ describe("EventProcessorValidator", () => {
 
         expect(result).toBeNull();
         expect(checkpointStore.loadCheckpoint).toHaveBeenCalledWith(
-          buildCheckpointKey(tenantId, TEST_CONSTANTS.PIPELINE_NAME, "processor", TEST_CONSTANTS.AGGREGATE_TYPE, TEST_CONSTANTS.AGGREGATE_ID),
+          buildCheckpointKey(
+            tenantId,
+            TEST_CONSTANTS.PIPELINE_NAME,
+            "processor",
+            TEST_CONSTANTS.AGGREGATE_TYPE,
+            TEST_CONSTANTS.AGGREGATE_ID,
+          ),
         );
       });
 
@@ -245,21 +251,22 @@ describe("EventProcessorValidator", () => {
 
         eventStore.countEventsBefore = vi
           .fn()
-          .mockImplementation((aggregateId, ctx, aggType, timestamp, eventId) => {
-            // For laterEvent: 1 event before it (earlierEvent), so sequence = 2
-            if (eventId === laterEvent.id) {
-              return Promise.resolve(1);
-            }
-            // For earlierEvent: no events before it, so sequence = 1
-            if (eventId === earlierEvent.id) {
+          .mockImplementation(
+            (aggregateId, ctx, aggType, timestamp, eventId) => {
+              // For laterEvent: 1 event before it (earlierEvent), so sequence = 2
+              if (eventId === laterEvent.id) {
+                return Promise.resolve(1);
+              }
+              // For earlierEvent: no events before it, so sequence = 1
+              if (eventId === earlierEvent.id) {
+                return Promise.resolve(0);
+              }
               return Promise.resolve(0);
-            }
-            return Promise.resolve(0);
-          });
-        eventStore.getEvents = vi.fn().mockResolvedValue([
-          earlierEvent,
-          laterEvent,
-        ]);
+            },
+          );
+        eventStore.getEvents = vi
+          .fn()
+          .mockResolvedValue([earlierEvent, laterEvent]);
 
         const checkpointStore = createMockProcessorCheckpointStore();
         checkpointStore.loadCheckpoint = vi
@@ -316,38 +323,57 @@ describe("EventProcessorValidator", () => {
         let callCount = 0;
         eventStore.countEventsBefore = vi
           .fn()
-          .mockImplementation((aggregateId, ctx, aggType, timestamp, eventId) => {
-            callCount++;
-            // First call: compute sequence for laterEvent (1 event before it, so sequence = 2)
-            if (callCount === 1 && eventId === laterEvent.id) {
-              return Promise.resolve(1);
-            }
-            // Subsequent calls: compute sequence for earlierEvent when checking ordering
-            // (no events before it, so sequence = 1)
-            if (eventId === earlierEvent.id) {
+          .mockImplementation(
+            (aggregateId, ctx, aggType, timestamp, eventId) => {
+              callCount++;
+              // First call: compute sequence for laterEvent (1 event before it, so sequence = 2)
+              if (callCount === 1 && eventId === laterEvent.id) {
+                return Promise.resolve(1);
+              }
+              // Subsequent calls: compute sequence for earlierEvent when checking ordering
+              // (no events before it, so sequence = 1)
+              if (eventId === earlierEvent.id) {
+                return Promise.resolve(0);
+              }
+              // For laterEvent in subsequent calls (shouldn't happen, but handle it)
+              if (eventId === laterEvent.id) {
+                return Promise.resolve(1);
+              }
               return Promise.resolve(0);
-            }
-            // For laterEvent in subsequent calls (shouldn't happen, but handle it)
-            if (eventId === laterEvent.id) {
-              return Promise.resolve(1);
-            }
-            return Promise.resolve(0);
-          });
-        eventStore.getEvents = vi.fn().mockResolvedValue([
-          earlierEvent,
-          laterEvent,
-        ]);
+            },
+          );
+        eventStore.getEvents = vi
+          .fn()
+          .mockResolvedValue([earlierEvent, laterEvent]);
 
         const checkpointStore = createMockProcessorCheckpointStore();
         checkpointStore.loadCheckpoint = vi
           .fn()
           .mockImplementation((checkpointKey: string) => {
             // laterEvent not processed
-            if (checkpointKey === buildCheckpointKey(tenantId, TEST_CONSTANTS.PIPELINE_NAME, "processor", TEST_CONSTANTS.AGGREGATE_TYPE, TEST_CONSTANTS.AGGREGATE_ID)) {
+            if (
+              checkpointKey ===
+              buildCheckpointKey(
+                tenantId,
+                TEST_CONSTANTS.PIPELINE_NAME,
+                "processor",
+                TEST_CONSTANTS.AGGREGATE_TYPE,
+                TEST_CONSTANTS.AGGREGATE_ID,
+              )
+            ) {
               return Promise.resolve(null);
             }
             // earlierEvent already processed
-            if (checkpointKey === buildCheckpointKey(tenantId, TEST_CONSTANTS.PIPELINE_NAME, "processor", TEST_CONSTANTS.AGGREGATE_TYPE, TEST_CONSTANTS.AGGREGATE_ID)) {
+            if (
+              checkpointKey ===
+              buildCheckpointKey(
+                tenantId,
+                TEST_CONSTANTS.PIPELINE_NAME,
+                "processor",
+                TEST_CONSTANTS.AGGREGATE_TYPE,
+                TEST_CONSTANTS.AGGREGATE_ID,
+              )
+            ) {
               return Promise.resolve({
                 status: "processed",
                 sequenceNumber: 1,
@@ -408,20 +434,15 @@ describe("EventProcessorValidator", () => {
         );
 
         // event has sequence 1 (no events before it by count)
-        eventStore.countEventsBefore = vi
-          .fn()
-          .mockResolvedValueOnce(0); // event sequence = 1
-        eventStore.getEvents = vi.fn().mockResolvedValue([
-          earlierEvent,
-          event,
-        ]);
+        eventStore.countEventsBefore = vi.fn().mockResolvedValueOnce(0); // event sequence = 1
+        eventStore.getEvents = vi.fn().mockResolvedValue([earlierEvent, event]);
 
         const checkpointStore = createMockProcessorCheckpointStore();
-        checkpointStore.loadCheckpoint = vi
-          .fn()
-          .mockResolvedValueOnce(null); // event not processed
+        checkpointStore.loadCheckpoint = vi.fn().mockResolvedValueOnce(null); // event not processed
         checkpointStore.hasFailedEvents = vi.fn().mockResolvedValue(false);
-        checkpointStore.getCheckpointBySequenceNumber = vi.fn().mockResolvedValue(null);
+        checkpointStore.getCheckpointBySequenceNumber = vi
+          .fn()
+          .mockResolvedValue(null);
 
         const validator = new EventProcessorValidator({
           eventStore,
@@ -473,4 +494,3 @@ describe("EventProcessorValidator", () => {
     });
   });
 });
-

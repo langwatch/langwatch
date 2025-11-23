@@ -1,13 +1,16 @@
 import type { Event } from "../../domain/types";
 import type { ProcessorCheckpointStore } from "../../stores/eventHandlerCheckpointStore.types";
 import { createLogger } from "~/utils/logger";
+import { SequentialOrderingError } from "../errorHandling";
 
 /**
  * Validates that events are processed in sequential order.
  * Ensures event N can only be processed after event N-1 is processed.
  */
 export class OrderingValidator<EventType extends Event = Event> {
-  private readonly logger = createLogger("langwatch:event-sourcing:ordering-validator");
+  private readonly logger = createLogger(
+    "langwatch:event-sourcing:ordering-validator",
+  );
 
   constructor(
     private readonly processorCheckpointStore?: ProcessorCheckpointStore,
@@ -81,8 +84,6 @@ export class OrderingValidator<EventType extends Event = Event> {
 
     // If no processed checkpoint exists with sequence >= previousSequenceNumber, we must wait
     if (!previousCheckpoint) {
-      const errorMessage =
-        `Previous event (sequence ${previousSequenceNumber}) has not been processed yet. Processing stopped to maintain event ordering.`;
       this.logger.warn(
         {
           processorName,
@@ -93,9 +94,19 @@ export class OrderingValidator<EventType extends Event = Event> {
           previousSequenceNumber,
           tenantId: event.tenantId,
         },
-        errorMessage,
+        "Previous event has not been processed yet. Processing stopped to maintain event ordering.",
       );
-      throw new Error(errorMessage);
+      throw new SequentialOrderingError(
+        previousSequenceNumber,
+        sequenceNumber,
+        event.id,
+        String(event.aggregateId),
+        event.tenantId,
+        {
+          processorName,
+          processorType,
+        },
+      );
     }
   }
 
@@ -141,4 +152,3 @@ export class OrderingValidator<EventType extends Event = Event> {
     return previousCheckpoint !== null;
   }
 }
-

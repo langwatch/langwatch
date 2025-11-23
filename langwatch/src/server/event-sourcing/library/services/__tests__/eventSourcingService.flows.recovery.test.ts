@@ -260,7 +260,8 @@ describe("EventSourcingService - Recovery Flows", () => {
         TEST_CONSTANTS.AGGREGATE_TYPE,
         TEST_CONSTANTS.AGGREGATE_ID,
       );
-      const checkpointBefore = await checkpointStore.loadCheckpoint(checkpointKey1);
+      const checkpointBefore =
+        await checkpointStore.loadCheckpoint(checkpointKey1);
       expect(checkpointBefore).not.toBeNull();
       expect(checkpointBefore?.status).toBe("failed");
 
@@ -268,7 +269,8 @@ describe("EventSourcingService - Recovery Flows", () => {
       await checkpointStore.clearCheckpoint(checkpointKey1);
 
       // Verify checkpoint is removed
-      const checkpointAfter = await checkpointStore.loadCheckpoint(checkpointKey1);
+      const checkpointAfter =
+        await checkpointStore.loadCheckpoint(checkpointKey1);
       expect(checkpointAfter).toBeNull();
     });
 
@@ -279,7 +281,9 @@ describe("EventSourcingService - Recovery Flows", () => {
 
       // Try to clear non-existent checkpoint - should not throw
       await expect(
-        checkpointStore.clearCheckpoint(`${TEST_CONSTANTS.PIPELINE_NAME}:handler:non-existent-id`),
+        checkpointStore.clearCheckpoint(
+          `${TEST_CONSTANTS.PIPELINE_NAME}:handler:non-existent-id`,
+        ),
       ).resolves.not.toThrow();
     });
   });
@@ -361,7 +365,8 @@ describe("EventSourcingService - Recovery Flows", () => {
       await checkpointStore.clearCheckpoint(checkpointKey1);
 
       // Verify checkpoint is cleared
-      const checkpointAfter = await checkpointStore.loadCheckpoint(checkpointKey1);
+      const checkpointAfter =
+        await checkpointStore.loadCheckpoint(checkpointKey1);
       expect(checkpointAfter).toBeNull();
 
       // Step 3: Fix handler (now succeeds)
@@ -388,13 +393,17 @@ describe("EventSourcingService - Recovery Flows", () => {
         context,
         aggregateType,
       );
-      const event1Count = allEventsAfter.filter((e) => e.id === event1.id).length;
+      const event1Count = allEventsAfter.filter(
+        (e) => e.id === event1.id,
+      ).length;
       expect(event1Count).toBe(1);
 
       // Verify event1 was processed (handler called twice: once failed, once succeeded)
       expect(handler.handle).toHaveBeenCalledTimes(2);
       // Check that the last call was with event1FromStore (the retrieved event)
-      const lastCall = vi.mocked(handler.handle).mock.calls[vi.mocked(handler.handle).mock.calls.length - 1];
+      const lastCall = vi.mocked(handler.handle).mock.calls[
+        vi.mocked(handler.handle).mock.calls.length - 1
+      ];
       expect(lastCall?.[0]?.id).toBe(event1.id);
 
       // Step 5: Reprocess event2 - should succeed now that event1 is processed
@@ -464,7 +473,9 @@ describe("EventSourcingService - Recovery Flows", () => {
         TEST_CONSTANTS.AGGREGATE_TYPE,
         TEST_CONSTANTS.AGGREGATE_ID,
       );
-      const checkpointBeforeEvent2 = await checkpointStore.loadCheckpoint(checkpointKeyBeforeEvent2);
+      const checkpointBeforeEvent2 = await checkpointStore.loadCheckpoint(
+        checkpointKeyBeforeEvent2,
+      );
       expect(checkpointBeforeEvent2).not.toBeNull();
       expect(checkpointBeforeEvent2?.status).toBe("failed");
       expect(checkpointBeforeEvent2?.sequenceNumber).toBe(1);
@@ -559,7 +570,11 @@ describe("EventSourcingService - Recovery Flows", () => {
       );
 
       // Store events
-      await eventStore.storeEvents([event1, event2, event3], context, aggregateType);
+      await eventStore.storeEvents(
+        [event1, event2, event3],
+        context,
+        aggregateType,
+      );
 
       // Make handler fail for event1
       handler.handle = vi
@@ -677,8 +692,12 @@ describe("EventSourcingService - Recovery Flows", () => {
         aggregateType,
       );
       expect(eventsBeforeReprocess).toHaveLength(2);
-      expect(eventsBeforeReprocess.find((e) => e.id === event1.id)).toBeDefined();
-      expect(eventsBeforeReprocess.find((e) => e.id === event2.id)).toBeDefined();
+      expect(
+        eventsBeforeReprocess.find((e) => e.id === event1.id),
+      ).toBeDefined();
+      expect(
+        eventsBeforeReprocess.find((e) => e.id === event2.id),
+      ).toBeDefined();
 
       // Clear checkpoint for event1 (using new per-aggregate key format)
       const checkpointKey1 = buildCheckpointKey(
@@ -719,9 +738,8 @@ describe("EventSourcingService - Recovery Flows", () => {
         TEST_CONSTANTS.AGGREGATE_TYPE,
         TEST_CONSTANTS.AGGREGATE_ID,
       );
-      const checkpointAfter = await checkpointStore.loadCheckpoint(
-        checkpointKeyAfter,
-      );
+      const checkpointAfter =
+        await checkpointStore.loadCheckpoint(checkpointKeyAfter);
       expect(checkpointAfter).not.toBeNull();
       expect(checkpointAfter?.status).toBe("processed");
       expect(checkpointAfter?.sequenceNumber).toBe(1);
@@ -889,4 +907,3 @@ describe("EventSourcingService - Recovery Flows", () => {
     });
   });
 });
-

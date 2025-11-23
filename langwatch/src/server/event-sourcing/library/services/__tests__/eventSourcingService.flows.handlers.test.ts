@@ -59,7 +59,11 @@ describe("EventSourcingService - Handler Flows", () => {
         logger: logger as any,
       });
 
-      const event = createTestEvent(TEST_CONSTANTS.AGGREGATE_ID, TEST_CONSTANTS.AGGREGATE_TYPE, tenantId);
+      const event = createTestEvent(
+        TEST_CONSTANTS.AGGREGATE_ID,
+        TEST_CONSTANTS.AGGREGATE_TYPE,
+        tenantId,
+      );
 
       await expect(
         service.storeEvents([event], context),
@@ -100,7 +104,11 @@ describe("EventSourcingService - Handler Flows", () => {
         logger: logger as any,
       });
 
-      const event = createTestEvent(TEST_CONSTANTS.AGGREGATE_ID, TEST_CONSTANTS.AGGREGATE_TYPE, tenantId);
+      const event = createTestEvent(
+        TEST_CONSTANTS.AGGREGATE_ID,
+        TEST_CONSTANTS.AGGREGATE_TYPE,
+        tenantId,
+      );
 
       await expect(
         service.storeEvents([event], context),
@@ -130,7 +138,11 @@ describe("EventSourcingService - Handler Flows", () => {
         },
       });
 
-      const event = createTestEvent(TEST_CONSTANTS.AGGREGATE_ID, TEST_CONSTANTS.AGGREGATE_TYPE, tenantId);
+      const event = createTestEvent(
+        TEST_CONSTANTS.AGGREGATE_ID,
+        TEST_CONSTANTS.AGGREGATE_TYPE,
+        tenantId,
+      );
 
       await expect(
         service.storeEvents([event], context),
@@ -190,7 +202,13 @@ describe("EventSourcingService - Handler Flows", () => {
 
       // Verify event1 was marked as failed
       expect(checkpointStore.saveCheckpoint).toHaveBeenCalledWith(
-        buildCheckpointKey(tenantId, TEST_CONSTANTS.PIPELINE_NAME, "handler", TEST_CONSTANTS.AGGREGATE_TYPE, TEST_CONSTANTS.AGGREGATE_ID),
+        buildCheckpointKey(
+          tenantId,
+          TEST_CONSTANTS.PIPELINE_NAME,
+          "handler",
+          TEST_CONSTANTS.AGGREGATE_TYPE,
+          TEST_CONSTANTS.AGGREGATE_ID,
+        ),
         "handler",
         event1,
         "failed",
@@ -250,9 +268,7 @@ describe("EventSourcingService - Handler Flows", () => {
         .mockRejectedValueOnce(new Error("Handler failed"))
         .mockResolvedValueOnce(void 0);
 
-      checkpointStore.hasFailedEvents = vi
-        .fn()
-        .mockResolvedValue(false); // No failures for aggregate-2
+      checkpointStore.hasFailedEvents = vi.fn().mockResolvedValue(false); // No failures for aggregate-2
 
       // Process both events
       await expect(
@@ -295,7 +311,13 @@ describe("EventSourcingService - Handler Flows", () => {
 
       // Should save pending checkpoint first
       expect(checkpointStore.saveCheckpoint).toHaveBeenCalledWith(
-        buildCheckpointKey(tenantId, TEST_CONSTANTS.PIPELINE_NAME, "handler", TEST_CONSTANTS.AGGREGATE_TYPE, TEST_CONSTANTS.AGGREGATE_ID),
+        buildCheckpointKey(
+          tenantId,
+          TEST_CONSTANTS.PIPELINE_NAME,
+          "handler",
+          TEST_CONSTANTS.AGGREGATE_TYPE,
+          TEST_CONSTANTS.AGGREGATE_ID,
+        ),
         "handler",
         event,
         "pending",
@@ -305,7 +327,13 @@ describe("EventSourcingService - Handler Flows", () => {
 
       // Then save failed checkpoint
       expect(checkpointStore.saveCheckpoint).toHaveBeenCalledWith(
-        buildCheckpointKey(tenantId, TEST_CONSTANTS.PIPELINE_NAME, "handler", TEST_CONSTANTS.AGGREGATE_TYPE, TEST_CONSTANTS.AGGREGATE_ID),
+        buildCheckpointKey(
+          tenantId,
+          TEST_CONSTANTS.PIPELINE_NAME,
+          "handler",
+          TEST_CONSTANTS.AGGREGATE_TYPE,
+          TEST_CONSTANTS.AGGREGATE_ID,
+        ),
         "handler",
         event,
         "failed",

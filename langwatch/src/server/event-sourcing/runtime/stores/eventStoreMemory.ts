@@ -5,8 +5,17 @@ import type {
   AggregateType,
 } from "../../library";
 import { EventUtils, createTenantId } from "../../library";
-import type { EventRepository, EventRecord } from "./repositories/eventRepository.types";
+import type {
+  EventRepository,
+  EventRecord,
+} from "./repositories/eventRepository.types";
 import { EventRepositoryMemory } from "./repositories/eventRepositoryMemory";
+import {
+  ConfigurationError,
+  ValidationError,
+  SecurityError,
+  StoreError,
+} from "../../library/services/errorHandling";
 
 /**
  * Simple in-memory EventStore used for tests and local development.
@@ -29,10 +38,13 @@ import { EventRepositoryMemory } from "./repositories/eventRepositoryMemory";
 export class EventStoreMemory<EventType extends Event = Event>
   implements BaseEventStore<EventType>
 {
-  constructor(private readonly repository: EventRepository = new EventRepositoryMemory()) {
+  constructor(
+    private readonly repository: EventRepository = new EventRepositoryMemory(),
+  ) {
     // Prevent accidental use in production - memory stores are not thread-safe
     if (process.env.NODE_ENV === "production") {
-      throw new Error(
+      throw new ConfigurationError(
+        "EventStoreMemory",
         "EventStoreMemory is not thread-safe and cannot be used in production. Use EventStoreClickHouse or another thread-safe implementation instead.",
       );
     }
@@ -54,7 +66,9 @@ export class EventStoreMemory<EventType extends Event = Event>
     );
 
     // Transform records to events
-    const events = records.map((record) => this.recordToEvent(record, aggregateId));
+    const events = records.map((record) =>
+      this.recordToEvent(record, aggregateId),
+    );
 
     // Sort by timestamp first to ensure consistent ordering
     const sortedEvents = [...events].sort((a, b) => {
@@ -162,26 +176,40 @@ export class EventStoreMemory<EventType extends Event = Event>
     for (let i = 0; i < events.length; i++) {
       const event = events[i];
       if (!EventUtils.isValidEvent(event)) {
-        throw new Error(
-          `[VALIDATION] Invalid event at index ${i}: event must have aggregateId, timestamp, type, and data`,
+        throw new ValidationError(
+          `Invalid event at index ${i}: event must have aggregateId, timestamp, type, and data`,
+          "event",
+          event,
+          { index: i },
         );
       }
 
       // Validate that event aggregateType matches context aggregateType
       if (event.aggregateType !== aggregateType) {
-        throw new Error(
-          `[VALIDATION] Event at index ${i} has aggregate type '${event.aggregateType}' that does not match pipeline aggregate type '${aggregateType}'`,
+        throw new ValidationError(
+          `Event at index ${i} has aggregate type '${event.aggregateType}' that does not match pipeline aggregate type '${aggregateType}'`,
+          "aggregateType",
+          event.aggregateType,
+          { index: i, expectedAggregateType: aggregateType },
         );
       }
 
       // Validate that event tenantId matches context tenantId
       const eventTenantId = event.tenantId;
       if (!eventTenantId) {
-        throw new Error(`[SECURITY] Event at index ${i} has no tenantId`);
+        throw new SecurityError(
+          "storeEvents",
+          `Event at index ${i} has no tenantId`,
+          void 0,
+          { index: i },
+        );
       }
       if (eventTenantId !== context.tenantId) {
-        throw new Error(
-          `[SECURITY] Event at index ${i} has tenantId '${eventTenantId}' that does not match context tenantId '${context.tenantId}'`,
+        throw new SecurityError(
+          "storeEvents",
+          `Event at index ${i} has tenantId '${eventTenantId}' that does not match context tenantId '${context.tenantId}'`,
+          eventTenantId,
+          { index: i, contextTenantId: context.tenantId },
         );
       }
     }
@@ -252,8 +280,12 @@ export class EventStoreMemory<EventType extends Event = Event>
     } else if (typeof rawPayload === "object") {
       return rawPayload;
     } else {
-      throw new Error(
-        `[CORRUPTED_DATA] EventPayload is not a string or object, it is of type ${typeof rawPayload}`,
+      throw new StoreError(
+        "parsePayload",
+        "EventStoreMemory",
+        `EventPayload is not a string or object, it is of type ${typeof rawPayload}`,
+        ErrorCategory.CRITICAL,
+        { rawPayloadType: typeof rawPayload },
       );
     }
   }

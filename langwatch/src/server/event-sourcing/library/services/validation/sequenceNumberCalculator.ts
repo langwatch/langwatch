@@ -10,7 +10,9 @@ import { createLogger } from "~/utils/logger";
  * in chronological order within the aggregate.
  */
 export class SequenceNumberCalculator<EventType extends Event = Event> {
-  private readonly logger = createLogger("langwatch:event-sourcing:sequence-number-calculator");
+  private readonly logger = createLogger(
+    "langwatch:event-sourcing:sequence-number-calculator",
+  );
 
   constructor(
     private readonly eventStore: EventStore<EventType>,
@@ -55,4 +57,3 @@ export class SequenceNumberCalculator<EventType extends Event = Event> {
     return sequenceNumber;
   }
 }
-

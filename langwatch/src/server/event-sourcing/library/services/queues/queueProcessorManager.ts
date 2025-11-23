@@ -10,6 +10,7 @@ import type { CommandType, CommandSchemaType } from "../../index";
 import { createCommand, createTenantId } from "../../index";
 import type { QueueProcessorFactory } from "../../../runtime/queue";
 import { createLogger } from "~/utils/logger";
+import { ValidationError, ConfigurationError } from "../errorHandling";
 
 /**
  * Configuration extracted from a command handler class, merged with options.
@@ -56,10 +57,8 @@ function extractHandlerConfig<Payload>(
 ): HandlerConfig<Payload> {
   return {
     getAggregateId:
-      options?.getAggregateId ??
-      HandlerClass.getAggregateId.bind(HandlerClass),
-    makeJobId:
-      options?.makeJobId ?? HandlerClass.makeJobId?.bind(HandlerClass),
+      options?.getAggregateId ?? HandlerClass.getAggregateId.bind(HandlerClass),
+    makeJobId: options?.makeJobId ?? HandlerClass.makeJobId?.bind(HandlerClass),
     delay: options?.delay ?? HandlerClass.delay,
     spanAttributes:
       options?.spanAttributes ??
@@ -92,8 +91,11 @@ function createCommandDispatcher<Payload, EventType extends Event>(
     async process(payload: Payload) {
       // Validate payload
       if (!commandSchema.validate(payload)) {
-        throw new Error(
+        throw new ValidationError(
           `Invalid payload for command type "${commandType}". Validation failed.`,
+          "payload",
+          payload,
+          { commandType },
         );
       }
 
@@ -124,7 +126,9 @@ function createCommandDispatcher<Payload, EventType extends Event>(
  */
 export class QueueProcessorManager<EventType extends Event = Event> {
   private readonly aggregateType: AggregateType;
-  private readonly logger = createLogger("langwatch:event-sourcing:queue-processor-manager");
+  private readonly logger = createLogger(
+    "langwatch:event-sourcing:queue-processor-manager",
+  );
   private readonly queueProcessorFactory?: QueueProcessorFactory;
   // Queue processors for event handlers (one per handler)
   private readonly handlerQueueProcessors = new Map<
@@ -193,7 +197,8 @@ export class QueueProcessorManager<EventType extends Event = Event> {
 
       const queueProcessor = this.queueProcessorFactory.create<EventType>({
         name: queueName,
-        makeJobId: handlerDef.options.makeJobId ?? this.createDefaultJobId.bind(this),
+        makeJobId:
+          handlerDef.options.makeJobId ?? this.createDefaultJobId.bind(this),
         delay: handlerDef.options.delay,
         options: handlerDef.options.concurrency
           ? { concurrency: handlerDef.options.concurrency }
@@ -345,8 +350,10 @@ export class QueueProcessorManager<EventType extends Event = Event> {
 
       // Validate uniqueness
       if (this.commandQueueProcessors.has(commandName)) {
-        throw new Error(
+        throw new ConfigurationError(
+          "QueueProcessorManager",
           `Command handler with name "${commandName}" already exists. Command handler names must be unique within a pipeline.`,
+          { commandName },
         );
       }
 
@@ -438,4 +445,3 @@ export class QueueProcessorManager<EventType extends Event = Event> {
     );
   }
 }
-

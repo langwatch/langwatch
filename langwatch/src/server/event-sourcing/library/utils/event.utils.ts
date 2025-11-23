@@ -18,6 +18,7 @@ import { TenantIdSchema } from "../domain/tenantId";
 import type { EventType } from "../domain/eventType";
 import type { AggregateType } from "../domain/aggregateType";
 import { generate } from "@langwatch/ksuid";
+import { SecurityError } from "../services/errorHandling";
 
 /**
  * Generates a unique event ID with entropy to prevent predictability and replay attacks.
@@ -110,7 +111,8 @@ function createEvent<
 
   let finalMetadata = metadata;
   if (options?.includeTraceContext === true) {
-    finalMetadata = buildEventMetadataWithCurrentProcessingTraceparent<Metadata>(metadata);
+    finalMetadata =
+      buildEventMetadataWithCurrentProcessingTraceparent<Metadata>(metadata);
   }
 
   const hasMetadata =
@@ -118,7 +120,12 @@ function createEvent<
     Object.keys(finalMetadata as Record<string, unknown>).length > 0;
 
   return {
-    id: generateEventId(eventTimestamp, String(tenantId), aggregateId, aggregateType),
+    id: generateEventId(
+      eventTimestamp,
+      String(tenantId),
+      aggregateId,
+      aggregateType,
+    ),
     aggregateId,
     aggregateType,
     tenantId,
@@ -177,7 +184,6 @@ function buildEventMetadataWithCurrentProcessingTraceparent<
   // any additional properties from the original metadata.
   return result.data as Metadata;
 }
-
 
 /**
  * Creates a projection representing the current state of an aggregate.
@@ -358,14 +364,16 @@ function validateTenantId(
   operation: string,
 ): void {
   if (!context) {
-    throw new Error(
-      `[SECURITY] ${operation} requires a context with tenantId for tenant isolation`,
+    throw new SecurityError(
+      operation,
+      `${operation} requires a context with tenantId for tenant isolation`,
     );
   }
 
   if (!context.tenantId) {
-    throw new Error(
-      `[SECURITY] ${operation} requires a tenantId for tenant isolation`,
+    throw new SecurityError(
+      operation,
+      `${operation} requires a tenantId for tenant isolation`,
     );
   }
 
@@ -374,8 +382,8 @@ function validateTenantId(
   if (!result.success) {
     const errorMessage =
       result.error.issues[0]?.message ??
-      "[SECURITY] TenantId must be a non-empty string for tenant isolation";
-    throw new Error(`[SECURITY] ${operation}: ${errorMessage}`);
+      "TenantId must be a non-empty string for tenant isolation";
+    throw new SecurityError(operation, errorMessage);
   }
 }
 

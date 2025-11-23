@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { SecurityError } from "../services/errorHandling";
 
 /**
  * Zod schema for tenant identifiers.
@@ -30,8 +31,10 @@ export function createTenantId(value: string): TenantId {
   } catch (error) {
     if (error instanceof z.ZodError) {
       // Extract the error message from the first issue
-      const message = error.issues[0]?.message ?? "[SECURITY] TenantId must be a non-empty string for tenant isolation";
-      throw new Error(message);
+      const message =
+        error.issues[0]?.message ??
+        "TenantId must be a non-empty string for tenant isolation";
+      throw new SecurityError("createTenantId", message);
     }
     throw error;
   }

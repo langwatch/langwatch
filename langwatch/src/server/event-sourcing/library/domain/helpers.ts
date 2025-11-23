@@ -53,12 +53,13 @@ export type ExtractProjectionData<TProjection extends Projection> =
  * type InferredProjection = InferProjectionHandlerProjection<Handler>; // MyProjection
  * ```
  */
-export type InferProjectionHandlerEvent<THandler extends ProjectionHandler<any, any>> =
-  THandler extends ProjectionHandler<infer E, any> ? E : never;
+export type InferProjectionHandlerEvent<
+  THandler extends ProjectionHandler<any, any>,
+> = THandler extends ProjectionHandler<infer E, any> ? E : never;
 
 export type InferProjectionHandlerProjection<
   THandler extends ProjectionHandler<any, any>,
-> =   THandler extends ProjectionHandler<any, infer P> ? P : never;
+> = THandler extends ProjectionHandler<any, infer P> ? P : never;
 
 /**
  * Helper type to infer the Event type from an EventStore.
@@ -83,7 +84,7 @@ export type InferEventStoreEvent<TStore extends EventStore<any>> =
  */
 export type InferProjectionStoreProjection<
   TStore extends ProjectionStore<any>,
-> =   TStore extends ProjectionStore<infer P> ? P : never;
+> = TStore extends ProjectionStore<infer P> ? P : never;
 
 /**
  * Type guard to check if a value is a valid Event.

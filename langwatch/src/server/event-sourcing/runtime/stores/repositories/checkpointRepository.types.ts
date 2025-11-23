@@ -21,7 +21,7 @@ export interface CheckpointRecord {
 /**
  * Repository interface for checkpoint data access.
  * Handles raw CRUD operations without business logic.
- * 
+ *
  * **Pure Data Access**: This interface only handles raw read/write operations.
  * All business logic (key construction, validation, transformation) must be
  * handled by the store layer that uses this repository.
@@ -31,9 +31,7 @@ export interface CheckpointRepository {
    * Gets a checkpoint record by checkpoint key.
    * Returns raw record without validation or transformation.
    */
-  getCheckpointRecord(
-    checkpointKey: string,
-  ): Promise<CheckpointRecord | null>;
+  getCheckpointRecord(checkpointKey: string): Promise<CheckpointRecord | null>;
 
   /**
    * Gets the last processed checkpoint record for a checkpoint key.
@@ -58,9 +56,7 @@ export interface CheckpointRepository {
    * Checks if any failed checkpoint records exist for a checkpoint key.
    * Returns raw boolean without validation.
    */
-  hasFailedCheckpointRecords(
-    checkpointKey: string,
-  ): Promise<boolean>;
+  hasFailedCheckpointRecords(checkpointKey: string): Promise<boolean>;
 
   /**
    * Gets all failed checkpoint records for a checkpoint key.
@@ -80,8 +76,5 @@ export interface CheckpointRepository {
    * Deletes a checkpoint record from storage.
    * Does not validate.
    */
-  deleteCheckpointRecord(
-    checkpointKey: string,
-  ): Promise<void>;
+  deleteCheckpointRecord(checkpointKey: string): Promise<void>;
 }
-

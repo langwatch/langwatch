@@ -16,9 +16,7 @@ export class CheckpointRepositoryMemory implements CheckpointRepository {
   private readonly checkpoints = new Map<string, CheckpointRecord>();
   private readonly logger?: ReturnType<typeof createLogger>;
 
-  constructor(
-    logger?: ReturnType<typeof createLogger>,
-  ) {
+  constructor(logger?: ReturnType<typeof createLogger>) {
     this.logger = logger;
   }
 
@@ -108,9 +106,7 @@ export class CheckpointRepositoryMemory implements CheckpointRepository {
     return null;
   }
 
-  async hasFailedCheckpointRecords(
-    checkpointKey: string,
-  ): Promise<boolean> {
+  async hasFailedCheckpointRecords(checkpointKey: string): Promise<boolean> {
     const record = this.checkpoints.get(checkpointKey);
     return record?.Status === "failed";
   }
@@ -145,10 +141,7 @@ export class CheckpointRepositoryMemory implements CheckpointRepository {
     );
   }
 
-  async deleteCheckpointRecord(
-    checkpointKey: string,
-  ): Promise<void> {
+  async deleteCheckpointRecord(checkpointKey: string): Promise<void> {
     this.checkpoints.delete(checkpointKey);
   }
 }
-

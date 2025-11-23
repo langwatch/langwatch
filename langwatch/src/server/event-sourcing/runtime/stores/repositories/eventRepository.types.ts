@@ -16,7 +16,7 @@ export interface EventRecord {
 /**
  * Repository interface for event data access.
  * Handles raw CRUD operations without business logic.
- * 
+ *
  * **Pure Data Access**: This interface only handles raw read/write operations.
  * All business logic (validation, transformation, deduplication) must be
  * handled by the store layer that uses this repository.
@@ -50,4 +50,3 @@ export interface EventRepository {
    */
   insertEventRecords(records: EventRecord[]): Promise<void>;
 }
-

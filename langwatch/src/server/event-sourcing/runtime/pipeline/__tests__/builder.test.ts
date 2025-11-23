@@ -246,7 +246,10 @@ describe("PipelineBuilder", () => {
       const builder = new PipelineBuilder<TestEvent, Projection>(eventStore)
         .withName("test-pipeline")
         .withAggregateType("span_ingestion")
-        .withProjection("my-projection", createTestProjectionHandlerClass<TestEvent, Projection>({ store }));
+        .withProjection(
+          "my-projection",
+          createTestProjectionHandlerClass<TestEvent, Projection>({ store }),
+        );
 
       const pipeline = builder.build();
 
@@ -256,9 +259,17 @@ describe("PipelineBuilder", () => {
     it("stores projection definition with handler reference matching provided handler", async () => {
       const eventStore = createMockEventStore<TestEvent>();
       const store = createMockProjectionStore<Projection>();
-      const ProjectionHandlerClass = createTestProjectionHandlerClass<TestEvent, Projection>({
+      const ProjectionHandlerClass = createTestProjectionHandlerClass<
+        TestEvent,
+        Projection
+      >({
         store,
-        handleImpl: async () => createTestProjection("proj-id", "aggregate-1", createTenantId(TEST_CONSTANTS.TENANT_ID_VALUE)),
+        handleImpl: async () =>
+          createTestProjection(
+            "proj-id",
+            "aggregate-1",
+            createTenantId(TEST_CONSTANTS.TENANT_ID_VALUE),
+          ),
       });
       const handleSpy = vi.spyOn(ProjectionHandlerClass.prototype, "handle");
 
@@ -291,7 +302,10 @@ describe("PipelineBuilder", () => {
         .withName("test-pipeline")
         .withAggregateType("span_ingestion");
 
-      const result = builder.withProjection("test-projection", createTestProjectionHandlerClass<TestEvent, Projection>({ store }));
+      const result = builder.withProjection(
+        "test-projection",
+        createTestProjectionHandlerClass<TestEvent, Projection>({ store }),
+      );
 
       expect(result).toBe(builder);
     });
@@ -303,10 +317,16 @@ describe("PipelineBuilder", () => {
       const builder = new PipelineBuilder<TestEvent, Projection>(eventStore)
         .withName("test-pipeline")
         .withAggregateType("span_ingestion")
-        .withProjection("duplicate-name", createTestProjectionHandlerClass<TestEvent, Projection>({ store }));
+        .withProjection(
+          "duplicate-name",
+          createTestProjectionHandlerClass<TestEvent, Projection>({ store }),
+        );
 
       expect(() => {
-        builder.withProjection("duplicate-name", createTestProjectionHandlerClass<TestEvent, Projection>({ store }));
+        builder.withProjection(
+          "duplicate-name",
+          createTestProjectionHandlerClass<TestEvent, Projection>({ store }),
+        );
       }).toThrow(
         'Projection with name "duplicate-name" already exists. Projection names must be unique within a pipeline.',
       );
@@ -320,8 +340,18 @@ describe("PipelineBuilder", () => {
       const builder = new PipelineBuilder<TestEvent, Projection>(eventStore)
         .withName("test-pipeline")
         .withAggregateType("span_ingestion")
-        .withProjection("projection-1", createTestProjectionHandlerClass<TestEvent, Projection>({ store: store1 }))
-        .withProjection("projection-2", createTestProjectionHandlerClass<TestEvent, Projection>({ store: store2 }));
+        .withProjection(
+          "projection-1",
+          createTestProjectionHandlerClass<TestEvent, Projection>({
+            store: store1,
+          }),
+        )
+        .withProjection(
+          "projection-2",
+          createTestProjectionHandlerClass<TestEvent, Projection>({
+            store: store2,
+          }),
+        );
 
       expect(() => {
         builder.build();
@@ -332,13 +362,29 @@ describe("PipelineBuilder", () => {
       const eventStore = createMockEventStore<TestEvent>();
       const store1 = createMockProjectionStore<Projection>();
       const store2 = createMockProjectionStore<Projection>();
-      const ProjectionHandlerClass1 = createTestProjectionHandlerClass<TestEvent, Projection>({
+      const ProjectionHandlerClass1 = createTestProjectionHandlerClass<
+        TestEvent,
+        Projection
+      >({
         store: store1,
-        handleImpl: async () => createTestProjection("proj1-id", "aggregate-1", createTenantId(TEST_CONSTANTS.TENANT_ID_VALUE)),
+        handleImpl: async () =>
+          createTestProjection(
+            "proj1-id",
+            "aggregate-1",
+            createTenantId(TEST_CONSTANTS.TENANT_ID_VALUE),
+          ),
       });
-      const ProjectionHandlerClass2 = createTestProjectionHandlerClass<TestEvent, Projection>({
+      const ProjectionHandlerClass2 = createTestProjectionHandlerClass<
+        TestEvent,
+        Projection
+      >({
         store: store2,
-        handleImpl: async () => createTestProjection("proj2-id", "aggregate-1", createTenantId(TEST_CONSTANTS.TENANT_ID_VALUE)),
+        handleImpl: async () =>
+          createTestProjection(
+            "proj2-id",
+            "aggregate-1",
+            createTenantId(TEST_CONSTANTS.TENANT_ID_VALUE),
+          ),
       });
       const handleSpy1 = vi.spyOn(ProjectionHandlerClass1.prototype, "handle");
       const handleSpy2 = vi.spyOn(ProjectionHandlerClass2.prototype, "handle");
@@ -479,7 +525,10 @@ describe("PipelineBuilder", () => {
         const builder = new PipelineBuilder<TestEvent, Projection>(eventStore)
           .withName("test-pipeline")
           .withAggregateType("span_ingestion")
-          .withEventHandler("my-handler", createTestEventHandlerClass<TestEvent>());
+          .withEventHandler(
+            "my-handler",
+            createTestEventHandlerClass<TestEvent>(),
+          );
 
         expect(() => {
           builder.build();
@@ -530,9 +579,13 @@ describe("PipelineBuilder", () => {
         const builder = new PipelineBuilder<TestEvent, Projection>(eventStore)
           .withName("test-pipeline")
           .withAggregateType("span_ingestion")
-          .withEventHandler("test-handler", createTestEventHandlerClass<TestEvent>(), {
-            eventTypes: [EVENT_TYPES[0]],
-          });
+          .withEventHandler(
+            "test-handler",
+            createTestEventHandlerClass<TestEvent>(),
+            {
+              eventTypes: [EVENT_TYPES[0]],
+            },
+          );
 
         expect(() => {
           builder.build();
@@ -544,7 +597,10 @@ describe("PipelineBuilder", () => {
         const builder = new PipelineBuilder<TestEvent, Projection>(eventStore)
           .withName("test-pipeline")
           .withAggregateType("span_ingestion")
-          .withEventHandler("test-handler", createTestEventHandlerClass<TestEvent>());
+          .withEventHandler(
+            "test-handler",
+            createTestEventHandlerClass<TestEvent>(),
+          );
 
         expect(() => {
           builder.build();
@@ -922,10 +978,7 @@ describe("PipelineBuilder", () => {
 
       // Create a schema that will reject invalid payloads
       const strictSchema = testCommandPayloadSchema.strict();
-      const schema = defineCommandSchema(
-        COMMAND_TYPES[0],
-        strictSchema,
-      );
+      const schema = defineCommandSchema(COMMAND_TYPES[0], strictSchema);
 
       const HandlerClass = createTestCommandHandlerClass<
         TestCommandPayload,
@@ -1218,10 +1271,16 @@ describe("PipelineBuilder", () => {
       const builder = new PipelineBuilder<TestEvent, Projection>(eventStore)
         .withName("test-pipeline")
         .withAggregateType("span_ingestion")
-        .withProjection("duplicate", createTestProjectionHandlerClass<TestEvent, Projection>({ store }));
+        .withProjection(
+          "duplicate",
+          createTestProjectionHandlerClass<TestEvent, Projection>({ store }),
+        );
 
       expect(() => {
-        builder.withProjection("duplicate", createTestProjectionHandlerClass<TestEvent, Projection>({ store }));
+        builder.withProjection(
+          "duplicate",
+          createTestProjectionHandlerClass<TestEvent, Projection>({ store }),
+        );
       }).toThrow(
         'Projection with name "duplicate" already exists. Projection names must be unique within a pipeline.',
       );

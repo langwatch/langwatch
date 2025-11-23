@@ -3,7 +3,10 @@ import { getLangWatchTracer } from "langwatch";
 import { generate } from "@langwatch/ksuid";
 
 import type { SpanRepository } from "./spanRepository";
-import type { StoreSpanIngestionCommandData, SpanData } from "../schemas/commands";
+import type {
+  StoreSpanIngestionCommandData,
+  SpanData,
+} from "../schemas/commands";
 import { createLogger } from "../../../../../utils/logger";
 
 export class SpanRepositoryMemory implements SpanRepository {

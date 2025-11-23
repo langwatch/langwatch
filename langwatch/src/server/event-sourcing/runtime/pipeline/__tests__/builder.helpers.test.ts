@@ -135,8 +135,7 @@ describe("Pipeline Builder Helper Functions", () => {
       const HandlerClass = createTestCommandHandlerClass<
         TestCommandPayload,
         TestEvent
-      >({
-      });
+      >({});
 
       new PipelineBuilder<TestEvent, Projection>(eventStore, factory)
         .withName("test-pipeline")
@@ -182,8 +181,7 @@ describe("Pipeline Builder Helper Functions", () => {
       const HandlerClass = createTestCommandHandlerClass<
         TestCommandPayload,
         TestEvent
-      >({
-      });
+      >({});
 
       new PipelineBuilder<TestEvent, Projection>(eventStore, factory)
         .withName("test-pipeline")
@@ -255,8 +253,7 @@ describe("Pipeline Builder Helper Functions", () => {
       const HandlerClass = createTestCommandHandlerClass<
         TestCommandPayload,
         TestEvent
-      >({
-      });
+      >({});
 
       new PipelineBuilder<TestEvent, Projection>(eventStore, factory)
         .withName("test-pipeline")
@@ -302,8 +299,7 @@ describe("Pipeline Builder Helper Functions", () => {
       const HandlerClass = createTestCommandHandlerClass<
         TestCommandPayload,
         TestEvent
-      >({
-      });
+      >({});
 
       new PipelineBuilder<TestEvent, Projection>(eventStore, factory)
         .withName("test-pipeline")

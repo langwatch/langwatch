@@ -36,9 +36,9 @@ describe("EventStoreClickHouse - countEventsBefore", () => {
       const mockResult = {
         json: vi.fn().mockResolvedValue([{ count: 0 }]),
       };
-      (mockClickHouseClient.query as ReturnType<typeof vi.fn>).mockResolvedValue(
-        mockResult,
-      );
+      (
+        mockClickHouseClient.query as ReturnType<typeof vi.fn>
+      ).mockResolvedValue(mockResult);
 
       const count = await store.countEventsBefore(
         aggregateId,
@@ -73,9 +73,9 @@ describe("EventStoreClickHouse - countEventsBefore", () => {
       const mockResult = {
         json: vi.fn().mockResolvedValue([{ count: 1 }]),
       };
-      (mockClickHouseClient.query as ReturnType<typeof vi.fn>).mockResolvedValue(
-        mockResult,
-      );
+      (
+        mockClickHouseClient.query as ReturnType<typeof vi.fn>
+      ).mockResolvedValue(mockResult);
 
       const count = await store.countEventsBefore(
         aggregateId,
@@ -88,7 +88,9 @@ describe("EventStoreClickHouse - countEventsBefore", () => {
       expect(count).toBe(1);
       expect(mockClickHouseClient.query).toHaveBeenCalledWith(
         expect.objectContaining({
-          query: expect.stringContaining("toUnixTimestamp64Milli(EventTimestamp) <"),
+          query: expect.stringContaining(
+            "toUnixTimestamp64Milli(EventTimestamp) <",
+          ),
           query_params: expect.objectContaining({
             beforeTimestamp: timestamp,
             beforeEventId: eventId,
@@ -106,9 +108,9 @@ describe("EventStoreClickHouse - countEventsBefore", () => {
       const mockResult = {
         json: vi.fn().mockResolvedValue([{ count: 1 }]),
       };
-      (mockClickHouseClient.query as ReturnType<typeof vi.fn>).mockResolvedValue(
-        mockResult,
-      );
+      (
+        mockClickHouseClient.query as ReturnType<typeof vi.fn>
+      ).mockResolvedValue(mockResult);
 
       const count = await store.countEventsBefore(
         aggregateId,
@@ -139,9 +141,9 @@ describe("EventStoreClickHouse - countEventsBefore", () => {
       const mockResult = {
         json: vi.fn().mockResolvedValue([{ count: 0 }]),
       };
-      (mockClickHouseClient.query as ReturnType<typeof vi.fn>).mockResolvedValue(
-        mockResult,
-      );
+      (
+        mockClickHouseClient.query as ReturnType<typeof vi.fn>
+      ).mockResolvedValue(mockResult);
 
       const count = await store.countEventsBefore(
         aggregateId,
@@ -163,9 +165,9 @@ describe("EventStoreClickHouse - countEventsBefore", () => {
       const mockResult = {
         json: vi.fn().mockResolvedValue([{ count: 0 }]),
       };
-      (mockClickHouseClient.query as ReturnType<typeof vi.fn>).mockResolvedValue(
-        mockResult,
-      );
+      (
+        mockClickHouseClient.query as ReturnType<typeof vi.fn>
+      ).mockResolvedValue(mockResult);
 
       await store.countEventsBefore(
         aggregateId,
@@ -214,9 +216,9 @@ describe("EventStoreClickHouse - countEventsBefore", () => {
       const mockResult = {
         json: vi.fn().mockResolvedValue([{ count: 2 }]),
       };
-      (mockClickHouseClient.query as ReturnType<typeof vi.fn>).mockResolvedValue(
-        mockResult,
-      );
+      (
+        mockClickHouseClient.query as ReturnType<typeof vi.fn>
+      ).mockResolvedValue(mockResult);
 
       const count = await store.countEventsBefore(
         aggregateId,
@@ -234,7 +236,9 @@ describe("EventStoreClickHouse - countEventsBefore", () => {
       if (callArgs && typeof callArgs === "object" && "query" in callArgs) {
         const query = String(callArgs.query);
         // Verify query contains both conditions (ClickHouse uses toUnixTimestamp64Milli for conversion)
-        expect(query).toMatch(/toUnixTimestamp64Milli\(EventTimestamp\)\s*<\s*\{beforeTimestamp:UInt64\}/s);
+        expect(query).toMatch(
+          /toUnixTimestamp64Milli\(EventTimestamp\)\s*<\s*\{beforeTimestamp:UInt64\}/s,
+        );
         expect(query).toMatch(
           /toUnixTimestamp64Milli\(EventTimestamp\)\s*=\s*\{beforeTimestamp:UInt64\}\s*AND\s*EventId\s*<\s*\{beforeEventId:String\}/s,
         );
@@ -247,9 +251,9 @@ describe("EventStoreClickHouse - countEventsBefore", () => {
       const eventId = "event-1";
 
       const queryError = new Error("ClickHouse connection failed");
-      (mockClickHouseClient.query as ReturnType<typeof vi.fn>).mockRejectedValue(
-        queryError,
-      );
+      (
+        mockClickHouseClient.query as ReturnType<typeof vi.fn>
+      ).mockRejectedValue(queryError);
 
       await expect(
         store.countEventsBefore(
@@ -263,4 +267,3 @@ describe("EventStoreClickHouse - countEventsBefore", () => {
     });
   });
 });
-

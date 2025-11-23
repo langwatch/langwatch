@@ -108,16 +108,17 @@ export class TriggerTraceAggregationCommand
         );
 
         // Emit completed event with all computed metrics
-        const completedEvent = EventUtils.createEvent<TraceAggregationCompletedEvent>(
-          "trace_aggregation",
-          traceId,
-          tenantIdObj,
-          "lw.obs.trace_aggregation.completed",
-          aggregatedData,
-          {
+        const completedEvent =
+          EventUtils.createEvent<TraceAggregationCompletedEvent>(
+            "trace_aggregation",
             traceId,
-          },
-        );
+            tenantIdObj,
+            "lw.obs.trace_aggregation.completed",
+            aggregatedData,
+            {
+              traceId,
+            },
+          );
 
         return [completedEvent];
       },

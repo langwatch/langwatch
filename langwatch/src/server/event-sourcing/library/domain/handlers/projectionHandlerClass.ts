@@ -54,4 +54,3 @@ export type ExtractProjectionHandlerProjection<T> =
   T extends ProjectionHandlerClass<any, infer ProjectionType>
     ? ProjectionType
     : never;
-

@@ -9,10 +9,15 @@ import { AGGREGATE_TYPE_IDENTIFIERS } from "../../schemas/typeIdentifiers";
  */
 
 export const AggregateTypeSpanIngestionSchema = z.literal("span_ingestion");
-export type AggregateTypeSpanIngestion = z.infer<typeof AggregateTypeSpanIngestionSchema>;
+export type AggregateTypeSpanIngestion = z.infer<
+  typeof AggregateTypeSpanIngestionSchema
+>;
 
-export const AggregateTypeTraceAggregationSchema = z.literal("trace_aggregation");
-export type AggregateTypeTraceAggregation = z.infer<typeof AggregateTypeTraceAggregationSchema>;
+export const AggregateTypeTraceAggregationSchema =
+  z.literal("trace_aggregation");
+export type AggregateTypeTraceAggregation = z.infer<
+  typeof AggregateTypeTraceAggregationSchema
+>;
 
 /**
  * Zod schema for aggregate type identifiers.

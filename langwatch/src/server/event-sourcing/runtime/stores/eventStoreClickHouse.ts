@@ -9,7 +9,16 @@ import type {
 } from "../../library";
 import { EventUtils, createTenantId } from "../../library";
 import { createLogger } from "../../../../utils/logger";
-import type { EventRepository, EventRecord } from "./repositories/eventRepository.types";
+import type {
+  EventRepository,
+  EventRecord,
+} from "./repositories/eventRepository.types";
+import {
+  ValidationError,
+  SecurityError,
+  StoreError,
+  ErrorCategory,
+} from "../../library/services/errorHandling";
 
 export class EventStoreClickHouse<EventType extends Event = Event>
   implements BaseEventStore<EventType>
@@ -216,7 +225,12 @@ export class EventStoreClickHouse<EventType extends Event = Event>
     for (let i = 0; i < events.length; i++) {
       const event = events[i];
       if (!event) {
-        throw new Error(`[VALIDATION] Event at index ${i} is undefined`);
+        throw new ValidationError(
+          `Event at index ${i} is undefined`,
+          "event",
+          void 0,
+          { index: i },
+        );
       }
 
       this.validateEventTenant(event, context, i);
@@ -234,7 +248,6 @@ export class EventStoreClickHouse<EventType extends Event = Event>
     index: number,
   ): void {
     if (event.aggregateType !== aggregateType) {
-      const error = new Error(`[VALIDATION] Event at index ${index} has aggregate type '${event.aggregateType}' that does not match pipeline aggregate type '${aggregateType}'`);
       this.logger.error(
         {
           tenantId: event.tenantId,
@@ -243,7 +256,12 @@ export class EventStoreClickHouse<EventType extends Event = Event>
         },
         "Aggregate type mismatch in event batch",
       );
-      throw error;
+      throw new ValidationError(
+        `Event at index ${index} has aggregate type '${event.aggregateType}' that does not match pipeline aggregate type '${aggregateType}'`,
+        "aggregateType",
+        event.aggregateType,
+        { index, expectedAggregateType: aggregateType },
+      );
     }
   }
 
@@ -257,9 +275,6 @@ export class EventStoreClickHouse<EventType extends Event = Event>
   ): void {
     const eventTenantId = event.tenantId;
     if (!eventTenantId) {
-      const error = new Error(
-        `[SECURITY] Event at index ${index} has no tenantId`,
-      );
       this.logger.error(
         {
           tenantId: context.tenantId,
@@ -269,13 +284,15 @@ export class EventStoreClickHouse<EventType extends Event = Event>
         },
         "Event has no tenantId",
       );
-      throw error;
+      throw new SecurityError(
+        "validateEventTenant",
+        `Event at index ${index} has no tenantId`,
+        void 0,
+        { index },
+      );
     }
 
     if (eventTenantId !== context.tenantId) {
-      const error = new Error(
-        `[SECURITY] Event at index ${index} has tenantId '${String(eventTenantId)}' that does not match context tenantId '${context.tenantId}'`,
-      );
       this.logger.error(
         {
           tenantId: context.tenantId,
@@ -298,9 +315,6 @@ export class EventStoreClickHouse<EventType extends Event = Event>
     index: number,
   ): void {
     if (!EventUtils.isValidEvent(event)) {
-      const error = new Error(
-        `[VALIDATION] Invalid event at index ${index}: event must have id, aggregateId, timestamp, type, and data`,
-      );
       const eventRecord = event as Record<string, unknown>;
       this.logger.error(
         {
@@ -311,7 +325,12 @@ export class EventStoreClickHouse<EventType extends Event = Event>
         },
         "Invalid event rejected",
       );
-      throw error;
+      throw new ValidationError(
+        `Invalid event at index ${index}: event must have id, aggregateId, timestamp, type, and data`,
+        "event",
+        event,
+        { index },
+      );
     }
   }
 
@@ -396,8 +415,12 @@ export class EventStoreClickHouse<EventType extends Event = Event>
     } else if (typeof rawPayload === "object") {
       return rawPayload;
     } else {
-      throw new Error(
-        `[CORRUPTED_DATA] EventPayload is not a string or object, it is of type ${typeof rawPayload}`,
+      throw new StoreError(
+        "parsePayload",
+        "EventStoreClickHouse",
+        `EventPayload is not a string or object, it is of type ${typeof rawPayload}`,
+        ErrorCategory.CRITICAL,
+        { rawPayloadType: typeof rawPayload },
       );
     }
   }

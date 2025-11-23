@@ -57,9 +57,17 @@ describe("PipelineBuilder Integration Tests", () => {
     it("builds pipeline with projections when withProjection() called before build()", async () => {
       const eventStore = createMockEventStore<TestEvent>();
       const store = createMockProjectionStore<Projection>();
-      const HandlerClass = createTestProjectionHandlerClass<TestEvent, Projection>({
+      const HandlerClass = createTestProjectionHandlerClass<
+        TestEvent,
+        Projection
+      >({
         store,
-        handleImpl: async () => createTestProjection("proj-id", "aggregate-1", createTenantId(TEST_CONSTANTS.TENANT_ID_VALUE)),
+        handleImpl: async () =>
+          createTestProjection(
+            "proj-id",
+            "aggregate-1",
+            createTenantId(TEST_CONSTANTS.TENANT_ID_VALUE),
+          ),
       });
       const handlerInstance = new HandlerClass();
       const handleSpy = vi.spyOn(handlerInstance, "handle");
@@ -124,7 +132,9 @@ describe("PipelineBuilder Integration Tests", () => {
     it("builds pipeline with eventHandlers when withEventHandler() called before build()", async () => {
       const eventStore = createMockEventStore<TestEvent>();
       const HandlerClass = createTestEventHandlerClass<TestEvent>({
-          handleImpl: async () => { /* no-op */ },
+        handleImpl: async () => {
+          /* no-op */
+        },
       });
       const handlerInstance = new HandlerClass();
       const handleSpy = vi.spyOn(handlerInstance, "handle");
@@ -171,13 +181,23 @@ describe("PipelineBuilder Integration Tests", () => {
       const eventStore = createMockEventStore<TestEvent>();
       const factory = createMockQueueProcessorFactory();
       const store = createMockProjectionStore<Projection>();
-      const ProjectionHandlerClass = createTestProjectionHandlerClass<TestEvent, Projection>({
+      const ProjectionHandlerClass = createTestProjectionHandlerClass<
+        TestEvent,
+        Projection
+      >({
         store,
-        handleImpl: async () => createTestProjection("proj-id", "aggregate-1", createTenantId(TEST_CONSTANTS.TENANT_ID_VALUE)),
+        handleImpl: async () =>
+          createTestProjection(
+            "proj-id",
+            "aggregate-1",
+            createTenantId(TEST_CONSTANTS.TENANT_ID_VALUE),
+          ),
       });
       const projectionHandlerInstance = new ProjectionHandlerClass();
       const EventHandlerClass = createTestEventHandlerClass<TestEvent>({
-          handleImpl: async () => { /* no-op */ },
+        handleImpl: async () => {
+          /* no-op */
+        },
       });
       const eventHandlerInstance = new EventHandlerClass();
       const publisher = createMockEventPublisher<TestEvent>();
@@ -242,7 +262,11 @@ describe("PipelineBuilder Integration Tests", () => {
 
       await pipeline.service.storeEvents([event], context);
 
-      expect(storeEventsSpy).toHaveBeenCalledWith([event], context, "span_ingestion");
+      expect(storeEventsSpy).toHaveBeenCalledWith(
+        [event],
+        context,
+        "span_ingestion",
+      );
     });
   });
 
@@ -311,7 +335,10 @@ describe("PipelineBuilder Integration Tests", () => {
       )
         .withName("test-pipeline")
         .withAggregateType("span_ingestion")
-        .withEventHandler("test-handler", createTestEventHandlerClass<TestEvent>())
+        .withEventHandler(
+          "test-handler",
+          createTestEventHandlerClass<TestEvent>(),
+        )
         .withCommand("testDispatcher", HandlerClass)
         .build();
 
@@ -357,7 +384,10 @@ describe("PipelineBuilder Integration Tests", () => {
       )
         .withName("test-pipeline")
         .withAggregateType("span_ingestion")
-        .withProjection("test-projection", createTestProjectionHandlerClass<TestEvent, Projection>({ store }))
+        .withProjection(
+          "test-projection",
+          createTestProjectionHandlerClass<TestEvent, Projection>({ store }),
+        )
         .withCommand("testDispatcher", HandlerClass)
         .build();
 
@@ -495,8 +525,7 @@ describe("PipelineBuilder Integration Tests", () => {
       const HandlerClass = createTestCommandHandlerClass<
         TestCommandPayload,
         TestEvent
-      >({
-      });
+      >({});
 
       const pipeline = new PipelineBuilder<TestEvent, Projection>(
         eventStore,
@@ -505,11 +534,15 @@ describe("PipelineBuilder Integration Tests", () => {
         .withName("span-ingestion")
         .withAggregateType("span_ingestion")
         .withCommand("recordSpan", HandlerClass)
-        .withEventHandler("trace-aggregation-trigger", createTestEventHandlerClass<TestEvent>({
-          getEventTypes: () => [EVENT_TYPES[0]] as const,
-        }), {
-          eventTypes: [EVENT_TYPES[0]],
-        })
+        .withEventHandler(
+          "trace-aggregation-trigger",
+          createTestEventHandlerClass<TestEvent>({
+            getEventTypes: () => [EVENT_TYPES[0]] as const,
+          }),
+          {
+            eventTypes: [EVENT_TYPES[0]],
+          },
+        )
         .build();
 
       expect(pipeline.name).toBe("span-ingestion");
@@ -526,8 +559,7 @@ describe("PipelineBuilder Integration Tests", () => {
       const HandlerClass = createTestCommandHandlerClass<
         TestCommandPayload,
         TestEvent
-      >({
-      });
+      >({});
 
       const pipeline = new PipelineBuilder<TestEvent, Projection>(
         eventStore,
@@ -535,7 +567,10 @@ describe("PipelineBuilder Integration Tests", () => {
       )
         .withName("trace-aggregation")
         .withAggregateType("trace_aggregation")
-        .withProjection("traceAggregationState", createTestProjectionHandlerClass<TestEvent, Projection>({ store }))
+        .withProjection(
+          "traceAggregationState",
+          createTestProjectionHandlerClass<TestEvent, Projection>({ store }),
+        )
         .withCommand("testDispatcher", HandlerClass)
         .build();
 
@@ -586,8 +621,7 @@ describe("PipelineBuilder Integration Tests", () => {
       const HandlerClass = createTestCommandHandlerClass<
         TestCommandPayload,
         TestEvent
-      >({
-      });
+      >({});
 
       const pipeline = new PipelineBuilder<TestEvent, Projection>(
         eventStore,
@@ -639,8 +673,7 @@ describe("PipelineBuilder Integration Tests", () => {
       const HandlerClass = createTestCommandHandlerClass<
         TestCommandPayload,
         TestEvent
-      >({
-      });
+      >({});
 
       const pipeline = new PipelineBuilder<TestEvent, Projection>(
         eventStore,
@@ -666,9 +699,17 @@ describe("PipelineBuilder Integration Tests", () => {
         new CheckpointRepositoryMemory(),
       );
       const projectionStore = createMockProjectionStore<Projection>();
-      const ProjectionHandlerClass = createTestProjectionHandlerClass<TestEvent, Projection>({
+      const ProjectionHandlerClass = createTestProjectionHandlerClass<
+        TestEvent,
+        Projection
+      >({
         store: projectionStore,
-        handleImpl: async () => createTestProjection("proj-id", "aggregate-1", createTenantId(TEST_CONSTANTS.TENANT_ID_VALUE)),
+        handleImpl: async () =>
+          createTestProjection(
+            "proj-id",
+            "aggregate-1",
+            createTenantId(TEST_CONSTANTS.TENANT_ID_VALUE),
+          ),
       });
 
       const tenantId = createTenantId(TEST_CONSTANTS.TENANT_ID_VALUE);
@@ -696,9 +737,13 @@ describe("PipelineBuilder Integration Tests", () => {
         .withName("test-pipeline")
         .withAggregateType("span_ingestion")
         .withCommand("recordSpan", HandlerClass)
-        .withEventHandler("span-storage", createTestEventHandlerClass<TestEvent>(), {
-          eventTypes: [EVENT_TYPES[0]],
-        })
+        .withEventHandler(
+          "span-storage",
+          createTestEventHandlerClass<TestEvent>(),
+          {
+            eventTypes: [EVENT_TYPES[0]],
+          },
+        )
         .withProjection("summary", ProjectionHandlerClass)
         .build();
 
@@ -746,7 +791,10 @@ describe("PipelineBuilder Integration Tests", () => {
           stream.getTenantId(),
         );
       });
-      const ProjectionHandlerClass = createTestProjectionHandlerClass<TestEvent, Projection>({
+      const ProjectionHandlerClass = createTestProjectionHandlerClass<
+        TestEvent,
+        Projection
+      >({
         store: projectionStore,
         handleImpl: handleSpy,
       });
@@ -787,17 +835,35 @@ describe("PipelineBuilder Integration Tests", () => {
       const factory = createMockQueueProcessorFactory();
       const projectionStore1 = createMockProjectionStore<Projection>();
       const projectionStore2 = createMockProjectionStore<Projection>();
-      const handleSpy1 = vi.fn().mockResolvedValue(
-        createTestProjection("proj1-id", "aggregate-1", createTenantId(TEST_CONSTANTS.TENANT_ID_VALUE)),
-      );
-      const handleSpy2 = vi.fn().mockResolvedValue(
-        createTestProjection("proj2-id", "aggregate-1", createTenantId(TEST_CONSTANTS.TENANT_ID_VALUE)),
-      );
-      const ProjectionHandlerClass1 = createTestProjectionHandlerClass<TestEvent, Projection>({
+      const handleSpy1 = vi
+        .fn()
+        .mockResolvedValue(
+          createTestProjection(
+            "proj1-id",
+            "aggregate-1",
+            createTenantId(TEST_CONSTANTS.TENANT_ID_VALUE),
+          ),
+        );
+      const handleSpy2 = vi
+        .fn()
+        .mockResolvedValue(
+          createTestProjection(
+            "proj2-id",
+            "aggregate-1",
+            createTenantId(TEST_CONSTANTS.TENANT_ID_VALUE),
+          ),
+        );
+      const ProjectionHandlerClass1 = createTestProjectionHandlerClass<
+        TestEvent,
+        Projection
+      >({
         store: projectionStore1,
         handleImpl: handleSpy1,
       });
-      const ProjectionHandlerClass2 = createTestProjectionHandlerClass<TestEvent, Projection>({
+      const ProjectionHandlerClass2 = createTestProjectionHandlerClass<
+        TestEvent,
+        Projection
+      >({
         store: projectionStore2,
         handleImpl: handleSpy2,
       });
@@ -826,7 +892,6 @@ describe("PipelineBuilder Integration Tests", () => {
       expect(projectionStore1.storeProjection).toHaveBeenCalledTimes(1);
       expect(projectionStore2.storeProjection).toHaveBeenCalledTimes(1);
     });
-
 
     it("queue-based processing with sequential enforcement", async () => {
       const eventStore = new EventStoreMemory<TestEvent>(
@@ -865,7 +930,11 @@ describe("PipelineBuilder Integration Tests", () => {
       event3.timestamp = TEST_CONSTANTS.BASE_TIMESTAMP + 2000;
 
       // Store events
-      await eventStore.storeEvents([event1, event2, event3], { tenantId }, "span_ingestion");
+      await eventStore.storeEvents(
+        [event1, event2, event3],
+        { tenantId },
+        "span_ingestion",
+      );
 
       // Process events - should enforce sequential ordering
       await pipeline.service.storeEvents([event1], { tenantId });
@@ -944,7 +1013,11 @@ describe("PipelineBuilder Integration Tests", () => {
       event2.timestamp = TEST_CONSTANTS.BASE_TIMESTAMP + 1000;
 
       // Store events
-      await eventStore.storeEvents([event1, event2], { tenantId }, "span_ingestion");
+      await eventStore.storeEvents(
+        [event1, event2],
+        { tenantId },
+        "span_ingestion",
+      );
 
       // Process event1 - should succeed
       await pipeline.service.storeEvents([event1], { tenantId });

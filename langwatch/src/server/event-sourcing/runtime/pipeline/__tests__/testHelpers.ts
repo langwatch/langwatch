@@ -328,7 +328,11 @@ export function createTestEventForBuilder(
   aggregateId: string,
   tenantId = createTenantId(TEST_CONSTANTS.TENANT_ID_VALUE),
 ): TestEvent {
-  return createTestEvent(aggregateId, TEST_CONSTANTS.AGGREGATE_TYPE, tenantId) as TestEvent;
+  return createTestEvent(
+    aggregateId,
+    TEST_CONSTANTS.AGGREGATE_TYPE,
+    tenantId,
+  ) as TestEvent;
 }
 
 /**
@@ -354,11 +358,10 @@ export function createTestProjection<TData = unknown>(
  * Common schema definition for command handler tests that need name inference.
  * This reduces duplication in tests that create classes with specific names.
  */
-export const BASE_COMMAND_HANDLER_SCHEMA =
-  defineCommandSchema(
-    COMMAND_TYPES[0],
-    testCommandPayloadSchema,
-  );
+export const BASE_COMMAND_HANDLER_SCHEMA = defineCommandSchema(
+  COMMAND_TYPES[0],
+  testCommandPayloadSchema,
+);
 
 /**
  * Creates a minimal pipeline builder setup for common test patterns.

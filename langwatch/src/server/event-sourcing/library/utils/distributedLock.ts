@@ -2,6 +2,8 @@ import { z } from "zod";
 import { SpanKind } from "@opentelemetry/api";
 import { getLangWatchTracer } from "langwatch";
 import type { Redis, Cluster } from "ioredis";
+import { createLogger } from "~/utils/logger";
+import { ConfigurationError } from "../services/errorHandling";
 
 /**
  * Distributed lock interface for preventing concurrent operations on the same resource.
@@ -42,7 +44,6 @@ export const LockHandleSchema = z.object({
  * Contains the lock key and a unique value to ensure only the acquiring process can release it.
  */
 export type LockHandle = z.infer<typeof LockHandleSchema>;
-
 
 /**
  * In-memory lock implementation for single-instance deployments.
@@ -228,7 +229,8 @@ export class RedisDistributedLock implements DistributedLock {
         // - Process A acquires lock, expires, Process B acquires same lock
         // - Process A tries to release: value check prevents deleting B's lock
         if (!this.redis.eval) {
-          throw new Error(
+          throw new ConfigurationError(
+            "RedisDistributedLock",
             "RedisDistributedLock requires eval() support for atomic lock release. The Redis client must support Lua script evaluation.",
           );
         }

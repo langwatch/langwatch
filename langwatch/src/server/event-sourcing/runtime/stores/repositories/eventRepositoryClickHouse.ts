@@ -158,9 +158,7 @@ export class EventRepositoryClickHouse implements EventRepository {
         {
           recordCount: records.length,
           tenantIds: [...new Set(records.map((r) => r.TenantId))],
-          aggregateIds: [
-            ...new Set(records.map((r) => String(r.AggregateId))),
-          ],
+          aggregateIds: [...new Set(records.map((r) => String(r.AggregateId)))],
         },
         "Inserted event records to ClickHouse",
       );
@@ -169,9 +167,7 @@ export class EventRepositoryClickHouse implements EventRepository {
         {
           recordCount: records.length,
           tenantIds: [...new Set(records.map((r) => r.TenantId))],
-          aggregateIds: [
-            ...new Set(records.map((r) => String(r.AggregateId))),
-          ],
+          aggregateIds: [...new Set(records.map((r) => String(r.AggregateId)))],
           error: error instanceof Error ? error.message : String(error),
           errorStack: error instanceof Error ? error.stack : void 0,
           errorName: error instanceof Error ? error.name : void 0,
@@ -182,4 +178,3 @@ export class EventRepositoryClickHouse implements EventRepository {
     }
   }
 }
-

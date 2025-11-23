@@ -8,7 +8,9 @@ import { buildCheckpointKey } from "../../utils/checkpointKey";
  * to prevent TOCTOU race conditions.
  */
 export class IdempotencyChecker<EventType extends Event = Event> {
-  private readonly logger = createLogger("langwatch:event-sourcing:idempotency-checker");
+  private readonly logger = createLogger(
+    "langwatch:event-sourcing:idempotency-checker",
+  );
 
   constructor(
     private readonly processorCheckpointStore?: ProcessorCheckpointStore,
@@ -91,17 +93,24 @@ export class IdempotencyChecker<EventType extends Event = Event> {
     // IMPORTANT: Don't save pending checkpoint if there's a processed checkpoint with lower sequence number,
     // as this would overwrite it and break ordering validation. The pending checkpoint will be saved
     // after ordering validation passes.
-    if (!existingCheckpoint || existingCheckpoint.sequenceNumber < sequenceNumber) {
+    if (
+      !existingCheckpoint ||
+      existingCheckpoint.sequenceNumber < sequenceNumber
+    ) {
       // If there's a processed checkpoint with lower sequence number, don't overwrite it yet
       // Ordering validation needs to check it first. The pending checkpoint will be saved after validation.
-      if (existingCheckpoint?.status === "processed" && existingCheckpoint.sequenceNumber < sequenceNumber) {
+      if (
+        existingCheckpoint?.status === "processed" &&
+        existingCheckpoint.sequenceNumber < sequenceNumber
+      ) {
         // Don't save pending checkpoint here - let ordering validation check the previous checkpoint first
         // The pending checkpoint will be saved after ordering validation passes
         return false; // Not processed, allow processing to continue
       }
 
       // Re-check for failed checkpoint right before saving to prevent race conditions
-      const recheckCheckpoint = await this.processorCheckpointStore.loadCheckpoint(checkpointKey);
+      const recheckCheckpoint =
+        await this.processorCheckpointStore.loadCheckpoint(checkpointKey);
       if (recheckCheckpoint?.status === "failed") {
         this.logger.warn(
           {
@@ -130,7 +139,10 @@ export class IdempotencyChecker<EventType extends Event = Event> {
         // If save fails, another process may have claimed it - check again
         const recheckCheckpoint =
           await this.processorCheckpointStore.loadCheckpoint(checkpointKey);
-        if (recheckCheckpoint?.status === "processed" && recheckCheckpoint.sequenceNumber >= sequenceNumber) {
+        if (
+          recheckCheckpoint?.status === "processed" &&
+          recheckCheckpoint.sequenceNumber >= sequenceNumber
+        ) {
           // Another process already processed it
           this.logger.debug(
             {
@@ -181,4 +193,3 @@ export class IdempotencyChecker<EventType extends Event = Event> {
     return false; // Not processed, not claimed
   }
 }
-

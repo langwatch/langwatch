@@ -13,6 +13,8 @@ import {
   ErrorCategory,
   handleError,
   isSequentialOrderingError,
+  SequentialOrderingError,
+  LockError,
 } from "../errorHandling";
 import { buildCheckpointKey } from "../../utils/checkpointKey";
 import type { DistributedLock } from "../../utils/distributedLock";
@@ -25,9 +27,14 @@ export class EventHandlerDispatcher<EventType extends Event = Event> {
   private readonly tracer = getLangWatchTracer(
     "langwatch.trace-processing.event-handler-dispatcher",
   );
-  private readonly logger = createLogger("langwatch:event-sourcing:event-handler-dispatcher");
+  private readonly logger = createLogger(
+    "langwatch:event-sourcing:event-handler-dispatcher",
+  );
   private readonly aggregateType: AggregateType;
-  private readonly eventHandlers?: Map<string, EventHandlerDefinition<EventType>>;
+  private readonly eventHandlers?: Map<
+    string,
+    EventHandlerDefinition<EventType>
+  >;
   private readonly processorCheckpointStore?: ProcessorCheckpointStore;
   private readonly validator: EventProcessorValidator<EventType>;
   private readonly checkpointManager: CheckpointManager<EventType>;
@@ -97,7 +104,9 @@ export class EventHandlerDispatcher<EventType extends Event = Event> {
           "tenant.id": context.tenantId,
           "handler.count": this.eventHandlers.size,
           "dispatch.mode":
-            this.queueManager.getHandlerQueueProcessors().size > 0 ? "async" : "sync",
+            this.queueManager.getHandlerQueueProcessors().size > 0
+              ? "async"
+              : "sync",
         },
       },
       async () => {
@@ -178,7 +187,8 @@ export class EventHandlerDispatcher<EventType extends Event = Event> {
               }
             }
 
-            const queueProcessor = this.queueManager.getHandlerQueueProcessor(handlerName);
+            const queueProcessor =
+              this.queueManager.getHandlerQueueProcessor(handlerName);
             if (!queueProcessor) {
               this.logger.warn(
                 {
@@ -301,17 +311,12 @@ export class EventHandlerDispatcher<EventType extends Event = Event> {
               // handleError throws for CRITICAL errors, so we need to let it propagate
               // For non-critical errors, it logs but doesn't throw, so processing continues
               try {
-                handleError(
-                  error,
-                  category,
-                  this.logger,
-                  {
-                    handlerName,
-                    eventType: event.type,
-                    aggregateId: String(event.aggregateId),
-                    tenantId: event.tenantId,
-                  },
-                );
+                handleError(error, category, this.logger, {
+                  handlerName,
+                  eventType: event.type,
+                  aggregateId: String(event.aggregateId),
+                  tenantId: event.tenantId,
+                });
                 this.logger.debug(
                   {
                     handlerName,
@@ -324,7 +329,10 @@ export class EventHandlerDispatcher<EventType extends Event = Event> {
                   {
                     handlerName,
                     eventId: event.id,
-                    error: rethrownError instanceof Error ? rethrownError.message : String(rethrownError),
+                    error:
+                      rethrownError instanceof Error
+                        ? rethrownError.message
+                        : String(rethrownError),
                   },
                   "handleError rethrew (critical)",
                 );
@@ -367,7 +375,8 @@ export class EventHandlerDispatcher<EventType extends Event = Event> {
     // For later sequence numbers, add a small buffer per sequence position
     // This accounts for potential waiting time and ensures lock doesn't expire
     // during processing even if there was some delay
-    const sequenceBufferMs = sequenceNumber > 1 ? (sequenceNumber - 1) * 500 : 0;
+    const sequenceBufferMs =
+      sequenceNumber > 1 ? (sequenceNumber - 1) * 500 : 0;
 
     const calculatedTtl = baseTtlMs + checkpointBufferMs + sequenceBufferMs;
 
@@ -554,8 +563,6 @@ export class EventHandlerDispatcher<EventType extends Event = Event> {
             // So we can just continue and let it handle it
           } else {
             const previousSequenceNumber = sequenceNumber - 1;
-            const errorMessage =
-              `Previous event (sequence ${previousSequenceNumber}) has not been processed yet. Processing stopped to maintain event ordering.`;
 
             this.logger.debug(
               {
@@ -576,9 +583,18 @@ export class EventHandlerDispatcher<EventType extends Event = Event> {
                 previousSequenceNumber,
                 tenantId: event.tenantId,
               },
-              errorMessage,
+              "Previous event has not been processed yet. Processing stopped to maintain event ordering.",
             );
-            throw new Error(errorMessage);
+            throw new SequentialOrderingError(
+              previousSequenceNumber,
+              sequenceNumber,
+              event.id,
+              String(event.aggregateId),
+              event.tenantId,
+              {
+                handlerName,
+              },
+            );
           }
         }
 
@@ -596,8 +612,16 @@ export class EventHandlerDispatcher<EventType extends Event = Event> {
           : null;
 
         if (this.distributedLock && !lockHandle) {
-          throw new Error(
+          throw new LockError(
+            lockKey,
+            "handleEvent",
             `Cannot acquire lock for handler: ${lockKey}. Another process is handling this event. Will retry.`,
+            {
+              handlerName,
+              eventId: event.id,
+              aggregateId: String(event.aggregateId),
+              tenantId: event.tenantId,
+            },
           );
         }
 
@@ -606,13 +630,14 @@ export class EventHandlerDispatcher<EventType extends Event = Event> {
           // Note: ordering is already checked above in early check using the same method
           // (getCheckpointBySequenceNumber) that orderingValidator uses, so it's safe to skip here.
           // The lock acquisition above ensures no concurrent processing of the same aggregate.
-          const validatedSequenceNumber = await this.validator.validateEventProcessing(
-            handlerName,
-            "handler",
-            event,
-            context,
-            { skipOrderingCheck: true },
-          );
+          const validatedSequenceNumber =
+            await this.validator.validateEventProcessing(
+              handlerName,
+              "handler",
+              event,
+              context,
+              { skipOrderingCheck: true },
+            );
 
           // If validation returned null, processing should be skipped (already processed or has failures)
           if (validatedSequenceNumber === null) {
@@ -653,7 +678,8 @@ export class EventHandlerDispatcher<EventType extends Event = Event> {
             String(event.aggregateId),
           );
 
-          const existingCheckpoint = await this.processorCheckpointStore?.loadCheckpoint(checkpointKey);
+          const existingCheckpoint =
+            await this.processorCheckpointStore?.loadCheckpoint(checkpointKey);
 
           // Only save "pending" if:
           // 1. No checkpoint exists, OR
@@ -662,7 +688,8 @@ export class EventHandlerDispatcher<EventType extends Event = Event> {
           const needsPendingSave =
             !existingCheckpoint ||
             existingCheckpoint.sequenceNumber < sequenceNumber ||
-            (existingCheckpoint.status !== "pending" || existingCheckpoint.sequenceNumber !== sequenceNumber);
+            existingCheckpoint.status !== "pending" ||
+            existingCheckpoint.sequenceNumber !== sequenceNumber;
 
           if (needsPendingSave) {
             this.logger.debug(
@@ -824,4 +851,3 @@ export class EventHandlerDispatcher<EventType extends Event = Event> {
     return options.eventTypes ?? handler.getEventTypes?.();
   }
 }
-

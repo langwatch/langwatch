@@ -151,17 +151,20 @@ describe("isEvent", () => {
 
   describe("when value is missing required fields", () => {
     it("returns false when aggregateId is missing", () => {
-      const { aggregateId: _aggregateId, ...eventWithoutAggregateId } = createValidEvent();
+      const { aggregateId: _aggregateId, ...eventWithoutAggregateId } =
+        createValidEvent();
       expect(isEvent(eventWithoutAggregateId)).toBe(false);
     });
 
     it("returns false when tenantId is missing", () => {
-      const { tenantId: _tenantId, ...eventWithoutTenantId } = createValidEvent();
+      const { tenantId: _tenantId, ...eventWithoutTenantId } =
+        createValidEvent();
       expect(isEvent(eventWithoutTenantId)).toBe(false);
     });
 
     it("returns false when timestamp is missing", () => {
-      const { timestamp: _timestamp, ...eventWithoutTimestamp } = createValidEvent();
+      const { timestamp: _timestamp, ...eventWithoutTimestamp } =
+        createValidEvent();
       expect(isEvent(eventWithoutTimestamp)).toBe(false);
     });
 
@@ -350,7 +353,8 @@ describe("isProjection", () => {
     });
 
     it("returns false when version is missing", () => {
-      const { version: _version, ...projectionWithoutVersion } = createValidProjection();
+      const { version: _version, ...projectionWithoutVersion } =
+        createValidProjection();
       expect(isProjection(projectionWithoutVersion)).toBe(false);
     });
 

@@ -57,7 +57,9 @@ export class EventRepositoryMemory implements EventRepository {
       const aggregateEvents = this.eventsByKey.get(key) ?? [];
 
       // Prevent duplicates by checking if event with same ID already exists
-      const alreadyExists = aggregateEvents.some((e) => e.EventId === record.EventId);
+      const alreadyExists = aggregateEvents.some(
+        (e) => e.EventId === record.EventId,
+      );
       if (alreadyExists) {
         // Log duplicate attempt for observability (memory store is test-only, so console is acceptable)
         if (process.env.NODE_ENV !== "test") {
@@ -72,7 +74,8 @@ export class EventRepositoryMemory implements EventRepository {
       aggregateEvents.push({
         ...record,
         EventPayload:
-          typeof record.EventPayload === "object" && record.EventPayload !== null
+          typeof record.EventPayload === "object" &&
+          record.EventPayload !== null
             ? JSON.parse(JSON.stringify(record.EventPayload))
             : record.EventPayload,
       });
@@ -80,4 +83,3 @@ export class EventRepositoryMemory implements EventRepository {
     }
   }
 }
-

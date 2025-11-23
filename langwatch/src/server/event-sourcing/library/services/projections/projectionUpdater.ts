@@ -19,6 +19,9 @@ import {
   ErrorCategory,
   handleError,
   isSequentialOrderingError,
+  ConfigurationError,
+  LockError,
+  ValidationError,
 } from "../errorHandling";
 
 /**
@@ -29,10 +32,15 @@ export class ProjectionUpdater<EventType extends Event = Event> {
   private readonly tracer = getLangWatchTracer(
     "langwatch.trace-processing.projection-updater",
   );
-  private readonly logger = createLogger("langwatch:event-sourcing:projection-updater");
+  private readonly logger = createLogger(
+    "langwatch:event-sourcing:projection-updater",
+  );
   private readonly aggregateType: AggregateType;
   private readonly eventStore: EventStore<EventType>;
-  private readonly projections?: Map<string, ProjectionDefinition<EventType, any>>;
+  private readonly projections?: Map<
+    string,
+    ProjectionDefinition<EventType, any>
+  >;
   private readonly processorCheckpointStore?: ProcessorCheckpointStore;
   private readonly distributedLock?: DistributedLock;
   private readonly updateLockTtlMs: number;
@@ -107,7 +115,9 @@ export class ProjectionUpdater<EventType extends Event = Event> {
           "tenant.id": context.tenantId,
           "projection.count": this.projections.size,
           "dispatch.mode":
-            this.queueManager.getProjectionQueueProcessors().size > 0 ? "async" : "sync",
+            this.queueManager.getProjectionQueueProcessors().size > 0
+              ? "async"
+              : "sync",
         },
       },
       async (span) => {
@@ -169,16 +179,11 @@ export class ProjectionUpdater<EventType extends Event = Event> {
                     error instanceof Error ? error.message : String(error),
                 });
 
-                handleError(
-                  error,
-                  category,
-                  this.logger,
-                  {
-                    projectionName,
-                    aggregateId,
-                    tenantId: context.tenantId,
-                  },
-                );
+                handleError(error, category, this.logger, {
+                  projectionName,
+                  aggregateId,
+                  tenantId: context.tenantId,
+                });
                 // If error was non-critical, processing continues
               }
             }
@@ -202,7 +207,8 @@ export class ProjectionUpdater<EventType extends Event = Event> {
         attributes: {
           "aggregate.type": this.aggregateType,
           "event.count": events.length,
-          "projection.count": this.queueManager.getProjectionQueueProcessors().size,
+          "projection.count":
+            this.queueManager.getProjectionQueueProcessors().size,
         },
       },
       async (span) => {
@@ -450,18 +456,21 @@ export class ProjectionUpdater<EventType extends Event = Event> {
     options?: UpdateProjectionOptions<EventType>,
   ): Promise<any> {
     if (!this.projections) {
-      throw new Error(
-        "EventSourcingService.updateProjectionByName requires multiple projections to be configured.",
+      throw new ConfigurationError(
+        "ProjectionUpdater",
+        "updateProjectionByName requires multiple projections to be configured",
       );
     }
 
     const projectionDef = this.projections.get(projectionName);
     if (!projectionDef) {
       const availableNames = Array.from(this.projections.keys()).join(", ");
-      throw new Error(
+      throw new ConfigurationError(
+        "ProjectionUpdater",
         `Projection "${projectionName}" not found. Available projections: ${
           availableNames || "none"
         }`,
+        { projectionName },
       );
     }
 
@@ -484,8 +493,15 @@ export class ProjectionUpdater<EventType extends Event = Event> {
           : null;
 
         if (this.distributedLock && !lockHandle) {
-          throw new Error(
+          throw new LockError(
+            lockKey,
+            "updateProjection",
             `Cannot acquire lock for projection update: ${lockKey}. Another process is updating this projection. Will retry.`,
+            {
+              projectionName,
+              aggregateId: String(aggregateId),
+              tenantId: context.tenantId,
+            },
           );
         }
 
@@ -512,8 +528,15 @@ export class ProjectionUpdater<EventType extends Event = Event> {
           });
 
           if (events.length === 0) {
-            throw new Error(
+            throw new ValidationError(
               `No events found for aggregate ${String(aggregateId)}`,
+              "events",
+              void 0,
+              {
+                aggregateId: String(aggregateId),
+                tenantId: context.tenantId,
+                projectionName,
+              },
             );
           }
 
@@ -637,18 +660,21 @@ export class ProjectionUpdater<EventType extends Event = Event> {
     context: EventStoreReadContext<EventType>,
   ): Promise<unknown> {
     if (!this.projections) {
-      throw new Error(
-        "EventSourcingService.getProjectionByName requires multiple projections to be configured. Use getProjection for single projection pipelines.",
+      throw new ConfigurationError(
+        "ProjectionUpdater",
+        "getProjectionByName requires multiple projections to be configured. Use getProjection for single projection pipelines.",
       );
     }
 
     const projectionDef = this.projections.get(projectionName);
     if (!projectionDef) {
       const availableNames = Array.from(this.projections.keys()).join(", ");
-      throw new Error(
+      throw new ConfigurationError(
+        "ProjectionUpdater",
         `Projection "${projectionName}" not found. Available projections: ${
           availableNames || "none"
         }`,
+        { projectionName },
       );
     }
 
@@ -690,18 +716,21 @@ export class ProjectionUpdater<EventType extends Event = Event> {
     context: EventStoreReadContext<EventType>,
   ): Promise<boolean> {
     if (!this.projections) {
-      throw new Error(
-        "EventSourcingService.hasProjectionByName requires multiple projections to be configured. Use hasProjection for single projection pipelines.",
+      throw new ConfigurationError(
+        "ProjectionUpdater",
+        "hasProjectionByName requires multiple projections to be configured. Use hasProjection for single projection pipelines.",
       );
     }
 
     const projectionDef = this.projections.get(projectionName);
     if (!projectionDef) {
       const availableNames = Array.from(this.projections.keys()).join(", ");
-      throw new Error(
+      throw new ConfigurationError(
+        "ProjectionUpdater",
         `Projection "${projectionName}" not found. Available projections: ${
           availableNames || "none"
         }`,
+        { projectionName },
       );
     }
 
@@ -761,4 +790,3 @@ export class ProjectionUpdater<EventType extends Event = Event> {
     );
   }
 }
-

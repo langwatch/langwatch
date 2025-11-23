@@ -225,7 +225,8 @@ const spanPayloadSchema = z.object({
 });
 
 class RecordSpanCommand
-  implements CommandHandler<Command<z.infer<typeof spanPayloadSchema>>, SpanEvent>
+  implements
+    CommandHandler<Command<z.infer<typeof spanPayloadSchema>>, SpanEvent>
 {
   static readonly dispatcherName = "recordSpan" as const;
   static readonly schema = defineCommandSchema(
@@ -237,7 +238,9 @@ class RecordSpanCommand
     return payload.traceId;
   }
 
-  async handle(command: Command<z.infer<typeof spanPayloadSchema>>): Promise<SpanEvent[]> {
+  async handle(
+    command: Command<z.infer<typeof spanPayloadSchema>>,
+  ): Promise<SpanEvent[]> {
     const event = EventUtils.createEvent(
       "span_ingestion",
       command.aggregateId,
@@ -300,6 +303,7 @@ const pipeline = eventSourcing
 ```
 
 **Key features:**
+
 - **Sequential ordering**: Events are processed in sequence number order per aggregate
 - **Per-aggregate checkpoints**: One checkpoint per aggregate tracks the last processed event (checkpoint key: `tenantId:pipelineName:processorName:aggregateType:aggregateId`)
 - **Idempotency**: Already processed events are automatically skipped via EventProcessorValidator
@@ -336,6 +340,7 @@ const summary = await pipeline.service.getProjectionByName(
 ```
 
 **Key features:**
+
 - **Queue-based processing**: Each projection has its own queue processor
 - **Per-event triggering**: Each event triggers a projection rebuild
 - **Full rebuild**: Projections rebuild from all events for the aggregate (not incremental)
@@ -352,7 +357,9 @@ const pipeline = eventSourcing
   .withName("pipeline-name")
   .withAggregateType("aggregate-type")
   .withProjection("projection-name", ProjectionHandlerClass)
-  .withEventHandler("handler-name", EventHandlerClass, { eventTypes: ["event.type"] })
+  .withEventHandler("handler-name", EventHandlerClass, {
+    eventTypes: ["event.type"],
+  })
   .withCommand("command-name", CommandHandlerClass)
   .withEventPublisher(publisher)
   .build();

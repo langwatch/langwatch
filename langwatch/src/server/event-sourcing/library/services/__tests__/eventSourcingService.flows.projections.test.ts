@@ -36,7 +36,13 @@ describe("EventSourcingService - Projection Flows", () => {
       const eventStore = createMockEventStore<Event>();
       const projectionHandler = createMockEventHandler<Event, any>();
       const projectionStore = createMockProjectionStore<any>();
-      const events = [createTestEvent(TEST_CONSTANTS.AGGREGATE_ID, TEST_CONSTANTS.AGGREGATE_TYPE, tenantId)];
+      const events = [
+        createTestEvent(
+          TEST_CONSTANTS.AGGREGATE_ID,
+          TEST_CONSTANTS.AGGREGATE_TYPE,
+          tenantId,
+        ),
+      ];
 
       eventStore.getEvents = vi.fn().mockResolvedValue(events);
       const expectedProjection = createTestProjection(
@@ -150,7 +156,13 @@ describe("EventSourcingService - Projection Flows", () => {
       const eventStore = createMockEventStore<Event>();
       const projectionHandler = createMockEventHandler<Event, any>();
       const projectionStore = createMockProjectionStore<any>();
-      const events = [createTestEvent(TEST_CONSTANTS.AGGREGATE_ID, TEST_CONSTANTS.AGGREGATE_TYPE, tenantId)];
+      const events = [
+        createTestEvent(
+          TEST_CONSTANTS.AGGREGATE_ID,
+          TEST_CONSTANTS.AGGREGATE_TYPE,
+          tenantId,
+        ),
+      ];
 
       eventStore.getEvents = vi.fn().mockResolvedValue(events);
       projectionHandler.handle = vi
@@ -234,7 +246,13 @@ describe("EventSourcingService - Projection Flows", () => {
       const eventStore = createMockEventStore<Event>();
       const projectionHandler = createMockEventHandler<Event, any>();
       const projectionStore = createMockProjectionStore<any>();
-      const events = [createTestEvent(TEST_CONSTANTS.AGGREGATE_ID, TEST_CONSTANTS.AGGREGATE_TYPE, tenantId)];
+      const events = [
+        createTestEvent(
+          TEST_CONSTANTS.AGGREGATE_ID,
+          TEST_CONSTANTS.AGGREGATE_TYPE,
+          tenantId,
+        ),
+      ];
 
       eventStore.getEvents = vi.fn().mockResolvedValue(events);
       const handlerError = new Error("Handler failed");
@@ -268,7 +286,13 @@ describe("EventSourcingService - Projection Flows", () => {
       const eventStore = createMockEventStore<Event>();
       const projectionHandler = createMockEventHandler<Event, any>();
       const projectionStore = createMockProjectionStore<any>();
-      const events = [createTestEvent(TEST_CONSTANTS.AGGREGATE_ID, TEST_CONSTANTS.AGGREGATE_TYPE, tenantId)];
+      const events = [
+        createTestEvent(
+          TEST_CONSTANTS.AGGREGATE_ID,
+          TEST_CONSTANTS.AGGREGATE_TYPE,
+          tenantId,
+        ),
+      ];
       const projection = createTestProjection(
         TEST_CONSTANTS.AGGREGATE_ID,
         tenantId,
@@ -524,7 +548,6 @@ describe("EventSourcingService - Projection Flows", () => {
       expect(names).toContain("projection2");
       expect(names).toContain("projection3");
     });
-
   });
 
   describe("updateProjectionsForAggregates", () => {
@@ -582,7 +605,13 @@ describe("EventSourcingService - Projection Flows", () => {
       const projectionHandler2 = createMockEventHandler<Event, any>();
       const projectionStore1 = createMockProjectionStore<any>();
       const projectionStore2 = createMockProjectionStore<any>();
-      const events = [createTestEvent(TEST_CONSTANTS.AGGREGATE_ID, TEST_CONSTANTS.AGGREGATE_TYPE, tenantId)];
+      const events = [
+        createTestEvent(
+          TEST_CONSTANTS.AGGREGATE_ID,
+          TEST_CONSTANTS.AGGREGATE_TYPE,
+          tenantId,
+        ),
+      ];
 
       eventStore.getEvents = vi.fn().mockResolvedValue(events);
       projectionHandler1.handle = vi
@@ -659,7 +688,6 @@ describe("EventSourcingService - Projection Flows", () => {
       expect(eventStore.getEvents).toHaveBeenCalledTimes(2);
       expect(projectionHandler.handle).toHaveBeenCalledTimes(2);
     });
-
   });
 
   describe("projection checkpointing", () => {
@@ -704,7 +732,13 @@ describe("EventSourcingService - Projection Flows", () => {
       // 1st call: pending checkpoint from idempotency checker (optimistic locking) - 5 args, no errorMessage
       expect(checkpointStore.saveCheckpoint).toHaveBeenNthCalledWith(
         1,
-        buildCheckpointKey(tenantId, TEST_CONSTANTS.PIPELINE_NAME, "projection", TEST_CONSTANTS.AGGREGATE_TYPE, TEST_CONSTANTS.AGGREGATE_ID),
+        buildCheckpointKey(
+          tenantId,
+          TEST_CONSTANTS.PIPELINE_NAME,
+          "projection",
+          TEST_CONSTANTS.AGGREGATE_TYPE,
+          TEST_CONSTANTS.AGGREGATE_ID,
+        ),
         "projection",
         events[0],
         "pending",
@@ -713,7 +747,13 @@ describe("EventSourcingService - Projection Flows", () => {
       // 2nd call: pending checkpoint before processing (from processProjectionEvent)
       expect(checkpointStore.saveCheckpoint).toHaveBeenNthCalledWith(
         2,
-        buildCheckpointKey(tenantId, TEST_CONSTANTS.PIPELINE_NAME, "projection", TEST_CONSTANTS.AGGREGATE_TYPE, TEST_CONSTANTS.AGGREGATE_ID),
+        buildCheckpointKey(
+          tenantId,
+          TEST_CONSTANTS.PIPELINE_NAME,
+          "projection",
+          TEST_CONSTANTS.AGGREGATE_TYPE,
+          TEST_CONSTANTS.AGGREGATE_ID,
+        ),
         "projection",
         events[0],
         "pending",
@@ -723,7 +763,13 @@ describe("EventSourcingService - Projection Flows", () => {
       // 3rd call: processed checkpoint after successful processing
       expect(checkpointStore.saveCheckpoint).toHaveBeenNthCalledWith(
         3,
-        buildCheckpointKey(tenantId, TEST_CONSTANTS.PIPELINE_NAME, "projection", TEST_CONSTANTS.AGGREGATE_TYPE, TEST_CONSTANTS.AGGREGATE_ID),
+        buildCheckpointKey(
+          tenantId,
+          TEST_CONSTANTS.PIPELINE_NAME,
+          "projection",
+          TEST_CONSTANTS.AGGREGATE_TYPE,
+          TEST_CONSTANTS.AGGREGATE_ID,
+        ),
         "projection",
         events[0],
         "processed",
@@ -764,13 +810,17 @@ describe("EventSourcingService - Projection Flows", () => {
         processorCheckpointStore: checkpointStore,
       });
 
-      await expect(
-        service.storeEvents(events, context),
-      ).resolves.not.toThrow();
+      await expect(service.storeEvents(events, context)).resolves.not.toThrow();
 
       // Should save pending checkpoint first, then failed checkpoint
       expect(checkpointStore.saveCheckpoint).toHaveBeenCalledWith(
-        buildCheckpointKey(tenantId, TEST_CONSTANTS.PIPELINE_NAME, "projection", TEST_CONSTANTS.AGGREGATE_TYPE, TEST_CONSTANTS.AGGREGATE_ID),
+        buildCheckpointKey(
+          tenantId,
+          TEST_CONSTANTS.PIPELINE_NAME,
+          "projection",
+          TEST_CONSTANTS.AGGREGATE_TYPE,
+          TEST_CONSTANTS.AGGREGATE_ID,
+        ),
         "projection",
         events[0],
         "pending",
@@ -778,7 +828,13 @@ describe("EventSourcingService - Projection Flows", () => {
         undefined,
       );
       expect(checkpointStore.saveCheckpoint).toHaveBeenCalledWith(
-        buildCheckpointKey(tenantId, TEST_CONSTANTS.PIPELINE_NAME, "projection", TEST_CONSTANTS.AGGREGATE_TYPE, TEST_CONSTANTS.AGGREGATE_ID),
+        buildCheckpointKey(
+          tenantId,
+          TEST_CONSTANTS.PIPELINE_NAME,
+          "projection",
+          TEST_CONSTANTS.AGGREGATE_TYPE,
+          TEST_CONSTANTS.AGGREGATE_ID,
+        ),
         "projection",
         events[0],
         "failed",
@@ -814,18 +870,14 @@ describe("EventSourcingService - Projection Flows", () => {
 
       // Make projection fail for event1
       const error = new Error("Projection failed");
-      projectionHandler.handle = vi
-        .fn()
-        .mockRejectedValueOnce(error);
+      projectionHandler.handle = vi.fn().mockRejectedValueOnce(error);
 
       checkpointStore.hasFailedEvents = vi
         .fn()
         .mockResolvedValueOnce(false) // First check for event1 (no failures yet)
         .mockResolvedValueOnce(true); // Second check for event2 (event1 failed)
 
-      checkpointStore.loadCheckpoint = vi
-        .fn()
-        .mockResolvedValue(null); // No existing checkpoints
+      checkpointStore.loadCheckpoint = vi.fn().mockResolvedValue(null); // No existing checkpoints
 
       const service = new EventSourcingService({
         pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
@@ -895,9 +947,7 @@ describe("EventSourcingService - Projection Flows", () => {
         processorCheckpointStore: checkpointStore,
       });
 
-      await expect(
-        service.storeEvents(events, context),
-      ).resolves.not.toThrow();
+      await expect(service.storeEvents(events, context)).resolves.not.toThrow();
 
       // Should check for failures
       expect(checkpointStore.hasFailedEvents).toHaveBeenCalledWith(

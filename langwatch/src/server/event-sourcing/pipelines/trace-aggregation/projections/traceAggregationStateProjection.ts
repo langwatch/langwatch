@@ -13,7 +13,7 @@ export interface TraceProjectionData {
   TraceId: string;
   SpanCount: number;
   TotalDurationMs: number;
-  
+
   // Computed metrics
   IOSchemaVersion: string;
   ComputedInput: string | null;
@@ -30,7 +30,7 @@ export interface TraceProjectionData {
   TotalPromptTokenCount: number | null;
   TotalCompletionTokenCount: number | null;
   HasAnnotation: boolean | null;
-  
+
   // Metadata timestamps
   CreatedAt: number;
   LastUpdatedAt: number;
@@ -39,8 +39,7 @@ export interface TraceProjectionData {
 /**
  * Projection for trace metrics matching the ClickHouse schema.
  */
-export interface TraceProjection
-  extends Projection<TraceProjectionData> {
+export interface TraceProjection extends Projection<TraceProjectionData> {
   data: TraceProjectionData;
 }
 
@@ -49,8 +48,7 @@ export interface TraceProjection
  * Populates all computed trace metrics from TraceAggregationCompletedEvent data.
  */
 export class TraceAggregationStateProjectionHandler
-  implements
-    ProjectionHandler<TraceAggregationEvent, TraceProjection>
+  implements ProjectionHandler<TraceAggregationEvent, TraceProjection>
 {
   static readonly store = traceAggregationStateProjectionRepository;
 
@@ -70,7 +68,10 @@ export class TraceAggregationStateProjectionHandler
 
     for (const event of events) {
       if (isTraceAggregationCompletedEvent(event)) {
-        if (!latestCompletedEvent || event.timestamp > latestCompletedEvent.timestamp) {
+        if (
+          !latestCompletedEvent ||
+          event.timestamp > latestCompletedEvent.timestamp
+        ) {
           latestCompletedEvent = event;
         }
         if (createdAt === null) {
@@ -80,7 +81,10 @@ export class TraceAggregationStateProjectionHandler
     }
 
     // If no completed event, return empty projection (shouldn't happen in practice)
-    if (!latestCompletedEvent || !isTraceAggregationCompletedEvent(latestCompletedEvent)) {
+    if (
+      !latestCompletedEvent ||
+      !isTraceAggregationCompletedEvent(latestCompletedEvent)
+    ) {
       const now = Date.now();
       return {
         id: `trace:${aggregateId}`,

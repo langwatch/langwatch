@@ -12,7 +12,6 @@ export {
   TRACE_AGGREGATION_EVENT_TYPES,
 } from "./typeIdentifiers";
 
-
 /**
  * Zod schema for EventMetadataBase.
  * Base metadata that all events can have.
@@ -35,7 +34,6 @@ export const traceAggregationEventMetadataSchema =
     traceId?: string;
     [key: string]: unknown;
   }>;
-
 
 /**
  * Zod schema for TraceAggregationCompletedEventData.
@@ -92,7 +90,6 @@ export const traceAggregationCompletedEventDataSchema = z.object({
   HasAnnotation: boolean | null;
 }>;
 
-
 /**
  * Zod schema for TraceAggregationCompletedEvent.
  */
@@ -109,7 +106,6 @@ export const traceAggregationCompletedEventSchema = EventSchema.extend({
   data: z.infer<typeof traceAggregationCompletedEventDataSchema>;
   metadata: z.infer<typeof traceAggregationEventMetadataSchema>;
 }>;
-
 
 /**
  * Types inferred from Zod schemas.
@@ -141,4 +137,3 @@ export function isTraceAggregationCompletedEvent(
 ): event is TraceAggregationCompletedEvent {
   return event.type === TRACE_AGGREGATION_COMPLETED_EVENT_TYPE;
 }
-

@@ -1,6 +1,7 @@
 import type { SpanData } from "../../span-ingestion/schemas/commands";
 import type { TraceAggregationCompletedEventData } from "../schemas/events";
 import { createLogger } from "../../../../../utils/logger";
+import { ValidationError } from "../../../library/services/errorHandling";
 
 /**
  * Service that handles the business logic of aggregating spans into trace metadata.
@@ -35,7 +36,11 @@ export class TraceAggregationService {
    */
   aggregateTrace(spans: SpanData[]): TraceAggregationCompletedEventData {
     if (spans.length === 0 || !spans[0]) {
-      throw new Error("Cannot aggregate trace with no spans");
+      throw new ValidationError(
+        "Cannot aggregate trace with no spans",
+        "spans",
+        spans,
+      );
     }
 
     // Filter out spans with invalid timestamps and log warnings
@@ -60,8 +65,10 @@ export class TraceAggregationService {
     });
 
     if (spansWithValidTimestamps.length === 0) {
-      throw new Error(
+      throw new ValidationError(
         "Cannot aggregate trace: all spans have invalid timestamps",
+        "spans",
+        spans,
       );
     }
 
@@ -142,7 +149,11 @@ export class TraceAggregationService {
       // Extract ComputedInput and ComputedOutput
       // Use latest GenAI semantic convention attributes: gen_ai.input.messages and gen_ai.output.messages
       const genAiInputMessages = span.attributes?.["gen_ai.input.messages"];
-      if (typeof genAiInputMessages === "string" && genAiInputMessages && !ComputedInput) {
+      if (
+        typeof genAiInputMessages === "string" &&
+        genAiInputMessages &&
+        !ComputedInput
+      ) {
         // Parse JSON string to extract content
         try {
           const parsed = JSON.parse(genAiInputMessages);
@@ -159,7 +170,8 @@ export class TraceAggregationService {
                     .map((p: any) => p.content || p.text || "")
                     .join(" ")) ||
                 JSON.stringify(firstMessage);
-              ComputedInput = typeof content === "string" ? content : JSON.stringify(content);
+              ComputedInput =
+                typeof content === "string" ? content : JSON.stringify(content);
             } else {
               ComputedInput = JSON.stringify(parsed);
             }
@@ -173,7 +185,11 @@ export class TraceAggregationService {
       }
 
       const genAiOutputMessages = span.attributes?.["gen_ai.output.messages"];
-      if (typeof genAiOutputMessages === "string" && genAiOutputMessages && !ComputedOutput) {
+      if (
+        typeof genAiOutputMessages === "string" &&
+        genAiOutputMessages &&
+        !ComputedOutput
+      ) {
         // Parse JSON string to extract content
         try {
           const parsed = JSON.parse(genAiOutputMessages);
@@ -190,7 +206,8 @@ export class TraceAggregationService {
                     .map((p: any) => p.content || p.text || "")
                     .join(" ")) ||
                 JSON.stringify(firstMessage);
-              ComputedOutput = typeof content === "string" ? content : JSON.stringify(content);
+              ComputedOutput =
+                typeof content === "string" ? content : JSON.stringify(content);
             } else {
               ComputedOutput = JSON.stringify(parsed);
             }
@@ -205,21 +222,37 @@ export class TraceAggregationService {
 
       // Fallback to legacy attribute names for backwards compatibility
       const legacyGenAiPrompt = span.attributes?.["gen_ai.prompt"];
-      if (typeof legacyGenAiPrompt === "string" && legacyGenAiPrompt && !ComputedInput) {
+      if (
+        typeof legacyGenAiPrompt === "string" &&
+        legacyGenAiPrompt &&
+        !ComputedInput
+      ) {
         ComputedInput = legacyGenAiPrompt;
       }
       const legacyGenAiCompletion = span.attributes?.["gen_ai.completion"];
-      if (typeof legacyGenAiCompletion === "string" && legacyGenAiCompletion && !ComputedOutput) {
+      if (
+        typeof legacyGenAiCompletion === "string" &&
+        legacyGenAiCompletion &&
+        !ComputedOutput
+      ) {
         ComputedOutput = legacyGenAiCompletion;
       }
 
       // Fallback to computed.* attributes for backwards compatibility
       const computedInput = span.attributes?.["computed.input"];
-      if (typeof computedInput === "string" && computedInput && !ComputedInput) {
+      if (
+        typeof computedInput === "string" &&
+        computedInput &&
+        !ComputedInput
+      ) {
         ComputedInput = computedInput;
       }
       const computedOutput = span.attributes?.["computed.output"];
-      if (typeof computedOutput === "string" && computedOutput && !ComputedOutput) {
+      if (
+        typeof computedOutput === "string" &&
+        computedOutput &&
+        !ComputedOutput
+      ) {
         ComputedOutput = computedOutput;
       }
 
@@ -255,7 +288,10 @@ export class TraceAggregationService {
         totalPromptTokens += legacyPromptTokens;
       }
       const legacyCompletionTokens = span.attributes?.["llm.completion_tokens"];
-      if (typeof legacyCompletionTokens === "number" && legacyCompletionTokens > 0) {
+      if (
+        typeof legacyCompletionTokens === "number" &&
+        legacyCompletionTokens > 0
+      ) {
         totalCompletionTokens += legacyCompletionTokens;
       }
 

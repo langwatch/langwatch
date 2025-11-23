@@ -107,7 +107,6 @@ describe("ProjectionUpdater", () => {
     });
   }
 
-
   describe("processProjectionEvent", () => {
     it("processes event and saves checkpoints", async () => {
       const projectionHandler = createMockEventHandler<Event, any>();
@@ -126,13 +125,11 @@ describe("ProjectionUpdater", () => {
 
       const eventStore = createMockEventStore<Event>();
       eventStore.countEventsBefore = vi.fn().mockResolvedValue(0);
-      eventStore.getEvents = vi.fn().mockResolvedValue([
-        createTestEvent(
-          TEST_CONSTANTS.AGGREGATE_ID,
-          aggregateType,
-          tenantId,
-        ),
-      ]);
+      eventStore.getEvents = vi
+        .fn()
+        .mockResolvedValue([
+          createTestEvent(TEST_CONSTANTS.AGGREGATE_ID, aggregateType, tenantId),
+        ]);
 
       const validator = new EventProcessorValidator({
         eventStore,
@@ -166,7 +163,13 @@ describe("ProjectionUpdater", () => {
       // The processed checkpoint is the 3rd call
       expect(checkpointStore.saveCheckpoint).toHaveBeenNthCalledWith(
         3,
-        buildCheckpointKey(tenantId, TEST_CONSTANTS.PIPELINE_NAME, "projection1", TEST_CONSTANTS.AGGREGATE_TYPE, TEST_CONSTANTS.AGGREGATE_ID),
+        buildCheckpointKey(
+          tenantId,
+          TEST_CONSTANTS.PIPELINE_NAME,
+          "projection1",
+          TEST_CONSTANTS.AGGREGATE_TYPE,
+          TEST_CONSTANTS.AGGREGATE_ID,
+        ),
         "projection",
         event,
         "processed",
@@ -195,13 +198,11 @@ describe("ProjectionUpdater", () => {
 
       const eventStore = createMockEventStore<Event>();
       eventStore.countEventsBefore = vi.fn().mockResolvedValue(0);
-      eventStore.getEvents = vi.fn().mockResolvedValue([
-        createTestEvent(
-          TEST_CONSTANTS.AGGREGATE_ID,
-          aggregateType,
-          tenantId,
-        ),
-      ]);
+      eventStore.getEvents = vi
+        .fn()
+        .mockResolvedValue([
+          createTestEvent(TEST_CONSTANTS.AGGREGATE_ID, aggregateType, tenantId),
+        ]);
 
       const validator = new EventProcessorValidator({
         eventStore,
@@ -239,7 +240,13 @@ describe("ProjectionUpdater", () => {
       // The failed checkpoint is the 3rd call (after 2 pending checkpoints)
       expect(checkpointStore.saveCheckpoint).toHaveBeenNthCalledWith(
         3,
-        buildCheckpointKey(tenantId, TEST_CONSTANTS.PIPELINE_NAME, "projection1", TEST_CONSTANTS.AGGREGATE_TYPE, TEST_CONSTANTS.AGGREGATE_ID),
+        buildCheckpointKey(
+          tenantId,
+          TEST_CONSTANTS.PIPELINE_NAME,
+          "projection1",
+          TEST_CONSTANTS.AGGREGATE_TYPE,
+          TEST_CONSTANTS.AGGREGATE_ID,
+        ),
         "projection",
         event,
         "failed",
@@ -270,11 +277,7 @@ describe("ProjectionUpdater", () => {
 
       const eventStore = createMockEventStore<Event>();
       const events = [
-        createTestEvent(
-          TEST_CONSTANTS.AGGREGATE_ID,
-          aggregateType,
-          tenantId,
-        ),
+        createTestEvent(TEST_CONSTANTS.AGGREGATE_ID, aggregateType, tenantId),
       ];
       eventStore.getEvents = vi.fn().mockResolvedValue(events);
 
@@ -371,4 +374,3 @@ describe("ProjectionUpdater", () => {
     });
   });
 });
-

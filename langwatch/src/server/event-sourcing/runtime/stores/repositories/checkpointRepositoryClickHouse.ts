@@ -185,9 +185,7 @@ export class CheckpointRepositoryClickHouse implements CheckpointRepository {
     }
   }
 
-  async hasFailedCheckpointRecords(
-    checkpointKey: string,
-  ): Promise<boolean> {
+  async hasFailedCheckpointRecords(checkpointKey: string): Promise<boolean> {
     try {
       const result = await this.clickHouseClient.query({
         query: `
@@ -306,9 +304,7 @@ export class CheckpointRepositoryClickHouse implements CheckpointRepository {
     }
   }
 
-  async deleteCheckpointRecord(
-    checkpointKey: string,
-  ): Promise<void> {
+  async deleteCheckpointRecord(checkpointKey: string): Promise<void> {
     try {
       // Delete checkpoint using ALTER DELETE
       await this.clickHouseClient.command({
@@ -340,4 +336,3 @@ export class CheckpointRepositoryClickHouse implements CheckpointRepository {
     }
   }
 }
-

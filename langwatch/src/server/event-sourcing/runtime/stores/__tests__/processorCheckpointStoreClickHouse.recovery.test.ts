@@ -63,9 +63,9 @@ describe("ProcessorCheckpointStoreClickHouse - Recovery Methods", () => {
           },
         ]),
       };
-      (mockClickHouseClient.query as ReturnType<typeof vi.fn>).mockResolvedValue(
-        mockResult,
-      );
+      (
+        mockClickHouseClient.query as ReturnType<typeof vi.fn>
+      ).mockResolvedValue(mockResult);
 
       const failedEvents = await store.getFailedEvents(
         pipelineName,
@@ -237,9 +237,9 @@ describe("ProcessorCheckpointStoreClickHouse - Recovery Methods", () => {
       const mockResult = {
         json: vi.fn().mockResolvedValue([]),
       };
-      (mockClickHouseClient.query as ReturnType<typeof vi.fn>).mockResolvedValue(
-        mockResult,
-      );
+      (
+        mockClickHouseClient.query as ReturnType<typeof vi.fn>
+      ).mockResolvedValue(mockResult);
 
       const failedEvents = await store.getFailedEvents(
         pipelineName,
@@ -344,7 +344,9 @@ describe("ProcessorCheckpointStoreClickHouse - Recovery Methods", () => {
 
       expect(mockClickHouseClient.query).toHaveBeenCalledWith(
         expect.objectContaining({
-          query: expect.stringContaining("CheckpointKey = {checkpointKey:String}"),
+          query: expect.stringContaining(
+            "CheckpointKey = {checkpointKey:String}",
+          ),
           query_params: expect.objectContaining({
             checkpointKey: expectedCheckpointKey1,
           }),
@@ -410,9 +412,9 @@ describe("ProcessorCheckpointStoreClickHouse - Recovery Methods", () => {
           },
         ]),
       };
-      (mockClickHouseClient.query as ReturnType<typeof vi.fn>).mockResolvedValue(
-        mockResult,
-      );
+      (
+        mockClickHouseClient.query as ReturnType<typeof vi.fn>
+      ).mockResolvedValue(mockResult);
 
       const failedEvents = await store.getFailedEvents(
         pipelineName,
@@ -439,9 +441,9 @@ describe("ProcessorCheckpointStoreClickHouse - Recovery Methods", () => {
       const processorType = "handler" as const;
 
       const queryError = new Error("ClickHouse connection failed");
-      (mockClickHouseClient.query as ReturnType<typeof vi.fn>).mockRejectedValue(
-        queryError,
-      );
+      (
+        mockClickHouseClient.query as ReturnType<typeof vi.fn>
+      ).mockRejectedValue(queryError);
 
       await expect(
         store.getFailedEvents(
@@ -469,16 +471,18 @@ describe("ProcessorCheckpointStoreClickHouse - Recovery Methods", () => {
       );
 
       // Mock ClickHouse command (clearCheckpoint uses command, not query)
-      (mockClickHouseClient.command as ReturnType<typeof vi.fn>).mockResolvedValue(
-        void 0,
-      );
+      (
+        mockClickHouseClient.command as ReturnType<typeof vi.fn>
+      ).mockResolvedValue(void 0);
 
       await store.clearCheckpoint(checkpointKey);
 
       // Verify ALTER DELETE command was executed
       expect(mockClickHouseClient.command).toHaveBeenCalledWith(
         expect.objectContaining({
-          query: expect.stringMatching(/ALTER TABLE processor_checkpoints.*DELETE WHERE CheckpointKey/s),
+          query: expect.stringMatching(
+            /ALTER TABLE processor_checkpoints.*DELETE WHERE CheckpointKey/s,
+          ),
           query_params: expect.objectContaining({
             checkpointKey,
           }),
@@ -492,9 +496,9 @@ describe("ProcessorCheckpointStoreClickHouse - Recovery Methods", () => {
       const nonExistentAggregateId = "non-existent-aggregate-id";
 
       // Mock ClickHouse command (DELETE on non-existent row succeeds)
-      (mockClickHouseClient.command as ReturnType<typeof vi.fn>).mockResolvedValue(
-        void 0,
-      );
+      (
+        mockClickHouseClient.command as ReturnType<typeof vi.fn>
+      ).mockResolvedValue(void 0);
 
       // Should not throw
       const nonExistentCheckpointKey = buildCheckpointKey(
@@ -521,9 +525,9 @@ describe("ProcessorCheckpointStoreClickHouse - Recovery Methods", () => {
       );
 
       // Mock ClickHouse command
-      (mockClickHouseClient.command as ReturnType<typeof vi.fn>).mockResolvedValue(
-        void 0,
-      );
+      (
+        mockClickHouseClient.command as ReturnType<typeof vi.fn>
+      ).mockResolvedValue(void 0);
 
       // Clear checkpoint for processor1
       await store.clearCheckpoint(checkpointKey);
@@ -549,9 +553,9 @@ describe("ProcessorCheckpointStoreClickHouse - Recovery Methods", () => {
       );
 
       // Mock ClickHouse command
-      (mockClickHouseClient.command as ReturnType<typeof vi.fn>).mockResolvedValue(
-        void 0,
-      );
+      (
+        mockClickHouseClient.command as ReturnType<typeof vi.fn>
+      ).mockResolvedValue(void 0);
 
       // Clear checkpoint for handler
       await store.clearCheckpoint(checkpointKey);
@@ -571,9 +575,9 @@ describe("ProcessorCheckpointStoreClickHouse - Recovery Methods", () => {
       const processorType = "handler" as const;
 
       const commandError = new Error("ClickHouse connection failed");
-      (mockClickHouseClient.command as ReturnType<typeof vi.fn>).mockRejectedValue(
-        commandError,
-      );
+      (
+        mockClickHouseClient.command as ReturnType<typeof vi.fn>
+      ).mockRejectedValue(commandError);
 
       const checkpointKey = buildCheckpointKey(
         tenantId,
@@ -582,10 +586,9 @@ describe("ProcessorCheckpointStoreClickHouse - Recovery Methods", () => {
         aggregateType,
         aggregateId,
       );
-      await expect(
-        store.clearCheckpoint(checkpointKey),
-      ).rejects.toThrow("ClickHouse connection failed");
+      await expect(store.clearCheckpoint(checkpointKey)).rejects.toThrow(
+        "ClickHouse connection failed",
+      );
     });
   });
 });
-

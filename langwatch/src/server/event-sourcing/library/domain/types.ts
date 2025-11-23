@@ -74,10 +74,10 @@ type EventBase = z.infer<typeof EventSchema>;
  * Event types follow the taxonomy system defined in ./taxonomy.ts.
  * For LangWatch Observability, event types are of the form: `lw.obs.<aggregate-type>.<event-name>`
  */
-export type Event<
-  Payload = unknown,
-  Metadata = EventMetadataBase,
-> = Omit<EventBase, "data" | "metadata"> & {
+export type Event<Payload = unknown, Metadata = EventMetadataBase> = Omit<
+  EventBase,
+  "data" | "metadata"
+> & {
   /** Event-specific data */
   data: Payload;
   /** Metadata about the event, optional */
@@ -152,9 +152,9 @@ export const ProjectionEnvelopeSchema = z.object({
  * @param projectionSchema - The custom projection schema to use
  * @returns A Zod schema for the projection envelope
  */
-export function createProjectionEnvelopeSchema<TProjection extends ProjectionType>(
-  projectionSchema: z.ZodType<TProjection>,
-) {
+export function createProjectionEnvelopeSchema<
+  TProjection extends ProjectionType,
+>(projectionSchema: z.ZodType<TProjection>) {
   return z.object({
     projection: projectionSchema,
     metadata: ProjectionMetadataSchema,
@@ -165,9 +165,7 @@ export function createProjectionEnvelopeSchema<TProjection extends ProjectionTyp
  * Projection envelope with type-safe projection.
  * Extends the base envelope type from the schema while allowing generic projection types.
  */
-export type ProjectionEnvelope<
-  TProjection extends Projection = Projection,
-> = {
+export type ProjectionEnvelope<TProjection extends Projection = Projection> = {
   projection: TProjection;
   metadata: ProjectionMetadata;
 };
