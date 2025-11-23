@@ -1,34 +1,41 @@
-import type { Event, Projection } from "../types";
-import type { EventStream } from "../../streams/eventStream";
+import type { Event } from "../types";
 
 /**
- * Result type for event handler execution.
- * Handlers can return a projection directly or as a promise.
- */
-export type EventHandlerResult<ProjectionType extends Projection = Projection> =
-  Promise<ProjectionType> | ProjectionType;
-
-/**
- * Handler that processes a stream of events to build or update a projection.
+ * Handler that reacts to individual events as they are stored.
+ * Unlike ProjectionHandler (for projections), this processes single events asynchronously.
  *
- * Event handlers are the core of the event sourcing system - they transform event streams
- * into queryable projections. The framework provides events in chronological order (unless
- * a custom ordering strategy is specified).
+ * Event handlers are orchestrated by the framework - they don't manage their own lifecycle.
+ * The framework dispatches events to handlers via queues and maintains checkpoints.
+ *
+ * @example
+ * ```typescript
+ * class SpanClickHouseWriterHandler implements EventHandler<SpanIngestionEvent> {
+ *   async handle(event: SpanIngestionEvent): Promise<void> {
+ *     await this.clickHouse.insert(event.data.spanData);
+ *   }
+ *
+ *   getEventTypes() {
+ *     return ["lw.obs.span_ingestion.recorded"];
+ *   }
+ * }
+ * ```
  */
-export interface EventHandler<
-  EventType extends Event = Event,
-  ProjectionType extends Projection = Projection,
-> {
+export interface EventHandler<EventType extends Event = Event> {
   /**
-   * Processes a batch of events to build or update a projection.
+   * Handles a single event.
+   * This method should be idempotent - the framework ensures idempotency via event ID
+   * in job IDs, but handlers can also implement their own checks.
    *
-   * Event streams are always provided in chronological order unless otherwise specified
-   * via the ordering strategy in EventSourcingOptions.
-   *
-   * @param stream - The event stream to process
-   * @returns The projection (or promise of projection) built from the events
+   * @param event - The event to handle
+   * @returns Promise that resolves when handling is complete
    */
-  handle(
-    stream: EventStream<EventType["tenantId"], EventType>,
-  ): EventHandlerResult<ProjectionType>;
+  handle(event: EventType): Promise<void>;
+
+  /**
+   * Optional: Returns the event types this handler is interested in.
+   * If not provided, the handler will receive all events for the aggregate type.
+   *
+   * @returns Array of event type strings, or undefined to handle all events
+   */
+  getEventTypes?(): readonly EventType["type"][] | undefined;
 }
