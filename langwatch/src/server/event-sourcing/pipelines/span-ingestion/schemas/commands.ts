@@ -123,16 +123,28 @@ export const spanDataSchema = z.object({
 });
 
 /**
+ * Zod schema for SpanData in command payloads.
+ * Omits id and tenantId since:
+ * - id is generated in the repository
+ * - tenantId comes from the command level
+ */
+const spanDataForCommandSchema = spanDataSchema.omit({
+  id: true,
+  tenantId: true,
+});
+
+/**
  * Zod schema for StoreSpanIngestionCommandData.
  * Matches the StoreSpanIngestionCommandData interface structure.
+ * The spanData in commands omits id and tenantId (handled separately).
  */
 export const storeSpanIngestionCommandDataSchema = z.object({
   tenantId: z.string(),
-  spanData: spanDataSchema,
+  spanData: spanDataForCommandSchema,
   collectedAtUnixMs: z.number(),
 }) satisfies z.ZodType<{
   tenantId: string;
-  spanData: z.infer<typeof spanDataSchema>;
+  spanData: z.infer<typeof spanDataForCommandSchema>;
   collectedAtUnixMs: number;
 }>;
 

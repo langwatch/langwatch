@@ -27,7 +27,6 @@ export class RecordSpanCommand
       SpanIngestionRecordedEvent
     >
 {
-  static readonly dispatcherName = "recordSpan" as const;
   static readonly schema = defineCommandSchema(
     SPAN_INGESTION_RECORD_COMMAND_TYPE,
     storeSpanIngestionCommandDataSchema,
@@ -93,10 +92,8 @@ export class RecordSpanCommand
 
         // Create lightweight event with only identifiers
         // Full span data is stored separately in ClickHouse
-        const ingestionEvent = EventUtils.createEventWithProcessingTraceContext<
-          SpanIngestionRecordedEvent["data"],
-          SpanIngestionRecordedEvent["metadata"]
-        >(
+        const ingestionEvent = EventUtils.createEvent<SpanIngestionRecordedEvent>(
+          "span_ingestion",
           traceId,
           tenantId,
           SPAN_INGESTION_RECORDED_EVENT_TYPE,
@@ -105,13 +102,11 @@ export class RecordSpanCommand
             spanId,
             collectedAtUnixMs,
           },
-          "span_ingestion",
           {
             spanId,
             collectedAtUnixMs,
           },
-          collectedAtUnixMs, // timestamp
-        ) as SpanIngestionRecordedEvent;
+        );
 
         return [ingestionEvent];
       },

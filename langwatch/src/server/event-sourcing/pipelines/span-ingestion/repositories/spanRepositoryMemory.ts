@@ -1,5 +1,6 @@
 import { SpanKind } from "@opentelemetry/api";
 import { getLangWatchTracer } from "langwatch";
+import { generate } from "@langwatch/ksuid";
 
 import type { SpanRepository } from "./spanRepository";
 import type { StoreSpanIngestionCommandData, SpanData } from "../schemas/commands";
@@ -32,8 +33,15 @@ export class SpanRepositoryMemory implements SpanRepository {
             command.spanData.traceId,
             command.spanData.spanId,
           );
+          // Add id and tenantId to spanData for storage
+          // id is generated, tenantId comes from command
+          const completeSpanData: SpanData = {
+            ...command.spanData,
+            id: generate("span").toString(),
+            tenantId: command.tenantId,
+          };
           // Idempotent: overwrite if exists
-          this.spans.set(key, command.spanData);
+          this.spans.set(key, completeSpanData);
           this.logger.info({ command }, "Span inserted into memory");
         } catch (error) {
           this.logger.error(

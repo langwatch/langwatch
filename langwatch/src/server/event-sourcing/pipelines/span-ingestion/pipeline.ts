@@ -5,14 +5,8 @@ import type { SpanIngestionEvent } from "./schemas/events";
 
 export const spanIngestionPipeline = eventSourcing
   .registerPipeline<SpanIngestionEvent>()
-  .withName("span-ingestion")
+  .withName("span_ingestion")
   .withAggregateType("span_ingestion")
-  .withCommandHandler(RecordSpanCommand)
-  .withEventHandler(
-    "trace-aggregation-trigger",
-    new TraceAggregationTriggerHandler(),
-    {
-      eventTypes: ["lw.obs.span_ingestion.recorded"],
-    },
-  )
+  .withCommand("recordSpan", RecordSpanCommand)
+  .withEventHandler("traceAggregationTrigger", TraceAggregationTriggerHandler)
   .build();

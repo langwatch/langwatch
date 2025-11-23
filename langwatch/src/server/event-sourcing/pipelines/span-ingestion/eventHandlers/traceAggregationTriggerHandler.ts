@@ -1,13 +1,13 @@
 import { SpanKind } from "@opentelemetry/api";
 import { getLangWatchTracer } from "langwatch";
 
-import type { EventReactionHandler } from "../../../library";
+import type { EventHandler } from "../../../library";
 import type { SpanIngestionRecordedEvent } from "../schemas/events";
 import { createLogger } from "../../../../../utils/logger";
 import { traceAggregationPipeline } from "../../trace-aggregation/pipeline";
 
 export class TraceAggregationTriggerHandler
-  implements EventReactionHandler<SpanIngestionRecordedEvent>
+  implements EventHandler<SpanIngestionRecordedEvent>
 {
   private readonly tracer = getLangWatchTracer(
     "langwatch.trace-aggregation-trigger.handler",
@@ -29,29 +29,31 @@ export class TraceAggregationTriggerHandler
         },
       },
       async () => {
-        const { traceId } = event.data;
+        const { traceId, spanId } = event.data;
         const { tenantId } = event;
 
         this.logger.debug(
           {
             tenantId,
             traceId,
-            spanId: event.data.spanId,
+            spanId,
           },
           "Triggering trace aggregation",
         );
 
-        // The trace aggregation pipeline will handle checking if aggregation is in progress
-        // and aggregating the trace data
+        // The trace aggregation pipeline will aggregate all spans for the trace
+        // and compute trace metrics
         await traceAggregationPipeline.commands.triggerTraceAggregation.send({
           traceId,
           tenantId,
+          spanId,
         });
 
         this.logger.debug(
           {
             tenantId,
             traceId,
+            spanId,
           },
           "Trace aggregation triggered",
         );
@@ -59,7 +61,7 @@ export class TraceAggregationTriggerHandler
     );
   }
 
-  getEventTypes() {
+  static getEventTypes() {
     return ["lw.obs.span_ingestion.recorded"] as const;
   }
 }

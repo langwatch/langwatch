@@ -113,6 +113,7 @@ export class SpanProcessingMapperService {
               resourceSpan?.resource,
               scopeSpan?.scope,
               trace.traceId,
+              trace.reservedTraceMetadata?.thread_id ?? undefined,
             );
 
             records.push({
@@ -169,10 +170,9 @@ export class SpanProcessingMapperService {
   /**
    * Converts a ReadableSpan to a JSON-serializable DTO for command payloads.
    * This mapping is critical for command serialization.
-   * Note: id, aggregateId, and tenantId are set to placeholder values here.
-   * They will be properly set when the command is processed (id is generated, aggregateId is traceId, tenantId comes from command).
+   * They will be properly set when the command is processed (aggregateId is traceId).
    */
-  mapReadableSpanToSpanData(span: ReadableSpan): SpanData {
+  mapReadableSpanToSpanData(span: ReadableSpan): Omit<SpanData, "id" | "tenantId"> {
     const spanContext = span.spanContext();
     const parentSpanContext = span.parentSpanContext;
 
@@ -184,9 +184,7 @@ export class SpanProcessingMapperService {
 
     return {
       // Placeholder values - will be set properly when command is processed
-      id: "", // Generated in repository
       aggregateId: spanContext.traceId, // Aggregate ID is the traceId
-      tenantId: "", // Set from command
 
       // Span context fields
       traceId: spanContext.traceId,
@@ -390,6 +388,7 @@ export class SpanProcessingMapperService {
     originalResource: DeepPartial<IResource> | undefined,
     scope: DeepPartial<IInstrumentationScope> | undefined,
     traceId: string,
+    threadId: string | undefined,
   ): ReadableSpan {
     const startTime =
       unixNanoToMs(originalOtelSpan.startTimeUnixNano) ??
@@ -421,6 +420,18 @@ export class SpanProcessingMapperService {
       ...langWatchAttributes,
       ...genAiAttributes,
     };
+
+    // Map thread_id to gen_ai.conversation.id per OTEL GenAI conventions
+    // Check both trace-level thread_id and span-level langwatch.thread.id
+    if (threadId && typeof threadId === "string") {
+      mergedAttributes["gen_ai.conversation.id"] = threadId;
+    } else if (
+      typeof mergedAttributes["langwatch.thread.id"] === "string" &&
+      mergedAttributes["langwatch.thread.id"]
+    ) {
+      mergedAttributes["gen_ai.conversation.id"] =
+        mergedAttributes["langwatch.thread.id"];
+    }
 
     // Convert attributes to the format ReadableSpan expects
     const spanAttributes: Record<string, any> = {};
@@ -557,52 +568,95 @@ export class SpanProcessingMapperService {
     return {};
   }
 
+  /**
+   * Maps LangWatch span input to GenAI semantic convention attributes.
+   * Uses gen_ai.input.messages per the latest OTEL GenAI conventions.
+   *
+   * According to the spec, gen_ai.input.messages should be used for all input content.
+   * Since structured attributes may not be supported on spans yet, we serialize to JSON string.
+   * When structured attributes become available, this should be updated to use structured format.
+   *
+   * @see https://github.com/open-telemetry/semantic-conventions/blob/main/docs/gen-ai/gen-ai-spans.md
+   */
   private mapInputAttributes(span: Span): Attributes {
     if (!span.input) return {};
 
     switch (span.input.type) {
       case "chat_messages":
-        return { "gen_ai.prompt": JSON.stringify(span.input.value) };
+        // For chat messages, use gen_ai.input.messages as JSON string
+        // (structured format when span attributes support it)
+        return { "gen_ai.input.messages": JSON.stringify(span.input.value) };
       case "text":
-        return { "gen_ai.prompt": span.input.value };
+        // For text input, wrap in a message-like structure and serialize
+        return {
+          "gen_ai.input.messages": JSON.stringify([
+            { role: "user", content: span.input.value },
+          ]),
+        };
       case "json":
-        return { "gen_ai.prompt": JSON.stringify(span.input.value) };
+        // For JSON input, serialize as messages array
+        return { "gen_ai.input.messages": JSON.stringify(span.input.value) };
       case "evaluation_result":
       case "guardrail_result":
       case "list":
       case "raw":
       default:
         // For unsupported types, stringify the entire input
-        return { "gen_ai.prompt": JSON.stringify(span.input) };
+        return { "gen_ai.input.messages": JSON.stringify(span.input) };
     }
   }
 
+  /**
+   * Maps LangWatch span output to GenAI semantic convention attributes.
+   * Uses gen_ai.output.messages per the latest OTEL GenAI conventions.
+   *
+   * According to the spec, gen_ai.output.messages should be used for all output content.
+   * Since structured attributes may not be supported on spans yet, we serialize to JSON string.
+   * When structured attributes become available, this should be updated to use structured format.
+   *
+   * @see https://github.com/open-telemetry/semantic-conventions/blob/main/docs/gen-ai/gen-ai-spans.md
+   */
   private mapOutputAttributes(span: Span): Attributes {
     if (!span.output) return {};
 
     switch (span.output.type) {
       case "chat_messages":
-        return { "gen_ai.completion": JSON.stringify(span.output.value) };
+        // For chat messages, use gen_ai.output.messages as JSON string
+        // (structured format when span attributes support it)
+        return { "gen_ai.output.messages": JSON.stringify(span.output.value) };
       case "text":
-        return { "gen_ai.completion": span.output.value };
+        // For text output, wrap in a message-like structure and serialize
+        return {
+          "gen_ai.output.messages": JSON.stringify([
+            { role: "assistant", content: span.output.value },
+          ]),
+        };
       case "json":
-        return { "gen_ai.completion": JSON.stringify(span.output.value) };
+        // For JSON output, serialize as messages array
+        return { "gen_ai.output.messages": JSON.stringify(span.output.value) };
       case "evaluation_result":
       case "guardrail_result":
       case "list":
       case "raw":
       default:
         // For unsupported types, stringify the entire output
-        return { "gen_ai.completion": JSON.stringify(span.output) };
+        return { "gen_ai.output.messages": JSON.stringify(span.output) };
     }
   }
 
+  /**
+   * Maps LangWatch span metrics to GenAI semantic convention attributes.
+   * Uses gen_ai.usage.input_tokens and gen_ai.usage.output_tokens per OTEL GenAI spec.
+   *
+   * @see https://github.com/open-telemetry/semantic-conventions/blob/main/docs/gen-ai/gen-ai-spans.md
+   */
   private mapMetricsAttributes(span: Span): Attributes {
     if (!span.metrics) return {};
 
     const attributes: Attributes = {};
     const { prompt_tokens, completion_tokens } = span.metrics;
 
+    // Map to OTEL GenAI semantic conventions
     if (prompt_tokens != null) {
       attributes["gen_ai.usage.input_tokens"] = prompt_tokens;
     }
