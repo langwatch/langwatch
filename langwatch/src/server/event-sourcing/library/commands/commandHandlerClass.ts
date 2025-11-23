@@ -15,13 +15,6 @@ export interface CommandHandlerClassStatic<Payload, Type extends CommandType> {
   readonly schema: CommandSchema<Payload, Type>;
 
   /**
-   * Dispatcher name for this command handler.
-   * Used to access the command dispatcher via `pipeline.commands.{dispatcherName}`.
-   * Must be a static readonly property with a string literal type.
-   */
-  readonly dispatcherName: string;
-
-  /**
    * Extract the aggregate ID from the command payload.
    * Required - used for routing and event storage.
    */
@@ -116,13 +109,3 @@ export type ExtractCommandHandlerType<T> =
 export type ExtractCommandHandlerEvent<T> =
   T extends CommandHandlerClass<any, any, infer EventType> ? EventType : never;
 
-/**
- * Type helper to extract the dispatcher name from a CommandHandlerClass.
- */
-export type ExtractCommandHandlerDispatcherName<T> = T extends {
-  dispatcherName: infer Name;
-}
-  ? Name extends string
-    ? Name
-    : never
-  : never;
