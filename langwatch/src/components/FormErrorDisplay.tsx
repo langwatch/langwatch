@@ -1,4 +1,5 @@
 import { Text, VStack } from "@chakra-ui/react";
+import { isValidElement } from "react";
 import type { ReactNode } from "react";
 
 interface FormErrorDisplayProps {
@@ -44,17 +45,29 @@ export function extractErrorMessages(error: unknown): string[] {
 /**
  * Robust form error display component that handles:
  * - Error objects: {message: "error"} or nested structures
- * - ReactNode: JSX elements to render directly
+ * - React elements: JSX elements to render directly
+ * - Primitive errors: strings and numbers rendered as single error messages
  * - Arrays of errors: {field: [{message: "error1"}, {message: "error2"}]}
  */
 export function FormErrorDisplay({ error }: FormErrorDisplayProps) {
-  // If it's a ReactNode, render it directly
-  if (error && typeof error === "object" && "props" in error) {
+  // If it's a React element, render it directly
+  if (isValidElement(error)) {
     return <>{error}</>;
   }
 
-  if (!error) return null;
+  // Handle null/undefined explicitly
+  if (error === null || error === undefined) return null;
 
+  // Handle primitive errors (strings and numbers)
+  if (typeof error === "string" || typeof error === "number") {
+    return (
+      <Text fontSize="13px" color="red.500">
+        {error}
+      </Text>
+    );
+  }
+
+  // Handle structured error objects
   const messages = extractErrorMessages(error);
 
   if (messages.length === 0) return null;

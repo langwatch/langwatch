@@ -39,11 +39,11 @@ describe("extractErrorMessages", () => {
 
   describe("when input is an array", () => {
     it("processes multiple error objects in array", () => {
-      const errors = [
-        { message: "First error" },
-        { message: "Second error" }
-      ];
-      expect(extractErrorMessages(errors)).toEqual(["First error", "Second error"]);
+      const errors = [{ message: "First error" }, { message: "Second error" }];
+      expect(extractErrorMessages(errors)).toEqual([
+        "First error",
+        "Second error",
+      ]);
     });
 
     it("handles mixed array with valid and invalid items", () => {
@@ -51,9 +51,12 @@ describe("extractErrorMessages", () => {
         { message: "Valid error" },
         "invalid string",
         { message: null },
-        { message: "Another valid error" }
+        { message: "Another valid error" },
       ];
-      expect(extractErrorMessages(errors)).toEqual(["Valid error", "Another valid error"]);
+      expect(extractErrorMessages(errors)).toEqual([
+        "Valid error",
+        "Another valid error",
+      ]);
     });
 
     it("handles empty array", () => {
@@ -65,16 +68,19 @@ describe("extractErrorMessages", () => {
     it("processes nested error objects", () => {
       const error = {
         field1: { message: "Field 1 error" },
-        field2: { message: "Field 2 error" }
+        field2: { message: "Field 2 error" },
       };
-      expect(extractErrorMessages(error)).toEqual(["Field 1 error", "Field 2 error"]);
+      expect(extractErrorMessages(error)).toEqual([
+        "Field 1 error",
+        "Field 2 error",
+      ]);
     });
 
     it("ignores non-error nested values", () => {
       const error = {
         field1: { message: "Valid error" },
         field2: "invalid string",
-        field3: { message: null }
+        field3: { message: null },
       };
       expect(extractErrorMessages(error)).toEqual(["Valid error"]);
     });
@@ -83,9 +89,9 @@ describe("extractErrorMessages", () => {
       const error = {
         level1: {
           level2: {
-            field: { message: "Deep error" }
-          }
-        }
+            field: { message: "Deep error" },
+          },
+        },
       };
       expect(extractErrorMessages(error)).toEqual(["Deep error"]);
     });
@@ -96,16 +102,16 @@ describe("extractErrorMessages", () => {
       const error = {
         temperature: {
           message: "Must be between 0 and 2",
-          type: "custom"
+          type: "custom",
         },
         maxTokens: {
           message: "Cannot exceed 32,768",
-          type: "max"
-        }
+          type: "max",
+        },
       };
       expect(extractErrorMessages(error)).toEqual([
         "Must be between 0 and 2",
-        "Cannot exceed 32,768"
+        "Cannot exceed 32,768",
       ]);
     });
 
@@ -115,13 +121,13 @@ describe("extractErrorMessages", () => {
         invalidField: { type: "required" }, // no message
         arrayField: [
           { message: "Array error 1" },
-          { message: "Array error 2" }
-        ]
+          { message: "Array error 2" },
+        ],
       };
       expect(extractErrorMessages(error)).toEqual([
         "Valid message",
         "Array error 1",
-        "Array error 2"
+        "Array error 2",
       ]);
     });
   });
