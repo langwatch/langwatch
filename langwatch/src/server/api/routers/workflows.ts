@@ -71,17 +71,18 @@ export const workflowRouter = createTRPCRouter({
     )
     .use(checkProjectPermission("workflows:create"))
     .mutation(async ({ ctx, input }) => {
-      // Check that the user has at least workflows:view permission on the source project
+      // Check that the user has at least workflows:create permission on the source project
       const hasSourcePermission = await hasProjectPermission(
         ctx,
         input.sourceProjectId,
-        "workflows:view",
+        "workflows:create",
       );
 
       if (!hasSourcePermission) {
         throw new TRPCError({
           code: "UNAUTHORIZED",
-          message: "You do not have permission to view workflows in the source project",
+          message:
+            "You do not have permission to view workflows in the source project",
         });
       }
 
