@@ -1,4 +1,5 @@
 import {
+  Alert,
   Box,
   Button,
   Card,
@@ -15,7 +16,7 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { Trash2, Plus, Eye, EyeOff } from "react-feather";
-import React from "react";
+import React, { useEffect } from "react";
 import { ProjectSelector } from "../../components/DashboardLayout";
 import { HorizontalFormControl } from "../../components/HorizontalFormControl";
 import {
@@ -179,6 +180,13 @@ function ModelProviderRow({
   });
   const ManagedModelProviderAny = ManagedModelProvider as any;
 
+  useEffect(() => {
+    if (ManagedModelProviderAny) {
+      actions.setManaged(true);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [JSON.stringify(state.customKeys)]);
+
   return (
     <Box
       width="full"
@@ -263,7 +271,9 @@ function ModelProviderRow({
                         <GridItem>
                           <Input
                             value={state.customKeys[key] ?? ""}
-                            onChange={(e) => actions.setCustomKey(key, e.target.value)}
+                            onChange={(e) =>
+                              actions.setCustomKey(key, e.target.value)
+                            }
                             type={
                               KEY_CHECK.some((k) => key.includes(k))
                                 ? "password"
@@ -271,8 +281,8 @@ function ModelProviderRow({
                             }
                             autoComplete="off"
                             placeholder={
-                              (state.displayKeys as any)[key]?._def?.typeName ===
-                              "ZodOptional"
+                              (state.displayKeys as any)[key]?._def
+                                ?.typeName === "ZodOptional"
                                 ? "optional"
                                 : undefined
                             }
@@ -281,11 +291,14 @@ function ModelProviderRow({
                       </React.Fragment>
                     ))}
                   </Grid>
-                  <Field.ErrorText>{state.errors.customKeysRoot}</Field.ErrorText>
+                  <Field.ErrorText>
+                    {state.errors.customKeysRoot}
+                  </Field.ErrorText>
                 </Field.Root>
               )}
 
-              {(provider.provider === "azure" || provider.provider === "custom") &&
+              {(provider.provider === "azure" ||
+                provider.provider === "custom") &&
                 state.enabled && (
                   <VStack width="full" align="start" paddingTop={4}>
                     {state.extraHeaders.length > 0 && (
@@ -304,7 +317,10 @@ function ModelProviderRow({
                               <Input
                                 value={h.key}
                                 onChange={(e) =>
-                                  actions.setExtraHeaderKey(index, e.target.value)
+                                  actions.setExtraHeaderKey(
+                                    index,
+                                    e.target.value,
+                                  )
                                 }
                                 placeholder="Header name"
                                 autoComplete="off"
@@ -314,7 +330,10 @@ function ModelProviderRow({
                               <Input
                                 value={h.value}
                                 onChange={(e) =>
-                                  actions.setExtraHeaderValue(index, e.target.value)
+                                  actions.setExtraHeaderValue(
+                                    index,
+                                    e.target.value,
+                                  )
                                 }
                                 type={h.concealed ? "password" : "text"}
                                 placeholder="Header value"
@@ -325,9 +344,15 @@ function ModelProviderRow({
                               <Button
                                 size="sm"
                                 variant="ghost"
-                                onClick={() => actions.toggleExtraHeaderConcealed(index)}
+                                onClick={() =>
+                                  actions.toggleExtraHeaderConcealed(index)
+                                }
                               >
-                                {h.concealed ? <EyeOff size={16} /> : <Eye size={16} />}
+                                {h.concealed ? (
+                                  <EyeOff size={16} />
+                                ) : (
+                                  <Eye size={16} />
+                                )}
                               </Button>
                             </GridItem>
                             <GridItem>
@@ -346,7 +371,11 @@ function ModelProviderRow({
                     )}
 
                     <HStack width="full" justify="end">
-                      <Button size="xs" variant="outline" onClick={actions.addExtraHeader}>
+                      <Button
+                        size="xs"
+                        variant="outline"
+                        onClick={actions.addExtraHeader}
+                      >
                         <Plus size={16} />
                         Add Header
                       </Button>
@@ -360,7 +389,9 @@ function ModelProviderRow({
                   <CreatableSelect
                     value={state.customModels}
                     onChange={(v) => actions.setCustomModels((v as any) ?? [])}
-                    onCreateOption={(text) => actions.addCustomModelsFromText(text)}
+                    onCreateOption={(text) =>
+                      actions.addCustomModelsFromText(text)
+                    }
                     isMulti
                     options={getProviderModelOptions(provider.provider, "chat")}
                     placeholder="Add custom model"
@@ -450,7 +481,8 @@ export function TopicClusteringModel() {
   const { project } = useOrganizationTeamProject();
   const hook = useTopicClusteringModel({
     projectId: project?.id,
-    initialValue: project?.topicClusteringModel ?? DEFAULT_TOPIC_CLUSTERING_MODEL,
+    initialValue:
+      project?.topicClusteringModel ?? DEFAULT_TOPIC_CLUSTERING_MODEL,
   });
 
   return (
