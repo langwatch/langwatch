@@ -191,6 +191,8 @@ const getCurrentMonthCostForProjects = async (projectIds: string[]) => {
   );
 };
 
-export const maxMonthlyUsageLimit = async () => {
-  return Infinity;
+export const maxMonthlyUsageLimit = async (organizationId: string) => {
+  const plan =
+    await dependencies.subscriptionHandler.getActivePlan(organizationId);
+  return plan.maxMessagesPerMonth;
 };
