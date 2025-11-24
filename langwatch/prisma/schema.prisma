@@ -244,18 +244,18 @@ enum INVITE_STATUS {
 }
 
 model OrganizationInvite {
-    id               String               @id @default(nanoid())
-    email            String
-    inviteCode       String               @unique
-    expiration       DateTime
-    status           INVITE_STATUS        @default(PENDING)
-    organizationId   String
-    organization     Organization         @relation(fields: [organizationId], references: [id])
-    teamIds          String
-    teamAssignments  Json?                // Array of {teamId: string, role: TeamUserRole, customRoleId?: string}
-    role             OrganizationUserRole
-    createdAt        DateTime             @default(now())
-    updatedAt        DateTime             @default(now()) @updatedAt
+    id              String               @id @default(nanoid())
+    email           String
+    inviteCode      String               @unique
+    expiration      DateTime
+    status          INVITE_STATUS        @default(PENDING)
+    organizationId  String
+    organization    Organization         @relation(fields: [organizationId], references: [id])
+    teamIds         String
+    teamAssignments Json? // Array of {teamId: string, role: TeamUserRole, customRoleId?: string}
+    role            OrganizationUserRole
+    createdAt       DateTime             @default(now())
+    updatedAt       DateTime             @default(now()) @updatedAt
 
     @@index([organizationId])
 }
@@ -654,31 +654,35 @@ model CustomLLMModelCost {
 }
 
 model Workflow {
-    id               String            @id @default(nanoid())
-    projectId        String
-    project          Project           @relation(fields: [projectId], references: [id])
-    name             String
-    icon             String
-    description      String
-    createdAt        DateTime          @default(now())
-    updatedAt        DateTime          @default(now()) @updatedAt
-    latestVersionId  String?
-    latestVersion    WorkflowVersion?  @relation("LatestVersion", fields: [latestVersionId], references: [id], onDelete: Restrict, onUpdate: Restrict)
-    currentVersionId String?
-    currentVersion   WorkflowVersion?  @relation("CurrentVersion", fields: [currentVersionId], references: [id], onDelete: Restrict, onUpdate: Restrict)
-    versions         WorkflowVersion[] @relation("Versions")
-    publishedId      String?
-    publishedById    String?
-    publishedBy      User?             @relation(fields: [publishedById], references: [id])
-    archivedAt       DateTime?
-    experiments      Experiment[]
-    isEvaluator      Boolean           @default(false)
-    isComponent      Boolean           @default(false)
+    id                   String            @id @default(nanoid())
+    projectId            String
+    project              Project           @relation(fields: [projectId], references: [id])
+    name                 String
+    icon                 String
+    description          String
+    createdAt            DateTime          @default(now())
+    updatedAt            DateTime          @default(now()) @updatedAt
+    latestVersionId      String?
+    latestVersion        WorkflowVersion?  @relation("LatestVersion", fields: [latestVersionId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+    currentVersionId     String?
+    currentVersion       WorkflowVersion?  @relation("CurrentVersion", fields: [currentVersionId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+    versions             WorkflowVersion[] @relation("Versions")
+    publishedId          String?
+    publishedById        String?
+    publishedBy          User?             @relation(fields: [publishedById], references: [id])
+    archivedAt           DateTime?
+    experiments          Experiment[]
+    isEvaluator          Boolean           @default(false)
+    isComponent          Boolean           @default(false)
+    copiedFromWorkflowId String?
+    copiedFrom           Workflow?         @relation("WorkflowCopies", fields: [copiedFromWorkflowId], references: [id], onDelete: Restrict, onUpdate: Restrict)
+    copiedWorkflows      Workflow[]        @relation("WorkflowCopies")
 
     @@index([projectId])
     @@index([publishedById])
     @@index([latestVersionId])
     @@index([currentVersionId])
+    @@index([copiedFromWorkflowId])
 }
 
 model WorkflowVersion {

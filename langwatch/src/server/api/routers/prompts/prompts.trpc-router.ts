@@ -1,8 +1,9 @@
 import { PromptScope } from "@prisma/client";
+import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 
 import { PromptService } from "~/server/prompt-config";
-import { checkProjectPermission } from "../../rbac";
+import { checkProjectPermission, hasProjectPermission } from "../../rbac";
 import { createTRPCRouter, protectedProcedure } from "../../trpc";
 
 import {
@@ -231,5 +232,115 @@ export const promptsRouter = createTRPCRouter({
     .mutation(async ({ ctx, input }) => {
       const service = new PromptService(ctx.prisma);
       return await service.deletePrompt(input);
+    }),
+
+  /**
+   * Copy a prompt to another project
+   */
+  copy: protectedProcedure
+    .input(
+      z.object({
+        idOrHandle: z.string(),
+        projectId: z.string(),
+        sourceProjectId: z.string(),
+      }),
+    )
+    .use(checkProjectPermission("prompts:create"))
+    .mutation(async ({ ctx, input }) => {
+      // Check that the user has at least prompts:create permission on the source project
+      const hasSourcePermission = await hasProjectPermission(
+        ctx,
+        input.sourceProjectId,
+        "prompts:create",
+      );
+
+      if (!hasSourcePermission) {
+        throw new TRPCError({
+          code: "UNAUTHORIZED",
+          message:
+            "You do not have permission to create prompts in the source project",
+        });
+      }
+
+      const service = new PromptService(ctx.prisma);
+      const authorId = ctx.session?.user?.id;
+
+      // Get the source prompt
+      const sourcePrompt = await service.getPromptByIdOrHandle({
+        idOrHandle: input.idOrHandle,
+        projectId: input.sourceProjectId,
+      });
+
+      if (!sourcePrompt) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Prompt not found",
+        });
+      }
+
+      // Check handle uniqueness in target project
+      let newHandle = sourcePrompt.handle ?? sourcePrompt.id;
+      let handleAvailable = await service.checkHandleUniqueness({
+        handle: newHandle,
+        projectId: input.projectId,
+        scope: sourcePrompt.scope ?? "PROJECT",
+      });
+
+      // If handle is not available, append a suffix
+      if (!handleAvailable) {
+        let index = 1;
+        while (!handleAvailable) {
+          newHandle = `${sourcePrompt.handle ?? sourcePrompt.id}_copy${index}`;
+          handleAvailable = await service.checkHandleUniqueness({
+            handle: newHandle,
+            projectId: input.projectId,
+            scope: sourcePrompt.scope ?? "PROJECT",
+          });
+          index++;
+        }
+      }
+
+      // Normalize prompt/messages to avoid system prompt conflict
+      // Extract system message from messages array into prompt field
+      const systemMessage = sourcePrompt.messages?.find(
+        (msg) => msg.role === "system",
+      );
+      const nonSystemMessages = sourcePrompt.messages?.filter(
+        (msg) => msg.role !== "system",
+      );
+
+      // Use system message as prompt if it exists, otherwise use the prompt field
+      const normalizedPrompt = systemMessage
+        ? systemMessage.content
+        : sourcePrompt.prompt ?? undefined;
+
+      // Only include messages if there are non-system messages
+      const normalizedMessages =
+        nonSystemMessages && nonSystemMessages.length > 0
+          ? nonSystemMessages
+          : undefined;
+
+      // Create the prompt in the target project
+      const copiedPrompt = await service.createPrompt({
+        projectId: input.projectId,
+        handle: newHandle,
+        scope: sourcePrompt.scope ?? "PROJECT",
+        authorId,
+        commitMessage: `Copied from "${
+          sourcePrompt.handle ?? sourcePrompt.id
+        }"`,
+        prompt: normalizedPrompt,
+        messages: normalizedMessages,
+        inputs: sourcePrompt.inputs ?? undefined,
+        outputs: sourcePrompt.outputs ?? undefined,
+        model: sourcePrompt.model ?? undefined,
+        temperature: sourcePrompt.temperature ?? undefined,
+        maxTokens: sourcePrompt.maxTokens ?? undefined,
+        promptingTechnique: sourcePrompt.promptingTechnique ?? undefined,
+        demonstrations: sourcePrompt.demonstrations ?? undefined,
+        responseFormat: sourcePrompt.responseFormat ?? undefined,
+      });
+
+      return copiedPrompt;
     }),
 });

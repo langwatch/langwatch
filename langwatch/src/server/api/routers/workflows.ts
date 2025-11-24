@@ -172,6 +172,7 @@ export const workflowRouter = createTRPCRouter({
           name: workflow.name,
           icon: workflow.icon,
           description: workflow.description,
+          copiedFromWorkflowId: input.workflowId,
         },
       });
 
@@ -199,6 +200,28 @@ export const workflowRouter = createTRPCRouter({
       return ctx.prisma.workflow.findMany({
         where: { projectId: input.projectId, archivedAt: null },
         orderBy: { updatedAt: "desc" },
+        select: {
+          id: true,
+          projectId: true,
+          name: true,
+          icon: true,
+          description: true,
+          createdAt: true,
+          updatedAt: true,
+          latestVersionId: true,
+          currentVersionId: true,
+          publishedId: true,
+          publishedById: true,
+          archivedAt: true,
+          isEvaluator: true,
+          isComponent: true,
+          copiedFromWorkflowId: true,
+          _count: {
+            select: {
+              copiedWorkflows: true,
+            },
+          },
+        },
       });
     }),
 
@@ -467,6 +490,232 @@ export const workflowRouter = createTRPCRouter({
           publishedById: null,
         },
       });
+    }),
+
+  syncFromSource: protectedProcedure
+    .input(
+      z.object({
+        projectId: z.string(),
+        workflowId: z.string(),
+      }),
+    )
+    .use(checkProjectPermission("workflows:update"))
+    .mutation(async ({ ctx, input }) => {
+      // Get the workflow and check if it has a source
+      const workflow = await ctx.prisma.workflow.findUnique({
+        where: {
+          id: input.workflowId,
+          projectId: input.projectId,
+          archivedAt: null,
+        },
+        include: {
+          latestVersion: true,
+          copiedFrom: {
+            include: {
+              latestVersion: true,
+            },
+          },
+        },
+      });
+
+      if (!workflow) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Workflow not found",
+        });
+      }
+
+      if (!workflow.copiedFromWorkflowId || !workflow.copiedFrom) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "This workflow is not a copy and has no source to sync from",
+        });
+      }
+
+      // Check if source workflow is archived
+      if (workflow.copiedFrom.archivedAt) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Source workflow has been archived",
+        });
+      }
+
+      const sourceWorkflow = workflow.copiedFrom;
+
+      if (!sourceWorkflow || !sourceWorkflow.latestVersion?.dsl) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Source workflow or its latest version not found",
+        });
+      }
+
+      // Check that the user has at least workflows:view permission on the source project
+      const hasSourcePermission = await hasProjectPermission(
+        ctx,
+        sourceWorkflow.projectId,
+        "workflows:view",
+      );
+
+      if (!hasSourcePermission) {
+        throw new TRPCError({
+          code: "UNAUTHORIZED",
+          message: "You do not have permission to view workflows in the source project",
+        });
+      }
+
+      // Calculate next version based on THIS copy's latest version (not the source's version)
+      const copyLatestVersion = workflow.latestVersion;
+      const [versionMajor] = (copyLatestVersion?.version ?? "0.0").split(".");
+      const nextVersion = `${parseInt(versionMajor ?? "0") + 1}`;
+
+      // Deep clone DSL to ensure mutability
+      const dsl = JSON.parse(
+        JSON.stringify(sourceWorkflow.latestVersion.dsl),
+      ) as Workflow;
+
+      // Update the workflow_id to match the copied workflow
+      dsl.workflow_id = workflow.id;
+
+      // Create a new version with the source workflow's latest DSL
+      const version = await saveOrCommitWorkflowVersion({
+        ctx,
+        input: {
+          projectId: input.projectId,
+          workflowId: input.workflowId,
+          dsl: {
+            ...dsl,
+            version: nextVersion,
+          },
+        },
+        autoSaved: false,
+        commitMessage: "Updated from source workflow",
+      });
+
+      return { workflow, version };
+    }),
+
+  pushToCopies: protectedProcedure
+    .input(
+      z.object({
+        projectId: z.string(),
+        workflowId: z.string(),
+      }),
+    )
+    .use(checkProjectPermission("workflows:update"))
+    .mutation(async ({ ctx, input }) => {
+      // Get the workflow (source) and check if it has copies
+      const workflow = await ctx.prisma.workflow.findUnique({
+        where: {
+          id: input.workflowId,
+          projectId: input.projectId,
+          archivedAt: null,
+        },
+        include: {
+          latestVersion: true,
+          copiedWorkflows: {
+            where: {
+              archivedAt: null,
+            },
+            include: {
+              latestVersion: true,
+            },
+          },
+        },
+      });
+
+      if (!workflow) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Workflow not found",
+        });
+      }
+
+      if (!workflow.latestVersion?.dsl) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "This workflow has no latest version to push",
+        });
+      }
+
+      if (workflow.copiedWorkflows.length === 0) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "This workflow has no copies to push to",
+        });
+      }
+
+      // Deep clone DSL to ensure mutability
+      const dsl = JSON.parse(
+        JSON.stringify(workflow.latestVersion.dsl),
+      ) as Workflow;
+
+      const results = [];
+
+      // Push to each copy
+      for (const copy of workflow.copiedWorkflows) {
+        // Check that the user has workflows:update permission on the copy's project
+        const hasCopyPermission = await hasProjectPermission(
+          ctx,
+          copy.projectId,
+          "workflows:update",
+        );
+
+        if (!hasCopyPermission) {
+          // Skip copies where user doesn't have permission
+          continue;
+        }
+
+        // Fetch the copy's latest version to get its current version number
+        // Each copy maintains its own version history independently
+        const copyWithLatestVersion = await ctx.prisma.workflow.findUnique({
+          where: {
+            id: copy.id,
+            projectId: copy.projectId,
+          },
+          include: {
+            latestVersion: true,
+          },
+        });
+
+        if (!copyWithLatestVersion) {
+          continue;
+        }
+
+        // Calculate next version based on THIS copy's latest version (not the source's version)
+        const copyLatestVersion = copyWithLatestVersion.latestVersion;
+        const [versionMajor] = (copyLatestVersion?.version ?? "0.0").split(".");
+        const nextVersion = `${parseInt(versionMajor ?? "0") + 1}`;
+
+        // Update the workflow_id to match the copy
+        const copyDsl = JSON.parse(JSON.stringify(dsl)) as Workflow;
+        copyDsl.workflow_id = copy.id;
+
+        // Create a new version in the copy with the source's latest DSL
+        const version = await saveOrCommitWorkflowVersion({
+          ctx,
+          input: {
+            projectId: copy.projectId,
+            workflowId: copy.id,
+            dsl: {
+              ...copyDsl,
+              version: nextVersion,
+            },
+          },
+          autoSaved: false,
+          commitMessage: "Updated from source workflow",
+        });
+
+        results.push({ copyId: copy.id, copyName: copy.name, version });
+      }
+
+      if (results.length === 0) {
+        throw new TRPCError({
+          code: "UNAUTHORIZED",
+          message: "You do not have permission to update any of the copied workflows",
+        });
+      }
+
+      return { pushedTo: results.length, totalCopies: workflow.copiedWorkflows.length, results };
     }),
 
   archive: protectedProcedure
