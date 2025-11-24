@@ -23,8 +23,6 @@ function formToDslFormat(formLlm: any): LLMConfig {
  * Convert DSL LLM config format (snake_case) to form format (camelCase)
  */
 function dslToFormFormat(dslLlm: LLMConfig): any {
-  if (!dslLlm) return dslLlm;
-
   return {
     model: dslLlm.model,
     temperature: dslLlm.temperature,
@@ -38,7 +36,8 @@ function dslToFormFormat(dslLlm: LLMConfig): any {
  * the Form field
  */
 export function WrappedOptimizationStudioLLMConfigField() {
-  const { control, formState, trigger } = useFormContext<PromptConfigFormValues>();
+  const { control, formState, trigger } =
+    useFormContext<PromptConfigFormValues>();
   const { errors } = formState;
 
   return (
