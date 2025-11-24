@@ -191,8 +191,16 @@ const getCurrentMonthCostForProjects = async (projectIds: string[]) => {
   );
 };
 
-export const maxMonthlyUsageLimit = async (organizationId: string) => {
-  const plan =
-    await dependencies.subscriptionHandler.getActivePlan(organizationId);
-  return plan.maxMessagesPerMonth;
+/**
+ * Get the maximum monthly usage limit for the organization.
+ * FIXME: This was recently changed to return Infinity,
+ * but still takes the organizationId as a parameter.
+ *
+ * Either we remove the organizationId parameter from all the calls to this function,
+ * or we use to get the plan and return it correctly.
+ *
+ * @returns The maximum monthly usage limit for the organization.
+ */
+export const maxMonthlyUsageLimit = async (_organizationId: string) => {
+  return Infinity;
 };
