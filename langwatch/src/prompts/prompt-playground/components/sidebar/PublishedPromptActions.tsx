@@ -1,5 +1,6 @@
 import { Box, Button, Text } from "@chakra-ui/react";
 import { LuEllipsisVertical, LuTrash2 } from "react-icons/lu";
+import { Copy } from "react-feather";
 import { Menu } from "~/components/ui/menu";
 import { Tooltip } from "~/components/ui/tooltip";
 import { DeleteConfirmationDialog } from "~/components/annotations/DeleteConfirmationDialog";
@@ -9,6 +10,7 @@ import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { toaster } from "~/components/ui/toaster";
 import { getDisplayHandle } from "./PublishedPromptsList";
 import { api } from "~/utils/api";
+import { CopyPromptDialog } from "~/prompts/components/CopyPromptDialog";
 
 interface PublishedPromptActionsProps {
   promptId: string;
@@ -24,8 +26,10 @@ export function PublishedPromptActions({
   promptHandle,
 }: PublishedPromptActionsProps) {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [isCopyDialogOpen, setIsCopyDialogOpen] = useState(false);
   const { deletePrompt } = usePrompts();
-  const { project } = useOrganizationTeamProject();
+  const { project, hasPermission } = useOrganizationTeamProject();
+  const hasPromptsCreatePermission = hasPermission("prompts:create");
 
   const { data: permission } = api.prompts.checkModifyPermission.useQuery(
     {
@@ -84,6 +88,28 @@ export function PublishedPromptActions({
           </Menu.Trigger>
           <Menu.Content onClick={(event) => event.stopPropagation()}>
             <Tooltip
+              content={
+                !hasPromptsCreatePermission
+                  ? "You need prompts:create permission to copy prompts"
+                  : undefined
+              }
+              disabled={hasPromptsCreatePermission}
+              positioning={{ placement: "right" }}
+              showArrow
+            >
+              <Menu.Item
+                value="copy"
+                onClick={
+                  hasPromptsCreatePermission
+                    ? () => setIsCopyDialogOpen(true)
+                    : undefined
+                }
+                disabled={!hasPromptsCreatePermission}
+              >
+                <Copy size={16} /> Copy to another project
+              </Menu.Item>
+            </Tooltip>
+            <Tooltip
               content={permission?.reason}
               disabled={canDelete}
               positioning={{ placement: "right" }}
@@ -112,6 +138,13 @@ export function PublishedPromptActions({
         open={isDeleteDialogOpen}
         onClose={() => setIsDeleteDialogOpen(false)}
         onConfirm={() => void handleDelete()}
+      />
+
+      <CopyPromptDialog
+        open={isCopyDialogOpen}
+        onClose={() => setIsCopyDialogOpen(false)}
+        promptId={promptId}
+        promptName={getDisplayHandle(promptHandle)}
       />
     </>
   );

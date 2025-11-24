@@ -8,9 +8,11 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { UnplugIcon } from "lucide-react";
-import { Edit, MoreVertical, Trash2 } from "react-feather";
+import { Edit, MoreVertical, Trash2, Copy } from "react-feather";
+import { useState } from "react";
 
 import { GeneratePromptApiSnippetDialog } from "./components/GeneratePromptApiSnippetDialog";
+import { CopyPromptDialog } from "./components/CopyPromptDialog";
 
 import { Menu } from "~/components/ui/menu";
 import { Tooltip } from "~/components/ui/tooltip";
@@ -61,6 +63,13 @@ export function PromptsList({
   const hasPromptsViewPermission = hasPermission("prompts:view");
   const hasPromptsUpdatePermission = hasPermission("prompts:update");
   const hasPromptsDeletePermission = hasPermission("prompts:delete");
+  const hasPromptsCreatePermission = hasPermission("prompts:create");
+
+  const [copyDialogOpen, setCopyDialogOpen] = useState(false);
+  const [copyPrompt, setCopyPrompt] = useState<{
+    promptId: string;
+    promptName: string;
+  } | null>(null);
 
   if (!project || isLoading) {
     return <Text>Loading prompts...</Text>;
@@ -220,6 +229,35 @@ export function PromptsList({
                       </Menu.Item>
                       <Tooltip
                         content={
+                          !hasPromptsCreatePermission
+                            ? "You need prompts:create permission to copy prompts"
+                            : undefined
+                        }
+                        disabled={hasPromptsCreatePermission}
+                        positioning={{ placement: "right" }}
+                        showArrow
+                      >
+                        <Menu.Item
+                          value="copy"
+                          onClick={
+                            hasPromptsCreatePermission
+                              ? () => {
+                                  setCopyPrompt({
+                                    promptId: config.id,
+                                    promptName:
+                                      config.handle ?? config.name ?? config.id,
+                                  });
+                                  setCopyDialogOpen(true);
+                                }
+                              : undefined
+                          }
+                          disabled={!hasPromptsCreatePermission}
+                        >
+                          <Copy size={16} /> Copy to another project
+                        </Menu.Item>
+                      </Tooltip>
+                      <Tooltip
+                        content={
                           !hasPromptsDeletePermission
                             ? "You need prompts:delete permission to delete prompts"
                             : undefined
@@ -293,6 +331,17 @@ export function PromptsList({
           </Card.Root>
         </GeneratePromptApiSnippetDialog>
       ))}
+      {copyPrompt && (
+        <CopyPromptDialog
+          open={copyDialogOpen}
+          onClose={() => {
+            setCopyDialogOpen(false);
+            setCopyPrompt(null);
+          }}
+          promptId={copyPrompt.promptId}
+          promptName={copyPrompt.promptName}
+        />
+      )}
     </VStack>
   );
 }
