@@ -8,7 +8,7 @@ interface FormErrorDisplayProps {
 /**
  * Extracts error messages from various error structures
  */
-function extractErrorMessages(error: unknown): string[] {
+export function extractErrorMessages(error: unknown): string[] {
   const messages: string[] = [];
 
   function processError(obj: unknown): void {
