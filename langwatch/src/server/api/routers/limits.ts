@@ -191,28 +191,6 @@ const getCurrentMonthCostForProjects = async (projectIds: string[]) => {
   );
 };
 
-export const maxMonthlyUsageLimit = async (organizationId: string) => {
-  const activePlan =
-    await dependencies.subscriptionHandler.getActivePlan(organizationId);
-  if (activePlan.name === "Open Source") {
-    const organization = await prisma.organization.findUnique({
-      where: { id: organizationId },
-    });
-
-    return organization?.usageSpendingMaxLimit ?? Infinity;
-  }
-  if (activePlan.evaluationsCredit < 10) {
-    return activePlan.evaluationsCredit;
-  }
-
-  const organization = await prisma.organization.findUnique({
-    where: { id: organizationId },
-  });
-
-  // TODO: improve this logic to be based on subscription history
-  const maxLimitAccordingToSubscription = activePlan.prices.USD;
-  const maxLimitAccordingToUser =
-    organization?.usageSpendingMaxLimit ?? maxLimitAccordingToSubscription;
-
-  return Math.min(maxLimitAccordingToSubscription, maxLimitAccordingToUser);
+export const maxMonthlyUsageLimit = async () => {
+  return Infinity;
 };
