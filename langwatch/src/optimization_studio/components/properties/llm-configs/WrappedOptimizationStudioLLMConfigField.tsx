@@ -4,32 +4,8 @@ import { OptimizationStudioLLMConfigField } from "./OptimizationStudioLLMConfigF
 
 import { VStack } from "@chakra-ui/react";
 import { VerticalFormControl } from "~/components/VerticalFormControl";
-import type { LLMConfig } from "~/optimization_studio/types/dsl";
 import type { PromptConfigFormValues } from "~/prompts";
-
-/**
- * Convert form LLM config format (camelCase) to DSL format (snake_case)
- */
-function formToDslFormat(formLlm: any): LLMConfig {
-  return {
-    model: formLlm.model,
-    temperature: formLlm.temperature,
-    max_tokens: formLlm.maxTokens,
-    litellm_params: formLlm.litellmParams,
-  };
-}
-
-/**
- * Convert DSL LLM config format (snake_case) to form format (camelCase)
- */
-function dslToFormFormat(dslLlm: LLMConfig): any {
-  return {
-    model: dslLlm.model,
-    temperature: dslLlm.temperature,
-    maxTokens: dslLlm.max_tokens,
-    litellmParams: dslLlm.litellm_params,
-  };
-}
+import { LLMConfigFormatUtils } from "./llm-config-format-utils";
 
 /**
  * Wrapped OptimizationStudioLLMConfigField that works with
@@ -55,9 +31,9 @@ export function WrappedOptimizationStudioLLMConfigField() {
           render={({ field }) => {
             return (
               <OptimizationStudioLLMConfigField
-                llmConfig={formToDslFormat(field.value)}
+                llmConfig={LLMConfigFormatUtils.formToDslFormat(field.value)}
                 onChange={(values) => {
-                  field.onChange(dslToFormFormat(values));
+                  field.onChange(LLMConfigFormatUtils.dslToFormFormat(values));
                   void trigger?.("version.configData.llm");
                 }}
               />
