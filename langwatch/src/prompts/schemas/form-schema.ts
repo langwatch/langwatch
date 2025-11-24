@@ -5,10 +5,8 @@ import { getLatestConfigVersionSchema } from "~/server/prompt-config/repositorie
 import { handleSchema, scopeSchema } from "./field-schemas";
 import { versionMetadataSchema } from "./version-metadata-schema";
 import {
-  DEFAULT_MAX_TOKENS,
   DEFAULT_MODEL,
   MIN_MAX_TOKENS,
-  DEFAULT_TEMPERATURE,
   FALLBACK_MAX_TOKENS,
 } from "~/utils/constants";
 
@@ -19,8 +17,8 @@ const llmSchemaWithPreprocessing = z.object({
     latestConfigVersionSchema.shape.configData.shape.model.default(
       DEFAULT_MODEL,
     ),
-  temperature: z.preprocess((v) => v ?? DEFAULT_TEMPERATURE, z.number()),
-  maxTokens: z.preprocess((v) => v ?? DEFAULT_MAX_TOKENS, z.number()),
+  temperature: z.number(),
+  maxTokens: z.number(),
   litellmParams: z.record(z.string()).optional(),
 });
 

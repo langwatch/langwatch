@@ -8,6 +8,32 @@ import type { LLMConfig } from "~/optimization_studio/types/dsl";
 import type { PromptConfigFormValues } from "~/prompts";
 
 /**
+ * Convert form LLM config format (camelCase) to DSL format (snake_case)
+ */
+function formToDslFormat(formLlm: any): LLMConfig {
+  return {
+    model: formLlm.model,
+    temperature: formLlm.temperature,
+    max_tokens: formLlm.maxTokens,
+    litellm_params: formLlm.litellmParams,
+  };
+}
+
+/**
+ * Convert DSL LLM config format (snake_case) to form format (camelCase)
+ */
+function dslToFormFormat(dslLlm: LLMConfig): any {
+  if (!dslLlm) return dslLlm;
+
+  return {
+    model: dslLlm.model,
+    temperature: dslLlm.temperature,
+    maxTokens: dslLlm.max_tokens,
+    litellmParams: dslLlm.litellm_params,
+  };
+}
+
+/**
  * Wrapped OptimizationStudioLLMConfigField that works with
  * the Form field
  */
@@ -30,9 +56,9 @@ export function WrappedOptimizationStudioLLMConfigField() {
           render={({ field }) => {
             return (
               <OptimizationStudioLLMConfigField
-                llmConfig={field.value as LLMConfig}
+                llmConfig={formToDslFormat(field.value)}
                 onChange={(values) => {
-                  field.onChange(values);
+                  field.onChange(dslToFormFormat(values));
                   void trigger?.("version.configData.llm");
                 }}
               />
