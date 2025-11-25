@@ -4,15 +4,16 @@ import { OptimizationStudioLLMConfigField } from "./OptimizationStudioLLMConfigF
 
 import { VStack } from "@chakra-ui/react";
 import { VerticalFormControl } from "~/components/VerticalFormControl";
-import type { LLMConfig } from "~/optimization_studio/types/dsl";
 import type { PromptConfigFormValues } from "~/prompts";
+import { LLMConfigFormatUtils } from "./llm-config-format-utils";
 
 /**
  * Wrapped OptimizationStudioLLMConfigField that works with
  * the Form field
  */
 export function WrappedOptimizationStudioLLMConfigField() {
-  const { control, formState, trigger } = useFormContext<PromptConfigFormValues>();
+  const { control, formState, trigger } =
+    useFormContext<PromptConfigFormValues>();
   const { errors } = formState;
 
   return (
@@ -30,9 +31,9 @@ export function WrappedOptimizationStudioLLMConfigField() {
           render={({ field }) => {
             return (
               <OptimizationStudioLLMConfigField
-                llmConfig={field.value as LLMConfig}
+                llmConfig={LLMConfigFormatUtils.formToDslFormat(field.value)}
                 onChange={(values) => {
-                  field.onChange(values);
+                  field.onChange(LLMConfigFormatUtils.dslToFormFormat(values));
                   void trigger?.("version.configData.llm");
                 }}
               />
