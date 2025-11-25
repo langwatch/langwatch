@@ -329,7 +329,10 @@ const addOpenTelemetrySpanAsSpan = (
         if (started_at && attributesMap.gen_ai?.server?.time_to_first_token) {
           first_token_at =
             started_at +
-            parseInt((attributesMap as any).gen_ai.server.time_to_first_token, 10);
+            parseInt(
+              (attributesMap as any).gen_ai.server.time_to_first_token,
+              10,
+            );
         }
 
         if (started_at && attributesMap.ai?.response?.msToFirstChunk) {
@@ -414,7 +417,10 @@ const addOpenTelemetrySpanAsSpan = (
         }
 
         // Strands chat LLM calls
-        if (type == "span" && attributesMap.gen_ai?.operation?.name === "chat") {
+        if (
+          type == "span" &&
+          attributesMap.gen_ai?.operation?.name === "chat"
+        ) {
           type = "llm";
         }
 
@@ -520,6 +526,26 @@ const addOpenTelemetrySpanAsSpan = (
             };
           }
           delete attributesMap.gen_ai.prompt;
+        }
+        if (
+          !input &&
+          attributesMap.gen_ai?.prompt?.messages &&
+          Array.isArray(attributesMap.gen_ai.prompt.messages)
+        ) {
+          const input_ = typedValueChatMessagesSchema.safeParse({
+            type: "chat_messages",
+            value: attributesMap.gen_ai.prompt.messages,
+          });
+
+          if (input_.success) {
+            input = input_.data as TypedValueChatMessages;
+            delete attributesMap.gen_ai.prompt;
+          } else {
+            input = {
+              type: "json",
+              value: attributesMap.gen_ai.prompt.messages,
+            };
+          }
         }
 
         // vercel
@@ -667,6 +693,18 @@ const addOpenTelemetrySpanAsSpan = (
               value: attributesMap.gen_ai.completion,
             };
           }
+          delete attributesMap.gen_ai.completion;
+        }
+
+        if (
+          !output &&
+          attributesMap.gen_ai?.completion &&
+          !Array.isArray(attributesMap.gen_ai.completion)
+        ) {
+          output = {
+            type: "json",
+            value: attributesMap.gen_ai.completion,
+          };
           delete attributesMap.gen_ai.completion;
         }
 
