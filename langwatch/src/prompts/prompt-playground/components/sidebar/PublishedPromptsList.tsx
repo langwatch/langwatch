@@ -101,6 +101,7 @@ export function PublishedPromptsList() {
               <PublishedPromptContent
                 promptId={prompt.id}
                 promptHandle={prompt.handle}
+                prompt={prompt}
               />
             </Sidebar.Item>
           ))}

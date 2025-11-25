@@ -89,6 +89,11 @@ export class LlmConfigRepository {
           },
           take: 1,
         },
+        _count: {
+          select: {
+            copiedPrompts: true,
+          },
+        },
       },
     });
 

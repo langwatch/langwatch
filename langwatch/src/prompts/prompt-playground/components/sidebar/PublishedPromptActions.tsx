@@ -1,6 +1,6 @@
 import { Box, Button, Text } from "@chakra-ui/react";
 import { LuEllipsisVertical, LuTrash2 } from "react-icons/lu";
-import { Copy } from "react-feather";
+import { Copy, RefreshCw, ArrowUp } from "react-feather";
 import { Menu } from "~/components/ui/menu";
 import { Tooltip } from "~/components/ui/tooltip";
 import { DeleteConfirmationDialog } from "~/components/annotations/DeleteConfirmationDialog";
@@ -11,10 +11,12 @@ import { toaster } from "~/components/ui/toaster";
 import { getDisplayHandle } from "./PublishedPromptsList";
 import { api } from "~/utils/api";
 import { CopyPromptDialog } from "~/prompts/components/CopyPromptDialog";
+import type { VersionedPrompt } from "~/server/prompt-config/prompt.service";
 
 interface PublishedPromptActionsProps {
   promptId: string;
   promptHandle: string | null;
+  prompt?: VersionedPrompt | null;
 }
 
 /**
@@ -24,12 +26,87 @@ interface PublishedPromptActionsProps {
 export function PublishedPromptActions({
   promptId,
   promptHandle,
+  prompt,
 }: PublishedPromptActionsProps) {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isCopyDialogOpen, setIsCopyDialogOpen] = useState(false);
   const { deletePrompt } = usePrompts();
   const { project, hasPermission } = useOrganizationTeamProject();
   const hasPromptsCreatePermission = hasPermission("prompts:create");
+  const hasPromptsUpdatePermission = hasPermission("prompts:update");
+
+  const syncFromSource = api.prompts.syncFromSource.useMutation();
+  const pushToCopies = api.prompts.pushToCopies.useMutation();
+  const utils = api.useContext();
+
+  const isCopiedPrompt = !!prompt?.copiedFromPromptId;
+  const hasCopies = (prompt?._count?.copiedPrompts ?? 0) > 0;
+
+  const onSyncFromSource = useCallback(async () => {
+    if (!project) return;
+
+    try {
+      await syncFromSource.mutateAsync({
+        idOrHandle: promptId,
+        projectId: project.id,
+      });
+      await utils.prompts.getAllPromptsForProject.invalidate();
+      toaster.create({
+        title: "Prompt updated",
+        description: `Prompt "${getDisplayHandle(
+          promptHandle,
+        )}" has been updated from source.`,
+        type: "success",
+        meta: {
+          closable: true,
+        },
+      });
+    } catch (error) {
+      toaster.create({
+        title: "Error updating prompt",
+        description:
+          error instanceof Error ? error.message : "Please try again later.",
+        type: "error",
+        meta: {
+          closable: true,
+        },
+      });
+    }
+  }, [syncFromSource, project, utils, promptId, promptHandle]);
+
+  const onPushToCopies = useCallback(async () => {
+    if (!project) return;
+
+    try {
+      const result = await pushToCopies.mutateAsync({
+        idOrHandle: promptId,
+        projectId: project.id,
+      });
+      await utils.prompts.getAllPromptsForProject.invalidate();
+      toaster.create({
+        title: "Prompt pushed",
+        description: `Latest version of "${getDisplayHandle(
+          promptHandle,
+        )}" has been pushed to ${result.pushedTo} of ${
+          result.totalCopies
+        } copied prompt(s).`,
+        type: "success",
+        meta: {
+          closable: true,
+        },
+      });
+    } catch (error) {
+      toaster.create({
+        title: "Error pushing prompt",
+        description:
+          error instanceof Error ? error.message : "Please try again later.",
+        type: "error",
+        meta: {
+          closable: true,
+        },
+      });
+    }
+  }, [pushToCopies, project, utils, promptId, promptHandle]);
 
   const { data: permission } = api.prompts.checkModifyPermission.useQuery(
     {
@@ -87,6 +164,54 @@ export function PublishedPromptActions({
             </Button>
           </Menu.Trigger>
           <Menu.Content onClick={(event) => event.stopPropagation()}>
+            {isCopiedPrompt && (
+              <Tooltip
+                content={
+                  !hasPromptsUpdatePermission
+                    ? "You need prompts:update permission to sync from source"
+                    : undefined
+                }
+                disabled={hasPromptsUpdatePermission}
+                positioning={{ placement: "right" }}
+                showArrow
+              >
+                <Menu.Item
+                  value="sync"
+                  onClick={
+                    hasPromptsUpdatePermission
+                      ? () => void onSyncFromSource()
+                      : undefined
+                  }
+                  disabled={!hasPromptsUpdatePermission}
+                >
+                  <RefreshCw size={16} /> Update from source
+                </Menu.Item>
+              </Tooltip>
+            )}
+            {hasCopies && (
+              <Tooltip
+                content={
+                  !hasPromptsUpdatePermission
+                    ? "You need prompts:update permission to push to copies"
+                    : undefined
+                }
+                disabled={hasPromptsUpdatePermission}
+                positioning={{ placement: "right" }}
+                showArrow
+              >
+                <Menu.Item
+                  value="push"
+                  onClick={
+                    hasPromptsUpdatePermission
+                      ? () => void onPushToCopies()
+                      : undefined
+                  }
+                  disabled={!hasPromptsUpdatePermission}
+                >
+                  <ArrowUp size={16} /> Push to copies
+                </Menu.Item>
+              </Tooltip>
+            )}
             <Tooltip
               content={
                 !hasPromptsCreatePermission

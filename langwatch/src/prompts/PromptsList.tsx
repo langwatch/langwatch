@@ -8,8 +8,15 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { UnplugIcon } from "lucide-react";
-import { Edit, MoreVertical, Trash2, Copy } from "react-feather";
-import { useState } from "react";
+import {
+  Edit,
+  MoreVertical,
+  Trash2,
+  Copy,
+  RefreshCw,
+  ArrowUp,
+} from "react-feather";
+import { useState, useCallback } from "react";
 
 import { GeneratePromptApiSnippetDialog } from "./components/GeneratePromptApiSnippetDialog";
 import { CopyPromptDialog } from "./components/CopyPromptDialog";
@@ -22,6 +29,8 @@ import { CopyButton } from "../components/CopyButton";
 import { GenerateApiSnippetButton } from "../components/GenerateApiSnippetButton";
 import { LLMModelDisplay } from "../components/llmPromptConfigs/LLMModelDisplay";
 import { LuBuilding } from "react-icons/lu";
+import { api } from "~/utils/api";
+import { toaster } from "~/components/ui/toaster";
 
 /**
  * Flat interface for prompt list items
@@ -38,6 +47,10 @@ interface PromptListItem {
   author?: {
     name: string;
   } | null;
+  copiedFromPromptId?: string | null;
+  _count?: {
+    copiedPrompts?: number;
+  };
 }
 
 /**
@@ -70,6 +83,82 @@ export function PromptsList({
     promptId: string;
     promptName: string;
   } | null>(null);
+
+  const syncFromSource = api.prompts.syncFromSource.useMutation();
+  const pushToCopies = api.prompts.pushToCopies.useMutation();
+  const utils = api.useContext();
+
+  const onSyncFromSource = useCallback(
+    async (config: PromptListItem) => {
+      if (!project || !config.copiedFromPromptId) return;
+
+      try {
+        await syncFromSource.mutateAsync({
+          idOrHandle: config.id,
+          projectId: project.id,
+        });
+        await utils.prompts.getAllPromptsForProject.invalidate();
+        toaster.create({
+          title: "Prompt updated",
+          description: `Prompt "${
+            config.handle ?? config.name ?? config.id
+          }" has been updated from source.`,
+          type: "success",
+          meta: {
+            closable: true,
+          },
+        });
+      } catch (error) {
+        toaster.create({
+          title: "Error updating prompt",
+          description:
+            error instanceof Error ? error.message : "Please try again later.",
+          type: "error",
+          meta: {
+            closable: true,
+          },
+        });
+      }
+    },
+    [syncFromSource, project, utils],
+  );
+
+  const onPushToCopies = useCallback(
+    async (config: PromptListItem) => {
+      if (!project) return;
+
+      try {
+        const result = await pushToCopies.mutateAsync({
+          idOrHandle: config.id,
+          projectId: project.id,
+        });
+        await utils.prompts.getAllPromptsForProject.invalidate();
+        toaster.create({
+          title: "Prompt pushed",
+          description: `Latest version of "${
+            config.handle ?? config.name ?? config.id
+          }" has been pushed to ${result.pushedTo} of ${
+            result.totalCopies
+          } copied prompt(s).`,
+          type: "success",
+          meta: {
+            closable: true,
+          },
+        });
+      } catch (error) {
+        toaster.create({
+          title: "Error pushing prompt",
+          description:
+            error instanceof Error ? error.message : "Please try again later.",
+          type: "error",
+          meta: {
+            closable: true,
+          },
+        });
+      }
+    },
+    [pushToCopies, project, utils],
+  );
 
   if (!project || isLoading) {
     return <Text>Loading prompts...</Text>;
@@ -227,6 +316,54 @@ export function PromptsList({
                           </HStack>
                         </GeneratePromptApiSnippetDialog.Trigger>
                       </Menu.Item>
+                      {config.copiedFromPromptId && (
+                        <Tooltip
+                          content={
+                            !hasPromptsUpdatePermission
+                              ? "You need prompts:update permission to sync from source"
+                              : undefined
+                          }
+                          disabled={hasPromptsUpdatePermission}
+                          positioning={{ placement: "right" }}
+                          showArrow
+                        >
+                          <Menu.Item
+                            value="sync"
+                            onClick={
+                              hasPromptsUpdatePermission
+                                ? () => void onSyncFromSource(config)
+                                : undefined
+                            }
+                            disabled={!hasPromptsUpdatePermission}
+                          >
+                            <RefreshCw size={16} /> Update from source
+                          </Menu.Item>
+                        </Tooltip>
+                      )}
+                      {(config._count?.copiedPrompts ?? 0) > 0 && (
+                        <Tooltip
+                          content={
+                            !hasPromptsUpdatePermission
+                              ? "You need prompts:update permission to push to copies"
+                              : undefined
+                          }
+                          disabled={hasPromptsUpdatePermission}
+                          positioning={{ placement: "right" }}
+                          showArrow
+                        >
+                          <Menu.Item
+                            value="push"
+                            onClick={
+                              hasPromptsUpdatePermission
+                                ? () => void onPushToCopies(config)
+                                : undefined
+                            }
+                            disabled={!hasPromptsUpdatePermission}
+                          >
+                            <ArrowUp size={16} /> Push to copies
+                          </Menu.Item>
+                        </Tooltip>
+                      )}
                       <Tooltip
                         content={
                           !hasPromptsCreatePermission
