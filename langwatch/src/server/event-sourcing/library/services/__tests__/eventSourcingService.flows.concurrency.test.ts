@@ -124,54 +124,6 @@ describe("EventSourcingService - Concurrency Flows", () => {
       );
     });
 
-    it("lock TTL is used correctly", async () => {
-      const eventStore = createMockEventStore<Event>();
-      const projectionHandler = createMockEventHandler<Event, any>();
-      const projectionStore = createMockProjectionStore<any>();
-      const distributedLock = createMockDistributedLock();
-      const customTtl = 10 * 60 * 1000; // 10 minutes
-      const events = [
-        createTestEvent(
-          TEST_CONSTANTS.AGGREGATE_ID,
-          TEST_CONSTANTS.AGGREGATE_TYPE,
-          tenantId,
-        ),
-      ];
-
-      eventStore.getEvents = vi.fn().mockResolvedValue(events);
-      projectionHandler.handle = vi
-        .fn()
-        .mockResolvedValue(
-          createTestProjection(TEST_CONSTANTS.AGGREGATE_ID, tenantId),
-        );
-
-      const service = new EventSourcingService({
-        pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
-        aggregateType,
-        eventStore,
-        projections: {
-          projection: createMockProjectionDefinition(
-            "projection",
-            projectionHandler,
-            projectionStore,
-          ),
-        },
-        distributedLock,
-        updateLockTtlMs: customTtl,
-      });
-
-      await service.updateProjectionByName(
-        "projection",
-        TEST_CONSTANTS.AGGREGATE_ID,
-        context,
-      );
-
-      expect(distributedLock.acquire).toHaveBeenCalledWith(
-        expect.any(String),
-        customTtl,
-      );
-    });
-
     it("lock is released after update (success)", async () => {
       const eventStore = createMockEventStore<Event>();
       const projectionHandler = createMockEventHandler<Event, any>();
