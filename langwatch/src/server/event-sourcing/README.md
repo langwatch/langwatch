@@ -2,7 +2,7 @@
 
 A generic, reusable event sourcing library for building event-driven systems with projections.
 
-For conceptual overview and architecture, see [OVERVIEW.md](./OVERVIEW.md).
+For conceptual overview and architecture, see [ARCHITECTURE.md](./ARCHITECTURE.md).
 
 ## Creating a Pipeline
 

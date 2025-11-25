@@ -26,7 +26,7 @@ Events are immutable facts that represent something that happened. They are the 
 - `type`: Event type for routing
 - `data`: Event-specific payload
 
-See: [`domain/types.ts`](./domain/types.ts#L18-L33)
+See: [`library/domain/types.ts`](./library/domain/types.ts#L18-L33)
 
 ### Commands
 
@@ -34,7 +34,7 @@ Commands represent **intent** to perform an action. They are validated and proce
 
 **Flow:** Command → Command Handler → Events
 
-See: [`commands/command.ts`](./commands/command.ts)
+See: [`library/commands/command.ts`](./library/commands/command.ts)
 
 ### Projections
 
@@ -47,13 +47,13 @@ Projections are **computed views** built by replaying events through projection 
 - Multiple projections can exist for the same aggregate
 - Stored separately for fast queries
 
-See: [`domain/types.ts`](./domain/types.ts#L39-L50)
+See: [`library/domain/types.ts`](./library/domain/types.ts#L39-L50)
 
 ### Event Handlers (Side Effects)
 
 Event handlers react to individual events and perform side effects (e.g., writing to ClickHouse, triggering external processes). They process events asynchronously via queues.
 
-See: [`domain/handlers/eventHandler.ts`](./domain/handlers/eventHandler.ts)
+See: [`library/domain/handlers/eventHandler.ts`](./library/domain/handlers/eventHandler.ts)
 
 ## Architecture Overview
 
@@ -97,7 +97,7 @@ graph TB
 5. Events are replayed through projection handlers to build projections
 6. Projections are stored separately for fast queries
 
-See: [`services/eventSourcingService.ts`](./services/eventSourcingService.ts#L145-L186) for the `storeEvents` implementation.
+See: [`library/services/eventSourcingService.ts`](./library/services/eventSourcingService.ts#L145-L186) for the `storeEvents` implementation.
 
 ## Guaranteed Ordering & Consistency
 
@@ -170,7 +170,7 @@ Checkpoints track processing status per aggregate (not per event). One checkpoin
 
 - **Checkpoint key format**: `tenantId:pipelineName:processorName:aggregateType:aggregateId`
 - **Checkpoint data**: Last processed event ID, sequence number, status (pending/processed/failed), timestamps
-- **Key construction**: Centralized in `buildCheckpointKey()` utility (see [`utils/checkpointKey.ts`](./utils/checkpointKey.ts))
+- **Key construction**: Centralized in `buildCheckpointKey()` utility (see [`library/utils/checkpointKey.ts`](./library/utils/checkpointKey.ts))
 
 This design enables:
 
@@ -179,7 +179,7 @@ This design enables:
 - Sequential ordering validation (check if previous sequence number was processed)
 - Failure detection (check if any events failed for the aggregate)
 
-See: [`streams/eventStream.ts`](./streams/eventStream.ts#L38-L68) for ordering implementation, [`services/validation/sequenceNumberCalculator.ts`](./services/validation/sequenceNumberCalculator.ts) for sequence number computation, [`services/validation/eventProcessorValidator.ts`](./services/validation/eventProcessorValidator.ts) for validation orchestration, and [`stores/eventStore.types.ts`](./stores/eventStore.types.ts#L11-L12) for concurrency guarantees.
+See: [`library/streams/eventStream.ts`](./library/streams/eventStream.ts#L38-L68) for ordering implementation, [`library/services/validation/sequenceNumberCalculator.ts`](./library/services/validation/sequenceNumberCalculator.ts) for sequence number computation, [`library/services/validation/eventProcessorValidator.ts`](./library/services/validation/eventProcessorValidator.ts) for validation orchestration, and [`library/stores/eventStore.types.ts`](./library/stores/eventStore.types.ts#L11-L12) for concurrency guarantees.
 
 ### Concurrent Projection Updates
 
@@ -217,7 +217,7 @@ sequenceDiagram
 - Only updates to the **same aggregate's projection** are serialized
 - This maximizes parallelism while ensuring consistency
 
-**Note:** Without distributed locking in production, concurrent updates to the same aggregate projection may result in lost updates. See: [`services/eventSourcingService.ts`](./services/eventSourcingService.ts#L598-L608) for lock implementation.
+**Note:** Without distributed locking in production, concurrent updates to the same aggregate projection may result in lost updates. See: [`library/services/eventSourcingService.ts`](./library/services/eventSourcingService.ts#L598-L608) for lock implementation.
 
 ## Modular Service Architecture
 
@@ -229,7 +229,7 @@ The event sourcing library uses a modular service architecture for maintainabili
 - **EventHandlerDispatcher**: Dispatches events to handlers (supports both sync and async dispatch via queues)
 - **ProjectionUpdater**: Handles projection updates (supports both sync and async dispatch via queues)
 
-These services are composed by `EventSourcingService` to provide the complete event sourcing functionality. See: [`services/eventSourcingService.ts`](./services/eventSourcingService.ts) for the main orchestration.
+These services are composed by `EventSourcingService` to provide the complete event sourcing functionality. See: [`library/services/eventSourcingService.ts`](./library/services/eventSourcingService.ts) for the main orchestration.
 
 ## Side Effects: Event Handlers & Publishing
 
@@ -283,17 +283,17 @@ Checkpoints enable:
 - **Failure detection**: Failed events stop processing of subsequent events for that aggregate
 - **Recovery**: Failed events can be identified and reprocessed
 
-**Handler dependencies:** Handlers are topologically sorted to respect dependencies. See: [`services/handlers/eventHandlerDispatcher.ts`](./services/handlers/eventHandlerDispatcher.ts) for handler dispatch logic.
+**Handler dependencies:** Handlers are topologically sorted to respect dependencies. See: [`library/services/handlers/eventHandlerDispatcher.ts`](./library/services/handlers/eventHandlerDispatcher.ts) for handler dispatch logic.
 
-**Queue processing:** The `QueueProcessorManager` manages queue processors for handlers. Handlers are dispatched to queues for async processing. See: [`services/queues/queueProcessorManager.ts`](./services/queues/queueProcessorManager.ts) for queue initialization.
+**Queue processing:** The `QueueProcessorManager` manages queue processors for handlers. Handlers are dispatched to queues for async processing. See: [`library/services/queues/queueProcessorManager.ts`](./library/services/queues/queueProcessorManager.ts) for queue initialization.
 
-**Sequential ordering:** Events are processed in sequence number order per aggregate. The `EventProcessorValidator` enforces ordering before processing. See: [`services/handlers/eventHandlerDispatcher.ts`](./services/handlers/eventHandlerDispatcher.ts) for handler processing implementation.
+**Sequential ordering:** Events are processed in sequence number order per aggregate. The `EventProcessorValidator` enforces ordering before processing. See: [`library/services/handlers/eventHandlerDispatcher.ts`](./library/services/handlers/eventHandlerDispatcher.ts) for handler processing implementation.
 
 ### Event Publishing
 
 Events can be published to external systems (message queues, event buses) after successful storage. Publishing failures are logged but don't fail event storage.
 
-See: [`publishing/eventPublisher.types.ts`](./publishing/eventPublisher.types.ts) and [`services/eventSourcingService.ts`](./services/eventSourcingService.ts) for publishing integration.
+See: [`library/publishing/eventPublisher.types.ts`](./library/publishing/eventPublisher.types.ts) and [`library/services/eventSourcingService.ts`](./library/services/eventSourcingService.ts) for publishing integration.
 
 ### Failure Handling
 
@@ -314,7 +314,7 @@ Before processing an event, the system checks `hasFailedEvents()` for the aggreg
 3. Clear checkpoints for failed events using `clearCheckpoint()`
 4. Events will be reprocessed automatically via queue retries or manual replay
 
-The `FailureDetector` component checks for failed events before processing. See: [`services/validation/failureDetector.ts`](./services/validation/failureDetector.ts) for failure detection and [`stores/eventHandlerCheckpointStore.types.ts`](./stores/eventHandlerCheckpointStore.types.ts) for checkpoint store interface.
+The `FailureDetector` component checks for failed events before processing. See: [`library/services/validation/failureDetector.ts`](./library/services/validation/failureDetector.ts) for failure detection and [`library/stores/eventHandlerCheckpointStore.types.ts`](./library/stores/eventHandlerCheckpointStore.types.ts) for checkpoint store interface.
 
 ## Time Travel & Debugging
 
@@ -334,9 +334,9 @@ graph LR
     style FS fill:#ffe1f5
 ```
 
-**Implementation:** See [`services/eventSourcingService.ts`](./services/eventSourcingService.ts#L1013-L1020) for `replayEvents` (time travel support).
+**Implementation:** See [`library/services/eventSourcingService.ts`](./library/services/eventSourcingService.ts#L1013-L1020) for `replayEvents` (time travel support).
 
-**Manual projection updates:** You can manually rebuild projections for debugging or recovery. See: [`services/eventSourcingService.ts`](./services/eventSourcingService.ts#L662-L818)
+**Manual projection updates:** You can manually rebuild projections for debugging or recovery. See: [`library/services/eventSourcingService.ts`](./library/services/eventSourcingService.ts#L662-L818)
 
 ### Event Streams
 
@@ -346,7 +346,7 @@ Events are provided to projection handlers as **EventStream** objects, which:
 - Provide metadata (event count, first/last timestamps)
 - Enable time-based filtering
 
-See: [`streams/eventStream.ts`](./streams/eventStream.ts)
+See: [`library/streams/eventStream.ts`](./library/streams/eventStream.ts)
 
 ### Debugging Workflow
 
@@ -408,11 +408,11 @@ graph TB
 - **Search index:** Full-text searchable representation
 - **Reporting view:** Pre-computed reports
 
-**Registration:** Multiple projections are registered via the pipeline builder. See: [`runtime/pipeline/builder.ts`](./runtime/pipeline/builder.ts#L303-L329)
+**Registration:** Multiple projections are registered via the pipeline builder. See: [`library/runtime/pipeline/builder.ts`](./library/runtime/pipeline/builder.ts#L303-L329)
 
-**Access:** Each projection is accessed by name. See: [`services/eventSourcingService.ts`](./services/eventSourcingService.ts) for projection access methods.
+**Access:** Each projection is accessed by name. See: [`library/services/eventSourcingService.ts`](./library/services/eventSourcingService.ts) for projection access methods.
 
-**Implementation:** The `ProjectionUpdater` handles projection updates. See: [`services/projections/projectionUpdater.ts`](./services/projections/projectionUpdater.ts) for projection processing and [`services/queues/queueProcessorManager.ts`](./services/queues/queueProcessorManager.ts) for projection queue initialization.
+**Implementation:** The `ProjectionUpdater` handles projection updates. See: [`library/services/projections/projectionUpdater.ts`](./library/services/projections/projectionUpdater.ts) for projection processing and [`library/services/queues/queueProcessorManager.ts`](./library/services/queues/queueProcessorManager.ts) for projection queue initialization.
 
 ## Understanding State Over Time
 
@@ -440,7 +440,7 @@ Projections include metadata about the events that produced them:
 - `lastEventTimestamp`: When the last event occurred
 - `computedAtUnixMs`: When the projection was computed
 
-See: [`domain/types.ts`](./domain/types.ts#L55-L64)
+See: [`library/domain/types.ts`](./library/domain/types.ts#L55-L64)
 
 ### Simple View Models
 
@@ -473,32 +473,32 @@ graph LR
     Build --> Pipeline[Registered Pipeline]
 ```
 
-**Type safety:** The builder enforces required fields through TypeScript's type system. See: [`runtime/pipeline/builder.ts`](./runtime/pipeline/builder.ts#L195-L541)
+**Type safety:** The builder enforces required fields through TypeScript's type system. See: [`library/runtime/pipeline/builder.ts`](./library/runtime/pipeline/builder.ts#L195-L541)
 
 ## Key Implementation Files
 
-- **Core types:** [`domain/types.ts`](./domain/types.ts)
-- **Event streams:** [`streams/eventStream.ts`](./streams/eventStream.ts)
-- **Main service:** [`services/eventSourcingService.ts`](./services/eventSourcingService.ts)
+- **Core types:** [`library/domain/types.ts`](./library/domain/types.ts)
+- **Event streams:** [`library/streams/eventStream.ts`](./library/streams/eventStream.ts)
+- **Main service:** [`library/services/eventSourcingService.ts`](./library/services/eventSourcingService.ts)
 - **Modular services:**
-  - **Validation:** [`services/validation/eventProcessorValidator.ts`](./services/validation/eventProcessorValidator.ts) - Orchestrates validation
-  - **Validation components:** [`services/validation/sequenceNumberCalculator.ts`](./services/validation/sequenceNumberCalculator.ts), [`services/validation/idempotencyChecker.ts`](./services/validation/idempotencyChecker.ts), [`services/validation/orderingValidator.ts`](./services/validation/orderingValidator.ts), [`services/validation/failureDetector.ts`](./services/validation/failureDetector.ts)
-  - **Checkpoints:** [`services/checkpoints/checkpointManager.ts`](./services/checkpoints/checkpointManager.ts) - Manages checkpoint operations
-  - **Queues:** [`services/queues/queueProcessorManager.ts`](./services/queues/queueProcessorManager.ts) - Manages queue processors
-  - **Handlers:** [`services/handlers/eventHandlerDispatcher.ts`](./services/handlers/eventHandlerDispatcher.ts) - Dispatches events to handlers
-  - **Projections:** [`services/projections/projectionUpdater.ts`](./services/projections/projectionUpdater.ts) - Handles projection updates
-  - **Error handling:** [`services/errorHandling.ts`](./services/errorHandling.ts) - Standardized error categorization
-  - **Dispatch strategy:** [`services/dispatchStrategy.ts`](./services/dispatchStrategy.ts) - Sync vs async dispatch
-- **Pipeline builder:** [`runtime/pipeline/builder.ts`](./runtime/pipeline/builder.ts)
-- **Command handling:** [`commands/commandHandlerClass.ts`](./commands/commandHandlerClass.ts)
-- **Event handlers:** [`domain/handlers/eventHandler.ts`](./domain/handlers/eventHandler.ts)
-- **Projection handlers:** [`domain/handlers/projectionHandler.ts`](./domain/handlers/projectionHandler.ts)
-- **Distributed locking:** [`utils/distributedLock.ts`](./utils/distributedLock.ts)
-- **Checkpoint keys:** [`utils/checkpointKey.ts`](./utils/checkpointKey.ts) - Checkpoint key construction
-- **Processor checkpoints:** [`stores/eventHandlerCheckpointStore.types.ts`](./stores/eventHandlerCheckpointStore.types.ts)
+  - **Validation:** [`library/services/validation/eventProcessorValidator.ts`](./library/services/validation/eventProcessorValidator.ts) - Orchestrates validation
+  - **Validation components:** [`library/services/validation/sequenceNumberCalculator.ts`](./library/services/validation/sequenceNumberCalculator.ts), [`library/services/validation/idempotencyChecker.ts`](./library/services/validation/idempotencyChecker.ts), [`library/services/validation/orderingValidator.ts`](./library/services/validation/orderingValidator.ts), [`library/services/validation/failureDetector.ts`](./library/services/validation/failureDetector.ts)
+  - **Checkpoints:** [`library/services/checkpoints/checkpointManager.ts`](./library/services/checkpoints/checkpointManager.ts) - Manages checkpoint operations
+  - **Queues:** [`library/services/queues/queueProcessorManager.ts`](./library/services/queues/queueProcessorManager.ts) - Manages queue processors
+  - **Handlers:** [`library/services/handlers/eventHandlerDispatcher.ts`](./library/services/handlers/eventHandlerDispatcher.ts) - Dispatches events to handlers
+  - **Projections:** [`library/services/projections/projectionUpdater.ts`](./library/services/projections/projectionUpdater.ts) - Handles projection updates
+  - **Error handling:** [`library/services/errorHandling.ts`](./library/services/errorHandling.ts) - Standardized error categorization
+  - **Dispatch strategy:** [`library/services/dispatchStrategy.ts`](./library/services/dispatchStrategy.ts) - Sync vs async dispatch
+- **Pipeline builder:** [`library/runtime/pipeline/builder.ts`](./library/runtime/pipeline/builder.ts)
+- **Command handling:** [`library/commands/commandHandlerClass.ts`](./library/commands/commandHandlerClass.ts)
+- **Event handlers:** [`library/domain/handlers/eventHandler.ts`](./library/domain/handlers/eventHandler.ts)
+- **Projection handlers:** [`library/domain/handlers/projectionHandler.ts`](./library/domain/handlers/projectionHandler.ts)
+- **Distributed locking:** [`library/utils/distributedLock.ts`](./library/utils/distributedLock.ts)
+- **Checkpoint keys:** [`library/utils/checkpointKey.ts`](./library/utils/checkpointKey.ts) - Checkpoint key construction
+- **Processor checkpoints:** [`library/stores/eventHandlerCheckpointStore.types.ts`](./library/stores/eventHandlerCheckpointStore.types.ts)
 
 ## Next Steps
 
 - **Implementation guide:** See [README.md](./README.md) for code examples and patterns
 - **Security & concurrency:** See the security guide for tenant isolation and distributed locking
-- **Store interfaces:** See `stores/` directory for implementing custom stores
+- **Store interfaces:** See `library/stores/` directory for implementing custom stores
